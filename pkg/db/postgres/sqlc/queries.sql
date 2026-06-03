@@ -193,34 +193,6 @@ FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (SELECT UNNEST(sqlc.slice('event_ids')::BYTEA[]));
 
--- name: GetRuns :many
-SELECT sqlc.embed(function_runs),
-    COALESCE(function_finishes.status, '') AS finish_status,
-    COALESCE(function_finishes.output, '') AS finish_output,
-    COALESCE(function_finishes.completed_step_count, 0) AS finish_completed_step_count,
-    COALESCE(function_finishes.created_at, function_runs.run_started_at) AS finish_created_at,
-    COALESCE(functions.slug, '') AS function_slug,
-    COALESCE(functions.name, '') AS function_name,
-    COALESCE(functions.config, '{}') AS function_config,
-    COALESCE(functions.app_id, '00000000-0000-0000-0000-000000000000') AS function_app_id,
-    COALESCE(apps.name, '') AS app_name
-FROM function_runs
-LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
-LEFT JOIN functions ON functions.id = function_runs.function_id AND functions.archived_at IS NULL
-LEFT JOIN apps ON apps.id = functions.app_id AND apps.archived_at IS NULL
-WHERE (
-        function_runs.event_id = sqlc.arg('event_id')::BYTEA
-        OR function_runs.run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::BYTEA[]))
-    )
-    AND function_runs.run_id > sqlc.arg('cursor_run_id')::BYTEA
-ORDER BY function_runs.run_id
-LIMIT @limit_rows;
-
--- name: GetTraceRunOutputs :many
-SELECT run_id, COALESCE(output, ''::bytea) AS output
-FROM trace_runs
-WHERE run_id = ANY($1::CHAR(26)[]);
-
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id = ANY($1::BYTEA[]);
 
