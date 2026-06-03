@@ -193,6 +193,32 @@ FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (SELECT UNNEST(sqlc.slice('event_ids')::BYTEA[]));
 
+-- name: GetRuns :many
+SELECT
+  run_id,
+  function_id,
+  app_id,
+  start_time,
+  end_time,
+  COALESCE(status, '') AS status,
+  COALESCE(output::text, '') AS output,
+  COALESCE((attributes#>>'{}')::json->>'_inngest.function.slug', '') AS function_slug,
+  COALESCE((attributes#>>'{}')::json->>'_inngest.function.name', '') AS function_name,
+  COALESCE((attributes#>>'{}')::json->>'_inngest.app.name', '') AS app_name,
+  COALESCE((attributes#>>'{}')::json->>'_inngest.batch.id', '') AS batch_id,
+  COALESCE((attributes#>>'{}')::json->>'_inngest.cron.schedule', '') AS cron_schedule
+FROM spans
+WHERE name = sqlc.arg('name')
+  AND debug_run_id IS NULL
+  AND run_id > sqlc.arg('cursor_run_id')::TEXT
+  AND EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements_text(NULLIF(spans.event_ids#>>'{}', '')::jsonb) AS eid(event_id)
+    WHERE eid.event_id = sqlc.arg('event_id')::TEXT
+  )
+ORDER BY run_id
+LIMIT @limit_rows;
+
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id = ANY($1::BYTEA[]);
 
