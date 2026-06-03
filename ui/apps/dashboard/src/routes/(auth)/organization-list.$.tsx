@@ -1,6 +1,7 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
 import { validateRedirectUrlSearch } from '@/lib/deepLinkUtils';
+import { canonicalLink } from '@/utils/urls';
 import { OrganizationList, useAuth } from '@clerk/tanstack-react-start';
 import { createFileRoute, useLocation } from '@tanstack/react-router';
 import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
@@ -8,6 +9,9 @@ import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png
 export const Route = createFileRoute('/(auth)/organization-list/$')({
   component: RouteComponent,
   validateSearch: validateRedirectUrlSearch,
+  head: () => ({
+    links: [canonicalLink('/organization-list')],
+  }),
 });
 
 function RouteComponent() {

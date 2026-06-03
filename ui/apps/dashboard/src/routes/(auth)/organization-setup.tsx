@@ -1,7 +1,7 @@
 import ReloadClerkAndRedirect from '@/components/Clerk/ReloadClerkAndRedirect';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
-import { pathCreator } from '@/utils/urls';
+import { canonicalLink, pathCreator } from '@/utils/urls';
 import { createFileRoute } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 
@@ -21,6 +21,9 @@ const setUpAccount = createServerFn({ method: 'GET' }).handler(() =>
 
 export const Route = createFileRoute('/(auth)/organization-setup')({
   component: OrganizationSetupComponent,
+  head: () => ({
+    links: [canonicalLink('/organization-setup')],
+  }),
   beforeLoad: async () => {
     await setUpAccount();
   },

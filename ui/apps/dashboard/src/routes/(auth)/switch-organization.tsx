@@ -1,6 +1,7 @@
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import SplitView from '@/components/SignIn/SplitView';
 import { validateSwitchOrganizationSearch } from '@/lib/deepLinkUtils';
+import { canonicalLink } from '@/utils/urls';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useClerk } from '@clerk/tanstack-react-start';
 import { useEffect } from 'react';
@@ -8,6 +9,9 @@ import { useEffect } from 'react';
 export const Route = createFileRoute('/(auth)/switch-organization')({
   component: RouteComponent,
   validateSearch: validateSwitchOrganizationSearch,
+  head: () => ({
+    links: [canonicalLink('/switch-organization')],
+  }),
 });
 
 function RouteComponent() {
