@@ -23,6 +23,7 @@ type Service struct {
 	eventKeys      EventKeysProvider
 	functions      FunctionProvider
 	runs           FunctionRunReader
+	runList        RunsReader
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
@@ -36,6 +37,7 @@ type ServiceOptions struct {
 	EventKeysProvider   EventKeysProvider
 	Functions           FunctionProvider
 	FunctionRuns        FunctionRunReader
+	RunList             RunsReader
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
@@ -52,6 +54,7 @@ func NewService(opts ServiceOptions) *Service {
 		eventKeys:      opts.EventKeysProvider,
 		functions:      opts.Functions,
 		runs:           opts.FunctionRuns,
+		runList:        opts.RunList,
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,

@@ -13,13 +13,15 @@ import (
 
 var Attrs = struct {
 	// Timings
-	StartedAt attr[*time.Time]
-	QueuedAt  attr[*time.Time]
-	EndedAt   attr[*time.Time]
+	QueuedAt    attr[*time.Time]
+	ScheduledAt attr[*time.Time]
+	StartedAt   attr[*time.Time]
+	EndedAt     attr[*time.Time]
 
 	// Run attributes
 	AccountID           attr[*uuid.UUID]
 	AppID               attr[*uuid.UUID]
+	AppName             attr[*string]
 	BatchID             attr[*ulid.ULID]
 	BatchTimestamp      attr[*time.Time]
 	CronSchedule        attr[*string]
@@ -29,6 +31,8 @@ var Attrs = struct {
 	EventsInput         attr[*string]
 	TriggeringEventName attr[*string]
 	FunctionID          attr[*uuid.UUID]
+	FunctionName        attr[*string]
+	FunctionSlug        attr[*string]
 	FunctionVersion     attr[*int]
 	RunID               attr[*ulid.ULID]
 	ReplayOriginalRunID attr[*ulid.ULID]
@@ -136,6 +140,7 @@ var Attrs = struct {
 	// HTTP (serve) attributes
 	RequestID          attr[*string]
 	JobID              attr[*string]
+	GroupID            attr[*string]
 	RequestURL         attr[*string]
 	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
@@ -173,6 +178,7 @@ var Attrs = struct {
 	AIResponseMetadata:                 JsonAttr[aigateway.ParsedInferenceResponse]("ai.response"),
 	AccountID:                          UUIDAttr("account.id"),
 	AppID:                              UUIDAttr("app.id"),
+	AppName:                            StringAttr("app.name"),
 	BatchID:                            ULIDAttr("batch.id"),
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
@@ -193,6 +199,8 @@ var Attrs = struct {
 	EventsInput:                        StringAttr("events.input"),
 	TriggeringEventName:                StringAttr("event.trigger.name"),
 	FunctionID:                         UUIDAttr("function.id"),
+	FunctionName:                       StringAttr("function.name"),
+	FunctionSlug:                       StringAttr("function.slug"),
 	FunctionVersion:                    IntAttr("function.version"),
 	InternalLocation:                   StringAttr("internal.location"),
 	IsDurableEndpointRun:               BoolAttr("run.is_durable_endpoint"),
@@ -201,6 +209,7 @@ var Attrs = struct {
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestID:                          StringAttr("request.id"),
 	JobID:                              StringAttr("job.id"),
+	GroupID:                            StringAttr("job.group.id"),
 	RequestURL:                         StringAttr("request.url"),
 	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
@@ -212,6 +221,7 @@ var Attrs = struct {
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
 	StartedAt:                          TimeAttr("started_at"),
+	ScheduledAt:                        TimeAttr("scheduled_at"),
 	StepAttempt:                        IntAttr("step.attempt"),
 	StepCodeLocation:                   StringAttr("step.code_location"),
 	StepGatewayResponseOutputSizeBytes: IntAttr("step.gateway.response.output_size_bytes"),

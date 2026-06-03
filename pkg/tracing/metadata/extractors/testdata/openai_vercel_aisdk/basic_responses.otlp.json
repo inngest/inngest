@@ -1,0 +1,377 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "unknown_service:node"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.7.1"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "ai"
+          },
+          "spans": [
+            {
+              "traceId": "d069bf14279b319a53e31f48db2e135e",
+              "spanId": "8b66b60781e335a3",
+              "parentSpanId": "60d37a7b3ae50b38",
+              "name": "ai.generateText.doGenerate",
+              "kind": 1,
+              "startTimeUnixNano": "1780439002130000000",
+              "endTimeUnixNano": "1780439003458481583",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateText.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateText.doGenerate"
+                  }
+                },
+                {
+                  "key": "ai.model.provider",
+                  "value": {
+                    "stringValue": "openai.responses"
+                  }
+                },
+                {
+                  "key": "ai.model.id",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": 2
+                  }
+                },
+                {
+                  "key": "ai.request.headers.user-agent",
+                  "value": {
+                    "stringValue": "ai/6.0.195"
+                  }
+                },
+                {
+                  "key": "ai.prompt.messages",
+                  "value": {
+                    "stringValue": "[{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"Write a one-sentence bedtime story about a unicorn.\"}]}]"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai.responses"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano"
+                  }
+                },
+                {
+                  "key": "ai.response.finishReason",
+                  "value": {
+                    "stringValue": "stop"
+                  }
+                },
+                {
+                  "key": "ai.response.text",
+                  "value": {
+                    "stringValue": "In the hush of night, a gentle unicorn trotted through a moonlit field, sprinkling stardust on every sleeping blanket until the whole world drifted peacefully into dreams."
+                  }
+                },
+                {
+                  "key": "ai.response.id",
+                  "value": {
+                    "stringValue": "resp_0e56d5c95850276a006a1f57da3d60819a8974cbbffaedd001"
+                  }
+                },
+                {
+                  "key": "ai.response.model",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano-2026-03-17"
+                  }
+                },
+                {
+                  "key": "ai.response.timestamp",
+                  "value": {
+                    "stringValue": "2026-06-02T22:23:22.000Z"
+                  }
+                },
+                {
+                  "key": "ai.response.providerMetadata",
+                  "value": {
+                    "stringValue": "{\"openai\":{\"responseId\":\"resp_0e56d5c95850276a006a1f57da3d60819a8974cbbffaedd001\",\"serviceTier\":\"default\"}}"
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokens",
+                  "value": {
+                    "intValue": 17
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokenDetails.noCacheTokens",
+                  "value": {
+                    "intValue": 17
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokenDetails.cacheReadTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokens",
+                  "value": {
+                    "intValue": 40
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokenDetails.textTokens",
+                  "value": {
+                    "intValue": 40
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokenDetails.reasoningTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.totalTokens",
+                  "value": {
+                    "intValue": 57
+                  }
+                },
+                {
+                  "key": "ai.usage.reasoningTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.cachedInputTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "arrayValue": {
+                      "values": [
+                        {
+                          "stringValue": "stop"
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "resp_0e56d5c95850276a006a1f57da3d60819a8974cbbffaedd001"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano-2026-03-17"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": 17
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": 40
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 0
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            },
+            {
+              "traceId": "d069bf14279b319a53e31f48db2e135e",
+              "spanId": "60d37a7b3ae50b38",
+              "name": "ai.generateText",
+              "kind": 1,
+              "startTimeUnixNano": "1780439002129000000",
+              "endTimeUnixNano": "1780439003459391417",
+              "attributes": [
+                {
+                  "key": "operation.name",
+                  "value": {
+                    "stringValue": "ai.generateText"
+                  }
+                },
+                {
+                  "key": "ai.operationId",
+                  "value": {
+                    "stringValue": "ai.generateText"
+                  }
+                },
+                {
+                  "key": "ai.model.provider",
+                  "value": {
+                    "stringValue": "openai.responses"
+                  }
+                },
+                {
+                  "key": "ai.model.id",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano"
+                  }
+                },
+                {
+                  "key": "ai.settings.maxRetries",
+                  "value": {
+                    "intValue": 2
+                  }
+                },
+                {
+                  "key": "ai.request.headers.user-agent",
+                  "value": {
+                    "stringValue": "ai/6.0.195"
+                  }
+                },
+                {
+                  "key": "ai.prompt",
+                  "value": {
+                    "stringValue": "{\"prompt\":\"Write a one-sentence bedtime story about a unicorn.\"}"
+                  }
+                },
+                {
+                  "key": "ai.response.finishReason",
+                  "value": {
+                    "stringValue": "stop"
+                  }
+                },
+                {
+                  "key": "ai.response.text",
+                  "value": {
+                    "stringValue": "In the hush of night, a gentle unicorn trotted through a moonlit field, sprinkling stardust on every sleeping blanket until the whole world drifted peacefully into dreams."
+                  }
+                },
+                {
+                  "key": "ai.response.providerMetadata",
+                  "value": {
+                    "stringValue": "{\"openai\":{\"responseId\":\"resp_0e56d5c95850276a006a1f57da3d60819a8974cbbffaedd001\",\"serviceTier\":\"default\"}}"
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokens",
+                  "value": {
+                    "intValue": 17
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokenDetails.noCacheTokens",
+                  "value": {
+                    "intValue": 17
+                  }
+                },
+                {
+                  "key": "ai.usage.inputTokenDetails.cacheReadTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokens",
+                  "value": {
+                    "intValue": 40
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokenDetails.textTokens",
+                  "value": {
+                    "intValue": 40
+                  }
+                },
+                {
+                  "key": "ai.usage.outputTokenDetails.reasoningTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.totalTokens",
+                  "value": {
+                    "intValue": 57
+                  }
+                },
+                {
+                  "key": "ai.usage.reasoningTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                },
+                {
+                  "key": "ai.usage.cachedInputTokens",
+                  "value": {
+                    "intValue": 0
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 0
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

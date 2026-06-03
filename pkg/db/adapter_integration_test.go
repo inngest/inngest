@@ -12,6 +12,8 @@ import (
 	"github.com/inngest/inngest/pkg/db"
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -204,6 +206,130 @@ func TestInsertFunctionRoundTrip(t *testing.T) {
 	allFns, err := q.GetFunctions(ctx)
 	require.NoError(t, err)
 	assert.Len(t, allFns, 1)
+}
+
+func TestGetRuns(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	fnID := uuid.New()
+	eventID := ulid.Make()
+	firstBatchEventID := ulid.Make()
+	thirdBatchEventID := ulid.Make()
+	batchID := ulid.Make()
+	runID := ulid.Make()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "event-runs-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	require.NoError(t, insertRunListSpan(ctx, q, runListSpan{
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{firstBatchEventID, eventID, thirdBatchEventID},
+		BatchID:      batchID,
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "event-runs-function",
+		FunctionName: "Event Runs Function",
+		Output:       []byte(`{"data":{"ok":true}}`),
+		Cron:         "*/5 * * * *",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt.Add(time.Second),
+		Status:       enums.StepStatusCompleted.String(),
+	}))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{
+		EventID:       eventID,
+		Limit:         10,
+		IncludeOutput: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	assert.Equal(t, batchID, rows[0].FunctionRun.BatchID)
+	assert.Equal(t, "cron", rows[0].FunctionRun.TriggerType)
+	assert.Equal(t, "*/5 * * * *", rows[0].FunctionRun.Cron.String)
+	assert.Equal(t, "event-runs-app", rows[0].AppName)
+	assert.Equal(t, "event-runs-function", rows[0].FunctionSlug)
+	assert.Equal(t, "Event Runs Function", rows[0].FunctionName)
+	assert.Equal(t, "Completed", rows[0].FunctionFinish.Status.String)
+	assert.JSONEq(t, `{"data":{"ok":true}}`, string(rows[0].Output))
+
+	for _, batchEventID := range []ulid.ULID{firstBatchEventID, eventID, thirdBatchEventID} {
+		rows, err := q.GetRuns(ctx, db.GetRunsParams{
+			EventID: batchEventID,
+			Limit:   10,
+		})
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+		assert.Equal(t, "cron", rows[0].FunctionRun.TriggerType)
+	}
+}
+
+type runListSpan struct {
+	RunID        ulid.ULID
+	EventIDs     []ulid.ULID
+	BatchID      ulid.ULID
+	AppID        uuid.UUID
+	FunctionID   uuid.UUID
+	FunctionSlug string
+	FunctionName string
+	Output       []byte
+	Cron         string
+	StartedAt    time.Time
+	EndedAt      time.Time
+	Status       string
+}
+
+func insertRunListSpan(ctx context.Context, q db.Querier, span runListSpan) error {
+	attrs := map[string]any{
+		meta.Attrs.FunctionSlug.Key(): span.FunctionSlug,
+		meta.Attrs.FunctionName.Key(): span.FunctionName,
+	}
+	if !span.BatchID.IsZero() {
+		attrs[meta.Attrs.BatchID.Key()] = span.BatchID.String()
+	}
+	if span.Cron != "" {
+		attrs[meta.Attrs.CronSchedule.Key()] = span.Cron
+	}
+	attrBytes, _ := json.Marshal(attrs)
+
+	eventIDs := make([]string, len(span.EventIDs))
+	for i, id := range span.EventIDs {
+		eventIDs[i] = id.String()
+	}
+	eventIDBytes, _ := json.Marshal(eventIDs)
+
+	return q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:     ulid.Make().String(),
+		TraceID:    "trace-" + span.RunID.String(),
+		Name:       meta.SpanNameRun,
+		StartTime:  span.StartedAt,
+		EndTime:    span.EndedAt,
+		RunID:      span.RunID.String(),
+		AccountID:  uuid.NewString(),
+		AppID:      span.AppID.String(),
+		FunctionID: span.FunctionID.String(),
+		EnvID:      uuid.NewString(),
+		Attributes: attrBytes,
+		Links:      []byte(`[]`),
+		Output:     span.Output,
+		Status:     sql.NullString{String: span.Status, Valid: span.Status != ""},
+		EventIds:   eventIDBytes,
+	})
 }
 
 // ---------------------------------------------------------------------------

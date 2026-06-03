@@ -2,8 +2,11 @@ package apiv2
 
 import (
 	"context"
+	"encoding/json"
+	"time"
 
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -38,6 +41,37 @@ type GetFunctionRunOpts struct {
 
 type FunctionRunReader interface {
 	GetFunctionRun(ctx context.Context, runID ulid.ULID, opts GetFunctionRunOpts) (*cqrs.FunctionRun, error)
+}
+
+type GetRunsOpts struct {
+	EventID       ulid.ULID
+	Cursor        ulid.ULID
+	Limit         int
+	IncludeOutput bool
+}
+
+type RunListItem struct {
+	RunID        ulid.ULID
+	RunStartedAt time.Time
+	EventID      ulid.ULID
+	BatchID      *ulid.ULID
+	Cron         *string
+	Status       enums.RunStatus
+	EndedAt      *time.Time
+	Output       json.RawMessage
+
+	FunctionID   string
+	FunctionName string
+	AppID        string
+}
+
+type GetRunsResult struct {
+	Runs    []*RunListItem
+	HasMore bool
+}
+
+type RunsReader interface {
+	GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error)
 }
 
 type FunctionTraceReader interface {

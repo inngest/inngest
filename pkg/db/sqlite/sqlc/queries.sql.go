@@ -1251,6 +1251,93 @@ func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDPa
 	return &i, err
 }
 
+const getRuns = `-- name: GetRuns :many
+SELECT
+  spans.run_id,
+  spans.function_id,
+  spans.app_id,
+  spans.start_time,
+  spans.end_time,
+  COALESCE(spans.status, '') AS status,
+  COALESCE(CAST(spans.output AS TEXT), '') AS output,
+  COALESCE(spans.attributes->>'$."_inngest.function.slug"', '') AS function_slug,
+  COALESCE(spans.attributes->>'$."_inngest.function.name"', '') AS function_name,
+  COALESCE(apps.name, '') AS app_name,
+  COALESCE(spans.attributes->>'$."_inngest.batch.id"', '') AS batch_id,
+  COALESCE(spans.attributes->>'$."_inngest.cron.schedule"', '') AS cron_schedule
+FROM spans
+LEFT JOIN apps ON apps.id = spans.app_id AND apps.archived_at IS NULL
+WHERE spans.name = ?1
+  AND spans.debug_run_id IS NULL
+  AND spans.run_id > ?2
+  AND INSTR(CAST(spans.event_ids AS TEXT), ?3) > 0
+ORDER BY spans.run_id
+LIMIT ?4
+`
+
+type GetRunsParams struct {
+	Name        string
+	CursorRunID string
+	EventID     string
+	LimitRows   int64
+}
+
+type GetRunsRow struct {
+	RunID        string
+	FunctionID   string
+	AppID        string
+	StartTime    time.Time
+	EndTime      time.Time
+	Status       string
+	Output       interface{}
+	FunctionSlug interface{}
+	FunctionName interface{}
+	AppName      string
+	BatchID      interface{}
+	CronSchedule interface{}
+}
+
+func (q *Queries) GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRuns,
+		arg.Name,
+		arg.CursorRunID,
+		arg.EventID,
+		arg.LimitRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunsRow
+	for rows.Next() {
+		var i GetRunsRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.FunctionID,
+			&i.AppID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Status,
+			&i.Output,
+			&i.FunctionSlug,
+			&i.FunctionName,
+			&i.AppName,
+			&i.BatchID,
+			&i.CronSchedule,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSpanBySpanID = `-- name: GetSpanBySpanID :one
 SELECT
   run_id,

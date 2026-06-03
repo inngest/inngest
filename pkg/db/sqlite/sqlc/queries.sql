@@ -173,6 +173,29 @@ SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_ru
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
 
+-- name: GetRuns :many
+SELECT
+  spans.run_id,
+  spans.function_id,
+  spans.app_id,
+  spans.start_time,
+  spans.end_time,
+  COALESCE(spans.status, '') AS status,
+  COALESCE(CAST(spans.output AS TEXT), '') AS output,
+  COALESCE(spans.attributes->>'$."_inngest.function.slug"', '') AS function_slug,
+  COALESCE(spans.attributes->>'$."_inngest.function.name"', '') AS function_name,
+  COALESCE(apps.name, '') AS app_name,
+  COALESCE(spans.attributes->>'$."_inngest.batch.id"', '') AS batch_id,
+  COALESCE(spans.attributes->>'$."_inngest.cron.schedule"', '') AS cron_schedule
+FROM spans
+LEFT JOIN apps ON apps.id = spans.app_id AND apps.archived_at IS NULL
+WHERE spans.name = @name
+  AND spans.debug_run_id IS NULL
+  AND spans.run_id > @cursor_run_id
+  AND INSTR(CAST(spans.event_ids AS TEXT), @event_id) > 0
+ORDER BY spans.run_id
+LIMIT @limit_rows;
+
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
 

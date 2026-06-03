@@ -54,6 +54,8 @@ type DebounceItem struct {
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// AppID represents the app for the debounce item
 	AppID uuid.UUID `json:"appID"`
+	// AppName represents the app ID defined in user code.
+	AppName string `json:"appName,omitempty"`
 	// FunctionID represents the function ID that this debounce is for.
 	FunctionID uuid.UUID `json:"fnID"`
 	// FunctionVersion represents the version of the function that was debounced.

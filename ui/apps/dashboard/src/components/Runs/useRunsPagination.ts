@@ -15,6 +15,7 @@ type UseRunsPaginationParams = {
     status: any[] | null;
     timeField: any;
     celQuery: string | undefined;
+    isDeferred: boolean | null;
   };
   tracePreviewEnabled: boolean;
 };
