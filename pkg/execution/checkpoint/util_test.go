@@ -7,6 +7,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util/interval"
 	"github.com/oklog/ulid/v2"
@@ -96,6 +97,43 @@ func TestIsPairedTrailingStepRun_WireShape(t *testing.T) {
 
 	require.Equal(t, enums.OpcodeStepRun, op.Op)
 	require.True(t, isPairedTrailingStepRun(op))
+}
+
+// TestStepPlannedAttrs_LeadingEdgeStatus pins the leading-edge contract for
+// the paired StepPlanned + StepRun flow: when the leading-edge span's
+// attributes are built via the real GeneratorAttrs → stepPlannedAttrs
+// composition (see checkpointAsyncSteps), the effective DynamicStatus is
+// Running. GeneratorAttrs may set its own StepPlanned default (e.g. Queued
+// for classic parallel planning); stepPlannedAttrs must merge after it so
+// Running wins. This fails if that merge order is ever flipped.
+func TestStepPlannedAttrs_LeadingEdgeStatus(t *testing.T) {
+	runID := ulid.Make()
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	name := "my-step"
+	op := state.GeneratorOpcode{
+		Op:          enums.OpcodeStepPlanned,
+		ID:          "step-id",
+		DisplayName: &name,
+		Timing:      interval.Interval{A: start.UnixNano(), B: int64(5 * time.Second)},
+	}
+
+	// Mirror the composition in checkpointAsyncSteps: generator attrs first,
+	// then the leading-edge attrs merged on top.
+	attrs := stepPlannedAttrs(tracing.GeneratorAttrs(&op), op, runID)
+
+	status, ok := attrs.Get(meta.Attrs.DynamicStatus.Key()).(*enums.StepStatus)
+	require.True(t, ok, "DynamicStatus must be set on the leading-edge span")
+	require.Equal(t, enums.StepStatusRunning, *status,
+		"leading-edge StepPlanned must read as Running even if GeneratorAttrs defaults StepPlanned to Queued")
+
+	// The leading edge owns the timing the trailing arm deliberately omits.
+	qa, ok := attrs.Get(meta.Attrs.QueuedAt.Key()).(*time.Time)
+	require.True(t, ok, "QueuedAt must be set on the leading edge")
+	require.Equal(t, op.Timing.Start().UnixNano(), qa.UnixNano())
+
+	sa, ok := attrs.Get(meta.Attrs.StartedAt.Key()).(*time.Time)
+	require.True(t, ok, "StartedAt must be set on the leading edge")
+	require.Equal(t, op.Timing.Start().UnixNano(), sa.UnixNano())
 }
 
 func TestStepRunAttrs(t *testing.T) {
