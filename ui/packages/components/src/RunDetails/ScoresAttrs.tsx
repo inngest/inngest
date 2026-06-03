@@ -56,7 +56,7 @@ export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
 
   return (
     <div className="relative h-full overflow-y-auto overflow-x-hidden">
-      <div className="text-muted bg-canvasSubtle sticky top-0 grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 px-4 py-2 text-sm font-medium leading-tight">
+      <div className="text-muted bg-canvasSubtle sticky top-0 grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 px-4 py-2 text-xs font-medium leading-tight">
         <div>Score</div>
         <div>Value</div>
         <div>Updated at</div>

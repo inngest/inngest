@@ -27,7 +27,7 @@ export const LinkedRuns = ({ defers, siblingDefers, deferredFrom }: Props) => {
 const sectionBorder = 'border-muted mb-2 border-b pb-2';
 const tableClass = 'w-full table-fixed border-separate border-spacing-0';
 const theadClass = 'text-muted bg-canvasSubtle';
-const thClass = 'px-2 py-2 text-left text-sm font-medium leading-tight first:pl-4 last:pr-4';
+const thClass = 'px-2 py-2 text-left text-xs font-medium leading-tight first:pl-4 last:pr-4';
 const tdClass = 'min-w-0 truncate px-2 py-2 text-sm leading-tight first:pl-4 last:pr-4';
 
 type Column = { header: string; width?: string };

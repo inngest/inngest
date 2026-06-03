@@ -55,7 +55,7 @@ const MetadataAttrRow = ({
           isLast ? '' : 'border-muted border-b pb-4'
         } mt-2 flex max-h-full flex-col gap-2`}
       >
-        <div className="text-muted bg-canvasSubtle sticky top-0 flex flex-row px-4 py-2 text-sm font-medium leading-tight">
+        <div className="text-muted bg-canvasSubtle sticky top-0 flex flex-row px-4 py-2 text-xs font-medium leading-tight">
           <div className="w-48">Key</div>
           <div className="">Value</div>
         </div>
