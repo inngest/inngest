@@ -19,6 +19,7 @@ export const Route = createFileRoute('/(auth)/agent-deep-link')({
   validateSearch: validateAgentDeepLinkSearch,
   head: () => ({
     links: [canonicalLink('/agent-deep-link')],
+    meta: [{ name: 'robots', content: 'noindex' }],
   }),
 });
 

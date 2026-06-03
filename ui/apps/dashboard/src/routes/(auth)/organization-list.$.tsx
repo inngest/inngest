@@ -11,6 +11,7 @@ export const Route = createFileRoute('/(auth)/organization-list/$')({
   validateSearch: validateRedirectUrlSearch,
   head: () => ({
     links: [canonicalLink('/organization-list')],
+    meta: [{ name: 'robots', content: 'noindex' }],
   }),
 });
 

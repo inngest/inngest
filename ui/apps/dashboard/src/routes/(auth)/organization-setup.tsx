@@ -23,6 +23,7 @@ export const Route = createFileRoute('/(auth)/organization-setup')({
   component: OrganizationSetupComponent,
   head: () => ({
     links: [canonicalLink('/organization-setup')],
+    meta: [{ name: 'robots', content: 'noindex' }],
   }),
   beforeLoad: async () => {
     await setUpAccount();

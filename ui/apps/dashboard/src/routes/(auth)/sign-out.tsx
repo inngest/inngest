@@ -10,6 +10,7 @@ export const Route = createFileRoute('/(auth)/sign-out')({
   component: RouteComponent,
   head: () => ({
     links: [canonicalLink('/sign-out')],
+    meta: [{ name: 'robots', content: 'noindex' }],
   }),
 });
 

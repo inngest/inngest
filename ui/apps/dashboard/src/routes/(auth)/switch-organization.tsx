@@ -11,6 +11,7 @@ export const Route = createFileRoute('/(auth)/switch-organization')({
   validateSearch: validateSwitchOrganizationSearch,
   head: () => ({
     links: [canonicalLink('/switch-organization')],
+    meta: [{ name: 'robots', content: 'noindex' }],
   }),
 });
 
