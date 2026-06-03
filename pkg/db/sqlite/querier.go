@@ -381,6 +381,10 @@ func scanSpanRunListRows(rows []*sqlc.GetRunsRow, arg db.GetRunsParams) ([]*db.R
 		}
 
 		cronSchedule := valueString(r.CronSchedule)
+		triggerType := "event"
+		if cronSchedule != "" {
+			triggerType = "cron"
+		}
 		var output []byte
 		outputText := valueString(r.Output)
 		if arg.IncludeOutput && outputText != "" {
@@ -392,7 +396,7 @@ func scanSpanRunListRows(rows []*sqlc.GetRunsRow, arg db.GetRunsParams) ([]*db.R
 				RunID:        parsedRunID,
 				RunStartedAt: r.StartTime,
 				FunctionID:   parsedFunctionID,
-				TriggerType:  "event",
+				TriggerType:  triggerType,
 				EventID:      arg.EventID,
 				BatchID:      batchID,
 				Cron:         sql.NullString{String: cronSchedule, Valid: cronSchedule != ""},

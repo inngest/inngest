@@ -259,6 +259,7 @@ func TestGetRuns(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
 	assert.Equal(t, batchID, rows[0].FunctionRun.BatchID)
+	assert.Equal(t, "cron", rows[0].FunctionRun.TriggerType)
 	assert.Equal(t, "*/5 * * * *", rows[0].FunctionRun.Cron.String)
 	assert.Equal(t, "event-runs-app", rows[0].AppName)
 	assert.Equal(t, "event-runs-function", rows[0].FunctionSlug)
@@ -274,6 +275,7 @@ func TestGetRuns(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+		assert.Equal(t, "cron", rows[0].FunctionRun.TriggerType)
 	}
 }
 

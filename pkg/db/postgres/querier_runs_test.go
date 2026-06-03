@@ -56,6 +56,7 @@ func TestQuerierGetRuns(t *testing.T) {
 	require.Equal(t, runID, rows[0].FunctionRun.RunID)
 	require.Equal(t, eventID, rows[0].FunctionRun.EventID)
 	require.Equal(t, batchID, rows[0].FunctionRun.BatchID)
+	require.Equal(t, "cron", rows[0].FunctionRun.TriggerType)
 	require.Equal(t, "*/5 * * * *", rows[0].FunctionRun.Cron.String)
 	require.Equal(t, "Completed", rows[0].FunctionFinish.Status.String)
 	require.True(t, rows[0].FunctionFinish.CreatedAt.Valid)
@@ -98,6 +99,7 @@ func TestQuerierGetRunsSkipsOutput(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
+	require.Equal(t, "event", rows[0].FunctionRun.TriggerType)
 	require.Empty(t, rows[0].Output)
 }
 
