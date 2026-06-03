@@ -1,0 +1,210 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "Mac.localdomain"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "host.id",
+            "value": {
+              "stringValue": "C5C64DB3-DCD6-588B-81A1-B56AA61D0585"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": 90049
+            }
+          },
+          {
+            "key": "process.executable.name",
+            "value": {
+              "stringValue": "node"
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/nix/store/0rb3g0249h5y7bzzcavsjj7s6hhpabdy-nodejs-24.13.1/bin/node"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/nix/store/0rb3g0249h5y7bzzcavsjj7s6hhpabdy-nodejs-24.13.1/bin/node"
+                  },
+                  {
+                    "stringValue": "--require"
+                  },
+                  {
+                    "stringValue": "./capture-instrumentation-otlp.cjs"
+                  },
+                  {
+                    "stringValue": "/Users/scott/src/ai-sdk-metadata/langfuse-openai/capture.cjs"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "24.13.1"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Node.js"
+            }
+          },
+          {
+            "key": "process.command",
+            "value": {
+              "stringValue": "/Users/scott/src/ai-sdk-metadata/langfuse-openai/capture.cjs"
+            }
+          },
+          {
+            "key": "process.owner",
+            "value": {
+              "stringValue": "scott"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "unknown_service:node"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.1.0"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "langfuse-sdk",
+            "version": "5.4.1"
+          },
+          "spans": [
+            {
+              "traceId": "d0508b44b19758f0c1b11f40a51495aa",
+              "spanId": "6bf40ce119b0664e",
+              "name": "OpenAI.chat",
+              "kind": 1,
+              "startTimeUnixNano": "1780441264971000000",
+              "endTimeUnixNano": "1780441265261486167",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "capture-user"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "capture-session-params_chat"
+                  }
+                },
+                {
+                  "key": "langfuse.trace.name",
+                  "value": {
+                    "stringValue": "capture-params_chat"
+                  }
+                },
+                {
+                  "key": "langfuse.internal.is_app_root",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "langfuse.observation.type",
+                  "value": {
+                    "stringValue": "generation"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.input",
+                  "value": {
+                    "stringValue": "{\"messages\":[{\"role\":\"system\",\"content\":\"You are a terse assistant.\"},{\"role\":\"user\",\"content\":\"Name three primary colors.\"}]}"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.model.name",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano-2025-04-14"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.model.parameters",
+                  "value": {
+                    "stringValue": "{\"frequency_penalty\":0.2,\"max_tokens\":64,\"presence_penalty\":0.1,\"seed\":42,\"stop\":[\"\\n\\n\"],\"temperature\":0.7,\"top_p\":0.9,\"response_format\":\"\"}"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.output",
+                  "value": {
+                    "stringValue": "{\"role\":\"assistant\",\"content\":\"Red, blue, yellow.\",\"refusal\":null,\"annotations\":[]}"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.usage_details",
+                  "value": {
+                    "stringValue": "{\"input\":22,\"output\":6,\"total\":28,\"input_cached_tokens\":0,\"input_audio_tokens\":0,\"output_reasoning_tokens\":0,\"output_audio_tokens\":0,\"output_accepted_prediction_tokens\":0,\"output_rejected_prediction_tokens\":0}"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 0
+              },
+              "links": [],
+              "droppedLinksCount": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
