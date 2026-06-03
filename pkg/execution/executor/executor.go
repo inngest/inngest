@@ -992,6 +992,7 @@ func (e *executor) schedule(
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
 			AppID:            req.AppID,
+			AppName:          req.AppName,
 			FunctionID:       req.Function.ID,
 			FunctionVersion:  req.Function.FunctionVersion,
 			EventID:          req.Events[0].GetInternalID(),
@@ -1315,6 +1316,7 @@ func (e *executor) schedule(
 	}
 	functionName := req.Function.Name
 	functionSlug := req.Function.GetSlug()
+	appName := req.AppName
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1326,6 +1328,7 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
 			meta.Attr(meta.Attrs.ReplayOriginalRunID, req.OriginalRunID),
 			meta.Attr(meta.Attrs.RunScheduleType, scheduleTypePtr),
+			meta.Attr(meta.Attrs.AppName, &appName),
 			meta.Attr(meta.Attrs.FunctionName, &functionName),
 			meta.Attr(meta.Attrs.FunctionSlug, &functionSlug),
 		),
@@ -1602,23 +1605,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	conditionalTraceCtx, conditionalSpan := e.conditionalTracer.NewSpan(ctx, "executor.Execute", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	defer conditionalSpan.End()
 
+	requestID := driver.DispatchRequestID(e.now(), id.RunID, queue.GenerationIDFromContext(ctx)).String()
+
+	jobID := queue.JobIDFromContext(ctx)
+	if item.JobID != nil {
+		jobID = *item.JobID
+	}
+
 	// Immediately store execution context for tracing.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 		Identifier:  sv2.IDFromV1(id),
 		Attempt:     item.Attempt,
 		MaxAttempts: item.MaxAttempts,
 		QueueKind:   item.Kind,
+		RequestID:   inngestgo.Ptr(requestID),
+		GroupID:     inngestgo.Ptr(item.GroupID),
+		JobID:       inngestgo.Ptr(jobID),
 	})
 
 	if e.fl == nil {
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
-	requestID := driver.DispatchRequestID(e.now(), id.RunID, queue.GenerationIDFromContext(ctx)).String()
-	jobID := queue.JobIDFromContext(ctx)
-	if item.JobID != nil {
-		jobID = *item.JobID
-	}
 	ctx = driver.WithRequestIDs(ctx, requestID, jobID)
 
 	l := e.log.With(
@@ -1872,8 +1880,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	// This span will be updated with output as soon as execution finishes.
 	execAttrs := tracing.FunctionAttrs(&instance.f)
-	meta.AddAttr(execAttrs, meta.Attrs.RequestID, &instance.requestID)
-	meta.AddAttr(execAttrs, meta.Attrs.JobID, &instance.jobID)
 
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		ctx,
@@ -1910,8 +1916,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
 		responseAttrs := tracing.DriverResponseAttrs(resp, nil)
-		meta.AddAttr(responseAttrs, meta.Attrs.RequestID, &instance.requestID)
-		meta.AddAttr(responseAttrs, meta.Attrs.JobID, &instance.jobID)
 
 		updateOpts := &tracing.UpdateSpanOptions{
 			Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},

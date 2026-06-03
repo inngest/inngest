@@ -32,6 +32,7 @@ type RunTraceSpan struct {
 	Run               *FunctionRun              `json:"run"`
 	SpanID            string                    `json:"spanID"`
 	TraceID           string                    `json:"traceID"`
+	GroupID           *string                   `json:"groupID,omitempty"`
 	Name              string                    `json:"name"`
 	Status            RunTraceSpanStatus        `json:"status"`
 	Attempts          *int                      `json:"attempts,omitempty"`
