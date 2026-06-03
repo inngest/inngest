@@ -13,9 +13,10 @@ import (
 
 var Attrs = struct {
 	// Timings
-	StartedAt attr[*time.Time]
-	QueuedAt  attr[*time.Time]
-	EndedAt   attr[*time.Time]
+	QueuedAt    attr[*time.Time]
+	ScheduledAt attr[*time.Time]
+	StartedAt   attr[*time.Time]
+	EndedAt     attr[*time.Time]
 
 	// Run attributes
 	AccountID           attr[*uuid.UUID]
@@ -220,6 +221,7 @@ var Attrs = struct {
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
 	StartedAt:                          TimeAttr("started_at"),
+	ScheduledAt:                        TimeAttr("scheduled_at"),
 	StepAttempt:                        IntAttr("step.attempt"),
 	StepCodeLocation:                   StringAttr("step.code_location"),
 	StepGatewayResponseOutputSizeBytes: IntAttr("step.gateway.response.output_size_bytes"),

@@ -80,8 +80,8 @@ func GetAttr[T any](r *SerializableAttrs, attr attr[*T]) (*T, bool) {
 	// iterate in reverse order.
 	for i := len(r.Attrs) - 1; i >= 0; i-- {
 		if r.Attrs[i].key == attr.Key() {
-			if val, ok := r.Attrs[i].value.(T); ok {
-				return &val, true
+			if val, ok := r.Attrs[i].value.(*T); ok {
+				return val, true
 			}
 
 			return nil, false
