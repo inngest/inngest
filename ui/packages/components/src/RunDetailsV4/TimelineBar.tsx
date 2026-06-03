@@ -358,14 +358,25 @@ function BarIconComponent({
 /**
  * Renders the expand/collapse toggle button as a solid triangle.
  */
-function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?: () => void }) {
+function ExpandToggle({
+  expanded,
+  onCollapse,
+  selected,
+  hoverCardOpen,
+}: {
+  expanded: boolean;
+  onCollapse?: () => void;
+  selected?: boolean;
+  hoverCardOpen?: boolean;
+}) {
   return (
     <div
       role={expanded ? 'button' : undefined}
       aria-label={expanded ? 'Collapse' : 'Expand'}
       className={cn(
-        'bg-canvasBase flex items-center justify-center p-0',
-        expanded && 'cursor-pointer bg-transparent'
+        'flex items-center justify-center p-0',
+        selected || hoverCardOpen ? 'bg-transparent' : 'bg-canvasBase',
+        expanded && 'cursor-pointer'
       )}
       onClick={
         expanded

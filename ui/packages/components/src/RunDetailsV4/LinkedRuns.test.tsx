@@ -31,7 +31,8 @@ vi.mock('../Table/Cell', () => ({
   StatusCell: ({ status, label }: { status: string; label?: string }) => (
     <span>{label || status}</span>
   ),
-  PillCell: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  PillCell: ({ href, children }: { href?: string; children: React.ReactNode }) =>
+    href ? <a href={href}>{children}</a> : <span>{children}</span>,
 }));
 
 vi.mock('../Tooltip/OptionalTooltip', () => ({
