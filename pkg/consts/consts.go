@@ -59,6 +59,10 @@ const (
 	// the API.
 	MaxUserlandTraceBodySize = 8 * 1024 * 1024 // 8MB
 
+	// MaxConcurrentRejectedTraceRecorders caps the background goroutine pool that
+	// runs the over-cap /v1/traces/userland ExtendedTraceRejectedRecorder.
+	MaxConcurrentRejectedTraceRecorders = 1000
+
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
 	MaxRetries = 20

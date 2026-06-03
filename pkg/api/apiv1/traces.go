@@ -133,9 +133,7 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 
 	if capDecision.OverCap {
 		if a.opts.ExtendedTraceRejectedRecorder != nil {
-			if err := a.opts.ExtendedTraceRejectedRecorder(ctx, auth, req, capDecision); err != nil {
-				logger.StdlibLogger(ctx).Warn("failed to record rejected extended-trace payload", "err", err, "account_id", auth.AccountID())
-			}
+			a.recordRejectedTrace(ctx, auth, req, capDecision)
 		}
 		msg := capDecision.Response
 		if msg == "" {
@@ -172,6 +170,31 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(respBytes)
+}
+
+// recordRejectedTrace runs the ExtendedTraceRejectedRecorder for an over-cap
+// payload. The recorder does network I/O, so it runs off the request goroutine
+// in a bounded pool: this keeps the 429 fast and stops a flood of over-cap
+// payloads from spawning unbounded background goroutines. When the pool is
+// saturated the record is dropped (and logged) rather than blocking the
+// response — consistent with the recorder being best-effort accounting.
+func (a *API) recordRejectedTrace(ctx context.Context, auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest, decision ExtendedTraceCapDecision) {
+	if !a.rejectedTraceRecorderSem.TryAcquire(1) {
+		logger.StdlibLogger(ctx).Warn("dropping rejected extended-trace record; recorder pool saturated", "account_id", auth.AccountID())
+		return
+	}
+
+	go func() {
+		defer a.rejectedTraceRecorderSem.Release(1)
+		defer func() {
+			if r := recover(); r != nil {
+				logger.StdlibLogger(ctx).Error("panic recording rejected extended-trace payload", "panic", r, "account_id", auth.AccountID())
+			}
+		}()
+		if err := a.opts.ExtendedTraceRejectedRecorder(ctx, auth, req, decision); err != nil {
+			logger.StdlibLogger(ctx).Warn("failed to record rejected extended-trace payload", "err", err, "account_id", auth.AccountID())
+		}
+	}()
 }
 
 func respondError(w http.ResponseWriter, r *http.Request, code int, msg string) {

@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -18,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing"
+	"golang.org/x/sync/semaphore"
 )
 
 // Opts represents options for the APIv1 router.
@@ -103,7 +105,10 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 
 	// Create the HTTP implementation, which wraps the handler.  We do ths to code
 	// share and split the HTTP concerns from the actual logic, eg. to share to GQL.
-	impl := &API{opts: o}
+	impl := &API{
+		opts:                     o,
+		rejectedTraceRecorderSem: semaphore.NewWeighted(consts.MaxConcurrentRejectedTraceRecorders),
+	}
 
 	instance := &router{
 		Router: r,
@@ -116,6 +121,11 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 
 type API struct {
 	opts Opts
+
+	// rejectedTraceRecorderSem bounds the goroutine pool that runs the
+	// ExtendedTraceRejectedRecorder, capping concurrent calls. Initialized by
+	// AddRoutes.
+	rejectedTraceRecorderSem *semaphore.Weighted
 }
 
 type router struct {
