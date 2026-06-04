@@ -2065,6 +2065,8 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					i.resp.Generator = []*state.GeneratorOpcode{}
 				}
 
+				e.emitNonStepSpan(ctx, i, nil, nil, enums.StepStatusFailed)
+
 				if err := e.Finalize(ctx, execution.FinalizeOpts{
 					Metadata: i.md,
 					// Always, when called from the executor, as this handles async
@@ -2106,15 +2108,18 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	// This is purely for network errors or top-level function code errors.
 	if i.resp.Err != nil {
 		if i.resp.Retryable() {
+			e.emitNonStepSpan(ctx, i, nil, nil, enums.StepStatusErrored)
 			// Retries are a native aspect of the queue;  returning errors always
 			// retries steps if possible.
 			for _, e := range e.lifecycles {
 				// Run the lifecycle method for this retry, which is baked into the queue.
-				i.item.Attempt += 1
+				i.IncrementAttempt()
 				go e.OnStepScheduled(context.WithoutCancel(ctx), i.md, i.item, &i.resp.Step.Name)
 			}
 			return nil
 		}
+
+		e.emitNonStepSpan(ctx, i, nil, nil, enums.StepStatusFailed)
 
 		// If i.resp.Err != nil, we don't know whether to invoke the fn again
 		// with per-step errors, as we don't know if the intent behind this queue item
@@ -2153,6 +2158,8 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	// The generator length check is necessary because parallel steps in older
 	// SDK versions (e.g. 2.7.2) can result in an OpcodeNone.
 	if len(i.resp.Generator) == 0 && i.resp.IsFunctionResult() {
+		e.emitNonStepSpan(ctx, i, nil, nil, enums.StepStatusCompleted)
+
 		// This is the function result.
 		if err := e.Finalize(ctx, execution.FinalizeOpts{
 			Metadata: i.md,
@@ -3164,6 +3171,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		Identifier:  sv2id,
 		Attempt:     0,
 		MaxAttempts: pause.MaxAttempts,
+		GroupID:     inngestgo.Ptr(pause.GroupID),
 	})
 
 	md, err := e.smv2.LoadMetadata(ctx, sv2id)
@@ -3938,6 +3946,8 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 	evts := runCtx.Events()
 	resp := runCtx.DriverResponse()
 
+	e.emitNonStepSpan(ctx, runCtx, &gen, nil, enums.StepStatusCompleted)
+
 	err := e.Finalize(ctx, execution.FinalizeOpts{
 		Metadata: *md,
 		Response: execution.FinalizeResponse{
@@ -3976,6 +3986,8 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 		logger.StdlibLogger(ctx).Error("error unmarshalling api result from sync RunComplete op", "error", err)
 		return err
 	}
+
+	e.emitNonStepSpan(ctx, runCtx, &gen, &result.Data, enums.StepStatusCompleted)
 
 	md := runCtx.Metadata()
 	evts := runCtx.Events()
@@ -5819,6 +5831,47 @@ func (e *executor) emitStepSpan(ctx context.Context, runCtx execution.RunContext
 		// without needing to upgrade their SDK, and keeps the metadata
 		// contract consistent across SDK languages.
 		e.emitExperimentMetadataFromOpts(ctx, runCtx, gen)
+	}
+}
+
+func (e *executor) emitNonStepSpan(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, result *apiresult.APIResult, status enums.StepStatus) {
+	md := runCtx.Metadata()
+
+	attrs := tracing.DriverResponseOutputAttrs(runCtx.DriverResponse())
+	tracing.AddMetadataTenantAttrs(attrs, md.ID)
+
+	queuedAt, scheduledAt, startedAt, endedAt := e.opcodeTiming(ctx, runCtx, gen)
+	tracing.AddTimingAttrs(attrs, queuedAt, scheduledAt, startedAt, endedAt)
+
+	if result != nil {
+		attrs.Merge(apiAttributes(*result))
+	}
+
+	item := runCtx.LifecycleItem()
+
+	seed := tracing.RetryNonStepDynamicSeed(item)
+	if status == enums.StepStatusFailed {
+		seed = tracing.FinalizedNonStepDynamicSeed(item)
+	}
+
+	_, err := e.tracerProvider.CreateSpan(
+		ctx,
+		meta.SpanNameNonStep,
+		&tracing.CreateSpanOptions{
+			Seed:      seed,
+			Debug:     &tracing.SpanDebugData{Location: "executor.emitNonStepSpan"},
+			Metadata:  md,
+			QueueItem: &item,
+			Parent:    runCtx.RootSpan(),
+			StartTime: queuedAt,
+			EndTime:   endedAt,
+			Attributes: attrs.Merge(meta.NewAttrSet(
+				meta.Attr(meta.Attrs.DynamicStatus, &status),
+			)),
+		},
+	)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error creating non-step span", "error", err)
 	}
 }
 

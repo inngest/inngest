@@ -73,6 +73,39 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 	return rawAttrs
 }
 
+// DriverResponseOutputAttrs extracts output-related attributes from the given `DriverResponse`.
+// This is used for extracting output details for non-step spans like finalization or network/top-level
+// function error spans.
+func DriverResponseOutputAttrs(resp *state.DriverResponse) *meta.SerializableAttrs {
+	rawAttrs := meta.NewAttrSet()
+
+	if resp == nil {
+		return rawAttrs
+	}
+
+	fnOutput, err := resp.GetTraceFunctionOutput()
+	if err != nil {
+		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
+	} else if fnOutput != "" {
+		isFunctionOutput := true
+		meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, &isFunctionOutput)
+		meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, &fnOutput)
+	}
+
+	if resp.Retryable() {
+		meta.AddAttr(rawAttrs, meta.Attrs.Retryable, inngestgo.Ptr(true))
+	}
+
+	size := resp.OutputSize
+	if size == 0 && fnOutput != "" {
+		size = len(fnOutput)
+	}
+
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
+
+	return rawAttrs
+}
+
 // DriverResponseAttrs applies details from the given `DriverResponse` to the
 // given span. This is used for adding additional details to the span after the
 // execution has completed.

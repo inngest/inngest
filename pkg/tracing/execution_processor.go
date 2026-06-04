@@ -212,6 +212,16 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 			break
 		}
 
+	case meta.SpanNameNonStep:
+		{
+
+			if ec != nil {
+				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
+			}
+
+			break
+		}
+
 	case meta.SpanNameDynamicExtension:
 		{
 			var (
