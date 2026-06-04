@@ -1,540 +1,100 @@
 package extractors_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io/fs"
+	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/sebdah/goldie/v2"
 	"github.com/stretchr/testify/require"
-	tracev1 "go.opentelemetry.io/proto/otlp/trace/v1"
 
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
-	"github.com/inngest/inngest/pkg/util"
 )
 
-// TestAIMetadataExtractor_CapturedFixtures asserts AIMetadata fields against captured OTLP spans
+// goldenAIMetadata mirrors extractors.AIMetadata without omitempty so the
+// golden files keep empty fields visible — what an instrumentation does NOT
+// emit is part of what these tests lock in. LatencyMs is excluded as
+// span-timing dependent and EstimatedCost as covered by EstimateCost's own
+// tests (and coupled to the pricing table).
+type goldenAIMetadata struct {
+	Model         string   `json:"model"`
+	System        string   `json:"system"`
+	OperationName string   `json:"operation_name"`
+	ResponseModel string   `json:"response_model"`
+	ResponseID    string   `json:"response_id"`
+	FinishReasons []string `json:"finish_reasons"`
+	InputTokens   int64    `json:"input_tokens"`
+	OutputTokens  int64    `json:"output_tokens"`
+	TotalTokens   *int64   `json:"total_tokens"`
+}
+
+// TestAIMetadataExtractor_CapturedFixtures asserts AIMetadata extraction
+// against every captured OTLP fixture under testdata/, with a golden file
+// alongside each fixture (<fixture>.out). Every span is rendered in document
+// order. Regenerate with `go test -update`; see testdata/README.md for how
+// fixtures were captured and per-instrumentation quirks.
 func TestAIMetadataExtractor_CapturedFixtures(t *testing.T) {
-	cases := []struct {
-		fixture string
-		// spanName selects a span by name from a multi-span fixture (the Vercel
-		// AI SDK emits a parent ai.<op> + child ai.<op>.do<Op> per call). When
-		// empty, the fixture must contain exactly one span.
-		spanName string
-		expected extractors.AIMetadata
-	}{
-		// official @opentelemetry/instrumentation-openai
-		{
-			fixture: "openai_otel_official/params_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-4.1-nano-2025-04-14",
-				ResponseID:    "chatcmpl-DmQgLKk5KeV2yWFNlpzOVrmXErHfC",
-				FinishReasons: []string{"stop"},
-				InputTokens:   22,
-				OutputTokens:  6,
-				TotalTokens:   util.ToPtr[int64](28),
-			},
-		},
-		{
-			fixture: "openai_otel_official/tools_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-4.1-nano-2025-04-14",
-				ResponseID:    "chatcmpl-DmQgMTBrf7SFrIb1VMoKSIbKkIcBf",
-				FinishReasons: []string{"tool_calls"},
-				InputTokens:   56,
-				OutputTokens:  14,
-				TotalTokens:   util.ToPtr[int64](70),
-			},
-		},
-		{
-			fixture: "openai_otel_official/stream_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-4.1-nano-2025-04-14",
-				ResponseID:    "chatcmpl-DmQgMYCyOdQgzMUm4UU6jFY7NuSGB",
-				FinishReasons: []string{"stop"},
-				InputTokens:   11,
-				OutputTokens:  10,
-				TotalTokens:   util.ToPtr[int64](21),
-			},
-		},
-		{
-			fixture: "openai_otel_official/embeddings.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "text-embedding-3-small",
-				System:        "openai",
-				OperationName: "embeddings",
-				ResponseModel: "text-embedding-3-small",
-				ResponseID:    "",
-				FinishReasons: nil,
-				InputTokens:   10,
-				OutputTokens:  0,
-				TotalTokens:   util.ToPtr[int64](10),
-			},
-		},
+	// goldenAIMetadata must mirror every asserted field of AIMetadata (9
+	// rendered + the 2 deliberately-blanked LatencyMs/EstimatedCost). If this
+	// fails, a field was added: update goldenAIMetadata and regenerate.
+	require.Equal(t, 11, reflect.TypeFor[extractors.AIMetadata]().NumField(),
+		"AIMetadata changed shape; update goldenAIMetadata and the goldens")
 
-		// @traceloop/instrumentation-openai
-		{
-			fixture: "openai_otel_traceloop/basic_responses.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-5.4-nano-2026-03-17",
-				ResponseID:    "resp_0ba2819472261845006a1f474f066c819983ffb0a8d045e3d5",
-				FinishReasons: []string{"stop"},
-				InputTokens:   17,
-				OutputTokens:  44,
-				TotalTokens:   util.ToPtr[int64](61),
-			},
-		},
-		{
-			fixture: "openai_otel_traceloop/params_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-4.1-nano-2025-04-14",
-				ResponseID:    "chatcmpl-DmQhkoGWd8y8RoHHnRbkw7BHGMj8j",
-				FinishReasons: []string{"stop"},
-				InputTokens:   22,
-				OutputTokens:  6,
-				TotalTokens:   util.ToPtr[int64](28),
-			},
-		},
-		{
-			fixture: "openai_otel_traceloop/tools_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-4.1-nano-2025-04-14",
-				ResponseID:    "chatcmpl-DmQhkWBiDrfqwzKv6CFoRu2DACmfB",
-				FinishReasons: []string{"tool_call"},
-				InputTokens:   56,
-				OutputTokens:  14,
-				TotalTokens:   util.ToPtr[int64](70),
-			},
-		},
-		{
-			fixture: "openai_otel_traceloop/stream_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-4.1-nano-2025-04-14",
-				ResponseID:    "chatcmpl-DmQhlDTJIJh3jrQMeZ8BBMqtVzv8A",
-				FinishReasons: []string{"stop"},
-				InputTokens:   0,
-				OutputTokens:  0,
-				TotalTokens:   nil,
-			},
-		},
-		{
-			fixture: "openai_otel_traceloop/reasoning_responses.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-5.4-nano-2026-03-17",
-				ResponseID:    "resp_0947697ae2c24bfe006a1f4751ad68819aa81bfb021e3ac05e",
-				FinishReasons: []string{"stop"},
-				InputTokens:   17,
-				OutputTokens:  13,
-				TotalTokens:   util.ToPtr[int64](30),
-			},
-		},
+	paths, err := fs.Glob(fixtures, "testdata/*/*.otlp.json")
+	require.NoError(t, err)
+	require.NotEmpty(t, paths, "no OTLP fixtures discovered; check the glob")
 
-		// @arizeai/openinference-instrumentation-openai
-		{
-			fixture: "openai_openinference_arize/basic_responses.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano-2026-03-17",
-				System:        "openai",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: nil,
-				InputTokens:   17,
-				OutputTokens:  51,
-				TotalTokens:   util.ToPtr[int64](68),
-			},
-		},
-		{
-			fixture: "openai_openinference_arize/params_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano-2025-04-14",
-				System:        "openai",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: []string{"stop"},
-				InputTokens:   22,
-				OutputTokens:  6,
-				TotalTokens:   util.ToPtr[int64](28),
-			},
-		},
-		{
-			fixture: "openai_openinference_arize/tools_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano-2025-04-14",
-				System:        "openai",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: []string{"tool_calls"},
-				InputTokens:   56,
-				OutputTokens:  30,
-				TotalTokens:   util.ToPtr[int64](86),
-			},
-		},
-		{
-			fixture: "openai_openinference_arize/stream_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: []string{"stop"},
-				InputTokens:   0,
-				OutputTokens:  0,
-				TotalTokens:   nil,
-			},
-		},
-		{
-			fixture: "openai_openinference_arize/reasoning_responses.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano-2026-03-17",
-				System:        "openai",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: nil,
-				InputTokens:   17,
-				OutputTokens:  13,
-				TotalTokens:   util.ToPtr[int64](30),
-			},
-		},
-		{
-			fixture: "openai_openinference_arize/embeddings.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "",
-				System:        "openai",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: nil,
-				InputTokens:   0,
-				OutputTokens:  0,
-				TotalTokens:   nil,
-			},
-		},
-
-		// Vercel AI SDK
-		//
-		// Each call emits a 2-span tree; we assert the top-level ai.<op> parent span,
-		// which carries only ai.* attributes.
-		//
-		// Documented gaps for the parent:
-		// - OperationName is empty (no gen_ai.operation.name; ai.operationId is not mapped),
-		// - ResponseModel/ResponseID are empty (only the child .doGenerate span carries them).
-		// - System is kept faithful as the provider+surface ("openai.responses"/
-		//   "openai.chat"/"openai.embedding").
-		{
-			fixture:  "openai_vercel_aisdk/basic_responses.otlp.json",
-			spanName: "ai.generateText",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano",
-				System:        "openai.responses",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: []string{"stop"},
-				InputTokens:   17,
-				OutputTokens:  40,
-				TotalTokens:   util.ToPtr[int64](57),
-			},
-		},
-		{
-			fixture:  "openai_vercel_aisdk/params_chat.otlp.json",
-			spanName: "ai.generateText",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai.chat",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: []string{"stop"},
-				InputTokens:   22,
-				OutputTokens:  6,
-				TotalTokens:   util.ToPtr[int64](28),
-			},
-		},
-		{
-			fixture:  "openai_vercel_aisdk/tools_chat.otlp.json",
-			spanName: "ai.generateText",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai.chat",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				// Vercel emits the finish reason as "tool-calls" (hyphen); stored raw.
-				FinishReasons: []string{"tool-calls"},
-				InputTokens:   56,
-				OutputTokens:  14,
-				TotalTokens:   util.ToPtr[int64](70),
-			},
-		},
-		{
-			fixture:  "openai_vercel_aisdk/stream_chat.otlp.json",
-			spanName: "ai.streamText",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai.chat",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: []string{"stop"},
-				// Unlike the traceloop/openinference stream cases (0/0/nil), the AI
-				// SDK keeps usage on the streaming span.
-				InputTokens:  11,
-				OutputTokens: 10,
-				TotalTokens:  util.ToPtr[int64](21),
-			},
-		},
-		{
-			fixture:  "openai_vercel_aisdk/reasoning_responses.otlp.json",
-			spanName: "ai.generateText",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano",
-				System:        "openai.responses",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: []string{"stop"},
-				InputTokens:   42,
-				OutputTokens:  195,
-				TotalTokens:   util.ToPtr[int64](237),
-			},
-		},
-		{
-			fixture:  "openai_vercel_aisdk/embeddings.otlp.json",
-			spanName: "ai.embed",
-			expected: extractors.AIMetadata{
-				Model:         "text-embedding-3-small",
-				System:        "openai.embedding",
-				OperationName: "",
-				ResponseModel: "",
-				ResponseID:    "",
-				FinishReasons: nil,
-				// Embeddings emit a single ai.usage.tokens count -> inputTokens;
-				// TotalTokens derives to the same value.
-				InputTokens:  10,
-				OutputTokens: 0,
-				TotalTokens:  util.ToPtr[int64](10),
-			},
-		},
-		// One child span (ai.generateText.doGenerate) to lock dual-convention
-		// coexistence: gen_ai.* wins the shared fields (values agree), and
-		// TotalTokens comes from ai.usage.totalTokens because gen_ai.* omits a
-		// total. ResponseModel/ResponseID are present on the child.
-		{
-			fixture:  "openai_vercel_aisdk/basic_responses.otlp.json",
-			spanName: "ai.generateText.doGenerate",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano",
-				System:        "openai.responses",
-				OperationName: "",
-				ResponseModel: "gpt-5.4-nano-2026-03-17",
-				ResponseID:    "resp_0e56d5c95850276a006a1f57da3d60819a8974cbbffaedd001",
-				FinishReasons: []string{"stop"},
-				InputTokens:   17,
-				OutputTokens:  40,
-				TotalTokens:   util.ToPtr[int64](57),
-			},
-		},
-
-		// Langfuse (@langfuse/openai + LangfuseSpanProcessor)
-		//
-		// Langfuse spans carry NO gen_ai.*/llm.* — extraction relies entirely on
-		// the langfuse.* mappings. Model is the dated response model (from
-		// langfuse.observation.model.name); tokens come from the usage_details
-		// JSON blob (input/output/total), exploded into scalar fields.
-		//
-		// Documented gaps (no Langfuse key emits them): System, OperationName,
-		// ResponseModel, ResponseID, FinishReasons are all empty.
-		{
-			fixture: "openai_langfuse_observe/basic_responses.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:        "gpt-5.4-nano-2026-03-17",
-				InputTokens:  17,
-				OutputTokens: 36,
-				TotalTokens:  util.ToPtr[int64](53),
-			},
-		},
-		{
-			fixture: "openai_langfuse_observe/params_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:        "gpt-4.1-nano-2025-04-14",
-				InputTokens:  22,
-				OutputTokens: 6,
-				TotalTokens:  util.ToPtr[int64](28),
-			},
-		},
-		{
-			fixture: "openai_langfuse_observe/tools_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:        "gpt-4.1-nano-2025-04-14",
-				InputTokens:  56,
-				OutputTokens: 30,
-				TotalTokens:  util.ToPtr[int64](86),
-			},
-		},
-		{
-			fixture: "openai_langfuse_observe/stream_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:        "gpt-4.1-nano",
-				InputTokens:  11,
-				OutputTokens: 10,
-				TotalTokens:  util.ToPtr[int64](21),
-			},
-		},
-		{
-			fixture: "openai_langfuse_observe/reasoning_responses.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:        "gpt-5.4-nano-2026-03-17",
-				InputTokens:  17,
-				OutputTokens: 13,
-				TotalTokens:  util.ToPtr[int64](30),
-			},
-		},
-		{
-			// Embeddings emit no usage_details, so token counts stay zero and
-			// TotalTokens is not derived (nil) — a documented gap, like the OI
-			// embeddings case.
-			fixture: "openai_langfuse_observe/embeddings.otlp.json",
-			expected: extractors.AIMetadata{
-				Model: "text-embedding-3-small",
-			},
-		},
-
-		// LangSmith (langsmith wrapOpenAI + OTel mode)
-		//
-		// Unlike Langfuse, LangSmith spans carry a standard gen_ai.* set alongside
-		// its langsmith.* keys, so extraction works through the semconv mappings
-		// with no LangSmith-specific convention. Model is the requested alias
-		// (gen_ai.request.model); the dated model lands in ResponseModel.
-		//
-		// gen_ai.response.finish_reasons arrives as a scalar string (not the
-		// semconv array); the setter's scalar fallback wraps it.
-		//
-		// Missing variants (documented gaps in the capture app): wrapOpenAI wraps
-		// neither embeddings.create nor streaming chat completions (langsmith
-		// 0.7.3), so there are no embeddings/stream_chat fixtures. The Responses
-		// API variants (basic/reasoning) omit finish_reasons entirely.
-		{
-			fixture: "openai_langsmith_otel/basic_responses.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-5.4-nano-2026-03-17",
-				ResponseID:    "resp_076af25434275e80006a1f60fe34c081989e65e074eb0213b3",
-				FinishReasons: nil,
-				InputTokens:   17,
-				OutputTokens:  35,
-				TotalTokens:   util.ToPtr[int64](52),
-			},
-		},
-		{
-			fixture: "openai_langsmith_otel/params_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-4.1-nano-2025-04-14",
-				ResponseID:    "chatcmpl-DmSPnK1FqD0W1V6k55vnLKTyNV9cH",
-				FinishReasons: []string{"stop"},
-				InputTokens:   22,
-				OutputTokens:  6,
-				TotalTokens:   util.ToPtr[int64](28),
-			},
-		},
-		{
-			fixture: "openai_langsmith_otel/tools_chat.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-4.1-nano-2025-04-14",
-				ResponseID:    "chatcmpl-DmSPog8FUcyXw3C6bUGF0WZZDZw1k",
-				FinishReasons: []string{"tool_calls"},
-				InputTokens:   56,
-				OutputTokens:  30,
-				TotalTokens:   util.ToPtr[int64](86),
-			},
-		},
-		{
-			fixture: "openai_langsmith_otel/reasoning_responses.otlp.json",
-			expected: extractors.AIMetadata{
-				Model:         "gpt-5.4-nano",
-				System:        "openai",
-				OperationName: "chat",
-				ResponseModel: "gpt-5.4-nano-2026-03-17",
-				ResponseID:    "resp_0c58250a28f29e7f006a1f61028f248199962f6ae9f6dcec2f",
-				FinishReasons: nil,
-				InputTokens:   17,
-				OutputTokens:  12,
-				TotalTokens:   util.ToPtr[int64](29),
-			},
-		},
-	}
-
-	for _, tc := range cases {
-		name := tc.fixture
-		if tc.spanName != "" {
-			name += "#" + tc.spanName
-		}
+	for _, path := range paths {
+		name := strings.TrimPrefix(path, "testdata/")
 		t.Run(name, func(t *testing.T) {
-			spans := loadOTLPSpans(t, tc.fixture)
+			spans := loadOTLPSpans(t, name)
 
-			var span *tracev1.Span
-			if tc.spanName == "" {
-				require.Len(t, spans, 1, "fixture should contain exactly one span")
-				span = spans[0]
-			} else {
-				var matches []*tracev1.Span
-				for _, s := range spans {
-					if s.Name == tc.spanName {
-						matches = append(matches, s)
-					}
+			var buf bytes.Buffer
+			for i, span := range spans {
+				if i > 0 {
+					buf.WriteRune('\n')
 				}
-				require.Len(t, matches, 1, "expected exactly one %q span in %s", tc.spanName, tc.fixture)
-				span = matches[0]
+				buf.WriteString("SPAN ")
+				buf.WriteString(span.Name)
+				buf.WriteRune('\n')
+
+				structured, err := extractors.NewAIMetadataExtractor().
+					ExtractSpanMetadata(context.Background(), span)
+				require.NoError(t, err)
+
+				if len(structured) == 0 {
+					buf.WriteString("no AI metadata extracted\n")
+					continue
+				}
+				require.Len(t, structured, 1)
+				md, ok := structured[0].(extractors.AIMetadata)
+				require.True(t, ok, "expected AIMetadata, got %T", structured[0])
+
+				enc := json.NewEncoder(&buf)
+				enc.SetIndent("", "  ")
+				require.NoError(t, enc.Encode(goldenAIMetadata{
+					Model:         md.Model,
+					System:        md.System,
+					OperationName: md.OperationName,
+					ResponseModel: md.ResponseModel,
+					ResponseID:    md.ResponseID,
+					FinishReasons: md.FinishReasons,
+					InputTokens:   md.InputTokens,
+					OutputTokens:  md.OutputTokens,
+					TotalTokens:   md.TotalTokens,
+				}))
 			}
 
-			structured, err := extractors.NewAIMetadataExtractor().
-				ExtractSpanMetadata(context.Background(), span)
-			require.NoError(t, err)
-			require.Len(t, structured, 1)
-
-			md, ok := structured[0].(extractors.AIMetadata)
-			require.True(t, ok, "expected AIMetadata, got %T", structured[0])
-
-			// Blank the derived fields: LatencyMs is span-timing dependent and
-			// EstimatedCost is covered by EstimateCost's own tests. The rest is
-			// what's mapped from span attributes.
-			md.LatencyMs = nil
-			md.EstimatedCost = nil
-			require.Equal(t, tc.expected, md)
+			g := goldie.New(t,
+				goldie.WithFixtureDir("testdata"),
+				goldie.WithNameSuffix(".out"),
+				goldie.WithDiffEngine(goldie.ColoredDiff),
+			)
+			g.Assert(t, name, buf.Bytes())
 		})
 	}
 }
