@@ -488,13 +488,9 @@ func RetryStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID string, 
 	}
 }
 
-// RetryNonStepDynamicSeed returns the deterministic seed used to derive a dynamic span ID for non-step spans
+// NonStepDynamicSeed returns the deterministic seed used to derive a dynamic span ID for non-step spans
 // execution (previously called Finalization).
-func RetryNonStepDynamicSeed(item queue.Item) []byte {
-	return fmt.Appendf(nil, "nonstep:%s:%d", item.GroupID, item.Attempt)
-}
-
-func FinalizedNonStepDynamicSeed(item queue.Item) []byte {
+func NonStepDynamicSeed(item queue.Item) []byte {
 	return fmt.Appendf(nil, "nonstep:%s:%d", item.GroupID, item.Attempt)
 }
 

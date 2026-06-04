@@ -5849,16 +5849,11 @@ func (e *executor) emitNonStepSpan(ctx context.Context, runCtx execution.RunCont
 
 	item := runCtx.LifecycleItem()
 
-	seed := tracing.RetryNonStepDynamicSeed(item)
-	if status == enums.StepStatusFailed {
-		seed = tracing.FinalizedNonStepDynamicSeed(item)
-	}
-
 	_, err := e.tracerProvider.CreateSpan(
 		ctx,
 		meta.SpanNameNonStep,
 		&tracing.CreateSpanOptions{
-			Seed:      seed,
+			Seed:      tracing.NonStepDynamicSeed(item),
 			Debug:     &tracing.SpanDebugData{Location: "executor.emitNonStepSpan"},
 			Metadata:  md,
 			QueueItem: &item,
