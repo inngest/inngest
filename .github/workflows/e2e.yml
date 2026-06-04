@@ -15,6 +15,7 @@ permissions:
 
 env:
   GOCOVERDIR: "coverage"
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
   ts:
@@ -117,7 +118,7 @@ jobs:
           go-version-file: ./go.mod
 
       - name: Log in to Docker Hub
-        if: matrix.database == 'postgres' && secrets.DOCKERHUB_USERNAME != ''
+        if: matrix.database == 'postgres' && env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -226,7 +227,7 @@ jobs:
           go-version-file: ./go.mod
 
       - name: Log in to Docker Hub
-        if: matrix.database == 'postgres' && secrets.DOCKERHUB_USERNAME != ''
+        if: matrix.database == 'postgres' && env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -331,7 +332,7 @@ jobs:
           go-version-file: ./go.mod
 
       - name: Log in to Docker Hub
-        if: matrix.database == 'postgres' && secrets.DOCKERHUB_USERNAME != ''
+        if: matrix.database == 'postgres' && env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -434,7 +435,7 @@ jobs:
           go-version-file: ./go.mod
 
       - name: Log in to Docker Hub
-        if: secrets.DOCKERHUB_USERNAME != ''
+        if: env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
