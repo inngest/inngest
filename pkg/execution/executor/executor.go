@@ -5618,7 +5618,6 @@ func shouldEnqueueDiscovery(hasPendingSteps bool, mode enums.ParallelMode) bool 
 }
 
 func (e *executor) getParentSpan(ctx context.Context, item queue.Item, md sv2.Metadata) *meta.SpanReference {
-	// TODO: make behavior change handle older queue items that don't have the discovery span ID derived from group ID.
 	if item.Kind != queue.KindSleep {
 		return tracing.SpanRefFromQueueItem(&item)
 	}
