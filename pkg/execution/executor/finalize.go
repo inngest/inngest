@@ -340,6 +340,20 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 		return
 	}
 
+	removed := e.doRemoveRunJobs(ctx, l, shard, opts)
+	if removed > 0 {
+		// If items were found, a concurrent executor may still be enqueuing items
+		// for this run (e.g., a KindSleep item being scheduled while the run is
+		// being cancelled). Wait briefly then sweep again to catch any stragglers
+		// that were enqueued during the first pass.
+		time.Sleep(50 * time.Millisecond)
+		e.doRemoveRunJobs(ctx, l, shard, opts)
+	}
+}
+
+// doRemoveRunJobs performs a single pass of removing all queue items for the given run.
+// Returns the number of items successfully dequeued.
+func (e *executor) doRemoveRunJobs(ctx context.Context, l logger.Logger, shard queue.ShardOperations, opts execution.FinalizeOpts) int {
 	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
 	// outstanding jobs from the queue, if possible.
 	//
@@ -362,8 +376,10 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 			"error", err,
 			"run_id", opts.Metadata.ID.RunID,
 		)
+		return 0
 	}
 
+	removed := 0
 	for _, j := range jobs {
 		qi, _ := j.Raw.(*queue.QueueItem)
 		if qi == nil {
@@ -384,7 +400,11 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 				"run_id", opts.Metadata.ID.RunID.String(),
 			)
 		}
+		if err == nil {
+			removed++
+		}
 	}
+	return removed
 }
 
 func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOpts, extraEvents []event.Event) error {
