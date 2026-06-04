@@ -1,4 +1,4 @@
-# RunDetailsV4 Timeline System
+# RunDetails Timeline System
 
 A composable, extensible timeline visualization system built with a "one-bar-to-rule-them-all" architecture.
 
@@ -304,7 +304,7 @@ src/
 ├── TimeBrush/
 │   ├── TimeBrush.tsx      # Reusable range selection component
 │   └── index.ts           # Exports
-└── RunDetailsV4/
+└── RunDetails/
     ├── Timeline.tsx           # Container component
     ├── TimelineBar.tsx        # Core bar component
     ├── TimelineBar.types.ts   # Type definitions

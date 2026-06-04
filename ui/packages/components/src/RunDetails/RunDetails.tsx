@@ -1,9 +1,6 @@
 /**
- * RunDetailsV4 - Run details page using the composable TimelineBar.
+ * RunDetails - Run details page using the composable TimelineBar.
  * Feature: 001-composable-timeline-bar
- *
- * This component mirrors RunDetailsV3's interface but uses the V4 Timeline
- * component for the timeline visualization.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -18,11 +15,11 @@ import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import { isLazyDone, nullishToLazy } from '../utils/lazyLoad';
-// Import V4 components (decoupled from V3)
+// Import new components (decoupled from previous details version)
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
-// Import V4 Timeline
+// Import Timeline
 import { Timeline } from './Timeline';
 import { TimelineLegend } from './TimelineLegend';
 import { TopInfo } from './TopInfo';
@@ -61,7 +58,7 @@ const isWaiting = (status?: string, runError?: Error | null, traceResultError?: 
 };
 
 /**
- * V4 Timeline wrapper that converts V3 Trace data to V4 format
+ * Timeline wrapper that converts Trace data to timeline format
  * and handles step selection to update the right panel.
  */
 function TimelineV4Wrapper({
@@ -86,7 +83,7 @@ function TimelineV4Wrapper({
     return map;
   }, [trace]);
 
-  // Convert V3 trace to V4 TimelineData
+  // Convert traces to TimelineData
   const timelineData = useMemo(
     () => traceToTimelineData(trace, { runID, orgName, functionSlug }),
     [trace, runID, orgName, functionSlug]
@@ -106,7 +103,7 @@ function TimelineV4Wrapper({
   return <Timeline data={timelineData} onSelectStep={handleSelectStep} />;
 }
 
-export const RunDetailsV4 = ({
+export const RunDetails = ({
   getTrigger,
   runID,
   standalone,

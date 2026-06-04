@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { RunDetailsV4 } from '@inngest/components/RunDetails';
+import { RunDetails } from '@inngest/components/RunDetails';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { cn } from '@inngest/components/utils/classNames';
@@ -28,7 +28,7 @@ function RunComponent() {
 
   return (
     <div className={cn('bg-canvasBase overflow-y-auto pt-8')}>
-      <RunDetailsV4
+      <RunDetails
         standalone
         getTrigger={getTrigger}
         pollInterval={pollInterval}

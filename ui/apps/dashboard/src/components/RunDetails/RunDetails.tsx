@@ -1,4 +1,4 @@
-import { RunDetailsV4 } from '@inngest/components/RunDetails';
+import { RunDetails } from '@inngest/components/RunDetails';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useGetTrigger } from './useGetTrigger';
@@ -15,7 +15,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
 
   return (
     <div className={cn('overflow-y-auto', standalone && 'pt-8')}>
-      <RunDetailsV4
+      <RunDetails
         standalone={standalone}
         getTrigger={getTrigger}
         runID={runID}

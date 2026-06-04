@@ -1,5 +1,5 @@
 /**
- * RunDetailsV4 - Composable Timeline Bar Component
+ * RunDetails - Composable Timeline Bar Component
  * Feature: 001-composable-timeline-bar
  */
 
@@ -20,7 +20,7 @@ export type {
 export { TimelineBar } from './TimelineBar';
 export { TimelineHeader } from './TimelineHeader';
 export { Timeline } from './Timeline';
-export { RunDetailsV4 } from './RunDetailsV4';
+export { RunDetails } from './RunDetails';
 
 // Utilities
 export { formatDuration } from './runDetailsUtils';
