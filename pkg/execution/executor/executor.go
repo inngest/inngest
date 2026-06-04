@@ -1990,12 +1990,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			// from the HTTP request to the user's SDK function.
 			if resp.HTTPStat != nil {
 				httpTimingMd := extractors.ExtractHTTPTimingMetadata(resp.HTTPStat)
-				_, err := e.createMetadataSpan(
+				_, err := e.createMetadataSpanOnParent(
 					ctx,
 					&instance,
 					"executor.httpTiming",
 					httpTimingMd,
-					enums.MetadataScopeStepAttempt,
+					enums.MetadataScopeRequest,
+					instance.execSpan,
 				)
 				if err != nil {
 					l.Warn("error creating HTTP timing metadata span", "error", err)
@@ -2004,12 +2005,13 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 			// Attach timing breakdown metadata (queue delay, system latency, network total)
 			if timingMd := extractors.BuildTimingMetadata(instance.item.RunInfo, resp.HTTPStat); timingMd != nil {
-				_, err := e.createMetadataSpan(
+				_, err := e.createMetadataSpanOnParent(
 					ctx,
 					&instance,
 					"executor.timing",
 					timingMd,
-					enums.MetadataScopeStepAttempt,
+					enums.MetadataScopeRequest,
+					instance.execSpan,
 				)
 				if err != nil {
 					l.Warn("error creating timing metadata span", "error", err)
@@ -5757,8 +5759,6 @@ func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx ex
 }
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {
-	l := e.log
-
 	var parent *meta.SpanReference
 
 	switch scope {
@@ -5767,9 +5767,13 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
 		parent = runCtx.ExecutionSpan()
 	default:
-		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
+		return nil, fmt.Errorf("unknown metadata scope: %s", sanitizeLogValue(scope.String()))
 	}
 
+	return e.createMetadataSpanOnParent(ctx, runCtx, location, md, scope, parent)
+}
+
+func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope, parent *meta.SpanReference) (*meta.SpanReference, error) {
 	ref, err := tracing.CreateMetadataSpan(
 		ctx,
 		e.tracerProvider,
@@ -5782,14 +5786,14 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	)
 	if err != nil {
 		if errors.Is(err, metadata.ErrMetadataSpanTooLarge) {
-			l.Warn("metadata span exceeds maximum size",
+			e.log.Warn("metadata span exceeds maximum size",
 				"run_id", runCtx.Metadata().ID.RunID,
 				"metadata_kind", md.Kind().String(),
 				"location", location,
 			)
 		}
 		if errors.Is(err, metadata.ErrRunMetadataSizeExceeded) {
-			l.Warn("run cumulative metadata size exceeded",
+			e.log.Warn("run cumulative metadata size exceeded",
 				"current_size", runCtx.Metadata().Metrics.MetadataSize,
 				"limit", consts.MaxRunMetadataSize,
 				"run_id", runCtx.Metadata().ID.RunID,
