@@ -26,7 +26,6 @@ type checkpointRunContext struct {
 	priorityFactor  *int64
 	concurrencyKeys []state.CustomConcurrency
 	parallelMode    enums.ParallelMode
-	requestID       string
 }
 
 func (c *checkpointRunContext) Metadata() *state.Metadata {
@@ -145,8 +144,4 @@ func (c *checkpointRunContext) StartTime() time.Time {
 func (c *checkpointRunContext) ReleaseCapacityLease() error {
 	// TODO: Implement this once capacity leases are supported in Checkpointing
 	return nil
-}
-
-func (c *checkpointRunContext) RequestID() string {
-	return c.requestID
 }

@@ -82,10 +82,6 @@ func (r *runInstance) MaxAttempts() *int {
 	return &max
 }
 
-func (r *runInstance) RequestID() string {
-	return r.requestID
-}
-
 func (r *runInstance) OnlyHasLazyOps() bool {
 	if r.resp == nil {
 		return false
