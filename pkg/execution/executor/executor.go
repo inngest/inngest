@@ -3011,7 +3011,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
 	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
 	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
-	// trace lifecycles, whihc also require pauses.
+	// trace lifecycles, which also require pauses.
 	id := sv2.IDFromPause(pause)
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == state.ErrRunNotFound {
@@ -4054,7 +4054,7 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 
 func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	// An API-based function went async and finished.  This must always be a apiresult.APIResult.
-	// Both opcodes in a sync fn cehckpoint should always return this shape of data.
+	// Both opcodes in a sync fn checkpoint should always return this shape of data.
 	result := struct {
 		Data apiresult.APIResult `json:"data"`
 	}{}
@@ -4100,7 +4100,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		// Planned generator IDs are the same as the actual OpcodeStep IDs.
 		// We can't set edge.Edge.Outgoing here because the step hasn't yet ran.
 		//
-		// We do, though, want to store the incomin step ID name _without_ overriding
+		// We do, though, want to store the incoming step ID name _without_ overriding
 		// the actual DAG step, though.
 		// Run the same action.
 		IncomingGeneratorStep:     gen.ID,

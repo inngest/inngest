@@ -393,7 +393,7 @@ func SpanRefFromPause(p *state.Pause) *meta.SpanReference {
 // _userland_) this step should be under.
 //
 // A single exception is maybe the very first execution, but also with that we
-// shoud have the run span inside the queue item's metadata.
+// should have the run span inside the queue item's metadata.
 func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 	if md == nil {
 		return nil
