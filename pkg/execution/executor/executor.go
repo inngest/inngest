@@ -3895,19 +3895,7 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 	// real data.
 	//
 	// State stored for each step MUST always be wrapped with either "error" or "data".
-	retryable := true
-
-	if gen.Error.NoRetry {
-		// This is a NonRetryableError thrown in a step.
-		retryable = false
-	}
-	if !runCtx.ShouldRetry() {
-		// This is the last attempt as per the attempt in the queue, which
-		// means we've failed N times, and so it is not retryable.
-		retryable = false
-	}
-
-	if retryable {
+	if IsStepRetryable(&gen, runCtx) {
 		// Return an error to trigger standard queue retries.
 		runCtx.IncrementAttempt()
 		for _, l := range e.lifecycles {
