@@ -462,8 +462,7 @@ func FinalizedStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID stri
 	cfg := DeterministicSpanConfig(md.ID.RunID[:])
 	stepSpanID := DeterministicSpanConfig(FinalizedStepDynamicSeed(stepID)).SpanID
 	return &meta.SpanReference{
-		DynamicSpanID: stepSpanID.String(),
-		// TODO: validate that -00 is ok
+		DynamicSpanID:          stepSpanID.String(),
 		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
 	}
@@ -483,8 +482,7 @@ func RetryStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID string, 
 	cfg := DeterministicSpanConfig(md.ID.RunID[:])
 	stepSpanID := DeterministicSpanConfig(RetryStepDynamicSeed(stepID, attempt)).SpanID
 	return &meta.SpanReference{
-		DynamicSpanID: stepSpanID.String(),
-		// TODO: validate that -00 is ok
+		DynamicSpanID:          stepSpanID.String(),
 		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
 	}
