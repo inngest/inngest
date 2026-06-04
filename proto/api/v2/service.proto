@@ -1236,6 +1236,7 @@ service V2 {
       summary: "List insights tables"
       tags: "Insights"
       tags: "Beta"
+      tags: "Internal"
       description: "Lists the available tables that can be queried via the Insights query endpoint."
       security: {
         security_requirement: {
@@ -1298,6 +1299,7 @@ service V2 {
       summary: "List event type schemas"
       tags: "Insights"
       tags: "Beta"
+      tags: "Internal"
       description: "Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON."
       security: {
         security_requirement: {
@@ -1372,6 +1374,7 @@ service V2 {
       summary: "Generate insights query from prompt"
       tags: "Insights"
       tags: "Beta"
+      tags: "Internal"
       description: "Translates a natural language prompt into an Insights SQL query."
       security: {
         security_requirement: {
@@ -1457,6 +1460,7 @@ service V2 {
       summary: "Query insights"
       tags: "Insights"
       tags: "Beta"
+      tags: "Internal"
       description: "Query Insights using the provided SQL query."
       security: {
         security_requirement: {
