@@ -677,7 +677,8 @@ func (d debouncer) runMigration(
 
 	if err := secondary.DebounceDeleteItems(ctx, scopeForDebounceItem(di), *existingID); err != nil {
 		l.Error("unable to delete old debounce after migration", "err", err)
-		return ulid.ULID{}, nil // non-fatal: let caller skip
+		return *existingID, nil // non-fatal: proceed with migrated ID
+	}
 	}
 	queueItemID := queue.HashID(ctx, existingID.String())
 	if err := secondary.RemoveQueueItem(ctx, scopeForDebounceItem(di), queue.KindDebounce, queueItemID); err != nil {
