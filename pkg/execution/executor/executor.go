@@ -1122,6 +1122,9 @@ func (e *executor) schedule(
 	// Some scenarios are happy path (e.g.  queue idempotency) and some are sad
 	// path (e.g. Executor borked)
 	sendSpans := func() {
+		_, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule.send_spans", req.AccountID, req.WorkspaceID, req.Function.ID)
+		defer span.End()
+
 		if runSpanRef != nil {
 			err := runSpanRef.Send()
 			if err != nil {
@@ -1260,7 +1263,9 @@ func (e *executor) schedule(
 	// Check if the function should be skipped (paused, draining, backlog limit)
 	// Only check if not already marked as skipped (e.g., by singleton)
 	if skipReason == enums.SkipReasonNone {
+		_, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule.skipped", req.AccountID, req.WorkspaceID, req.Function.ID)
 		skipReason = e.skipped(ctx, req)
+		span.End()
 	}
 
 	// Create run state if not skipped
@@ -1505,7 +1510,9 @@ func (e *executor) schedule(
 	}
 
 	// Schedule for async functons (the default)
+	_, queueSpan := e.conditionalTracer.NewSpan(ctx, "executor.schedule.queue_enqueue", req.AccountID, req.WorkspaceID, req.Function.ID)
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
+	queueSpan.End()
 
 	switch err {
 	case nil:
