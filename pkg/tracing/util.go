@@ -258,6 +258,8 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	case enums.OpcodeStepPlanned:
 		{
 			// Nothing yet (there are defaults above)
+			status := enums.StepStatusQueued
+			meta.AddAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 		}
 
 	case enums.OpcodeWaitForEvent:

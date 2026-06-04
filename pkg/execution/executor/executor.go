@@ -4050,23 +4050,38 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		ParallelMode: gen.ParallelMode(),
 	}
 
-	parent := tracing.RunSpanRefFromMetadata(runCtx.Metadata())
-	attrs := tracing.GeneratorAttrs(&gen)
-	meta.AddAttr(attrs, meta.Attrs.QueuedAt, &now)
-	meta.AddAttr(attrs, meta.Attrs.ScheduledAt, &now)
-
+	md := runCtx.Metadata()
 	lifecycleItem := runCtx.LifecycleItem()
+
+	_, err := e.tracerProvider.CreateSpan(
+		ctx,
+		meta.SpanNameStepDiscovery,
+		&tracing.CreateSpanOptions{
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStepPlanned"},
+			Carriers:    []map[string]any{nextItem.Metadata},
+			Metadata:    md,
+			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Parent:      runCtx.RootSpan(),
+			QueueItem:   &nextItem,
+		},
+	)
+	if err != nil {
+		e.log.Debug("error creating span discovery step after sleep", "error", err)
+	}
+
+	attrs := tracing.GeneratorAttrs(&gen)
+	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
+
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
-			Carriers:    []map[string]any{nextItem.Metadata},
-			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStepPlanned"},
-			Metadata:    runCtx.Metadata(),
-			QueueItem:   &nextItem,
-			Parent:      parent,
-			Attributes:  attrs,
+			DynamicSpanIDOverride: tracing.DeterministicSpanConfig(tracing.FinalizedStepDynamicSeed(gen.ID)).SpanID.String(),
+			Debug:                 &tracing.SpanDebugData{Location: "executor.handleGeneratorStepPlanned"},
+			Metadata:              runCtx.Metadata(),
+			QueueItem:             &nextItem,
+			Parent:                runCtx.RootSpan(),
+			Attributes:            attrs,
 		},
 	)
 	if err != nil {
@@ -4166,7 +4181,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 			&tracing.CreateSpanOptions{
 				Debug:       &tracing.SpanDebugData{Location: "executor.sleepDiscovery"},
 				Metadata:    metadata,
-				FollowsFrom: span.Ref,
+				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
 				// Always from the root span.
 				Parent:    tracing.RunSpanRefFromMetadata(metadata),
 				QueueItem: &nextItem,
