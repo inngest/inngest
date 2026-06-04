@@ -756,13 +756,9 @@ func (d debouncer) scheduleTimeout(
 			case <-ctx.Done():
 				return ctx.Err()
 			}
-		// One re-entry only. If the lease is still held after the sleep the
-		// executing function will read the latest event from the hash; bail
-		// rather than recurse again.
-		if reentry {
+			// One re-entry only. If the lease is still held after the sleep the
+			// executing function will read the latest event from the hash; bail.
 			return nil
-		}
-		return d.scheduleTimeoutReentry(ctx, di, fn, ttl, now, queueShard, shouldMigrate, result)
 
 		case errors.Is(reqErr, queue.ErrQueueItemNotFound):
 			// State was updated but the queue item vanished. Create a fresh one.
