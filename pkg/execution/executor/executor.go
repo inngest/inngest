@@ -5680,9 +5680,9 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		parent = tracing.RunSpanRefFromMetadata(runMD)
 	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
 		if op.Op == enums.OpcodeStepError && IsStepRetryable(op, runCtx) {
-			parent = tracing.FinalizedStepSpanRefFromMetadataAndStepID(runMD, op.ID)
-		} else {
 			parent = tracing.RetryStepSpanRefFromMetadataAndStepID(runMD, op.ID, runCtx.AttemptCount())
+		} else {
+			parent = tracing.FinalizedStepSpanRefFromMetadataAndStepID(runMD, op.ID)
 		}
 	default:
 		return nil, fmt.Errorf("unknown metadata scope: %s", sanitizeLogValue(scope.String()))
