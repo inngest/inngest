@@ -5685,7 +5685,7 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 			parent = tracing.RetryStepSpanRefFromMetadataAndStepID(runMD, op.ID, runCtx.AttemptCount())
 		}
 	default:
-		return nil, fmt.Errorf("unknown metadata scope: %s", scope)
+		return nil, fmt.Errorf("unknown metadata scope: %s", sanitizeLogValue(scope.String()))
 	}
 
 	return e.createMetadataSpanOnParent(ctx, runCtx, location, md, scope, parent)
@@ -5728,7 +5728,7 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, extra ...metadata.Structured) {
 	for _, md := range gen.Metadata {
 		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata", md, md.Scope, gen); err != nil {
-			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", gen.ID)
+			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
 		}
 	}
 
@@ -5736,7 +5736,7 @@ func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution
 		// TODO: maybe make all metadata have a Scope() method?
 		// For now, we hardcode extra metadata to be step attempt-scoped, as that's the only place we use it and it makes the most sense for it to be tied to the specific attempt that emitted it.
 		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata.extra", ex, enums.MetadataScopeStepAttempt, gen); err != nil {
-			e.log.Warn("error creating metadata span from generator extra metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", gen.ID)
+			e.log.Warn("error creating metadata span from generator extra metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
 		}
 	}
 }
