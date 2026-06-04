@@ -1,0 +1,220 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "unknown_service:node"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.7.1"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "langsmith",
+            "version": "0.7.3"
+          },
+          "spans": [
+            {
+              "traceId": "abfdcffdc9d58d4907c632cb5ebde721",
+              "spanId": "93d60525c6f42e2f",
+              "name": "ChatOpenAI",
+              "kind": 1,
+              "startTimeUnixNano": "1780441346513000000",
+              "endTimeUnixNano": "1780441347995000000",
+              "attributes": [
+                {
+                  "key": "langsmith.traceable",
+                  "value": {
+                    "stringValue": "true"
+                  }
+                },
+                {
+                  "key": "langsmith.span.kind",
+                  "value": {
+                    "stringValue": "llm"
+                  }
+                },
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "langsmith.trace.name",
+                  "value": {
+                    "stringValue": "ChatOpenAI"
+                  }
+                },
+                {
+                  "key": "langsmith.trace.session_name",
+                  "value": {
+                    "stringValue": "langsmith-openai-fixtures"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.LANGSMITH_TRACING",
+                  "value": {
+                    "stringValue": "true"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.LANGSMITH_OTEL_ENABLED",
+                  "value": {
+                    "stringValue": "true"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_provider",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_model_type",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_model_name",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_invocation_params",
+                  "value": {
+                    "stringValue": "{\"reasoning\":{\"effort\":\"low\"},\"use_responses_api\":true}"
+                  }
+                },
+                {
+                  "key": "langsmith.span.tags",
+                  "value": {
+                    "stringValue": ""
+                  }
+                },
+                {
+                  "key": "gen_ai.prompt",
+                  "value": {
+                    "stringValue": "{\"model\":\"gpt-5.4-nano\",\"input\":\"What is 17 * 24? Think briefly.\",\"reasoning\":{\"effort\":\"low\"}}"
+                  }
+                },
+                {
+                  "key": "langsmith.usage_metadata",
+                  "value": {
+                    "stringValue": "{\"input_tokens\":17,\"output_tokens\":12,\"total_tokens\":29,\"input_token_details\":{\"cache_read\":0},\"output_token_details\":{\"reasoning\":0}}"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.usage_metadata",
+                  "value": {
+                    "stringValue": "{\"input_tokens\":17,\"output_tokens\":12,\"total_tokens\":29,\"input_token_details\":{\"cache_read\":0},\"output_token_details\":{\"reasoning\":0}}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": 17
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": 12
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": 29
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano-2026-03-17"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "resp_0c58250a28f29e7f006a1f61028f248199962f6ae9f6dcec2f"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.service_tier",
+                  "value": {
+                    "stringValue": "default"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_token_details",
+                  "value": {
+                    "stringValue": "{\"cache_read\":0}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_token_details",
+                  "value": {
+                    "stringValue": "{\"reasoning\":0}"
+                  }
+                },
+                {
+                  "key": "gen_ai.completion",
+                  "value": {
+                    "stringValue": "{\"id\":\"resp_0c58250a28f29e7f006a1f61028f248199962f6ae9f6dcec2f\",\"object\":\"response\",\"created_at\":1780441346,\"status\":\"completed\",\"background\":false,\"billing\":{\"payer\":\"developer\"},\"completed_at\":1780441347,\"error\":null,\"frequency_penalty\":0,\"incomplete_details\":null,\"instructions\":null,\"max_output_tokens\":null,\"max_tool_calls\":null,\"model\":\"gpt-5.4-nano-2026-03-17\",\"moderation\":null,\"output\":[{\"id\":\"msg_0c58250a28f29e7f006a1f6102e5508199b723d69648100b8a\",\"type\":\"message\",\"status\":\"completed\",\"content\":[{\"type\":\"output_text\",\"annotations\":[],\"logprobs\":[],\"text\":\"17 × 24 = 408.\"}],\"phase\":\"final_answer\",\"role\":\"assistant\"}],\"parallel_tool_calls\":true,\"presence_penalty\":0,\"previous_response_id\":null,\"prompt_cache_key\":null,\"prompt_cache_retention\":\"24h\",\"reasoning\":{\"context\":\"current_turn\",\"effort\":\"low\",\"summary\":null},\"safety_identifier\":null,\"service_tier\":\"default\",\"store\":true,\"temperature\":1,\"text\":{\"format\":{\"type\":\"text\"},\"verbosity\":\"medium\"},\"tool_choice\":\"auto\",\"tools\":[],\"top_logprobs\":0,\"top_p\":0.98,\"truncation\":\"disabled\",\"user\":null,\"metadata\":{},\"output_text\":\"17 × 24 = 408.\",\"usage_metadata\":{\"input_tokens\":17,\"output_tokens\":12,\"total_tokens\":29,\"input_token_details\":{\"cache_read\":0},\"output_token_details\":{\"reasoning\":0}}}"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 1
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
