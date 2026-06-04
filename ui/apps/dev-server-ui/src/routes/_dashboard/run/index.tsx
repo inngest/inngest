@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { RunDetailsV4 } from '@inngest/components/RunDetailsV4';
+import { RunDetailsV4 } from '@inngest/components/RunDetails';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { cn } from '@inngest/components/utils/classNames';

@@ -22,7 +22,7 @@ import useLocalStorage from 'react-use/lib/useLocalStorage';
 import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetailsV4 } from '../RunDetailsV4';
+import { RunDetailsV4 } from '../RunDetails';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,

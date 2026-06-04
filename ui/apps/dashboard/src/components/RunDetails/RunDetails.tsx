@@ -1,4 +1,4 @@
-import { RunDetailsV4 } from '@inngest/components/RunDetailsV4';
+import { RunDetailsV4 } from '@inngest/components/RunDetails';
 import { cn } from '@inngest/components/utils/classNames';
 
 import { useGetTrigger } from './useGetTrigger';
