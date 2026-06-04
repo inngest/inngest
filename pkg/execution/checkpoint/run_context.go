@@ -2,6 +2,7 @@ package checkpoint
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -127,8 +128,17 @@ func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
 	return nil
 }
 
-func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
+func (c *checkpointRunContext) RootSpan() *meta.SpanReference {
 	return tracing.RunSpanRefFromMetadata(&c.md)
+}
+
+func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
+	return c.RootSpan()
+}
+
+func (c *checkpointRunContext) StartTime() time.Time {
+	// Plumbed here for interface compatibility, but not currently used in checkpointing
+	return time.Time{}
 }
 
 func (c *checkpointRunContext) ReleaseCapacityLease() error {

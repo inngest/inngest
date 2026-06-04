@@ -4233,7 +4233,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorSleep"},
 			Metadata:    metadata,
 			QueueItem:   &nextItem,
-			Parent:      runCtx.ParentSpan(),
+			Parent:      runCtx.RootSpan(),
 			Attributes:  attrs,
 		},
 	)
@@ -4820,7 +4820,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForSignal"},
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Parent:      runCtx.RootSpan(),
 			Attributes:  attrs,
 			StartTime:   now,
 		},
@@ -5023,7 +5023,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorInvokeFunction"},
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Parent:      runCtx.RootSpan(),
 			Attributes:  attrs,
 		},
 	)
@@ -5244,7 +5244,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForEvent"},
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
+			Parent:      runCtx.RootSpan(),
 			Attributes:  attrs,
 		},
 	)

@@ -156,6 +156,10 @@ type RunContext interface {
 	ExecutionSpan() *meta.SpanReference
 	// The span that represents this execution's parent.
 	ParentSpan() *meta.SpanReference
+	// The root span of this execution. IE the run span.
+	RootSpan() *meta.SpanReference
+
+	StartTime() time.Time
 
 	// Group correlation - for pause operations and history tracking
 	GroupID() string
