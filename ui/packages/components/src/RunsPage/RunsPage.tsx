@@ -42,7 +42,7 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'isDeferred'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'isDeferred'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -247,28 +247,17 @@ export function RunsPage({
     (rowData: Run) => {
       return (
         <div className={`border-subtle `}>
-          {features.runDetailsV4 ? (
-            <RunDetailsV4
-              initialRunData={rowData}
-              getTrigger={getTrigger}
-              pollInterval={pollInterval}
-              runID={rowData.id}
-              standalone={false}
-            />
-          ) : (
-            <RunDetailsV3
-              initialRunData={rowData}
-              getTrigger={getTrigger}
-              pollInterval={pollInterval}
-              runID={rowData.id}
-              standalone={false}
-              newStack={true}
-            />
-          )}
+          <RunDetailsV4
+            initialRunData={rowData}
+            getTrigger={getTrigger}
+            pollInterval={pollInterval}
+            runID={rowData.id}
+            standalone={false}
+          />
         </div>
       );
     },
-    [getTrigger, pollInterval, features.tracesPreview, features.runDetailsV4]
+    [getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {
