@@ -362,6 +362,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     status
     attempts
     queuedAt
+    scheduledAt
     startedAt
     endedAt
     isRoot

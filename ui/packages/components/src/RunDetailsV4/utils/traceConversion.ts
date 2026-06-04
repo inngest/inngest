@@ -359,15 +359,18 @@ export function traceRollup(root: Trace): Trace {
       attempts: maxAttempt,
       stepID: stepID,
       queuedAt: minAttemptTrace.queuedAt,
+      scheduledAt: minAttemptTrace.scheduledAt,
       startedAt: minAttemptTrace.startedAt,
       endedAt: maxAttemptTrace.endedAt,
       status: maxAttemptTrace.status,
       outputID: maxAttemptTrace.outputID,
       debugRunID: maxAttemptTrace.debugRunID,
       debugSessionID: maxAttemptTrace.debugSessionID,
-      stepInfo: null,
+      stepInfo: maxAttemptTrace.stepInfo,
 
-      childrenSpans: Array.from(attempts.values()),
+      childrenSpans: Array.from(attempts.values()).sort(
+        (a, b) => (a.attempts ?? 0) - (b.attempts ?? 0)
+      ),
 
       userlandSpan: null,
     };
@@ -381,12 +384,12 @@ export function traceRollup(root: Trace): Trace {
 
   if (finalSpan && finalSpan.groupID && groupedSpans.has(finalSpan.groupID)) {
     const attempts = groupedSpans.get(finalSpan.groupID) as Map<number, Trace>;
-
     const minAttempt = Math.min(...attempts.keys());
     const minAttemptTrace = attempts.get(minAttempt) as Trace;
     const maxAttempt = Math.max(...attempts.keys());
     const maxAttemptTrace = attempts.get(maxAttempt) as Trace;
     if (attempts.size == 1) {
+      maxAttemptTrace.name = 'Finalization';
       rolledUpRunChildren.push(maxAttemptTrace);
     } else {
       // Create a virtual span to represent the finalization as a whole with all attempts
@@ -396,8 +399,9 @@ export function traceRollup(root: Trace): Trace {
         name: 'Finalization',
         spanID: `final-rollup`, // virtual span
         groupID: maxAttemptTrace.groupID,
-        attempts: minAttemptTrace.attempts,
+        attempts: maxAttemptTrace.attempts,
         queuedAt: minAttemptTrace.queuedAt,
+        scheduledAt: minAttemptTrace.scheduledAt,
         startedAt: minAttemptTrace.startedAt,
         endedAt: maxAttemptTrace.endedAt,
         status: maxAttemptTrace.status,
@@ -405,7 +409,9 @@ export function traceRollup(root: Trace): Trace {
         debugRunID: maxAttemptTrace.debugRunID,
         debugSessionID: maxAttemptTrace.debugSessionID,
 
-        childrenSpans: Array.from(attempts.values()),
+        childrenSpans: Array.from(attempts.values()).sort(
+          (a, b) => (a.attempts ?? 0) - (b.attempts ?? 0)
+        ),
 
         stepInfo: null,
         userlandSpan: null,

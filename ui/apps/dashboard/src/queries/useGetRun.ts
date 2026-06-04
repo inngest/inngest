@@ -14,6 +14,7 @@ const traceDetailsFragment = graphql(`
     status
     attempts
     queuedAt
+    scheduledAt
     startedAt
     endedAt
     isRoot
@@ -36,6 +37,7 @@ const traceDetailsFragment = graphql(`
     outputID
     stepID
     spanID
+    groupID
     stepOp
     stepType
     stepInfo {
