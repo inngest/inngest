@@ -4547,7 +4547,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			runCtx,
 			&gen,
 			md,
-			tracing.GatewayResponseAttrs(resp, nil, gen, nil))
+			tracing.GatewayResponseAttrs(resp, nil, gen, rawBody))
 
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
