@@ -5778,7 +5778,6 @@ func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution
 
 func (e *executor) opcodeTiming(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode) (queuedAt, scheduledAt, startedAt, endedAt time.Time) {
 	item := runCtx.LifecycleItem()
-	// TODO: Add a new scheduledAt timestamp and populate queuedAt from item.Enqueued
 	queuedAt = item.EnqueuedAt
 	scheduledAt = slices.MaxFunc([]time.Time{item.At, queuedAt}, time.Time.Compare)
 
