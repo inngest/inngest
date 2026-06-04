@@ -2994,9 +2994,12 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 
 	builder := newSpanRunsQueryBuilder(ctx, opt)
 
-	// Parse CEL expressions using adapter's converter
-	var celFilters []sq.Expression
-	var useJoin bool
+	// Parse CEL expressions using adapter's converter.
+	// Event filters and output filters must be kept separate: event filters reference the
+	// events table (via a join) while output filters reference spans.output directly.
+	// Mixing them in the main span aggregation join corrupts MAX(end_time) — see fix below.
+	var eventCELFilters []sq.Expression
+	var outputCELFilters []sq.Expression
 	if opt.Filter.CEL != "" {
 		expHandler, err := run.NewExpressionHandler(ctx,
 			run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
@@ -3005,12 +3008,17 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 		if err != nil {
 			return nil, err
 		}
-		if expHandler.HasFilters() {
-			celFilters, err = expHandler.ToSQLFilters(ctx)
+		if expHandler.HasEventFilters() {
+			eventCELFilters, err = expHandler.ToEventSQLFilters(ctx)
 			if err != nil {
 				return nil, err
 			}
-			useJoin = needsEventJoin(opt.Filter.CEL)
+		}
+		if expHandler.HasOutputFilters() {
+			outputCELFilters, err = expHandler.ToOutputSQLFilters(ctx)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -3072,13 +3080,46 @@ func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*c
 	orderExprs = append(orderExprs, sq.C("run_id").Asc())
 
 	q := sq.Dialect(h.GoquDialect()).From("spans")
-	if useJoin {
-		// database specific join syntax needed because event_ids is an array of ids to the events table,
-		// so we need to unpack that and perform the join before the spans are grouped back together by run_id
-		q = h.BuildEventJoin(q)
+	// NOTE: the event join (BuildEventJoin) is intentionally NOT applied to the main query here.
+	//
+	// The join uses INNER JOIN on spans.event_ids, which excludes EXTEND spans (they carry no
+	// event_ids). Those spans are required for MAX(spans.end_time) to reflect the true run end
+	// time. Joining events into the main aggregation query therefore causes the "Ended At" column
+	// to show the root executor.run span's end_time instead of the last EXTEND span's end_time
+	// (i.e. the wrong, earlier timestamp reported in issue #4268).
+	//
+	// Instead, event-field CEL predicates are applied via a run_id correlated subquery so that
+	// all spans for a matched run participate in the GROUP BY aggregation.
+
+	allFilters := make([]sq.Expression, len(builder.filter))
+	copy(allFilters, builder.filter)
+
+	if len(eventCELFilters) > 0 {
+		// Identify run_ids whose events satisfy the CEL predicate using a correlated subquery.
+		// The subquery is the only place the event join lives, so EXTEND spans in the outer
+		// query are never dropped and MAX(end_time) remains correct.
+		eventSub := sq.Dialect(h.GoquDialect()).
+			Select(sq.L("spans.run_id")).
+			Distinct().
+			From("spans")
+		eventSub = h.BuildEventJoin(eventSub)
+		for _, f := range eventCELFilters {
+			eventSub = eventSub.Where(f)
+		}
+		allFilters = append(allFilters, sq.L("spans.run_id").In(eventSub))
 	}
 
-	allFilters := append(builder.filter, celFilters...)
+	if len(outputCELFilters) > 0 {
+		// Output/error predicates reference spans.output which is present on individual span rows;
+		// apply them directly.  A run_id subquery is used here too so that the main aggregation
+		// sees all spans for matched runs, not just the spans where output happens to be set.
+		outputSub := sq.Dialect(h.GoquDialect()).
+			Select(sq.L("spans.run_id")).
+			Distinct().
+			From("spans").
+			Where(outputCELFilters...)
+		allFilters = append(allFilters, sq.L("spans.run_id").In(outputSub))
+	}
 	if opt.Filter.IsDeferred != nil {
 		// is_deferred uses TRUE/NULL encoding, so a non-deferred filter must
 		// check IS NULL. Anchor on the executor.run row because EXTEND rows

@@ -328,3 +328,118 @@ func TestToSQLFiltersWithPostgresConverter(t *testing.T) {
 		})
 	}
 }
+
+// TestExpressionHandlerSeparateSQLFilters verifies the ToEventSQLFilters / ToOutputSQLFilters
+// split introduced to fix issue #4268 (wrong EndedAt when CEL event filter is active).
+//
+// Previously ToSQLFilters returned a single flat list; the GetSpanRuns aggregation query
+// then joined the events table in-line, which excluded EXTEND spans and corrupted MAX(end_time).
+// The fix exposes separate accessors so event filters can be moved to a subquery.
+func TestExpressionHandlerSeparateSQLFilters(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("event-only CEL populates only event filters", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerBlob(`event.name == "user/created"`, "\n"),
+			WithExpressionSQLConverter(SpanEventSQLiteConverter),
+		)
+		require.NoError(t, err)
+
+		eventFilters, err := h.ToEventSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.NotEmpty(t, eventFilters, "event CEL must produce event SQL filters")
+
+		outputFilters, err := h.ToOutputSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, outputFilters, "event-only CEL must produce no output SQL filters")
+	})
+
+	t.Run("output-only CEL populates only output filters", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerBlob(`output.status == "ok"`, "\n"),
+			WithExpressionSQLConverter(SpanEventSQLiteConverter),
+		)
+		require.NoError(t, err)
+
+		eventFilters, err := h.ToEventSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, eventFilters, "output-only CEL must produce no event SQL filters")
+
+		outputFilters, err := h.ToOutputSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.NotEmpty(t, outputFilters, "output CEL must produce output SQL filters")
+	})
+
+	t.Run("error-only CEL populates only output filters", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerBlob(`error.message == "timeout"`, "\n"),
+			WithExpressionSQLConverter(SpanEventSQLiteConverter),
+		)
+		require.NoError(t, err)
+
+		eventFilters, err := h.ToEventSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, eventFilters)
+
+		outputFilters, err := h.ToOutputSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.NotEmpty(t, outputFilters, "error.* maps to output filters (spans.output column)")
+	})
+
+	t.Run("mixed CEL populates both filter sets", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerBlob(`event.name == "user/created"`, "\n"),
+			WithExpressionHandlerBlob(`output.status == "ok"`, "\n"),
+			WithExpressionSQLConverter(SpanEventSQLiteConverter),
+		)
+		require.NoError(t, err)
+
+		eventFilters, err := h.ToEventSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.NotEmpty(t, eventFilters)
+
+		outputFilters, err := h.ToOutputSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.NotEmpty(t, outputFilters)
+	})
+
+	t.Run("ToSQLFilters is the union of event and output filters", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionHandlerBlob(`event.name == "user/created"`, "\n"),
+			WithExpressionHandlerBlob(`output.status == "ok"`, "\n"),
+			WithExpressionSQLConverter(SpanEventSQLiteConverter),
+		)
+		require.NoError(t, err)
+
+		all, err := h.ToSQLFilters(ctx)
+		require.NoError(t, err)
+
+		evtF, err := h.ToEventSQLFilters(ctx)
+		require.NoError(t, err)
+
+		outF, err := h.ToOutputSQLFilters(ctx)
+		require.NoError(t, err)
+
+		assert.Equal(t, len(evtF)+len(outF), len(all),
+			"ToSQLFilters count must equal ToEventSQLFilters + ToOutputSQLFilters")
+	})
+
+	t.Run("empty handler produces no filters from any accessor", func(t *testing.T) {
+		h, err := NewExpressionHandler(ctx,
+			WithExpressionSQLConverter(SpanEventSQLiteConverter),
+		)
+		require.NoError(t, err)
+
+		evtF, err := h.ToEventSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, evtF)
+
+		outF, err := h.ToOutputSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, outF)
+
+		all, err := h.ToSQLFilters(ctx)
+		require.NoError(t, err)
+		assert.Empty(t, all)
+	})
+}

@@ -1849,6 +1849,134 @@ func TestSpanOutputReadBack(t *testing.T) {
 	assert.Contains(t, string(out.Data), `"num":42`, "output should contain raw JSON, not double-encoded")
 }
 
+// TestGetSpanRunsCELEventFilterPreservesEndedAt is the regression test for issue #4268.
+//
+// Root cause: GetSpanRuns used INNER JOIN on spans.event_ids when a CEL event.* filter was
+// present. Only the root executor.run span carries event_ids; EXTEND spans have NULL
+// event_ids and are excluded by the INNER JOIN. MAX(spans.end_time) was therefore computed
+// only from the root span, producing an earlier (wrong) EndedAt.
+//
+// Fix: event CEL predicates are evaluated via a correlated run_id subquery so that ALL spans
+// for matched runs participate in the GROUP BY aggregation.
+func TestGetSpanRunsCELEventFilterPreservesEndedAt(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+
+	// Insert an event the CEL filter will match on.
+	eventID := uuid.New().String()
+	q := cm.(wrapper).q
+	err := q.InsertEvent(ctx, dbpkg.InsertEventParams{
+		InternalID: ulid.MustNew(ulid.Now(), rand.Reader),
+		ReceivedAt: time.Now(),
+		EventID:    eventID,
+		EventName:  "user/created",
+		EventData:  `{"plan":"pro"}`,
+		EventUser:  `{}`,
+		EventTs:    time.Now(),
+	})
+	require.NoError(t, err)
+
+	// event_ids encoded as a JSON array — the events join reads it with json_each (SQLite)
+	// or jsonb_array_elements_text (Postgres).
+	eventIDsJSON, err := json.Marshal([]string{eventID})
+	require.NoError(t, err)
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	// Spans in the same run share a single trace_id so they collapse into one GROUP BY group.
+	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	baseTime := time.Now().UTC().Truncate(time.Millisecond)
+	dynSpanID := "dyn-root"
+
+	// Root span (executor.run): has event_ids, short duration.
+	rootEnd := baseTime.Add(200 * time.Millisecond)
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		TraceID:       traceID,
+		DynamicSpanID: dynSpanID,
+		Name:          "executor.run",
+		StartTime:     baseTime,
+		EndTime:       rootEnd,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+		EventIds:      eventIDsJSON,
+	})
+
+	// EXTEND span: same run/trace/dynSpanID, no event_ids, ends 5 s after root.
+	// This is the true run end time and must survive the CEL event filter.
+	trueEndTime := baseTime.Add(5 * time.Second)
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		TraceID:       traceID,
+		DynamicSpanID: dynSpanID,
+		Name:          "executor.run:EXTEND",
+		StartTime:     rootEnd,
+		EndTime:       trueEndTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+		// EventIds intentionally omitted — EXTEND spans do not carry event_ids
+	})
+
+	baseFilter := cqrs.GetTraceRunFilter{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		FunctionID:  []uuid.UUID{functionID},
+		TimeField:   enums.TraceRunTimeStartedAt,
+		From:        baseTime.Add(-time.Hour),
+		Until:       baseTime.Add(time.Hour),
+	}
+	order := []cqrs.GetTraceRunOrder{
+		{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+	}
+
+	t.Run("without CEL: EndedAt reflects the last EXTEND span's end_time", func(t *testing.T) {
+		runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+			Filter:  baseFilter,
+			Order:   order,
+			Preview: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, runs, 1)
+		assert.Equal(t, trueEndTime.UnixMilli(), runs[0].EndedAt.UnixMilli(),
+			"without CEL, EndedAt must equal the last EXTEND span's end_time")
+	})
+
+	t.Run("with event CEL filter: EndedAt must still equal the true run end_time (regression #4268)", func(t *testing.T) {
+		filter := baseFilter
+		filter.CEL = `event.name == "user/created"`
+		runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+			Filter:  filter,
+			Order:   order,
+			Preview: true,
+		})
+		require.NoError(t, err)
+		require.Len(t, runs, 1, "run must appear in CEL-filtered results")
+		assert.Equal(t, trueEndTime.UnixMilli(), runs[0].EndedAt.UnixMilli(),
+			"with event CEL, EndedAt must still equal the EXTEND span's end_time, not the root span's")
+	})
+
+	t.Run("non-matching event CEL filter: run must be excluded", func(t *testing.T) {
+		filter := baseFilter
+		filter.CEL = `event.name == "other/event"`
+		runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+			Filter:  filter,
+			Order:   order,
+			Preview: true,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, runs, "CEL filter for non-matching event name must return no runs")
+	})
+}
+
 //
 // Helpers
 //
@@ -1856,18 +1984,21 @@ func TestSpanOutputReadBack(t *testing.T) {
 type testSpanFields struct {
 	RunID          string    // required
 	DynamicSpanID  string    // required for GROUP BY tests
+	TraceID        string    // shared across spans in the same run (generated if empty)
 	ParentSpanID   string    // for child spans (references parent's DynamicSpanID)
 	DebugRunID     string    // for debug run tests
 	DebugSessionID string    // for debug session tests
 	Name           string    // default: "test-span"
 	Status         string    // default: "" (NULL)
 	StartTime      time.Time // default: time.Now()
+	EndTime        time.Time // default: StartTime + 100ms
 	AccountID      string    // default: "acct"
 	AppID          string    // default: "app"
 	FunctionID     string    // default: "fn"
 	EnvID          string    // default: "env"
 	Attributes     []byte    // JSON attributes (optional)
 	Output         []byte    // JSON output (optional)
+	EventIds       []byte    // JSON-encoded event ID array, e.g. ["uuid1"] (optional)
 }
 
 // There aren't any functions exposed on cqrs.Manager that write to the new spans table
@@ -1876,7 +2007,10 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 	t.Helper()
 
 	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	traceID := spanFields.TraceID
+	if traceID == "" {
+		traceID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	}
 
 	// Apply defaults
 	if spanFields.Name == "" {
@@ -1898,6 +2032,11 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		spanFields.EnvID = "env"
 	}
 
+	endTime := spanFields.EndTime
+	if endTime.IsZero() {
+		endTime = spanFields.StartTime.Add(100 * time.Millisecond)
+	}
+
 	// TODO: ideally we should not have to do this type assertion to wrapper to write a span
 	q := cm.(wrapper).q
 	err := q.InsertSpan(t.Context(), dbpkg.InsertSpanParams{
@@ -1907,7 +2046,7 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		Name:           spanFields.Name,
 		Status:         sql.NullString{String: spanFields.Status, Valid: spanFields.Status != ""},
 		StartTime:      spanFields.StartTime,
-		EndTime:        spanFields.StartTime.Add(100 * time.Millisecond),
+		EndTime:        endTime,
 		RunID:          spanFields.RunID,
 		AccountID:      spanFields.AccountID,
 		AppID:          spanFields.AppID,
@@ -1918,6 +2057,7 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		DebugSessionID: sql.NullString{String: spanFields.DebugSessionID, Valid: spanFields.DebugSessionID != ""},
 		Attributes:     spanFields.Attributes,
 		Output:         spanFields.Output,
+		EventIds:       spanFields.EventIds,
 	})
 	require.NoError(t, err)
 }
