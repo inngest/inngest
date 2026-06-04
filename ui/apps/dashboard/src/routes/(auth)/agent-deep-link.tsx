@@ -4,6 +4,7 @@ import {
   stripDeepLinkParams,
   validateAgentDeepLinkSearch,
 } from '@/lib/deepLinkUtils';
+import { canonicalLink } from '@/utils/urls';
 import { useClerk, useSignIn } from '@clerk/tanstack-react-start';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
@@ -16,6 +17,10 @@ const consumedTickets = new Set<string>();
 export const Route = createFileRoute('/(auth)/agent-deep-link')({
   component: AgentDeepLink,
   validateSearch: validateAgentDeepLinkSearch,
+  head: () => ({
+    links: [canonicalLink('/agent-deep-link')],
+    meta: [{ name: 'robots', content: 'noindex' }],
+  }),
 });
 
 function AgentDeepLink() {
