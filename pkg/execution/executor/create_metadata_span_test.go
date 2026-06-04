@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -47,6 +48,8 @@ func (m *mockRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.
 func (m *mockRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {}
 func (m *mockRunContext) SetError(err error)                                                   {}
 func (m *mockRunContext) ReleaseCapacityLease() error                                          { return nil }
+func (m *mockRunContext) RootSpan() *meta.SpanReference                                        { return &meta.SpanReference{} }
+func (m *mockRunContext) StartTime() time.Time                                                 { return time.Time{} }
 
 // Compile-time check that mockRunContext implements RunContext.
 var _ execution.RunContext = (*mockRunContext)(nil)
