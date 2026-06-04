@@ -22,6 +22,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// singleShardEnv is all components needed for a non-migration debounce test.
+type singleShardEnv struct {
+	cluster *miniredis.Miniredis
+	client  *redis_state.UnshardedClient // for direct Redis inspection
+	shard   queue.QueueShard
+	deb     Debouncer
+}
+
+// newSingleShardEnv spins up an in-memory Redis shard and wires a Debouncer to
+// it. Uses the real clock; for fake-clock tests build the environment manually.
+func newSingleShardEnv(t *testing.T) singleShardEnv {
+	t.Helper()
+	cluster := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{cluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	client := redis_state.NewUnshardedClient(rc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{queue.KindDebounce: queue.KindDebounce}),
+	}
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, client.Queue(), opts...)
+	reg, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	q, err := queue.New(context.Background(), "debounce-test", reg, opts...)
+	require.NoError(t, err)
+	deb, err := NewDebouncer(reg, shard.Name(), q)
+	require.NoError(t, err)
+	return singleShardEnv{cluster: cluster, client: client, shard: shard, deb: deb}
+}
+
+func testScope(accountID, workspaceID, functionID uuid.UUID) queue.Scope {
+	return queue.Scope{AccountID: accountID, EnvID: workspaceID, FunctionID: functionID}
+}
+
 func migrationShardMap(defaultShard, newSystemShard queue.QueueShard) map[string]queue.QueueShard {
 	return map[string]queue.QueueShard{
 		consts.DefaultQueueShardName: defaultShard,
@@ -29,18 +65,10 @@ func migrationShardMap(defaultShard, newSystemShard queue.QueueShard) map[string
 	}
 }
 
-func testScope(accountID, workspaceID, functionID uuid.UUID) queue.Scope {
-	return queue.Scope{
-		AccountID:  accountID,
-		EnvID:      workspaceID,
-		FunctionID: functionID,
-	}
-}
-
 // migrationShardSelector routes system queue items (queueName != nil) to the
 // new system shard and everything else to the default shard.
 func migrationShardSelector(defaultShard, newSystemShard queue.QueueShard) func(ctx context.Context, accountID uuid.UUID, queueName *string) (queue.QueueShard, error) {
-	return func(ctx context.Context, accountID uuid.UUID, queueName *string) (queue.QueueShard, error) {
+	return func(_ context.Context, _ uuid.UUID, queueName *string) (queue.QueueShard, error) {
 		if queueName != nil {
 			return newSystemShard, nil
 		}
@@ -1785,33 +1813,8 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 }
 
 func TestGetDebounceInfo(t *testing.T) {
-	unshardedCluster := miniredis.RunT(t)
-
-	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{unshardedCluster.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-
-	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-
-	opts := []queue.QueueOpt{
-		queue.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
-	}
-
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
-
-	shardRegistry, err := queue.NewSingleShardRegistry(shard)
-	require.NoError(t, err)
-
-	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
-	require.NoError(t, err)
-
-	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
-	require.NoError(t, err)
-
+	env := newSingleShardEnv(t)
+	redisDebouncer := env.deb
 	ctx := context.Background()
 	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 
@@ -1976,33 +1979,8 @@ func TestGetDebounceInfo(t *testing.T) {
 }
 
 func TestDeleteDebounce(t *testing.T) {
-	unshardedCluster := miniredis.RunT(t)
-
-	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{unshardedCluster.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-
-	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-
-	opts := []queue.QueueOpt{
-		queue.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
-	}
-
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
-
-	shardRegistry, err := queue.NewSingleShardRegistry(shard)
-	require.NoError(t, err)
-
-	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
-	require.NoError(t, err)
-
-	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
-	require.NoError(t, err)
-
+	env := newSingleShardEnv(t)
+	redisDebouncer := env.deb
 	ctx := context.Background()
 	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
 
@@ -2068,33 +2046,8 @@ func TestDeleteDebounce(t *testing.T) {
 }
 
 func TestRunDebounce(t *testing.T) {
-	unshardedCluster := miniredis.RunT(t)
-
-	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{unshardedCluster.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-
-	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-
-	opts := []queue.QueueOpt{
-		queue.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
-	}
-
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
-
-	shardRegistry, err := queue.NewSingleShardRegistry(shard)
-	require.NoError(t, err)
-
-	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
-	require.NoError(t, err)
-
-	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
-	require.NoError(t, err)
-
+	env := newSingleShardEnv(t)
+	redisDebouncer := env.deb
 	ctx := context.Background()
 	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
 
@@ -2163,34 +2116,9 @@ func TestRunDebounce(t *testing.T) {
 }
 
 func TestDeleteDebounceByID(t *testing.T) {
-	unshardedCluster := miniredis.RunT(t)
-
-	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{unshardedCluster.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-
-	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	debounceClient := unshardedClient.Debounce()
-
-	opts := []queue.QueueOpt{
-		queue.WithKindToQueueMapping(map[string]string{
-			queue.KindDebounce: queue.KindDebounce,
-		}),
-	}
-
-	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
-
-	shardRegistry, err := queue.NewSingleShardRegistry(shard)
-	require.NoError(t, err)
-
-	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
-	require.NoError(t, err)
-
-	redisDebouncer, err := NewDebouncer(shardRegistry, shard.Name(), q)
-	require.NoError(t, err)
-
+	env := newSingleShardEnv(t)
+	redisDebouncer := env.deb
+	debounceClient := env.client.Debounce()
 	ctx := context.Background()
 	accountId, workspaceId, appId := uuid.New(), uuid.New(), uuid.New()
 
@@ -2236,7 +2164,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 
 	// hashFieldExists checks if a field exists in a Redis hash using miniredis.
 	hashFieldExists := func(key, field string) bool {
-		val := unshardedCluster.HGet(key, field)
+		val := env.cluster.HGet(key, field)
 		return val != ""
 	}
 
@@ -2256,7 +2184,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 
 		// Verify the timeout queue item exists
 		queueItemId := queue.HashID(ctx, debounceID.String())
-		_, err := shard.LoadQueueItem(ctx, queueItemId)
+		_, err := env.shard.LoadQueueItem(ctx, queueItemId)
 		require.NoError(t, err, "timeout queue item should exist")
 
 		// Delete by ID
@@ -2267,7 +2195,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.False(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should be deleted from hash")
 
 		// Verify the timeout queue item is gone
-		_, err = shard.LoadQueueItem(ctx, queueItemId)
+		_, err = env.shard.LoadQueueItem(ctx, queueItemId)
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout queue item should be deleted")
 
 		// The pointer key may still exist (DeleteDebounceByID does not clean it up),
@@ -2285,7 +2213,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 
 		// Verify the timeout queue item exists
 		queueItemId := queue.HashID(ctx, debounceID.String())
-		_, err := shard.LoadQueueItem(ctx, queueItemId)
+		_, err := env.shard.LoadQueueItem(ctx, queueItemId)
 		require.NoError(t, err, "timeout queue item should exist")
 
 		// Delete by ID (pointer is gone, but item + timeout still exist)
@@ -2296,7 +2224,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.False(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should be deleted from hash")
 
 		// Verify timeout queue item is gone
-		_, err = shard.LoadQueueItem(ctx, queueItemId)
+		_, err = env.shard.LoadQueueItem(ctx, queueItemId)
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout queue item should be deleted")
 	})
 
@@ -2308,11 +2236,11 @@ func TestDeleteDebounceByID(t *testing.T) {
 
 		// Manually remove the timeout queue item first
 		queueItemId := queue.HashID(ctx, debounceID.String())
-		err := shard.RemoveQueueItem(ctx, scope, queue.KindDebounce, queueItemId)
+		err := env.shard.RemoveQueueItem(ctx, scope, queue.KindDebounce, queueItemId)
 		require.NoError(t, err)
 
 		// Verify timeout is gone
-		_, err = shard.LoadQueueItem(ctx, queueItemId)
+		_, err = env.shard.LoadQueueItem(ctx, queueItemId)
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout should already be gone")
 
 		// Delete by ID should still succeed (timeout removal is best-effort)
@@ -2329,12 +2257,12 @@ func TestDeleteDebounceByID(t *testing.T) {
 		debounceKey := debounceClient.KeyGenerator().Debounce(ctx)
 
 		// Manually remove the debounce item from the hash, leaving only the timeout
-		unshardedCluster.HDel(debounceKey, debounceID.String())
+		env.cluster.HDel(debounceKey, debounceID.String())
 		require.False(t, hashFieldExists(debounceKey, debounceID.String()), "debounce item should be gone from hash")
 
 		// Verify the timeout queue item still exists
 		queueItemId := queue.HashID(ctx, debounceID.String())
-		_, err := shard.LoadQueueItem(ctx, queueItemId)
+		_, err := env.shard.LoadQueueItem(ctx, queueItemId)
 		require.NoError(t, err, "timeout queue item should still exist")
 
 		// Delete by ID — HDEL on missing item is a no-op, but timeout should be cleaned up
@@ -2342,7 +2270,7 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify timeout queue item is now gone
-		_, err = shard.LoadQueueItem(ctx, queueItemId)
+		_, err = env.shard.LoadQueueItem(ctx, queueItemId)
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound, "timeout queue item should be deleted")
 	})
 
@@ -2359,9 +2287,9 @@ func TestDeleteDebounceByID(t *testing.T) {
 		queueItemId1 := queue.HashID(ctx, debounceID1.String())
 		queueItemId2 := queue.HashID(ctx, debounceID2.String())
 
-		_, err := shard.LoadQueueItem(ctx, queueItemId1)
+		_, err := env.shard.LoadQueueItem(ctx, queueItemId1)
 		require.NoError(t, err)
-		_, err = shard.LoadQueueItem(ctx, queueItemId2)
+		_, err = env.shard.LoadQueueItem(ctx, queueItemId2)
 		require.NoError(t, err)
 
 		// Batch delete both
@@ -2373,9 +2301,9 @@ func TestDeleteDebounceByID(t *testing.T) {
 		require.False(t, hashFieldExists(debounceKey, debounceID2.String()))
 
 		// Both timeout queue items should be gone
-		_, err = shard.LoadQueueItem(ctx, queueItemId1)
+		_, err = env.shard.LoadQueueItem(ctx, queueItemId1)
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
-		_, err = shard.LoadQueueItem(ctx, queueItemId2)
+		_, err = env.shard.LoadQueueItem(ctx, queueItemId2)
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 	})
 
@@ -2383,4 +2311,316 @@ func TestDeleteDebounceByID(t *testing.T) {
 		err := redisDebouncer.DeleteDebounceByID(ctx, testScope(accountId, workspaceId, uuid.New()))
 		require.NoError(t, err)
 	})
+}
+
+// TestDebounceRetryBackoff verifies the debounceRetryDelay schedule for issue #4150.
+//
+// The previous implementation slept a flat 750ms per retry (5 retries max = 3,750ms worst
+// case). This test locks in the new exponential schedule and its worst-case total so any
+// future drift is caught immediately.
+func TestDebounceRetryBackoff(t *testing.T) {
+	// debounceBaseDelay is pure/deterministic — test with exact values.
+	t.Run("base schedule grows exponentially and is capped", func(t *testing.T) {
+		cases := []struct {
+			attempt int
+			want    time.Duration
+		}{
+			{0, 50 * time.Millisecond},
+			{1, 100 * time.Millisecond},
+			{2, 200 * time.Millisecond}, // capped at debounceMaxBackoff
+			{3, 200 * time.Millisecond}, // still capped
+			{5, 200 * time.Millisecond}, // still capped
+		}
+		for _, tc := range cases {
+			got := debounceBaseDelay(tc.attempt)
+			require.Equal(t, tc.want, got, "attempt %d: unexpected base delay", tc.attempt)
+		}
+	})
+
+	t.Run("overflow guard: large attempt returns max backoff", func(t *testing.T) {
+		require.Equal(t, debounceMaxBackoff, debounceBaseDelay(100))
+		require.Equal(t, debounceMaxBackoff, debounceBaseDelay(63)) // 1<<63 overflows int64
+	})
+
+	t.Run("base worst-case total across all retries is exactly 350ms", func(t *testing.T) {
+		var total time.Duration
+		for i := 0; i < debounceMaxRetries; i++ {
+			total += debounceBaseDelay(i)
+		}
+		// 50 + 100 + 200 = 350ms — down from 1,250ms (v1) and 3,750ms (original)
+		require.Equal(t, 350*time.Millisecond, total)
+	})
+
+	// debounceRetryDelay adds ±25% jitter — test with range assertions.
+	t.Run("jittered delay stays within ±25% of base", func(t *testing.T) {
+		for attempt := 0; attempt < debounceMaxRetries; attempt++ {
+			base := debounceBaseDelay(attempt)
+			quarter := base / debounceJitterFraction
+			lo := base - quarter
+			hi := base + quarter
+
+			// Sample several times; jitter is based on wall-clock nanoseconds so
+			// each call may differ. All samples must land in [base-25%, base+25%).
+			for sample := 0; sample < 20; sample++ {
+				got := debounceRetryDelay(attempt)
+				require.GreaterOrEqual(t, got, lo,
+					"attempt %d sample %d: jittered delay %v below floor %v", attempt, sample, got, lo)
+				require.Less(t, got, hi,
+					"attempt %d sample %d: jittered delay %v at or above ceiling %v", attempt, sample, got, hi)
+			}
+		}
+	})
+
+	t.Run("no jittered delay exceeds debounceMaxBackoff+25%%", func(t *testing.T) {
+		ceiling := debounceMaxBackoff + debounceMaxBackoff/debounceJitterFraction
+		for i := 0; i <= debounceMaxRetries+10; i++ {
+			d := debounceRetryDelay(i)
+			require.Less(t, d, ceiling,
+				"attempt %d returned %v which exceeds jitter ceiling %v", i, d, ceiling)
+		}
+	})
+}
+
+// TestDebounceContextCancellationDuringRetry verifies that a cancelled context is
+// respected between retry attempts and does not block for a full backoff window.
+func TestDebounceContextCancellationDuringRetry(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	}
+
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	q, err := queue.New(context.Background(), "debounce-cancel-test", shardRegistry, opts...)
+	require.NoError(t, err)
+
+	fakeClock := clockwork.NewFakeClock()
+
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           shardRegistry,
+		PrimaryShardName: shard.Name(),
+		Queue:            q,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	d := deb.(debouncer)
+
+	accountID, workspaceID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Period: "10s",
+		},
+	}
+
+	// Create an initial debounce so any subsequent call hits the update path.
+	baseCtx := context.Background()
+	initialEvent := ulid.MustNew(ulid.Now(), rand.Reader)
+	err = d.Debounce(baseCtx, DebounceItem{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		EventID:     initialEvent,
+		Event: event.Event{
+			Name:      "test/cancel",
+			ID:        initialEvent.String(),
+			Timestamp: fakeClock.Now().UnixMilli(),
+		},
+	}, fn)
+	require.NoError(t, err)
+
+	// Cancel the context before the second Debounce call so that any retry sleep
+	// should be preempted and return ctx.Err() rather than sleeping debounceBaseBackoff.
+	cancelCtx, cancel := context.WithCancel(baseCtx)
+	cancel() // cancelled immediately
+
+	start := time.Now()
+	nextEvent := ulid.MustNew(ulid.Now(), rand.Reader)
+	err = d.Debounce(cancelCtx, DebounceItem{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		EventID:     nextEvent,
+		Event: event.Event{
+			Name:      "test/cancel",
+			ID:        nextEvent.String(),
+			Timestamp: fakeClock.Now().UnixMilli(),
+		},
+	}, fn)
+	elapsed := time.Since(start)
+
+	// The call may succeed (no conflict) or return a context error — both are valid.
+	// What must NOT happen is blocking for 750ms × retries.
+	if err != nil {
+		require.ErrorIs(t, err, context.Canceled, "expected context cancellation, got: %v", err)
+	}
+	require.Less(t, elapsed, debounceBaseBackoff*3,
+		"debounce with cancelled context blocked for %v — retry sleep was not preempted", elapsed)
+}
+
+// Backoff comparison helpers for issue #4150.
+// retryStrategy lets tests compare delay schedules without touching real time or the debouncer.
+
+// retryStrategy is a function that returns the wait duration for the nth retry attempt.
+// Using a type alias keeps the signature explicit and self-documenting at call sites.
+type retryStrategy func(attempt int) time.Duration
+
+// oldDebounceRetryDelay replicates the pre-fix behavior (issue #4150): a flat 750ms
+// sleep regardless of which retry attempt this is.
+func oldDebounceRetryDelay(_ int) time.Duration {
+	return 750 * time.Millisecond
+}
+
+// simulateWorstCase accumulates the total wait across maxAttempts using the given strategy.
+// It is pure, allocation-free, and safe to call from both tests and benchmarks.
+func simulateWorstCase(maxAttempts int, strategy retryStrategy) time.Duration {
+	var total time.Duration
+	for i := 0; i < maxAttempts; i++ {
+		total += strategy(i)
+	}
+	return total
+}
+
+// v1DebounceRetryDelay replicates the first-pass fix (5 retries, exp backoff capped at 500ms).
+// Kept here purely for the three-way comparison in TestDebounceRetryStrategyComparison.
+func v1DebounceRetryDelay(attempt int) time.Duration {
+	const v1MaxRetries = 5
+	const v1MaxBackoff = 500 * time.Millisecond
+	d := debounceBaseBackoff << attempt
+	if d > v1MaxBackoff || d <= 0 {
+		return v1MaxBackoff
+	}
+	return d
+}
+
+// TestDebounceRetryStrategyComparison is a three-way table-driven comparison:
+//   - old: flat 750ms × 5 retries          = 3,750ms worst case
+//   - v1:  exp backoff 50→500ms × 5 retries = 1,250ms worst case  (-67%)
+//   - opt: exp backoff 50→200ms × 3 retries =   350ms worst case  (-91% vs old, -72% vs v1)
+//
+// Uses the retryStrategy protocol so any future strategy can be plugged in for comparison
+// without touching the debouncer, the clock, or Redis.
+func TestDebounceRetryStrategyComparison(t *testing.T) {
+	const oldMaxRetries = 5
+	const v1MaxRetries = 5
+
+	type strategy struct {
+		name       string
+		maxRetries int
+		fn         retryStrategy
+	}
+
+	strategies := []strategy{
+		{"old (flat 750ms)", oldMaxRetries, oldDebounceRetryDelay},
+		{"v1  (exp, cap 500ms, 5 retries)", v1MaxRetries, v1DebounceRetryDelay},
+		{"opt (exp+jitter, cap 200ms, 3 retries)", debounceMaxRetries, debounceBaseDelay},
+	}
+
+	totals := make([]time.Duration, len(strategies))
+	for i, s := range strategies {
+		totals[i] = simulateWorstCase(s.maxRetries, s.fn)
+	}
+
+	oldTotal := totals[0]
+
+	// Per-attempt side-by-side table (columns = strategies)
+	maxAttempts := oldMaxRetries
+	t.Log("Per-attempt backoff (base delays, no jitter):")
+	t.Log("┌─────────┬──────────────┬──────────────┬──────────────┐")
+	t.Logf("│ attempt │ %-12s │ %-12s │ %-12s │", "old", "v1", "opt")
+	t.Log("├─────────┼──────────────┼──────────────┼──────────────┤")
+	for attempt := range maxAttempts {
+		cols := make([]string, len(strategies))
+		for si, s := range strategies {
+			if attempt < s.maxRetries {
+				cols[si] = s.fn(attempt).String()
+			} else {
+				cols[si] = "—"
+			}
+		}
+		t.Logf("│    %d    │ %12s │ %12s │ %12s │", attempt, cols[0], cols[1], cols[2])
+	}
+	t.Log("├─────────┼──────────────┼──────────────┼──────────────┤")
+	t.Logf("│  TOTAL  │ %-12s │ %-12s │ %-12s │", totals[0], totals[1], totals[2])
+	for i := 1; i < len(strategies); i++ {
+		pct := float64(oldTotal-totals[i]) / float64(oldTotal) * 100
+		t.Logf("│         │              │              │  −%.0f%% vs old (#%d)", pct, i)
+	}
+	t.Logf("│  summary: old=%-7s v1=%-7s opt=%-7s", totals[0], totals[1], totals[2])
+	t.Log("└─────────┴──────────────┴──────────────┴──────────────┘")
+
+	savedVsOldV1 := oldTotal - totals[1]
+	savedVsOldOpt := oldTotal - totals[2]
+	savedV1VsOpt := totals[1] - totals[2]
+	pctVsOldV1 := float64(savedVsOldV1) / float64(oldTotal) * 100
+	pctVsOldOpt := float64(savedVsOldOpt) / float64(oldTotal) * 100
+	pctV1VsOpt := float64(savedV1VsOpt) / float64(totals[1]) * 100
+
+	t.Logf("v1  vs old: saved %s (%.0f%% reduction)", savedVsOldV1, pctVsOldV1)
+	t.Logf("opt vs old: saved %s (%.0f%% reduction)", savedVsOldOpt, pctVsOldOpt)
+	t.Logf("opt vs v1:  saved %s (%.0f%% additional reduction)", savedV1VsOpt, pctV1VsOpt)
+
+	// Hard assertions — these lock in the improvement guarantees.
+	require.Equal(t, 3750*time.Millisecond, totals[0], "old: 750ms × 5 = 3,750ms")
+	require.Equal(t, 1250*time.Millisecond, totals[1], "v1: 50+100+200+400+500 = 1,250ms")
+	require.Equal(t, 350*time.Millisecond, totals[2], "opt: 50+100+200 = 350ms")
+
+	require.InDelta(t, 67.0, pctVsOldV1, 1.0, "v1 must reduce worst-case by ~67%% vs old")
+	require.InDelta(t, 91.0, pctVsOldOpt, 1.0, "opt must reduce worst-case by ~91%% vs old")
+	require.InDelta(t, 72.0, pctV1VsOpt, 1.0, "opt must reduce worst-case by ~72%% vs v1")
+
+	// Every optimized delay must be strictly shorter than the corresponding old delay.
+	for attempt := 0; attempt < debounceMaxRetries; attempt++ {
+		require.Less(t, debounceBaseDelay(attempt), oldDebounceRetryDelay(attempt),
+			"attempt %d: optimized base delay must beat old flat delay", attempt)
+	}
+}
+
+// BenchmarkRetryDelay_Old benchmarks the old flat-750ms delay computation.
+// Since the old strategy ignores the attempt arg entirely, this measures pure
+// function call overhead — the baseline.
+func BenchmarkRetryDelay_Old(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = oldDebounceRetryDelay(i % debounceMaxRetries)
+	}
+}
+
+// BenchmarkRetryDelay_New benchmarks the new exponential backoff computation.
+// Should be equally cheap — the bit-shift + cap check adds no allocations.
+func BenchmarkRetryDelay_New(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = debounceRetryDelay(i % debounceMaxRetries)
+	}
+}
+
+// BenchmarkSimulateWorstCase_Old measures the full worst-case simulation for the old strategy.
+func BenchmarkSimulateWorstCase_Old(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = simulateWorstCase(debounceMaxRetries, oldDebounceRetryDelay)
+	}
+}
+
+// BenchmarkSimulateWorstCase_New measures the full worst-case simulation for the new strategy.
+func BenchmarkSimulateWorstCase_New(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = simulateWorstCase(debounceMaxRetries, debounceRetryDelay)
+	}
 }

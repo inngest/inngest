@@ -11,6 +11,108 @@ import (
 	"github.com/redis/rueidis"
 )
 
+// DebounceUpsert implements queue.DebounceOperations.
+func (q *queue) DebounceUpsert(
+	ctx context.Context,
+	scope osqueue.Scope,
+	key string,
+	newDebounceID ulid.ULID,
+	item []byte,
+	ttl time.Duration,
+	now time.Time,
+	eventTimestamp int64,
+) (osqueue.DebounceUpsertResult, error) {
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.DebounceKeyGenerator()
+
+	raw, err := scripts["debounce/upsertDebounce"].Exec(
+		ctx,
+		client,
+		[]string{
+			kg.DebouncePointer(ctx, scope.FunctionID, key),
+			kg.Debounce(ctx),
+		},
+		[]string{
+			newDebounceID.String(),
+			string(item),
+			strconv.Itoa(int(ttl.Seconds())),
+			strconv.FormatInt(now.UnixMilli(), 10),
+			strconv.FormatInt(eventTimestamp, 10),
+		},
+	).ToAny()
+	if err != nil {
+		return osqueue.DebounceUpsertResult{}, fmt.Errorf("error upserting debounce: %w", err)
+	}
+
+	// The Lua script returns a table: { status, [debounceIDStr], [ttlSeconds] }
+	parts, ok := raw.([]any)
+	if !ok || len(parts) < 1 {
+		return osqueue.DebounceUpsertResult{}, fmt.Errorf("unexpected upsert response: %v", raw)
+	}
+
+	status, ok := parts[0].(int64)
+	if !ok {
+		return osqueue.DebounceUpsertResult{}, fmt.Errorf("unexpected status type in upsert response: %T", parts[0])
+	}
+
+	parseID := func(idx int) (ulid.ULID, error) {
+		if len(parts) <= idx {
+			return ulid.ULID{}, fmt.Errorf("missing debounce ID at index %d", idx)
+		}
+		s, ok := parts[idx].(string)
+		if !ok {
+			return ulid.ULID{}, fmt.Errorf("debounce ID is not a string: %T", parts[idx])
+		}
+		return ulid.Parse(s)
+	}
+
+	switch status {
+	case 1: // CREATED
+		id, err := parseID(1)
+		if err != nil {
+			return osqueue.DebounceUpsertResult{}, fmt.Errorf("upsert created: %w", err)
+		}
+		return osqueue.DebounceUpsertResult{
+			Status:     osqueue.DebounceUpsertCreated,
+			DebounceID: id,
+		}, nil
+
+	case 2: // UPDATED
+		if len(parts) < 3 {
+			return osqueue.DebounceUpsertResult{}, fmt.Errorf("upsert updated: expected ttl+id, got %v", parts)
+		}
+		ttlSec, ok := parts[1].(int64)
+		if !ok {
+			return osqueue.DebounceUpsertResult{}, fmt.Errorf("upsert updated: unexpected ttl type %T", parts[1])
+		}
+		id, err := parseID(2)
+		if err != nil {
+			return osqueue.DebounceUpsertResult{}, fmt.Errorf("upsert updated: %w", err)
+		}
+		return osqueue.DebounceUpsertResult{
+			Status:        osqueue.DebounceUpsertUpdated,
+			DebounceID:    id,
+			NewTTLSeconds: ttlSec,
+		}, nil
+
+	case 3: // OUT_OF_ORDER
+		return osqueue.DebounceUpsertResult{Status: osqueue.DebounceUpsertOutOfOrder}, nil
+
+	case 4: // ORPHANED — treat as created
+		id, err := parseID(1)
+		if err != nil {
+			return osqueue.DebounceUpsertResult{}, fmt.Errorf("upsert orphaned: %w", err)
+		}
+		return osqueue.DebounceUpsertResult{
+			Status:     osqueue.DebounceUpsertOrphaned,
+			DebounceID: id,
+		}, nil
+
+	default:
+		return osqueue.DebounceUpsertResult{}, fmt.Errorf("upsert: unknown status %d", status)
+	}
+}
+
 // DebounceCreate implements queue.DebounceOperations.
 func (q *queue) DebounceCreate(ctx context.Context, scope osqueue.Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
 	client := q.RedisClient.Client()
