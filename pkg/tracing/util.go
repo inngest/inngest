@@ -413,6 +413,58 @@ func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 	}
 }
 
+// FinalizedStepDynamicSeed returns the deterministic seed used to derive an
+// executor.step row's dynamic_span_id for a finalized step.
+func FinalizedStepDynamicSeed(stepID string) []byte {
+	return []byte(stepID)
+}
+
+func FinalizedStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID string) *meta.SpanReference {
+	if md == nil {
+		return nil
+	}
+
+	cfg := DeterministicSpanConfig(md.ID.RunID[:])
+	stepSpanID := DeterministicSpanConfig(FinalizedStepDynamicSeed(stepID)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID: stepSpanID.String(),
+		// TODO: validate that -00 is ok
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
+	}
+}
+
+// RetryStepDynamicSeed returns the deterministic seed used to derive an
+// executor.step row's dynamic_span_id for a retry attempt.
+func RetryStepDynamicSeed(stepID string, attempt int) []byte {
+	return fmt.Appendf(nil, "%s:%d", stepID, attempt)
+}
+
+func RetryStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID string, attempt int) *meta.SpanReference {
+	if md == nil {
+		return nil
+	}
+
+	cfg := DeterministicSpanConfig(md.ID.RunID[:])
+	stepSpanID := DeterministicSpanConfig(RetryStepDynamicSeed(stepID, attempt)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID: stepSpanID.String(),
+		// TODO: validate that -00 is ok
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
+	}
+}
+
+// RetryNonStepDynamicSeed returns the deterministic seed used to derive a dynamic span ID for non-step spans
+// execution (previously called Finalization).
+func RetryNonStepDynamicSeed(item queue.Item) []byte {
+	return fmt.Appendf(nil, "nonstep:%s:%d", item.GroupID, item.Attempt)
+}
+
+func FinalizedNonStepDynamicSeed(item queue.Item) []byte {
+	return fmt.Appendf(nil, "nonstep:%s:%d", item.GroupID, item.Attempt)
+}
+
 // DeferSpanSeed returns the deterministic seed used to identify the
 // executor.defer span.
 func DeferSpanSeed(parentRunID ulid.ULID, hashedDeferID string) []byte {

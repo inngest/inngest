@@ -362,6 +362,10 @@ func (tp *otelTracerProvider) UpdateSpan(
 	return nil
 }
 
+// DeterministicSpanID creates a new span ID based off of a deterministic seed.
+// WARN: this is different from DeterministicSpanConfig.SpanID because this is the first 8 bytes while the
+// DeterministicSpanConfig.SpanID is the 16-24th bytes. This was/is a mistake but we're stuck with it now
+// for metadata. Don't use this for anything else new.
 func DeterministicSpanID(seed []byte) trace.SpanID {
 	sum := sha256.Sum256(seed)
 	r := frand.NewCustom(sum[:], 8, 10)
