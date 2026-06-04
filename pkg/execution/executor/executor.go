@@ -3418,26 +3418,6 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
-	// NOTE: Before checkpointing, we could never have a slice of opcodes with len(1)
-	// which contained a step.run.  However, with checkpointing we can batch step.run
-	// outputs into one single HTTP response.
-	//
-	// When this happens, we ALWAYS need to create a trace for each step.
-	//
-	// We pass this down in context, unfortunately.
-	if nonLazy > 0 {
-		for _, op := range resp.Generator {
-			if op == nil {
-				// Just in case, because panics are bad
-				continue
-			}
-			if op.Op == enums.OpcodeStepRun {
-				ctx = setEmitCheckpointTraces(ctx)
-				break
-			}
-		}
-	}
-
 	for _, group := range groups.All() {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
@@ -5656,21 +5636,6 @@ func (e *executor) getParentSpan(ctx context.Context, item queue.Item, md sv2.Me
 	}
 
 	return parentRef
-}
-
-// Checkpoint traces configures hwehter we should emit traces after recording steps.
-
-type traceStepsValT struct{}
-
-var traceStepsVal = traceStepsValT{}
-
-func setEmitCheckpointTraces(ctx context.Context) context.Context {
-	return context.WithValue(ctx, traceStepsVal, true)
-}
-
-func emitCheckpointTraces(ctx context.Context) bool {
-	ok, _ := ctx.Value(traceStepsVal).(bool)
-	return ok
 }
 
 // emitExperimentMetadataFromOpts extracts experiment context from an opcode's
