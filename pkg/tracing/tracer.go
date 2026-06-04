@@ -155,7 +155,7 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	if st.IsZero() {
 		st = time.Now()
 	} else {
-		meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
+		meta.AddAttrIfUnset(attrs, meta.Attrs.StartedAt, &st)
 	}
 
 	if opts.Parent != nil {
@@ -182,10 +182,10 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		}
 	}
 	if !opts.StartTime.IsZero() {
-		meta.AddAttr(attrs, meta.Attrs.StartedAt, &opts.StartTime)
+		meta.AddAttrIfUnset(attrs, meta.Attrs.StartedAt, &opts.StartTime)
 	}
 	if !opts.EndTime.IsZero() {
-		meta.AddAttr(attrs, meta.Attrs.EndedAt, &opts.EndTime)
+		meta.AddAttrIfUnset(attrs, meta.Attrs.EndedAt, &opts.EndTime)
 	}
 
 	spanOptions := append(

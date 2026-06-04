@@ -1924,6 +1924,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
+		// NOTE: we should make this not emit output if we also emit a step span containing the output.
+		// We're emitting both for now to be safe and ensure we don't lose data,
+		// but ideally the step span should be the one emitting output if it's present, and this span should not emit output in that case. This is because the step span is the one that will be visible to users, and we don't want to have duplicate output attributes on both spans. The step span will also have more context about the step, so it makes more sense for it to have the output.
 		responseAttrs := tracing.DriverResponseAttrs(resp, nil)
 
 		updateOpts := &tracing.UpdateSpanOptions{
@@ -1963,28 +1966,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 
 		if e.allowStepMetadata.Enabled(ctx, instance.Metadata().ID.Tenant.AccountID) {
-			l := l.With("step_metadata", true)
-			for _, opcode := range resp.Generator {
-				for _, md := range opcode.Metadata {
-					// SDK metadata is untrusted; validate before creating spans.
-					if err := md.ValidateAllowed(); err != nil {
-						l.Warn("invalid metadata in driver response", "error", err, "kind", md.Kind())
-						continue
-					}
-
-					_, err := e.createMetadataSpan(
-						ctx,
-						&instance,
-						"executor.ExecutePostMetadata",
-						md,
-						md.Scope,
-					)
-					if err != nil {
-						l.Warn("error creating metadata span", "error", err)
-					}
-				}
-			}
-
 			// Extract HTTP timing metadata from httpstat if available.
 			// This captures the detailed connection timing breakdown (DNS, TCP, TLS, TTFB, transfer)
 			// from the HTTP request to the user's SDK function.
@@ -3407,26 +3388,6 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		}
 	}
 
-	// NOTE: Before checkpointing, we could never have a slice of opcodes with len(1)
-	// which contained a step.run.  However, with checkpointing we can batch step.run
-	// outputs into one single HTTP response.
-	//
-	// When this happens, we ALWAYS need to create a trace for each step.
-	//
-	// We pass this down in context, unfortunately.
-	if nonLazy > 1 {
-		for _, op := range resp.Generator {
-			if op == nil {
-				// Just in case, because panics are bad
-				continue
-			}
-			if op.Op == enums.OpcodeStepRun {
-				ctx = setEmitCheckpointTraces(ctx)
-				break
-			}
-		}
-	}
-
 	for _, group := range groups.All() {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
@@ -3737,41 +3698,17 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 		return err
 	}
 
+	// Calculate step duration in milliseconds
+	stepDurationMs := gen.Timing.B / 1_000_000
+
 	// Extract AI metadata from step output before saving so the cumulative
 	// metadata size delta is accurate when persisted alongside the step.
-	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
-		// Calculate step duration in milliseconds
-		stepDurationMs := gen.Timing.B / 1_000_000
+	extraMetadata := metadata.WithWarnings(extractors.ExtractAIOutputMetadata(
+		[]byte(output),
+		stepDurationMs,
+	))
 
-		md := metadata.WithWarnings(extractors.ExtractAIOutputMetadata(
-			[]byte(output),
-			stepDurationMs,
-		))
-		for _, m := range md {
-			_, err := e.createMetadataSpan(
-				ctx,
-				runCtx,
-				"executor.handleGeneratorStep.aiOutput",
-				m,
-				enums.MetadataScopeStepAttempt,
-			)
-			if err != nil {
-				e.log.Warn("error creating AI output metadata span", "error", err)
-			}
-		}
-
-		// Extract experiment metadata from opcode opts. The SDK spreads
-		// group.experiment() variant context (experimentName, variant,
-		// selectionStrategy) onto variant sub-steps' opts; landing the
-		// same data as a step-scoped metadata span means ClickHouse
-		// can aggregate variant output metrics in a single-row query.
-		//
-		// Performing this emission server-side (rather than via an SDK
-		// addMetadata() call) means clients receive experiment data
-		// without needing to upgrade their SDK, and keeps the metadata
-		// contract consistent across SDK languages.
-		e.emitExperimentMetadataFromOpts(ctx, runCtx, gen.Opts)
-	}
+	e.emitStepSpan(ctx, runCtx, &gen, extraMetadata, nil)
 
 	// Persist the cumulative metadata size delta alongside the step output.
 	// SwapMetadataSizeDelta atomically reads the delta and advances the
@@ -3797,48 +3734,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	// the next step is enqueued and accounting is handled.
 	if err := runCtx.ReleaseCapacityLease(); err != nil {
 		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
-
-	// Steps can be batched with checkpointing!  Imagine an SDK that opts into checkpointing,
-	// then returned as an async response because the checkpooint batch time was greater than
-	// the run execution.  In this case, all opcodes are returned to the executor via the async
-	// response, and we have to retroactively save traces for each step.
-	//
-	// Again, we ONLY create new traces if the steps were batched, otherwise the standard
-	// trace -> exec -> cleanup flow handles individual steps.
-	//
-	// In this case, we MUST retroactively record spans for each past step.
-	//
-	// XXX: (feat: checkpoint) We also only want to enqueue one discovery step per request,
-	// if this isn't in parallelism.
-	if emitCheckpointTraces(ctx) {
-		attrs := tracing.GeneratorAttrs(&gen)
-		tracing.AddMetadataTenantAttrs(attrs, runCtx.Metadata().ID)
-		_, err := e.tracerProvider.CreateSpan(
-			ctx,
-			meta.SpanNameStep,
-			&tracing.CreateSpanOptions{
-				Seed:      []byte(gen.ID + gen.Timing.String()),
-				Parent:    tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-				StartTime: gen.Timing.Start(),
-				EndTime:   gen.Timing.End(),
-				Attributes: attrs.Merge(
-					meta.NewAttrSet(
-						meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(gen.UserDefinedName())),
-						meta.Attr(meta.Attrs.RunID, &runCtx.Metadata().ID.RunID),
-						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(gen.Timing.Start())),
-						meta.Attr(meta.Attrs.ScheduledAt, inngestgo.Ptr(gen.Timing.Start())),
-						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(gen.Timing.Start())),
-						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(gen.Timing.End())),
-						meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
-					),
-				),
-			},
-		)
-		if err != nil {
-			// We should never hit a blocker creating a span.  If so, warn loudly.
-			logger.StdlibLogger(ctx).Error("error saving span for checkpoint op", "error", err)
-		}
 	}
 
 	// Update the group ID in context;  we've already saved this step's success and we're now
@@ -3898,12 +3793,15 @@ func (e *executor) handleStepError(ctx context.Context, runCtx execution.RunCont
 	//
 	// State stored for each step MUST always be wrapped with either "error" or "data".
 	if IsStepRetryable(&gen, runCtx) {
+		e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
+
 		// Return an error to trigger standard queue retries.
 		runCtx.IncrementAttempt()
 		for _, l := range e.lifecycles {
 			lifecycleItem := runCtx.LifecycleItem()
 			go l.OnStepScheduled(ctx, *runCtx.Metadata(), lifecycleItem, &gen.Name)
 		}
+
 		return ErrHandledStepError
 	}
 
@@ -3919,6 +3817,8 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 	if err != nil {
 		return err
 	}
+
+	e.emitStepSpan(ctx, runCtx, &gen, nil, nil)
 
 	// Persist the cumulative metadata size delta alongside the step output.
 	// SwapMetadataSizeDelta atomically reads the delta and advances the
@@ -4521,6 +4421,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				"executor.handleGeneratorAIGateway",
 				m,
 				enums.MetadataScopeStepAttempt,
+				&gen,
 			)
 			if err != nil {
 				e.log.Warn("error creating metadata span", "error", err)
@@ -5712,21 +5613,6 @@ func (e *executor) getParentSpan(ctx context.Context, item queue.Item, md sv2.Me
 	return parentRef
 }
 
-// Checkpoint traces configures hwehter we should emit traces after recording steps.
-
-type traceStepsValT struct{}
-
-var traceStepsVal = traceStepsValT{}
-
-func setEmitCheckpointTraces(ctx context.Context) context.Context {
-	return context.WithValue(ctx, traceStepsVal, true)
-}
-
-func emitCheckpointTraces(ctx context.Context) bool {
-	ok, _ := ctx.Value(traceStepsVal).(bool)
-	return ok
-}
-
 // emitExperimentMetadataFromOpts extracts experiment context from an opcode's
 // opts (populated by the SDK inside group.experiment() variant callbacks) and,
 // if present, writes a step-scoped inngest.experiment metadata span. This is
@@ -5737,8 +5623,8 @@ func emitCheckpointTraces(ctx context.Context) bool {
 //
 // Errors are logged and swallowed: failing to attach experiment metadata must
 // not interrupt step execution.
-func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx execution.RunContext, opts any) {
-	expMd, err := extractors.ExtractExperimentOptsMetadata(opts)
+func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode) {
+	expMd, err := extractors.ExtractExperimentOptsMetadata(gen.Opts)
 	if err != nil {
 		e.log.Warn("error extracting experiment opts metadata", "error", err)
 		return
@@ -5753,19 +5639,26 @@ func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx ex
 		"executor.handleGeneratorStep.experiment",
 		expMd,
 		enums.MetadataScopeStep,
+		gen,
 	); err != nil {
 		e.log.Warn("error creating experiment metadata span", "error", err)
 	}
 }
 
-func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope) (*meta.SpanReference, error) {
+func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope, op *state.GeneratorOpcode) (*meta.SpanReference, error) {
 	var parent *meta.SpanReference
+
+	runMD := runCtx.Metadata()
 
 	switch scope {
 	case enums.MetadataScopeRun:
-		parent = tracing.RunSpanRefFromMetadata(runCtx.Metadata())
+		parent = tracing.RunSpanRefFromMetadata(runMD)
 	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
-		parent = runCtx.ExecutionSpan()
+		if op.Op == enums.OpcodeStepError && IsStepRetryable(op, runCtx) {
+			parent = tracing.RetryStepSpanRefFromMetadataAndStepID(runMD, op.ID, runCtx.AttemptCount())
+		} else {
+			parent = tracing.FinalizedStepSpanRefFromMetadataAndStepID(runMD, op.ID)
+		}
 	default:
 		return nil, fmt.Errorf("unknown metadata scope: %s", sanitizeLogValue(scope.String()))
 	}
@@ -5805,6 +5698,115 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 	}
 
 	return ref, nil
+}
+
+func (e *executor) handleGeneratorMetadata(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, extra ...metadata.Structured) {
+	for _, md := range gen.Metadata {
+		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata", md, md.Scope, gen); err != nil {
+			e.log.Warn("error creating metadata span from generator metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
+		}
+	}
+
+	for _, ex := range extra {
+		// TODO: maybe make all metadata have a Scope() method?
+		// For now, we hardcode extra metadata to be step attempt-scoped, as that's the only place we use it and it makes the most sense for it to be tied to the specific attempt that emitted it.
+		if _, err := e.createMetadataSpan(ctx, runCtx, "executor.handleGeneratorMetadata.extra", ex, enums.MetadataScopeStepAttempt, gen); err != nil {
+			e.log.Warn("error creating metadata span from generator extra metadata", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", sanitizeLogValue(gen.ID))
+		}
+	}
+}
+
+func (e *executor) opcodeTiming(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode) (queuedAt, scheduledAt, startedAt, endedAt time.Time) {
+	item := runCtx.LifecycleItem()
+	queuedAt = item.EnqueuedAt
+	scheduledAt = slices.MaxFunc([]time.Time{item.At, queuedAt}, time.Time.Compare)
+
+	if gen != nil {
+		startedAt = gen.Timing.Start()
+		endedAt = gen.Timing.End()
+	}
+
+	if startedAt.IsZero() || startedAt.Before(queuedAt) {
+		startedAt = runCtx.StartTime()
+	}
+
+	if endedAt.IsZero() || endedAt.Before(startedAt) {
+		endedAt = e.now()
+	}
+
+	return queuedAt, scheduledAt, startedAt, endedAt
+}
+
+func (e *executor) emitStepSpan(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, extraMetadata []metadata.Structured, extraAttrs *meta.SerializableAttrs) {
+	md := runCtx.Metadata()
+	lifecycleItem := runCtx.LifecycleItem()
+	attrs := tracing.GeneratorAttrs(gen)
+	tracing.AddMetadataTenantAttrs(attrs, md.ID)
+
+	seed := tracing.FinalizedStepDynamicSeed(gen.ID)
+	switch gen.Op {
+	case enums.OpcodeStepError:
+		if IsStepRetryable(gen, runCtx) {
+			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusErrored))
+			seed = tracing.RetryStepDynamicSeed(gen.ID, runCtx.AttemptCount())
+		} else {
+			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusFailed))
+		}
+	case enums.OpcodeStepFailed:
+		meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusFailed))
+	case enums.OpcodeGateway, enums.OpcodeAIGateway:
+		if gen.Error != nil {
+			if IsStepRetryable(gen, runCtx) {
+				meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusErrored))
+			} else {
+				meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusFailed))
+			}
+		} else {
+			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted))
+		}
+	default:
+		// TODO: handle other generator ops that should emit step spans with appropriate status
+		meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted))
+	}
+
+	attrs = attrs.Merge(extraAttrs)
+
+	queuedAt, scheduledAt, startedAt, endedAt := e.opcodeTiming(ctx, runCtx, gen)
+	tracing.AddTimingAttrs(attrs, queuedAt, scheduledAt, startedAt, endedAt)
+
+	_, err := e.tracerProvider.CreateSpan(
+		ctx,
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Seed:       seed,
+			Debug:      &tracing.SpanDebugData{Location: "executor.emitStepSpan"},
+			Metadata:   md,
+			QueueItem:  &lifecycleItem,
+			Parent:     runCtx.RootSpan(),
+			Attributes: attrs,
+			StartTime:  queuedAt,
+			EndTime:    endedAt,
+		},
+	)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("error creating step span", "error", err)
+	}
+
+	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
+		e.handleGeneratorMetadata(ctx, runCtx, gen, extraMetadata...)
+
+		// Extract experiment metadata from opcode opts. The SDK spreads
+		// group.experiment() variant context (experimentName, variant,
+		// selectionStrategy) onto variant sub-steps' opts; landing the
+		// same data as a step-scoped metadata span means ClickHouse
+		// can aggregate variant output metrics in a single-row query.
+		//
+		// Performing this emission server-side (rather than via an SDK
+		// addMetadata() call) means clients receive experiment data
+		// without needing to upgrade their SDK, and keeps the metadata
+		// contract consistent across SDK languages.
+		e.emitExperimentMetadataFromOpts(ctx, runCtx, gen)
+	}
 }
 
 // true for pause-backed opcodes — ones the server resumes later
