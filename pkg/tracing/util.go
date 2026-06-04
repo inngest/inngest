@@ -84,9 +84,6 @@ func DriverResponseOutputAttrs(resp *state.DriverResponse) *meta.SerializableAtt
 	}
 
 	fnOutput, err := resp.GetTraceFunctionOutput()
-	rawAttrs := meta.NewAttrSet()
-
-	fnOutput, err := resp.GetTraceFunctionOutput()
 	if err != nil {
 		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
 	} else if fnOutput != "" {
