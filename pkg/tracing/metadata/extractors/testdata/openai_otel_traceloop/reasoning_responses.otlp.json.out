@@ -1,0 +1,14 @@
+SPAN chat gpt-5.4-nano
+{
+  "model": "gpt-5.4-nano",
+  "system": "openai",
+  "operation_name": "chat",
+  "response_model": "gpt-5.4-nano-2026-03-17",
+  "response_id": "resp_0947697ae2c24bfe006a1f4751ad68819aa81bfb021e3ac05e",
+  "finish_reasons": [
+    "stop"
+  ],
+  "input_tokens": 17,
+  "output_tokens": 13,
+  "total_tokens": 30
+}

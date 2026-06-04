@@ -1,0 +1,29 @@
+SPAN ai.generateText.doGenerate
+{
+  "model": "gpt-5.4-nano",
+  "system": "openai.responses",
+  "operation_name": "",
+  "response_model": "gpt-5.4-nano-2026-03-17",
+  "response_id": "resp_0e56d5c95850276a006a1f57da3d60819a8974cbbffaedd001",
+  "finish_reasons": [
+    "stop"
+  ],
+  "input_tokens": 17,
+  "output_tokens": 40,
+  "total_tokens": 57
+}
+
+SPAN ai.generateText
+{
+  "model": "gpt-5.4-nano",
+  "system": "openai.responses",
+  "operation_name": "",
+  "response_model": "",
+  "response_id": "",
+  "finish_reasons": [
+    "stop"
+  ],
+  "input_tokens": 17,
+  "output_tokens": 40,
+  "total_tokens": 57
+}

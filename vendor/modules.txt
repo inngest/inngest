@@ -1145,6 +1145,9 @@ github.com/russross/blackfriday/v2
 ## explicit; go 1.18
 github.com/sashabaranov/go-openai
 github.com/sashabaranov/go-openai/internal
+# github.com/sebdah/goldie/v2 v2.8.0
+## explicit; go 1.12
+github.com/sebdah/goldie/v2
 # github.com/segmentio/asm v1.2.1
 ## explicit; go 1.18
 github.com/segmentio/asm/ascii
@@ -1161,6 +1164,9 @@ github.com/segmentio/asm/keyset
 github.com/segmentio/encoding/ascii
 github.com/segmentio/encoding/iso8601
 github.com/segmentio/encoding/json
+# github.com/sergi/go-diff v1.3.1
+## explicit; go 1.12
+github.com/sergi/go-diff/diffmatchpatch
 # github.com/sethvargo/go-retry v0.3.0
 ## explicit; go 1.21
 github.com/sethvargo/go-retry
