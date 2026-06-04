@@ -61,7 +61,7 @@ const isWaiting = (status?: string, runError?: Error | null, traceResultError?: 
  * Timeline wrapper that converts Trace data to timeline format
  * and handles step selection to update the right panel.
  */
-function TimelineV4Wrapper({
+function TimelineWrapper({
   runID,
   trace,
   orgName,
@@ -268,7 +268,7 @@ export const RunDetails = ({
   // Works around a variety of layout and scroll issues with two column layout
   const dynamicHeight = standalone ? '85vh' : height < windowHeight * 0.85 ? height : '85vh';
 
-  // Check if trace data is ready for V4 Timeline
+  // Check if trace data is ready for Timeline
   const traceReady = runData?.trace && isLazyDone(runData.trace);
 
   return (
@@ -314,7 +314,7 @@ export const RunDetails = ({
                 node: waiting ? (
                   <Waiting />
                 ) : traceReady ? (
-                  <TimelineV4Wrapper
+                  <TimelineWrapper
                     runID={runID}
                     trace={runData.trace as unknown as Trace}
                     orgName={orgName}

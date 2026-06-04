@@ -1,5 +1,5 @@
 /**
- * Utilities to convert V3 Trace data to V4 TimelineData format.
+ * Utilities to convert Trace data to TimelineData format.
  * Feature: 001-composable-timeline-bar
  */
 
@@ -287,7 +287,7 @@ function traceToBarData(
 }
 
 /**
- * Convert a V3 Trace to V4 TimelineData
+ * Convert a Trace to TimelineData
  */
 export function traceToTimelineData(
   trace: Trace,
