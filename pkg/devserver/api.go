@@ -161,10 +161,6 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		enabled, _ := strconv.ParseBool(os.Getenv(flag))
 		features[flag] = enabled
 	}
-	// TODO: Remove once we drop the run-details-v4 feature flag.
-	if os.Getenv("run-details-v4") == "" {
-		features["run-details-v4"] = true
-	}
 	// Enable step metadata (including experiments) by default in dev server.
 	if os.Getenv("enable-step-metadata") == "" {
 		features["enable-step-metadata"] = true
