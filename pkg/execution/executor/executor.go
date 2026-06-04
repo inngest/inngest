@@ -1943,11 +1943,15 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if !resp.IsGatewayRequest() {
 			updateOpts.EndTime = e.now()
 
-			status := enums.StepStatusCompleted
+			updateOpts.Status = enums.StepStatusCompleted
 			if err != nil || resp.Err != nil || resp.UserError != nil {
-				status = enums.StepStatusFailed
+				// TODO: once we're sure that the new tracing is safe we can change the status semantics here to just
+				// reflect if the request itself was successful rather than trying to also account for
+				// user errors, which are really just part of the response and not the request execution.
+				updateOpts.Status = enums.StepStatusFailed
 			}
-			updateOpts.Status = status
+		} else {
+			updateOpts.Status = enums.StepStatusRunning
 		}
 
 		_ = e.tracerProvider.UpdateSpan(ctx, updateOpts)
@@ -2000,7 +2004,25 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			}
 		}
 
-		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
+		handleErr := e.HandleResponse(ctx, &instance)
+		if resp.IsGatewayRequest() {
+			status := enums.StepStatusCompleted
+			if handleErr != nil {
+				status = enums.StepStatusFailed
+			}
+
+			_ = e.tracerProvider.UpdateSpan(ctx,
+				&tracing.UpdateSpanOptions{
+					Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePostGateway"},
+					Metadata:   &md,
+					QueueItem:  &item,
+					Status:     status,
+					EndTime:    e.now(),
+					TargetSpan: instance.execSpan,
+				})
+		}
+
+		if handleErr != nil {
 			return resp, handleErr
 		}
 		return resp, err
@@ -4177,6 +4199,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 }
 
 func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	start := e.now()
+	gen.Timing.A = start.UnixNano()
+
 	input, err := gen.GatewayOpts()
 	if err != nil {
 		return fmt.Errorf("error parsing gateway step: %w", err)
@@ -4187,18 +4212,19 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		return fmt.Errorf("error creating gateway request: %w", err)
 	}
 
+	//TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
+
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
 	//
 	// Without this, publishing will not work.
 	lifecycleItem := runCtx.LifecycleItem()
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
-	metadata := runCtx.Metadata()
-	execSpan := runCtx.ExecutionSpan()
 
 	var output []byte
 
 	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
+	gen.Timing.B = e.now().Sub(start).Nanoseconds()
 	if err != nil {
 		// Request failed entirely. Create an error.
 		userLandErr := state.UserError{
@@ -4207,16 +4233,12 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
-			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
-			Metadata:   metadata,
-			QueueItem:  &lifecycleItem,
-			TargetSpan: execSpan,
-		}); spanErr != nil {
-			e.log.Debug("error updating span for erroring gateway request during handleGeneratorGateway", "error", spanErr)
-		}
-
+		e.emitStepSpan(
+			ctx,
+			runCtx,
+			&gen,
+			nil,
+			tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil))
 		if runCtx.ShouldRetry() {
 			runCtx.SetError(err)
 
@@ -4259,15 +4281,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		runCtx.UpdateOpcodeOutput(&gen, output)
 		lifecycleItem := runCtx.LifecycleItem()
 
-		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, nil),
-			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorGateway"},
-			Metadata:   metadata,
-			QueueItem:  &lifecycleItem,
-			TargetSpan: execSpan,
-		}); spanErr != nil {
-			e.log.Debug("error updating span for successful gateway request during handleGeneratorGateway", "error", spanErr)
-		}
+		e.emitStepSpan(ctx, runCtx, &gen, nil, tracing.GatewayResponseAttrs(resp, nil, gen, nil))
 
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
@@ -4326,6 +4340,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			ctx,
 			meta.SpanNameStepDiscovery,
+
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
 				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
@@ -4369,10 +4384,15 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 }
 
 func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	start := e.now()
+	gen.Timing.A = start.UnixNano()
+
 	input, err := gen.AIGatewayOpts()
 	if err != nil {
 		return fmt.Errorf("error parsing ai gateway step: %w", err)
 	}
+
+	//TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
 
 	// NOTE:  It's the responsibility of `trace_lifecycle` to parse the gateway request,
 	// then generate an aigateway.ParsedInferenceRequest to store in the history store.
@@ -4384,7 +4404,6 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
-	runMetadata := runCtx.Metadata()
 
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
@@ -4393,6 +4412,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	e.addRequestPublishOpts(ctx, lifecycleItem, &req)
 
 	resp, err := runCtx.HTTPClient().DoRequest(ctx, req)
+	gen.Timing.B = e.now().Sub(start).Nanoseconds()
 	failure := err != nil || (resp != nil && resp.StatusCode > 299)
 
 	// Update the driver response appropriately for the trace lifecycles.
@@ -4402,32 +4422,17 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 
 	runCtx.SetStatusCode(resp.StatusCode)
 
-	if e.allowStepMetadata.Enabled(ctx, runMetadata.ID.Tenant.AccountID) {
-		var serverProcessingMs int64
-		if resp.StatResult != nil {
-			serverProcessingMs = resp.StatResult.ServerProcessing.Milliseconds()
-		}
-
-		md := metadata.WithWarnings(extractors.ExtractAIGatewayMetadata(
-			input,
-			resp.StatusCode,
-			resp.Body,
-			serverProcessingMs,
-		))
-		for _, m := range md {
-			_, err := e.createMetadataSpan(
-				ctx,
-				runCtx,
-				"executor.handleGeneratorAIGateway",
-				m,
-				enums.MetadataScopeStepAttempt,
-				&gen,
-			)
-			if err != nil {
-				e.log.Warn("error creating metadata span", "error", err)
-			}
-		}
+	var serverProcessingMs int64
+	if resp.StatResult != nil {
+		serverProcessingMs = resp.StatResult.ServerProcessing.Milliseconds()
 	}
+
+	md := metadata.WithWarnings(extractors.ExtractAIGatewayMetadata(
+		input,
+		resp.StatusCode,
+		resp.Body,
+		serverProcessingMs,
+	))
 
 	// Handle errors individually, here.
 	if failure {
@@ -4449,15 +4454,12 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		}
 		runCtx.UpdateOpcodeError(&gen, userLandErr)
 
-		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			Attributes: tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil),
-			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
-			Metadata:   runMetadata,
-			QueueItem:  &lifecycleItem,
-			TargetSpan: runCtx.ExecutionSpan(),
-		}); spanErr != nil {
-			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
-		}
+		e.emitStepSpan(
+			ctx,
+			runCtx,
+			&gen,
+			md,
+			tracing.GatewayResponseAttrs(resp, &userLandErr, gen, nil))
 
 		// And, finally, if this is retryable return an error which will be retried.
 		// Otherwise, we enqueue the next step directly so that the SDK can throw
@@ -4512,17 +4514,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		}
 
 		runCtx.UpdateOpcodeOutput(&gen, resp.Body)
-		lifecycleItem := runCtx.LifecycleItem()
 
-		if spanErr := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			Attributes: tracing.GatewayResponseAttrs(resp, nil, gen, rawBody),
-			Debug:      &tracing.SpanDebugData{Location: "executor.handleGeneratorAIGateway"},
-			Metadata:   runMetadata,
-			QueueItem:  &lifecycleItem,
-			TargetSpan: runCtx.ExecutionSpan(),
-		}); spanErr != nil {
-			e.log.Debug("error updating span for successful gateway request during handleGeneratorAIGateway", "error", spanErr)
-		}
+		e.emitStepSpan(
+			ctx,
+			runCtx,
+			&gen,
+			md,
+			tracing.GatewayResponseAttrs(resp, nil, gen, nil))
 
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
