@@ -79,6 +79,13 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 func DriverResponseOutputAttrs(resp *state.DriverResponse) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
+	if resp == nil {
+		return rawAttrs
+	}
+
+	fnOutput, err := resp.GetTraceFunctionOutput()
+	rawAttrs := meta.NewAttrSet()
+
 	fnOutput, err := resp.GetTraceFunctionOutput()
 	if err != nil {
 		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
