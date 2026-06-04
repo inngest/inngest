@@ -73,6 +73,9 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 	return rawAttrs
 }
 
+// DriverResponseOutputAttrs extracts output-related attributes from the given `DriverResponse`.
+// This is used for extracting output details for non-step spans like finalization or network/top-level
+// function error spans.
 func DriverResponseOutputAttrs(resp *state.DriverResponse) *meta.SerializableAttrs {
 	rawAttrs := meta.NewAttrSet()
 
