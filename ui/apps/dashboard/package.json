@@ -66,7 +66,7 @@
     "graphql": "16.8.1",
     "graphql-config": "^4.5.0",
     "graphql-request": "^6.1.0",
-    "inngest": "^4.2.0",
+    "inngest": "4.4.1-pr-1521.15",
     "ky": "^0.33.3",
     "launchdarkly-react-client-sdk": "^3.0.8",
     "mustache": "^4.2.0",

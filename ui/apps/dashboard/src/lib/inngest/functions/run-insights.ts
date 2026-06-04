@@ -1,4 +1,4 @@
-import { anthropic } from 'inngest';
+import { anthropic, experiment } from 'inngest';
 import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
@@ -41,7 +41,7 @@ export const runInsightsAgent = inngest.createFunction(
     name: 'Insights SQL Agent',
     triggers: [{ event: 'insights-agent/chat.requested' }],
   },
-  async ({ event, step }) => {
+  async ({ event, step, group }) => {
     const {
       threadId: providedThreadId,
       userMessage,
@@ -155,17 +155,71 @@ export const runInsightsAgent = inngest.createFunction(
       },
     );
 
-    const queryWriterResult = await step.ai.infer('query-writer', {
-      model: anthropic({
-        model: 'claude-sonnet-4-5',
-        defaultParameters: { max_tokens: 4096 },
-      }),
-      body: {
-        system: queryWriterPrompt.system,
-        messages: queryWriterPrompt.messages,
-        tools: [generateSqlTool],
-        tool_choice: { type: 'tool' as const, name: 'generate_sql' },
-      },
+    // Anthropic API pricing per 1M tokens (hardcoded for now).
+    const QUERY_WRITER_PRICING = {
+      'claude-sonnet-4-5': { inputPerMTok: 3, outputPerMTok: 15 },
+      'claude-opus-4-8': { inputPerMTok: 5, outputPerMTok: 25 },
+    } as const;
+
+    const queryWriterBody = {
+      system: queryWriterPrompt.system,
+      messages: queryWriterPrompt.messages,
+      tools: [generateSqlTool],
+      tool_choice: { type: 'tool' as const, name: 'generate_sql' },
+    };
+
+    const { result: queryWriterResult, variant: queryWriterModel } =
+      await group.experiment('query-writer-model', {
+        variants: {
+          'claude-sonnet-4-5': () =>
+            step.ai.infer('query-writer', {
+              model: anthropic({
+                model: 'claude-sonnet-4-5',
+                defaultParameters: { max_tokens: 4096 },
+              }),
+              body: queryWriterBody,
+            }),
+          'claude-opus-4-8': () =>
+            step.ai.infer('query-writer', {
+              model: anthropic({
+                model: 'claude-opus-4-8',
+                defaultParameters: { max_tokens: 4096 },
+              }),
+              body: queryWriterBody,
+            }),
+        },
+        select: experiment.weighted({
+          'claude-sonnet-4-5': 50,
+          'claude-opus-4-8': 50,
+        }),
+        withVariant: true,
+      });
+
+    const usage = (
+      queryWriterResult as {
+        usage?: { input_tokens?: number; output_tokens?: number };
+      }
+    ).usage;
+    const inputTokens = usage?.input_tokens ?? 0;
+    const outputTokens = usage?.output_tokens ?? 0;
+
+    await step.score('score-query-writer-tokens', {
+      name: 'query_writer_output_tokens',
+      value: outputTokens,
+    });
+
+    const pricing =
+      QUERY_WRITER_PRICING[
+        queryWriterModel as keyof typeof QUERY_WRITER_PRICING
+      ];
+    const rawCostUsd =
+      (inputTokens / 1_000_000) * pricing.inputPerMTok +
+      (outputTokens / 1_000_000) * pricing.outputPerMTok;
+    // Round to micro-dollars to avoid floating-point noise in the score.
+    const costUsd = Math.round(rawCostUsd * 1_000_000) / 1_000_000;
+    await step.score('score-query-writer-cost', {
+      name: 'query_writer_cost_usd',
+      value: costUsd,
     });
 
     const sqlResult = await step.run('extract-query-writer-result', () => {
