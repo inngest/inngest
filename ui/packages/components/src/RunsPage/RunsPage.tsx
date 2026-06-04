@@ -22,7 +22,6 @@ import useLocalStorage from 'react-use/lib/useLocalStorage';
 import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import { RunDetailsV4 } from '../RunDetailsV4';
 import {
   useBatchedSearchParams,
@@ -43,7 +42,7 @@ type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history' | 'tracesPreview' | 'isDeferred'>;
-  getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
+  getTrigger: React.ComponentProps<typeof RunDetailsV4>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
