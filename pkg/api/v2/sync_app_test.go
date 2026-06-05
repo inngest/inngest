@@ -17,8 +17,8 @@ import (
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngestgo"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -121,8 +121,31 @@ func TestSyncApp(t *testing.T) {
 		r.Equal(inngestgo.SDKLanguage+":"+inngestgo.SDKVersion, syncer.gotReq.SDK)
 	})
 
+	t.Run("app mismatch returns monorepo error contract", func(t *testing.T) {
+		r := require.New(t)
+		srv := realSDKHandler(t)
+		defer srv.Close()
+
+		syncer := &recordingAppSyncer{}
+		service := NewService(ServiceOptions{
+			SigningKeysProvider:      fakeSigningKeyProvider{key: testSigningKey},
+			AppSyncer:                syncer,
+			ServerKind:               headers.ServerKindDev,
+			AppSyncAllowInsecureHTTP: true,
+		})
+
+		_, err := service.SyncApp(context.Background(), &apiv2.SyncAppRequest{
+			AppId: "wrong-app",
+			Url:   srv.URL,
+		})
+		requireErrorWithCode(t, err, codes.FailedPrecondition, syscode.CodeAppMismatch)
+		st, _ := status.FromError(err)
+		r.Contains(st.Message(), "expected app ID wrong-app, got my-app")
+		r.False(syncer.called)
+	})
+
 	// Stands in for the entire family of appsync.Sync syscode failures
-	// (unreachable, app_id mismatch, etc.). At this layer the assertion is
+	// (unreachable, app mismatch, etc.). At this layer the assertion is
 	// the same: syscode propagates as the gRPC error code, status maps to
 	// 422, and ProcessSync is not invoked. Per-syscode behavior is covered
 	// in pkg/appsync.
@@ -168,7 +191,6 @@ func TestSyncApp(t *testing.T) {
 	})
 
 	t.Run("requires URL", func(t *testing.T) {
-		r := require.New(t)
 		service := NewService(ServiceOptions{
 			SigningKeysProvider: fakeSigningKeyProvider{key: testSigningKey},
 			AppSyncer:           &recordingAppSyncer{},
@@ -176,21 +198,22 @@ func TestSyncApp(t *testing.T) {
 
 		_, err := service.SyncApp(context.Background(), &apiv2.SyncAppRequest{
 			AppId: "my-app",
+			Url:   "   ",
 		})
-		r.Error(err)
+		requireErrorWithCode(t, err, codes.InvalidArgument, apiv2base.ErrorMissingField)
 	})
 
 	t.Run("requires app ID", func(t *testing.T) {
-		r := require.New(t)
 		service := NewService(ServiceOptions{
 			SigningKeysProvider: fakeSigningKeyProvider{key: testSigningKey},
 			AppSyncer:           &recordingAppSyncer{},
 		})
 
 		_, err := service.SyncApp(context.Background(), &apiv2.SyncAppRequest{
-			Url: "http://example.com",
+			AppId: "   ",
+			Url:   "http://example.com",
 		})
-		r.Error(err)
+		requireErrorWithCode(t, err, codes.InvalidArgument, apiv2base.ErrorMissingField)
 	})
 
 	t.Run("no app syncer wired", func(t *testing.T) {

@@ -86,9 +86,9 @@ func (r *Response) Validate(expectedAppID string) *syscode.Error {
 	}
 	if r.AppID != expectedAppID {
 		return &syscode.Error{
-			Code: syscode.CodeAppIDMismatch,
+			Code: syscode.CodeAppMismatch,
 			Message: fmt.Sprintf(
-				"app_id mismatch: expected %q, SDK reported %q",
+				"expected app ID %s, got %s",
 				expectedAppID,
 				r.AppID,
 			),

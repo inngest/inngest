@@ -456,9 +456,8 @@ func TestSync(t *testing.T) {
 			AllowInsecureHTTP: true,
 			HTTPClient:        srv.Client(),
 		})
-		assertSyscode(t, syscodeErr, err, syscode.CodeAppIDMismatch)
-		r.Contains(syscodeErr.Message, "other-app")
-		r.Contains(syscodeErr.Message, "my-app")
+		assertSyscode(t, syscodeErr, err, syscode.CodeAppMismatch)
+		r.Equal("expected app ID other-app, got my-app", syscodeErr.Message)
 	})
 
 }

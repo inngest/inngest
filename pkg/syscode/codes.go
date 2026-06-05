@@ -1,7 +1,7 @@
 package syscode
 
 const (
-	CodeAppIDMismatch             = "app_id_mismatch"
+	CodeAppMismatch               = "app_mismatch"
 	CodeBatchIfExpressionInvalid  = "batch_if_expression_invalid"
 	CodeBatchKeyExpressionInvalid = "batch_key_expression_invalid"
 	CodeBatchSizeInvalid          = "batch_size_invalid"

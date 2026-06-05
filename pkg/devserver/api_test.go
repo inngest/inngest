@@ -1027,4 +1027,3 @@ func TestDevEndpoint_Returns404InCloudMode(t *testing.T) {
 	// Should return 404
 	require.Equal(t, http.StatusNotFound, w.Code)
 }
-

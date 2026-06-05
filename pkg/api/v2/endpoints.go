@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
@@ -291,14 +292,16 @@ func (s *Service) SyncApp(
 ) (*apiv2.SyncAppResponse, error) {
 	ctx = logger.WithStdlib(ctx, logger.From(ctx).With("handler", "SyncApp"))
 
-	if req.Url == "" {
+	appURL := strings.TrimSpace(req.GetUrl())
+	if appURL == "" {
 		return nil, s.base.NewError(
 			http.StatusBadRequest,
 			apiv2base.ErrorMissingField,
 			"url is required",
 		)
 	}
-	if req.AppId == "" {
+	appID := strings.TrimSpace(req.GetAppId())
+	if appID == "" {
 		return nil, s.base.NewError(
 			http.StatusBadRequest,
 			apiv2base.ErrorMissingField,
@@ -331,16 +334,16 @@ func (s *Service) SyncApp(
 
 	syncResp, syscodeErr, err := appsync.Sync(ctx, appsync.Opts{
 		AllowInsecureHTTP: s.appSyncAllowInsecure,
-		ExpectedAppID:     req.AppId,
+		ExpectedAppID:     appID,
 		ServerKind:        s.serverKind,
 		SigningKey:        signingKey,
-		URL:               req.Url,
+		URL:               appURL,
 	})
 	if err != nil {
 		logger.From(ctx).Error(
 			"system error during sync",
 			"error", err,
-			"url", req.Url,
+			"url", appURL,
 		)
 		return nil, s.base.NewError(
 			http.StatusInternalServerError,
@@ -353,7 +356,7 @@ func (s *Service) SyncApp(
 			"sync failed",
 			"code", syscodeErr.Code,
 			"message", syscodeErr.Message,
-			"url", req.Url,
+			"url", appURL,
 		)
 		return nil, s.base.NewError(
 			httpStatusForSyncSyscode(syscodeErr.Code),
@@ -375,7 +378,7 @@ func (s *Service) SyncApp(
 
 	return &apiv2.SyncAppResponse{
 		Data: &apiv2.SyncAppData{
-			AppId:  req.AppId,
+			AppId:  appID,
 			Id:     syncID,
 			Status: syncStatusSuccess,
 		},
