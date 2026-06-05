@@ -880,7 +880,7 @@ func (d debouncer) primaryDebounceReady(ctx context.Context, di DebounceItem, fn
 		return false, fmt.Errorf("failed to read primary debounce state: %w", err)
 	}
 
-	exists, err := primary.ItemExists(ctx, scopeForDebounceItem(di), debounceID.String())
+	exists, err := primary.ItemExists(ctx, scopeForDebounceItem(di), queue.HashID(ctx, debounceID.String()))
 	if err != nil {
 		return false, fmt.Errorf("failed to inspect primary debounce queue item: %w", err)
 	}
