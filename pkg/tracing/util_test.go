@@ -190,42 +190,27 @@ func TestRetryStepSpanRefFromMetadataAndStepID(t *testing.T) {
 	})
 }
 
-func TestRetryNonStepDynamicSeed(t *testing.T) {
+func TestNonStepDynamicSeed(t *testing.T) {
 	t.Run("seed encodes nonstep prefix, group ID, and attempt", func(t *testing.T) {
 		item := queue.Item{GroupID: "grp-123", Attempt: 2}
-		seed := RetryNonStepDynamicSeed(item)
+		seed := NonStepDynamicSeed(item)
 		assert.Equal(t, []byte("nonstep:grp-123:2"), seed)
 	})
 
 	t.Run("same item always produces the same seed", func(t *testing.T) {
 		item := queue.Item{GroupID: "grp-abc", Attempt: 0}
-		assert.Equal(t, RetryNonStepDynamicSeed(item), RetryNonStepDynamicSeed(item))
+		assert.Equal(t, NonStepDynamicSeed(item), NonStepDynamicSeed(item))
 	})
 
 	t.Run("different group IDs produce different seeds", func(t *testing.T) {
 		a := queue.Item{GroupID: "grp-a", Attempt: 0}
 		b := queue.Item{GroupID: "grp-b", Attempt: 0}
-		assert.NotEqual(t, RetryNonStepDynamicSeed(a), RetryNonStepDynamicSeed(b))
+		assert.NotEqual(t, NonStepDynamicSeed(a), NonStepDynamicSeed(b))
 	})
 
 	t.Run("different attempts produce different seeds", func(t *testing.T) {
 		a := queue.Item{GroupID: "grp-x", Attempt: 0}
 		b := queue.Item{GroupID: "grp-x", Attempt: 1}
-		assert.NotEqual(t, RetryNonStepDynamicSeed(a), RetryNonStepDynamicSeed(b))
-	})
-}
-
-func TestFinalizedNonStepDynamicSeed(t *testing.T) {
-	t.Run("seed encodes nonstep prefix, group ID, and attempt", func(t *testing.T) {
-		item := queue.Item{GroupID: "grp-456", Attempt: 1}
-		seed := FinalizedNonStepDynamicSeed(item)
-		assert.Equal(t, []byte("nonstep:grp-456:1"), seed)
-	})
-
-	t.Run("matches retry seed for the same item", func(t *testing.T) {
-		// Retry and finalized non-step seeds use the same formula intentionally,
-		// so the span upserts correctly on finalization.
-		item := queue.Item{GroupID: "grp-same", Attempt: 3}
-		assert.Equal(t, RetryNonStepDynamicSeed(item), FinalizedNonStepDynamicSeed(item))
+		assert.NotEqual(t, NonStepDynamicSeed(a), NonStepDynamicSeed(b))
 	})
 }
