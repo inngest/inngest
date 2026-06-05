@@ -13,7 +13,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiSparkling2Fill } from '@remixicon/react';
 import { type LinkComponentProps } from '@tanstack/react-router';
 
-import { useDynamicRunData } from '../RunDetailsV3/utils';
+import { useDynamicRunData } from '../RunDetails/utils/useDynamicRunData';
 
 const cellStyles = 'text-basis text-sm';
 
