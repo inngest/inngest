@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func requestIDForGeneration(runID ulid.ULID, generationID int) string {
-	return driver.DispatchRequestID(time.Now(), runID, generationID).String()
+func requestIDForGeneration(runID ulid.ULID, queueItemRef string, generationID int) string {
+	return driver.DispatchRequestID(time.Now(), runID, queueItemRef, generationID).String()
 }
 
 func TestCheckpointAsyncSteps(t *testing.T) {
@@ -467,7 +467,7 @@ func TestCheckpointAsyncSteps_RequestStartedAtGate(t *testing.T) {
 			}
 			mocks, testData := setupAsyncCheckpointTest(t, op)
 
-			testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 4)
+			testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, testData.asyncCheckpoint.QueueItemRef, 4)
 			testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(tc.ageOffset).UnixMilli()
 
 			if tc.expectLoad {
@@ -527,7 +527,7 @@ func TestCheckpointAsyncSteps_ValidationDisabledBypassesGate(t *testing.T) {
 	}
 	mocks, testData := setupAsyncCheckpointTestWithValidation(t, false, op)
 
-	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
+	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, testData.asyncCheckpoint.QueueItemRef, 1)
 	testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(-time.Hour).UnixMilli()
 
 	expectedData, err := json.Marshal(map[string]any{
@@ -561,7 +561,7 @@ func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
 	}
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
+	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, testData.asyncCheckpoint.QueueItemRef, 1)
 	// Nil-from-HGET means the dispatch the SDK is serving no longer exists,
 	// which is exactly the stale case.
 	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(nil, queue.ErrQueueItemNotFound)
