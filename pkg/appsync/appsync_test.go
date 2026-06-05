@@ -259,6 +259,62 @@ func TestSync(t *testing.T) {
 		assertSyscode(t, syscodeErr, err, syscode.CodeMalformedResponse)
 	})
 
+	t.Run("signed response missing required fields", func(t *testing.T) {
+		r := require.New(t)
+		// A valid signature proves authenticity, but the signed response still
+		// needs schema validation before it can become a RegisterRequest.
+		body := []byte(`{"app_id":"my-app"}`)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set(headers.HeaderKeySignature, hmacSignResponse(t, body, testSigningKey))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(body)
+		}))
+		defer srv.Close()
+
+		resp, syscodeErr, err := Sync(context.Background(), Opts{
+			URL:               srv.URL,
+			SigningKey:        testSigningKey,
+			ExpectedAppID:     "my-app",
+			AllowInsecureHTTP: true,
+			HTTPClient:        srv.Client(),
+		})
+		r.Nil(resp)
+		assertSyscode(t, syscodeErr, err, syscode.CodeMalformedResponse)
+		r.Equal("missing url", syscodeErr.Message)
+	})
+
+	t.Run("signed response allows explicit empty functions", func(t *testing.T) {
+		r := require.New(t)
+		var srv *httptest.Server
+		srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			body, err := json.Marshal(Response{
+				AppID:       "my-app",
+				Functions:   []sdk.SDKFunction{},
+				SDKAuthor:   "inngest",
+				SDKLanguage: "go",
+				SDKVersion:  "1.0.0",
+				URL:         srv.URL,
+			})
+			require.NoError(t, err)
+			w.Header().Set(headers.HeaderKeySignature, hmacSignResponse(t, body, testSigningKey))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(body)
+		}))
+		defer srv.Close()
+
+		resp, syscodeErr, err := Sync(context.Background(), Opts{
+			URL:               srv.URL,
+			SigningKey:        testSigningKey,
+			ExpectedAppID:     "my-app",
+			AllowInsecureHTTP: true,
+			HTTPClient:        srv.Client(),
+		})
+		r.NoError(err)
+		r.Nil(syscodeErr)
+		r.NotNil(resp)
+		r.Empty(resp.Functions)
+	})
+
 	t.Run("body too large", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set(headers.HeaderKeySignature, "t=0&s=00")

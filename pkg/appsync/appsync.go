@@ -80,6 +80,33 @@ type Response struct {
 	URL         string            `json:"url"`
 }
 
+func (r *Response) Validate(expectedAppID string) *syscode.Error {
+	if r.AppID == "" {
+		return malformedResponse("missing app_id")
+	}
+	if r.AppID != expectedAppID {
+		return &syscode.Error{
+			Code: syscode.CodeAppIDMismatch,
+			Message: fmt.Sprintf(
+				"app_id mismatch: expected %q, SDK reported %q",
+				expectedAppID,
+				r.AppID,
+			),
+		}
+	}
+	if r.URL == "" {
+		return malformedResponse("missing url")
+	}
+	parsedURL, err := url.Parse(r.URL)
+	if err != nil || parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return malformedResponse("invalid url")
+	}
+	if r.Functions == nil {
+		return malformedResponse("missing functions")
+	}
+	return nil
+}
+
 // ToRegisterRequest returns a normalized RegisterRequest so checksums match
 // the /fn/register pipeline.
 func (r *Response) ToRegisterRequest() *sdk.RegisterRequest {
@@ -254,14 +281,18 @@ func Sync(ctx context.Context, opts Opts) (*Response, *syscode.Error, error) {
 		}, nil
 	}
 
-	if out.AppID != opts.ExpectedAppID {
-		return nil, &syscode.Error{
-			Code:    syscode.CodeAppIDMismatch,
-			Message: fmt.Sprintf("app_id mismatch: expected %q, SDK reported %q", opts.ExpectedAppID, out.AppID),
-		}, nil
+	if syscodeErr := out.Validate(opts.ExpectedAppID); syscodeErr != nil {
+		return nil, syscodeErr, nil
 	}
 
 	return &out, nil, nil
+}
+
+func malformedResponse(message string) *syscode.Error {
+	return &syscode.Error{
+		Code:    syscode.CodeMalformedResponse,
+		Message: message,
+	}
 }
 
 // checkScheme rejects unsupported schemes and gates http:// behind the flag.
