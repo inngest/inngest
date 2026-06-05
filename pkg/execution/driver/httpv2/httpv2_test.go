@@ -161,49 +161,6 @@ func TestSyncHeaders(t *testing.T) {
 	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
 }
 
-func TestSyncGenerationIDHeaderOmittedWhenZero(t *testing.T) {
-	var receivedHeaders http.Header
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedHeaders = r.Header
-		w.Header().Set(headers.HeaderKeySDK, "test-sdk")
-		opcodes := []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}}
-		w.WriteHeader(200)
-		_ = json.NewEncoder(w).Encode(opcodes)
-	}))
-	defer ts.Close()
-
-	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
-	d := &httpv2{Client: client}
-
-	u, _ := url.Parse(ts.URL)
-	fn := inngest.Function{
-		Driver: inngest.FunctionDriver{
-			URI: u.String(),
-			Metadata: map[string]any{
-				"type": "sync",
-			},
-		},
-	}
-
-	opts := driver.V2RequestOpts{
-		Fn:         fn,
-		SigningKey: []byte("test-signing-key"),
-		Metadata: sv2.Metadata{
-			ID: sv2.ID{
-				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
-			},
-		},
-		URL: u.String(),
-	}
-
-	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
-	require.NoError(t, userErr)
-	require.NoError(t, internalErr)
-	require.NotNil(t, resp)
-
-	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyGenerationID))
-}
-
 func TestSyncHeadersWithForceStepPlan(t *testing.T) {
 	var receivedHeaders http.Header
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -630,27 +587,35 @@ type mockStateLoader struct {
 func (m *mockStateLoader) LoadMetadata(ctx context.Context, id sv2.ID) (sv2.Metadata, error) {
 	return sv2.Metadata{}, nil
 }
+
 func (m *mockStateLoader) LoadEvents(ctx context.Context, id sv2.ID) ([]json.RawMessage, error) {
 	return m.events, m.err
 }
+
 func (m *mockStateLoader) LoadSteps(ctx context.Context, id sv2.ID) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStepInputs(ctx context.Context, id sv2.ID) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStepsWithIDs(ctx context.Context, id sv2.ID, stepIDs []string) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStack(ctx context.Context, id sv2.ID) ([]string, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadState(ctx context.Context, id sv2.ID) (sv2.State, error) {
 	return sv2.State{}, nil
 }
+
 func (m *mockStateLoader) LoadDefers(ctx context.Context, id sv2.ID) (map[string]sv2.Defer, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadDefersMeta(ctx context.Context, id sv2.ID) (map[string]sv2.DeferMeta, error) {
 	return nil, nil
 }

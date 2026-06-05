@@ -1621,7 +1621,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if item.JobID != nil {
 		jobID = *item.JobID
 	}
-	requestID := driver.DispatchRequestID(e.now(), jobID, item.Attempt).String()
+	requestID := driver.DispatchRequestID(e.now(), jobID, queue.GenerationIDFromContext(ctx)).String()
 
 	// Immediately store execution context for tracing.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{

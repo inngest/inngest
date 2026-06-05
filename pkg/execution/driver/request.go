@@ -17,8 +17,8 @@ type sdkJobIDCtxKey struct{}
 
 // DispatchRequestID is the single source of truth for the per-dispatch
 // GenerationID the executor stamps on outbound SDK requests.
-func DispatchRequestID(ts time.Time, jobID string, attempt int) ulid.ULID {
-	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", jobID, attempt))
+func DispatchRequestID(ts time.Time, jobID string, generationID int) ulid.ULID {
+	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", jobID, generationID))
 }
 
 // WithRequestIDs stores the per-outbound request ID and stable job ID for SDK

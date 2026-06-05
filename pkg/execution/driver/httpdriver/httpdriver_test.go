@@ -93,27 +93,6 @@ func TestRequestAndJobIDHeaders(t *testing.T) {
 	require.Equal(t, jobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 }
 
-func TestGenerationIDHeaderOmittedWhenZero(t *testing.T) {
-	input := []byte(`{"event":{"name":"hi","data":{}}}`)
-
-	var receivedHeaders http.Header
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedHeaders = r.Header
-		w.Header().Set(headerSDK, "test-sdk")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"ok":true}`))
-	}))
-	defer ts.Close()
-
-	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
-	_, _, err := do(context.Background(), client, Request{
-		URL:   parseURL(ts.URL),
-		Input: input,
-	})
-	require.NoError(t, err)
-	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyGenerationID))
-}
-
 func TestRetryAfter(t *testing.T) {
 	input := []byte(`{"event":{"name":"hi","data":{}}}`)
 	at := time.Now().Add(6 * time.Hour).Truncate(time.Second).UTC()

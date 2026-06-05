@@ -29,7 +29,7 @@ const (
 	// HeaderKeyGenerationID is the monotonic dispatch generation for the
 	// current job. The SDK echoes this back in async checkpoint POSTs so the
 	// API can fence requeues that supersede the original dispatch.
-	HeaderKeyGenerationID = "x-generation-id"
+	HeaderKeyGenerationID = "x-inngest-generation-id"
 
 	// HeaderKeyJobID is the stable queue item identifier for the current job.
 	HeaderKeyJobID = "x-inngest-job-id"
