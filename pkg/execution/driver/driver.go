@@ -165,6 +165,7 @@ func MarshalV1(
 			RunID:        md.ID.RunID,
 			QueueItemRef: queueItemRef,
 			RequestID:    RequestIDFromContext(ctx),
+			GenerationID: queue.GenerationIDFromContext(ctx),
 			JobID:        JobIDFromContext(ctx),
 			Stack: &FunctionStack{
 				Stack:   md.Stack,

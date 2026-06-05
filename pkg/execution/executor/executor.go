@@ -1617,12 +1617,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	conditionalTraceCtx, conditionalSpan := e.conditionalTracer.NewSpan(ctx, "executor.Execute", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	defer conditionalSpan.End()
 
-	requestID := driver.DispatchRequestID(e.now(), id.RunID, queue.GenerationIDFromContext(ctx)).String()
-
 	jobID := queue.JobIDFromContext(ctx)
 	if item.JobID != nil {
 		jobID = *item.JobID
 	}
+	requestID := driver.DispatchRequestID(e.now(), jobID, item.Attempt).String()
 
 	// Immediately store execution context for tracing.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
