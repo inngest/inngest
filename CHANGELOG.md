@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.26.0] - 2026-06-05
+
+### 🚀 Features
+
+- Add support for parsing span attribute data from Langfuse (EXE-1914) (#4318)
+- A/B test insights query-writer model and score tokens/cost (#4331)
+- Promote api cli, add redirect message and beta tag (#4344)
+
+### 🐛 Bug Fixes
+
+- Mark insights api as internal to get docs gen working again (#4327)
+- Make v2 api path match mono/docs & improve host/port handling (#4302)
+- Status, duration, output in v2 api event/runs (#4343)
+
+### 🚜 Refactor
+
+- Use step.run for llm calls in insights experiment (#4338)
+- Use Item.Kind for shard selection instead of Item.QueueName (#4336)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(tracing)* Add more conditional traces around scheduling (#4323)
+
 ## [v1.25.0] - 2026-06-03
 
 ### 🚀 Features
@@ -25,6 +48,7 @@ All notable changes to this project will be documented in this file.
 
 - Add function metadata to run spans (#4287)
 - Improve usability on deferred runs (#4320)
+- *(release)* V1.25.0 (#4301)
 
 ## [v1.24.0] - 2026-06-01
 
