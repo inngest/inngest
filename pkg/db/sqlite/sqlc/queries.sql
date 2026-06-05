@@ -178,10 +178,46 @@ SELECT
   spans.run_id,
   spans.function_id,
   spans.app_id,
-  spans.start_time,
-  spans.end_time,
-  COALESCE(spans.status, '') AS status,
-  COALESCE(CAST(spans.output AS TEXT), '') AS output,
+  CAST(COALESCE((
+    SELECT start_lookup.start_time
+    FROM spans start_lookup
+    WHERE start_lookup.run_id = spans.run_id
+      AND start_lookup.debug_run_id IS NULL
+      AND start_lookup.parent_span_id IS NOT NULL
+      AND start_lookup.parent_span_id <> ''
+      AND start_lookup.parent_span_id <> '0000000000000000'
+    ORDER BY start_lookup.start_time
+    LIMIT 1
+  ), spans.start_time) AS TEXT) AS start_time,
+  CAST(COALESCE((
+    SELECT status_lookup.end_time
+    FROM spans status_lookup
+    WHERE status_lookup.run_id = spans.run_id
+      AND status_lookup.debug_run_id IS NULL
+      AND status_lookup.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
+    ORDER BY status_lookup.end_time DESC
+    LIMIT 1
+  ), spans.end_time) AS TEXT) AS end_time,
+  COALESCE((
+    SELECT status_lookup.status
+    FROM spans status_lookup
+    WHERE status_lookup.run_id = spans.run_id
+      AND status_lookup.debug_run_id IS NULL
+      AND status_lookup.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
+    ORDER BY status_lookup.end_time DESC
+    LIMIT 1
+  ), spans.status, '') AS status,
+  COALESCE((
+    SELECT CAST(output_lookup.output AS TEXT)
+    FROM spans output_lookup
+    WHERE output_lookup.run_id = spans.run_id
+      AND output_lookup.output IS NOT NULL
+      AND output_lookup.debug_run_id IS NULL
+    ORDER BY
+      CASE WHEN COALESCE(output_lookup.attributes->>'$."_inngest.is.function.output"', '') = 'true' THEN 0 ELSE 1 END,
+      output_lookup.end_time DESC
+    LIMIT 1
+  ), CAST(spans.output AS TEXT), '') AS output,
   COALESCE(spans.attributes->>'$."_inngest.function.slug"', '') AS function_slug,
   COALESCE(spans.attributes->>'$."_inngest.function.name"', '') AS function_name,
   COALESCE(apps.name, '') AS app_name,
