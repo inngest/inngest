@@ -19,6 +19,8 @@ type checkpointRunContext struct {
 	httpClient exechttp.RequestExecutor
 	events     []json.RawMessage
 
+	fallbackTime time.Time
+
 	// Data from queue.Item that we actually need
 	groupID         string
 	attemptCount    int
@@ -137,8 +139,7 @@ func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
 }
 
 func (c *checkpointRunContext) StartTime() time.Time {
-	// Plumbed here for interface compatibility, but not currently used in checkpointing
-	return time.Time{}
+	return c.fallbackTime
 }
 
 func (c *checkpointRunContext) ReleaseCapacityLease() error {

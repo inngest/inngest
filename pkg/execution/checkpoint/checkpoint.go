@@ -771,6 +771,9 @@ func (c checkpointer) runContext(md state.Metadata, fn *inngest.Function) execut
 		// ie. first attempts at teps.
 		attemptCount: 0,
 
+		// This is only used if the checkpointed opcode is missing its timing field.
+		fallbackStartTime: time.Now(),
+
 		maxAttempts:     fn.MaxAttempts(),
 		priorityFactor:  nil,                         // Use default priority
 		concurrencyKeys: []state.CustomConcurrency{}, // No custom concurrency
