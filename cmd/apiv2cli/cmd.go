@@ -105,7 +105,7 @@ func commonFlags() []cli.Flag {
 		&cli.StringFlag{
 			Category: "Target",
 			Name:     "api-host",
-			Usage:    "Custom API host or origin",
+			Usage:    "Custom API host or origin; may include /api/v2 or /v2",
 		},
 		&cli.IntFlag{
 			Category:    "Target",
@@ -299,7 +299,7 @@ func endpointDescription(ep endpoint) string {
 		"",
 		"Target, auth, and output flags are inherited from `inngest alpha api`:",
 		"  --prod                  Target Inngest Cloud Production",
-		"  --api-host, --api-port  Target a custom API server",
+		"  --api-host, --api-port  Target a custom API server; host may include /api/v2 or /v2",
 		"  --api-key               API key, or INNGEST_API_KEY",
 		"  --signing-key           Signing key, or INNGEST_SIGNING_KEY",
 		"  --env                   Environment name, or INNGEST_ENV",
@@ -494,7 +494,7 @@ func resolveBaseURL(ctx context.Context, cmd *cli.Command) (string, error) {
 
 	apiPort := localconfig.GetIntValue(cmd, "api-port", 0)
 	if apiHost := localconfig.GetValue(cmd, "api-host", ""); apiHost != "" {
-		if apiPort == 0 {
+		if apiPort == 0 && !looksLikeURL(apiHost) {
 			apiPort = api.DefaultAPIPort
 		}
 		return normalizeAPIHostTarget(apiHost, apiPort)
@@ -513,7 +513,7 @@ func resolveBaseURL(ctx context.Context, cmd *cli.Command) (string, error) {
 
 func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
 	if looksLikeURL(rawHost) {
-		return normalizeAPIURL(rawHost)
+		return normalizeAPIURLWithPort(rawHost, port)
 	}
 
 	host := rawHost
@@ -532,6 +532,21 @@ func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
 	}
 
 	return normalizeAPIURL(fmt.Sprintf("%s://%s", scheme, rawHost))
+}
+
+func normalizeAPIURLWithPort(rawURL string, port int) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("api host must include scheme and host")
+	}
+	if port != 0 && parsed.Port() == "" {
+		parsed.Host = net.JoinHostPort(parsed.Hostname(), strconv.Itoa(port))
+	}
+
+	return normalizeAPIURL(parsed.String())
 }
 
 func normalizeAPIURL(rawURL string) (string, error) {

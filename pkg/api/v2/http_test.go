@@ -325,6 +325,15 @@ func TestHTTPGateway_Routing(t *testing.T) {
 		require.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
+	t.Run("invalid endpoints under /v2 return 404", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v2/invalid", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
 	t.Run("root path returns 404", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
