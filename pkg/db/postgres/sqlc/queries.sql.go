@@ -1237,10 +1237,10 @@ SELECT
   spans.run_id,
   spans.function_id,
   spans.app_id,
-  spans.start_time,
-  spans.end_time,
-  COALESCE(spans.status, '') AS status,
-  COALESCE(spans.output::text, '') AS output,
+  COALESCE(run_start.start_time, spans.start_time) AS start_time,
+  COALESCE(run_status.end_time, spans.end_time) AS end_time,
+  COALESCE(run_status.status, spans.status, '') AS status,
+  COALESCE(run_output.output::text, spans.output::text, '') AS output,
   COALESCE((spans.attributes#>>'{}')::json->>'_inngest.function.slug', '') AS function_slug,
   COALESCE((spans.attributes#>>'{}')::json->>'_inngest.function.name', '') AS function_name,
   COALESCE(apps.name, '') AS app_name,
@@ -1248,6 +1248,37 @@ SELECT
   COALESCE((spans.attributes#>>'{}')::json->>'_inngest.cron.schedule', '') AS cron_schedule
 FROM spans
 LEFT JOIN apps ON apps.id::text = spans.app_id AND apps.archived_at IS NULL
+LEFT JOIN LATERAL (
+  SELECT start_time
+  FROM spans start_spans
+  WHERE start_spans.run_id = spans.run_id
+    AND start_spans.debug_run_id IS NULL
+    AND start_spans.parent_span_id IS NOT NULL
+    AND start_spans.parent_span_id <> ''
+    AND start_spans.parent_span_id <> '0000000000000000'
+  ORDER BY start_spans.start_time
+  LIMIT 1
+) run_start ON true
+LEFT JOIN LATERAL (
+  SELECT status, end_time
+  FROM spans status_spans
+  WHERE status_spans.run_id = spans.run_id
+    AND status_spans.debug_run_id IS NULL
+    AND status_spans.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
+  ORDER BY status_spans.end_time DESC
+  LIMIT 1
+) run_status ON true
+LEFT JOIN LATERAL (
+  SELECT output
+  FROM spans output_spans
+  WHERE output_spans.run_id = spans.run_id
+    AND output_spans.debug_run_id IS NULL
+    AND output_spans.output IS NOT NULL
+  ORDER BY
+    COALESCE((output_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') != 'true',
+    output_spans.end_time DESC
+  LIMIT 1
+) run_output ON true
 WHERE spans.name = $1
   AND spans.debug_run_id IS NULL
   AND spans.run_id > $2::TEXT
