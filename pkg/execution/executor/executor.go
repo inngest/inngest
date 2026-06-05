@@ -5684,6 +5684,8 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		} else {
 			parent = tracing.FinalizedStepSpanRefFromMetadataAndStepID(runMD, op.ID)
 		}
+	case enums.MetadataScopeRequest:
+		parent = runCtx.ExecutionSpan()
 	default:
 		return nil, fmt.Errorf("unknown metadata scope: %s", sanitizeLogValue(scope.String()))
 	}
