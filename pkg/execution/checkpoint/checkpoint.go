@@ -772,7 +772,7 @@ func (c checkpointer) runContext(md state.Metadata, fn *inngest.Function) execut
 		attemptCount: 0,
 
 		// This is only used if the checkpointed opcode is missing its timing field.
-		fallbackStartTime: time.Now(),
+		fallbackTime: time.Now(),
 
 		maxAttempts:     fn.MaxAttempts(),
 		priorityFactor:  nil,                         // Use default priority
