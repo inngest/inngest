@@ -585,6 +585,61 @@ func TestService_GetEventRuns(t *testing.T) {
 		require.Equal(t, "trace", resp.Data[0].Output.Fields["from"].GetStringValue())
 	})
 
+	t.Run("hydrates stale status and end time from trace reader", func(t *testing.T) {
+		queuedRun := &RunListItem{
+			RunID:        runID,
+			RunStartedAt: startedAt,
+			EventID:      eventID,
+			Status:       enums.RunStatusScheduled,
+			FunctionID:   "test-fn",
+			FunctionName: "Test function",
+			AppID:        "my-app",
+		}
+		completed := enums.StepStatusCompleted
+
+		reader := &mockRunsReader{}
+		reader.On("GetRuns", mock.Anything, GetRunsOpts{
+			EventID: eventID,
+			Limit:   defaultEventRunsLimit,
+		}).Return(&GetRunsResult{Runs: []*RunListItem{queuedRun}}, nil).Once()
+
+		traces := &mockFunctionTraceReader{}
+		traces.On("GetSpansByRunID", mock.Anything, runID).Return(&cqrs.OtelSpan{
+			RunID: runID,
+			Children: []*cqrs.OtelSpan{
+				{
+					RawOtelSpan: cqrs.RawOtelSpan{
+						StartTime: startedAt,
+						EndTime:   endedAt,
+					},
+					Status: completed,
+					Attributes: &meta.ExtractedValues{
+						IsFunctionOutput: boolPtr(true),
+					},
+				},
+			},
+		}, nil).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+			traces.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			RunList:        reader,
+			FunctionTraces: traces,
+		})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
+		require.Equal(t, endedAt, resp.Data[0].EndedAt.AsTime())
+		require.Equal(t, uint64(2000), *resp.Data[0].DurationMs)
+		require.Nil(t, resp.Data[0].Output)
+	})
+
 	t.Run("passes pagination to reader", func(t *testing.T) {
 		reader := &mockRunsReader{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{

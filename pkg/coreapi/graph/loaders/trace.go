@@ -178,11 +178,8 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
 	status := models.RunTraceSpanStatusRunning
 
-	// Make sure we parse dynamic statuses from updates
-	if span.Attributes.DynamicStatus != nil {
-		if gqlStatus := tr.stepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
-			status = *gqlStatus
-		}
+	if gqlStatus := tr.stepStatusToGQL(run.OtelSpanStatus(span)); gqlStatus != nil {
+		status = *gqlStatus
 	}
 
 	attempts := span.GetAttempts()
@@ -449,7 +446,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 						gqlSpan.OutputID = child.OutputID
 					}
 
-					if cs.Attributes.IsFunctionOutput != nil && *cs.Attributes.IsFunctionOutput {
+					if run.IsFunctionOutputSpan(cs) {
 						gqlSpan.Name = FinalizationSpanName
 					} else if strings.HasPrefix(gqlSpan.Name, "executor.") && child.Name != "" {
 						gqlSpan.Name = child.Name
@@ -509,8 +506,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				gqlSpan.StartedAt = gqlSpan.ChildrenSpans[0].StartedAt
 			}
 
-			if gqlSpan.EndedAt != nil && gqlSpan.StartedAt != nil {
-				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
+			if durationMs := run.DurationMS(gqlSpan.StartedAt, gqlSpan.EndedAt); durationMs != nil {
+				dur := int(*durationMs)
 				gqlSpan.Duration = &dur
 			}
 		}
@@ -570,8 +567,8 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	if models.RunTraceEnded(gqlSpan.Status) || gqlSpan.IsUserland {
 		startedAt := span.GetStartedAtTime()
 		endedAt := span.GetEndedAtTime()
-		if startedAt != nil && endedAt != nil {
-			dur := int(endedAt.Sub(*startedAt).Milliseconds())
+		if durationMs := run.DurationMS(startedAt, endedAt); durationMs != nil {
+			dur := int(*durationMs)
 			gqlSpan.Duration = &dur
 		}
 	} else {

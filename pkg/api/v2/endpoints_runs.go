@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
+	runpkg "github.com/inngest/inngest/pkg/run"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -102,9 +103,10 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 
 	data := make([]*apiv2.FunctionRun, 0, len(result.Runs))
 	for _, run := range result.Runs {
+		output := s.hydrateRunListItemFromTrace(ctx, run, req.GetIncludeOutput())
 		item := toAPIRunListItem(run)
-		if req.GetIncludeOutput() && item.Output == nil {
-			item.Output = s.traceRunOutput(ctx, run.RunID)
+		if output != nil {
+			item.Output = output
 		}
 		data = append(data, item)
 	}
@@ -529,12 +531,12 @@ func (s *Service) traceRunOutput(ctx context.Context, runID ulid.ULID) *structpb
 		return nil
 	}
 
-	outputID := runOutputID(root)
-	if outputID == nil {
+	summary, err := runpkg.SummarizeSpanTree(root)
+	if err != nil || summary == nil || summary.OutputID == nil {
 		return nil
 	}
 
-	output, err := loadTraceOutput(ctx, s.traces, *outputID)
+	output, err := loadTraceOutput(ctx, s.traces, *summary.OutputID)
 	if err != nil || output == nil {
 		return nil
 	}
@@ -542,32 +544,41 @@ func (s *Service) traceRunOutput(ctx context.Context, runID ulid.ULID) *structpb
 	return output.output
 }
 
-func runOutputID(root *cqrs.OtelSpan) *string {
-	if outputID := root.GetOutputID(); outputID != nil {
-		return outputID
-	}
-
-	var selected *cqrs.OtelSpan
-	var walk func(*cqrs.OtelSpan)
-	walk = func(span *cqrs.OtelSpan) {
-		if span == nil {
-			return
-		}
-
-		if span.Attributes != nil && span.Attributes.IsFunctionOutput != nil && *span.Attributes.IsFunctionOutput && span.GetOutputID() != nil {
-			if selected == nil || span.EndTime.After(selected.EndTime) || span.StartTime.After(selected.StartTime) {
-				selected = span
-			}
-		}
-
-		for _, child := range span.Children {
-			walk(child)
-		}
-	}
-	walk(root)
-
-	if selected == nil {
+func (s *Service) hydrateRunListItemFromTrace(ctx context.Context, item *RunListItem, includeOutput bool) *structpb.Struct {
+	if s.traces == nil || item == nil {
 		return nil
 	}
-	return selected.GetOutputID()
+
+	state := runpkg.RunSummaryState{
+		Status:    item.Status,
+		StartedAt: item.RunStartedAt,
+		EndedAt:   item.EndedAt,
+		HasOutput: len(item.Output) > 0,
+	}
+	if !runpkg.ShouldHydrateRunSummary(state, includeOutput) {
+		return nil
+	}
+
+	root, err := s.traces.GetSpansByRunID(ctx, item.RunID)
+	if err != nil || root == nil {
+		return nil
+	}
+
+	summary, err := runpkg.SummarizeSpanTree(root)
+	if err != nil || summary == nil {
+		return nil
+	}
+	state = summary.ApplyTo(state)
+	item.Status = state.Status
+	item.RunStartedAt = state.StartedAt
+	item.EndedAt = state.EndedAt
+
+	if includeOutput && !state.HasOutput && summary.OutputID != nil {
+		output, err := loadTraceOutput(ctx, s.traces, *summary.OutputID)
+		if err == nil && output != nil {
+			return output.output
+		}
+	}
+
+	return nil
 }
