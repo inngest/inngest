@@ -1275,7 +1275,7 @@ LEFT JOIN LATERAL (
     AND output_spans.debug_run_id IS NULL
     AND output_spans.output IS NOT NULL
   ORDER BY
-    CASE WHEN COALESCE((output_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') = 'true' THEN 0 ELSE 1 END,
+    COALESCE((output_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') != 'true',
     output_spans.end_time DESC
   LIMIT 1
 ) run_output ON true
