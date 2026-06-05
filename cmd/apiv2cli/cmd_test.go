@@ -46,6 +46,36 @@ func TestEndpointCommandNameNormalizesReadVerbs(t *testing.T) {
 	require.Equal(t, "create-env", endpointCommandName("CreateEnv"))
 }
 
+func TestCommandHelpUsesTopLevelAPIAndBetaLabel(t *testing.T) {
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--help",
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, out.String(), "inngest api [target/auth flags] <endpoint> [endpoint flags]")
+	require.Contains(t, out.String(), "Call Inngest REST API v2 endpoints (beta)")
+	require.Contains(t, out.String(), "Beta: this command is under active development and may change.")
+	require.NotContains(t, out.String(), "inngest alpha api [target/auth flags]")
+}
+
+func TestMovedCommandTellsUsersToUseTopLevelAPI(t *testing.T) {
+	cmd := MovedCommand()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, out.String(), "The alpha api command has moved. Use `inngest api` instead.")
+}
+
 func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
 	var invoke *cli.Command
 	for _, cmd := range endpointCommands() {

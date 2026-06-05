@@ -58,14 +58,28 @@ type endpoint struct {
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "api",
-		Usage:     "Call Inngest REST API v2 endpoints",
-		UsageText: "inngest alpha api [target/auth flags] <endpoint> [endpoint flags]",
+		Usage:     "Call Inngest REST API v2 endpoints (beta)",
+		UsageText: "inngest api [target/auth flags] <endpoint> [endpoint flags]",
 		Description: strings.Join([]string{
+			"Beta: this command is under active development and may change.",
 			"By default, the command targets the local dev server.",
 			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom API server.",
 		}, "\n"),
 		Flags:    commonFlags(),
 		Commands: endpointCommands(),
+	}
+}
+
+func MovedCommand() *cli.Command {
+	return &cli.Command{
+		Name:        "api",
+		Usage:       "Moved to inngest api",
+		UsageText:   "inngest alpha api",
+		Description: "The alpha api command has moved. Use `inngest api` instead.",
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			_, err := fmt.Fprintln(cmd.Root().Writer, "The alpha api command has moved. Use `inngest api` instead.")
+			return err
+		},
 	}
 }
 
@@ -150,7 +164,7 @@ func endpointUsageText(ep endpoint) string {
 	for _, name := range ep.pathParams {
 		fmt.Fprintf(&positional, " [<%s>]", kebab(name))
 	}
-	return fmt.Sprintf("inngest alpha api [target/auth flags] %s%s [endpoint flags]", ep.name, positional.String())
+	return fmt.Sprintf("inngest api [target/auth flags] %s%s [endpoint flags]", ep.name, positional.String())
 }
 
 func endpointArguments(ep endpoint) []cli.Argument {
