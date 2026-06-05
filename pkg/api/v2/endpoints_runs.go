@@ -102,7 +102,9 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 
 	data := make([]*apiv2.FunctionRun, 0, len(result.Runs))
 	for _, run := range result.Runs {
-		data = append(data, toAPIRunListItem(run))
+		item := toAPIRunListItem(run)
+		s.hydrateRunListItemFromTrace(ctx, item, run.RunID, req.GetIncludeOutput())
+		data = append(data, item)
 	}
 
 	return &apiv2.GetEventRunsResponse{
@@ -268,6 +270,74 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 	return result
 }
 
+func (s *Service) hydrateRunListItemFromTrace(ctx context.Context, item *apiv2.FunctionRun, runID ulid.ULID, includeOutput bool) {
+	if s.traces == nil {
+		return
+	}
+
+	root, err := s.traces.GetSpansByRunID(ctx, runID)
+	if err != nil || root == nil {
+		return
+	}
+
+	span, err := loader.ConvertRunSpan(ctx, root)
+	if err != nil || span == nil {
+		return
+	}
+
+	item.Status = toFunctionRunStatusFromTrace(span.Status)
+	if span.StartedAt != nil {
+		item.StartedAt = timestamppb.New(*span.StartedAt)
+	}
+	if span.EndedAt != nil {
+		item.EndedAt = timestamppb.New(*span.EndedAt)
+	}
+	if duration := traceDuration(span); duration != nil {
+		item.DurationMs = duration
+	}
+
+	if includeOutput {
+		outputID := traceRunOutputID(span)
+		if outputID == nil {
+			return
+		}
+		output, err := loadTraceOutput(ctx, s.traces, *outputID)
+		if err == nil && output != nil {
+			item.Output = output.output
+		}
+	}
+}
+
+func traceRunOutputID(span *models.RunTraceSpan) *string {
+	if span == nil {
+		return nil
+	}
+
+	var fallback *string
+	var walk func(*models.RunTraceSpan) *string
+	walk = func(current *models.RunTraceSpan) *string {
+		if current.OutputID != nil && *current.OutputID != "" {
+			if current.Name == loader.FinalizationSpanName {
+				return current.OutputID
+			}
+			fallback = current.OutputID
+		}
+
+		for _, child := range current.ChildrenSpans {
+			if outputID := walk(child); outputID != nil {
+				return outputID
+			}
+		}
+
+		return nil
+	}
+
+	if outputID := walk(span); outputID != nil {
+		return outputID
+	}
+	return fallback
+}
+
 func functionRefID(fn inngest.DeployedFunction) string {
 	if fn.Function.Slug != "" {
 		return fn.Function.Slug
@@ -294,6 +364,21 @@ func toFunctionRunStatus(status enums.RunStatus) apiv2.FunctionRunStatus {
 	case enums.RunStatusCancelled:
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_CANCELLED
 	case enums.RunStatusRunning:
+		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING
+	default:
+		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED
+	}
+}
+
+func toFunctionRunStatusFromTrace(status models.RunTraceSpanStatus) apiv2.FunctionRunStatus {
+	switch status {
+	case models.RunTraceSpanStatusCompleted:
+		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED
+	case models.RunTraceSpanStatusFailed:
+		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_FAILED
+	case models.RunTraceSpanStatusCancelled:
+		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_CANCELLED
+	case models.RunTraceSpanStatusRunning:
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_RUNNING
 	default:
 		return apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_QUEUED

@@ -514,6 +514,90 @@ func TestService_GetEventRuns(t *testing.T) {
 		require.Equal(t, int32(defaultEventRunsLimit), resp.Page.Limit)
 	})
 
+	t.Run("hydrates status timing and output from trace", func(t *testing.T) {
+		staleRun := &RunListItem{
+			RunID:        runID,
+			RunStartedAt: startedAt,
+			EventID:      eventID,
+			Status:       enums.RunStatusScheduled,
+			FunctionID:   "test-fn",
+			FunctionName: "Test function",
+			AppID:        "my-app",
+		}
+		outputIdentifier := cqrs.SpanIdentifier{SpanID: "finalization-output", Preview: boolPtr(true)}
+		outputID, err := outputIdentifier.Encode()
+		require.NoError(t, err)
+		completed := enums.StepStatusCompleted
+		isFunctionOutput := true
+
+		root := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameRun, SpanID: "run-span", TraceID: "trace-id"},
+			RunID:       runID,
+			Attributes: &meta.ExtractedValues{
+				DynamicStatus: &completed,
+				QueuedAt:      &startedAt,
+				StartedAt:     &startedAt,
+				EndedAt:       &endedAt,
+			},
+			Children: []*cqrs.OtelSpan{
+				{
+					RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep, SpanID: "finalization-step", TraceID: "trace-id"},
+					Attributes: &meta.ExtractedValues{
+						DynamicStatus: &completed,
+						QueuedAt:      &startedAt,
+						StartedAt:     &startedAt,
+						EndedAt:       &endedAt,
+					},
+					Children: []*cqrs.OtelSpan{
+						{
+							RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution, SpanID: "finalization-exec", TraceID: "trace-id"},
+							OutputID:    &outputID,
+							Attributes: &meta.ExtractedValues{
+								DynamicStatus:    &completed,
+								QueuedAt:         &startedAt,
+								StartedAt:        &startedAt,
+								EndedAt:          &endedAt,
+								IsFunctionOutput: &isFunctionOutput,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		reader := &mockRunsReader{}
+		reader.On("GetRuns", mock.Anything, GetRunsOpts{
+			EventID:       eventID,
+			Limit:         defaultEventRunsLimit,
+			IncludeOutput: true,
+		}).Return(&GetRunsResult{Runs: []*RunListItem{staleRun}}, nil).Once()
+
+		traces := &mockFunctionTraceReader{}
+		traces.On("GetSpansByRunID", mock.Anything, runID).Return(root, nil).Once()
+		traces.On("GetSpanOutput", mock.Anything, outputIdentifier).Return(&cqrs.SpanOutput{
+			Data: []byte(`{"body":"Hello, World!"}`),
+		}, nil).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+			traces.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{RunList: reader, FunctionTraces: traces})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId:       eventID.String(),
+			IncludeOutput: boolPtr(true),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
+		require.Equal(t, endedAt, resp.Data[0].EndedAt.AsTime())
+		require.NotNil(t, resp.Data[0].DurationMs)
+		require.Equal(t, uint64(2000), *resp.Data[0].DurationMs)
+		require.NotNil(t, resp.Data[0].Output)
+		require.Equal(t, "Hello, World!", resp.Data[0].Output.Fields["body"].GetStringValue())
+	})
+
 	t.Run("passes pagination to reader", func(t *testing.T) {
 		reader := &mockRunsReader{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
