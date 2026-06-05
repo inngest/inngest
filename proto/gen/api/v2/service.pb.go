@@ -4988,7 +4988,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xd8k\n" +
+	"\x04INFO\x10\x032\xd6j\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -5248,8 +5248,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x0eGet event runs\x1a1Lists function runs triggered by a specific eventb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19\x12\x17/events/{event_id}/runs\x12\xca\x06\n" +
-	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x8d\x06\x92A\xea\x05\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19\x12\x17/events/{event_id}/runs\x12\xc8\x05\n" +
+	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x8b\x05\x92A\xe8\x04\n" +
 	"\x04Apps\n" +
 	"\x04Beta\x12\bSync app\x1a Sync an app at the provided URL.JE\n" +
 	"\x03200\x12>\n" +
@@ -5266,10 +5266,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJM\n" +
 	"\x03404\x12F\n" +
 	"!Not Found - environment not found\x12!\n" +
-	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ\xd0\x01\n" +
-	"\x03422\x12\xc8\x01\n" +
-	"\xa0\x01Unprocessable Entity - sync failed. The response body is still SyncAppResponse and includes the persisted deploy plus a coded error under data.latestSync.error.\x12#\n" +
-	"!\x1a\x1f#/definitions/v2SyncAppResponseJA\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJO\n" +
+	"\x03422\x12H\n" +
+	"#Unprocessable Entity - sync failed.\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
 	"\x03500\x12:\n" +
 	"\x15Internal Server Error\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
