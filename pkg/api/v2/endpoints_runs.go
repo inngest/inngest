@@ -102,7 +102,11 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 
 	data := make([]*apiv2.FunctionRun, 0, len(result.Runs))
 	for _, run := range result.Runs {
-		data = append(data, toAPIRunListItem(run))
+		item := toAPIRunListItem(run)
+		if req.GetIncludeOutput() && item.Output == nil {
+			item.Output = s.traceRunOutput(ctx, run.RunID)
+		}
+		data = append(data, item)
 	}
 
 	return &apiv2.GetEventRunsResponse{
@@ -525,7 +529,7 @@ func (s *Service) traceRunOutput(ctx context.Context, runID ulid.ULID) *structpb
 		return nil
 	}
 
-	outputID := root.GetOutputID()
+	outputID := runOutputID(root)
 	if outputID == nil {
 		return nil
 	}
@@ -536,4 +540,34 @@ func (s *Service) traceRunOutput(ctx context.Context, runID ulid.ULID) *structpb
 	}
 
 	return output.output
+}
+
+func runOutputID(root *cqrs.OtelSpan) *string {
+	if outputID := root.GetOutputID(); outputID != nil {
+		return outputID
+	}
+
+	var selected *cqrs.OtelSpan
+	var walk func(*cqrs.OtelSpan)
+	walk = func(span *cqrs.OtelSpan) {
+		if span == nil {
+			return
+		}
+
+		if span.Attributes != nil && span.Attributes.IsFunctionOutput != nil && *span.Attributes.IsFunctionOutput && span.GetOutputID() != nil {
+			if selected == nil || span.EndTime.After(selected.EndTime) || span.StartTime.After(selected.StartTime) {
+				selected = span
+			}
+		}
+
+		for _, child := range span.Children {
+			walk(child)
+		}
+	}
+	walk(root)
+
+	if selected == nil {
+		return nil
+	}
+	return selected.GetOutputID()
 }
