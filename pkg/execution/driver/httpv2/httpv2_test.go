@@ -132,10 +132,11 @@ func TestSyncHeaders(t *testing.T) {
 	}
 
 	opts := driver.V2RequestOpts{
-		Fn:         fn,
-		RequestID:  "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-		JobID:      "job-123",
-		SigningKey: []byte("test-signing-key"),
+		Fn:           fn,
+		RequestID:    "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		GenerationID: 3,
+		JobID:        "job-123",
+		SigningKey:   []byte("test-signing-key"),
 		Metadata: sv2.Metadata{
 			ID: sv2.ID{
 				RunID: runID,
@@ -154,9 +155,53 @@ func TestSyncHeaders(t *testing.T) {
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "s=")
 	require.Equal(t, runID.String(), receivedHeaders.Get("X-Run-ID"))
 	require.Equal(t, opts.RequestID, receivedHeaders.Get(headers.HeaderKeyRequestID))
+	require.Equal(t, "3", receivedHeaders.Get(headers.HeaderKeyGenerationID))
 	require.Equal(t, opts.JobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 	// ForceStepPlan not set, so header should be absent
 	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
+}
+
+func TestSyncGenerationIDHeaderOmittedWhenZero(t *testing.T) {
+	var receivedHeaders http.Header
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = r.Header
+		w.Header().Set(headers.HeaderKeySDK, "test-sdk")
+		opcodes := []*sv1.GeneratorOpcode{{Op: enums.OpcodeNone}}
+		w.WriteHeader(200)
+		_ = json.NewEncoder(w).Encode(opcodes)
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	d := &httpv2{Client: client}
+
+	u, _ := url.Parse(ts.URL)
+	fn := inngest.Function{
+		Driver: inngest.FunctionDriver{
+			URI: u.String(),
+			Metadata: map[string]any{
+				"type": "sync",
+			},
+		},
+	}
+
+	opts := driver.V2RequestOpts{
+		Fn:         fn,
+		SigningKey: []byte("test-signing-key"),
+		Metadata: sv2.Metadata{
+			ID: sv2.ID{
+				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+			},
+		},
+		URL: u.String(),
+	}
+
+	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
+	require.NoError(t, userErr)
+	require.NoError(t, internalErr)
+	require.NotNil(t, resp)
+
+	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyGenerationID))
 }
 
 func TestSyncHeadersWithForceStepPlan(t *testing.T) {

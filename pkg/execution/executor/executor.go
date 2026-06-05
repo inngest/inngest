@@ -2369,16 +2369,17 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 	}
 
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
-		Metadata:   *run.Metadata(),
-		Fn:         run.f,
-		SigningKey: sk,
-		Attempt:    run.AttemptCount(),
-		Index:      run.stackIndex,
-		StepID:     &stepID,
-		QueueRef:   queueref.StringFromCtx(ctx),
-		RequestID:  run.requestID,
-		JobID:      run.jobID,
-		URL:        url,
+		Metadata:     *run.Metadata(),
+		Fn:           run.f,
+		SigningKey:   sk,
+		Attempt:      run.AttemptCount(),
+		Index:        run.stackIndex,
+		StepID:       &stepID,
+		QueueRef:     queueref.StringFromCtx(ctx),
+		RequestID:    run.requestID,
+		GenerationID: queue.GenerationIDFromContext(ctx),
+		JobID:        run.jobID,
+		URL:          url,
 	})
 
 	// For now, the executor expects V1 style errors directly in state.DriverResponse.
