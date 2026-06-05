@@ -32,10 +32,8 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 	}
 
 	if item.QueueName == nil {
-		// Check if we have a kind mapping.
-		if name, ok := q.queueKindMapping[item.Kind]; ok {
-			item.QueueName = &name
-		}
+		// Check if we have a kind => queuename mapping.
+		item.QueueName = q.defaultQueueNameForItemKind(item.Kind)
 	}
 
 	qi := QueueItem{
