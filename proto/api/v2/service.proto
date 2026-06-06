@@ -1049,10 +1049,10 @@ service V2 {
       responses: {
         key: "422"
         value: {
-          description: "Unprocessable Entity - sync failed. The response body is still SyncAppResponse and includes the persisted deploy plus a coded error under data.latestSync.error."
+          description: "Unprocessable Entity - sync failed."
           schema: {
             json_schema: {
-              ref: "#/definitions/v2SyncAppResponse"
+              ref: "#/definitions/v2ErrorResponse"
             }
           }
         }

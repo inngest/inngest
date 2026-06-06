@@ -40,7 +40,7 @@ func FromReadCloser(r io.ReadCloser, opts FromReadCloserOpts) (RegisterRequest, 
 	fr.Headers.Env = opts.Env
 	fr.Headers.Platform = opts.Platform
 
-	err = fr.normalize(opts.ForceHTTPS)
+	err = fr.Normalize(opts.ForceHTTPS)
 	if err != nil {
 		return fr, err
 	}
@@ -142,7 +142,9 @@ func (f RegisterRequest) IsConnect() bool {
 }
 
 
-func (f *RegisterRequest) normalize(forceHTTPS bool) error {
+// Normalize canonicalizes URLs so checksums match across registration entry
+// points. forceHTTPS rewrites http(s)/ws(s) to the secure variant.
+func (f *RegisterRequest) Normalize(forceHTTPS bool) error {
 	f.URL = util.NormalizeAppURL(f.URL, forceHTTPS)
 
 	for _, fn := range f.Functions {

@@ -118,12 +118,8 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 	t.Run("new function starts with version 1", func(t *testing.T) {
 		// Create a test devserver with in-memory data store
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		// Register the app with one function
-		_, err := api.register(ctx, req)
+		_, err := ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Verify the function was created with version 1
@@ -137,12 +133,8 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 	t.Run("re-registering same app config does not increment version", func(t *testing.T) {
 		// Create a test devserver with in-memory data store
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		// Register the app with one function
-		_, err := api.register(ctx, req)
+		_, err := ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Verify the function was created with version 1
@@ -153,7 +145,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		}
 
 		// Register the same app again
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Get the updated version — same config means no increment
@@ -166,10 +158,6 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 
 	t.Run("multiple re-registrations increment version correctly", func(t *testing.T) {
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		expectedVersions := []int{1, 2, 3, 4, 5}
 
 		// Register the function multiple times with different config
@@ -182,7 +170,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 			req.Functions[0] = sdkFunction1
 
 			// Re-register the app
-			_, err := api.register(ctx, req)
+			_, err := ds.ProcessSync(ctx, req)
 			require.NoError(t, err, "registration %d failed", i)
 
 			// Verify the version is incremented
@@ -196,12 +184,8 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 
 	t.Run("different functions have independent versions", func(t *testing.T) {
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		// First registration with a single function has version=1
-		_, err := api.register(ctx, req)
+		_, err := ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
@@ -214,7 +198,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		// existing function bumped up to version 2
 		// new function set to version 1
 		req.Functions = []sdk.SDKFunction{sdkFunction1, sdkFunction2}
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		fnVersions = getFunctionIDandVersion(t, ds, req.AppName)
@@ -226,7 +210,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 
 		// Now register only function1 again, removing function2
 		req.Functions = []sdk.SDKFunction{sdkFunction1}
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Function1 should bumped up to version 3, function2 should be removed.
@@ -239,14 +223,10 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 	// When one function's config changes, all functions get their versions updated, even those that don't have any change in config.
 	t.Run("all function versions incremented on app sync", func(t *testing.T) {
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		req.Functions = []sdk.SDKFunction{sdkFunction1, sdkFunction2}
 
 		// Register the app
-		_, err := api.register(ctx, req)
+		_, err := ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Verify the functions were created with version 1
@@ -263,7 +243,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		req.Functions[0] = sdkFunction1
 
 		// Re-Register the app
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Verify both functions had versions incremented even though function2 had no change in config.
@@ -276,14 +256,10 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 
 	t.Run("removing function increments versions of other functions on app sync", func(t *testing.T) {
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		req.Functions = []sdk.SDKFunction{sdkFunction1, sdkFunction2}
 
 		// Register the app
-		_, err := api.register(ctx, req)
+		_, err := ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Verify the functions were created with version 1
@@ -299,7 +275,7 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 		}
 
 		// Re-Register the app
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Verify function1 is gone and function2 is now on version=2
@@ -344,9 +320,8 @@ func TestRegister_BlockedSDKVersion(t *testing.T) {
 
 	t.Run("blocked versions are rejected and persisted as sync errors", func(t *testing.T) {
 		ds := newTestDevServer(t)
-		api := &devapi{devserver: ds}
 
-		_, err := api.register(ctx, newRequest("v3.35.0"))
+		_, err := ds.ProcessSync(ctx, newRequest("v3.35.0"))
 		require.Error(t, err)
 
 		var publicErr publicerr.Error
@@ -362,7 +337,6 @@ func TestRegister_BlockedSDKVersion(t *testing.T) {
 
 	t.Run("blocked check runs before successful checksum short circuit", func(t *testing.T) {
 		ds := newTestDevServer(t)
-		api := &devapi{devserver: ds}
 		req := newRequest("v3.35.0")
 
 		sum, err := req.Checksum()
@@ -379,7 +353,7 @@ func TestRegister_BlockedSDKVersion(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.Error(t, err)
 
 		var publicErr publicerr.Error
@@ -431,10 +405,9 @@ func TestRegister_CronJitterPropagation(t *testing.T) {
 	ds := newTestDevServer(t)
 	syncer := &capturingCronSyncer{}
 	ds.CronSyncer = syncer
-	api := &devapi{devserver: ds}
 
 	// register the app with a cron function that has jitter configured
-	_, err := api.register(ctx, req)
+	_, err := ds.ProcessSync(ctx, req)
 	require.NoError(t, err)
 
 	// Verify the cron item was synced
@@ -452,7 +425,7 @@ func TestRegister_CronJitterPropagation(t *testing.T) {
 	sdkFunction.Triggers[0].CronTrigger.Jitter = &updatedJitter
 	req.Functions[0] = sdkFunction
 
-	_, err = api.register(ctx, req)
+	_, err = ds.ProcessSync(ctx, req)
 	require.NoError(t, err)
 
 	// Verify the cron item was synced a second time again with the updated jitter
@@ -578,12 +551,8 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		// 4. BUG: Two apps exist — the real one and the zombie placeholder
 
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		// Step 1: SDK registers the app normally
-		_, err := api.register(ctx, req)
+		_, err := ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Verify: one app exists
@@ -613,7 +582,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 
 		// Step 3: SDK re-registers with the same request (same checksum).
 		// This triggers the checksum early-return path in register().
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Step 4: Assert that the placeholder was cleaned up.
@@ -631,10 +600,6 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		// placeholder should be cleaned up.
 
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		// Step 1: Simulate the `-u` flag creating a placeholder (pollSDKs initial loop)
 		placeholderID := inngest.DeterministicAppUUID(req.URL)
 		_, err := ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
@@ -648,7 +613,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Step 2: SDK registers (first time — placeholder has no name, so cleanup works)
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Verify: one app, placeholder was cleaned up
@@ -675,7 +640,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		require.Len(t, apps, 2)
 
 		// Step 4: SDK re-registers with the same checksum
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		// Step 5: Assert that the placeholder was cleaned up
@@ -695,10 +660,6 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		// the placeholder even on the first registration.
 
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		// Step 1: User adds "http://myhost/api/inngest" via UI (no port).
 		// This creates a placeholder with ID based on the URL without port.
 		uiURL := "http://myhost/api/inngest"
@@ -721,7 +682,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 			V:         "1",
 			Functions: []sdk.SDKFunction{sdkFunction},
 		}
-		_, err = api.register(ctx, sdkReq)
+		_, err = ds.ProcessSync(ctx, sdkReq)
 		require.NoError(t, err)
 
 		// There should be exactly one app. The placeholder should have been
@@ -737,10 +698,6 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		// should result in only one app (the last one wins).
 
 		ds := newTestDevServer(t)
-		api := &devapi{
-			devserver: ds,
-		}
-
 		// Register from URL1
 		req1 := sdk.RegisterRequest{
 			URL:       "http://localhost:3000/api/inngest",
@@ -748,7 +705,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 			V:         "1",
 			Functions: []sdk.SDKFunction{sdkFunction},
 		}
-		_, err := api.register(ctx, req1)
+		_, err := ds.ProcessSync(ctx, req1)
 		require.NoError(t, err)
 
 		// Register from URL2 with the same app name
@@ -758,7 +715,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 			V:         "1",
 			Functions: []sdk.SDKFunction{sdkFunction},
 		}
-		_, err = api.register(ctx, req2)
+		_, err = ds.ProcessSync(ctx, req2)
 		require.NoError(t, err)
 
 		// Should only have one app
@@ -772,10 +729,6 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		ds := newTestDevServer(t)
 		sm := &capturingSemaphoreManager{}
 		ds.SemaphoreManager = sm
-		api := &devapi{
-			devserver: ds,
-		}
-
 		fn := sdkFunction
 		fn.Concurrency = &inngest.ConcurrencyLimits{
 			Fn: []inngest.FnConcurrency{
@@ -791,7 +744,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 			V:         "1",
 			Functions: []sdk.SDKFunction{fn},
 		}
-		_, err := api.register(ctx, req1)
+		_, err := ds.ProcessSync(ctx, req1)
 		require.NoError(t, err)
 
 		funcs, err := ds.Data.GetFunctionsByAppInternalID(ctx, inngest.DeterministicAppUUID("my-app"))
@@ -818,7 +771,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 			V:         "1",
 			Functions: []sdk.SDKFunction{rotatedFn},
 		}
-		_, err = api.register(ctx, req2)
+		_, err = ds.ProcessSync(ctx, req2)
 		require.NoError(t, err)
 
 		funcs, err = ds.Data.GetFunctionsByAppInternalID(ctx, inngest.DeterministicAppUUID("my-app"))
@@ -840,8 +793,6 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		// pre-existing functions. This test pre-populates the v1.13 state and
 		// asserts adoption: legacy id is reused, function uuid is unchanged.
 		ds := newTestDevServer(t)
-		api := &devapi{devserver: ds}
-
 		legacyAppID := inngest.DeterministicAppUUID(util.NormalizeAppURL(req.URL, false))
 		nameAppID := inngest.DeterministicAppUUID(req.AppName)
 		require.NotEqual(t, legacyAppID, nameAppID, "fixture must reproduce the seed mismatch")
@@ -873,7 +824,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
@@ -925,9 +876,8 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 
 	t.Run("fresh install with no legacy row uses name-derived ID", func(t *testing.T) {
 		ds := newTestDevServer(t)
-		api := &devapi{devserver: ds}
 
-		_, err := api.register(ctx, req)
+		_, err := ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
@@ -956,7 +906,6 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		// The fix adopts the row by id (renaming '' → r.AppName) when it
 		// has attached functions; UpsertAppByName then resolves it by name.
 		ds := newTestDevServer(t)
-		api := &devapi{devserver: ds}
 
 		legacyAppID := inngest.DeterministicAppUUID(util.NormalizeAppURL(req.URL, false))
 
@@ -987,7 +936,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		apps, err := ds.Data.GetAllApps(ctx, consts.DevServerEnvID)
@@ -1020,11 +969,10 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		// UpsertAppByName must revive the archived row in place: same id,
 		// archived_at cleared, function uuid unchanged.
 		ds := newTestDevServer(t)
-		api := &devapi{devserver: ds}
 
 		// First sync to create the app + a function. The deterministic
 		// candidate id IS the row's id since this is a fresh install.
-		_, err := api.register(ctx, req)
+		_, err := ds.ProcessSync(ctx, req)
 		require.NoError(t, err)
 
 		appID := inngest.DeterministicAppUUID(req.AppName)
@@ -1040,7 +988,7 @@ func TestRegister_DuplicateAppCleanup(t *testing.T) {
 		require.Empty(t, apps, "archived row must drop out of the active listing")
 
 		// Resync with the same payload. The archived row should revive.
-		_, err = api.register(ctx, req)
+		_, err = ds.ProcessSync(ctx, req)
 		require.NoError(t, err, "resync after archive must not collide on PK")
 
 		apps, err = ds.Data.GetAllApps(ctx, consts.DevServerEnvID)

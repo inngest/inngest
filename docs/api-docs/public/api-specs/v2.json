@@ -336,11 +336,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/v2SyncAppResponse"
+                  "$ref": "#/components/schemas/v2ErrorResponse"
                 }
               }
             },
-            "description": "Unprocessable Entity - sync failed. The response body is still SyncAppResponse and includes the persisted deploy plus a coded error under data.latestSync.error."
+            "description": "Unprocessable Entity - sync failed."
           },
           "500": {
             "content": {
