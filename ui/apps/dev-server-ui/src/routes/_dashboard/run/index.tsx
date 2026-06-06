@@ -1,8 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
-import { RunDetailsV4 } from '@inngest/components/RunDetailsV4';
+import { RunDetails } from '@inngest/components/RunDetails';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
-import { useTripleEscapeToggle } from '@inngest/components/hooks/useTripleEscapeToggle';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -18,8 +16,7 @@ function RunComponent() {
     'polling-disabled',
     false,
   );
-  const { value: v4Enabled } = booleanFlag('run-details-v4', false, true);
-  const showV4 = useTripleEscapeToggle();
+
   const [runID] = useSearchParam('runID');
   const getTrigger = useGetTrigger();
 
@@ -29,27 +26,14 @@ function RunComponent() {
 
   const pollInterval = pollingFlagReady && pollingDisabled ? 0 : 2500;
 
-  // When flag is OFF, always show V3. When ON, use toggle state.
-  const useV4 = v4Enabled && showV4;
-
   return (
     <div className={cn('bg-canvasBase overflow-y-auto pt-8')}>
-      {useV4 ? (
-        <RunDetailsV4
-          standalone
-          getTrigger={getTrigger}
-          pollInterval={pollInterval}
-          runID={runID}
-        />
-      ) : (
-        <RunDetailsV3
-          standalone
-          getTrigger={getTrigger}
-          pollInterval={pollInterval}
-          runID={runID}
-          newStack={true}
-        />
-      )}
+      <RunDetails
+        standalone
+        getTrigger={getTrigger}
+        pollInterval={pollInterval}
+        runID={runID}
+      />
     </div>
   );
 }

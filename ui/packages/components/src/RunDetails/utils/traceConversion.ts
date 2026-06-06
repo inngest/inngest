@@ -1,5 +1,5 @@
 /**
- * Utilities to convert V3 Trace data to V4 TimelineData format.
+ * Utilities to convert Trace data to TimelineData format.
  * Feature: 001-composable-timeline-bar
  */
 
@@ -174,9 +174,7 @@ function tracesToBarData(
     if (bar.endTime) {
       const endMs = bar.endTime.getTime();
       latestCompletedSiblingEndMs =
-        latestCompletedSiblingEndMs === null
-          ? endMs
-          : Math.max(latestCompletedSiblingEndMs, endMs);
+        latestCompletedSiblingEndMs === null ? endMs : Math.max(latestCompletedSiblingEndMs, endMs);
     }
 
     bars.push(bar);
@@ -246,8 +244,8 @@ function traceToBarData(
   const traceStartedAtMs = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
   const traceQueuedAtMs = trace.queuedAt ? new Date(trace.queuedAt).getTime() : null;
   const childDiscoveryStartAtMs = trace.isRoot
-    ? (traceStartedAtMs ?? discoveryStartAtMs)
-    : (traceStartedAtMs ?? traceQueuedAtMs ?? discoveryStartAtMs);
+    ? traceStartedAtMs ?? discoveryStartAtMs
+    : traceStartedAtMs ?? traceQueuedAtMs ?? discoveryStartAtMs;
 
   // Check if this step has experiment metadata
   const hasExperiment = trace.metadata?.some((m) => m.kind === KindInngestExperiment) ?? false;
@@ -289,7 +287,7 @@ function traceToBarData(
 }
 
 /**
- * Convert a V3 Trace to V4 TimelineData
+ * Convert a Trace to TimelineData
  */
 export function traceToTimelineData(
   trace: Trace,
