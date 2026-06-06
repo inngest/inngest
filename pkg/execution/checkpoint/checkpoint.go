@@ -743,10 +743,18 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	}
 
 	// Compare only the entropy: it's the deterministic part bound to
-	// (runID, generationID). The ULID timestamp is incidental (it just
-	// gives RequestIDs chronological sort order) and isn't part of the
-	// fence.
-	if !bytes.Equal(parsed.Entropy(), driver.DispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
+	// (runID, queue item, generationID). The ULID timestamp is incidental
+	// (it just gives RequestIDs chronological sort order) and isn't part of
+	// the fence.
+	//
+	// Also, check the legacy request ID (from before it included QueueItemRef).
+	// We can delete this a day or so after updating the Executor's request ID
+	// generation logic to include queueItemRef. Just long enough to ensure
+	// there are no more in-flight requests (which shouldn't be longer than 2
+	// hours).
+	entropy := parsed.Entropy()
+	if !bytes.Equal(entropy, driver.DispatchRequestIDEntropy(input.RunID, input.QueueItemRef, item.GenerationID)) &&
+		!bytes.Equal(entropy, driver.LegacyDispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
 		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
 	}
 

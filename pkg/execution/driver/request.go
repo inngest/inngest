@@ -18,14 +18,39 @@ type sdkJobIDCtxKey struct{}
 // DispatchRequestID is the single source of truth for the request ID the
 // executor (producer) stamps on outbound SDK requests and the checkpoint
 // validator (consumer) recomputes when fencing stale dispatches.
-func DispatchRequestID(ts time.Time, runID ulid.ULID, generationID int) ulid.ULID {
-	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", runID, generationID))
+func DispatchRequestID(
+	ts time.Time,
+	runID ulid.ULID,
+	queueItemRef string,
+	generationID int,
+) ulid.ULID {
+	return util.MustDeterministicULID(
+		ts,
+		dispatchRequestIDSeed(runID, queueItemRef, generationID),
+	)
 }
 
 // DispatchRequestIDEntropy returns the entropy portion of the dispatch
 // RequestID; the timestamp doesn't participate in fencing.
-func DispatchRequestIDEntropy(runID ulid.ULID, generationID int) []byte {
-	return DispatchRequestID(time.Unix(0, 0), runID, generationID).Entropy()
+func DispatchRequestIDEntropy(
+	runID ulid.ULID,
+	queueItemRef string,
+	generationID int,
+) []byte {
+	return DispatchRequestID(
+		time.Unix(0, 0), runID, queueItemRef, generationID,
+	).Entropy()
+}
+
+// LegacyDispatchRequestIDEntropy returns the v1.24.0 request ID entropy that
+// omitted the queue item ref. Keep accepting this during rolling upgrades so
+// already-dispatched SDK work can checkpoint successfully.
+func LegacyDispatchRequestIDEntropy(runID ulid.ULID, generationID int) []byte {
+	return util.MustDeterministicULID(time.Unix(0, 0), fmt.Appendf(nil, "%s:%d", runID, generationID)).Entropy()
+}
+
+func dispatchRequestIDSeed(runID ulid.ULID, queueItemRef string, generationID int) []byte {
+	return fmt.Appendf(nil, "%s:%s:%d", runID, queueItemRef, generationID)
 }
 
 // WithRequestIDs stores the per-outbound request ID and stable job ID for SDK
