@@ -38,6 +38,21 @@ func (k KeyError) Unwrap() error {
 	return k.cause
 }
 
+// LeaseExpiryError is returned by RequeueByJobID when the target queue item is
+// currently leased. It carries the epoch-millisecond timestamp at which the
+// lease expires so callers can sleep precisely rather than using a fixed backoff.
+type LeaseExpiryError struct {
+	ExpiryMS int64 // Unix millisecond epoch at which the lease expires
+}
+
+func (e LeaseExpiryError) Error() string {
+	return fmt.Sprintf("queue item already leased (expires at %d ms)", e.ExpiryMS)
+}
+
+// Unwrap lets errors.Is(err, ErrQueueItemAlreadyLeased) work for callers that
+// only care about the category without needing the expiry timestamp.
+func (e LeaseExpiryError) Unwrap() error { return ErrQueueItemAlreadyLeased }
+
 var (
 	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
 	ErrQueueItemNotFound             = fmt.Errorf("queue item not found")

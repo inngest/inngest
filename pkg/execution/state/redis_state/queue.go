@@ -780,12 +780,12 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 	if err != nil {
 		return err
 	}
-	status, err := scripts["queue/requeueByID"].Exec(
+	raw, err := scripts["queue/requeueByID"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeueByID"),
 		q.RedisClient.unshardedRc,
 		keys,
 		args,
-	).AsInt64()
+	).ToAny()
 	if err != nil {
 		l.Error("error requeueing queue item by JobID",
 			"error", err,
@@ -794,15 +794,33 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		)
 		return fmt.Errorf("error requeueing item: %w", err)
 	}
-	switch status {
-	case 0:
-		return nil
-	case -1:
-		return osqueue.ErrQueueItemNotFound
-	case -2:
-		return osqueue.ErrQueueItemAlreadyLeased
+
+	// The Lua script returns either a plain integer (0 / -1) or a table
+	// ({ -2, leaseExpiryMS }) when the item is leased.
+	switch v := raw.(type) {
+	case int64:
+		switch v {
+		case 0:
+			return nil
+		case -1:
+			return osqueue.ErrQueueItemNotFound
+		default:
+			return fmt.Errorf("unknown requeue by id response: %d", v)
+		}
+	case []any:
+		if len(v) >= 1 {
+			if code, ok := v[0].(int64); ok && code == -2 {
+				if len(v) >= 2 {
+					if expiryMS, ok := v[1].(int64); ok {
+						return osqueue.LeaseExpiryError{ExpiryMS: expiryMS}
+					}
+				}
+				return osqueue.ErrQueueItemAlreadyLeased
+			}
+		}
+		return fmt.Errorf("unexpected requeue by id table response: %v", v)
 	default:
-		return fmt.Errorf("unknown requeue by id response: %d", status)
+		return fmt.Errorf("unexpected requeue by id response type %T: %v", raw, raw)
 	}
 }
 

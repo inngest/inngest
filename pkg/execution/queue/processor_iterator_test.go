@@ -191,6 +191,10 @@ func (m *mockShardForIterator) SingletonReleaseRunID(ctx context.Context, scope 
 	return nil, nil
 }
 
+func (m *mockShardForIterator) DebounceUpsert(ctx context.Context, scope Scope, key string, newDebounceID ulid.ULID, item []byte, ttl time.Duration, now time.Time, eventTimestamp int64) (DebounceUpsertResult, error) {
+	return DebounceUpsertResult{Status: DebounceUpsertCreated, DebounceID: newDebounceID}, nil
+}
+
 func (m *mockShardForIterator) DebounceCreate(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, item []byte, ttl time.Duration) (*ulid.ULID, error) {
 	return nil, nil
 }

@@ -44,8 +44,9 @@ end
 
 -- Ensure that we're not requeueing a leased job.
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > nowMS then
-    -- This is already leased, so don't requeue by ID.  Use the standard requeue operation.
-    return -2
+    -- Item is leased (executing). Return the lease expiry so the caller can sleep
+    -- precisely until the lease expires rather than using a fixed backoff.
+    return { -2, decode_ulid_time(item.leaseID) }
 end
 
 

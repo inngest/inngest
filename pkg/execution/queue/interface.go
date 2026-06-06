@@ -196,10 +196,55 @@ const (
 	DebounceStartMigrating
 )
 
+// DebounceUpsertStatus is the outcome of a single DebounceUpsert call.
+type DebounceUpsertStatus int
+
+const (
+	// DebounceUpsertCreated: no debounce existed; state written.
+	// Caller must Enqueue a timeout job for DebounceUpsertResult.DebounceID.
+	DebounceUpsertCreated DebounceUpsertStatus = iota + 1
+
+	// DebounceUpsertUpdated: existing debounce state refreshed.
+	// Caller must RequeueByJobID using DebounceUpsertResult.DebounceID and
+	// NewTTLSeconds.
+	DebounceUpsertUpdated
+
+	// DebounceUpsertOutOfOrder: the stored event is newer than the incoming
+	// one. Caller drops this event silently.
+	DebounceUpsertOutOfOrder
+
+	// DebounceUpsertOrphaned: pointer existed but hash entry was gone
+	// (post-execution slot). Treated identically to DebounceUpsertCreated —
+	// caller must Enqueue.
+	DebounceUpsertOrphaned
+)
+
+// DebounceUpsertResult is returned by DebounceUpsert.
+type DebounceUpsertResult struct {
+	Status DebounceUpsertStatus
+
+	// DebounceID is the debounce ULID that was created or updated.
+	// For Created/Orphaned this is the proposed newDebounceID passed in.
+	// For Updated it is the existing debounce ID from the pointer.
+	DebounceID ulid.ULID
+
+	// NewTTLSeconds is the effective TTL after the max-timeout cap is applied.
+	// Meaningful only when Status == DebounceUpsertUpdated.
+	NewTTLSeconds int64
+}
+
 // DebounceOperations is the per-shard surface for debounce state. Each
 // debounce lives on a single shard alongside its timeout queue item; route
 // to the right shard via ShardRegistry before invoking these.
 type DebounceOperations interface {
+	// DebounceUpsert atomically creates a new debounce (if none exists) or
+	// updates an existing one. It collapses the previous two-step
+	// DebounceCreate → DebounceUpdate flow into a single Redis round-trip,
+	// eliminating the race window between state mutation and queue-item
+	// management. Queue-item scheduling (Enqueue / RequeueByJobID) is the
+	// caller's responsibility based on the returned DebounceUpsertResult.
+	DebounceUpsert(ctx context.Context, scope Scope, key string, newDebounceID ulid.ULID, item []byte, ttl time.Duration, now time.Time, eventTimestamp int64) (DebounceUpsertResult, error)
+
 	// DebounceCreate atomically creates a new debounce for scope/key. If a
 	// debounce already exists, it returns the existing debounce ID and
 	// no error.
