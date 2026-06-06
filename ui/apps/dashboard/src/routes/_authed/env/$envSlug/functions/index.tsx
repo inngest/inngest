@@ -4,12 +4,15 @@ import { Button } from '@inngest/components/Button';
 import { FunctionsTable } from '@inngest/components/Functions/FunctionsTable';
 import { Header } from '@inngest/components/Header/Header';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { useQuery } from 'urql';
 
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { FunctionInfo } from '@/components/Functions/FunctionInfo';
 import {
   useFunctionVolume,
   useFunctions,
 } from '@/components/Functions/useFunctions';
+import { AppFilterDocument } from '@/components/Runs/queries';
 import { pathCreator } from '@/utils/urls';
 import { ClientOnly, createFileRoute, useRouter } from '@tanstack/react-router';
 
@@ -44,6 +47,20 @@ function FunctionPage() {
   const getFunctions = useFunctions();
   const getFunctionVolume = useFunctionVolume();
 
+  const env = useEnvironment();
+  const [appsRes] = useQuery({
+    query: AppFilterDocument,
+    variables: { envSlug: env.slug },
+  });
+  const apps = useMemo(
+    () =>
+      appsRes.data?.env?.apps.map((app) => ({
+        id: app.id,
+        name: app.externalID,
+      })),
+    [appsRes.data]
+  );
+
   return (
     <>
       <Header
@@ -56,6 +73,7 @@ function FunctionPage() {
           pathCreator={internalPathCreator}
           getFunctions={getFunctions}
           getFunctionVolume={getFunctionVolume}
+          apps={apps}
           emptyActions={
             <>
               <Button
