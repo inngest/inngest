@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
@@ -51,6 +52,29 @@ export default function SideBar({
     }
   };
 
+  // ⌘ B / Ctrl + B toggles the sidebar, except when the user is typing in a
+  // form field — otherwise typing "b" with a modifier in the search bar would
+  // collapse the sidebar from under them.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'b' || !(e.metaKey || e.ctrlKey)) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      toggleCollapsed();
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [collapsed]);
+
   return (
     <nav
       className={`bg-canvasBase border-subtle group relative flex h-full flex-col justify-start py-3 transition-[width] duration-200 ease-out ${
@@ -58,20 +82,24 @@ export default function SideBar({
       } shrink-0 overflow-visible border-r-hairline`}
       ref={navRef}
     >
-      {/* Floating collapse toggle, centered vertically on the right edge.
-          Hover-revealed so it stays out of the way until needed. */}
-      <button
-        type="button"
-        onClick={toggleCollapsed}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className="bg-canvasBase border-subtle text-muted hover:text-basis shadow-xs absolute right-0 top-1/2 z-[70] hidden h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-hairline transition-colors group-hover:flex"
+      {/* Vertical tab on the divider, hover-revealed. Sits half inside / half
+          outside the sidebar so it reads as part of the right edge itself. */}
+      <OptionalTooltip
+        tooltip={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        {collapsed ? (
-          <RiArrowRightSLine className="h-4 w-4" />
-        ) : (
-          <RiArrowLeftSLine className="h-4 w-4" />
-        )}
-      </button>
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="bg-canvasBase border-subtle text-muted hover:text-basis shadow-xs absolute right-0 top-1/2 z-[70] hidden h-8 w-5 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-md border-hairline transition-colors group-hover:flex"
+        >
+          {collapsed ? (
+            <RiArrowRightSLine className="h-4 w-4" />
+          ) : (
+            <RiArrowLeftSLine className="h-4 w-4" />
+          )}
+        </button>
+      </OptionalTooltip>
 
       <div className="flex grow flex-col justify-between">
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
