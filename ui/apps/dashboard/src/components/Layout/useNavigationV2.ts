@@ -41,7 +41,9 @@ function readNavOverride(): NavOverride {
 // so accounts not targeted for the flag always render the old nav. A manual
 // `?nav=v1|v2` override (see readNavOverride) takes precedence over the flag.
 export function useNavigationV2(): boolean {
-  const { value: flagValue } = useBooleanFlag(NAVIGATION_V2_FLAG);
+  // Default false: until LaunchDarkly serves an explicit `true` for this
+  // account, the old navigation is always used.
+  const { value: flagValue } = useBooleanFlag(NAVIGATION_V2_FLAG, false);
 
   // Resolved after mount to stay SSR/hydration-safe — no window access during
   // the first render, so the initial markup matches the flag-driven default.

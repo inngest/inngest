@@ -6,6 +6,8 @@ import { cn } from '@inngest/components/utils/classNames';
 import { RiSearchLine } from '@remixicon/react';
 import { Command } from 'cmdk';
 
+import { useEnvironments } from '@/queries';
+import { EnvironmentType } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
 import { ResultItem } from './ResultItem';
 import Shortcuts from './Shortcuts';
@@ -25,6 +27,13 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   const isTyping = term !== debouncedTerm;
 
   const res = useQuickSearch({ envSlug, term: debouncedTerm });
+  const [{ data: envs = [] }] = useEnvironments();
+  const productionEnvs = envs.filter(
+    (env) => env.type === EnvironmentType.Production,
+  );
+  const productionEnvSlug =
+    productionEnvs.length === 1 ? productionEnvs[0]?.slug : undefined;
+  const routeEnvSlug = coerceEnvSlug(envSlug, productionEnvSlug);
 
   return (
     <Modal
@@ -70,13 +79,17 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                 >
                   <ResultItem
                     isDifferentEnv={
-                      envSlug !== coerceEnvSlug(res.data.run.envSlug)
+                      routeEnvSlug !==
+                      coerceEnvSlug(res.data.run.envSlug, productionEnvSlug)
                     }
                     key={res.data.run.id}
                     kind="run"
                     onClick={onClose}
                     path={pathCreator.runPopout({
-                      envSlug: coerceEnvSlug(res.data.run.envSlug),
+                      envSlug: coerceEnvSlug(
+                        res.data.run.envSlug,
+                        productionEnvSlug,
+                      ),
                       runID: res.data.run.id,
                     })}
                     text={res.data.run.id}
@@ -95,7 +108,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                       kind="app"
                       onClick={onClose}
                       path={pathCreator.app({
-                        envSlug,
+                        envSlug: routeEnvSlug,
                         externalAppID: app.name,
                       })}
                       text={app.name}
@@ -115,7 +128,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                       kind="function"
                       onClick={onClose}
                       path={pathCreator.function({
-                        envSlug,
+                        envSlug: routeEnvSlug,
                         functionSlug: fn.slug,
                       })}
                       text={fn.name}
@@ -131,13 +144,17 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                 >
                   <ResultItem
                     isDifferentEnv={
-                      envSlug !== coerceEnvSlug(res.data.event.envSlug)
+                      routeEnvSlug !==
+                      coerceEnvSlug(res.data.event.envSlug, productionEnvSlug)
                     }
                     key={res.data.event.id}
                     kind="event"
                     onClick={onClose}
                     path={pathCreator.eventPopout({
-                      envSlug: coerceEnvSlug(res.data.event.envSlug),
+                      envSlug: coerceEnvSlug(
+                        res.data.event.envSlug,
+                        productionEnvSlug,
+                      ),
                       eventID: res.data.event.id,
                     })}
                     text={res.data.event.name}
@@ -156,7 +173,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                       kind="eventType"
                       onClick={onClose}
                       path={pathCreator.eventType({
-                        envSlug,
+                        envSlug: routeEnvSlug,
                         eventName: eventType.name,
                       })}
                       text={eventType.name}
@@ -168,7 +185,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
             </>
           )}
           {!isTyping && !res.isFetching && (
-            <Shortcuts onClose={onClose} envSlug={envSlug} />
+            <Shortcuts onClose={onClose} envSlug={routeEnvSlug} />
           )}
 
           <Command.Empty
@@ -197,15 +214,8 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
   );
 }
 
-function coerceEnvSlug(envSlug: string): string {
-  if (envSlug && envSlug.startsWith('production')) {
-    // This is hacky and flawed. The production env has a pseudo slug in the URL
-    // ("production") which will never match its real slug in the DB. So we'll
-    // coerce the real slug to the pseudo slug.
-    //
-    // This doesn't work if the user created a non-production env that starts
-    // with "production", but should otherwise be fine. This also won't work
-    // when we add support for multiple production environments.
+function coerceEnvSlug(envSlug: string, productionEnvSlug?: string): string {
+  if (envSlug === 'production' || envSlug === productionEnvSlug) {
     return 'production';
   }
 
