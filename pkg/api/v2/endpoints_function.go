@@ -48,8 +48,11 @@ func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest
 	}
 
 	fn, err := s.functions.GetFunction(ctx, id)
-	if err != nil {
+	if errors.Is(err, ErrFunctionNotFound) {
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Function not found")
+	}
+	if err != nil {
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch function")
 	}
 
 	return &apiv2.GetFunctionResponse{

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,6 +22,8 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -387,7 +390,7 @@ func TestService_GetFunction(t *testing.T) {
 
 	t.Run("returns not found when function is missing", func(t *testing.T) {
 		functions := &mockFunctionProvider{}
-		functions.On("GetFunction", mock.Anything, "missing-fn").Return(inngest.DeployedFunction{}, errors.New("missing")).Once()
+		functions.On("GetFunction", mock.Anything, "missing-fn").Return(inngest.DeployedFunction{}, fmt.Errorf("%w: missing-fn", ErrFunctionNotFound)).Once()
 		t.Cleanup(func() {
 			functions.AssertExpectations(t)
 		})
@@ -397,6 +400,22 @@ func TestService_GetFunction(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Function not found")
+		require.Equal(t, codes.NotFound, status.Code(err))
+	})
+
+	t.Run("returns internal error when function lookup fails", func(t *testing.T) {
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, "test-fn").Return(inngest.DeployedFunction{}, errors.New("database unavailable")).Once()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Functions: functions})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{Id: "test-fn"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Unable to fetch function")
+		require.Equal(t, codes.Internal, status.Code(err))
 	})
 }
 

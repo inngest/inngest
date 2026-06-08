@@ -2,6 +2,8 @@ package devserver
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -35,6 +37,8 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 		if reader, ok := p.reader.(cqrs.FunctionReader); ok {
 			if fn, err := reader.GetFunctionByInternalUUID(ctx, fnID); err == nil {
 				return p.toDeployedFunction(ctx, fn)
+			} else if !errors.Is(err, sql.ErrNoRows) {
+				return inngest.DeployedFunction{}, err
 			}
 		}
 	}
@@ -48,7 +52,7 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 			return p.toDeployedFunction(ctx, fn)
 		}
 	}
-	return inngest.DeployedFunction{}, fmt.Errorf("function not found: %s", identifier)
+	return inngest.DeployedFunction{}, fmt.Errorf("%w: %s", apiv2.ErrFunctionNotFound, identifier)
 }
 
 func (p *cqrsFunctionProvider) toDeployedFunction(ctx context.Context, fn *cqrs.Function) (inngest.DeployedFunction, error) {
