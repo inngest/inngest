@@ -1122,6 +1122,9 @@ func (e *executor) schedule(
 	// Some scenarios are happy path (e.g.  queue idempotency) and some are sad
 	// path (e.g. Executor borked)
 	sendSpans := func() {
+		_, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule.send_spans", req.AccountID, req.WorkspaceID, req.Function.ID)
+		defer span.End()
+
 		if runSpanRef != nil {
 			err := runSpanRef.Send()
 			if err != nil {
@@ -1260,7 +1263,9 @@ func (e *executor) schedule(
 	// Check if the function should be skipped (paused, draining, backlog limit)
 	// Only check if not already marked as skipped (e.g., by singleton)
 	if skipReason == enums.SkipReasonNone {
+		_, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule.skipped", req.AccountID, req.WorkspaceID, req.Function.ID)
 		skipReason = e.skipped(ctx, req)
+		span.End()
 	}
 
 	// Create run state if not skipped
@@ -1505,7 +1510,9 @@ func (e *executor) schedule(
 	}
 
 	// Schedule for async functons (the default)
+	_, queueSpan := e.conditionalTracer.NewSpan(ctx, "executor.schedule.queue_enqueue", req.AccountID, req.WorkspaceID, req.Function.ID)
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
+	queueSpan.End()
 
 	switch err {
 	case nil:
@@ -1610,12 +1617,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	conditionalTraceCtx, conditionalSpan := e.conditionalTracer.NewSpan(ctx, "executor.Execute", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	defer conditionalSpan.End()
 
-	requestID := driver.DispatchRequestID(e.now(), id.RunID, queue.GenerationIDFromContext(ctx)).String()
-
 	jobID := queue.JobIDFromContext(ctx)
 	if item.JobID != nil {
 		jobID = *item.JobID
 	}
+	requestID := driver.DispatchRequestID(e.now(), jobID, queue.GenerationIDFromContext(ctx)).String()
 
 	// Immediately store execution context for tracing.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
@@ -2363,16 +2369,17 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 	}
 
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
-		Metadata:   *run.Metadata(),
-		Fn:         run.f,
-		SigningKey: sk,
-		Attempt:    run.AttemptCount(),
-		Index:      run.stackIndex,
-		StepID:     &stepID,
-		QueueRef:   queueref.StringFromCtx(ctx),
-		RequestID:  run.requestID,
-		JobID:      run.jobID,
-		URL:        url,
+		Metadata:     *run.Metadata(),
+		Fn:           run.f,
+		SigningKey:   sk,
+		Attempt:      run.AttemptCount(),
+		Index:        run.stackIndex,
+		StepID:       &stepID,
+		QueueRef:     queueref.StringFromCtx(ctx),
+		RequestID:    run.requestID,
+		GenerationID: queue.GenerationIDFromContext(ctx),
+		JobID:        run.jobID,
+		URL:          url,
 	})
 
 	// For now, the executor expects V1 style errors directly in state.DriverResponse.

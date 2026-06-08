@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -45,6 +48,36 @@ func TestNewFunctionProvider(t *testing.T) {
 	require.Equal(t, consts.DevServerEnvID, fn.EnvironmentID)
 	require.Equal(t, "Test function", fn.Function.Name)
 	require.Equal(t, "test-fn", fn.Function.Slug)
+}
+
+func TestNewFunctionProviderFindsArchivedFunctionByID(t *testing.T) {
+	ctx := context.Background()
+	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	store := &fakeFunctionStore{
+		fnByID: map[uuid.UUID]*cqrs.Function{
+			fnID: {
+				ID:         fnID,
+				AppID:      appID,
+				Slug:       "app-cron-fn",
+				Config:     []byte(`{"name":"Cron function","slug":"cron-fn"}`),
+				ArchivedAt: time.Now().Add(-time.Minute),
+			},
+		},
+		app: &cqrs.App{
+			ID:   appID,
+			Name: "app",
+		},
+	}
+
+	fn, err := NewFunctionProvider(store).GetFunction(ctx, fnID.String())
+
+	require.NoError(t, err)
+	require.Equal(t, fnID, fn.ID)
+	require.Equal(t, "app-cron-fn", fn.Slug)
+	require.Equal(t, "app", fn.AppName)
+	require.Equal(t, "Cron function", fn.Function.Name)
+	require.Equal(t, "cron-fn", fn.Function.Slug)
 }
 
 func TestNewFunctionProviderErrors(t *testing.T) {
@@ -86,15 +119,38 @@ func TestNewFunctionProviderErrors(t *testing.T) {
 
 func TestFunctionRunReader(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
-	run := &cqrs.FunctionRun{RunID: runID}
-	reader := &fakeFunctionRunReader{run: run}
+	eventID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cz")
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	startedAt := time.Date(2026, 6, 6, 12, 0, 0, 0, time.UTC)
+	endedAt := startedAt.Add(500 * time.Millisecond)
+	status := enums.StepStatusCompleted
+	eventIDs := []string{eventID.String()}
+	root := &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			Name:      meta.SpanNameRun,
+			StartTime: startedAt.Add(-100 * time.Millisecond),
+		},
+		RunID:      runID,
+		FunctionID: functionID,
+		Status:     status,
+		Attributes: &meta.ExtractedValues{
+			DynamicStatus: &status,
+			EventIDs:      &eventIDs,
+			StartedAt:     &startedAt,
+			EndedAt:       &endedAt,
+		},
+	}
+	reader := &fakeTraceReader{root: root}
 
 	result, err := NewFunctionRunReader(reader).GetFunctionRun(context.Background(), runID, apiv2.GetFunctionRunOpts{})
 
 	require.NoError(t, err)
-	require.Equal(t, run, result)
-	require.Equal(t, consts.DevServerAccountID, reader.accountID)
-	require.Equal(t, consts.DevServerEnvID, reader.workspaceID)
+	require.Equal(t, runID, result.RunID)
+	require.Equal(t, functionID, result.FunctionID)
+	require.Equal(t, eventID, result.EventID)
+	require.Equal(t, enums.RunStatusCompleted, result.Status)
+	require.Equal(t, startedAt, result.RunStartedAt)
+	require.Equal(t, &endedAt, result.EndedAt)
 	require.Equal(t, runID, reader.runID)
 }
 
@@ -118,13 +174,42 @@ func TestFunctionTraceReader(t *testing.T) {
 }
 
 type fakeFunctionStore struct {
-	fns []*cqrs.Function
-	app *cqrs.App
-	err error
+	fns    []*cqrs.Function
+	fnByID map[uuid.UUID]*cqrs.Function
+	app    *cqrs.App
+	err    error
 }
 
 func (f *fakeFunctionStore) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 	return f.fns, f.err
+}
+
+func (f *fakeFunctionStore) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, app string) ([]*cqrs.Function, error) {
+	return nil, nil
+}
+
+func (f *fakeFunctionStore) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
+	return nil, nil
+}
+
+func (f *fakeFunctionStore) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID string, functionID string) (*cqrs.Function, error) {
+	return nil, nil
+}
+
+func (f *fakeFunctionStore) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
+	if fn, ok := f.fnByID[fnID]; ok {
+		return fn, nil
+	}
+	for _, fn := range f.fns {
+		if fn.ID == fnID {
+			return fn, nil
+		}
+	}
+	return nil, errors.New("function not found")
+}
+
+func (f *fakeFunctionStore) GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*cqrs.Function, error) {
+	return nil, nil
 }
 
 func (f *fakeFunctionStore) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
@@ -152,24 +237,6 @@ func (f *fakeFunctionStore) GetAppByID(ctx context.Context, id uuid.UUID) (*cqrs
 		return nil, errors.New("app not found")
 	}
 	return f.app, nil
-}
-
-type fakeFunctionRunReader struct {
-	run         *cqrs.FunctionRun
-	accountID   uuid.UUID
-	workspaceID uuid.UUID
-	runID       ulid.ULID
-}
-
-func (f *fakeFunctionRunReader) GetFunctionRunsFromEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, eventIDs []ulid.ULID) ([]*cqrs.FunctionRun, error) {
-	return nil, nil
-}
-
-func (f *fakeFunctionRunReader) GetFunctionRun(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, runID ulid.ULID) (*cqrs.FunctionRun, error) {
-	f.accountID = accountID
-	f.workspaceID = workspaceID
-	f.runID = runID
-	return f.run, nil
 }
 
 type fakeTraceReader struct {

@@ -262,6 +262,13 @@
       }
     }
   },
+  "/events/{eventId}/runs": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /events/{eventId}/runs 200"
+      }
+    }
+  },
   "/health": {
     "get": {
       "200": {

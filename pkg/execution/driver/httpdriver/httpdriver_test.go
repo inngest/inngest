@@ -68,6 +68,7 @@ func TestRequestAndJobIDHeaders(t *testing.T) {
 	input := []byte(`{"event":{"name":"hi","data":{}}}`)
 	requestID := "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	jobID := "job-123"
+	generationID := 7
 
 	var receivedHeaders http.Header
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -80,13 +81,15 @@ func TestRequestAndJobIDHeaders(t *testing.T) {
 
 	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
 	_, _, err := do(context.Background(), client, Request{
-		URL:       parseURL(ts.URL),
-		Input:     input,
-		RequestID: requestID,
-		JobID:     jobID,
+		URL:          parseURL(ts.URL),
+		Input:        input,
+		RequestID:    requestID,
+		GenerationID: generationID,
+		JobID:        jobID,
 	})
 	require.NoError(t, err)
 	require.Equal(t, requestID, receivedHeaders.Get(headers.HeaderKeyRequestID))
+	require.Equal(t, "7", receivedHeaders.Get(headers.HeaderKeyGenerationID))
 	require.Equal(t, jobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 }
 

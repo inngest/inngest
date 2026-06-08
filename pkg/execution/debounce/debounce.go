@@ -261,6 +261,12 @@ type debouncer struct {
 	shouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
 }
 
+type preparedMigration struct {
+	debounceID       ulid.ULID
+	timeoutUnixMilli int64
+	pointerTTL       time.Duration
+}
+
 func (d debouncer) hasSecondary() bool {
 	return d.secondaryShardName != ""
 }
@@ -515,6 +521,8 @@ func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, n int, shouldMigrate bool) error {
 	newDebounceID := ulid.MustNew(ulid.Timestamp(d.c.Now()), rand.Reader)
 	var foundDebounce bool
+	var migration *preparedMigration
+	var err error
 
 	l := logger.StdlibLogger(ctx).With(
 		"fn_id", di.FunctionID.String(),
@@ -544,50 +552,24 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 			return fmt.Errorf("could not resolve secondary shard: %w", err)
 		}
 
-		debounceID, debounceTimeout, err := d.prepareMigration(ctx, di, fn, secondary)
+		migration, err = d.prepareMigration(ctx, di, fn, secondary)
 		if err != nil {
 			return fmt.Errorf("could not prepare debounce migration: %w", err)
 		}
 
-		if debounceID != nil {
+		if migration != nil {
 			l = l.With(
-				"debounce_id", *debounceID,
-				"timeout", time.UnixMilli(debounceTimeout).String(),
+				"debounce_id", migration.debounceID,
+				"timeout", time.UnixMilli(migration.timeoutUnixMilli).String(),
 			)
 
 			l.Debug("found debounce to migrate")
 
 			foundDebounce = true
-			newDebounceID = *debounceID
+			newDebounceID = migration.debounceID
 
 			// Preserve previous timeout
-			di.Timeout = debounceTimeout
-
-			// Delete debounce state from old cluster
-			if err := secondary.DebounceDeleteItems(ctx, scopeForDebounceItem(di), newDebounceID); err != nil {
-				l.Error("unable to delete old debounce after migration", "err", err)
-				return nil
-			}
-
-			// Delete debounce timeout from old cluster
-			queueItemId := queue.HashID(ctx, debounceID.String())
-			if err := secondary.RemoveQueueItem(ctx, scopeForDebounceItem(di), queue.KindDebounce, queueItemId); err != nil {
-				l.Error("could not remove queue item", "item_id", queueItemId)
-			} else {
-				l.Debug("deleted migrated debounce")
-			}
-
-			if err := secondary.DebounceDeleteMigratingFlag(ctx, scopeForDebounceItem(di), newDebounceID); err != nil {
-				l.Error("unable to delete debounce migrating flag", "err", err)
-			}
-
-			metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"op":          "migration_prepared",
-					"queue_shard": secondary.Name(),
-				},
-			})
+			di.Timeout = migration.timeoutUnixMilli
 		}
 	}
 
@@ -596,7 +578,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	// is atomic, and two individual threads/workers cannot create debounces simultaneously.
 	existingDebounceID, err := d.newDebounce(ctx, di, fn, ttl, shouldMigrate, newDebounceID)
 	if err == nil {
-		return nil
+		return d.finalizePreparedMigration(ctx, di, fn, migration, nil)
 	}
 	if err != ErrDebounceExists {
 		if shouldMigrate && foundDebounce {
@@ -604,23 +586,23 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		}
 
 		// There was an unkown error creating the debounce.
-		return err
+		return d.finalizePreparedMigration(ctx, di, fn, migration, err)
 	}
 	if existingDebounceID == nil {
 		if shouldMigrate && foundDebounce {
 			l.Error("unexpected missing existing debounce ID after creating on primary cluster", "err", err)
 		}
 
-		return fmt.Errorf("expected debounce ID when debounce exists")
+		return d.finalizePreparedMigration(ctx, di, fn, migration, fmt.Errorf("expected debounce ID when debounce exists"))
 	}
 
 	// A debounce must already exist for this fn.  Update it.
 	err = d.updateDebounce(ctx, di, fn, ttl, *existingDebounceID, shouldMigrate)
-	if err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound {
+	if migration == nil && (err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound) {
 		if n == 5 {
 			l.Error("unable to update debounce", "error", err)
 			// Only recurse 5 times.
-			return fmt.Errorf("unable to update debounce: %w", err)
+			return d.finalizePreparedMigration(ctx, di, fn, migration, fmt.Errorf("unable to update debounce: %w", err))
 		}
 		// Re-invoke this to see if we need to extend the debounce or continue.
 		// Wait 50 milliseconds for the current lock and job to have evaluated.
@@ -631,7 +613,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		return d.debounce(ctx, di, fn, ttl, n+1, shouldMigrate)
 	}
 
-	return err
+	return d.finalizePreparedMigration(ctx, di, fn, migration, err)
 }
 
 func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item {
@@ -730,17 +712,223 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 	return existingID, ErrDebounceExists
 }
 
-func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inngest.Function, secondary queue.QueueShard) (*ulid.ULID, int64, error) {
+func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inngest.Function, secondary queue.QueueShard) (*preparedMigration, error) {
 	// Replace existing debounce pointer with fake debounce ID so timeout jobs don't
 	now := d.c.Now()
 	fakeDebounceID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
 
 	key, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
-	return secondary.DebouncePrepareMigration(ctx, scopeForDebounceItem(di), key, fakeDebounceID)
+	existingID, timeoutUnixMillis, pointerTTL, err := secondary.DebouncePrepareMigration(ctx, scopeForDebounceItem(di), key, fakeDebounceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if existingID == nil {
+		return nil, nil
+	}
+
+	return &preparedMigration{
+		debounceID:       *existingID,
+		timeoutUnixMilli: timeoutUnixMillis,
+		pointerTTL:       pointerTTL,
+	}, nil
+}
+
+func (d debouncer) completePreparedMigration(ctx context.Context, di DebounceItem, fn inngest.Function, migration *preparedMigration) {
+	l := logger.StdlibLogger(ctx).With("debounce_id", migration.debounceID.String())
+
+	secondary, err := d.secondaryShard()
+	if err != nil {
+		l.Error("missing secondary debounce components while completing migration", "err", err)
+		return
+	}
+
+	if err := secondary.DebounceDeleteItems(ctx, scopeForDebounceItem(di), migration.debounceID); err != nil {
+		l.Error("unable to delete old debounce after migration", "err", err)
+	}
+
+	queueItemID := queue.HashID(ctx, migration.debounceID.String())
+	if err := secondary.RemoveQueueItem(
+		ctx,
+		scopeForDebounceItem(di),
+		queue.KindDebounce,
+		queueItemID,
+	); err != nil {
+		l.Error("could not remove queue item", "item_id", queueItemID, "err", err)
+	} else {
+		l.Debug("deleted migrated debounce")
+	}
+
+	if err := secondary.DebounceDeleteMigratingFlag(ctx, scopeForDebounceItem(di), migration.debounceID); err != nil {
+		l.Error("unable to delete debounce migrating flag", "err", err)
+	}
+
+	key, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		l.Error("unable to compute debounce key while completing migration", "err", err)
+	} else if err := secondary.DebounceDeletePointer(ctx, scopeForDebounceItem(di), key); err != nil {
+		l.Error("unable to delete secondary debounce pointer", "err", err)
+	}
+
+	metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"op":          "migration_prepared",
+			"queue_shard": secondary.Name(),
+		},
+	})
+}
+
+func (d debouncer) cleanupPreparedMigrationPrimary(ctx context.Context, di DebounceItem, fn inngest.Function, migration *preparedMigration) error {
+	primary, err := d.primaryShard()
+	if err != nil {
+		return fmt.Errorf("could not resolve primary shard: %w", err)
+	}
+
+	var cleanupErr error
+	key, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		cleanupErr = errors.Join(cleanupErr, err)
+	} else {
+		pointedID, err := primary.DebounceGetPointer(ctx, scopeForDebounceItem(di), key)
+		switch {
+		case err == nil:
+			if pointedID == migration.debounceID.String() {
+				if err := primary.DebounceDeletePointer(ctx, scopeForDebounceItem(di), key); err != nil {
+					cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete primary debounce pointer: %w", err))
+				}
+			}
+		case !errors.Is(err, ErrDebounceNotFound):
+			cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to inspect primary debounce pointer: %w", err))
+		}
+	}
+
+	if err := primary.DebounceDeleteItems(ctx, scopeForDebounceItem(di), migration.debounceID); err != nil {
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete primary debounce state: %w", err))
+	}
+
+	queueItemID := queue.HashID(ctx, migration.debounceID.String())
+	if err := primary.RemoveQueueItem(ctx, scopeForDebounceItem(di), queue.KindDebounce, queueItemID); err != nil {
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("failed to delete primary debounce queue item: %w", err))
+	}
+
+	return cleanupErr
+}
+
+func (d debouncer) rollbackPreparedMigration(ctx context.Context, di DebounceItem, fn inngest.Function, migration *preparedMigration) error {
+	secondary, err := d.secondaryShard()
+	if err != nil {
+		return fmt.Errorf("could not resolve secondary shard: %w", err)
+	}
+
+	var rollbackErr error
+	if err := d.cleanupPreparedMigrationPrimary(ctx, di, fn, migration); err != nil {
+		rollbackErr = errors.Join(rollbackErr, err)
+	}
+
+	key, err := d.debounceKey(ctx, di, fn)
+	pointerRestored := false
+	if err != nil {
+		rollbackErr = errors.Join(rollbackErr, err)
+	} else if err := secondary.DebounceSetPointer(ctx, scopeForDebounceItem(di), key, migration.debounceID, migration.pointerTTL); err != nil {
+		rollbackErr = errors.Join(rollbackErr, fmt.Errorf("failed to restore secondary debounce pointer: %w", err))
+	} else {
+		pointerRestored = true
+	}
+
+	if pointerRestored {
+		if err := secondary.DebounceDeleteMigratingFlag(ctx, scopeForDebounceItem(di), migration.debounceID); err != nil {
+			rollbackErr = errors.Join(rollbackErr, err)
+		}
+	} else {
+		rollbackErr = errors.Join(rollbackErr, fmt.Errorf("secondary debounce migration flag left in place because pointer restore failed"))
+	}
+
+	return rollbackErr
+}
+
+func (d debouncer) primaryDebounceReady(ctx context.Context, di DebounceItem, fn inngest.Function) (bool, error) {
+	primary, err := d.primaryShard()
+	if err != nil {
+		return false, fmt.Errorf("could not resolve primary shard: %w", err)
+	}
+
+	key, err := d.debounceKey(ctx, di, fn)
+	if err != nil {
+		return false, err
+	}
+
+	debounceIDStr, err := primary.DebounceGetPointer(ctx, scopeForDebounceItem(di), key)
+	if errors.Is(err, ErrDebounceNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("failed to read primary debounce pointer: %w", err)
+	}
+
+	debounceID, err := ulid.Parse(debounceIDStr)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse primary debounce pointer %q: %w", debounceIDStr, err)
+	}
+
+	if _, err := primary.DebounceGetItem(ctx, scopeForDebounceItem(di), debounceID); err != nil {
+		if errors.Is(err, ErrDebounceNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to read primary debounce state: %w", err)
+	}
+
+	exists, err := primary.ItemExists(ctx, scopeForDebounceItem(di), queue.HashID(ctx, debounceID.String()))
+	if err != nil {
+		return false, fmt.Errorf("failed to inspect primary debounce queue item: %w", err)
+	}
+	if !exists {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (d debouncer) finalizePreparedMigration(ctx context.Context, di DebounceItem, fn inngest.Function, migration *preparedMigration, opErr error) error {
+	if migration == nil {
+		return opErr
+	}
+
+	if opErr == nil {
+		d.completePreparedMigration(ctx, di, fn, migration)
+		return nil
+	}
+
+	ready, err := d.primaryDebounceReady(ctx, di, fn)
+	if err != nil {
+		logger.StdlibLogger(ctx).Warn("failed to inspect primary debounce after migration error; attempting rollback",
+			"debounce_id", migration.debounceID.String(),
+			"error", err,
+		)
+		if rollbackErr := d.rollbackPreparedMigration(ctx, di, fn, migration); rollbackErr != nil {
+			return fmt.Errorf("%w: additionally failed to inspect primary debounce (%v) and rollback prepared migration: %v", opErr, err, rollbackErr)
+		}
+		return opErr
+	}
+
+	if ready {
+		logger.StdlibLogger(ctx).Warn("primary debounce exists after migration error; cleaning up secondary state",
+			"debounce_id", migration.debounceID.String(),
+			"error", opErr,
+		)
+		d.completePreparedMigration(ctx, di, fn, migration)
+		return nil
+	}
+
+	if err := d.rollbackPreparedMigration(ctx, di, fn, migration); err != nil {
+		return fmt.Errorf("%w: additionally failed to rollback prepared migration: %v", opErr, err)
+	}
+
+	return opErr
 }
 
 // updateDebounce updates the currently pending debounce to point to the new event ID.  It pushes
@@ -795,8 +983,14 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// The queue item is not found with the debounceID
 		// enqueue a new item
 		qi := d.queueItem(ctx, di, debounceID)
+		// Some queue shards can preserve the debounce's max-timeout cap even
+		// when the timeout job is missing, and return the capped TTL here.
+		actualTTL := ttl
+		if newTTL > 0 {
+			actualTTL = time.Second * time.Duration(newTTL)
+		}
 
-		return d.queue.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
+		return d.queue.Enqueue(ctx, qi, now.Add(actualTTL).Add(buffer).Add(time.Second), queue.EnqueueOpts{
 			// Debounce timeout items must live on the same Redis instance as the state.
 			ForceQueueShardName: queueShard.Name(),
 		})

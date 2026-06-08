@@ -1,0 +1,12 @@
+SPAN OpenAI Embeddings
+{
+  "model": "",
+  "system": "openai",
+  "operation_name": "",
+  "response_model": "",
+  "response_id": "",
+  "finish_reasons": null,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "total_tokens": null
+}

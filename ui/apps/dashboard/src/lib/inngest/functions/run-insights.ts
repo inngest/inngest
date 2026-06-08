@@ -1,4 +1,5 @@
-import { anthropic } from 'inngest';
+import Anthropic from '@anthropic-ai/sdk';
+import { anthropic, experiment } from 'inngest';
 import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
@@ -41,7 +42,7 @@ export const runInsightsAgent = inngest.createFunction(
     name: 'Insights SQL Agent',
     triggers: [{ event: 'insights-agent/chat.requested' }],
   },
-  async ({ event, step }) => {
+  async ({ event, step, group }) => {
     const {
       threadId: providedThreadId,
       userMessage,
@@ -155,17 +156,105 @@ export const runInsightsAgent = inngest.createFunction(
       },
     );
 
-    const queryWriterResult = await step.ai.infer('query-writer', {
-      model: anthropic({
-        model: 'claude-sonnet-4-5',
-        defaultParameters: { max_tokens: 4096 },
-      }),
-      body: {
-        system: queryWriterPrompt.system,
-        messages: queryWriterPrompt.messages,
-        tools: [generateSqlTool],
-        tool_choice: { type: 'tool' as const, name: 'generate_sql' },
+    // Anthropic API pricing per 1M tokens (hardcoded for now).
+    const QUERY_WRITER_PRICING = {
+      'claude-sonnet-4-5': { inputPerMTok: 3, outputPerMTok: 15 },
+      'claude-opus-4-8': { inputPerMTok: 5, outputPerMTok: 25 },
+    } as const;
+
+    // Cost in USD from token counts and per-1M-token pricing.
+    const calculateCostUsd = (
+      inputTokens: number,
+      outputTokens: number,
+      pricing: { inputPerMTok: number; outputPerMTok: number },
+    ) =>
+      (inputTokens / 1_000_000) * pricing.inputPerMTok +
+      (outputTokens / 1_000_000) * pricing.outputPerMTok;
+
+    const queryWriterBody = {
+      system: queryWriterPrompt.system,
+      messages: queryWriterPrompt.messages,
+      tools: [generateSqlTool],
+      tool_choice: { type: 'tool' as const, name: 'generate_sql' },
+    };
+
+    const anthropicClient = new Anthropic();
+
+    const queryWriterResult = await group.experiment('query-writer-model', {
+      variants: {
+        'claude-sonnet-4-5': () =>
+          step.run('query-writer', async () => {
+            const startedAt = Date.now();
+            const result = await anthropicClient.messages.create({
+              model: 'claude-sonnet-4-5',
+              max_tokens: 4096,
+              ...queryWriterBody,
+            });
+            const latencyMs = Date.now() - startedAt;
+
+            const inputTokens = result.usage.input_tokens;
+            const outputTokens = result.usage.output_tokens;
+            const pricing = QUERY_WRITER_PRICING['claude-sonnet-4-5'];
+            const costUsd = calculateCostUsd(
+              inputTokens,
+              outputTokens,
+              pricing,
+            );
+
+            await inngest.score({
+              name: 'query_writer_latency_ms',
+              value: latencyMs,
+            });
+            await inngest.score({
+              name: 'query_writer_output_tokens',
+              value: outputTokens,
+            });
+            await inngest.score({
+              name: 'query_writer_cost_usd',
+              value: costUsd,
+            });
+
+            return result;
+          }),
+        'claude-opus-4-8': () =>
+          step.run('query-writer', async () => {
+            const startedAt = Date.now();
+            const result = await anthropicClient.messages.create({
+              model: 'claude-opus-4-8',
+              max_tokens: 4096,
+              ...queryWriterBody,
+            });
+            const latencyMs = Date.now() - startedAt;
+
+            const inputTokens = result.usage.input_tokens;
+            const outputTokens = result.usage.output_tokens;
+            const pricing = QUERY_WRITER_PRICING['claude-opus-4-8'];
+            const costUsd = calculateCostUsd(
+              inputTokens,
+              outputTokens,
+              pricing,
+            );
+
+            await inngest.score({
+              name: 'query_writer_latency_ms',
+              value: latencyMs,
+            });
+            await inngest.score({
+              name: 'query_writer_output_tokens',
+              value: outputTokens,
+            });
+            await inngest.score({
+              name: 'query_writer_cost_usd',
+              value: costUsd,
+            });
+
+            return result;
+          }),
       },
+      select: experiment.weighted({
+        'claude-sonnet-4-5': 50,
+        'claude-opus-4-8': 50,
+      }),
     });
 
     const sqlResult = await step.run('extract-query-writer-result', () => {

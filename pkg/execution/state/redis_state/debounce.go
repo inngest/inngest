@@ -117,7 +117,7 @@ func (q *queue) DebounceStartExecution(ctx context.Context, scope osqueue.Scope,
 }
 
 // DebouncePrepareMigration implements queue.DebounceOperations.
-func (q *queue) DebouncePrepareMigration(ctx context.Context, scope osqueue.Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
+func (q *queue) DebouncePrepareMigration(ctx context.Context, scope osqueue.Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, time.Duration, error) {
 	client := q.RedisClient.Client()
 	kg := q.RedisClient.DebounceKeyGenerator()
 
@@ -132,49 +132,60 @@ func (q *queue) DebouncePrepareMigration(ctx context.Context, scope osqueue.Scop
 		[]string{fakeDebounceID.String()},
 	).ToAny()
 	if err != nil {
-		return nil, 0, fmt.Errorf("error running prepareMigration script: %w", err)
+		return nil, 0, 0, fmt.Errorf("error running prepareMigration script: %w", err)
 	}
 
 	returnedSet, ok := out.([]any)
 	if !ok {
-		return nil, 0, fmt.Errorf("expected to receive one or more set items")
+		return nil, 0, 0, fmt.Errorf("expected to receive one or more set items")
 	}
 	if len(returnedSet) < 1 {
-		return nil, 0, fmt.Errorf("expected at least one item")
+		return nil, 0, 0, fmt.Errorf("expected at least one item")
 	}
 
 	status, ok := returnedSet[0].(int64)
 	if !ok {
-		return nil, 0, fmt.Errorf("unexpected return value, expected status int")
+		return nil, 0, 0, fmt.Errorf("unexpected return value, expected status int")
 	}
 
 	if status == 0 {
-		return nil, 0, nil
+		return nil, 0, 0, nil
 	}
 
 	if status != 1 || len(returnedSet) < 2 {
-		return nil, 0, fmt.Errorf("expected status 1 with at least two return items")
+		return nil, 0, 0, fmt.Errorf("expected status 1 with at least two return items")
 	}
 
 	debounceIdStr, ok := returnedSet[1].(string)
 	if !ok {
-		return nil, 0, fmt.Errorf("expected debounceID as second item")
+		return nil, 0, 0, fmt.Errorf("expected debounceID as second item")
 	}
 
 	existingID, err := ulid.Parse(debounceIdStr)
 	if err != nil {
-		return nil, 0, fmt.Errorf("unknown debounce ID return value: %s", debounceIdStr)
+		return nil, 0, 0, fmt.Errorf("unknown debounce ID return value: %s", debounceIdStr)
 	}
 
 	var timeoutMillis int64
-	if len(returnedSet) == 3 {
+	if len(returnedSet) >= 3 {
 		timeoutMillis, ok = returnedSet[2].(int64)
 		if !ok {
-			return nil, 0, fmt.Errorf("expected timeout int")
+			return nil, 0, 0, fmt.Errorf("expected timeout int")
 		}
 	}
 
-	return &existingID, timeoutMillis, nil
+	var pointerTTL time.Duration
+	if len(returnedSet) >= 4 {
+		pointerTTLMillis, ok := returnedSet[3].(int64)
+		if !ok {
+			return nil, 0, 0, fmt.Errorf("expected pointer ttl int")
+		}
+		if pointerTTLMillis > 0 {
+			pointerTTL = time.Duration(pointerTTLMillis) * time.Millisecond
+		}
+	}
+
+	return &existingID, timeoutMillis, pointerTTL, nil
 }
 
 // DebounceGetItem implements queue.DebounceOperations.
@@ -245,6 +256,25 @@ func (q *queue) DebounceGetPointer(ctx context.Context, scope osqueue.Scope, key
 		return "", err
 	}
 	return val, nil
+}
+
+// DebounceSetPointer implements queue.DebounceOperations.
+func (q *queue) DebounceSetPointer(ctx context.Context, scope osqueue.Scope, key string, debounceID ulid.ULID, ttl time.Duration) error {
+	client := q.RedisClient.Client()
+	kg := q.RedisClient.DebounceKeyGenerator()
+
+	builder := client.B().Set().Key(kg.DebouncePointer(ctx, scope.FunctionID, key)).Value(debounceID.String())
+	var cmd rueidis.Completed
+	if ttl > 0 {
+		cmd = builder.Ex(ttl).Build()
+	} else {
+		cmd = builder.Build()
+	}
+
+	if err := client.Do(ctx, cmd).Error(); err != nil {
+		return fmt.Errorf("error setting debounce pointer: %w", err)
+	}
+	return nil
 }
 
 // DebounceDeletePointer implements queue.DebounceOperations.

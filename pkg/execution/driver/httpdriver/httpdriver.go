@@ -97,6 +97,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		WorkflowID:     s.ID.FunctionID,
 		RunID:          s.ID.RunID,
 		RequestID:      driver.RequestIDFromContext(ctx),
+		GenerationID:   queue.GenerationIDFromContext(ctx),
 		JobID:          driver.JobIDFromContext(ctx),
 		SigningKey:     e.localSigningKey,
 		URL:            *uri,
@@ -122,6 +123,8 @@ type Request struct {
 	RunID ulid.ULID
 	// RequestID is the unique per-outbound SDK request ID.
 	RequestID string
+	// GenerationID is the monotonic dispatch generation for this SDK request.
+	GenerationID int
 	// JobID is the stable queue item ID for this SDK request.
 	JobID string
 
@@ -331,6 +334,9 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	req.Header.Add("X-Run-ID", r.RunID.String())
 	if r.RequestID != "" {
 		req.Header.Add(headerspkg.HeaderKeyRequestID, r.RequestID)
+	}
+	if r.GenerationID > 0 {
+		req.Header.Add(headerspkg.HeaderKeyGenerationID, strconv.Itoa(r.GenerationID))
 	}
 	if r.JobID != "" {
 		req.Header.Add(headerspkg.HeaderKeyJobID, r.JobID)

@@ -390,11 +390,13 @@ func scanSpanRunListRows(rows []*sqlc.GetRunsRow, arg db.GetRunsParams) ([]*db.R
 		if arg.IncludeOutput && outputText != "" {
 			output = []byte(outputText)
 		}
+		startTime := toTime(r.StartTime)
+		endTime := toTime(r.EndTime)
 
 		out = append(out, &db.RunListItemRow{
 			FunctionRun: db.FunctionRun{
 				RunID:        parsedRunID,
-				RunStartedAt: r.StartTime,
+				RunStartedAt: startTime,
 				FunctionID:   parsedFunctionID,
 				TriggerType:  triggerType,
 				EventID:      arg.EventID,
@@ -405,7 +407,7 @@ func scanSpanRunListRows(rows []*sqlc.GetRunsRow, arg db.GetRunsParams) ([]*db.R
 				RunID:              parsedRunID,
 				Status:             sql.NullString{String: status.String(), Valid: statusText != ""},
 				CompletedStepCount: sql.NullInt64{Int64: 1, Valid: true},
-				CreatedAt:          sql.NullTime{Time: r.EndTime, Valid: enums.RunStatusEnded(status)},
+				CreatedAt:          sql.NullTime{Time: endTime, Valid: enums.RunStatusEnded(status)},
 			},
 			Output:         output,
 			FunctionSlug:   valueString(r.FunctionSlug),

@@ -58,14 +58,28 @@ type endpoint struct {
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "api",
-		Usage:     "Call Inngest REST API v2 endpoints",
-		UsageText: "inngest alpha api [target/auth flags] <endpoint> [endpoint flags]",
+		Usage:     "Call Inngest REST API v2 endpoints (beta)",
+		UsageText: "inngest api [target/auth flags] <endpoint> [endpoint flags]",
 		Description: strings.Join([]string{
+			"Beta: this command is under active development and may change.",
 			"By default, the command targets the local dev server.",
 			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom API server.",
 		}, "\n"),
 		Flags:    commonFlags(),
 		Commands: endpointCommands(),
+	}
+}
+
+func MovedCommand() *cli.Command {
+	return &cli.Command{
+		Name:        "api",
+		Usage:       "Moved to inngest api",
+		UsageText:   "inngest alpha api",
+		Description: "The alpha api command has moved. Use `inngest api` instead.",
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			_, err := fmt.Fprintln(cmd.Root().Writer, "The alpha api command has moved. Use `inngest api` instead.")
+			return err
+		},
 	}
 }
 
@@ -105,7 +119,7 @@ func commonFlags() []cli.Flag {
 		&cli.StringFlag{
 			Category: "Target",
 			Name:     "api-host",
-			Usage:    "Custom API host or origin",
+			Usage:    "Custom API host or origin; may include /api/v2 or /v2",
 		},
 		&cli.IntFlag{
 			Category:    "Target",
@@ -150,7 +164,7 @@ func endpointUsageText(ep endpoint) string {
 	for _, name := range ep.pathParams {
 		fmt.Fprintf(&positional, " [<%s>]", kebab(name))
 	}
-	return fmt.Sprintf("inngest alpha api [target/auth flags] %s%s [endpoint flags]", ep.name, positional.String())
+	return fmt.Sprintf("inngest api [target/auth flags] %s%s [endpoint flags]", ep.name, positional.String())
 }
 
 func endpointArguments(ep endpoint) []cli.Argument {
@@ -299,7 +313,7 @@ func endpointDescription(ep endpoint) string {
 		"",
 		"Target, auth, and output flags are inherited from `inngest alpha api`:",
 		"  --prod                  Target Inngest Cloud Production",
-		"  --api-host, --api-port  Target a custom API server",
+		"  --api-host, --api-port  Target a custom API server; host may include /api/v2 or /v2",
 		"  --api-key               API key, or INNGEST_API_KEY",
 		"  --signing-key           Signing key, or INNGEST_SIGNING_KEY",
 		"  --env                   Environment name, or INNGEST_ENV",
@@ -494,7 +508,7 @@ func resolveBaseURL(ctx context.Context, cmd *cli.Command) (string, error) {
 
 	apiPort := localconfig.GetIntValue(cmd, "api-port", 0)
 	if apiHost := localconfig.GetValue(cmd, "api-host", ""); apiHost != "" {
-		if apiPort == 0 {
+		if apiPort == 0 && !looksLikeURL(apiHost) {
 			apiPort = api.DefaultAPIPort
 		}
 		return normalizeAPIHostTarget(apiHost, apiPort)
@@ -513,7 +527,7 @@ func resolveBaseURL(ctx context.Context, cmd *cli.Command) (string, error) {
 
 func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
 	if looksLikeURL(rawHost) {
-		return normalizeAPIURL(rawHost)
+		return normalizeAPIURLWithPort(rawHost, port)
 	}
 
 	host := rawHost
@@ -532,6 +546,21 @@ func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
 	}
 
 	return normalizeAPIURL(fmt.Sprintf("%s://%s", scheme, rawHost))
+}
+
+func normalizeAPIURLWithPort(rawURL string, port int) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("api host must include scheme and host")
+	}
+	if port != 0 && parsed.Port() == "" {
+		parsed.Host = net.JoinHostPort(parsed.Hostname(), strconv.Itoa(port))
+	}
+
+	return normalizeAPIURL(parsed.String())
 }
 
 func normalizeAPIURL(rawURL string) (string, error) {

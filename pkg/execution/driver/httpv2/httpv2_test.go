@@ -132,10 +132,11 @@ func TestSyncHeaders(t *testing.T) {
 	}
 
 	opts := driver.V2RequestOpts{
-		Fn:         fn,
-		RequestID:  "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-		JobID:      "job-123",
-		SigningKey: []byte("test-signing-key"),
+		Fn:           fn,
+		RequestID:    "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		GenerationID: 3,
+		JobID:        "job-123",
+		SigningKey:   []byte("test-signing-key"),
 		Metadata: sv2.Metadata{
 			ID: sv2.ID{
 				RunID: runID,
@@ -154,6 +155,7 @@ func TestSyncHeaders(t *testing.T) {
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "s=")
 	require.Equal(t, runID.String(), receivedHeaders.Get("X-Run-ID"))
 	require.Equal(t, opts.RequestID, receivedHeaders.Get(headers.HeaderKeyRequestID))
+	require.Equal(t, "3", receivedHeaders.Get(headers.HeaderKeyGenerationID))
 	require.Equal(t, opts.JobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 	// ForceStepPlan not set, so header should be absent
 	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
@@ -585,27 +587,35 @@ type mockStateLoader struct {
 func (m *mockStateLoader) LoadMetadata(ctx context.Context, id sv2.ID) (sv2.Metadata, error) {
 	return sv2.Metadata{}, nil
 }
+
 func (m *mockStateLoader) LoadEvents(ctx context.Context, id sv2.ID) ([]json.RawMessage, error) {
 	return m.events, m.err
 }
+
 func (m *mockStateLoader) LoadSteps(ctx context.Context, id sv2.ID) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStepInputs(ctx context.Context, id sv2.ID) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStepsWithIDs(ctx context.Context, id sv2.ID, stepIDs []string) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStack(ctx context.Context, id sv2.ID) ([]string, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadState(ctx context.Context, id sv2.ID) (sv2.State, error) {
 	return sv2.State{}, nil
 }
+
 func (m *mockStateLoader) LoadDefers(ctx context.Context, id sv2.ID) (map[string]sv2.Defer, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadDefersMeta(ctx context.Context, id sv2.ID) (map[string]sv2.DeferMeta, error) {
 	return nil, nil
 }

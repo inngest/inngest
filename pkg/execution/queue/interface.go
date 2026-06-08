@@ -181,7 +181,8 @@ const (
 	// the debounce; the caller should drop the update.
 	DebounceUpdateOutOfOrder
 	// DebounceUpdateNotFound indicates the timeout queue item is missing;
-	// the caller should enqueue a fresh timeout job.
+	// the caller should enqueue a fresh timeout job. Implementations may
+	// return ttlSeconds when they can preserve the debounce's capped timeout.
 	DebounceUpdateNotFound
 )
 
@@ -217,10 +218,10 @@ type DebounceOperations interface {
 
 	// DebouncePrepareMigration atomically replaces the debounce pointer
 	// with fakeDebounceID to disable execution on this shard, returning
-	// the existing debounce ID and timeout (millis) so the caller can
-	// re-create the debounce on another shard. Returns (nil, 0, nil)
-	// when no debounce exists.
-	DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (existingID *ulid.ULID, timeoutMillis int64, err error)
+	// the existing debounce ID, timeout (millis), and pointer TTL so the
+	// caller can re-create or restore the debounce on another shard.
+	// Returns (nil, 0, 0, nil) when no debounce exists.
+	DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (existingID *ulid.ULID, timeoutMillis int64, pointerTTL time.Duration, err error)
 
 	// DebounceGetItem retrieves the serialized debounce item from the
 	// hash. Returns ErrDebounceNotFound when absent.
@@ -237,6 +238,10 @@ type DebounceOperations interface {
 	// DebounceGetPointer reads the current debounce ID for scope/key.
 	// Returns ErrDebounceNotFound when no debounce is active.
 	DebounceGetPointer(ctx context.Context, scope Scope, key string) (string, error)
+
+	// DebounceSetPointer sets the pointer for scope/key, optionally
+	// preserving the previous TTL when ttl is greater than zero.
+	DebounceSetPointer(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, ttl time.Duration) error
 
 	// DebounceDeletePointer removes the pointer for scope/key.
 	DebounceDeletePointer(ctx context.Context, scope Scope, key string) error

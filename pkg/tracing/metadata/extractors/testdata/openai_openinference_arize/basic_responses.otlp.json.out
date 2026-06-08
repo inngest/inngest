@@ -1,0 +1,12 @@
+SPAN OpenAI Responses
+{
+  "model": "gpt-5.4-nano-2026-03-17",
+  "system": "openai",
+  "operation_name": "",
+  "response_model": "",
+  "response_id": "",
+  "finish_reasons": null,
+  "input_tokens": 17,
+  "output_tokens": 51,
+  "total_tokens": 68
+}

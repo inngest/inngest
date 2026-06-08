@@ -950,6 +950,69 @@
         ]
       }
     },
+    "/events/{eventId}/runs": {
+      "get": {
+        "description": "Lists function runs triggered by a specific event",
+        "operationId": "V2_GetEventRuns",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeOutput",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Pagination cursor from previous response",
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Number of runs to return per page (min: 1, max: 40)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": "20",
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetEventRunsResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get event runs",
+        "tags": [
+          "Runs"
+        ],
+        "x-beta": true
+      }
+    },
     "/keys/events": {
       "get": {
         "description": "Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys.",
@@ -2130,6 +2193,23 @@
         },
         "type": "object"
       },
+      "v2GetEventRunsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2FunctionRun"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
       "v2GetFunctionRunResponse": {
         "properties": {
           "data": {
@@ -2167,6 +2247,140 @@
           },
           "metadata": {
             "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsDiagnostic": {
+        "properties": {
+          "code": {
+            "description": "Machine-readable code representing the type of diagnostic",
+            "type": "string"
+          },
+          "message": {
+            "description": "Human-readable message describing the diagnostic",
+            "type": "string"
+          },
+          "position": {
+            "$ref": "#/components/schemas/v2InsightsDiagnosticPosition"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/v2InsightsDiagnosticSeverity"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsDiagnosticPosition": {
+        "properties": {
+          "context": {
+            "description": "Snippet of the query string around the position to provide context for the diagnostic",
+            "type": "string"
+          },
+          "end": {
+            "description": "Ending character index in the query string where the diagnostic applies",
+            "format": "int32",
+            "type": "integer"
+          },
+          "start": {
+            "description": "Starting character index in the query string where the diagnostic applies",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsDiagnosticSeverity": {
+        "default": "SEVERITY_UNSPECIFIED",
+        "enum": [
+          "SEVERITY_UNSPECIFIED",
+          "ERROR",
+          "WARNING",
+          "INFO"
+        ],
+        "type": "string"
+      },
+      "v2InsightsEventSchema": {
+        "properties": {
+          "name": {
+            "description": "Event type name",
+            "example": "orders/payment.created",
+            "type": "string"
+          },
+          "schema": {
+            "description": "JSON Schema describing the shape of this event's data, represented as a nested JSON object",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsOutputColumn": {
+        "properties": {
+          "name": {
+            "description": "Name of the column in the insights query result",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/v2InsightsOutputColumnType"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsOutputColumnType": {
+        "default": "VALUE_TYPE_UNSPECIFIED",
+        "enum": [
+          "VALUE_TYPE_UNSPECIFIED",
+          "STRING",
+          "NUMBER",
+          "BOOLEAN",
+          "DATETIME",
+          "COMPLEX"
+        ],
+        "type": "string"
+      },
+      "v2InsightsRow": {
+        "properties": {
+          "values": {
+            "description": "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.)",
+            "items": {},
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsTable": {
+        "properties": {
+          "columns": {
+            "description": "Columns available in this table",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsTableColumn"
+            },
+            "type": "array"
+          },
+          "description": {
+            "description": "Human-readable description of the table and its contents",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the table, used when writing queries",
+            "example": "function_runs",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsTableColumn": {
+        "properties": {
+          "description": {
+            "description": "Human-readable description of the column and the data it contains",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the column in the insights table",
+            "type": "string"
+          },
+          "type": {
+            "description": "Data type of the column (e.g., 'String', 'Int64', 'Array(String)', etc.)",
+            "type": "string"
           }
         },
         "type": "object"
@@ -2216,6 +2430,39 @@
         },
         "type": "object"
       },
+      "v2ListInsightsEventSchemasResponse": {
+        "properties": {
+          "data": {
+            "description": "Paginated list of event type schemas",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsEventSchema"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2ListInsightsTablesResponse": {
+        "properties": {
+          "data": {
+            "description": "List of available tables that can be queried via the Insights query endpoint",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsTable"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
       "v2ListWebhooksResponse": {
         "properties": {
           "data": {
@@ -2252,6 +2499,88 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/v2Env"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsData": {
+        "properties": {
+          "columns": {
+            "description": "Column metadata for the insights query result",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsOutputColumn"
+            },
+            "type": "array"
+          },
+          "diagnostics": {
+            "description": "Any non-fatal diagnostics related to the insights query execution",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsDiagnostic"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "description": "Rows of the insights query result, where each row contains a list of values corresponding to the columns",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsRow"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsPromptData": {
+        "properties": {
+          "sql": {
+            "description": "The generated Insights SQL query",
+            "example": "SELECT function_id, COUNT(*) AS total, countIf(status = 'Failed') AS failures, failures / total AS failure_rate FROM function_runs WHERE started_at >= now() - INTERVAL 7 DAY GROUP BY function_id ORDER BY failure_rate DESC LIMIT 10",
+            "type": "string"
+          },
+          "summary": {
+            "description": "A natural language summary of the generated query, useful for explaining the query's intent to agents",
+            "example": "This query retrieves the top 10 functions with the highest failure rate over the past week, showing the total number of runs, number of failures, and calculated failure rate for each function.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsPromptRequest": {
+        "properties": {
+          "prompt": {
+            "description": "Natural language description of the query to generate",
+            "example": "Show me the top 10 functions by failure rate in the last 7 days",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsPromptResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2QueryInsightsPromptData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsRequest": {
+        "properties": {
+          "query": {
+            "description": "The insights query to execute, written in modified ClickHouse SQL",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2QueryInsightsData"
           },
           "metadata": {
             "$ref": "#/components/schemas/v2ResponseMetadata"
