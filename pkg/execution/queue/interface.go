@@ -181,7 +181,8 @@ const (
 	// the debounce; the caller should drop the update.
 	DebounceUpdateOutOfOrder
 	// DebounceUpdateNotFound indicates the timeout queue item is missing;
-	// the caller should enqueue a fresh timeout job.
+	// the caller should enqueue a fresh timeout job. Implementations may
+	// return ttlSeconds when they can preserve the debounce's capped timeout.
 	DebounceUpdateNotFound
 )
 
