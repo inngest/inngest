@@ -75,9 +75,7 @@ func execute() {
 				}
 			}
 
-			m := tel.NewMetadata(ctx)
-			m.SetCliContext(cmd)
-			tel.SendMetadata(ctx, m)
+			tel.SendCmdExecutedEvent(ctx, cmd)
 
 			// Best-effort background refresh of the cached "latest version"
 			// record. Dedup'd by the cache TTL, so cheap on every invocation.

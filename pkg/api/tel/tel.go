@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	EventName   = "cli/command.executed"
-	CIEventName = "cli/ci.command.executed"
+	CommandExecutedEventName   = "cli/command.executed"
+	CICommandExecutedEventName = "cli/ci.command.executed"
 )
 
 var (
@@ -69,20 +69,16 @@ func NewMetadata(ctx context.Context) *Metadata {
 	}
 }
 
-func (m *Metadata) SetCliContext(cmd *cli.Command) {
+func FormatCommand(cmd *cli.Command) string {
 	// Build command path similar to cobra's CommandPath()
 	cmdPath := "inngest"
 	if cmd != nil && cmd.Args().Len() > 0 {
 		cmdPath += " " + cmd.Args().Get(0)
 	}
-	m.Cmd = cmdPath
+	return cmdPath
 }
 
-func (m *Metadata) Event() inngestgo.Event {
-	name := EventName
-	if isCI() {
-		name = CIEventName
-	}
+func (m *Metadata) Event(name string) inngestgo.Event {
 	return inngestgo.Event{
 		Name: name,
 		Data: map[string]any{
@@ -98,16 +94,26 @@ func (m *Metadata) Event() inngestgo.Event {
 	}
 }
 
-func SendMetadata(ctx context.Context, m *Metadata) {
-	Send(ctx, m.Event())
-}
 func SendEvent(ctx context.Context, name string, m *Metadata) {
 	if isCI() {
 		return
 	}
-	evt := m.Event()
-	evt.Name = name
+	evt := m.Event(name)
 	Send(ctx, evt)
+}
+
+func SendCmdExecutedEvent(ctx context.Context, cmd *cli.Command) {
+	cmdString := FormatCommand(cmd)
+	if cmdString == "" {
+		return
+	}
+	m := NewMetadata(ctx)
+	m.Cmd = cmdString
+	name := CommandExecutedEventName
+	if isCI() {
+		name = CICommandExecutedEventName
+	}
+	Send(ctx, m.Event(name))
 }
 
 func Send(ctx context.Context, e inngestgo.Event) {
