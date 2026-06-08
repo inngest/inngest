@@ -28,7 +28,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// GetFunction returns the canonical v2 function detail shape.
 func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest) (*apiv2.GetFunctionResponse, error) {
 	if req.Id == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Function ID is required")
