@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useRouter } from '@tanstack/react-router';
+import { useOrganization } from '@clerk/tanstack-react-start';
 import { Button } from '@inngest/components/Button';
+import { useRouter } from '@tanstack/react-router';
 import { toast } from 'sonner';
 
 import CheckoutModal, {
@@ -32,6 +33,8 @@ export default function UpgradeButton({
   label?: string;
 }) {
   const router = useRouter();
+  const { isLoaded: orgLoaded, membership } = useOrganization();
+  const canChangePlan = orgLoaded && membership?.role === 'org:admin';
   const [checkoutData, setCheckoutData] = useState<{
     action: 'upgrade' | 'downgrade' | 'cancel';
     items: CheckoutItem[];
@@ -110,14 +113,14 @@ export default function UpgradeButton({
       <Button
         className="w-full"
         label={buttonLabel}
-        disabled={isActive}
+        disabled={isActive || !canChangePlan}
         href={
-          isEnterpriseCard && !isActive
+          isEnterpriseCard && !isActive && canChangePlan
             ? pathCreator.support({ ref: 'app-billing-plans-enterprise' })
             : undefined
         }
         onClick={() => {
-          if (isActive || isEnterpriseCard) return;
+          if (isActive || isEnterpriseCard || !canChangePlan) return;
           onClickChangePlan({
             action: isFreeCard
               ? 'cancel'
