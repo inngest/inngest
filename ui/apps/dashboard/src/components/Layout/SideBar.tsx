@@ -3,9 +3,12 @@ import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
-import Navigation from '../Navigation/Navigation';
+import NavigationV1 from '../Navigation/Navigation';
+import OnboardingWidgetV1 from '../Navigation/OnboardingWidget';
+import NavigationV2 from '../NavigationV2/Navigation';
+import OnboardingWidgetV2 from '../NavigationV2/OnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
-import OnboardingWidget from '../Navigation/OnboardingWidget';
+import { useNavigationV2 } from './useNavigationV2';
 
 export default function SideBar({
   collapsed: serverCollapsed,
@@ -19,6 +22,10 @@ export default function SideBar({
   closeWidget: () => void;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
+
+  const navV2 = useNavigationV2();
+  const Navigation = navV2 ? NavigationV2 : NavigationV1;
+  const OnboardingWidget = navV2 ? OnboardingWidgetV2 : OnboardingWidgetV1;
 
   const [collapsed, setCollapsed] = useState<boolean>(serverCollapsed ?? false);
 
