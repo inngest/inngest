@@ -3,6 +3,7 @@
  * Feature: 001-composable-timeline-bar
  */
 
+import { toMaybeDate } from '@inngest/components/utils/date';
 import { max, min } from 'date-fns';
 
 import { KindInngestExperiment } from '../../generated';
@@ -29,6 +30,10 @@ import { TIMELINE_CONSTANTS } from './timing';
  */
 function isStepRunSpan(trace: Trace): boolean {
   return trace.stepOp === 'RUN' || trace.stepType === 'RUN' || isStepInfoRun(trace.stepInfo);
+}
+
+function isNonStepSpan(trace: Trace): boolean {
+  return !trace.stepOp && !trace.stepType;
 }
 
 /**
@@ -174,9 +179,7 @@ function tracesToBarData(
     if (bar.endTime) {
       const endMs = bar.endTime.getTime();
       latestCompletedSiblingEndMs =
-        latestCompletedSiblingEndMs === null
-          ? endMs
-          : Math.max(latestCompletedSiblingEndMs, endMs);
+        latestCompletedSiblingEndMs === null ? endMs : Math.max(latestCompletedSiblingEndMs, endMs);
     }
 
     bars.push(bar);
@@ -218,9 +221,9 @@ function traceToBarData(
   discoveryStartAtMs?: number | null,
   functionSlug?: string
 ): TimelineBarData {
-  const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
+  const shouldShowTiming = (isStepRunSpan(trace) || isNonStepSpan(trace)) && !trace.isUserland;
   // Prefer server-computed timing from metadata, fall back to span-timestamp calculation
-  let timingBreakdown = isStepRun
+  let timingBreakdown = shouldShowTiming
     ? getTimingFromMetadata(trace, trace.metadata) ?? calculateTimingBreakdown(trace)
     : undefined;
 
@@ -239,15 +242,15 @@ function traceToBarData(
     : undefined;
 
   // Per-step Inngest overhead breakdown (discovery + metadata timing)
-  const inngestBreakdown = isStepRun
+  const inngestBreakdown = shouldShowTiming
     ? getInngestBreakdown(trace, discoveryStartAtMs ?? null) ?? undefined
     : undefined;
 
   const traceStartedAtMs = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
   const traceQueuedAtMs = trace.queuedAt ? new Date(trace.queuedAt).getTime() : null;
   const childDiscoveryStartAtMs = trace.isRoot
-    ? (traceStartedAtMs ?? discoveryStartAtMs)
-    : (traceStartedAtMs ?? traceQueuedAtMs ?? discoveryStartAtMs);
+    ? traceStartedAtMs ?? discoveryStartAtMs
+    : traceStartedAtMs ?? traceQueuedAtMs ?? discoveryStartAtMs;
 
   // Check if this step has experiment metadata
   const hasExperiment = trace.metadata?.some((m) => m.kind === KindInngestExperiment) ?? false;
@@ -286,6 +289,147 @@ function traceToBarData(
     hasExperiment,
     experimentMetadata,
   };
+}
+
+// traceRollup groups attempts by stepID and groupID
+// (for spans without stepIDs, typically finalization spans or failures hitting the SDK entirely)
+// and creates virtual "rollup" spans that represent the entire step/finalization
+// with all attempts grouped together. This simplifies the trace for
+// display in the timeline while still allowing users to see
+// individual attempts when they expand the step details.
+export function traceRollup(root: Trace): Trace {
+  const stepOrder: string[] = [];
+  const steps = new Map<string, Map<number, Trace>>();
+  const rolledUpRunChildren: Trace[] = [];
+  const groupedSpans = new Map<string, Map<number, Trace>>();
+  let finalSpan: Trace | null = null;
+  for (const child of root.childrenSpans ?? []) {
+    if (child.outputID && !child.stepID) {
+      if (child.groupID) {
+        finalSpan = child;
+        const attempts = groupedSpans.get(child.groupID) ?? new Map<number, Trace>();
+        attempts.set(child.attempts ?? 0, child);
+        groupedSpans.set(child.groupID, attempts);
+      } else {
+        rolledUpRunChildren.push(child);
+      }
+      continue;
+    } else if (!child.stepID || child.attempts === null) {
+      continue;
+    }
+
+    if (!steps.get(child.stepID)) {
+      stepOrder.push(child.stepID);
+    }
+
+    const attempts = steps.get(child.stepID) ?? new Map<number, Trace>();
+    if (child.groupID) {
+      // Associate any other spans with the same groupID (IE network failures/similar) with this step
+      for (const [attempt, attemptSpan] of groupedSpans.get(child.groupID) ?? []) {
+        attempts.set(attempt, attemptSpan);
+      }
+    }
+
+    attempts.set(child.attempts, child);
+    steps.set(child.stepID, attempts);
+  }
+
+  for (const stepID of stepOrder) {
+    const attempts = steps.get(stepID);
+    if (!attempts) {
+      continue;
+    }
+
+    const minAttempt = Math.min(...attempts.keys());
+    const minAttemptTrace = attempts.get(minAttempt) as Trace;
+    const maxAttempt = Math.max(...attempts.keys());
+    const maxAttemptTrace = attempts.get(maxAttempt) as Trace;
+    if (attempts.size == 1) {
+      rolledUpRunChildren.push(maxAttemptTrace);
+      continue;
+    }
+
+    // Create a virtual span to represent the step as a whole with all attempts
+    const virtualSpan: Trace = {
+      isRoot: false,
+      isUserland: false,
+      spanID: `${stepID}-rollup`, // virtual span
+      groupID: maxAttemptTrace.groupID,
+      name: maxAttemptTrace.name,
+      attempts: maxAttempt,
+      stepID: stepID,
+      queuedAt: minAttemptTrace.queuedAt,
+      scheduledAt: minAttemptTrace.scheduledAt,
+      startedAt: minAttemptTrace.startedAt,
+      endedAt: maxAttemptTrace.endedAt,
+      status: maxAttemptTrace.status,
+      outputID: maxAttemptTrace.outputID,
+      debugRunID: maxAttemptTrace.debugRunID,
+      debugSessionID: maxAttemptTrace.debugSessionID,
+      stepInfo: maxAttemptTrace.stepInfo,
+
+      childrenSpans: Array.from(attempts.values()).sort(
+        (a, b) => (a.attempts ?? 0) - (b.attempts ?? 0)
+      ),
+
+      userlandSpan: null,
+    };
+
+    for (const attempt of attempts.values()) {
+      attempt.name = `Attempt ${attempt.attempts}`;
+    }
+
+    rolledUpRunChildren.push(virtualSpan);
+  }
+
+  if (finalSpan && finalSpan.groupID && groupedSpans.has(finalSpan.groupID)) {
+    const attempts = groupedSpans.get(finalSpan.groupID) as Map<number, Trace>;
+    const minAttempt = Math.min(...attempts.keys());
+    const minAttemptTrace = attempts.get(minAttempt) as Trace;
+    const maxAttempt = Math.max(...attempts.keys());
+    const maxAttemptTrace = attempts.get(maxAttempt) as Trace;
+    if (attempts.size == 1) {
+      maxAttemptTrace.name = 'Finalization';
+      rolledUpRunChildren.push(maxAttemptTrace);
+    } else {
+      // Create a virtual span to represent the finalization as a whole with all attempts
+      const virtualSpan: Trace = {
+        isRoot: false,
+        isUserland: false,
+        name: 'Finalization',
+        spanID: `final-rollup`, // virtual span
+        groupID: maxAttemptTrace.groupID,
+        attempts: maxAttemptTrace.attempts,
+        queuedAt: minAttemptTrace.queuedAt,
+        scheduledAt: minAttemptTrace.scheduledAt,
+        startedAt: minAttemptTrace.startedAt,
+        endedAt: maxAttemptTrace.endedAt,
+        status: maxAttemptTrace.status,
+        outputID: maxAttemptTrace.outputID,
+        debugRunID: maxAttemptTrace.debugRunID,
+        debugSessionID: maxAttemptTrace.debugSessionID,
+
+        childrenSpans: Array.from(attempts.values()).sort(
+          (a, b) => (a.attempts ?? 0) - (b.attempts ?? 0)
+        ),
+
+        stepInfo: null,
+        userlandSpan: null,
+      };
+
+      for (const attempt of attempts.values()) {
+        attempt.name = `Attempt ${attempt.attempts}`;
+      }
+
+      rolledUpRunChildren.push(virtualSpan);
+    }
+  }
+
+  const sortingKey = (trace: Trace) =>
+    toMaybeDate(trace.queuedAt)?.getTime() ?? toMaybeDate(trace.startedAt)?.getTime() ?? 0;
+  root.childrenSpans = rolledUpRunChildren.sort((a, b) => sortingKey(a) - sortingKey(b));
+
+  return root;
 }
 
 /**

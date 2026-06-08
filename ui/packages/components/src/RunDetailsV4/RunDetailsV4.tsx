@@ -29,7 +29,7 @@ import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
 import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
 import type { Trace } from './types';
-import { traceToTimelineData } from './utils/traceConversion';
+import { traceRollup, traceToTimelineData } from './utils/traceConversion';
 
 // Residual poll interval for userland traces
 const RESIDUAL_POLL_INTERVAL = 6000;
@@ -77,19 +77,25 @@ function TimelineV4Wrapper({
 }) {
   const { selectStep } = useStepSelection({ runID });
 
+  const rolledUpTrace = useMemo(
+    // Roll up the trace to hide (new) request spans and group step attempts.
+    () => traceRollup(trace),
+    [trace, runID, orgName, functionSlug]
+  );
+
   // Build a map of spanID -> Trace for looking up traces when clicked
   const traceMap = useMemo(() => {
     const map = new Map<string, Trace>();
-    traceWalk(trace, (t) => {
+    traceWalk(rolledUpTrace, (t) => {
       map.set(t.spanID, t);
     });
     return map;
-  }, [trace]);
+  }, [rolledUpTrace]);
 
   // Convert V3 trace to V4 TimelineData
   const timelineData = useMemo(
-    () => traceToTimelineData(trace, { runID, orgName, functionSlug }),
-    [trace, runID, orgName, functionSlug]
+    () => traceToTimelineData(rolledUpTrace, { runID, orgName, functionSlug }),
+    [rolledUpTrace, runID, orgName, functionSlug]
   );
 
   // Handle step selection - look up the trace and emit to global selection
