@@ -738,17 +738,17 @@ func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inn
 	}, nil
 }
 
-func (d debouncer) completePreparedMigration(ctx context.Context, di DebounceItem, fn inngest.Function, migration *preparedMigration) {
+func (d debouncer) completePreparedMigration(ctx context.Context, di DebounceItem, fn inngest.Function, migration *preparedMigration) error {
 	l := logger.StdlibLogger(ctx).With("debounce_id", migration.debounceID.String())
 
 	secondary, err := d.secondaryShard()
 	if err != nil {
-		l.Error("missing secondary debounce components while completing migration", "err", err)
-		return
+		return fmt.Errorf("missing secondary debounce components while completing migration: %w", err)
 	}
 
+	var cleanupErr error
 	if err := secondary.DebounceDeleteItems(ctx, scopeForDebounceItem(di), migration.debounceID); err != nil {
-		l.Error("unable to delete old debounce after migration", "err", err)
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("unable to delete old debounce after migration: %w", err))
 	}
 
 	queueItemID := queue.HashID(ctx, migration.debounceID.String())
@@ -758,20 +758,24 @@ func (d debouncer) completePreparedMigration(ctx context.Context, di DebounceIte
 		queue.KindDebounce,
 		queueItemID,
 	); err != nil {
-		l.Error("could not remove queue item", "item_id", queueItemID, "err", err)
+		cleanupErr = errors.Join(cleanupErr, fmt.Errorf("could not remove queue item %s: %w", queueItemID, err))
 	} else {
 		l.Debug("deleted migrated debounce")
 	}
 
+	if cleanupErr != nil {
+		return fmt.Errorf("secondary debounce migration guard left in place because cleanup failed: %w", cleanupErr)
+	}
+
 	if err := secondary.DebounceDeleteMigratingFlag(ctx, scopeForDebounceItem(di), migration.debounceID); err != nil {
-		l.Error("unable to delete debounce migrating flag", "err", err)
+		return fmt.Errorf("unable to delete debounce migrating flag: %w", err)
 	}
 
 	key, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
-		l.Error("unable to compute debounce key while completing migration", "err", err)
+		return fmt.Errorf("unable to compute debounce key while completing migration: %w", err)
 	} else if err := secondary.DebounceDeletePointer(ctx, scopeForDebounceItem(di), key); err != nil {
-		l.Error("unable to delete secondary debounce pointer", "err", err)
+		return fmt.Errorf("unable to delete secondary debounce pointer: %w", err)
 	}
 
 	metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
@@ -781,6 +785,8 @@ func (d debouncer) completePreparedMigration(ctx context.Context, di DebounceIte
 			"queue_shard": secondary.Name(),
 		},
 	})
+
+	return nil
 }
 
 func (d debouncer) cleanupPreparedMigrationPrimary(ctx context.Context, di DebounceItem, fn inngest.Function, migration *preparedMigration) error {
@@ -899,7 +905,9 @@ func (d debouncer) finalizePreparedMigration(ctx context.Context, di DebounceIte
 	}
 
 	if opErr == nil {
-		d.completePreparedMigration(ctx, di, fn, migration)
+		if err := d.completePreparedMigration(ctx, di, fn, migration); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -920,7 +928,9 @@ func (d debouncer) finalizePreparedMigration(ctx context.Context, di DebounceIte
 			"debounce_id", migration.debounceID.String(),
 			"error", opErr,
 		)
-		d.completePreparedMigration(ctx, di, fn, migration)
+		if err := d.completePreparedMigration(ctx, di, fn, migration); err != nil {
+			return fmt.Errorf("primary debounce exists after migration error, but secondary cleanup failed: %w", err)
+		}
 		return nil
 	}
 
