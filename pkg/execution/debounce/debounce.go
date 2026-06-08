@@ -795,8 +795,14 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// The queue item is not found with the debounceID
 		// enqueue a new item
 		qi := d.queueItem(ctx, di, debounceID)
+		// Some queue shards can preserve the debounce's max-timeout cap even
+		// when the timeout job is missing, and return the capped TTL here.
+		actualTTL := ttl
+		if newTTL > 0 {
+			actualTTL = time.Second * time.Duration(newTTL)
+		}
 
-		return d.queue.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
+		return d.queue.Enqueue(ctx, qi, now.Add(actualTTL).Add(buffer).Add(time.Second), queue.EnqueueOpts{
 			// Debounce timeout items must live on the same Redis instance as the state.
 			ForceQueueShardName: queueShard.Name(),
 		})
