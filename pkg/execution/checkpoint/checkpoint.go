@@ -1,7 +1,6 @@
 package checkpoint
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,7 +19,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/defers"
-	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -34,7 +32,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
-	"github.com/oklog/ulid/v2"
 )
 
 type Checkpointer interface {
@@ -686,8 +683,8 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 			Tags:    map[string]any{"result": result},
 		})
 	}()
-	if input.RequestID == "" {
-		result = "no_request_id"
+	if input.GenerationID == 0 {
+		result = "no_generation_id"
 		return nil
 	}
 
@@ -701,11 +698,6 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		}
 	}
 
-	parsed, err := ulid.Parse(input.RequestID)
-	if err != nil {
-		return fmt.Errorf("%w: invalid request id %q: %v", ErrStaleDispatch, input.RequestID, err)
-	}
-
 	ref := queueref.Decode(input.QueueItemRef)
 	if ref.JobID() == "" || ref.ShardID() == "" {
 		result = "no_qi_ref"
@@ -716,9 +708,7 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 	if !ok {
 		// Fail open if the queue can't load items (e.g. mock or alt backend);
 		// the alternative is rejecting every fenced POST forever.
-		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping",
-			"run_id", input.RunID,
-		)
+		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping", "run_id", input.RunID)
 		result = "no_loader"
 		return nil
 	}
@@ -742,12 +732,11 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		return nil
 	}
 
-	// Compare only the entropy: it's the deterministic part bound to
-	// (runID, generationID). The ULID timestamp is incidental (it just
-	// gives RequestIDs chronological sort order) and isn't part of the
-	// fence.
-	if !bytes.Equal(parsed.Entropy(), driver.DispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
-		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
+	if item.GenerationID != input.GenerationID {
+		return fmt.Errorf("%w: dispatch generation %d does not match queue item generation %d",
+			ErrStaleDispatch,
+			input.GenerationID,
+			item.GenerationID)
 	}
 
 	return nil

@@ -145,6 +145,9 @@ func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2Requ
 	if opts.RequestID != "" {
 		req.Header.Add(headers.HeaderKeyRequestID, opts.RequestID)
 	}
+	if opts.GenerationID > 0 {
+		req.Header.Add(headers.HeaderKeyGenerationID, fmt.Sprintf("%d", opts.GenerationID))
+	}
 	if opts.JobID != "" {
 		req.Header.Add(headers.HeaderKeyJobID, opts.JobID)
 	}
