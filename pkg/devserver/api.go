@@ -131,7 +131,6 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 
 	m := tel.NewMetadata(r.Context())
 	tel.SendEvent(r.Context(), "cli/dev_ui.loaded", m)
-	tel.SendMetadata(r.Context(), m)
 
 	byt := serve(r.Context(), r.URL.Path)
 	_, _ = w.Write(byt)
