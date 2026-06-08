@@ -27,7 +27,7 @@ export default function Layout({
   const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
 
   return (
-    <div className="bg-canvasSubtle flex h-screen w-full flex-col overflow-hidden">
+    <div className="bg-canvasSubtle fixed inset-0 flex flex-col overflow-hidden overscroll-none">
       <TopBar
         activeEnv={activeEnv}
         profile={profile}
@@ -44,7 +44,7 @@ export default function Layout({
 
         <div
           id="layout-scroll-container"
-          className="no-scrollbar flex flex-1 flex-col overflow-auto"
+          className="no-scrollbar flex flex-1 flex-col overflow-auto overscroll-contain"
         >
           <IncidentBanner />
 
