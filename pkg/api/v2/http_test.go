@@ -111,7 +111,7 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 		AppName: "my-app",
 		Function: inngest.Function{
 			Name: "Test function",
-			Slug: "test-fn",
+			Slug: "my-app-test-fn",
 		},
 	}
 	functionRun := &cqrs.FunctionRun{
@@ -161,7 +161,7 @@ func TestHTTPGateway_GetFunction(t *testing.T) {
 		ID:      functionID,
 		Slug:    "my-app-test-fn",
 		AppID:   appID,
-		AppName: "My App",
+		AppName: "my-app",
 		Function: inngest.Function{
 			Name: "Test function",
 			Slug: "test-fn",
@@ -175,7 +175,7 @@ func TestHTTPGateway_GetFunction(t *testing.T) {
 		},
 	}
 	functions := &mockFunctionProvider{}
-	functions.On("GetFunction", mock.Anything, "my-app-test-fn").Return(fn, nil).Once()
+	functions.On("GetFunctionByApp", mock.Anything, "my-app", "test-fn").Return(fn, nil).Once()
 
 	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Functions: functions}, HTTPHandlerOptions{})
 	require.NoError(t, err)
@@ -183,7 +183,7 @@ func TestHTTPGateway_GetFunction(t *testing.T) {
 		functions.AssertExpectations(t)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v2/functions/my-app-test-fn", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn", nil)
 	req.Header.Set("Accept", "*/*")
 	rec := httptest.NewRecorder()
 
@@ -194,12 +194,12 @@ func TestHTTPGateway_GetFunction(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	data := body["data"].(map[string]any)
-	require.Equal(t, functionID.String(), data["id"])
+	require.Equal(t, "test-fn", data["id"])
 	require.Equal(t, "Test function", data["name"])
 	require.Equal(t, "test-fn", data["slug"])
 
 	app := data["app"].(map[string]any)
-	require.Equal(t, "My App", app["id"])
+	require.Equal(t, "my-app", app["id"])
 
 	triggers := data["triggers"].([]any)
 	trigger := triggers[0].(map[string]any)

@@ -1091,11 +1091,11 @@ service V2 {
 
   rpc GetFunction(GetFunctionRequest) returns (GetFunctionResponse) {
     option (google.api.http) = {
-      get: "/functions/{id}"
+      get: "/apps/{app_id}/functions/{function_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get function"
-      description: "Fetches function configuration and status details"
+      description: "Fetches function configuration and status details for a function within an app"
       tags: "Functions"
       tags: "Beta"
       security: {
@@ -1840,7 +1840,8 @@ message GetFunctionTraceResponse {
 }
 
 message GetFunctionRequest {
-  string id = 1;
+  string app_id = 1;
+  string function_id = 2;
 }
 
 message GetFunctionResponse {

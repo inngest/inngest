@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
@@ -53,6 +54,45 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 		}
 	}
 	return inngest.DeployedFunction{}, fmt.Errorf("%w: %s", apiv2.ErrFunctionNotFound, identifier)
+}
+
+func (p *cqrsFunctionProvider) GetFunctionByApp(ctx context.Context, appID string, functionID string) (inngest.DeployedFunction, error) {
+	if reader, ok := p.reader.(cqrs.FunctionReader); ok {
+		fns, err := reader.GetFunctionsByAppExternalID(ctx, consts.DevServerEnvID, appID)
+		if err != nil {
+			return inngest.DeployedFunction{}, err
+		}
+		return p.findFunctionInApp(ctx, fns, appID, functionID, false)
+	}
+
+	fns, err := p.reader.GetFunctions(ctx)
+	if err != nil {
+		return inngest.DeployedFunction{}, err
+	}
+	return p.findFunctionInApp(ctx, fns, appID, functionID, true)
+}
+
+func (p *cqrsFunctionProvider) findFunctionInApp(ctx context.Context, fns []*cqrs.Function, appID string, functionID string, requireAppMatch bool) (inngest.DeployedFunction, error) {
+	bareFunctionID := strings.TrimPrefix(functionID, appID+"-")
+	prefixedFunctionID := appID + "-" + bareFunctionID
+
+	for _, fn := range fns {
+		deployed, err := p.toDeployedFunction(ctx, fn)
+		if err != nil {
+			return inngest.DeployedFunction{}, err
+		}
+		if (!requireAppMatch || deployed.AppName == appID) && functionIDsMatch(deployed, bareFunctionID, prefixedFunctionID) {
+			return deployed, nil
+		}
+	}
+	return inngest.DeployedFunction{}, fmt.Errorf("%w: %s/%s", apiv2.ErrFunctionNotFound, appID, functionID)
+}
+
+func functionIDsMatch(fn inngest.DeployedFunction, bareFunctionID string, prefixedFunctionID string) bool {
+	return fn.Function.Slug == bareFunctionID ||
+		fn.Function.Slug == prefixedFunctionID ||
+		fn.Slug == bareFunctionID ||
+		fn.Slug == prefixedFunctionID
 }
 
 func (p *cqrsFunctionProvider) toDeployedFunction(ctx context.Context, fn *cqrs.Function) (inngest.DeployedFunction, error) {

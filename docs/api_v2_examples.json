@@ -28,6 +28,13 @@
       }
     }
   },
+  "/apps/{appId}/functions/{functionId}": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /apps/{appId}/functions/{functionId} 200"
+      }
+    }
+  },
   "/apps/{appId}/functions/{functionId}/invoke": {
     "post": {
       "201": {
@@ -266,13 +273,6 @@
     "get": {
       "200": {
         "// TODO": "Add example data for get /events/{eventId}/runs 200"
-      }
-    }
-  },
-  "/functions/{id}": {
-    "get": {
-      "200": {
-        "// TODO": "Add example data for get /functions/{id} 200"
       }
     }
   },

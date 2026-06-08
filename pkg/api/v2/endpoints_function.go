@@ -29,8 +29,8 @@ import (
 )
 
 func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest) (*apiv2.GetFunctionResponse, error) {
-	if req.Id == "" {
-		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Function ID is required")
+	if req.AppId == "" || req.FunctionId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID and function ID are required")
 	}
 
 	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetFunction_FullMethodName); result.Limited {
@@ -42,23 +42,31 @@ func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get function is not yet implemented")
 	}
 
-	id := req.Id
-	if decoded, err := url.PathUnescape(req.Id); err == nil {
-		id = decoded
-	}
+	appID := decodePathParam(req.AppId)
+	functionID := decodePathParam(req.FunctionId)
 
-	fn, err := s.functions.GetFunction(ctx, id)
-	if errors.Is(err, ErrFunctionNotFound) {
-		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Function not found")
-	}
+	fn, err := s.functions.GetFunctionByApp(ctx, appID, functionID)
 	if err != nil {
-		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch function")
+		return nil, s.getFunctionError(err)
 	}
+	fn.AppName = appID
+	fn.Function.Slug = publicFunctionID(appID, functionID)
 
+	return s.getFunctionResponse(ctx, fn), nil
+}
+
+func (s *Service) getFunctionError(err error) error {
+	if errors.Is(err, ErrFunctionNotFound) {
+		return s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Function not found")
+	}
+	return s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch function")
+}
+
+func (s *Service) getFunctionResponse(ctx context.Context, fn inngest.DeployedFunction) *apiv2.GetFunctionResponse {
 	return &apiv2.GetFunctionResponse{
 		Data:     toFunction(fn, s.planConcurrencyLimit(ctx, fn)),
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
-	}, nil
+	}
 }
 
 // InvokeFunction invokes a function either synchronously or asynchronously.
@@ -68,12 +76,8 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 	}
 
 	// URI-decode path parameters to handle encoded characters (e.g. %2F for slashes)
-	if decoded, err := url.PathUnescape(req.FunctionId); err == nil {
-		req.FunctionId = decoded
-	}
-	if decoded, err := url.PathUnescape(req.AppId); err == nil {
-		req.AppId = decoded
-	}
+	req.FunctionId = decodePathParam(req.FunctionId)
+	req.AppId = decodePathParam(req.AppId)
 
 	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_InvokeFunction_FullMethodName); result.Limited {
 		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
@@ -84,14 +88,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Invoke is not yet implemented")
 	}
 
-	// Build the composite function slug from app_id and function_id.
-	// If the function_id already has the app_id prefix, use it as-is.
-	functionSlug := req.FunctionId
-	if len(req.AppId) > 0 && !strings.HasPrefix(req.FunctionId, req.AppId+"-") {
-		functionSlug = req.AppId + "-" + req.FunctionId
-	}
-
-	f, err := s.functions.GetFunction(ctx, functionSlug)
+	f, err := s.functions.GetFunctionByApp(ctx, req.AppId, req.FunctionId)
 	if err != nil {
 		return nil, s.base.NewError(404, apiv2base.ErrorNotFound, "function not found")
 	}
@@ -213,6 +210,17 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 	return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "There was an error invoking your function")
 }
 
+func decodePathParam(value string) string {
+	if decoded, err := url.PathUnescape(value); err == nil {
+		return decoded
+	}
+	return value
+}
+
+func publicFunctionID(appID string, functionID string) string {
+	return strings.TrimPrefix(functionID, appID+"-")
+}
+
 // isIdempotencyError checks whether the given error represents an idempotency
 // conflict. It first checks via errors.Is for the standard sentinel errors,
 // then falls back to string matching for cases where the sentinel identity is
@@ -243,7 +251,7 @@ func (s *Service) planConcurrencyLimit(ctx context.Context, fn inngest.DeployedF
 
 func toFunction(fn inngest.DeployedFunction, planConcurrencyLimit int) *apiv2.Function {
 	return &apiv2.Function{
-		Id:         fn.ID.String(),
+		Id:         functionRefID(fn),
 		Name:       fn.Function.Name,
 		Slug:       functionRefID(fn),
 		IsPaused:   !fn.PausedAt.IsZero() && fn.PausedAt.Before(time.Now()),

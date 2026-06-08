@@ -1463,6 +1463,52 @@
         ]
       }
     },
+    "/apps/{appId}/functions/{functionId}": {
+      "get": {
+        "description": "Fetches function configuration and status details for a function within an app",
+        "operationId": "V2_GetFunction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "functionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetFunctionResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get function",
+        "tags": [
+          "Functions",
+          "Beta"
+        ]
+      }
+    },
     "/apps/{appId}/functions/{functionId}/invoke": {
       "post": {
         "description": "Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request body",
@@ -2365,44 +2411,6 @@
         "summary": "Get event runs",
         "tags": [
           "Runs",
-          "Beta"
-        ]
-      }
-    },
-    "/functions/{id}": {
-      "get": {
-        "description": "Fetches function configuration and status details",
-        "operationId": "V2_GetFunction",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/v2GetFunctionResponse"
-                }
-              }
-            },
-            "description": "A successful response."
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": []
-          }
-        ],
-        "summary": "Get function",
-        "tags": [
-          "Functions",
           "Beta"
         ]
       }

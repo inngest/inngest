@@ -278,12 +278,12 @@ func TestService_GetFunction(t *testing.T) {
 		ID:         functionID,
 		Slug:       "my-app-test-fn",
 		AppID:      appID,
-		AppName:    "My App",
+		AppName:    "my-app",
 		PausedAt:   pausedAt,
 		ArchivedAt: archivedAt,
 		Function: inngest.Function{
 			Name: "Test function",
-			Slug: "test-fn",
+			Slug: "my-app-test-fn",
 			Steps: []inngest.Step{{
 				ID:      "step",
 				Retries: intPtr(retries),
@@ -334,21 +334,21 @@ func TestService_GetFunction(t *testing.T) {
 
 	t.Run("returns mapped function data", func(t *testing.T) {
 		functions := &mockFunctionProvider{}
-		functions.On("GetFunction", mock.Anything, "my-app-test-fn").Return(fn, nil).Once()
+		functions.On("GetFunctionByApp", mock.Anything, "my-app", "test-fn").Return(fn, nil).Once()
 		t.Cleanup(func() {
 			functions.AssertExpectations(t)
 		})
 
 		service := NewService(ServiceOptions{Functions: functions})
-		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{Id: "my-app-test-fn"})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{AppId: "my-app", FunctionId: "test-fn"})
 
 		require.NoError(t, err)
-		require.Equal(t, functionID.String(), resp.Data.Id)
+		require.Equal(t, "test-fn", resp.Data.Id)
 		require.Equal(t, "Test function", resp.Data.Name)
 		require.Equal(t, "test-fn", resp.Data.Slug)
 		require.True(t, resp.Data.IsPaused)
 		require.True(t, resp.Data.IsArchived)
-		require.Equal(t, "My App", resp.Data.App.Id)
+		require.Equal(t, "my-app", resp.Data.App.Id)
 		require.Len(t, resp.Data.Triggers, 2)
 		require.Equal(t, apiv2.FunctionTriggerType_FUNCTION_TRIGGER_TYPE_EVENT, resp.Data.Triggers[0].Type)
 		require.Equal(t, "user.created", resp.Data.Triggers[0].Value)
@@ -372,17 +372,25 @@ func TestService_GetFunction(t *testing.T) {
 		require.Equal(t, singletonKey, config.Singleton.GetKey())
 	})
 
-	t.Run("requires function id", func(t *testing.T) {
+	t.Run("requires app id and function id", func(t *testing.T) {
 		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
 		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{})
 
 		require.Nil(t, resp)
-		require.ErrorContains(t, err, "Function ID is required")
+		require.ErrorContains(t, err, "App ID and function ID are required")
+	})
+
+	t.Run("requires app id and function id for scoped lookup", func(t *testing.T) {
+		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{AppId: "my-app"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "App ID and function ID are required")
 	})
 
 	t.Run("returns not implemented without function provider", func(t *testing.T) {
 		service := NewService(ServiceOptions{})
-		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{Id: "test-fn"})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{AppId: "my-app", FunctionId: "test-fn"})
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Get function is not yet implemented")
@@ -390,13 +398,13 @@ func TestService_GetFunction(t *testing.T) {
 
 	t.Run("returns not found when function is missing", func(t *testing.T) {
 		functions := &mockFunctionProvider{}
-		functions.On("GetFunction", mock.Anything, "missing-fn").Return(inngest.DeployedFunction{}, fmt.Errorf("%w: missing-fn", ErrFunctionNotFound)).Once()
+		functions.On("GetFunctionByApp", mock.Anything, "my-app", "missing-fn").Return(inngest.DeployedFunction{}, fmt.Errorf("%w: my-app/missing-fn", ErrFunctionNotFound)).Once()
 		t.Cleanup(func() {
 			functions.AssertExpectations(t)
 		})
 
 		service := NewService(ServiceOptions{Functions: functions})
-		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{Id: "missing-fn"})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{AppId: "my-app", FunctionId: "missing-fn"})
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Function not found")
@@ -405,13 +413,13 @@ func TestService_GetFunction(t *testing.T) {
 
 	t.Run("returns internal error when function lookup fails", func(t *testing.T) {
 		functions := &mockFunctionProvider{}
-		functions.On("GetFunction", mock.Anything, "test-fn").Return(inngest.DeployedFunction{}, errors.New("database unavailable")).Once()
+		functions.On("GetFunctionByApp", mock.Anything, "my-app", "test-fn").Return(inngest.DeployedFunction{}, errors.New("database unavailable")).Once()
 		t.Cleanup(func() {
 			functions.AssertExpectations(t)
 		})
 
 		service := NewService(ServiceOptions{Functions: functions})
-		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{Id: "test-fn"})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{AppId: "my-app", FunctionId: "test-fn"})
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Unable to fetch function")

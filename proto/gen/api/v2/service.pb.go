@@ -2653,7 +2653,8 @@ func (x *GetFunctionTraceResponse) GetMetadata() *ResponseMetadata {
 
 type GetFunctionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2688,9 +2689,16 @@ func (*GetFunctionRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{34}
 }
 
-func (x *GetFunctionRequest) GetId() string {
+func (x *GetFunctionRequest) GetAppId() string {
 	if x != nil {
-		return x.Id
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *GetFunctionRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
 	}
 	return ""
 }
@@ -5933,9 +5941,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0f_include_output\"{\n" +
 	"\x18GetFunctionTraceResponse\x12)\n" +
 	"\x04data\x18\x01 \x01(\v2\x15.api.v2.FunctionTraceR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"$\n" +
-	"\x12GetFunctionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"q\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"L\n" +
+	"\x12GetFunctionRequest\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
+	"\vfunction_id\x18\x02 \x01(\tR\n" +
+	"functionId\"q\n" +
 	"\x13GetFunctionResponse\x12$\n" +
 	"\x04data\x18\x01 \x01(\v2\x10.api.v2.FunctionR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"N\n" +
@@ -6227,7 +6237,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xa1m\n" +
+	"\x04INFO\x10\x032\xd7m\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -6520,13 +6530,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x12Get function trace\x1a0Fetches the trace tree for a single function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x16\x12\x14/runs/{run_id}/trace\x12\xc6\x01\n" +
-	"\vGetFunction\x12\x1a.api.v2.GetFunctionRequest\x1a\x1b.api.v2.GetFunctionResponse\"~\x92Ad\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x16\x12\x14/runs/{run_id}/trace\x12\xfc\x01\n" +
+	"\vGetFunction\x12\x1a.api.v2.GetFunctionRequest\x1a\x1b.api.v2.GetFunctionResponse\"\xb3\x01\x92A\x81\x01\n" +
 	"\tFunctions\n" +
-	"\x04Beta\x12\fGet function\x1a1Fetches function configuration and status detailsb\x10\n" +
+	"\x04Beta\x12\fGet function\x1aNFetches function configuration and status details for a function within an appb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x11\x12\x0f/functions/{id}\x12\xfc\v\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xfc\v\n" +
 	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\xaa\v\x92A\xee\n" +
 	"\n" +
 	"\tFunctions\x12\x0fInvoke function\x1a\x81\x01Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request bodyJn\n" +

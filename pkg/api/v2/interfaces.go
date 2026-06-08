@@ -17,6 +17,8 @@ import (
 type FunctionProvider interface {
 	// GetFunction returns a function given its slug OR ID.
 	GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error)
+	// GetFunctionByApp returns a function given its app ID and user-defined function ID.
+	GetFunctionByApp(ctx context.Context, appID string, functionID string) (inngest.DeployedFunction, error)
 }
 
 type FunctionConfigProvider interface {
