@@ -35,18 +35,13 @@ export default function KeysNavItem({
               'my-0.5 flex items-center rounded text-left',
               collapsed
                 ? 'mx-auto h-8 w-8 justify-center'
-                : 'h-6 w-full flex-row gap-3 self-stretch px-1',
+                : 'h-7 w-full flex-row gap-2 self-stretch px-1',
               active
-                ? 'bg-canvasMuted text-basis'
+                ? 'bg-canvasSubtle text-basis'
                 : 'hover:bg-canvasSubtle text-muted',
             )}
           >
-            <span
-              className={cn(
-                'flex shrink-0',
-                active ? 'text-basis' : 'text-light',
-              )}
-            >
+            <span className="flex shrink-0">
               <RiKey2Line className="h-[14px] w-[14px]" />
             </span>
             {!collapsed && <span className="text-sm leading-tight">Keys</span>}

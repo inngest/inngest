@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
+import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
 import Navigation from '../Navigation/Navigation';
@@ -58,17 +58,18 @@ export default function SideBar({
       } shrink-0 overflow-visible border-r-hairline`}
       ref={navRef}
     >
-      {/* Floating collapse toggle on the right edge — hover to reveal. */}
+      {/* Floating collapse toggle, centered vertically on the right edge.
+          Hover-revealed so it stays out of the way until needed. */}
       <button
         type="button"
         onClick={toggleCollapsed}
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className="bg-canvasBase border-subtle shadow-xs absolute right-0 top-6 z-[70] hidden h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-hairline group-hover:flex"
+        className="bg-canvasBase border-subtle text-muted hover:text-basis shadow-xs absolute right-0 top-1/2 z-[70] hidden h-6 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border-hairline transition-colors group-hover:flex"
       >
         {collapsed ? (
-          <RiContractRightLine className="text-muted h-3.5 w-3.5" />
+          <RiArrowRightSLine className="h-4 w-4" />
         ) : (
-          <RiContractLeftLine className="text-muted h-3.5 w-3.5" />
+          <RiArrowLeftSLine className="h-4 w-4" />
         )}
       </button>
 
