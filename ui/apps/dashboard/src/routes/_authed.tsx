@@ -2,7 +2,9 @@ import { fetchClerkAuth, jwtAuth } from '@/lib/auth';
 import { sanitizeRedirectUrl } from '@/lib/deepLinkUtils';
 import { createFileRoute, notFound, Outlet } from '@tanstack/react-router';
 
-import Layout from '@/components/Layout/Layout';
+import LayoutV1 from '@/components/Layout/Layout';
+import LayoutV2 from '@/components/Layout/LayoutV2';
+import { useNavigationV2 } from '@/components/Layout/useNavigationV2';
 import { navCollapsed } from '@/lib/nav';
 import { getEnvironment } from '@/queries/server/getEnvironment';
 import { getProfileDisplay } from '@/queries/server/profile';
@@ -59,6 +61,7 @@ export const Route = createFileRoute('/_authed')({
 
 function Authed() {
   const { env, navCollapsed, profile } = Route.useLoaderData();
+  const Layout = useNavigationV2() ? LayoutV2 : LayoutV1;
 
   return (
     <Layout collapsed={navCollapsed} activeEnv={env} profile={profile}>

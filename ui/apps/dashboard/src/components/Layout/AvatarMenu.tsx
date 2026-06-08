@@ -1,16 +1,13 @@
 import { Image } from '@unpic/react';
 
 import type { ProfileDisplayType } from '@/queries/server/profile';
-import { ProfileMenu as ProfileMenuV1 } from '../Navigation/ProfileMenu';
-import { ProfileMenu as ProfileMenuV2 } from '../NavigationV2/ProfileMenu';
-import { useNavigationV2 } from './useNavigationV2';
+import { ProfileMenu } from '../NavigationV2/ProfileMenu';
 
 export default function AvatarMenu({
   profile,
 }: {
   profile: ProfileDisplayType;
 }) {
-  const ProfileMenu = useNavigationV2() ? ProfileMenuV2 : ProfileMenuV1;
   const initial = profile.displayName?.substring(0, 1) || '?';
 
   return (
