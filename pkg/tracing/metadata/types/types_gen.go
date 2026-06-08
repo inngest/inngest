@@ -49,7 +49,7 @@ const (
 
 // From experiment.go
 type ExperimentMetadata struct {
-	ExperimentName		string			`json:"experiment_name"`
+	ExperimentName		string			`json:"name"`
 	Variant			string			`json:"variant"`
 	SelectionStrategy	string			`json:"selection_strategy"`
 	AvailableVariants	[]string		`json:"available_variants,omitempty"`
