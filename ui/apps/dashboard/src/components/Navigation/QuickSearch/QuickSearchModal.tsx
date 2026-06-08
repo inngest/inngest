@@ -46,7 +46,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
             value={term}
             onValueChange={setTerm}
             className={cn(
-              'placeholder-disabled bg-modalBase w-[656px] border-0 p-0 outline-none focus:ring-0',
+              'placeholder-disabled bg-modalBase w-full min-w-0 border-0 p-0 outline-none focus:ring-0',
             )}
           />
         </div>
