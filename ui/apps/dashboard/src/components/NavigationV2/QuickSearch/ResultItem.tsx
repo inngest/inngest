@@ -18,6 +18,10 @@ type Props = {
   icon?: React.ReactNode;
 };
 
+function isExternalUrl(path: string): boolean {
+  return /^https?:\/\//.test(path);
+}
+
 export function ResultItem({
   isDifferentEnv = false,
   kind,
@@ -34,11 +38,20 @@ export function ResultItem({
       className="data-[selected=true]:bg-canvasSubtle/50 text-basis group flex h-10 cursor-pointer items-center gap-2 rounded-md px-2 text-sm"
       onSelect={() => {
         if (path) {
-          navigate({ to: path });
+          if (isExternalUrl(path)) {
+            // Off-app links (docs, support, Discord) must go through the
+            // browser; the router's navigate() only resolves in-app routes.
+            window.open(path, '_blank', 'noopener,noreferrer');
+          } else {
+            navigate({ to: path });
+          }
         }
         onClick();
       }}
       value={value}
+      // Filter on the visible text too, so a server match shown by name but
+      // keyed by id (e.g. events) isn't hidden by cmdk's client-side filter.
+      keywords={[text]}
     >
       <span className="text-light flex h-4 w-4 items-center justify-center">
         {kind ? getKindDetails(kind).icon : icon}
