@@ -103,12 +103,8 @@ func SendEvent(ctx context.Context, name string, m *Metadata) {
 }
 
 func SendCmdExecutedEvent(ctx context.Context, cmd *cli.Command) {
-	cmdString := FormatCommand(cmd)
-	if cmdString == "" {
-		return
-	}
 	m := NewMetadata(ctx)
-	m.Cmd = cmdString
+	m.Cmd = FormatCommand(cmd)
 	name := CommandExecutedEventName
 	if isCI() {
 		name = CICommandExecutedEventName
