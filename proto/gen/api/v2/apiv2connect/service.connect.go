@@ -67,6 +67,8 @@ const (
 	V2SyncAppProcedure = "/api.v2.V2/SyncApp"
 	// V2GetFunctionTraceProcedure is the fully-qualified name of the V2's GetFunctionTrace RPC.
 	V2GetFunctionTraceProcedure = "/api.v2.V2/GetFunctionTrace"
+	// V2GetFunctionProcedure is the fully-qualified name of the V2's GetFunction RPC.
+	V2GetFunctionProcedure = "/api.v2.V2/GetFunction"
 	// V2InvokeFunctionProcedure is the fully-qualified name of the V2's InvokeFunction RPC.
 	V2InvokeFunctionProcedure = "/api.v2.V2/InvokeFunction"
 	// V2ListInsightsTablesProcedure is the fully-qualified name of the V2's ListInsightsTables RPC.
@@ -101,6 +103,7 @@ type V2Client interface {
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
+	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 	ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error)
 	ListInsightsEventSchemas(context.Context, *connect.Request[v2.ListInsightsEventSchemasRequest]) (*connect.Response[v2.ListInsightsEventSchemasResponse], error)
@@ -215,6 +218,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetFunctionTrace")),
 			connect.WithClientOptions(opts...),
 		),
+		getFunction: connect.NewClient[v2.GetFunctionRequest, v2.GetFunctionResponse](
+			httpClient,
+			baseURL+V2GetFunctionProcedure,
+			connect.WithSchema(v2Methods.ByName("GetFunction")),
+			connect.WithClientOptions(opts...),
+		),
 		invokeFunction: connect.NewClient[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse](
 			httpClient,
 			baseURL+V2InvokeFunctionProcedure,
@@ -266,6 +275,7 @@ type v2Client struct {
 	getEventRuns             *connect.Client[v2.GetEventRunsRequest, v2.GetEventRunsResponse]
 	syncApp                  *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace         *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
+	getFunction              *connect.Client[v2.GetFunctionRequest, v2.GetFunctionResponse]
 	invokeFunction           *connect.Client[v2.InvokeFunctionRequest, v2.InvokeFunctionResponse]
 	listInsightsTables       *connect.Client[v2.ListInsightsTablesRequest, v2.ListInsightsTablesResponse]
 	listInsightsEventSchemas *connect.Client[v2.ListInsightsEventSchemasRequest, v2.ListInsightsEventSchemasResponse]
@@ -353,6 +363,11 @@ func (c *v2Client) GetFunctionTrace(ctx context.Context, req *connect.Request[v2
 	return c.getFunctionTrace.CallUnary(ctx, req)
 }
 
+// GetFunction calls api.v2.V2.GetFunction.
+func (c *v2Client) GetFunction(ctx context.Context, req *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error) {
+	return c.getFunction.CallUnary(ctx, req)
+}
+
 // InvokeFunction calls api.v2.V2.InvokeFunction.
 func (c *v2Client) InvokeFunction(ctx context.Context, req *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {
 	return c.invokeFunction.CallUnary(ctx, req)
@@ -399,6 +414,7 @@ type V2Handler interface {
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
+	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
 	InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error)
 	ListInsightsTables(context.Context, *connect.Request[v2.ListInsightsTablesRequest]) (*connect.Response[v2.ListInsightsTablesResponse], error)
 	ListInsightsEventSchemas(context.Context, *connect.Request[v2.ListInsightsEventSchemasRequest]) (*connect.Response[v2.ListInsightsEventSchemasResponse], error)
@@ -509,6 +525,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetFunctionTrace")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2GetFunctionHandler := connect.NewUnaryHandler(
+		V2GetFunctionProcedure,
+		svc.GetFunction,
+		connect.WithSchema(v2Methods.ByName("GetFunction")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2InvokeFunctionHandler := connect.NewUnaryHandler(
 		V2InvokeFunctionProcedure,
 		svc.InvokeFunction,
@@ -573,6 +595,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2SyncAppHandler.ServeHTTP(w, r)
 		case V2GetFunctionTraceProcedure:
 			v2GetFunctionTraceHandler.ServeHTTP(w, r)
+		case V2GetFunctionProcedure:
+			v2GetFunctionHandler.ServeHTTP(w, r)
 		case V2InvokeFunctionProcedure:
 			v2InvokeFunctionHandler.ServeHTTP(w, r)
 		case V2ListInsightsTablesProcedure:
@@ -654,6 +678,10 @@ func (UnimplementedV2Handler) SyncApp(context.Context, *connect.Request[v2.SyncA
 
 func (UnimplementedV2Handler) GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionTrace is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunction is not implemented"))
 }
 
 func (UnimplementedV2Handler) InvokeFunction(context.Context, *connect.Request[v2.InvokeFunctionRequest]) (*connect.Response[v2.InvokeFunctionResponse], error) {

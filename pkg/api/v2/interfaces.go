@@ -19,6 +19,10 @@ type FunctionProvider interface {
 	GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error)
 }
 
+type FunctionConfigProvider interface {
+	PlanConcurrencyLimit(ctx context.Context, fn inngest.DeployedFunction) int
+}
+
 type FunctionScheduler interface {
 	// Schedule initializes a new function run, ensuring that the function will be
 	// executed via our async execution engine as quickly as possible.

@@ -255,6 +255,151 @@ func strPtr(value string) *string {
 	return &value
 }
 
+func intPtr(value int) *int {
+	return &value
+}
+
+func TestService_GetFunction(t *testing.T) {
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	pausedAt := time.Now().Add(-time.Minute)
+	archivedAt := time.Now().Add(-time.Hour)
+	condition := "event.data.user_id != nil"
+	timeout := "10m"
+	key := "event.data.user_id"
+	priority := "event.data.priority"
+	retries := 2
+	singletonKey := "event.data.account_id"
+
+	fn := inngest.DeployedFunction{
+		ID:         functionID,
+		Slug:       "my-app-test-fn",
+		AppID:      appID,
+		AppName:    "My App",
+		PausedAt:   pausedAt,
+		ArchivedAt: archivedAt,
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+			Steps: []inngest.Step{{
+				ID:      "step",
+				Retries: intPtr(retries),
+			}},
+			Triggers: inngest.MultipleTriggers{
+				{EventTrigger: &inngest.EventTrigger{Event: "user.created", Expression: &condition}},
+				{CronTrigger: &inngest.CronTrigger{Cron: "0 * * * *"}},
+			},
+			Cancel: []inngest.Cancel{{
+				Event:   "user.deleted",
+				Timeout: &timeout,
+				If:      &condition,
+			}},
+			Priority: &inngest.Priority{Run: &priority},
+			EventBatch: &inngest.EventBatchConfig{
+				MaxSize: 25,
+				Timeout: "60s",
+				Key:     &key,
+			},
+			Concurrency: &inngest.ConcurrencyLimits{
+				Limits: []inngest.StepConcurrency{{
+					Limit: 3,
+					Scope: enums.ConcurrencyScopeFn,
+					Key:   &key,
+				}},
+			},
+			RateLimit: &inngest.RateLimit{
+				Limit:  10,
+				Period: "1m",
+				Key:    &key,
+			},
+			Debounce: &inngest.Debounce{
+				Period: "30s",
+				Key:    &key,
+			},
+			Throttle: &inngest.Throttle{
+				Limit:  5,
+				Burst:  2,
+				Period: time.Minute,
+				Key:    &key,
+			},
+			Singleton: &inngest.Singleton{
+				Key:  &singletonKey,
+				Mode: enums.SingletonModeCancel,
+			},
+		},
+	}
+
+	t.Run("returns mapped function data", func(t *testing.T) {
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, "my-app-test-fn").Return(fn, nil).Once()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Functions: functions})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{Id: "my-app-test-fn"})
+
+		require.NoError(t, err)
+		require.Equal(t, functionID.String(), resp.Data.Id)
+		require.Equal(t, "Test function", resp.Data.Name)
+		require.Equal(t, "test-fn", resp.Data.Slug)
+		require.True(t, resp.Data.IsPaused)
+		require.True(t, resp.Data.IsArchived)
+		require.Equal(t, "My App", resp.Data.App.Id)
+		require.Len(t, resp.Data.Triggers, 2)
+		require.Equal(t, apiv2.FunctionTriggerType_FUNCTION_TRIGGER_TYPE_EVENT, resp.Data.Triggers[0].Type)
+		require.Equal(t, "user.created", resp.Data.Triggers[0].Value)
+		require.Equal(t, condition, resp.Data.Triggers[0].GetCondition())
+		require.Equal(t, apiv2.FunctionTriggerType_FUNCTION_TRIGGER_TYPE_CRON, resp.Data.Triggers[1].Type)
+		require.Equal(t, "0 * * * *", resp.Data.Triggers[1].Value)
+
+		config := resp.Data.Configuration
+		require.NotNil(t, config)
+		require.Equal(t, int32(retries), config.Retries.Value)
+		require.False(t, config.Retries.GetIsDefault())
+		require.Equal(t, priority, config.GetPriority())
+		require.Equal(t, int32(25), config.EventsBatch.MaxSize)
+		require.Equal(t, key, config.EventsBatch.GetKey())
+		require.Equal(t, apiv2.FunctionConcurrencyScope_FUNCTION_CONCURRENCY_SCOPE_FUNCTION, config.Concurrency[0].Scope)
+		require.Equal(t, int32(3), config.Concurrency[0].Limit.Value)
+		require.Equal(t, int32(10), config.RateLimit.Limit)
+		require.Equal(t, "30s", config.Debounce.Period)
+		require.Equal(t, int32(2), config.Throttle.Burst)
+		require.Equal(t, apiv2.FunctionSingletonMode_FUNCTION_SINGLETON_MODE_CANCEL, config.Singleton.Mode)
+		require.Equal(t, singletonKey, config.Singleton.GetKey())
+	})
+
+	t.Run("requires function id", func(t *testing.T) {
+		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Function ID is required")
+	})
+
+	t.Run("returns not implemented without function provider", func(t *testing.T) {
+		service := NewService(ServiceOptions{})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{Id: "test-fn"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Get function is not yet implemented")
+	})
+
+	t.Run("returns not found when function is missing", func(t *testing.T) {
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunction", mock.Anything, "missing-fn").Return(inngest.DeployedFunction{}, errors.New("missing")).Once()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Functions: functions})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{Id: "missing-fn"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Function not found")
+	})
+}
+
 func TestService_GetFunctionRun(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")

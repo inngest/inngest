@@ -150,6 +150,68 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	require.Equal(t, "COMPLETED", run["status"])
 }
 
+func TestHTTPGateway_GetFunction(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	retries := 2
+	condition := "event.data.user_id != nil"
+
+	fn := inngest.DeployedFunction{
+		ID:      functionID,
+		Slug:    "my-app-test-fn",
+		AppID:   appID,
+		AppName: "My App",
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+			Steps: []inngest.Step{{
+				ID:      "step",
+				Retries: &retries,
+			}},
+			Triggers: inngest.MultipleTriggers{
+				{EventTrigger: &inngest.EventTrigger{Event: "user.created", Expression: &condition}},
+			},
+		},
+	}
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunction", mock.Anything, "my-app-test-fn").Return(fn, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Functions: functions}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		functions.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/functions/my-app-test-fn", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	data := body["data"].(map[string]any)
+	require.Equal(t, functionID.String(), data["id"])
+	require.Equal(t, "Test function", data["name"])
+	require.Equal(t, "test-fn", data["slug"])
+
+	app := data["app"].(map[string]any)
+	require.Equal(t, "My App", app["id"])
+
+	triggers := data["triggers"].([]any)
+	trigger := triggers[0].(map[string]any)
+	require.Equal(t, "EVENT", trigger["type"])
+	require.Equal(t, "user.created", trigger["value"])
+	require.Equal(t, condition, trigger["condition"])
+
+	configuration := data["configuration"].(map[string]any)
+	retryConfiguration := configuration["retries"].(map[string]any)
+	require.Equal(t, float64(retries), retryConfiguration["value"])
+}
+
 func TestHTTPGateway_Middleware(t *testing.T) {
 	ctx := context.Background()
 
