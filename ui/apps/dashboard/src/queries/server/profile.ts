@@ -19,6 +19,7 @@ export type ProfileDisplayType = {
   orgName?: string;
   displayName: string;
   orgProfilePic: string | null;
+  userProfilePic: string | null;
 };
 
 const ProfileQuery = graphql(`
@@ -36,6 +37,7 @@ export const getProfileDisplay = createServerFn({
   let orgName: string | undefined;
   let displayName: string;
   let orgProfilePic: string | null;
+  let userProfilePic: string | null;
 
   const res = await graphqlAPI.request(ProfileQuery);
   if (res.account.marketplace) {
@@ -44,6 +46,7 @@ export const getProfileDisplay = createServerFn({
     orgName = res.account.name ?? undefined;
     displayName = 'System';
     orgProfilePic = null;
+    userProfilePic = null;
   } else {
     const { user, org } = await getProfile();
     orgName = org?.name;
@@ -52,6 +55,7 @@ export const getProfileDisplay = createServerFn({
         ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
         : user.username ?? '';
     orgProfilePic = org?.hasImage ? org.imageUrl : null;
+    userProfilePic = user.hasImage ? user.imageUrl : null;
   }
 
   return {
@@ -59,6 +63,7 @@ export const getProfileDisplay = createServerFn({
     orgName,
     displayName,
     orgProfilePic,
+    userProfilePic,
   };
 });
 
