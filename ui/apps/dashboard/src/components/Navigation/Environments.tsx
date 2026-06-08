@@ -192,7 +192,7 @@ export default function EnvironmentSelectMenu({
                 If the env switcher ever gets mounted somewhere else we'll
                 want to introduce a variant prop here. */}
             <Listbox.Button
-              className={`text-basis hover:bg-canvasMuted flex items-center gap-1.5 rounded px-2 py-1 text-sm ${
+              className={`text-basis hover:bg-canvasMuted flex h-8 items-center gap-1.5 rounded px-2 text-sm ${
                 collapsed ? 'w-8 justify-center' : ''
               } ${open ? 'bg-canvasMuted' : ''}`}
             >

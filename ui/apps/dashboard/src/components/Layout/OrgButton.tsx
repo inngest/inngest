@@ -12,14 +12,14 @@ export default function OrgButton({
   const initial = orgName.substring(0, 1) || '?';
 
   return (
-    <div className="text-basis hover:bg-canvasMuted flex items-center gap-2 rounded px-2 py-1 text-sm font-medium">
-      <span className="bg-canvasBase text-subtle border-subtle flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded border text-xs uppercase">
+    <div className="text-basis hover:bg-canvasMuted flex h-8 items-center gap-1.5 rounded px-2 text-sm">
+      <span className="bg-canvasMuted text-subtle flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs uppercase">
         {profile.orgProfilePic ? (
           <Image
             src={profile.orgProfilePic}
-            className="h-6 w-6 rounded object-cover"
-            width={24}
-            height={24}
+            className="h-7 w-7 rounded-full object-cover"
+            width={28}
+            height={28}
             alt="org-profile-pic"
           />
         ) : (
