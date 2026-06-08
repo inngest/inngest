@@ -61,7 +61,6 @@ function AppsPage() {
     <>
       <Header
         breadcrumb={[{ text: 'Apps' }]}
-        backNav
         infoIcon={<AppInfo />}
         action={
           (!isArchived || displayOnboarding) && (
