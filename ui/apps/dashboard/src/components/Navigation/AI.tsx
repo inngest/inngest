@@ -1,5 +1,6 @@
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { ExperimentsIcon } from '@inngest/components/icons/sections/Experiments';
+import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import type { Environment as EnvType } from '@/utils/environments';
@@ -27,6 +28,13 @@ export default function AI({
         collapsed={collapsed}
         text="Experiments"
         icon={<ExperimentsIcon className="h-[18px] w-[18px]" />}
+      />
+      <MenuItem
+        to={getNavRoute(activeEnv, 'scores')}
+        beta
+        collapsed={collapsed}
+        text="Scores"
+        icon={<InsightsIcon className="h-[18px] w-[18px]" />}
       />
     </div>
   );
