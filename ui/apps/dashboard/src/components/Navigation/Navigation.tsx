@@ -4,9 +4,12 @@ import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import type { Environment as EnvType } from '@/utils/environments';
 import Environments from './Environments';
 import KeysMenu from './KeysMenu';
+import AI from './AI';
 import Manage from './Manage';
 import Monitor from './Monitor';
 import type { FileRouteTypes } from '@tanstack/react-router';
+
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 
 export type NavProps = {
   collapsed: boolean;
@@ -18,6 +21,8 @@ export const getNavRoute = (activeEnv: EnvType, link: string) =>
   `/env/${activeEnv.slug}/${link}` as FileRouteTypes['to'];
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
+  const experimentsEnabled = useBooleanFlag('experimentation-steps');
+
   return (
     <div className={`text-basis mx-4 mt-4 flex h-full flex-col`}>
       <div
@@ -33,6 +38,9 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
       </div>
 
       {activeEnv && <Monitor activeEnv={activeEnv} collapsed={collapsed} />}
+      {activeEnv && experimentsEnabled.value && (
+        <AI activeEnv={activeEnv} collapsed={collapsed} />
+      )}
       {activeEnv && <Manage activeEnv={activeEnv} collapsed={collapsed} />}
     </div>
   );
