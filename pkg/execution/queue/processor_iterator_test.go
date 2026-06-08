@@ -203,8 +203,8 @@ func (m *mockShardForIterator) DebounceStartExecution(ctx context.Context, scope
 	return DebounceStartStarted, nil
 }
 
-func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
-	return nil, 0, nil
+func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, time.Duration, error) {
+	return nil, 0, 0, nil
 }
 
 func (m *mockShardForIterator) DebounceGetItem(ctx context.Context, scope Scope, debounceID ulid.ULID) ([]byte, error) {
@@ -221,6 +221,10 @@ func (m *mockShardForIterator) DebounceDeleteMigratingFlag(ctx context.Context, 
 
 func (m *mockShardForIterator) DebounceGetPointer(ctx context.Context, scope Scope, key string) (string, error) {
 	return "", nil
+}
+
+func (m *mockShardForIterator) DebounceSetPointer(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, ttl time.Duration) error {
+	return nil
 }
 
 func (m *mockShardForIterator) DebounceDeletePointer(ctx context.Context, scope Scope, key string) error {
