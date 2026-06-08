@@ -70,6 +70,7 @@ require (
 	github.com/redis/rueidis v1.0.68
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sashabaranov/go-openai v1.35.6
+	github.com/sebdah/goldie/v2 v2.8.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sourcegraph/conc v0.3.0
 	github.com/spf13/viper v1.10.1
@@ -251,6 +252,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
+	github.com/sergi/go-diff v1.3.1 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect

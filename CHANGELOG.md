@@ -2,6 +2,103 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.26.0] - 2026-06-05
+
+### 🚀 Features
+
+- Add support for parsing span attribute data from Langfuse (EXE-1914) (#4318)
+- A/B test insights query-writer model and score tokens/cost (#4331)
+- Promote api cli, add redirect message and beta tag (#4344)
+
+### 🐛 Bug Fixes
+
+- Mark insights api as internal to get docs gen working again (#4327)
+- Make v2 api path match mono/docs & improve host/port handling (#4302)
+- Status, duration, output in v2 api event/runs (#4343)
+
+### 🚜 Refactor
+
+- Use step.run for llm calls in insights experiment (#4338)
+- Use Item.Kind for shard selection instead of Item.QueueName (#4336)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(tracing)* Add more conditional traces around scheduling (#4323)
+
+## [v1.25.0] - 2026-06-03
+
+### 🚀 Features
+
+- EXE-1837: Add a few Open Inference attributes to Metadata (#4297)
+- EXE-1918: Parse total tokens from AI Metadata (#4307)
+- Add Group ID & Request ID attributes to most execution spans (#4304)
+- EXE-1918: Add Response Model, Response ID, and finish reasons to extracted AI Metadata (#4311)
+- Use queue item timestamps for traces (#4316)
+- Add event runs query for v2 api (#4282)
+- Add event runs v2 api contract and implementation (#4283)
+- EXE-1913: Add support for parsing span attribute data from Vercel's AI SDK (#4312)
+
+### 🐛 Bug Fixes
+
+- *(queue)* Log queue role acquire and loss (#4300)
+- *(realtime)* Websocket memory leak (#4309)
+- Add app name to run spans (#4314)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add function metadata to run spans (#4287)
+- Improve usability on deferred runs (#4320)
+- *(release)* V1.25.0 (#4301)
+
+## [v1.24.0] - 2026-06-01
+
+### 🚀 Features
+
+- Surface deferred runs in run details (#4290)
+
+### 🐛 Bug Fixes
+
+- *(queue)* Quarantine deleted account partitions (#4281)
+- Properly calculate discover step (#4280)
+- Prevent duplicate function.finished on overlapping finalize (#4242)
+- Validate dispatch generation on async checkpoints (#4140)
+
+### 🚜 Refactor
+
+- *(queue)* Introduce queue roles (#4289)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.24.0 (#4288)
+
+## [v1.23.0] - 2026-05-28
+
+### 🚀 Features
+
+- *(queue)* Allow EnqueueItem on other shard types (#4263)
+- Accept positional path params in agentic cli (#4246)
+
+### 🐛 Bug Fixes
+
+- *(executor)* Initialize synthetic cancel metadata config (#4261)
+- *(queue)* Handle renewed item lease during processing (#4267)
+- Get outputs working again with v2 runs (#4273)
+
+### 🚜 Refactor
+
+- *(connect)* Gate gateway routing by connection phase (#4241)
+- *(queue)* Add Scope to more queue methods (#4271)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update go sdk (#4264)
+- Improve agentic api cli help  (#4245)
+- *(release)* V1.23.0 (#4258)
+
+### ◀️ Revert
+
+- "chore: add a concurrency safe marshal to state configs" (#4257)
+
 ## [v1.22.0] - 2026-05-22
 
 ### 🚀 Features
@@ -34,6 +131,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Add a concurrency safe marshal to state configs (#4256)
+- *(release)* V1.22.0 (#4230)
 
 ### 🛡️ Security
 

@@ -933,7 +933,6 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 		string(d.Input),
 		consts.MaxDefersPerRun,
 		consts.MaxDeferInputAggregateSize,
-		int(enums.DeferStatusRejected),
 	})
 	if err != nil {
 		return err

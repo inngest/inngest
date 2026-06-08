@@ -46,4 +46,12 @@ type HistoryReader interface {
 	// GetFunctionRunHistory must return history for the given function run,
 	// ordered from oldest to newest.
 	GetFunctionRunHistory(ctx context.Context, runID ulid.ULID) ([]*History, error)
+
+	// GetRunDefers returns the child deferred runs. Empty if this run didn't
+	// defer any runs.
+	GetRunDefers(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDefer, error)
+
+	// GetRunDeferredFrom returns the parent runs that triggered this deferred
+	// run. Empty if this run isn't a defer.
+	GetRunDeferredFrom(ctx context.Context, runIDs []ulid.ULID) (map[ulid.ULID][]RunDeferredFrom, error)
 }

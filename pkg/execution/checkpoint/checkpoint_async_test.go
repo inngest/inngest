@@ -3,6 +3,7 @@ package checkpoint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -306,6 +307,11 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 				d.ScheduleStatus == enums.DeferStatusAfterRun &&
 				string(d.Input) == `{"user_id":"u_123"}`
 		})).Return(nil)
+		// defers.SaveFromOp emits an executor.defer span on the accepted
+		// DeferAdd so the run's defer list is visible before finalize.
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, meta.SpanNameDefer, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
 		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
@@ -334,6 +340,10 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 		mocks, testData := setupAsyncCheckpointTest(t, op)
 
 		mocks.state.On("SetDeferStatus", ctx, testData.metadata.ID, "step-defer", enums.DeferStatusAborted).Return(nil)
+		// defers.AbortFromOp updates the existing defer span to status=Aborted.
+		mocks.tracer.
+			On("UpdateSpan", mock.Anything, mock.AnythingOfType("*tracing.UpdateSpanOptions")).
+			Return(nil)
 		mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
 
 		err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
@@ -427,14 +437,302 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 	})
 }
 
+func TestCheckpointAsyncSteps_RequestStartedAtGate(t *testing.T) {
+	cases := []struct {
+		name        string
+		ageOffset   time.Duration
+		expectLoad  bool
+		expectStale bool
+	}{
+		{"fresh dispatch skips load", -time.Second, false, false},
+		{"stale RequestStartedAt forces queue load", -time.Hour, true, false},
+		{"future-dated dispatch falls through to load", time.Hour, true, false},
+		{"stale generation rejects", -time.Hour, true, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			require := require.New(t)
+
+			op := state.GeneratorOpcode{
+				ID:   "step-1",
+				Op:   enums.OpcodeStepRun,
+				Data: json.RawMessage(`{"result":"ok"}`),
+			}
+			mocks, testData := setupAsyncCheckpointTest(t, op)
+
+			testData.asyncCheckpoint.GenerationID = 4
+			testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(tc.ageOffset).UnixMilli()
+
+			if tc.expectLoad {
+				loadedGenerationID := 4
+				if tc.expectStale {
+					loadedGenerationID = 7
+				}
+				mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(&queue.QueueItem{
+					ID:           "job-123",
+					GenerationID: loadedGenerationID,
+				}, nil)
+			}
+
+			if !tc.expectStale {
+				expectedData, err := json.Marshal(map[string]any{
+					"data": json.RawMessage(`{"result":"ok"}`),
+				})
+				require.NoError(err)
+				mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+				mocks.tracer.
+					On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+					Return(&meta.SpanReference{}, nil)
+				mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+			}
+
+			err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+			if tc.expectStale {
+				require.Error(err)
+				require.True(errors.Is(err, ErrStaleDispatch))
+				mocks.state.AssertNotCalled(t, "SaveStep")
+				mocks.tracer.AssertNotCalled(t, "CreateSpan")
+				mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
+			} else {
+				require.NoError(err)
+			}
+
+			if tc.expectLoad {
+				mocks.queue.AssertCalled(t, "LoadQueueItem", ctx, "shard-1", "job-123")
+			} else {
+				mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+			}
+			mocks.state.AssertExpectations(t)
+			mocks.tracer.AssertExpectations(t)
+			mocks.queue.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCheckpointAsyncSteps_ValidationDisabledBypassesGate(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTestWithValidation(t, false, op)
+
+	testData.asyncCheckpoint.GenerationID = 1
+	testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(-time.Hour).UnixMilli()
+
+	expectedData, err := json.Marshal(map[string]any{
+		"data": json.RawMessage(`{"result":"ok"}`),
+	})
+	require.NoError(err)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.NoError(err)
+
+	// LoadQueueItem is the validator's first call; it must not have fired.
+	mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
+func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+
+	testData.asyncCheckpoint.GenerationID = 1
+	// Nil-from-HGET means the dispatch the SDK is serving no longer exists,
+	// which is exactly the stale case.
+	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(nil, queue.ErrQueueItemNotFound)
+
+	err := testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.Error(err)
+	require.True(errors.Is(err, ErrStaleDispatch))
+
+	mocks.state.AssertNotCalled(t, "SaveStep")
+	mocks.tracer.AssertNotCalled(t, "CreateSpan")
+	mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
+	mocks.state.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
+// TestCheckpointAsyncSteps_BackCompatNoGenerationID covers older SDKs that
+// don't echo a GenerationID. Even with an ancient RequestStartedAt, the
+// validator must short-circuit and the checkpoint must complete (SaveStep
+// called) so existing deployments keep working through the rollout.
+func TestCheckpointAsyncSteps_BackCompatNoGenerationID(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+
+	// GenerationID==0 (zero-value) and an ancient RequestStartedAt that would
+	// otherwise force a queue load.
+	testData.asyncCheckpoint.GenerationID = 0
+	testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(-time.Hour).UnixMilli()
+
+	expectedData, err := json.Marshal(map[string]any{
+		"data": json.RawMessage(`{"result":"ok"}`),
+	})
+	require.NoError(err)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.NoError(err)
+
+	// LoadQueueItem must not have been called; the validator bailed before
+	// reaching the loader.
+	mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+	mocks.state.AssertCalled(t, "SaveStep", ctx, testData.metadata.ID, op.ID, expectedData)
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
+// noLoaderQueue is a queue.Queue that does NOT implement queueItemLoader.
+// It exists to exercise the validator's fail-open branch when the configured
+// queue can't load items (e.g. an alternate backend).
+type noLoaderQueue struct {
+	queue.Queue
+	mock.Mock
+}
+
+func (m *noLoaderQueue) ResetAttemptsByJobID(ctx context.Context, shardID string, scope queue.Scope, jobID string) error {
+	args := m.Called(ctx, shardID, scope, jobID)
+	return args.Error(0)
+}
+
+// TestCheckpointAsyncSteps_LoaderMissingFailsOpen ensures that when the
+// configured queue doesn't satisfy queueItemLoader, the validator returns nil
+// (no panic, no error) and the checkpoint still saves state.
+func TestCheckpointAsyncSteps_LoaderMissingFailsOpen(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+
+	// Set up the standard mocks but replace the queue with one that doesn't
+	// implement queueItemLoader.
+	stateMock := &mockRunService{}
+	tracerMock := &mockTracerProvider{}
+	queueMock := &noLoaderQueue{}
+	metricsMock := &mockMetricsProvider{}
+
+	runID := ulid.MustNew(ulid.Now(), nil)
+	fnID := uuid.New()
+	accountID := uuid.New()
+	envID := uuid.New()
+	appID := uuid.New()
+
+	scope := queue.Scope{
+		AccountID:  accountID,
+		EnvID:      envID,
+		FunctionID: fnID,
+	}
+	testMetadata := state.Metadata{
+		ID: state.ID{
+			RunID:      runID,
+			FunctionID: fnID,
+			Tenant: state.Tenant{
+				AccountID: accountID,
+				EnvID:     envID,
+				AppID:     appID,
+			},
+		},
+	}
+
+	qRef := queueref.QueueRef{"job-123", "shard-1"}
+	asyncCheckpoint := AsyncCheckpoint{
+		RunID:            runID,
+		FnID:             fnID,
+		Steps:            []state.GeneratorOpcode{op},
+		QueueItemRef:     qRef.String(),
+		AccountID:        accountID,
+		EnvID:            envID,
+		GenerationID:     1,
+		RequestStartedAt: time.Now().Add(-time.Hour).UnixMilli(),
+	}
+
+	stateMock.On("LoadMetadata", ctx, asyncCheckpoint.ID()).Return(testMetadata, nil)
+
+	expectedData, err := json.Marshal(map[string]any{
+		"data": json.RawMessage(`{"result":"ok"}`),
+	})
+	require.NoError(err)
+	stateMock.On("SaveStep", ctx, testMetadata.ID, op.ID, expectedData).Return(false, nil)
+	tracerMock.
+		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+	queueMock.On("ResetAttemptsByJobID", ctx, "shard-1", scope, "job-123").Return(nil)
+
+	checkpointer := New(Opts{
+		State:           stateMock,
+		TracerProvider:  tracerMock,
+		Queue:           queueMock,
+		MetricsProvider: metricsMock,
+		AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		},
+	})
+
+	// Sanity check the precondition: the test queue must not implement the
+	// loader interface, otherwise this test isn't exercising the branch.
+	if _, ok := any(queueMock).(queueItemLoader); ok {
+		t.Fatalf("test precondition violated: noLoaderQueue unexpectedly satisfies queueItemLoader")
+	}
+
+	err = checkpointer.CheckpointAsyncSteps(ctx, asyncCheckpoint)
+	require.NoError(err)
+
+	stateMock.AssertCalled(t, "SaveStep", ctx, testMetadata.ID, op.ID, expectedData)
+	stateMock.AssertExpectations(t)
+	tracerMock.AssertExpectations(t)
+	queueMock.AssertExpectations(t)
+}
+
 //
 //
 // Testing utils.
 //
 //
 
-// setupAsyncCheckpointTest creates new mocks, asserting that
+// setupAsyncCheckpointTest creates new mocks with dispatch validation enabled.
 func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*testMocks, *testData) {
+	return setupAsyncCheckpointTestWithValidation(t, true, ops...)
+}
+
+// setupAsyncCheckpointTestWithValidation creates new mocks and lets the caller
+// toggle the AllowAsyncDispatchValidation gate.
+func setupAsyncCheckpointTestWithValidation(t *testing.T, validationEnabled bool, ops ...state.GeneratorOpcode) (*testMocks, *testData) {
 	ctx := context.Background()
 
 	// Create mock dependencies
@@ -490,6 +788,9 @@ func setupAsyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*test
 		TracerProvider:  mocks.tracer,
 		Queue:           mocks.queue,
 		MetricsProvider: mocks.metrics,
+		AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
+			return validationEnabled
+		},
 	})
 
 	return mocks, &testData{
@@ -555,11 +856,6 @@ func (m *mockRunService) SetDeferStatus(ctx context.Context, id state.ID, hashed
 	return args.Error(0)
 }
 
-func (m *mockRunService) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, hashedID string) error {
-	args := m.Called(ctx, id, fnSlug, hashedID)
-	return args.Error(0)
-}
-
 // mockTracerProvider mocks the tracing.TracerProvider interface
 type mockTracerProvider struct {
 	tracing.TracerProvider
@@ -622,6 +918,12 @@ type mockQueue struct {
 func (m *mockQueue) ResetAttemptsByJobID(ctx context.Context, shardID string, scope queue.Scope, jobID string) error {
 	args := m.Called(ctx, shardID, scope, jobID)
 	return args.Error(0)
+}
+
+func (m *mockQueue) LoadQueueItem(ctx context.Context, shardID, jobID string) (*queue.QueueItem, error) {
+	args := m.Called(ctx, shardID, jobID)
+	item, _ := args.Get(0).(*queue.QueueItem)
+	return item, args.Error(1)
 }
 
 func (m *mockQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {

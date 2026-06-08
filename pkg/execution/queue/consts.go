@@ -33,10 +33,11 @@ const (
 	// NOTE: This must be greater than PartitionLookahead
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
-	PartitionConcurrencyLimitRequeueExtension  = 5 * time.Second
+	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
 	PartitionSemaphoreLimitRequeueExtension   = 1 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 1 * time.Second
 	PartitionPausedRequeueExtension           = 5 * time.Minute
+	PartitionDeletedAccountRequeueExtension   = 7 * 24 * time.Hour
 	PartitionLookahead                        = time.Second
 
 	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
@@ -54,8 +55,8 @@ const (
 	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
 	QueuePeekEWMALen        int   = 10
 	QueueLeaseDuration            = 30 * time.Second
-	ConfigLeaseDuration           = 10 * time.Second
-	ConfigLeaseMax                = 20 * time.Second
+	RoleLeaseDuration             = 10 * time.Second
+	RoleLeaseMax                  = 20 * time.Second
 	ShardLeaseDuration            = 10 * time.Second
 	ShardLeaseMax                 = 20 * time.Second
 

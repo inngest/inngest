@@ -24,7 +24,6 @@ type mockQueueProcessor struct {
 	sem                  util.TrackingSemaphore
 	opts                 *QueueOptions
 	workers              chan ProcessItem
-	seqLease             *ulid.ULID
 	shadowCh             chan ShadowPartitionChanMsg
 	shadowMu             sync.Mutex
 	shadowMap            map[string]ShadowContinuation
@@ -37,7 +36,6 @@ func (m *mockQueueProcessor) Clock() clockwork.Clock                            
 func (m *mockQueueProcessor) Semaphore() util.TrackingSemaphore                   { return m.sem }
 func (m *mockQueueProcessor) Options() *QueueOptions                              { return m.opts }
 func (m *mockQueueProcessor) Workers() chan ProcessItem                           { return m.workers }
-func (m *mockQueueProcessor) SequentialLease() *ulid.ULID                         { return m.seqLease }
 func (m *mockQueueProcessor) ShadowPartitionWorkers() chan ShadowPartitionChanMsg { return m.shadowCh }
 func (m *mockQueueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
 }
@@ -56,7 +54,11 @@ func (m *mockQueueProcessor) ClearShadowContinuations() {
 
 // mockShardForIterator implements the minimal QueueShard interface methods used by ProcessorIterator
 type mockShardForIterator struct {
-	name string
+	name                    string
+	partitionLeaseCount     int32
+	partitionRequeueCount   int32
+	partitionRequeueAt      time.Time
+	partitionRequeueForceAt bool
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -125,10 +127,15 @@ func (m *mockShardForIterator) PartitionPeek(ctx context.Context, sequential boo
 }
 
 func (m *mockShardForIterator) PartitionLease(ctx context.Context, p *QueuePartition, duration time.Duration, opts ...PartitionLeaseOpt) (*ulid.ULID, error) {
-	return nil, nil
+	atomic.AddInt32(&m.partitionLeaseCount, 1)
+	id := ulid.Make()
+	return &id, nil
 }
 
 func (m *mockShardForIterator) PartitionRequeue(ctx context.Context, p *QueuePartition, at time.Time, forceAt bool) error {
+	atomic.AddInt32(&m.partitionRequeueCount, 1)
+	m.partitionRequeueAt = at
+	m.partitionRequeueForceAt = forceAt
 	return nil
 }
 
@@ -168,7 +175,7 @@ func (m *mockShardForIterator) PartitionSize(ctx context.Context, scope Scope, p
 	return 0, nil
 }
 
-func (m *mockShardForIterator) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
+func (m *mockShardForIterator) RoleLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
 	return nil, nil
 }
 
@@ -196,8 +203,8 @@ func (m *mockShardForIterator) DebounceStartExecution(ctx context.Context, scope
 	return DebounceStartStarted, nil
 }
 
-func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
-	return nil, 0, nil
+func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, time.Duration, error) {
+	return nil, 0, 0, nil
 }
 
 func (m *mockShardForIterator) DebounceGetItem(ctx context.Context, scope Scope, debounceID ulid.ULID) ([]byte, error) {
@@ -214,6 +221,10 @@ func (m *mockShardForIterator) DebounceDeleteMigratingFlag(ctx context.Context, 
 
 func (m *mockShardForIterator) DebounceGetPointer(ctx context.Context, scope Scope, key string) (string, error) {
 	return "", nil
+}
+
+func (m *mockShardForIterator) DebounceSetPointer(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, ttl time.Duration) error {
+	return nil
 }
 
 func (m *mockShardForIterator) DebounceDeletePointer(ctx context.Context, scope Scope, key string) error {

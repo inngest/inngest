@@ -13,8 +13,10 @@ export type Trace = {
   name: string;
   outputID: string | null;
   queuedAt: string;
+  scheduledAt: string | null;
   spanID: string;
   stepID?: string | null;
+  groupID?: string | null;
   startedAt: string | null;
   status: string;
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | StepInfoSignal | null;

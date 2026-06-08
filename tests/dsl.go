@@ -198,6 +198,7 @@ func (t *Test) ExpectRequest(name string, queryStepID string, timeout time.Durat
 			er.Ctx.QueueItemRef = ""
 			copyRequestContextFieldIfPresent(&t.requestCtx, er.Ctx, "RequestID")
 			copyRequestContextFieldIfPresent(&t.requestCtx, er.Ctx, "JobID")
+			copyRequestContextFieldIfPresent(&t.requestCtx, er.Ctx, "GenerationID")
 
 			// For each error, remove the stack from our tests.
 			for _, v := range er.Steps {

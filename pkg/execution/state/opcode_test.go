@@ -166,7 +166,9 @@ func TestDeferAddOpts_Validate(t *testing.T) {
 	t.Run("rejects Input larger than MaxDeferInputSize", func(t *testing.T) {
 		// Build an Input one byte over the limit. Padding is filler — the
 		// validator only cares about byte length.
-		oversized := bytes.Repeat([]byte("x"), consts.MaxDeferInputSize+1)
+		oversized, _ := json.Marshal(map[string]any{
+			"msg": string(bytes.Repeat([]byte("x"), consts.MaxDeferInputSize+1)),
+		})
 		opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(oversized)}
 		err := opts.Validate()
 		require.ErrorIs(t, err, ErrDeferInputTooLarge,
@@ -175,7 +177,10 @@ func TestDeferAddOpts_Validate(t *testing.T) {
 
 	t.Run("accepts Input at exactly MaxDeferInputSize", func(t *testing.T) {
 		// Boundary: equal-to-limit must pass; only strictly greater fails.
-		atLimit := bytes.Repeat([]byte("x"), consts.MaxDeferInputSize)
+		atLimit, _ := json.Marshal(map[string]any{
+			"msg": string(bytes.Repeat([]byte("x"), consts.MaxDeferInputSize-10)),
+		})
+		require.Equal(t, consts.MaxDeferInputSize, len(atLimit))
 		opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(atLimit)}
 		require.NoError(t, opts.Validate())
 	})

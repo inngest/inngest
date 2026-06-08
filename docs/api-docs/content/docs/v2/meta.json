@@ -10,12 +10,12 @@
     "...webhooks",
     "---Environments---",
     "...environments",
+    "---Runs---",
+    "...runs",
     "---Keys---",
     "...keys",
     "---Partner API---",
-    "...partner-api",
-    "---Runs---",
-    "...runs"
+    "...partner-api"
   ],
   "title": "v2"
 }

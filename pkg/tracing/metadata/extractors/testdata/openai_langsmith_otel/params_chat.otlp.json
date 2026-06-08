@@ -1,0 +1,250 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "unknown_service:node"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.7.1"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "langsmith",
+            "version": "0.7.3"
+          },
+          "spans": [
+            {
+              "traceId": "71cf19bb84453e7d515b8f49aa00e6fe",
+              "spanId": "6759083dcb25cf8d",
+              "name": "ChatOpenAI",
+              "kind": 1,
+              "startTimeUnixNano": "1780441343487000000",
+              "endTimeUnixNano": "1780441344024000000",
+              "attributes": [
+                {
+                  "key": "langsmith.traceable",
+                  "value": {
+                    "stringValue": "true"
+                  }
+                },
+                {
+                  "key": "langsmith.span.kind",
+                  "value": {
+                    "stringValue": "llm"
+                  }
+                },
+                {
+                  "key": "gen_ai.operation.name",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "langsmith.trace.name",
+                  "value": {
+                    "stringValue": "ChatOpenAI"
+                  }
+                },
+                {
+                  "key": "langsmith.trace.session_name",
+                  "value": {
+                    "stringValue": "langsmith-openai-fixtures"
+                  }
+                },
+                {
+                  "key": "gen_ai.system",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.LANGSMITH_TRACING",
+                  "value": {
+                    "stringValue": "true"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.LANGSMITH_OTEL_ENABLED",
+                  "value": {
+                    "stringValue": "true"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_provider",
+                  "value": {
+                    "stringValue": "openai"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_model_type",
+                  "value": {
+                    "stringValue": "chat"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_model_name",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_max_tokens",
+                  "value": {
+                    "stringValue": "64"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_temperature",
+                  "value": {
+                    "stringValue": "0.7"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_stop",
+                  "value": {
+                    "stringValue": "[\"\\n\\n\"]"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.ls_invocation_params",
+                  "value": {
+                    "stringValue": "{\"top_p\":0.9,\"frequency_penalty\":0.2,\"presence_penalty\":0.1,\"seed\":42}"
+                  }
+                },
+                {
+                  "key": "langsmith.span.tags",
+                  "value": {
+                    "stringValue": ""
+                  }
+                },
+                {
+                  "key": "gen_ai.prompt",
+                  "value": {
+                    "stringValue": "{\"model\":\"gpt-4.1-nano\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a terse assistant.\"},{\"role\":\"user\",\"content\":\"Name three primary colors.\"}],\"temperature\":0.7,\"top_p\":0.9,\"max_tokens\":64,\"frequency_penalty\":0.2,\"presence_penalty\":0.1,\"stop\":[\"\\n\\n\"],\"seed\":42}"
+                  }
+                },
+                {
+                  "key": "langsmith.usage_metadata",
+                  "value": {
+                    "stringValue": "{\"input_tokens\":22,\"output_tokens\":6,\"total_tokens\":28,\"input_token_details\":{\"audio\":0,\"cache_read\":0},\"output_token_details\":{\"audio\":0,\"reasoning\":0}}"
+                  }
+                },
+                {
+                  "key": "langsmith.metadata.usage_metadata",
+                  "value": {
+                    "stringValue": "{\"input_tokens\":22,\"output_tokens\":6,\"total_tokens\":28,\"input_token_details\":{\"audio\":0,\"cache_read\":0},\"output_token_details\":{\"audio\":0,\"reasoning\":0}}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": 22
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": 6
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.total_tokens",
+                  "value": {
+                    "intValue": 28
+                  }
+                },
+                {
+                  "key": "gen_ai.response.model",
+                  "value": {
+                    "stringValue": "gpt-4.1-nano-2025-04-14"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.id",
+                  "value": {
+                    "stringValue": "chatcmpl-DmSPnK1FqD0W1V6k55vnLKTyNV9cH"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.finish_reasons",
+                  "value": {
+                    "stringValue": "stop"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.service_tier",
+                  "value": {
+                    "stringValue": "default"
+                  }
+                },
+                {
+                  "key": "gen_ai.response.system_fingerprint",
+                  "value": {
+                    "stringValue": "fp_97e92d7018"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_token_details",
+                  "value": {
+                    "stringValue": "{\"audio\":0,\"cache_read\":0}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_token_details",
+                  "value": {
+                    "stringValue": "{\"audio\":0,\"reasoning\":0}"
+                  }
+                },
+                {
+                  "key": "gen_ai.completion",
+                  "value": {
+                    "stringValue": "{\"id\":\"chatcmpl-DmSPnK1FqD0W1V6k55vnLKTyNV9cH\",\"object\":\"chat.completion\",\"created\":1780441343,\"model\":\"gpt-4.1-nano-2025-04-14\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Red, blue, yellow.\",\"refusal\":null,\"annotations\":[]},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"service_tier\":\"default\",\"system_fingerprint\":\"fp_97e92d7018\",\"usage_metadata\":{\"input_tokens\":22,\"output_tokens\":6,\"total_tokens\":28,\"input_token_details\":{\"audio\":0,\"cache_read\":0},\"output_token_details\":{\"audio\":0,\"reasoning\":0}}}"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 1
+              },
+              "links": [],
+              "droppedLinksCount": 0,
+              "flags": 257
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

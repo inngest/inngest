@@ -11,6 +11,7 @@ import (
 
 var _ FunctionProvider = (*mockFunctionProvider)(nil)
 var _ FunctionRunReader = (*mockFunctionRunReader)(nil)
+var _ RunsReader = (*mockRunsReader)(nil)
 var _ FunctionTraceReader = (*mockFunctionTraceReader)(nil)
 
 type mockFunctionProvider struct {
@@ -27,10 +28,20 @@ type mockFunctionRunReader struct {
 	mock.Mock
 }
 
-func (m *mockFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.ULID) (*cqrs.FunctionRun, error) {
-	args := m.Called(ctx, runID)
+func (m *mockFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.ULID, opts GetFunctionRunOpts) (*cqrs.FunctionRun, error) {
+	args := m.Called(ctx, runID, opts)
 	run, _ := args.Get(0).(*cqrs.FunctionRun)
 	return run, args.Error(1)
+}
+
+type mockRunsReader struct {
+	mock.Mock
+}
+
+func (m *mockRunsReader) GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error) {
+	args := m.Called(ctx, opts)
+	result, _ := args.Get(0).(*GetRunsResult)
+	return result, args.Error(1)
 }
 
 type mockFunctionTraceReader struct {

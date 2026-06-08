@@ -154,6 +154,7 @@ type Span struct {
 	Status         sql.NullString
 	Input          json.RawMessage
 	EventIds       json.RawMessage
+	IsDeferred     sql.NullBool
 }
 
 type Trace struct {

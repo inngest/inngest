@@ -1,5 +1,22 @@
 import { gql } from 'graphql-request';
 
+export const RUN_DEFER_SUMMARY_FRAGMENT = gql`
+  fragment RunDeferSummaryFields on RunDefer {
+    hashedDeferID
+    userlandDeferID
+    fnSlug
+    status
+    function {
+      name
+      slug
+    }
+    run {
+      id
+      status
+    }
+  }
+`;
+
 export const EVENT = gql`
   query GetEvent($id: ID!) {
     event(query: { eventId: $id }) {
@@ -262,6 +279,7 @@ export const GET_RUNS = gql`
     $functionRunCursor: String = null
     $celQuery: String = null
     $preview: Boolean = false
+    $isDeferred: Boolean = null
   ) {
     runs(
       filter: {
@@ -270,6 +288,7 @@ export const GET_RUNS = gql`
         status: $status
         timeField: $timeField
         query: $celQuery
+        isDeferred: $isDeferred
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
@@ -294,6 +313,14 @@ export const GET_RUNS = gql`
           startedAt
           status
           hasAI
+          isDeferred
+          deferredFrom {
+            runID
+            function {
+              name
+              slug
+            }
+          }
         }
       }
       pageInfo {
@@ -312,9 +339,15 @@ export const COUNT_RUNS = gql`
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
     $preview: Boolean = false
+    $isDeferred: Boolean = null
   ) {
     runs(
-      filter: { from: $startTime, status: $status, timeField: $timeField }
+      filter: {
+        from: $startTime
+        status: $status
+        timeField: $timeField
+        isDeferred: $isDeferred
+      }
       orderBy: [{ field: $timeField, direction: DESC }]
       preview: $preview
     ) {
@@ -329,6 +362,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     status
     attempts
     queuedAt
+    scheduledAt
     startedAt
     endedAt
     isRoot
@@ -349,6 +383,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       updatedAt
     }
     outputID
+    groupID
     debugRunID
     debugSessionID
     spanID
@@ -420,6 +455,30 @@ export const GET_RUN = gql`
         }
       }
       hasAI
+    }
+  }
+`;
+
+export const GET_RUN_LINKAGE = gql`
+  query GetRunLinkage($runID: String!) {
+    run(runID: $runID) {
+      defers {
+        ...RunDeferSummaryFields
+      }
+      siblingDefers {
+        ...RunDeferSummaryFields
+      }
+      deferredFrom {
+        runID
+        function {
+          name
+          slug
+        }
+        run {
+          id
+          status
+        }
+      }
     }
   }
 `;

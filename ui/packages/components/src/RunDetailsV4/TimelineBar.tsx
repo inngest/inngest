@@ -358,12 +358,26 @@ function BarIconComponent({
 /**
  * Renders the expand/collapse toggle button as a solid triangle.
  */
-function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?: () => void }) {
+function ExpandToggle({
+  expanded,
+  onCollapse,
+  selected,
+  hoverCardOpen,
+}: {
+  expanded: boolean;
+  onCollapse?: () => void;
+  selected?: boolean;
+  hoverCardOpen?: boolean;
+}) {
   return (
     <div
       role={expanded ? 'button' : undefined}
       aria-label={expanded ? 'Collapse' : 'Expand'}
-      className={cn('flex items-center justify-center p-0', expanded && 'cursor-pointer')}
+      className={cn(
+        'flex items-center justify-center p-0',
+        selected || hoverCardOpen ? 'bg-transparent' : 'bg-canvasBase',
+        expanded && 'cursor-pointer'
+      )}
       onClick={
         expanded
           ? (e) => {
@@ -374,7 +388,7 @@ function ExpandToggle({ expanded, onCollapse }: { expanded: boolean; onCollapse?
       }
     >
       <RiArrowRightSFill
-        className={cn('h-4 w-4 transition-transform', expanded && 'rotate-90')}
+        className={cn('text-light h-4 w-4 transition-transform', expanded && 'rotate-90')}
         style={{ transitionDuration: `${TIMELINE_CONSTANTS.TRANSITION_MS}ms` }}
       />
     </div>
@@ -838,7 +852,12 @@ export function TimelineBar({
               className="absolute flex items-center justify-center"
               style={{ left: `${indentPx - 20}px` }}
             >
-              <ExpandToggle expanded={expanded ?? false} onCollapse={onToggle} />
+              <ExpandToggle
+                expanded={expanded ?? false}
+                onCollapse={onToggle}
+                selected={selected}
+                hoverCardOpen={hoverCardOpen}
+              />
             </div>
           )}
 

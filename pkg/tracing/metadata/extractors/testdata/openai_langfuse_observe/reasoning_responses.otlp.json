@@ -1,0 +1,234 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "host.name",
+            "value": {
+              "stringValue": "Mac.localdomain"
+            }
+          },
+          {
+            "key": "host.arch",
+            "value": {
+              "stringValue": "arm64"
+            }
+          },
+          {
+            "key": "host.id",
+            "value": {
+              "stringValue": "C5C64DB3-DCD6-588B-81A1-B56AA61D0585"
+            }
+          },
+          {
+            "key": "process.pid",
+            "value": {
+              "intValue": 90049
+            }
+          },
+          {
+            "key": "process.executable.name",
+            "value": {
+              "stringValue": "node"
+            }
+          },
+          {
+            "key": "process.executable.path",
+            "value": {
+              "stringValue": "/nix/store/0rb3g0249h5y7bzzcavsjj7s6hhpabdy-nodejs-24.13.1/bin/node"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "/nix/store/0rb3g0249h5y7bzzcavsjj7s6hhpabdy-nodejs-24.13.1/bin/node"
+                  },
+                  {
+                    "stringValue": "--require"
+                  },
+                  {
+                    "stringValue": "./capture-instrumentation-otlp.cjs"
+                  },
+                  {
+                    "stringValue": "/Users/scott/src/ai-sdk-metadata/langfuse-openai/capture.cjs"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "24.13.1"
+            }
+          },
+          {
+            "key": "process.runtime.name",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "process.runtime.description",
+            "value": {
+              "stringValue": "Node.js"
+            }
+          },
+          {
+            "key": "process.command",
+            "value": {
+              "stringValue": "/Users/scott/src/ai-sdk-metadata/langfuse-openai/capture.cjs"
+            }
+          },
+          {
+            "key": "process.owner",
+            "value": {
+              "stringValue": "scott"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "unknown_service:node"
+            }
+          },
+          {
+            "key": "telemetry.sdk.language",
+            "value": {
+              "stringValue": "nodejs"
+            }
+          },
+          {
+            "key": "telemetry.sdk.name",
+            "value": {
+              "stringValue": "opentelemetry"
+            }
+          },
+          {
+            "key": "telemetry.sdk.version",
+            "value": {
+              "stringValue": "2.1.0"
+            }
+          }
+        ],
+        "droppedAttributesCount": 0
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "langfuse-sdk",
+            "version": "5.4.1"
+          },
+          "spans": [
+            {
+              "traceId": "a82f012672983aa393d7309287721ecc",
+              "spanId": "b02f67378b40e2bd",
+              "name": "OpenAI.responses",
+              "kind": 1,
+              "startTimeUnixNano": "1780441266710000000",
+              "endTimeUnixNano": "1780441267555921458",
+              "attributes": [
+                {
+                  "key": "user.id",
+                  "value": {
+                    "stringValue": "capture-user"
+                  }
+                },
+                {
+                  "key": "session.id",
+                  "value": {
+                    "stringValue": "capture-session-reasoning_responses"
+                  }
+                },
+                {
+                  "key": "langfuse.trace.name",
+                  "value": {
+                    "stringValue": "capture-reasoning_responses"
+                  }
+                },
+                {
+                  "key": "langfuse.internal.is_app_root",
+                  "value": {
+                    "boolValue": true
+                  }
+                },
+                {
+                  "key": "langfuse.observation.type",
+                  "value": {
+                    "stringValue": "generation"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.input",
+                  "value": {
+                    "stringValue": "What is 17 * 24? Think briefly."
+                  }
+                },
+                {
+                  "key": "langfuse.observation.model.name",
+                  "value": {
+                    "stringValue": "gpt-5.4-nano-2026-03-17"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.model.parameters",
+                  "value": {
+                    "stringValue": "{\"parallel_tool_calls\":true,\"store\":true,\"temperature\":1,\"tool_choice\":\"auto\",\"top_p\":0.98,\"truncation\":\"disabled\"}"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.output",
+                  "value": {
+                    "stringValue": "17 × 24 = **408**."
+                  }
+                },
+                {
+                  "key": "langfuse.observation.usage_details",
+                  "value": {
+                    "stringValue": "{\"input\":17,\"output\":13,\"total\":30,\"input_cached_tokens\":0,\"output_reasoning_tokens\":0}"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.metadata.reasoning",
+                  "value": {
+                    "stringValue": "{\"context\":\"current_turn\",\"effort\":\"low\",\"summary\":null}"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.metadata.tools",
+                  "value": {
+                    "stringValue": "[]"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.metadata.metadata",
+                  "value": {
+                    "stringValue": "{}"
+                  }
+                },
+                {
+                  "key": "langfuse.observation.metadata.status",
+                  "value": {
+                    "stringValue": "completed"
+                  }
+                }
+              ],
+              "droppedAttributesCount": 0,
+              "events": [],
+              "droppedEventsCount": 0,
+              "status": {
+                "code": 0
+              },
+              "links": [],
+              "droppedLinksCount": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

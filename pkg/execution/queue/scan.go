@@ -25,10 +25,6 @@ func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
 		go q.worker(ctx, f)
 	}
 
-	if !q.runMode.Partition && !q.runMode.Account {
-		return fmt.Errorf("need to specify either partition, account, or both in queue run mode")
-	}
-
 	tick := q.Clock().NewTicker(q.pollTick)
 	l.Debug("starting queue worker", "poll", q.pollTick.String())
 
@@ -92,6 +88,15 @@ LOOP:
 func (q *queueProcessor) scan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
 	shard := q.Shard()
+
+	if roleName := q.scanningExcludedByRole(); roleName != "" {
+		l.Trace("skipping queue scan due to active queue role", "role", roleName, "queue_shard", shard.Name())
+		return nil
+	}
+
+	if !q.runMode.Partition && !q.runMode.Account {
+		return nil
+	}
 
 	if q.capacity() == 0 || q.partitionCapacity() == 0 {
 		metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})

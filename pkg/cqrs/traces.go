@@ -148,6 +148,13 @@ func (s *OtelSpan) GetQueuedAtTime() time.Time {
 	return s.StartTime
 }
 
+func (s *OtelSpan) GetScheduledAtTime() *time.Time {
+	if s.Attributes != nil && s.Attributes.ScheduledAt != nil {
+		return s.Attributes.ScheduledAt
+	}
+	return nil
+}
+
 // GetStartedAtTime gets the time that the span started. Note that this is not necessarily
 // when the span created, as it may be dynamic.
 func (s *OtelSpan) GetStartedAtTime() *time.Time {
@@ -367,6 +374,7 @@ type TraceRun struct {
 	Triggers     [][]byte        `json:"triggers"`
 	Output       []byte          `json:"output,omitempty"`
 	Status       enums.RunStatus `json:"status"`
+	IsDeferred   bool            `json:"is_deferred"`
 	IsBatch      bool            `json:"is_batch"`
 	IsDebounce   bool            `json:"is_debounce"`
 	HasAI        bool            `json:"has_ai"`
@@ -492,6 +500,7 @@ type GetTraceRunFilter struct {
 	Until       time.Time
 	Status      []enums.RunStatus
 	CEL         string
+	IsDeferred  *bool
 }
 
 type GetTraceRunOrder struct {

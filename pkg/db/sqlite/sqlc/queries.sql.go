@@ -1251,6 +1251,146 @@ func (q *Queries) GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDPa
 	return &i, err
 }
 
+const getRuns = `-- name: GetRuns :many
+WITH run_roots AS (
+  SELECT
+    spans.run_id,
+    spans.function_id,
+    spans.app_id,
+    CAST(COALESCE((
+      SELECT start_lookup.start_time
+      FROM spans start_lookup
+      WHERE start_lookup.run_id = spans.run_id
+        AND start_lookup.debug_run_id IS NULL
+        AND start_lookup.parent_span_id IS NOT NULL
+        AND start_lookup.parent_span_id <> ''
+        AND start_lookup.parent_span_id <> '0000000000000000'
+      ORDER BY start_lookup.start_time
+      LIMIT 1
+    ), spans.start_time) AS TEXT) AS start_time,
+    spans.end_time AS root_end_time,
+    spans.status AS root_status,
+    CAST(spans.output AS TEXT) AS root_output,
+    COALESCE(spans.attributes->>'$."_inngest.function.slug"', '') AS function_slug,
+    COALESCE(spans.attributes->>'$."_inngest.function.name"', '') AS function_name,
+    COALESCE(apps.name, '') AS app_name,
+    COALESCE(spans.attributes->>'$."_inngest.batch.id"', '') AS batch_id,
+    COALESCE(spans.attributes->>'$."_inngest.cron.schedule"', '') AS cron_schedule
+  FROM spans
+  LEFT JOIN apps ON apps.id = spans.app_id AND apps.archived_at IS NULL
+  WHERE spans.name = ?1
+    AND spans.debug_run_id IS NULL
+    AND spans.run_id > ?2
+    AND INSTR(CAST(spans.event_ids AS TEXT), ?3) > 0
+  ORDER BY spans.run_id
+  LIMIT ?4
+),
+run_status AS (
+  SELECT run_id, status, end_time
+  FROM (
+    SELECT
+      status_spans.run_id,
+      status_spans.status,
+      status_spans.end_time,
+      ROW_NUMBER() OVER (PARTITION BY status_spans.run_id ORDER BY status_spans.end_time DESC) AS rn
+    FROM spans status_spans
+    JOIN run_roots ON run_roots.run_id = status_spans.run_id
+    WHERE status_spans.debug_run_id IS NULL
+      AND status_spans.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
+  )
+  WHERE rn = 1
+)
+SELECT
+  run_roots.run_id,
+  run_roots.function_id,
+  run_roots.app_id,
+  run_roots.start_time,
+  CAST(COALESCE(run_status.end_time, run_roots.root_end_time) AS TEXT) AS end_time,
+  COALESCE(run_status.status, run_roots.root_status, '') AS status,
+  COALESCE((
+    SELECT CAST(output_lookup.output AS TEXT)
+    FROM spans output_lookup
+    WHERE output_lookup.run_id = run_roots.run_id
+      AND output_lookup.output IS NOT NULL
+      AND output_lookup.debug_run_id IS NULL
+    ORDER BY
+      CASE WHEN COALESCE(output_lookup.attributes->>'$."_inngest.is.function.output"', '') = 'true' THEN 0 ELSE 1 END,
+      output_lookup.end_time DESC
+    LIMIT 1
+  ), run_roots.root_output, '') AS output,
+  run_roots.function_slug,
+  run_roots.function_name,
+  run_roots.app_name,
+  run_roots.batch_id,
+  run_roots.cron_schedule
+FROM run_roots
+LEFT JOIN run_status ON run_status.run_id = run_roots.run_id
+ORDER BY run_roots.run_id
+`
+
+type GetRunsParams struct {
+	Name        string
+	CursorRunID string
+	EventID     string
+	LimitRows   int64
+}
+
+type GetRunsRow struct {
+	RunID        string
+	FunctionID   string
+	AppID        string
+	StartTime    string
+	EndTime      string
+	Status       string
+	Output       string
+	FunctionSlug interface{}
+	FunctionName interface{}
+	AppName      string
+	BatchID      interface{}
+	CronSchedule interface{}
+}
+
+func (q *Queries) GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getRuns,
+		arg.Name,
+		arg.CursorRunID,
+		arg.EventID,
+		arg.LimitRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetRunsRow
+	for rows.Next() {
+		var i GetRunsRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.FunctionID,
+			&i.AppID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.Status,
+			&i.Output,
+			&i.FunctionSlug,
+			&i.FunctionName,
+			&i.AppName,
+			&i.BatchID,
+			&i.CronSchedule,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getSpanBySpanID = `-- name: GetSpanBySpanID :one
 SELECT
   run_id,
@@ -1531,6 +1671,91 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpan
 			&i.DynamicSpanID,
 			&i.StartTime,
 			&i.EndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpansByRunIDsAndName = `-- name: GetSpansByRunIDsAndName :many
+SELECT
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
+  json_group_array(json_object(
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = ?
+  AND m.run_id IN (/*SLICE:run_ids*/?)
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time
+`
+
+type GetSpansByRunIDsAndNameParams struct {
+	Name   string
+	RunIds []string
+}
+
+type GetSpansByRunIDsAndNameRow struct {
+	RunID         string
+	TraceID       string
+	DynamicSpanID sql.NullString
+	SpanStartTime interface{}
+	SpanEndTime   interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+// Returns spans by name with their current attribute values, merging in any
+// updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+// up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+// carry the span name and would otherwise be filtered out.
+func (q *Queries) GetSpansByRunIDsAndName(ctx context.Context, arg GetSpansByRunIDsAndNameParams) ([]*GetSpansByRunIDsAndNameRow, error) {
+	query := getSpansByRunIDsAndName
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.Name)
+	if len(arg.RunIds) > 0 {
+		for _, v := range arg.RunIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", strings.Repeat(",?", len(arg.RunIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:run_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByRunIDsAndNameRow
+	for rows.Next() {
+		var i GetSpansByRunIDsAndNameRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.TraceID,
+			&i.DynamicSpanID,
+			&i.SpanStartTime,
+			&i.SpanEndTime,
 			&i.ParentSpanID,
 			&i.SpanFragments,
 		); err != nil {
@@ -2104,7 +2329,8 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
+  event_ids,
+  is_deferred
 ) VALUES (
   ?1,
   ?2,
@@ -2125,7 +2351,8 @@ INSERT INTO spans (
   ?17,
   ?18,
   ?19,
-  CAST(?20 AS TEXT)
+  CAST(?20 AS TEXT),
+  ?21
 )
 `
 
@@ -2150,6 +2377,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       sql.NullString
+	IsDeferred     sql.NullBool
 }
 
 // New
@@ -2175,6 +2403,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.DebugSessionID,
 		arg.Status,
 		arg.EventIds,
+		arg.IsDeferred,
 	)
 	return err
 }

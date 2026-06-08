@@ -124,7 +124,7 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
 	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID).Return(functionRun, nil).Once()
+	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(functionRun, nil).Once()
 
 	handler, err := newTestHTTPHandler(ctx, ServiceOptions{
 		Functions:    functions,
@@ -318,6 +318,15 @@ func TestHTTPGateway_Routing(t *testing.T) {
 
 	t.Run("invalid endpoints under /api/v2 return 404", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/invalid", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("invalid endpoints under /v2 return 404", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v2/invalid", nil)
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)

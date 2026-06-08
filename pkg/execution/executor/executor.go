@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -992,6 +993,7 @@ func (e *executor) schedule(
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
 			AppID:            req.AppID,
+			AppName:          req.AppName,
 			FunctionID:       req.Function.ID,
 			FunctionVersion:  req.Function.FunctionVersion,
 			EventID:          req.Events[0].GetInternalID(),
@@ -1120,6 +1122,9 @@ func (e *executor) schedule(
 	// Some scenarios are happy path (e.g.  queue idempotency) and some are sad
 	// path (e.g. Executor borked)
 	sendSpans := func() {
+		_, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule.send_spans", req.AccountID, req.WorkspaceID, req.Function.ID)
+		defer span.End()
+
 		if runSpanRef != nil {
 			err := runSpanRef.Send()
 			if err != nil {
@@ -1258,7 +1263,9 @@ func (e *executor) schedule(
 	// Check if the function should be skipped (paused, draining, backlog limit)
 	// Only check if not already marked as skipped (e.g., by singleton)
 	if skipReason == enums.SkipReasonNone {
+		_, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule.skipped", req.AccountID, req.WorkspaceID, req.Function.ID)
 		skipReason = e.skipped(ctx, req)
+		span.End()
 	}
 
 	// Create run state if not skipped
@@ -1308,11 +1315,30 @@ func (e *executor) schedule(
 		}
 	}
 
+	at := e.now()
+	if req.BatchID == nil {
+		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
+		if evtTs.After(at) {
+			// Schedule functions in the future if there's a future
+			// event `ts` field.
+			at = evtTs
+		}
+	}
+	if req.At != nil {
+		at = *req.At
+	}
+
+	// Fudge the timestamp slightly so that scheduledAt >= queuedAt
+	scheduledAt := slices.MaxFunc([]time.Time{at, runID.Timestamp()}, time.Time.Compare)
+
 	runTimestamp := runID.Timestamp()
 	var scheduleTypePtr *enums.ScheduleType
 	if req.ScheduleType != enums.ScheduleTypeUnknown {
 		scheduleTypePtr = &req.ScheduleType
 	}
+	functionName := req.Function.Name
+	functionSlug := req.Function.GetSlug()
+	appName := req.AppName
 	runSpanOpts := &tracing.CreateSpanOptions{
 		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 		Metadata: &metadata,
@@ -1322,8 +1348,12 @@ func (e *executor) schedule(
 			meta.Attr(meta.Attrs.EventsInput, &strEvts),
 			meta.Attr(meta.Attrs.TriggeringEventName, eventName),
 			meta.Attr(meta.Attrs.QueuedAt, &runTimestamp),
+			meta.Attr(meta.Attrs.ScheduledAt, &scheduledAt),
 			meta.Attr(meta.Attrs.ReplayOriginalRunID, req.OriginalRunID),
 			meta.Attr(meta.Attrs.RunScheduleType, scheduleTypePtr),
+			meta.Attr(meta.Attrs.AppName, &appName),
+			meta.Attr(meta.Attrs.FunctionName, &functionName),
+			meta.Attr(meta.Attrs.FunctionSlug, &functionSlug),
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
@@ -1364,6 +1394,16 @@ func (e *executor) schedule(
 		}
 	}
 
+	// IMPORTANT: Do not move this below the CreateDroppableSpan call, since
+	// that would cause us to lose defer-related attributes in the created span
+	updateDeferSpans(
+		logger.WithStdlib(ctx, l),
+		e.tracerProvider,
+		req.Events,
+		runSpanOpts,
+		metadata,
+	)
+
 	// Always the root span.
 	runSpanRef, err = e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -1397,19 +1437,6 @@ func (e *executor) schedule(
 				return &metadata.ID.RunID, &metadata, err
 			}
 		}
-	}
-
-	at := e.now()
-	if req.BatchID == nil {
-		evtTs := time.UnixMilli(req.Events[0].GetEvent().Timestamp)
-		if evtTs.After(at) {
-			// Schedule functions in the future if there's a future
-			// event `ts` field.
-			at = evtTs
-		}
-	}
-	if req.At != nil {
-		at = *req.At
 	}
 
 	// Prefix the workflow to the job ID so that no invocation can accidentally
@@ -1483,7 +1510,9 @@ func (e *executor) schedule(
 	}
 
 	// Schedule for async functons (the default)
+	_, queueSpan := e.conditionalTracer.NewSpan(ctx, "executor.schedule.queue_enqueue", req.AccountID, req.WorkspaceID, req.Function.ID)
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
+	queueSpan.End()
 
 	switch err {
 	case nil:
@@ -1588,23 +1617,27 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	conditionalTraceCtx, conditionalSpan := e.conditionalTracer.NewSpan(ctx, "executor.Execute", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	defer conditionalSpan.End()
 
+	jobID := queue.JobIDFromContext(ctx)
+	if item.JobID != nil {
+		jobID = *item.JobID
+	}
+	requestID := driver.DispatchRequestID(e.now(), jobID, queue.GenerationIDFromContext(ctx)).String()
+
 	// Immediately store execution context for tracing.
 	ctx = tracing.WithExecutionContext(ctx, tracing.ExecutionContext{
 		Identifier:  sv2.IDFromV1(id),
 		Attempt:     item.Attempt,
 		MaxAttempts: item.MaxAttempts,
 		QueueKind:   item.Kind,
+		RequestID:   inngestgo.Ptr(requestID),
+		GroupID:     inngestgo.Ptr(item.GroupID),
+		JobID:       inngestgo.Ptr(jobID),
 	})
 
 	if e.fl == nil {
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
-	requestID := ulid.MustNew(ulid.Timestamp(e.now()), rand.Reader).String()
-	jobID := queue.JobIDFromContext(ctx)
-	if item.JobID != nil {
-		jobID = *item.JobID
-	}
 	ctx = driver.WithRequestIDs(ctx, requestID, jobID)
 
 	l := e.log.With(
@@ -1858,8 +1891,10 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	// This span will be updated with output as soon as execution finishes.
 	execAttrs := tracing.FunctionAttrs(&instance.f)
-	meta.AddAttr(execAttrs, meta.Attrs.RequestID, &instance.requestID)
-	meta.AddAttr(execAttrs, meta.Attrs.JobID, &instance.jobID)
+	meta.AddAttr(execAttrs, meta.Attrs.StartedAt, &start)
+	runningStatus := enums.StepStatusRunning
+	meta.AddAttr(execAttrs, meta.Attrs.DynamicStatus, &runningStatus)
+	tracing.AddQueueTimestampAttrs(execAttrs, item)
 
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		ctx,
@@ -1896,8 +1931,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
 		responseAttrs := tracing.DriverResponseAttrs(resp, nil)
-		meta.AddAttr(responseAttrs, meta.Attrs.RequestID, &instance.requestID)
-		meta.AddAttr(responseAttrs, meta.Attrs.JobID, &instance.jobID)
 
 		updateOpts := &tracing.UpdateSpanOptions{
 			Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},
@@ -2336,16 +2369,17 @@ func (e *executor) executeDriverV2(ctx context.Context, run *runInstance, d driv
 	}
 
 	resp, uerr, ierr := d.Do(ctx, e.smv2, driver.V2RequestOpts{
-		Metadata:   *run.Metadata(),
-		Fn:         run.f,
-		SigningKey: sk,
-		Attempt:    run.AttemptCount(),
-		Index:      run.stackIndex,
-		StepID:     &stepID,
-		QueueRef:   queueref.StringFromCtx(ctx),
-		RequestID:  run.requestID,
-		JobID:      run.jobID,
-		URL:        url,
+		Metadata:     *run.Metadata(),
+		Fn:           run.f,
+		SigningKey:   sk,
+		Attempt:      run.AttemptCount(),
+		Index:        run.stackIndex,
+		StepID:       &stepID,
+		QueueRef:     queueref.StringFromCtx(ctx),
+		RequestID:    run.requestID,
+		GenerationID: queue.GenerationIDFromContext(ctx),
+		JobID:        run.jobID,
+		URL:          url,
 	})
 
 	// For now, the executor expects V1 style errors directly in state.DriverResponse.
@@ -3640,7 +3674,7 @@ func (e *executor) handleGeneratorDiscoveryRequest(ctx context.Context, runCtx e
 }
 
 func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	if err := defers.SaveFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+	if err := defers.SaveFromOp(ctx, e.smv2, e.tracerProvider, e.log, runCtx.Metadata(), gen); err != nil {
 		return err
 	}
 	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAdd")
@@ -3653,7 +3687,7 @@ func (e *executor) handleGeneratorDeferAbort(ctx context.Context, runCtx executi
 	// cancelled tombstone when the defer is absent) because emitting an
 	// DeferAdd and DeferAbort for the same hashed ID in a single response is
 	// an SDK bug, and the cost of handling it isn't worth the complexity.
-	if err := defers.AbortFromOp(ctx, e.smv2, e.log, runCtx.Metadata().ID, gen); err != nil {
+	if err := defers.AbortFromOp(ctx, e.smv2, e.tracerProvider, e.log, runCtx.Metadata(), gen); err != nil {
 		return err
 	}
 	return e.enqueueLazyOpFallback(ctx, runCtx, gen, edge, "DeferAbort")
@@ -3798,6 +3832,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 						meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(gen.UserDefinedName())),
 						meta.Attr(meta.Attrs.RunID, &runCtx.Metadata().ID.RunID),
 						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(gen.Timing.Start())),
+						meta.Attr(meta.Attrs.ScheduledAt, inngestgo.Ptr(gen.Timing.Start())),
 						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(gen.Timing.Start())),
 						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(gen.Timing.End())),
 						meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
@@ -4112,6 +4147,8 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 
 	parent := tracing.RunSpanRefFromMetadata(runCtx.Metadata())
 	attrs := tracing.GeneratorAttrs(&gen)
+	meta.AddAttr(attrs, meta.Attrs.QueuedAt, &now)
+	meta.AddAttr(attrs, meta.Attrs.ScheduledAt, &now)
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -4189,6 +4226,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 
 	lifecycleItem := runCtx.LifecycleItem()
 	metadata := runCtx.Metadata()
+	attrs := tracing.GeneratorAttrs(&gen)
+	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
 
 	// Create a new span that we'll use to record the sleep as complete.
 	// This is going to be attached to the same parent (the discovery step that started this sleep).
@@ -4202,7 +4241,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 			Metadata:    metadata,
 			QueueItem:   &nextItem,
 			Parent:      runCtx.ParentSpan(),
-			Attributes:  tracing.GeneratorAttrs(&gen),
+			Attributes:  attrs,
 		},
 	)
 	if err != nil {
@@ -4776,6 +4815,9 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	}
 
 	lifecycleItem := runCtx.LifecycleItem()
+	attrs := tracing.GeneratorAttrs(&gen)
+	tracing.AddQueueTimestampAttrs(attrs, lifecycleItem)
+
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
 		meta.SpanNameStep,
@@ -4786,7 +4828,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes:  tracing.GeneratorAttrs(&gen),
+			Attributes:  attrs,
 			StartTime:   now,
 		},
 	)
@@ -4972,6 +5014,10 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
 	}
+	attrs := tracing.GeneratorAttrs(&gen)
+	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
+	// Always correlate the triggering event ID with the invoked step.
+	meta.AddAttr(attrs, meta.Attrs.StepInvokeTriggerEventID, &evt.ID)
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -4985,10 +5031,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes: tracing.GeneratorAttrs(&gen).Merge(
-				// Always correlate the triggering event ID with the invoked step.
-				meta.NewAttrSet(meta.Attr(meta.Attrs.StepInvokeTriggerEventID, &evt.ID)),
-			),
+			Attributes:  attrs,
 		},
 	)
 	if err != nil {
@@ -5195,6 +5238,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
 	}
+	attrs := tracing.GeneratorAttrs(&gen)
+	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -5207,7 +5252,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 			Metadata:    runCtx.Metadata(),
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(runCtx.Metadata()),
-			Attributes:  tracing.GeneratorAttrs(&gen),
+			Attributes:  attrs,
 		},
 	)
 	if err != nil {
@@ -5794,4 +5839,103 @@ func hasPlanOp(ops []*state.GeneratorOpcode) bool {
 		}
 	}
 	return false
+}
+
+// updateDeferSpans links the child run we're about to schedule back
+// to each parent's defer span. For every inngest/deferred.schedule event in the
+// batch it:
+//  1. Puts the child run ID onto the parent's defer span.
+//  2. Collects the parent (run ID, fn slug) pairs to put onto the child's run
+//     span. The fn slugs let read paths resolve the parent's function without
+//     fetching the full parent TraceRun (a perf issue for Cloud).
+//
+// Additionally, this function adds parent run attributes to the child run's
+// span.
+func updateDeferSpans(
+	ctx context.Context,
+	tp tracing.TracerProvider,
+	events []event.TrackedEvent,
+	spanOpts *tracing.CreateSpanOptions,
+	md sv2.Metadata,
+) {
+	var parentRunIDs []string
+
+	// This probably looks weird to have a single parent function slug despite
+	// possibly many parent run IDs. The reason for this is that when we
+	// introduce deferred function batching, we'll likely implictly use the
+	// parent function slug as a batch key. Therefore, a single child run will
+	// probably never have multiple parent function in its batch.
+	var parentFnSlug string
+
+	// For each event, update the parent run's defer span.
+	// This loop does 2 things:
+	// 1. Updates each parent run's defer span. Note that there's a 1:1 mapping
+	//    between parent run defer spans and event. This is how parent runs will
+	//    know about their children.
+	// 2. Compiling a slice of parent run IDs which will will add to this child
+	//    run's span. This is how child runs will know about their parents.
+	for _, te := range events {
+		evt := te.GetEvent()
+		if evt.Name != consts.FnDeferScheduleName {
+			continue
+		}
+		m, err := evt.DeferredScheduleMetadata()
+		if err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"malformed deferred schedule metadata",
+				"error", err,
+				"event_id", evt.ID,
+			)
+			continue
+		}
+		if err := m.Validate(); err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"invalid deferred schedule metadata",
+				"error", err,
+				"event_id", evt.ID,
+			)
+			continue
+		}
+
+		// Update the defer span on the parent run.
+		err = tp.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Attributes: meta.NewAttrSet(
+				meta.Attr(meta.Attrs.AccountID, &md.ID.Tenant.AccountID),
+				meta.Attr(meta.Attrs.AppID, &m.ParentAppID),
+				meta.Attr(meta.Attrs.DeferChildRunID, &md.ID.RunID),
+				meta.Attr(meta.Attrs.EnvID, &md.ID.Tenant.EnvID),
+				meta.Attr(meta.Attrs.FunctionID, &m.ParentFnID),
+				meta.Attr(meta.Attrs.RunID, &m.ParentRunID),
+			),
+			Debug: &tracing.SpanDebugData{
+				Location: "executor.Schedule.deferChildRunID",
+			},
+			TargetSpan: m.ParentDeferSpan,
+		})
+		if err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error updating parent defer span with deferred run ID",
+				"error", err,
+				"parent_run_id", m.ParentRunID,
+			)
+		}
+
+		parentFnSlug = m.ParentFnSlug
+		parentRunIDs = append(parentRunIDs, m.ParentRunID.String())
+	}
+
+	if len(parentRunIDs) > 0 {
+		// Defer-related attributes stay on the child run's span; tracer_sqlc
+		// reads DeferParentRunIDs presence to populate spans.is_deferred.
+		meta.AddAttr(
+			spanOpts.Attributes,
+			meta.Attrs.DeferParentRunIDs,
+			&parentRunIDs,
+		)
+		meta.AddAttr(
+			spanOpts.Attributes,
+			meta.Attrs.DeferParentFnSlug,
+			&parentFnSlug,
+		)
+	}
 }

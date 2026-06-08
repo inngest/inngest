@@ -117,6 +117,13 @@ type GetFunctionRunsTimeboundParams struct {
 	Limit  int64
 }
 
+type GetRunsParams struct {
+	EventID       ulid.ULID
+	Limit         int64
+	Cursor        ulid.ULID
+	IncludeOutput bool
+}
+
 // InsertHistoryParams are the parameters for inserting a history record.
 type InsertHistoryParams struct {
 	ID                   ulid.ULID
@@ -174,6 +181,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       []byte
+	IsDeferred     sql.NullBool
 }
 
 // InsertTraceParams are the parameters for inserting a trace.

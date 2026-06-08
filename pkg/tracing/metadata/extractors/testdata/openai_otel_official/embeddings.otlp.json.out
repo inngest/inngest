@@ -1,0 +1,12 @@
+SPAN embeddings text-embedding-3-small
+{
+  "model": "text-embedding-3-small",
+  "system": "openai",
+  "operation_name": "embeddings",
+  "response_model": "text-embedding-3-small",
+  "response_id": "",
+  "finish_reasons": null,
+  "input_tokens": 10,
+  "output_tokens": 0,
+  "total_tokens": 10
+}

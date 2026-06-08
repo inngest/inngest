@@ -173,6 +173,82 @@ SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_ru
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
 
+-- name: GetRuns :many
+WITH run_roots AS (
+  SELECT
+    spans.run_id,
+    spans.function_id,
+    spans.app_id,
+    CAST(COALESCE((
+      SELECT start_lookup.start_time
+      FROM spans start_lookup
+      WHERE start_lookup.run_id = spans.run_id
+        AND start_lookup.debug_run_id IS NULL
+        AND start_lookup.parent_span_id IS NOT NULL
+        AND start_lookup.parent_span_id <> ''
+        AND start_lookup.parent_span_id <> '0000000000000000'
+      ORDER BY start_lookup.start_time
+      LIMIT 1
+    ), spans.start_time) AS TEXT) AS start_time,
+    spans.end_time AS root_end_time,
+    spans.status AS root_status,
+    CAST(spans.output AS TEXT) AS root_output,
+    COALESCE(spans.attributes->>'$."_inngest.function.slug"', '') AS function_slug,
+    COALESCE(spans.attributes->>'$."_inngest.function.name"', '') AS function_name,
+    COALESCE(apps.name, '') AS app_name,
+    COALESCE(spans.attributes->>'$."_inngest.batch.id"', '') AS batch_id,
+    COALESCE(spans.attributes->>'$."_inngest.cron.schedule"', '') AS cron_schedule
+  FROM spans
+  LEFT JOIN apps ON apps.id = spans.app_id AND apps.archived_at IS NULL
+  WHERE spans.name = @name
+    AND spans.debug_run_id IS NULL
+    AND spans.run_id > @cursor_run_id
+    AND INSTR(CAST(spans.event_ids AS TEXT), @event_id) > 0
+  ORDER BY spans.run_id
+  LIMIT @limit_rows
+),
+run_status AS (
+  SELECT run_id, status, end_time
+  FROM (
+    SELECT
+      status_spans.run_id,
+      status_spans.status,
+      status_spans.end_time,
+      ROW_NUMBER() OVER (PARTITION BY status_spans.run_id ORDER BY status_spans.end_time DESC) AS rn
+    FROM spans status_spans
+    JOIN run_roots ON run_roots.run_id = status_spans.run_id
+    WHERE status_spans.debug_run_id IS NULL
+      AND status_spans.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
+  )
+  WHERE rn = 1
+)
+SELECT
+  run_roots.run_id,
+  run_roots.function_id,
+  run_roots.app_id,
+  run_roots.start_time,
+  CAST(COALESCE(run_status.end_time, run_roots.root_end_time) AS TEXT) AS end_time,
+  COALESCE(run_status.status, run_roots.root_status, '') AS status,
+  COALESCE((
+    SELECT CAST(output_lookup.output AS TEXT)
+    FROM spans output_lookup
+    WHERE output_lookup.run_id = run_roots.run_id
+      AND output_lookup.output IS NOT NULL
+      AND output_lookup.debug_run_id IS NULL
+    ORDER BY
+      CASE WHEN COALESCE(output_lookup.attributes->>'$."_inngest.is.function.output"', '') = 'true' THEN 0 ELSE 1 END,
+      output_lookup.end_time DESC
+    LIMIT 1
+  ), run_roots.root_output, '') AS output,
+  run_roots.function_slug,
+  run_roots.function_name,
+  run_roots.app_name,
+  run_roots.batch_id,
+  run_roots.cron_schedule
+FROM run_roots
+LEFT JOIN run_status ON run_status.run_id = run_roots.run_id
+ORDER BY run_roots.run_id;
+
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
 
@@ -398,7 +474,8 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
+  event_ids,
+  is_deferred
 ) VALUES (
   sqlc.arg(span_id),
   sqlc.arg(trace_id),
@@ -419,7 +496,8 @@ INSERT INTO spans (
   sqlc.narg(debug_run_id),
   sqlc.narg(debug_session_id),
   sqlc.narg(status),
-  CAST(sqlc.narg(event_ids) AS TEXT)
+  CAST(sqlc.narg(event_ids) AS TEXT),
+  sqlc.narg(is_deferred)
 );
 
 -- name: GetSpansByRunID :many
@@ -651,3 +729,31 @@ WHERE run_id = ? AND span_id = ? AND account_id = ?
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
+
+
+-- name: GetSpansByRunIDsAndName :many
+-- Returns spans by name with their current attribute values, merging in any
+-- updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+-- up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+-- carry the span name and would otherwise be filtered out.
+SELECT
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
+  json_group_array(json_object(
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = ?
+  AND m.run_id IN (sqlc.slice('run_ids'))
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time;

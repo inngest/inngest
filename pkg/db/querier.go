@@ -57,6 +57,7 @@ type Querier interface {
 	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*FunctionRunRow, error)
 	GetFunctionRuns(ctx context.Context) ([]*FunctionRunRow, error)
 	GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*FunctionRunRow, error)
+	GetRuns(ctx context.Context, arg GetRunsParams) ([]*RunListItemRow, error)
 	GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*FunctionRunRow, error)
 	GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*FunctionFinish, error)
 
@@ -75,6 +76,7 @@ type Querier interface {
 	// Spans (new tracing)
 	InsertSpan(ctx context.Context, arg InsertSpanParams) error
 	GetSpansByRunID(ctx context.Context, runID string) ([]*SpanRow, error)
+	GetSpansByRunIDsAndName(ctx context.Context, runIDs []string, name string) ([]*SpanRow, error)
 	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*SpanRow, error)
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*SpanRow, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*SpanRow, error)

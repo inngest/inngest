@@ -193,6 +193,64 @@ FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (SELECT UNNEST(sqlc.slice('event_ids')::BYTEA[]));
 
+-- name: GetRuns :many
+SELECT
+  spans.run_id,
+  spans.function_id,
+  spans.app_id,
+  COALESCE(run_start.start_time, spans.start_time) AS start_time,
+  COALESCE(run_status.end_time, spans.end_time) AS end_time,
+  COALESCE(run_status.status, spans.status, '') AS status,
+  COALESCE(run_output.output::text, spans.output::text, '') AS output,
+  COALESCE((spans.attributes#>>'{}')::json->>'_inngest.function.slug', '') AS function_slug,
+  COALESCE((spans.attributes#>>'{}')::json->>'_inngest.function.name', '') AS function_name,
+  COALESCE(apps.name, '') AS app_name,
+  COALESCE((spans.attributes#>>'{}')::json->>'_inngest.batch.id', '') AS batch_id,
+  COALESCE((spans.attributes#>>'{}')::json->>'_inngest.cron.schedule', '') AS cron_schedule
+FROM spans
+LEFT JOIN apps ON apps.id::text = spans.app_id AND apps.archived_at IS NULL
+LEFT JOIN LATERAL (
+  SELECT start_time
+  FROM spans start_spans
+  WHERE start_spans.run_id = spans.run_id
+    AND start_spans.debug_run_id IS NULL
+    AND start_spans.parent_span_id IS NOT NULL
+    AND start_spans.parent_span_id <> ''
+    AND start_spans.parent_span_id <> '0000000000000000'
+  ORDER BY start_spans.start_time
+  LIMIT 1
+) run_start ON true
+LEFT JOIN LATERAL (
+  SELECT status, end_time
+  FROM spans status_spans
+  WHERE status_spans.run_id = spans.run_id
+    AND status_spans.debug_run_id IS NULL
+    AND status_spans.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
+  ORDER BY status_spans.end_time DESC
+  LIMIT 1
+) run_status ON true
+LEFT JOIN LATERAL (
+  SELECT output
+  FROM spans output_spans
+  WHERE output_spans.run_id = spans.run_id
+    AND output_spans.debug_run_id IS NULL
+    AND output_spans.output IS NOT NULL
+  ORDER BY
+    COALESCE((output_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') != 'true',
+    output_spans.end_time DESC
+  LIMIT 1
+) run_output ON true
+WHERE spans.name = sqlc.arg('name')
+  AND spans.debug_run_id IS NULL
+  AND spans.run_id > sqlc.arg('cursor_run_id')::TEXT
+  AND EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements_text(NULLIF(spans.event_ids#>>'{}', '')::jsonb) AS eid(event_id)
+    WHERE eid.event_id = sqlc.arg('event_id')::TEXT
+  )
+ORDER BY spans.run_id
+LIMIT @limit_rows;
+
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id = ANY($1::BYTEA[]);
 
@@ -438,8 +496,9 @@ INSERT INTO spans (
   debug_run_id,
   debug_session_id,
   status,
-  event_ids
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20);
+  event_ids,
+  is_deferred
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21);
 
 -- name: GetSpansByRunID :many
 SELECT
@@ -461,6 +520,33 @@ FROM spans
 WHERE run_id = CAST($1 AS CHAR(26))
 GROUP BY run_id, trace_id, dynamic_span_id, parent_span_id
 ORDER BY start_time;
+
+-- name: GetSpansByRunIDsAndName :many
+-- Returns spans by name with their current attribute values, merging in any
+-- updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+-- up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+-- carry the span name and would otherwise be filtered out.
+SELECT
+  s.run_id,
+  s.trace_id,
+  s.dynamic_span_id,
+  MIN(s.start_time) AS span_start_time,
+  MAX(s.end_time) AS span_end_time,
+  s.parent_span_id,
+  json_agg(json_build_object(
+    'span_id', s.span_id,
+    'name', s.name,
+    'attributes', s.attributes,
+    'links', s.links,
+    'output_span_id', CASE WHEN s.output IS NOT NULL THEN s.span_id ELSE NULL END,
+    'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans AS s
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+WHERE m.name = sqlc.arg('name')
+  AND m.run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::TEXT[]))
+GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
+ORDER BY s.run_id, span_start_time;
 
 -- name: GetSpansByDebugRunID :many
 SELECT

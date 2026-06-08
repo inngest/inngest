@@ -3,6 +3,7 @@ package apiv2
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -19,6 +20,11 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+const (
+	defaultEventRunsLimit = 20
+	maxEventRunsLimit     = 40
+)
+
 func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunRequest) (*apiv2.GetFunctionRunResponse, error) {
 	if req.RunId == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Run ID is required")
@@ -33,7 +39,10 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
 	}
 
-	run, err := s.runs.GetFunctionRun(ctx, runID)
+	includeOutput := req.GetIncludeOutput()
+	run, err := s.runs.GetFunctionRun(ctx, runID, GetFunctionRunOpts{
+		IncludeOutput: includeOutput,
+	})
 	if err != nil {
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Run not found")
 	}
@@ -43,10 +52,108 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Function not found")
 	}
 
+	data := toFunctionRun(run, fn)
+	if includeOutput {
+		data.Output = s.traceRunOutput(ctx, runID)
+	}
+
 	return &apiv2.GetFunctionRunResponse{
-		Data:     toFunctionRun(run, fn, req.GetIncludeOutput()),
+		Data:     data,
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 	}, nil
+}
+
+func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsRequest) (*apiv2.GetEventRunsResponse, error) {
+	if req.EventId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Event ID is required")
+	}
+
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetEventRuns_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no event runs were fetched.")
+	}
+
+	if s.runList == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get event runs is not yet implemented")
+	}
+
+	eventID, err := ulid.Parse(req.EventId)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Event ID must be a valid ULID")
+	}
+
+	cursor, limit, err := runsPageOpts(req.GetCursor(), req.GetLimit())
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
+
+	result, err := s.runList.GetRuns(ctx, GetRunsOpts{
+		EventID:       eventID,
+		Cursor:        cursor,
+		Limit:         limit,
+		IncludeOutput: req.GetIncludeOutput(),
+	})
+	if err != nil {
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch event runs")
+	}
+	if result == nil {
+		result = &GetRunsResult{}
+	}
+
+	data := make([]*apiv2.FunctionRun, 0, len(result.Runs))
+	for _, run := range result.Runs {
+		data = append(data, toAPIRunListItem(run))
+	}
+
+	return &apiv2.GetEventRunsResponse{
+		Data:     data,
+		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
+		Page:     runsPage(result.Runs, limit, result.HasMore),
+	}, nil
+}
+
+func runsPageOpts(cursor string, requestedLimit int32) (ulid.ULID, int, error) {
+	limit := int(requestedLimit)
+	if limit == 0 {
+		limit = defaultEventRunsLimit
+	}
+	if limit < 1 {
+		return ulid.Zero, 0, fmt.Errorf("Limit must be at least 1")
+	}
+	if limit > maxEventRunsLimit {
+		return ulid.Zero, 0, fmt.Errorf("Limit cannot exceed %d", maxEventRunsLimit)
+	}
+
+	parsedCursor := ulid.Zero
+	if cursor != "" {
+		decodedCursor, err := decodeEventRunsCursor(cursor)
+		if err != nil {
+			return ulid.Zero, 0, fmt.Errorf("Cursor is invalid")
+		}
+		parsedCursor = decodedCursor
+	}
+
+	return parsedCursor, limit, nil
+}
+
+func runsPage(runs []*RunListItem, limit int, hasMore bool) *apiv2.Page {
+	page := &apiv2.Page{
+		HasMore: hasMore,
+		Limit:   int32(limit),
+	}
+	if hasMore && len(runs) > 0 {
+		nextCursor := encodeEventRunsCursor(runs[len(runs)-1].RunID)
+		page.Cursor = &nextCursor
+	}
+	return page
+}
+
+func encodeEventRunsCursor(runID ulid.ULID) string {
+	return runID.String()
+}
+
+func decodeEventRunsCursor(cursor string) (ulid.ULID, error) {
+	return ulid.Parse(cursor)
 }
 
 func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTraceRequest) (*apiv2.GetFunctionTraceResponse, error) {
@@ -79,7 +186,7 @@ func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTr
 	}, nil
 }
 
-func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOutput bool) *apiv2.FunctionRun {
+func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction) *apiv2.FunctionRun {
 	queuedAt := timestamppb.New(ulid.Time(run.RunID.Time()))
 	startedAt := timestamppb.New(run.RunStartedAt)
 
@@ -115,7 +222,46 @@ func toFunctionRun(run *cqrs.FunctionRun, fn inngest.DeployedFunction, includeOu
 		result.DurationMs = &duration
 	}
 
-	if includeOutput {
+	return result
+}
+
+func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
+	queuedAt := timestamppb.New(ulid.Time(run.RunID.Time()))
+	startedAt := timestamppb.New(run.RunStartedAt)
+
+	result := &apiv2.FunctionRun{
+		Id: run.RunID.String(),
+		Function: &apiv2.FunctionRef{
+			Id:   run.FunctionID,
+			Name: run.FunctionName,
+		},
+		App: &apiv2.AppRef{
+			Id: run.AppID,
+		},
+		Status:    toFunctionRunStatus(run.Status),
+		QueuedAt:  queuedAt,
+		StartedAt: startedAt,
+		Trigger: &apiv2.RunTrigger{
+			EventIds: []string{run.EventID.String()},
+			IsBatch:  run.BatchID != nil,
+		},
+	}
+
+	if run.BatchID != nil {
+		result.Trigger.BatchId = optionalString(run.BatchID.String())
+	}
+
+	if run.Cron != nil {
+		result.Trigger.CronSchedule = optionalString(*run.Cron)
+	}
+
+	if run.EndedAt != nil {
+		result.EndedAt = timestamppb.New(*run.EndedAt)
+		duration := uint64(run.EndedAt.Sub(run.RunStartedAt) / time.Millisecond)
+		result.DurationMs = &duration
+	}
+
+	if len(run.Output) > 0 {
 		result.Output = jsonToStruct(run.Output)
 	}
 
@@ -159,17 +305,30 @@ func jsonToStruct(raw json.RawMessage) *structpb.Struct {
 		return nil
 	}
 
-	var value map[string]any
+	var value any
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil
 	}
 
-	result, err := structpb.NewStruct(value)
+	if object, ok := value.(map[string]any); ok {
+		result, err := structpb.NewStruct(object)
+		if err != nil {
+			return nil
+		}
+
+		return result
+	}
+
+	wrapped, err := structpb.NewValue(value)
 	if err != nil {
 		return nil
 	}
 
-	return result
+	return &structpb.Struct{
+		Fields: map[string]*structpb.Value{
+			"data": wrapped,
+		},
+	}
 }
 
 func optionalString(value string) *string {
@@ -354,4 +513,27 @@ func loadTraceOutput(ctx context.Context, reader FunctionTraceReader, encodedID 
 		input:  jsonToStruct(json.RawMessage(data.Input)),
 		output: jsonToStruct(json.RawMessage(data.Data)),
 	}, nil
+}
+
+func (s *Service) traceRunOutput(ctx context.Context, runID ulid.ULID) *structpb.Struct {
+	if s.traces == nil {
+		return nil
+	}
+
+	root, err := s.traces.GetSpansByRunID(ctx, runID)
+	if err != nil || root == nil {
+		return nil
+	}
+
+	outputID := root.GetOutputID()
+	if outputID == nil {
+		return nil
+	}
+
+	output, err := loadTraceOutput(ctx, s.traces, *outputID)
+	if err != nil || output == nil {
+		return nil
+	}
+
+	return output.output
 }

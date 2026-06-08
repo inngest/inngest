@@ -4,6 +4,7 @@ import SignInRedirectErrors, {
 } from '@/components/SignIn/Errors';
 import SplitView from '@/components/SignIn/SplitView';
 import { validateRedirectUrlSearch } from '@/lib/deepLinkUtils';
+import { canonicalLink } from '@/utils/urls';
 import { SignIn } from '@clerk/tanstack-react-start';
 import { Alert } from '@inngest/components/Alert';
 import { createFileRoute, useLocation } from '@tanstack/react-router';
@@ -15,6 +16,9 @@ type SignInSearchParams = ReturnType<typeof validateRedirectUrlSearch> & {
 
 export const Route = createFileRoute('/(auth)/sign-in/$')({
   component: RouteComponent,
+  head: () => ({
+    links: [canonicalLink('/sign-in')],
+  }),
   validateSearch: (search: Record<string, unknown>): SignInSearchParams => {
     return {
       ...validateRedirectUrlSearch(search),
