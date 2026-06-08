@@ -35,7 +35,7 @@ function ExperimentsInfo() {
   );
 }
 
-export default function ExperimentsComponent() {
+function ExperimentsComponent() {
   const { envSlug } = Route.useParams();
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
