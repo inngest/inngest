@@ -1884,6 +1884,8 @@ export type Query = {
   metrics: MetricsResponse;
   plans: Array<Maybe<BillingPlan>>;
   runCountTimeSeries: Array<TimeSeries>;
+  scoreNames: Array<Score>;
+  scoreTimeSeries: Array<ScoreSeries>;
   session: Maybe<Session>;
   workspace: Workspace;
   workspaces: Maybe<Array<Workspace>>;
@@ -1974,6 +1976,22 @@ export type QueryMetricsArgs = {
 
 export type QueryRunCountTimeSeriesArgs = {
   timeOptions: TimeSeriesOptions;
+};
+
+
+export type QueryScoreNamesArgs = {
+  filter: ScoreFilter;
+  functionID: InputMaybe<Scalars['ID']['input']>;
+  workspaceID: Scalars['ID']['input'];
+};
+
+
+export type QueryScoreTimeSeriesArgs = {
+  bucketSeconds: InputMaybe<Scalars['Int']['input']>;
+  filter: ScoreFilter;
+  functionID: InputMaybe<Scalars['ID']['input']>;
+  scoreNames: InputMaybe<Array<Scalars['String']['input']>>;
+  workspaceID: Scalars['ID']['input'];
 };
 
 
@@ -2297,6 +2315,42 @@ export type ScopedMetricsResponse = {
   metrics: Array<ScopedMetric>;
   scope: MetricsScope;
   to: Scalars['Time']['output'];
+};
+
+export type Score = {
+  __typename?: 'Score';
+  kind: ScoreKind;
+  name: Scalars['String']['output'];
+};
+
+export type ScoreBucket = {
+  __typename?: 'ScoreBucket';
+  avg: Maybe<Scalars['Float']['output']>;
+  bucketStart: Scalars['Time']['output'];
+  falseCount: Maybe<Scalars['Int']['output']>;
+  max: Maybe<Scalars['Float']['output']>;
+  p50: Maybe<Scalars['Float']['output']>;
+  p90: Maybe<Scalars['Float']['output']>;
+  p99: Maybe<Scalars['Float']['output']>;
+  runCount: Scalars['Int']['output'];
+  trueCount: Maybe<Scalars['Int']['output']>;
+};
+
+export type ScoreFilter = {
+  timeRange: TimeRangeInput;
+};
+
+export enum ScoreKind {
+  Boolean = 'BOOLEAN',
+  Numeric = 'NUMERIC'
+}
+
+export type ScoreSeries = {
+  __typename?: 'ScoreSeries';
+  bucketSeconds: Scalars['Int']['output'];
+  buckets: Array<ScoreBucket>;
+  kind: ScoreKind;
+  scoreName: Scalars['String']['output'];
 };
 
 export type SearchInput = {

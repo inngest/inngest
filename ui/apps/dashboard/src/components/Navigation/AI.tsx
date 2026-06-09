@@ -2,7 +2,6 @@ import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { ExperimentsIcon } from '@inngest/components/icons/sections/Experiments';
 import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import type { Environment as EnvType } from '@/utils/environments';
 import { getNavRoute } from './Navigation';
 
