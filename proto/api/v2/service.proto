@@ -851,7 +851,8 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update webhook"
-      description: "Updates an existing webhook configuration"
+      description: "Replaces an existing webhook's configuration. This is a full replacement (PUT): the request body must contain the complete desired configuration, and any omitted optional field (response, event filter) is cleared."
+      tags: "Webhooks"
       parameters: {
         headers: {
           name: "X-Inngest-Env"
@@ -1992,25 +1993,27 @@ message UpdateWebhookRequest {
       example: "\"wh_01HFBK7X8Q2Y3Z4A5B6C7D8E9F\""
     }
   ];
-  optional string name = 2 [
+  string name = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Updated descriptive name for the webhook"
+      description: "Descriptive name for the webhook"
       example: "\"Payment Processing Webhook - Updated\""
     }
   ];
-  optional string transform = 3 [
+  string transform = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Updated JavaScript transformation code"
+      description: "The inline JS transform function for incoming events"
+      example: "\"function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }\""
     }
   ];
   optional string response = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Updated custom response configuration"
+      description: "Optional inline JS function which is called to respond to GET requests. Omit to clear an existing response function."
+      example: "\"function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };\""
     }
   ];
   optional EventFilter event_filter = 5 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Updated event filtering configuration"
+      description: "Optional event filtering configuration. Omit to clear existing filtering."
     }
   ];
 }

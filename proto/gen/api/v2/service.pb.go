@@ -2928,8 +2928,8 @@ func (x *ListWebhooksResponse) GetPage() *Page {
 type UpdateWebhookRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          *string                `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	Transform     *string                `protobuf:"bytes,3,opt,name=transform,proto3,oneof" json:"transform,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Transform     string                 `protobuf:"bytes,3,opt,name=transform,proto3" json:"transform,omitempty"`
 	Response      *string                `protobuf:"bytes,4,opt,name=response,proto3,oneof" json:"response,omitempty"`
 	EventFilter   *EventFilter           `protobuf:"bytes,5,opt,name=event_filter,json=eventFilter,proto3,oneof" json:"event_filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -2974,15 +2974,15 @@ func (x *UpdateWebhookRequest) GetId() string {
 }
 
 func (x *UpdateWebhookRequest) GetName() string {
-	if x != nil && x.Name != nil {
-		return *x.Name
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
 
 func (x *UpdateWebhookRequest) GetTransform() string {
-	if x != nil && x.Transform != nil {
-		return *x.Transform
+	if x != nil {
+		return x.Transform
 	}
 	return ""
 }
@@ -4814,17 +4814,14 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14ListWebhooksResponse\x12#\n" +
 	"\x04data\x18\x01 \x03(\v2\x0f.api.v2.WebhookR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x83\x04\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xd2\x06\n" +
 	"\x14UpdateWebhookRequest\x12@\n" +
 	"\x02id\x18\x01 \x01(\tB0\x92A-2\n" +
-	"Webhook IDJ\x1f\"wh_01HFBK7X8Q2Y3Z4A5B6C7D8E9F\"R\x02id\x12n\n" +
-	"\x04name\x18\x02 \x01(\tBU\x92AR2(Updated descriptive name for the webhookJ&\"Payment Processing Webhook - Updated\"H\x00R\x04name\x88\x01\x01\x12N\n" +
-	"\ttransform\x18\x03 \x01(\tB+\x92A(2&Updated JavaScript transformation codeH\x01R\ttransform\x88\x01\x01\x12K\n" +
-	"\bresponse\x18\x04 \x01(\tB*\x92A'2%Updated custom response configurationH\x02R\bresponse\x88\x01\x01\x12g\n" +
-	"\fevent_filter\x18\x05 \x01(\v2\x13.api.v2.EventFilterB*\x92A'2%Updated event filtering configurationH\x03R\veventFilter\x88\x01\x01B\a\n" +
-	"\x05_nameB\f\n" +
-	"\n" +
-	"_transformB\v\n" +
+	"Webhook IDJ\x1f\"wh_01HFBK7X8Q2Y3Z4A5B6C7D8E9F\"R\x02id\x12a\n" +
+	"\x04name\x18\x02 \x01(\tBM\x92AJ2 Descriptive name for the webhookJ&\"Payment Processing Webhook - Updated\"R\x04name\x12\xda\x01\n" +
+	"\ttransform\x18\x03 \x01(\tB\xbb\x01\x92A\xb7\x0124The inline JS transform function for incoming eventsJ\x7f\"function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }\"R\ttransform\x12\x8b\x02\n" +
+	"\bresponse\x18\x04 \x01(\tB\xe9\x01\x92A\xe5\x012tOptional inline JS function which is called to respond to GET requests. Omit to clear an existing response function.Jm\"function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };\"H\x00R\bresponse\x88\x01\x01\x12\x8b\x01\n" +
+	"\fevent_filter\x18\x05 \x01(\v2\x13.api.v2.EventFilterBN\x92AK2IOptional event filtering configuration. Omit to clear existing filtering.H\x01R\veventFilter\x88\x01\x01B\v\n" +
 	"\t_responseB\x0f\n" +
 	"\r_event_filter\"r\n" +
 	"\x15UpdateWebhookResponse\x12#\n" +
@@ -4991,7 +4988,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xd6o\n" +
+	"\x04INFO\x10\x032\x8dq\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -5212,8 +5209,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00ri\n" +
 	"g\n" +
-	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\xf5\x05\n" +
-	"\rUpdateWebhook\x12\x1c.api.v2.UpdateWebhookRequest\x1a\x1d.api.v2.UpdateWebhookResponse\"\xa6\x05\x92A\x85\x05\x12\x0eUpdate webhook\x1a)Updates an existing webhook configurationJC\n" +
+	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\xac\a\n" +
+	"\rUpdateWebhook\x12\x1c.api.v2.UpdateWebhookRequest\x1a\x1d.api.v2.UpdateWebhookResponse\"\xdd\x06\x92A\xbc\x06\n" +
+	"\bWebhooks\x12\x0eUpdate webhook\x1a\xd5\x01Replaces an existing webhook's configuration. This is a full replacement (PUT): the request body must contain the complete desired configuration, and any omitted optional field (response, event filter) is cleared.JC\n" +
 	"\x03200\x12<\n" +
 	"\x0fUpdated webhook\x12)\n" +
 	"'\x1a%#/definitions/v2UpdateWebhookResponseJN\n" +
