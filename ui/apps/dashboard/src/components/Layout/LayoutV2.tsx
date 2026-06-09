@@ -1,4 +1,5 @@
 import { Suspense, type ReactNode } from 'react';
+import { useLocation } from '@tanstack/react-router';
 
 import { type ProfileDisplayType } from '@/queries/server/profile';
 import type { Environment } from '@/utils/environments';
@@ -26,6 +27,18 @@ export default function Layout({
   // menu (top bar) while the widget itself renders in the sidebar.
   const { isWidgetOpen, showWidget, closeWidget } = useOnboardingWidget();
 
+  // Org-level surfaces (settings, billing) and the All Environments list
+  // aren't environment-scoped, so the env navigation in the sidebar is
+  // meaningless there. Hide it and let the content fill the width; the org
+  // menu in the top bar handles org nav. Match /env exactly so env-scoped
+  // pages (/env/<slug>/...) keep the sidebar.
+  const { pathname } = useLocation();
+  const hideSidebar =
+    pathname.startsWith('/settings') ||
+    pathname.startsWith('/billing') ||
+    pathname === '/env' ||
+    pathname === '/env/';
+
   return (
     <div className="bg-canvasSubtle fixed inset-0 flex flex-col overflow-hidden overscroll-none">
       <TopBar
@@ -35,12 +48,14 @@ export default function Layout({
       />
 
       <div className="border-subtle bg-canvasBase shadow-xs mx-3 flex flex-1 flex-row overflow-hidden rounded border-hairline">
-        <SideBarV2
-          activeEnv={activeEnv}
-          collapsed={collapsed}
-          isWidgetOpen={isWidgetOpen}
-          closeWidget={closeWidget}
-        />
+        {!hideSidebar && (
+          <SideBarV2
+            activeEnv={activeEnv}
+            collapsed={collapsed}
+            isWidgetOpen={isWidgetOpen}
+            closeWidget={closeWidget}
+          />
+        )}
 
         <div
           id="layout-scroll-container"
