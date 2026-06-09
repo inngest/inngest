@@ -55,6 +55,10 @@ type Querier interface {
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error)
+	// Mirrors the span-runs grouping the GraphQL runs list uses (GetSpanRuns): a
+	// run is its executor.run root row plus extension rows sharing the root's
+	// dynamic_span_id, and the latest row in that group carries the run's current
+	// status. Child/step spans never decide run status.
 	GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error)
 	GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error)

@@ -174,24 +174,18 @@ LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
 
 -- name: GetRuns :many
+-- Mirrors the span-runs grouping the GraphQL runs list uses (GetSpanRuns): a
+-- run is its executor.run root row plus extension rows sharing the root's
+-- dynamic_span_id, and the latest row in that group carries the run's current
+-- status. Child/step spans never decide run status.
 WITH run_roots AS (
   SELECT
     spans.run_id,
+    spans.dynamic_span_id,
     spans.function_id,
     spans.app_id,
-    CAST(COALESCE((
-      SELECT start_lookup.start_time
-      FROM spans start_lookup
-      WHERE start_lookup.run_id = spans.run_id
-        AND start_lookup.debug_run_id IS NULL
-        AND start_lookup.parent_span_id IS NOT NULL
-        AND start_lookup.parent_span_id <> ''
-        AND start_lookup.parent_span_id <> '0000000000000000'
-      ORDER BY start_lookup.start_time
-      LIMIT 1
-    ), spans.start_time) AS TEXT) AS start_time,
+    spans.start_time AS root_start_time,
     spans.end_time AS root_end_time,
-    spans.status AS root_status,
     CAST(spans.output AS TEXT) AS root_output,
     COALESCE(spans.attributes->>'$."_inngest.function.slug"', '') AS function_slug,
     COALESCE(spans.attributes->>'$."_inngest.function.name"', '') AS function_name,
@@ -206,29 +200,34 @@ WITH run_roots AS (
     AND INSTR(CAST(spans.event_ids AS TEXT), @event_id) > 0
   ORDER BY spans.run_id
   LIMIT @limit_rows
-),
-run_status AS (
-  SELECT run_id, status, end_time
-  FROM (
-    SELECT
-      status_spans.run_id,
-      status_spans.status,
-      status_spans.end_time,
-      ROW_NUMBER() OVER (PARTITION BY status_spans.run_id ORDER BY status_spans.end_time DESC) AS rn
-    FROM spans status_spans
-    JOIN run_roots ON run_roots.run_id = status_spans.run_id
-    WHERE status_spans.debug_run_id IS NULL
-      AND status_spans.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
-  )
-  WHERE rn = 1
 )
 SELECT
   run_roots.run_id,
   run_roots.function_id,
   run_roots.app_id,
-  run_roots.start_time,
-  CAST(COALESCE(run_status.end_time, run_roots.root_end_time) AS TEXT) AS end_time,
-  COALESCE(run_status.status, run_roots.root_status, '') AS status,
+  CAST(COALESCE((
+    SELECT MIN(group_spans.start_time)
+    FROM spans group_spans
+    WHERE group_spans.run_id = run_roots.run_id
+      AND group_spans.dynamic_span_id = run_roots.dynamic_span_id
+      AND group_spans.debug_run_id IS NULL
+  ), run_roots.root_start_time) AS TEXT) AS start_time,
+  CAST(COALESCE((
+    SELECT MAX(group_spans.end_time)
+    FROM spans group_spans
+    WHERE group_spans.run_id = run_roots.run_id
+      AND group_spans.dynamic_span_id = run_roots.dynamic_span_id
+      AND group_spans.debug_run_id IS NULL
+  ), run_roots.root_end_time) AS TEXT) AS end_time,
+  CAST(COALESCE((
+    SELECT status_spans.status
+    FROM spans status_spans
+    WHERE status_spans.run_id = run_roots.run_id
+      AND status_spans.dynamic_span_id = run_roots.dynamic_span_id
+      AND status_spans.debug_run_id IS NULL
+    ORDER BY status_spans.end_time DESC
+    LIMIT 1
+  ), '') AS TEXT) AS status,
   COALESCE((
     SELECT CAST(output_lookup.output AS TEXT)
     FROM spans output_lookup
@@ -236,7 +235,7 @@ SELECT
       AND output_lookup.output IS NOT NULL
       AND output_lookup.debug_run_id IS NULL
     ORDER BY
-      CASE WHEN COALESCE(output_lookup.attributes->>'$."_inngest.is.function.output"', '') = 'true' THEN 0 ELSE 1 END,
+      CASE WHEN COALESCE(CAST(output_lookup.attributes->>'$."_inngest.is.function.output"' AS TEXT), '') IN ('true', '1') THEN 0 ELSE 1 END,
       output_lookup.end_time DESC
     LIMIT 1
   ), run_roots.root_output, '') AS output,
@@ -246,7 +245,6 @@ SELECT
   run_roots.batch_id,
   run_roots.cron_schedule
 FROM run_roots
-LEFT JOIN run_status ON run_status.run_id = run_roots.run_id
 ORDER BY run_roots.run_id;
 
 -- name: GetFunctionRunFinishesByRunIDs :many
