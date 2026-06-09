@@ -151,15 +151,6 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, 0, opt.healthCheckLeadTimeSeconds)
 	})
 
-	t.Run("WithSplitCronPartitionByWorkspace sets callback", func(t *testing.T) {
-		opt := managerOpt{}
-		WithSplitCronPartitionByWorkspace(func(context.Context, uuid.UUID) bool {
-			return true
-		})(&opt)
-
-		require.NotNil(t, opt.splitCronPartitionByWorkspace)
-	})
-
 	t.Run("validate options", func(t *testing.T) {
 		t.Run("valid configuration should not modify values", func(t *testing.T) {
 			opt := managerOpt{
@@ -682,62 +673,26 @@ func TestScheduleNextQueueName(t *testing.T) {
 	appID := uuid.New()
 	functionID := uuid.New()
 
-	tests := []struct {
-		name      string
-		gate      func(context.Context, uuid.UUID) bool
-		queueName string
-	}{
-		{
-			name:      "flag gate unset",
-			queueName: queue.KindCron,
-		}, {
-			name:      "flag gate nil",
-			gate:      nil,
-			queueName: queue.KindCron,
-		},
-		{
-			name: "workspace scoped cron partition disabled",
-			gate: func(_ context.Context, acctID uuid.UUID) bool {
-				return false
-			},
-			queueName: queue.KindCron,
-		},
-		{
-			name: "workspace scoped cron partition enabled",
-			gate: func(_ context.Context, acctID uuid.UUID) bool {
-				return true
-			},
-			queueName: queue.KindCron + ":" + workspaceID.String(),
-		},
-	}
+	t.Run("cron partition is split by workspaceID", func(t *testing.T) {
+		producer := &captureProducer{}
+		mgr := NewManager(nil, producer, logger.StdlibLogger(ctx))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			producer := &captureProducer{}
-			opts := []ManagerOpt{
-				WithJitterRange(0, 0),
-			}
-			if tt.gate != nil {
-				opts = append(opts, WithSplitCronPartitionByWorkspace(tt.gate))
-			}
-			mgr := NewManager(nil, producer, logger.StdlibLogger(ctx), opts...)
-
-			_, err := mgr.ScheduleNext(ctx, CronItem{
-				ID:              ulid.Make(),
-				AccountID:       accountID,
-				WorkspaceID:     workspaceID,
-				AppID:           appID,
-				FunctionID:      functionID,
-				FunctionVersion: 1,
-				Expression:      "* * * * *",
-				Op:              enums.CronOpProcess,
-			})
-			require.NoError(t, err)
-			require.NotNil(t, producer.item.QueueName)
-			require.Equal(t, tt.queueName, *producer.item.QueueName)
-			require.Equal(t, queue.KindCron, producer.item.Kind)
+		_, err := mgr.ScheduleNext(ctx, CronItem{
+			ID:              ulid.Make(),
+			AccountID:       accountID,
+			WorkspaceID:     workspaceID,
+			AppID:           appID,
+			FunctionID:      functionID,
+			FunctionVersion: 1,
+			Expression:      "* * * * *",
+			Op:              enums.CronOpProcess,
 		})
-	}
+		require.NoError(t, err)
+		require.NotNil(t, producer.item.QueueName)
+		require.Equal(t, queue.KindCron+":"+workspaceID.String(), *producer.item.QueueName)
+		require.Equal(t, queue.KindCron, producer.item.Kind)
+	})
+
 }
 
 func TestScheduleNextProductionWorkspaceJitter(t *testing.T) {
