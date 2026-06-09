@@ -35,8 +35,8 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
 
   return (
     <Listbox>
-      <div className="relative">
-        <Listbox.Button className="cursor-pointer ring-0">
+      <div className="relative flex h-8 items-center">
+        <Listbox.Button className="flex h-8 cursor-pointer items-center ring-0">
           {children}
         </Listbox.Button>
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute left-0 top-full z-50 mt-2 w-[240px] rounded border ring-0 focus:outline-none">
