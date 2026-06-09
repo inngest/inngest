@@ -5,8 +5,12 @@ import (
 )
 
 var (
-	batchBufferWaitDurationBoundaries = []float64{5, 10, 25, 50, 100, 200, 500, 1000, 2000, 3000, 5000}
-	batchBufferFlushSizeBoundaries    = []float64{1, 2, 5, 10, 20, 50, 100, 200, 500}
+	batchBufferWaitDurationBoundaries = []float64{
+		5, 10, 25, 50, 100, 200, 500, 1000, 2000, 3000, 5000, // <=5s
+		10000, 15000, 30000, 60000, 180000, 300000, // <=5m
+		600000, 1200000, // <= 20m
+	}
+	batchBufferFlushSizeBoundaries = []float64{1, 2, 5, 10, 20, 50, 100, 200, 500}
 )
 
 // #1 - Gauge: items currently in-memory waiting to flush
