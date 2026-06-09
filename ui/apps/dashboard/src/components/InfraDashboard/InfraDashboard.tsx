@@ -65,7 +65,7 @@ export function InfraDashboard() {
   const selectedPlan = data.currentInfraPlan;
 
   return (
-    <div className="bg-canvasBase flex min-h-full w-full flex-col px-4 py-4 lg:px-6">
+    <div className="bg-canvasBase min-h-full w-full px-4 py-4 lg:px-6">
       <header className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -428,8 +428,6 @@ function InfraPlanDropdown({
                       reason: 'Billing plan is still loading.',
                       type: 'unavailable',
                     } as const);
-                const isSelected =
-                  billingPlanReady && plan.sku === selectedPlan.sku;
                 const isCurrent = billingPlanReady && action.type === 'current';
                 const isActionable =
                   billingPlanReady &&
@@ -441,7 +439,7 @@ function InfraPlanDropdown({
                   <button
                     className={cn(
                       'border-subtle text-basis grid w-full grid-cols-[96px_140px_140px_160px_1fr] items-center border-t px-3 py-2.5 text-left text-xs disabled:cursor-default disabled:opacity-100',
-                      isSelected && 'bg-canvasSubtle',
+                      isCurrent && 'bg-canvasSubtle',
                       isActionable &&
                         'hover:bg-canvasSubtle focus:bg-canvasSubtle focus:outline-none',
                     )}
@@ -633,7 +631,11 @@ function InfraTierDropdown({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="center"
-          className="w-[min(calc(100vw-2rem),720px)] overflow-hidden p-0"
+          className="w-[min(calc(100vw-2rem),720px)] overflow-y-auto p-0"
+          style={{
+            maxHeight:
+              'min(var(--radix-dropdown-menu-content-available-height), calc(100vh - 2rem))',
+          }}
         >
           <div className="border-subtle bg-canvasSubtle text-muted border-b px-3 py-2 text-[11px] font-medium uppercase">
             Infrastructure tier
@@ -753,7 +755,7 @@ function InfraFlowPanel({
     ) ?? placeholders.infraTiers[0];
 
   return (
-    <section className="border-subtle bg-canvasSubtle relative z-0 mb-10 min-h-[280px] overflow-visible rounded-md border p-4 md:p-6">
+    <section className="border-subtle bg-canvasSubtle relative z-0 mb-10 min-h-[280px] shrink-0 overflow-visible rounded-md border p-4 md:p-6">
       <div
         className="pointer-events-none absolute inset-0 rounded-md opacity-80"
         style={{

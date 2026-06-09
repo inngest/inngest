@@ -214,6 +214,12 @@ function isFreeBillingPlan(plan?: BillingPlanSource | null): boolean {
   return Boolean(plan?.isFree || plan?.slug === FREE_INFRA_PLAN_SLUG);
 }
 
+function isMappedInfraBillingPlan(plan?: BillingPlanSource | null): boolean {
+  return (
+    plan?.slug === FREE_INFRA_PLAN_SLUG || plan?.slug === PRO_INFRA_PLAN_SLUG
+  );
+}
+
 function buildCheckoutItem(planSlug: string): InfraPlanCheckoutItem {
   if (planSlug === FREE_INFRA_PLAN_SLUG) {
     return {
@@ -346,19 +352,19 @@ export function getInfraPlanBillingAction({
   currentPlanSku: InfraPlanSku;
   targetSku: InfraPlanSku;
 }): InfraPlanBillingAction {
-  if (targetSku === currentPlanSku) {
-    return { type: 'current' };
-  }
-
   if (!currentPlan) {
     return { reason: 'Billing plan is still loading.', type: 'unavailable' };
+  }
+
+  if (isMappedInfraBillingPlan(currentPlan) && targetSku === currentPlanSku) {
+    return { type: 'current' };
   }
 
   const target = INFRA_PLAN_BILLING_TARGETS[targetSku];
   const currentIsFree = isFreeBillingPlan(currentPlan);
 
   if (target.basePlanSlug === FREE_INFRA_PLAN_SLUG) {
-    return currentIsFree
+    return currentPlan.slug === FREE_INFRA_PLAN_SLUG
       ? { type: 'current' }
       : {
           addonUpdate: buildAddonRemoval({
@@ -495,6 +501,7 @@ export function mergeBillingPlanIntoInfraPlans({
   const fallbackPlan =
     plans.find((candidate) => candidate.sku === currentPlanSku) ?? plans[0];
   const hasLiveEntitlements = typeof concurrencyLimit === 'number';
+  const hasMappedBillingPlan = isMappedInfraBillingPlan(plan);
 
   if (!plan && !hasLiveEntitlements) {
     const currentFallbackPlan = { ...fallbackPlan, isCurrent: true };
@@ -520,7 +527,7 @@ export function mergeBillingPlanIntoInfraPlans({
       typeof concurrencyLimit === 'number'
         ? concurrencyLimit
         : fallbackPlan.execConcurrencyLimit,
-    isCurrent: true,
+    isCurrent: hasMappedBillingPlan,
     priceMonthly: formatCentsMonthly(plan?.amount) || fallbackPlan.priceMonthly,
   };
 
@@ -528,7 +535,7 @@ export function mergeBillingPlanIntoInfraPlans({
     currentPlan,
     currentPlanSku,
     plans: plans.map((candidate) =>
-      candidate.sku === currentPlanSku
+      hasMappedBillingPlan && candidate.sku === currentPlanSku
         ? currentPlan
         : { ...candidate, isCurrent: false },
     ),

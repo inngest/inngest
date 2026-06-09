@@ -135,6 +135,30 @@ describe('infra dashboard billing plan merge', () => {
     );
   });
 
+  it('infers a displayed SKU for legacy plans without marking it current', () => {
+    const result = mergeBillingPlanIntoInfraPlans({
+      accountEntitlements: {
+        concurrency: { limit: 500 },
+      },
+      defaultSku: 'IN-S',
+      plan: {
+        amount: 49_900,
+        isFree: false,
+        name: 'Legacy Pro',
+        slug: 'legacy-pro-2024',
+      },
+      plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
+    });
+
+    expect(result.currentPlanSku).toBe('IN-L');
+    expect(result.currentPlan).toMatchObject({
+      execConcurrencyLimit: 500,
+      isCurrent: false,
+      sku: 'IN-L',
+    });
+    expect(result.plans.every((plan) => !plan.isCurrent)).toBe(true);
+  });
+
   it('maps current infra SKU to the included infrastructure tier', () => {
     expect(getCurrentInfraTierId('IN-XS')).toBe('free');
     expect(getCurrentInfraTierId('IN-S')).toBe('shared');
@@ -359,6 +383,50 @@ describe('infra dashboard billing actions', () => {
         targetSku: 'IN-M',
       }),
     ).toEqual({ type: 'current' });
+  });
+
+  it('allows selecting every SKU when the account is on a legacy plan', () => {
+    const legacyPlan = {
+      amount: 49_900,
+      isFree: false,
+      name: 'Legacy Pro',
+      slug: 'legacy-pro-2024',
+    };
+
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 500,
+        currentPlan: legacyPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-L',
+      }),
+    ).toMatchObject({
+      addonUpdate: {
+        addonQuantity: 4,
+        targetConcurrency: 500,
+        targetSku: 'IN-L',
+      },
+      item: {
+        planSlug: 'pro-2025-08-08',
+      },
+      type: 'upgrade-base-plan',
+    });
+
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 500,
+        currentPlan: legacyPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-XS',
+      }),
+    ).toMatchObject({
+      item: {
+        planSlug: 'hobby-free-2025-08-08',
+      },
+      type: 'cancel-to-free',
+    });
   });
 
   it('returns unavailable for missing addon data or targets above addon max', () => {
