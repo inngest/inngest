@@ -66,7 +66,7 @@ const useSwitchablePathname = (): string => {
   }
 
   if (segments.length === 0) {
-    return '/functions'; // default if selected from /env
+    return '/';
   }
 
   return '/' + segments.join('/');

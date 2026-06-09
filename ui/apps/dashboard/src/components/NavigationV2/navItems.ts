@@ -15,6 +15,7 @@ export type NavItemConfig = {
   route: string;
   Icon: ComponentType<{ className?: string }>;
   beta?: boolean;
+  exact?: boolean;
 };
 
 export type NavGroupConfig = {
@@ -23,7 +24,7 @@ export type NavGroupConfig = {
 };
 
 export const observe: NavGroupConfig = {
-  heading: 'Observe',
+  heading: 'Monitor',
   items: [
     { label: 'Metrics', route: 'metrics', Icon: MetricsIcon },
     { label: 'Insights', route: 'insights', Icon: InsightsIcon, beta: true },
@@ -33,6 +34,7 @@ export const observe: NavGroupConfig = {
 export const workflow: NavGroupConfig = {
   heading: 'Workflow',
   items: [
+    { label: 'Overview', route: '', Icon: MetricsIcon, exact: true },
     { label: 'Functions', route: 'functions', Icon: FunctionsIcon },
     { label: 'Runs', route: 'runs', Icon: RunsIcon },
     { label: 'Events', route: 'events', Icon: EventLogsIcon },

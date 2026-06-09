@@ -47,6 +47,9 @@ export function getManageKey(pathname: string) {
 }
 
 export const pathCreator = {
+  dashboard({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/`;
+  },
   apps({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/apps`;
   },
