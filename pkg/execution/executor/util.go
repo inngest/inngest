@@ -137,3 +137,22 @@ func CreateInvokeFailedEvent(ctx context.Context, opts execution.InvokeFailHandl
 
 	return evt
 }
+
+func IsStepRetryable(gen *state.GeneratorOpcode, runCtx execution.RunContext) bool {
+	if gen.Op == enums.OpcodeStepFailed {
+		// This is a step that is already marked as failed.
+		return false
+	}
+
+	if gen.Error.NoRetry {
+		// This is a NonRetryableError thrown in a step.
+		return false
+	}
+	if !runCtx.ShouldRetry() {
+		// This is the last attempt as per the attempt in the queue, which
+		// means we've failed N times, and so it is not retryable.
+		return false
+	}
+
+	return true
+}
