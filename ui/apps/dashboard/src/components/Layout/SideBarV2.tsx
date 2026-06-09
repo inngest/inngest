@@ -82,25 +82,6 @@ export default function SideBar({
       } shrink-0 overflow-visible border-r-hairline`}
       ref={navRef}
     >
-      {/* Vertical tab on the divider, hover-revealed. Sits half inside / half
-          outside the sidebar so it reads as part of the right edge itself. */}
-      <OptionalTooltip
-        tooltip={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="bg-canvasBase border-subtle text-muted hover:text-basis shadow-xs absolute right-0 top-1/2 z-[70] hidden h-8 w-5 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-md border-hairline transition-colors group-hover:flex"
-        >
-          {collapsed ? (
-            <RiArrowRightSLine className="h-4 w-4" />
-          ) : (
-            <RiArrowLeftSLine className="h-4 w-4" />
-          )}
-        </button>
-      </OptionalTooltip>
-
       <div className="flex grow flex-col justify-between">
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 
@@ -109,6 +90,35 @@ export default function SideBar({
           {isWidgetOpen && (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
           )}
+
+          {/* Bottom-pinned collapse toggle, hover-revealed via opacity so the
+              sidebar foot doesn't jump. focus-within keeps it keyboard
+              reachable while it's transparent. */}
+          <div className="pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+            <OptionalTooltip
+              tooltip={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                className={`text-muted hover:bg-canvasSubtle my-0.5 flex items-center rounded ${
+                  collapsed
+                    ? 'mx-auto h-8 w-8 justify-center'
+                    : 'h-7 w-full flex-row gap-2 self-stretch px-1'
+                }`}
+              >
+                {collapsed ? (
+                  <RiArrowRightSLine className="h-4 w-4 shrink-0" />
+                ) : (
+                  <>
+                    <RiArrowLeftSLine className="h-4 w-4 shrink-0" />
+                    <span className="text-sm leading-tight">Collapse</span>
+                  </>
+                )}
+              </button>
+            </OptionalTooltip>
+          </div>
         </div>
       </div>
     </nav>
