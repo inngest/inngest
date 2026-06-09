@@ -47,12 +47,12 @@ const ScoresLookupDocument = graphql(`
 const ScoreNamesDocument = parse(`
   query ScoreNames(
     $workspaceID: ID!
-    $functionID: ID
+    $functionIDs: [ID!]
     $filter: ScoreFilter!
   ) {
     scoreNames(
       workspaceID: $workspaceID
-      functionID: $functionID
+      functionIDs: $functionIDs
       filter: $filter
     ) {
       name
@@ -63,7 +63,7 @@ const ScoreNamesDocument = parse(`
   ScoreNamesResult,
   {
     workspaceID: string;
-    functionID?: string;
+    functionIDs?: string[];
     filter: { timeRange: { from: string; to: string } };
   }
 >;
@@ -71,13 +71,13 @@ const ScoreNamesDocument = parse(`
 const ScoreTimeSeriesDocument = parse(`
   query ScoreTimeSeries(
     $workspaceID: ID!
-    $functionID: ID
+    $functionIDs: [ID!]
     $filter: ScoreFilter!
     $scoreNames: [String!]
   ) {
     scoreTimeSeries(
       workspaceID: $workspaceID
-      functionID: $functionID
+      functionIDs: $functionIDs
       filter: $filter
       scoreNames: $scoreNames
     ) {
@@ -98,7 +98,7 @@ const ScoreTimeSeriesDocument = parse(`
   ScoreTimeSeriesResult,
   {
     workspaceID: string;
-    functionID?: string;
+    functionIDs?: string[];
     filter: { timeRange: { from: string; to: string } };
     scoreNames?: string[];
   }
@@ -149,13 +149,14 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
 
   const functions = lookupData?.envBySlug?.workflows.data ?? [];
 
-  // TODO: scoring API only accepts one functionID; widen to [ID!] and pass all.
-  const functionID = selectedFns?.[0];
-
   const [{ data: namesData, fetching: namesFetching, error: namesError }] =
     useQuery({
       query: ScoreNamesDocument,
-      variables: { workspaceID, functionID, filter: { timeRange } },
+      variables: {
+        workspaceID,
+        functionIDs: selectedFns,
+        filter: { timeRange },
+      },
     });
 
   const availableScores = useMemo(
@@ -188,7 +189,7 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
       query: ScoreTimeSeriesDocument,
       variables: {
         workspaceID,
-        functionID,
+        functionIDs: selectedFns,
         filter: { timeRange },
         scoreNames: enabledNames,
       },

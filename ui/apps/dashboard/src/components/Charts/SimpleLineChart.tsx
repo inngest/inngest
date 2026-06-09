@@ -41,10 +41,6 @@ type SimpleLineChartProps = {
   }[];
   isLoading: boolean;
   error?: Error;
-  // Sparse series need visible dots — recharts' monotone line won't bridge
-  // gaps between non-adjacent points, so a chart with two isolated buckets
-  // would otherwise render empty.
-  dot?: boolean;
 };
 
 type AxisProps = {
@@ -94,7 +90,6 @@ export default function SimpleLineChart({
   legend = [],
   isLoading,
   error,
-  dot = false,
 }: SimpleLineChartProps) {
   const referenceAreas = useMemo(
     () => legend.filter((k) => k.referenceArea),
@@ -241,7 +236,7 @@ export default function SimpleLineChart({
               />
               {legend.map((l) => (
                 <Line
-                  dot={dot}
+                  dot={false}
                   key={l.name}
                   type="monotone"
                   dataKey={l.dataKey}

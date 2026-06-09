@@ -1981,7 +1981,7 @@ export type QueryRunCountTimeSeriesArgs = {
 
 export type QueryScoreNamesArgs = {
   filter: ScoreFilter;
-  functionID: InputMaybe<Scalars['ID']['input']>;
+  functionIDs: InputMaybe<Array<Scalars['ID']['input']>>;
   workspaceID: Scalars['ID']['input'];
 };
 
@@ -1989,7 +1989,7 @@ export type QueryScoreNamesArgs = {
 export type QueryScoreTimeSeriesArgs = {
   bucketSeconds: InputMaybe<Scalars['Int']['input']>;
   filter: ScoreFilter;
-  functionID: InputMaybe<Scalars['ID']['input']>;
+  functionIDs: InputMaybe<Array<Scalars['ID']['input']>>;
   scoreNames: InputMaybe<Array<Scalars['String']['input']>>;
   workspaceID: Scalars['ID']['input'];
 };
