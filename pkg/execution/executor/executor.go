@@ -4051,7 +4051,9 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID+"-plan")
-	now := e.now()
+	// NOTE: we fudge the time to be slightly in the past so that ultra-low-latency step executions don't return
+	// with the same timestamp as the step, which can cause issues with span ordering for rollup.
+	adjustedStartTime := e.now().Add(-1 * time.Millisecond)
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		GroupID:               groupID, // Ensure we correlate future jobs with this group ID, eg. started/failed.
@@ -4081,6 +4083,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 			Metadata:    md,
 			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
 			Parent:      runCtx.RootSpan(),
+			StartTime:   adjustedStartTime,
 			QueueItem:   &nextItem,
 		},
 	)
@@ -4100,6 +4103,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 			Metadata:              runCtx.Metadata(),
 			QueueItem:             &nextItem,
 			Parent:                runCtx.RootSpan(),
+			StartTime:             adjustedStartTime,
 			Attributes:            attrs,
 		},
 	)
@@ -4109,7 +4113,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		e.log.Debug("error creating span for next step after StepPlanned", "error", err)
 	}
 
-	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+	err = e.queue.Enqueue(ctx, nextItem, adjustedStartTime, queue.EnqueueOpts{})
 	if err == queue.ErrQueueItemExists {
 		span.Drop()
 		return nil
