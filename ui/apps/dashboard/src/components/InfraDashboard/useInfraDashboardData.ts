@@ -8,6 +8,7 @@ import {
   GetEventsV2Document,
   GetFunctionsDocument,
   GetFunctionsUsageDocument,
+  GetPlansDocument,
   MetricsLookupsDocument,
   MetricsScope,
   VolumeMetricsDocument,
@@ -20,6 +21,8 @@ import {
   latestBucketMetricTotal,
   latestMetricTotal,
   mergeBillingPlanIntoInfraPlans,
+  isEnterprisePlanName,
+  pickCheapestEnabledProPlanAmount,
   pickInfraConcurrencyAddon,
   sumDataValues,
   sumMetricValues,
@@ -107,6 +110,9 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
   const [currentPlan, refetchCurrentPlan] = useQuery({
     query: GetCurrentPlanDocument,
   });
+  const [availablePlans, refetchAvailablePlans] = useQuery({
+    query: GetPlansDocument,
+  });
 
   const data = useMemo(() => {
     const activeApps =
@@ -133,11 +139,15 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
         ({ id }) => id !== zeroID,
       ),
     );
+    const proPlanAmountCents = pickCheapestEnabledProPlanAmount(
+      availablePlans.data?.plans,
+    );
     const billingPlan = mergeBillingPlanIntoInfraPlans({
       accountEntitlements: currentPlan.data?.account.entitlements,
       defaultSku: INFRA_DASHBOARD_PLACEHOLDERS.defaultPlanSku,
       plan: currentPlan.data?.account.plan,
       plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
+      proPlanAmountCents,
     });
     const billingPlanReady = Boolean(
       !currentPlan.fetching &&
@@ -176,8 +186,12 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       hasPaymentMethod: Boolean(
         currentPlan.data?.account.paymentMethods?.length,
       ),
+      isEnterprisePlan: isEnterprisePlanName(
+        currentPlan.data?.account.plan?.name,
+      ),
       planName: currentPlan.data?.account.plan?.name ?? 'Plan',
       placeholders: INFRA_DASHBOARD_PLACEHOLDERS,
+      proPlanAmountCents,
       sdkRequests:
         sumMetricValues(volume.data?.workspace.sdkThroughputStarted.metrics) ||
         sumMetricValues(volume.data?.workspace.sdkThroughputEnded.metrics),
@@ -199,6 +213,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
         : 0,
     };
   }, [
+    availablePlans.data?.plans,
     billableExecutions.data?.usage,
     currentPlan.data?.account.addons?.concurrency,
     currentPlan.data?.account.entitlements,
@@ -233,7 +248,8 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       events.error ||
       volume.error ||
       billableExecutions.error ||
-      currentPlan.error,
+      currentPlan.error ||
+      availablePlans.error,
     fetching:
       lookups.fetching ||
       functions.fetching ||
@@ -241,13 +257,18 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       events.fetching ||
       volume.fetching ||
       billableExecutions.fetching ||
-      currentPlan.fetching,
+      currentPlan.fetching ||
+      availablePlans.fetching,
     range,
     refetchBillingData: async () => {
       await client
         .query(GetCurrentPlanDocument, {}, { requestPolicy: 'network-only' })
         .toPromise();
+      await client
+        .query(GetPlansDocument, {}, { requestPolicy: 'network-only' })
+        .toPromise();
       refetchCurrentPlan({ requestPolicy: 'network-only' });
+      refetchAvailablePlans({ requestPolicy: 'network-only' });
     },
   };
 }

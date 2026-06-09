@@ -86,6 +86,7 @@ export function InfraDashboard() {
             hasPaymentMethod={data.hasPaymentMethod}
             onBillingChange={refetchBillingData}
             plans={data.infraPlans}
+            proPlanAmountCents={data.proPlanAmountCents}
             selectedPlan={selectedPlan}
           />
           <div className="text-muted flex w-full items-center justify-between gap-3 text-xs">
@@ -139,13 +140,16 @@ export function InfraDashboard() {
         backlogDepth={data.backlogDepth}
         currentConcurrency={data.currentConcurrency}
         currentInfraTierId={
-          data.billingPlanReady && data.currentInfraPlan.isCurrent
+          data.isEnterprisePlan
+            ? 'dedicated'
+            : data.billingPlanReady && data.currentInfraPlan.isCurrent
             ? getCurrentInfraTierId(data.currentInfraPlanSku)
             : undefined
         }
         eventsReceived={data.eventsReceived}
         fetching={fetching}
         infraPlan={data.currentInfraPlan}
+        isEnterprisePlan={data.isEnterprisePlan}
         placeholders={placeholders}
       />
 
@@ -221,6 +225,7 @@ function InfraPlanDropdown({
   hasPaymentMethod,
   onBillingChange,
   plans,
+  proPlanAmountCents,
   selectedPlan,
 }: {
   billingActionsReady: boolean;
@@ -232,6 +237,7 @@ function InfraPlanDropdown({
   hasPaymentMethod: boolean;
   onBillingChange: () => Promise<void>;
   plans: InfraPlan[];
+  proPlanAmountCents?: number | null;
   selectedPlan: InfraPlan;
 }) {
   const router = useRouter();
@@ -312,6 +318,7 @@ function InfraPlanDropdown({
         currentConcurrencyLimit,
         currentPlan: currentBillingPlan,
         currentPlanSku,
+        proPlanAmountCents,
         targetSku: plan.sku,
       });
 
@@ -359,6 +366,7 @@ function InfraPlanDropdown({
       currentConcurrencyLimit,
       currentPlanSku,
       hasPaymentMethod,
+      proPlanAmountCents,
     ],
   );
 
@@ -425,6 +433,7 @@ function InfraPlanDropdown({
                       currentConcurrencyLimit,
                       currentPlan: currentBillingPlan,
                       currentPlanSku,
+                      proPlanAmountCents,
                       targetSku: plan.sku,
                     })
                   : ({
@@ -587,21 +596,25 @@ function getAddonUpdateDescription(update: InfraPlanAddonUpdate) {
   }/mo.`;
 }
 
-function YourPlanBadge() {
+function YourPlanBadge({ label = 'Your plan' }: { label?: string }) {
   return (
     <span className="bg-primary-intense text-alwaysWhite inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
       <RiCheckboxCircleLine className="h-3.5 w-3.5" />
-      Your plan
+      {label}
     </span>
   );
 }
 
 function InfraTierDropdown({
   currentTierId,
+  disabled = false,
+  isEnterprisePlan = false,
   selectedTier,
   tiers,
 }: {
   currentTierId?: InfraTierId;
+  disabled?: boolean;
+  isEnterprisePlan?: boolean;
   selectedTier: InfraTier;
   tiers: InfraTier[];
 }) {
@@ -610,10 +623,22 @@ function InfraTierDropdown({
 
   return (
     <div className="relative z-10 mx-auto mb-6 w-full max-w-xl">
-      <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenu
+        open={disabled ? false : open}
+        onOpenChange={(nextOpen) => {
+          if (!disabled) {
+            setOpen(nextOpen);
+          }
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <button
-            className="border-subtle bg-canvasBase text-basis hover:bg-canvasSubtle focus:ring-primary-moderate flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left shadow-sm focus:outline-none focus:ring-2"
+            className={cn(
+              'border-subtle bg-canvasBase text-basis flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left shadow-sm disabled:cursor-default disabled:opacity-100',
+              !disabled &&
+                'hover:bg-canvasSubtle focus:ring-primary-moderate focus:outline-none focus:ring-2',
+            )}
+            disabled={disabled}
             type="button"
           >
             <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
@@ -625,80 +650,88 @@ function InfraTierDropdown({
                 />
               ))}
             </div>
-            {open ? (
-              <RiArrowUpSLine className="h-4 w-4 shrink-0" />
-            ) : (
-              <RiArrowDownSLine className="h-4 w-4 shrink-0" />
-            )}
+            {!disabled ? (
+              open ? (
+                <RiArrowUpSLine className="h-4 w-4 shrink-0" />
+              ) : (
+                <RiArrowDownSLine className="h-4 w-4 shrink-0" />
+              )
+            ) : null}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="center"
-          className="w-[min(calc(100vw-2rem),720px)] overflow-y-auto p-0"
-          style={{
-            maxHeight:
-              'min(var(--radix-dropdown-menu-content-available-height), calc(100vh - 2rem))',
-          }}
-        >
-          <div className="border-subtle bg-canvasSubtle text-muted border-b px-3 py-2 text-[11px] font-medium uppercase">
-            Infrastructure tier
-          </div>
-          <div className="divide-subtle divide-y">
-            {tiers.map((tier) => {
-              const isSelected = tier.id === selectedTier.id;
-              const isCurrentTier = tier.id === currentTierId;
+        {!disabled ? (
+          <DropdownMenuContent
+            align="center"
+            className="w-[min(calc(100vw-2rem),720px)] overflow-y-auto p-0"
+            style={{
+              maxHeight:
+                'min(var(--radix-dropdown-menu-content-available-height), calc(100vh - 2rem))',
+            }}
+          >
+            <div className="border-subtle bg-canvasSubtle text-muted border-b px-3 py-2 text-[11px] font-medium uppercase">
+              Infrastructure tier
+            </div>
+            <div className="divide-subtle divide-y">
+              {tiers.map((tier) => {
+                const isSelected = tier.id === selectedTier.id;
+                const isCurrentTier = tier.id === currentTierId;
 
-              return (
-                <div
-                  className={cn(
-                    'w-full cursor-default px-3 py-3 text-left',
-                    isSelected && 'bg-canvasSubtle',
-                  )}
-                  key={tier.id}
-                >
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="text-basis text-sm font-medium">
-                        {tier.name}
-                      </div>
-                      <div className="text-muted mt-0.5 text-xs">
-                        {tier.description}
-                      </div>
-                    </div>
-                    {isCurrentTier ? (
-                      <YourPlanBadge />
-                    ) : (
-                      <div className="text-primary-intense shrink-0 text-xs font-medium">
-                        {tier.availability}
-                      </div>
+                return (
+                  <div
+                    className={cn(
+                      'w-full cursor-default px-3 py-3 text-left',
+                      isSelected && 'bg-canvasSubtle',
                     )}
-                  </div>
+                    key={tier.id}
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-basis text-sm font-medium">
+                          {tier.name}
+                        </div>
+                        <div className="text-muted mt-0.5 text-xs">
+                          {tier.description}
+                        </div>
+                      </div>
+                      {isCurrentTier ? (
+                        <YourPlanBadge
+                          label={
+                            isEnterprisePlan ? 'Current plan' : 'Your plan'
+                          }
+                        />
+                      ) : (
+                        <div className="text-primary-intense shrink-0 text-xs font-medium">
+                          {tier.availability}
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {getTierMetrics(tier).map((metric) => (
-                      <TierMetric
-                        key={metric.label}
-                        label={metric.label}
-                        value={metric.value}
-                      />
-                    ))}
-                  </div>
-
-                  {tier.notes?.length ? (
-                    <ul className="text-muted mt-3 space-y-1 text-xs">
-                      {tier.notes.map((note) => (
-                        <li className="flex gap-2" key={note}>
-                          <span className="text-primary-intense">-</span>
-                          <span>{note}</span>
-                        </li>
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {getTierMetrics(tier).map((metric) => (
+                        <TierMetric
+                          key={metric.label}
+                          label={metric.label}
+                          value={metric.value}
+                        />
                       ))}
-                    </ul>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </DropdownMenuContent>
+                    </div>
+
+                    {tier.notes?.length ? (
+                      <ul className="text-muted mt-3 space-y-1 text-xs">
+                        {tier.notes.map((note) => (
+                          <li className="flex gap-2" key={note}>
+                            <span className="text-primary-intense">-</span>
+                            <span>{note}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </DropdownMenuContent>
+        ) : null}
       </DropdownMenu>
     </div>
   );
@@ -741,6 +774,7 @@ function InfraFlowPanel({
   eventsReceived,
   fetching,
   infraPlan,
+  isEnterprisePlan,
   placeholders,
 }: {
   backlogDepth: number;
@@ -749,6 +783,7 @@ function InfraFlowPanel({
   eventsReceived: number;
   fetching: boolean;
   infraPlan: InfraPlan;
+  isEnterprisePlan: boolean;
   placeholders: InfraDashboardPlaceholders;
 }) {
   const selectedTier =
@@ -769,6 +804,8 @@ function InfraFlowPanel({
       />
       <InfraTierDropdown
         currentTierId={currentInfraTierId}
+        disabled={isEnterprisePlan}
+        isEnterprisePlan={isEnterprisePlan}
         tiers={placeholders.infraTiers}
         selectedTier={selectedTier}
       />
@@ -964,7 +1001,7 @@ function MostRanFunctions({
   });
 
   return (
-    <section className="mb-8">
+    <section className="pb-20">
       <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-basis text-lg font-medium">

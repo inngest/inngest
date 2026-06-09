@@ -14,9 +14,11 @@ import {
   getInfraPlanBillingAction,
   getUtcMonthToDateRange,
   inferInfraPlanSku,
+  isEnterprisePlanName,
   latestBucketMetricTotal,
   latestMetricTotal,
   mergeBillingPlanIntoInfraPlans,
+  pickCheapestEnabledProPlanAmount,
   pickInfraConcurrencyAddon,
   sumMetricValues,
   sumTimeSeriesValues,
@@ -59,6 +61,25 @@ describe('infra dashboard formatters', () => {
     expect(range.until.toISOString()).toBe('2026-06-01T00:30:00.000Z');
     expect(range.month).toBe(6);
     expect(range.year).toBe(2026);
+  });
+
+  it('detects enterprise plan names case-insensitively', () => {
+    expect(isEnterprisePlanName('Enterprise')).toBe(true);
+    expect(isEnterprisePlanName('Legacy ENTERPRISE Plus')).toBe(true);
+    expect(isEnterprisePlanName('Pro')).toBe(false);
+    expect(isEnterprisePlanName(null)).toBe(false);
+  });
+
+  it('picks the cheapest enabled Pro plan amount from GQL plans', () => {
+    expect(
+      pickCheapestEnabledProPlanAmount([
+        { amount: 19_900, isFree: false, isLegacy: false, name: 'Pro Plus' },
+        { amount: 0, isFree: true, isLegacy: false, name: 'Pro Trial' },
+        { amount: 4_900, isFree: false, isLegacy: true, name: 'Legacy Pro' },
+        { amount: 7_500, isFree: false, isLegacy: false, name: 'Pro' },
+        { amount: 2_500, isFree: false, isLegacy: false, name: 'Basic' },
+      ]),
+    ).toBe(7_500);
   });
 });
 
@@ -159,6 +180,25 @@ describe('infra dashboard billing plan merge', () => {
     expect(result.plans.every((plan) => !plan.isCurrent)).toBe(true);
   });
 
+  it('uses the live Pro plan amount for the IN-S row price', () => {
+    const result = mergeBillingPlanIntoInfraPlans({
+      accountEntitlements: null,
+      defaultSku: 'IN-S',
+      plan: {
+        amount: 0,
+        isFree: true,
+        name: 'Hobby',
+        slug: 'hobby-free-2025-08-08',
+      },
+      plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
+      proPlanAmountCents: 7_500,
+    });
+
+    expect(result.plans.find((plan) => plan.sku === 'IN-S')).toMatchObject({
+      priceMonthly: '$75',
+    });
+  });
+
   it('maps current infra SKU to the included infrastructure tier', () => {
     expect(getCurrentInfraTierId('IN-XS')).toBe('free');
     expect(getCurrentInfraTierId('IN-S')).toBe('shared');
@@ -205,6 +245,25 @@ describe('infra dashboard billing actions', () => {
         name: 'Pro',
         planSlug: 'pro-2025-08-08',
         quantity: 1,
+      },
+      type: 'upgrade-base-plan',
+    });
+  });
+
+  it('uses the live Pro plan amount when selecting IN-S', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 5,
+        currentPlan: freePlan,
+        currentPlanSku: 'IN-XS',
+        proPlanAmountCents: 6_500,
+        targetSku: 'IN-S',
+      }),
+    ).toMatchObject({
+      item: {
+        amount: 6_500,
+        planSlug: 'pro-2025-08-08',
       },
       type: 'upgrade-base-plan',
     });
