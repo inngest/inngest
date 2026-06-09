@@ -317,6 +317,15 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 		return
 	}
 	start := time.Now()
+	success := false
+	defer func() {
+		d.l.Lock()
+		defer d.l.Unlock()
+		delete(d.inflightBlocks, id)
+		if success {
+			d.fetchedBlocks[id] = struct{}{}
+		}
+	}()
 
 	block, err := d.blockReader.ReadBlock(ctx, d.idx, id)
 	// TODO: Maybe we should retry if it's a retriable error
@@ -335,6 +344,7 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 	}
 
 	if block == nil {
+		success = true
 		return
 	}
 
@@ -369,12 +379,9 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 
 	d.l.Lock()
 	defer d.l.Unlock()
-	// Remove this from in-flight stuff.
-	delete(d.inflightBlocks, id)
-	// Add to fetched blocks to keep track of already processed blocks.
-	d.fetchedBlocks[id] = struct{}{}
 	// And, of course, add our pauses so that we can iterate through them.
 	d.pauses = append(d.pauses, block.Pauses...)
+	success = true
 
 	metrics.HistogramPauseBlockFetchLatency(ctx, time.Since(start), metrics.HistogramOpt{
 		PkgName: pkgName,
