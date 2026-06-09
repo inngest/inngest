@@ -856,6 +856,7 @@ function InfraFlowPanel({
           fetching={executorsFetching}
           label="Executors"
           primaryLabel="Concurrency in use"
+          primaryHint="~ Approx."
           primaryValue={formatCompactNumber(currentConcurrency)}
           progressValue={currentConcurrency}
           limit={infraPlan.execConcurrencyLimit}
