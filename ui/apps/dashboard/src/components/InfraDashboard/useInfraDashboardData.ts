@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from 'urql';
+import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import {
@@ -20,6 +20,7 @@ import {
   latestBucketMetricTotal,
   latestMetricTotal,
   mergeBillingPlanIntoInfraPlans,
+  pickInfraConcurrencyAddon,
   sumDataValues,
   sumMetricValues,
   sumTimeSeriesValues,
@@ -35,9 +36,13 @@ export const TIME_RANGE_OPTIONS: TimeRangeOption[] = [
 ];
 
 const zeroID = '00000000-0000-0000-0000-000000000000';
+const functionCountPageSize = 1;
+const topFunctionsUsagePageSize = 1000;
+const topFunctionsLimit = 50;
 
 export function useInfraDashboardData(timeRange: TimeRangeOption) {
   const env = useEnvironment();
+  const client = useClient();
   const range = useMemo(() => getUtcMonthToDateRange(), [timeRange.id]);
 
   const [lookups] = useQuery({
@@ -51,7 +56,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       archived: false,
       environmentID: env.id,
       page: 1,
-      pageSize: 50,
+      pageSize: functionCountPageSize,
       search: null,
     },
   });
@@ -62,7 +67,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       archived: false,
       environmentID: env.id,
       page: 1,
-      pageSize: 50,
+      pageSize: topFunctionsUsagePageSize,
     },
   });
 
@@ -99,7 +104,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     },
   });
 
-  const [currentPlan] = useQuery({
+  const [currentPlan, refetchCurrentPlan] = useQuery({
     query: GetCurrentPlanDocument,
   });
 
@@ -107,7 +112,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     const activeApps =
       lookups.data?.envBySlug?.apps.filter((app) => !app.isArchived) ?? [];
     const workflowPage = functions.data?.workspace.workflows.page;
-    const functionRows = functions.data?.workspace.workflows.data;
     const usageRows = functionUsage.data?.workspace.workflows.data;
     const functionsRan =
       usageRows?.reduce((total, fn) => total + fn.dailyStarts.total, 0) ?? 0;
@@ -135,6 +139,11 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       plan: currentPlan.data?.account.plan,
       plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
     });
+    const billingPlanReady = Boolean(
+      !currentPlan.fetching &&
+        currentPlan.data?.account.plan &&
+        currentPlan.data?.account.entitlements,
+    );
 
     return {
       accountConcurrencyLimit: billingPlan.currentPlan.execConcurrencyLimit,
@@ -142,6 +151,12 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       backlogDepth,
       billingNextInvoiceDate:
         currentPlan.data?.account.subscription?.nextInvoiceDate,
+      billingPlanReady,
+      concurrencyAddon: pickInfraConcurrencyAddon({
+        accountAddon: currentPlan.data?.account.addons?.concurrency,
+        planAddon: currentPlan.data?.account.plan?.addons.concurrency,
+      }),
+      currentBillingPlan: currentPlan.data?.account.plan,
       currentInfraPlan: billingPlan.currentPlan,
       currentInfraPlanSku: billingPlan.currentPlanSku,
       currentConcurrency,
@@ -155,6 +170,9 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
         0,
       functionsRan: functionsRan || runsEnded,
       infraPlans: billingPlan.plans,
+      hasPaymentMethod: Boolean(
+        currentPlan.data?.account.paymentMethods?.length,
+      ),
       planName: currentPlan.data?.account.plan?.name ?? 'Plan',
       placeholders: INFRA_DASHBOARD_PLACEHOLDERS,
       sdkRequests:
@@ -164,7 +182,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
         volume.data?.workspace.stepRunning.metrics,
       ),
       topFunctions: buildTopFunctionRows({
-        functions: functionRows,
+        limit: topFunctionsLimit,
         usage: usageRows,
       }),
       workerCapacity: latestMetricTotal(
@@ -179,13 +197,16 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     };
   }, [
     billableExecutions.data?.usage,
+    currentPlan.data?.account.addons?.concurrency,
     currentPlan.data?.account.entitlements,
+    currentPlan.data?.account.paymentMethods,
     currentPlan.data?.account.plan,
+    currentPlan.data?.account.plan?.addons.concurrency,
     currentPlan.data?.account.plan?.name,
     currentPlan.data?.account.subscription?.nextInvoiceDate,
+    currentPlan.fetching,
     events.data?.environment.eventsV2.totalCount,
     functionUsage.data?.workspace.workflows.data,
-    functions.data?.workspace.workflows.data,
     functions.data?.workspace.workflows.page,
     lookups.data?.envBySlug?.apps,
     lookups.data?.envBySlug?.workflows.data.length,
@@ -219,5 +240,11 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       billableExecutions.fetching ||
       currentPlan.fetching,
     range,
+    refetchBillingData: async () => {
+      await client
+        .query(GetCurrentPlanDocument, {}, { requestPolicy: 'network-only' })
+        .toPromise();
+      refetchCurrentPlan({ requestPolicy: 'network-only' });
+    },
   };
 }

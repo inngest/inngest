@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useOrganization } from '@clerk/tanstack-react-start';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu/DropdownMenu';
 import { useColumns as useFunctionColumns } from '@inngest/components/Functions/columns';
+import { AlertModal } from '@inngest/components/Modal/AlertModal';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table } from '@inngest/components/Table';
 import { cn } from '@inngest/components/utils/classNames';
@@ -17,9 +19,17 @@ import {
   RiGroupLine,
   RiShieldCheckLine,
 } from '@remixicon/react';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useRouter } from '@tanstack/react-router';
+import { toast } from 'sonner';
+import { useMutation } from 'urql';
 
+import UpdateCardModal from '@/components/Billing/BillingDetails/UpdateCardModal';
+import CheckoutModal, {
+  type CheckoutItem,
+} from '@/components/Billing/Plans/CheckoutModal';
+import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { UpdateAccountAddonQuantityDocument } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
 import {
@@ -29,19 +39,27 @@ import {
 import type {
   InfraDashboardPlaceholders,
   InfraPlan,
+  InfraPlanSku,
   InfraTier,
   InfraTierId,
 } from './placeholderData';
 import {
   billingCycleDaysRemaining,
   formatCompactNumber,
+  formatCentsMonthly,
   formatPercent,
   getCurrentInfraTierId,
+  getInfraPlanBillingAction,
+  type BillingPlanSource,
+  type InfraConcurrencyAddonSource,
+  type InfraPlanAddonUpdate,
 } from './utils';
 
 export function InfraDashboard() {
   const env = useEnvironment();
-  const { data, fetching } = useInfraDashboardData(TIME_RANGE_OPTIONS[0]);
+  const { data, fetching, refetchBillingData } = useInfraDashboardData(
+    TIME_RANGE_OPTIONS[0],
+  );
   const placeholders = data.placeholders;
   const billingDays = billingCycleDaysRemaining(data.billingNextInvoiceDate);
   const selectedPlan = data.currentInfraPlan;
@@ -59,6 +77,13 @@ export function InfraDashboard() {
 
         <div className="flex w-fit max-w-full flex-col items-stretch gap-2">
           <InfraPlanDropdown
+            billingPlanReady={data.billingPlanReady}
+            concurrencyAddon={data.concurrencyAddon}
+            currentBillingPlan={data.currentBillingPlan}
+            currentConcurrencyLimit={data.accountConcurrencyLimit}
+            currentPlanSku={data.currentInfraPlanSku}
+            hasPaymentMethod={data.hasPaymentMethod}
+            onBillingChange={refetchBillingData}
             plans={data.infraPlans}
             selectedPlan={selectedPlan}
           />
@@ -113,7 +138,7 @@ export function InfraDashboard() {
         backlogDepth={data.backlogDepth}
         currentConcurrency={data.currentConcurrency}
         currentInfraTierId={
-          data.currentInfraPlan.isCurrent
+          data.billingPlanReady && data.currentInfraPlan.isCurrent
             ? getCurrentInfraTierId(data.currentInfraPlanSku)
             : undefined
         }
@@ -186,131 +211,379 @@ function KpiCard({
 }
 
 function InfraPlanDropdown({
+  billingPlanReady,
+  concurrencyAddon,
+  currentBillingPlan,
+  currentConcurrencyLimit,
+  currentPlanSku,
+  hasPaymentMethod,
+  onBillingChange,
   plans,
   selectedPlan,
 }: {
+  billingPlanReady: boolean;
+  concurrencyAddon?: InfraConcurrencyAddonSource | null;
+  currentBillingPlan?: BillingPlanSource | null;
+  currentConcurrencyLimit?: number | null;
+  currentPlanSku: InfraPlanSku;
+  hasPaymentMethod: boolean;
+  onBillingChange: () => Promise<void>;
   plans: InfraPlan[];
   selectedPlan: InfraPlan;
 }) {
+  const router = useRouter();
+  const { isLoaded: orgLoaded, membership } = useOrganization();
+  const canChangePlan = orgLoaded && membership?.role === 'org:admin';
   const [open, setOpen] = useState(false);
+  const [checkoutData, setCheckoutData] = useState<{
+    followUpAddonUpdate: InfraPlanAddonUpdate | null;
+    items: CheckoutItem[];
+  } | null>(null);
+  const [planChangeData, setPlanChangeData] = useState<{
+    action: 'cancel';
+    addonUpdate: InfraPlanAddonUpdate | null;
+    items: CheckoutItem[];
+  } | null>(null);
+  const [pendingAddonUpdate, setPendingAddonUpdate] =
+    useState<InfraPlanAddonUpdate | null>(null);
+  const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+  const [isUpdatingAddon, setIsUpdatingAddon] = useState(false);
+
+  const [, updateAccountAddonQuantity] = useMutation(
+    UpdateAccountAddonQuantityDocument,
+  );
+
+  const handleBillingSuccess = useCallback(async () => {
+    await onBillingChange();
+    await router.invalidate();
+    toast.success('Plan changed successfully');
+  }, [onBillingChange, router]);
+
+  const handleCheckoutSuccess = useCallback(() => {
+    const followUpAddonUpdate = checkoutData?.followUpAddonUpdate ?? null;
+    setCheckoutData(null);
+
+    if (followUpAddonUpdate) {
+      void onBillingChange().finally(() => {
+        setPendingAddonUpdate(followUpAddonUpdate);
+      });
+      return;
+    }
+
+    void handleBillingSuccess();
+  }, [
+    checkoutData?.followUpAddonUpdate,
+    handleBillingSuccess,
+    onBillingChange,
+  ]);
+
+  const handleAddonUpdate = useCallback(async () => {
+    if (!pendingAddonUpdate) {
+      return;
+    }
+
+    setIsUpdatingAddon(true);
+    const result = await updateAccountAddonQuantity({
+      addonName: pendingAddonUpdate.addonName,
+      quantity: pendingAddonUpdate.addonQuantity,
+    });
+    setIsUpdatingAddon(false);
+
+    if (result.error) {
+      toast.error('Failed to update concurrency add-on');
+      return;
+    }
+
+    setPendingAddonUpdate(null);
+    await handleBillingSuccess();
+  }, [handleBillingSuccess, pendingAddonUpdate, updateAccountAddonQuantity]);
+
+  const handlePlanClick = useCallback(
+    (plan: InfraPlan) => {
+      if (!canChangePlan || !billingPlanReady) {
+        return;
+      }
+
+      const action = getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit,
+        currentPlan: currentBillingPlan,
+        currentPlanSku,
+        targetSku: plan.sku,
+      });
+
+      if (action.type === 'current') {
+        return;
+      }
+
+      if (action.type === 'unavailable') {
+        toast.error(action.reason);
+        return;
+      }
+
+      setOpen(false);
+
+      if (action.type === 'cancel-to-free') {
+        setPlanChangeData({
+          action: 'cancel',
+          addonUpdate: action.addonUpdate,
+          items: [action.item],
+        });
+        return;
+      }
+
+      if (action.type === 'upgrade-base-plan') {
+        setCheckoutData({
+          followUpAddonUpdate: action.addonUpdate,
+          items: [action.item],
+        });
+        return;
+      }
+
+      if (action.isIncrease && !hasPaymentMethod) {
+        setPendingAddonUpdate(action);
+        setShowPaymentMethodModal(true);
+        return;
+      }
+
+      setPendingAddonUpdate(action);
+    },
+    [
+      canChangePlan,
+      billingPlanReady,
+      concurrencyAddon,
+      currentBillingPlan,
+      currentConcurrencyLimit,
+      currentPlanSku,
+      hasPaymentMethod,
+    ],
+  );
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="border-muted bg-canvasBase text-basis hover:bg-canvasSubtle focus:ring-primary-moderate flex max-w-full items-center justify-between gap-2 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-2"
-          type="button"
-        >
-          <span className="flex min-w-0 flex-wrap items-center gap-2">
-            <span className="bg-canvasMuted rounded px-1.5 py-0.5 font-medium">
-              {selectedPlan.sku}
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="border-muted bg-canvasBase text-basis hover:bg-canvasSubtle focus:ring-primary-moderate flex max-w-full items-center justify-between gap-2 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-2"
+            type="button"
+          >
+            <span className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="bg-canvasMuted rounded px-1.5 py-0.5 font-medium">
+                {selectedPlan.sku}
+              </span>
+              <span>{selectedPlan.eventStream}</span>
+              <span className="text-disabled">·</span>
+              <span>{selectedPlan.queueDepth} depth</span>
+              <span className="text-disabled">·</span>
+              <span>{selectedPlan.execConcurrency} concurrency</span>
             </span>
-            <span>{selectedPlan.eventStream}</span>
-            <span className="text-disabled">·</span>
-            <span>{selectedPlan.queueDepth} depth</span>
-            <span className="text-disabled">·</span>
-            <span>{selectedPlan.execConcurrency} concurrency</span>
-          </span>
-          {open ? (
-            <RiArrowUpSLine className="h-3.5 w-3.5 shrink-0" />
-          ) : (
-            <RiArrowDownSLine className="h-3.5 w-3.5 shrink-0" />
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="w-[min(calc(100vw-2rem),640px)] overflow-hidden p-0"
-      >
-        <div className="border-subtle bg-canvasSubtle flex items-center gap-1 border-b p-2">
-          <button
-            className="border-subtle text-muted inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs"
-            disabled
-            type="button"
-          >
-            <RiShieldCheckLine className="h-3.5 w-3.5" />
-            Single-tenant
+            {open ? (
+              <RiArrowUpSLine className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <RiArrowDownSLine className="h-3.5 w-3.5 shrink-0" />
+            )}
           </button>
-          <button
-            className="bg-canvasBase border-muted text-basis inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium"
-            type="button"
-          >
-            <RiGroupLine className="h-3.5 w-3.5" />
-            Shared
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <div className="min-w-[580px]">
-            <div className="bg-canvasSubtle text-muted grid grid-cols-[96px_140px_140px_160px_1fr] px-3 py-2 text-left text-[11px] font-medium uppercase">
-              <span>SKU</span>
-              <span>Event stream</span>
-              <span>Queue depth</span>
-              <span>Exec concurrency</span>
-              <span className="text-right">Price / mo</span>
-            </div>
-            {plans.map((plan) => {
-              const isSelected = plan.sku === selectedPlan.sku;
-
-              return (
-                <div
-                  className={cn(
-                    'border-subtle text-basis grid w-full grid-cols-[96px_140px_140px_160px_1fr] items-center border-t px-3 py-2.5 text-left text-xs',
-                    isSelected && 'bg-canvasSubtle',
-                  )}
-                  key={plan.sku}
-                >
-                  <span>
-                    <span className="border-muted bg-canvasBase inline-flex rounded border px-1.5 py-0.5 font-medium">
-                      {plan.sku}
-                    </span>
-                  </span>
-                  <PlanMetric value={plan.eventStream} />
-                  <PlanMetric value={plan.queueDepth} />
-                  <PlanMetric value={plan.execConcurrency} />
-                  <span className="flex min-w-0 items-center justify-end gap-2">
-                    {plan.isCurrent ? <YourPlanBadge /> : null}
-                    <span className="text-primary-intense truncate text-right font-medium">
-                      {plan.priceMonthly}
-                    </span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="border-subtle bg-canvasSubtle border-t p-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <div className="text-basis text-sm font-medium">
-                Need more than IN-XL?
-              </div>
-              <p className="text-muted text-xs">
-                Workloads above 1K concurrency move to dedicated capacity with
-                custom sizing.
-              </p>
-            </div>
-            <a
-              className="border-muted bg-canvasBase text-basis hover:bg-canvasSubtle inline-flex shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-xs"
-              href={pathCreator.support({ ref: 'infra-dashboard-plan' })}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-[min(calc(100vw-2rem),640px)] overflow-hidden p-0"
+        >
+          <div className="border-subtle bg-canvasSubtle flex items-center gap-1 border-b p-2">
+            <button
+              className="border-subtle text-muted inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs"
+              disabled
+              type="button"
             >
-              <RiCalendarLine className="h-3.5 w-3.5" />
-              Talk to sales
-            </a>
+              <RiShieldCheckLine className="h-3.5 w-3.5" />
+              Single-tenant
+            </button>
+            <button
+              className="bg-canvasBase border-muted text-basis inline-flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium"
+              type="button"
+            >
+              <RiGroupLine className="h-3.5 w-3.5" />
+              Shared
+            </button>
           </div>
-        </div>
 
-        <div className="border-subtle text-muted border-t px-3 py-2 text-xs">
-          Per-component sizes can also be tuned individually from each node.
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <div className="overflow-x-auto">
+            <div className="min-w-[580px]">
+              <div className="bg-canvasSubtle text-muted grid grid-cols-[96px_140px_140px_160px_1fr] px-3 py-2 text-left text-[11px] font-medium uppercase">
+                <span>SKU</span>
+                <span>Event stream</span>
+                <span>Queue depth</span>
+                <span>Exec concurrency</span>
+                <span className="text-right">Price / mo</span>
+              </div>
+              {plans.map((plan) => {
+                const action = billingPlanReady
+                  ? getInfraPlanBillingAction({
+                      concurrencyAddon,
+                      currentConcurrencyLimit,
+                      currentPlan: currentBillingPlan,
+                      currentPlanSku,
+                      targetSku: plan.sku,
+                    })
+                  : ({
+                      reason: 'Billing plan is still loading.',
+                      type: 'unavailable',
+                    } as const);
+                const isSelected =
+                  billingPlanReady && plan.sku === selectedPlan.sku;
+                const isCurrent = billingPlanReady && action.type === 'current';
+                const isActionable =
+                  billingPlanReady &&
+                  canChangePlan &&
+                  action.type !== 'current' &&
+                  action.type !== 'unavailable';
+
+                return (
+                  <button
+                    className={cn(
+                      'border-subtle text-basis grid w-full grid-cols-[96px_140px_140px_160px_1fr] items-center border-t px-3 py-2.5 text-left text-xs disabled:cursor-default disabled:opacity-100',
+                      isSelected && 'bg-canvasSubtle',
+                      isActionable &&
+                        'hover:bg-canvasSubtle focus:bg-canvasSubtle focus:outline-none',
+                    )}
+                    disabled={!isActionable}
+                    key={plan.sku}
+                    onClick={() => handlePlanClick(plan)}
+                    title={
+                      !canChangePlan
+                        ? 'Only organization admins can change plans.'
+                        : action.type === 'unavailable'
+                        ? action.reason
+                        : undefined
+                    }
+                    type="button"
+                  >
+                    <span>
+                      <span className="border-muted bg-canvasBase inline-flex rounded border px-1.5 py-0.5 font-medium">
+                        {plan.sku}
+                      </span>
+                    </span>
+                    <PlanMetric value={plan.eventStream} />
+                    <PlanMetric value={plan.queueDepth} />
+                    <PlanMetric value={plan.execConcurrency} />
+                    <span className="flex min-w-0 items-center justify-end gap-2">
+                      {isCurrent ? <YourPlanBadge /> : null}
+                      {!isCurrent ? (
+                        <span className="text-primary-intense truncate text-right font-medium">
+                          {plan.priceMonthly}
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-subtle bg-canvasSubtle border-t p-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="text-basis text-sm font-medium">
+                  Need more than IN-XL?
+                </div>
+                <p className="text-muted text-xs">
+                  Workloads above 1K concurrency move to dedicated capacity with
+                  custom sizing.
+                </p>
+              </div>
+              <a
+                className="border-muted bg-canvasBase text-basis hover:bg-canvasSubtle inline-flex shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-xs"
+                href={pathCreator.support({ ref: 'infra-dashboard-plan' })}
+              >
+                <RiCalendarLine className="h-3.5 w-3.5" />
+                Talk to sales
+              </a>
+            </div>
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {checkoutData ? (
+        <CheckoutModal
+          items={checkoutData.items}
+          onCancel={() => setCheckoutData(null)}
+          onSuccess={handleCheckoutSuccess}
+        />
+      ) : null}
+      {planChangeData ? (
+        <ConfirmPlanChangeModal
+          action={planChangeData.action}
+          items={planChangeData.items}
+          onCancel={() => setPlanChangeData(null)}
+          onBeforePlanChange={async () => {
+            if (!planChangeData.addonUpdate) {
+              return;
+            }
+
+            const result = await updateAccountAddonQuantity({
+              addonName: planChangeData.addonUpdate.addonName,
+              quantity: planChangeData.addonUpdate.addonQuantity,
+            });
+
+            if (result.error) {
+              throw result.error;
+            }
+          }}
+          onSuccess={() => {
+            setPlanChangeData(null);
+            void handleBillingSuccess();
+          }}
+        />
+      ) : null}
+      {showPaymentMethodModal ? (
+        <UpdateCardModal
+          onCancel={() => {
+            setShowPaymentMethodModal(false);
+            setPendingAddonUpdate(null);
+          }}
+          onSuccess={() => {
+            setShowPaymentMethodModal(false);
+            void onBillingChange();
+          }}
+        />
+      ) : null}
+      {pendingAddonUpdate && !showPaymentMethodModal ? (
+        <AlertModal
+          autoClose={false}
+          className="w-full max-w-md"
+          confirmButtonKind="primary"
+          confirmButtonLabel={
+            pendingAddonUpdate.estimatedMonthlyAddonCost > 0
+              ? 'Confirm and pay'
+              : 'Confirm'
+          }
+          description={getAddonUpdateDescription(pendingAddonUpdate)}
+          isLoading={isUpdatingAddon}
+          isOpen={true}
+          onClose={() => setPendingAddonUpdate(null)}
+          onSubmit={handleAddonUpdate}
+          title={getAddonUpdateTitle(pendingAddonUpdate)}
+        />
+      ) : null}
+    </>
   );
 }
 
 function PlanMetric({ value }: { value: string }) {
   return <span className="min-w-0 truncate">{value}</span>;
+}
+
+function getAddonUpdateTitle(update: InfraPlanAddonUpdate) {
+  return `${update.isIncrease ? 'Upgrade' : 'Downgrade'} to ${
+    update.targetSku
+  }`;
+}
+
+function getAddonUpdateDescription(update: InfraPlanAddonUpdate) {
+  const totalCost = formatCentsMonthly(update.targetMonthlyAmountCents);
+
+  return `Your plan will change to ${update.targetSku} for ${
+    totalCost || '$0'
+  }/mo.`;
 }
 
 function YourPlanBadge() {
@@ -515,11 +788,14 @@ function InfraFlowPanel({
       <div className="relative grid items-center gap-4 lg:grid-cols-[1fr_56px_1fr_56px_1fr]">
         <FlowNode
           fetching={fetching}
-          label="Event stream"
+          label="Events"
           primaryLabel={
             infraPlan.eventStreamUnit === 'events'
               ? 'Events received'
               : 'Rate limit | GPS'
+          }
+          primaryHint={
+            infraPlan.eventStreamUnit === 'events' ? 'Soft limit' : undefined
           }
           primaryValue={
             infraPlan.eventStreamUnit === 'events'
@@ -539,6 +815,7 @@ function InfraFlowPanel({
           fetching={fetching}
           label="Queue"
           primaryLabel="Current backlog"
+          primaryHint="Soft limit"
           primaryValue={formatCompactNumber(backlogDepth)}
           progressValue={backlogDepth}
           limit={infraPlan.queueDepthLimit}
@@ -564,6 +841,7 @@ function FlowNode({
   limit,
   progressValue,
   primaryLabel,
+  primaryHint,
   primaryValue,
 }: {
   accent?: boolean;
@@ -572,6 +850,7 @@ function FlowNode({
   limit: number | null;
   progressValue?: number;
   primaryLabel: string;
+  primaryHint?: string;
   primaryValue: string;
 }) {
   const numericPrimary =
@@ -586,7 +865,14 @@ function FlowNode({
   return (
     <div className="bg-canvasBase border-subtle min-h-[132px] rounded-md border p-5 shadow-sm">
       <div className="text-basis mb-4 text-sm font-medium">{label}</div>
-      <div className="text-muted mb-1 text-xs uppercase">{primaryLabel}</div>
+      <div className="mb-1 flex items-center justify-between gap-3 text-xs">
+        <span className="text-muted uppercase">{primaryLabel}</span>
+        {primaryHint ? (
+          <span className="text-muted/40 shrink-0 text-right">
+            {primaryHint}
+          </span>
+        ) : null}
+      </div>
       {fetching ? (
         <Skeleton className="mb-2 h-6 w-20" />
       ) : (

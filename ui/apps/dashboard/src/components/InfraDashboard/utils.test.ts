@@ -11,11 +11,13 @@ import {
   formatCentsMonthly,
   formatCompactNumber,
   getCurrentInfraTierId,
+  getInfraPlanBillingAction,
   getUtcMonthToDateRange,
   inferInfraPlanSku,
   latestBucketMetricTotal,
   latestMetricTotal,
   mergeBillingPlanIntoInfraPlans,
+  pickInfraConcurrencyAddon,
   sumMetricValues,
   sumTimeSeriesValues,
 } from './utils';
@@ -90,7 +92,7 @@ describe('infra dashboard billing plan merge', () => {
     ).toBe('IN-XS');
   });
 
-  it('merges live billing entitlements into the current infra plan row', () => {
+  it('merges live concurrency while keeping soft event and queue limits static', () => {
     const result = mergeBillingPlanIntoInfraPlans({
       accountEntitlements: {
         concurrency: { limit: 256 },
@@ -114,19 +116,22 @@ describe('infra dashboard billing plan merge', () => {
 
     expect(result.currentPlanSku).toBe('IN-M');
     expect(result.currentPlan).toMatchObject({
-      eventStream: 'Unlimited events/mo',
-      eventStreamLimit: null,
+      eventStream: '15M events/mo',
+      eventStreamLimit: 15_000_000,
       eventStreamUnit: 'events',
       execConcurrency: '256',
       execConcurrencyLimit: 256,
       isCurrent: true,
       priceMonthly: '$75',
-      queueDepth: '2.5M',
-      queueDepthLimit: 2_500_000,
+      queueDepth: '5M',
+      queueDepthLimit: 5_000_000,
       sku: 'IN-M',
     });
     expect(result.plans.find((plan) => plan.sku === 'IN-M')).toEqual(
       result.currentPlan,
+    );
+    expect(result.plans.find((plan) => plan.sku === 'IN-XS')?.isCurrent).toBe(
+      false,
     );
   });
 
@@ -134,6 +139,247 @@ describe('infra dashboard billing plan merge', () => {
     expect(getCurrentInfraTierId('IN-XS')).toBe('free');
     expect(getCurrentInfraTierId('IN-S')).toBe('shared');
     expect(getCurrentInfraTierId('IN-XL')).toBe('shared');
+  });
+});
+
+describe('infra dashboard billing actions', () => {
+  const concurrencyAddon = {
+    available: true,
+    baseValue: 100,
+    maxValue: 1_000,
+    name: 'concurrency',
+    price: 9_900,
+    purchaseCount: 0,
+    quantityPer: 100,
+  };
+  const freePlan = {
+    amount: 0,
+    isFree: true,
+    name: 'Hobby',
+    slug: 'hobby-free-2025-08-08',
+  };
+  const proPlan = {
+    amount: 7_500,
+    isFree: false,
+    name: 'Pro',
+    slug: 'pro-2025-08-08',
+  };
+
+  it('opens Pro checkout when a free account selects IN-S', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 5,
+        currentPlan: freePlan,
+        currentPlanSku: 'IN-XS',
+        targetSku: 'IN-S',
+      }),
+    ).toEqual({
+      addonUpdate: null,
+      item: {
+        amount: 7_500,
+        name: 'Pro',
+        planSlug: 'pro-2025-08-08',
+        quantity: 1,
+      },
+      type: 'upgrade-base-plan',
+    });
+  });
+
+  it('does not require addon metadata when selecting base Pro', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: null,
+        currentConcurrencyLimit: 5,
+        currentPlan: freePlan,
+        currentPlanSku: 'IN-XS',
+        targetSku: 'IN-S',
+      }),
+    ).toMatchObject({
+      addonUpdate: null,
+      type: 'upgrade-base-plan',
+    });
+  });
+
+  it('opens Pro checkout with a follow-up addon quantity for IN-L', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 5,
+        currentPlan: freePlan,
+        currentPlanSku: 'IN-XS',
+        targetSku: 'IN-L',
+      }),
+    ).toMatchObject({
+      addonUpdate: {
+        addonName: 'concurrency',
+        addonQuantity: 4,
+        targetMonthlyAmountCents: 59_900,
+        targetConcurrency: 500,
+        targetSku: 'IN-L',
+      },
+      type: 'upgrade-base-plan',
+    });
+  });
+
+  it('updates concurrency add-on quantity when Pro selects a larger SKU', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 100,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-S',
+        targetSku: 'IN-M',
+      }),
+    ).toEqual({
+      addonName: 'concurrency',
+      addonQuantity: 2,
+      estimatedMonthlyAddonCost: 19_800,
+      isIncrease: true,
+      targetConcurrency: 250,
+      targetMonthlyAmountCents: 24_900,
+      targetSku: 'IN-M',
+      type: 'update-concurrency-addon',
+    });
+  });
+
+  it('calculates addon quantity from Pro base concurrency instead of addon base value', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: { ...concurrencyAddon, baseValue: 0 },
+        currentConcurrencyLimit: 100,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-S',
+        targetSku: 'IN-M',
+      }),
+    ).toMatchObject({
+      addonQuantity: 2,
+      targetConcurrency: 250,
+      targetMonthlyAmountCents: 24_900,
+      type: 'update-concurrency-addon',
+    });
+  });
+
+  it('decreases concurrency add-on quantity back to base Pro when selecting IN-S', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 500,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-S',
+      }),
+    ).toEqual({
+      addonName: 'concurrency',
+      addonQuantity: 0,
+      estimatedMonthlyAddonCost: 0,
+      isIncrease: false,
+      targetConcurrency: 100,
+      targetMonthlyAmountCents: 9_900,
+      targetSku: 'IN-S',
+      type: 'update-concurrency-addon',
+    });
+  });
+
+  it('can remove concurrency addons without loaded addon pricing metadata', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: null,
+        currentConcurrencyLimit: 500,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-S',
+      }),
+    ).toEqual({
+      addonName: 'concurrency',
+      addonQuantity: 0,
+      estimatedMonthlyAddonCost: 0,
+      isIncrease: false,
+      targetConcurrency: 100,
+      targetMonthlyAmountCents: 9_900,
+      targetSku: 'IN-S',
+      type: 'update-concurrency-addon',
+    });
+  });
+
+  it('removes concurrency addons before canceling to free', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 500,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-XS',
+      }),
+    ).toEqual({
+      addonUpdate: {
+        addonName: 'concurrency',
+        addonQuantity: 0,
+        estimatedMonthlyAddonCost: 0,
+        isIncrease: false,
+        targetConcurrency: 5,
+        targetMonthlyAmountCents: 0,
+        targetSku: 'IN-XS',
+      },
+      item: {
+        amount: 0,
+        name: 'Hobby',
+        planSlug: 'hobby-free-2025-08-08',
+        quantity: 1,
+      },
+      type: 'cancel-to-free',
+    });
+  });
+
+  it('uses add-on metadata even when the account availability flag is false', () => {
+    expect(
+      pickInfraConcurrencyAddon({
+        accountAddon: { ...concurrencyAddon, available: false },
+        planAddon: concurrencyAddon,
+      }),
+    ).toEqual({ ...concurrencyAddon, available: false });
+  });
+
+  it('falls back to plan addon metadata when account addon sizing is incomplete', () => {
+    expect(
+      pickInfraConcurrencyAddon({
+        accountAddon: { ...concurrencyAddon, price: null },
+        planAddon: concurrencyAddon,
+      }),
+    ).toBe(concurrencyAddon);
+  });
+
+  it('treats the floored SKU as current', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon,
+        currentConcurrencyLimit: 300,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-M',
+        targetSku: 'IN-M',
+      }),
+    ).toEqual({ type: 'current' });
+  });
+
+  it('returns unavailable for missing addon data or targets above addon max', () => {
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: { ...concurrencyAddon, price: null },
+        currentConcurrencyLimit: 100,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-S',
+        targetSku: 'IN-M',
+      }),
+    ).toMatchObject({ type: 'unavailable' });
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: { ...concurrencyAddon, maxValue: 500 },
+        currentConcurrencyLimit: 500,
+        currentPlan: proPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-XL',
+      }),
+    ).toMatchObject({ type: 'unavailable' });
   });
 });
 
@@ -267,6 +513,66 @@ describe('infra dashboard top functions', () => {
           totalVolume: 10,
         },
       },
+    ]);
+  });
+
+  it('builds sorted top rows from enriched usage and does not hard-cap at five', () => {
+    const usage = [10, 60, 20, 50, 30, 40].map((total, index) => ({
+      app: { externalID: `app-${index + 1}`, name: `App ${index + 1}` },
+      id: `fn-${index + 1}`,
+      isArchived: false,
+      isPaused: false,
+      name: `Function ${index + 1}`,
+      slug: `function-${index + 1}`,
+      triggers: [],
+      dailyStarts: { total, data: [] },
+      dailyCompleted: { total, data: [] },
+      dailyCancelled: { total: 0, data: [] },
+      dailyFailures: { total: 0, data: [] },
+    })) as unknown as NonNullable<
+      Parameters<typeof buildTopFunctionRows>[0]['usage']
+    >;
+
+    const rows = buildTopFunctionRows({ functions: undefined, usage });
+
+    expect(rows).toHaveLength(6);
+    expect(rows.map((row) => row.name)).toEqual([
+      'Function 2',
+      'Function 4',
+      'Function 6',
+      'Function 5',
+      'Function 3',
+      'Function 1',
+    ]);
+  });
+
+  it('applies the display limit after sorting by run volume', () => {
+    const usage = [10, 60, 20, 50, 30, 40].map((total, index) => ({
+      app: { externalID: `app-${index + 1}`, name: `App ${index + 1}` },
+      id: `fn-${index + 1}`,
+      isArchived: false,
+      isPaused: false,
+      name: `Function ${index + 1}`,
+      slug: `function-${index + 1}`,
+      triggers: [],
+      dailyStarts: { total, data: [] },
+      dailyCompleted: { total, data: [] },
+      dailyCancelled: { total: 0, data: [] },
+      dailyFailures: { total: 0, data: [] },
+    })) as unknown as NonNullable<
+      Parameters<typeof buildTopFunctionRows>[0]['usage']
+    >;
+
+    const rows = buildTopFunctionRows({
+      functions: undefined,
+      limit: 3,
+      usage,
+    });
+
+    expect(rows.map((row) => row.name)).toEqual([
+      'Function 2',
+      'Function 4',
+      'Function 6',
     ]);
   });
 });

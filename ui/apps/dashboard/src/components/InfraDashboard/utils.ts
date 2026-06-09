@@ -76,7 +76,7 @@ export function formatCentsMonthly(
   }).format(amountCents / 100);
 }
 
-type BillingPlanSource = {
+export type BillingPlanSource = {
   amount?: number | null;
   entitlements?: {
     concurrency?: { limit?: number | null } | null;
@@ -94,11 +94,332 @@ type AccountEntitlementsSource = {
   functionBacklogSize?: { limit?: number | null } | null;
 };
 
-function preferDefinedLimit<T extends number | null>(
-  accountLimit: T | undefined,
-  planLimit: T | undefined,
-): T | undefined {
-  return accountLimit !== undefined ? accountLimit : planLimit;
+export const FREE_INFRA_PLAN_SLUG = 'hobby-free-2025-08-08';
+export const PRO_INFRA_PLAN_SLUG = 'pro-2025-08-08';
+
+const PRO_PLAN_BASE_AMOUNT_CENTS = 7_500;
+
+export type InfraConcurrencyAddonSource = {
+  available?: boolean | null;
+  baseValue?: number | null;
+  maxValue?: number | null;
+  name?: string | null;
+  price?: number | null;
+  purchaseCount?: number | null;
+  quantityPer?: number | null;
+};
+
+export type InfraPlanCheckoutItem = {
+  amount: number;
+  name: string;
+  planSlug: string;
+  quantity: number;
+};
+
+export type InfraPlanAddonUpdate = {
+  addonName: string;
+  addonQuantity: number;
+  estimatedMonthlyAddonCost: number;
+  isIncrease: boolean;
+  targetConcurrency: number;
+  targetMonthlyAmountCents: number;
+  targetSku: InfraPlanSku;
+};
+
+export type InfraPlanBillingAction =
+  | { type: 'current' }
+  | {
+      addonUpdate: InfraPlanAddonUpdate | null;
+      item: InfraPlanCheckoutItem;
+      type: 'cancel-to-free';
+    }
+  | {
+      addonUpdate: InfraPlanAddonUpdate | null;
+      item: InfraPlanCheckoutItem;
+      type: 'upgrade-base-plan';
+    }
+  | (InfraPlanAddonUpdate & { type: 'update-concurrency-addon' })
+  | { reason: string; type: 'unavailable' };
+
+const INFRA_PLAN_BILLING_TARGETS: Record<
+  InfraPlanSku,
+  {
+    basePlanSlug: string;
+    monthlyAmountCents: number;
+    targetConcurrency: number;
+  }
+> = {
+  'IN-XS': {
+    basePlanSlug: FREE_INFRA_PLAN_SLUG,
+    monthlyAmountCents: 0,
+    targetConcurrency: 5,
+  },
+  'IN-S': {
+    basePlanSlug: PRO_INFRA_PLAN_SLUG,
+    monthlyAmountCents: 9_900,
+    targetConcurrency: 100,
+  },
+  'IN-M': {
+    basePlanSlug: PRO_INFRA_PLAN_SLUG,
+    monthlyAmountCents: 24_900,
+    targetConcurrency: 250,
+  },
+  'IN-L': {
+    basePlanSlug: PRO_INFRA_PLAN_SLUG,
+    monthlyAmountCents: 59_900,
+    targetConcurrency: 500,
+  },
+  'IN-XL': {
+    basePlanSlug: PRO_INFRA_PLAN_SLUG,
+    monthlyAmountCents: 119_900,
+    targetConcurrency: 1_000,
+  },
+};
+
+const CONCURRENCY_ADDON_NAME = 'concurrency';
+const PRO_BASE_CONCURRENCY =
+  INFRA_PLAN_BILLING_TARGETS['IN-S'].targetConcurrency;
+
+function isUsableConcurrencyAddon(
+  addon?: InfraConcurrencyAddonSource | null,
+): boolean {
+  return Boolean(
+    addon?.name &&
+      typeof addon.maxValue === 'number' &&
+      typeof addon.price === 'number' &&
+      typeof addon.quantityPer === 'number' &&
+      addon.quantityPer > 0,
+  );
+}
+
+export function pickInfraConcurrencyAddon({
+  accountAddon,
+  planAddon,
+}: {
+  accountAddon?: InfraConcurrencyAddonSource | null;
+  planAddon?: InfraConcurrencyAddonSource | null;
+}): InfraConcurrencyAddonSource | null | undefined {
+  if (isUsableConcurrencyAddon(accountAddon)) {
+    return accountAddon;
+  }
+
+  if (isUsableConcurrencyAddon(planAddon)) {
+    return planAddon;
+  }
+
+  return accountAddon ?? planAddon;
+}
+
+function isFreeBillingPlan(plan?: BillingPlanSource | null): boolean {
+  return Boolean(plan?.isFree || plan?.slug === FREE_INFRA_PLAN_SLUG);
+}
+
+function buildCheckoutItem(planSlug: string): InfraPlanCheckoutItem {
+  if (planSlug === FREE_INFRA_PLAN_SLUG) {
+    return {
+      amount: 0,
+      name: 'Hobby',
+      planSlug,
+      quantity: 1,
+    };
+  }
+
+  return {
+    amount: PRO_PLAN_BASE_AMOUNT_CENTS,
+    name: 'Pro',
+    planSlug,
+    quantity: 1,
+  };
+}
+
+function buildAddonUpdate({
+  addon,
+  currentConcurrencyLimit,
+  targetConcurrency,
+  targetMonthlyAmountCents,
+  targetSku,
+}: {
+  addon?: InfraConcurrencyAddonSource | null;
+  currentConcurrencyLimit?: number | null;
+  targetConcurrency: number;
+  targetMonthlyAmountCents: number;
+  targetSku: InfraPlanSku;
+}): InfraPlanAddonUpdate | { reason: string; type: 'unavailable' } {
+  if (!addon) {
+    return {
+      reason: 'Concurrency add-on metadata is unavailable.',
+      type: 'unavailable',
+    };
+  }
+
+  if (!addon.name) {
+    return {
+      reason: 'Concurrency add-on name is missing.',
+      type: 'unavailable',
+    };
+  }
+
+  if (typeof addon.price !== 'number') {
+    return {
+      reason: 'Concurrency add-on price is missing.',
+      type: 'unavailable',
+    };
+  }
+
+  if (typeof addon.quantityPer !== 'number' || addon.quantityPer <= 0) {
+    return {
+      reason: 'Concurrency add-on sizing is unavailable.',
+      type: 'unavailable',
+    };
+  }
+
+  if (
+    typeof addon.maxValue === 'number' &&
+    targetConcurrency > addon.maxValue
+  ) {
+    return {
+      reason: 'Selected concurrency is above the add-on maximum.',
+      type: 'unavailable',
+    };
+  }
+
+  const addonQuantity = Math.max(
+    0,
+    Math.ceil((targetConcurrency - PRO_BASE_CONCURRENCY) / addon.quantityPer),
+  );
+
+  return {
+    addonName: addon.name,
+    addonQuantity,
+    estimatedMonthlyAddonCost: addonQuantity * addon.price,
+    isIncrease:
+      typeof currentConcurrencyLimit !== 'number' ||
+      targetConcurrency > currentConcurrencyLimit,
+    targetConcurrency,
+    targetMonthlyAmountCents,
+    targetSku,
+  };
+}
+
+function buildAddonRemoval({
+  addon,
+  currentConcurrencyLimit,
+  targetConcurrency,
+  targetMonthlyAmountCents,
+  targetSku,
+}: {
+  addon?: InfraConcurrencyAddonSource | null;
+  currentConcurrencyLimit?: number | null;
+  targetConcurrency: number;
+  targetMonthlyAmountCents: number;
+  targetSku: InfraPlanSku;
+}): InfraPlanAddonUpdate | null {
+  if (
+    typeof currentConcurrencyLimit !== 'number' ||
+    (currentConcurrencyLimit <= PRO_BASE_CONCURRENCY &&
+      (addon?.purchaseCount ?? 0) <= 0)
+  ) {
+    return null;
+  }
+
+  return {
+    addonName: addon?.name ?? CONCURRENCY_ADDON_NAME,
+    addonQuantity: 0,
+    estimatedMonthlyAddonCost: 0,
+    isIncrease: false,
+    targetConcurrency,
+    targetMonthlyAmountCents,
+    targetSku,
+  };
+}
+
+export function getInfraPlanBillingAction({
+  concurrencyAddon,
+  currentConcurrencyLimit,
+  currentPlan,
+  currentPlanSku,
+  targetSku,
+}: {
+  concurrencyAddon?: InfraConcurrencyAddonSource | null;
+  currentConcurrencyLimit?: number | null;
+  currentPlan?: BillingPlanSource | null;
+  currentPlanSku: InfraPlanSku;
+  targetSku: InfraPlanSku;
+}): InfraPlanBillingAction {
+  if (targetSku === currentPlanSku) {
+    return { type: 'current' };
+  }
+
+  if (!currentPlan) {
+    return { reason: 'Billing plan is still loading.', type: 'unavailable' };
+  }
+
+  const target = INFRA_PLAN_BILLING_TARGETS[targetSku];
+  const currentIsFree = isFreeBillingPlan(currentPlan);
+
+  if (target.basePlanSlug === FREE_INFRA_PLAN_SLUG) {
+    return currentIsFree
+      ? { type: 'current' }
+      : {
+          addonUpdate: buildAddonRemoval({
+            addon: concurrencyAddon,
+            currentConcurrencyLimit,
+            targetConcurrency: target.targetConcurrency,
+            targetMonthlyAmountCents: target.monthlyAmountCents,
+            targetSku,
+          }),
+          item: buildCheckoutItem(FREE_INFRA_PLAN_SLUG),
+          type: 'cancel-to-free',
+        };
+  }
+
+  if (target.targetConcurrency <= PRO_BASE_CONCURRENCY) {
+    if (currentIsFree || currentPlan?.slug !== PRO_INFRA_PLAN_SLUG) {
+      return {
+        addonUpdate: null,
+        item: buildCheckoutItem(PRO_INFRA_PLAN_SLUG),
+        type: 'upgrade-base-plan',
+      };
+    }
+
+    return {
+      addonName: concurrencyAddon?.name ?? CONCURRENCY_ADDON_NAME,
+      addonQuantity: 0,
+      estimatedMonthlyAddonCost: 0,
+      isIncrease:
+        typeof currentConcurrencyLimit !== 'number' ||
+        target.targetConcurrency > currentConcurrencyLimit,
+      targetConcurrency: target.targetConcurrency,
+      targetMonthlyAmountCents: target.monthlyAmountCents,
+      targetSku,
+      type: 'update-concurrency-addon',
+    };
+  }
+
+  const addonUpdate = buildAddonUpdate({
+    addon: concurrencyAddon,
+    currentConcurrencyLimit,
+    targetConcurrency: target.targetConcurrency,
+    targetMonthlyAmountCents: target.monthlyAmountCents,
+    targetSku,
+  });
+
+  if ('type' in addonUpdate) {
+    return addonUpdate;
+  }
+
+  if (currentIsFree || currentPlan?.slug !== PRO_INFRA_PLAN_SLUG) {
+    return {
+      addonUpdate: addonUpdate.addonQuantity > 0 ? addonUpdate : null,
+      item: buildCheckoutItem(PRO_INFRA_PLAN_SLUG),
+      type: 'upgrade-base-plan',
+    };
+  }
+
+  return {
+    ...addonUpdate,
+    type: 'update-concurrency-addon',
+  };
 }
 
 export function inferInfraPlanSku({
@@ -165,14 +486,6 @@ export function mergeBillingPlanIntoInfraPlans({
     accountEntitlements?.concurrency?.limit ??
     plan?.entitlements?.concurrency?.limit ??
     null;
-  const eventLimit = preferDefinedLimit(
-    accountEntitlements?.events?.limit,
-    plan?.entitlements?.events?.limit,
-  );
-  const queueDepthLimit = preferDefinedLimit(
-    accountEntitlements?.functionBacklogSize?.limit,
-    plan?.entitlements?.functionBacklogSize?.limit,
-  );
   const currentPlanSku = inferInfraPlanSku({
     concurrencyLimit,
     defaultSku,
@@ -181,31 +494,24 @@ export function mergeBillingPlanIntoInfraPlans({
   });
   const fallbackPlan =
     plans.find((candidate) => candidate.sku === currentPlanSku) ?? plans[0];
-  const hasLiveEntitlements =
-    typeof concurrencyLimit === 'number' ||
-    eventLimit !== undefined ||
-    queueDepthLimit !== undefined;
+  const hasLiveEntitlements = typeof concurrencyLimit === 'number';
 
   if (!plan && !hasLiveEntitlements) {
+    const currentFallbackPlan = { ...fallbackPlan, isCurrent: true };
+
     return {
-      currentPlan: fallbackPlan,
+      currentPlan: currentFallbackPlan,
       currentPlanSku: fallbackPlan.sku,
-      plans,
+      plans: plans.map((candidate) =>
+        candidate.sku === currentFallbackPlan.sku
+          ? currentFallbackPlan
+          : { ...candidate, isCurrent: false },
+      ),
     };
   }
 
   const currentPlan: InfraPlan = {
     ...fallbackPlan,
-    eventStream:
-      eventLimit === null
-        ? 'Unlimited events/mo'
-        : eventLimit === undefined
-        ? fallbackPlan.eventStream
-        : `${formatCompactNumber(eventLimit)} events/mo`,
-    eventStreamLimit:
-      eventLimit === undefined ? fallbackPlan.eventStreamLimit : eventLimit,
-    eventStreamUnit:
-      eventLimit === undefined ? fallbackPlan.eventStreamUnit : 'events',
     execConcurrency:
       typeof concurrencyLimit === 'number'
         ? formatCompactNumber(concurrencyLimit)
@@ -216,23 +522,15 @@ export function mergeBillingPlanIntoInfraPlans({
         : fallbackPlan.execConcurrencyLimit,
     isCurrent: true,
     priceMonthly: formatCentsMonthly(plan?.amount) || fallbackPlan.priceMonthly,
-    queueDepth:
-      queueDepthLimit === null
-        ? 'Unlimited'
-        : queueDepthLimit === undefined
-        ? fallbackPlan.queueDepth
-        : formatCompactNumber(queueDepthLimit),
-    queueDepthLimit:
-      queueDepthLimit === undefined
-        ? fallbackPlan.queueDepthLimit
-        : queueDepthLimit,
   };
 
   return {
     currentPlan,
     currentPlanSku,
     plans: plans.map((candidate) =>
-      candidate.sku === currentPlanSku ? currentPlan : candidate,
+      candidate.sku === currentPlanSku
+        ? currentPlan
+        : { ...candidate, isCurrent: false },
     ),
   };
 }
@@ -362,9 +660,11 @@ export function calculateUsageShare(value: number, total: number): number {
 
 export function buildTopFunctionRows({
   functions,
+  limit = 50,
   usage,
 }: {
-  functions: WorkflowSummary[] | undefined;
+  functions?: WorkflowSummary[] | undefined;
+  limit?: number;
   usage: WorkflowUsage[] | undefined;
 }): TopFunctionRow[] {
   const summariesBySlug = new Map(
@@ -374,7 +674,7 @@ export function buildTopFunctionRows({
   return (
     usage
       ?.map((fn) => {
-        const summary = summariesBySlug.get(fn.slug);
+        const summary = summariesBySlug.get(fn.slug) ?? fn;
         const dailyFailureCount = fn.dailyFailures.total;
         const dailyFinishedCount =
           fn.dailyCompleted.total + fn.dailyCancelled.total + dailyFailureCount;
@@ -410,6 +710,6 @@ export function buildTopFunctionRows({
         };
       })
       .sort((a, b) => (b.usage?.totalVolume ?? 0) - (a.usage?.totalVolume ?? 0))
-      .slice(0, 5) ?? []
+      .slice(0, limit) ?? []
   );
 }

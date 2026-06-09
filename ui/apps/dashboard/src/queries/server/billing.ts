@@ -339,6 +339,9 @@ export const currentPlanDocument = graphql(`
         addons {
           concurrency {
             available
+            baseValue
+            maxValue
+            name
             price
             purchaseCount
             quantityPer
@@ -373,6 +376,20 @@ export const currentPlanDocument = graphql(`
         functionBacklogSize {
           limit
         }
+      }
+      addons {
+        concurrency {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+      }
+      paymentMethods {
+        default
       }
       subscription {
         nextInvoiceDate
