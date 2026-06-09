@@ -2,6 +2,7 @@ package pauses
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -337,8 +338,34 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 		return
 	}
 
-	// TODO:  Here we can optionally filter out deleted pauses from
-	// the delete buffer.
+	// Deleted IDs are authoritative for compacted blocks: a block may retain a
+	// deleted pause as a phantom boundary marker, but iteration must not return
+	// it as live work. Fail closed on lookup errors so callers retry instead of
+	// potentially resuming a deleted pause.
+	deletedIDs, _, err := d.blockReader.GetBlockDeletedIDs(ctx, d.idx, id)
+	if err != nil {
+		if d.err == nil {
+			d.l.Lock()
+			d.err = err
+			d.l.Unlock()
+		}
+
+		metrics.HistogramPauseBlockFetchLatency(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"success": false},
+		})
+		return
+	}
+	if len(deletedIDs) > 0 {
+		deleted := make(map[string]struct{}, len(deletedIDs))
+		for _, pauseID := range deletedIDs {
+			deleted[pauseID] = struct{}{}
+		}
+		block.Pauses = slices.DeleteFunc(block.Pauses, func(pause *state.Pause) bool {
+			_, ok := deleted[pause.ID.String()]
+			return ok
+		})
+	}
 
 	d.l.Lock()
 	defer d.l.Unlock()
