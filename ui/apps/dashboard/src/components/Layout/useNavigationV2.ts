@@ -9,6 +9,11 @@ const NAV_QUERY_PARAM = 'nav';
 
 type NavOverride = 'v1' | 'v2' | null;
 
+type NavigationV2State = {
+  value: boolean;
+  isReady: boolean;
+};
+
 function parseOverride(value: string | null): NavOverride {
   return value === 'v1' || value === 'v2' ? value : null;
 }
@@ -40,21 +45,32 @@ function readNavOverride(): NavOverride {
 // Defaults to false (old navigation) until LaunchDarkly identifies the account,
 // so accounts not targeted for the flag always render the old nav. A manual
 // `?nav=v1|v2` override (see readNavOverride) takes precedence over the flag.
-export function useNavigationV2(): boolean {
+export function useNavigationV2State(): NavigationV2State {
   // Default false: until LaunchDarkly serves an explicit `true` for this
   // account, the old navigation is always used.
-  const { value: flagValue } = useBooleanFlag(NAVIGATION_V2_FLAG, false);
+  const { isReady: flagReady, value: flagValue } = useBooleanFlag(
+    NAVIGATION_V2_FLAG,
+    false,
+  );
 
   // Resolved after mount to stay SSR/hydration-safe — no window access during
   // the first render, so the initial markup matches the flag-driven default.
-  const [override, setOverride] = useState<NavOverride>(null);
+  const [override, setOverride] = useState<NavOverride | undefined>(undefined);
   useEffect(() => {
     setOverride(readNavOverride());
   }, []);
 
-  if (override) {
-    return override === 'v2';
+  if (override === undefined) {
+    return { isReady: false, value: flagValue };
   }
 
-  return flagValue;
+  if (override) {
+    return { isReady: true, value: override === 'v2' };
+  }
+
+  return { isReady: flagReady, value: flagValue };
+}
+
+export function useNavigationV2(): boolean {
+  return useNavigationV2State().value;
 }

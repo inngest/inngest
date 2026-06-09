@@ -5,6 +5,7 @@ import { OptionalLink } from '../Link/OptionalLink';
 import { Pill } from '../Pill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { cn } from '../utils/classNames';
+import { isMenuItemActive } from './isMenuItemActive';
 
 export const MenuItem = ({
   text,
@@ -12,6 +13,7 @@ export const MenuItem = ({
   collapsed,
   href,
   to,
+  exact = false,
   prefetch = false,
   comingSoon = false,
   beta = false,
@@ -23,6 +25,7 @@ export const MenuItem = ({
   collapsed: boolean;
   href?: string;
   to?: LinkComponentProps['to'];
+  exact?: boolean;
   prefetch?: false | 'intent' | 'viewport' | 'render';
   comingSoon?: boolean;
   beta?: boolean;
@@ -30,7 +33,7 @@ export const MenuItem = ({
   className?: string;
 }) => {
   const location = useLocation();
-  const active = (href || to) && location.href.startsWith(href || to || '');
+  const active = isMenuItemActive(location.href, href || to || '', exact);
 
   return (
     <OptionalLink href={comingSoon ? '' : href} to={comingSoon ? undefined : to} preload={prefetch}>
