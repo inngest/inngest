@@ -24,6 +24,12 @@ func (m *mockFunctionProvider) GetFunction(ctx context.Context, identifier strin
 	return fn, args.Error(1)
 }
 
+func (m *mockFunctionProvider) GetFunctionByApp(ctx context.Context, appID string, functionID string) (inngest.DeployedFunction, error) {
+	args := m.Called(ctx, appID, functionID)
+	fn, _ := args.Get(0).(inngest.DeployedFunction)
+	return fn, args.Error(1)
+}
+
 type mockFunctionRunReader struct {
 	mock.Mock
 }

@@ -12,6 +12,9 @@ import (
 
 var responseEnumPrefixes = []string{
 	"FUNCTION_RUN_STATUS_",
+	"FUNCTION_TRIGGER_TYPE_",
+	"FUNCTION_CONCURRENCY_SCOPE_",
+	"FUNCTION_SINGLETON_MODE_",
 	"TRACE_SPAN_STATUS_",
 	"TRACE_STEP_OP_",
 }

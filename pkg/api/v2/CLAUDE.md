@@ -143,7 +143,7 @@ GET /v2/functions?cursor=01hp1zx8m3ng9vp6qn0xk7j4cy&limit=50
 ### Resource CRUD
 
 ```go
-// GET /v2/functions/{id} - retrieve
+// GET /v2/apps/{appId}/functions/{functionId} - retrieve
 // POST /v2/functions - create
 // PUT /v2/functions/{id} - full replace
 // PATCH /v2/functions/{id} - partial update
@@ -153,7 +153,7 @@ GET /v2/functions?cursor=01hp1zx8m3ng9vp6qn0xk7j4cy&limit=50
 ### Action Endpoints
 
 ```go
-// POST /v2/functions/{id}/invoke - trigger action
+// POST /v2/apps/{appId}/functions/{functionId}/invoke - trigger action
 // POST /v2/functions/{id}/pause - state change
 // POST /v2/runs/{id}/replay - action on resource
 ```

@@ -35,6 +35,7 @@ const (
 	V2_GetEventRuns_FullMethodName             = "/api.v2.V2/GetEventRuns"
 	V2_SyncApp_FullMethodName                  = "/api.v2.V2/SyncApp"
 	V2_GetFunctionTrace_FullMethodName         = "/api.v2.V2/GetFunctionTrace"
+	V2_GetFunction_FullMethodName              = "/api.v2.V2/GetFunction"
 	V2_InvokeFunction_FullMethodName           = "/api.v2.V2/InvokeFunction"
 	V2_ListInsightsTables_FullMethodName       = "/api.v2.V2/ListInsightsTables"
 	V2_ListInsightsEventSchemas_FullMethodName = "/api.v2.V2/ListInsightsEventSchemas"
@@ -65,6 +66,7 @@ type V2Client interface {
 	GetEventRuns(ctx context.Context, in *GetEventRunsRequest, opts ...grpc.CallOption) (*GetEventRunsResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
+	GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error)
 	InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error)
 	ListInsightsTables(ctx context.Context, in *ListInsightsTablesRequest, opts ...grpc.CallOption) (*ListInsightsTablesResponse, error)
 	ListInsightsEventSchemas(ctx context.Context, in *ListInsightsEventSchemasRequest, opts ...grpc.CallOption) (*ListInsightsEventSchemasResponse, error)
@@ -240,6 +242,16 @@ func (c *v2Client) GetFunctionTrace(ctx context.Context, in *GetFunctionTraceReq
 	return out, nil
 }
 
+func (c *v2Client) GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFunctionResponse)
+	err := c.cc.Invoke(ctx, V2_GetFunction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) InvokeFunction(ctx context.Context, in *InvokeFunctionRequest, opts ...grpc.CallOption) (*InvokeFunctionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(InvokeFunctionResponse)
@@ -313,6 +325,7 @@ type V2Server interface {
 	GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
+	GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error)
 	InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error)
 	ListInsightsTables(context.Context, *ListInsightsTablesRequest) (*ListInsightsTablesResponse, error)
 	ListInsightsEventSchemas(context.Context, *ListInsightsEventSchemasRequest) (*ListInsightsEventSchemasResponse, error)
@@ -375,6 +388,9 @@ func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncApp
 }
 func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctionTrace not implemented")
+}
+func (UnimplementedV2Server) GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFunction not implemented")
 }
 func (UnimplementedV2Server) InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InvokeFunction not implemented")
@@ -700,6 +716,24 @@ func _V2_GetFunctionTrace_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_GetFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFunctionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetFunction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetFunction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetFunction(ctx, req.(*GetFunctionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_InvokeFunction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InvokeFunctionRequest)
 	if err := dec(in); err != nil {
@@ -860,6 +894,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFunctionTrace",
 			Handler:    _V2_GetFunctionTrace_Handler,
+		},
+		{
+			MethodName: "GetFunction",
+			Handler:    _V2_GetFunction_Handler,
 		},
 		{
 			MethodName: "InvokeFunction",

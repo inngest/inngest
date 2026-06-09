@@ -1089,6 +1089,24 @@ service V2 {
     };
   }
 
+  rpc GetFunction(GetFunctionRequest) returns (GetFunctionResponse) {
+    option (google.api.http) = {
+      get: "/apps/{app_id}/functions/{function_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get function"
+      description: "Fetches function configuration and status details for a function within an app"
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/{function_id}/invoke",
@@ -1619,6 +1637,117 @@ message AppRef {
   string id = 1;
 }
 
+enum FunctionTriggerType {
+  FUNCTION_TRIGGER_TYPE_UNSPECIFIED = 0;
+  FUNCTION_TRIGGER_TYPE_EVENT = 1;
+  FUNCTION_TRIGGER_TYPE_CRON = 2;
+}
+
+enum FunctionConcurrencyScope {
+  FUNCTION_CONCURRENCY_SCOPE_UNSPECIFIED = 0;
+  FUNCTION_CONCURRENCY_SCOPE_ACCOUNT = 1;
+  FUNCTION_CONCURRENCY_SCOPE_ENVIRONMENT = 2;
+  FUNCTION_CONCURRENCY_SCOPE_FUNCTION = 3;
+}
+
+enum FunctionSingletonMode {
+  FUNCTION_SINGLETON_MODE_UNSPECIFIED = 0;
+  FUNCTION_SINGLETON_MODE_SKIP = 1;
+  FUNCTION_SINGLETON_MODE_CANCEL = 2;
+}
+
+message FunctionApp {
+  string id = 1;
+  reserved 2, 3, 4;
+  reserved "external_id", "name", "latest_sync";
+}
+
+message FunctionTrigger {
+  FunctionTriggerType type = 1;
+  string value = 2;
+  optional string if = 3;
+}
+
+message FunctionFailureHandler {
+  string slug = 1;
+  string name = 2;
+}
+
+message FunctionCancellationConfiguration {
+  string event = 1;
+  optional string timeout = 2;
+  optional string condition = 3;
+}
+
+message FunctionRetryConfiguration {
+  int32 value = 1;
+  optional bool is_default = 2;
+}
+
+message FunctionEventsBatchConfiguration {
+  int32 max_size = 1;
+  string timeout = 2;
+  optional string key = 3;
+}
+
+message FunctionConcurrencyLimitConfiguration {
+  int32 value = 1;
+  optional bool is_plan_limit = 2;
+}
+
+message FunctionConcurrencyConfiguration {
+  FunctionConcurrencyScope scope = 1;
+  FunctionConcurrencyLimitConfiguration limit = 2;
+  optional string key = 3;
+}
+
+message FunctionRateLimitConfiguration {
+  int32 limit = 1;
+  string period = 2;
+  optional string key = 3;
+}
+
+message FunctionDebounceConfiguration {
+  string period = 1;
+  optional string key = 2;
+}
+
+message FunctionThrottleConfiguration {
+  int32 burst = 1;
+  optional string key = 2;
+  int32 limit = 3;
+  string period = 4;
+}
+
+message FunctionSingletonConfiguration {
+  FunctionSingletonMode mode = 1;
+  optional string key = 2;
+}
+
+message FunctionConfiguration {
+  repeated FunctionCancellationConfiguration cancellations = 1;
+  FunctionRetryConfiguration retries = 2;
+  optional string priority = 3;
+  optional FunctionEventsBatchConfiguration events_batch = 4;
+  repeated FunctionConcurrencyConfiguration concurrency = 5;
+  optional FunctionRateLimitConfiguration rate_limit = 6;
+  optional FunctionDebounceConfiguration debounce = 7;
+  optional FunctionThrottleConfiguration throttle = 8;
+  optional FunctionSingletonConfiguration singleton = 9;
+}
+
+message Function {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  bool is_paused = 4;
+  bool is_archived = 5;
+  FunctionApp app = 6;
+  repeated FunctionTrigger triggers = 7;
+  optional FunctionFailureHandler failure_handler = 8;
+  FunctionConfiguration configuration = 9;
+}
+
 message RunTrigger {
   repeated string event_ids = 1;
   optional string event_name = 2;
@@ -1707,6 +1836,16 @@ message GetFunctionTraceRequest {
 
 message GetFunctionTraceResponse {
   FunctionTrace data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message GetFunctionRequest {
+  string app_id = 1;
+  string function_id = 2;
+}
+
+message GetFunctionResponse {
+  Function data = 1;
   ResponseMetadata metadata = 2;
 }
 
