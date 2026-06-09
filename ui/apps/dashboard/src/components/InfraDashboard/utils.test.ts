@@ -429,6 +429,97 @@ describe('infra dashboard billing actions', () => {
     });
   });
 
+  it('allows legacy plans to select every paid SKU without addon metadata', () => {
+    const legacyPlan = {
+      amount: 49_900,
+      isFree: false,
+      name: 'Legacy Pro',
+      slug: 'legacy-pro-2024',
+    };
+
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: null,
+        currentConcurrencyLimit: 500,
+        currentPlan: legacyPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-S',
+      }),
+    ).toMatchObject({
+      addonUpdate: null,
+      item: {
+        planSlug: 'pro-2025-08-08',
+      },
+      type: 'upgrade-base-plan',
+    });
+
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: null,
+        currentConcurrencyLimit: 500,
+        currentPlan: legacyPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-M',
+      }),
+    ).toMatchObject({
+      addonUpdate: {
+        addonName: 'concurrency',
+        addonQuantity: 2,
+        targetConcurrency: 250,
+        targetMonthlyAmountCents: 24_900,
+        targetSku: 'IN-M',
+      },
+      item: {
+        planSlug: 'pro-2025-08-08',
+      },
+      type: 'upgrade-base-plan',
+    });
+
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: null,
+        currentConcurrencyLimit: 500,
+        currentPlan: legacyPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-L',
+      }),
+    ).toMatchObject({
+      addonUpdate: {
+        addonName: 'concurrency',
+        addonQuantity: 4,
+        targetConcurrency: 500,
+        targetMonthlyAmountCents: 59_900,
+        targetSku: 'IN-L',
+      },
+      item: {
+        planSlug: 'pro-2025-08-08',
+      },
+      type: 'upgrade-base-plan',
+    });
+
+    expect(
+      getInfraPlanBillingAction({
+        concurrencyAddon: null,
+        currentConcurrencyLimit: 500,
+        currentPlan: legacyPlan,
+        currentPlanSku: 'IN-L',
+        targetSku: 'IN-XL',
+      }),
+    ).toMatchObject({
+      addonUpdate: {
+        addonName: 'concurrency',
+        addonQuantity: 9,
+        targetConcurrency: 1_000,
+        targetMonthlyAmountCents: 119_900,
+        targetSku: 'IN-XL',
+      },
+      item: {
+        planSlug: 'pro-2025-08-08',
+      },
+      type: 'upgrade-base-plan',
+    });
+  });
+
   it('returns unavailable for missing addon data or targets above addon max', () => {
     expect(
       getInfraPlanBillingAction({

@@ -179,6 +179,7 @@ const INFRA_PLAN_BILLING_TARGETS: Record<
 const CONCURRENCY_ADDON_NAME = 'concurrency';
 const PRO_BASE_CONCURRENCY =
   INFRA_PLAN_BILLING_TARGETS['IN-S'].targetConcurrency;
+const DEFAULT_CONCURRENCY_ADDON_QUANTITY_PER = 100;
 
 function isUsableConcurrencyAddon(
   addon?: InfraConcurrencyAddonSource | null,
@@ -339,6 +340,41 @@ function buildAddonRemoval({
   };
 }
 
+function buildStaticAddonUpdate({
+  currentConcurrencyLimit,
+  targetConcurrency,
+  targetMonthlyAmountCents,
+  targetSku,
+}: {
+  currentConcurrencyLimit?: number | null;
+  targetConcurrency: number;
+  targetMonthlyAmountCents: number;
+  targetSku: InfraPlanSku;
+}): InfraPlanAddonUpdate {
+  const addonQuantity = Math.max(
+    0,
+    Math.ceil(
+      (targetConcurrency - PRO_BASE_CONCURRENCY) /
+        DEFAULT_CONCURRENCY_ADDON_QUANTITY_PER,
+    ),
+  );
+
+  return {
+    addonName: CONCURRENCY_ADDON_NAME,
+    addonQuantity,
+    estimatedMonthlyAddonCost: Math.max(
+      0,
+      targetMonthlyAmountCents - PRO_PLAN_BASE_AMOUNT_CENTS,
+    ),
+    isIncrease:
+      typeof currentConcurrencyLimit !== 'number' ||
+      targetConcurrency > currentConcurrencyLimit,
+    targetConcurrency,
+    targetMonthlyAmountCents,
+    targetSku,
+  };
+}
+
 export function getInfraPlanBillingAction({
   concurrencyAddon,
   currentConcurrencyLimit,
@@ -362,6 +398,7 @@ export function getInfraPlanBillingAction({
 
   const target = INFRA_PLAN_BILLING_TARGETS[targetSku];
   const currentIsFree = isFreeBillingPlan(currentPlan);
+  const currentIsMappedInfraPlan = isMappedInfraBillingPlan(currentPlan);
 
   if (target.basePlanSlug === FREE_INFRA_PLAN_SLUG) {
     return currentPlan.slug === FREE_INFRA_PLAN_SLUG
@@ -409,21 +446,31 @@ export function getInfraPlanBillingAction({
     targetMonthlyAmountCents: target.monthlyAmountCents,
     targetSku,
   });
+  const resolvedAddonUpdate =
+    'type' in addonUpdate && !currentIsMappedInfraPlan
+      ? buildStaticAddonUpdate({
+          currentConcurrencyLimit,
+          targetConcurrency: target.targetConcurrency,
+          targetMonthlyAmountCents: target.monthlyAmountCents,
+          targetSku,
+        })
+      : addonUpdate;
 
-  if ('type' in addonUpdate) {
-    return addonUpdate;
+  if ('type' in resolvedAddonUpdate) {
+    return resolvedAddonUpdate;
   }
 
   if (currentIsFree || currentPlan?.slug !== PRO_INFRA_PLAN_SLUG) {
     return {
-      addonUpdate: addonUpdate.addonQuantity > 0 ? addonUpdate : null,
+      addonUpdate:
+        resolvedAddonUpdate.addonQuantity > 0 ? resolvedAddonUpdate : null,
       item: buildCheckoutItem(PRO_INFRA_PLAN_SLUG),
       type: 'upgrade-base-plan',
     };
   }
 
   return {
-    ...addonUpdate,
+    ...resolvedAddonUpdate,
     type: 'update-concurrency-addon',
   };
 }

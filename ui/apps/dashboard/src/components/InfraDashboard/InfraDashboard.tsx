@@ -77,6 +77,7 @@ export function InfraDashboard() {
 
         <div className="flex w-fit max-w-full flex-col items-stretch gap-2">
           <InfraPlanDropdown
+            billingActionsReady={data.billingActionsReady}
             billingPlanReady={data.billingPlanReady}
             concurrencyAddon={data.concurrencyAddon}
             currentBillingPlan={data.currentBillingPlan}
@@ -211,6 +212,7 @@ function KpiCard({
 }
 
 function InfraPlanDropdown({
+  billingActionsReady,
   billingPlanReady,
   concurrencyAddon,
   currentBillingPlan,
@@ -221,6 +223,7 @@ function InfraPlanDropdown({
   plans,
   selectedPlan,
 }: {
+  billingActionsReady: boolean;
   billingPlanReady: boolean;
   concurrencyAddon?: InfraConcurrencyAddonSource | null;
   currentBillingPlan?: BillingPlanSource | null;
@@ -300,7 +303,7 @@ function InfraPlanDropdown({
 
   const handlePlanClick = useCallback(
     (plan: InfraPlan) => {
-      if (!canChangePlan || !billingPlanReady) {
+      if (!canChangePlan || !billingActionsReady) {
         return;
       }
 
@@ -350,7 +353,7 @@ function InfraPlanDropdown({
     },
     [
       canChangePlan,
-      billingPlanReady,
+      billingActionsReady,
       concurrencyAddon,
       currentBillingPlan,
       currentConcurrencyLimit,
@@ -416,7 +419,7 @@ function InfraPlanDropdown({
                 <span className="text-right">Price / mo</span>
               </div>
               {plans.map((plan) => {
-                const action = billingPlanReady
+                const action = billingActionsReady
                   ? getInfraPlanBillingAction({
                       concurrencyAddon,
                       currentConcurrencyLimit,
@@ -430,7 +433,7 @@ function InfraPlanDropdown({
                     } as const);
                 const isCurrent = billingPlanReady && action.type === 'current';
                 const isActionable =
-                  billingPlanReady &&
+                  billingActionsReady &&
                   canChangePlan &&
                   action.type !== 'current' &&
                   action.type !== 'unavailable';

@@ -151,6 +151,9 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       backlogDepth,
       billingNextInvoiceDate:
         currentPlan.data?.account.subscription?.nextInvoiceDate,
+      billingActionsReady: Boolean(
+        !currentPlan.fetching && currentPlan.data?.account.plan,
+      ),
       billingPlanReady,
       concurrencyAddon: pickInfraConcurrencyAddon({
         accountAddon: currentPlan.data?.account.addons?.concurrency,
