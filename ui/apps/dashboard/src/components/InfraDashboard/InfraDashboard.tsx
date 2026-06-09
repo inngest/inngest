@@ -65,7 +65,7 @@ export function InfraDashboard() {
   const selectedPlan = data.currentInfraPlan;
 
   return (
-    <div className="bg-canvasBase min-h-full w-full px-4 py-4 lg:px-6">
+    <div className="bg-canvasBase min-h-full w-full px-4 pb-16 pt-4 lg:px-6">
       <header className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
