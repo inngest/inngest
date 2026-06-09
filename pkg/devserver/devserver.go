@@ -425,7 +425,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("could not create debounce manager: %w", err)
 	}
-	croner := cron.NewManager(queueShard, rq, l)
+	croner := cron.NewManager(queueShard, rq, l, cron.WithSplitCronPartitionByWorkspace(func(_ context.Context, _ uuid.UUID) bool {
+		return true
+	}))
 
 	sn := singleton.New(ctx, shardRegistry)
 
