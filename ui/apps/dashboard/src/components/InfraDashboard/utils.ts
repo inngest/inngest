@@ -673,6 +673,7 @@ export function buildTopFunctionRows({
 
   return (
     usage
+      ?.filter((fn) => fn.dailyStarts.total > 0)
       ?.map((fn) => {
         const summary = summariesBySlug.get(fn.slug) ?? fn;
         const dailyFailureCount = fn.dailyFailures.total;

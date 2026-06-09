@@ -608,7 +608,7 @@ function InfraTierDropdown({
   const triggerMetrics = getTierTriggerMetrics(selectedTier);
 
   return (
-    <div className="relative mx-auto mb-6 w-full max-w-xl">
+    <div className="relative z-10 mx-auto mb-6 w-full max-w-xl">
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <button
@@ -753,9 +753,9 @@ function InfraFlowPanel({
     ) ?? placeholders.infraTiers[0];
 
   return (
-    <section className="border-subtle bg-canvasSubtle relative mb-8 overflow-hidden rounded-md border p-4 md:p-6">
+    <section className="border-subtle bg-canvasSubtle relative z-0 mb-10 min-h-[280px] overflow-visible rounded-md border p-4 md:p-6">
       <div
-        className="absolute inset-0 opacity-80"
+        className="pointer-events-none absolute inset-0 rounded-md opacity-80"
         style={{
           backgroundImage:
             'radial-gradient(circle, rgba(120,120,120,0.22) 1px, transparent 1px)',
@@ -768,7 +768,7 @@ function InfraFlowPanel({
         selectedTier={selectedTier}
       />
 
-      <div className="relative grid items-center gap-4 lg:grid-cols-[1fr_56px_1fr_56px_1fr]">
+      <div className="relative z-10 grid items-center gap-4 lg:grid-cols-[1fr_56px_1fr_56px_1fr]">
         <FlowNode
           fetching={fetching}
           label="Events"
@@ -838,10 +838,20 @@ function FlowNode({
 }) {
   const numericPrimary =
     progressValue ?? Number(primaryValue.replace(/[^\d.]/g, ''));
-  const progress =
+  const progressPercent =
     Number.isFinite(numericPrimary) && typeof limit === 'number' && limit > 0
-      ? Math.max(8, Math.min(100, (numericPrimary / limit) * 100))
-      : 28;
+      ? (numericPrimary / limit) * 100
+      : null;
+  const progress =
+    progressPercent === null ? 28 : Math.max(8, Math.min(100, progressPercent));
+  const progressColor =
+    progressPercent !== null && progressPercent >= 90
+      ? 'bg-errorContrast'
+      : progressPercent !== null && progressPercent >= 75
+      ? 'bg-warning'
+      : accent
+      ? 'bg-secondary-moderate'
+      : 'bg-primary-moderate';
   const limitLabel =
     typeof limit === 'number' ? formatCompactNumber(limit) : 'Unlimited';
 
@@ -866,10 +876,7 @@ function FlowNode({
       )}
       <div className="bg-canvasMuted h-1 overflow-hidden rounded-full">
         <div
-          className={cn(
-            'h-full rounded-full',
-            accent ? 'bg-secondary-moderate' : 'bg-primary-moderate',
-          )}
+          className={cn('h-full rounded-full', progressColor)}
           style={{ width: `${progress}%` }}
         />
       </div>

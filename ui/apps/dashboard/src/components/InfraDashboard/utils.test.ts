@@ -575,6 +575,28 @@ describe('infra dashboard top functions', () => {
       'Function 6',
     ]);
   });
+
+  it('filters functions with no runs from top rows', () => {
+    const usage = [0, 12, 0, 4].map((total, index) => ({
+      app: { externalID: `app-${index + 1}`, name: `App ${index + 1}` },
+      id: `fn-${index + 1}`,
+      isArchived: false,
+      isPaused: false,
+      name: `Function ${index + 1}`,
+      slug: `function-${index + 1}`,
+      triggers: [],
+      dailyStarts: { total, data: [] },
+      dailyCompleted: { total, data: [] },
+      dailyCancelled: { total: 0, data: [] },
+      dailyFailures: { total: 0, data: [] },
+    })) as unknown as NonNullable<
+      Parameters<typeof buildTopFunctionRows>[0]['usage']
+    >;
+
+    const rows = buildTopFunctionRows({ functions: undefined, usage });
+
+    expect(rows.map((row) => row.name)).toEqual(['Function 2', 'Function 4']);
+  });
 });
 
 describe('MenuItem exact matching', () => {
