@@ -261,20 +261,31 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       lookups.error ||
       functions.error ||
       functionUsage.error ||
-      events.error ||
       volume.error ||
       billableExecutions.error ||
       currentPlan.error ||
       availablePlans.error,
+    eventsError: events.error,
+    eventsFetching: events.fetching,
     fetching:
       lookups.fetching ||
       functions.fetching ||
       functionUsage.fetching ||
-      events.fetching ||
       volume.fetching ||
       billableExecutions.fetching ||
       currentPlan.fetching ||
       availablePlans.fetching,
+    loading: {
+      backlog: volume.fetching,
+      billing: currentPlan.fetching || availablePlans.fetching,
+      eventsReceived: events.fetching,
+      executionsRan:
+        billableExecutions.fetching ||
+        (!billableExecutions.data?.usage && volume.fetching),
+      executors: volume.fetching,
+      queue: volume.fetching,
+      topFunctions: functionUsage.fetching,
+    },
     range,
     refetchBillingData: async () => {
       await client
