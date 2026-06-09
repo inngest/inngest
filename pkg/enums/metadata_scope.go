@@ -11,4 +11,5 @@ const (
 	// We keep it here for backward compatibility with old metadata that was written with this scope.
 	MetadataScopeStepAttempt
 	MetadataScopeExtendedTrace
+	MetadataScopeRequest
 )
