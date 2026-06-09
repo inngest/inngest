@@ -29,7 +29,10 @@ export default function TopBar({
             >
               <OrgButton profile={profile} />
             </OrgMenu>
-            <span className="text-disabled flex h-8 items-center" aria-hidden>
+            <span
+              className="text-disabled flex h-8 items-center leading-none"
+              aria-hidden
+            >
               /
             </span>
           </>
