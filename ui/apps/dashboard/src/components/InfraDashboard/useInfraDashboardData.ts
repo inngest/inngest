@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
 import {
   GetBillableExecutionsDocument,
   GetCurrentPlanDocument,
-  GetEventsV2Document,
   GetFunctionsDocument,
   GetFunctionsUsageDocument,
   GetPlansDocument,
@@ -43,6 +43,26 @@ const functionCountPageSize = 1;
 const topFunctionsUsagePageSize = 1000;
 const topFunctionsLimit = 50;
 
+const InfraDashboardEventsCountDocument = graphql(`
+  query InfraDashboardEventsCount(
+    $envID: ID!
+    $startTime: Time!
+    $endTime: Time
+  ) {
+    environment: workspace(id: $envID) {
+      eventsV2(
+        filter: {
+          from: $startTime
+          until: $endTime
+          includeInternalEvents: false
+        }
+      ) {
+        totalCount
+      }
+    }
+  }
+`);
+
 export function useInfraDashboardData(timeRange: TimeRangeOption) {
   const env = useEnvironment();
   const client = useClient();
@@ -75,14 +95,10 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
   });
 
   const [events] = useQuery({
-    query: GetEventsV2Document,
+    query: InfraDashboardEventsCountDocument,
     variables: {
-      celQuery: null,
-      cursor: null,
       endTime: range.until.toISOString(),
       envID: env.id,
-      eventNames: null,
-      includeInternalEvents: false,
       startTime: range.from.toISOString(),
     },
   });
