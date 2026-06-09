@@ -6,7 +6,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
@@ -48,8 +47,6 @@ func (m *mockRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.
 func (m *mockRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {}
 func (m *mockRunContext) SetError(err error)                                                   {}
 func (m *mockRunContext) ReleaseCapacityLease() error                                          { return nil }
-func (m *mockRunContext) RootSpan() *meta.SpanReference                                        { return &meta.SpanReference{} }
-func (m *mockRunContext) StartTime() time.Time                                                 { return time.Time{} }
 
 // Compile-time check that mockRunContext implements RunContext.
 var _ execution.RunContext = (*mockRunContext)(nil)
@@ -108,7 +105,7 @@ func TestCreateMetadataSpan_SpanExactlyAtLimit(t *testing.T) {
 		values: makeValues(consts.MaxMetadataSpanSize), // exactly 64 KB
 	}
 
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.NoError(t, err)
 	require.NotNil(t, ref)
 }
@@ -122,7 +119,7 @@ func TestCreateMetadataSpan_SpanOverLimit(t *testing.T) {
 		values: makeValues(consts.MaxMetadataSpanSize + 1), // 64 KB + 1
 	}
 
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.ErrorIs(t, err, metadata.ErrMetadataSpanTooLarge)
 	require.Nil(t, ref)
 }
@@ -136,7 +133,7 @@ func TestCreateMetadataSpan_CumulativeWithinLimit(t *testing.T) {
 		values: makeValues(1000),
 	}
 
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.NoError(t, err)
 	require.NotNil(t, ref)
 }
@@ -152,7 +149,7 @@ func TestCreateMetadataSpan_CumulativeOverLimit(t *testing.T) {
 		values: makeValues(101), // would push over 1 MB
 	}
 
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.ErrorIs(t, err, metadata.ErrRunMetadataSizeExceeded)
 	require.Nil(t, ref)
 }
@@ -168,7 +165,7 @@ func TestCreateMetadataSpan_CumulativeExactlyAtLimit(t *testing.T) {
 		values: makeValues(500), // currentSize + spanSize == MaxRunMetadataSize
 	}
 
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.NoError(t, err)
 	require.NotNil(t, ref)
 }
@@ -184,7 +181,7 @@ func TestCreateMetadataSpan_CumulativeAtMaxRejectsNonZero(t *testing.T) {
 		values: makeValues(1), // any non-zero span should be rejected
 	}
 
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.ErrorIs(t, err, metadata.ErrRunMetadataSizeExceeded)
 	require.Nil(t, ref)
 }
@@ -204,7 +201,7 @@ func TestCreateMetadataSpan_SequentialAccumulation(t *testing.T) {
 	expectedFits := consts.MaxRunMetadataSize / spanSize // 1048576 / 50000 = 20
 
 	for i := range expectedFits {
-		ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+		ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 		require.NoError(t, err, "span %d should succeed", i)
 		require.NotNil(t, ref)
 	}
@@ -213,7 +210,7 @@ func TestCreateMetadataSpan_SequentialAccumulation(t *testing.T) {
 	require.Equal(t, expectedFits*spanSize, rc.md.Metrics.MetadataSize)
 
 	// The next span should exceed the cumulative limit
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.ErrorIs(t, err, metadata.ErrRunMetadataSizeExceeded)
 	require.Nil(t, ref)
 
@@ -230,7 +227,7 @@ func TestCreateMetadataSpan_SerializationError(t *testing.T) {
 		serializeErr: errors.New("marshal failed"),
 	}
 
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to serialize metadata")
 	require.Nil(t, ref)
@@ -245,7 +242,7 @@ func TestCreateMetadataSpan_EmptyValues(t *testing.T) {
 		values: metadata.Values{}, // empty, size = 0
 	}
 
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.NoError(t, err)
 	require.NotNil(t, ref)
 	// MetadataSize should still be 0 since span size was 0
@@ -270,7 +267,7 @@ func TestCreateMetadataSpan_CrossStepAccumulation(t *testing.T) {
 		kind:   "test.kind",
 		values: makeValues(spanSize),
 	}
-	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err := e.createMetadataSpan(context.Background(), rc, "test.location", md, enums.MetadataScopeStep)
 	require.NoError(t, err)
 	require.NotNil(t, ref)
 	require.Equal(t, previouslyPersisted+spanSize, rc.md.Metrics.MetadataSize)
@@ -280,7 +277,7 @@ func TestCreateMetadataSpan_CrossStepAccumulation(t *testing.T) {
 		kind:   "test.kind",
 		values: makeValues(20000),
 	}
-	ref, err = e.createMetadataSpan(context.Background(), rc, "test.location", md2, enums.MetadataScopeStep, &state.GeneratorOpcode{})
+	ref, err = e.createMetadataSpan(context.Background(), rc, "test.location", md2, enums.MetadataScopeStep)
 	require.ErrorIs(t, err, metadata.ErrRunMetadataSizeExceeded)
 	require.Nil(t, ref)
 

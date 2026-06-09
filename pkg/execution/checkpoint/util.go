@@ -1,12 +1,20 @@
 package checkpoint
 
 import (
+	"fmt"
+
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 )
+
+// stepDynamicSeed returns the deterministic seed used to derive an
+// executor.step row's dynamic_span_id.
+func stepDynamicSeed(op state.GeneratorOpcode, attempt int) []byte {
+	return fmt.Appendf(nil, "%s:%d", op.ID, attempt)
+}
 
 func stepRunAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID ulid.ULID) *meta.SerializableAttrs {
 	return attrs.Merge(
