@@ -121,6 +121,11 @@ type Executor interface {
 	// registered LifecycleListener.
 	RunFunctionFinishedLifecycle(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage, resp state.DriverResponse)
 
+	// RunStepExperimentLifecycle fans OnStepExperiment out to every registered
+	// LifecycleListener. Called from both the v1 step handler and the
+	// checkpointer when an opcode carries group.experiment() variant context.
+	RunStepExperimentLifecycle(ctx context.Context, md sv2.Metadata, op state.GeneratorOpcode)
+
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)

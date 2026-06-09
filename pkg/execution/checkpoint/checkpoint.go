@@ -277,6 +277,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncStep.metadata")
+			c.processExperiment(ctx, input.Metadata, op)
 
 			go c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
 				AccountID: input.AccountID,
@@ -315,6 +316,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncErr.metadata")
+			c.processExperiment(ctx, input.Metadata, op)
 
 			err = c.Executor.HandleGenerator(ctx, runCtx, op)
 			if errors.Is(err, executor.ErrHandledStepError) {
@@ -571,6 +573,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
+			c.processExperiment(ctx, &md, op)
 
 		case enums.OpcodeStepPlanned:
 			// When the SDK announces a step is about to run, we open a Running
@@ -795,6 +798,16 @@ func (c checkpointer) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function
 		return nil, fmt.Errorf("error loading function: %w", err)
 	}
 	return cfn.InngestFunction()
+}
+
+// Deliberately not behind the AllowStepMetadata gate (unlike processMetadata):
+// experiment observation must fire regardless of the trace-metadata flag.
+func (c checkpointer) processExperiment(ctx context.Context, md *state.Metadata, op state.GeneratorOpcode) {
+	expMd, err := extractors.ExtractExperimentOptsMetadata(op.Opts)
+	if err != nil || expMd == nil {
+		return
+	}
+	c.Executor.RunStepExperimentLifecycle(ctx, *md, op)
 }
 
 func (c checkpointer) processMetadata(

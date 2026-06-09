@@ -561,6 +561,16 @@ func (e *executor) RunFunctionFinishedLifecycle(
 	}
 }
 
+func (e *executor) RunStepExperimentLifecycle(
+	ctx context.Context,
+	md sv2.Metadata,
+	op state.GeneratorOpcode,
+) {
+	for _, l := range e.lifecycles {
+		go l.OnStepExperiment(context.WithoutCancel(ctx), md, op)
+	}
+}
+
 func (e *executor) CloseLifecycleListeners(ctx context.Context) {
 	var eg errgroup.Group
 
@@ -5675,6 +5685,8 @@ func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx ex
 	); err != nil {
 		e.log.Warn("error creating experiment metadata span", "error", err)
 	}
+
+	e.RunStepExperimentLifecycle(ctx, *runCtx.Metadata(), *gen)
 }
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope, op *state.GeneratorOpcode) (*meta.SpanReference, error) {

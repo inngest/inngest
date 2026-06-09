@@ -358,6 +358,10 @@ func (l lifecycle) OnStepStarted(
 	}
 }
 
+// OnStepExperiment captures group.experiment() selections; a no-op here since
+// that is handled by a dedicated listener, not recorded in run history.
+func (l lifecycle) OnStepExperiment(context.Context, sv2.Metadata, state.GeneratorOpcode) {}
+
 func (l lifecycle) OnStepFinished(
 	ctx context.Context,
 	md sv2.Metadata,

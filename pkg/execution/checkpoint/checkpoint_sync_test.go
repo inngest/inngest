@@ -1163,6 +1163,19 @@ func (m *mockExecutor) RunFunctionFinishedLifecycle(
 	}
 }
 
+func (m *mockExecutor) RunStepExperimentLifecycle(
+	ctx context.Context,
+	md state.Metadata,
+	op state.GeneratorOpcode,
+) {
+	for _, c := range m.ExpectedCalls {
+		if c.Method == "RunStepExperimentLifecycle" {
+			m.Called(ctx, md, op)
+			return
+		}
+	}
+}
+
 // mockFnReader mocks the function reader interface
 type mockFnReader struct {
 	cqrs.FunctionReader

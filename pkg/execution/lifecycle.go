@@ -117,6 +117,15 @@ type LifecycleListener interface {
 		error,
 	)
 
+	// OnStepExperiment is called when a step's opcode carries group.experiment()
+	// variant context. Fires in both v1 and checkpointing execution, independent
+	// of the step-metadata gate, so listeners see every experiment selection.
+	OnStepExperiment(
+		context.Context,
+		statev2.Metadata,
+		statev1.GeneratorOpcode,
+	)
+
 	// OnGatewayRequestFinished is called when a step's offloaded request finishes.
 	// The offloaded request may be a success or error; it does not matter.
 	OnStepGatewayRequestFinished(
@@ -299,6 +308,13 @@ func (NoopLifecyceListener) OnStepFinished(
 	inngest.Edge,
 	*statev1.DriverResponse,
 	error,
+) {
+}
+
+func (NoopLifecyceListener) OnStepExperiment(
+	context.Context,
+	statev2.Metadata,
+	statev1.GeneratorOpcode,
 ) {
 }
 
