@@ -205,7 +205,7 @@ func TestHTTPGateway_GetFunction(t *testing.T) {
 	trigger := triggers[0].(map[string]any)
 	require.Equal(t, "EVENT", trigger["type"])
 	require.Equal(t, "user.created", trigger["value"])
-	require.Equal(t, condition, trigger["condition"])
+	require.Equal(t, condition, trigger["if"])
 
 	configuration := data["configuration"].(map[string]any)
 	retryConfiguration := configuration["retries"].(map[string]any)

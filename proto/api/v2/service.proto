@@ -1665,7 +1665,7 @@ message FunctionApp {
 message FunctionTrigger {
   FunctionTriggerType type = 1;
   string value = 2;
-  optional string condition = 3;
+  optional string if = 3;
 }
 
 message FunctionFailureHandler {

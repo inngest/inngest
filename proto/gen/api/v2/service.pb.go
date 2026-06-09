@@ -1023,7 +1023,7 @@ type FunctionTrigger struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Type          FunctionTriggerType    `protobuf:"varint,1,opt,name=type,proto3,enum=api.v2.FunctionTriggerType" json:"type,omitempty"`
 	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
-	Condition     *string                `protobuf:"bytes,3,opt,name=condition,proto3,oneof" json:"condition,omitempty"`
+	If            *string                `protobuf:"bytes,3,opt,name=if,proto3,oneof" json:"if,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1072,9 +1072,9 @@ func (x *FunctionTrigger) GetValue() string {
 	return ""
 }
 
-func (x *FunctionTrigger) GetCondition() string {
-	if x != nil && x.Condition != nil {
-		return *x.Condition
+func (x *FunctionTrigger) GetIf() string {
+	if x != nil && x.If != nil {
+		return *x.If
 	}
 	return ""
 }
@@ -5763,13 +5763,12 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06AppRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"O\n" +
 	"\vFunctionApp\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02idJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\vexternal_idR\x04nameR\vlatest_sync\"\x89\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02idJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\vexternal_idR\x04nameR\vlatest_sync\"t\n" +
 	"\x0fFunctionTrigger\x12/\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1b.api.v2.FunctionTriggerTypeR\x04type\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\x12!\n" +
-	"\tcondition\x18\x03 \x01(\tH\x00R\tcondition\x88\x01\x01B\f\n" +
-	"\n" +
-	"_condition\"@\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12\x13\n" +
+	"\x02if\x18\x03 \x01(\tH\x00R\x02if\x88\x01\x01B\x05\n" +
+	"\x03_if\"@\n" +
 	"\x16FunctionFailureHandler\x12\x12\n" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x95\x01\n" +

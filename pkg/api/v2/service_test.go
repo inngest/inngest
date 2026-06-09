@@ -352,7 +352,7 @@ func TestService_GetFunction(t *testing.T) {
 		require.Len(t, resp.Data.Triggers, 2)
 		require.Equal(t, apiv2.FunctionTriggerType_FUNCTION_TRIGGER_TYPE_EVENT, resp.Data.Triggers[0].Type)
 		require.Equal(t, "user.created", resp.Data.Triggers[0].Value)
-		require.Equal(t, condition, resp.Data.Triggers[0].GetCondition())
+		require.Equal(t, condition, resp.Data.Triggers[0].GetIf())
 		require.Equal(t, apiv2.FunctionTriggerType_FUNCTION_TRIGGER_TYPE_CRON, resp.Data.Triggers[1].Type)
 		require.Equal(t, "0 * * * *", resp.Data.Triggers[1].Value)
 

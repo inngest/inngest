@@ -290,9 +290,9 @@ func toFunctionTriggers(triggers inngest.MultipleTriggers) []*apiv2.FunctionTrig
 	for _, trigger := range triggers {
 		if trigger.EventTrigger != nil {
 			result = append(result, &apiv2.FunctionTrigger{
-				Type:      apiv2.FunctionTriggerType_FUNCTION_TRIGGER_TYPE_EVENT,
-				Value:     trigger.Event,
-				Condition: trigger.Expression,
+				Type:  apiv2.FunctionTriggerType_FUNCTION_TRIGGER_TYPE_EVENT,
+				Value: trigger.Event,
+				If:    trigger.Expression,
 			})
 		}
 		if trigger.CronTrigger != nil {
