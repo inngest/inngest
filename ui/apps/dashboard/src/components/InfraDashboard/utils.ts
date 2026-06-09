@@ -5,6 +5,7 @@ import type {
   TimeSeriesPoint,
 } from '@/gql/graphql';
 import type { Function as FunctionRow } from '@inngest/components/types/function';
+import type { InfraPlan, InfraPlanSku, InfraTierId } from './placeholderData';
 
 export type DashboardKpi = {
   label: string;
@@ -59,6 +60,181 @@ export function formatBytes(bytes: number): string {
       ? value.toFixed(0)
       : value.toFixed(1);
   return `${formatted}${units[unitIndex]}`;
+}
+
+export function formatCentsMonthly(
+  amountCents: number | null | undefined,
+): string {
+  if (amountCents === null || amountCents === undefined) {
+    return '';
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    currency: 'USD',
+    maximumFractionDigits: 0,
+    style: 'currency',
+  }).format(amountCents / 100);
+}
+
+type BillingPlanSource = {
+  amount?: number | null;
+  entitlements?: {
+    concurrency?: { limit?: number | null } | null;
+    events?: { limit?: number | null } | null;
+    functionBacklogSize?: { limit?: number | null } | null;
+  } | null;
+  isFree?: boolean | null;
+  name?: string | null;
+  slug?: string | null;
+};
+
+type AccountEntitlementsSource = {
+  concurrency?: { limit?: number | null } | null;
+  events?: { limit?: number | null } | null;
+  functionBacklogSize?: { limit?: number | null } | null;
+};
+
+function preferDefinedLimit<T extends number | null>(
+  accountLimit: T | undefined,
+  planLimit: T | undefined,
+): T | undefined {
+  return accountLimit !== undefined ? accountLimit : planLimit;
+}
+
+export function inferInfraPlanSku({
+  concurrencyLimit,
+  defaultSku,
+  plan,
+  plans,
+}: {
+  concurrencyLimit?: number | null;
+  defaultSku: InfraPlanSku;
+  plan?: BillingPlanSource | null;
+  plans: InfraPlan[];
+}): InfraPlanSku {
+  if (typeof concurrencyLimit === 'number') {
+    const sortedPlans = [...plans].sort(
+      (a, b) => a.execConcurrencyLimit - b.execConcurrencyLimit,
+    );
+    const flooredPlan = sortedPlans.reduce<InfraPlan | undefined>(
+      (best, candidate) =>
+        candidate.execConcurrencyLimit <= concurrencyLimit ? candidate : best,
+      undefined,
+    );
+
+    return flooredPlan?.sku ?? sortedPlans[0]?.sku ?? defaultSku;
+  }
+
+  const planKey = `${plan?.slug ?? ''} ${plan?.name ?? ''}`.toLowerCase();
+
+  if (plan?.isFree || planKey.match(/\b(hobby|free|in-xs|xs)\b/)) {
+    return 'IN-XS';
+  }
+
+  if (planKey.match(/\b(pro|basic|in-s)\b/)) {
+    return 'IN-S';
+  }
+
+  if (planKey.match(/\b(enterprise|in-xl|xl)\b/)) {
+    return 'IN-XL';
+  }
+
+  return defaultSku;
+}
+
+export function getCurrentInfraTierId(planSku: InfraPlanSku): InfraTierId {
+  return planSku === 'IN-XS' ? 'free' : 'shared';
+}
+
+export function mergeBillingPlanIntoInfraPlans({
+  accountEntitlements,
+  defaultSku,
+  plan,
+  plans,
+}: {
+  accountEntitlements?: AccountEntitlementsSource | null;
+  defaultSku: InfraPlanSku;
+  plan?: BillingPlanSource | null;
+  plans: InfraPlan[];
+}): {
+  currentPlan: InfraPlan;
+  currentPlanSku: InfraPlanSku;
+  plans: InfraPlan[];
+} {
+  const concurrencyLimit =
+    accountEntitlements?.concurrency?.limit ??
+    plan?.entitlements?.concurrency?.limit ??
+    null;
+  const eventLimit = preferDefinedLimit(
+    accountEntitlements?.events?.limit,
+    plan?.entitlements?.events?.limit,
+  );
+  const queueDepthLimit = preferDefinedLimit(
+    accountEntitlements?.functionBacklogSize?.limit,
+    plan?.entitlements?.functionBacklogSize?.limit,
+  );
+  const currentPlanSku = inferInfraPlanSku({
+    concurrencyLimit,
+    defaultSku,
+    plan,
+    plans,
+  });
+  const fallbackPlan =
+    plans.find((candidate) => candidate.sku === currentPlanSku) ?? plans[0];
+  const hasLiveEntitlements =
+    typeof concurrencyLimit === 'number' ||
+    eventLimit !== undefined ||
+    queueDepthLimit !== undefined;
+
+  if (!plan && !hasLiveEntitlements) {
+    return {
+      currentPlan: fallbackPlan,
+      currentPlanSku: fallbackPlan.sku,
+      plans,
+    };
+  }
+
+  const currentPlan: InfraPlan = {
+    ...fallbackPlan,
+    eventStream:
+      eventLimit === null
+        ? 'Unlimited events/mo'
+        : eventLimit === undefined
+        ? fallbackPlan.eventStream
+        : `${formatCompactNumber(eventLimit)} events/mo`,
+    eventStreamLimit:
+      eventLimit === undefined ? fallbackPlan.eventStreamLimit : eventLimit,
+    eventStreamUnit:
+      eventLimit === undefined ? fallbackPlan.eventStreamUnit : 'events',
+    execConcurrency:
+      typeof concurrencyLimit === 'number'
+        ? formatCompactNumber(concurrencyLimit)
+        : fallbackPlan.execConcurrency,
+    execConcurrencyLimit:
+      typeof concurrencyLimit === 'number'
+        ? concurrencyLimit
+        : fallbackPlan.execConcurrencyLimit,
+    isCurrent: true,
+    priceMonthly: formatCentsMonthly(plan?.amount) || fallbackPlan.priceMonthly,
+    queueDepth:
+      queueDepthLimit === null
+        ? 'Unlimited'
+        : queueDepthLimit === undefined
+        ? fallbackPlan.queueDepth
+        : formatCompactNumber(queueDepthLimit),
+    queueDepthLimit:
+      queueDepthLimit === undefined
+        ? fallbackPlan.queueDepthLimit
+        : queueDepthLimit,
+  };
+
+  return {
+    currentPlan,
+    currentPlanSku,
+    plans: plans.map((candidate) =>
+      candidate.sku === currentPlanSku ? currentPlan : candidate,
+    ),
+  };
 }
 
 export function daysUntil(

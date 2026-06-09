@@ -8,13 +8,18 @@ import {
   calculateUsageShare,
   daysUntil,
   formatBytes,
+  formatCentsMonthly,
   formatCompactNumber,
+  getCurrentInfraTierId,
   getUtcMonthToDateRange,
+  inferInfraPlanSku,
   latestBucketMetricTotal,
   latestMetricTotal,
+  mergeBillingPlanIntoInfraPlans,
   sumMetricValues,
   sumTimeSeriesValues,
 } from './utils';
+import { INFRA_DASHBOARD_PLACEHOLDERS } from './placeholderData';
 
 describe('infra dashboard formatters', () => {
   it('formats compact numbers and bytes', () => {
@@ -22,6 +27,7 @@ describe('infra dashboard formatters', () => {
     expect(formatCompactNumber(312)).toBe('312');
     expect(formatBytes(412 * 1024 ** 3)).toBe('412GB');
     expect(formatBytes(1.4 * 1024 ** 4)).toBe('1.4TB');
+    expect(formatCentsMonthly(7_500)).toBe('$75');
   });
 
   it('calculates billing days remaining', () => {
@@ -51,6 +57,83 @@ describe('infra dashboard formatters', () => {
     expect(range.until.toISOString()).toBe('2026-06-01T00:30:00.000Z');
     expect(range.month).toBe(6);
     expect(range.year).toBe(2026);
+  });
+});
+
+describe('infra dashboard billing plan merge', () => {
+  it('infers current infra SKU from plan metadata and concurrency', () => {
+    const plans = INFRA_DASHBOARD_PLACEHOLDERS.infraPlans;
+
+    expect(
+      inferInfraPlanSku({
+        concurrencyLimit: 250,
+        defaultSku: 'IN-S',
+        plan: null,
+        plans,
+      }),
+    ).toBe('IN-M');
+    expect(
+      inferInfraPlanSku({
+        concurrencyLimit: 300,
+        defaultSku: 'IN-S',
+        plan: null,
+        plans,
+      }),
+    ).toBe('IN-M');
+    expect(
+      inferInfraPlanSku({
+        concurrencyLimit: 56,
+        defaultSku: 'IN-S',
+        plan: { isFree: false, name: 'Pro', slug: 'pro-2025-08-08' },
+        plans,
+      }),
+    ).toBe('IN-XS');
+  });
+
+  it('merges live billing entitlements into the current infra plan row', () => {
+    const result = mergeBillingPlanIntoInfraPlans({
+      accountEntitlements: {
+        concurrency: { limit: 256 },
+        events: { limit: null },
+        functionBacklogSize: { limit: 2_500_000 },
+      },
+      defaultSku: 'IN-S',
+      plan: {
+        amount: 7_500,
+        entitlements: {
+          concurrency: { limit: 100 },
+          events: { limit: 1_000_000 },
+          functionBacklogSize: { limit: 1_000_000 },
+        },
+        isFree: false,
+        name: 'Pro',
+        slug: 'pro-2025-08-08',
+      },
+      plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
+    });
+
+    expect(result.currentPlanSku).toBe('IN-M');
+    expect(result.currentPlan).toMatchObject({
+      eventStream: 'Unlimited events/mo',
+      eventStreamLimit: null,
+      eventStreamUnit: 'events',
+      execConcurrency: '256',
+      execConcurrencyLimit: 256,
+      isCurrent: true,
+      priceMonthly: '$75',
+      queueDepth: '2.5M',
+      queueDepthLimit: 2_500_000,
+      sku: 'IN-M',
+    });
+    expect(result.plans.find((plan) => plan.sku === 'IN-M')).toEqual(
+      result.currentPlan,
+    );
+  });
+
+  it('maps current infra SKU to the included infrastructure tier', () => {
+    expect(getCurrentInfraTierId('IN-XS')).toBe('free');
+    expect(getCurrentInfraTierId('IN-S')).toBe('shared');
+    expect(getCurrentInfraTierId('IN-XL')).toBe('shared');
   });
 });
 

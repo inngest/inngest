@@ -3,9 +3,14 @@ export type InfraPlanSku = 'IN-XS' | 'IN-S' | 'IN-M' | 'IN-L' | 'IN-XL';
 export type InfraPlan = {
   sku: InfraPlanSku;
   eventStream: string;
+  eventStreamLimit: number | null;
+  eventStreamUnit: 'qps' | 'events';
   queueDepth: string;
+  queueDepthLimit: number | null;
   execConcurrency: string;
+  execConcurrencyLimit: number;
   priceMonthly: string;
+  isCurrent?: boolean;
 };
 
 export type InfraTierId = 'free' | 'shared' | 'dedicated';
@@ -114,36 +119,56 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
     {
       sku: 'IN-XS',
       eventStream: '5 QPS',
+      eventStreamLimit: 5,
+      eventStreamUnit: 'qps',
       queueDepth: '100K',
+      queueDepthLimit: 100_000,
       execConcurrency: '5',
+      execConcurrencyLimit: 5,
       priceMonthly: '$0',
     },
     {
       sku: 'IN-S',
       eventStream: '50 QPS',
+      eventStreamLimit: 50,
+      eventStreamUnit: 'qps',
       queueDepth: '1M',
+      queueDepthLimit: 1_000_000,
       execConcurrency: '100',
+      execConcurrencyLimit: 100,
       priceMonthly: '$99',
     },
     {
       sku: 'IN-M',
       eventStream: '250 QPS',
+      eventStreamLimit: 250,
+      eventStreamUnit: 'qps',
       queueDepth: '5M',
+      queueDepthLimit: 5_000_000,
       execConcurrency: '250',
+      execConcurrencyLimit: 250,
       priceMonthly: '$249',
     },
     {
       sku: 'IN-L',
       eventStream: '500 QPS',
+      eventStreamLimit: 500,
+      eventStreamUnit: 'qps',
       queueDepth: '10M',
+      queueDepthLimit: 10_000_000,
       execConcurrency: '500',
+      execConcurrencyLimit: 500,
       priceMonthly: '$599',
     },
     {
       sku: 'IN-XL',
       eventStream: '1K QPS',
+      eventStreamLimit: 1_000,
+      eventStreamUnit: 'qps',
       queueDepth: '25M',
+      queueDepthLimit: 25_000_000,
       execConcurrency: '1K',
+      execConcurrencyLimit: 1_000,
       priceMonthly: '$1,199',
     },
   ],

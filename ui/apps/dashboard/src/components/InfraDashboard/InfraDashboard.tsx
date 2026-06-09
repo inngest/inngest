@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,7 @@ import {
   RiArrowRightUpLine,
   RiArrowUpSLine,
   RiCalendarLine,
+  RiCheckboxCircleLine,
   RiGroupLine,
   RiShieldCheckLine,
 } from '@remixicon/react';
@@ -28,7 +29,6 @@ import {
 import type {
   InfraDashboardPlaceholders,
   InfraPlan,
-  InfraPlanSku,
   InfraTier,
   InfraTierId,
 } from './placeholderData';
@@ -36,6 +36,7 @@ import {
   billingCycleDaysRemaining,
   formatCompactNumber,
   formatPercent,
+  getCurrentInfraTierId,
 } from './utils';
 
 export function InfraDashboard() {
@@ -44,13 +45,8 @@ export function InfraDashboard() {
     TIME_RANGE_OPTIONS[0],
   );
   const placeholders = data.placeholders;
-  const [selectedPlanSku, setSelectedPlanSku] = useState<InfraPlanSku>(
-    placeholders.defaultPlanSku,
-  );
   const billingDays = billingCycleDaysRemaining(data.billingNextInvoiceDate);
-  const selectedPlan =
-    placeholders.infraPlans.find((plan) => plan.sku === selectedPlanSku) ??
-    placeholders.infraPlans[0];
+  const selectedPlan = data.currentInfraPlan;
 
   return (
     <div className="bg-canvasBase flex min-h-full w-full flex-col px-4 py-4 lg:px-6">
@@ -65,9 +61,8 @@ export function InfraDashboard() {
 
         <div className="flex w-fit max-w-full flex-col items-stretch gap-2">
           <InfraPlanDropdown
-            plans={placeholders.infraPlans}
+            plans={data.infraPlans}
             selectedPlan={selectedPlan}
-            onSelect={setSelectedPlanSku}
           />
           <div className="text-muted flex w-full items-center justify-between gap-3 text-xs">
             <div className="flex min-w-0 items-center gap-2">
@@ -126,7 +121,14 @@ export function InfraDashboard() {
       <InfraFlowPanel
         backlogDepth={data.backlogDepth}
         currentConcurrency={data.currentConcurrency}
+        currentInfraTierId={
+          data.currentInfraPlan.isCurrent
+            ? getCurrentInfraTierId(data.currentInfraPlanSku)
+            : undefined
+        }
+        eventsReceived={data.eventsReceived}
         fetching={fetching}
+        infraPlan={data.currentInfraPlan}
         placeholders={placeholders}
       />
 
@@ -193,20 +195,13 @@ function KpiCard({
 }
 
 function InfraPlanDropdown({
-  onSelect,
   plans,
   selectedPlan,
 }: {
-  onSelect: (sku: InfraPlanSku) => void;
   plans: InfraPlan[];
   selectedPlan: InfraPlan;
 }) {
   const [open, setOpen] = useState(false);
-
-  const selectPlan = (sku: InfraPlanSku) => {
-    onSelect(sku);
-    setOpen(false);
-  };
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -267,14 +262,12 @@ function InfraPlanDropdown({
               const isSelected = plan.sku === selectedPlan.sku;
 
               return (
-                <button
+                <div
                   className={cn(
-                    'border-subtle text-basis hover:bg-canvasSubtle grid w-full grid-cols-[96px_140px_140px_160px_1fr] items-center border-t px-3 py-2.5 text-left text-xs',
+                    'border-subtle text-basis grid w-full grid-cols-[96px_140px_140px_160px_1fr] items-center border-t px-3 py-2.5 text-left text-xs',
                     isSelected && 'bg-canvasSubtle',
                   )}
                   key={plan.sku}
-                  onClick={() => selectPlan(plan.sku)}
-                  type="button"
                 >
                   <span>
                     <span className="border-muted bg-canvasBase inline-flex rounded border px-1.5 py-0.5 font-medium">
@@ -284,10 +277,13 @@ function InfraPlanDropdown({
                   <PlanMetric value={plan.eventStream} />
                   <PlanMetric value={plan.queueDepth} />
                   <PlanMetric value={plan.execConcurrency} />
-                  <span className="text-primary-intense text-right font-medium">
-                    {plan.priceMonthly}
+                  <span className="flex min-w-0 items-center justify-end gap-2">
+                    {plan.isCurrent ? <YourPlanBadge /> : null}
+                    <span className="text-primary-intense truncate text-right font-medium">
+                      {plan.priceMonthly}
+                    </span>
                   </span>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -326,11 +322,22 @@ function PlanMetric({ value }: { value: string }) {
   return <span className="min-w-0 truncate">{value}</span>;
 }
 
+function YourPlanBadge() {
+  return (
+    <span className="bg-primary-intense text-alwaysWhite inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
+      <RiCheckboxCircleLine className="h-3.5 w-3.5" />
+      Your plan
+    </span>
+  );
+}
+
 function InfraTierDropdown({
+  currentTierId,
   onSelect,
   selectedTier,
   tiers,
 }: {
+  currentTierId?: InfraTierId;
   onSelect: (tierId: InfraTierId) => void;
   selectedTier: InfraTier;
   tiers: InfraTier[];
@@ -377,6 +384,7 @@ function InfraTierDropdown({
           <div className="divide-subtle divide-y">
             {tiers.map((tier) => {
               const isSelected = tier.id === selectedTier.id;
+              const isCurrentTier = tier.id === currentTierId;
 
               return (
                 <button
@@ -397,9 +405,13 @@ function InfraTierDropdown({
                         {tier.description}
                       </div>
                     </div>
-                    <div className="text-primary-intense shrink-0 text-xs font-medium">
-                      {tier.availability}
-                    </div>
+                    {isCurrentTier ? (
+                      <YourPlanBadge />
+                    ) : (
+                      <div className="text-primary-intense shrink-0 text-xs font-medium">
+                        {tier.availability}
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -465,17 +477,29 @@ function TierMetric({ label, value }: { label: string; value: string }) {
 function InfraFlowPanel({
   backlogDepth,
   currentConcurrency,
+  currentInfraTierId,
+  eventsReceived,
   fetching,
+  infraPlan,
   placeholders,
 }: {
   backlogDepth: number;
   currentConcurrency: number;
+  currentInfraTierId?: InfraTierId;
+  eventsReceived: number;
   fetching: boolean;
+  infraPlan: InfraPlan;
   placeholders: InfraDashboardPlaceholders;
 }) {
   const [selectedTierId, setSelectedTierId] = useState<InfraTierId>(
-    placeholders.defaultInfraTierId,
+    currentInfraTierId ?? placeholders.defaultInfraTierId,
   );
+  useEffect(() => {
+    if (currentInfraTierId) {
+      setSelectedTierId(currentInfraTierId);
+    }
+  }, [currentInfraTierId]);
+
   const selectedTier =
     placeholders.infraTiers.find((tier) => tier.id === selectedTierId) ??
     placeholders.infraTiers[0];
@@ -491,6 +515,7 @@ function InfraFlowPanel({
         }}
       />
       <InfraTierDropdown
+        currentTierId={currentInfraTierId}
         tiers={placeholders.infraTiers}
         selectedTier={selectedTier}
         onSelect={setSelectedTierId}
@@ -500,9 +525,22 @@ function InfraFlowPanel({
         <FlowNode
           fetching={fetching}
           label="Event stream"
-          primaryLabel="Rate limit | GPS"
-          primaryValue={String(placeholders.eventRateLimit.current)}
-          limit={placeholders.eventRateLimit.limit}
+          primaryLabel={
+            infraPlan.eventStreamUnit === 'events'
+              ? 'Events received'
+              : 'Rate limit | GPS'
+          }
+          primaryValue={
+            infraPlan.eventStreamUnit === 'events'
+              ? formatCompactNumber(eventsReceived)
+              : String(placeholders.eventRateLimit.current)
+          }
+          progressValue={
+            infraPlan.eventStreamUnit === 'events'
+              ? eventsReceived
+              : placeholders.eventRateLimit.current
+          }
+          limit={infraPlan.eventStreamLimit}
         />
         <Connector />
         <FlowNode
@@ -511,15 +549,17 @@ function InfraFlowPanel({
           label="Queue"
           primaryLabel="Current backlog"
           primaryValue={formatCompactNumber(backlogDepth)}
-          limit={100_000}
+          progressValue={backlogDepth}
+          limit={infraPlan.queueDepthLimit}
         />
         <Connector />
         <FlowNode
           fetching={fetching}
           label="Executors"
-          primaryLabel="Concurrency"
+          primaryLabel="Concurrency in use"
           primaryValue={formatCompactNumber(currentConcurrency)}
-          limit={placeholders.functionRateLimit.limit}
+          progressValue={currentConcurrency}
+          limit={infraPlan.execConcurrencyLimit}
         />
       </div>
     </section>
@@ -531,21 +571,26 @@ function FlowNode({
   fetching,
   label,
   limit,
+  progressValue,
   primaryLabel,
   primaryValue,
 }: {
   accent?: boolean;
   fetching: boolean;
   label: string;
-  limit: number;
+  limit: number | null;
+  progressValue?: number;
   primaryLabel: string;
   primaryValue: string;
 }) {
-  const numericPrimary = Number(primaryValue.replace(/[^\d.]/g, ''));
+  const numericPrimary =
+    progressValue ?? Number(primaryValue.replace(/[^\d.]/g, ''));
   const progress =
-    Number.isFinite(numericPrimary) && limit
+    Number.isFinite(numericPrimary) && typeof limit === 'number' && limit > 0
       ? Math.max(8, Math.min(100, (numericPrimary / limit) * 100))
       : 28;
+  const limitLabel =
+    typeof limit === 'number' ? formatCompactNumber(limit) : 'Unlimited';
 
   return (
     <div className="bg-canvasBase border-subtle min-h-[132px] rounded-md border p-5 shadow-sm">
@@ -556,9 +601,7 @@ function FlowNode({
       ) : (
         <div className="text-basis mb-2 flex items-baseline justify-between">
           <span className="text-xl font-medium">{primaryValue}</span>
-          <span className="text-muted text-sm">
-            / {formatCompactNumber(limit)}
-          </span>
+          <span className="text-muted text-sm">/ {limitLabel}</span>
         </div>
       )}
       <div className="bg-canvasMuted h-1 overflow-hidden rounded-full">

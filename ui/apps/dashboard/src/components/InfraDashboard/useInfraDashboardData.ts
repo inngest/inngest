@@ -3,7 +3,6 @@ import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import {
-  AccountConcurrencyLookupDocument,
   GetBillableExecutionsDocument,
   GetCurrentPlanDocument,
   GetEventsV2Document,
@@ -20,6 +19,7 @@ import {
   getUtcMonthToDateRange,
   latestBucketMetricTotal,
   latestMetricTotal,
+  mergeBillingPlanIntoInfraPlans,
   sumDataValues,
   sumMetricValues,
   sumTimeSeriesValues,
@@ -33,6 +33,8 @@ export type TimeRangeOption = {
 export const TIME_RANGE_OPTIONS: TimeRangeOption[] = [
   { id: 'month', name: 'This month' },
 ];
+
+const zeroID = '00000000-0000-0000-0000-000000000000';
 
 export function useInfraDashboardData(timeRange: TimeRangeOption) {
   const env = useEnvironment();
@@ -97,10 +99,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     },
   });
 
-  const [accountConcurrency] = useQuery({
-    query: AccountConcurrencyLookupDocument,
-  });
-
   const [currentPlan] = useQuery({
     query: GetCurrentPlanDocument,
   });
@@ -126,17 +124,26 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     const backlogDepth = latestBucketMetricTotal(
       volume.data?.workspace.backlog.metrics,
     );
-    const currentConcurrency = volume.data?.accountConcurrency
-      ? volume.data.accountConcurrency.data.at(-1)?.value ?? 0
-      : 0;
+    const currentConcurrency = latestBucketMetricTotal(
+      volume.data?.workspace.stepRunning.metrics.filter(
+        ({ id }) => id !== zeroID,
+      ),
+    );
+    const billingPlan = mergeBillingPlanIntoInfraPlans({
+      accountEntitlements: currentPlan.data?.account.entitlements,
+      defaultSku: INFRA_DASHBOARD_PLACEHOLDERS.defaultPlanSku,
+      plan: currentPlan.data?.account.plan,
+      plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
+    });
 
     return {
-      accountConcurrencyLimit:
-        accountConcurrency.data?.account.entitlements.concurrency.limit,
+      accountConcurrencyLimit: billingPlan.currentPlan.execConcurrencyLimit,
       appsCount: activeApps.length,
       backlogDepth,
       billingNextInvoiceDate:
         currentPlan.data?.account.subscription?.nextInvoiceDate,
+      currentInfraPlan: billingPlan.currentPlan,
+      currentInfraPlanSku: billingPlan.currentPlanSku,
       currentConcurrency,
       eventsReceived: events.data?.environment.eventsV2.totalCount ?? 0,
       executionsRan: hasBillableExecutions
@@ -147,6 +154,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
         lookups.data?.envBySlug?.workflows.data.length ??
         0,
       functionsRan: functionsRan || runsEnded,
+      infraPlans: billingPlan.plans,
       planName: currentPlan.data?.account.plan?.name ?? 'Plan',
       placeholders: INFRA_DASHBOARD_PLACEHOLDERS,
       sdkRequests:
@@ -170,8 +178,9 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
         : 0,
     };
   }, [
-    accountConcurrency.data?.account.entitlements.concurrency.limit,
     billableExecutions.data?.usage,
+    currentPlan.data?.account.entitlements,
+    currentPlan.data?.account.plan,
     currentPlan.data?.account.plan?.name,
     currentPlan.data?.account.subscription?.nextInvoiceDate,
     events.data?.environment.eventsV2.totalCount,
@@ -200,7 +209,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       events.error ||
       volume.error ||
       billableExecutions.error ||
-      accountConcurrency.error ||
       currentPlan.error,
     fetching:
       lookups.fetching ||
@@ -209,7 +217,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       events.fetching ||
       volume.fetching ||
       billableExecutions.fetching ||
-      accountConcurrency.fetching ||
       currentPlan.fetching,
     range,
   };
