@@ -12,7 +12,7 @@ export default function OrgButton({
   const initial = orgName.substring(0, 1) || '?';
 
   return (
-    <div className="text-basis hover:bg-canvasMuted flex h-7 items-center gap-1.5 rounded px-2 text-sm">
+    <>
       <span className="bg-canvasMuted text-subtle flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs uppercase">
         {profile.orgProfilePic ? (
           <Image
@@ -30,6 +30,6 @@ export default function OrgButton({
         {orgName}
       </span>
       <RiExpandUpDownLine className="text-muted h-4 w-4 shrink-0" />
-    </div>
+    </>
   );
 }

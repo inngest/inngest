@@ -29,12 +29,12 @@ export default function TopBar({
             >
               <OrgButton profile={profile} />
             </OrgMenu>
-            <span className="text-disabled" aria-hidden>
+            <span className="text-disabled text-sm" aria-hidden>
               /
             </span>
           </>
         )}
-        <Suspense fallback={<Skeleton className="h-8 w-40" />}>
+        <Suspense fallback={<Skeleton className="h-7 w-40" />}>
           <Environments activeEnv={activeEnv} collapsed={false} />
         </Suspense>
       </div>
