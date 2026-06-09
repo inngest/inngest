@@ -1262,7 +1262,12 @@ LEFT JOIN LATERAL (
 ) run_start ON true
 LEFT JOIN LATERAL (
   SELECT
-    COALESCE((status_spans.attributes#>>'{}')::json->>'sys.function.status.code', status_spans.status, '')::TEXT AS status,
+    COALESCE(
+      (status_spans.attributes#>>'{}')::json->>'sys.function.status.code',
+      (status_spans.attributes#>>'{}')::json->>'_inngest.dynamic.status',
+      status_spans.status,
+      ''
+    )::TEXT AS status,
     end_time
   FROM spans status_spans
   WHERE status_spans.run_id = spans.run_id
@@ -1272,7 +1277,14 @@ LEFT JOIN LATERAL (
     -- run status.
     AND (
       COALESCE((status_spans.attributes#>>'{}')::json->>'sys.function.status.code', '') <> ''
-      OR COALESCE((status_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') = 'true'
+      OR (
+        COALESCE((status_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') IN ('true', '1')
+        AND COALESCE((status_spans.attributes#>>'{}')::json->>'_inngest.retryable', '') NOT IN ('true', '1')
+      )
+      OR (
+        COALESCE((status_spans.attributes#>>'{}')::json->>'_inngest.dynamic.span.id', '') = spans.span_id
+        AND COALESCE((status_spans.attributes#>>'{}')::json->>'_inngest.dynamic.status', status_spans.status, '') IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped')
+      )
     )
   ORDER BY status_spans.end_time DESC
   LIMIT 1
@@ -1284,7 +1296,7 @@ LEFT JOIN LATERAL (
     AND output_spans.debug_run_id IS NULL
     AND output_spans.output IS NOT NULL
   ORDER BY
-    COALESCE((output_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') != 'true',
+    COALESCE((output_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') NOT IN ('true', '1'),
     output_spans.end_time DESC
   LIMIT 1
 ) run_output ON true

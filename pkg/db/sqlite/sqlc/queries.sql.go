@@ -1255,6 +1255,7 @@ const getRuns = `-- name: GetRuns :many
 WITH run_roots AS (
   SELECT
     spans.run_id,
+    spans.span_id AS root_span_id,
     spans.function_id,
     spans.app_id,
     -- Child spans mean user code has started even if the root run span still says queued.
@@ -1300,7 +1301,12 @@ run_status AS (
   FROM (
     SELECT
       status_spans.run_id,
-      COALESCE(CAST(status_spans.attributes->>'$."sys.function.status.code"' AS TEXT), status_spans.status, '') AS status,
+      COALESCE(
+        CAST(status_spans.attributes->>'$."sys.function.status.code"' AS TEXT),
+        CAST(status_spans.attributes->>'$."_inngest.dynamic.status"' AS TEXT),
+        status_spans.status,
+        ''
+      ) AS status,
       status_spans.end_time,
       ROW_NUMBER() OVER (PARTITION BY status_spans.run_id ORDER BY status_spans.end_time DESC) AS rn
     FROM spans status_spans
@@ -1311,7 +1317,14 @@ run_status AS (
       -- run status.
       AND (
         COALESCE(CAST(status_spans.attributes->>'$."sys.function.status.code"' AS TEXT), '') <> ''
-        OR COALESCE(CAST(status_spans.attributes->>'$."_inngest.is.function.output"' AS TEXT), '') IN ('true', '1')
+        OR (
+          COALESCE(CAST(status_spans.attributes->>'$."_inngest.is.function.output"' AS TEXT), '') IN ('true', '1')
+          AND COALESCE(CAST(status_spans.attributes->>'$."_inngest.retryable"' AS TEXT), '') NOT IN ('true', '1')
+        )
+        OR (
+          COALESCE(CAST(status_spans.attributes->>'$."_inngest.dynamic.span.id"' AS TEXT), '') = run_roots.root_span_id
+          AND COALESCE(CAST(status_spans.attributes->>'$."_inngest.dynamic.status"' AS TEXT), status_spans.status, '') IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut', 'Skipped')
+        )
       )
   )
   WHERE rn = 1

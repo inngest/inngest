@@ -279,7 +279,276 @@ func TestGetRuns(t *testing.T) {
 	}
 }
 
+func TestGetRunsTreatsNumericFunctionOutputAttributeAsFinal(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	fnID := uuid.New()
+	eventID := ulid.Make()
+	runID := ulid.Make()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	childStartedAt := startedAt.Add(50 * time.Millisecond)
+	finalEndedAt := startedAt.Add(time.Second)
+	laterEndedAt := finalEndedAt.Add(time.Second)
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "numeric-output-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	require.NoError(t, insertRunListSpan(ctx, q, runListSpan{
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{eventID},
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "numeric-output-function",
+		FunctionName: "Numeric Output Function",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt,
+		Status:       enums.StepStatusQueued.String(),
+	}))
+
+	finalAttrs, err := json.Marshal(map[string]any{
+		meta.Attrs.IsFunctionOutput.Key(): 1,
+	})
+	require.NoError(t, err)
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         meta.SpanNameExecution,
+		ParentSpanID: sql.NullString{String: "run-span", Valid: true},
+		StartTime:    childStartedAt,
+		EndTime:      finalEndedAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   finalAttrs,
+		Links:        []byte(`[]`),
+		Output:       []byte(`{"data":{"body":"final"}}`),
+		Status:       sql.NullString{String: enums.StepStatusCompleted.String(), Valid: true},
+		EventIds:     []byte(`[]`),
+	}))
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         meta.SpanNameExecution,
+		ParentSpanID: sql.NullString{String: "run-span", Valid: true},
+		StartTime:    childStartedAt,
+		EndTime:      laterEndedAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   []byte(`{}`),
+		Links:        []byte(`[]`),
+		Output:       []byte(`{"data":{"body":"step"}}`),
+		Status:       sql.NullString{String: enums.StepStatusCompleted.String(), Valid: true},
+		EventIds:     []byte(`[]`),
+	}))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{
+		EventID:       eventID,
+		Limit:         1,
+		IncludeOutput: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	assert.Equal(t, "Completed", rows[0].FunctionFinish.Status.String)
+	assert.True(t, rows[0].FunctionFinish.CreatedAt.Valid)
+	assert.WithinDuration(t, finalEndedAt, rows[0].FunctionFinish.CreatedAt.Time, time.Millisecond)
+	assert.JSONEq(t, `{"data":{"body":"final"}}`, string(rows[0].Output))
+}
+
+func TestGetRunsUsesRootDynamicTerminalStatus(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	fnID := uuid.New()
+	eventID := ulid.Make()
+	runID := ulid.Make()
+	rootSpanID := "root-" + ulid.Make().String()
+	childSpanID := "child-" + ulid.Make().String()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	cancelledAt := startedAt.Add(3 * time.Minute)
+	childCompletedAt := cancelledAt.Add(7 * time.Minute)
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "dynamic-status-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	require.NoError(t, insertRunListSpan(ctx, q, runListSpan{
+		SpanID:       rootSpanID,
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{eventID},
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "dynamic-status-function",
+		FunctionName: "Dynamic Status Function",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt,
+		Status:       enums.StepStatusQueued.String(),
+	}))
+
+	rootAttrs, err := json.Marshal(map[string]any{
+		meta.Attrs.DynamicSpanID.Key(): rootSpanID,
+		meta.Attrs.DynamicStatus.Key(): enums.StepStatusCancelled.String(),
+	})
+	require.NoError(t, err)
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         meta.SpanNameDynamicExtension,
+		ParentSpanID: sql.NullString{String: "0000000000000000", Valid: true},
+		StartTime:    cancelledAt,
+		EndTime:      cancelledAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   rootAttrs,
+		Links:        []byte(`[]`),
+		Status:       sql.NullString{String: enums.StepStatusCancelled.String(), Valid: true},
+		EventIds:     []byte(`[]`),
+	}))
+
+	childAttrs, err := json.Marshal(map[string]any{
+		meta.Attrs.DynamicSpanID.Key(): childSpanID,
+		meta.Attrs.DynamicStatus.Key(): enums.StepStatusCompleted.String(),
+	})
+	require.NoError(t, err)
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         meta.SpanNameDynamicExtension,
+		ParentSpanID: sql.NullString{String: rootSpanID, Valid: true},
+		StartTime:    childCompletedAt,
+		EndTime:      childCompletedAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   childAttrs,
+		Links:        []byte(`[]`),
+		Output:       []byte(`{"data":"child completed after cancellation"}`),
+		Status:       sql.NullString{String: enums.StepStatusCompleted.String(), Valid: true},
+		EventIds:     []byte(`[]`),
+	}))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{
+		EventID: eventID,
+		Limit:   1,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	assert.Equal(t, "Cancelled", rows[0].FunctionFinish.Status.String)
+	assert.True(t, rows[0].FunctionFinish.CreatedAt.Valid)
+	assert.WithinDuration(t, cancelledAt, rows[0].FunctionFinish.CreatedAt.Time, time.Millisecond)
+}
+
+func TestGetRunsIgnoresRetryableFunctionOutputStatus(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	fnID := uuid.New()
+	eventID := ulid.Make()
+	runID := ulid.Make()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	childStartedAt := startedAt.Add(50 * time.Millisecond)
+	failedAt := startedAt.Add(time.Second)
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "retryable-output-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	require.NoError(t, insertRunListSpan(ctx, q, runListSpan{
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{eventID},
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "retryable-output-function",
+		FunctionName: "Retryable Output Function",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt,
+		Status:       enums.StepStatusQueued.String(),
+	}))
+
+	attrs, err := json.Marshal(map[string]any{
+		meta.Attrs.DynamicStatus.Key():    enums.StepStatusFailed.String(),
+		meta.Attrs.IsFunctionOutput.Key(): true,
+		meta.Attrs.Retryable.Key():        true,
+	})
+	require.NoError(t, err)
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         meta.SpanNameDynamicExtension,
+		ParentSpanID: sql.NullString{String: "child-span", Valid: true},
+		StartTime:    childStartedAt,
+		EndTime:      failedAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   attrs,
+		Links:        []byte(`[]`),
+		Output:       []byte(`{"error":{"message":"retry me"}}`),
+		Status:       sql.NullString{String: enums.StepStatusFailed.String(), Valid: true},
+		EventIds:     []byte(`[]`),
+	}))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{
+		EventID: eventID,
+		Limit:   1,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	assert.Equal(t, "Running", rows[0].FunctionFinish.Status.String)
+	assert.False(t, rows[0].FunctionFinish.CreatedAt.Valid)
+}
+
 type runListSpan struct {
+	SpanID       string
 	RunID        ulid.ULID
 	EventIDs     []ulid.ULID
 	BatchID      ulid.ULID
@@ -295,6 +564,11 @@ type runListSpan struct {
 }
 
 func insertRunListSpan(ctx context.Context, q db.Querier, span runListSpan) error {
+	spanID := span.SpanID
+	if spanID == "" {
+		spanID = ulid.Make().String()
+	}
+
 	attrs := map[string]any{
 		meta.Attrs.FunctionSlug.Key(): span.FunctionSlug,
 		meta.Attrs.FunctionName.Key(): span.FunctionName,
@@ -314,7 +588,7 @@ func insertRunListSpan(ctx context.Context, q db.Querier, span runListSpan) erro
 	eventIDBytes, _ := json.Marshal(eventIDs)
 
 	return q.InsertSpan(ctx, db.InsertSpanParams{
-		SpanID:     ulid.Make().String(),
+		SpanID:     spanID,
 		TraceID:    "trace-" + span.RunID.String(),
 		Name:       meta.SpanNameRun,
 		StartTime:  span.StartedAt,
