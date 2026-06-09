@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useOrganization } from '@clerk/tanstack-react-start';
 import {
   DropdownMenu,
@@ -410,7 +410,7 @@ function InfraPlanDropdown({
             <div className="min-w-[580px]">
               <div className="bg-canvasSubtle text-muted grid grid-cols-[96px_140px_140px_160px_1fr] px-3 py-2 text-left text-[11px] font-medium uppercase">
                 <span>SKU</span>
-                <span>Event stream</span>
+                <span>Events</span>
                 <span>Queue depth</span>
                 <span>Exec concurrency</span>
                 <span className="text-right">Price / mo</span>
@@ -597,22 +597,15 @@ function YourPlanBadge() {
 
 function InfraTierDropdown({
   currentTierId,
-  onSelect,
   selectedTier,
   tiers,
 }: {
   currentTierId?: InfraTierId;
-  onSelect: (tierId: InfraTierId) => void;
   selectedTier: InfraTier;
   tiers: InfraTier[];
 }) {
   const [open, setOpen] = useState(false);
   const triggerMetrics = getTierTriggerMetrics(selectedTier);
-
-  const selectTier = (tierId: InfraTierId) => {
-    onSelect(tierId);
-    setOpen(false);
-  };
 
   return (
     <div className="relative mx-auto mb-6 w-full max-w-xl">
@@ -651,14 +644,12 @@ function InfraTierDropdown({
               const isCurrentTier = tier.id === currentTierId;
 
               return (
-                <button
+                <div
                   className={cn(
-                    'hover:bg-canvasSubtle w-full px-3 py-3 text-left',
+                    'w-full cursor-default px-3 py-3 text-left',
                     isSelected && 'bg-canvasSubtle',
                   )}
                   key={tier.id}
-                  onClick={() => selectTier(tier.id)}
-                  type="button"
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
@@ -698,7 +689,7 @@ function InfraTierDropdown({
                       ))}
                     </ul>
                   ) : null}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -755,18 +746,11 @@ function InfraFlowPanel({
   infraPlan: InfraPlan;
   placeholders: InfraDashboardPlaceholders;
 }) {
-  const [selectedTierId, setSelectedTierId] = useState<InfraTierId>(
-    currentInfraTierId ?? placeholders.defaultInfraTierId,
-  );
-  useEffect(() => {
-    if (currentInfraTierId) {
-      setSelectedTierId(currentInfraTierId);
-    }
-  }, [currentInfraTierId]);
-
   const selectedTier =
-    placeholders.infraTiers.find((tier) => tier.id === selectedTierId) ??
-    placeholders.infraTiers[0];
+    placeholders.infraTiers.find(
+      (tier) =>
+        tier.id === (currentInfraTierId ?? placeholders.defaultInfraTierId),
+    ) ?? placeholders.infraTiers[0];
 
   return (
     <section className="border-subtle bg-canvasSubtle relative mb-8 overflow-hidden rounded-md border p-4 md:p-6">
@@ -782,7 +766,6 @@ function InfraFlowPanel({
         currentTierId={currentInfraTierId}
         tiers={placeholders.infraTiers}
         selectedTier={selectedTier}
-        onSelect={setSelectedTierId}
       />
 
       <div className="relative grid items-center gap-4 lg:grid-cols-[1fr_56px_1fr_56px_1fr]">
