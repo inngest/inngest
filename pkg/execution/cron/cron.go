@@ -68,6 +68,8 @@ type CronItem struct {
 	AppID           uuid.UUID `json:"appID"`
 	FunctionID      uuid.UUID `json:"fnID"`
 	FunctionVersion int       `json:"fnV"`
+	// IsProductionWorkspace indicates whether this cron belongs to a production workspace.
+	IsProductionWorkspace bool `json:"prodWs,omitempty"`
 	// Expression is the actual cron expression being used
 	Expression string `json:"expr"`
 	// JobID stores queue item ID that's supposed to be handling this cron item.

@@ -39,6 +39,7 @@ import { Route as AuthedSettingsApiKeysIndexRouteImport } from './routes/_authed
 import { Route as AuthedIntentSetupAwsMarketplaceIndexRouteImport } from './routes/_authed/intent/setup-aws-marketplace/index'
 import { Route as AuthedIntentCreateWebhookIndexRouteImport } from './routes/_authed/intent/create-webhook/index'
 import { Route as AuthedIntegrationsVercelIndexRouteImport } from './routes/_authed/integrations/vercel/index'
+import { Route as AuthedEnvEnvSlugIndexRouteImport } from './routes/_authed/env/$envSlug/index'
 import { Route as AuthedBillingUsageIndexRouteImport } from './routes/_authed/billing/usage/index'
 import { Route as AuthedBillingPlansIndexRouteImport } from './routes/_authed/billing/plans/index'
 import { Route as AuthedBillingPaymentsIndexRouteImport } from './routes/_authed/billing/payments/index'
@@ -259,6 +260,11 @@ const AuthedIntegrationsVercelIndexRoute =
     path: '/integrations/vercel/',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedEnvEnvSlugIndexRoute = AuthedEnvEnvSlugIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+} as any)
 const AuthedBillingUsageIndexRoute = AuthedBillingUsageIndexRouteImport.update({
   id: '/usage/',
   path: '/usage/',
@@ -663,6 +669,7 @@ export interface FileRoutesByFullPath {
   '/billing/payments/': typeof AuthedBillingPaymentsIndexRoute
   '/billing/plans/': typeof AuthedBillingPlansIndexRoute
   '/billing/usage/': typeof AuthedBillingUsageIndexRoute
+  '/env/$envSlug/': typeof AuthedEnvEnvSlugIndexRoute
   '/integrations/vercel/': typeof AuthedIntegrationsVercelIndexRoute
   '/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute
   '/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
@@ -737,7 +744,6 @@ export interface FileRoutesByTo {
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
   '/support': typeof SupportIndexRoute
-  '/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren
   '/organization-list/$': typeof authOrganizationListSplatRoute
   '/sign-in/$': typeof authSignInSplatRoute
   '/sign-up/$': typeof authSignUpSplatRoute
@@ -752,6 +758,7 @@ export interface FileRoutesByTo {
   '/billing/payments': typeof AuthedBillingPaymentsIndexRoute
   '/billing/plans': typeof AuthedBillingPlansIndexRoute
   '/billing/usage': typeof AuthedBillingUsageIndexRoute
+  '/env/$envSlug': typeof AuthedEnvEnvSlugIndexRoute
   '/integrations/vercel': typeof AuthedIntegrationsVercelIndexRoute
   '/intent/create-webhook': typeof AuthedIntentCreateWebhookIndexRoute
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
@@ -839,6 +846,7 @@ export interface FileRoutesById {
   '/_authed/billing/payments/': typeof AuthedBillingPaymentsIndexRoute
   '/_authed/billing/plans/': typeof AuthedBillingPlansIndexRoute
   '/_authed/billing/usage/': typeof AuthedBillingUsageIndexRoute
+  '/_authed/env/$envSlug/': typeof AuthedEnvEnvSlugIndexRoute
   '/_authed/integrations/vercel/': typeof AuthedIntegrationsVercelIndexRoute
   '/_authed/intent/create-webhook/': typeof AuthedIntentCreateWebhookIndexRoute
   '/_authed/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
@@ -934,6 +942,7 @@ export interface FileRouteTypes {
     | '/billing/payments/'
     | '/billing/plans/'
     | '/billing/usage/'
+    | '/env/$envSlug/'
     | '/integrations/vercel/'
     | '/intent/create-webhook/'
     | '/intent/setup-aws-marketplace/'
@@ -1008,7 +1017,6 @@ export interface FileRouteTypes {
     | '/api/sentry'
     | '/api/support-tickets'
     | '/support'
-    | '/env/$envSlug'
     | '/organization-list/$'
     | '/sign-in/$'
     | '/sign-up/$'
@@ -1023,6 +1031,7 @@ export interface FileRouteTypes {
     | '/billing/payments'
     | '/billing/plans'
     | '/billing/usage'
+    | '/env/$envSlug'
     | '/integrations/vercel'
     | '/intent/create-webhook'
     | '/intent/setup-aws-marketplace'
@@ -1109,6 +1118,7 @@ export interface FileRouteTypes {
     | '/_authed/billing/payments/'
     | '/_authed/billing/plans/'
     | '/_authed/billing/usage/'
+    | '/_authed/env/$envSlug/'
     | '/_authed/integrations/vercel/'
     | '/_authed/intent/create-webhook/'
     | '/_authed/intent/setup-aws-marketplace/'
@@ -1401,6 +1411,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/integrations/vercel/'
       preLoaderRoute: typeof AuthedIntegrationsVercelIndexRouteImport
       parentRoute: typeof AuthedRoute
+    }
+    '/_authed/env/$envSlug/': {
+      id: '/_authed/env/$envSlug/'
+      path: '/'
+      fullPath: '/env/$envSlug/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/billing/usage/': {
       id: '/_authed/billing/usage/'
@@ -2145,6 +2162,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugManageRouteRoute: typeof AuthedEnvEnvSlugManageRouteRouteWithChildren
   AuthedEnvEnvSlugOnboardingRouteRoute: typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren
   AuthedEnvEnvSlugUnattachedSyncsRouteRoute: typeof AuthedEnvEnvSlugUnattachedSyncsRouteRouteWithChildren
+  AuthedEnvEnvSlugIndexRoute: typeof AuthedEnvEnvSlugIndexRoute
   AuthedEnvEnvSlugEventTypesEventTypeNameRouteRoute: typeof AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren
   AuthedEnvEnvSlugFunctionsSlugRouteRoute: typeof AuthedEnvEnvSlugFunctionsSlugRouteRouteWithChildren
   AuthedEnvEnvSlugDebuggerIndexRoute: typeof AuthedEnvEnvSlugDebuggerIndexRoute
@@ -2169,6 +2187,7 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
     AuthedEnvEnvSlugOnboardingRouteRouteWithChildren,
   AuthedEnvEnvSlugUnattachedSyncsRouteRoute:
     AuthedEnvEnvSlugUnattachedSyncsRouteRouteWithChildren,
+  AuthedEnvEnvSlugIndexRoute: AuthedEnvEnvSlugIndexRoute,
   AuthedEnvEnvSlugEventTypesEventTypeNameRouteRoute:
     AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren,
   AuthedEnvEnvSlugFunctionsSlugRouteRoute:

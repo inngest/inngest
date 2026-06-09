@@ -279,7 +279,229 @@ func TestGetRuns(t *testing.T) {
 	}
 }
 
+func TestGetRunsPrefersFunctionOutputSpan(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	fnID := uuid.New()
+	eventID := ulid.Make()
+	runID := ulid.Make()
+	rootSpanID := "root-" + ulid.Make().String()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	childStartedAt := startedAt.Add(50 * time.Millisecond)
+	finalEndedAt := startedAt.Add(time.Second)
+	laterEndedAt := finalEndedAt.Add(time.Second)
+	endedAt := laterEndedAt.Add(time.Second)
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "function-output-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	root := runListSpan{
+		SpanID:       rootSpanID,
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{eventID},
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "function-output-function",
+		FunctionName: "Function Output Function",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt,
+		Status:       enums.StepStatusQueued.String(),
+	}
+	require.NoError(t, insertRunListSpan(ctx, q, root))
+	require.NoError(t, extendSpan(ctx, q, root, rootSpanID, endedAt, enums.StepStatusCompleted.String()))
+
+	finalAttrs, err := json.Marshal(map[string]any{
+		meta.Attrs.IsFunctionOutput.Key(): true,
+	})
+	require.NoError(t, err)
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         meta.SpanNameExecution,
+		ParentSpanID: sql.NullString{String: rootSpanID, Valid: true},
+		StartTime:    childStartedAt,
+		EndTime:      finalEndedAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   finalAttrs,
+		Links:        []byte(`[]`),
+		Output:       []byte(`{"data":{"body":"final"}}`),
+		Status:       sql.NullString{String: enums.StepStatusCompleted.String(), Valid: true},
+		EventIds:     []byte(`[]`),
+	}))
+
+	//
+	// a later step output without the function-output marker must not win
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         meta.SpanNameExecution,
+		ParentSpanID: sql.NullString{String: rootSpanID, Valid: true},
+		StartTime:    childStartedAt,
+		EndTime:      laterEndedAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   []byte(`{}`),
+		Links:        []byte(`[]`),
+		Output:       []byte(`{"data":{"body":"step"}}`),
+		Status:       sql.NullString{String: enums.StepStatusCompleted.String(), Valid: true},
+		EventIds:     []byte(`[]`),
+	}))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{
+		EventID:       eventID,
+		Limit:         1,
+		IncludeOutput: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	assert.Equal(t, "Completed", rows[0].FunctionFinish.Status.String)
+	assert.True(t, rows[0].FunctionFinish.CreatedAt.Valid)
+	assert.WithinDuration(t, endedAt, rows[0].FunctionFinish.CreatedAt.Time, time.Millisecond)
+	assert.JSONEq(t, `{"data":{"body":"final"}}`, string(rows[0].Output))
+}
+
+func TestGetRunsUsesRootDynamicSpanStatus(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	fnID := uuid.New()
+	eventID := ulid.Make()
+	runID := ulid.Make()
+	rootSpanID := "root-" + ulid.Make().String()
+	stepSpanID := "step-" + ulid.Make().String()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	cancelledAt := startedAt.Add(3 * time.Minute)
+	stepCompletedAt := cancelledAt.Add(7 * time.Minute)
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "dynamic-status-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	root := runListSpan{
+		SpanID:       rootSpanID,
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{eventID},
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "dynamic-status-function",
+		FunctionName: "Dynamic Status Function",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt,
+		Status:       enums.StepStatusQueued.String(),
+	}
+	require.NoError(t, insertRunListSpan(ctx, q, root))
+	require.NoError(t, extendSpan(ctx, q, root, rootSpanID, startedAt.Add(time.Second), enums.StepStatusRunning.String()))
+	require.NoError(t, extendSpan(ctx, q, root, rootSpanID, cancelledAt, enums.StepStatusCancelled.String()))
+
+	//
+	// a step's own dynamic span finishing later must not override the run
+	// root group's terminal status
+	require.NoError(t, extendSpan(ctx, q, root, stepSpanID, stepCompletedAt, enums.StepStatusCompleted.String()))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{
+		EventID: eventID,
+		Limit:   1,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	assert.Equal(t, "Cancelled", rows[0].FunctionFinish.Status.String)
+	assert.True(t, rows[0].FunctionFinish.CreatedAt.Valid)
+	assert.WithinDuration(t, cancelledAt, rows[0].FunctionFinish.CreatedAt.Time, time.Millisecond)
+}
+
+func TestGetRunsIgnoresStepFailureStatus(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	appID := uuid.New()
+	fnID := uuid.New()
+	eventID := ulid.Make()
+	runID := ulid.Make()
+	rootSpanID := "root-" + ulid.Make().String()
+	stepSpanID := "step-" + ulid.Make().String()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	failedAt := startedAt.Add(time.Second)
+	_, err := q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "step-failure-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	root := runListSpan{
+		SpanID:       rootSpanID,
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{eventID},
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "step-failure-function",
+		FunctionName: "Step Failure Function",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt,
+		Status:       enums.StepStatusQueued.String(),
+	}
+	require.NoError(t, insertRunListSpan(ctx, q, root))
+	require.NoError(t, extendSpan(ctx, q, root, rootSpanID, startedAt.Add(time.Millisecond), enums.StepStatusRunning.String()))
+
+	//
+	// a retryable step failure only extends the step's dynamic span; the run
+	// root group keeps the run in flight
+	require.NoError(t, extendSpan(ctx, q, root, stepSpanID, failedAt, enums.StepStatusErrored.String()))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{
+		EventID: eventID,
+		Limit:   1,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, runID, rows[0].FunctionRun.RunID)
+	assert.Equal(t, "Running", rows[0].FunctionFinish.Status.String)
+	assert.False(t, rows[0].FunctionFinish.CreatedAt.Valid)
+}
+
 type runListSpan struct {
+	SpanID       string
 	RunID        ulid.ULID
 	EventIDs     []ulid.ULID
 	BatchID      ulid.ULID
@@ -294,7 +516,14 @@ type runListSpan struct {
 	Status       string
 }
 
+// the exporter stores the run root as an executor.run row whose
+// dynamic_span_id doubles as the grouping key for later EXTEND rows
 func insertRunListSpan(ctx context.Context, q db.Querier, span runListSpan) error {
+	spanID := span.SpanID
+	if spanID == "" {
+		spanID = ulid.Make().String()
+	}
+
 	attrs := map[string]any{
 		meta.Attrs.FunctionSlug.Key(): span.FunctionSlug,
 		meta.Attrs.FunctionName.Key(): span.FunctionName,
@@ -314,21 +543,44 @@ func insertRunListSpan(ctx context.Context, q db.Querier, span runListSpan) erro
 	eventIDBytes, _ := json.Marshal(eventIDs)
 
 	return q.InsertSpan(ctx, db.InsertSpanParams{
-		SpanID:     ulid.Make().String(),
-		TraceID:    "trace-" + span.RunID.String(),
-		Name:       meta.SpanNameRun,
-		StartTime:  span.StartedAt,
-		EndTime:    span.EndedAt,
-		RunID:      span.RunID.String(),
-		AccountID:  uuid.NewString(),
-		AppID:      span.AppID.String(),
-		FunctionID: span.FunctionID.String(),
-		EnvID:      uuid.NewString(),
-		Attributes: attrBytes,
-		Links:      []byte(`[]`),
-		Output:     span.Output,
-		Status:     sql.NullString{String: span.Status, Valid: span.Status != ""},
-		EventIds:   eventIDBytes,
+		SpanID:        spanID,
+		TraceID:       "trace-" + span.RunID.String(),
+		Name:          meta.SpanNameRun,
+		StartTime:     span.StartedAt,
+		EndTime:       span.EndedAt,
+		RunID:         span.RunID.String(),
+		AccountID:     uuid.NewString(),
+		AppID:         span.AppID.String(),
+		FunctionID:    span.FunctionID.String(),
+		EnvID:         uuid.NewString(),
+		DynamicSpanID: sql.NullString{String: spanID, Valid: true},
+		Attributes:    attrBytes,
+		Links:         []byte(`[]`),
+		Output:        span.Output,
+		Status:        sql.NullString{String: span.Status, Valid: span.Status != ""},
+		EventIds:      eventIDBytes,
+	})
+}
+
+// status transitions arrive as EXTEND rows sharing the target span's
+// dynamic_span_id
+func extendSpan(ctx context.Context, q db.Querier, span runListSpan, dynamicSpanID string, at time.Time, status string) error {
+	return q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:        ulid.Make().String(),
+		TraceID:       "trace-" + span.RunID.String(),
+		Name:          meta.SpanNameDynamicExtension,
+		StartTime:     at,
+		EndTime:       at,
+		RunID:         span.RunID.String(),
+		AccountID:     uuid.NewString(),
+		AppID:         span.AppID.String(),
+		FunctionID:    span.FunctionID.String(),
+		EnvID:         uuid.NewString(),
+		DynamicSpanID: sql.NullString{String: dynamicSpanID, Valid: true},
+		Attributes:    []byte(`{}`),
+		Links:         []byte(`[]`),
+		Status:        sql.NullString{String: status, Valid: status != ""},
+		EventIds:      []byte(`[]`),
 	})
 }
 
