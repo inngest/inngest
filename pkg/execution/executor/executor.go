@@ -4171,6 +4171,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	metadata := runCtx.Metadata()
 	attrs := tracing.GeneratorAttrs(&gen)
 	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusSleeping))
 
 	// Create a new span that we'll use to record the sleep as complete.
 	// This is going to be attached to the same parent (the discovery step that started this sleep).
@@ -4737,6 +4738,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	lifecycleItem := runCtx.LifecycleItem()
 	attrs := tracing.GeneratorAttrs(&gen)
 	tracing.AddQueueTimestampAttrs(attrs, lifecycleItem)
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusWaiting))
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -4938,6 +4940,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
 	// Always correlate the triggering event ID with the invoked step.
 	meta.AddAttr(attrs, meta.Attrs.StepInvokeTriggerEventID, &evt.ID)
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusInvoking))
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -5160,6 +5163,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 	}
 	attrs := tracing.GeneratorAttrs(&gen)
 	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusWaiting))
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
