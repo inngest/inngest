@@ -22,20 +22,22 @@ export type NavGroupConfig = {
   items: NavItemConfig[];
 };
 
-export const observe: NavGroupConfig = {
-  heading: 'Observe',
-  items: [
-    { label: 'Metrics', route: 'metrics', Icon: MetricsIcon },
-    { label: 'Insights', route: 'insights', Icon: InsightsIcon, beta: true },
-  ],
-};
-
 export const workflow: NavGroupConfig = {
   heading: 'Workflow',
   items: [
+    { label: 'Apps', route: 'apps', Icon: AppsIcon },
     { label: 'Functions', route: 'functions', Icon: FunctionsIcon },
     { label: 'Runs', route: 'runs', Icon: RunsIcon },
+    { label: 'Event Types', route: 'event-types', Icon: EventsIcon },
     { label: 'Events', route: 'events', Icon: EventLogsIcon },
+  ],
+};
+
+export const monitor: NavGroupConfig = {
+  heading: 'Monitor',
+  items: [
+    { label: 'Metrics', route: 'metrics', Icon: MetricsIcon },
+    { label: 'Insights', route: 'insights', Icon: InsightsIcon, beta: true },
   ],
 };
 
@@ -48,9 +50,5 @@ export const experimentsItem: NavItemConfig = {
 
 export const manage: NavGroupConfig = {
   heading: 'Manage',
-  items: [
-    { label: 'Apps', route: 'apps', Icon: AppsIcon },
-    { label: 'Event Types', route: 'event-types', Icon: EventsIcon },
-    { label: 'Webhooks', route: 'manage/webhooks', Icon: WebhooksIcon },
-  ],
+  items: [{ label: 'Webhooks', route: 'manage/webhooks', Icon: WebhooksIcon }],
 };

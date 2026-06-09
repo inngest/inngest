@@ -32,7 +32,7 @@ export default function NavSection({
       {collapsed ? (
         !first && <hr className="border-subtle mx-auto mb-1 w-6" />
       ) : (
-        <div className="text-muted leading-4.5 mb-1 text-xs font-medium">
+        <div className="text-muted leading-4.5 mb-0.5 text-xs font-medium">
           {group.heading}
         </div>
       )}
@@ -43,7 +43,7 @@ export default function NavSection({
           collapsed={collapsed}
           text={item.label}
           beta={item.beta}
-          icon={<item.Icon className="h-[14px] w-[14px]" />}
+          icon={<item.Icon className="h-[16px] w-[16px]" />}
         />
       ))}
       {footer}
