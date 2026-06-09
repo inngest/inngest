@@ -200,7 +200,8 @@ SELECT
   spans.app_id,
   COALESCE(run_start.start_time, spans.start_time) AS start_time,
   COALESCE(run_status.end_time, spans.end_time) AS end_time,
-  COALESCE(run_status.status, spans.status, '') AS status,
+  -- Child spans mean user code has started even if the root run span still says queued.
+  COALESCE(run_status.status, CASE WHEN run_start.start_time IS NOT NULL THEN 'Running' END, spans.status, '') AS status,
   COALESCE(run_output.output::text, spans.output::text, '') AS output,
   COALESCE((spans.attributes#>>'{}')::json->>'_inngest.function.slug', '') AS function_slug,
   COALESCE((spans.attributes#>>'{}')::json->>'_inngest.function.name', '') AS function_name,
@@ -221,11 +222,19 @@ LEFT JOIN LATERAL (
   LIMIT 1
 ) run_start ON true
 LEFT JOIN LATERAL (
-  SELECT status, end_time
+  SELECT
+    COALESCE((status_spans.attributes#>>'{}')::json->>'sys.function.status.code', status_spans.status, '')::TEXT AS status,
+    end_time
   FROM spans status_spans
   WHERE status_spans.run_id = spans.run_id
     AND status_spans.debug_run_id IS NULL
-    AND status_spans.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
+    -- Step spans can finish while the run is still active; only function
+    -- status code spans or final function-output spans should decide terminal
+    -- run status.
+    AND (
+      COALESCE((status_spans.attributes#>>'{}')::json->>'sys.function.status.code', '') <> ''
+      OR COALESCE((status_spans.attributes#>>'{}')::json->>'_inngest.is.function.output', '') = 'true'
+    )
   ORDER BY status_spans.end_time DESC
   LIMIT 1
 ) run_status ON true

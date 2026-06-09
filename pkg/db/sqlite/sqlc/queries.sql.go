@@ -1257,6 +1257,16 @@ WITH run_roots AS (
     spans.run_id,
     spans.function_id,
     spans.app_id,
+    -- Child spans mean user code has started even if the root run span still says queued.
+    EXISTS (
+      SELECT 1
+      FROM spans start_lookup
+      WHERE start_lookup.run_id = spans.run_id
+        AND start_lookup.debug_run_id IS NULL
+        AND start_lookup.parent_span_id IS NOT NULL
+        AND start_lookup.parent_span_id <> ''
+        AND start_lookup.parent_span_id <> '0000000000000000'
+    ) AS has_started,
     CAST(COALESCE((
       SELECT start_lookup.start_time
       FROM spans start_lookup
@@ -1290,13 +1300,19 @@ run_status AS (
   FROM (
     SELECT
       status_spans.run_id,
-      status_spans.status,
+      COALESCE(CAST(status_spans.attributes->>'$."sys.function.status.code"' AS TEXT), status_spans.status, '') AS status,
       status_spans.end_time,
       ROW_NUMBER() OVER (PARTITION BY status_spans.run_id ORDER BY status_spans.end_time DESC) AS rn
     FROM spans status_spans
     JOIN run_roots ON run_roots.run_id = status_spans.run_id
     WHERE status_spans.debug_run_id IS NULL
-      AND status_spans.status IN ('Completed', 'Failed', 'Errored', 'Cancelled', 'TimedOut')
+      -- Step spans can finish while the run is still active; only function
+      -- status code spans or final function-output spans should decide terminal
+      -- run status.
+      AND (
+        COALESCE(CAST(status_spans.attributes->>'$."sys.function.status.code"' AS TEXT), '') <> ''
+        OR COALESCE(CAST(status_spans.attributes->>'$."_inngest.is.function.output"' AS TEXT), '') IN ('true', '1')
+      )
   )
   WHERE rn = 1
 )
@@ -1306,7 +1322,7 @@ SELECT
   run_roots.app_id,
   run_roots.start_time,
   CAST(COALESCE(run_status.end_time, run_roots.root_end_time) AS TEXT) AS end_time,
-  COALESCE(run_status.status, run_roots.root_status, '') AS status,
+  COALESCE(run_status.status, CASE WHEN run_roots.has_started THEN 'Running' END, run_roots.root_status, '') AS status,
   COALESCE((
     SELECT CAST(output_lookup.output AS TEXT)
     FROM spans output_lookup
@@ -1314,7 +1330,7 @@ SELECT
       AND output_lookup.output IS NOT NULL
       AND output_lookup.debug_run_id IS NULL
     ORDER BY
-      CASE WHEN COALESCE(output_lookup.attributes->>'$."_inngest.is.function.output"', '') = 'true' THEN 0 ELSE 1 END,
+      CASE WHEN COALESCE(CAST(output_lookup.attributes->>'$."_inngest.is.function.output"' AS TEXT), '') IN ('true', '1') THEN 0 ELSE 1 END,
       output_lookup.end_time DESC
     LIMIT 1
   ), run_roots.root_output, '') AS output,

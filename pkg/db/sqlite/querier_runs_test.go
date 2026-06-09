@@ -150,6 +150,139 @@ func TestQuerierGetRunsUsesChildSpanSummary(t *testing.T) {
 	require.JSONEq(t, `{"data":{"body":"Hello, World!"}}`, string(rows[0].Output))
 }
 
+func TestQuerierGetRunsIgnoresCompletedNonOutputChildStatus(t *testing.T) {
+	ctx := context.Background()
+	conn, err := Open(ctx, Options{ForTest: true})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, conn.Close()) })
+
+	q := New(conn).Q()
+	runID := ulid.Make()
+	eventID := ulid.Make()
+	appID := uuid.New()
+	fnID := uuid.New()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	childStartedAt := startedAt.Add(50 * time.Millisecond)
+	childEndedAt := startedAt.Add(time.Second)
+	_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "event-runs-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	require.NoError(t, insertRunSpan(ctx, q, runSpan{
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{eventID},
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "event-runs-function",
+		FunctionName: "Event Runs Function",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt,
+		Status:       enums.StepStatusQueued.String(),
+	}))
+
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         meta.SpanNameExecution,
+		ParentSpanID: sql.NullString{String: "run-span", Valid: true},
+		StartTime:    childStartedAt,
+		EndTime:      childEndedAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   []byte(`{}`),
+		Links:        []byte(`[]`),
+		Output:       []byte(`{"data":{"step":"done"}}`),
+		Status:       sql.NullString{String: enums.StepStatusCompleted.String(), Valid: true},
+		EventIds:     []byte(`[]`),
+	}))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{EventID: eventID, Limit: 1, IncludeOutput: true})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, childStartedAt, rows[0].FunctionRun.RunStartedAt)
+	require.Equal(t, "Running", rows[0].FunctionFinish.Status.String)
+	require.False(t, rows[0].FunctionFinish.CreatedAt.Valid)
+	require.JSONEq(t, `{"data":{"step":"done"}}`, string(rows[0].Output))
+}
+
+func TestQuerierGetRunsUsesFunctionStatusCodeForCancellation(t *testing.T) {
+	ctx := context.Background()
+	conn, err := Open(ctx, Options{ForTest: true})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, conn.Close()) })
+
+	q := New(conn).Q()
+	runID := ulid.Make()
+	eventID := ulid.Make()
+	appID := uuid.New()
+	fnID := uuid.New()
+	startedAt := time.Now().UTC().Truncate(time.Millisecond)
+	cancelledAt := startedAt.Add(time.Second)
+	_, err = q.UpsertApp(ctx, db.UpsertAppParams{
+		ID:          appID,
+		Name:        "event-runs-app",
+		SdkLanguage: "go",
+		SdkVersion:  "1.0.0",
+		Metadata:    "{}",
+		Status:      "active",
+		Checksum:    "checksum",
+		Url:         "https://example.com/inngest",
+		Method:      "POST",
+	})
+	require.NoError(t, err)
+	require.NoError(t, insertRunSpan(ctx, q, runSpan{
+		RunID:        runID,
+		EventIDs:     []ulid.ULID{eventID},
+		AppID:        appID,
+		FunctionID:   fnID,
+		FunctionSlug: "event-runs-function",
+		FunctionName: "Event Runs Function",
+		StartedAt:    startedAt,
+		EndedAt:      startedAt,
+		Status:       enums.StepStatusQueued.String(),
+	}))
+
+	attrs, err := json.Marshal(map[string]any{
+		"sys.function.status.code": enums.RunStatusCancelled.ToCode(),
+	})
+	require.NoError(t, err)
+	require.NoError(t, q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:       ulid.Make().String(),
+		TraceID:      "trace-" + runID.String(),
+		Name:         "long-running",
+		ParentSpanID: sql.NullString{String: "run-span", Valid: true},
+		StartTime:    startedAt,
+		EndTime:      cancelledAt,
+		RunID:        runID.String(),
+		AccountID:    uuid.NewString(),
+		AppID:        appID.String(),
+		FunctionID:   fnID.String(),
+		EnvID:        uuid.NewString(),
+		Attributes:   attrs,
+		Links:        []byte(`[]`),
+		Status:       sql.NullString{},
+		EventIds:     []byte(`[]`),
+	}))
+
+	rows, err := q.GetRuns(ctx, db.GetRunsParams{EventID: eventID, Limit: 1})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, "Cancelled", rows[0].FunctionFinish.Status.String)
+	require.True(t, rows[0].FunctionFinish.CreatedAt.Valid)
+	require.Equal(t, cancelledAt, rows[0].FunctionFinish.CreatedAt.Time)
+}
+
 func TestQuerierGetRunsError(t *testing.T) {
 	ctx := context.Background()
 	conn, err := Open(ctx, Options{ForTest: true})
