@@ -41,9 +41,7 @@ import {
 
 export function InfraDashboard() {
   const env = useEnvironment();
-  const { data, error, fetching } = useInfraDashboardData(
-    TIME_RANGE_OPTIONS[0],
-  );
+  const { data, fetching } = useInfraDashboardData(TIME_RANGE_OPTIONS[0]);
   const placeholders = data.placeholders;
   const billingDays = billingCycleDaysRemaining(data.billingNextInvoiceDate);
   const selectedPlan = data.currentInfraPlan;
@@ -79,13 +77,6 @@ export function InfraDashboard() {
           </div>
         </div>
       </header>
-
-      {error && (
-        <div className="bg-error border-error text-error mb-4 rounded border px-3 py-2 text-sm">
-          Some dashboard data failed to load. Placeholder-backed sections are
-          still shown.
-        </div>
-      )}
 
       <section className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-3">
         <KpiCard
