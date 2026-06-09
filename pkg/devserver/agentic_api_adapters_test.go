@@ -79,6 +79,35 @@ func TestNewFunctionProviderFindsFunctionByApp(t *testing.T) {
 	require.Equal(t, "test-fn", fn.Function.Slug)
 }
 
+func TestNewFunctionProviderFindsFunctionWhenFunctionIDStartsWithAppID(t *testing.T) {
+	ctx := context.Background()
+	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	store := &fakeFunctionStore{
+		fns: []*cqrs.Function{
+			{
+				ID:     fnID,
+				AppID:  appID,
+				Slug:   "app-app-test-fn",
+				Config: []byte(`{"name":"Test function","slug":"app-test-fn"}`),
+			},
+		},
+		app: &cqrs.App{
+			ID:   appID,
+			Name: "app",
+		},
+	}
+
+	fn, err := NewFunctionProvider(store).GetFunctionByApp(ctx, "app", "app-test-fn")
+
+	require.NoError(t, err)
+	require.Equal(t, fnID, fn.ID)
+	require.Equal(t, "app-app-test-fn", fn.Slug)
+	require.Equal(t, "app", fn.AppName)
+	require.Equal(t, "Test function", fn.Function.Name)
+	require.Equal(t, "app-test-fn", fn.Function.Slug)
+}
+
 func TestNewFunctionProviderFindsArchivedFunctionByID(t *testing.T) {
 	ctx := context.Background()
 	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")

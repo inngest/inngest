@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
@@ -15,13 +14,18 @@ import (
 )
 
 type cqrsFunctionProvider struct {
-	reader cqrs.DevFunctionReader
+	reader functionProviderReader
 	apps   cqrs.AppReader
 }
 
+type functionProviderReader interface {
+	cqrs.DevFunctionReader
+	cqrs.FunctionReader
+}
+
 // NewFunctionProvider returns a FunctionProvider that looks up functions by
-// slug or UUID using the given DevFunctionReader.
-func NewFunctionProvider(reader cqrs.DevFunctionReader) apiv2.FunctionProvider {
+// app-scoped slug or UUID using the given FunctionReader.
+func NewFunctionProvider(reader functionProviderReader) apiv2.FunctionProvider {
 	var apps cqrs.AppReader
 	if appReader, ok := reader.(cqrs.AppReader); ok {
 		apps = appReader
@@ -35,12 +39,10 @@ func NewFunctionProvider(reader cqrs.DevFunctionReader) apiv2.FunctionProvider {
 
 func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error) {
 	if fnID, err := uuid.Parse(identifier); err == nil {
-		if reader, ok := p.reader.(cqrs.FunctionReader); ok {
-			if fn, err := reader.GetFunctionByInternalUUID(ctx, fnID); err == nil {
-				return p.toDeployedFunction(ctx, fn)
-			} else if !errors.Is(err, sql.ErrNoRows) {
-				return inngest.DeployedFunction{}, err
-			}
+		if fn, err := p.reader.GetFunctionByInternalUUID(ctx, fnID); err == nil {
+			return p.toDeployedFunction(ctx, fn)
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return inngest.DeployedFunction{}, err
 		}
 	}
 
@@ -57,31 +59,20 @@ func (p *cqrsFunctionProvider) GetFunction(ctx context.Context, identifier strin
 }
 
 func (p *cqrsFunctionProvider) GetFunctionByApp(ctx context.Context, appID string, functionID string) (inngest.DeployedFunction, error) {
-	if reader, ok := p.reader.(cqrs.FunctionReader); ok {
-		fns, err := reader.GetFunctionsByAppExternalID(ctx, consts.DevServerEnvID, appID)
-		if err != nil {
-			return inngest.DeployedFunction{}, err
-		}
-		return p.findFunctionInApp(ctx, fns, appID, functionID, false)
-	}
-
-	fns, err := p.reader.GetFunctions(ctx)
+	fns, err := p.reader.GetFunctionsByAppExternalID(ctx, consts.DevServerEnvID, appID)
 	if err != nil {
 		return inngest.DeployedFunction{}, err
 	}
-	return p.findFunctionInApp(ctx, fns, appID, functionID, true)
+	return p.findFunctionInApp(ctx, fns, appID, functionID)
 }
 
-func (p *cqrsFunctionProvider) findFunctionInApp(ctx context.Context, fns []*cqrs.Function, appID string, functionID string, requireAppMatch bool) (inngest.DeployedFunction, error) {
-	bareFunctionID := strings.TrimPrefix(functionID, appID+"-")
-	prefixedFunctionID := appID + "-" + bareFunctionID
-
+func (p *cqrsFunctionProvider) findFunctionInApp(ctx context.Context, fns []*cqrs.Function, appID string, functionID string) (inngest.DeployedFunction, error) {
 	for _, fn := range fns {
 		deployed, err := p.toDeployedFunction(ctx, fn)
 		if err != nil {
 			return inngest.DeployedFunction{}, err
 		}
-		if (!requireAppMatch || deployed.AppName == appID) && functionIDsMatch(deployed, bareFunctionID, prefixedFunctionID) {
+		if functionIDsMatch(deployed, functionID, appID+"-"+functionID) {
 			return deployed, nil
 		}
 	}

@@ -372,6 +372,22 @@ func TestService_GetFunction(t *testing.T) {
 		require.Equal(t, singletonKey, config.Singleton.GetKey())
 	})
 
+	t.Run("returns bare function id for combined function id lookup", func(t *testing.T) {
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunctionByApp", mock.Anything, "my-app", "my-app-test-fn").Return(fn, nil).Once()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Functions: functions})
+		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{AppId: "my-app", FunctionId: "my-app-test-fn"})
+
+		require.NoError(t, err)
+		require.Equal(t, "test-fn", resp.Data.Id)
+		require.Equal(t, "test-fn", resp.Data.Slug)
+		require.Equal(t, "my-app", resp.Data.App.Id)
+	})
+
 	t.Run("requires app id and function id", func(t *testing.T) {
 		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
 		resp, err := service.GetFunction(context.Background(), &apiv2.GetFunctionRequest{})

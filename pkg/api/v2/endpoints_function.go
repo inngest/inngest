@@ -50,7 +50,7 @@ func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest
 		return nil, s.getFunctionError(err)
 	}
 	fn.AppName = appID
-	fn.Function.Slug = publicFunctionID(appID, functionID)
+	fn.Function.Slug = publicFunctionID(appID, functionID, fn)
 
 	return s.getFunctionResponse(ctx, fn), nil
 }
@@ -90,7 +90,7 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 
 	f, err := s.functions.GetFunctionByApp(ctx, req.AppId, req.FunctionId)
 	if err != nil {
-		return nil, s.base.NewError(404, apiv2base.ErrorNotFound, "function not found")
+		return nil, s.getFunctionError(err)
 	}
 
 	var idempotencyHash string
@@ -217,8 +217,22 @@ func decodePathParam(value string) string {
 	return value
 }
 
-func publicFunctionID(appID string, functionID string) string {
-	return strings.TrimPrefix(functionID, appID+"-")
+func publicFunctionID(appID string, requestedFunctionID string, fn inngest.DeployedFunction) string {
+	if fn.Function.Slug != "" && fn.Function.Slug != fn.Slug {
+		return fn.Function.Slug
+	}
+	if requestedFunctionID != "" && requestedFunctionID != fn.Slug {
+		return requestedFunctionID
+	}
+
+	functionID := fn.Function.Slug
+	if functionID == "" {
+		functionID = fn.Slug
+	}
+	if trimmed := strings.TrimPrefix(functionID, appID+"-"); trimmed != functionID {
+		return trimmed
+	}
+	return functionID
 }
 
 // isIdempotencyError checks whether the given error represents an idempotency
