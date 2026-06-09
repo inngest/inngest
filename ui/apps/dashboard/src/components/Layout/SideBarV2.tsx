@@ -91,9 +91,9 @@ export default function SideBar({
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
           )}
 
-          {/* Bottom-pinned collapse toggle, hover-revealed via opacity so the
-              sidebar foot doesn't jump. focus-within keeps it keyboard
-              reachable while it's transparent. */}
+          {/* Discreet, icon-only collapse toggle pinned to the sidebar foot.
+              Hover-revealed via opacity so it stays out of the way; focus-within
+              keeps it keyboard reachable while it's transparent. */}
           <div className="pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
             <OptionalTooltip
               tooltip={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -102,19 +102,14 @@ export default function SideBar({
                 type="button"
                 onClick={toggleCollapsed}
                 aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                className={`text-muted hover:bg-canvasSubtle my-0.5 flex items-center rounded ${
-                  collapsed
-                    ? 'mx-auto h-8 w-8 justify-center'
-                    : 'h-7 w-full flex-row gap-2 self-stretch px-1'
+                className={`text-muted hover:bg-canvasSubtle hover:text-basis my-0.5 flex h-8 w-8 items-center justify-center rounded ${
+                  collapsed ? 'mx-auto' : 'ml-auto'
                 }`}
               >
                 {collapsed ? (
-                  <RiArrowRightSLine className="h-4 w-4 shrink-0" />
+                  <RiArrowRightSLine className="h-4 w-4" />
                 ) : (
-                  <>
-                    <RiArrowLeftSLine className="h-4 w-4 shrink-0" />
-                    <span className="text-sm leading-tight">Collapse</span>
-                  </>
+                  <RiArrowLeftSLine className="h-4 w-4" />
                 )}
               </button>
             </OptionalTooltip>
