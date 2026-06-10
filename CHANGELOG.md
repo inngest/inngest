@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.27.0] - 2026-06-09
+
+### 🚀 Features
+
+- UI: Group top-level step spans using step/group IDs (#4305)
+- Extended traces metrics with hard caps (#4293)
+- Deterministic finalized step span IDs (#4274)
+
+### 🐛 Bug Fixes
+
+- Preserve debounce on migration failure (#4243)
+- *(debounce)* Preserve TTL from DebounceUpdate (#4349)
+- Preserve debounce migration guard on cleanup failure (#4354)
+- Fudge planned step span times slightly to prevent rollup race condition (#4364)
+- V2 api event/runs statuses (#4361)
+- Re-enable parallel processing for crons (#4369)
+
+### 🚜 Refactor
+
+- *(checkpointing)* RequestID -> GenerationID (#4342)
+- Refactor tel package to remove noise (#4352)
+
+### ⚡ Performance
+
+- *(cron)* Split cron partitions by workspace (#4356)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update v2 /runs to use latest trace span structures (#4346)
+- Expand batch buffer wait metric buckets (#3867)
+
 ## [v1.26.0] - 2026-06-05
 
 ### 🚀 Features
@@ -24,6 +55,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - *(tracing)* Add more conditional traces around scheduling (#4323)
+- *(release)* V1.26.0 (#4328)
 
 ## [v1.25.0] - 2026-06-03
 

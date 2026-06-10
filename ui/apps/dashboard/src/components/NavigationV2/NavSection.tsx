@@ -43,6 +43,7 @@ export default function NavSection({
           collapsed={collapsed}
           text={item.label}
           beta={item.beta}
+          exact={item.exact}
           icon={<item.Icon className="h-[16px] w-[16px]" />}
         />
       ))}

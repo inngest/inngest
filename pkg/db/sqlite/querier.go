@@ -366,13 +366,8 @@ func scanSpanRunListRows(rows []*sqlc.GetRunsRow, arg db.GetRunsParams) ([]*db.R
 			return nil, err
 		}
 
-		status := enums.RunStatusRunning
 		statusText := r.Status
-		if statusText != "" {
-			if stepStatus, err := enums.StepStatusString(statusText); err == nil && stepStatus != enums.StepStatusUnknown {
-				status = enums.StepStatusToRunStatus(stepStatus)
-			}
-		}
+		status := db.RunStatusFromSpanStatus(statusText)
 
 		batchIDText := valueString(r.BatchID)
 		var batchID ulid.ULID

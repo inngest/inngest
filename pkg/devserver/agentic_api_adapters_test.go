@@ -50,6 +50,64 @@ func TestNewFunctionProvider(t *testing.T) {
 	require.Equal(t, "test-fn", fn.Function.Slug)
 }
 
+func TestNewFunctionProviderFindsFunctionByApp(t *testing.T) {
+	ctx := context.Background()
+	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	store := &fakeFunctionStore{
+		fns: []*cqrs.Function{
+			{
+				ID:     fnID,
+				AppID:  appID,
+				Slug:   "app-test-fn",
+				Config: []byte(`{"name":"Test function","slug":"test-fn"}`),
+			},
+		},
+		app: &cqrs.App{
+			ID:   appID,
+			Name: "app",
+		},
+	}
+
+	fn, err := NewFunctionProvider(store).GetFunctionByApp(ctx, "app", "test-fn")
+
+	require.NoError(t, err)
+	require.Equal(t, fnID, fn.ID)
+	require.Equal(t, "app-test-fn", fn.Slug)
+	require.Equal(t, "app", fn.AppName)
+	require.Equal(t, "Test function", fn.Function.Name)
+	require.Equal(t, "test-fn", fn.Function.Slug)
+}
+
+func TestNewFunctionProviderFindsFunctionWhenFunctionIDStartsWithAppID(t *testing.T) {
+	ctx := context.Background()
+	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	store := &fakeFunctionStore{
+		fns: []*cqrs.Function{
+			{
+				ID:     fnID,
+				AppID:  appID,
+				Slug:   "app-app-test-fn",
+				Config: []byte(`{"name":"Test function","slug":"app-test-fn"}`),
+			},
+		},
+		app: &cqrs.App{
+			ID:   appID,
+			Name: "app",
+		},
+	}
+
+	fn, err := NewFunctionProvider(store).GetFunctionByApp(ctx, "app", "app-test-fn")
+
+	require.NoError(t, err)
+	require.Equal(t, fnID, fn.ID)
+	require.Equal(t, "app-app-test-fn", fn.Slug)
+	require.Equal(t, "app", fn.AppName)
+	require.Equal(t, "Test function", fn.Function.Name)
+	require.Equal(t, "app-test-fn", fn.Function.Slug)
+}
+
 func TestNewFunctionProviderFindsArchivedFunctionByID(t *testing.T) {
 	ctx := context.Background()
 	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
@@ -185,7 +243,25 @@ func (f *fakeFunctionStore) GetFunctions(ctx context.Context) ([]*cqrs.Function,
 }
 
 func (f *fakeFunctionStore) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, app string) ([]*cqrs.Function, error) {
-	return nil, nil
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.app == nil || f.app.Name != app {
+		return nil, nil
+	}
+
+	fns := []*cqrs.Function{}
+	for _, fn := range f.fns {
+		if fn.AppID == f.app.ID {
+			fns = append(fns, fn)
+		}
+	}
+	for _, fn := range f.fnByID {
+		if fn.AppID == f.app.ID {
+			fns = append(fns, fn)
+		}
+	}
+	return fns, nil
 }
 
 func (f *fakeFunctionStore) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {

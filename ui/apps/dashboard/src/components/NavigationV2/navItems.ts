@@ -15,6 +15,7 @@ export type NavItemConfig = {
   route: string;
   Icon: ComponentType<{ className?: string }>;
   beta?: boolean;
+  exact?: boolean;
 };
 
 export type NavGroupConfig = {
@@ -25,6 +26,7 @@ export type NavGroupConfig = {
 export const workflow: NavGroupConfig = {
   heading: 'Workflow',
   items: [
+    { label: 'Overview', route: '', Icon: MetricsIcon, exact: true },
     { label: 'Apps', route: 'apps', Icon: AppsIcon },
     { label: 'Functions', route: 'functions', Icon: FunctionsIcon },
     { label: 'Runs', route: 'runs', Icon: RunsIcon },

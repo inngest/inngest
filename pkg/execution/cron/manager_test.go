@@ -105,6 +105,24 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, time.Duration(0), opt.jitterMax)
 	})
 
+	t.Run("WithProductionWorkspaceJitterRange sets jitter correctly", func(t *testing.T) {
+		opt := managerOpt{}
+		WithProductionWorkspaceJitterRange(10*time.Millisecond, 30*time.Millisecond)(&opt)
+
+		assert.Equal(t, 10*time.Millisecond, opt.productionWorkspaceJitterMin)
+		assert.Equal(t, 30*time.Millisecond, opt.productionWorkspaceJitterMax)
+		assert.True(t, opt.productionWorkspaceJitterSet)
+	})
+
+	t.Run("WithProductionWorkspaceJitterRange ignores invalid range", func(t *testing.T) {
+		opt := managerOpt{}
+		WithProductionWorkspaceJitterRange(30*time.Millisecond, 10*time.Millisecond)(&opt)
+
+		assert.Equal(t, time.Duration(0), opt.productionWorkspaceJitterMin)
+		assert.Equal(t, time.Duration(0), opt.productionWorkspaceJitterMax)
+		assert.False(t, opt.productionWorkspaceJitterSet)
+	})
+
 	t.Run("WithHealthCheckInterval sets interval correctly", func(t *testing.T) {
 		opt := managerOpt{}
 		WithHealthCheckInterval(5 * time.Minute)(&opt)
@@ -131,6 +149,15 @@ func TestOptions(t *testing.T) {
 		WithHealthCheckLeadTimeSeconds(-20)(&opt)
 
 		assert.Equal(t, 0, opt.healthCheckLeadTimeSeconds)
+	})
+
+	t.Run("WithSplitCronPartitionByWorkspace sets callback", func(t *testing.T) {
+		opt := managerOpt{}
+		WithSplitCronPartitionByWorkspace(func(context.Context, uuid.UUID) bool {
+			return true
+		})(&opt)
+
+		require.NotNil(t, opt.splitCronPartitionByWorkspace)
 	})
 
 	t.Run("validate options", func(t *testing.T) {
@@ -622,6 +649,7 @@ func CronItemEqualsIgnoreIDAndOp(t *testing.T, expected, actual CronItem) {
 	assert.Equal(t, expected.AppID, actual.AppID)
 	assert.Equal(t, expected.FunctionID, actual.FunctionID)
 	assert.Equal(t, expected.FunctionVersion, actual.FunctionVersion)
+	assert.Equal(t, expected.IsProductionWorkspace, actual.IsProductionWorkspace)
 	assert.Equal(t, expected.Expression, actual.Expression)
 }
 
@@ -632,6 +660,146 @@ func CronItemEquals(t *testing.T, expected, actual CronItem) {
 	assert.True(t, expected.ID.Timestamp().Equal(actual.ID.Timestamp()))
 	assert.Equal(t, expected.JobID, actual.JobID)
 	assert.Equal(t, expected.Op, actual.Op)
+}
+
+type captureProducer struct {
+	item queue.Item
+	at   time.Time
+	opts queue.EnqueueOpts
+}
+
+func (p *captureProducer) Enqueue(_ context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {
+	p.item = item
+	p.at = at
+	p.opts = opts
+	return nil
+}
+
+func TestScheduleNextQueueName(t *testing.T) {
+	ctx := context.Background()
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+
+	tests := []struct {
+		name      string
+		gate      func(context.Context, uuid.UUID) bool
+		queueName string
+	}{
+		{
+			name:      "flag gate unset",
+			queueName: queue.KindCron,
+		}, {
+			name:      "flag gate nil",
+			gate:      nil,
+			queueName: queue.KindCron,
+		},
+		{
+			name: "workspace scoped cron partition disabled",
+			gate: func(_ context.Context, acctID uuid.UUID) bool {
+				return false
+			},
+			queueName: queue.KindCron,
+		},
+		{
+			name: "workspace scoped cron partition enabled",
+			gate: func(_ context.Context, acctID uuid.UUID) bool {
+				return true
+			},
+			queueName: queue.KindCron + ":" + workspaceID.String(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			producer := &captureProducer{}
+			opts := []ManagerOpt{
+				WithJitterRange(0, 0),
+			}
+			if tt.gate != nil {
+				opts = append(opts, WithSplitCronPartitionByWorkspace(tt.gate))
+			}
+			mgr := NewManager(nil, producer, logger.StdlibLogger(ctx), opts...)
+
+			_, err := mgr.ScheduleNext(ctx, CronItem{
+				ID:              ulid.Make(),
+				AccountID:       accountID,
+				WorkspaceID:     workspaceID,
+				AppID:           appID,
+				FunctionID:      functionID,
+				FunctionVersion: 1,
+				Expression:      "* * * * *",
+				Op:              enums.CronOpProcess,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, producer.item.QueueName)
+			require.Equal(t, tt.queueName, *producer.item.QueueName)
+			require.Equal(t, queue.KindCron, producer.item.Kind)
+		})
+	}
+}
+
+func TestScheduleNextProductionWorkspaceJitter(t *testing.T) {
+	ctx := context.Background()
+
+	// Manager with both standard and production-workspace jitter ranges.
+	producer := &captureProducer{}
+	mgr := NewManager(
+		nil,
+		producer,
+		logger.StdlibLogger(ctx),
+		WithJitterRange(10*time.Second, 10*time.Second),
+		WithProductionWorkspaceJitterRange(30*time.Second, 30*time.Second),
+	)
+
+	from := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	item := CronItem{
+		ID:              ulid.MustNew(ulid.Timestamp(from), ulid.DefaultEntropy()),
+		AccountID:       uuid.New(),
+		WorkspaceID:     uuid.New(),
+		AppID:           uuid.New(),
+		FunctionID:      uuid.New(),
+		FunctionVersion: 1,
+		Expression:      "* * * * *",
+		Op:              enums.CronOpProcess,
+	}
+
+	// The first schedule below uses the standard range because the item is not a
+	// production workspace cron.
+	nextItem, err := mgr.ScheduleNext(ctx, item)
+	require.NoError(t, err)
+	require.NotNil(t, nextItem)
+	require.False(t, nextItem.IsProductionWorkspace)
+	require.True(t, producer.at.Equal(from.Add(time.Minute).Add(-10*time.Second)))
+
+	// Production workspace item should use the production-specific range.
+	item.IsProductionWorkspace = true
+	nextItem, err = mgr.ScheduleNext(ctx, item)
+	require.NoError(t, err)
+	require.NotNil(t, nextItem)
+	require.True(t, nextItem.IsProductionWorkspace)
+	require.True(t, producer.at.Equal(from.Add(time.Minute).Add(-30*time.Second)))
+
+	payload, ok := producer.item.Payload.(CronItem)
+	require.True(t, ok)
+	require.True(t, payload.IsProductionWorkspace)
+
+	// Manager with only the standard jitter range. Production workspace items
+	// should fall back to the standard range when no production range is set.
+	producer = &captureProducer{}
+	mgr = NewManager(
+		nil,
+		producer,
+		logger.StdlibLogger(ctx),
+		WithJitterRange(10*time.Second, 10*time.Second),
+	)
+
+	nextItem, err = mgr.ScheduleNext(ctx, item)
+	require.NoError(t, err)
+	require.NotNil(t, nextItem)
+	require.True(t, nextItem.IsProductionWorkspace)
+	require.True(t, producer.at.Equal(from.Add(time.Minute).Add(-10*time.Second)))
 }
 
 func TestManager(t *testing.T) {

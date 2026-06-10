@@ -15,6 +15,7 @@ type ConfirmPlanChangeModalProps = {
   action: 'upgrade' | 'downgrade' | 'cancel';
   items: CheckoutItem[];
   onCancel: () => void;
+  onBeforePlanChange?: () => Promise<void> | void;
   onSuccess: () => void;
 };
 
@@ -75,6 +76,7 @@ export default function ConfirmPlanChangeModal({
   action,
   items,
   onCancel,
+  onBeforePlanChange,
   onSuccess,
 }: ConfirmPlanChangeModalProps) {
   const [uiError, setUiError] = useState('');
@@ -146,6 +148,15 @@ export default function ConfirmPlanChangeModal({
           // Continue with cancellation even if survey fails
         }
       }
+    }
+
+    try {
+      await onBeforePlanChange?.();
+    } catch (error) {
+      console.error('Failed to prepare plan change:', error);
+      return setUiError(
+        'Unable to update plan add-ons before changing your plan. Please try again.',
+      );
     }
 
     await updatePlan({ planSlug });

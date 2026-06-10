@@ -51,6 +51,8 @@ type DeployedFunction struct {
 	AppName string
 	// PausedAt, if non-zero, indicates that the function is paused as of the given time.
 	PausedAt time.Time
+	// ArchivedAt, if non-zero, indicates that the function is archived as of the given time.
+	ArchivedAt time.Time
 	// DrainedAt, if non-zero, indicates that the function is draining as of the given time.
 	DrainedAt time.Time
 }

@@ -20,7 +20,7 @@ export default function TopBar({
 }) {
   return (
     <header className="bg-canvasSubtle relative z-[60] flex h-[42px] shrink-0 items-center justify-between gap-3 px-3">
-      <div className="flex items-center gap-1">
+      <div className="flex h-8 items-center gap-1">
         {profile && (
           <>
             <OrgMenu
@@ -29,12 +29,15 @@ export default function TopBar({
             >
               <OrgButton profile={profile} />
             </OrgMenu>
-            <span className="text-disabled text-sm" aria-hidden>
+            <span
+              className="text-disabled flex h-8 items-center leading-none"
+              aria-hidden
+            >
               /
             </span>
           </>
         )}
-        <Suspense fallback={<Skeleton className="h-7 w-40" />}>
+        <Suspense fallback={<Skeleton className="h-8 w-40" />}>
           <Environments activeEnv={activeEnv} collapsed={false} />
         </Suspense>
       </div>
