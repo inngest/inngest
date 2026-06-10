@@ -608,6 +608,78 @@ function applyProPlanAmountToInfraPlans({
   );
 }
 
+function hasEntitlementLimit(
+  entitlement?: { limit?: number | null } | null,
+): boolean {
+  return typeof entitlement?.limit === 'number' || entitlement?.limit === null;
+}
+
+function pickEffectiveEntitlementLimit({
+  accountEntitlement,
+  planEntitlement,
+}: {
+  accountEntitlement?: { limit?: number | null } | null;
+  planEntitlement?: { limit?: number | null } | null;
+}): number | null | undefined {
+  if (hasEntitlementLimit(accountEntitlement)) {
+    return accountEntitlement?.limit ?? null;
+  }
+
+  if (hasEntitlementLimit(planEntitlement)) {
+    return planEntitlement?.limit ?? null;
+  }
+
+  return undefined;
+}
+
+function formatEventLimit(
+  limit: number | null | undefined,
+  fallback: InfraPlan,
+) {
+  if (limit === undefined) {
+    return {
+      label: fallback.eventStream,
+      limit: fallback.eventStreamLimit,
+    };
+  }
+
+  if (limit === null) {
+    return {
+      label: 'Unlimited events/mo',
+      limit,
+    };
+  }
+
+  return {
+    label: `${formatCompactNumber(limit)} events/mo`,
+    limit,
+  };
+}
+
+function formatQueueDepthLimit(
+  limit: number | null | undefined,
+  fallback: InfraPlan,
+) {
+  if (limit === undefined) {
+    return {
+      label: fallback.queueDepth,
+      limit: fallback.queueDepthLimit,
+    };
+  }
+
+  if (limit === null) {
+    return {
+      label: 'Unlimited',
+      limit,
+    };
+  }
+
+  return {
+    label: formatCompactNumber(limit),
+    limit,
+  };
+}
+
 export function mergeBillingPlanIntoInfraPlans({
   accountEntitlements,
   defaultSku,
@@ -633,12 +705,15 @@ export function mergeBillingPlanIntoInfraPlans({
     accountEntitlements?.concurrency?.limit ??
     plan?.entitlements?.concurrency?.limit ??
     null;
-  const currentPlanSku = inferInfraPlanSku({
-    concurrencyLimit,
-    defaultSku,
-    plan,
-    plans: pricedPlans,
-  });
+  const isEnterprisePlan = isEnterprisePlanName(plan?.name);
+  const currentPlanSku = isEnterprisePlan
+    ? 'IN-XL'
+    : inferInfraPlanSku({
+        concurrencyLimit,
+        defaultSku,
+        plan,
+        plans: pricedPlans,
+      });
   const fallbackPlan =
     pricedPlans.find((candidate) => candidate.sku === currentPlanSku) ??
     pricedPlans[0];
@@ -656,6 +731,51 @@ export function mergeBillingPlanIntoInfraPlans({
           ? currentFallbackPlan
           : { ...candidate, isCurrent: false },
       ),
+    };
+  }
+
+  if (isEnterprisePlan) {
+    const eventLimit = formatEventLimit(
+      pickEffectiveEntitlementLimit({
+        accountEntitlement: accountEntitlements?.events,
+        planEntitlement: plan?.entitlements?.events,
+      }),
+      fallbackPlan,
+    );
+    const queueDepthLimit = formatQueueDepthLimit(
+      pickEffectiveEntitlementLimit({
+        accountEntitlement: accountEntitlements?.functionBacklogSize,
+        planEntitlement: plan?.entitlements?.functionBacklogSize,
+      }),
+      fallbackPlan,
+    );
+    const currentPlan: InfraPlan = {
+      ...fallbackPlan,
+      displaySku: 'ENTERPRISE',
+      eventStream: eventLimit.label,
+      eventStreamLimit: eventLimit.limit,
+      eventStreamUnit: 'events',
+      execConcurrency:
+        typeof concurrencyLimit === 'number'
+          ? formatCompactNumber(concurrencyLimit)
+          : fallbackPlan.execConcurrency,
+      execConcurrencyLimit:
+        typeof concurrencyLimit === 'number'
+          ? concurrencyLimit
+          : fallbackPlan.execConcurrencyLimit,
+      isCurrent: true,
+      priceMonthly: 'Current plan',
+      queueDepth: queueDepthLimit.label,
+      queueDepthLimit: queueDepthLimit.limit,
+    };
+
+    return {
+      currentPlan,
+      currentPlanSku,
+      plans: pricedPlans.map((candidate) => ({
+        ...candidate,
+        isCurrent: false,
+      })),
     };
   }
 
@@ -707,15 +827,8 @@ export function utcEndOfMonth(now = new Date()): Date {
   );
 }
 
-export function billingCycleDaysRemaining(
-  nextInvoiceDate?: string | null,
-  now = new Date(),
-): number {
-  return (
-    daysUntil(nextInvoiceDate, now) ??
-    daysUntil(utcEndOfMonth(now).toISOString(), now) ??
-    0
-  );
+export function billingCycleDaysRemaining(now = new Date()): number {
+  return daysUntil(utcEndOfMonth(now).toISOString(), now) ?? 0;
 }
 
 export function getUtcMonthToDateRange(now = new Date()) {

@@ -2,6 +2,7 @@ export type InfraPlanSku = 'IN-XS' | 'IN-S' | 'IN-M' | 'IN-L' | 'IN-XL';
 
 export type InfraPlan = {
   sku: InfraPlanSku;
+  displaySku?: string;
   eventStream: string;
   eventStreamLimit: number | null;
   eventStreamUnit: 'qps' | 'events';

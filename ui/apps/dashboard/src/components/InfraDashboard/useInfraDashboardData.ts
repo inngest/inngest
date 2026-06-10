@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -12,6 +12,7 @@ import {
   MetricsLookupsDocument,
   MetricsScope,
   VolumeMetricsDocument,
+  type GetCurrentPlanQuery,
 } from '@/gql/graphql';
 
 import { INFRA_DASHBOARD_PLACEHOLDERS } from './placeholderData';
@@ -39,9 +40,50 @@ export const TIME_RANGE_OPTIONS: TimeRangeOption[] = [
 ];
 
 const zeroID = '00000000-0000-0000-0000-000000000000';
+const cacheTTL = 60 * 60 * 1000;
+const cacheVersion = 2;
 const functionCountPageSize = 1;
 const topFunctionsUsagePageSize = 1000;
 const topFunctionsLimit = 50;
+
+type InfraDashboardData = {
+  accountConcurrencyLimit: number;
+  appsCount: number;
+  backlogDepth: number;
+  billingActionsReady: boolean;
+  billingPlanReady: boolean;
+  concurrencyAddon: ReturnType<typeof pickInfraConcurrencyAddon>;
+  currentBillingPlan: GetCurrentPlanQuery['account']['plan'] | undefined;
+  currentInfraPlan: ReturnType<
+    typeof mergeBillingPlanIntoInfraPlans
+  >['currentPlan'];
+  currentInfraPlanSku: ReturnType<
+    typeof mergeBillingPlanIntoInfraPlans
+  >['currentPlanSku'];
+  currentConcurrency: number;
+  eventsReceived: number;
+  executionsRan: number;
+  functionsCount: number;
+  functionsRan: number;
+  infraPlans: ReturnType<typeof mergeBillingPlanIntoInfraPlans>['plans'];
+  hasPaymentMethod: boolean;
+  isEnterprisePlan: boolean;
+  planName: string;
+  placeholders: typeof INFRA_DASHBOARD_PLACEHOLDERS;
+  proPlanAmountCents: number | null;
+  sdkRequests: number;
+  stepRunning: number;
+  topFunctions: ReturnType<typeof buildTopFunctionRows>;
+  workerCapacity: number;
+  workerPercentUsed: number | null;
+  totalAccountConcurrency: number;
+};
+
+type InfraDashboardCacheEntry = {
+  data: InfraDashboardData;
+  savedAt: number;
+  version: number;
+};
 
 const InfraDashboardEventsCountDocument = graphql(`
   query InfraDashboardEventsCount(
@@ -63,10 +105,81 @@ const InfraDashboardEventsCountDocument = graphql(`
   }
 `);
 
+function cacheKey({
+  envID,
+  month,
+  year,
+}: {
+  envID: string;
+  month: number;
+  year: number;
+}) {
+  return `inngest:infra-dashboard:v${cacheVersion}:${envID}:${year}-${month}`;
+}
+
+function readCache(key: string): InfraDashboardCacheEntry | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) {
+      return null;
+    }
+
+    const cached = JSON.parse(raw) as InfraDashboardCacheEntry;
+    if (
+      cached.version !== cacheVersion ||
+      typeof cached.savedAt !== 'number' ||
+      Date.now() - cached.savedAt > cacheTTL
+    ) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+
+    return cached;
+  } catch {
+    window.localStorage.removeItem(key);
+    return null;
+  }
+}
+
+function writeCache(
+  key: string,
+  data: InfraDashboardData,
+): InfraDashboardCacheEntry | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const entry: InfraDashboardCacheEntry = {
+    data,
+    savedAt: Date.now(),
+    version: cacheVersion,
+  };
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(entry));
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
 export function useInfraDashboardData(timeRange: TimeRangeOption) {
   const env = useEnvironment();
   const client = useClient();
   const range = useMemo(() => getUtcMonthToDateRange(), [timeRange.id]);
+  const key = useMemo(
+    () => cacheKey({ envID: env.id, month: range.month, year: range.year }),
+    [env.id, range.month, range.year],
+  );
+  const [cached, setCached] = useState<InfraDashboardCacheEntry | null>(null);
+
+  useEffect(() => {
+    setCached(readCache(key));
+  }, [key]);
 
   const [lookups] = useQuery({
     query: MetricsLookupsDocument,
@@ -130,7 +243,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     query: GetPlansDocument,
   });
 
-  const data = useMemo(() => {
+  const liveData = useMemo<InfraDashboardData>(() => {
     const activeApps =
       lookups.data?.envBySlug?.apps.filter((app) => !app.isArchived) ?? [];
     const workflowPage = functions.data?.workspace.workflows.page;
@@ -175,8 +288,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       accountConcurrencyLimit: billingPlan.currentPlan.execConcurrencyLimit,
       appsCount: activeApps.length,
       backlogDepth,
-      billingNextInvoiceDate:
-        currentPlan.data?.account.subscription?.nextInvoiceDate,
       billingActionsReady: Boolean(
         !currentPlan.fetching && currentPlan.data?.account.plan,
       ),
@@ -237,7 +348,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     currentPlan.data?.account.plan,
     currentPlan.data?.account.plan?.addons.concurrency,
     currentPlan.data?.account.plan?.name,
-    currentPlan.data?.account.subscription?.nextInvoiceDate,
     currentPlan.fetching,
     events.data?.environment.eventsV2.totalCount,
     functionUsage.data?.workspace.workflows.data,
@@ -255,26 +365,66 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     volume.data?.workspace.workerTotalCapacity.metrics,
   ]);
 
-  return {
-    data,
-    error:
-      lookups.error ||
-      functions.error ||
-      functionUsage.error ||
-      events.error ||
-      volume.error ||
-      billableExecutions.error ||
-      currentPlan.error ||
-      availablePlans.error,
-    fetching:
-      lookups.fetching ||
+  const liveDataReady = Boolean(
+    lookups.data &&
+      functions.data &&
+      functionUsage.data &&
+      events.data &&
+      volume.data &&
+      billableExecutions.data &&
+      currentPlan.data &&
+      availablePlans.data &&
+      !lookups.fetching &&
+      !functions.fetching &&
+      !functionUsage.fetching &&
+      !events.fetching &&
+      !volume.fetching &&
+      !billableExecutions.fetching &&
+      !currentPlan.fetching &&
+      !availablePlans.fetching,
+  );
+  const liveError =
+    lookups.error ||
+    functions.error ||
+    functionUsage.error ||
+    events.error ||
+    volume.error ||
+    billableExecutions.error ||
+    currentPlan.error ||
+    availablePlans.error;
+  const isUsingCachedData = Boolean(cached && !liveDataReady);
+  const data = isUsingCachedData && cached ? cached.data : liveData;
+  const fetching =
+    !isUsingCachedData &&
+    (lookups.fetching ||
       functions.fetching ||
       functionUsage.fetching ||
       events.fetching ||
       volume.fetching ||
       billableExecutions.fetching ||
       currentPlan.fetching ||
-      availablePlans.fetching,
+      availablePlans.fetching);
+
+  useEffect(() => {
+    if (!liveDataReady || liveError) {
+      return;
+    }
+
+    const entry = writeCache(key, liveData);
+    if (entry) {
+      setCached(entry);
+    }
+  }, [key, liveData, liveDataReady, liveError]);
+
+  return {
+    cacheStatus: {
+      cachedAt: cached?.savedAt,
+      isUsingCachedData,
+      ttlMs: cacheTTL,
+    },
+    data,
+    error: !isUsingCachedData && liveError ? liveError : undefined,
+    fetching,
     range,
     refetchBillingData: async () => {
       await client

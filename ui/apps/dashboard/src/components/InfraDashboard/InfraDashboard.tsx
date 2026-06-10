@@ -55,13 +55,23 @@ import {
   type InfraPlanAddonUpdate,
 } from './utils';
 
+function formatCacheAge(cachedAt: number) {
+  const ageMs = Math.max(0, Date.now() - cachedAt);
+  const minutes = Math.floor(ageMs / 60_000);
+
+  if (minutes < 1) {
+    return 'just now';
+  }
+
+  return `${minutes}m`;
+}
+
 export function InfraDashboard() {
   const env = useEnvironment();
-  const { data, fetching, refetchBillingData } = useInfraDashboardData(
-    TIME_RANGE_OPTIONS[0],
-  );
+  const { cacheStatus, data, fetching, refetchBillingData } =
+    useInfraDashboardData(TIME_RANGE_OPTIONS[0]);
   const placeholders = data.placeholders;
-  const billingDays = billingCycleDaysRemaining(data.billingNextInvoiceDate);
+  const billingDays = billingCycleDaysRemaining();
   const selectedPlan = data.currentInfraPlan;
 
   return (
@@ -73,6 +83,11 @@ export function InfraDashboard() {
               {env.name}
             </h1>
           </div>
+          {cacheStatus.isUsingCachedData && cacheStatus.cachedAt ? (
+            <div className="text-muted/50 mt-1 text-xs">
+              Cached {formatCacheAge(cacheStatus.cachedAt)} ago · refreshing
+            </div>
+          ) : null}
         </div>
 
         <div className="flex w-fit max-w-full flex-col items-stretch gap-2">
@@ -85,6 +100,7 @@ export function InfraDashboard() {
             currentPlanSku={data.currentInfraPlanSku}
             hasPaymentMethod={data.hasPaymentMethod}
             onBillingChange={refetchBillingData}
+            isEnterprisePlan={data.isEnterprisePlan}
             plans={data.infraPlans}
             proPlanAmountCents={data.proPlanAmountCents}
             selectedPlan={selectedPlan}
@@ -223,6 +239,7 @@ function InfraPlanDropdown({
   currentConcurrencyLimit,
   currentPlanSku,
   hasPaymentMethod,
+  isEnterprisePlan,
   onBillingChange,
   plans,
   proPlanAmountCents,
@@ -235,6 +252,7 @@ function InfraPlanDropdown({
   currentConcurrencyLimit?: number | null;
   currentPlanSku: InfraPlanSku;
   hasPaymentMethod: boolean;
+  isEnterprisePlan: boolean;
   onBillingChange: () => Promise<void>;
   plans: InfraPlan[];
   proPlanAmountCents?: number | null;
@@ -372,15 +390,27 @@ function InfraPlanDropdown({
 
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenu
+        open={isEnterprisePlan ? false : open}
+        onOpenChange={(nextOpen) => {
+          if (!isEnterprisePlan) {
+            setOpen(nextOpen);
+          }
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <button
-            className="border-muted bg-canvasBase text-basis hover:bg-canvasSubtle focus:ring-primary-moderate flex max-w-full items-center justify-between gap-2 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-2"
+            className={cn(
+              'border-muted bg-canvasBase text-basis flex max-w-full items-center justify-between gap-2 rounded border px-2 py-1 text-xs disabled:cursor-default disabled:opacity-100',
+              !isEnterprisePlan &&
+                'hover:bg-canvasSubtle focus:ring-primary-moderate focus:outline-none focus:ring-2',
+            )}
+            disabled={isEnterprisePlan}
             type="button"
           >
             <span className="flex min-w-0 flex-wrap items-center gap-2">
               <span className="bg-canvasMuted rounded px-1.5 py-0.5 font-medium">
-                {selectedPlan.sku}
+                {selectedPlan.displaySku ?? selectedPlan.sku}
               </span>
               <span>{selectedPlan.eventStream}</span>
               <span className="text-disabled">·</span>
@@ -388,11 +418,13 @@ function InfraPlanDropdown({
               <span className="text-disabled">·</span>
               <span>{selectedPlan.execConcurrency} concurrency</span>
             </span>
-            {open ? (
-              <RiArrowUpSLine className="h-3.5 w-3.5 shrink-0" />
-            ) : (
-              <RiArrowDownSLine className="h-3.5 w-3.5 shrink-0" />
-            )}
+            {!isEnterprisePlan ? (
+              open ? (
+                <RiArrowUpSLine className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <RiArrowDownSLine className="h-3.5 w-3.5 shrink-0" />
+              )
+            ) : null}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
