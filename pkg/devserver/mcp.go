@@ -115,14 +115,14 @@ type MCPHandler struct {
 	events api.EventHandler
 	data   cqrs.Manager
 	tick   time.Duration
-	
+
 	serverOnce sync.Once
 	server     *mcp.Server
-	
+
 	// File content cache
 	fileCacheMu sync.RWMutex
 	fileCache   map[string][]byte
-	
+
 	// File info cache
 	fileInfoCache map[string]fs.FileInfo
 }
@@ -209,6 +209,17 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "send_event",
 		Description: "Send an event to the Inngest dev server which will trigger any functions listening to that event. Returns event ID and run IDs of triggered functions. Parameters: name (required string - the event name like 'test/hello.world'), data (optional - the event data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), eventIdSeed (optional string for deterministic event IDs)",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"name":        map[string]any{"type": "string"},
+				"data":        map[string]any{},
+				"user":        map[string]any{},
+				"eventIdSeed": map[string]any{"type": "string"},
+			},
+			"required":             []string{"name"},
+			"additionalProperties": false,
+		},
 	}, h.sendEvent)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -229,6 +240,17 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "invoke_function",
 		Description: "Directly invoke a specific function and wait for its result. Unlike send_event (which is fire-and-forget), this waits for completion and returns the function's actual output data. Parameters: functionId (required string - function slug, ID, or name), data (optional - function input data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), timeout (optional int - seconds to wait, default 30)",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"functionId": map[string]any{"type": "string"},
+				"data":       map[string]any{},
+				"user":       map[string]any{},
+				"timeout":    map[string]any{"type": "integer"},
+			},
+			"required":             []string{"functionId"},
+			"additionalProperties": false,
+		},
 	}, h.invokeFunction)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -252,16 +274,16 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 // SendEventArgs represents the arguments for sending an event
 type SendEventArgs struct {
 	Name        string `json:"name"`
-	Data        any    `json:"data,omitempty" jsonschema:"true"`
-	User        any    `json:"user,omitempty" jsonschema:"true"`
+	Data        any    `json:"data,omitempty"`
+	User        any    `json:"user,omitempty"`
 	EventIDSeed string `json:"eventIdSeed,omitempty"`
 }
 
 // InvokeFunctionArgs represents the arguments for invoking a function
 type InvokeFunctionArgs struct {
 	FunctionID string `json:"functionId"`
-	Data       any    `json:"data,omitempty" jsonschema:"true"`
-	User       any    `json:"user,omitempty" jsonschema:"true"`
+	Data       any    `json:"data,omitempty"`
+	User       any    `json:"user,omitempty"`
 	Timeout    int    `json:"timeout,omitempty"`
 }
 
