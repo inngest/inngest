@@ -240,6 +240,8 @@ func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, it
 }
 
 func (q *queueProcessor) forAccountShards(ctx context.Context, accountID uuid.UUID, fn func(context.Context, QueueShard) error) error {
+	// Fan-out is feature-flagged because querying every shard increases
+	// latency and makes a single shard failure affect the whole read.
 	if q.AccountShardIterationEnabled != nil && q.AccountShardIterationEnabled(ctx, accountID) {
 		return q.shards.ForEach(ctx, fn)
 	}
