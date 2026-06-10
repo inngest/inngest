@@ -108,6 +108,16 @@ SELECT * FROM functions WHERE app_id = $1 AND archived_at IS NULL;
 -- name: GetAppFunctionsBySlug :many
 SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = $1 AND functions.archived_at IS NULL;
 
+-- name: GetAppFunctionsBySlugPage :many
+SELECT functions.* FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = @name
+  AND functions.id > @cursor
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL
+ORDER BY functions.id ASC
+LIMIT @limit_rows;
+
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = $1;
 

@@ -1236,6 +1236,20 @@ func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uu
 	return domainToCQRSList(fns, domainFunction), nil
 }
 
+func (w wrapper) GetFunctionsByAppExternalIDPage(ctx context.Context, opts cqrs.GetFunctionsByAppExternalIDPageOpts) ([]*cqrs.Function, error) {
+	// Ignore the workspace ID for now.
+	fns, err := w.q.GetAppFunctionsBySlugPage(ctx, dbpkg.GetAppFunctionsBySlugPageParams{
+		Name:      opts.AppID,
+		Cursor:    opts.Cursor,
+		LimitRows: int64(opts.Limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return domainToCQRSList(fns, domainFunction), nil
+}
+
 func (w wrapper) UpsertFunction(ctx context.Context, params cqrs.UpsertFunctionParams) (*cqrs.Function, error) {
 	fn, err := w.q.UpsertFunction(ctx, dbpkg.UpsertFunctionParams{
 		ID:        params.ID,

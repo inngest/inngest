@@ -165,6 +165,18 @@ func (pq *pgQuerier) GetAppFunctionsBySlug(ctx context.Context, name string) ([]
 	return convertSlice(rows, functionFromPG), nil
 }
 
+func (pq *pgQuerier) GetAppFunctionsBySlugPage(ctx context.Context, arg db.GetAppFunctionsBySlugPageParams) ([]*db.Function, error) {
+	rows, err := pq.q.GetAppFunctionsBySlugPage(ctx, sqlc.GetAppFunctionsBySlugPageParams{
+		Name:      arg.Name,
+		Cursor:    arg.Cursor,
+		LimitRows: int32(arg.LimitRows),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromPG), nil
+}
+
 func (pq *pgQuerier) GetFunctionByID(ctx context.Context, id uuid.UUID) (*db.Function, error) {
 	r, err := pq.q.GetFunctionByID(ctx, id)
 	if err != nil {

@@ -54,6 +54,12 @@ type UpdateFunctionConfigParams struct {
 	ID     uuid.UUID
 }
 
+type GetAppFunctionsBySlugPageParams struct {
+	Name      string
+	Cursor    uuid.UUID
+	LimitRows int64
+}
+
 // InsertEventParams are the parameters for inserting an event.
 type InsertEventParams struct {
 	InternalID ulid.ULID

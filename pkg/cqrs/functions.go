@@ -41,6 +41,7 @@ type FunctionReader interface {
 	// GetFunctionsByAppInternalID returns functions given the string ID of an app as defined
 	// by users in our SDKs.
 	GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, app string) ([]*Function, error)
+	GetFunctionsByAppExternalIDPage(ctx context.Context, opts GetFunctionsByAppExternalIDPageOpts) ([]*Function, error)
 	// GetFunctionsByAppInternalID returns functions given an internal app UUID.
 	GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*Function, error)
 	// GetFunctionByExternalID returns a function given a workspace ID and the SDK's client ID / function ID,
@@ -61,6 +62,13 @@ type FunctionReader interface {
 	// partial unique index `functions_app_id_slug_active_key`); this method is
 	// the caller-facing lookup that resolves to the right `app_id` via name.
 	GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
+}
+
+type GetFunctionsByAppExternalIDPageOpts struct {
+	WorkspaceID uuid.UUID
+	AppID       string
+	Cursor      uuid.UUID
+	Limit       int
 }
 
 // DevFunctionManager is a development-only function manager

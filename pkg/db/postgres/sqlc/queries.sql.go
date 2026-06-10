@@ -305,6 +305,54 @@ func (q *Queries) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Fu
 	return items, nil
 }
 
+const getAppFunctionsBySlugPage = `-- name: GetAppFunctionsBySlugPage :many
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.archived_at FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE apps.name = $1
+  AND functions.id > $2
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL
+ORDER BY functions.id ASC
+LIMIT $3
+`
+
+type GetAppFunctionsBySlugPageParams struct {
+	Name      string
+	Cursor    uuid.UUID
+	LimitRows int32
+}
+
+func (q *Queries) GetAppFunctionsBySlugPage(ctx context.Context, arg GetAppFunctionsBySlugPageParams) ([]*Function, error) {
+	rows, err := q.db.QueryContext(ctx, getAppFunctionsBySlugPage, arg.Name, arg.Cursor, arg.LimitRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Function
+	for rows.Next() {
+		var i Function
+		if err := rows.Scan(
+			&i.ID,
+			&i.AppID,
+			&i.Name,
+			&i.Slug,
+			&i.Config,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getApps = `-- name: GetApps :many
 SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version FROM apps WHERE archived_at IS NULL
 `
