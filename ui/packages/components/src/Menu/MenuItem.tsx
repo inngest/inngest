@@ -53,7 +53,9 @@ export const MenuItem = ({
           )}
         >
           <span className="flex shrink-0">{icon}</span>
-          {!collapsed && <span className="text-sm leading-tight">{text}</span>}
+          {!collapsed && (
+            <span className="truncate whitespace-nowrap text-sm leading-tight">{text}</span>
+          )}
           {!collapsed && beta && (
             <Pill kind="primary" appearance="solid" className="ml-auto h-4 px-1.5 text-[10px]">
               Beta
