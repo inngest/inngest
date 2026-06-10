@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -12,6 +13,46 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/oklog/ulid/v2"
 )
+
+// App represents a synced app within an Inngest environment, alongside
+// derived display data such as its function count.
+type App struct {
+	// ID is the user-facing app ID used in v2 API paths.
+	ID string
+	// InternalID is the internal surrogate key representing this app.
+	InternalID uuid.UUID
+	// Name is the app name.
+	Name string
+	// Method is how the app communicates with Inngest (serve, connect, api).
+	Method enums.AppMethod
+	// AppVersion is the user-defined app version, if set.
+	AppVersion string
+	// CreatedAt is when the app was first synced.
+	CreatedAt time.Time
+	// ArchivedAt, if non-zero, indicates that the app is archived as of the given time.
+	ArchivedAt time.Time
+	// FunctionCount is the number of functions in the app.
+	FunctionCount int
+	// LatestSync contains data reported by the latest app sync, if available.
+	LatestSync *AppSync
+}
+
+type AppSync struct {
+	Status      string
+	StartedAt   time.Time
+	CompletedAt time.Time
+	SdkLanguage string
+	SdkVersion  string
+	Framework   string
+	URL         string
+	Error       string
+	AppVersion  string
+}
+
+type AppProvider interface {
+	// GetApp returns an app given its external ID OR internal UUID.
+	GetApp(ctx context.Context, identifier string) (App, error)
+}
 
 type FunctionScheduler interface {
 	// Schedule initializes a new function run, ensuring that the function will be

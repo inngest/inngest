@@ -266,6 +266,155 @@ func int32Ptr(value int32) *int32 {
 	return &value
 }
 
+func TestService_GetApp(t *testing.T) {
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	createdAt := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	archivedAt := time.Now().Add(-time.Hour)
+
+	app := App{
+		ID:            "my-app",
+		InternalID:    appID,
+		Name:          "my-app",
+		Method:        enums.AppMethodConnect,
+		AppVersion:    "1.2.3",
+		CreatedAt:     createdAt,
+		FunctionCount: 4,
+		LatestSync: &AppSync{
+			Status:      "failed",
+			SdkLanguage: "typescript",
+			SdkVersion:  "3.22.0",
+			Framework:   "nextjs",
+			URL:         "https://example.com/api/inngest",
+			Error:       "could not reach app",
+			AppVersion:  "1.2.3",
+		},
+	}
+
+	t.Run("returns mapped app data", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(app, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.NoError(t, err)
+		require.Equal(t, "my-app", resp.Data.Id)
+		require.Equal(t, "my-app", resp.Data.Name)
+		require.Equal(t, apiv2.AppMethod_APP_METHOD_CONNECT, resp.Data.Method)
+		require.Equal(t, "1.2.3", resp.Data.GetAppVersion())
+		require.Equal(t, createdAt, resp.Data.CreatedAt.AsTime())
+		require.False(t, resp.Data.IsArchived)
+		require.Nil(t, resp.Data.ArchivedAt)
+		require.Equal(t, int32(4), resp.Data.FunctionCount)
+		require.NotNil(t, resp.Data.LatestSync)
+		require.Equal(t, "failed", resp.Data.LatestSync.GetStatus())
+		require.Equal(t, "typescript", resp.Data.LatestSync.GetSdkLanguage())
+		require.Equal(t, "3.22.0", resp.Data.LatestSync.GetSdkVersion())
+		require.Equal(t, "nextjs", resp.Data.LatestSync.GetFramework())
+		require.Equal(t, "https://example.com/api/inngest", resp.Data.LatestSync.GetUrl())
+		require.Equal(t, "could not reach app", resp.Data.LatestSync.GetError())
+		require.Equal(t, "1.2.3", resp.Data.LatestSync.GetAppVersion())
+		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("omits empty optional fields", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(App{InternalID: appID, Name: "my-app"}, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.NoError(t, err)
+		require.Equal(t, "my-app", resp.Data.Id)
+		require.Nil(t, resp.Data.AppVersion)
+		require.Nil(t, resp.Data.LatestSync)
+		require.Nil(t, resp.Data.CreatedAt)
+	})
+
+	t.Run("returns archived app data", func(t *testing.T) {
+		archived := app
+		archived.ArchivedAt = archivedAt
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(archived, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.NoError(t, err)
+		require.True(t, resp.Data.IsArchived)
+		require.Equal(t, archivedAt.UTC().Truncate(time.Microsecond), resp.Data.ArchivedAt.AsTime().Truncate(time.Microsecond))
+	})
+
+	t.Run("falls back to internal uuid when external id is missing", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, appID.String()).Return(App{InternalID: appID}, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: appID.String()})
+
+		require.NoError(t, err)
+		require.Equal(t, appID.String(), resp.Data.Id)
+	})
+
+	t.Run("requires app id", func(t *testing.T) {
+		service := NewService(ServiceOptions{Apps: &mockAppProvider{}})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "App ID is required")
+	})
+
+	t.Run("returns not implemented without app provider", func(t *testing.T) {
+		service := NewService(ServiceOptions{})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Get app is not yet implemented")
+	})
+
+	t.Run("returns not found when app is missing", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "missing-app").Return(App{}, fmt.Errorf("%w: missing-app", ErrAppNotFound)).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "missing-app"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "App not found")
+		require.Equal(t, codes.NotFound, status.Code(err))
+	})
+
+	t.Run("returns internal error when app lookup fails", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(App{}, errors.New("database unavailable")).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Unable to fetch app")
+		require.Equal(t, codes.Internal, status.Code(err))
+	})
+}
+
 func TestService_GetFunction(t *testing.T) {
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")

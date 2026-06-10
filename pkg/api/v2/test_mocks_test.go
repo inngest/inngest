@@ -9,10 +9,21 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+var _ AppProvider = (*mockAppProvider)(nil)
 var _ FunctionProvider = (*mockFunctionProvider)(nil)
 var _ FunctionRunReader = (*mockFunctionRunReader)(nil)
 var _ RunsReader = (*mockRunsReader)(nil)
 var _ FunctionTraceReader = (*mockFunctionTraceReader)(nil)
+
+type mockAppProvider struct {
+	mock.Mock
+}
+
+func (m *mockAppProvider) GetApp(ctx context.Context, identifier string) (App, error) {
+	args := m.Called(ctx, identifier)
+	app, _ := args.Get(0).(App)
+	return app, args.Error(1)
+}
 
 type mockFunctionProvider struct {
 	mock.Mock
