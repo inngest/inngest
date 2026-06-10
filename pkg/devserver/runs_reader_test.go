@@ -44,6 +44,37 @@ func TestRunListItemFromRowUsesTraceRunOutput(t *testing.T) {
 	require.True(t, output["ok"])
 }
 
+func TestRunListItemFromRowUsesBareFunctionID(t *testing.T) {
+	t.Run("uses distinct configured slug", func(t *testing.T) {
+		result := runListItemFromRow(&db.RunListItemRow{
+			FunctionSlug:   "app-app-test-fn",
+			FunctionConfig: `{"name":"Test function","slug":"app-test-fn"}`,
+			AppName:        "app",
+		}, false)
+
+		require.Equal(t, "app-test-fn", result.FunctionID)
+	})
+
+	t.Run("trims composite configured slug", func(t *testing.T) {
+		result := runListItemFromRow(&db.RunListItemRow{
+			FunctionSlug:   "app-test-fn",
+			FunctionConfig: `{"name":"Test function","slug":"app-test-fn"}`,
+			AppName:        "app",
+		}, false)
+
+		require.Equal(t, "test-fn", result.FunctionID)
+	})
+
+	t.Run("trims stored slug without configured slug", func(t *testing.T) {
+		result := runListItemFromRow(&db.RunListItemRow{
+			FunctionSlug: "app-test-fn",
+			AppName:      "app",
+		}, false)
+
+		require.Equal(t, "test-fn", result.FunctionID)
+	})
+}
+
 func TestRunListItemFromRowUnwrapsRunCompleteOpcodeOutput(t *testing.T) {
 	runID := ulid.Make()
 	eventID := ulid.Make()

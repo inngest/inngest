@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
@@ -67,16 +68,46 @@ func (p *cqrsFunctionProvider) GetFunctionByApp(ctx context.Context, appID strin
 }
 
 func (p *cqrsFunctionProvider) findFunctionInApp(ctx context.Context, fns []*cqrs.Function, appID string, functionID string) (inngest.DeployedFunction, error) {
+	deployedFns := make([]inngest.DeployedFunction, 0, len(fns))
 	for _, fn := range fns {
 		deployed, err := p.toDeployedFunction(ctx, fn)
 		if err != nil {
 			return inngest.DeployedFunction{}, err
 		}
-		if functionIDsMatch(deployed, functionID, appID+"-"+functionID) {
-			return deployed, nil
+		deployedFns = append(deployedFns, deployed)
+	}
+
+	//
+	// Prefer the app-scoped ID before accepting legacy combined IDs; users can
+	// name a function with the app prefix, and that should still resolve exactly.
+	for _, fn := range deployedFns {
+		if publicDeployedFunctionID(appID, fn) == functionID {
+			return fn, nil
 		}
 	}
+
+	for _, fn := range deployedFns {
+		if functionIDsMatch(fn, functionID, appID+"-"+functionID) {
+			return fn, nil
+		}
+	}
+
 	return inngest.DeployedFunction{}, fmt.Errorf("%w: %s/%s", apiv2.ErrFunctionNotFound, appID, functionID)
+}
+
+func publicDeployedFunctionID(appID string, fn inngest.DeployedFunction) string {
+	if fn.Function.Slug != "" && fn.Function.Slug != fn.Slug {
+		return fn.Function.Slug
+	}
+
+	functionID := fn.Function.Slug
+	if functionID == "" {
+		functionID = fn.Slug
+	}
+	if appID != "" {
+		return strings.TrimPrefix(functionID, appID+"-")
+	}
+	return functionID
 }
 
 func functionIDsMatch(fn inngest.DeployedFunction, bareFunctionID string, prefixedFunctionID string) bool {

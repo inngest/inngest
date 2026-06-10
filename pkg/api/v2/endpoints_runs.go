@@ -269,11 +269,15 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 }
 
 func functionRefID(fn inngest.DeployedFunction) string {
-	if fn.Function.Slug != "" {
+	if fn.Function.Slug != "" && fn.Function.Slug != fn.Slug {
 		return fn.Function.Slug
 	}
+
 	if fn.AppName != "" {
 		return strings.TrimPrefix(fn.Slug, fn.AppName+"-")
+	}
+	if fn.Function.Slug != "" {
+		return fn.Function.Slug
 	}
 	return fn.Slug
 }

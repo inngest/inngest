@@ -51,14 +51,6 @@ func runListItemFromRow(row *db.RunListItemRow, includeOutput bool) *apiv2.RunLi
 	fn := inngest.Function{}
 	_ = json.Unmarshal([]byte(row.FunctionConfig), &fn)
 
-	functionID := fn.Slug
-	if functionID == "" && row.AppName != "" {
-		functionID = strings.TrimPrefix(row.FunctionSlug, row.AppName+"-")
-	}
-	if functionID == "" {
-		functionID = row.FunctionSlug
-	}
-
 	functionName := fn.Name
 	if functionName == "" {
 		functionName = row.FunctionName
@@ -73,7 +65,7 @@ func runListItemFromRow(row *db.RunListItemRow, includeOutput bool) *apiv2.RunLi
 		RunID:        row.FunctionRun.RunID,
 		RunStartedAt: row.FunctionRun.RunStartedAt,
 		EventID:      row.FunctionRun.EventID,
-		FunctionID:   functionID,
+		FunctionID:   publicRunListFunctionID(row.AppName, row.FunctionSlug, fn.Slug),
 		FunctionName: functionName,
 		AppID:        appID,
 	}
@@ -95,6 +87,21 @@ func runListItemFromRow(row *db.RunListItemRow, includeOutput bool) *apiv2.RunLi
 	}
 
 	return run
+}
+
+func publicRunListFunctionID(appID string, storedFunctionID string, configFunctionID string) string {
+	if configFunctionID != "" && configFunctionID != storedFunctionID {
+		return configFunctionID
+	}
+
+	functionID := configFunctionID
+	if functionID == "" {
+		functionID = storedFunctionID
+	}
+	if appID != "" {
+		return strings.TrimPrefix(functionID, appID+"-")
+	}
+	return functionID
 }
 
 func publicRunOutput(raw []byte) json.RawMessage {
