@@ -103,7 +103,7 @@ export default function SideBar({
                 onClick={toggleCollapsed}
                 aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 className={`text-muted hover:bg-canvasSubtle hover:text-basis my-0.5 flex h-8 w-8 items-center justify-center rounded ${
-                  collapsed ? 'mx-auto' : 'ml-auto'
+                  collapsed ? 'mx-auto' : 'mr-auto'
                 }`}
               >
                 {collapsed ? (

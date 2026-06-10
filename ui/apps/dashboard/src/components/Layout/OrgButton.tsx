@@ -26,7 +26,7 @@ export default function OrgButton({
           initial
         )}
       </span>
-      <span className="max-w-[140px] truncate" title={orgName}>
+      <span className="max-w-[140px] truncate leading-normal" title={orgName}>
         {orgName}
       </span>
       <RiExpandUpDownLine className="text-muted h-4 w-4 shrink-0" />
