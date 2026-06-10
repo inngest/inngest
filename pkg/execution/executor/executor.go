@@ -5861,7 +5861,7 @@ func (e *executor) emitNonStepSpan(ctx context.Context, runCtx execution.RunCont
 	tracing.AddTimingAttrs(attrs, queuedAt, scheduledAt, startedAt, endedAt)
 
 	if result != nil {
-		attrs.Merge(apiAttributes(*result))
+		attrs = attrs.Merge(apiAttributes(*result))
 	}
 
 	item := runCtx.LifecycleItem()
