@@ -75,6 +75,24 @@ func AddQueueTimestampAttrs(rawAttrs *meta.SerializableAttrs, item queue.Item) {
 	}
 }
 
+func AddTimingAttrs(rawAttrs *meta.SerializableAttrs, queuedAt, scheduledAt, startedAt, endedAt time.Time) {
+	if !queuedAt.IsZero() {
+		meta.AddAttr(rawAttrs, meta.Attrs.QueuedAt, &queuedAt)
+	}
+
+	if !scheduledAt.IsZero() {
+		meta.AddAttr(rawAttrs, meta.Attrs.ScheduledAt, &scheduledAt)
+	}
+
+	if !startedAt.IsZero() {
+		meta.AddAttr(rawAttrs, meta.Attrs.StartedAt, &startedAt)
+	}
+
+	if !endedAt.IsZero() {
+		meta.AddAttr(rawAttrs, meta.Attrs.EndedAt, &endedAt)
+	}
+}
+
 func getExecutionContext(ctx context.Context) *ExecutionContext {
 	ec, ok := ctx.Value(_spanCtxKeyV).(*ExecutionContext)
 	if ok {
@@ -186,6 +204,16 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	case meta.SpanNameExecution:
 		{
 			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.StartedAt, &now)
+
+			if ec != nil {
+				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)
+			}
+
+			break
+		}
+
+	case meta.SpanNameNonStep:
+		{
 
 			if ec != nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &ec.Attempt)

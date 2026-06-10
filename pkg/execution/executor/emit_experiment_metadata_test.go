@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
@@ -55,7 +56,7 @@ func (s *spyExecutor) emit(ctx context.Context, opts any) {
 			values:   vals,
 		})
 	}
-	s.executor.emitExperimentMetadataFromOpts(ctx, newTestRunContext(), opts)
+	s.executor.emitExperimentMetadataFromOpts(ctx, newTestRunContext(), &state.GeneratorOpcode{Opts: opts})
 }
 
 func TestEmitExperimentMetadataFromOpts_VariantStep(t *testing.T) {

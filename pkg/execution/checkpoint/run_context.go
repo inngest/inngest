@@ -2,6 +2,7 @@ package checkpoint
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -17,6 +18,8 @@ type checkpointRunContext struct {
 	md         state.Metadata
 	httpClient exechttp.RequestExecutor
 	events     []json.RawMessage
+
+	fallbackTime time.Time
 
 	// Data from queue.Item that we actually need
 	groupID         string
@@ -127,8 +130,16 @@ func (c *checkpointRunContext) ExecutionSpan() *meta.SpanReference {
 	return nil
 }
 
-func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
+func (c *checkpointRunContext) RootSpan() *meta.SpanReference {
 	return tracing.RunSpanRefFromMetadata(&c.md)
+}
+
+func (c *checkpointRunContext) ParentSpan() *meta.SpanReference {
+	return c.RootSpan()
+}
+
+func (c *checkpointRunContext) StartTime() time.Time {
+	return c.fallbackTime
 }
 
 func (c *checkpointRunContext) ReleaseCapacityLease() error {
