@@ -93,3 +93,5 @@ release:
   github:
     owner: inngest
     name: inngest
+  prerelease: auto
+  make_latest: "{{ not .Prerelease }}"
