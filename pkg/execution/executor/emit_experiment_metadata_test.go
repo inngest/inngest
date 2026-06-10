@@ -81,7 +81,7 @@ func TestEmitExperimentMetadataFromOpts_VariantStep(t *testing.T) {
 	assert.Equal(t, "executor.handleGeneratorStep.experiment", got.location)
 
 	// Decode the serialized values to verify SDK -> executor field mapping.
-	assert.JSONEq(t, `"checkout-flow"`, string(got.values["experiment_name"]))
+	assert.JSONEq(t, `"checkout-flow"`, string(got.values["name"]))
 	assert.JSONEq(t, `"variant-b"`, string(got.values["variant"]))
 	assert.JSONEq(t, `"weighted"`, string(got.values["selection_strategy"]))
 }
@@ -125,7 +125,7 @@ func TestEmitExperimentMetadataFromOpts_OlderSDKMissingStrategy(t *testing.T) {
 	require.Len(t, s.captured, 1)
 	got := s.captured[0]
 	assert.Equal(t, extractors.KindInngestExperiment, got.kind)
-	assert.JSONEq(t, `"feature-flag"`, string(got.values["experiment_name"]))
+	assert.JSONEq(t, `"feature-flag"`, string(got.values["name"]))
 	assert.JSONEq(t, `"enabled"`, string(got.values["variant"]))
 	assert.JSONEq(t, `""`, string(got.values["selection_strategy"]))
 }
@@ -142,7 +142,7 @@ func TestEmitExperimentMetadataFromOpts_RawJSONBytes(t *testing.T) {
 
 	require.Len(t, s.captured, 1)
 	got := s.captured[0]
-	assert.JSONEq(t, `"raw-bytes"`, string(got.values["experiment_name"]))
+	assert.JSONEq(t, `"raw-bytes"`, string(got.values["name"]))
 	assert.JSONEq(t, `"v1"`, string(got.values["variant"]))
 	assert.JSONEq(t, `"fixed"`, string(got.values["selection_strategy"]))
 }

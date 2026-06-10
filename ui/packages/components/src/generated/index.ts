@@ -68,7 +68,7 @@ export const KindInngestExperiment = 'inngest.experiment';
  * From experiment.go
  */
 export interface ExperimentMetadata {
-  experiment_name: string;
+  name: string;
   variant: string;
   selection_strategy: string;
   available_variants?: string[];
