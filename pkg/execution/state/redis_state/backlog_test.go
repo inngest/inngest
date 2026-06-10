@@ -1293,6 +1293,9 @@ func TestPartitionBacklogSize(t *testing.T) {
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
 		}),
+		osqueue.WithAccountShardIterationEnabled(func(context.Context, uuid.UUID) bool {
+			return true
+		}),
 		osqueue.WithClock(clock),
 	}
 
