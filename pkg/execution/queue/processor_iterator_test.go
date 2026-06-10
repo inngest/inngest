@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"iter"
 	"sync"
 	"sync/atomic"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
@@ -28,6 +30,7 @@ type mockQueueProcessor struct {
 	shadowMu             sync.Mutex
 	shadowMap            map[string]ShadowContinuation
 	constraintResultFunc func() enums.QueueConstraint
+	constraintErr        error
 	leaseCount           int32
 }
 
@@ -59,6 +62,12 @@ type mockShardForIterator struct {
 	partitionRequeueCount   int32
 	partitionRequeueAt      time.Time
 	partitionRequeueForceAt bool
+	itemOpMu                sync.Mutex
+	requeueCount            int
+	requeuedItem            *QueueItem
+	requeueAt               time.Time
+	dequeueCount            int
+	dequeuedItem            *QueueItem
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -94,6 +103,12 @@ func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, durati
 }
 
 func (m *mockShardForIterator) Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
+	m.itemOpMu.Lock()
+	defer m.itemOpMu.Unlock()
+
+	m.requeueCount++
+	m.requeuedItem = &i
+	m.requeueAt = at
 	return nil
 }
 
@@ -119,6 +134,11 @@ func (m *mockShardForIterator) RequeueByJobID(ctx context.Context, jobID string,
 }
 
 func (m *mockShardForIterator) Dequeue(ctx context.Context, i QueueItem, opts ...DequeueOptionFn) error {
+	m.itemOpMu.Lock()
+	defer m.itemOpMu.Unlock()
+
+	m.dequeueCount++
+	m.dequeuedItem = &i
 	return nil
 }
 
@@ -389,6 +409,10 @@ func (m *mockQueueProcessor) ItemLeaseConstraintCheck(ctx context.Context, shado
 	// Add some delay to increase chance of race
 	time.Sleep(time.Microsecond * 50)
 
+	if m.constraintErr != nil {
+		return ItemLeaseConstraintCheckResult{}, m.constraintErr
+	}
+
 	var constraint enums.QueueConstraint
 	if m.constraintResultFunc != nil {
 		constraint = m.constraintResultFunc()
@@ -399,6 +423,140 @@ func (m *mockQueueProcessor) ItemLeaseConstraintCheck(ctx context.Context, shado
 	return ItemLeaseConstraintCheckResult{
 		LimitingConstraint: constraint,
 	}, nil
+}
+
+func TestProcessorIteratorConstraintCheckErrorRequeuesWithAttempt(t *testing.T) {
+	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+	envID := uuid.New()
+	runID := ulid.Make()
+	maxAttempts := 3
+	nextAttemptAt := time.Now().Add(time.Minute)
+
+	shard := &mockShardForIterator{name: "test-shard"}
+	opts := NewQueueOptions()
+	opts.backoffFunc = func(attempt int) time.Time {
+		require.Equal(t, 1, attempt)
+		return nextAttemptAt
+	}
+
+	mockProc := &mockQueueProcessor{
+		shard:         shard,
+		clock:         clockwork.NewRealClock(),
+		sem:           util.NewTrackingSemaphore(1),
+		workers:       make(chan ProcessItem, 1),
+		shadowMap:     make(map[string]ShadowContinuation),
+		opts:          opts,
+		constraintErr: errors.New("missing constraint config workflow version"),
+	}
+
+	item := &QueueItem{
+		ID:          ulid.Make().String(),
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		AtMS:        time.Now().UnixMilli(),
+		Data: Item{
+			Kind:        KindEdge,
+			Attempt:     1,
+			MaxAttempts: &maxAttempts,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       runID,
+			},
+		},
+	}
+
+	iter := ProcessorIterator{
+		Partition: &QueuePartition{
+			ID:         fnID.String(),
+			AccountID:  accountID,
+			EnvID:      &envID,
+			FunctionID: &fnID,
+		},
+		Items:      []*QueueItem{item},
+		Queue:      mockProc,
+		StaticTime: time.Now(),
+	}
+
+	err := iter.Iterate(ctx)
+	require.NoError(t, err)
+
+	shard.itemOpMu.Lock()
+	defer shard.itemOpMu.Unlock()
+
+	require.Equal(t, 1, shard.requeueCount)
+	require.Equal(t, 0, shard.dequeueCount)
+	require.NotNil(t, shard.requeuedItem)
+	require.Equal(t, 2, shard.requeuedItem.Data.Attempt)
+	require.Equal(t, nextAttemptAt, shard.requeueAt)
+	require.Empty(t, mockProc.workers)
+}
+
+func TestProcessorIteratorConstraintCheckErrorDequeuesAtMaxAttempts(t *testing.T) {
+	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+	envID := uuid.New()
+	runID := ulid.Make()
+	maxAttempts := 3
+
+	shard := &mockShardForIterator{name: "test-shard"}
+	mockProc := &mockQueueProcessor{
+		shard:         shard,
+		clock:         clockwork.NewRealClock(),
+		sem:           util.NewTrackingSemaphore(1),
+		workers:       make(chan ProcessItem, 1),
+		shadowMap:     make(map[string]ShadowContinuation),
+		opts:          NewQueueOptions(),
+		constraintErr: errors.New("missing constraint config workflow version"),
+	}
+
+	item := &QueueItem{
+		ID:          ulid.Make().String(),
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		AtMS:        time.Now().UnixMilli(),
+		Data: Item{
+			Kind:        KindEdge,
+			Attempt:     2,
+			MaxAttempts: &maxAttempts,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       runID,
+			},
+		},
+	}
+
+	iter := ProcessorIterator{
+		Partition: &QueuePartition{
+			ID:         fnID.String(),
+			AccountID:  accountID,
+			EnvID:      &envID,
+			FunctionID: &fnID,
+		},
+		Items:      []*QueueItem{item},
+		Queue:      mockProc,
+		StaticTime: time.Now(),
+	}
+
+	err := iter.Iterate(ctx)
+	require.NoError(t, err)
+
+	shard.itemOpMu.Lock()
+	defer shard.itemOpMu.Unlock()
+
+	require.Equal(t, 0, shard.requeueCount)
+	require.Equal(t, 1, shard.dequeueCount)
+	require.NotNil(t, shard.dequeuedItem)
+	require.Equal(t, 2, shard.dequeuedItem.Data.Attempt)
+	require.Empty(t, mockProc.workers)
 }
 
 // TestProcessorIteratorCounterRaceCondition tests for race conditions when

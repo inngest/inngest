@@ -219,6 +219,9 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	if err != nil {
 		span.RecordError(err)
 		l.ReportError(err, "could not check constraints to lease item")
+		if err := p.handlePreLeaseConstraintCheckError(ctx, item, err); err != nil {
+			return err
+		}
 		// Stop iterator but don't quit the queue
 		return ErrProcessStopIterator
 	}
@@ -519,6 +522,42 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		ConditionalTraceCtx: context.WithoutCancel(ctx),
 	}
 	commitSemaphoreAcquire = true
+
+	return nil
+}
+
+func (p *ProcessorIterator) handlePreLeaseConstraintCheckError(ctx context.Context, item *QueueItem, err error) error {
+	shard := p.Queue.Shard()
+	l := logger.StdlibLogger(ctx).With("item", item, "cause", err)
+
+	if ShouldRetry(err, item.Data.Attempt, item.Data.GetMaxAttempts()) {
+		at := p.Queue.Options().backoffFunc(item.Data.Attempt)
+		// Match Process error handling: calculate backoff from the current attempt,
+		// then advance the stored attempt for the next dispatch.
+		if !IsAlwaysRetryable(err) {
+			item.Data.Attempt += 1
+		}
+
+		if err := shard.Requeue(context.WithoutCancel(ctx), *item, at); err != nil {
+			if errors.Is(err, ErrQueueItemNotFound) {
+				return nil
+			}
+
+			l.ReportError(err, "could not requeue item after pre-lease constraint check failure")
+			return fmt.Errorf("could not requeue item after pre-lease constraint check failure: %w", err)
+		}
+
+		return nil
+	}
+
+	if err := shard.Dequeue(context.WithoutCancel(ctx), *item); err != nil {
+		if errors.Is(err, ErrQueueItemNotFound) {
+			return nil
+		}
+
+		l.ReportError(err, "could not dequeue item after pre-lease constraint check failure")
+		return fmt.Errorf("could not dequeue item after pre-lease constraint check failure: %w", err)
+	}
 
 	return nil
 }
