@@ -68,7 +68,7 @@ function formatCacheAge(cachedAt: number) {
 
 export function InfraDashboard() {
   const env = useEnvironment();
-  const { cacheStatus, data, fetching, refetchBillingData } =
+  const { cacheStatus, data, loading, refetchBillingData } =
     useInfraDashboardData(TIME_RANGE_OPTIONS[0]);
   const placeholders = data.placeholders;
   const billingDays = billingCycleDaysRemaining();
@@ -123,17 +123,17 @@ export function InfraDashboard() {
 
       <section className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-3">
         <KpiCard
-          fetching={fetching}
+          fetching={loading.eventsReceived}
           label="Events received"
           value={formatCompactNumber(data.eventsReceived)}
         />
         <KpiCard
-          fetching={fetching}
+          fetching={loading.executionsRan}
           label="Executions ran (runs + steps)"
           value={formatCompactNumber(data.executionsRan)}
         />
         <KpiCard
-          fetching={fetching}
+          fetching={loading.backlog}
           label="Current backlog"
           value={formatCompactNumber(data.backlogDepth)}
         />
@@ -163,16 +163,18 @@ export function InfraDashboard() {
             : undefined
         }
         eventsReceived={data.eventsReceived}
-        fetching={fetching}
+        eventsFetching={loading.eventsReceived}
         infraPlan={data.currentInfraPlan}
         isEnterprisePlan={data.isEnterprisePlan}
         placeholders={placeholders}
+        queueFetching={loading.queue}
+        executorsFetching={loading.executors}
       />
 
       <MostRanFunctions
         envSlug={env.slug}
         rows={data.topFunctions}
-        fetching={fetching}
+        fetching={loading.topFunctions}
       />
     </div>
   );
@@ -804,19 +806,23 @@ function InfraFlowPanel({
   currentConcurrency,
   currentInfraTierId,
   eventsReceived,
-  fetching,
+  eventsFetching,
+  executorsFetching,
   infraPlan,
   isEnterprisePlan,
   placeholders,
+  queueFetching,
 }: {
   backlogDepth: number;
   currentConcurrency: number;
   currentInfraTierId?: InfraTierId;
   eventsReceived: number;
-  fetching: boolean;
+  eventsFetching: boolean;
+  executorsFetching: boolean;
   infraPlan: InfraPlan;
   isEnterprisePlan: boolean;
   placeholders: InfraDashboardPlaceholders;
+  queueFetching: boolean;
 }) {
   const selectedTier =
     placeholders.infraTiers.find(
@@ -844,7 +850,7 @@ function InfraFlowPanel({
 
       <div className="relative z-10 grid items-center gap-4 lg:grid-cols-[1fr_56px_1fr_56px_1fr]">
         <FlowNode
-          fetching={fetching}
+          fetching={eventsFetching}
           label="Events"
           primaryLabel={
             infraPlan.eventStreamUnit === 'events'
@@ -869,7 +875,7 @@ function InfraFlowPanel({
         <Connector />
         <FlowNode
           accent
-          fetching={fetching}
+          fetching={queueFetching}
           label="Queue"
           primaryLabel="Current backlog"
           primaryHint="Soft limit"
@@ -879,9 +885,10 @@ function InfraFlowPanel({
         />
         <Connector />
         <FlowNode
-          fetching={fetching}
+          fetching={executorsFetching}
           label="Executors"
           primaryLabel="Concurrency in use"
+          primaryHint="~ Approx."
           primaryValue={formatCompactNumber(currentConcurrency)}
           progressValue={currentConcurrency}
           limit={infraPlan.execConcurrencyLimit}

@@ -399,11 +399,31 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     (lookups.fetching ||
       functions.fetching ||
       functionUsage.fetching ||
-      events.fetching ||
       volume.fetching ||
       billableExecutions.fetching ||
       currentPlan.fetching ||
       availablePlans.fetching);
+  const loading = isUsingCachedData
+    ? {
+        backlog: false,
+        billing: false,
+        eventsReceived: false,
+        executionsRan: false,
+        executors: false,
+        queue: false,
+        topFunctions: false,
+      }
+    : {
+        backlog: volume.fetching,
+        billing: currentPlan.fetching || availablePlans.fetching,
+        eventsReceived: events.fetching,
+        executionsRan:
+          billableExecutions.fetching ||
+          (!billableExecutions.data?.usage && volume.fetching),
+        executors: volume.fetching,
+        queue: volume.fetching,
+        topFunctions: functionUsage.fetching,
+      };
 
   useEffect(() => {
     if (!liveDataReady || liveError) {
@@ -424,7 +444,10 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     },
     data,
     error: !isUsingCachedData && liveError ? liveError : undefined,
+    eventsError: !isUsingCachedData ? events.error : undefined,
+    eventsFetching: !isUsingCachedData && events.fetching,
     fetching,
+    loading,
     range,
     refetchBillingData: async () => {
       await client
