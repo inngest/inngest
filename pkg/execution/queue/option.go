@@ -36,6 +36,10 @@ type QueueOpt func(q *QueueOptions)
 
 type QueueProcessorOpt func(q *queueProcessor)
 
+// AccountShardIterationEnabled controls whether account-scoped queue reads
+// should fan out across every shard instead of resolving the account's shard.
+type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID) bool
+
 func WithName(name string) QueueProcessorOpt {
 	return func(q *queueProcessor) {
 		q.name = name
@@ -70,6 +74,14 @@ func WithAccountExists(f AccountExists) QueueOpt {
 	return func(q *QueueOptions) {
 		if f != nil {
 			q.AccountExists = f
+		}
+	}
+}
+
+func WithAccountShardIterationEnabled(f AccountShardIterationEnabled) QueueOpt {
+	return func(q *QueueOptions) {
+		if f != nil {
+			q.AccountShardIterationEnabled = f
 		}
 	}
 }
@@ -341,10 +353,11 @@ type QueueRunMode struct {
 }
 
 type QueueOptions struct {
-	PartitionPriorityFinder PartitionPriorityFinder
-	AccountPriorityFinder   AccountPriorityFinder
-	AccountExists           AccountExists
-	PartitionPausedGetter   PartitionPausedGetter
+	PartitionPriorityFinder      PartitionPriorityFinder
+	AccountPriorityFinder        AccountPriorityFinder
+	AccountExists                AccountExists
+	PartitionPausedGetter        PartitionPausedGetter
+	AccountShardIterationEnabled AccountShardIterationEnabled
 
 	lifecycles QueueLifecycleListeners
 
@@ -709,6 +722,9 @@ func NewQueueOptions(
 		},
 		AccountExists: func(_ context.Context, _ uuid.UUID) (bool, error) {
 			return true, nil
+		},
+		AccountShardIterationEnabled: func(context.Context, uuid.UUID) bool {
+			return false
 		},
 		PartitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
 			return PartitionPausedInfo{}

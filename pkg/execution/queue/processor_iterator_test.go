@@ -59,6 +59,14 @@ type mockShardForIterator struct {
 	partitionRequeueCount   int32
 	partitionRequeueAt      time.Time
 	partitionRequeueForceAt bool
+	partitionBacklogSize    int64
+	partitionBacklogCalls   int32
+	outstandingJobCount     int
+	outstandingJobCalls     int32
+	runningCount            int64
+	runningCountCalls       int32
+	statusCount             int64
+	statusCountCalls        int32
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -352,7 +360,8 @@ func (m *mockShardForIterator) ItemsByRunID(ctx context.Context, scope Scope, ru
 }
 
 func (m *mockShardForIterator) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
-	return 0, nil
+	atomic.AddInt32(&m.partitionBacklogCalls, 1)
+	return m.partitionBacklogSize, nil
 }
 
 func (m *mockShardForIterator) PartitionByID(ctx context.Context, scope Scope, partitionID string) (*PartitionInspectionResult, error) {
@@ -364,15 +373,18 @@ func (m *mockShardForIterator) UnpauseFunction(ctx context.Context, scope Scope)
 }
 
 func (m *mockShardForIterator) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
-	return 0, nil
+	atomic.AddInt32(&m.outstandingJobCalls, 1)
+	return m.outstandingJobCount, nil
 }
 
 func (m *mockShardForIterator) RunningCount(ctx context.Context, scope Scope) (int64, error) {
-	return 0, nil
+	atomic.AddInt32(&m.runningCountCalls, 1)
+	return m.runningCount, nil
 }
 
 func (m *mockShardForIterator) StatusCount(ctx context.Context, scope Scope, status string) (int64, error) {
-	return 0, nil
+	atomic.AddInt32(&m.statusCountCalls, 1)
+	return m.statusCount, nil
 }
 
 func (m *mockShardForIterator) RunJobs(ctx context.Context, scope Scope, runID ulid.ULID, limit, offset int64) ([]JobResponse, error) {

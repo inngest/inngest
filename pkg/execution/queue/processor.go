@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
@@ -238,11 +239,25 @@ func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, it
 	return shard.LoadQueueItem(ctx, itemID)
 }
 
+func (q *queueProcessor) forAccountShards(ctx context.Context, accountID uuid.UUID, fn func(context.Context, QueueShard) error) error {
+	// Fan-out is feature-flagged because querying every shard increases
+	// latency and makes a single shard failure affect the whole read.
+	if q.AccountShardIterationEnabled != nil && q.AccountShardIterationEnabled(ctx, accountID) {
+		return q.shards.ForEach(ctx, fn)
+	}
+
+	shard, err := q.shards.Resolve(ctx, accountID, nil)
+	if err != nil {
+		return fmt.Errorf("could not resolve account shard: %w", err)
+	}
+	return fn(ctx, shard)
+}
+
 // PartitionBacklogSize implements QueueManager.
 func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
 	var totalCount int64
 
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
 		backlogSize, err := shard.PartitionBacklogSize(ctx, scope, partitionID)
 		if err != nil {
 			return fmt.Errorf("could not load partition backlog size: %w", err)
@@ -292,7 +307,7 @@ func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context, shard QueueS
 func (q *queueProcessor) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
 	var totalCount int64
 
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
 		outstanding, err := shard.OutstandingJobCount(ctx, scope, runID)
 		if err != nil {
 			return fmt.Errorf("could not load outstanding job count: %w", err)
@@ -320,7 +335,7 @@ func (q *queueProcessor) RunJobs(ctx context.Context, shardName string, scope Sc
 func (q *queueProcessor) RunningCount(ctx context.Context, scope Scope) (int64, error) {
 	var totalCount int64
 
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
 		running, err := shard.RunningCount(ctx, scope)
 		if err != nil {
 			return fmt.Errorf("could not load running count: %w", err)
@@ -338,7 +353,7 @@ func (q *queueProcessor) RunningCount(ctx context.Context, scope Scope) (int64, 
 func (q *queueProcessor) StatusCount(ctx context.Context, scope Scope, status string) (int64, error) {
 	var totalCount int64
 
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
 		running, err := shard.StatusCount(ctx, scope, status)
 		if err != nil {
 			return fmt.Errorf("could not load status count: %w", err)
