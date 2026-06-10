@@ -112,7 +112,7 @@ homebrew_casks:
 
     # auto only uploads stable releases to homebrew-tap
     # set to false temporarily if testing prereleases too
-    skip_upload: auto
+    skip_upload: false
 
     homepage: "https://www.inngest.com/"
     description: "Inngest CLI and development server"
