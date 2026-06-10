@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -30,6 +31,15 @@ type Options struct {
 	// purposes. By default database handlers are singletons, but when this flag
 	// is enabled, each call creates a new connection.
 	ForTest bool
+
+	// MaxOpenConns sets the maximum number of open connections to the database.
+	MaxOpenConns int
+	// MaxIdleConns sets the maximum number of idle connections in the pool.
+	MaxIdleConns int
+	// ConnMaxLifetime sets the maximum amount of time a connection may be reused.
+	ConnMaxLifetime time.Duration
+	// ConnMaxIdleTime sets the maximum amount of time a connection may be idle.
+	ConnMaxIdleTime time.Duration
 }
 
 func Open(ctx context.Context, opts Options) (*sql.DB, error) {
@@ -59,6 +69,20 @@ func Open(ctx context.Context, opts Options) (*sql.DB, error) {
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Apply connection pool settings for resilience against transient failures.
+	if opts.MaxOpenConns > 0 {
+		conn.SetMaxOpenConns(opts.MaxOpenConns)
+	}
+	if opts.MaxIdleConns > 0 {
+		conn.SetMaxIdleConns(opts.MaxIdleConns)
+	}
+	if opts.ConnMaxLifetime > 0 {
+		conn.SetConnMaxLifetime(opts.ConnMaxLifetime)
+	}
+	if opts.ConnMaxIdleTime > 0 {
+		conn.SetConnMaxIdleTime(opts.ConnMaxIdleTime)
 	}
 
 	if err := conn.Ping(); err != nil {

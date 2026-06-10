@@ -29,6 +29,9 @@ func (q *queueProcessor) executionScan(ctx context.Context, f RunFunc) error {
 	l.Debug("starting queue worker", "poll", q.pollTick.String())
 
 	backoff := time.Millisecond * 250
+	// consecutiveTransientErrors tracks how long transient DB errors have persisted.
+	// The scanner only gives up after sustained failure (30s of continuous errors).
+	var transientErrorStart time.Time
 
 	var err error
 LOOP:
@@ -66,6 +69,27 @@ LOOP:
 					continue
 				}
 
+				// On transient DB errors, retry with backoff instead of halting.
+				if IsTransientDBError(err) {
+					now := time.Now()
+					if transientErrorStart.IsZero() {
+						transientErrorStart = now
+					}
+					// Only give up after 30s of sustained transient failures.
+					if now.Sub(transientErrorStart) > 30*time.Second {
+						l.ReportError(err, "sustained database connection failure, halting queue scanner")
+						break LOOP
+					}
+					l.Warn("transient database error during scan, retrying",
+						"error", err,
+						"backoff", backoff.String(),
+						"failing_since", transientErrorStart.Format(time.RFC3339),
+					)
+					<-time.After(backoff)
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(time.Second*5)))
+					continue
+				}
+
 				// On scan errors, halt the worker entirely.
 				if !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "error scanning partition pointers")
@@ -73,7 +97,9 @@ LOOP:
 				break LOOP
 			}
 
+			// Reset backoff and transient error tracking on success.
 			backoff = time.Millisecond * 250
+			transientErrorStart = time.Time{}
 		}
 	}
 
@@ -319,6 +345,7 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 	l.Debug("starting shadow scanner", "poll", q.shadowPollTick.String())
 
 	backoff := 200 * time.Millisecond
+	var transientErrorStart time.Time
 
 	for {
 		select {
@@ -340,6 +367,25 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 					continue
 				}
 
+				// On transient DB errors, retry with backoff.
+				if IsTransientDBError(err) {
+					realNow := time.Now()
+					if transientErrorStart.IsZero() {
+						transientErrorStart = realNow
+					}
+					if realNow.Sub(transientErrorStart) > 30*time.Second {
+						l.ReportError(err, "sustained database connection failure, halting shadow scanner")
+						return fmt.Errorf("sustained database connection failure in shadow scan: %w", err)
+					}
+					l.Warn("transient database error during shadow scan, retrying",
+						"error", err,
+						"backoff", backoff.String(),
+					)
+					<-time.After(backoff)
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(5*time.Second)))
+					continue
+				}
+
 				if !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "error scanning shadow partitions")
 				}
@@ -347,6 +393,7 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 			}
 
 			backoff = 200 * time.Millisecond
+			transientErrorStart = time.Time{}
 		}
 	}
 }
