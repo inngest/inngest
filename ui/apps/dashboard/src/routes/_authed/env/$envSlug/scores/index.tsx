@@ -32,7 +32,10 @@ function ScoresComponent() {
   // TODO: this likely needs its own flag
   const scoresEnabled = useBooleanFlag('experimentation-steps');
 
-  if (scoresEnabled.isReady && !scoresEnabled.value) {
+  if (!scoresEnabled.isReady) {
+    return null;
+  }
+  if (!scoresEnabled.value) {
     return <NotFound />;
   }
 

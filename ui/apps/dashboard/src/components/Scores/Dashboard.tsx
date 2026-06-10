@@ -16,14 +16,13 @@ import {
   subtractDuration,
   toDate,
 } from '@inngest/components/utils/date';
-import { parse } from 'graphql';
-import { useQuery, type TypedDocumentNode } from 'urql';
+import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { ScoreCard } from './ScoreCard';
-import type { ScoreNamesResult, ScoreTimeSeriesResult } from './types';
+import type { ScoreSeries } from './types';
 
 const DEFAULT_DURATION = { hours: 24 };
 
@@ -41,10 +40,7 @@ const ScoresLookupDocument = graphql(`
   }
 `);
 
-// Parsed at runtime; codegen skips plain `parse(...)` calls so these don't get
-// validated against the live schema until the cloud deploy lands. Swap to
-// `graphql(...)` then for typed introspection.
-const ScoreNamesDocument = parse(`
+const ScoreNamesDocument = graphql(`
   query ScoreNames(
     $workspaceID: ID!
     $functionIDs: [ID!]
@@ -56,19 +52,11 @@ const ScoreNamesDocument = parse(`
       filter: $filter
     ) {
       name
-      kind
     }
   }
-`) as TypedDocumentNode<
-  ScoreNamesResult,
-  {
-    workspaceID: string;
-    functionIDs?: string[];
-    filter: { timeRange: { from: string; to: string } };
-  }
->;
+`);
 
-const ScoreTimeSeriesDocument = parse(`
+const ScoreTimeSeriesDocument = graphql(`
   query ScoreTimeSeries(
     $workspaceID: ID!
     $functionIDs: [ID!]
@@ -83,9 +71,10 @@ const ScoreTimeSeriesDocument = parse(`
     ) {
       scoreName
       kind
-      bucketSeconds
       buckets {
         bucketStart
+        avg
+        max
         p50
         p90
         p99
@@ -94,15 +83,7 @@ const ScoreTimeSeriesDocument = parse(`
       }
     }
   }
-`) as TypedDocumentNode<
-  ScoreTimeSeriesResult,
-  {
-    workspaceID: string;
-    functionIDs?: string[];
-    filter: { timeRange: { from: string; to: string } };
-    scoreNames?: string[];
-  }
->;
+`);
 
 export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
   const environment = useEnvironment();
@@ -197,10 +178,7 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
     });
 
   const seriesByName = useMemo(() => {
-    const m = new Map<
-      string,
-      ScoreTimeSeriesResult['scoreTimeSeries'][number]
-    >();
+    const m = new Map<string, ScoreSeries>();
     for (const s of seriesData?.scoreTimeSeries ?? []) {
       m.set(s.scoreName, s);
     }
@@ -222,8 +200,6 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
   const isLoading = namesFetching || seriesFetching;
 
   const filterError = lookupError ?? namesError;
-  filterError &&
-    console.error('Error fetching scores filter data', filterError);
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -268,7 +244,6 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
                 key={s.name}
                 name={s.name}
                 series={seriesByName.get(s.name)}
-                range={range}
                 isLoading={seriesFetching}
                 error={seriesError}
               />

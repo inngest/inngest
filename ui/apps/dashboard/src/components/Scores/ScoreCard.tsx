@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Error } from '@inngest/components/Error/Error';
+import { cn } from '@inngest/components/utils/classNames';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
+import type { CombinedError } from 'urql';
 
 import {
   getLineChartOptions,
@@ -10,38 +12,34 @@ import {
   lineColors,
   seriesOptions,
 } from '@/components/Metrics/utils';
-import type { MetricsResponse } from '@/gql/graphql';
-import { gapFill } from './gapFill';
+import { ScoreKind, type MetricsResponse } from '@/gql/graphql';
 import type { ScoreSeries } from './types';
 
-const PERCENTILES = [
-  { name: 'p50', key: 'p50' },
-  { name: 'p90', key: 'p90' },
-  { name: 'p99', key: 'p99' },
+const AGGREGATIONS = [
+  { label: 'Average', key: 'avg' },
+  { label: 'Max', key: 'max' },
+  { label: 'p99', key: 'p99' },
+  { label: 'p90', key: 'p90' },
+  { label: 'p50', key: 'p50' },
 ] as const;
+
+type AggregationKey = (typeof AGGREGATIONS)[number]['key'];
 
 type Props = {
   name: string;
   series: ScoreSeries | undefined;
-  range: { from: Date; to: Date };
   isLoading: boolean;
-  error?: Error;
+  // The `Error` import above is the banner component and shadows the global
+  // Error type, so type this as what Dashboard actually passes.
+  error?: CombinedError;
 };
 
-export const ScoreCard = ({ name, series, range, isLoading, error }: Props) => {
-  const filled = useMemo(() => {
-    if (!series) return [];
-    return gapFill({
-      buckets: series.buckets,
-      kind: series.kind,
-      bucketSeconds: series.bucketSeconds,
-      from: range.from,
-      to: range.to,
-    });
-  }, [series, range.from, range.to]);
+export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
+  const [aggregation, setAggregation] = useState<AggregationKey>('avg');
 
   const option = useMemo(() => {
     if (!series) return {};
+    const buckets = series.buckets;
     const dark = isDark();
 
     const color = (i: number) =>
@@ -51,37 +49,39 @@ export const ScoreCard = ({ name, series, range, isLoading, error }: Props) => {
         lineColors[0]?.[1],
       );
 
-    // getXAxis only reads bucket timestamps, so the gap-filled buckets can
-    // stand in for a metrics response.
+    // getXAxis only reads bucket timestamps, so the score buckets can stand
+    // in for a metrics response.
     const xAxis = getXAxis({
-      data: filled.map((b) => ({ bucket: b.bucketStart, value: 0 })),
+      data: buckets.map((b) => ({ bucket: b.bucketStart, value: 0 })),
     } as MetricsResponse);
 
     const chartSeries =
-      series.kind === 'NUMERIC'
-        ? PERCENTILES.map((p, i) => ({
-            ...seriesOptions,
-            name: p.name,
-            data: filled.map((b) => b[p.key]),
-            // The server omits empty buckets and gapFill synthesizes them as
-            // nulls; bridge them so sparse data still draws continuous lines
-            // like the metrics dashboard.
-            connectNulls: true,
-            itemStyle: { color: color(i) },
-          }))
+      series.kind === ScoreKind.Numeric
+        ? [
+            {
+              ...seriesOptions,
+              name,
+              data: buckets.map((b) => b[aggregation]),
+              // The server's dense buckets carry null aggregates for empty
+              // intervals; bridge them so sparse data still draws continuous
+              // lines like the metrics dashboard.
+              connectNulls: true,
+              itemStyle: { color: color(2) },
+            },
+          ]
         : [
             {
               name: 'true',
               type: 'bar' as const,
               stack: 'count',
-              data: filled.map((b) => b.trueCount ?? 0),
+              data: buckets.map((b) => b.trueCount ?? 0),
               itemStyle: { color: color(1) },
             },
             {
               name: 'false',
               type: 'bar' as const,
               stack: 'count',
-              data: filled.map((b) => b.falseCount ?? 0),
+              data: buckets.map((b) => b.falseCount ?? 0),
               itemStyle: { color: color(3) },
             },
           ];
@@ -90,7 +90,7 @@ export const ScoreCard = ({ name, series, range, isLoading, error }: Props) => {
       { xAxis, series: chartSeries },
       chartSeries.map((s) => s.name),
     );
-  }, [series, filled]);
+  }, [series, name, aggregation]);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-visible rounded-md border p-5">
@@ -99,14 +99,23 @@ export const ScoreCard = ({ name, series, range, isLoading, error }: Props) => {
           {name}
         </div>
       </div>
+      {series?.kind === ScoreKind.Numeric ? (
+        <AggregationTabs selected={aggregation} onSelect={setAggregation} />
+      ) : series ? (
+        // Boolean scores have a single fixed view; keep a static tab row so
+        // the card layout lines up with numeric cards.
+        <TabRow>
+          <TabButton label="Aggregate" isActive />
+        </TabRow>
+      ) : null}
       {error ? (
         <Error message="Failed to load chart" />
       ) : !series && !isLoading ? (
-        <div className="text-muted flex h-full items-center justify-center text-sm">
+        <div className="text-muted flex min-h-0 flex-1 items-center justify-center text-sm">
           No data in selected range
         </div>
       ) : (
-        <div className="flex h-full flex-row items-center overflow-visible">
+        <div className="flex min-h-0 flex-1 flex-row items-center overflow-visible">
           <Chart
             option={option}
             className="relative h-full w-full overflow-visible"
@@ -118,3 +127,51 @@ export const ScoreCard = ({ name, series, range, isLoading, error }: Props) => {
     </div>
   );
 };
+
+const AggregationTabs = ({
+  selected,
+  onSelect,
+}: {
+  selected: AggregationKey;
+  onSelect: (key: AggregationKey) => void;
+}) => (
+  <TabRow>
+    {AGGREGATIONS.map((agg) => (
+      <TabButton
+        key={agg.key}
+        label={agg.label}
+        isActive={agg.key === selected}
+        onClick={() => onSelect(agg.key)}
+      />
+    ))}
+  </TabRow>
+);
+
+const TabRow = ({ children }: React.PropsWithChildren) => (
+  <div className="border-subtle mb-2 flex flex-row gap-4 border-b">
+    {children}
+  </div>
+);
+
+const TabButton = ({
+  label,
+  isActive,
+  onClick,
+}: {
+  label: string;
+  isActive: boolean;
+  onClick?: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      '-mb-px pb-1.5 text-sm',
+      isActive
+        ? 'text-basis border-contrast border-b-2 font-medium'
+        : 'text-muted hover:text-basis',
+    )}
+  >
+    {label}
+  </button>
+);
