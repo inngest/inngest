@@ -108,6 +108,41 @@ func TestNewFunctionProviderFindsFunctionWhenFunctionIDStartsWithAppID(t *testin
 	require.Equal(t, "app-test-fn", fn.Function.Slug)
 }
 
+func TestNewFunctionProviderPrefersExactPublicFunctionID(t *testing.T) {
+	ctx := context.Background()
+	legacyCompatibleFnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	exactFnID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	appID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	store := &fakeFunctionStore{
+		fns: []*cqrs.Function{
+			{
+				ID:     legacyCompatibleFnID,
+				AppID:  appID,
+				Slug:   "app-test-fn",
+				Config: []byte(`{"name":"Test function","slug":"test-fn"}`),
+			},
+			{
+				ID:     exactFnID,
+				AppID:  appID,
+				Slug:   "app-app-test-fn",
+				Config: []byte(`{"name":"App test function","slug":"app-test-fn"}`),
+			},
+		},
+		app: &cqrs.App{
+			ID:   appID,
+			Name: "app",
+		},
+	}
+
+	fn, err := NewFunctionProvider(store).GetFunctionByApp(ctx, "app", "app-test-fn")
+
+	require.NoError(t, err)
+	require.Equal(t, exactFnID, fn.ID)
+	require.Equal(t, "app-app-test-fn", fn.Slug)
+	require.Equal(t, "App test function", fn.Function.Name)
+	require.Equal(t, "app-test-fn", fn.Function.Slug)
+}
+
 func TestNewFunctionProviderFindsArchivedFunctionByID(t *testing.T) {
 	ctx := context.Background()
 	fnID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
