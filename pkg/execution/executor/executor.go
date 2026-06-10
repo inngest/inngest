@@ -1269,13 +1269,15 @@ func (e *executor) schedule(
 	}
 
 	// Create run state if not skipped
+	var stateCreated bool
 	if skipReason == enums.SkipReasonNone {
 		ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
 		st, err := e.smv2.Create(ctx, newState)
 		span.End()
 
 		switch {
-		case err == nil: // no-op
+		case err == nil:
+			stateCreated = true
 		case errors.Is(err, state.ErrIdentifierExists): // no-op
 		case errors.Is(err, state.ErrIdentifierTombstone):
 			tombstoneRunID := st.Metadata.ID.RunID
@@ -1521,6 +1523,14 @@ func (e *executor) schedule(
 		// If the item already exists in the queue, we can safely ignore this
 		// entire schedule request; it's basically a retry and we should not
 		// persist this for the user.
+		if stateCreated {
+			metrics.IncrScheduleFreshStateQueueDuplicateCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"is_invoke": req.IdempotencyKey != nil,
+				},
+			})
+		}
 		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
 	case queue.ErrQueueItemSingletonExists:

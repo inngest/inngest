@@ -148,6 +148,18 @@ func IncrExecutorScheduleCount(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrScheduleFreshStateQueueDuplicateCounter(ctx context.Context, opts CounterOpt) {
+	// This should not happen for Redis state: run-level idempotency is claimed
+	// atomically before state creation, so a duplicate should adopt the
+	// existing run ID instead of creating fresh state.
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_fresh_state_queue_duplicate_total",
+		Description: "Fresh run states created before queue idempotency rejected the schedule",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrBatchScheduledCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
