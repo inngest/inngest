@@ -4,7 +4,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func TestDeterministicTraceID(t *testing.T) {
@@ -127,4 +130,45 @@ func TestSeededSpanThenReuseContext(t *testing.T) {
 	require.NotEmpty(t, newTraceID)
 	require.NotEmpty(t, newDynamicSpanID)
 	require.NotEmpty(t, newTraceParent)
+}
+
+// TestCreateDroppableSpanPairedTrailingOmitsStartedAt verifies that the
+// consume-site honors the paired-trailing flag: a paired-trailing span must
+// not record StartedAt (so the leading StepPlanned arm's value survives on the
+// shared dynamic span), while an otherwise-identical plain span records it.
+func TestCreateDroppableSpanPairedTrailingOmitsStartedAt(t *testing.T) {
+	ctx := t.Context()
+	startedAtKey := meta.Attrs.StartedAt.Key()
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	hasStartedAtAttr := func(t *testing.T, ds *DroppableSpan) bool {
+		span, ok := ds.span.(sdktrace.ReadOnlySpan)
+		require.True(t, ok, "span must be a ReadOnlySpan to inspect attributes")
+		for _, kv := range span.Attributes() {
+			if string(kv.Key) == startedAtKey {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("plain span with a StartTime records StartedAt", func(t *testing.T) {
+		traceProvider := NewOtelTracerProvider(nil, time.Millisecond)
+		droppableSpan, err := traceProvider.CreateDroppableSpan(ctx, "step", &CreateSpanOptions{
+			StartTime: start,
+		})
+		require.NoError(t, err)
+		require.True(t, hasStartedAtAttr(t, droppableSpan), "StartedAt must be recorded when not paired-trailing")
+	})
+
+	t.Run("paired-trailing span omits StartedAt", func(t *testing.T) {
+		traceProvider := NewOtelTracerProvider(nil, time.Millisecond)
+		droppableSPan, err := traceProvider.CreateDroppableSpan(ctx, "step", &CreateSpanOptions{
+			StartTime:  start,
+			Attributes: meta.NewAttrSet(meta.Attr(meta.Attrs.IsPairedTrailing, util.ToPtr(true))),
+		})
+		require.NoError(t, err)
+		require.False(t, hasStartedAtAttr(t, droppableSPan),
+			"StartedAt must be omitted for the paired-trailing arm so the leading arm's value survives")
+	})
 }

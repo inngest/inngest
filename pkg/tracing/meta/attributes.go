@@ -149,6 +149,11 @@ var Attrs = struct {
 
 	IsCheckpoint attr[*bool]
 
+	// IsPairedTrailing marks a span as the trailing arm of a StepPlanned +
+	// StepRun pair, so that downstream processing skips StartedAt and
+	// QueuedAt attributes that would overwrite the leading arm's values.
+	IsPairedTrailing attr[*bool]
+
 	// Userland attributes
 	IsUserland                 attr[*bool]
 	UserlandSpanID             attr[*string]
@@ -255,6 +260,7 @@ var Attrs = struct {
 	StepWaitForEventName:               StringAttr("step.wait_for_event.name"),
 	UserlandSpanID:                     StringAttr("userland.span.id"),
 	IsCheckpoint:                       BoolAttr("checkpoint"),
+	IsPairedTrailing:                   BoolAttr("step.paired_trailing"),
 	IsUserland:                         BoolAttr("userland"),
 	UserlandKind:                       StringAttr("userland.kind"),
 	UserlandServiceName:                StringAttr("userland.service.name"),

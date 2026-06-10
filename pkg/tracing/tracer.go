@@ -151,11 +151,13 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		attrs = meta.NewAttrSet()
 	}
 
+	// The StepRun of a (StepPlanned, StepRun) pair omits StartedAt so the
+	// StepPlanned's value survives.
+	isPairedTrailing, _ := meta.GetBoolFlag(attrs, meta.Attrs.IsPairedTrailing)
+
 	st := opts.StartTime
 	if st.IsZero() {
 		st = time.Now()
-	} else {
-		meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
 	}
 
 	if opts.Parent != nil {
@@ -181,7 +183,7 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)
 		}
 	}
-	if !opts.StartTime.IsZero() {
+	if !opts.StartTime.IsZero() && !(isPairedTrailing) {
 		meta.AddAttr(attrs, meta.Attrs.StartedAt, &opts.StartTime)
 	}
 	if !opts.EndTime.IsZero() {

@@ -829,6 +829,58 @@ func TestExtractTypedValues(t *testing.T) {
 	})
 }
 
+func TestGetBoolFlag(t *testing.T) {
+	tr, fl := true, false
+
+	t.Run("nil receiver", func(t *testing.T) {
+		val, ok := GetBoolFlag(nil, Attrs.IsPairedTrailing)
+		require.False(t, ok)
+		require.False(t, val)
+	})
+
+	t.Run("missing key", func(t *testing.T) {
+		attrs := NewAttrSet(Attr(Attrs.IsCheckpoint, &tr))
+		val, ok := GetBoolFlag(attrs, Attrs.IsPairedTrailing)
+		require.False(t, ok)
+		require.False(t, val)
+	})
+
+	t.Run("present and true", func(t *testing.T) {
+		attrs := NewAttrSet(Attr(Attrs.IsPairedTrailing, &tr))
+		val, ok := GetBoolFlag(attrs, Attrs.IsPairedTrailing)
+		require.True(t, ok)
+		require.True(t, val)
+	})
+
+	t.Run("present and false reports presence", func(t *testing.T) {
+		// The ok return must distinguish "set to false" from "absent" — the
+		// consumer in tracer.go branches on (ok && val).
+		attrs := NewAttrSet(Attr(Attrs.IsPairedTrailing, &fl))
+		val, ok := GetBoolFlag(attrs, Attrs.IsPairedTrailing)
+		require.True(t, ok)
+		require.False(t, val)
+	})
+
+	t.Run("present but nil pointer", func(t *testing.T) {
+		attrs := NewAttrSet(Attr(Attrs.IsPairedTrailing, (*bool)(nil)))
+		val, ok := GetBoolFlag(attrs, Attrs.IsPairedTrailing)
+		require.False(t, ok)
+		require.False(t, val)
+	})
+
+	t.Run("present but wrong stored type", func(t *testing.T) {
+		// Simulate the key mapping to a non-*bool value (e.g. a key collision
+		// with an attribute of another type).
+		attrs := &SerializableAttrs{
+			Attrs:  []SerializableAttr{{key: Attrs.IsPairedTrailing.key, value: "not-a-bool"}},
+			keyMap: map[string]int{Attrs.IsPairedTrailing.key: 0},
+		}
+		val, ok := GetBoolFlag(attrs, Attrs.IsPairedTrailing)
+		require.False(t, ok)
+		require.False(t, val)
+	})
+}
+
 type hexInt int64
 
 func (t hexInt) MarshalText() ([]byte, error) {

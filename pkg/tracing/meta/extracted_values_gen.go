@@ -95,6 +95,7 @@ type ExtractedValues struct {
 	ResponseOutputSize *int
 	ResponseSteps *ResponseOps
 	IsCheckpoint *bool
+	IsPairedTrailing *bool
 	IsUserland *bool
 	UserlandSpanID *string
 	UserlandName *string

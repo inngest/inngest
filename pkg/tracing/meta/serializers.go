@@ -75,6 +75,23 @@ func AddAttrIfUnset[T any](r *SerializableAttrs, attr attr[T], value T) {
 	r.Attrs = append(r.Attrs, newAttr)
 }
 
+// GetBoolFlag returns a bool flag and its presence.
+func GetBoolFlag(r *SerializableAttrs, a attr[*bool]) (val bool, ok bool) {
+	if r == nil {
+		return false, false
+	}
+	idx, ok := r.keyMap[a.key]
+	if !ok {
+		return false, false
+	}
+	v, ok := r.Attrs[idx].value.(*bool)
+	if !ok || v == nil {
+		return false, false
+	}
+
+	return *v, true
+}
+
 func GetAttr[T any](r *SerializableAttrs, attr attr[*T]) (*T, bool) {
 	// Attributes that are applied later will override earlier ones, so we
 	// iterate in reverse order.
