@@ -46,12 +46,10 @@ describe('infra dashboard formatters', () => {
     ).toBeNull();
   });
 
-  it('falls back to UTC end of month for billing cycle days', () => {
+  it('uses UTC end of month for billing cycle days', () => {
     const now = new Date('2026-06-08T00:00:00.000Z');
 
-    expect(billingCycleDaysRemaining('2026-06-15T00:00:00.000Z', now)).toBe(7);
-    expect(billingCycleDaysRemaining(null, now)).toBe(23);
-    expect(billingCycleDaysRemaining('invalid', now)).toBe(23);
+    expect(billingCycleDaysRemaining(now)).toBe(23);
   });
 
   it('builds UTC month-to-date ranges for billing-backed totals', () => {
@@ -178,6 +176,63 @@ describe('infra dashboard billing plan merge', () => {
       sku: 'IN-L',
     });
     expect(result.plans.every((plan) => !plan.isCurrent)).toBe(true);
+  });
+
+  it('displays enterprise plans with effective custom entitlement limits', () => {
+    const result = mergeBillingPlanIntoInfraPlans({
+      accountEntitlements: {
+        concurrency: { limit: 100_000 },
+        events: { limit: 250_000_000 },
+        functionBacklogSize: { limit: 75_000_000 },
+      },
+      defaultSku: 'IN-S',
+      plan: {
+        amount: 0,
+        entitlements: {
+          concurrency: { limit: 1_000 },
+          events: { limit: 100_000_000 },
+          functionBacklogSize: { limit: 25_000_000 },
+        },
+        isFree: false,
+        name: 'Enterprise',
+        slug: 'enterprise-2026',
+      },
+      plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
+    });
+
+    expect(result.currentPlanSku).toBe('IN-XL');
+    expect(result.currentPlan).toMatchObject({
+      displaySku: 'ENTERPRISE',
+      eventStream: '250M events/mo',
+      eventStreamLimit: 250_000_000,
+      execConcurrency: '100K',
+      execConcurrencyLimit: 100_000,
+      isCurrent: true,
+      priceMonthly: 'Current plan',
+      queueDepth: '75M',
+      queueDepthLimit: 75_000_000,
+      sku: 'IN-XL',
+    });
+    expect(result.plans.every((plan) => !plan.isCurrent)).toBe(true);
+  });
+
+  it('keeps enterprise plans on the IN-XL base row without loaded concurrency', () => {
+    const result = mergeBillingPlanIntoInfraPlans({
+      accountEntitlements: null,
+      defaultSku: 'IN-S',
+      plan: {
+        isFree: false,
+        name: 'Enterprise',
+        slug: 'enterprise-2026',
+      },
+      plans: INFRA_DASHBOARD_PLACEHOLDERS.infraPlans,
+    });
+
+    expect(result.currentPlan).toMatchObject({
+      displaySku: 'ENTERPRISE',
+      sku: 'IN-XL',
+    });
+    expect(result.currentPlanSku).toBe('IN-XL');
   });
 
   it('uses the live Pro plan amount for the IN-S row price', () => {
