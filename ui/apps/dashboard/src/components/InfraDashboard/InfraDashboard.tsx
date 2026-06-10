@@ -59,8 +59,8 @@ function formatCacheAge(cachedAt: number) {
   const ageMs = Math.max(0, Date.now() - cachedAt);
   const minutes = Math.floor(ageMs / 60_000);
 
-  if (minutes < 1) {
-    return 'just now';
+  if (minutes < 5) {
+    return null;
   }
 
   return `${minutes}m`;
@@ -70,6 +70,9 @@ export function InfraDashboard() {
   const env = useEnvironment();
   const { cacheStatus, data, loading, refetchBillingData } =
     useInfraDashboardData(TIME_RANGE_OPTIONS[0]);
+  const cacheAge = cacheStatus.cachedAt
+    ? formatCacheAge(cacheStatus.cachedAt)
+    : null;
   const placeholders = data.placeholders;
   const billingDays = billingCycleDaysRemaining();
   const selectedPlan = data.currentInfraPlan;
@@ -83,9 +86,9 @@ export function InfraDashboard() {
               {env.name}
             </h1>
           </div>
-          {cacheStatus.isUsingCachedData && cacheStatus.cachedAt ? (
+          {cacheStatus.isUsingCachedData && cacheAge ? (
             <div className="text-muted/50 mt-1 text-xs">
-              Cached {formatCacheAge(cacheStatus.cachedAt)} ago · refreshing
+              Cached {cacheAge} ago · refreshing
             </div>
           ) : null}
         </div>
