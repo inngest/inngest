@@ -43,7 +43,7 @@ export const MenuItem = ({
             'my-0.5 flex items-center rounded',
             collapsed
               ? 'mx-auto h-8 w-8 justify-center'
-              : 'h-7 w-full flex-row gap-2 self-stretch px-1',
+              : 'h-7 w-full flex-row gap-2 self-stretch px-2',
             comingSoon
               ? 'text-disabled hover:bg-disabled cursor-not-allowed'
               : active

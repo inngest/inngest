@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
+import { IconPanelLeftClose } from '@inngest/components/icons/PanelLeftClose';
+import { IconPanelLeftOpen } from '@inngest/components/icons/PanelLeftOpen';
 
 import type { Environment } from '@/utils/environments';
 import Navigation from '../NavigationV2/Navigation';
@@ -78,8 +79,8 @@ export default function SideBar({
   return (
     <nav
       className={`bg-canvasBase border-subtle group relative flex h-full flex-col justify-start py-3 transition-[width] duration-200 ease-out ${
-        collapsed ? 'w-[60px]' : 'w-[200px]'
-      } shrink-0 overflow-visible border-r-hairline`}
+        collapsed ? 'w-[60px]' : 'w-[220px]'
+      } shrink-0 overflow-visible border-r`}
       ref={navRef}
     >
       <div className="flex grow flex-col justify-between">
@@ -107,9 +108,9 @@ export default function SideBar({
                 }`}
               >
                 {collapsed ? (
-                  <RiArrowRightSLine className="h-4 w-4" />
+                  <IconPanelLeftOpen className="h-4 w-4" />
                 ) : (
-                  <RiArrowLeftSLine className="h-4 w-4" />
+                  <IconPanelLeftClose className="h-4 w-4" />
                 )}
               </button>
             </OptionalTooltip>

@@ -34,7 +34,7 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
 
   return (
     <div
-      className={`text-basis flex h-full flex-col pl-3 pr-2 pt-1 ${
+      className={`text-basis flex h-full flex-col pl-3 pr-3 pt-1 ${
         collapsed ? 'gap-6' : 'gap-4'
       }`}
     >

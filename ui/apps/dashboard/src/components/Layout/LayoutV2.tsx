@@ -47,7 +47,7 @@ export default function Layout({
         showOnboardingWidget={showWidget}
       />
 
-      <div className="border-subtle bg-canvasBase shadow-xs mx-3 flex flex-1 flex-row overflow-hidden rounded border-hairline">
+      <div className="border-subtle bg-canvasBase shadow-xs mx-3 flex flex-1 flex-row overflow-hidden rounded-lg border">
         {!hideSidebar && (
           <SideBarV2
             activeEnv={activeEnv}
