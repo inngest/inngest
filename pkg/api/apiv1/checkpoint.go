@@ -466,6 +466,8 @@ func (a checkpointAPI) Output(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
 	_, _ = w.Write([]byte(`{"status":"running","message":"run did not end within 5 minutes"}`))
 }
 
