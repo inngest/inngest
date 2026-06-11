@@ -42,6 +42,7 @@ function ScoresComponent() {
   return (
     <>
       <Header breadcrumb={[{ text: 'Scores' }]} infoIcon={<ScoresInfo />} />
+      <div id="chart-tooltip" className="z-[1000]" />
       <div className="bg-canvasBase mx-auto flex h-full w-full flex-col">
         <ScoresDashboard envSlug={envSlug} />
       </div>

@@ -4,7 +4,7 @@ import { Error } from '@inngest/components/Error/Error';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import { Switch } from '@inngest/components/Switch';
+import { Switch, SwitchLabel } from '@inngest/components/Switch';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -278,15 +278,21 @@ const Legend = ({ scores, disabled, onToggle, isLoading }: LegendProps) => {
         <div className="text-muted text-xs">None in range.</div>
       ) : (
         <div className="flex flex-col gap-3">
-          {scores.map((s) => (
-            <div key={s.name} className="flex items-center justify-between">
-              <span className="text-basis text-sm">{s.name}</span>
-              <Switch
-                checked={!disabled.has(s.name)}
-                onCheckedChange={() => onToggle(s.name)}
-              />
-            </div>
-          ))}
+          {scores.map((s) => {
+            const switchId = `score-toggle-${encodeURIComponent(s.name)}`;
+            return (
+              <div key={s.name} className="flex items-center justify-between">
+                <SwitchLabel htmlFor={switchId} className="text-sm font-normal">
+                  {s.name}
+                </SwitchLabel>
+                <Switch
+                  id={switchId}
+                  checked={!disabled.has(s.name)}
+                  onCheckedChange={() => onToggle(s.name)}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
