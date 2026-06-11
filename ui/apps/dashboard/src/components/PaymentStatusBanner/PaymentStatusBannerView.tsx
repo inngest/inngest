@@ -3,7 +3,6 @@ import { Banner, type Severity } from '@inngest/components/Banner';
 import { Button } from '@inngest/components/Button';
 import { useBooleanLocalStorage } from '@inngest/components/hooks/useBooleanLocalStorage';
 import { formatDayString } from '@inngest/components/utils/date';
-import { Link } from '@inngest/components/Link';
 
 import {
   type AccountPaymentStatus,
