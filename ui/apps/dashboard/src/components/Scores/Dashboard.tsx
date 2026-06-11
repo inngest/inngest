@@ -16,6 +16,7 @@ import {
   subtractDuration,
   toDate,
 } from '@inngest/components/utils/date';
+import { useRouterState } from '@tanstack/react-router';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -101,6 +102,9 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
   const parsedStart = toDate(start);
   const parsedEnd = toDate(end);
 
+  // `loadedAt` bumps on router.invalidate(), so RefreshButton refires queries.
+  const loadedAt = useRouterState({ select: (s) => s.loadedAt });
+
   // Stabilize range against the raw URL params so a fresh `now` doesn't
   // refire queries on every render.
   const range = useMemo(() => {
@@ -110,7 +114,7 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
     const to = new Date();
     const dur = parsedDuration || DEFAULT_DURATION;
     return { from: subtractDuration(to, dur), to };
-  }, [start, end, duration]);
+  }, [start, end, duration, loadedAt]);
 
   const timeRange = useMemo(
     () => ({ from: range.from.toISOString(), to: range.to.toISOString() }),

@@ -1,6 +1,7 @@
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
+import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { createFileRoute } from '@tanstack/react-router';
 
 import NotFound from '@/components/Error/NotFound';
@@ -41,7 +42,11 @@ function ScoresComponent() {
 
   return (
     <>
-      <Header breadcrumb={[{ text: 'Scores' }]} infoIcon={<ScoresInfo />} />
+      <Header
+        breadcrumb={[{ text: 'Scores' }]}
+        infoIcon={<ScoresInfo />}
+        action={<RefreshButton />}
+      />
       <div id="chart-tooltip" className="z-[1000]" />
       <div className="bg-canvasBase mx-auto flex h-full w-full flex-col">
         <ScoresDashboard envSlug={envSlug} />
