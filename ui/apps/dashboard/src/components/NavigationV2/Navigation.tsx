@@ -6,6 +6,7 @@ import {
   experimentsItem,
   manage,
   monitor,
+  scoresItem,
   workflow,
   type NavGroupConfig,
 } from './navItems';
@@ -25,7 +26,7 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
 
   const ai: NavGroupConfig = {
     heading: 'AI',
-    items: experimentsEnabled.value ? [experimentsItem] : [],
+    items: experimentsEnabled.value ? [experimentsItem, scoresItem] : [],
   };
 
   if (!activeEnv) {
@@ -34,9 +35,8 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
 
   return (
     <div
-      className={`text-basis flex h-full flex-col pl-3 pr-3 pt-1 ${
-        collapsed ? 'gap-6' : 'gap-4'
-      }`}
+      className={`text-basis flex h-full flex-col pl-3 pr-3 pt-1 ${collapsed ? 'gap-6' : 'gap-4'
+        }`}
     >
       <NavSection
         group={workflow}
