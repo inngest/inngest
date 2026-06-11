@@ -195,18 +195,15 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 
 	default:
 		scope = enums.MetadataScopeExtendedTrace
-		// TODO: require that this is an extended trace span
-		span, err := a.opts.TraceReader.GetSpanBySpanID(ctx, runID, *req.Target.SpanID, auth.AccountID(), auth.WorkspaceID())
-		switch {
-		case err != nil:
-			return publicerr.Wrap(err, 404, "Unable to find metadata target")
-		case span == nil:
-			return publicerr.Errorf(404, "Unable to find metadata target")
-		}
+		// The TraceID is the same for all spans in the run and is derived
+		// deterministically from the runID. The span itself is referenced by
+		// the caller-supplied SpanID, so no ClickHouse lookup is needed.
+		traceID := tracing.DeterministicSpanConfig(runID[:]).TraceID.String()
+		spanID := *req.Target.SpanID
 		parentSpanRef = &meta.SpanReference{
-			TraceParent:            fmt.Sprintf("00-%s-%s-00", span.TraceID, span.SpanID),
-			DynamicSpanID:          span.SpanID,
-			DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", span.TraceID, span.SpanID),
+			TraceParent:            fmt.Sprintf("00-%s-%s-00", traceID, spanID),
+			DynamicSpanID:          spanID,
+			DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", traceID, spanID),
 		}
 	}
 
