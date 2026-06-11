@@ -810,7 +810,7 @@ type mockRunService struct {
 	mock.Mock
 }
 
-func (m *mockRunService) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, error) {
+func (m *mockRunService) LoadMetadata(ctx context.Context, id state.ID, _ ...state.LoadMetadataOption) (state.Metadata, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(state.Metadata), args.Error(1)
 }

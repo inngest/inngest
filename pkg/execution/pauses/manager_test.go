@@ -376,7 +376,7 @@ func (m *mockRunService) SavePending(ctx context.Context, id statev2.ID, pending
 	return nil
 }
 
-func (m *mockRunService) LoadMetadata(ctx context.Context, id statev2.ID) (statev2.Metadata, error) {
+func (m *mockRunService) LoadMetadata(ctx context.Context, id statev2.ID, _ ...statev2.LoadMetadataOption) (statev2.Metadata, error) {
 	return statev2.Metadata{}, nil
 }
 

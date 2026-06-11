@@ -83,7 +83,10 @@ message DeleteStateResponse {
 }
 
 message LoadMetadataRequest {
-  ID id = 1;
+  ID   id                          = 1;
+  // Skip loading stack and step-derived metrics (state_size, step_count)
+  // when the caller doesn't need them, avoiding an extra round trip.
+  bool omit_stack_and_step_metrics = 2;
 }
 
 message LoadMetadataResponse {

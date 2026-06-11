@@ -584,7 +584,7 @@ type mockStateLoader struct {
 	err    error
 }
 
-func (m *mockStateLoader) LoadMetadata(ctx context.Context, id sv2.ID) (sv2.Metadata, error) {
+func (m *mockStateLoader) LoadMetadata(ctx context.Context, id sv2.ID, _ ...sv2.LoadMetadataOption) (sv2.Metadata, error) {
 	return sv2.Metadata{}, nil
 }
 
