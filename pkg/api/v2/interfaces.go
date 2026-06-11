@@ -5,38 +5,13 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
-
-type FunctionProvider interface {
-	// GetFunction returns a function given its slug OR ID.
-	GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error)
-	// GetFunctionByApp returns a function given its app ID and user-defined function ID.
-	GetFunctionByApp(ctx context.Context, appID string, functionID string) (inngest.DeployedFunction, error)
-	// GetFunctions returns a stable page of functions within an app.
-	GetFunctions(ctx context.Context, appID string, opts GetFunctionsOpts) (*GetFunctionsResult, error)
-}
-
-type FunctionConfigProvider interface {
-	PlanConcurrencyLimit(ctx context.Context, fn inngest.DeployedFunction) int
-}
-
-type GetFunctionsOpts struct {
-	Cursor uuid.UUID
-	Limit  int
-}
-
-type GetFunctionsResult struct {
-	Functions []inngest.DeployedFunction
-	HasMore   bool
-}
 
 type FunctionScheduler interface {
 	// Schedule initializes a new function run, ensuring that the function will be

@@ -41,7 +41,6 @@ type FunctionReader interface {
 	// GetFunctionsByAppInternalID returns functions given the string ID of an app as defined
 	// by users in our SDKs.
 	GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, app string) ([]*Function, error)
-	GetFunctionsByAppExternalIDPage(ctx context.Context, opts GetFunctionsByAppExternalIDPageOpts) ([]*Function, error)
 	// GetFunctionsByAppInternalID returns functions given an internal app UUID.
 	GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*Function, error)
 	// GetFunctionByExternalID returns a function given a workspace ID and the SDK's client ID / function ID,
@@ -64,6 +63,11 @@ type FunctionReader interface {
 	GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
 }
 
+type AppScopedFunctionReader interface {
+	GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, app string) ([]*Function, error)
+	GetFunctionsByAppExternalIDPage(ctx context.Context, opts GetFunctionsByAppExternalIDPageOpts) ([]*Function, error)
+}
+
 type GetFunctionsByAppExternalIDPageOpts struct {
 	WorkspaceID uuid.UUID
 	AppID       string
@@ -76,6 +80,7 @@ type DevFunctionManager interface {
 	// Embeds production & API related functionality.
 
 	FunctionReader
+	AppScopedFunctionReader
 
 	// Also embeds the development functionality.
 

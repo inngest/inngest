@@ -22,6 +22,7 @@ type cqrsFunctionProvider struct {
 type functionProviderReader interface {
 	cqrs.DevFunctionReader
 	cqrs.FunctionReader
+	cqrs.AppScopedFunctionReader
 }
 
 // NewFunctionProvider returns a FunctionProvider that looks up functions by
