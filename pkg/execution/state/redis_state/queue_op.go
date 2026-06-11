@@ -81,6 +81,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 
 		kg.PartitionScavengerIndex(partition.PartitionID),
+		kg.QueueItemEarliestPeekTime(i.ID),
 	}
 
 	// Append indexes
@@ -170,6 +171,7 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 	// Reset enqueuedAt (used for latency calculation)
 	i.EnqueuedAt = now.UnixMilli()
+	i.EarliestPeekTime = 0
 
 	fnPartition := osqueue.ItemPartition(ctx, i)
 	shadowPartition := osqueue.ItemShadowPartition(ctx, i)
@@ -237,6 +239,7 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // empty for system partitions
 
 		kg.PartitionScavengerIndex(shadowPartition.PartitionID),
+		kg.QueueItemEarliestPeekTime(i.ID),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {

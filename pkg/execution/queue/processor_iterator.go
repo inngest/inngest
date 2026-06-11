@@ -146,6 +146,21 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	item.Data.At = time.UnixMilli(item.AtMS)
 	item.Data.EnqueuedAt = time.UnixMilli(item.EnqueuedAt)
 
+	if item.EarliestPeekTime == 0 && p.Queue.Options().ItemEarliestPeekTimeConfig(ctx, p.Queue.Shard().Name(), *item).Enabled {
+		peekTime := p.StaticTime
+		if peekTime.IsZero() {
+			peekTime = p.Queue.Clock().Now()
+		}
+
+		earliestPeekTime, err := p.Queue.Shard().SetEarliestPeekTime(ctx, *item, peekTime)
+		if err != nil {
+			span.RecordError(err)
+			l.Warn("could not set earliest peek time", "error", err)
+		} else {
+			item.EarliestPeekTime = earliestPeekTime.UnixMilli()
+		}
+	}
+
 	if item.IsLeased(p.Queue.Clock().Now()) {
 		span.SetAttributes(attribute.String("skip_reason", "already_leased"))
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{

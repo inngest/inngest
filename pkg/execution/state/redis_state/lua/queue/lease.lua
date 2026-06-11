@@ -17,6 +17,7 @@ local queueID = ARGV[1]
 local partitionID = ARGV[2]
 local newLeaseID = ARGV[3]
 local currentTime = tonumber(ARGV[4]) -- in ms
+local setLegacyPeekTime = tonumber(ARGV[5])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -41,8 +42,11 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 	return -2
 end
 
--- Track the earliest time this job was attempted in the queue.
-item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
+if setLegacyPeekTime == 1 then
+	-- Track the earliest time this job was attempted in the queue. This is the
+	-- legacy path used before earliest peek time moved to a side key.
+	item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
+end
 
 -- Update the item's lease key.
 item.leaseID = newLeaseID
