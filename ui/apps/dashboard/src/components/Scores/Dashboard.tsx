@@ -4,7 +4,6 @@ import { Error } from '@inngest/components/Error/Error';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import { Switch, SwitchLabel } from '@inngest/components/Switch';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -22,6 +21,7 @@ import { useQuery } from 'urql';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
+import { Legend } from './Legend';
 import { ScoreCard } from './ScoreCard';
 import type { ScoreSeries } from './types';
 
@@ -144,22 +144,20 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
       },
     });
 
-  const availableScores = useMemo(
-    () => namesData?.scoreNames ?? [],
-    [namesData],
-  );
-
-  const disabled = useMemo(() => new Set(disabledParam ?? []), [disabledParam]);
-
-  const visibleScores = useMemo(
-    () => availableScores.filter((s) => !disabled.has(s.name)),
-    [availableScores, disabled],
-  );
-
-  const enabledNames = useMemo(
-    () => visibleScores.map((s) => s.name),
-    [visibleScores],
-  );
+  const { availableScores, disabled, visibleScores, enabledNames } =
+    useMemo(() => {
+      const availableScores = namesData?.scoreNames ?? [];
+      const disabled = new Set(disabledParam ?? []);
+      const visibleScores = availableScores.filter(
+        (s) => !disabled.has(s.name),
+      );
+      return {
+        availableScores,
+        disabled,
+        visibleScores,
+        enabledNames: visibleScores.map((s) => s.name),
+      };
+    }, [namesData, disabledParam]);
 
   const toggleScore = (key: string) => {
     const current = disabledParam ?? [];
@@ -261,44 +259,6 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
           isLoading={namesFetching}
         />
       </div>
-    </div>
-  );
-};
-
-type LegendProps = {
-  scores: { name: string }[];
-  disabled: Set<string>;
-  onToggle: (key: string) => void;
-  isLoading: boolean;
-};
-
-const Legend = ({ scores, disabled, onToggle, isLoading }: LegendProps) => {
-  return (
-    <div className="border-subtle w-[220px] shrink-0 rounded-md border p-4">
-      <div className="text-subtle mb-3 text-sm font-medium">Scores</div>
-      {isLoading && scores.length === 0 ? (
-        <Skeleton className="h-24 w-full" />
-      ) : scores.length === 0 ? (
-        <div className="text-muted text-xs">None in range.</div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {scores.map((s) => {
-            const switchId = `score-toggle-${encodeURIComponent(s.name)}`;
-            return (
-              <div key={s.name} className="flex items-center justify-between">
-                <SwitchLabel htmlFor={switchId} className="text-sm font-normal">
-                  {s.name}
-                </SwitchLabel>
-                <Switch
-                  id={switchId}
-                  checked={!disabled.has(s.name)}
-                  onCheckedChange={() => onToggle(s.name)}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 };

@@ -93,7 +93,7 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
   }, [series, name, aggregation]);
 
   return (
-    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-visible rounded-md border p-5">
+    <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-hidden rounded-md border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           {name}
@@ -107,7 +107,15 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
         <TabRow>
           <TabButton label="Aggregate" isActive />
         </TabRow>
-      ) : null}
+      ) : (
+        // Reserve the tab row's height while loading so the chart container
+        // doesn't shrink after ECharts has measured it.
+        <TabRow>
+          <span className="invisible -mb-px border-b-2 border-transparent pb-1.5 text-sm">
+            Average
+          </span>
+        </TabRow>
+      )}
       {error ? (
         <Error message="Failed to load chart" />
       ) : !series && !isLoading ? (
@@ -115,10 +123,10 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
           No data in selected range
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-row items-center overflow-visible">
+        <div className="flex min-h-0 flex-1 flex-row items-center">
           <Chart
             option={option}
-            className="relative h-full w-full overflow-visible"
+            className="relative h-full w-full"
             group="scoresDashboard"
             loading={isLoading && !series}
           />
