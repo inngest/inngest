@@ -3,6 +3,7 @@ import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
 import { formatDayString } from '@inngest/components/utils/date';
 import { createFileRoute } from '@tanstack/react-router';
+import { useOrganization } from '@clerk/tanstack-react-start';
 
 import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
@@ -157,6 +158,8 @@ function BillingComponent() {
     await getEntitlementUsage();
     await getBillingDetails();
   };
+  const { isLoaded: orgLoaded, membership } = useOrganization();
+  const canManageBilling = orgLoaded && membership?.role === 'org:admin';
 
   const nextInvoiceDate = currentSubscription?.nextInvoiceDate
     ? formatDayString(new Date(currentSubscription.nextInvoiceDate))
@@ -184,7 +187,7 @@ function BillingComponent() {
 
   return (
     <>
-      <BillingPaymentStatusBanner />
+      <BillingPaymentStatusBanner canManageBilling={canManageBilling} />
       <div className="grid grid-cols-3 gap-4">
         <Card className="col-span-2">
           {!overageAllowed && !isHobbyFreePlan(currentPlan) && (
@@ -280,6 +283,7 @@ function BillingComponent() {
               }}
               addon={addons.concurrency}
               onChange={refetch}
+              canEdit={canManageBilling}
             />
             <EntitlementListItem
               planName={currentPlan.name}
@@ -291,6 +295,7 @@ function BillingComponent() {
               }}
               addon={addons.userCount}
               onChange={refetch}
+              canEdit={canManageBilling}
             />
             <ClientFeatureFlag
               flag="advanced-observability"
@@ -309,6 +314,7 @@ function BillingComponent() {
                 }}
                 addon={advancedObservabilityAddon}
                 onChange={refetch}
+                canEdit={canManageBilling}
               />
             </ClientFeatureFlag>
             <EntitlementListItem
@@ -328,6 +334,7 @@ function BillingComponent() {
               }}
               addon={advancedObservabilityAddon}
               onChange={refetch}
+              canEdit={canManageBilling}
             />
             <EntitlementListItem
               increaseInHigherPlan={true}
@@ -346,6 +353,7 @@ function BillingComponent() {
               }}
               addon={advancedObservabilityAddon}
               onChange={refetch}
+              canEdit={canManageBilling}
             />
             <ClientFeatureFlag
               flag="dedicated-slack-channel"
@@ -368,6 +376,7 @@ function BillingComponent() {
                   purchased: addons.slackChannel.purchaseCount > 0,
                 }}
                 onChange={refetch}
+                canEdit={canManageBilling}
               />
             </ClientFeatureFlag>
             <EntitlementListItem
@@ -380,6 +389,7 @@ function BillingComponent() {
               }}
               addon={addons.connectWorkers}
               onChange={refetch}
+              canEdit={canManageBilling}
             />
             <EntitlementListItem
               increaseInHigherPlan={false}
@@ -392,6 +402,7 @@ function BillingComponent() {
                   ? 'Enabled'
                   : 'Not enabled',
               }}
+              canEdit={canManageBilling}
             />
             <EntitlementListItem
               planName={currentPlan.name}
@@ -401,6 +412,7 @@ function BillingComponent() {
                 currentValue: entitlements.eventSize.limit,
                 displayValue: kbyteDisplayValue(entitlements.eventSize.limit),
               }}
+              canEdit={canManageBilling}
             />
             <div className="flex flex-col items-center gap-2 pt-6">
               <p className="text-muted text-xs">Custom needs?</p>
@@ -442,8 +454,12 @@ function BillingComponent() {
           <BillingInformation
             billingEmail={billing.billingEmail}
             accountName={billing.name}
+            canManageBilling={canManageBilling}
           />
-          <PaymentMethod paymentMethod={paymentMethod} />
+          <PaymentMethod
+            paymentMethod={paymentMethod}
+            canManageBilling={canManageBilling}
+          />
         </div>
       </div>
     </>

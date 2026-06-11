@@ -25,6 +25,7 @@ export default function AdvancedObservabilityComponent({
   addon,
   addonPurchased,
   onChange,
+  canEdit = false,
 }: {
   title: string;
   description: string | React.ReactNode;
@@ -39,6 +40,7 @@ export default function AdvancedObservabilityComponent({
   };
   addonPurchased?: boolean;
   onChange?: () => void;
+  canEdit: boolean;
 }) {
   const router = useRouter();
   const [, updateAccountAddonQuantity] = useMutation(
@@ -131,12 +133,14 @@ export default function AdvancedObservabilityComponent({
             appearance="outlined"
             label="Remove advanced observability"
             onClick={() => handleClick(true)}
+            disabled={!canEdit}
           />
         ) : (
           <Button
             appearance="outlined"
             label="Add advanced observability"
             onClick={() => handleClick(false)}
+            disabled={!canEdit}
           />
         )}
       </div>

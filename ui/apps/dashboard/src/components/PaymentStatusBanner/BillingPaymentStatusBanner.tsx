@@ -30,7 +30,11 @@ function title(status: AccountPaymentStatus): string {
 // Detailed variant for the /billing Overview. Reuses the same query as the
 // global banner (deduped by React Query), so it shows the per-invoice breakdown
 // and support routing without a second request.
-export function BillingPaymentStatusBanner() {
+export function BillingPaymentStatusBanner({
+  canManageBilling = false,
+}: {
+  canManageBilling: boolean;
+}) {
   const status = usePaymentStatus();
   if (!status) return null;
 
@@ -78,6 +82,7 @@ export function BillingPaymentStatusBanner() {
                       href={invoice.invoiceURL}
                       target="_blank"
                       rel="noopener noreferrer"
+                      className="inline"
                     >
                       Pay invoice
                     </ContextualBanner.Link>
@@ -87,17 +92,22 @@ export function BillingPaymentStatusBanner() {
             ))}
           </ContextualBanner.List>
         )}
+        {/* TODO - When the dunning flow is updated to auto-downgrade accounts, direct the user to self-serve this before contacting support. */}
         {showSupport && (
           <p>
             Need help?{' '}
             <ContextualBanner.Link
               severity={severity}
               href={pathCreator.support({ ref: 'app-billing-overdue' })}
+              className="inline"
             >
               Contact support
             </ContextualBanner.Link>{' '}
             to restore your account.
           </p>
+        )}
+        {!canManageBilling && (
+          <p>Contact your organization admin to update billing information.</p>
         )}
       </div>
     </ContextualBanner>

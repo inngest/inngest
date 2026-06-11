@@ -86,12 +86,7 @@ export function PaymentStatusBannerView({
         />
       }
     >
-      <span className="block text-left">
-        {message(status)}{' '}
-        {/* <Link href="/billing" className="inline-flex">
-          Manage billing
-        </Link> */}
-      </span>
+      <span className="block text-left">{message(status)}</span>
     </Banner>
   );
 }
