@@ -1527,9 +1527,50 @@ func (e *executor) schedule(
 			metrics.IncrScheduleFreshStateQueueDuplicateCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"is_invoke": req.IdempotencyKey != nil,
+					"has_schedule_idempotency_key": req.IdempotencyKey != nil,
 				},
 			})
+
+			var triggeringEventName string
+			if eventName != nil {
+				triggeringEventName = *eventName
+			}
+			evt := req.Events[0].GetEvent()
+			var batchID, originalRunID, replayID, scheduleIdempotencyKey string
+			if req.BatchID != nil {
+				batchID = req.BatchID.String()
+			}
+			if req.OriginalRunID != nil {
+				originalRunID = req.OriginalRunID.String()
+			}
+			if req.ReplayID != nil {
+				replayID = req.ReplayID.String()
+			}
+			if req.IdempotencyKey != nil {
+				scheduleIdempotencyKey = *req.IdempotencyKey
+			}
+
+			l.Warn("queue item already exists after creating fresh run state",
+				"queue_job_id", queueKey,
+				"queue_group_id", item.GroupID,
+				"run_id", metadata.ID.RunID.String(),
+				"requested_run_id", runID.String(),
+				"schedule_idempotency_key", scheduleIdempotencyKey,
+				"idempotency_key", key,
+				"is_invoke_event", evt.IsInvokeEvent(),
+				"triggering_event_name", triggeringEventName,
+				"event_internal_id", req.Events[0].GetInternalID().String(),
+				"event_id", evt.ID,
+				"event_name", evt.Name,
+				"event_ts", evt.Timestamp,
+				"batch_id", batchID,
+				"original_run_id", originalRunID,
+				"replay_id", replayID,
+				"schedule_type", req.ScheduleType,
+				"run_mode", req.RunMode,
+				"queue_at", at,
+				"scheduled_at", scheduledAt,
+			)
 		}
 		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
