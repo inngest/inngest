@@ -9,6 +9,7 @@ import {
   scoresItem,
   workflow,
   type NavGroupConfig,
+  type NavItemConfig,
 } from './navItems';
 import type { FileRouteTypes } from '@tanstack/react-router';
 
@@ -23,10 +24,19 @@ export const getNavRoute = (activeEnv: EnvType, link: string) =>
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   const experimentsEnabled = useBooleanFlag('experimentation-steps');
+  const scoresEnabled = useBooleanFlag('scoring-dashboard');
+
+  const aiItems: NavItemConfig[] = [];
+  if (experimentsEnabled.value) {
+    aiItems.push(experimentsItem);
+  }
+  if (scoresEnabled.value) {
+    aiItems.push(scoresItem);
+  }
 
   const ai: NavGroupConfig = {
     heading: 'AI',
-    items: experimentsEnabled.value ? [experimentsItem, scoresItem] : [],
+    items: aiItems,
   };
 
   if (!activeEnv) {

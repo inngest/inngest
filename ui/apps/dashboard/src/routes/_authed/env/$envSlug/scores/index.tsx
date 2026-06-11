@@ -30,8 +30,7 @@ function ScoresInfo() {
 
 function ScoresComponent() {
   const { envSlug } = Route.useParams();
-  // TODO: this likely needs its own flag
-  const scoresEnabled = useBooleanFlag('experimentation-steps');
+  const scoresEnabled = useBooleanFlag('scoring-dashboard');
 
   if (!scoresEnabled.isReady) {
     return null;
