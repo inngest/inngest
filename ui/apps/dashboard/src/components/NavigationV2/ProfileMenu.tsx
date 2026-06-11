@@ -20,7 +20,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
   return (
     <Listbox>
       <div className="relative flex">
-        <Listbox.Button className="bg-canvasMuted text-subtle flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full text-xs uppercase ring-0">
+        <Listbox.Button className="bg-canvasMuted/75 border border-subtle text-subtle flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full text-xs uppercase ring-0">
           {children}
         </Listbox.Button>
         <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute right-0 top-full z-50 mt-2 w-[220px] rounded border ring-0 focus:outline-none">

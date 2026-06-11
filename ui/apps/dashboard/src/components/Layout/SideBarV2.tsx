@@ -97,7 +97,14 @@ export default function SideBar({
               keeps it keyboard reachable while it's transparent. */}
           <div className="pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
             <OptionalTooltip
-              tooltip={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              tooltip={
+                <span className="flex items-center gap-1.5">
+                  {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                  <kbd className="border-subtle flex h-4 items-center gap-0.5 rounded border px-1 font-mono text-[10px] font-medium leading-none">
+                    <span className="text-xs">⌘</span>B
+                  </kbd>
+                </span>
+              }
             >
               <button
                 type="button"

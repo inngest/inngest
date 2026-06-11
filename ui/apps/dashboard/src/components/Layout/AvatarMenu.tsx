@@ -16,8 +16,8 @@ export default function AvatarMenu({
         <Image
           src={profile.userProfilePic}
           className="h-7 w-7 rounded-full object-cover"
-          width={28}
-          height={28}
+          width={24}
+          height={24}
           alt="profile-pic"
         />
       ) : (
