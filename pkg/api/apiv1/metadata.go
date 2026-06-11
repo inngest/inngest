@@ -337,6 +337,8 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 		}
 	}
 
+	// Missing state uses a request-local fallback so this write still enforces
+	// the cumulative size limit within the request.
 	if stateMetadata == nil {
 		stateMetadata = &statev2.Metadata{ID: stateID}
 	}
@@ -373,6 +375,9 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 		}
 	}
 
+	// Persist the cumulative metadata size delta back to the state store.
+	// Only persist when we successfully loaded from state; the fallback
+	// Metadata is request-local and has no backing store to update.
 	if loadedFromState {
 		if delta := stateMetadata.Metrics.SwapMetadataSizeDelta(); delta > 0 {
 			if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, stateID, delta); err != nil {
