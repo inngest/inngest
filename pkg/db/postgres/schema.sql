@@ -466,6 +466,12 @@ CREATE INDEX idx_spans_name_dynamic_span_id ON public.spans USING btree (name, d
 CREATE INDEX idx_spans_name_start_time_dynamic_span_id ON public.spans USING btree (name, start_time, dynamic_span_id);
 
 --
+-- Name: idx_spans_run_dynamic_endtime_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_spans_run_dynamic_endtime_status ON public.spans USING btree (run_id, dynamic_span_id, end_time DESC NULLS LAST) INCLUDE (status);
+
+--
 -- Name: idx_spans_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -476,12 +482,6 @@ CREATE INDEX idx_spans_run_id ON public.spans USING btree (run_id);
 --
 
 CREATE INDEX idx_spans_run_id_dynamic_start_time ON public.spans USING btree (run_id, dynamic_span_id, start_time);
-
---
--- Name: idx_spans_run_dynamic_endtime_status; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_spans_run_dynamic_endtime_status ON public.spans USING btree (run_id, dynamic_span_id, end_time DESC NULLS LAST) INCLUDE (status);
 
 --
 -- Name: idx_spans_run_inner_lookup; Type: INDEX; Schema: public; Owner: -
