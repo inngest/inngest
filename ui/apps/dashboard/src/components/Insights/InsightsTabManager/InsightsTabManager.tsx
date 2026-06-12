@@ -323,6 +323,7 @@ function SingleTabRenderer({
       query={tab.query}
       queryName={tab.name}
       renderChildren={isActive}
+      savedQueryId={tab.savedQueryId}
       tabId={tab.id}
     >
       <CellDetailProvider onOpenPanel={handleOpenCellDetailPanel}>

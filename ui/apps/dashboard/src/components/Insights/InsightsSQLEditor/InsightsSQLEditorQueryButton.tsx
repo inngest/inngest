@@ -34,7 +34,7 @@ export function InsightsSQLEditorQueryButton() {
     {
       combo: { code: 'Enter', metaOrCtrl: true },
       handler: () => {
-        if (canRunQuery) runQuery();
+        if (canRunQuery) runQuery({ trigger: 'keyboard' });
       },
     },
   ]);
@@ -46,7 +46,7 @@ export function InsightsSQLEditorQueryButton() {
       label={<QueryButtonLabel isRunning={isRunning} disabled={!canRunQuery} />}
       loading={isRunning}
       onClick={(e) => {
-        runQuery();
+        runQuery({ trigger: 'button' });
         e.currentTarget.blur();
       }}
       size="medium"

@@ -119,7 +119,7 @@ export function InsightsSQLEditor() {
   };
 
   const handleRunQuery = () => {
-    runQuery();
+    runQuery({ trigger: 'context_menu' });
   };
 
   const handleSaveQuery = () => {

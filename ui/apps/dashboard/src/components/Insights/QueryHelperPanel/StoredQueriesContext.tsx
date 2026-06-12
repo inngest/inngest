@@ -9,6 +9,10 @@ import {
 import { toast } from 'sonner';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
+import {
+  trackInsightsQuerySaved,
+  trackInsightsQueryShared,
+} from '@/components/Insights/tracking';
 import type { QuerySnapshot, Tab } from '@/components/Insights/types';
 import type { InsightsQueryStatement } from '@/gql/graphql';
 import { getOrderedSavedQueries } from '../queries';
@@ -68,6 +72,10 @@ export function StoredQueriesProvider({
           query: tab.query,
         });
         if (result.ok) {
+          trackInsightsQuerySaved({
+            queryId: result.data.id,
+            tab,
+          });
           // TODO: This often leads to double-fetching, but it's currently needed because the "InsightsQueryStatement"
           // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
           // that we have a consistent type name to match on regardless of existing saved queries.
@@ -83,6 +91,10 @@ export function StoredQueriesProvider({
       } else {
         const result = await beSaveQuery({ name: tab.name, query: tab.query });
         if (result.ok) {
+          trackInsightsQuerySaved({
+            queryId: result.data.id,
+            tab,
+          });
           tabManagerActionsRef.current.updateTab(tab.id, {
             savedQueryId: result.data.id,
           });
@@ -123,6 +135,7 @@ export function StoredQueriesProvider({
     async (queryId: string) => {
       const result = await beShareQuery({ id: queryId });
       if (result.ok) {
+        trackInsightsQueryShared({ queryId: result.data.id });
         // TODO: This often leads to double-fetching, but it's currently needed because the "InsightsQueryStatement"
         // __typename does not exist and does not auto-refetch if the list was previously empty. We need to make sure
         // that we have a consistent type name to match on regardless of existing saved queries.

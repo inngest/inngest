@@ -1,10 +1,24 @@
-import { createContext, useCallback, useContext, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { makeQuerySnapshot } from '../queries';
+import {
+  trackInsightsQueryRan,
+  type InsightsQueryRunTrigger,
+} from '../tracking';
 import type { InsightsFetchResult, InsightsStatus } from './types';
 import { useFetchInsights } from './useFetchInsights';
+
+type RunQueryOptions = {
+  trigger?: InsightsQueryRunTrigger;
+};
 
 interface InsightsStateMachineContextValue {
   data: InsightsFetchResult | undefined;
@@ -13,7 +27,7 @@ interface InsightsStateMachineContextValue {
   queryName: string;
   onChange: (value: string) => void;
   onNameChange: (name: string) => void;
-  runQuery: () => void;
+  runQuery: (options?: RunQueryOptions) => void;
   status: InsightsStatus;
 }
 
@@ -27,6 +41,7 @@ type InsightsStateMachineContextProviderProps = {
   query: string;
   queryName: string;
   renderChildren: boolean;
+  savedQueryId?: string;
   tabId: string;
 };
 
@@ -37,27 +52,79 @@ export function InsightsStateMachineContextProvider({
   query,
   queryName,
   renderChildren,
+  savedQueryId,
   tabId,
 }: InsightsStateMachineContextProviderProps) {
   const { fetchInsights } = useFetchInsights();
   const { saveQuerySnapshot } = useStoredQueries();
+  const runQueryTriggerRef = useRef<InsightsQueryRunTrigger>('unknown');
 
   const { data, error, isError, isFetching, refetch } = useQuery({
     enabled: false,
     gcTime: 0,
     queryKey: ['insights', tabId],
-    queryFn: () => {
-      return fetchInsights({ query, queryName }, (query, queryName) => {
-        saveQuerySnapshot(makeQuerySnapshot(query, queryName));
-      });
+    queryFn: async () => {
+      const trigger = runQueryTriggerRef.current;
+      const startedAt =
+        typeof performance === 'undefined' ? Date.now() : performance.now();
+      const getDurationMs = () =>
+        Math.round(
+          (typeof performance === 'undefined'
+            ? Date.now()
+            : performance.now()) - startedAt,
+        );
+
+      try {
+        const result = await fetchInsights(
+          { query, queryName },
+          (query, queryName) => {
+            saveQuerySnapshot(makeQuerySnapshot(query, queryName));
+          },
+        );
+        const hasDiagnosticErrors = result.diagnostics.some(
+          (diagnostic) => diagnostic.severity === 'error',
+        );
+
+        trackInsightsQueryRan({
+          data: result,
+          durationMs: getDurationMs(),
+          errorType: hasDiagnosticErrors ? 'diagnostic' : undefined,
+          query,
+          queryName,
+          result: hasDiagnosticErrors ? 'failure' : 'success',
+          savedQueryId,
+          tabId,
+          trigger,
+        });
+
+        return result;
+      } catch (error) {
+        trackInsightsQueryRan({
+          durationMs: getDurationMs(),
+          errorType: 'network',
+          query,
+          queryName,
+          result: 'failure',
+          savedQueryId,
+          tabId,
+          trigger,
+        });
+        throw error;
+      } finally {
+        runQueryTriggerRef.current = 'unknown';
+      }
     },
     staleTime: 0,
     retry: false,
   });
 
-  const runQuery = useCallback(() => {
-    refetch();
-  }, [refetch]);
+  const runQuery = useCallback(
+    (options: RunQueryOptions = {}) => {
+      runQueryTriggerRef.current = options.trigger ?? 'unknown';
+      refetch();
+    },
+    [refetch],
+  );
 
   return (
     <InsightsStateMachineContext.Provider
