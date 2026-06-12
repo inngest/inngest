@@ -13,7 +13,7 @@ export default function BottomBar() {
   const status = useSystemStatus();
 
   return (
-    <footer className="bg-canvasSubtle text-muted flex h-[30px] shrink-0 items-center px-3 text-xs">
+    <footer className="bg-canvasSubtle text-muted flex h-[30px] shrink-0 items-center px-6 text-xs">
       <div className="flex items-center gap-3">
         {links.map((item, i) => (
           <Fragment key={item.label}>
