@@ -13,8 +13,10 @@ export type Trace = {
   name: string;
   outputID: string | null;
   queuedAt: string;
+  scheduledAt: string | null;
   spanID: string;
   stepID?: string | null;
+  groupID?: string | null;
   startedAt: string | null;
   status: string;
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | StepInfoSignal | null;
@@ -71,7 +73,8 @@ export type SpanMetadataInngestExperiment = {
   kind: 'inngest.experiment';
   updatedAt: string;
   values: {
-    experiment_name: string;
+    name: string;
+    experiment_name?: string; // TODO: remove this in a month or so
     variant: string;
     selection_strategy: string;
     available_variants?: string[];

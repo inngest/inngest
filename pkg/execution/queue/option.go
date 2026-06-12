@@ -36,6 +36,10 @@ type QueueOpt func(q *QueueOptions)
 
 type QueueProcessorOpt func(q *queueProcessor)
 
+// AccountShardIterationEnabled controls whether account-scoped queue reads
+// should fan out across every shard instead of resolving the account's shard.
+type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID) bool
+
 func WithName(name string) QueueProcessorOpt {
 	return func(q *queueProcessor) {
 		q.name = name
@@ -70,6 +74,14 @@ func WithAccountExists(f AccountExists) QueueOpt {
 	return func(q *QueueOptions) {
 		if f != nil {
 			q.AccountExists = f
+		}
+	}
+}
+
+func WithAccountShardIterationEnabled(f AccountShardIterationEnabled) QueueOpt {
+	return func(q *QueueOptions) {
+		if f != nil {
+			q.AccountShardIterationEnabled = f
 		}
 	}
 }
@@ -266,6 +278,12 @@ func WithRunMode(m QueueRunMode) QueueOpt {
 	}
 }
 
+func WithQueueRoles(roles ...QueueRole) QueueOpt {
+	return func(q *QueueOptions) {
+		q.roles = append(q.roles, roles...)
+	}
+}
+
 // WithClock allows replacing the queue's default (real) clock by a mock, for testing.
 func WithClock(c clockwork.Clock) QueueOpt {
 	return func(q *QueueOptions) {
@@ -335,10 +353,11 @@ type QueueRunMode struct {
 }
 
 type QueueOptions struct {
-	PartitionPriorityFinder PartitionPriorityFinder
-	AccountPriorityFinder   AccountPriorityFinder
-	AccountExists           AccountExists
-	PartitionPausedGetter   PartitionPausedGetter
+	PartitionPriorityFinder      PartitionPriorityFinder
+	AccountPriorityFinder        AccountPriorityFinder
+	AccountExists                AccountExists
+	PartitionPausedGetter        PartitionPausedGetter
+	AccountShardIterationEnabled AccountShardIterationEnabled
 
 	lifecycles QueueLifecycleListeners
 
@@ -409,6 +428,8 @@ type QueueOptions struct {
 
 	// runMode defines the processing scopes or capabilities of the queue instances
 	runMode QueueRunMode
+
+	roles []QueueRole
 
 	continuationLimit uint
 
@@ -702,6 +723,9 @@ func NewQueueOptions(
 		AccountExists: func(_ context.Context, _ uuid.UUID) (bool, error) {
 			return true, nil
 		},
+		AccountShardIterationEnabled: func(context.Context, uuid.UUID) bool {
+			return false
+		},
 		PartitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
 			return PartitionPausedInfo{}
 		},
@@ -773,5 +797,40 @@ func NewQueueOptions(
 	for _, qopt := range options {
 		qopt(o)
 	}
+
 	return o
+}
+
+func (q *queueProcessor) configureQueueRoles() {
+	q.roles = append(q.defaultQueueRoles(), q.roles...)
+	q.roles = filterQueueRoles(q.QueueOptions, q.roles)
+}
+
+func (q *queueProcessor) defaultQueueRoles() []QueueRole {
+	roles := []QueueRole{}
+	if includeSequentialRole(q.QueueOptions) {
+		roles = append(roles, NewSequentialRole())
+	}
+	if q.runMode.Scavenger {
+		roles = append(roles, NewScavengerRole())
+	}
+	roles = append(roles, newInstrumentationRole(q, WithRoleRunInterval(q.instrumentInterval)))
+	if q.latencyPartition != nil {
+		roles = append(roles, NewLatencyTrackerRole(*q.latencyPartition, WithRoleRunInterval(q.latencyPartition.Interval)))
+	}
+	return roles
+}
+
+func filterQueueRoles(o *QueueOptions, roles []QueueRole) []QueueRole {
+	filtered := make([]QueueRole, 0, len(roles))
+	for _, role := range roles {
+		if role == nil {
+			continue
+		}
+		if role.Name() == QueueRoleSequential && !includeSequentialRole(o) {
+			continue
+		}
+		filtered = append(filtered, role)
+	}
+	return filtered
 }

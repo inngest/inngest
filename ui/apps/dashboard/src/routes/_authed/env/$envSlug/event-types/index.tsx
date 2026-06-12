@@ -20,7 +20,7 @@ export const Route = createFileRoute('/_authed/env/$envSlug/event-types/')({
   component: EventTypesComponent,
 });
 
-export default function EventTypesComponent() {
+function EventTypesComponent() {
   const { envSlug } = Route.useParams();
   const router = useRouter();
 

@@ -3,6 +3,8 @@ package queue
 import (
 	"errors"
 	"fmt"
+
+	"github.com/oklog/ulid/v2"
 )
 
 var ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
@@ -38,6 +40,23 @@ func (k KeyError) Unwrap() error {
 	return k.cause
 }
 
+// QueueItemExistsError is a wrapper for ErrQueueItemExists.
+// RunID is the owning run of the existing item, or nil
+// when the duplicate is a post-dequeue tombstone.
+type QueueItemExistsError struct {
+	JobID string
+	RunID *ulid.ULID
+}
+
+func (e QueueItemExistsError) Error() string { return ErrQueueItemExists.Error() }
+func (e QueueItemExistsError) Unwrap() error { return ErrQueueItemExists }
+
+// QueueItemExists returns a QueueItemExistsError. Pass nil runID when the
+// duplicate is a tombstone with no live runID.
+func QueueItemExists(jobID string, runID *ulid.ULID) error {
+	return QueueItemExistsError{JobID: jobID, RunID: runID}
+}
+
 var (
 	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
 	ErrQueueItemNotFound             = fmt.Errorf("queue item not found")
@@ -54,8 +73,8 @@ var (
 	ErrAccountPeekMaxExceedsLimits   = fmt.Errorf("account peek exceeded the maximum limit of %d", AccountPeekMax)
 	ErrPartitionGarbageCollected     = fmt.Errorf("partition garbage collected")
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
-	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
-	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
+	ErrRoleAlreadyLeased             = fmt.Errorf("role already leased")
+	ErrRoleLeaseExceedsLimits        = fmt.Errorf("role lease duration exceeds the maximum of %d seconds", int(RoleLeaseMax.Seconds()))
 
 	ErrAllShardsAlreadyLeased  = fmt.Errorf("all shards in the group are fully allocated")
 	ErrShardLeaseNotFound      = fmt.Errorf("shard lease not found")

@@ -30,7 +30,7 @@ func TestExtractExperimentOptsMetadata_FullFields(t *testing.T) {
 	require.NoError(t, err)
 
 	decoded := decodeValues(t, raw)
-	assert.Equal(t, "checkout-flow", decoded["experiment_name"])
+	assert.Equal(t, "checkout-flow", decoded["name"])
 	assert.Equal(t, "variant-b", decoded["variant"])
 	assert.Equal(t, "weighted", decoded["selection_strategy"])
 }
@@ -67,7 +67,7 @@ func TestExtractExperimentOptsMetadata_NameOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	decoded := decodeValues(t, raw)
-	assert.Equal(t, "ab-test", decoded["experiment_name"])
+	assert.Equal(t, "ab-test", decoded["name"])
 	assert.Equal(t, "alpha", decoded["variant"])
 	assert.Equal(t, "", decoded["selection_strategy"])
 }
@@ -98,7 +98,7 @@ func TestExtractExperimentOptsMetadata_RawJSONBytes(t *testing.T) {
 	require.NoError(t, err)
 
 	decoded := decodeValues(t, serialized)
-	assert.Equal(t, "raw", decoded["experiment_name"])
+	assert.Equal(t, "raw", decoded["name"])
 	assert.Equal(t, "v1", decoded["variant"])
 	assert.Equal(t, "fixed", decoded["selection_strategy"])
 }

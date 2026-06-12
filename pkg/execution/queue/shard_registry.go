@@ -36,7 +36,7 @@ type ShardRegistry interface {
 
 	// Resolve picks a shard for a given enqueue, applying the registry's
 	// shard selector. Resolve errors if no selector has been configured.
-	Resolve(ctx context.Context, accountID uuid.UUID, queueName *string) (QueueShard, error)
+	Resolve(ctx context.Context, accountID uuid.UUID, queueItemKind *string) (QueueShard, error)
 
 	// ForEach runs fn against every active shard concurrently, returning
 	// the first error encountered. The shard set is snapshotted at call
@@ -176,8 +176,8 @@ func (r *shardRegistry) ByGroup(groupName string) []QueueShard {
 	return out
 }
 
-func (r *shardRegistry) Resolve(ctx context.Context, accountID uuid.UUID, queueName *string) (QueueShard, error) {
-	return r.selector(ctx, accountID, queueName)
+func (r *shardRegistry) Resolve(ctx context.Context, accountID uuid.UUID, queueItemKind *string) (QueueShard, error) {
+	return r.selector(ctx, accountID, queueItemKind)
 }
 
 func (r *shardRegistry) ForEach(ctx context.Context, fn func(context.Context, QueueShard) error) error {

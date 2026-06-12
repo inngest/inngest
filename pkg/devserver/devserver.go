@@ -322,6 +322,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
 	// Step metadata is enabled by default in the dev server; set EXPERIMENTAL_STEP_METADATA=false to disable.
 	enableStepMetadata := os.Getenv("EXPERIMENTAL_STEP_METADATA") != "false"
+	enableAsyncDispatchValidation := os.Getenv("EXPERIMENTAL_ASYNC_DISPATCH_VALIDATION") == "true"
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
@@ -424,7 +425,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("could not create debounce manager: %w", err)
 	}
-	croner := cron.NewManager(queueShard, rq, l)
+	croner := cron.NewManager(queueShard, rq, l, cron.WithSplitCronPartitionByWorkspace(func(_ context.Context, _ uuid.UUID) bool {
+		return true
+	}))
 
 	sn := singleton.New(ctx, shardRegistry)
 
@@ -679,6 +682,9 @@ func start(ctx context.Context, opts StartOpts) error {
 				AllowStepMetadata: func(ctx context.Context, acctID uuid.UUID) bool {
 					return enableStepMetadata
 				},
+				AllowAsyncDispatchValidation: func(ctx context.Context, acctID uuid.UUID) bool {
+					return enableAsyncDispatchValidation
+				},
 			},
 
 			MetadataOpts: apiv1.MetadataOpts{
@@ -719,6 +725,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Functions:           NewFunctionProvider(dbcqrs),
 		FunctionRuns:        NewFunctionRunReader(dbcqrs),
+		RunList:             NewRunsReader(adapter.Q()),
 		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
@@ -743,6 +750,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
 		{At: "/api/v2", Handler: apiv2Handler},
+		{At: "/v2", Handler: apiv2Handler},
 		{At: "/debug", Handler: middleware.Profiler()},
 		{At: "/metrics", Router: metricsAPI.Router},
 	}

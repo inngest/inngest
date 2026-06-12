@@ -1,10 +1,12 @@
 export const statusTitles: Record<string, string> = {
+  REJECTED: 'Rejected',
   CANCELED: 'Canceled',
   CANCELLED: 'Canceled',
   COMPLETED: 'Completed',
   FAILED: 'Failed',
   RUNNING: 'Running',
   QUEUED: 'Queued',
+  SCHEDULED: 'Scheduled',
   SKIPPED: 'Skipped',
   SKIPPED_PAUSED: 'Skipped',
   PAUSED: 'Paused',

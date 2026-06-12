@@ -24,6 +24,14 @@ export function isReplayRunStatus(s: string): s is ReplayRunStatus {
   return replayRunStatuses.includes(s as ReplayRunStatus);
 }
 
+// Defer statuses describe the lifecycle of a deferred run scheduling row,
+// not the run itself. Mirrors enums.DeferStatus.
+export const deferStatuses = ['REJECTED', 'SCHEDULED'] as const;
+export type DeferStatus = (typeof deferStatuses)[number];
+export function isDeferStatus(s: string): s is DeferStatus {
+  return deferStatuses.includes(s as DeferStatus);
+}
+
 export type FunctionRun = {
   batchCreatedAt: Date | null;
   batchID: string | null;

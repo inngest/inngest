@@ -24,6 +24,18 @@ export function setSkipCacheSearchParam(url: string): string {
   return url;
 }
 
+/**
+ * Builds an absolute `<link rel="canonical">` descriptor for a route's `head`
+ * option. Splat routes (e.g. Clerk's /sign-in/factor-one) should pass their
+ * base path so all sub-paths collapse to one canonical URL.
+ */
+export function canonicalLink(path: string) {
+  return {
+    rel: 'canonical',
+    href: new URL(path, import.meta.env.VITE_APP_URL).toString(),
+  };
+}
+
 export function getManageKey(pathname: string) {
   const regex = /\/manage\/(\w+)/;
   const match = pathname.match(regex);
@@ -35,6 +47,9 @@ export function getManageKey(pathname: string) {
 }
 
 export const pathCreator = {
+  dashboard({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/`;
+  },
   apps({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/apps`;
   },

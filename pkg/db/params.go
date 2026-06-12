@@ -54,6 +54,13 @@ type UpdateFunctionConfigParams struct {
 	ID     uuid.UUID
 }
 
+type GetFunctionsByAppParams struct {
+	AppID     uuid.UUID
+	AppName   string
+	Cursor    uuid.UUID
+	LimitRows int64
+}
+
 // InsertEventParams are the parameters for inserting an event.
 type InsertEventParams struct {
 	InternalID ulid.ULID
@@ -117,6 +124,13 @@ type GetFunctionRunsTimeboundParams struct {
 	Limit  int64
 }
 
+type GetRunsParams struct {
+	EventID       ulid.ULID
+	Limit         int64
+	Cursor        ulid.ULID
+	IncludeOutput bool
+}
+
 // InsertHistoryParams are the parameters for inserting a history record.
 type InsertHistoryParams struct {
 	ID                   ulid.ULID
@@ -174,6 +188,7 @@ type InsertSpanParams struct {
 	DebugSessionID sql.NullString
 	Status         sql.NullString
 	EventIds       []byte
+	IsDeferred     sql.NullBool
 }
 
 // InsertTraceParams are the parameters for inserting a trace.

@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngest/pkg/util/interval"
@@ -21,6 +22,7 @@ var (
 	ErrStepInputTooLarge  = fmt.Errorf("step input size is greater than the limit")
 	ErrStepOutputTooLarge = fmt.Errorf("step output size is greater than the limit")
 	ErrDeferInputTooLarge = fmt.Errorf("defer input size is greater than the limit")
+	ErrDeferInputInvalid  = fmt.Errorf("defer input is not a valid JSON object")
 )
 
 type GeneratorOpcode struct {
@@ -401,8 +403,8 @@ func (d *DeferAddOpts) Validate() error {
 	if d.FnSlug == "" {
 		return fmt.Errorf("FnSlug is required")
 	}
-	if len(d.Input) == 0 {
-		return fmt.Errorf("Input is required")
+	if !util.IsJSONObject(d.Input) {
+		return ErrDeferInputInvalid
 	}
 	if len(d.Input) > consts.MaxDeferInputSize {
 		// Mirrors the GeneratorOpcode.Validate() check on step inputs. Prevents

@@ -32,12 +32,14 @@ type RunTraceSpan struct {
 	Run               *FunctionRun              `json:"run"`
 	SpanID            string                    `json:"spanID"`
 	TraceID           string                    `json:"traceID"`
+	GroupID           *string                   `json:"groupID,omitempty"`
 	Name              string                    `json:"name"`
 	Status            RunTraceSpanStatus        `json:"status"`
 	Attempts          *int                      `json:"attempts,omitempty"`
 	Duration          *int                      `json:"duration,omitempty"`
 	OutputID          *string                   `json:"outputID,omitempty"`
 	QueuedAt          time.Time                 `json:"queuedAt"`
+	ScheduledAt       *time.Time                `json:"scheduledAt,omitempty"`
 	StartedAt         *time.Time                `json:"startedAt,omitempty"`
 	EndedAt           *time.Time                `json:"endedAt,omitempty"`
 	ChildrenSpans     []*RunTraceSpan           `json:"childrenSpans"`
@@ -65,4 +67,25 @@ type RunTraceSpan struct {
 
 func RunTraceEnded(s RunTraceSpanStatus) bool {
 	return s == RunTraceSpanStatusCompleted || s == RunTraceSpanStatusCancelled || s == RunTraceSpanStatusFailed || s == RunTraceSpanStatusSkipped
+}
+
+// RunDeferredFrom carries a parent run's ID and function slug. Function and
+// Run are resolved lazily so list views that only need the parent's function
+// metadata don't pay for a full TraceRun fetch per linkage entry.
+type RunDeferredFrom struct {
+	RunID  ulid.ULID `json:"runID"`
+	FnSlug string    `json:"-"`
+}
+
+// RunDefer is a single defer attached to a parent run. Function and Run are
+// resolved lazily — FnSlug (always set) drives the function lookup, RunID
+// drives the run lookup when the child has been scheduled.
+type RunDefer struct {
+	HashedDeferID   string         `json:"hashedDeferID"`
+	UserlandDeferID string         `json:"userlandDeferID"`
+	FnSlug          string         `json:"fnSlug"`
+	Status          RunDeferStatus `json:"status"`
+	// RunID is nil when the defer hasn't been linked to a scheduled child
+	// yet (parent still running, aborted, or rejected).
+	RunID *ulid.ULID `json:"runID,omitempty"`
 }

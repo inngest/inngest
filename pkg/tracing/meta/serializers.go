@@ -80,8 +80,8 @@ func GetAttr[T any](r *SerializableAttrs, attr attr[*T]) (*T, bool) {
 	// iterate in reverse order.
 	for i := len(r.Attrs) - 1; i >= 0; i-- {
 		if r.Attrs[i].key == attr.Key() {
-			if val, ok := r.Attrs[i].value.(T); ok {
-				return &val, true
+			if val, ok := r.Attrs[i].value.(*T); ok {
+				return val, true
 			}
 
 			return nil, false
@@ -288,8 +288,20 @@ func StringSliceAttr(key string) attr[*[]string] {
 			return attribute.StringSlice(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*[]string, bool) {
-			if slice, ok := v.([]string); ok {
-				return &slice, true
+			switch v := v.(type) {
+			case []string:
+				// This may be unreachable. At runtime, `v` is of type `[]any`.
+				return &v, true
+			case []any:
+				strings := make([]string, len(v))
+				for i, item := range v {
+					itemStr, ok := item.(string)
+					if !ok {
+						return nil, false
+					}
+					strings[i] = itemStr
+				}
+				return &strings, true
 			}
 
 			return nil, false

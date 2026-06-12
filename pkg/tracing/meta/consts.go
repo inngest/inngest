@@ -16,9 +16,11 @@ const (
 	SpanNameStep             = "executor.step"
 	SpanNameExecution        = "executor.execution"
 	SpanNameStepFailed       = "executor.failed"
+	SpanNameDefer            = "executor.defer"
 	SpanNameDynamicExtension = "EXTEND"
 	SpanNameUserland         = "userland"
 	SpanNameMetadata         = "metadata"
+	SpanNameNonStep          = "executor.nonstep" // TODO: better name
 
 	// SDKExecutionSpanName is the name of the execution wrapper span
 	// created by SDKs (e.g., "inngest.execution"). This span houses

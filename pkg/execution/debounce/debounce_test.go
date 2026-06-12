@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -35,6 +36,36 @@ func testScope(accountID, workspaceID, functionID uuid.UUID) queue.Scope {
 		EnvID:      workspaceID,
 		FunctionID: functionID,
 	}
+}
+
+type setPointerFailingShard struct {
+	queue.QueueShard
+	err                  error
+	deleteMigratingCalls int
+}
+
+func (s *setPointerFailingShard) DebounceSetPointer(ctx context.Context, scope queue.Scope, key string, debounceID ulid.ULID, ttl time.Duration) error {
+	return s.err
+}
+
+func (s *setPointerFailingShard) DebounceDeleteMigratingFlag(ctx context.Context, scope queue.Scope, debounceID ulid.ULID) error {
+	s.deleteMigratingCalls++
+	return s.QueueShard.DebounceDeleteMigratingFlag(ctx, scope, debounceID)
+}
+
+type removeQueueItemFailingShard struct {
+	queue.QueueShard
+	err                  error
+	deleteMigratingCalls int
+}
+
+func (s *removeQueueItemFailingShard) RemoveQueueItem(ctx context.Context, scope queue.Scope, partitionID string, itemID string) error {
+	return s.err
+}
+
+func (s *removeQueueItemFailingShard) DebounceDeleteMigratingFlag(ctx context.Context, scope queue.Scope, debounceID ulid.ULID) error {
+	s.deleteMigratingCalls++
+	return s.QueueShard.DebounceDeleteMigratingFlag(ctx, scope, debounceID)
 }
 
 // migrationShardSelector routes system queue items (queueName != nil) to the
@@ -1557,7 +1588,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 
 		// A racing prepareMigration call must not be able to find the debounce
 		fakeID := ulid.MustNew(ulid.Now(), rand.Reader)
-		existingID, _, err := defaultQueueShard.DebouncePrepareMigration(ctx, testScope(accountId, workspaceId, fn.ID), fn.ID.String(), fakeID)
+		existingID, _, _, err := defaultQueueShard.DebouncePrepareMigration(ctx, testScope(accountId, workspaceId, fn.ID), fn.ID.String(), fakeID)
 		require.NoError(t, err)
 		require.Nil(t, existingID)
 
@@ -1748,7 +1779,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 
 		// If prepareMigration is called first, it must lock the execution from running the debounce item
 		fakeID := ulid.MustNew(ulid.Now(), rand.Reader)
-		existingID, _, err := defaultQueueShard.DebouncePrepareMigration(ctx, testScope(accountId, workspaceId, fn.ID), fn.ID.String(), fakeID)
+		existingID, _, _, err := defaultQueueShard.DebouncePrepareMigration(ctx, testScope(accountId, workspaceId, fn.ID), fn.ID.String(), fakeID)
 		require.NoError(t, err)
 		require.NotNil(t, existingID)
 		require.Equal(t, debounceId, *existingID)
@@ -1782,6 +1813,504 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 		// Lock must be gone
 		require.False(t, unshardedCluster.Exists(unshardedDebounceClient.KeyGenerator().DebounceMigrating(ctx)))
 	})
+}
+
+func TestRollbackPreparedMigrationKeepsMigratingFlagWhenPointerRestoreFails(t *testing.T) {
+	secondaryCluster := miniredis.RunT(t)
+	primaryCluster := miniredis.RunT(t)
+
+	secondaryRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{secondaryCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer secondaryRc.Close()
+
+	primaryRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{primaryCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer primaryRc.Close()
+
+	secondaryClient := redis_state.NewUnshardedClient(secondaryRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	primaryClient := redis_state.NewUnshardedClient(primaryRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	secondaryDebounceClient := secondaryClient.Debounce()
+
+	secondaryShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, secondaryClient.Queue())
+	primaryShard := redis_state.NewQueueShard("new-system", primaryClient.Queue())
+	failingSecondary := &setPointerFailingShard{
+		QueueShard: secondaryShard,
+		err:        errors.New("set pointer failed"),
+	}
+
+	shards, err := queue.NewShardRegistry(
+		migrationShardMap(failingSecondary, primaryShard),
+		queue.WithShardSelector(migrationShardSelector(failingSecondary, primaryShard)),
+		queue.WithPrimary(primaryShard),
+	)
+	require.NoError(t, err)
+
+	redisDebouncer := debouncer{
+		shards:             shards,
+		primaryShardName:   primaryShard.Name(),
+		secondaryShardName: failingSecondary.Name(),
+	}
+
+	ctx := context.Background()
+	accountID, workspaceID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	scope := testScope(accountID, workspaceID, functionID)
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Period:  "10s",
+			Timeout: util.StrPtr("60s"),
+		},
+	}
+	key := functionID.String()
+	debounceID := ulid.MustNew(ulid.Now(), rand.Reader)
+	fakeDebounceID := ulid.MustNew(ulid.Now()+1, rand.Reader)
+	di := DebounceItem{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		EventID:     ulid.MustNew(ulid.Now()+2, rand.Reader),
+		Event: event.Event{
+			Name: "initial",
+			ID:   "initial-event",
+		},
+		Timeout: time.Now().Add(time.Minute).UnixMilli(),
+	}
+	item, err := json.Marshal(di)
+	require.NoError(t, err)
+
+	existingID, err := secondaryShard.DebounceCreate(ctx, scope, key, debounceID, item, 10*time.Second)
+	require.NoError(t, err)
+	require.Nil(t, existingID)
+
+	preparedID, _, pointerTTL, err := secondaryShard.DebouncePrepareMigration(ctx, scope, key, fakeDebounceID)
+	require.NoError(t, err)
+	require.NotNil(t, preparedID)
+	require.Equal(t, debounceID, *preparedID)
+
+	err = redisDebouncer.rollbackPreparedMigration(ctx, di, fn, &preparedMigration{
+		debounceID:       debounceID,
+		timeoutUnixMilli: di.Timeout,
+		pointerTTL:       pointerTTL,
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to restore secondary debounce pointer")
+	require.ErrorContains(t, err, "migration flag left in place")
+	require.Equal(t, 0, failingSecondary.deleteMigratingCalls)
+
+	pointerVal, err := secondaryCluster.Get(secondaryDebounceClient.KeyGenerator().DebouncePointer(ctx, functionID, key))
+	require.NoError(t, err)
+	require.Equal(t, fakeDebounceID.String(), pointerVal)
+
+	migratingIDs, err := secondaryCluster.HKeys(secondaryDebounceClient.KeyGenerator().DebounceMigrating(ctx))
+	require.NoError(t, err)
+	require.Contains(t, migratingIDs, debounceID.String())
+	require.NotEmpty(t, secondaryCluster.HGet(secondaryDebounceClient.KeyGenerator().Debounce(ctx), debounceID.String()))
+}
+
+func TestFinalizePreparedMigrationCommitsWhenPrimaryReadyAfterError(t *testing.T) {
+	secondaryCluster := miniredis.RunT(t)
+	primaryCluster := miniredis.RunT(t)
+
+	secondaryRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{secondaryCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer secondaryRc.Close()
+
+	primaryRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{primaryCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer primaryRc.Close()
+
+	secondaryClient := redis_state.NewUnshardedClient(secondaryRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	primaryClient := redis_state.NewUnshardedClient(primaryRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	secondaryDebounceClient := secondaryClient.Debounce()
+	primaryDebounceClient := primaryClient.Debounce()
+
+	fakeClock := clockwork.NewFakeClock()
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	secondaryShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, secondaryClient.Queue(), opts...)
+	primaryShard := redis_state.NewQueueShard("new-system", primaryClient.Queue(), opts...)
+
+	shards, err := queue.NewShardRegistry(
+		migrationShardMap(secondaryShard, primaryShard),
+		queue.WithShardSelector(migrationShardSelector(secondaryShard, primaryShard)),
+		queue.WithPrimary(primaryShard),
+	)
+	require.NoError(t, err)
+
+	q, err := queue.New(context.Background(), "new-queue", shards, opts...)
+	require.NoError(t, err)
+
+	redisDebouncer := debouncer{
+		shards:             shards,
+		primaryShardName:   primaryShard.Name(),
+		secondaryShardName: secondaryShard.Name(),
+		queue:              q,
+		c:                  fakeClock,
+	}
+
+	ctx := context.Background()
+	accountID, workspaceID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	scope := testScope(accountID, workspaceID, functionID)
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Period:  "10s",
+			Timeout: util.StrPtr("60s"),
+		},
+	}
+	key := functionID.String()
+	debounceID := ulid.MustNew(ulid.Now(), rand.Reader)
+	fakeDebounceID := ulid.MustNew(ulid.Now()+1, rand.Reader)
+	initialTime := fakeClock.Now()
+	di := DebounceItem{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		EventID:     ulid.MustNew(ulid.Timestamp(initialTime), rand.Reader),
+		Event: event.Event{
+			Name:      "initial",
+			ID:        "initial-event",
+			Timestamp: initialTime.UnixMilli(),
+		},
+		Timeout: initialTime.Add(time.Minute).UnixMilli(),
+	}
+	item, err := json.Marshal(di)
+	require.NoError(t, err)
+
+	existingID, err := secondaryShard.DebounceCreate(ctx, scope, key, debounceID, item, 10*time.Second)
+	require.NoError(t, err)
+	require.Nil(t, existingID)
+
+	queueItem := redisDebouncer.queueItem(ctx, di, debounceID)
+	err = q.Enqueue(ctx, queueItem, initialTime.Add(10*time.Second), queue.EnqueueOpts{ForceQueueShardName: secondaryShard.Name()})
+	require.NoError(t, err)
+
+	preparedID, timeoutUnixMillis, pointerTTL, err := secondaryShard.DebouncePrepareMigration(ctx, scope, key, fakeDebounceID)
+	require.NoError(t, err)
+	require.NotNil(t, preparedID)
+	require.Equal(t, debounceID, *preparedID)
+	require.Equal(t, di.Timeout, timeoutUnixMillis)
+
+	// This fills the coverage gap where the primary debounce is already fully
+	// ready, but a later migration operation returns an error. In that case we
+	// must commit cleanup of the secondary instead of rolling back and leaving
+	// duplicate runnable debounce state on both shards.
+	createdID, err := redisDebouncer.newDebounce(ctx, di, fn, pointerTTL, true, debounceID)
+	require.NoError(t, err)
+	require.NotNil(t, createdID)
+	require.Equal(t, debounceID, *createdID)
+
+	err = redisDebouncer.finalizePreparedMigration(ctx, di, fn, &preparedMigration{
+		debounceID:       debounceID,
+		timeoutUnixMilli: timeoutUnixMillis,
+		pointerTTL:       pointerTTL,
+	}, errors.New("post-primary migration error"))
+	require.NoError(t, err)
+
+	_, err = secondaryCluster.Get(secondaryDebounceClient.KeyGenerator().DebouncePointer(ctx, functionID, key))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "no such key")
+
+	_, err = secondaryCluster.HKeys(secondaryDebounceClient.KeyGenerator().DebounceMigrating(ctx))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "no such key")
+	require.Empty(t, secondaryCluster.HGet(secondaryDebounceClient.KeyGenerator().Debounce(ctx), debounceID.String()))
+	require.Empty(t, secondaryCluster.HGet(secondaryClient.Queue().KeyGenerator().QueueItem(), queue.HashID(ctx, debounceID.String())))
+
+	primaryPointer, err := primaryCluster.Get(primaryDebounceClient.KeyGenerator().DebouncePointer(ctx, functionID, key))
+	require.NoError(t, err)
+	require.Equal(t, debounceID.String(), primaryPointer)
+	require.NotEmpty(t, primaryCluster.HGet(primaryDebounceClient.KeyGenerator().Debounce(ctx), debounceID.String()))
+	require.NotEmpty(t, primaryCluster.HGet(primaryClient.Queue().KeyGenerator().QueueItem(), queue.HashID(ctx, debounceID.String())))
+}
+
+func TestCompletePreparedMigrationKeepsMigratingFlagWhenSecondaryCleanupFails(t *testing.T) {
+	secondaryCluster := miniredis.RunT(t)
+	primaryCluster := miniredis.RunT(t)
+
+	secondaryRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{secondaryCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer secondaryRc.Close()
+
+	primaryRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{primaryCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer primaryRc.Close()
+
+	secondaryClient := redis_state.NewUnshardedClient(secondaryRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	primaryClient := redis_state.NewUnshardedClient(primaryRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	secondaryDebounceClient := secondaryClient.Debounce()
+
+	fakeClock := clockwork.NewFakeClock()
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	secondaryShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, secondaryClient.Queue(), opts...)
+	failingSecondary := &removeQueueItemFailingShard{
+		QueueShard: secondaryShard,
+		err:        errors.New("remove queue item failed"),
+	}
+	primaryShard := redis_state.NewQueueShard("new-system", primaryClient.Queue(), opts...)
+
+	shards, err := queue.NewShardRegistry(
+		migrationShardMap(failingSecondary, primaryShard),
+		queue.WithShardSelector(migrationShardSelector(failingSecondary, primaryShard)),
+		queue.WithPrimary(primaryShard),
+	)
+	require.NoError(t, err)
+
+	q, err := queue.New(context.Background(), "new-queue", shards, opts...)
+	require.NoError(t, err)
+
+	redisDebouncer := debouncer{
+		shards:             shards,
+		primaryShardName:   primaryShard.Name(),
+		secondaryShardName: failingSecondary.Name(),
+		queue:              q,
+		c:                  fakeClock,
+	}
+
+	ctx := context.Background()
+	accountID, workspaceID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	scope := testScope(accountID, workspaceID, functionID)
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Period:  "10s",
+			Timeout: util.StrPtr("60s"),
+		},
+	}
+	key := functionID.String()
+	debounceID := ulid.MustNew(ulid.Now(), rand.Reader)
+	fakeDebounceID := ulid.MustNew(ulid.Now()+1, rand.Reader)
+	initialTime := fakeClock.Now()
+	di := DebounceItem{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		EventID:     ulid.MustNew(ulid.Timestamp(initialTime), rand.Reader),
+		Event: event.Event{
+			Name:      "initial",
+			ID:        "initial-event",
+			Timestamp: initialTime.UnixMilli(),
+		},
+		Timeout: initialTime.Add(time.Minute).UnixMilli(),
+	}
+	item, err := json.Marshal(di)
+	require.NoError(t, err)
+
+	existingID, err := secondaryShard.DebounceCreate(ctx, scope, key, debounceID, item, 10*time.Second)
+	require.NoError(t, err)
+	require.Nil(t, existingID)
+
+	queueItem := redisDebouncer.queueItem(ctx, di, debounceID)
+	err = q.Enqueue(ctx, queueItem, initialTime.Add(10*time.Second), queue.EnqueueOpts{ForceQueueShardName: secondaryShard.Name()})
+	require.NoError(t, err)
+
+	preparedID, timeoutUnixMillis, pointerTTL, err := secondaryShard.DebouncePrepareMigration(ctx, scope, key, fakeDebounceID)
+	require.NoError(t, err)
+	require.NotNil(t, preparedID)
+	require.Equal(t, debounceID, *preparedID)
+
+	createdID, err := redisDebouncer.newDebounce(ctx, di, fn, pointerTTL, true, debounceID)
+	require.NoError(t, err)
+	require.NotNil(t, createdID)
+
+	err = redisDebouncer.finalizePreparedMigration(ctx, di, fn, &preparedMigration{
+		debounceID:       debounceID,
+		timeoutUnixMilli: timeoutUnixMillis,
+		pointerTTL:       pointerTTL,
+	}, nil)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "secondary debounce migration guard left in place")
+	require.Equal(t, 0, failingSecondary.deleteMigratingCalls)
+
+	migratingIDs, err := secondaryCluster.HKeys(secondaryDebounceClient.KeyGenerator().DebounceMigrating(ctx))
+	require.NoError(t, err)
+	require.Contains(t, migratingIDs, debounceID.String())
+}
+
+func TestDebounceMigrationFailurePreservesExistingDebounce(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+	newSystemCluster := miniredis.RunT(t)
+
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer unshardedRc.Close()
+
+	newSystemRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{newSystemCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	newSystemClient := redis_state.NewUnshardedClient(newSystemRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+
+	unshardedDebounceClient := unshardedClient.Debounce()
+	newSystemDebounceClient := newSystemClient.Debounce()
+
+	fakeClock := clockwork.NewFakeClock()
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+		queue.WithClock(fakeClock),
+	}
+
+	defaultQueueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+	newSystemShard := redis_state.NewQueueShard("new-system", newSystemClient.Queue(), opts...)
+
+	oldShardRegistry, err := queue.NewSingleShardRegistry(defaultQueueShard)
+	require.NoError(t, err)
+	oldQueue, err := queue.New(context.Background(), "old-queue", oldShardRegistry, opts...)
+	require.NoError(t, err)
+
+	newShardRegistry, err := queue.NewShardRegistry(
+		migrationShardMap(defaultQueueShard, newSystemShard),
+		queue.WithShardSelector(migrationShardSelector(defaultQueueShard, newSystemShard)),
+		queue.WithPrimary(newSystemShard),
+	)
+	require.NoError(t, err)
+
+	newQueue, err := queue.New(context.Background(), "new-queue", newShardRegistry, opts...)
+	require.NoError(t, err)
+
+	oldDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           oldShardRegistry,
+		PrimaryShardName: defaultQueueShard.Name(),
+		Queue:            oldQueue,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	oldRedisDebouncer := oldDeb.(debouncer)
+
+	newDeb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:             newShardRegistry,
+		PrimaryShardName:   newSystemShard.Name(),
+		SecondaryShardName: defaultQueueShard.Name(),
+		Queue:              newQueue,
+		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+		Clock: fakeClock,
+	})
+	require.NoError(t, err)
+	newRedisDebouncer := newDeb.(debouncer)
+
+	ctx := context.Background()
+	accountID, workspaceID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	fn := inngest.Function{
+		ID: functionID,
+		Debounce: &inngest.Debounce{
+			Period:  "10s",
+			Timeout: util.StrPtr("60s"),
+		},
+	}
+
+	firstEventTime := fakeClock.Now()
+	firstEventID := ulid.MustNew(ulid.Timestamp(firstEventTime), rand.Reader)
+
+	err = oldRedisDebouncer.Debounce(ctx, DebounceItem{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		EventID:     firstEventID,
+		Event: event.Event{
+			Name:      "initial",
+			ID:        firstEventID.String(),
+			Timestamp: firstEventTime.UnixMilli(),
+		},
+	}, fn)
+	require.NoError(t, err)
+
+	debounceIDs, err := unshardedCluster.HKeys(unshardedDebounceClient.KeyGenerator().Debounce(ctx))
+	require.NoError(t, err)
+	require.Len(t, debounceIDs, 1)
+	originalDebounceID := debounceIDs[0]
+
+	queueItemIDs, err := unshardedCluster.HKeys(defaultQueueShard.Client().KeyGenerator().QueueItem())
+	require.NoError(t, err)
+	require.Len(t, queueItemIDs, 1)
+	require.Equal(t, queue.HashID(ctx, originalDebounceID), queueItemIDs[0])
+
+	// Force the primary path to fail after prepareMigration() has already
+	// locked the old debounce for migration.
+	newSystemRc.Close()
+
+	fakeClock.Advance(5 * time.Second)
+	secondEventTime := fakeClock.Now()
+	secondEventID := ulid.MustNew(ulid.Timestamp(secondEventTime), rand.Reader)
+
+	err = newRedisDebouncer.Debounce(ctx, DebounceItem{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		EventID:     secondEventID,
+		Event: event.Event{
+			Name:      "migrate",
+			ID:        secondEventID.String(),
+			Timestamp: secondEventTime.UnixMilli(),
+		},
+	}, fn)
+	require.Error(t, err)
+
+	// If the new primary debounce is never created, the old debounce must remain
+	// runnable on the secondary cluster.
+	require.NotEmpty(t, unshardedCluster.HGet(unshardedDebounceClient.KeyGenerator().Debounce(ctx), originalDebounceID))
+
+	pointerVal, err := unshardedCluster.Get(unshardedDebounceClient.KeyGenerator().DebouncePointer(ctx, functionID, functionID.String()))
+	require.NoError(t, err)
+	require.NotEmpty(t, pointerVal)
+	require.Equal(t, originalDebounceID, pointerVal)
+
+	_, err = unshardedCluster.HKeys(unshardedDebounceClient.KeyGenerator().DebounceMigrating(ctx))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "no such key")
+
+	queueItemIDs, err = unshardedCluster.HKeys(defaultQueueShard.Client().KeyGenerator().QueueItem())
+	require.NoError(t, err)
+	require.Len(t, queueItemIDs, 1)
+	require.Equal(t, queue.HashID(ctx, originalDebounceID), queueItemIDs[0])
+
+	require.False(t, newSystemCluster.Exists(newSystemDebounceClient.KeyGenerator().DebouncePointer(ctx, functionID, functionID.String())))
+	require.False(t, newSystemCluster.Exists(newSystemDebounceClient.KeyGenerator().Debounce(ctx)))
 }
 
 func TestGetDebounceInfo(t *testing.T) {

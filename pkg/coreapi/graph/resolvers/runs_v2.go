@@ -101,6 +101,7 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 			BatchCreatedAt: batchTime,
 			CronSchedule:   r.CronSchedule,
 			HasAi:          r.HasAI,
+			IsDeferred:     r.IsDeferred,
 		}
 
 		triggerIDS := []ulid.ULID{}
@@ -234,6 +235,7 @@ func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.Functio
 		CronSchedule:   run.CronSchedule,
 		Output:         output,
 		HasAi:          run.HasAI,
+		IsDeferred:     run.IsDeferred,
 	}
 
 	return &res, nil
@@ -517,6 +519,7 @@ func toRunsQueryOpt(
 			Until:       until,
 			Status:      statuses,
 			CEL:         cel,
+			IsDeferred:  filter.IsDeferred,
 		},
 		Order:   orderBy,
 		Cursor:  cursor,

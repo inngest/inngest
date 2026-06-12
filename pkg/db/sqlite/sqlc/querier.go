@@ -47,6 +47,7 @@ type Querier interface {
 	GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*GetFunctionRunsFromEventsRow, error)
 	GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*GetFunctionRunsTimeboundRow, error)
 	GetFunctions(ctx context.Context) ([]*Function, error)
+	GetFunctionsByApp(ctx context.Context, arg GetFunctionsByAppParams) ([]*Function, error)
 	GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error)
 	GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*GetLatestExecutionSpanByStepIDRow, error)
 	GetLatestQueueSnapshotChunks(ctx context.Context) ([]*GetLatestQueueSnapshotChunksRow, error)
@@ -55,11 +56,21 @@ type Querier interface {
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*GetRunSpanByRunIDRow, error)
+	// Mirrors the span-runs grouping the GraphQL runs list uses (GetSpanRuns): a
+	// run is its executor.run root row plus extension rows sharing the root's
+	// dynamic_span_id, and the latest row in that group carries the run's current
+	// status. Child/step spans never decide run status.
+	GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error)
 	GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error)
 	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*GetSpansByDebugRunIDRow, error)
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*GetSpansByDebugSessionIDRow, error)
 	GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error)
+	// Returns spans by name with their current attribute values, merging in any
+	// updates applied later via UpdateSpan. The self-join on dynamic_span_id picks
+	// up follow-up rows (e.g. status flips, post-emit attribute stamps) that don't
+	// carry the span name and would otherwise be filtered out.
+	GetSpansByRunIDsAndName(ctx context.Context, arg GetSpansByRunIDsAndNameParams) ([]*GetSpansByRunIDsAndNameRow, error)
 	GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStepIDParams) (*GetStepSpanByStepIDRow, error)
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
 	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)

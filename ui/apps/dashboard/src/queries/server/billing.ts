@@ -314,7 +314,13 @@ export const currentPlanDocument = graphql(`
           concurrency {
             limit
           }
+          events {
+            limit
+          }
           eventSize {
+            limit
+          }
+          functionBacklogSize {
             limit
           }
           history {
@@ -333,6 +339,9 @@ export const currentPlanDocument = graphql(`
         addons {
           concurrency {
             available
+            baseValue
+            maxValue
+            name
             price
             purchaseCount
             quantityPer
@@ -356,6 +365,31 @@ export const currentPlanDocument = graphql(`
             quantityPer
           }
         }
+      }
+      entitlements {
+        concurrency {
+          limit
+        }
+        events {
+          limit
+        }
+        functionBacklogSize {
+          limit
+        }
+      }
+      addons {
+        concurrency {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
+      }
+      paymentMethods {
+        default
       }
       subscription {
         nextInvoiceDate

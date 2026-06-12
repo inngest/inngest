@@ -255,6 +255,10 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	if strings.HasPrefix(p.Queue(), KindScheduleBatch) {
 		isSystemFn = true
 	}
+	// All cron queue partitions get parallel processing.
+	if strings.HasPrefix(p.Queue(), KindCron) {
+		isSystemFn = true
+	}
 	_, parallelFn := q.disableFifoForFunctions[p.Queue()]
 	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
 

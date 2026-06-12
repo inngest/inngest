@@ -377,6 +377,11 @@ type Item struct {
 	// Only present on start jobs for function concurrency, or on all items
 	// for worker concurrency (app-scoped semaphores).
 	Semaphores []constraintapi.Semaphore `json:"sem,omitempty"`
+
+	// EnqueuedAt is the time this item was enqueued, populated from the outer queue item's EnqueuedAt field
+	EnqueuedAt time.Time `json:"-"`
+	// At is the time that this item is scheduled to run, populated from the outer queue item's At field.
+	At time.Time `json:"-"`
 }
 
 func (i Item) GetMaxAttempts() int {

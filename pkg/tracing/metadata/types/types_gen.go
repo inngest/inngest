@@ -29,6 +29,14 @@ type AIMetadata struct {
 	System		string	`json:"system"`
 	OperationName	string	`json:"operation_name"`
 
+	// Response identity. ResponseModel is the model that served the request (may
+	// differ from the requested Model, e.g. a dated snapshot). FinishReasons is
+	// stored raw per emitter — note OpenAI's native "tool_calls" is emitted as
+	// the singular "tool_call" by some instrumentations.
+	ResponseModel	string		`json:"response_model,omitempty"`
+	ResponseID	string		`json:"response_id,omitempty"`
+	FinishReasons	[]string	`json:"finish_reasons,omitempty"`
+
 	LatencyMs	*int64		`json:"latency_ms,omitempty"`
 	TotalTokens	*int64		`json:"total_tokens,omitempty"`
 	EstimatedCost	*float64	`json:"estimated_cost,omitempty"`
@@ -41,7 +49,7 @@ const (
 
 // From experiment.go
 type ExperimentMetadata struct {
-	ExperimentName		string			`json:"experiment_name"`
+	ExperimentName		string			`json:"name"`
 	Variant			string			`json:"variant"`
 	SelectionStrategy	string			`json:"selection_strategy"`
 	AvailableVariants	[]string		`json:"available_variants,omitempty"`

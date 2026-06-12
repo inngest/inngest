@@ -5,6 +5,7 @@ import { OptionalLink } from '../Link/OptionalLink';
 import { Pill } from '../Pill';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { cn } from '../utils/classNames';
+import { isMenuItemActive } from './isMenuItemActive';
 
 export const MenuItem = ({
   text,
@@ -12,6 +13,7 @@ export const MenuItem = ({
   collapsed,
   href,
   to,
+  exact = false,
   prefetch = false,
   comingSoon = false,
   beta = false,
@@ -23,6 +25,7 @@ export const MenuItem = ({
   collapsed: boolean;
   href?: string;
   to?: LinkComponentProps['to'];
+  exact?: boolean;
   prefetch?: false | 'intent' | 'viewport' | 'render';
   comingSoon?: boolean;
   beta?: boolean;
@@ -30,32 +33,36 @@ export const MenuItem = ({
   className?: string;
 }) => {
   const location = useLocation();
-  const active = (href || to) && location.href.startsWith(href || to || '');
+  const active = isMenuItemActive(location.href, href || to || '', exact);
 
   return (
     <OptionalLink href={comingSoon ? '' : href} to={comingSoon ? undefined : to} preload={prefetch}>
       <OptionalTooltip tooltip={comingSoon ? 'Coming soon...' : collapsed ? text : ''}>
         <div
           className={cn(
-            `my-0.5 flex h-8 w-full flex-row items-center rounded px-1.5  ${
-              comingSoon
-                ? 'text-disabled hover:bg-disabled cursor-not-allowed'
-                : active
-                ? 'bg-secondary-3xSubtle text-info hover:bg-secondary-2xSubtle'
-                : 'hover:bg-canvasSubtle text-subtle hover:text-basis'
-            } `,
+            'my-0.5 flex items-center rounded',
+            collapsed
+              ? 'mx-auto h-8 w-8 justify-center'
+              : 'h-7 w-full flex-row gap-2 self-stretch px-2',
+            comingSoon
+              ? 'text-disabled hover:bg-disabled cursor-not-allowed'
+              : active
+              ? 'bg-canvasSubtle text-basis'
+              : 'hover:bg-canvasSubtle text-muted',
             className
           )}
         >
-          {icon}
-          {!collapsed && <span className="ml-2.5 text-sm leading-tight">{text}</span>}
+          <span className="flex shrink-0">{icon}</span>
+          {!collapsed && (
+            <span className="truncate whitespace-nowrap text-sm leading-tight">{text}</span>
+          )}
           {!collapsed && beta && (
-            <Pill kind="primary" appearance="solid" className="ml-2.5">
+            <Pill kind="primary" appearance="solid" className="ml-auto h-4 px-1.5 text-[10px]">
               Beta
             </Pill>
           )}
           {!collapsed && error && (
-            <Pill kind="error" className="ml-2.5">
+            <Pill kind="error" className="ml-auto h-4 px-1.5 text-[10px]">
               Error
             </Pill>
           )}

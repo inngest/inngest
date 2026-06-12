@@ -1,3 +1,4 @@
+import { Link, type LinkProps } from '@inngest/components/Link';
 import {
   Pill,
   PillContent,
@@ -10,6 +11,7 @@ import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSparkling2Fill } from '@remixicon/react';
+import { type LinkComponentProps } from '@tanstack/react-router';
 
 import { useDynamicRunData } from '../RunDetailsV3/utils';
 
@@ -19,8 +21,8 @@ export function IDCell({ children }: React.PropsWithChildren) {
   return <p className={cn(cellStyles, 'font-mono')}>{children}</p>;
 }
 
-export function TextCell({ children }: React.PropsWithChildren) {
-  return <p className={cn(cellStyles, 'truncate font-medium')}>{children}</p>;
+export function TextCell({ children, className }: React.PropsWithChildren<{ className?: string }>) {
+  return <p className={cn(cellStyles, 'truncate font-medium', className)}>{children}</p>;
 }
 
 export function AICell({ children }: React.PropsWithChildren) {
@@ -37,13 +39,25 @@ export function AICell({ children }: React.PropsWithChildren) {
   );
 }
 
+export function LinkCell({ children, href, ...props }: React.PropsWithChildren<LinkProps>) {
+  return (
+    <Link href={href} {...props}>
+      {children}
+    </Link>
+  );
+}
+
 export function PillCell({
   children,
   type,
   appearance = 'outlined',
-}: PillContentProps & { appearance?: PillAppearance }) {
+  href,
+}: PillContentProps & {
+  appearance?: PillAppearance;
+  href?: LinkComponentProps['href'];
+}) {
   return (
-    <Pill appearance={appearance}>
+    <Pill appearance={appearance} href={href}>
       <PillContent type={type}>{children}</PillContent>
     </Pill>
   );

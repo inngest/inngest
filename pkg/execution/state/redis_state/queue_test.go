@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -610,7 +611,13 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It enqueues an item only once", func(t *testing.T) {
-		i := osqueue.QueueItem{ID: "once"}
+		runID := ulid.MustNew(ulid.Timestamp(start), rand.Reader)
+		i := osqueue.QueueItem{
+			ID: "once",
+			Data: osqueue.Item{
+				Identifier: state.Identifier{RunID: runID},
+			},
+		}
 
 		item, err := shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
 
@@ -620,17 +627,21 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 
-		// Ensure we can't enqueue again.
 		_, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
-		require.Equal(t, osqueue.ErrQueueItemExists, err)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+		var existsErr osqueue.QueueItemExistsError
+		require.True(t, errors.As(err, &existsErr))
+		require.NotNil(t, existsErr.RunID)
+		require.Equal(t, runID, *existsErr.RunID)
 
-		// Dequeue
 		err = shard.Dequeue(ctx, item)
 		require.NoError(t, err)
 
-		// Ensure we can't enqueue even after dequeue.
 		_, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
-		require.Equal(t, osqueue.ErrQueueItemExists, err)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+		var tombstoneErr osqueue.QueueItemExistsError
+		require.True(t, errors.As(err, &tombstoneErr))
+		require.Nil(t, tombstoneErr.RunID)
 
 		// Wait for the idempotency TTL to expire
 		r.FastForward(dur)
@@ -2049,7 +2060,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	})
 }
 
-func TestQueueLeaseSequential(t *testing.T) {
+func TestQueueRoleLeaseSequential(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
 
@@ -2067,22 +2078,22 @@ func TestQueueLeaseSequential(t *testing.T) {
 	t.Run("It claims sequential leases", func(t *testing.T) {
 		now := time.Now()
 		dur := 500 * time.Millisecond
-		leaseID, err = shard.ConfigLease(ctx, "sequential", dur)
+		leaseID, err = shard.RoleLease(ctx, "sequential", dur)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
 	})
 
 	t.Run("It doesn't allow renewing leasing without an existing lease ID", func(t *testing.T) {
-		id, err := shard.ConfigLease(ctx, "sequential", time.Second)
-		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
+		id, err := shard.RoleLease(ctx, "sequential", time.Second)
+		require.Equal(t, osqueue.ErrRoleAlreadyLeased, err)
 		require.Nil(t, id)
 	})
 
 	t.Run("It doesn't allow leasing with an invalid lease ID", func(t *testing.T) {
 		newULID := ulid.MustNew(ulid.Now(), rnd)
-		id, err := shard.ConfigLease(ctx, "sequential", time.Second, &newULID)
-		require.Equal(t, osqueue.ErrConfigAlreadyLeased, err)
+		id, err := shard.RoleLease(ctx, "sequential", time.Second, &newULID)
+		require.Equal(t, osqueue.ErrRoleAlreadyLeased, err)
 		require.Nil(t, id)
 	})
 
@@ -2091,7 +2102,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
-		leaseID, err = shard.ConfigLease(ctx, "sequential", dur, leaseID)
+		leaseID, err = shard.RoleLease(ctx, "sequential", dur, leaseID)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)
@@ -2102,7 +2113,7 @@ func TestQueueLeaseSequential(t *testing.T) {
 
 		now := time.Now()
 		dur := 50 * time.Millisecond
-		leaseID, err = shard.ConfigLease(ctx, "sequential", dur)
+		leaseID, err = shard.RoleLease(ctx, "sequential", dur)
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 		require.WithinDuration(t, now.Add(dur), ulid.Time(leaseID.Time()), 5*time.Millisecond)

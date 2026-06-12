@@ -47,6 +47,15 @@ export interface AIMetadata {
   model: string;
   system: string;
   operation_name: string;
+  /**
+   * Response identity. ResponseModel is the model that served the request (may
+   * differ from the requested Model, e.g. a dated snapshot). FinishReasons is
+   * stored raw per emitter — note OpenAI's native "tool_calls" is emitted as
+   * the singular "tool_call" by some instrumentations.
+   */
+  response_model?: string;
+  response_id?: string;
+  finish_reasons?: string[];
   latency_ms?: number /* int64 */;
   total_tokens?: number /* int64 */;
   estimated_cost?: number /* float64 */;
@@ -59,7 +68,7 @@ export const KindInngestExperiment = 'inngest.experiment';
  * From experiment.go
  */
 export interface ExperimentMetadata {
-  experiment_name: string;
+  name: string;
   variant: string;
   selection_strategy: string;
   available_variants?: string[];

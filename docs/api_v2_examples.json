@@ -28,6 +28,51 @@
       }
     }
   },
+  "/apps/{appId}/functions": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "app": {
+              "id": "production-app"
+            },
+            "configuration": {
+              "retries": {
+                "isDefault": true,
+                "value": 3
+              }
+            },
+            "id": "send-welcome-email",
+            "isArchived": false,
+            "isPaused": false,
+            "name": "Send welcome email",
+            "slug": "send-welcome-email",
+            "triggers": [
+              {
+                "type": "EVENT",
+                "value": "user.created"
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-06-10T12:00:00Z"
+        },
+        "page": {
+          "cursor": null,
+          "hasMore": false,
+          "limit": 20
+        }
+      }
+    }
+  },
+  "/apps/{appId}/functions/{functionId}": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /apps/{appId}/functions/{functionId} 200"
+      }
+    }
+  },
   "/apps/{appId}/functions/{functionId}/invoke": {
     "post": {
       "201": {
@@ -259,6 +304,13 @@
       },
       "500": {
         "// TODO": "Add example data for patch /envs/{id} 500"
+      }
+    }
+  },
+  "/events/{eventId}/runs": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /events/{eventId}/runs 200"
       }
     }
   },

@@ -6,6 +6,7 @@ import type { CreateDebugSessionPayload, CreateDebugSessionResult } from './useC
 import type { DebugRunResult, GetDebugRunPayload } from './useGetDebugRun';
 import type { DebugSessionResult, GetDebugSessionPayload } from './useGetDebugSession';
 import type { GetRunPayload, GetRunResult } from './useGetRun';
+import type { GetRunLinkagePayload, GetRunLinkageResult } from './useGetRunLinkage';
 import type { GetRunTracePayload, GetRunTraceResult } from './useGetRunTrace';
 import type { GetTraceResultPayload, TraceResult } from './useGetTraceResult';
 import type { InngestStatus } from './useInngestStatus';
@@ -19,6 +20,7 @@ import type { RerunFromStepPayload, RerunFromStepResult } from './useRerunFromSt
 // one global implementation
 export type SharedDefinitions = {
   getRun: (payload: GetRunPayload) => Promise<GetRunResult>;
+  getRunLinkage?: (payload: GetRunLinkagePayload) => Promise<GetRunLinkageResult>;
   getRunTrace: (payload: GetRunTracePayload) => Promise<GetRunTraceResult>;
   getTraceResult: (payload: GetTraceResultPayload) => Promise<TraceResult>;
   invokeRun: (payload: InvokeRunPayload) => Promise<InvokeRunResult>;

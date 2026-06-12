@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/VividCortex/ewma"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
@@ -52,11 +53,10 @@ func New(
 
 		QueueOptions: o,
 
-		wg:                       &sync.WaitGroup{},
-		seqLeaseLock:             &sync.RWMutex{},
-		scavengerLeaseLock:       &sync.RWMutex{},
-		instrumentationLeaseLock: &sync.RWMutex{},
-		shardLeaseLock:           &sync.RWMutex{},
+		wg:             &sync.WaitGroup{},
+		roleLeaseLock:  &sync.RWMutex{},
+		roleLeaseIDs:   map[string]*ulid.ULID{},
+		shardLeaseLock: &sync.RWMutex{},
 
 		continuesLock:    &sync.Mutex{},
 		continues:        map[string]continuation{},
@@ -86,6 +86,8 @@ func New(
 			return nil, fmt.Errorf("No shards found for configured shard group: %s", o.runMode.ShardGroup)
 		}
 	}
+
+	qp.configureQueueRoles()
 
 	return qp, nil
 }
@@ -121,12 +123,11 @@ type queueProcessor struct {
 	// prior to leasing items.
 	sem util.TrackingSemaphore
 
-	// seqLeaseID stores the lease ID if this queue is the sequential processor.
-	// all runners attempt to claim this lease automatically.
-	seqLeaseID *ulid.ULID
-	// seqLeaseLock ensures that there are no data races writing to
-	// or reading from seqLeaseID in parallel.
-	seqLeaseLock *sync.RWMutex
+	// roleLeaseIDs stores per-role lease IDs.
+	roleLeaseIDs map[string]*ulid.ULID
+	// roleLeaseLock ensures that there are no data races writing to
+	// or reading from roleLeaseIDs in parallel.
+	roleLeaseLock *sync.RWMutex
 
 	// shardLeaseID stores the lease ID for the primary shard this queue is processing from.
 	// all runners attempt to claim this lease on start up.
@@ -134,13 +135,6 @@ type queueProcessor struct {
 	// shardLeaseLock ensures that there are no data races writing to
 	// or reading from shardLeaseID in parallel.
 	shardLeaseLock *sync.RWMutex
-
-	// instrumentationLeaseID stores the lease ID if executor is running queue
-	// instrumentations
-	instrumentationLeaseID *ulid.ULID
-	// instrumentationLeaseLock ensures that there are no data races writing to or
-	// reading from instrumentationLeaseID
-	instrumentationLeaseLock *sync.RWMutex
 
 	// continues stores a map of all partition IDs to continues for a partition.
 	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
@@ -152,13 +146,6 @@ type queueProcessor struct {
 
 	// continuesLock protects the continues map.
 	continuesLock *sync.Mutex
-
-	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
-	// all runners attempt to claim this lease automatically.
-	scavengerLeaseID *ulid.ULID
-	// scavengerLeaseLock ensures that there are no data races writing to
-	// or reading from scavengerLeaseID in parallel.
-	scavengerLeaseLock *sync.RWMutex
 
 	shadowContinues        map[string]ShadowContinuation
 	shadowContinueCooldown map[string]time.Time
@@ -252,11 +239,25 @@ func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, it
 	return shard.LoadQueueItem(ctx, itemID)
 }
 
+func (q *queueProcessor) forAccountShards(ctx context.Context, accountID uuid.UUID, fn func(context.Context, QueueShard) error) error {
+	// Fan-out is feature-flagged because querying every shard increases
+	// latency and makes a single shard failure affect the whole read.
+	if q.AccountShardIterationEnabled != nil && q.AccountShardIterationEnabled(ctx, accountID) {
+		return q.shards.ForEach(ctx, fn)
+	}
+
+	shard, err := q.shards.Resolve(ctx, accountID, nil)
+	if err != nil {
+		return fmt.Errorf("could not resolve account shard: %w", err)
+	}
+	return fn(ctx, shard)
+}
+
 // PartitionBacklogSize implements QueueManager.
 func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
 	var totalCount int64
 
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
 		backlogSize, err := shard.PartitionBacklogSize(ctx, scope, partitionID)
 		if err != nil {
 			return fmt.Errorf("could not load partition backlog size: %w", err)
@@ -306,7 +307,7 @@ func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context, shard QueueS
 func (q *queueProcessor) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
 	var totalCount int64
 
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
 		outstanding, err := shard.OutstandingJobCount(ctx, scope, runID)
 		if err != nil {
 			return fmt.Errorf("could not load outstanding job count: %w", err)
@@ -334,7 +335,7 @@ func (q *queueProcessor) RunJobs(ctx context.Context, shardName string, scope Sc
 func (q *queueProcessor) RunningCount(ctx context.Context, scope Scope) (int64, error) {
 	var totalCount int64
 
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
 		running, err := shard.RunningCount(ctx, scope)
 		if err != nil {
 			return fmt.Errorf("could not load running count: %w", err)
@@ -352,7 +353,7 @@ func (q *queueProcessor) RunningCount(ctx context.Context, scope Scope) (int64, 
 func (q *queueProcessor) StatusCount(ctx context.Context, scope Scope, status string) (int64, error) {
 	var totalCount int64
 
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
+	err := q.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
 		running, err := shard.StatusCount(ctx, scope, status)
 		if err != nil {
 			return fmt.Errorf("could not load status count: %w", err)
@@ -388,16 +389,9 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		l.Info("Executor started in assignedQueueShard Mode", "queue_shard", q.Shard().Name())
 	}
 
-	if q.runMode.Sequential {
-		go q.claimSequentialLease(ctx)
+	for _, role := range q.roles {
+		go q.runRole(ctx, role)
 	}
-
-	if q.runMode.Scavenger {
-		go q.runScavenger(ctx)
-	}
-
-	go q.runInstrumentation(ctx)
-	go q.runLatencyTracker(ctx)
 
 	wrappedF := q.wrapRunFuncWithLatency(f)
 

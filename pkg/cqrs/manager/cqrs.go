@@ -108,6 +108,43 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	return mapRootSpansFromRows(ctx, spans)
 }
 
+// GetSpansByRunIDsAndName returns spans by name with their current attribute
+// values, merging in any updates applied later via UpdateSpan. The self-join
+// on dynamic_span_id picks up follow-up rows (e.g. status flips, post-emit
+// attribute stamps) that don't carry the span name and would otherwise be
+// filtered out.
+func (w wrapper) GetSpansByRunIDsAndName(
+	ctx context.Context,
+	runIDs []ulid.ULID,
+	name string,
+) (map[ulid.ULID][]*cqrs.OtelSpan, error) {
+	if len(runIDs) == 0 {
+		return nil, nil
+	}
+
+	strIDs := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		strIDs[i] = id.String()
+	}
+
+	rows, err := w.q.GetSpansByRunIDsAndName(ctx, strIDs, name)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by run IDs and name", "error", err)
+		return nil, err
+	}
+
+	out := make(map[ulid.ULID][]*cqrs.OtelSpan, len(runIDs))
+	for _, row := range rows {
+		span, err := mapSpanFromRow(ctx, row, nil)
+		if err != nil {
+			return nil, err
+		}
+		out[span.RunID] = append(out[span.RunID], span)
+	}
+
+	return out, nil
+}
+
 func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
 	if err != nil {
@@ -500,7 +537,11 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			return nil, err
 		}
 
-		if newSpan.Name == meta.SpanNameMetadata {
+		// Skip spans that are read separately and shouldn't appear in the run's
+		// trace tree. Metadata is attached to other spans. Defers are surfaced
+		// in their own view.
+		switch newSpan.Name {
+		case meta.SpanNameMetadata, meta.SpanNameDefer:
 			continue
 		}
 
@@ -1064,7 +1105,7 @@ func (w wrapper) UpsertApp(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs
 }
 
 // UpsertAppByName upserts on the partial unique index apps_name_active_key
-// (name) WHERE archived_at IS NULL AND name <> ”. The id provided in arg is
+// (name) WHERE archived_at IS NULL AND name <> "". The id provided in arg is
 // only used for fresh inserts; on conflict, the existing row's id is kept,
 // so SDK re-syncs adopt legacy URL-derived ids in place.
 func (w wrapper) UpsertAppByName(ctx context.Context, arg cqrs.UpsertAppParams) (*cqrs.App, error) {
@@ -1186,8 +1227,20 @@ func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUI
 }
 
 func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, appID string) ([]*cqrs.Function, error) {
-	// Ingore the workspace ID for now.
-	fns, err := w.q.GetAppFunctionsBySlug(ctx, appID)
+	return w.GetFunctionsByApp(ctx, cqrs.GetFunctionsByAppOpts{
+		WorkspaceID: workspaceID,
+		AppName:     appID,
+	})
+}
+
+func (w wrapper) GetFunctionsByApp(ctx context.Context, opts cqrs.GetFunctionsByAppOpts) ([]*cqrs.Function, error) {
+	// Ignore the workspace ID for now.
+	fns, err := w.q.GetFunctionsByApp(ctx, dbpkg.GetFunctionsByAppParams{
+		AppID:     opts.AppID,
+		AppName:   opts.AppName,
+		Cursor:    opts.Cursor,
+		LimitRows: int64(opts.Limit),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -1910,47 +1963,8 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 		return nil, err
 	}
 	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
-	// dedupe this conversion
 	for i, run := range sqlcTraceRuns {
-		start := time.UnixMilli(run.StartedAt)
-		end := time.UnixMilli(run.EndedAt)
-		triggerIDS := strings.Split(string(run.TriggerIds), ",")
-
-		var (
-			isBatch bool
-			batchID *ulid.ULID
-			cron    *string
-		)
-
-		if !run.BatchID.IsZero() {
-			isBatch = true
-			batchID = &run.BatchID
-		}
-
-		if run.CronSchedule.Valid {
-			cron = &run.CronSchedule.String
-		}
-
-		cqrsTraceRuns[i] = &cqrs.TraceRun{
-			AccountID:    run.AccountID,
-			WorkspaceID:  run.WorkspaceID,
-			AppID:        run.AppID,
-			FunctionID:   run.FunctionID,
-			TraceID:      string(run.TraceID),
-			RunID:        run.RunID.String(),
-			QueuedAt:     time.UnixMilli(run.QueuedAt),
-			StartedAt:    start,
-			EndedAt:      end,
-			Duration:     end.Sub(start),
-			SourceID:     run.SourceID,
-			TriggerIDs:   triggerIDS,
-			Output:       run.Output,
-			Status:       traceRunStatusFromDB(run.Status),
-			BatchID:      batchID,
-			IsBatch:      isBatch,
-			CronSchedule: cron,
-			HasAI:        run.HasAi,
-		}
+		cqrsTraceRuns[i] = traceRunToCQRS(run)
 	}
 	return cqrsTraceRuns, nil
 }
@@ -1961,9 +1975,17 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		return nil, err
 	}
 
+	trun := traceRunToCQRS(run)
+	if err := w.applySpanDetailsToTraceRuns(ctx, []*cqrs.TraceRun{trun}); err != nil {
+		return nil, err
+	}
+
+	return trun, nil
+}
+
+func traceRunToCQRS(run *dbpkg.TraceRun) *cqrs.TraceRun {
 	start := time.UnixMilli(run.StartedAt)
 	end := time.UnixMilli(run.EndedAt)
-	triggerIDS := strings.Split(string(run.TriggerIds), ",")
 
 	var (
 		isBatch bool
@@ -1980,19 +2002,19 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		cron = &run.CronSchedule.String
 	}
 
-	trun := cqrs.TraceRun{
+	return &cqrs.TraceRun{
 		AccountID:    run.AccountID,
 		WorkspaceID:  run.WorkspaceID,
 		AppID:        run.AppID,
 		FunctionID:   run.FunctionID,
 		TraceID:      string(run.TraceID),
-		RunID:        id.RunID.String(),
+		RunID:        run.RunID.String(),
 		QueuedAt:     time.UnixMilli(run.QueuedAt),
 		StartedAt:    start,
 		EndedAt:      end,
 		Duration:     end.Sub(start),
 		SourceID:     run.SourceID,
-		TriggerIDs:   triggerIDS,
+		TriggerIDs:   run.EventIDs(),
 		Output:       run.Output,
 		Status:       traceRunStatusFromDB(run.Status),
 		BatchID:      batchID,
@@ -2000,12 +2022,6 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		CronSchedule: cron,
 		HasAI:        run.HasAi,
 	}
-
-	if err := w.applySpanDetailsToTraceRuns(ctx, []*cqrs.TraceRun{&trun}); err != nil {
-		return nil, err
-	}
-
-	return &trun, nil
 }
 
 type traceRunSpanDetail struct {
@@ -3220,6 +3236,11 @@ func (w wrapper) getSpanRunsFullAggregate(ctx context.Context, opt cqrs.GetTrace
 		sq.L(`(SELECT s2.status FROM spans s2
 			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
 			ORDER BY s2.end_time DESC NULLS LAST, s2.span_id DESC LIMIT 1)`).As("status"),
+		// Only executor.run rows carry is_deferred (EXTEND rows leave it NULL),
+		// so a subselect anchored on that row gives an unambiguous boolean.
+		sq.L(`(SELECT s3.is_deferred FROM spans s3
+			WHERE s3.run_id = spans.run_id AND s3.name = ?
+			ORDER BY s3.start_time ASC LIMIT 1)`, meta.SpanNameRun).As("is_deferred"),
 		h.EventIDsExpr(), // DB-specific due to storage differences
 	}
 
@@ -3403,6 +3424,7 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 			"start_time",
 			"end_time",
 			"status",
+			"is_deferred",
 			h.RootEventIDsExpr(),
 		).
 		Where(rootPreds...).
@@ -3605,6 +3627,13 @@ func spanRunRootPredicates(opt cqrs.GetTraceRunOpt) []sq.Expression {
 	if len(opt.Filter.FunctionID) > 0 {
 		preds = append(preds, sq.C("function_id").In(opt.Filter.FunctionID))
 	}
+	if opt.Filter.IsDeferred != nil {
+		if *opt.Filter.IsDeferred {
+			preds = append(preds, sq.C("is_deferred").IsTrue())
+		} else {
+			preds = append(preds, sq.C("is_deferred").IsNull())
+		}
+	}
 	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
 		preds = append(preds, sq.C("start_time").Gte(opt.Filter.From.UTC()))
 	}
@@ -3687,6 +3716,7 @@ type spanRunRow struct {
 	StartTime     string
 	EndTime       *string
 	Status        *string
+	IsDeferred    sql.NullBool
 	EventIDs      *string
 }
 
@@ -3703,6 +3733,7 @@ func scanSpanRunRow(rows *sql.Rows) (spanRunRow, error) {
 		&row.StartTime,
 		&row.EndTime,
 		&row.Status,
+		&row.IsDeferred,
 		&row.EventIDs,
 	)
 	return row, err
@@ -3795,6 +3826,7 @@ func convertSpanRunRow(
 		StartedAt:   startTime,
 		Duration:    duration,
 		Status:      status,
+		IsDeferred:  row.IsDeferred.Valid && row.IsDeferred.Bool,
 		Cursor:      cursor,
 		TriggerIDs:  triggerIDs,
 	}

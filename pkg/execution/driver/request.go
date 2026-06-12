@@ -3,14 +3,23 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
 type sdkRequestIDCtxKey struct{}
 
 type sdkJobIDCtxKey struct{}
+
+// DispatchRequestID is the single source of truth for the per-dispatch
+// GenerationID the executor stamps on outbound SDK requests.
+func DispatchRequestID(ts time.Time, jobID string, generationID int) ulid.ULID {
+	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", jobID, generationID))
+}
 
 // WithRequestIDs stores the per-outbound request ID and stable job ID for SDK
 // driver calls.
@@ -95,6 +104,9 @@ type SDKRequestContext struct {
 
 	// RequestID is a unique ID generated for each outbound SDK request.
 	RequestID string `json:"request_id,omitempty"`
+
+	// GenerationID is the ID of the current generation of the request.
+	GenerationID int `json:"generation_id,omitempty"`
 
 	// JobID is the stable queue item ID for the current job.
 	JobID string `json:"job_id,omitempty"`

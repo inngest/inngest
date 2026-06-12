@@ -50,6 +50,19 @@ const (
 	// MaxRunMetadataSize is the maximum cumulative metadata size per function run in bytes (1 MB).
 	MaxRunMetadataSize = 1024 * 1024
 
+	// MaxUserlandTraceBodySize bounds the /v1/traces/userland request body. The
+	// cap gate runs only after the body is read and parsed (it needs the parsed
+	// spans to meter ingress bytes), so without this an over-cap or abusive
+	// account would force unbounded read+parse on every request before the 429 —
+	// the amplification the old pre-read cap gate prevented. Generous enough for
+	// a full OTLP userland span batch; well below anything that would pressure
+	// the API.
+	MaxUserlandTraceBodySize = 8 * 1024 * 1024 // 8MB
+
+	// MaxConcurrentRejectedTraceRecorders caps the background goroutine pool that
+	// runs the over-cap /v1/traces/userland ExtendedTraceRejectedRecorder.
+	MaxConcurrentRejectedTraceRecorders = 1000
+
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
 	MaxRetries = 20

@@ -27,6 +27,15 @@ export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
   return [...metadata, ...childMetadata];
 }
 
+// Trim floating-point noise and excess precision from non-integer scores;
+// integers and booleans render as-is.
+function formatScoreValue(value: number | boolean): string {
+  if (typeof value === 'number' && !Number.isInteger(value)) {
+    return String(Number(value.toPrecision(4)));
+  }
+  return String(value);
+}
+
 function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   return metadata
     .flatMap((md) => {
@@ -56,7 +65,7 @@ export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
 
   return (
     <div className="relative h-full overflow-y-auto overflow-x-hidden">
-      <div className="text-muted bg-canvasSubtle sticky top-0 grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 px-4 py-2 text-sm font-medium leading-tight">
+      <div className="text-muted bg-canvasSubtle sticky top-0 grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 px-4 py-2 text-xs font-medium leading-tight">
         <div>Score</div>
         <div>Value</div>
         <div>Updated at</div>
@@ -67,7 +76,7 @@ export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
           className="border-muted grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 border-b px-4 py-3 text-sm last:border-b-0"
         >
           <div className="text-basis min-w-0 font-medium [overflow-wrap:anywhere]">{row.name}</div>
-          <div className="text-basis font-mono">{String(row.value)}</div>
+          <div className="text-basis font-mono">{formatScoreValue(row.value)}</div>
           <TimeElement date={new Date(row.updatedAt)} />
         </div>
       ))}

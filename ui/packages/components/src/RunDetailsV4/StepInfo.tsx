@@ -373,7 +373,9 @@ export const StepInfo = ({
           {experimentMetadata && (
             <>
               <ElementWrapper label="Experiment name">
-                <TextElement>{experimentMetadata.values.experiment_name}</TextElement>
+                <TextElement>
+                  {experimentMetadata.values.experiment_name ?? experimentMetadata.values.name}
+                </TextElement>
               </ElementWrapper>
               <ElementWrapper label="Variant">
                 <TextElement>{experimentMetadata.values.variant}</TextElement>
