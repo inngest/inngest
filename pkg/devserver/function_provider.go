@@ -22,11 +22,11 @@ type cqrsFunctionProvider struct {
 type functionProviderReader interface {
 	cqrs.DevFunctionReader
 	cqrs.FunctionReader
-	cqrs.AppScopedFunctionReader
+	cqrs.FunctionV2Reader
 }
 
 // NewFunctionProvider returns a FunctionProvider that looks up functions by
-// app-scoped slug or UUID using the given FunctionReader.
+// app-scoped slug or UUID using the given function reader.
 func NewFunctionProvider(reader functionProviderReader) apiv2.FunctionProvider {
 	var apps cqrs.AppReader
 	if appReader, ok := reader.(cqrs.AppReader); ok {
@@ -74,9 +74,9 @@ func (p *cqrsFunctionProvider) GetFunctions(ctx context.Context, appID string, o
 		limit = 1
 	}
 
-	fns, err := p.reader.GetFunctionsByAppExternalIDPage(ctx, cqrs.GetFunctionsByAppExternalIDPageOpts{
+	fns, err := p.reader.GetFunctionsByApp(ctx, cqrs.GetFunctionsByAppOpts{
 		WorkspaceID: consts.DevServerEnvID,
-		AppID:       appID,
+		AppName:     appID,
 		Cursor:      opts.Cursor,
 		Limit:       limit + 1,
 	})

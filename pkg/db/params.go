@@ -54,8 +54,9 @@ type UpdateFunctionConfigParams struct {
 	ID     uuid.UUID
 }
 
-type GetAppFunctionsBySlugPageParams struct {
-	Name      string
+type GetFunctionsByAppParams struct {
+	AppID     uuid.UUID
+	AppName   string
 	Cursor    uuid.UUID
 	LimitRows int64
 }

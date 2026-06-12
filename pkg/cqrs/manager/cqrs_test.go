@@ -1166,9 +1166,9 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	})
 
 	t.Run("pages functions for target app in id order", func(t *testing.T) {
-		functions, err := cm.GetFunctionsByAppExternalIDPage(ctx, cqrs.GetFunctionsByAppExternalIDPageOpts{
+		functions, err := cm.GetFunctionsByApp(ctx, cqrs.GetFunctionsByAppOpts{
 			WorkspaceID: workspaceID,
-			AppID:       targetAppExternalID,
+			AppName:     targetAppExternalID,
 			Cursor:      targetFnIDs[0],
 			Limit:       1,
 		})

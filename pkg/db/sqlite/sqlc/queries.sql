@@ -109,15 +109,16 @@ SELECT * FROM functions WHERE app_id = ? AND archived_at IS NULL;
 -- name: GetAppFunctionsBySlug :many
 SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.archived_at IS NULL;
 
--- name: GetAppFunctionsBySlugPage :many
+-- name: GetFunctionsByApp :many
 SELECT functions.* FROM functions
 JOIN apps ON apps.id = functions.app_id
-WHERE apps.name = @name
-  AND functions.id > @cursor
+WHERE (@app_id = '00000000-0000-0000-0000-000000000000' OR functions.app_id = @app_id)
+  AND (@app_name = '' OR apps.name = @app_name)
+  AND (@cursor = '00000000-0000-0000-0000-000000000000' OR functions.id > @cursor)
   AND functions.archived_at IS NULL
   AND apps.archived_at IS NULL
 ORDER BY functions.id ASC
-LIMIT @limit_rows;
+LIMIT CASE WHEN @limit_rows > 0 THEN @limit_rows ELSE -1 END;
 
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;

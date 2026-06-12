@@ -33,7 +33,7 @@ type Querier interface {
 	DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error
 	GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Function, error)
 	GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Function, error)
-	GetAppFunctionsBySlugPage(ctx context.Context, arg GetAppFunctionsBySlugPageParams) ([]*Function, error)
+	GetFunctionsByApp(ctx context.Context, arg GetFunctionsByAppParams) ([]*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
 	GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*Function, error)

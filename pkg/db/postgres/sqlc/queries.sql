@@ -108,15 +108,16 @@ SELECT * FROM functions WHERE app_id = $1 AND archived_at IS NULL;
 -- name: GetAppFunctionsBySlug :many
 SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = $1 AND functions.archived_at IS NULL;
 
--- name: GetAppFunctionsBySlugPage :many
+-- name: GetFunctionsByApp :many
 SELECT functions.* FROM functions
 JOIN apps ON apps.id = functions.app_id
-WHERE apps.name = @name
-  AND functions.id > @cursor
+WHERE (sqlc.arg('app_id')::uuid = '00000000-0000-0000-0000-000000000000'::uuid OR functions.app_id = sqlc.arg('app_id')::uuid::text)
+  AND (sqlc.arg('app_name')::text = '' OR apps.name = sqlc.arg('app_name')::text)
+  AND (sqlc.arg('cursor')::uuid = '00000000-0000-0000-0000-000000000000'::uuid OR functions.id > sqlc.arg('cursor')::uuid::text)
   AND functions.archived_at IS NULL
   AND apps.archived_at IS NULL
 ORDER BY functions.id ASC
-LIMIT @limit_rows;
+LIMIT CASE WHEN sqlc.arg('limit_rows')::int > 0 THEN sqlc.arg('limit_rows')::int END;
 
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = $1;

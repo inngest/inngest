@@ -249,11 +249,11 @@ func TestNewFunctionProviderPagesFunctionsInReader(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.NotNil(t, store.pageOpts)
-	require.Equal(t, consts.DevServerEnvID, store.pageOpts.WorkspaceID)
-	require.Equal(t, "app", store.pageOpts.AppID)
-	require.Equal(t, firstID, store.pageOpts.Cursor)
-	require.Equal(t, 2, store.pageOpts.Limit)
+	require.NotNil(t, store.functionOpts)
+	require.Equal(t, consts.DevServerEnvID, store.functionOpts.WorkspaceID)
+	require.Equal(t, "app", store.functionOpts.AppName)
+	require.Equal(t, firstID, store.functionOpts.Cursor)
+	require.Equal(t, 2, store.functionOpts.Limit)
 	require.Len(t, result.Functions, 1)
 	require.Equal(t, secondID, result.Functions[0].ID)
 	require.True(t, result.HasMore)
@@ -316,11 +316,11 @@ func TestFunctionTraceReader(t *testing.T) {
 }
 
 type fakeFunctionStore struct {
-	fns      []*cqrs.Function
-	fnByID   map[uuid.UUID]*cqrs.Function
-	app      *cqrs.App
-	err      error
-	pageOpts *cqrs.GetFunctionsByAppExternalIDPageOpts
+	fns          []*cqrs.Function
+	fnByID       map[uuid.UUID]*cqrs.Function
+	app          *cqrs.App
+	err          error
+	functionOpts *cqrs.GetFunctionsByAppOpts
 }
 
 func (f *fakeFunctionStore) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
@@ -349,12 +349,12 @@ func (f *fakeFunctionStore) GetFunctionsByAppExternalID(ctx context.Context, wor
 	return fns, nil
 }
 
-func (f *fakeFunctionStore) GetFunctionsByAppExternalIDPage(ctx context.Context, opts cqrs.GetFunctionsByAppExternalIDPageOpts) ([]*cqrs.Function, error) {
-	f.pageOpts = &opts
+func (f *fakeFunctionStore) GetFunctionsByApp(ctx context.Context, opts cqrs.GetFunctionsByAppOpts) ([]*cqrs.Function, error) {
+	f.functionOpts = &opts
 	if f.err != nil {
 		return nil, f.err
 	}
-	if f.app == nil || f.app.Name != opts.AppID {
+	if f.app == nil || f.app.Name != opts.AppName {
 		return nil, nil
 	}
 
