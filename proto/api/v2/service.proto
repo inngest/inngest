@@ -975,6 +975,24 @@ service V2 {
     };
   }
 
+  rpc GetApp(GetAppRequest) returns (GetAppResponse) {
+    option (google.api.http) = {
+      get: "/apps/{app_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get app"
+      tags: "Apps"
+      tags: "Beta"
+      description: "Fetches details for a single app, including sync metadata and function count"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc SyncApp(SyncAppRequest) returns (SyncAppResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/syncs",
@@ -1864,6 +1882,130 @@ message GetFunctionRequest {
 
 message GetFunctionResponse {
   Function data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+enum AppMethod {
+  APP_METHOD_UNSPECIFIED = 0;
+  APP_METHOD_SERVE = 1;
+  APP_METHOD_CONNECT = 2;
+  APP_METHOD_API = 3;
+}
+
+message App {
+  reserved 5, 6, 7, 8, 13;
+  reserved "sdk_language", "sdk_version", "framework", "url", "error";
+
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The user-defined app ID"
+      example: "\"my-app\""
+    }
+  ];
+  string name = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "App name"
+      example: "\"my-app\""
+    }
+  ];
+  AppMethod method = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "How the app communicates with Inngest"
+    }
+  ];
+  optional string app_version = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "User-defined app version, if set"
+    }
+  ];
+  google.protobuf.Timestamp created_at = 9 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp when the app was first synced"
+    }
+  ];
+  bool is_archived = 10 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether the app is archived"
+    }
+  ];
+  optional google.protobuf.Timestamp archived_at = 11 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp when the app was archived (if archived)"
+    }
+  ];
+  int32 function_count = 12 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of functions in the app"
+    }
+  ];
+  optional AppSync latest_sync = 14 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Latest sync metadata for the app, if available"
+    }
+  ];
+}
+
+message AppSync {
+  reserved 2, 3, 10;
+  reserved "started_at", "completed_at", "function_count";
+
+  optional string status = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Status of the latest sync"
+    }
+  ];
+  optional google.protobuf.Timestamp synced_at = 11 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp for the latest sync, if available"
+    }
+  ];
+  optional string sdk_language = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Language of the SDK that synced the app"
+      example: "\"typescript\""
+    }
+  ];
+  optional string sdk_version = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Version of the SDK that synced the app"
+      example: "\"3.22.0\""
+    }
+  ];
+  optional string framework = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Framework used by the app, if reported by the SDK"
+      example: "\"nextjs\""
+    }
+  ];
+  optional string url = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "URL of the Inngest endpoint in the app, if synced via URL"
+      example: "\"https://example.com/api/inngest\""
+    }
+  ];
+  optional string error = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Most recent sync or connectivity error for the app, if any"
+    }
+  ];
+  optional string app_version = 9 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "App version reported by the latest sync, if set"
+    }
+  ];
+}
+
+message GetAppRequest {
+  string app_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The user-defined app ID"
+      example: "\"my-app\""
+    }
+  ];
+}
+
+message GetAppResponse {
+  App data = 1;
   ResponseMetadata metadata = 2;
 }
 
