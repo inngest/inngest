@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -610,7 +611,13 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It enqueues an item only once", func(t *testing.T) {
-		i := osqueue.QueueItem{ID: "once"}
+		runID := ulid.MustNew(ulid.Timestamp(start), rand.Reader)
+		i := osqueue.QueueItem{
+			ID: "once",
+			Data: osqueue.Item{
+				Identifier: state.Identifier{RunID: runID},
+			},
+		}
 
 		item, err := shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
 
@@ -620,17 +627,21 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 
-		// Ensure we can't enqueue again.
 		_, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
-		require.Equal(t, osqueue.ErrQueueItemExists, err)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+		var existsErr osqueue.QueueItemExistsError
+		require.True(t, errors.As(err, &existsErr))
+		require.NotNil(t, existsErr.RunID)
+		require.Equal(t, runID, *existsErr.RunID)
 
-		// Dequeue
 		err = shard.Dequeue(ctx, item)
 		require.NoError(t, err)
 
-		// Ensure we can't enqueue even after dequeue.
 		_, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
-		require.Equal(t, osqueue.ErrQueueItemExists, err)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+		var tombstoneErr osqueue.QueueItemExistsError
+		require.True(t, errors.As(err, &tombstoneErr))
+		require.Nil(t, tombstoneErr.RunID)
 
 		// Wait for the idempotency TTL to expire
 		r.FastForward(dur)

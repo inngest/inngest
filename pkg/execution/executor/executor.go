@@ -1516,10 +1516,10 @@ func (e *executor) schedule(
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	queueSpan.End()
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		// no-op
-	case queue.ErrQueueItemExists:
+	case errors.Is(err, queue.ErrQueueItemExists):
 		// If the item already exists in the queue, we can safely ignore this
 		// entire schedule request; it's basically a retry and we should not
 		// persist this for the user.
@@ -1530,6 +1530,27 @@ func (e *executor) schedule(
 					"has_schedule_idempotency_key": req.IdempotencyKey != nil,
 				},
 			})
+
+			// Determine whether the duplicate item belongs to this same run.
+			// If it does, keep state. Otherwise delete it to avoid leaking state.
+			var existsErr queue.QueueItemExistsError
+			keepState := errors.As(err, &existsErr) && existsErr.RunID != nil && *existsErr.RunID == metadata.ID.RunID
+
+			var ownerRunID string
+			if existsErr.RunID != nil {
+				ownerRunID = existsErr.RunID.String()
+			}
+
+			if !keepState {
+				if deleteErr := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID)); deleteErr != nil {
+					l.Error("error deleting run state after queue duplicate, this has likely leaked state", deleteErr,
+						"run_id", metadata.ID.RunID.String(),
+						"account_id", req.AccountID.String(),
+						"workspace_id", req.WorkspaceID.String(),
+						"event_internal_id", req.Events[0].GetInternalID().String(),
+					)
+				}
+			}
 
 			var triggeringEventName string
 			if eventName != nil {
@@ -1570,14 +1591,16 @@ func (e *executor) schedule(
 				"run_mode", req.RunMode,
 				"queue_at", at,
 				"scheduled_at", scheduledAt,
+				"queue_duplicate_owner_run_id", ownerRunID,
+				"new_state_deleted", !keepState,
 			)
 		}
 		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
-	case queue.ErrQueueItemSingletonExists:
-		err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
-		if err != nil {
-			l.ReportError(err, "error deleting function state")
+	case errors.Is(err, queue.ErrQueueItemSingletonExists):
+		deleteErr := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
+		if deleteErr != nil {
+			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
 		return nil, nil, ErrFunctionSkipped
 

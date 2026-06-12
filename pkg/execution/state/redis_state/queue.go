@@ -288,7 +288,14 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	case 0:
 		return i, nil
 	case 1:
-		return i, osqueue.ErrQueueItemExists
+		var runID *ulid.ULID
+		if existing, loadErr := q.LoadQueueItem(ctx, i.ID); loadErr == nil {
+			id := existing.Data.Identifier.RunID
+			runID = &id
+		} else if loadErr != osqueue.ErrQueueItemNotFound {
+			return i, loadErr
+		}
+		return i, osqueue.QueueItemExists(i.ID, runID)
 	case 2:
 		return i, osqueue.ErrQueueItemSingletonExists
 	default:
