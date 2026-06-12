@@ -7,6 +7,7 @@ import SideBarV2 from './SideBarV2';
 import TopBar from './TopBar';
 import { ActiveBanners } from '../ActiveBanners/ActiveBanners';
 import IncidentBanner from '../Incident/IncidentBanner';
+import { PaymentStatusBanner } from '../PaymentStatusBanner/PaymentStatusBanner';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
 
 type LayoutProps = {
@@ -49,6 +50,8 @@ export default function Layout({
           <IncidentBanner />
 
           <ActiveBanners />
+
+          <PaymentStatusBanner />
 
           {/* disabled by Dan 11/22/2025 for performance reasons */}
           <Suspense>{/* <BillingBanner /> */}</Suspense>
