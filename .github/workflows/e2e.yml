@@ -103,8 +103,8 @@ jobs:
         os: [ubuntu-latest]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
-        parallelism: [5]
-        index: [0, 1, 2, 3, 4]
+        parallelism: [8]
+        index: [0, 1, 2, 3, 4, 5, 6, 7]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
