@@ -724,7 +724,7 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 		QueueName:   &queueName,
 	}, enqueueAt, queue.EnqueueOpts{})
 
-	if err != nil && err != queue.ErrQueueItemExists {
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 		l.Trace("Error enqueueing system job", "error", err.Error())
 		return err
 	}
@@ -3366,7 +3366,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				return nil
 			}
 
-			if err != nil && err != queue.ErrQueueItemExists {
+			if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 				nextStepSpan.Drop()
 				return fmt.Errorf("error enqueueing after pause: %w", err)
 			}
@@ -3689,7 +3689,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		if err != nil {
 			span.Drop()
 
-			if err == queue.ErrQueueItemExists {
+			if errors.Is(err, queue.ErrQueueItemExists) {
 				return nil
 			}
 
@@ -4004,7 +4004,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err == queue.ErrQueueItemExists {
+		if errors.Is(err, queue.ErrQueueItemExists) {
 			span.Drop()
 			return nil
 		}
@@ -4188,7 +4188,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, adjustedStartTime, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
 		return nil
 	}
@@ -4297,7 +4297,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
 		PassthroughJobId: true,
 	})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
 		return nil
 	}
@@ -4473,7 +4473,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 				span.Drop()
 			}
 
-			if err == queue.ErrQueueItemExists {
+			if errors.Is(err, queue.ErrQueueItemExists) {
 				return nil
 			}
 
@@ -4716,7 +4716,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				span.Drop()
 			}
 
-			if err == queue.ErrQueueItemExists {
+			if errors.Is(err, queue.ErrQueueItemExists) {
 				return nil
 			}
 
@@ -4890,7 +4890,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		if span != nil {
 			span.Drop()
 		}
@@ -5059,7 +5059,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		if span != nil {
 			span.Drop()
 		}
@@ -5287,7 +5287,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
 		return nil
 	}
@@ -5462,7 +5462,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
 	shouldDeleteBatch := err == nil ||
-		err == queue.ErrQueueItemExists ||
+		errors.Is(err, queue.ErrQueueItemExists) ||
 		errors.Is(err, ErrFunctionSkipped) ||
 		errors.Is(err, ErrFunctionSkippedIdempotency) ||
 		errors.Is(err, state.ErrIdentifierExists)
@@ -5475,7 +5475,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Don't bother if it's already there
 	// If function is paused, we do not schedule runs
-	if err == queue.ErrQueueItemExists ||
+	if errors.Is(err, queue.ErrQueueItemExists) ||
 		errors.Is(err, ErrFunctionSkipped) ||
 		errors.Is(err, ErrFunctionSkippedIdempotency) {
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
