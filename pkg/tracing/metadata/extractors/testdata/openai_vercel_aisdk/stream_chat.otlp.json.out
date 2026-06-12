@@ -14,16 +14,4 @@ SPAN ai.streamText.doStream
 }
 
 SPAN ai.streamText
-{
-  "model": "gpt-4.1-nano",
-  "system": "openai.chat",
-  "operation_name": "",
-  "response_model": "",
-  "response_id": "",
-  "finish_reasons": [
-    "stop"
-  ],
-  "input_tokens": 11,
-  "output_tokens": 10,
-  "total_tokens": 21
-}
+no AI metadata extracted
