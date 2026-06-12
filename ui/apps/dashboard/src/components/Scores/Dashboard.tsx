@@ -252,12 +252,14 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
             ))
           )}
         </div>
-        <Legend
-          scores={availableScores}
-          disabled={disabled}
-          onToggle={toggleScore}
-          isLoading={namesFetching}
-        />
+        {!filterError && (
+          <Legend
+            scores={availableScores}
+            disabled={disabled}
+            onToggle={toggleScore}
+            isLoading={namesFetching}
+          />
+        )}
       </div>
     </div>
   );
