@@ -116,3 +116,32 @@ func TestLangfusePrecedenceAndUsageExpansion(t *testing.T) {
 		}
 	}
 }
+
+// TestSkipsVercelRollupSpan verifies that the Vercel AI SDK's framework rollup
+// span (e.g. `ai.generateText`) extracts to nothing so its `ai.usage.*` isn't
+// double-counted against its provider-call child (`ai.generateText.doGenerate`),
+// which carries the same usage and the documented `.do*` segment.
+func TestSkipsVercelRollupSpan(t *testing.T) {
+	t.Parallel()
+
+	// The rollup span (no `.do*` segment) is skipped entirely.
+	rollup := []*v1.KeyValue{
+		strAttr("ai.operationId", "ai.generateText"),
+		strAttr("ai.model.id", "gpt-4.1-nano"),
+		intAttr("ai.usage.inputTokens", 17),
+	}
+	var rollupMd AIMetadata
+	assert.False(t, extractAIMetadataFromAttributes(rollup, &rollupMd))
+	assert.Equal(t, AIMetadata{}, rollupMd)
+
+	// The provider-call (leaf) span is still extracted normally.
+	leaf := []*v1.KeyValue{
+		strAttr("ai.operationId", "ai.generateText.doGenerate"),
+		strAttr("ai.model.id", "gpt-4.1-nano"),
+		intAttr("ai.usage.inputTokens", 17),
+	}
+	var leafMd AIMetadata
+	assert.True(t, extractAIMetadataFromAttributes(leaf, &leafMd))
+	assert.Equal(t, "gpt-4.1-nano", leafMd.Model)
+	assert.Equal(t, int64(17), leafMd.InputTokens)
+}
