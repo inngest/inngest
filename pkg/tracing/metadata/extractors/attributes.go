@@ -107,7 +107,7 @@ var keyFieldMap = map[string]attrMapping{
 		convention: openinference,
 	},
 	"llm.model_name": {
-		field:      "model",
+		field:      "responseModel",
 		convention: openinference,
 	},
 	// llm.system identifies the AI product/vendor (openai, anthropic, ...),
@@ -180,7 +180,7 @@ var keyFieldMap = map[string]attrMapping{
 	// Langfuse (`langfuse.*`, via @langfuse/openai + LangfuseSpanProcessor)
 	// ---------------------------------------------------------------------------
 	"langfuse.observation.model.name": {
-		field:      "model",
+		field:      "responseModel",
 		convention: langfuse,
 	},
 	// usage_details is a single JSON blob ({"input":N,"output":N,"total":N,...}).

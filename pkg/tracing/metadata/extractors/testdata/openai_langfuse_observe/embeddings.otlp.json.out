@@ -1,9 +1,9 @@
 SPAN OpenAI.embeddings
 {
-  "model": "text-embedding-3-small",
+  "model": "",
   "system": "",
   "operation_name": "",
-  "response_model": "",
+  "response_model": "text-embedding-3-small",
   "response_id": "",
   "finish_reasons": null,
   "input_tokens": 0,
