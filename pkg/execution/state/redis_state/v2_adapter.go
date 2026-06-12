@@ -333,7 +333,7 @@ func (v v2) SaveRejectedDefer(ctx context.Context, id state.ID, fnSlug string, h
 }
 
 // Metadata returns metadata for a given run
-func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, error) {
+func (v v2) LoadMetadata(ctx context.Context, id state.ID, _ ...state.LoadMetadataOption) (state.Metadata, error) {
 	md, err := v.mgr.metadata(ctx, id.Tenant.AccountID, id.RunID)
 	if err != nil {
 		return state.Metadata{}, err
