@@ -39,8 +39,7 @@ type App struct {
 
 type AppSync struct {
 	Status      string
-	StartedAt   time.Time
-	CompletedAt time.Time
+	SyncedAt    time.Time
 	SdkLanguage string
 	SdkVersion  string
 	Framework   string

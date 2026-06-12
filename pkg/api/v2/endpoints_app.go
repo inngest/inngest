@@ -73,11 +73,8 @@ func toAppSync(sync *AppSync) *apiv2.AppSync {
 		Error:       nonEmptyString(sync.Error),
 		AppVersion:  nonEmptyString(sync.AppVersion),
 	}
-	if !sync.StartedAt.IsZero() {
-		result.StartedAt = timestamppb.New(sync.StartedAt)
-	}
-	if !sync.CompletedAt.IsZero() {
-		result.CompletedAt = timestamppb.New(sync.CompletedAt)
+	if !sync.SyncedAt.IsZero() {
+		result.SyncedAt = timestamppb.New(sync.SyncedAt)
 	}
 	return result
 }

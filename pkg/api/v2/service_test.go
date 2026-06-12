@@ -269,6 +269,7 @@ func int32Ptr(value int32) *int32 {
 func TestService_GetApp(t *testing.T) {
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	createdAt := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	syncedAt := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
 	archivedAt := time.Now().Add(-time.Hour)
 
 	app := App{
@@ -281,6 +282,7 @@ func TestService_GetApp(t *testing.T) {
 		FunctionCount: 4,
 		LatestSync: &AppSync{
 			Status:      "failed",
+			SyncedAt:    syncedAt,
 			SdkLanguage: "typescript",
 			SdkVersion:  "3.22.0",
 			Framework:   "nextjs",
@@ -311,6 +313,7 @@ func TestService_GetApp(t *testing.T) {
 		require.Equal(t, int32(4), resp.Data.FunctionCount)
 		require.NotNil(t, resp.Data.LatestSync)
 		require.Equal(t, "failed", resp.Data.LatestSync.GetStatus())
+		require.Equal(t, syncedAt, resp.Data.LatestSync.GetSyncedAt().AsTime())
 		require.Equal(t, "typescript", resp.Data.LatestSync.GetSdkLanguage())
 		require.Equal(t, "3.22.0", resp.Data.LatestSync.GetSdkVersion())
 		require.Equal(t, "nextjs", resp.Data.LatestSync.GetFramework())

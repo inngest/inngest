@@ -1946,22 +1946,17 @@ message App {
 }
 
 message AppSync {
-  reserved 10;
-  reserved "function_count";
+  reserved 2, 3, 10;
+  reserved "started_at", "completed_at", "function_count";
 
   optional string status = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Status of the latest sync"
     }
   ];
-  optional google.protobuf.Timestamp started_at = 2 [
+  optional google.protobuf.Timestamp synced_at = 11 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Timestamp when the latest sync started"
-    }
-  ];
-  optional google.protobuf.Timestamp completed_at = 3 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Timestamp when the latest sync completed, if recorded"
+      description: "Timestamp for the latest sync, if available"
     }
   ];
   optional string sdk_language = 4 [

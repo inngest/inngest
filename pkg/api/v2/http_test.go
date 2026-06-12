@@ -154,6 +154,7 @@ func TestHTTPGateway_GetApp(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	createdAt := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	syncedAt := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
 
 	apps := &mockAppProvider{}
 	apps.On("GetApp", mock.Anything, "my-app").Return(App{
@@ -164,6 +165,7 @@ func TestHTTPGateway_GetApp(t *testing.T) {
 		CreatedAt:     createdAt,
 		FunctionCount: 2,
 		LatestSync: &AppSync{
+			SyncedAt:    syncedAt,
 			SdkLanguage: "typescript",
 			SdkVersion:  "3.22.0",
 			URL:         "https://example.com/api/inngest",
@@ -193,6 +195,7 @@ func TestHTTPGateway_GetApp(t *testing.T) {
 	require.Equal(t, float64(2), data["functionCount"])
 	require.Equal(t, "2026-06-01T12:00:00Z", data["createdAt"])
 	latestSync := data["latestSync"].(map[string]any)
+	require.Equal(t, "2026-06-02T12:00:00Z", latestSync["syncedAt"])
 	require.Equal(t, "typescript", latestSync["sdkLanguage"])
 	require.Equal(t, "3.22.0", latestSync["sdkVersion"])
 	require.Equal(t, "https://example.com/api/inngest", latestSync["url"])

@@ -2918,8 +2918,7 @@ func (x *App) GetLatestSync() *AppSync {
 type AppSync struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        *string                `protobuf:"bytes,1,opt,name=status,proto3,oneof" json:"status,omitempty"`
-	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
-	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=completed_at,json=completedAt,proto3,oneof" json:"completed_at,omitempty"`
+	SyncedAt      *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=synced_at,json=syncedAt,proto3,oneof" json:"synced_at,omitempty"`
 	SdkLanguage   *string                `protobuf:"bytes,4,opt,name=sdk_language,json=sdkLanguage,proto3,oneof" json:"sdk_language,omitempty"`
 	SdkVersion    *string                `protobuf:"bytes,5,opt,name=sdk_version,json=sdkVersion,proto3,oneof" json:"sdk_version,omitempty"`
 	Framework     *string                `protobuf:"bytes,6,opt,name=framework,proto3,oneof" json:"framework,omitempty"`
@@ -2967,16 +2966,9 @@ func (x *AppSync) GetStatus() string {
 	return ""
 }
 
-func (x *AppSync) GetStartedAt() *timestamppb.Timestamp {
+func (x *AppSync) GetSyncedAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.StartedAt
-	}
-	return nil
-}
-
-func (x *AppSync) GetCompletedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CompletedAt
+		return x.SyncedAt
 	}
 	return nil
 }
@@ -6450,31 +6442,30 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"latestSync\x88\x01\x01B\x0e\n" +
 	"\f_app_versionB\x0e\n" +
 	"\f_archived_atB\x0e\n" +
-	"\f_latest_syncJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\r\x10\x0eR\fsdk_languageR\vsdk_versionR\tframeworkR\x03urlR\x05error\"\x9d\b\n" +
+	"\f_latest_syncJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\r\x10\x0eR\fsdk_languageR\vsdk_versionR\tframeworkR\x03urlR\x05error\"\xb4\a\n" +
 	"\aAppSync\x12;\n" +
-	"\x06status\x18\x01 \x01(\tB\x1e\x92A\x1b2\x19Status of the latest syncH\x00R\x06status\x88\x01\x01\x12k\n" +
-	"\n" +
-	"started_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB+\x92A(2&Timestamp when the latest sync startedH\x01R\tstartedAt\x88\x01\x01\x12~\n" +
-	"\fcompleted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB:\x92A725Timestamp when the latest sync completed, if recordedH\x02R\vcompletedAt\x88\x01\x01\x12b\n" +
-	"\fsdk_language\x18\x04 \x01(\tB:\x92A72'Language of the SDK that synced the appJ\f\"typescript\"H\x03R\vsdkLanguage\x88\x01\x01\x12[\n" +
-	"\vsdk_version\x18\x05 \x01(\tB5\x92A22&Version of the SDK that synced the appJ\b\"3.22.0\"H\x04R\n" +
+	"\x06status\x18\x01 \x01(\tB\x1e\x92A\x1b2\x19Status of the latest syncH\x00R\x06status\x88\x01\x01\x12n\n" +
+	"\tsynced_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB0\x92A-2+Timestamp for the latest sync, if availableH\x01R\bsyncedAt\x88\x01\x01\x12b\n" +
+	"\fsdk_language\x18\x04 \x01(\tB:\x92A72'Language of the SDK that synced the appJ\f\"typescript\"H\x02R\vsdkLanguage\x88\x01\x01\x12[\n" +
+	"\vsdk_version\x18\x05 \x01(\tB5\x92A22&Version of the SDK that synced the appJ\b\"3.22.0\"H\x03R\n" +
 	"sdkVersion\x88\x01\x01\x12c\n" +
-	"\tframework\x18\x06 \x01(\tB@\x92A=21Framework used by the app, if reported by the SDKJ\b\"nextjs\"H\x05R\tframework\x88\x01\x01\x12x\n" +
-	"\x03url\x18\a \x01(\tBa\x92A^29URL of the Inngest endpoint in the app, if synced via URLJ!\"https://example.com/api/inngest\"H\x06R\x03url\x88\x01\x01\x12Z\n" +
-	"\x05error\x18\b \x01(\tB?\x92A<2:Most recent sync or connectivity error for the app, if anyH\aR\x05error\x88\x01\x01\x12Z\n" +
-	"\vapp_version\x18\t \x01(\tB4\x92A12/App version reported by the latest sync, if setH\bR\n" +
+	"\tframework\x18\x06 \x01(\tB@\x92A=21Framework used by the app, if reported by the SDKJ\b\"nextjs\"H\x04R\tframework\x88\x01\x01\x12x\n" +
+	"\x03url\x18\a \x01(\tBa\x92A^29URL of the Inngest endpoint in the app, if synced via URLJ!\"https://example.com/api/inngest\"H\x05R\x03url\x88\x01\x01\x12Z\n" +
+	"\x05error\x18\b \x01(\tB?\x92A<2:Most recent sync or connectivity error for the app, if anyH\x06R\x05error\x88\x01\x01\x12Z\n" +
+	"\vapp_version\x18\t \x01(\tB4\x92A12/App version reported by the latest sync, if setH\aR\n" +
 	"appVersion\x88\x01\x01B\t\n" +
-	"\a_statusB\r\n" +
-	"\v_started_atB\x0f\n" +
-	"\r_completed_atB\x0f\n" +
+	"\a_statusB\f\n" +
+	"\n" +
+	"_synced_atB\x0f\n" +
 	"\r_sdk_languageB\x0e\n" +
 	"\f_sdk_versionB\f\n" +
 	"\n" +
 	"_frameworkB\x06\n" +
 	"\x04_urlB\b\n" +
 	"\x06_errorB\x0e\n" +
-	"\f_app_versionJ\x04\b\n" +
-	"\x10\vR\x0efunction_count\"N\n" +
+	"\f_app_versionJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\n" +
+	"\x10\vR\n" +
+	"started_atR\fcompleted_atR\x0efunction_count\"N\n" +
 	"\rGetAppRequest\x12=\n" +
 	"\x06app_id\x18\x01 \x01(\tB&\x92A#2\x17The user-defined app IDJ\b\"my-app\"R\x05appId\"g\n" +
 	"\x0eGetAppResponse\x12\x1f\n" +
@@ -7420,131 +7411,130 @@ var file_api_v2_service_proto_depIdxs = []int32{
 	105, // 51: api.v2.App.created_at:type_name -> google.protobuf.Timestamp
 	105, // 52: api.v2.App.archived_at:type_name -> google.protobuf.Timestamp
 	48,  // 53: api.v2.App.latest_sync:type_name -> api.v2.AppSync
-	105, // 54: api.v2.AppSync.started_at:type_name -> google.protobuf.Timestamp
-	105, // 55: api.v2.AppSync.completed_at:type_name -> google.protobuf.Timestamp
-	47,  // 56: api.v2.GetAppResponse.data:type_name -> api.v2.App
-	17,  // 57: api.v2.GetAppResponse.metadata:type_name -> api.v2.ResponseMetadata
-	33,  // 58: api.v2.GetFunctionsResponse.data:type_name -> api.v2.Function
-	17,  // 59: api.v2.GetFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	63,  // 60: api.v2.GetFunctionsResponse.page:type_name -> api.v2.Page
-	58,  // 61: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
-	17,  // 62: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	57,  // 63: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
-	17,  // 64: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
-	7,   // 65: api.v2.Env.type:type_name -> api.v2.EnvType
-	105, // 66: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	105, // 67: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	105, // 68: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	62,  // 69: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
-	17,  // 70: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	63,  // 71: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
-	62,  // 72: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
-	17,  // 73: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	105, // 74: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	105, // 75: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
-	66,  // 76: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
-	17,  // 77: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	63,  // 78: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	105, // 79: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
-	57,  // 80: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
-	17,  // 81: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	63,  // 82: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
-	71,  // 83: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
-	17,  // 84: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	63,  // 85: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	105, // 86: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
-	74,  // 87: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
-	77,  // 88: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
-	17,  // 89: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
-	8,   // 90: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
-	77,  // 91: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
-	17,  // 92: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
-	63,  // 93: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
-	74,  // 94: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	105, // 95: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	105, // 96: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
-	57,  // 97: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
-	17,  // 98: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	106, // 99: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
-	82,  // 100: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
-	17,  // 101: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	105, // 102: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	105, // 103: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	105, // 104: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
-	85,  // 105: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
-	17,  // 106: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
-	86,  // 107: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
-	89,  // 108: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
-	17,  // 109: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	90,  // 110: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
-	91,  // 111: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
-	92,  // 112: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
-	9,   // 113: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
-	107, // 114: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
-	10,  // 115: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
-	93,  // 116: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
-	96,  // 117: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
-	17,  // 118: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
-	97,  // 119: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
-	100, // 120: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
-	17,  // 121: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
-	103, // 122: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
-	17,  // 123: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
-	63,  // 124: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
-	106, // 125: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
-	11,  // 126: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	11,  // 127: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	53,  // 128: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	55,  // 129: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	59,  // 130: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	12,  // 131: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	67,  // 132: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	64,  // 133: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	69,  // 134: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	72,  // 135: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	75,  // 136: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	78,  // 137: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	36,  // 138: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
-	38,  // 139: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
-	49,  // 140: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
-	83,  // 141: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	43,  // 142: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
-	45,  // 143: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
-	51,  // 144: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
-	80,  // 145: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	94,  // 146: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
-	101, // 147: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
-	98,  // 148: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
-	87,  // 149: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
-	13,  // 150: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	16,  // 151: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	54,  // 152: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	56,  // 153: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	60,  // 154: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	61,  // 155: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	68,  // 156: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	65,  // 157: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	70,  // 158: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	73,  // 159: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	76,  // 160: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	79,  // 161: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	37,  // 162: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
-	39,  // 163: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
-	50,  // 164: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
-	84,  // 165: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	44,  // 166: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
-	46,  // 167: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
-	52,  // 168: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
-	81,  // 169: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	95,  // 170: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
-	102, // 171: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
-	99,  // 172: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
-	88,  // 173: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
-	150, // [150:174] is the sub-list for method output_type
-	126, // [126:150] is the sub-list for method input_type
-	126, // [126:126] is the sub-list for extension type_name
-	126, // [126:126] is the sub-list for extension extendee
-	0,   // [0:126] is the sub-list for field type_name
+	105, // 54: api.v2.AppSync.synced_at:type_name -> google.protobuf.Timestamp
+	47,  // 55: api.v2.GetAppResponse.data:type_name -> api.v2.App
+	17,  // 56: api.v2.GetAppResponse.metadata:type_name -> api.v2.ResponseMetadata
+	33,  // 57: api.v2.GetFunctionsResponse.data:type_name -> api.v2.Function
+	17,  // 58: api.v2.GetFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	63,  // 59: api.v2.GetFunctionsResponse.page:type_name -> api.v2.Page
+	58,  // 60: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
+	17,  // 61: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	57,  // 62: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
+	17,  // 63: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
+	7,   // 64: api.v2.Env.type:type_name -> api.v2.EnvType
+	105, // 65: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	105, // 66: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	105, // 67: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	62,  // 68: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
+	17,  // 69: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	63,  // 70: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
+	62,  // 71: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
+	17,  // 72: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	105, // 73: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	105, // 74: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	66,  // 75: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
+	17,  // 76: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	63,  // 77: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
+	105, // 78: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	57,  // 79: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
+	17,  // 80: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	63,  // 81: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
+	71,  // 82: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
+	17,  // 83: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	63,  // 84: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
+	105, // 85: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	74,  // 86: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
+	77,  // 87: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
+	17,  // 88: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
+	8,   // 89: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
+	77,  // 90: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
+	17,  // 91: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
+	63,  // 92: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
+	74,  // 93: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
+	105, // 94: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	105, // 95: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	57,  // 96: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
+	17,  // 97: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	106, // 98: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	82,  // 99: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
+	17,  // 100: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
+	105, // 101: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	105, // 102: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	105, // 103: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	85,  // 104: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
+	17,  // 105: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
+	86,  // 106: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
+	89,  // 107: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
+	17,  // 108: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	90,  // 109: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
+	91,  // 110: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
+	92,  // 111: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
+	9,   // 112: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
+	107, // 113: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
+	10,  // 114: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
+	93,  // 115: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
+	96,  // 116: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
+	17,  // 117: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
+	97,  // 118: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
+	100, // 119: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
+	17,  // 120: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
+	103, // 121: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
+	17,  // 122: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
+	63,  // 123: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
+	106, // 124: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
+	11,  // 125: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	11,  // 126: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	53,  // 127: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	55,  // 128: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	59,  // 129: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	12,  // 130: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	67,  // 131: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	64,  // 132: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	69,  // 133: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	72,  // 134: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	75,  // 135: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	78,  // 136: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	36,  // 137: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
+	38,  // 138: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
+	49,  // 139: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
+	83,  // 140: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	43,  // 141: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
+	45,  // 142: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
+	51,  // 143: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
+	80,  // 144: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	94,  // 145: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
+	101, // 146: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
+	98,  // 147: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
+	87,  // 148: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
+	13,  // 149: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	16,  // 150: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	54,  // 151: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	56,  // 152: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	60,  // 153: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	61,  // 154: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	68,  // 155: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	65,  // 156: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	70,  // 157: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	73,  // 158: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	76,  // 159: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	79,  // 160: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	37,  // 161: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
+	39,  // 162: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
+	50,  // 163: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
+	84,  // 164: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	44,  // 165: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
+	46,  // 166: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
+	52,  // 167: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
+	81,  // 168: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	95,  // 169: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
+	102, // 170: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
+	99,  // 171: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
+	88,  // 172: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
+	149, // [149:173] is the sub-list for method output_type
+	125, // [125:149] is the sub-list for method input_type
+	125, // [125:125] is the sub-list for extension type_name
+	125, // [125:125] is the sub-list for extension extendee
+	0,   // [0:125] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
