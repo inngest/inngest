@@ -1227,8 +1227,20 @@ func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUI
 }
 
 func (w wrapper) GetFunctionsByAppExternalID(ctx context.Context, workspaceID uuid.UUID, appID string) ([]*cqrs.Function, error) {
-	// Ingore the workspace ID for now.
-	fns, err := w.q.GetAppFunctionsBySlug(ctx, appID)
+	return w.GetFunctionsByApp(ctx, cqrs.GetFunctionsByAppOpts{
+		WorkspaceID: workspaceID,
+		AppName:     appID,
+	})
+}
+
+func (w wrapper) GetFunctionsByApp(ctx context.Context, opts cqrs.GetFunctionsByAppOpts) ([]*cqrs.Function, error) {
+	// Ignore the workspace ID for now.
+	fns, err := w.q.GetFunctionsByApp(ctx, dbpkg.GetFunctionsByAppParams{
+		AppID:     opts.AppID,
+		AppName:   opts.AppName,
+		Cursor:    opts.Cursor,
+		LimitRows: int64(opts.Limit),
+	})
 	if err != nil {
 		return nil, err
 	}

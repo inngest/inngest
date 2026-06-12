@@ -1009,6 +1009,61 @@ func (q *Queries) GetFunctions(ctx context.Context) ([]*Function, error) {
 	return items, nil
 }
 
+const getFunctionsByApp = `-- name: GetFunctionsByApp :many
+SELECT functions.id, functions.app_id, functions.name, functions.slug, functions.config, functions.created_at, functions.archived_at FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE ($1::uuid = '00000000-0000-0000-0000-000000000000'::uuid OR functions.app_id = $1::uuid::text)
+  AND ($2::text = '' OR apps.name = $2::text)
+  AND ($3::uuid = '00000000-0000-0000-0000-000000000000'::uuid OR functions.id > $3::uuid::text)
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL
+ORDER BY functions.id ASC
+LIMIT CASE WHEN $4::int > 0 THEN $4::int END
+`
+
+type GetFunctionsByAppParams struct {
+	AppID     uuid.UUID
+	AppName   string
+	Cursor    uuid.UUID
+	LimitRows int32
+}
+
+func (q *Queries) GetFunctionsByApp(ctx context.Context, arg GetFunctionsByAppParams) ([]*Function, error) {
+	rows, err := q.db.QueryContext(ctx, getFunctionsByApp,
+		arg.AppID,
+		arg.AppName,
+		arg.Cursor,
+		arg.LimitRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Function
+	for rows.Next() {
+		var i Function
+		if err := rows.Scan(
+			&i.ID,
+			&i.AppID,
+			&i.Name,
+			&i.Slug,
+			&i.Config,
+			&i.CreatedAt,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getHistoryItem = `-- name: GetHistoryItem :one
 SELECT id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result, step_type FROM history WHERE id = $1
 `

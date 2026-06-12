@@ -1084,7 +1084,10 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create functions for TARGET app
-	targetFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	targetFnIDs := []uuid.UUID{
+		uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+	}
 	for i, fnID := range targetFnIDs {
 		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
@@ -1100,7 +1103,10 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	}
 
 	// Create functions for OTHER app (should NOT be returned)
-	otherFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	otherFnIDs := []uuid.UUID{
+		uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+	}
 	for i, fnID := range otherFnIDs {
 		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
@@ -1157,6 +1163,18 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 		functions, err := cm.GetFunctionsByAppExternalID(ctx, workspaceID, "non-existent-app")
 		require.NoError(t, err)
 		assert.Empty(t, functions, "Should return empty result for non-existent app")
+	})
+
+	t.Run("pages functions for target app in id order", func(t *testing.T) {
+		functions, err := cm.GetFunctionsByApp(ctx, cqrs.GetFunctionsByAppOpts{
+			WorkspaceID: workspaceID,
+			AppName:     targetAppExternalID,
+			Cursor:      targetFnIDs[0],
+			Limit:       1,
+		})
+		require.NoError(t, err)
+		require.Len(t, functions, 1)
+		require.Equal(t, targetFnIDs[1], functions[0].ID)
 	})
 }
 

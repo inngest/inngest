@@ -210,6 +210,55 @@ func TestNewFunctionProviderErrors(t *testing.T) {
 	})
 }
 
+func TestNewFunctionProviderPagesFunctionsInReader(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	firstID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	secondID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	thirdID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	store := &fakeFunctionStore{
+		fns: []*cqrs.Function{
+			{
+				ID:     firstID,
+				AppID:  appID,
+				Slug:   "app-first-fn",
+				Config: []byte(`{"name":"First function","slug":"first-fn"}`),
+			},
+			{
+				ID:     secondID,
+				AppID:  appID,
+				Slug:   "app-second-fn",
+				Config: []byte(`{"name":"Second function","slug":"second-fn"}`),
+			},
+			{
+				ID:     thirdID,
+				AppID:  appID,
+				Slug:   "app-third-fn",
+				Config: []byte(`{"name":"Third function","slug":"third-fn"}`),
+			},
+		},
+		app: &cqrs.App{
+			ID:   appID,
+			Name: "app",
+		},
+	}
+
+	result, err := NewFunctionProvider(store).GetFunctions(ctx, "app", apiv2.GetFunctionsOpts{
+		Cursor: firstID,
+		Limit:  1,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, store.functionOpts)
+	require.Equal(t, consts.DevServerEnvID, store.functionOpts.WorkspaceID)
+	require.Equal(t, "app", store.functionOpts.AppName)
+	require.Equal(t, firstID, store.functionOpts.Cursor)
+	require.Equal(t, 2, store.functionOpts.Limit)
+	require.Len(t, result.Functions, 1)
+	require.Equal(t, secondID, result.Functions[0].ID)
+	require.True(t, result.HasMore)
+}
+
 func TestFunctionRunReader(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 	eventID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cz")
@@ -267,10 +316,11 @@ func TestFunctionTraceReader(t *testing.T) {
 }
 
 type fakeFunctionStore struct {
-	fns    []*cqrs.Function
-	fnByID map[uuid.UUID]*cqrs.Function
-	app    *cqrs.App
-	err    error
+	fns          []*cqrs.Function
+	fnByID       map[uuid.UUID]*cqrs.Function
+	app          *cqrs.App
+	err          error
+	functionOpts *cqrs.GetFunctionsByAppOpts
 }
 
 func (f *fakeFunctionStore) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
@@ -294,6 +344,28 @@ func (f *fakeFunctionStore) GetFunctionsByAppExternalID(ctx context.Context, wor
 	for _, fn := range f.fnByID {
 		if fn.AppID == f.app.ID {
 			fns = append(fns, fn)
+		}
+	}
+	return fns, nil
+}
+
+func (f *fakeFunctionStore) GetFunctionsByApp(ctx context.Context, opts cqrs.GetFunctionsByAppOpts) ([]*cqrs.Function, error) {
+	f.functionOpts = &opts
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.app == nil || f.app.Name != opts.AppName {
+		return nil, nil
+	}
+
+	fns := []*cqrs.Function{}
+	for _, fn := range f.fns {
+		if fn.AppID != f.app.ID || fn.ID.String() <= opts.Cursor.String() {
+			continue
+		}
+		fns = append(fns, fn)
+		if len(fns) == opts.Limit {
+			break
 		}
 	}
 	return fns, nil

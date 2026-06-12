@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
@@ -26,6 +28,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	defaultFunctionsLimit = 20
+	maxFunctionsLimit     = 100
 )
 
 func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest) (*apiv2.GetFunctionResponse, error) {
@@ -55,6 +62,51 @@ func (s *Service) GetFunction(ctx context.Context, req *apiv2.GetFunctionRequest
 	return s.getFunctionResponse(ctx, fn), nil
 }
 
+func (s *Service) GetFunctions(ctx context.Context, req *apiv2.GetFunctionsRequest) (*apiv2.GetFunctionsResponse, error) {
+	if req.AppId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID is required")
+	}
+
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetFunctions_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no functions were fetched.")
+	}
+
+	if s.functions == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get functions is not yet implemented")
+	}
+
+	cursor, limit, err := functionsPageOpts(req.GetCursor(), req.GetLimit())
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
+
+	appID := decodePathParam(req.AppId)
+	result, err := s.functions.GetFunctions(ctx, appID, GetFunctionsOpts{
+		Cursor: cursor,
+		Limit:  limit,
+	})
+	if err != nil {
+		logger.From(ctx).Error("unable to fetch functions", "error", err)
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch functions")
+	}
+	if result == nil {
+		result = &GetFunctionsResult{}
+	}
+
+	data := make([]*apiv2.Function, 0, len(result.Functions))
+	for _, fn := range result.Functions {
+		fn.Function.Slug = publicFunctionID(appID, "", fn)
+		data = append(data, toFunction(fn, s.planConcurrencyLimit(ctx, fn)))
+	}
+
+	return &apiv2.GetFunctionsResponse{
+		Data:     data,
+		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
+		Page:     functionsPage(result.Functions, limit, result.HasMore),
+	}, nil
+}
+
 func (s *Service) getFunctionError(err error) error {
 	if errors.Is(err, ErrFunctionNotFound) {
 		return s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Function not found")
@@ -67,6 +119,50 @@ func (s *Service) getFunctionResponse(ctx context.Context, fn inngest.DeployedFu
 		Data:     toFunction(fn, s.planConcurrencyLimit(ctx, fn)),
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 	}
+}
+
+func functionsPageOpts(cursor string, requestedLimit int32) (uuid.UUID, int, error) {
+	limit := int(requestedLimit)
+	if limit == 0 {
+		limit = defaultFunctionsLimit
+	}
+	if limit < 1 {
+		return uuid.Nil, 0, fmt.Errorf("Limit must be at least 1")
+	}
+	if limit > maxFunctionsLimit {
+		return uuid.Nil, 0, fmt.Errorf("Limit cannot exceed %d", maxFunctionsLimit)
+	}
+
+	parsedCursor := uuid.Nil
+	if cursor != "" {
+		decodedCursor, err := decodeFunctionsCursor(cursor)
+		if err != nil {
+			return uuid.Nil, 0, fmt.Errorf("Cursor is invalid")
+		}
+		parsedCursor = decodedCursor
+	}
+
+	return parsedCursor, limit, nil
+}
+
+func functionsPage(functions []inngest.DeployedFunction, limit int, hasMore bool) *apiv2.Page {
+	page := &apiv2.Page{
+		HasMore: hasMore,
+		Limit:   int32(limit),
+	}
+	if hasMore && len(functions) > 0 {
+		nextCursor := encodeFunctionsCursor(functions[len(functions)-1].ID)
+		page.Cursor = &nextCursor
+	}
+	return page
+}
+
+func encodeFunctionsCursor(functionID uuid.UUID) string {
+	return functionID.String()
+}
+
+func decodeFunctionsCursor(cursor string) (uuid.UUID, error) {
+	return uuid.Parse(cursor)
 }
 
 // InvokeFunction invokes a function either synchronously or asynchronously.

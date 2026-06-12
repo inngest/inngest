@@ -10,20 +10,8 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
-
-type FunctionProvider interface {
-	// GetFunction returns a function given its slug OR ID.
-	GetFunction(ctx context.Context, identifier string) (inngest.DeployedFunction, error)
-	// GetFunctionByApp returns a function given its app ID and user-defined function ID.
-	GetFunctionByApp(ctx context.Context, appID string, functionID string) (inngest.DeployedFunction, error)
-}
-
-type FunctionConfigProvider interface {
-	PlanConcurrencyLimit(ctx context.Context, fn inngest.DeployedFunction) int
-}
 
 type FunctionScheduler interface {
 	// Schedule initializes a new function run, ensuring that the function will be

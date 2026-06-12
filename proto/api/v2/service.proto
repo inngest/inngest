@@ -1107,6 +1107,24 @@ service V2 {
     };
   }
 
+  rpc GetFunctions(GetFunctionsRequest) returns (GetFunctionsResponse) {
+    option (google.api.http) = {
+      get: "/apps/{app_id}/functions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get functions"
+      description: "Lists function configuration and status details for an app"
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/{function_id}/invoke",
@@ -1847,6 +1865,27 @@ message GetFunctionRequest {
 message GetFunctionResponse {
   Function data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message GetFunctionsRequest {
+  string app_id = 1;
+  optional string cursor = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of functions to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message GetFunctionsResponse {
+  repeated Function data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
 }
 
 message CreateAccountRequest {

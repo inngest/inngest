@@ -167,6 +167,19 @@ func (sq *sqliteQuerier) GetAppFunctionsBySlug(ctx context.Context, name string)
 	return convertSlice(rows, functionFromSQLite), nil
 }
 
+func (sq *sqliteQuerier) GetFunctionsByApp(ctx context.Context, arg db.GetFunctionsByAppParams) ([]*db.Function, error) {
+	rows, err := sq.q.GetFunctionsByApp(ctx, sqlc.GetFunctionsByAppParams{
+		AppID:     arg.AppID,
+		AppName:   arg.AppName,
+		Cursor:    arg.Cursor,
+		LimitRows: arg.LimitRows,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromSQLite), nil
+}
+
 func (sq *sqliteQuerier) GetFunctionByID(ctx context.Context, id uuid.UUID) (*db.Function, error) {
 	r, err := sq.q.GetFunctionByID(ctx, id)
 	if err != nil {

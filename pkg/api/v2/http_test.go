@@ -212,6 +212,58 @@ func TestHTTPGateway_GetFunction(t *testing.T) {
 	require.Equal(t, float64(retries), retryConfiguration["value"])
 }
 
+func TestHTTPGateway_GetFunctions(t *testing.T) {
+	ctx := context.Background()
+	firstID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	fn := inngest.DeployedFunction{
+		ID:      firstID,
+		Slug:    "my-app-test-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+			Steps: []inngest.Step{{
+				ID: "step",
+			}},
+		},
+	}
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunctions", mock.Anything, "my-app", GetFunctionsOpts{
+		Limit: 1,
+	}).Return(&GetFunctionsResult{
+		Functions: []inngest.DeployedFunction{fn},
+		HasMore:   true,
+	}, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Functions: functions}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		functions.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions?limit=1", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	data := body["data"].([]any)
+	item := data[0].(map[string]any)
+	require.Equal(t, "test-fn", item["id"])
+	require.Equal(t, "Test function", item["name"])
+
+	page := body["page"].(map[string]any)
+	require.True(t, page["hasMore"].(bool))
+	require.Equal(t, firstID.String(), page["cursor"])
+	require.Equal(t, float64(1), page["limit"])
+}
+
 func TestHTTPGateway_Middleware(t *testing.T) {
 	ctx := context.Background()
 
