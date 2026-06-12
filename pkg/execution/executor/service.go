@@ -646,7 +646,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
-	if err != nil && err != queue.ErrQueueItemExists {
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 		return err
 	}
 	l.Info("re-enqueued eager cancellation of finish timeout", "requeueAt", requeueAt)
@@ -732,7 +732,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
-	if err != nil && err != queue.ErrQueueItemExists {
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 		return err
 	}
 	l.Info("re-enqueued eager cancellation of start timeout", "requeueAt", requeueAt)

@@ -3,6 +3,8 @@ package queue
 import (
 	"errors"
 	"fmt"
+
+	"github.com/oklog/ulid/v2"
 )
 
 var ErrQueueItemThrottled = fmt.Errorf("queue item throttled")
@@ -36,6 +38,23 @@ func (k KeyError) Error() string {
 
 func (k KeyError) Unwrap() error {
 	return k.cause
+}
+
+// QueueItemExistsError is a wrapper for ErrQueueItemExists.
+// RunID is the owning run of the existing item, or nil
+// when the duplicate is a post-dequeue tombstone.
+type QueueItemExistsError struct {
+	JobID string
+	RunID *ulid.ULID
+}
+
+func (e QueueItemExistsError) Error() string { return ErrQueueItemExists.Error() }
+func (e QueueItemExistsError) Unwrap() error { return ErrQueueItemExists }
+
+// QueueItemExists returns a QueueItemExistsError. Pass nil runID when the
+// duplicate is a tombstone with no live runID.
+func QueueItemExists(jobID string, runID *ulid.ULID) error {
+	return QueueItemExistsError{JobID: jobID, RunID: runID}
 }
 
 var (
