@@ -727,7 +727,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Apps:                NewAppProvider(dbcqrs),
 		Functions:           NewFunctionProvider(dbcqrs),
-		Runs:                NewRunProvider(dbcqrs, adapter.Q()),
+		Runs:                NewRunProvider(dbcqrs, adapter.Q(), exec),
 		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,

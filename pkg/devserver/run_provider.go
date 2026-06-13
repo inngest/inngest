@@ -2,16 +2,21 @@ package devserver
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
+	"github.com/inngest/inngest/pkg/consts"
 	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
@@ -19,20 +24,28 @@ import (
 )
 
 type runProvider struct {
-	spans runSpanReader
-	q     db.Querier
+	data      runProviderDataReader
+	q         db.Querier
+	scheduler apiv2.FunctionScheduler
+}
+
+type runProviderDataReader interface {
+	runSpanReader
+	GetFunctionRun(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, runID ulid.ULID) (*cqrs.FunctionRun, error)
+	GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error)
+	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error)
 }
 
 type runSpanReader interface {
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error)
 }
 
-func NewRunProvider(spans runSpanReader, q db.Querier) apiv2.RunProvider {
-	return &runProvider{spans: spans, q: q}
+func NewRunProvider(data runProviderDataReader, q db.Querier, scheduler apiv2.FunctionScheduler) apiv2.RunProvider {
+	return &runProvider{data: data, q: q, scheduler: scheduler}
 }
 
 func (p *runProvider) GetRun(ctx context.Context, runID ulid.ULID, _ apiv2.GetRunOpts) (*cqrs.FunctionRun, error) {
-	return functionRunFromSpan(ctx, p.spans, runID)
+	return functionRunFromSpan(ctx, p.data, runID)
 }
 
 func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*apiv2.GetRunsResult, error) {
@@ -60,6 +73,71 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		Runs:    runs,
 		HasMore: hasMore,
 	}, nil
+}
+
+func (p *runProvider) Rerun(ctx context.Context, runID ulid.ULID, opts apiv2.RerunOpts) (ulid.ULID, error) {
+	fnrun, err := p.data.GetFunctionRun(ctx, consts.DevServerAccountID, consts.DevServerEnvID, runID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ulid.ULID{}, apiv2.ErrRunNotFound
+		}
+		return ulid.ULID{}, err
+	}
+
+	fnCQRS, err := p.data.GetFunctionByInternalUUID(ctx, fnrun.FunctionID)
+	if err != nil {
+		return ulid.ULID{}, err
+	}
+
+	fn, err := fnCQRS.InngestFunction()
+	if err != nil {
+		return ulid.ULID{}, err
+	}
+
+	evt, err := p.data.GetEventByInternalID(ctx, fnrun.EventID)
+	if err != nil {
+		return ulid.ULID{}, fmt.Errorf("failed to get run event: %w", err)
+	}
+
+	var fromStep *execution.ScheduleRequestFromStep
+	if opts.FromStep != nil {
+		fromStep = &execution.ScheduleRequestFromStep{
+			StepID: opts.FromStep.StepID,
+		}
+
+		if len(opts.FromStep.Input) > 0 {
+			if opts.FromStep.Input[0] != '[' {
+				return ulid.ULID{}, fmt.Errorf("input is not a valid JSON array")
+			}
+			fromStep.Input = json.RawMessage(opts.FromStep.Input)
+		}
+	}
+
+	originalRunID := &fnrun.RunID
+	if fnrun.OriginalRunID != nil {
+		originalRunID = fnrun.OriginalRunID
+	}
+
+	newRunID, _, err := p.scheduler.Schedule(ctx, execution.ScheduleRequest{
+		Function: *fn,
+		AppID:    fnCQRS.AppID,
+		Events: []event.TrackedEvent{
+			event.NewBaseTrackedEventWithID(evt.Event(), evt.InternalID()),
+		},
+		OriginalRunID:    originalRunID,
+		AccountID:        consts.DevServerAccountID,
+		FromStep:         fromStep,
+		WorkspaceID:      consts.DevServerEnvID,
+		PreventRateLimit: true,
+	})
+	if err != nil {
+		return ulid.ULID{}, err
+	}
+	if newRunID == nil {
+		return ulid.ULID{}, fmt.Errorf("rerun did not return run ID")
+	}
+
+	return *newRunID, nil
 }
 
 func functionRunFromSpan(ctx context.Context, reader runSpanReader, runID ulid.ULID) (*cqrs.FunctionRun, error) {

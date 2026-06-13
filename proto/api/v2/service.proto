@@ -975,6 +975,25 @@ service V2 {
     };
   }
 
+  rpc Rerun(RerunRequest) returns (RerunResponse) {
+    option (google.api.http) = {
+      post: "/runs/{run_id}/rerun"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Rerun function run"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Creates a new run using the original run's triggering event data"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc GetApp(GetAppRequest) returns (GetAppResponse) {
     option (google.api.http) = {
       get: "/apps/{app_id}"
@@ -1835,6 +1854,40 @@ message GetEventRunsResponse {
   repeated FunctionRun data = 1;
   ResponseMetadata metadata = 2;
   Page page = 3;
+}
+
+message RerunRequest {
+  string run_id = 1;
+  optional RerunFromStep from_step = 2;
+}
+
+message RerunFromStep {
+  string step_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Step ID to rerun from"
+      example: "\"step-1\""
+    }
+  ];
+  optional google.protobuf.ListValue input = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional replacement step input as a JSON array"
+      example: "[{\"foo\": \"bar\"}]"
+    }
+  ];
+}
+
+message RerunResponse {
+  RerunData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message RerunData {
+  string run_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "New run ID created by the rerun"
+      example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
+    }
+  ];
 }
 
 message TraceSpanMetadata {
