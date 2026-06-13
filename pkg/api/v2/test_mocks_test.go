@@ -13,6 +13,7 @@ var _ AppProvider = (*mockAppProvider)(nil)
 var _ FunctionProvider = (*mockFunctionProvider)(nil)
 var _ RunProvider = (*mockRunProvider)(nil)
 var _ FunctionTraceReader = (*mockFunctionTraceReader)(nil)
+var _ RateLimitProvider = (*mockRateLimitProvider)(nil)
 
 type mockAppProvider struct {
 	mock.Mock
@@ -62,6 +63,12 @@ func (m *mockRunProvider) GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRu
 	return result, args.Error(1)
 }
 
+func (m *mockRunProvider) Rerun(ctx context.Context, runID ulid.ULID, opts RerunOpts) (ulid.ULID, error) {
+	args := m.Called(ctx, runID, opts)
+	runID, _ = args.Get(0).(ulid.ULID)
+	return runID, args.Error(1)
+}
+
 type mockFunctionTraceReader struct {
 	mock.Mock
 }
@@ -76,4 +83,14 @@ func (m *mockFunctionTraceReader) GetSpanOutput(ctx context.Context, id cqrs.Spa
 	args := m.Called(ctx, id)
 	output, _ := args.Get(0).(*cqrs.SpanOutput)
 	return output, args.Error(1)
+}
+
+type mockRateLimitProvider struct {
+	mock.Mock
+}
+
+func (m *mockRateLimitProvider) CheckRateLimit(ctx context.Context, method string) RateLimitResult {
+	args := m.Called(ctx, method)
+	result, _ := args.Get(0).(RateLimitResult)
+	return result
 }

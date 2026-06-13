@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -1067,6 +1068,115 @@ func TestService_GetEventRuns(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Limit cannot exceed 40")
+	})
+}
+
+func TestService_Rerun(t *testing.T) {
+	runID := ulid.MustParse("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	newRunID := ulid.MustParse("01BX5ZZKBKACTAV9WEVGEMMVRZ")
+
+	t.Run("reruns a run", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(newRunID, nil).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, newRunID.String(), resp.Data.RunId)
+		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("rejects from step opts", func(t *testing.T) {
+		input, err := structpb.NewList([]any{map[string]any{"foo": "bar"}})
+		require.NoError(t, err)
+
+		rerun := &mockRunProvider{}
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+			FromStep: &apiv2.RerunFromStep{
+				StepId: "step-1",
+				Input:  input,
+			},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Rerun from step is not yet implemented")
+	})
+
+	t.Run("requires run id", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run ID is required")
+	})
+
+	t.Run("validates run id format", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: "not-a-ulid",
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run ID must be a valid ULID")
+	})
+
+	t.Run("rejects empty from step opts", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId:    runID.String(),
+			FromStep: &apiv2.RerunFromStep{},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Rerun from step is not yet implemented")
+	})
+
+	t.Run("maps missing run", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(ulid.ULID{}, ErrRunNotFound).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run not found")
+	})
+
+	t.Run("applies rate limit", func(t *testing.T) {
+		rateLimiter := &mockRateLimitProvider{}
+		rateLimiter.On("CheckRateLimit", mock.Anything, apiv2.V2_Rerun_FullMethodName).
+			Return(RateLimitResult{Limited: true}).Once()
+		t.Cleanup(func() {
+			rateLimiter.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Runs:              &mockRunProvider{},
+			RateLimitProvider: rateLimiter,
+		})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "API rate limit exceeded")
 	})
 }
 

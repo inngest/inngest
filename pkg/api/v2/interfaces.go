@@ -103,6 +103,16 @@ type GetRunsResult struct {
 type RunProvider interface {
 	GetRun(ctx context.Context, runID ulid.ULID, opts GetRunOpts) (*cqrs.FunctionRun, error)
 	GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error)
+	Rerun(ctx context.Context, runID ulid.ULID, opts RerunOpts) (ulid.ULID, error)
+}
+
+type RerunOpts struct {
+	FromStep *RerunFromStep
+}
+
+type RerunFromStep struct {
+	StepID string
+	Input  json.RawMessage
 }
 
 type FunctionTraceReader interface {

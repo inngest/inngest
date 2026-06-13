@@ -3,6 +3,7 @@ package apiv2
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -109,6 +110,46 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 		Data:     data,
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 		Page:     runsPage(result.Runs, limit, result.HasMore),
+	}, nil
+}
+
+func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.RerunResponse, error) {
+	if req.RunId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Run ID is required")
+	}
+
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_Rerun_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no run was rerun.")
+	}
+
+	if s.runs == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Rerun is not yet implemented")
+	}
+
+	runID, err := ulid.Parse(req.RunId)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
+	}
+
+	if req.FromStep != nil {
+		// TODO: Re-enable once rerun from step reconstruction is fully implemented.
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Rerun from step is not yet implemented")
+	}
+
+	newRunID, err := s.runs.Rerun(ctx, runID, RerunOpts{})
+	if err != nil {
+		if errors.Is(err, ErrRunNotFound) {
+			return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Run not found")
+		}
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to rerun run")
+	}
+
+	return &apiv2.RerunResponse{
+		Data: &apiv2.RerunData{
+			RunId: newRunID.String(),
+		},
+		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 	}, nil
 }
 
