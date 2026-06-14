@@ -328,7 +328,7 @@ func TestNewAppProvider(t *testing.T) {
 	})
 }
 
-func TestFunctionRunReader(t *testing.T) {
+func TestFunctionRunFromSpan(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 	eventID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cz")
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
@@ -353,7 +353,7 @@ func TestFunctionRunReader(t *testing.T) {
 	}
 	reader := &fakeTraceReader{root: root}
 
-	result, err := NewFunctionRunReader(reader).GetFunctionRun(context.Background(), runID, apiv2.GetFunctionRunOpts{})
+	result, err := functionRunFromSpan(context.Background(), reader, runID)
 
 	require.NoError(t, err)
 	require.Equal(t, runID, result.RunID)
