@@ -40,7 +40,7 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 	}
 
 	includeOutput := req.GetIncludeOutput()
-	run, err := s.runs.GetFunctionRun(ctx, runID, GetFunctionRunOpts{
+	run, err := s.runs.GetRun(ctx, runID, GetRunOpts{
 		IncludeOutput: includeOutput,
 	})
 	if err != nil {
@@ -73,7 +73,7 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 			"API rate limit exceeded. The request was rejected and no event runs were fetched.")
 	}
 
-	if s.runList == nil {
+	if s.runs == nil {
 		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get event runs is not yet implemented")
 	}
 
@@ -87,7 +87,7 @@ func (s *Service) GetEventRuns(ctx context.Context, req *apiv2.GetEventRunsReque
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
 	}
 
-	result, err := s.runList.GetRuns(ctx, GetRunsOpts{
+	result, err := s.runs.GetRuns(ctx, GetRunsOpts{
 		EventID:       eventID,
 		Cursor:        cursor,
 		Limit:         limit,

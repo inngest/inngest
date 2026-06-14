@@ -123,12 +123,12 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	}
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
-	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(functionRun, nil).Once()
+	runs := &mockRunProvider{}
+	runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(functionRun, nil).Once()
 
 	handler, err := newTestHTTPHandler(ctx, ServiceOptions{
-		Functions:    functions,
-		FunctionRuns: runs,
+		Functions: functions,
+		Runs:      runs,
 	}, HTTPHandlerOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
