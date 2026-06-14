@@ -101,6 +101,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 			constraints: PartitionConstraintConfig{
 				FunctionVersion: 1,
 				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
 					Limit:                     10,
 					Burst:                     5,
 					Period:                    60,
@@ -117,6 +118,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
+						Scope:             enums.ThrottleScopeEnv,
 						Limit:             10,
 						Burst:             5,
 						Period:            60,
@@ -144,6 +146,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 					},
 				},
 				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeAccount,
 					Limit:                     20,
 					Burst:                     10,
 					Period:                    30,
@@ -168,6 +171,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
+						Scope:             enums.ThrottleScopeAccount,
 						Limit:             20,
 						Burst:             10,
 						Period:            30,
@@ -237,6 +241,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 			},
 			constraints: PartitionConstraintConfig{
 				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
 					Limit:                     10,
 					Burst:                     5,
 					Period:                    60,
@@ -261,6 +266,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindThrottle,
 					Throttle: &constraintapi.ThrottleConstraint{
+						Scope:             enums.ThrottleScopeEnv,
 						KeyExpressionHash: "throttle-expr-hash",
 						EvaluatedKeyHash:  "throttle-key-value",
 					},

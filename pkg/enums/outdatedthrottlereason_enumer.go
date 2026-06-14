@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _OutdatedThrottleReasonName = "nonemissing_item_throttlemissing_constraintkey_expression_mismatchmissing_key_expression_hash"
+const _OutdatedThrottleReasonName = "nonemissing_item_throttlemissing_constraintkey_expression_mismatchmissing_key_expression_hashscope_mismatch"
 
-var _OutdatedThrottleReasonIndex = [...]uint8{0, 4, 25, 43, 66, 93}
+var _OutdatedThrottleReasonIndex = [...]uint8{0, 4, 25, 43, 66, 93, 107}
 
-const _OutdatedThrottleReasonLowerName = "nonemissing_item_throttlemissing_constraintkey_expression_mismatchmissing_key_expression_hash"
+const _OutdatedThrottleReasonLowerName = "nonemissing_item_throttlemissing_constraintkey_expression_mismatchmissing_key_expression_hashscope_mismatch"
 
 func (i OutdatedThrottleReason) String() string {
 	if i < 0 || i >= OutdatedThrottleReason(len(_OutdatedThrottleReasonIndex)-1) {
@@ -30,21 +30,24 @@ func _OutdatedThrottleReasonNoOp() {
 	_ = x[OutdatedThrottleReasonMissingConstraint-(2)]
 	_ = x[OutdatedThrottleReasonKeyExpressionMismatch-(3)]
 	_ = x[OutdatedThrottleReasonMissingKeyExpressionHash-(4)]
+	_ = x[OutdatedThrottleReasonScopeMismatch-(5)]
 }
 
-var _OutdatedThrottleReasonValues = []OutdatedThrottleReason{OutdatedThrottleReasonNone, OutdatedThrottleReasonMissingItemThrottle, OutdatedThrottleReasonMissingConstraint, OutdatedThrottleReasonKeyExpressionMismatch, OutdatedThrottleReasonMissingKeyExpressionHash}
+var _OutdatedThrottleReasonValues = []OutdatedThrottleReason{OutdatedThrottleReasonNone, OutdatedThrottleReasonMissingItemThrottle, OutdatedThrottleReasonMissingConstraint, OutdatedThrottleReasonKeyExpressionMismatch, OutdatedThrottleReasonMissingKeyExpressionHash, OutdatedThrottleReasonScopeMismatch}
 
 var _OutdatedThrottleReasonNameToValueMap = map[string]OutdatedThrottleReason{
-	_OutdatedThrottleReasonName[0:4]:        OutdatedThrottleReasonNone,
-	_OutdatedThrottleReasonLowerName[0:4]:   OutdatedThrottleReasonNone,
-	_OutdatedThrottleReasonName[4:25]:       OutdatedThrottleReasonMissingItemThrottle,
-	_OutdatedThrottleReasonLowerName[4:25]:  OutdatedThrottleReasonMissingItemThrottle,
-	_OutdatedThrottleReasonName[25:43]:      OutdatedThrottleReasonMissingConstraint,
-	_OutdatedThrottleReasonLowerName[25:43]: OutdatedThrottleReasonMissingConstraint,
-	_OutdatedThrottleReasonName[43:66]:      OutdatedThrottleReasonKeyExpressionMismatch,
-	_OutdatedThrottleReasonLowerName[43:66]: OutdatedThrottleReasonKeyExpressionMismatch,
-	_OutdatedThrottleReasonName[66:93]:      OutdatedThrottleReasonMissingKeyExpressionHash,
-	_OutdatedThrottleReasonLowerName[66:93]: OutdatedThrottleReasonMissingKeyExpressionHash,
+	_OutdatedThrottleReasonName[0:4]:         OutdatedThrottleReasonNone,
+	_OutdatedThrottleReasonLowerName[0:4]:    OutdatedThrottleReasonNone,
+	_OutdatedThrottleReasonName[4:25]:        OutdatedThrottleReasonMissingItemThrottle,
+	_OutdatedThrottleReasonLowerName[4:25]:   OutdatedThrottleReasonMissingItemThrottle,
+	_OutdatedThrottleReasonName[25:43]:       OutdatedThrottleReasonMissingConstraint,
+	_OutdatedThrottleReasonLowerName[25:43]:  OutdatedThrottleReasonMissingConstraint,
+	_OutdatedThrottleReasonName[43:66]:       OutdatedThrottleReasonKeyExpressionMismatch,
+	_OutdatedThrottleReasonLowerName[43:66]:  OutdatedThrottleReasonKeyExpressionMismatch,
+	_OutdatedThrottleReasonName[66:93]:       OutdatedThrottleReasonMissingKeyExpressionHash,
+	_OutdatedThrottleReasonLowerName[66:93]:  OutdatedThrottleReasonMissingKeyExpressionHash,
+	_OutdatedThrottleReasonName[93:107]:      OutdatedThrottleReasonScopeMismatch,
+	_OutdatedThrottleReasonLowerName[93:107]: OutdatedThrottleReasonScopeMismatch,
 }
 
 var _OutdatedThrottleReasonNames = []string{
@@ -53,6 +56,7 @@ var _OutdatedThrottleReasonNames = []string{
 	_OutdatedThrottleReasonName[25:43],
 	_OutdatedThrottleReasonName[43:66],
 	_OutdatedThrottleReasonName[66:93],
+	_OutdatedThrottleReasonName[93:107],
 }
 
 // OutdatedThrottleReasonString retrieves an enum value from the enum constants string name.

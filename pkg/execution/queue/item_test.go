@@ -1,11 +1,14 @@
 package queue
 
 import (
+	"context"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/assert"
@@ -169,6 +172,64 @@ func TestDelay(t *testing.T) {
 			require.Equal(t, test.expectedExpectedDelay, test.qi.ExpectedDelay())
 			require.Equal(t, test.expectedRefillDelay, test.qi.RefillDelay())
 			require.Equal(t, test.expectedLeaseDelay, test.qi.LeaseDelay(test.now))
+		})
+	}
+}
+
+func TestGetThrottleConfigScopedKeys(t *testing.T) {
+	ctx := context.Background()
+	accountID := uuid.New()
+	envID := uuid.New()
+	fnID := uuid.New()
+	id := sv2.ID{
+		FunctionID: fnID,
+		Tenant: sv2.Tenant{
+			AccountID: accountID,
+			EnvID:     envID,
+		},
+	}
+
+	keyExpr := "event.data.provider"
+	tests := []struct {
+		name       string
+		scope      enums.ThrottleScope
+		wantPrefix string
+	}{
+		{
+			name:       "function scope uses function id prefix",
+			scope:      enums.ThrottleScopeFn,
+			wantPrefix: HashID(ctx, fnID.String()),
+		},
+		{
+			name:       "environment scope uses environment id prefix",
+			scope:      enums.ThrottleScopeEnv,
+			wantPrefix: HashID(ctx, envID.String()),
+		},
+		{
+			name:       "account scope uses account id prefix",
+			scope:      enums.ThrottleScopeAccount,
+			wantPrefix: HashID(ctx, accountID.String()),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetThrottleConfig(ctx, id, &inngest.Throttle{
+				Limit:  10,
+				Period: time.Minute,
+				Scope:  tt.scope,
+				Key:    &keyExpr,
+			}, map[string]any{
+				"data": map[string]any{
+					"provider": "provider-a",
+				},
+			})
+
+			require.NotNil(t, got)
+			require.Equal(t, tt.scope, got.Scope)
+			require.Equal(t, tt.wantPrefix+"-"+HashID(ctx, "provider-a"), got.Key)
+			require.Equal(t, "provider-a", got.UnhashedThrottleKey)
+			require.Equal(t, util.XXHash(keyExpr), got.KeyExpressionHash)
 		})
 	}
 }
@@ -418,6 +479,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 					Limit:  50,
 					Burst:  10,
 					Period: 90 * time.Second,
+					Scope:  enums.ThrottleScopeAccount,
 					Key:    stringPtr("event.organization.slug"),
 				},
 			},
@@ -448,7 +510,7 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 						Limit:             50,
 						Burst:             10,
 						Period:            90,
-						Scope:             enums.ThrottleScopeFn,
+						Scope:             enums.ThrottleScopeAccount,
 						KeyExpressionHash: util.XXHash("event.organization.slug"),
 					},
 				},

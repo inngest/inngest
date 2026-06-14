@@ -79,6 +79,25 @@ func TestOutdatedThrottle(t *testing.T) {
 			},
 			expected: enums.OutdatedThrottleReasonKeyExpressionMismatch,
 		},
+		{
+			name: "changed throttle scope",
+			constraint: &osqueue.PartitionThrottle{
+				Scope:                     enums.ThrottleScopeEnv,
+				ThrottleKeyExpressionHash: util.XXHash("event.data.customerID"),
+				Limit:                     10,
+				Burst:                     1,
+				Period:                    60,
+			},
+			item: &osqueue.Throttle{
+				Key:               util.XXHash("user1"),
+				Scope:             enums.ThrottleScopeFn,
+				KeyExpressionHash: util.XXHash("event.data.customerID"),
+				Limit:             10,
+				Burst:             1,
+				Period:            60,
+			},
+			expected: enums.OutdatedThrottleReasonScopeMismatch,
+		},
 	}
 
 	for _, tc := range cases {
