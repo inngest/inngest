@@ -264,18 +264,29 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 
 func (t Throttle) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Limit  uint                `json:"limit"`
-		Period string              `json:"period"`
-		Burst  uint                `json:"burst"`
-		Scope  enums.ThrottleScope `json:"scope,omitempty"`
-		Key    *string             `json:"key,omitempty"`
+		Limit  uint    `json:"limit"`
+		Period string  `json:"period"`
+		Burst  uint    `json:"burst"`
+		Scope  string  `json:"scope,omitempty"`
+		Key    *string `json:"key,omitempty"`
 	}{
 		Limit:  t.Limit,
 		Period: str2duration.String(t.Period),
 		Burst:  t.Burst,
-		Scope:  t.Scope,
+		Scope:  throttleScopeString(t.Scope),
 		Key:    t.Key,
 	})
+}
+
+func throttleScopeString(scope enums.ThrottleScope) string {
+	switch scope {
+	case enums.ThrottleScopeEnv:
+		return "env"
+	case enums.ThrottleScopeAccount:
+		return "account"
+	default:
+		return ""
+	}
 }
 
 // Timeouts represents timeouts for the function. If any of the timeouts are hit, the function

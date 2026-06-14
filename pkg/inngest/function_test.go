@@ -557,6 +557,18 @@ func TestThrottleScopeJSON(t *testing.T) {
 		require.NoError(t, err)
 		require.JSONEq(t, `{"limit":10,"period":"1m","burst":2}`, string(got))
 	})
+
+	t.Run("marshals account scope using SDK value", func(t *testing.T) {
+		got, err := json.Marshal(Throttle{
+			Limit:  10,
+			Period: time.Minute,
+			Burst:  2,
+			Scope:  enums.ThrottleScopeAccount,
+		})
+
+		require.NoError(t, err)
+		require.JSONEq(t, `{"limit":10,"period":"1m","burst":2,"scope":"account"}`, string(got))
+	})
 }
 
 func strptr(s string) *string { return &s }
