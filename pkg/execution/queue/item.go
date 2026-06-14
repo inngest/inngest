@@ -395,6 +395,9 @@ type Throttle struct {
 	// Key is the unique throttling key that's used to group queue items when
 	// processing rate limiting/throttling.
 	Key string `json:"k"`
+	// Scope controls whether the throttle applies to this function, environment,
+	// or account.
+	Scope enums.ThrottleScope `json:"s,omitempty"`
 	// Limit is the actual rate limit
 	Limit int `json:"l"`
 	// Burst is the busrsable capacity of the rate limit
@@ -656,12 +659,20 @@ func HashID(_ context.Context, id string) string {
 	return strconv.FormatUint(ui, 36)
 }
 
-func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Throttle, evtMap map[string]any) *Throttle {
+func GetThrottleConfig(ctx context.Context, id sv2.ID, throttle *inngest.Throttle, evtMap map[string]any) *Throttle {
 	if throttle == nil {
 		return nil
 	}
 
-	unhashedThrottleKey := fnID.String()
+	scopeID := id.FunctionID
+	switch throttle.Scope {
+	case enums.ThrottleScopeAccount:
+		scopeID = id.Tenant.AccountID
+	case enums.ThrottleScopeEnv:
+		scopeID = id.Tenant.EnvID
+	}
+
+	unhashedThrottleKey := scopeID.String()
 	throttleKey := HashID(ctx, unhashedThrottleKey)
 	var throttleExpr string
 	if throttle.Key != nil {
@@ -675,6 +686,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 
 	return &Throttle{
 		Key:                 throttleKey,
+		Scope:               throttle.Scope,
 		Limit:               int(throttle.Limit),
 		Burst:               int(throttle.Burst),
 		Period:              int(throttle.Period.Seconds()),
@@ -776,7 +788,7 @@ func ConvertToConstraintConfiguration(accountConcurrency int, fn inngest.Functio
 			Limit:             int(fn.Throttle.Limit),
 			Burst:             int(fn.Throttle.Burst),
 			Period:            int(fn.Throttle.Period.Seconds()),
-			Scope:             enums.ThrottleScopeFn,
+			Scope:             fn.Throttle.Scope,
 			KeyExpressionHash: util.XXHash(throttleKey),
 		})
 	}

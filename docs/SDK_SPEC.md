@@ -743,6 +743,15 @@ A Sync’s payload MUST be the following JSON object:
       key?: string;
 
       /**
+       * An optional scope for the throttle group. By default, throttle limits are
+       * scoped to functions - one function's throttle does not impact other functions.
+       *
+       * Changing this "scope" allows throttle limits to work across environments
+       * or accounts for shared external quotas.
+       */
+      scope?: "fn" | "env" | "account";
+
+      /**
        * The maximum number of runs to allow per the given `period`.
        */
       limit: number;

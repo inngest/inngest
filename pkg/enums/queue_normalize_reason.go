@@ -16,4 +16,5 @@ const (
 	QueueNormalizeReasonThrottleKeyChanged
 	QueueNormalizeReasonCustomConcurrencyKeyCountMismatch
 	QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition
+	QueueNormalizeReasonThrottleScopeChanged
 )

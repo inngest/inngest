@@ -516,6 +516,18 @@ func toFunctionThrottleConfiguration(config *models.ThrottleConfiguration) *apiv
 		Key:    config.Key,
 		Limit:  int32(config.Limit),
 		Period: config.Period,
+		Scope:  toFunctionThrottleScope(config.Scope),
+	}
+}
+
+func toFunctionThrottleScope(scope models.ThrottleScope) apiv2.FunctionThrottleScope {
+	switch scope {
+	case models.ThrottleScopeAccount:
+		return apiv2.FunctionThrottleScope_FUNCTION_THROTTLE_SCOPE_ACCOUNT
+	case models.ThrottleScopeEnvironment:
+		return apiv2.FunctionThrottleScope_FUNCTION_THROTTLE_SCOPE_ENVIRONMENT
+	default:
+		return apiv2.FunctionThrottleScope_FUNCTION_THROTTLE_SCOPE_FUNCTION
 	}
 }
 
