@@ -176,29 +176,46 @@ func (h *ExpressionHandler) HasOutputFilters() bool {
 }
 
 func (h *ExpressionHandler) ToSQLFilters(ctx context.Context) ([]sq.Expression, error) {
+	eventFilters, err := h.ToEventSQLFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	outputFilters, err := h.ToOutputSQLFilters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return append(eventFilters, outputFilters...), nil
+}
+
+// ToEventSQLFilters returns SQL filter expressions derived only from event.* CEL predicates.
+// Callers that join the events table (for span-level aggregation queries) must use this
+// instead of ToSQLFilters so that output/error predicates are not inadvertently mixed in.
+func (h *ExpressionHandler) ToEventSQLFilters(ctx context.Context) ([]sq.Expression, error) {
+	return h.exprListToSQL(ctx, h.EventExprList)
+}
+
+// ToOutputSQLFilters returns SQL filter expressions derived only from output.*/error.* CEL
+// predicates (both map to the spans.output column).
+func (h *ExpressionHandler) ToOutputSQLFilters(ctx context.Context) ([]sq.Expression, error) {
+	return h.exprListToSQL(ctx, h.OutputExprList)
+}
+
+// exprListToSQL converts a deduplicated slice of raw CEL strings to goqu SQL expressions
+// using this handler's configured SQLConverter.
+func (h *ExpressionHandler) exprListToSQL(ctx context.Context, cel []string) ([]sq.Expression, error) {
 	filters := []sq.Expression{}
 	parser := expressions.ParserSingleton()
 
-	// used to dedup in case there's an expression that is included in both list
-	dedup := map[string]bool{}
-	exprs := []string{}
-	for _, e := range h.EventExprList {
-		if _, ok := dedup[e]; !ok {
-			dedup[e] = true
-			exprs = append(exprs, e)
+	seen := map[string]bool{}
+	for _, exp := range cel {
+		if seen[exp] {
+			continue
 		}
-	}
-	for _, e := range h.OutputExprList {
-		if _, ok := dedup[e]; !ok {
-			dedup[e] = true
-			exprs = append(exprs, e)
-		}
-	}
+		seen[exp] = true
 
-	for _, exp := range exprs {
 		tree, err := parser.Parse(ctx, expr.StringExpression(exp))
 		if err != nil {
-			return nil, fmt.Errorf("error evaluating event expression '%s': %w", exp, err)
+			return nil, fmt.Errorf("error evaluating expression '%s': %w", exp, err)
 		}
 
 		expFilter, err := h.toSQLFilters(ctx, []*expr.Node{&tree.Root})
