@@ -745,12 +745,12 @@ func TestService_GetFunctionRun(t *testing.T) {
 	}
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
-	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(run, nil).Once()
+	runs := &mockRunProvider{}
+	runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(run, nil).Once()
 
 	service := NewService(ServiceOptions{
-		Functions:    functions,
-		FunctionRuns: runs,
+		Functions: functions,
+		Runs:      runs,
 	})
 	t.Cleanup(func() {
 		functions.AssertExpectations(t)
@@ -792,15 +792,15 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("returns not found when run is missing", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(nil, errors.New("missing")).Once()
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(nil, errors.New("missing")).Once()
 		t.Cleanup(func() {
 			runs.AssertExpectations(t)
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    &mockFunctionProvider{},
-			FunctionRuns: runs,
+			Functions: &mockFunctionProvider{},
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -812,8 +812,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("returns not found when function is missing", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(run, nil).Once()
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(run, nil).Once()
 		functions := &mockFunctionProvider{}
 		functions.On("GetFunction", mock.Anything, functionID.String()).Return(inngest.DeployedFunction{}, errors.New("missing")).Once()
 		t.Cleanup(func() {
@@ -822,8 +822,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    functions,
-			FunctionRuns: runs,
+			Functions: functions,
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -844,8 +844,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		outputID, err := outputIdentifier.Encode()
 		require.NoError(t, err)
 
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
 			RunID:        runID,
 			RunStartedAt: startedAt,
 			FunctionID:   functionID,
@@ -872,7 +872,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 		service := NewService(ServiceOptions{
 			Functions:      functions,
-			FunctionRuns:   runs,
+			Runs:           runs,
 			FunctionTraces: traces,
 		})
 
@@ -887,8 +887,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("does not fall back to run output", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
 			RunID:        runID,
 			RunStartedAt: startedAt,
 			FunctionID:   functionID,
@@ -905,8 +905,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    functions,
-			FunctionRuns: runs,
+			Functions: functions,
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -948,7 +948,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	}
 
 	t.Run("returns mapped event runs", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID:       eventID,
 			Limit:         defaultEventRunsLimit,
@@ -958,7 +958,7 @@ func TestService_GetEventRuns(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId:       eventID.String(),
 			IncludeOutput: boolPtr(true),
@@ -979,7 +979,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("passes pagination to reader", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
 			Limit:   1,
@@ -993,7 +993,7 @@ func TestService_GetEventRuns(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		limit := int32(1)
 
 		first, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
@@ -1028,7 +1028,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("validates event id format", func(t *testing.T) {
-		service := NewService(ServiceOptions{RunList: &mockRunsReader{}})
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: "not-a-ulid",
 		})
@@ -1038,7 +1038,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("returns internal error when reader fails", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
 			Limit:   defaultEventRunsLimit,
@@ -1047,7 +1047,7 @@ func TestService_GetEventRuns(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: eventID.String(),
 		})
@@ -1057,7 +1057,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("validates pagination", func(t *testing.T) {
-		service := NewService(ServiceOptions{RunList: &mockRunsReader{}})
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
 		invalidLimit := int32(maxEventRunsLimit + 1)
 
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
