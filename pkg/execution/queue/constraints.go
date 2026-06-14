@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -262,7 +263,7 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	// Build constraint items and config.
 	// NOTE: Semaphores are NOT included in the batch Acquire... they come directly
 	// from queue items.
-	constraintsToCheck := constraintItemsFromBacklog(backlog, constraints)
+	constraintsToCheck := constraintItemsFromBacklog(backlog, constraints, shadowPart)
 	if len(constraintsToCheck) == 0 {
 		return &BacklogRefillConstraintCheckResult{
 			ItemsToRefill: itemIDs,
@@ -443,7 +444,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		}
 
 		// claim everything from the constraint api: concurrency, keys, throttles, etc.
-		constraintItems = constraintItemsFromBacklog(backlog, constraints)
+		constraintItems = constraintItemsFromBacklog(backlog, constraints, shadowPart)
 		config = ConstraintConfigFromConstraints(constraints)
 	}
 
@@ -547,7 +548,7 @@ func (q *queueProcessor) semaphoreConstraintChecksDisabled(ctx context.Context, 
 	return q.DisableSemaphoreConstraintChecks(ctx, accountID)
 }
 
-func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {
+func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints PartitionConstraintConfig, shadowPart *QueueShadowPartition) []constraintapi.ConstraintItem {
 	constraints := []constraintapi.ConstraintItem{}
 
 	// Account concurrency
@@ -576,14 +577,10 @@ func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints Partiti
 		)
 	}
 
-	if backlog.Throttle != nil && latestConstraints.Throttle != nil && backlog.Throttle.ThrottleKeyExpressionHash == latestConstraints.Throttle.ThrottleKeyExpressionHash {
+	if throttleConstraint := throttleConstraintFromBacklog(backlog.Throttle, latestConstraints.Throttle, shadowPart); throttleConstraint != nil {
 		constraints = append(constraints, constraintapi.ConstraintItem{
-			Kind: constraintapi.ConstraintKindThrottle,
-			Throttle: &constraintapi.ThrottleConstraint{
-				Scope:             latestConstraints.Throttle.Scope,
-				KeyExpressionHash: backlog.Throttle.ThrottleKeyExpressionHash,
-				EvaluatedKeyHash:  backlog.Throttle.ThrottleKey,
-			},
+			Kind:     constraintapi.ConstraintKindThrottle,
+			Throttle: throttleConstraint,
 		})
 	}
 
@@ -616,4 +613,68 @@ func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints Partiti
 	}
 
 	return constraints
+}
+
+func throttleConstraintFromBacklog(backlogThrottle *BacklogThrottle, latestThrottle *PartitionThrottle, shadowPart *QueueShadowPartition) *constraintapi.ThrottleConstraint {
+	if backlogThrottle == nil || latestThrottle == nil {
+		return nil
+	}
+	if backlogThrottle.ThrottleKeyExpressionHash != latestThrottle.ThrottleKeyExpressionHash {
+		return nil
+	}
+
+	evaluatedKeyHash := backlogThrottle.ThrottleKey
+	if backlogThrottle.Scope != latestThrottle.Scope {
+		refreshedKey, ok := refreshThrottleKeyForScope(backlogThrottle.ThrottleKey, latestThrottle.Scope, shadowPart)
+		if !ok {
+			return nil
+		}
+		evaluatedKeyHash = refreshedKey
+	}
+
+	return &constraintapi.ThrottleConstraint{
+		Scope:             latestThrottle.Scope,
+		KeyExpressionHash: backlogThrottle.ThrottleKeyExpressionHash,
+		EvaluatedKeyHash:  evaluatedKeyHash,
+	}
+}
+
+func refreshThrottleKeyForScope(existingKey string, scope enums.ThrottleScope, shadowPart *QueueShadowPartition) (string, bool) {
+	scopeID, ok := throttleScopeID(scope, shadowPart)
+	if !ok {
+		return "", false
+	}
+
+	key := HashID(context.Background(), scopeID.String())
+	if _, evaluatedKeyHash, ok := strings.Cut(existingKey, "-"); ok {
+		key += "-" + evaluatedKeyHash
+	}
+
+	return key, true
+}
+
+func throttleScopeID(scope enums.ThrottleScope, shadowPart *QueueShadowPartition) (uuid.UUID, bool) {
+	if shadowPart == nil {
+		return uuid.Nil, false
+	}
+
+	switch scope {
+	case enums.ThrottleScopeAccount:
+		if shadowPart.AccountID == nil {
+			return uuid.Nil, false
+		}
+		return *shadowPart.AccountID, true
+	case enums.ThrottleScopeEnv:
+		if shadowPart.EnvID == nil {
+			return uuid.Nil, false
+		}
+		return *shadowPart.EnvID, true
+	case enums.ThrottleScopeFn:
+		if shadowPart.FunctionID == nil {
+			return uuid.Nil, false
+		}
+		return *shadowPart.FunctionID, true
+	default:
+		return uuid.Nil, false
+	}
 }
