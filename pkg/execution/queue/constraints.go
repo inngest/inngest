@@ -400,7 +400,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			},
 		})
 
-		if len(item.Data.Semaphores) == 0 {
+		if len(item.Data.Semaphores) == 0 || q.semaphoreConstraintChecksDisabled(ctx, *shadowPart.AccountID) {
 			// backlog lease covers everything, no semaphores — skip Acquire entirely.
 			span.SetAttributes(attribute.Bool("valid_lease", true))
 			return ItemLeaseConstraintCheckResult{
@@ -532,6 +532,14 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 func hasValidCapacityLease(item *QueueItem, now time.Time) bool {
 	return item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
+}
+
+func (q *queueProcessor) semaphoreConstraintChecksDisabled(ctx context.Context, accountID uuid.UUID) bool {
+	if q.DisableSemaphoreConstraintChecks == nil {
+		return false
+	}
+
+	return q.DisableSemaphoreConstraintChecks(ctx, accountID)
 }
 
 func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {

@@ -40,6 +40,10 @@ type QueueProcessorOpt func(q *queueProcessor)
 // should fan out across every shard instead of resolving the account's shard.
 type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID) bool
 
+// DisableSemaphoreConstraintChecks controls whether semaphore constraints should
+// be ignored for an account while semaphores are rolled out.
+type DisableSemaphoreConstraintChecks func(ctx context.Context, accountID uuid.UUID) bool
+
 func WithName(name string) QueueProcessorOpt {
 	return func(q *queueProcessor) {
 		q.name = name
@@ -451,6 +455,7 @@ type QueueOptions struct {
 	EnableCapacityLeaseInstrumentation  constraintapi.EnableHighCardinalityInstrumentation
 	CapacityLeaseExtendInterval         time.Duration
 	AcquireCapacityLeaseOnBacklogRefill bool
+	DisableSemaphoreConstraintChecks    DisableSemaphoreConstraintChecks
 
 	ConditionalTracer trace.ConditionalTracer
 
@@ -576,6 +581,12 @@ func WithCapacityLeaseInstrumentation(enable constraintapi.EnableHighCardinality
 func WithAcquireCapacityLeaseOnBacklogRefill(acquire bool) QueueOpt {
 	return func(q *QueueOptions) {
 		q.AcquireCapacityLeaseOnBacklogRefill = acquire
+	}
+}
+
+func WithDisableSemaphoreConstraintChecks(f DisableSemaphoreConstraintChecks) QueueOpt {
+	return func(q *QueueOptions) {
+		q.DisableSemaphoreConstraintChecks = f
 	}
 }
 
