@@ -98,9 +98,15 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 			if errors.Is(err, ErrQueueItemNotFound) {
 				continue
 			}
+
+			// If item processing was terminated early due to user constraints,
+			// set the earliest peek time for the remaining items.
+			// This ensures accurate tracking of peeked items waiting for
+			// user constraint capacity to become available (user latency).
 			if errors.Is(err, ErrProcessNoUserConstraintCapacity) {
 				config := p.Queue.Options().ItemEarliestPeekTimeConfig(ctx, p.Queue.Shard().Name(), *i)
 				if config.Enabled {
+					// Stamp remaining items from next item on (idx+1)
 					p.stampRemainingEarliestPeekTimes(ctx, idx+1, config.BulkStampLimit)
 				}
 			}
@@ -133,6 +139,7 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	return err
 }
 
+// stampRemainingEarliestPeekTimes iterates over a slice of items starting from start and up to limit.
 func (p *ProcessorIterator) stampRemainingEarliestPeekTimes(ctx context.Context, start, limit int) {
 	if limit <= 0 || start >= len(p.Items) {
 		return
@@ -183,21 +190,6 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	item.Data.At = time.UnixMilli(item.AtMS)
 	item.Data.EnqueuedAt = time.UnixMilli(item.EnqueuedAt)
 
-	if item.EarliestPeekTime == 0 && p.Queue.Options().ItemEarliestPeekTimeConfig(ctx, p.Queue.Shard().Name(), *item).Enabled {
-		peekTime := p.StaticTime
-		if peekTime.IsZero() {
-			peekTime = p.Queue.Clock().Now()
-		}
-
-		earliestPeekTime, err := p.Queue.Shard().SetEarliestPeekTime(ctx, *item, peekTime)
-		if err != nil {
-			span.RecordError(err)
-			l.Warn("could not set earliest peek time", "error", err)
-		} else {
-			item.EarliestPeekTime = earliestPeekTime.UnixMilli()
-		}
-	}
-
 	if item.IsLeased(p.Queue.Clock().Now()) {
 		span.SetAttributes(attribute.String("skip_reason", "already_leased"))
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
@@ -236,6 +228,25 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		release()
 	}()
+
+	// In case the item has no earliest peek time set and stamping is enabled,
+	// call SetEarliestPeekTime before verifying and user constraints.
+	// This is intentionally called AFTER queue worker capacity; unlike user constraints,
+	// worker capacity counts towards system latency, not user latency.
+	if item.EarliestPeekTime == 0 && p.Queue.Options().ItemEarliestPeekTimeConfig(ctx, p.Queue.Shard().Name(), *item).Enabled {
+		peekTime := p.StaticTime
+		if peekTime.IsZero() {
+			peekTime = p.Queue.Clock().Now()
+		}
+
+		earliestPeekTime, err := p.Queue.Shard().SetEarliestPeekTime(ctx, *item, peekTime)
+		if err != nil {
+			span.RecordError(err)
+			l.Warn("could not set earliest peek time", "error", err)
+		} else {
+			item.EarliestPeekTime = earliestPeekTime.UnixMilli()
+		}
+	}
 
 	//
 	// Before we can do any work on the queue item, we need to check if all the constraints have capacity.

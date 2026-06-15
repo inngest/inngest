@@ -297,6 +297,244 @@ func TestProcessorIteratorSetsEarliestPeekTimeForProcessedItemsBeforeConcurrency
 	}
 }
 
+func TestProcessorIteratorDoesNotStampRemainingItemsWhenDisabled(t *testing.T) {
+	ctx := context.Background()
+
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClockAt(time.Date(2026, 6, 11, 10, 0, 0, 123_000_000, time.UTC))
+	r.SetTime(clock.Now())
+
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	cmLifecycles := constraintapi.NewConstraintAPIDebugLifecycles()
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
+		constraintapi.WithClock(clock),
+		constraintapi.WithLifecycles(cmLifecycles),
+	)
+	require.NoError(t, err)
+
+	const bulkStampLimit = 5
+	options := []osqueue.QueueOpt{
+		osqueue.WithClock(clock),
+		osqueue.WithCapacityManager(cm),
+		osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		osqueue.WithQueueItemEarliestPeekTimeEnabled(func(ctx context.Context, shardName string, acctID, gotEnvID, gotFnID uuid.UUID) osqueue.QueueItemEarliestPeekTimeConfig {
+			if shardName == "test" && acctID == accountID && gotEnvID == envID && gotFnID == fnID {
+				return osqueue.QueueItemEarliestPeekTimeConfig{
+					Enabled:        false,
+					BulkStampLimit: bulkStampLimit,
+				}
+			}
+			return osqueue.QueueItemEarliestPeekTimeConfig{}
+		}),
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return osqueue.PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: osqueue.PartitionConcurrency{
+					AccountConcurrency:  1,
+					FunctionConcurrency: 1,
+				},
+			}
+		}),
+	}
+
+	queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+	shard := redis_state.NewQueueShard("test", queueClient, options...)
+
+	shardRegistry, err := osqueue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	q, err := osqueue.New(ctx, "test", shardRegistry, options...)
+	require.NoError(t, err)
+
+	makeItem := func() osqueue.QueueItem {
+		return osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				Kind: osqueue.KindStart,
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
+					RunID:       ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader),
+				},
+				WorkspaceID: envID,
+			},
+		}
+	}
+
+	items := make([]*osqueue.QueueItem, 10)
+	for i := range items {
+		qi, err := shard.EnqueueItem(ctx, makeItem(), clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		items[i] = &qi
+	}
+
+	partition := osqueue.ItemPartition(ctx, *items[0])
+	iter := osqueue.ProcessorIterator{
+		Partition:  &partition,
+		Items:      items,
+		Queue:      q,
+		StaticTime: clock.Now().Add(250 * time.Millisecond),
+	}
+
+	err = iter.Iterate(ctx)
+	require.NoError(t, err)
+
+	require.Len(t, cmLifecycles.AcquireCalls, 2)
+	require.Len(t, cmLifecycles.AcquireCalls[0].GrantedLeases, 1)
+	require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 0)
+
+	for i, qi := range items {
+		key := queueClient.KeyGenerator().QueueItemEarliestPeekTime(qi.ID)
+		require.False(t, r.Exists(key), "item %d should not have a side key", i)
+	}
+}
+
+func TestQueueLatencySeparatesSystemAndUserLatencyAfterEarliestPeekStamp(t *testing.T) {
+	ctx := context.Background()
+
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	enqueuedAt := time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC)
+	clock := clockwork.NewFakeClockAt(enqueuedAt)
+	r.SetTime(clock.Now())
+
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
+		constraintapi.WithClock(clock),
+	)
+	require.NoError(t, err)
+
+	functionVersion := 1
+	concurrencyLimit := 1
+	options := []osqueue.QueueOpt{
+		osqueue.WithClock(clock),
+		osqueue.WithCapacityManager(cm),
+		osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		osqueue.WithQueueItemEarliestPeekTimeEnabled(func(ctx context.Context, shardName string, acctID, gotEnvID, gotFnID uuid.UUID) osqueue.QueueItemEarliestPeekTimeConfig {
+			if shardName == "test" && acctID == accountID && gotEnvID == envID && gotFnID == fnID {
+				return osqueue.QueueItemEarliestPeekTimeConfig{
+					Enabled:        true,
+					BulkStampLimit: 10,
+				}
+			}
+			return osqueue.QueueItemEarliestPeekTimeConfig{}
+		}),
+		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return osqueue.PartitionConstraintConfig{
+				FunctionVersion: functionVersion,
+				Concurrency: osqueue.PartitionConcurrency{
+					AccountConcurrency:  concurrencyLimit,
+					FunctionConcurrency: concurrencyLimit,
+				},
+			}
+		}),
+	}
+
+	queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+	shard := redis_state.NewQueueShard("test", queueClient, options...)
+
+	shardRegistry, err := osqueue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	q, err := osqueue.New(ctx, "test", shardRegistry, options...)
+	require.NoError(t, err)
+
+	makeItem := func() osqueue.QueueItem {
+		return osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				Kind: osqueue.KindStart,
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
+					RunID:       ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader),
+				},
+				WorkspaceID: envID,
+			},
+		}
+	}
+
+	qi1, err := shard.EnqueueItem(ctx, makeItem(), enqueuedAt, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+	qi2, err := shard.EnqueueItem(ctx, makeItem(), enqueuedAt, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	partition := osqueue.ItemPartition(ctx, qi1)
+	peekTime := enqueuedAt.Add(5 * time.Second)
+	iter := osqueue.ProcessorIterator{
+		Partition:  &partition,
+		Items:      []*osqueue.QueueItem{&qi1, &qi2},
+		Queue:      q,
+		StaticTime: peekTime,
+	}
+
+	err = iter.Iterate(ctx)
+	require.NoError(t, err)
+	require.Equal(t, peekTime.UnixMilli(), qi2.EarliestPeekTime)
+
+	firstWork := <-q.Workers()
+	err = q.ProcessItem(ctx, firstWork, func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
+		return osqueue.RunResult{}, nil
+	})
+	require.NoError(t, err)
+	q.Semaphore().Release(1)
+	require.NotNil(t, firstWork.CapacityLease)
+	require.NoError(t, firstWork.CapacityLease.Release())
+
+	functionVersion = 2
+	concurrencyLimit = 2
+
+	processTime := peekTime.Add(7 * time.Second)
+	clock.Advance(processTime.Sub(clock.Now()))
+	r.SetTime(clock.Now())
+
+	iter = osqueue.ProcessorIterator{
+		Partition:  &partition,
+		Items:      []*osqueue.QueueItem{&qi2},
+		Queue:      q,
+		StaticTime: processTime,
+	}
+	err = iter.Iterate(ctx)
+	require.NoError(t, err)
+	require.Len(t, q.Workers(), 1)
+
+	infoCh := make(chan osqueue.RunInfo, 1)
+	secondWork := <-q.Workers()
+	err = q.ProcessItem(ctx, secondWork, func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
+		infoCh <- info
+		return osqueue.RunResult{}, nil
+	})
+	require.NoError(t, err)
+	q.Semaphore().Release(1)
+	require.NotNil(t, secondWork.CapacityLease)
+	require.NoError(t, secondWork.CapacityLease.Release())
+
+	info := <-infoCh
+	require.Equal(t, peekTime.Sub(enqueuedAt), info.Latency)
+	require.Equal(t, processTime.Sub(peekTime), info.SojournDelay)
+}
+
 func TestSetEarliestPeekTimeOnlyStoresFirstTimestamp(t *testing.T) {
 	ctx := context.Background()
 

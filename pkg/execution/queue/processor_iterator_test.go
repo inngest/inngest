@@ -803,7 +803,7 @@ func TestProcessorIteratorUsesPartitionLastEarliestPeekFallbackWhenFlagDisabled(
 	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
 }
 
-func TestProcessorIteratorStampsProcessedItemWhenBulkLimitZero(t *testing.T) {
+func TestProcessorIteratorSkipsEarliestPeekTimeWhenNoWorkerCapacity(t *testing.T) {
 	ctx := context.Background()
 
 	accountID := uuid.New()
@@ -866,8 +866,8 @@ func TestProcessorIteratorStampsProcessedItemWhenBulkLimitZero(t *testing.T) {
 
 	err := iter.Process(ctx, item)
 	require.ErrorIs(t, err, ErrProcessNoCapacity)
-	require.Equal(t, peekTime.UnixMilli(), item.EarliestPeekTime)
-	require.Equal(t, int32(1), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
+	require.Zero(t, item.EarliestPeekTime)
+	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
 }
 
 func TestProcessorIteratorContinuesWhenEarliestPeekTimeStampFails(t *testing.T) {
