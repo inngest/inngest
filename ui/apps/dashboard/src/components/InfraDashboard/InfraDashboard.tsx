@@ -786,7 +786,6 @@ function getTierTriggerMetrics(tier: InfraTier) {
 function getTierMetrics(tier: InfraTier) {
   return [
     { label: 'Availability', value: tier.sla },
-    { label: 'P99 SLO', value: tier.dispatchP99 },
     tier.compliance ? { label: 'Compliance', value: tier.compliance } : null,
   ].filter((metric): metric is { label: string; value: string } =>
     Boolean(metric),
