@@ -3466,7 +3466,7 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 		return []*cqrs.TraceRun{}, nil
 	}
 
-	if err := w.loadSpanRunPageDetails(ctx, opt, h, pageRows); err != nil {
+	if err := w.loadSpanRunPageDetails(ctx, h, pageRows); err != nil {
 		return nil, err
 	}
 
@@ -3490,15 +3490,16 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 // loadSpanRunPageDetails fills in end_time and status for the selected roots.
 func (w wrapper) loadSpanRunPageDetails(
 	ctx context.Context,
-	opt cqrs.GetTraceRunOpt,
 	h driverhelp.DialectHelpers,
 	pageRows []spanRunRow,
 ) error {
 	l := logger.StdlibLogger(ctx)
 
 	// Root dynamic_span_id is unique to a run and shared by its EXTEND spans.
+	runIDs := make([]string, 0, len(pageRows))
 	dynamicSpanIDs := make([]string, 0, len(pageRows))
 	for _, p := range pageRows {
+		runIDs = append(runIDs, p.RunID)
 		dynamicSpanIDs = append(dynamicSpanIDs, p.DynamicSpanID)
 	}
 
@@ -3513,15 +3514,16 @@ func (w wrapper) loadSpanRunPageDetails(
 				WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
 				ORDER BY s2.end_time DESC NULLS LAST, s2.span_id DESC LIMIT 1)`).As("status"),
 		).
-		Where(sq.C("dynamic_span_id").In(dynamicSpanIDs)).
+		Where(
+			sq.C("run_id").In(runIDs),
+			sq.C("dynamic_span_id").In(dynamicSpanIDs),
+		).
 		Where(
 			sq.C("debug_run_id").IsNull(),
 			sq.Or(
 				sq.C("status").IsNull(),
 				sq.C("status").Neq(enums.RunStatusSkipped.String()),
 			),
-			sq.C("start_time").Gte(opt.Filter.From.UTC()),
-			sq.C("start_time").Lt(opt.Filter.Until.UTC()),
 		).
 		GroupBy("spans.run_id", "spans.dynamic_span_id")
 

@@ -2085,6 +2085,65 @@ func TestCQRSGetSpanRunsEnrichmentFromExtendSpans(t *testing.T) {
 	assert.Less(t, rootOnly.EndedAt.Sub(rootOnly.StartedAt), time.Second)
 }
 
+func TestCQRSGetSpanRunsEnrichmentIncludesExtendSpansAfterPageWindow(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	until := baseTime.Add(time.Minute)
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-post-window-extend",
+		Name:          "executor.run",
+		Status:        enums.RunStatusRunning.String(),
+		StartTime:     until.Add(-time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-post-window-extend",
+		Name:          "EXTEND",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     until.Add(5 * time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       until,
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Preview: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+
+	assert.Equal(t, runID, runs[0].RunID)
+	assert.Equal(t, enums.RunStatusCompleted, runs[0].Status)
+	assert.True(t, runs[0].EndedAt.UTC().After(until), "end_time should come from the post-window EXTEND span")
+}
+
 // Status filters match final run status, not any historical span row.
 func TestCQRSGetSpanRunsFinalStatusFilter(t *testing.T) {
 	ctx := context.Background()
