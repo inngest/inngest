@@ -345,6 +345,12 @@ export const tableEntries: SchemaEntry[] = [
         },
         {
           kind: 'value',
+          name: 'status',
+          path: 'runs.status',
+          type: 'String',
+        },
+        {
+          kind: 'value',
           name: 'queued_at',
           path: 'runs.queued_at',
           type: 'DateTime',
