@@ -903,6 +903,19 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 	return nil
 }
 
+// cronHealthCheckEnvID resolves the env (workspace) ID used to health-check and
+// re-sync a self-hosted cron function. Self-hosted functions carry no env ID
+// (cqrsFn.EnvID is uuid.Nil), so we fall back to consts.DevServerEnvID — the same
+// non-zero env ID InitializeCrons stamps when it first enrolls the cron. This keeps
+// the health-check lookup and re-sync consistent with the original schedule and
+// avoids the capacity-lease "missing envID" rejection. See issue #4387.
+func cronHealthCheckEnvID(cqrsFn *cqrs.Function) uuid.UUID {
+	if cqrsFn == nil || cqrsFn.EnvID == uuid.Nil {
+		return consts.DevServerEnvID
+	}
+	return cqrsFn.EnvID
+}
+
 func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error {
 	l := s.log.With("handler", "cron-health-check")
 
@@ -935,7 +948,14 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
 
 		accountID := consts.DevServerAccountID
-		envID := cqrsFn.EnvID
+		// Self-hosted functions are stored without an env ID, so cqrsFn.EnvID is the
+		// zero UUID. Using it here stamps an all-zero workspace ID on the cron item,
+		// which the capacity-lease CheckConstraints validation rejects with "missing
+		// envID" (uuid.Nil) — so the cron can never schedule and the health check
+		// re-syncs it forever. It also makes the HealthCheck lookup below miss the
+		// item enqueued by InitializeCrons under consts.DevServerEnvID. Resolve to the
+		// canonical self-hosted env ID, matching InitializeCrons. See issue #4387.
+		envID := cronHealthCheckEnvID(cqrsFn)
 		appID := cqrsFn.AppID
 
 		for _, cronExpr := range fn.ScheduleExpressions() {
