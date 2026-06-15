@@ -1305,7 +1305,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		err = rc.Do(ctx, rc.B().Hdel().Key(shard.Client().kg.PartitionItem()).Field(idA.String()).Build()).Error()
 		require.NoError(t, err)
 
-		items, err := shard.PeekGlobalPartitions(ctx, osqueue.PartitionPeekMax, time.Now().Add(time.Hour), true)
+		items, err := shard.PartitionPeek(ctx, true, time.Now().Add(time.Hour), osqueue.PartitionPeekMax)
 		require.NoError(t, err)
 		require.Len(t, items, 2)
 		require.EqualValues(t, []*osqueue.QueuePartition{
