@@ -797,6 +797,7 @@ func TestProcessorIteratorUsesPartitionLastEarliestPeekFallbackWhenFlagDisabled(
 	}
 
 	err := iter.Process(ctx, item)
+	require.ErrorIs(t, err, ErrProcessNoUserConstraintCapacity)
 	require.ErrorIs(t, err, ErrProcessStopIterator)
 	require.Equal(t, item.AtMS, item.EarliestPeekTime)
 	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))

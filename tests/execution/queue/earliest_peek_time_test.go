@@ -278,7 +278,10 @@ func TestProcessorIteratorSetsEarliestPeekTimeForProcessedItemsBeforeConcurrency
 	require.Len(t, cmLifecycles.AcquireCalls[1].GrantedLeases, 0)
 	require.Len(t, cmLifecycles.AcquireCalls[1].LimitingConstraints, 1)
 
-	stampedItems := len(cmLifecycles.AcquireCalls)
+	stampedItems := len(cmLifecycles.AcquireCalls) + bulkStampLimit
+	if stampedItems > len(items) {
+		stampedItems = len(items)
+	}
 	for i, qi := range items {
 		key := queueClient.KeyGenerator().QueueItemEarliestPeekTime(qi.ID)
 		if i < stampedItems {

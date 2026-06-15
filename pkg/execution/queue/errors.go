@@ -108,8 +108,9 @@ var (
 )
 
 var (
-	ErrProcessNoCapacity   = fmt.Errorf("no capacity")
-	ErrProcessStopIterator = fmt.Errorf("stop iterator")
+	ErrProcessNoCapacity               = fmt.Errorf("no capacity")
+	ErrProcessStopIterator             = fmt.Errorf("stop iterator")
+	ErrProcessNoUserConstraintCapacity = fmt.Errorf("no user constraint capacity: %w", ErrProcessStopIterator)
 )
 
 var (

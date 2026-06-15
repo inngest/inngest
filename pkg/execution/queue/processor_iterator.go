@@ -70,7 +70,7 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	p.IsSemaphoreLimitOnly.Store(true)
 
 	eg := errgroup.Group{}
-	for _, i := range p.Items {
+	for idx, i := range p.Items {
 		if i == nil {
 			// THIS SHOULD NEVER HAPPEN. Skip gracefully and log error
 			logger.StdlibLogger(ctx).Error("nil queue item in partition", "partition", p.Partition)
@@ -97,6 +97,12 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 			// NOTE: ignore if the queue item is not found
 			if errors.Is(err, ErrQueueItemNotFound) {
 				continue
+			}
+			if errors.Is(err, ErrProcessNoUserConstraintCapacity) {
+				config := p.Queue.Options().ItemEarliestPeekTimeConfig(ctx, p.Queue.Shard().Name(), *i)
+				if config.Enabled {
+					p.stampRemainingEarliestPeekTimes(ctx, idx+1, config.BulkStampLimit)
+				}
 			}
 			// always break on the first error;  if processing returns an error we
 			// always assume that we stop iterating.
@@ -125,6 +131,37 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 
 	// someting went wrong.  report the error.
 	return err
+}
+
+func (p *ProcessorIterator) stampRemainingEarliestPeekTimes(ctx context.Context, start, limit int) {
+	if limit <= 0 || start >= len(p.Items) {
+		return
+	}
+
+	peekTime := p.StaticTime
+	if peekTime.IsZero() {
+		peekTime = p.Queue.Clock().Now()
+	}
+
+	l := logger.StdlibLogger(ctx).With("partition", p.Partition)
+	attempts := 0
+	for _, item := range p.Items[start:] {
+		if attempts >= limit {
+			return
+		}
+		if item == nil || item.EarliestPeekTime != 0 {
+			continue
+		}
+
+		attempts++
+		earliestPeekTime, err := p.Queue.Shard().SetEarliestPeekTime(ctx, *item, peekTime)
+		if err != nil {
+			l.Warn("could not set earliest peek time for remaining item", "item", item, "error", err)
+			continue
+		}
+
+		item.EarliestPeekTime = earliestPeekTime.UnixMilli()
+	}
 }
 
 func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
@@ -437,7 +474,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			})
 		}
 
-		return fmt.Errorf("concurrency hit: %w", ErrProcessStopIterator)
+		return fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
 	case ErrConcurrencyLimitCustomKey:
 		p.IsSemaphoreLimitOnly.Store(false)
 		p.CtrConcurrency.Add(1)
