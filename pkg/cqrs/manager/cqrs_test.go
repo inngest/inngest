@@ -1613,6 +1613,90 @@ func TestCQRSInsertTraceRun_PreservesTerminalStateAgainstStaleNonTerminalWrite(t
 	assert.Equal(t, enums.RunStatusCompleted, got.Status)
 }
 
+// Invariant from TLA RunStateProjection ("terminal states are monotonic"):
+// once a terminal status has been written for a run_id, no subsequent read
+// returns a non-terminal status, regardless of the order writes arrive in.
+func TestCQRSInsertTraceRun_TerminalMonotonicityUnderAllOrderings(t *testing.T) {
+	base := []enums.RunStatus{
+		enums.RunStatusScheduled,
+		enums.RunStatusRunning,
+		enums.RunStatusCompleted,
+		enums.RunStatusCancelled,
+	}
+
+	var perms [][]enums.RunStatus
+	var permute func([]enums.RunStatus, int)
+	permute = func(arr []enums.RunStatus, k int) {
+		if k == len(arr)-1 {
+			cpy := make([]enums.RunStatus, len(arr))
+			copy(cpy, arr)
+			perms = append(perms, cpy)
+			return
+		}
+		for i := k; i < len(arr); i++ {
+			arr[k], arr[i] = arr[i], arr[k]
+			permute(arr, k+1)
+			arr[k], arr[i] = arr[i], arr[k]
+		}
+	}
+	arr := make([]enums.RunStatus, len(base))
+	copy(arr, base)
+	permute(arr, 0)
+
+	for _, perm := range perms {
+		name := ""
+		for i, s := range perm {
+			if i > 0 {
+				name += "-"
+			}
+			name += s.String()
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			appID := uuid.New()
+			cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+			defer cleanup()
+
+			accountID := uuid.New()
+			workspaceID := uuid.New()
+			functionID := uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+			now := time.Now().UTC().Truncate(time.Second)
+
+			sawTerminal := false
+			for i, s := range perm {
+				tr := &cqrs.TraceRun{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					FunctionID:  functionID,
+					TraceID:     fmt.Sprintf("trace-%d-%s", i, runID.String()),
+					RunID:       runID.String(),
+					QueuedAt:    now,
+					StartedAt:   now,
+					EndedAt:     now,
+					SourceID:    "test-source",
+					TriggerIDs:  []string{"evt-test"},
+					Status:      s,
+				}
+				require.NoError(t, cm.InsertTraceRun(ctx, tr))
+
+				got, err := cm.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+				require.NoError(t, err)
+
+				if enums.RunStatusEnded(s) {
+					sawTerminal = true
+				}
+				if sawTerminal {
+					assert.True(t, enums.RunStatusEnded(got.Status),
+						"step %d (write %s): after observing terminal, got %s",
+						i, s, got.Status)
+				}
+			}
+		})
+	}
+}
+
 func TestCQRSGetTraceRunsPagination(t *testing.T) {
 	// This test verifies that cursor-based pagination works correctly for the GetSpanRuns
 	ctx := context.Background()
