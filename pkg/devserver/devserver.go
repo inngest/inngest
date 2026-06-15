@@ -195,7 +195,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		Helpers() driverhelp.DialectHelpers
 	}
 	if opts.PostgresURI != "" {
-		db, err := dbpostgres.Open(ctx, dbpostgres.Options{URI: opts.PostgresURI})
+		// Pool settings are in minutes, mirroring the postgres-conn-max-* flags.
+		db, err := dbpostgres.Open(ctx, dbpostgres.Options{
+			URI:             opts.PostgresURI,
+			MaxIdleConns:    opts.PostgresMaxIdleConns,
+			MaxOpenConns:    opts.PostgresMaxOpenConns,
+			ConnMaxIdleTime: time.Duration(opts.PostgresConnMaxIdleTime) * time.Minute,
+			ConnMaxLifetime: time.Duration(opts.PostgresConnMaxLifetime) * time.Minute,
+		})
 		if err != nil {
 			return err
 		}
