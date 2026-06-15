@@ -198,13 +198,26 @@ accurateCastOrNull(inngest.`score.<score_name>`.values.value, 'Float64')
 
 The backticks are **required** here because the key contains a dot; plain bracket syntax silently returns NULL.
 
-To discover which score names exist, enumerate the metadata keys and keep the ones beginning with `score.`:
+**The score name must be a literal you write into the query.** You cannot read a value with a key that comes from a column, an alias, or an `arrayJoin`/`mapKeys` result — dynamic Map indexing like `inngest[some_alias].values.value` is not supported and fails to transpile. So you cannot turn unknown scores into (name, value) rows in one query. Scores are a **two-step** flow:
 
-```sql
-SELECT DISTINCT arrayJoin(mapKeys(inngest)) AS metric_key FROM steps
-```
+1. **List the score names that exist** — use this whenever the user has NOT named a specific score (e.g. "show me my scores"). Do not guess a name; list what's there:
 
-Use `mapContainsKey(inngest, 'score.<score_name>')` to restrict to rows that carry a specific score.
+   ```sql
+   SELECT DISTINCT arrayJoin(mapKeys(inngest)) AS metric_key FROM steps WHERE startsWith(metric_key, 'score.')
+   ```
+
+   Each `metric_key` looks like `score.<name>`; `substring(metric_key, 7)` drops the `score.` prefix for display.
+
+2. **Show values for a named score** — once you have a literal name, read it as its own column and filter to rows carrying it (add one literal column per score for several):
+
+   ```sql
+   SELECT run_id, id AS step_id,
+     accurateCastOrNull(inngest.`score.accuracy`.values.value, 'Float64') AS accuracy,
+     ended_at
+   FROM steps
+   WHERE mapContainsKey(inngest, 'score.accuracy')
+   ORDER BY ended_at DESC
+   ```
 
 ## Querying Experiments
 
@@ -214,6 +227,15 @@ Experiment results are queryable on the `steps` table via the `inngest` metadata
 - `inngest.experiment.values.variant` — the selected variant.
 - `inngest.experiment.values.selection_strategy` — how the variant was chosen.
 - `inngest.experiment.values.variant_weights` — the configured variant weights (JSON).
+
+Unlike scores, an experiment's name and variant are **values at a fixed path** (not encoded in the Map key), so you can read and group by them directly — no need to know the names first. To list which experiments exist (use this when the user hasn't named one, e.g. "show me my experiments"):
+
+```sql
+SELECT toString(inngest.experiment.values.name) AS experiment, COUNT(DISTINCT run_id) AS runs
+FROM steps
+WHERE attributes['_inngest.step.run.type'] = 'group.experiment'
+GROUP BY experiment
+```
 
 A run's scores live on the variant's sub-steps, so aggregate scores grouped by variant with no extra span filter. Wrap the variant in `toString(...)` when grouping (a `Dynamic` value cannot be a `GROUP BY` key), and use `COUNT(DISTINCT run_id)` for run counts (one run can emit several score steps):
 
