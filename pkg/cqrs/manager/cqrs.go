@@ -24,6 +24,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/dateutil"
 	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
 	"github.com/inngest/inngest/pkg/enums"
@@ -304,6 +305,50 @@ func fragmentAttributesJSON(raw any) ([]byte, bool) {
 	}
 }
 
+func sortSpanFragments(fragments []map[string]any) {
+	slices.SortStableFunc(fragments, func(a, b map[string]any) int {
+		return cmp.Or(
+			compareFragmentTime(a, b, "start_time"),
+			compareFragmentTime(a, b, "end_time"),
+			cmp.Compare(fragmentString(a, "span_id"), fragmentString(b, "span_id")),
+		)
+	})
+}
+
+func compareFragmentTime(a, b map[string]any, key string) int {
+	at, aok := parseFragmentTime(a[key])
+	bt, bok := parseFragmentTime(b[key])
+	switch {
+	case aok && bok:
+		return at.Compare(bt)
+	case aok:
+		return -1
+	case bok:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func parseFragmentTime(raw any) (time.Time, bool) {
+	s, ok := raw.(string)
+	if !ok || s == "" {
+		return time.Time{}, false
+	}
+	if idx := strings.Index(s, " m="); idx != -1 {
+		s = s[:idx]
+	}
+	t, err := dateutil.ParseString(s)
+	return t, err == nil
+}
+
+func fragmentString(fragment map[string]any, key string) string {
+	if s, ok := fragment[key].(string); ok {
+		return s
+	}
+	return ""
+}
+
 func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRollupInfo) (*cqrs.OtelSpan, error) {
 	// Use interface methods to get the fields directly
 	traceID := span.GetTraceID()
@@ -398,6 +443,7 @@ func mapSpanFromRow[T normalizedSpan](ctx context.Context, span T, info *spanRol
 	}
 
 	_ = json.Unmarshal(spanFragmentsBytes, &fragments)
+	sortSpanFragments(fragments)
 
 fragmentLoop:
 	for _, fragment := range fragments {
