@@ -935,7 +935,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
 
 		accountID := consts.DevServerAccountID
-		envID := cqrsFn.EnvID
+		envID := consts.DevServerEnvID
 		appID := cqrsFn.AppID
 
 		for _, cronExpr := range fn.ScheduleExpressions() {
