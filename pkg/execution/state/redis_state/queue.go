@@ -1211,6 +1211,25 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 	return nil
 }
 
+// cleanupNilPartitionInGlobal is invoked when we peek a missing partition in the global partitions pointer zset.
+// This ensures a stale global partition pointer does not halt the queue scanner.
+//
+// Safe under concurrent deletes: partitionRequeue.lua atomically ZREMs the pointer before HDEL'ing
+// metadata, so a missing partition here is a stale pointer (migration/legacy), not a transient race.
+func (q *queue) cleanupNilPartitionInGlobal(ctx context.Context, partitionKey string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInGlobal"), redis_telemetry.ScopeQueue)
+
+	l := logger.StdlibLogger(ctx)
+	l.Warn("removing global partitions pointer to missing partition", "partition", partitionKey)
+
+	cmd := q.RedisClient.Client().B().Zrem().Key(q.RedisClient.kg.GlobalPartitionIndex()).Member(partitionKey).Build()
+	if err := q.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
+		return fmt.Errorf("failed to remove nil partition from global partitions pointer queue: %w", err)
+	}
+
+	return nil
+}
+
 // cleanupEmptyAccount is invoked when we peek an account without any partitions in the account pointer zset.
 // This happens when old executors process default function partitions and .
 // This ensures we gracefully handle inconsistencies created by the backwards compatible (keep using global partitions pointer _and_ account partitions) key queues implementation.
@@ -1377,19 +1396,21 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	if len(missingPartitions) > 0 {
-		if accountId == nil {
-			return nil, fmt.Errorf("encountered missing partitions in partition pointer queue %q", partitionKey)
-		}
-
 		eg := errgroup.Group{}
 		for _, partitionId := range missingPartitions {
 			id := partitionId
 			eg.Go(func() error {
+				if accountId == nil {
+					return q.cleanupNilPartitionInGlobal(ctx, id)
+				}
 				return q.cleanupNilPartitionInAccount(ctx, *accountId, id)
 			})
 		}
 
 		if err := eg.Wait(); err != nil {
+			if accountId == nil {
+				return nil, fmt.Errorf("error cleaning up nil partitions in global pointer queue: %w", err)
+			}
 			return nil, fmt.Errorf("error cleaning up nil partitions in account pointer queue: %w", err)
 		}
 	}
