@@ -29,6 +29,7 @@ export default function EntitlementListItemSelfService({
   addon,
   addonPurchased,
   onChange,
+  canEdit = false,
 }: {
   title: string;
   description: string | React.ReactNode;
@@ -46,6 +47,7 @@ export default function EntitlementListItemSelfService({
   };
   addonPurchased?: boolean;
   onChange?: () => void;
+  canEdit: boolean;
 }) {
   const router = useRouter();
 
@@ -114,6 +116,7 @@ export default function EntitlementListItemSelfService({
           addon={addon}
           addonPurchased={addonPurchased}
           onChange={onChange}
+          canEdit={canEdit}
         />
       );
     } else if (isDedicatedSlackChannel) {
@@ -126,6 +129,7 @@ export default function EntitlementListItemSelfService({
           addon={addon}
           addonPurchased={addonPurchased}
           onChange={onChange}
+          canEdit={canEdit}
         />
       );
     } else {
@@ -170,6 +174,7 @@ export default function EntitlementListItemSelfService({
               setOpenSelfService(true);
               setErr(null);
             }}
+            disabled={!canEdit}
           />
         )}
       </div>
@@ -193,6 +198,7 @@ export default function EntitlementListItemSelfService({
               setOpenConfirmationModal(true);
               setOpenSelfService(false);
             }}
+            canEdit={canEdit}
           />
         )}
       {openConfirmationModal && (
