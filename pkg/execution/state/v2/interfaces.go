@@ -132,10 +132,31 @@ func TryIncrementMetadataSize(ctx context.Context, svc RunService, id ID, delta 
 	return nil
 }
 
+type LoadMetadataOpts struct {
+	OmitStackAndStepMetrics bool
+}
+
+type LoadMetadataOption func(*LoadMetadataOpts)
+
+// OmitStackAndStepMetrics skips loading Stack and step-derived metrics
+// (StateSize, StepCount), avoiding an extra round trip. Those fields are
+// zero-valued in the returned Metadata.
+func OmitStackAndStepMetrics() LoadMetadataOption {
+	return func(o *LoadMetadataOpts) { o.OmitStackAndStepMetrics = true }
+}
+
+func ApplyLoadMetadataOpts(opts []LoadMetadataOption) LoadMetadataOpts {
+	var o LoadMetadataOpts
+	for _, fn := range opts {
+		fn(&o)
+	}
+	return o
+}
+
 // Staeloader defines an interface for loading the entire run state from the state store.
 type StateLoader interface {
 	// Metadata returns metadata for a given run
-	LoadMetadata(ctx context.Context, id ID) (Metadata, error)
+	LoadMetadata(ctx context.Context, id ID, opts ...LoadMetadataOption) (Metadata, error)
 	// LoadEvents loads the triggering events for the given run.
 	LoadEvents(ctx context.Context, id ID) ([]json.RawMessage, error)
 	// LoadState returns all steps for a run.

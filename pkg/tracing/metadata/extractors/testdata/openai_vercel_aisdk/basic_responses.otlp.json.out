@@ -14,16 +14,4 @@ SPAN ai.generateText.doGenerate
 }
 
 SPAN ai.generateText
-{
-  "model": "gpt-5.4-nano",
-  "system": "openai.responses",
-  "operation_name": "",
-  "response_model": "",
-  "response_id": "",
-  "finish_reasons": [
-    "stop"
-  ],
-  "input_tokens": 17,
-  "output_tokens": 40,
-  "total_tokens": 57
-}
+no AI metadata extracted

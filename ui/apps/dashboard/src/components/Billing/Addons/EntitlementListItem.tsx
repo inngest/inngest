@@ -21,6 +21,7 @@ export default function EntitlementListItem({
   entitlement,
   addon,
   onChange,
+  canEdit = false,
 }: {
   increaseInHigherPlan?: boolean;
   planName: string;
@@ -41,6 +42,8 @@ export default function EntitlementListItem({
     purchased?: boolean;
   }; // No addon, or no price, implies self-service is not available.
   onChange?: () => void;
+  // Does the user have permissions to edit this:
+  canEdit: boolean;
 }) {
   const [highlight] = useSearchParam('highlight');
 
@@ -84,6 +87,7 @@ export default function EntitlementListItem({
         }}
         addonPurchased={addon.purchased}
         onChange={onChange}
+        canEdit={canEdit}
       />
     );
   } else {
@@ -122,6 +126,7 @@ export default function EntitlementListItem({
         </div>
         <Button
           appearance="ghost"
+          disabled={!canEdit}
           label={contactHumanToIncrease ? 'Contact us' : 'Upgrade plan'}
           href={
             contactHumanToIncrease

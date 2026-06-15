@@ -3,6 +3,7 @@ package extractors
 import (
 	"cmp"
 	"encoding/json"
+	"regexp"
 	"slices"
 
 	"github.com/inngest/inngest/pkg/util"
@@ -107,7 +108,7 @@ var keyFieldMap = map[string]attrMapping{
 		convention: openinference,
 	},
 	"llm.model_name": {
-		field:      "model",
+		field:      "responseModel",
 		convention: openinference,
 	},
 	// llm.system identifies the AI product/vendor (openai, anthropic, ...),
@@ -180,7 +181,7 @@ var keyFieldMap = map[string]attrMapping{
 	// Langfuse (`langfuse.*`, via @langfuse/openai + LangfuseSpanProcessor)
 	// ---------------------------------------------------------------------------
 	"langfuse.observation.model.name": {
-		field:      "model",
+		field:      "responseModel",
 		convention: langfuse,
 	},
 	// usage_details is a single JSON blob ({"input":N,"output":N,"total":N,...}).
@@ -292,7 +293,41 @@ func compareByRank(a, b parsedAttr) int {
 	)
 }
 
+// vercelProviderCallSegment matches the `.do<Op>` segment (e.g. `.doGenerate`,
+// `.doStream`, `.doEmbed`) that the Vercel AI SDK appends to the provider-call
+// (leaf) span's operationId. The framework rollup span lacks this segment.
+//
+// @see https://ai-sdk.dev/docs/ai-sdk-core/telemetry
+var vercelProviderCallSegment = regexp.MustCompile(`\.do[A-Z]`)
+
+// isVercelRollupSpan reports whether the span is a Vercel AI SDK framework
+// rollup (wrapper) span.
+//
+// The Vercel AI SDK emits a span *tree*: a framework rollup span
+// (`ai.generateText`) whose children are the provider-call (leaf) spans
+// (`ai.generateText.doGenerate`). Both carry overlapping usage data, so
+// extracting from both would double count. We choose to skip the rollup span.
+//
+// Only Vercel AI SDK spans carry `ai.operationId`; among them, the
+// provider-call leaf has a `.do*` segment and the rollup does not.
+func isVercelRollupSpan(attributes []*v1.KeyValue) bool {
+	for _, attr := range attributes {
+		if attr.Key != "ai.operationId" {
+			continue
+		}
+		op := attr.Value.GetStringValue()
+		return op != "" && !vercelProviderCallSegment.MatchString(op)
+	}
+	return false
+}
+
 func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) (foundAny bool) {
+	// The Vercel AI SDK's rollup span duplicates its provider-call child's
+	// usage; skip it to avoid double counting.
+	if isVercelRollupSpan(attributes) {
+		return false
+	}
+
 	potentialAttrs := map[string][]parsedAttr{}
 
 	// addAttr records a matched attribute as a candidate for its canonical field.

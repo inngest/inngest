@@ -46,7 +46,7 @@ type metadataStateLoader struct {
 	loadMetadata func(context.Context, statev2.ID) (statev2.Metadata, error)
 }
 
-func (s metadataStateLoader) LoadMetadata(ctx context.Context, id statev2.ID) (statev2.Metadata, error) {
+func (s metadataStateLoader) LoadMetadata(ctx context.Context, id statev2.ID, _ ...statev2.LoadMetadataOption) (statev2.Metadata, error) {
 	if s.loadMetadata != nil {
 		return s.loadMetadata(ctx, id)
 	}

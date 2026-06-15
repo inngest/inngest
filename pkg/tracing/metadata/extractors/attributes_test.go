@@ -85,7 +85,7 @@ func TestLangfusePrecedenceAndUsageExpansion(t *testing.T) {
 
 	orders := [][]*v1.KeyValue{
 		{
-			strAttr("gen_ai.request.model", "gpt-4.1-nano"),
+			strAttr("gen_ai.response.model", "gpt-4.1-nano-another"),
 			intAttr("gen_ai.usage.input_tokens", 100),
 			strAttr("langfuse.observation.model.name", "gpt-4.1-nano-2025-04-14"),
 			strAttr("langfuse.observation.usage_details",
@@ -97,7 +97,7 @@ func TestLangfusePrecedenceAndUsageExpansion(t *testing.T) {
 				`{"input":22,"output":6,"total":28,"input_cached_tokens":5}`),
 			strAttr("langfuse.observation.model.name", "gpt-4.1-nano-2025-04-14"),
 			intAttr("gen_ai.usage.input_tokens", 100),
-			strAttr("gen_ai.request.model", "gpt-4.1-nano"),
+			strAttr("gen_ai.response.model", "gpt-4.1-nano-another"),
 		},
 	}
 
@@ -106,7 +106,7 @@ func TestLangfusePrecedenceAndUsageExpansion(t *testing.T) {
 		foundAny := extractAIMetadataFromAttributes(attrs, &md)
 		assert.True(t, foundAny)
 		// langfuse ranks first, so its values win over the co-present gen_ai.*.
-		assert.Equal(t, "gpt-4.1-nano-2025-04-14", md.Model)
+		assert.Equal(t, "gpt-4.1-nano-2025-04-14", md.ResponseModel)
 		assert.Equal(t, int64(22), md.InputTokens)
 		assert.Equal(t, int64(6), md.OutputTokens)
 		// usage_details supplies the total; input_cached_tokens is unmapped and
@@ -115,4 +115,33 @@ func TestLangfusePrecedenceAndUsageExpansion(t *testing.T) {
 			assert.Equal(t, int64(28), *md.TotalTokens)
 		}
 	}
+}
+
+// TestSkipsVercelRollupSpan verifies that the Vercel AI SDK's framework rollup
+// span (e.g. `ai.generateText`) extracts to nothing so its `ai.usage.*` isn't
+// double-counted against its provider-call child (`ai.generateText.doGenerate`),
+// which carries the same usage and the documented `.do*` segment.
+func TestSkipsVercelRollupSpan(t *testing.T) {
+	t.Parallel()
+
+	// The rollup span (no `.do*` segment) is skipped entirely.
+	rollup := []*v1.KeyValue{
+		strAttr("ai.operationId", "ai.generateText"),
+		strAttr("ai.model.id", "gpt-4.1-nano"),
+		intAttr("ai.usage.inputTokens", 17),
+	}
+	var rollupMd AIMetadata
+	assert.False(t, extractAIMetadataFromAttributes(rollup, &rollupMd))
+	assert.Equal(t, AIMetadata{}, rollupMd)
+
+	// The provider-call (leaf) span is still extracted normally.
+	leaf := []*v1.KeyValue{
+		strAttr("ai.operationId", "ai.generateText.doGenerate"),
+		strAttr("ai.model.id", "gpt-4.1-nano"),
+		intAttr("ai.usage.inputTokens", 17),
+	}
+	var leafMd AIMetadata
+	assert.True(t, extractAIMetadataFromAttributes(leaf, &leafMd))
+	assert.Equal(t, "gpt-4.1-nano", leafMd.Model)
+	assert.Equal(t, int64(17), leafMd.InputTokens)
 }

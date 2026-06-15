@@ -8,6 +8,7 @@ import UpdateCardModal from './UpdateCardModal';
 
 export default function PaymentMethod({
   paymentMethod,
+  canManageBilling,
 }: {
   paymentMethod: {
     __typename?: 'PaymentMethod';
@@ -18,6 +19,7 @@ export default function PaymentMethod({
     createdAt: string;
     default: boolean;
   } | null;
+  canManageBilling: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const router = useRouter();
@@ -40,6 +42,7 @@ export default function PaymentMethod({
           onClick={() => setIsEditing(true)}
           label="Edit"
           className="h-6 font-semibold"
+          disabled={!canManageBilling}
         />
       }
     >
@@ -48,7 +51,7 @@ export default function PaymentMethod({
           <Row
             label="Credit Card"
             value={`${capitalCase(paymentMethod.brand)} ending in ${
-              paymentMethod.last4
+              canManageBilling ? paymentMethod.last4 : '****'
             }`}
           />
           <Row

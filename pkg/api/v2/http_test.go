@@ -150,6 +150,62 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	require.Equal(t, "COMPLETED", run["status"])
 }
 
+func TestHTTPGateway_GetApp(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	createdAt := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	syncedAt := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
+
+	apps := &mockAppProvider{}
+	apps.On("GetApp", mock.Anything, "my-app").Return(App{
+		ID:            "my-app",
+		InternalID:    appID,
+		Name:          "my-app",
+		Method:        enums.AppMethodServe,
+		CreatedAt:     createdAt,
+		FunctionCount: 2,
+		LatestSync: &AppSync{
+			SyncedAt:    syncedAt,
+			SdkLanguage: "typescript",
+			SdkVersion:  "3.22.0",
+			URL:         "https://example.com/api/inngest",
+		},
+	}, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Apps: apps}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		apps.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	data := body["data"].(map[string]any)
+	require.Equal(t, "my-app", data["id"])
+	require.Equal(t, "my-app", data["name"])
+	require.Equal(t, "SERVE", data["method"])
+	require.Equal(t, float64(2), data["functionCount"])
+	require.Equal(t, "2026-06-01T12:00:00Z", data["createdAt"])
+	latestSync := data["latestSync"].(map[string]any)
+	require.Equal(t, "2026-06-02T12:00:00Z", latestSync["syncedAt"])
+	require.Equal(t, "typescript", latestSync["sdkLanguage"])
+	require.Equal(t, "3.22.0", latestSync["sdkVersion"])
+	require.Equal(t, "https://example.com/api/inngest", latestSync["url"])
+	//
+	// zero-value and empty optional fields are omitted by the gateway marshaler
+	require.NotContains(t, data, "isArchived")
+	require.NotContains(t, latestSync, "framework")
+	require.NotContains(t, latestSync, "error")
+}
+
 func TestHTTPGateway_GetFunction(t *testing.T) {
 	ctx := context.Background()
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")

@@ -772,10 +772,13 @@ func (x *DeleteStateResponse) GetDeleted() bool {
 }
 
 type LoadMetadataRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    *ID                    `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Skip loading stack and step-derived metrics (state_size, step_count)
+	// when the caller doesn't need them, avoiding an extra round trip.
+	OmitStackAndStepMetrics bool `protobuf:"varint,2,opt,name=omit_stack_and_step_metrics,json=omitStackAndStepMetrics,proto3" json:"omit_stack_and_step_metrics,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *LoadMetadataRequest) Reset() {
@@ -813,6 +816,13 @@ func (x *LoadMetadataRequest) GetId() *ID {
 		return x.Id
 	}
 	return nil
+}
+
+func (x *LoadMetadataRequest) GetOmitStackAndStepMetrics() bool {
+	if x != nil {
+		return x.OmitStackAndStepMetrics
+	}
+	return false
 }
 
 type LoadMetadataResponse struct {
@@ -2508,9 +2518,10 @@ const file_state_v2_state_proto_rawDesc = "" +
 	"\x12DeleteStateRequest\x12\x1c\n" +
 	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"/\n" +
 	"\x13DeleteStateResponse\x12\x18\n" +
-	"\adeleted\x18\x01 \x01(\bR\adeleted\"3\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\"q\n" +
 	"\x13LoadMetadataRequest\x12\x1c\n" +
-	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\"F\n" +
+	"\x02id\x18\x01 \x01(\v2\f.state.v2.IDR\x02id\x12<\n" +
+	"\x1bomit_stack_and_step_metrics\x18\x02 \x01(\bR\x17omitStackAndStepMetrics\"F\n" +
 	"\x14LoadMetadataResponse\x12.\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x12.state.v2.MetadataR\bmetadata\"\xc1\x01\n" +
 	"\x15UpdateMetadataRequest\x12\x1c\n" +
