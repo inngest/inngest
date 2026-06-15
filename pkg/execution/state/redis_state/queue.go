@@ -1213,6 +1213,9 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 
 // cleanupNilPartitionInGlobal is invoked when we peek a missing partition in the global partitions pointer zset.
 // This ensures a stale global partition pointer does not halt the queue scanner.
+//
+// Safe under concurrent deletes: partitionRequeue.lua atomically ZREMs the pointer before HDEL'ing
+// metadata, so a missing partition here is a stale pointer (migration/legacy), not a transient race.
 func (q *queue) cleanupNilPartitionInGlobal(ctx context.Context, partitionKey string) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInGlobal"), redis_telemetry.ScopeQueue)
 
