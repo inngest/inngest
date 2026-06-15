@@ -2001,6 +2001,68 @@ func TestCQRSGetTraceRunsPreviewEndedAtUsesTraceRuns(t *testing.T) {
 	assert.Equal(t, runIDs[0], secondPage[0].RunID)
 }
 
+func TestCQRSGetSpanRunsCELJoinQualifiesTenantFilters(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	eventID := "evt-cel-tenant-filter"
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	require.NoError(t, cm.InsertEvent(ctx, cqrs.Event{
+		ID:        ulid.MustNew(ulid.Now(), rand.Reader),
+		EventID:   eventID,
+		EventName: "app/cel.match",
+		EventData: map[string]any{"tenant": "target"},
+		EventUser: map[string]any{},
+		EventTS:   baseTime.UnixMilli(),
+	}))
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-cel-tenant-filter",
+		Name:          meta.SpanNameRun,
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+		EventIDs:      []byte(fmt.Sprintf(`["%s"]`, eventID)),
+	})
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+			CEL:         `event.data.tenant == "target"`,
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Preview: true,
+	}
+
+	runs, err := cm.GetTraceRuns(ctx, opt)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, runID, runs[0].RunID)
+
+	count, err := cm.GetTraceRunsCount(ctx, opt)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}
+
 // Root-page results must derive end_time/status from EXTEND spans.
 func TestCQRSGetSpanRunsEnrichmentFromExtendSpans(t *testing.T) {
 	ctx := context.Background()
@@ -2485,6 +2547,7 @@ type testSpanFields struct {
 	EnvID          string    // default: "env"
 	Attributes     []byte    // JSON attributes (optional)
 	Output         []byte    // JSON output (optional)
+	EventIDs       []byte    // JSON array of event IDs (optional)
 }
 
 // There aren't any functions exposed on cqrs.Manager that write to the new spans table
@@ -2535,6 +2598,7 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		DebugSessionID: sql.NullString{String: spanFields.DebugSessionID, Valid: spanFields.DebugSessionID != ""},
 		Attributes:     spanFields.Attributes,
 		Output:         spanFields.Output,
+		EventIds:       spanFields.EventIDs,
 	})
 	require.NoError(t, err)
 }
