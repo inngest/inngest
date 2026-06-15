@@ -75,6 +75,14 @@ func (c *ConstraintApiDebugLifecycles) OnCapacityLeaseReleased(ctx context.Conte
 	return nil
 }
 
+// ExtendCallCount lets tests observe the lifecycle from another goroutine
+// without racing the extender that appends to ExtendCalls.
+func (c *ConstraintApiDebugLifecycles) ExtendCallCount() int {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return len(c.ExtendCalls)
+}
+
 func (c *ConstraintApiDebugLifecycles) Reset() {
 	c.l.Lock()
 	defer c.l.Unlock()

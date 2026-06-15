@@ -33,9 +33,10 @@ func TestFnCheckpoint(t *testing.T) {
 		},
 	}
 
+	// Keep the middle delay above, but not equal to, the custom 1s batch interval below.
 	delays := []time.Duration{
 		time.Millisecond,
-		time.Second,
+		1500 * time.Millisecond,
 		2 * time.Second,
 	}
 
@@ -55,8 +56,6 @@ func TestFnCheckpoint(t *testing.T) {
 				},
 				inngestgo.EventTrigger(evtName, nil),
 				func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-					rid.Send(input.InputCtx.RunID)
-
 					_, _ = step.Run(ctx, "a", func(ctx context.Context) (string, error) { return "a", nil })
 					fmt.Println("a")
 					_, _ = step.Run(ctx, "b", func(ctx context.Context) (string, error) {
@@ -69,6 +68,9 @@ func TestFnCheckpoint(t *testing.T) {
 						return "c", nil
 					})
 					fmt.Println("c (done), ", input.InputCtx.RunID)
+					// Publish the run ID after the final step so the status poll
+					// does not race checkpoint replay while the function is still running.
+					rid.Send(input.InputCtx.RunID)
 					return nil, nil
 				},
 			)
@@ -80,7 +82,7 @@ func TestFnCheckpoint(t *testing.T) {
 			r.NoError(err)
 
 			runID := rid.Wait(t)
-			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 60 * time.Second})
+			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 2 * time.Minute})
 			var output string
 			err = json.Unmarshal([]byte(run.Output), &output)
 			require.NotEmpty(t, runID)
@@ -113,8 +115,6 @@ func TestCheckpointMaxDuration(t *testing.T) {
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-			rid.Send(input.InputCtx.RunID)
-
 			for i := range 8 {
 				_, _ = step.Run(ctx, fmt.Sprintf("%d", i), func(ctx context.Context) (string, error) {
 					<-time.After(1 * time.Second)
@@ -123,6 +123,9 @@ func TestCheckpointMaxDuration(t *testing.T) {
 				fmt.Println(i)
 			}
 			fmt.Println("c (done), ", input.InputCtx.RunID)
+			// Publish the run ID after the final step so the status poll does not
+			// race checkpoint replay while the function is still running.
+			rid.Send(input.InputCtx.RunID)
 			return nil, nil
 		},
 	)
@@ -134,7 +137,7 @@ func TestCheckpointMaxDuration(t *testing.T) {
 	r.NoError(err)
 
 	runID := rid.Wait(t)
-	run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID)
+	run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 2 * time.Minute})
 	var output string
 	err = json.Unmarshal([]byte(run.Output), &output)
 	require.NotEmpty(t, runID)

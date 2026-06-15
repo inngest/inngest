@@ -33,9 +33,9 @@ func TestWorkerConcurrency(t *testing.T) {
 	inngestClient := NewSDKConnectHandler(t, "worker-concurrency")
 
 	var (
-		inProgress, total int32
-		numEvents         = 3
-		stepDuration      = 2
+		inProgress, total, ready int32
+		numEvents                = 3
+		stepDuration             = 2
 	)
 
 	trigger := "test/worker-concurrency"
@@ -48,6 +48,13 @@ func TestWorkerConcurrency(t *testing.T) {
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			if data, ok := input.Event.Data.(map[string]any); ok {
+				if probe, _ := data["probe"].(bool); probe {
+					atomic.StoreInt32(&ready, 1)
+					return "ready", nil
+				}
+			}
+
 			fmt.Println("Running worker concurrency test", *input.Event.ID)
 
 			next := atomic.AddInt32(&inProgress, 1)
@@ -75,23 +82,70 @@ func TestWorkerConcurrency(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Wait for the worker to be connected and synced
+	appName := inngestClient.AppID()
+	var workerGroupID string
+
+	// Wait for this app's worker group to be connected.
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		a := assert.New(collect)
 		resp, err := http.Get(fmt.Sprintf("%s/v0/connect/envs/dev/conns", DEV_URL))
-		a.NoError(err)
+		if !a.NoError(err) {
+			return
+		}
+		defer resp.Body.Close()
+
 		var reply rest.ShowConnsReply
 		err = json.NewDecoder(resp.Body).Decode(&reply)
-		a.NoError(err)
-		a.GreaterOrEqual(len(reply.Data), 1, "worker should be connected")
-		if len(reply.Data) > 0 {
-			// Verify at least one worker group is synced
-			a.GreaterOrEqual(len(reply.Data[0].SyncedWorkerGroups), 1, "worker should be synced")
+		if !a.NoError(err) {
+			return
 		}
+
+		for _, conn := range reply.Data {
+			if groupID, ok := conn.AllWorkerGroups[appName]; ok {
+				workerGroupID = groupID
+				return
+			}
+		}
+		a.Failf("worker group not connected", "no worker group found for app %q", appName)
 	}, 10*time.Second, 500*time.Millisecond)
 
-	// Give time for semaphore capacity to propagate and gateway routing to stabilize
-	<-time.After(10 * time.Second)
+	// Wait for the worker group to be fully synced before enqueueing work.
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		a := assert.New(collect)
+		resp, err := http.Get(fmt.Sprintf("%s/v0/connect/envs/dev/groups/%s", DEV_URL, workerGroupID))
+		if !a.NoError(err) {
+			return
+		}
+		defer resp.Body.Close()
+
+		var reply rest.ShowWorkerGroupReply
+		if !a.NoError(json.NewDecoder(resp.Body).Decode(&reply)) {
+			return
+		}
+		if !a.NotNil(reply.Data) {
+			return
+		}
+
+		a.True(reply.Data.Synced, "worker group should be synced")
+	}, 10*time.Second, 500*time.Millisecond)
+
+	// A synced worker group can still race with gateway routing metadata becoming
+	// visible. Prove the route can execute before sending the workload under test.
+	require.Eventually(t, func() bool {
+		if atomic.LoadInt32(&ready) == 1 {
+			return true
+		}
+
+		_, err := inngestClient.Send(context.Background(), inngestgo.Event{
+			Name: trigger,
+			Data: map[string]any{"probe": true},
+		})
+		if err != nil {
+			return false
+		}
+
+		return atomic.LoadInt32(&ready) == 1
+	}, 30*time.Second, 500*time.Millisecond, "worker route should become ready")
 
 	// Send multiple events
 	for i := 0; i < numEvents; i++ {
