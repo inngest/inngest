@@ -25,6 +25,9 @@ type DialectHelpers interface {
 	// EventIDsExpr returns the goqu expression for aggregating event IDs in span queries.
 	EventIDsExpr() sqexp.Expression
 
+	// RootEventIDsExpr selects root-only event IDs without aggregation.
+	RootEventIDsExpr() sqexp.Expression
+
 	// BuildEventJoin adds the dialect-specific event join to a span query.
 	BuildEventJoin(q *sq.SelectDataset) *sq.SelectDataset
 

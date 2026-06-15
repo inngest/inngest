@@ -519,6 +519,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -541,6 +543,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -563,6 +567,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -592,6 +598,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -615,6 +623,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -647,6 +657,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -673,6 +685,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -701,6 +715,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -727,6 +743,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -754,6 +772,8 @@ SELECT
   s.parent_span_id,
   json_group_array(json_object(
     'span_id', s.span_id,
+    'start_time', s.start_time,
+    'end_time', s.end_time,
     'name', s.name,
     'attributes', s.attributes,
     'links', s.links,
