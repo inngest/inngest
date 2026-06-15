@@ -365,6 +365,8 @@ DO UPDATE SET
                  WHEN trace_runs.has_ai = 1 THEN 1
                  ELSE excluded.has_ai
              END
+-- Terminal status codes (matches enums.runStatusCode in pkg/enums/run_status.go):
+--   50=Overflowed, 300=Completed, 400=Failed, 500=Cancelled, 600=Skipped.
 WHERE NOT (
     trace_runs.status IN (50, 300, 400, 500, 600)
     AND excluded.status NOT IN (50, 300, 400, 500, 600)
