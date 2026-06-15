@@ -2,6 +2,7 @@ import { ContextualBanner, type Severity } from '@inngest/components/Banner';
 import { Button } from '@inngest/components/Button';
 import { formatDayString } from '@inngest/components/utils/date';
 
+import { isSafeCTAURL } from '@/components/ActiveBanners/safeUrl';
 import { pathCreator } from '@/utils/urls';
 import { type AccountPaymentStatus } from './types';
 import { usePaymentStatus } from './usePaymentStatus';
@@ -74,7 +75,11 @@ export function BillingPaymentStatusBanner({
                 {invoice.amountLabel} — due{' '}
                 {formatDayString(new Date(invoice.dueAt))} (
                 {invoice.daysPastDue} days overdue)
-                {invoice.invoiceURL && (
+                {/* Validate the scheme before rendering: invoiceURL comes from
+                    the API and this banner reaches all end users, so an unsafe
+                    `javascript:`/`data:` href would be a click-to-execute
+                    primitive. Defense in depth, mirroring ActiveBannerItem. */}
+                {invoice.invoiceURL && isSafeCTAURL(invoice.invoiceURL) && (
                   <>
                     {' · '}
                     <ContextualBanner.Link
