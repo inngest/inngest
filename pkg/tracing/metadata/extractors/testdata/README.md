@@ -1,10 +1,10 @@
 # AI metadata OTLP fixtures
 
 Real OTLP/JSON `ExportTraceServiceRequest` payloads captured from instrumented
-OpenAI SDK calls, one directory per instrumentation. Each directory holds one
-fixture per call variant (`params_chat`, `tools_chat`, `stream_chat`,
-`basic_responses`, `reasoning_responses`, `embeddings`) where the
-instrumentation emits a span for it.
+AI SDK calls, one directory per instrumentation. Each directory holds one
+fixture per call variant (OpenAI: `params_chat`, `tools_chat`, `stream_chat`,
+`basic_responses`, `reasoning_responses`, `embeddings`; Anthropic:
+`reasoning_messages`) where the instrumentation emits a span for it.
 
 `TestAIMetadataExtractor_CapturedFixtures` extracts `AIMetadata` from every
 span of every fixture and asserts against the `<fixture>.out` golden file
@@ -71,3 +71,15 @@ The Responses API variants omit finish reasons entirely. No embeddings or
 stream_chat fixtures: `wrapOpenAI` (langsmith 0.7.3) wraps neither
 `embeddings.create` nor streaming chat completions, so those variants emit no
 span.
+
+### anthropic_otel_traceloop — `@traceloop/instrumentation-anthropic`
+
+Anthropic Messages API (`messages.create`), `gen_ai.*` attributes, one span per
+call. Like the OpenAI Traceloop emitter it uses the current
+`gen_ai.provider.name` (`anthropic`) and emits `gen_ai.usage.total_tokens`
+directly (not derived). `response_id` is empty — the instrumentation emits no
+`gen_ai.response.id`. The single `reasoning_messages` fixture uses adaptive
+extended thinking: Anthropic has no separate reasoning-token field, so thinking
+folds into `output_tokens` (hence the large count); the thinking text is carried
+as a `reasoning` part inside `gen_ai.output.messages`, which the extractor does
+not map.
