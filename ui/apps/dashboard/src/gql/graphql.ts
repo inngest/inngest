@@ -101,6 +101,12 @@ export type Account = {
   name: Maybe<Scalars['NullString']['output']>;
   paymentIntents: Array<PaymentIntent>;
   paymentMethods: Maybe<Array<PaymentMethod>>;
+  /**
+   * Collections / payment status for the account. Null when the account is in
+   * good standing (no overdue invoices and no failed payment). Powers the in-app
+   * overdue-invoice banner.
+   */
+  paymentStatus: Maybe<AccountPaymentStatus>;
   plan: Maybe<BillingPlan>;
   quickSearch: QuickSearchResults;
   search: SearchResults;
@@ -131,6 +137,35 @@ export type AccountQuickSearchArgs = {
 
 export type AccountSearchArgs = {
   opts: SearchInput;
+};
+
+export type AccountPaymentStatus = {
+  __typename?: 'AccountPaymentStatus';
+  /** When the pending action takes effect (downgrade/suspension), if scheduled. Null otherwise. */
+  actionDate: Maybe<Scalars['Time']['output']>;
+  /** Total past-due amount across all overdue invoices, in cents. */
+  amountDueCents: Scalars['Int']['output'];
+  /** Pre-formatted amount for display, e.g. "$240.00". */
+  amountDueLabel: Scalars['String']['output'];
+  /** ISO 4217 currency code, e.g. "usd". */
+  currency: Scalars['String']['output'];
+  /** Days the oldest overdue invoice is past due. 0 if a payment failed but nothing is overdue yet. */
+  daysPastDue: Scalars['Int']['output'];
+  /** Whether the most recent payment attempt failed (card declined, etc.). */
+  hasFailedPayment: Scalars['Boolean']['output'];
+  /** Per-invoice detail for the /billing page banner. */
+  overdueInvoices: Array<OverdueInvoice>;
+  /** What happens at actionDate. Null when nothing is scheduled. */
+  pendingAction: Maybe<PaymentPendingAction>;
+  /** Most direct link to resolve payment (hosted invoice URL or billing portal). Must be https. */
+  resolveURL: Scalars['String']['output'];
+  /** Highest severity across all open/overdue invoices. Drives banner color. */
+  severity: PaymentStatusSeverity;
+  /**
+   * Machine-readable collections stage, computed server-side from invoice age and
+   * payment state. Drives banner copy and /billing detail messaging.
+   */
+  stage: PaymentCollectionStage;
 };
 
 export type Addon = {
@@ -1718,6 +1753,26 @@ export type NewWorkspaceInput = {
   name: Scalars['String']['input'];
 };
 
+export type OverdueInvoice = {
+  __typename?: 'OverdueInvoice';
+  amountCents: Scalars['Int']['output'];
+  /** e.g. "$120.00" */
+  amountLabel: Scalars['String']['output'];
+  /** last payment attempt, null if none */
+  attemptedAt: Maybe<Scalars['Time']['output']>;
+  currency: Scalars['String']['output'];
+  daysPastDue: Scalars['Int']['output'];
+  dueAt: Scalars['Time']['output'];
+  /** e.g. "card_declined", null if none */
+  failureReason: Maybe<Scalars['String']['output']>;
+  /** Stripe invoice ID (e.g. "in_123"). Typed as String because IDs in this schema are UUIDs; invoice IDs are not. */
+  id: Scalars['String']['output'];
+  /** hosted invoice / pay link (https), null if none */
+  invoiceURL: Maybe<Scalars['String']['output']>;
+  /** underlying invoice status (open, uncollectible, …) */
+  status: Scalars['String']['output'];
+};
+
 /** The pagination information in a connection. */
 export type PageInfo = {
   __typename?: 'PageInfo';
@@ -1758,6 +1813,21 @@ export type PaginatedWorkflows = {
   page: PageResults;
 };
 
+export enum PaymentCollectionStage {
+  /** already downgraded for non-payment */
+  Downgraded = 'DOWNGRADED',
+  /** scheduled to downgrade on actionDate */
+  DowngradePending = 'DOWNGRADE_PENDING',
+  /** overdue beyond stricter threshold */
+  FinalNotice = 'FINAL_NOTICE',
+  /** overdue, within grace window */
+  PastDue = 'PAST_DUE',
+  /** card declined / retrying, not yet past grace */
+  PaymentFailed = 'PAYMENT_FAILED',
+  /** account suspended for non-payment */
+  Suspended = 'SUSPENDED'
+}
+
 export type PaymentIntent = {
   __typename?: 'PaymentIntent';
   amountLabel: Scalars['String']['output'];
@@ -1776,6 +1846,18 @@ export type PaymentMethod = {
   expYear: Scalars['String']['output'];
   last4: Scalars['String']['output'];
 };
+
+export enum PaymentPendingAction {
+  Downgrade = 'DOWNGRADE',
+  Suspend = 'SUSPEND'
+}
+
+export enum PaymentStatusSeverity {
+  /** past stricter threshold, downgrade/suspension imminent or active */
+  Critical = 'CRITICAL',
+  /** failed payment / within grace window */
+  Warning = 'WARNING'
+}
 
 export type Price = {
   __typename?: 'Price';
@@ -3575,6 +3657,11 @@ export type ProductionAppsQueryVariables = Exact<{
 
 export type ProductionAppsQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', apps: Array<{ __typename?: 'App', id: string }>, unattachedSyncs: Array<{ __typename?: 'Deploy', lastSyncedAt: string }> } };
 
+export type PaymentStatusQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type PaymentStatusQuery = { __typename?: 'Query', account: { __typename?: 'Account', id: string, paymentStatus: { __typename?: 'AccountPaymentStatus', severity: PaymentStatusSeverity, stage: PaymentCollectionStage, amountDueLabel: string, daysPastDue: number, hasFailedPayment: boolean, actionDate: string | null, pendingAction: PaymentPendingAction | null, resolveURL: string, overdueInvoices: Array<{ __typename?: 'OverdueInvoice', id: string, amountLabel: string, dueAt: string, daysPastDue: number, status: string, invoiceURL: string | null, failureReason: string | null }> } | null } };
+
 export type GetAccountEntitlementsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -4133,6 +4220,7 @@ export const InvokeFunctionOnboardingDocument = {"kind":"Document","definitions"
 export const InvokeFunctionLookupDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"InvokeFunctionLookup"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pageSize"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"envBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflows"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"paginated"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"perPage"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pageSize"}}},{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}},{"kind":"Field","name":{"kind":"Name","value":"triggers"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"page"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}},{"kind":"Field","name":{"kind":"Name","value":"perPage"}}]}}]}}]}}]}}]} as unknown as DocumentNode<InvokeFunctionLookupQuery, InvokeFunctionLookupQueryVariables>;
 export const GetVercelAppsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetVercelApps"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"unattachedSyncs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"lastSyncedAt"}},{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"url"}},{"kind":"Field","name":{"kind":"Name","value":"vercelDeploymentURL"}}]}},{"kind":"Field","name":{"kind":"Name","value":"apps"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"externalID"}},{"kind":"Field","name":{"kind":"Name","value":"isArchived"}},{"kind":"Field","name":{"kind":"Name","value":"latestSync"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"error"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"platform"}},{"kind":"Field","name":{"kind":"Name","value":"vercelDeploymentID"}},{"kind":"Field","name":{"kind":"Name","value":"vercelProjectID"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetVercelAppsQuery, GetVercelAppsQueryVariables>;
 export const ProductionAppsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ProductionApps"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"apps"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}},{"kind":"Field","name":{"kind":"Name","value":"unattachedSyncs"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"IntValue","value":"1"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"lastSyncedAt"}}]}}]}}]}}]} as unknown as DocumentNode<ProductionAppsQuery, ProductionAppsQueryVariables>;
+export const PaymentStatusDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"PaymentStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"paymentStatus"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"severity"}},{"kind":"Field","name":{"kind":"Name","value":"stage"}},{"kind":"Field","name":{"kind":"Name","value":"amountDueLabel"}},{"kind":"Field","name":{"kind":"Name","value":"daysPastDue"}},{"kind":"Field","name":{"kind":"Name","value":"hasFailedPayment"}},{"kind":"Field","name":{"kind":"Name","value":"actionDate"}},{"kind":"Field","name":{"kind":"Name","value":"pendingAction"}},{"kind":"Field","name":{"kind":"Name","value":"resolveURL"}},{"kind":"Field","name":{"kind":"Name","value":"overdueInvoices"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"amountLabel"}},{"kind":"Field","name":{"kind":"Name","value":"dueAt"}},{"kind":"Field","name":{"kind":"Name","value":"daysPastDue"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"invoiceURL"}},{"kind":"Field","name":{"kind":"Name","value":"failureReason"}}]}}]}}]}}]}}]} as unknown as DocumentNode<PaymentStatusQuery, PaymentStatusQueryVariables>;
 export const GetAccountEntitlementsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetAccountEntitlements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"entitlements"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"history"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"limit"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetAccountEntitlementsQuery, GetAccountEntitlementsQueryVariables>;
 export const GetReplayRunCountsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetReplayRunCounts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"from"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"to"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","alias":{"kind":"Name","value":"replayCounts"},"name":{"kind":"Name","value":"replayCounts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"from"},"value":{"kind":"Variable","name":{"kind":"Name","value":"from"}}},{"kind":"Argument","name":{"kind":"Name","value":"to"},"value":{"kind":"Variable","name":{"kind":"Name","value":"to"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"completedCount"}},{"kind":"Field","name":{"kind":"Name","value":"failedCount"}},{"kind":"Field","name":{"kind":"Name","value":"cancelledCount"}},{"kind":"Field","name":{"kind":"Name","value":"skippedPausedCount"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetReplayRunCountsQuery, GetReplayRunCountsQueryVariables>;
 export const CreateFunctionReplayDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateFunctionReplay"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"fromRange"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"toRange"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ULID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ReplayRunStatus"}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createFunctionReplay"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"workflowID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionID"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"fromRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"fromRange"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"toRange"},"value":{"kind":"Variable","name":{"kind":"Name","value":"toRange"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"statusesV2"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateFunctionReplayMutation, CreateFunctionReplayMutationVariables>;

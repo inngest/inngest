@@ -142,10 +142,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 			break
 		}
 	}
-	// Since blockStore.Delete only marks the pause for deletion and doesn't immediately remove it
-	// from the block, we can't assert \!found here. In a real implementation,
-	// this would eventually be removed during compaction.
-	require.True(t, found)
+	require.False(t, found)
 }
 
 func TestConsumePause(t *testing.T) {

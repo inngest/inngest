@@ -175,11 +175,71 @@ func TestDualIterErrorHandling(t *testing.T) {
 	require.Equal(t, expectedErr, iter.Error())
 }
 
+func TestDualIterCompletesWhenFetchedBlockFiltersEmpty(t *testing.T) {
+	idx := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.event",
+	}
+
+	blockID := ulid.Make()
+	pauseID := uuid.New()
+	blockReader := &mockBlockReader{
+		blocks: map[ulid.ULID]*Block{
+			blockID: {
+				Pauses: []*state.Pause{{ID: pauseID}},
+			},
+		},
+		deletedIDs: map[ulid.ULID][]string{
+			blockID: {pauseID.String()},
+		},
+	}
+
+	iter := newDualIter(idx, &mockPauseIterator{}, blockReader, func() ([]ulid.ULID, error) {
+		return []ulid.ULID{blockID}, nil
+	})
+
+	ctx := context.Background()
+	require.False(t, iter.Next(ctx))
+	require.ErrorIs(t, iter.Error(), context.Canceled)
+	require.Empty(t, iter.inflightBlocks)
+	require.Contains(t, iter.fetchedBlocks, blockID)
+}
+
+func TestDualIterClearsInflightBlockOnDeletedIDLookupError(t *testing.T) {
+	idx := Index{
+		WorkspaceID: uuid.New(),
+		EventName:   "test.event",
+	}
+
+	blockID := ulid.Make()
+	expectedErr := errors.New("deleted ID lookup failed")
+	blockReader := &mockBlockReader{
+		blocks: map[ulid.ULID]*Block{
+			blockID: {
+				Pauses: []*state.Pause{{ID: uuid.New()}},
+			},
+		},
+		deletedErr: expectedErr,
+	}
+
+	iter := newDualIter(idx, &mockPauseIterator{}, blockReader, func() ([]ulid.ULID, error) {
+		return []ulid.ULID{blockID}, nil
+	})
+
+	ctx := context.Background()
+	require.False(t, iter.Next(ctx))
+	require.Equal(t, expectedErr, iter.Error())
+	require.Empty(t, iter.inflightBlocks)
+	require.NotContains(t, iter.fetchedBlocks, blockID)
+}
+
 // mockBlockReader implements BlockReader for testing
 type mockBlockReader struct {
-	blocks map[ulid.ULID]*Block
-	delay  time.Duration
-	err    error
+	blocks     map[ulid.ULID]*Block
+	deletedIDs map[ulid.ULID][]string
+	delay      time.Duration
+	err        error
+	deletedErr error
 }
 
 func (m *mockBlockReader) ReadBlock(ctx context.Context, idx Index, blockID ulid.ULID) (*Block, error) {
@@ -233,6 +293,8 @@ func (m *mockBlockReader) GetBlockPauseIDs(ctx context.Context, index Index, blo
 }
 
 func (m *mockBlockReader) GetBlockDeletedIDs(ctx context.Context, index Index, blockID ulid.ULID) ([]string, int64, error) {
-	return nil, 0, nil // Not needed for this test
+	if m.deletedErr != nil {
+		return nil, 0, m.deletedErr
+	}
+	return m.deletedIDs[blockID], 0, nil
 }
-
