@@ -139,8 +139,11 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
 
 	newRunID, err := s.runs.Rerun(ctx, runID, RerunOpts{})
 	if err != nil {
-		if errors.Is(err, ErrRunNotFound) {
+		switch {
+		case errors.Is(err, ErrRunNotFound):
 			return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Run not found")
+		case errors.Is(err, ErrCronRerunNotSupported):
+			return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Rerunning cron-triggered runs is not yet supported")
 		}
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to rerun run")
 	}

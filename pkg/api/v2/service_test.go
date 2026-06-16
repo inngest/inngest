@@ -1159,6 +1159,22 @@ func TestService_Rerun(t *testing.T) {
 		require.ErrorContains(t, err, "Run not found")
 	})
 
+	t.Run("maps cron rerun unsupported", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(ulid.ULID{}, ErrCronRerunNotSupported).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Rerunning cron-triggered runs is not yet supported")
+	})
+
 	t.Run("applies rate limit", func(t *testing.T) {
 		rateLimiter := &mockRateLimitProvider{}
 		rateLimiter.On("CheckRateLimit", mock.Anything, apiv2.V2_Rerun_FullMethodName).
