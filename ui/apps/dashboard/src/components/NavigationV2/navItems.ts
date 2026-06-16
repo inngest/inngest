@@ -50,6 +50,13 @@ export const experimentsItem: NavItemConfig = {
   beta: true,
 };
 
+export const scoresItem: NavItemConfig = {
+  label: 'Scores',
+  route: 'scores',
+  Icon: InsightsIcon,
+  beta: true,
+};
+
 export const manage: NavGroupConfig = {
   heading: 'Manage',
   items: [{ label: 'Webhooks', route: 'manage/webhooks', Icon: WebhooksIcon }],
