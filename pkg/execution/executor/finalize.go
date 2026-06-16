@@ -340,14 +340,19 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 		return
 	}
 
-	removed := e.doRemoveRunJobs(ctx, l, shard, opts)
-	if removed > 0 {
-		// If items were found, a concurrent executor may still be enqueuing items
-		// for this run (e.g., a KindSleep item being scheduled while the run is
-		// being cancelled). Wait briefly then sweep again to catch any stragglers
-		// that were enqueued during the first pass.
-		time.Sleep(50 * time.Millisecond)
-		e.doRemoveRunJobs(ctx, l, shard, opts)
+	// A concurrent executor may still be enqueuing items for this run (e.g.,
+	// a KindSleep item being scheduled while the run is being cancelled). Use
+	// a bounded loop: keep sweeping while items are found, up to a maximum
+	// number of attempts, to avoid orphaning items enqueued during a sweep.
+	const maxSweeps = 3
+	for i := 0; i < maxSweeps; i++ {
+		removed := e.doRemoveRunJobs(ctx, l, shard, opts)
+		if removed == 0 {
+			break
+		}
+		if i < maxSweeps-1 {
+			time.Sleep(50 * time.Millisecond)
+		}
 	}
 }
 
