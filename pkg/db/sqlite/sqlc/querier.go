@@ -99,6 +99,8 @@ type Querier interface {
 	// Traces
 	//
 	InsertTrace(ctx context.Context, arg InsertTraceParams) error
+	// Terminal status codes (matches enums.runStatusCode in pkg/enums/run_status.go):
+	//   50=Overflowed, 300=Completed, 400=Failed, 500=Cancelled, 600=Skipped.
 	InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error
 	//
 	// Worker Connections
