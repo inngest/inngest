@@ -2,6 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.28.0] - 2026-06-16
+
+### 🚀 Features
+
+- Implements v2 api/cli get function (#4353)
+- *(queue)* Enable shard ForEach using feature flag (#4375)
+- Deterministic finalized step span IDs  (#4370)
+- *(experiments)* Change experiment_name -> name in metadata (#4355)
+- *(metadata)* Use deterministic step span IDs (#4386)
+- Rest v2 api get functions  (#4385)
+- V2 rest api get app (#4389)
+
+### 🐛 Bug Fixes
+
+- Return consistent function ids across v2 endpoints (#4377)
+- *(release)* Mark prerelease tags as non-latest (#4380)
+- State leak when new state is created but ErrQueueItemExists is hit (#4394)
+- Exact matching on ErrQueueItemExists causing unnecessary retries (#4400)
+- Properly identify the response AI model while parsing OTel attributes (EXE-1837) (#4398)
+- Don't double count Vercel SDK AI spans (EXE-1837) (#4399)
+- *(pauses)* Filter deleted block pauses during iteration (#4358)
+- *(queue)* Fix Semaphore Key Queues edge case (#4411)
+- *(queue)* Self-heal stale global partition pointers (#4244)
+- *(devserver)* Reapply postgres connection pool settings (#4392)
+- *(cron)* Set envid on health check resync path (#4419)
+
+### ⚡ Performance
+
+- Add state metadata option to skip fetching stack & step metadata (#4393)
+- Improvements for OSS filters (#4299)
+
+### 🧪 Testing
+
+- Synchronize compaction in TestCompactionSkipsPhantomBlocks (#4382)
+
+### ⚙️ Miscellaneous Tasks
+
+- Measure non-atomic state idempotency claim races (#4365)
+- Log warning on hitting the duplicate state metric (#4388)
+
 ## [v1.27.0] - 2026-06-09
 
 ### 🚀 Features
@@ -32,6 +72,11 @@ All notable changes to this project will be documented in this file.
 
 - Update v2 /runs to use latest trace span structures (#4346)
 - Expand batch buffer wait metric buckets (#3867)
+- *(release)* V1.27.0 (#4347)
+
+### ◀️ Revert
+
+- "feat: Deterministic finalized step span IDs" (#4360)
 
 ## [v1.26.0] - 2026-06-05
 
