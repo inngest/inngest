@@ -4,9 +4,11 @@ import (
 	"container/heap"
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/jonboulle/clockwork"
 	"golang.org/x/sync/singleflight"
@@ -15,6 +17,11 @@ import (
 const (
 	defaultTTL      = 10 * time.Minute
 	defaultCapacity = 10_000
+	metricsPkgName  = "ttlupsert"
+
+	metricStatusUpsert = "upsert"
+	metricStatusSkip   = "skip"
+	metricStatusError  = "error"
 )
 
 var (
@@ -95,12 +102,15 @@ func NewWithKey[T any](keyFn func(T) string, opts ...Option) Upserter[T] {
 			return util.XXHash(t)
 		}
 	}
+	metricType := metricTypeName[T]()
 
 	return &upserter[T]{
 		keyFn:       keyFn,
 		ttl:         conf.ttl,
 		capacity:    conf.capacity,
 		clock:       conf.clock,
+		metricType:  metricType,
+		metricTags:  map[string]any{"type": metricType},
 		entries:     map[string]*expiryEntry{},
 		expirations: expiryHeap{},
 	}
@@ -113,6 +123,9 @@ type upserter[T any] struct {
 	// capacity is how many keys wiull be tracked to skip uypserting
 	capacity int
 	clock    clockwork.Clock
+
+	metricType string
+	metricTags map[string]any
 
 	// mu locks entries and expirations, a basic LRU cache
 	mu          sync.Mutex
@@ -139,6 +152,7 @@ func (s *upserter[T]) Upsert(ctx context.Context, item T, tx func(context.Contex
 	}
 
 	if s.cached(key) {
+		s.incrCounter(ctx, metricStatusSkip)
 		return false, nil
 	}
 
@@ -151,15 +165,40 @@ func (s *upserter[T]) Upsert(ctx context.Context, item T, tx func(context.Contex
 		}
 
 		ran = true
+		start := s.clock.Now()
 		err := tx(ctx)
+		metrics.HistogramTTLUpsertDuration(ctx, s.clock.Since(start), metrics.HistogramOpt{
+			PkgName: metricsPkgName,
+			Tags:    s.metricTags,
+		})
 		if err != nil {
+			s.incrCounter(ctx, metricStatusError)
 			return nil, err
 		}
 
 		s.record(key)
+		s.incrCounter(ctx, metricStatusUpsert)
 		return nil, nil
 	})
+	if !ran {
+		if err != nil {
+			s.incrCounter(ctx, metricStatusError)
+		} else {
+			s.incrCounter(ctx, metricStatusSkip)
+		}
+	}
 	return ran, err
+}
+
+func (s *upserter[T]) incrCounter(ctx context.Context, status string) {
+	metrics.IncrTTLUpsertCounter(ctx, status, metrics.CounterOpt{
+		PkgName: metricsPkgName,
+		Tags:    s.metricTags,
+	})
+}
+
+func metricTypeName[T any]() string {
+	return reflect.TypeOf((*T)(nil)).Elem().String()
 }
 
 func (s *upserter[T]) cached(key string) bool {

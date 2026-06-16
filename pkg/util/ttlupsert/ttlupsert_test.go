@@ -16,6 +16,13 @@ type testItem struct {
 	ID string
 }
 
+func TestMetricTypeNameUsesGenericType(t *testing.T) {
+	u := NewWithKey(func(i testItem) string { return i.ID })
+	impl := u.(*upserter[testItem])
+
+	require.Equal(t, "ttlupsert.testItem", impl.metricType)
+}
+
 func TestUpsertSkipsSuccessfulKeyWithinTTL(t *testing.T) {
 	ctx := context.Background()
 	u := NewWithKey(func(i testItem) string { return i.ID })
