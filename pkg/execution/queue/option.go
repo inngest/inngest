@@ -43,6 +43,7 @@ type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID)
 // DisableSemaphoreConstraintChecks controls whether semaphore constraints should
 // be ignored for an account while semaphores are rolled out.
 type DisableSemaphoreConstraintChecks func(ctx context.Context, accountID uuid.UUID) bool
+
 // QueueItemEarliestPeekTimeConfig controls earliest-peek-time side-key stamping.
 // Items already visited by the iterator are stamped individually when Enabled is
 // true. BulkStampLimit is only the additional tail budget used if the iterator

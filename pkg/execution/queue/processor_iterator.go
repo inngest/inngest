@@ -361,7 +361,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	//
 	// Anyway, here we set the first peek item to the item's start time if there was a
 	// peek since the job was added.
-	if p.Partition.Last > 0 && p.Partition.Last > item.AtMS {
+	if item.EarliestPeekTime == 0 && p.Partition.Last > 0 && p.Partition.Last > item.AtMS {
 		// Fudge the earliest peek time because we know this wasn't peeked and so
 		// the peek time wasn't set;  but, as we were still processing jobs after
 		// the job was added this item was concurrency-limited.
