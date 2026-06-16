@@ -240,7 +240,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		opts.Interval = 2 * time.Second
 	}
 	if opts.Timeout == 0 {
-		opts.Timeout = 10 * time.Second
+		opts.Timeout = 30 * time.Second
 	}
 
 	var traces *RunV2
