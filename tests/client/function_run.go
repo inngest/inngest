@@ -210,7 +210,7 @@ func (c *Client) WaitForRunStatus(
 		o = opts[0]
 	}
 
-	timeout := 20 * time.Second
+	timeout := 60 * time.Second
 	if o.Timeout > 0 {
 		timeout = o.Timeout
 	}
