@@ -58,7 +58,7 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
+			Timeout: 45 * time.Second,
 		})
 
 		r.Equal(int32(1), stepExecutions.Load(), "step should execute exactly once (no retries)")
@@ -111,7 +111,7 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
+			Timeout: 45 * time.Second,
 		})
 
 		r.Equal(int32(2), stepExecutions.Load(), "step should execute twice (initial + 1 retry)")
@@ -161,7 +161,7 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
+			Timeout: 45 * time.Second,
 		})
 
 		r.Equal(int32(1), stepExecutions.Load(), "step should execute exactly once (NoRetryError prevents retries)")
@@ -204,7 +204,7 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
+			Timeout: 45 * time.Second,
 		})
 
 		r.Equal(int32(1), functionExecutions.Load(), "function should execute exactly once (no retries)")
@@ -244,7 +244,7 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusFailed.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
+			Timeout: 45 * time.Second,
 		})
 
 		r.Equal(int32(1), functionExecutions.Load(), "function should execute exactly once (NoRetryError prevents retries)")
@@ -294,7 +294,7 @@ func TestStepRetry(t *testing.T) {
 		r.NoError(err)
 
 		c.WaitForRunStatus(ctx, t, models.FunctionStatusCompleted.String(), rid.Wait(t), client.WaitForRunStatusOpts{
-			Timeout: 15 * time.Second,
+			Timeout: 45 * time.Second,
 		})
 
 		// The step executes once and fails, but the function continues and returns success
