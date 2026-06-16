@@ -19,7 +19,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/grpc"
+	connectGRPC "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
@@ -993,8 +993,8 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		WithGatewayPublicPort(gwPort),
 		WithGRPCConfig(connectConfig.NewGRPCConfig(
 			ctx,
-			grpc.DefaultConnectGRPCIP, grpcGwPort,
-			grpc.DefaultConnectGRPCIP, grpcExecPort,
+			connectGRPC.DefaultConnectGRPCIP, grpcGwPort,
+			connectGRPC.DefaultConnectGRPCIP, grpcExecPort,
 		)),
 	}
 
