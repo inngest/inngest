@@ -443,13 +443,15 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			released := make(chan struct{})
 			go func() {
 				for {
+					// Wait until the extend goroutine is blocked on the ticker
+					// before advancing. This makes advancement deterministic.
+					clock.BlockUntil(1)
+					// Double-check that release hasn't been signalled before advancing.
+					// This prevents advancing after the lease is released.
 					select {
-					case <-ctx.Done():
-						return
 					case <-released:
 						return
-					case <-time.After(time.Second):
-						// Ensure we tick the extend at least once
+					default:
 						clock.Advance(time.Second)
 					}
 				}
@@ -460,12 +462,13 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			// Release the capacity early
 			require.NotNil(t, ri.CapacityLease)
 
+			// Stop clock advances before releasing the lease. Any in-flight
+			// Advance (between BlockUntil returning and the select check)
+			// fires while the lease is still valid, so extend succeeds safely.
+			close(released)
+
 			err := ri.CapacityLease.Release()
 			require.NoError(t, err)
-			close(released) // stop clock advances after release
-
-			// Give the extend goroutine time to observe the cancelled context
-			<-time.After(50 * time.Millisecond)
 
 			// And do some more processing before returning
 			<-time.After(500 * time.Millisecond)
