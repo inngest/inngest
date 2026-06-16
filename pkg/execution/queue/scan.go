@@ -287,7 +287,7 @@ func (q *queueProcessor) processScannedPartitions(
 			})
 
 			if err != nil {
-				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
+				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected || err == ErrPartitionAlreadyLeased {
 					// Another worker grabbed the partition, or the partition was deleted
 					// during the scan by an another worker.
 					// TODO: Increase internal metrics
