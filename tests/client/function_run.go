@@ -183,7 +183,7 @@ func (c *Client) RunOrError(ctx context.Context, runID string) (Run, error) {
 			}
 		}`
 
-	resp := c.MustDoGQL(ctx, graphql.RawParams{
+	resp := c.doGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
 			"runID": runID,
