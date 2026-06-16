@@ -258,8 +258,15 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		if !a.NotNil(run) {
 			return
 		}
-		if opts.Status != "" && !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
-			return
+		if opts.Status != "" {
+			if !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
+				return
+			}
+
+			// Run status and trace root status update separately. Wait for both.
+			if run.Trace != nil && !a.Equal(opts.Status.String(), run.Trace.Status, "expected status did not match trace root status") {
+				return
+			}
 		}
 
 		if opts.ChildSpanCount > 0 {
