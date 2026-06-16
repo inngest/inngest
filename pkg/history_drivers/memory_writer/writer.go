@@ -144,6 +144,10 @@ func (w *writer) writeWorkflowStart(
 	item history.History,
 ) {
 	run := w.store.Data[item.RunID]
+
+	// Late scheduled/started events must not overwrite terminal status or output.
+	alreadyEnded := enums.RunStatusEnded(run.Run.Status)
+
 	run.Run.AccountID = item.AccountID
 	run.Run.BatchID = item.BatchID
 	run.Run.Cron = item.Cron
@@ -151,7 +155,7 @@ func (w *writer) writeWorkflowStart(
 	run.Run.ID = item.RunID
 	run.Run.OriginalRunID = item.OriginalRunID
 
-	if item.Result != nil {
+	if item.Result != nil && !alreadyEnded {
 		run.Run.Output = &item.Result.Output
 	}
 
@@ -166,7 +170,9 @@ func (w *writer) writeWorkflowStart(
 	}
 
 	run.Run.StartedAt = time.UnixMilli(int64(item.RunID.Time()))
-	run.Run.Status = status
+	if !alreadyEnded {
+		run.Run.Status = status
+	}
 	run.Run.WorkflowID = item.FunctionID
 	run.Run.WorkspaceID = item.WorkspaceID
 	run.Run.WorkflowVersion = int(item.FunctionVersion)
