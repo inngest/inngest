@@ -70,6 +70,17 @@ func New[T any](opts ...Option) Upserter[T] {
 	}, opts...)
 }
 
+// NewWithKey creates a new upserter for a given type.  Usage:
+//
+//	upserter := ttlupsert.NewWithKey(fn(s Struct) string {
+//	  return util.XXHash(s)
+//	})
+//
+//	// keep upserter around for caching
+//
+//	err := upserter.Upsert(ctx, s, func(ctx context.Context) error {
+//	  // xxx: do db txn here and return error.
+//	})
 func NewWithKey[T any](keyFn func(T) string, opts ...Option) Upserter[T] {
 	conf := config{
 		ttl:      defaultTTL,
