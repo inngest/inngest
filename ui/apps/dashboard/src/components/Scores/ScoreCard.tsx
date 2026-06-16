@@ -12,8 +12,13 @@ import {
   lineColors,
   seriesOptions,
 } from '@/components/Metrics/utils';
+import { borderColor } from '@/utils/tailwind';
 import { ScoreKind, type MetricsResponse } from '@/gql/graphql';
 import type { ScoreSeries } from './types';
+
+// toPrecision keeps significant digits so sub-1 scores don't round to "0".
+const formatScoreTick = (value: number) =>
+  Number(value.toPrecision(3)).toLocaleString(undefined);
 
 const AGGREGATIONS = [
   { label: 'Average', key: 'avg' },
@@ -55,17 +60,26 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
       data: buckets.map((b) => ({ bucket: b.bucketStart, value: 0 })),
     } as MetricsResponse);
 
+    const numericData = buckets.map((b) => b[aggregation]);
+    const nonNullCount = numericData.filter((v) => v != null).length;
+
     const chartSeries =
       series.kind === ScoreKind.Numeric
         ? [
             {
               ...seriesOptions,
               name,
-              data: buckets.map((b) => b[aggregation]),
+              data: numericData,
               // The server's dense buckets carry null aggregates for empty
               // intervals; bridge them so sparse data still draws continuous
               // lines like the metrics dashboard.
               connectNulls: true,
+              // A lone point draws no line, so mark it; showAllSymbol overrides
+              // ECharts hiding symbols as "crowded" across the dense buckets.
+              showSymbol: nonNullCount <= 1,
+              showAllSymbol: true,
+              symbol: 'circle',
+              symbolSize: 8,
               itemStyle: { color: color(2) },
             },
           ]
@@ -87,7 +101,23 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
           ];
 
     return getLineChartOptions(
-      { xAxis, series: chartSeries },
+      {
+        xAxis,
+        series: chartSeries,
+        // Scores can be fractional or negative; scale:true fits the domain to
+        // the data instead of the base config's integer/zero-baseline yAxis.
+        ...(series.kind === ScoreKind.Numeric && {
+          yAxis: {
+            type: 'value' as const,
+            scale: true,
+            splitNumber: 4,
+            axisLabel: { formatter: (value: number) => formatScoreTick(value) },
+            splitLine: {
+              lineStyle: { color: resolveColor(borderColor.subtle, dark) },
+            },
+          },
+        }),
+      },
       chartSeries.map((s) => s.name),
     );
   }, [series, name, aggregation]);
