@@ -912,9 +912,9 @@ func (q *queue) Lease(
 		kg.PartitionScavengerIndex(o.ShadowPartition.PartitionID),
 	}
 
-	setLegacyPeekTime := "1"
+	setEarliestPeekTime := "0"
 	if q.ItemEarliestPeekTimeConfig(ctx, q.Name(), item).Enabled {
-		setLegacyPeekTime = "0"
+		setEarliestPeekTime = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -922,7 +922,8 @@ func (q *queue) Lease(
 		o.ShadowPartition.PartitionID,
 		leaseID.String(),
 		now.UnixMilli(),
-		setLegacyPeekTime,
+		setEarliestPeekTime,
+		item.EarliestPeekTime,
 	})
 	if err != nil {
 		return nil, err

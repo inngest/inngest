@@ -125,14 +125,83 @@ func TestProcessorIteratorSetsEarliestPeekTimeBeforeConstraintLimit(t *testing.T
 
 	loaded, err := shard.LoadQueueItem(ctx, qi1.ID)
 	require.NoError(t, err)
-	require.Zero(t, loaded.EarliestPeekTime, "earliest peek time should live in the side key, not the queue item hash")
+	require.Equal(t, peekTime.UnixMilli(), loaded.EarliestPeekTime, "leased item should persist stamped earliest peek time")
 
 	loaded, err = shard.LoadQueueItem(ctx, qi2.ID)
 	require.NoError(t, err)
-	require.Zero(t, loaded.EarliestPeekTime, "earliest peek time should live in the side key, not the queue item hash")
+	require.Zero(t, loaded.EarliestPeekTime, "unleased stamped item should still live in the side key only")
 }
 
-func TestLeaseSetsLegacyEarliestPeekTimeWhenFeatureFlagDisabled(t *testing.T) {
+func TestLeasePersistsStampedEarliestPeekTimeWhenFeatureFlagEnabled(t *testing.T) {
+	ctx := context.Background()
+
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClockAt(time.Date(2026, 6, 11, 10, 0, 0, 0, time.UTC))
+	r.SetTime(clock.Now())
+
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+	shard := redis_state.NewQueueShard(
+		"test",
+		queueClient,
+		osqueue.WithClock(clock),
+		osqueue.WithQueueItemEarliestPeekTimeEnabled(func(ctx context.Context, shardName string, acctID, gotEnvID, gotFnID uuid.UUID) osqueue.QueueItemEarliestPeekTimeConfig {
+			if shardName == "test" && acctID == accountID && gotEnvID == envID && gotFnID == fnID {
+				return osqueue.QueueItemEarliestPeekTimeConfig{Enabled: true}
+			}
+			return osqueue.QueueItemEarliestPeekTimeConfig{}
+		}),
+	)
+
+	qi, err := shard.EnqueueItem(ctx, osqueue.QueueItem{
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		Data: osqueue.Item{
+			Kind: osqueue.KindStart,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader),
+			},
+			WorkspaceID: envID,
+		},
+	}, clock.Now(), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+	require.Zero(t, qi.EarliestPeekTime)
+
+	peekTime := clock.Now().Add(250 * time.Millisecond)
+	stampedAt, err := shard.SetEarliestPeekTime(ctx, qi, peekTime)
+	require.NoError(t, err)
+	require.Equal(t, peekTime.UnixMilli(), stampedAt.UnixMilli())
+
+	loaded, err := shard.LoadQueueItem(ctx, qi.ID)
+	require.NoError(t, err)
+	require.Zero(t, loaded.EarliestPeekTime)
+
+	qi.EarliestPeekTime = stampedAt.UnixMilli()
+	_, err = shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now().Add(time.Second))
+	require.NoError(t, err)
+
+	loaded, err = shard.LoadQueueItem(ctx, qi.ID)
+	require.NoError(t, err)
+	require.Equal(t, peekTime.UnixMilli(), loaded.EarliestPeekTime)
+
+	key := queueClient.KeyGenerator().QueueItemEarliestPeekTime(qi.ID)
+	val, err := r.Get(key)
+	require.NoError(t, err)
+	require.Equal(t, strconv.FormatInt(peekTime.UnixMilli(), 10), val)
+}
+
+func TestLeaseIgnoresStampedEarliestPeekTimeWhenFeatureFlagDisabled(t *testing.T) {
 	ctx := context.Background()
 
 	r := miniredis.RunT(t)
@@ -167,6 +236,9 @@ func TestLeaseSetsLegacyEarliestPeekTimeWhenFeatureFlagDisabled(t *testing.T) {
 	}, clock.Now(), osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
+	stampedPeekTime := clock.Now().Add(-time.Minute)
+	qi.EarliestPeekTime = stampedPeekTime.UnixMilli()
+
 	leaseTime := clock.Now().Add(250 * time.Millisecond)
 	_, err = shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, leaseTime)
 	require.NoError(t, err)
@@ -174,6 +246,7 @@ func TestLeaseSetsLegacyEarliestPeekTimeWhenFeatureFlagDisabled(t *testing.T) {
 	loaded, err := shard.LoadQueueItem(ctx, qi.ID)
 	require.NoError(t, err)
 	require.Equal(t, leaseTime.UnixMilli(), loaded.EarliestPeekTime)
+	require.NotEqual(t, stampedPeekTime.UnixMilli(), loaded.EarliestPeekTime)
 
 	key := queueClient.KeyGenerator().QueueItemEarliestPeekTime(qi.ID)
 	require.False(t, r.Exists(key), "legacy path should not create the side key")
