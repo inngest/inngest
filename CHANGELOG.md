@@ -2,7 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.29.0] - 2026-06-17
+
+### 🚀 Features
+
+- *(queue)* Track earliest peek time before Constraint API (#4391)
+
+### 🐛 Bug Fixes
+
+- Queue item cleanup race in non-key-queues postgres cancel path (#4337)
+- *(dashboard)* Use distinct speedometer icon for sidebar Overview (#4429)
+- *(tests)* Widen timing tolerance from 10ms to 100ms in TestStartAll/TestSingleSvcError (#4115)
+- Alias conflicting grpc import (#4436)
+- *(tests)* Replace 50ms settle delay with deterministic clock.BlockUntil() in TestQueueItemProcessWithConstraintChecks (#4434)
+- *(queue)* Ignore already-leased partitions during scan (#4438)
+- Keep completed runs from being reported as reverted (#4247)
+- *(tests)* Increase WaitForRunStatus timeouts in all affected E2E tests (#4435)
+- Make WaitForRunStatus tolerate transient not found GQL errors (#4206)
+- *(executor)* Always SavePending after parallel ops to coalesce discovery (#4021)
+- Scope GetSpanOutput query by run_id to prevent cross-run data leak (#4441)
+- *(scoring)* Improve scoring dashboard ui (#4433)
+
+### 🧪 Testing
+
+- *(cqrs)* Cover all terminal trace run statuses (#4446)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(tests)* Fix flaky test status (#4439)
+- *(tests)* Flaky test fix (#4440)
+- Ttl upsert pkg (#4432)
+
 ## [v1.28.0] - 2026-06-16
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.28.0 (#4373)
+
+## [v1.27.1] - 2026-06-16
 
 ### 🚀 Features
 
