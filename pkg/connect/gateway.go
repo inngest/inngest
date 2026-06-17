@@ -497,17 +497,19 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
 			ch.logConnStatus(connectpb.ConnectionStatus_DISCONNECTED, "connection cleanup", "close_reason", *closeReasonPtr.Load())
 
-			// This is a transactional operation, it should always complete regardless of context cancellation
-			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
-			if err != nil {
-				ch.log.ReportError(err, "error deleting connection from state")
-			}
-
 			// wait here so ondisconnected runs after onsynced.
 			onSyncedWG.Wait()
 
 			for _, lifecycle := range c.lifecycles {
 				lifecycle.OnDisconnected(context.Background(), conn, *closeReasonPtr.Load())
+			}
+
+			// This is a transactional operation, it should always complete regardless of context cancellation.
+			// Delete after disconnect lifecycles so absence from connection state also means worker capacity
+			// has been removed.
+			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
+			if err != nil {
+				ch.log.ReportError(err, "error deleting connection from state")
 			}
 
 			ch.log.Debug("cleaned up connection in metadata store")
