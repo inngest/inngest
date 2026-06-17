@@ -19,7 +19,6 @@ import (
 
 func TestFnCheckpoint(t *testing.T) {
 	ctx := context.Background()
-	r := require.New(t)
 	c := client.New(t)
 
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "checkpoint")
@@ -40,6 +39,7 @@ func TestFnCheckpoint(t *testing.T) {
 		2 * time.Second,
 	}
 
+	gt := &goroutineT{}
 	wg := sync.WaitGroup{}
 	for _, cfg := range configs {
 		for _, delay := range delays {
@@ -73,23 +73,24 @@ func TestFnCheckpoint(t *testing.T) {
 						return nil, nil
 					},
 				)
-				r.NoError(err)
+				require.NoError(gt, err)
 				registerFuncs()
 
 				_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
-				r.NoError(err)
+				require.NoError(gt, err)
 
-				runID := rid.Wait(t)
-				run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 120 * time.Second})
+				runID := rid.Wait(gt)
+				run := c.WaitForRunStatus(ctx, gt, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 120 * time.Second})
 				var output string
 				err = json.Unmarshal([]byte(run.Output), &output)
-				require.NotEmpty(t, runID)
-				r.NoError(err)
+				require.NotEmpty(gt, runID)
+				require.NoError(gt, err)
 			})
 		}
 	}
 
 	wg.Wait()
+	gt.check(t)
 }
 
 func TestCheckpointMaxDuration(t *testing.T) {
