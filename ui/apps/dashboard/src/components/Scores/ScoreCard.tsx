@@ -16,10 +16,6 @@ import { borderColor } from '@/utils/tailwind';
 import { ScoreKind, type MetricsResponse } from '@/gql/graphql';
 import type { ScoreSeries } from './types';
 
-// toPrecision keeps significant digits so sub-1 scores don't round to "0".
-const formatScoreTick = (value: number) =>
-  Number(value.toPrecision(3)).toLocaleString(undefined);
-
 const AGGREGATIONS = [
   { label: 'Average', key: 'avg' },
   { label: 'Max', key: 'max' },
@@ -104,14 +100,11 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
       {
         xAxis,
         series: chartSeries,
-        // Scores can be fractional or negative; scale:true fits the domain to
-        // the data instead of the base config's integer/zero-baseline yAxis.
         ...(series.kind === ScoreKind.Numeric && {
           yAxis: {
             type: 'value' as const,
             scale: true,
             splitNumber: 4,
-            axisLabel: { formatter: (value: number) => formatScoreTick(value) },
             splitLine: {
               lineStyle: { color: resolveColor(borderColor.subtle, dark) },
             },
