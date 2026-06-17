@@ -483,6 +483,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			c.closeDraining(ws)
 		}()
 
+		// wait for async onsynced callbacks before ondisconnected callbacks.  capacity
+		// must be added before it is removed for the same worker.
+		var onSyncedWG sync.WaitGroup
+
 		// Once a connection is established, we must make sure to update the state on any disconnect,
 		// regardless of whether it's permanent or temporary
 		defer func() {
@@ -498,6 +502,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			if err != nil {
 				ch.log.ReportError(err, "error deleting connection from state")
 			}
+
+			// wait here so ondisconnected runs after onsynced.
+			onSyncedWG.Wait()
 
 			for _, lifecycle := range c.lifecycles {
 				lifecycle.OnDisconnected(context.Background(), conn, *closeReasonPtr.Load())
@@ -571,7 +578,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			for _, l := range c.lifecycles {
-				go l.OnSynced(context.Background(), conn)
+				onSyncedWG.Go(func() {
+					l.OnSynced(context.Background(), conn)
+				})
 			}
 
 			appNames := make([]string, 0, len(conn.Groups))
