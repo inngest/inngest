@@ -35,7 +35,7 @@ func (q *queueProcessor) ProcessItem(
 		"run_id", i.I.Data.Identifier.RunID,
 	)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", accountID, envID, fnID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", TraceScopeFromQueueItem(i.I))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", i.P.ID))
 	span.SetAttributes(attribute.String("item_id", i.I.ID))

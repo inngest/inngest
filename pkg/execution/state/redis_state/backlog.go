@@ -85,7 +85,7 @@ func (q *queue) BacklogRefill(
 	}
 
 	partitionID := sp.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRefill", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRefill", osqueue.TraceScopeFromPartitionIdentifier(partitionID))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
 	span.SetAttributes(attribute.String("backlog_id", b.BacklogID))
@@ -191,7 +191,7 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *osqueue.QueueBacklo
 	}
 
 	partitionID := sp.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRequeue", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRequeue", osqueue.TraceScopeFromPartitionIdentifier(partitionID))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
 	span.SetAttributes(attribute.String("backlog_id", backlog.BacklogID))

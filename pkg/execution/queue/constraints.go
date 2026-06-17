@@ -373,7 +373,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	ctx, span := q.Options().ConditionalTracer.NewSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	ctx, span := q.Options().ConditionalTracer.NewUserSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	defer span.End()
 
 	idempotencyKey := item.ID

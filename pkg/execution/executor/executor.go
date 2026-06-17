@@ -809,7 +809,7 @@ func (e *executor) checkBacklogSizeLimit(ctx context.Context, req execution.Sche
 // metadata will be nil.  This will return the original run ID if runs were skipped due
 // to idemptoency.
 func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
-	ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.Schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
+	ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.Schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
 
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
@@ -905,7 +905,7 @@ func (e *executor) schedule(
 		return nil, nil, fmt.Errorf("app ID is required to schedule a run")
 	}
 
-	ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
+	ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
 
 	l := e.log.With(
@@ -989,7 +989,7 @@ func (e *executor) schedule(
 	// NOTE: From this point, we are guaranteed to operate within user constraints.
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
-		ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.Debounce", req.AccountID, req.WorkspaceID, req.Function.ID)
+		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.Debounce", req.AccountID, req.WorkspaceID, req.Function.ID)
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
@@ -1139,7 +1139,7 @@ func (e *executor) schedule(
 	// Some scenarios are happy path (e.g.  queue idempotency) and some are sad
 	// path (e.g. Executor borked)
 	sendSpans := func() {
-		_, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule.send_spans", req.AccountID, req.WorkspaceID, req.Function.ID)
+		_, span := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule.send_spans", req.AccountID, req.WorkspaceID, req.Function.ID)
 		defer span.End()
 
 		if runSpanRef != nil {
@@ -1280,7 +1280,7 @@ func (e *executor) schedule(
 	// Check if the function should be skipped (paused, draining, backlog limit)
 	// Only check if not already marked as skipped (e.g., by singleton)
 	if skipReason == enums.SkipReasonNone {
-		_, span := e.conditionalTracer.NewSpan(ctx, "executor.schedule.skipped", req.AccountID, req.WorkspaceID, req.Function.ID)
+		_, span := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule.skipped", req.AccountID, req.WorkspaceID, req.Function.ID)
 		skipReason = e.skipped(ctx, req)
 		span.End()
 	}
@@ -1288,7 +1288,7 @@ func (e *executor) schedule(
 	// Create run state if not skipped
 	var stateCreated bool
 	if skipReason == enums.SkipReasonNone {
-		ctx, span := e.conditionalTracer.NewSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
+		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.CreateState", req.AccountID, req.WorkspaceID, req.Function.ID)
 		st, err := e.smv2.Create(ctx, newState)
 		span.End()
 
@@ -1532,7 +1532,7 @@ func (e *executor) schedule(
 	}
 
 	// Schedule for async functons (the default)
-	_, queueSpan := e.conditionalTracer.NewSpan(ctx, "executor.schedule.queue_enqueue", req.AccountID, req.WorkspaceID, req.Function.ID)
+	_, queueSpan := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule.queue_enqueue", req.AccountID, req.WorkspaceID, req.Function.ID)
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	queueSpan.End()
 
@@ -1708,7 +1708,7 @@ func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.Sche
 // Execute loads a workflow and the current run state, then executes the
 // function's step via the necessary driver.
 func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.Item, edge inngest.Edge) (*state.DriverResponse, error) {
-	conditionalTraceCtx, conditionalSpan := e.conditionalTracer.NewSpan(ctx, "executor.Execute", id.AccountID, id.WorkspaceID, id.WorkflowID)
+	conditionalTraceCtx, conditionalSpan := e.conditionalTracer.NewUserSpan(ctx, "executor.Execute", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	defer conditionalSpan.End()
 
 	jobID := queue.JobIDFromContext(ctx)
@@ -1791,7 +1791,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		ctx = state.WithGroupID(ctx, uuid.New().String())
 	}
 
-	_, span := e.conditionalTracer.NewSpan(conditionalTraceCtx, "executor.LoadMetadata", id.AccountID, id.WorkspaceID, id.WorkflowID)
+	_, span := e.conditionalTracer.NewUserSpan(conditionalTraceCtx, "executor.LoadMetadata", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
 		RunID:      id.RunID,
 		FunctionID: id.WorkflowID,
@@ -1813,7 +1813,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	_, span = e.conditionalTracer.NewSpan(conditionalTraceCtx, "executor.LoadFunction", id.AccountID, id.WorkspaceID, id.WorkflowID)
+	_, span = e.conditionalTracer.NewUserSpan(conditionalTraceCtx, "executor.LoadFunction", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
 	span.End()
 	if err != nil {
@@ -1836,7 +1836,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	_, span = e.conditionalTracer.NewSpan(conditionalTraceCtx, "executor.LoadEvents", id.AccountID, id.WorkspaceID, id.WorkflowID)
+	_, span = e.conditionalTracer.NewUserSpan(conditionalTraceCtx, "executor.LoadEvents", id.AccountID, id.WorkspaceID, id.WorkflowID)
 	events, err := e.smv2.LoadEvents(ctx, md.ID)
 	span.End()
 	if err != nil {
@@ -2008,7 +2008,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
-		_, span = e.conditionalTracer.NewSpan(conditionalTraceCtx, "executor.run", id.AccountID, id.WorkspaceID, id.WorkflowID)
+		_, span = e.conditionalTracer.NewUserSpan(conditionalTraceCtx, "executor.run", id.AccountID, id.WorkspaceID, id.WorkflowID)
 		// Track how long it took us from the queue item job starting -> calling run.
 		instance.trackLatencyHistogram(ctx, "queue_to_run_start", nil)
 		resp, err := e.run(ctx, &instance)

@@ -193,7 +193,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	}
 
 	partitionID := defaultPartition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", osqueue.TraceScopeFromPartitionIdentifier(partitionID))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -883,7 +883,7 @@ func (q *queue) Lease(
 	}
 
 	partitionID := o.ShadowPartition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Lease", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Lease", osqueue.TraceScopeFromPartitionIdentifier(partitionID))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", o.ShadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", item.ID))
@@ -1025,7 +1025,7 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 	partition := osqueue.ItemShadowPartition(ctx, i)
 
 	partitionID := partition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ExtendLease", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ExtendLease", osqueue.TraceScopeFromPartitionIdentifier(partitionID))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", partition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -1099,7 +1099,7 @@ func (q *queue) PartitionLease(
 ) (*ulid.ULID, error) {
 	l := logger.StdlibLogger(ctx)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", p.AccountID, p.Identifier().EnvID, p.Identifier().FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", osqueue.TraceScopeFromPartitionIdentifier(p.Identifier()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.ID))
 
@@ -1727,7 +1727,7 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition, at time.Time, forceAt bool) error {
 	l := logger.StdlibLogger(ctx)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionRequeue", p.AccountID, p.Identifier().EnvID, p.Identifier().FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionRequeue", osqueue.TraceScopeFromPartitionIdentifier(p.Identifier()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.ID))
 

@@ -27,7 +27,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	shard := q.Shard()
 
 	partitionIdentifier := p.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", TraceScopeFromPartitionIdentifier(partitionIdentifier))
 	defer span.End()
 	span.SetAttributes(attribute.String("queue_shard", shard.Name()))
 
