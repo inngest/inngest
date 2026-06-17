@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,54 +40,56 @@ func TestFnCheckpoint(t *testing.T) {
 		2 * time.Second,
 	}
 
+	wg := sync.WaitGroup{}
 	for _, cfg := range configs {
-		// For each config, add a delay after the second and third step.  This is because a config
-		// will always checkpoint after a second, and we want to assert that this happens.
 		for _, delay := range delays {
-			rid := NewRunID()
-			evtName := fmt.Sprintf("invoke-checkpoint-delay-%v-cfg-%v", delay.String(), util.XXHash(cfg))
-			fmt.Println(evtName)
+			wg.Go(func() {
+				rid := NewRunID()
+				evtName := fmt.Sprintf("invoke-checkpoint-delay-%v-cfg-%v", delay.String(), util.XXHash(cfg))
+				fmt.Println(evtName)
 
-			_, err := inngestgo.CreateFunction(
-				inngestClient,
-				inngestgo.FunctionOpts{
-					ID:         evtName,
-					Checkpoint: cfg,
-				},
-				inngestgo.EventTrigger(evtName, nil),
-				func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
-					rid.Send(input.InputCtx.RunID)
+				_, err := inngestgo.CreateFunction(
+					inngestClient,
+					inngestgo.FunctionOpts{
+						ID:         evtName,
+						Checkpoint: cfg,
+					},
+					inngestgo.EventTrigger(evtName, nil),
+					func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+						rid.Send(input.InputCtx.RunID)
 
-					_, _ = step.Run(ctx, "a", func(ctx context.Context) (string, error) { return "a", nil })
-					fmt.Println("a")
-					_, _ = step.Run(ctx, "b", func(ctx context.Context) (string, error) {
-						<-time.After(delay)
-						return "b", nil
-					})
-					fmt.Println("b")
-					_, _ = step.Run(ctx, "c", func(ctx context.Context) (string, error) {
-						<-time.After(delay)
-						return "c", nil
-					})
-					fmt.Println("c (done), ", input.InputCtx.RunID)
-					return nil, nil
-				},
-			)
-			r.NoError(err)
-			registerFuncs()
+						_, _ = step.Run(ctx, "a", func(ctx context.Context) (string, error) { return "a", nil })
+						fmt.Println("a")
+						_, _ = step.Run(ctx, "b", func(ctx context.Context) (string, error) {
+							<-time.After(delay)
+							return "b", nil
+						})
+						fmt.Println("b")
+						_, _ = step.Run(ctx, "c", func(ctx context.Context) (string, error) {
+							<-time.After(delay)
+							return "c", nil
+						})
+						fmt.Println("c (done), ", input.InputCtx.RunID)
+						return nil, nil
+					},
+				)
+				r.NoError(err)
+				registerFuncs()
 
-			// Trigger the main function and successfully invoke the other function
-			_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
-			r.NoError(err)
+				_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+				r.NoError(err)
 
-			runID := rid.Wait(t)
-			run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 120 * time.Second})
-			var output string
-			err = json.Unmarshal([]byte(run.Output), &output)
-			require.NotEmpty(t, runID)
-			r.NoError(err)
+				runID := rid.Wait(t)
+				run := c.WaitForRunStatus(ctx, t, "COMPLETED", runID, client.WaitForRunStatusOpts{Timeout: 120 * time.Second})
+				var output string
+				err = json.Unmarshal([]byte(run.Output), &output)
+				require.NotEmpty(t, runID)
+				r.NoError(err)
+			})
 		}
 	}
+
+	wg.Wait()
 }
 
 func TestCheckpointMaxDuration(t *testing.T) {

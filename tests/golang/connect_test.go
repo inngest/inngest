@@ -123,10 +123,24 @@ func TestEndToEnd(t *testing.T) {
 		require.NoError(t, wc.Close())
 	})
 
-	// Connection is closed — with worker semaphores, the function stays queued
-	// until a worker reconnects and restores semaphore capacity.
+	// connection is closed.  with worker semaphores, the function stays queued
+	// until a worker reconnects and restores capacity.
 	t.Run("should remain queued without a connection", func(t *testing.T) {
 		atomic.StoreInt32(&counter, 0)
+
+		// wait until the prior connection is gone and worker capacity is zero.
+		// sending before cleanup races the queued-state assertion.
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			a := assert.New(collect)
+
+			resp, err := http.Get(fmt.Sprintf("%s/v0/connect/envs/dev/conns", DEV_URL))
+			a.NoError(err)
+
+			var reply rest.ShowConnsReply
+			a.NoError(json.NewDecoder(resp.Body).Decode(&reply))
+
+			a.Equal(0, len(reply.Data))
+		}, 15*time.Second, 500*time.Millisecond)
 
 		// Send event while no worker is connected
 		eventID, err := inngestClient.Send(ctx, inngestgo.Event{
