@@ -205,6 +205,44 @@ func (c *Client) RunOrError(ctx context.Context, runID string) (Run, error) {
 	return data.FunctionRun, nil
 }
 
+func (c *Client) RunV2Status(ctx context.Context, runID string) string {
+	c.Helper()
+
+	if runID == "" {
+		c.Fatalf("runID cannot be empty")
+	}
+
+	query := `
+		query GetRunStatus($runID: String!) {
+			run(runID: $runID) {
+				status
+			}
+		}`
+
+	resp := c.MustDoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"runID": runID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		c.Fatalf("err with gql: %#v", resp.Errors)
+	}
+
+	type response struct {
+		Run struct {
+			Status string `json:"status"`
+		} `json:"run"`
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		c.Fatal(err.Error())
+	}
+
+	return data.Run.Status
+}
+
 type WaitForRunStatusOpts struct {
 	Timeout time.Duration
 }

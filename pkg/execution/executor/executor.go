@@ -2119,6 +2119,16 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
 
+	// invalid checkpoints can returnsonly empty OpcodeNone entries.  that response
+	// cannot advance or complete the run, so redo step discovery.
+	if i.resp.Err == nil && len(i.resp.Generator) > 0 && allEmptyNoneOps(i.resp.Generator) {
+		l.Warn("re-driving run after empty no-op generator response",
+			"gen_count", len(i.resp.Generator),
+			"stack_len", len(i.md.Stack),
+		)
+		return e.restartDiscovery(ctx, i)
+	}
+
 	for _, e := range e.lifecycles {
 		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
 	}
@@ -3635,6 +3645,40 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
 }
 
+// allEmptyNoneOps reports whether every non-nil opcode is an empty OpcodeNone.
+func allEmptyNoneOps(gen []*state.GeneratorOpcode) bool {
+	for _, op := range gen {
+		if op == nil {
+			continue
+		}
+		if op.Op != enums.OpcodeNone || op.ID != "" {
+			return false
+		}
+	}
+	return true
+}
+
+// restartDiscovery enqueues discovery after a response with no executable ops
+// and no completion result.
+func (e *executor) restartDiscovery(ctx context.Context, i *runInstance) error {
+	groupID := uuid.New().String()
+
+	outgoing := "redrive-" + groupID
+	// reload metadata to include steps checkpointed during this execution.
+	if md, err := e.smv2.LoadMetadata(ctx, i.md.ID); err == nil && len(md.Stack) > 0 {
+		outgoing = md.Stack[len(md.Stack)-1]
+	}
+
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		i,
+		state.GeneratorOpcode{ID: outgoing},
+		queue.PayloadEdge{Edge: i.edge},
+		groupID,
+		false,
+	)
+}
+
 func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, groupID string, hasPendingSteps bool) error {
 	// Enqueue the next discovery step to continue execution.
 	nextEdge := inngest.Edge{
@@ -4325,7 +4369,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		return fmt.Errorf("error creating gateway request: %w", err)
 	}
 
-	//TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
+	// TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
 
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
@@ -4505,7 +4549,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		return fmt.Errorf("error parsing ai gateway step: %w", err)
 	}
 
-	//TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
+	// TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
 
 	// NOTE:  It's the responsibility of `trace_lifecycle` to parse the gateway request,
 	// then generate an aigateway.ParsedInferenceRequest to store in the history store.
