@@ -568,6 +568,12 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	// in the DB use OTEL span IDs, but the span tree is keyed by dynamic IDs.
 	otelToDynamic := make(map[string]string)
 
+	// Lookup maps for reparenting orphaned extended trace (userland) spans.
+	// Keyed by stepID+attempt → dynamic span ID, populated during the first pass.
+	// executor.step is the preferred parent; executor.execution is the fallback.
+	stepSpanByKey := make(map[extendedTraceKey]string)
+	execSpanByKey := make(map[extendedTraceKey]string)
+
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
 	var err error
@@ -592,6 +598,22 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 
 		spanMap.Set(newSpan.SpanID, newSpan)
+
+		// Index step and execution spans so orphaned extended trace spans can be
+		// reparented to their matching attempt during the parent-child pass below.
+		// Both stepID and attempt must be present; without attempt there is no
+		// unambiguous target to attach to.
+		if newSpan.Attributes != nil &&
+			newSpan.Attributes.StepID != nil && *newSpan.Attributes.StepID != "" &&
+			newSpan.Attributes.StepAttempt != nil {
+			key := newExtendedTraceKey(*newSpan.Attributes.StepID, *newSpan.Attributes.StepAttempt)
+			switch newSpan.Name {
+			case meta.SpanNameStep:
+				stepSpanByKey[key] = newSpan.SpanID
+			case meta.SpanNameExecution:
+				execSpanByKey[key] = newSpan.SpanID
+			}
+		}
 	}
 
 	// resolveDynamic looks up a dynamic span ID for the given ID, which may
@@ -672,6 +694,30 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 			item, _ := spanMap.Get(span.SpanID)
 			parent.Children = append(parent.Children, item)
+		} else if span.Attributes != nil &&
+			span.Attributes.IsUserland != nil && *span.Attributes.IsUserland &&
+			span.Attributes.StepID != nil && *span.Attributes.StepID != "" &&
+			span.Attributes.StepAttempt != nil {
+			// Orphaned extended trace (userland) span: try reparenting to the
+			// matching step or execution span by stepID+attempt.
+			// Attempt must be present; without it there is no unambiguous target.
+			key := newExtendedTraceKey(*span.Attributes.StepID, *span.Attributes.StepAttempt)
+			parentDynID, found := stepSpanByKey[key]
+			if !found {
+				parentDynID, found = execSpanByKey[key]
+			}
+			if found {
+				parent, _ := spanMap.Get(parentDynID)
+				item, _ := spanMap.Get(span.SpanID)
+				parent.Children = append(parent.Children, item)
+			} else {
+				logger.StdlibLogger(ctx).Warn(
+					"lost lineage detected for extended trace span",
+					"spanID", span.SpanID,
+					"stepID", *span.Attributes.StepID,
+					"stepAttempt", *span.Attributes.StepAttempt,
+				)
+			}
 		} else {
 			logger.StdlibLogger(ctx).Warn(
 				"lost lineage detected",
@@ -809,6 +855,17 @@ func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
 	for _, child := range span.Children {
 		walkMetadataSize(child, total)
 	}
+}
+
+// extendedTraceKey is the map key used when indexing and reparenting orphaned
+// extended trace spans. A zero Attempt means no attempt was recorded.
+type extendedTraceKey struct {
+	StepID  string
+	Attempt int // 0 when unknown
+}
+
+func newExtendedTraceKey(stepID string, attempt int) extendedTraceKey {
+	return extendedTraceKey{StepID: stepID, Attempt: attempt}
 }
 
 func encodeSpanOutputID(runID string, outputSpanID *string, inputSpanID *string) (*string, error) {
