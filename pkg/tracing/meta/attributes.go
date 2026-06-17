@@ -282,7 +282,7 @@ type EventSession struct {
 	ID  string `json:"id"`
 }
 
-// EventSessions is the run-level form of event.Sessions, which cannot be
+// EventSessions is the run-level form of event.EventMeta.Sessions, which cannot be
 // imported here because pkg/event depends on this package.
 type EventSessions []EventSession
 

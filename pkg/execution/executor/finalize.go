@@ -465,7 +465,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			Name:      event.FnFinishedName,
 			Timestamp: now.UnixMilli(),
 			Data:      data,
-			Sessions:  runEvt.Sessions,
+			Meta:      runEvt.Meta,
 		})
 
 		switch opts.Status() {
@@ -475,7 +475,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 				Name:      event.FnCancelledName,
 				Timestamp: now.UnixMilli(),
 				Data:      data,
-				Sessions:  runEvt.Sessions,
+				Meta:      runEvt.Meta,
 			})
 		case enums.StepStatusFailed:
 			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
@@ -484,7 +484,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 				Name:      event.FnFailedName,
 				Timestamp: now.UnixMilli(),
 				Data:      data,
-				Sessions:  runEvt.Sessions,
+				Meta:      runEvt.Meta,
 			})
 		}
 	}

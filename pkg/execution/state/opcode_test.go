@@ -157,7 +157,9 @@ func TestInvokeFunctionOpts_Validate(t *testing.T) {
 	t.Run("accepts valid payload sessions", func(t *testing.T) {
 		opts := InvokeFunctionOpts{
 			Payload: &event.Event{
-				Sessions: event.Sessions{"conversation_id": "conversation_1234"},
+				Meta: event.EventMeta{
+					Sessions: event.Sessions{"conversation_id": "conversation_1234"},
+				},
 			},
 		}
 		require.NoError(t, opts.Validate())
@@ -166,7 +168,9 @@ func TestInvokeFunctionOpts_Validate(t *testing.T) {
 	t.Run("rejects too many payload sessions", func(t *testing.T) {
 		opts := InvokeFunctionOpts{
 			Payload: &event.Event{
-				Sessions: event.Sessions{"a": "1", "b": "2", "c": "3", "d": "4", "e": "5", "f": "6"},
+				Meta: event.EventMeta{
+					Sessions: event.Sessions{"a": "1", "b": "2", "c": "3", "d": "4", "e": "5", "f": "6"},
+				},
 			},
 		}
 		require.EqualError(t, opts.Validate(), "event sessions can include at most 5 entries")

@@ -1032,7 +1032,7 @@ func (e *executor) schedule(
 			eventName = &name
 		}
 
-		for name, id := range evt.Sessions {
+		for name, id := range evt.Meta.Sessions {
 			sessions = append(sessions, meta.EventSession{Key: name, ID: id})
 		}
 

@@ -364,7 +364,7 @@ func (i *InvokeFunctionOpts) Validate() error {
 	}
 	// Mirrors the session checks in Event.Validate() at API ingest; invocation
 	// events are constructed by the executor and never pass through the API.
-	return i.Payload.Sessions.Validate()
+	return i.Payload.Meta.Sessions.Validate()
 }
 
 func (i *InvokeFunctionOpts) UnmarshalAny(a any) error {
