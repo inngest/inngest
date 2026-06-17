@@ -13,7 +13,7 @@ type SessionsEmptyStateProps = {
 export function SessionsEmptyState({
   onSubmit,
   // TODO: Replace with the sessions docs URL and include a ref param for dashboard traffic.
-  docsUrl = 'https://www.inngest.com/docs',
+  docsUrl = 'https://website-git-jakob-sessions-docs-inngest.vercel.app/docs/features/events-triggers/sessions',
 }: SessionsEmptyStateProps) {
   const [value, setValue] = useState('');
   const trimmed = value.trim();

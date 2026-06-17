@@ -17,7 +17,7 @@ import { useColumns } from './columns';
 
 const DEFAULT_RANGE = '7d';
 // TODO: Replace with the sessions docs URL and include a ref param for dashboard traffic.
-const DOCS_URL = 'https://www.inngest.com/docs';
+const DOCS_URL = 'ui/packages/components/src/Sessions/SessionResults.tsx';
 
 type SessionResultsProps = {
   envID: string;
