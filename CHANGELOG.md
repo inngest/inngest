@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.30.0] - 2026-06-17
+
+### 🚀 Features
+
+- V2 api rerun (#4410)
+
 ## [v1.29.0] - 2026-06-17
 
 ### 🚀 Features
@@ -32,6 +38,7 @@ All notable changes to this project will be documented in this file.
 - *(tests)* Fix flaky test status (#4439)
 - *(tests)* Flaky test fix (#4440)
 - Ttl upsert pkg (#4432)
+- *(release)* V1.29.0 (#4428)
 
 ## [v1.28.0] - 2026-06-16
 
