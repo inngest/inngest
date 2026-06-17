@@ -2878,6 +2878,58 @@ func TestExtendedTraceReparenting(t *testing.T) {
 		require.Len(t, step.Children, 1, "userland span with valid parent should attach via normal lineage")
 		assert.Equal(t, "dyn-userland", step.Children[0].SpanID)
 	})
+
+	t.Run("only subtree root is reparented, not interior nodes", func(t *testing.T) {
+		// A three-span userland subtree: root → child → grandchild.
+		// root's inngest parent ("stale-otel-id") is absent from the tree.
+		// child and grandchild have parents within the userland subtree.
+		// Only root should be reparented; child and grandchild attach normally.
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-sub", 0),
+		})
+		// Subtree root: orphaned from inngest tree, should be reparented to dyn-step.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-root", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-sub", 0),
+		})
+		// Interior node: parent is the userland root above; resolves via spanMap normally.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-child", Name: "userland",
+			ParentSpanID: "dyn-ul-root", Attributes: userlandAttrs("step-sub", 0),
+		})
+		// Leaf: parent is the interior node; resolves via spanMap normally.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-grandchild", Name: "userland",
+			ParentSpanID: "dyn-ul-child", Attributes: userlandAttrs("step-sub", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		step := result.Children[0]
+		assert.Equal(t, "dyn-step", step.SpanID)
+
+		require.Len(t, step.Children, 1, "only the userland subtree root should be reparented under executor.step")
+		root := step.Children[0]
+		assert.Equal(t, "dyn-ul-root", root.SpanID)
+
+		require.Len(t, root.Children, 1, "interior node should be attached under the subtree root")
+		child := root.Children[0]
+		assert.Equal(t, "dyn-ul-child", child.SpanID)
+
+		require.Len(t, child.Children, 1, "grandchild should be attached under the interior node")
+		assert.Equal(t, "dyn-ul-grandchild", child.Children[0].SpanID)
+	})
 }
 
 //

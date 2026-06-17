@@ -573,6 +573,9 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	// executor.step is the preferred parent; executor.execution is the fallback.
 	stepSpanByKey := make(map[extendedTraceKey]string)
 	execSpanByKey := make(map[extendedTraceKey]string)
+	// Dynamic span IDs of all userland spans, used to detect interior nodes of
+	// extended trace subtrees during the parent-child pass.
+	userlandDynIDs := make(map[string]struct{})
 
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
@@ -599,19 +602,25 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 		spanMap.Set(newSpan.SpanID, newSpan)
 
-		// Index step and execution spans so orphaned extended trace spans can be
-		// reparented to their matching attempt during the parent-child pass below.
-		// Both stepID and attempt must be present; without attempt there is no
-		// unambiguous target to attach to.
-		if newSpan.Attributes != nil &&
-			newSpan.Attributes.StepID != nil && *newSpan.Attributes.StepID != "" &&
-			newSpan.Attributes.StepAttempt != nil {
-			key := newExtendedTraceKey(*newSpan.Attributes.StepID, *newSpan.Attributes.StepAttempt)
-			switch newSpan.Name {
-			case meta.SpanNameStep:
-				stepSpanByKey[key] = newSpan.SpanID
-			case meta.SpanNameExecution:
-				execSpanByKey[key] = newSpan.SpanID
+		if newSpan.Attributes != nil {
+			// Track all userland spans so we can detect interior subtree nodes later.
+			if newSpan.Attributes.IsUserland != nil && *newSpan.Attributes.IsUserland {
+				userlandDynIDs[newSpan.SpanID] = struct{}{}
+			}
+
+			// Index step and execution spans so orphaned extended trace spans can be
+			// reparented to their matching attempt during the parent-child pass below.
+			// Both stepID and attempt must be present; without attempt there is no
+			// unambiguous target to attach to.
+			if newSpan.Attributes.StepID != nil && *newSpan.Attributes.StepID != "" &&
+				newSpan.Attributes.StepAttempt != nil {
+				key := newExtendedTraceKey(*newSpan.Attributes.StepID, *newSpan.Attributes.StepAttempt)
+				switch newSpan.Name {
+				case meta.SpanNameStep:
+					stepSpanByKey[key] = newSpan.SpanID
+				case meta.SpanNameExecution:
+					execSpanByKey[key] = newSpan.SpanID
+				}
 			}
 		}
 	}
@@ -698,25 +707,48 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			span.Attributes.IsUserland != nil && *span.Attributes.IsUserland &&
 			span.Attributes.StepID != nil && *span.Attributes.StepID != "" &&
 			span.Attributes.StepAttempt != nil {
-			// Orphaned extended trace (userland) span: try reparenting to the
-			// matching step or execution span by stepID+attempt.
-			// Attempt must be present; without it there is no unambiguous target.
-			key := newExtendedTraceKey(*span.Attributes.StepID, *span.Attributes.StepAttempt)
-			parentDynID, found := stepSpanByKey[key]
-			if !found {
-				parentDynID, found = execSpanByKey[key]
+			// Orphaned extended trace (userland) span. Only reparent if this is
+			// the root of its subtree: if the unresolvable parent is itself a
+			// userland span, this is an interior node and must not be lifted to a
+			// step/execution parent.
+			parentID := ""
+			if span.ParentSpanID != nil {
+				parentID = *span.ParentSpanID
 			}
-			if found {
-				parent, _ := spanMap.Get(parentDynID)
-				item, _ := spanMap.Get(span.SpanID)
-				parent.Children = append(parent.Children, item)
-			} else {
+			parentIsUserland := false
+			if parentID != "" {
+				if _, ok := userlandDynIDs[parentID]; ok {
+					parentIsUserland = true
+				} else if dynID, ok := otelToDynamic[parentID]; ok {
+					_, parentIsUserland = userlandDynIDs[dynID]
+				}
+			}
+			if parentIsUserland {
 				logger.StdlibLogger(ctx).Warn(
-					"lost lineage detected for extended trace span",
+					"lost lineage detected",
 					"spanID", span.SpanID,
-					"stepID", *span.Attributes.StepID,
-					"stepAttempt", *span.Attributes.StepAttempt,
+					"parentSpanID", parentID,
 				)
+			} else {
+				// Subtree root: reparent to the matching step or execution span.
+				// Attempt must be present; without it there is no unambiguous target.
+				key := newExtendedTraceKey(*span.Attributes.StepID, *span.Attributes.StepAttempt)
+				parentDynID, found := stepSpanByKey[key]
+				if !found {
+					parentDynID, found = execSpanByKey[key]
+				}
+				if found {
+					parent, _ := spanMap.Get(parentDynID)
+					item, _ := spanMap.Get(span.SpanID)
+					parent.Children = append(parent.Children, item)
+				} else {
+					logger.StdlibLogger(ctx).Warn(
+						"lost lineage detected for extended trace span",
+						"spanID", span.SpanID,
+						"stepID", *span.Attributes.StepID,
+						"stepAttempt", *span.Attributes.StepAttempt,
+					)
+				}
 			}
 		} else {
 			logger.StdlibLogger(ctx).Warn(
