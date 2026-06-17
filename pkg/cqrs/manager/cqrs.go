@@ -893,7 +893,7 @@ func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
 // extended trace spans. A zero Attempt means no attempt was recorded.
 type extendedTraceKey struct {
 	StepID  string
-	Attempt int // 0 when unknown
+	Attempt int
 }
 
 func newExtendedTraceKey(stepID string, attempt int) extendedTraceKey {
