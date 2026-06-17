@@ -639,6 +639,21 @@ func IncrAPICacheMiss(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrTTLUpsertCounter(ctx context.Context, status string, opts CounterOpt) {
+	tags := map[string]any{}
+	for k, v := range opts.Tags {
+		tags[k] = v
+	}
+	tags["status"] = status
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "ttlupsert_total",
+		Description: "Total number of ttlupsert calls by outcome status",
+		Tags:        tags,
+	})
+}
+
 func IncrTLSSessionCacheLookup(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

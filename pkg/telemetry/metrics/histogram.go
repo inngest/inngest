@@ -165,6 +165,17 @@ func HistogramRedisCommandDuration(ctx context.Context, value int64, opts Histog
 	})
 }
 
+func HistogramTTLUpsertDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "ttlupsert_duration",
+		Description: "Duration of ttlupsert database upserts",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
 func HistogramAggregatePausesLoadDuration(ctx context.Context, dur int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
 		PkgName:     opts.PkgName,
