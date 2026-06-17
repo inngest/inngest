@@ -18,11 +18,11 @@ import (
 	"github.com/aws/smithy-go/ptr"
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	connectGRPC "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
-	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
@@ -439,6 +439,41 @@ func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	require.Equal(t, connect.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String(), res.lifecycles.onDisconnected[0].closeReason)
 }
 
+func TestDisconnectLifecycleCompletesBeforeConnectionDeletion(t *testing.T) {
+	blocker := newBlockingDisconnectLifecycle()
+	t.Cleanup(blocker.Release)
+
+	res := createTestingGateway(t, testingParameters{
+		extraLifecycles: []ConnectGatewayLifecycleListener{blocker},
+	})
+	handshake(t, res)
+
+	closeErr := make(chan error, 1)
+	go func() {
+		closeErr <- res.ws.Close(websocket.StatusNormalClosure, "")
+	}()
+
+	select {
+	case <-blocker.entered:
+	case <-time.After(2 * time.Second):
+		require.Fail(t, "timed out waiting for disconnect lifecycle")
+	}
+
+	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.NotNil(t, conn, "connection state should remain until disconnect lifecycles finish")
+
+	blocker.Release()
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+		assert.NoError(t, err)
+		assert.Nil(t, conn)
+	}, 2*time.Second, 100*time.Millisecond)
+
+	require.NoError(t, <-closeErr)
+}
+
 func TestCloseConnectionOnWorkerMessageTooLarge(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 10,
@@ -827,6 +862,41 @@ func (r *testRecorderLifecycles) reset() {
 	r.onConnected = make([]*state.Connection, 0)
 }
 
+type blockingDisconnectLifecycle struct {
+	entered     chan struct{}
+	release     chan struct{}
+	enterOnce   gosync.Once
+	releaseOnce gosync.Once
+}
+
+func newBlockingDisconnectLifecycle() *blockingDisconnectLifecycle {
+	return &blockingDisconnectLifecycle{
+		entered: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+}
+
+func (b *blockingDisconnectLifecycle) Release() {
+	b.releaseOnce.Do(func() {
+		close(b.release)
+	})
+}
+
+func (b *blockingDisconnectLifecycle) OnConnected(ctx context.Context, conn *state.Connection)     {}
+func (b *blockingDisconnectLifecycle) OnReady(ctx context.Context, conn *state.Connection)         {}
+func (b *blockingDisconnectLifecycle) OnHeartbeat(ctx context.Context, conn *state.Connection)     {}
+func (b *blockingDisconnectLifecycle) OnStartDraining(ctx context.Context, conn *state.Connection) {}
+func (b *blockingDisconnectLifecycle) OnStartDisconnecting(ctx context.Context, conn *state.Connection) {
+}
+func (b *blockingDisconnectLifecycle) OnSynced(ctx context.Context, conn *state.Connection) {}
+
+func (b *blockingDisconnectLifecycle) OnDisconnected(ctx context.Context, conn *state.Connection, closeReason string) {
+	b.enterOnce.Do(func() {
+		close(b.entered)
+	})
+	<-b.release
+}
+
 type testingResources struct {
 	redis        *miniredis.Miniredis
 	rc           rueidis.Client
@@ -865,6 +935,7 @@ type testingParameters struct {
 	shouldFailSync               bool
 	disallowConnection           bool
 	shouldUseGRPC                bool
+	extraLifecycles              []ConnectGatewayLifecycleListener
 
 	noConnect bool
 	silent    bool
@@ -976,6 +1047,11 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		},
 	}
 
+	lifecycleListeners := []ConnectGatewayLifecycleListener{lifecycles}
+	if len(params) > 0 && len(params[0].extraLifecycles) > 0 {
+		lifecycleListeners = append(lifecycleListeners, params[0].extraLifecycles...)
+	}
+
 	opts := []gatewayOpt{
 		WithGatewayAuthHandler(func(ctx context.Context, data *connect.WorkerConnectRequestData) (*auth.Response, error) {
 			l.Info("got auth request", "data", data)
@@ -988,7 +1064,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		}),
 		WithConnectionStateManager(connManager),
 		WithGroupName("gw-1"),
-		WithLifeCycles([]ConnectGatewayLifecycleListener{lifecycles}),
+		WithLifeCycles(lifecycleListeners),
 		WithApiBaseUrl(fakeApiBaseUrl),
 		WithGatewayPublicPort(gwPort),
 		WithGRPCConfig(connectConfig.NewGRPCConfig(

@@ -168,8 +168,8 @@ func TestEndToEnd(t *testing.T) {
 		require.EqualValues(t, 0, atomic.LoadInt32(&counter))
 
 		// Verify the run is still queued
-		run := c.Run(ctx, queuedRunID)
-		require.Equal(t, "QUEUED", run.Status)
+		status := c.RunV2Status(ctx, queuedRunID)
+		require.Equal(t, "QUEUED", status)
 
 		// Reconnect the worker — semaphore capacity is restored
 		wc2, err := inngestgo.Connect(connectCtx, inngestgo.ConnectOpts{
@@ -185,7 +185,7 @@ func TestEndToEnd(t *testing.T) {
 		}, 15*time.Second, 1*time.Second)
 
 		// Verify the run completed
-		run = c.WaitForRunStatus(ctx, t, "COMPLETED", queuedRunID)
+		run := c.WaitForRunStatus(ctx, t, "COMPLETED", queuedRunID)
 		require.Equal(t, "COMPLETED", run.Status)
 	})
 }
