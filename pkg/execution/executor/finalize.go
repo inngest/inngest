@@ -163,7 +163,9 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 
 	// Delete the function state in every case.
 	err = e.smv2.Delete(ctx, opts.Metadata.ID)
+	deleteStatus := "success"
 	if err != nil {
+		deleteStatus = "failed"
 		l.Error(
 			"error deleting state in finalize",
 			"error", err,
@@ -171,11 +173,19 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
+	metrics.HistogramRunStateResidenceDuration(ctx, e.now().Sub(opts.Metadata.ID.RunID.Timestamp()), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags:    finalizeDeleteMetricTags(status, opts.Optional.Reason, deleteStatus),
+	})
+
+	metrics.HistogramRunStateStepCount(ctx, int64(opts.Metadata.Metrics.StepCount), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags:    finalizeMetricTags(status, opts.Optional.Reason),
+	})
+
 	metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
-		Tags: map[string]any{
-			"reason": opts.Optional.Reason,
-		},
+		Tags:    finalizeMetricTags(status, opts.Optional.Reason),
 	})
 
 	e.finalizeRemoveJobs(ctx, opts)
@@ -198,6 +208,19 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		return err
 	}
 	return nil
+}
+
+func finalizeMetricTags(status enums.StepStatus, reason string) map[string]any {
+	return map[string]any{
+		"reason": reason,
+		"status": status.String(),
+	}
+}
+
+func finalizeDeleteMetricTags(status enums.StepStatus, reason, deleteStatus string) map[string]any {
+	tags := finalizeMetricTags(status, reason)
+	tags["delete_status"] = deleteStatus
+	return tags
 }
 
 func (e *executor) claimFinalization(ctx context.Context, md sv2.Metadata) sv2.FinalizationClaim {

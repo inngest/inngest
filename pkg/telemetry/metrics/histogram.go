@@ -89,6 +89,23 @@ var (
 		30000,
 		60000,
 	}
+
+	runStateResidenceDurationBoundaries = []float64{
+		1_000,          // 1s
+		10_000,         // 10s
+		60_000,         // 1m
+		300_000,        // 5m
+		1_800_000,      // 30m
+		3_600_000,      // 1h
+		21_600_000,     // 6h
+		86_400_000,     // 1d
+		604_800_000,    // 7d
+		2_592_000_000,  // 30d
+		7_776_000_000,  // 90d
+		31_536_000_000, // 365d
+	}
+
+	runStateStepCountBoundaries = []float64{1, 2, 5, 10, 15, 20}
 )
 
 func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramOpt) {
@@ -678,6 +695,38 @@ func HistogramDefersPerRun(ctx context.Context, count int64, opts HistogramOpt) 
 		Description: "Distribution of the number of defers loaded per finalized run",
 		Tags:        opts.Tags,
 		Boundaries:  []float64{1, 2, 5, 10, 15, 20},
+	})
+}
+
+func HistogramRunStateResidenceDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	if dur < 0 {
+		dur = 0
+	}
+
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "run_state_residence_duration",
+		Description: "Distribution of time between run creation and finalization state delete outcome",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  runStateResidenceDurationBoundaries,
+	})
+}
+
+func HistogramRunStateStepCount(ctx context.Context, count int64, opts HistogramOpt) {
+	switch {
+	case count < 0:
+		count = 0
+	case count > 20:
+		count = 20
+	}
+
+	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "run_state_step_count",
+		Description: "Distribution of completed step count per finalized run, capped at 20",
+		Tags:        opts.Tags,
+		Boundaries:  runStateStepCountBoundaries,
 	})
 }
 
