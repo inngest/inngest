@@ -63,6 +63,8 @@ const (
 	V2GetFunctionRunProcedure = "/api.v2.V2/GetFunctionRun"
 	// V2GetEventRunsProcedure is the fully-qualified name of the V2's GetEventRuns RPC.
 	V2GetEventRunsProcedure = "/api.v2.V2/GetEventRuns"
+	// V2RerunProcedure is the fully-qualified name of the V2's Rerun RPC.
+	V2RerunProcedure = "/api.v2.V2/Rerun"
 	// V2GetAppProcedure is the fully-qualified name of the V2's GetApp RPC.
 	V2GetAppProcedure = "/api.v2.V2/GetApp"
 	// V2SyncAppProcedure is the fully-qualified name of the V2's SyncApp RPC.
@@ -105,6 +107,7 @@ type V2Client interface {
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
 	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
+	Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
@@ -212,6 +215,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetEventRuns")),
 			connect.WithClientOptions(opts...),
 		),
+		rerun: connect.NewClient[v2.RerunRequest, v2.RerunResponse](
+			httpClient,
+			baseURL+V2RerunProcedure,
+			connect.WithSchema(v2Methods.ByName("Rerun")),
+			connect.WithClientOptions(opts...),
+		),
 		getApp: connect.NewClient[v2.GetAppRequest, v2.GetAppResponse](
 			httpClient,
 			baseURL+V2GetAppProcedure,
@@ -291,6 +300,7 @@ type v2Client struct {
 	patchEnv                 *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
 	getFunctionRun           *connect.Client[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse]
 	getEventRuns             *connect.Client[v2.GetEventRunsRequest, v2.GetEventRunsResponse]
+	rerun                    *connect.Client[v2.RerunRequest, v2.RerunResponse]
 	getApp                   *connect.Client[v2.GetAppRequest, v2.GetAppResponse]
 	syncApp                  *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace         *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
@@ -373,6 +383,11 @@ func (c *v2Client) GetEventRuns(ctx context.Context, req *connect.Request[v2.Get
 	return c.getEventRuns.CallUnary(ctx, req)
 }
 
+// Rerun calls api.v2.V2.Rerun.
+func (c *v2Client) Rerun(ctx context.Context, req *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error) {
+	return c.rerun.CallUnary(ctx, req)
+}
+
 // GetApp calls api.v2.V2.GetApp.
 func (c *v2Client) GetApp(ctx context.Context, req *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error) {
 	return c.getApp.CallUnary(ctx, req)
@@ -442,6 +457,7 @@ type V2Handler interface {
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
 	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
+	Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
@@ -545,6 +561,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetEventRuns")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2RerunHandler := connect.NewUnaryHandler(
+		V2RerunProcedure,
+		svc.Rerun,
+		connect.WithSchema(v2Methods.ByName("Rerun")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2GetAppHandler := connect.NewUnaryHandler(
 		V2GetAppProcedure,
 		svc.GetApp,
@@ -635,6 +657,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2GetFunctionRunHandler.ServeHTTP(w, r)
 		case V2GetEventRunsProcedure:
 			v2GetEventRunsHandler.ServeHTTP(w, r)
+		case V2RerunProcedure:
+			v2RerunHandler.ServeHTTP(w, r)
 		case V2GetAppProcedure:
 			v2GetAppHandler.ServeHTTP(w, r)
 		case V2SyncAppProcedure:
@@ -718,6 +742,10 @@ func (UnimplementedV2Handler) GetFunctionRun(context.Context, *connect.Request[v
 
 func (UnimplementedV2Handler) GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetEventRuns is not implemented"))
+}
+
+func (UnimplementedV2Handler) Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.Rerun is not implemented"))
 }
 
 func (UnimplementedV2Handler) GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error) {
