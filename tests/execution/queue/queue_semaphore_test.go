@@ -565,6 +565,7 @@ func TestQueueSemaphore(t *testing.T) {
 
 				err = iter.Process(ctx, &qi2)
 				require.Error(t, err)
+				require.ErrorIs(t, err, queue.ErrProcessNoUserConstraintCapacity)
 				require.ErrorIs(t, err, queue.ErrProcessStopIterator)
 				require.ErrorContains(t, err, "concurrency hit")
 				require.Equal(t, int32(1), iter.CtrConcurrency.Load())
@@ -683,6 +684,7 @@ func TestQueueSemaphore(t *testing.T) {
 
 				err = iter.Process(ctx, &qi2)
 				require.Error(t, err)
+				require.ErrorIs(t, err, queue.ErrProcessNoUserConstraintCapacity)
 				require.ErrorIs(t, err, queue.ErrProcessStopIterator)
 				require.ErrorContains(t, err, "concurrency hit")
 				require.Equal(t, int32(1), iter.CtrConcurrency.Load())

@@ -323,6 +323,8 @@ type ShardOperations interface {
 
 	EnqueueItem(ctx context.Context, i QueueItem, at time.Time, opts EnqueueOpts) (QueueItem, error)
 
+	SetEarliestPeekTime(ctx context.Context, item QueueItem, at time.Time) (time.Time, error)
+
 	Lease(ctx context.Context, item QueueItem, leaseDuration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error)
 	ExtendLease(ctx context.Context, i QueueItem, leaseID ulid.ULID, duration time.Duration, opts ...ExtendLeaseOptionFn) (*ulid.ULID, error)
 
