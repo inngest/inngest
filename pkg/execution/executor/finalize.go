@@ -34,6 +34,11 @@ import (
 // that the function's final status is correct.
 const cancelationGracePeriod = 10 * time.Second
 
+const (
+	runStateDeleteStatusSuccess = "success"
+	runStateDeleteStatusFailed  = "failed"
+)
+
 // Finalize performs run finalization, which involves sending the function
 // finished/failed event and deleting state.
 func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) error {
@@ -163,9 +168,9 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 
 	// Delete the function state in every case.
 	err = e.smv2.Delete(ctx, opts.Metadata.ID)
-	deleteStatus := "success"
+	deleteStatus := runStateDeleteStatusSuccess
 	if err != nil {
-		deleteStatus = "failed"
+		deleteStatus = runStateDeleteStatusFailed
 		l.Error(
 			"error deleting state in finalize",
 			"error", err,
