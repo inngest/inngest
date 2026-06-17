@@ -6,6 +6,7 @@ import { ExperimentsIcon } from '@inngest/components/icons/sections/Experiments'
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
+import { OverviewIcon } from '@inngest/components/icons/sections/Overview';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 import { WebhooksIcon } from '@inngest/components/icons/sections/Webhooks';
 
@@ -26,7 +27,7 @@ export type NavGroupConfig = {
 export const workflow: NavGroupConfig = {
   heading: 'Workflow',
   items: [
-    { label: 'Overview', route: '', Icon: MetricsIcon, exact: true },
+    { label: 'Overview', route: '', Icon: OverviewIcon, exact: true },
     { label: 'Apps', route: 'apps', Icon: AppsIcon },
     { label: 'Functions', route: 'functions', Icon: FunctionsIcon },
     { label: 'Runs', route: 'runs', Icon: RunsIcon },

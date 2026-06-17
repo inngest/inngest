@@ -382,7 +382,13 @@ ON CONFLICT (run_id) DO UPDATE SET
     has_ai = CASE
                 WHEN trace_runs.has_ai = TRUE THEN TRUE
                 ELSE excluded.has_ai
-             END;
+             END
+-- Terminal status codes (matches enums.runStatusCode in pkg/enums/run_status.go):
+--   50=Overflowed, 300=Completed, 400=Failed, 500=Cancelled, 600=Skipped.
+WHERE NOT (
+    trace_runs.status IN (50, 300, 400, 500, 600)
+    AND excluded.status NOT IN (50, 300, 400, 500, 600)
+);
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = sqlc.arg('run_id')::CHAR(26);
