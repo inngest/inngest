@@ -226,12 +226,23 @@ func (c *Client) WaitForRunStatus(
 		timeout = o.Timeout
 	}
 
+	type statusObs struct {
+		at     time.Duration
+		status string
+	}
+
 	start := time.Now()
 	var run Run
+	var observations []statusObs
+	lastStatus := ""
 	for {
 		r, err := c.RunOrError(ctx, runID)
 		if err == nil {
 			run = r
+			if r.Status != lastStatus {
+				observations = append(observations, statusObs{at: time.Since(start), status: r.Status})
+				lastStatus = r.Status
+			}
 			if r.Status == expectedStatus {
 				return r
 			}
@@ -243,7 +254,13 @@ func (c *Client) WaitForRunStatus(
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s (runID: %s)", expectedStatus, run.Status, runID)
+	var hist strings.Builder
+	for _, o := range observations {
+		fmt.Fprintf(&hist, "[%s] %s -> ", o.at.Round(100*time.Millisecond), o.status)
+	}
+	hist.WriteString("end")
+
+	require.Failf(t, "status didn't match", "didn't get expected status: %s, got %s (runID: %s); history: %s", expectedStatus, run.Status, runID, hist.String())
 	return run
 }
 
