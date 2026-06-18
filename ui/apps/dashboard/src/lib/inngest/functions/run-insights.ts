@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
 import { insightsChannel } from '../realtime';
+import { buildImmediateScores } from './scoring/insights-scores';
 import {
   buildSystemPrompt as buildEventMatcherPrompt,
   parseToolResult as parseEventMatcherResult,
@@ -42,7 +43,7 @@ export const runInsightsAgent = inngest.createFunction(
     name: 'Insights SQL Agent',
     triggers: [{ event: 'insights-agent/chat.requested' }],
   },
-  async ({ event, step, group }) => {
+  async ({ event, step, group, runId }) => {
     const {
       threadId: providedThreadId,
       userMessage,
@@ -180,85 +181,100 @@ export const runInsightsAgent = inngest.createFunction(
 
     const anthropicClient = new Anthropic();
 
-    const queryWriterResult = await group.experiment('query-writer-model', {
-      variants: {
-        'claude-sonnet-4-5': () =>
-          step.run('query-writer', async () => {
-            const startedAt = Date.now();
-            const result = await anthropicClient.messages.create({
-              model: 'claude-sonnet-4-5',
-              max_tokens: 4096,
-              ...queryWriterBody,
-            });
-            const latencyMs = Date.now() - startedAt;
+    const { result: queryWriterResult, variant } = await group.experiment(
+      'query-writer-model',
+      {
+        variants: {
+          'claude-sonnet-4-5': () =>
+            step.run('query-writer', async () => {
+              const startedAt = Date.now();
+              const result = await anthropicClient.messages.create({
+                model: 'claude-sonnet-4-5',
+                max_tokens: 4096,
+                ...queryWriterBody,
+              });
+              const latencyMs = Date.now() - startedAt;
 
-            const inputTokens = result.usage.input_tokens;
-            const outputTokens = result.usage.output_tokens;
-            const pricing = QUERY_WRITER_PRICING['claude-sonnet-4-5'];
-            const costUsd = calculateCostUsd(
-              inputTokens,
-              outputTokens,
-              pricing,
-            );
+              const inputTokens = result.usage.input_tokens;
+              const outputTokens = result.usage.output_tokens;
+              const pricing = QUERY_WRITER_PRICING['claude-sonnet-4-5'];
+              const costUsd = calculateCostUsd(
+                inputTokens,
+                outputTokens,
+                pricing,
+              );
 
-            await inngest.score({
-              name: 'query_writer_latency_ms',
-              value: latencyMs,
-            });
-            await inngest.score({
-              name: 'query_writer_output_tokens',
-              value: outputTokens,
-            });
-            await inngest.score({
-              name: 'query_writer_cost_usd',
-              value: costUsd,
-            });
+              await inngest.score({
+                name: 'query_writer_latency_ms',
+                value: latencyMs,
+              });
+              await inngest.score({
+                name: 'query_writer_output_tokens',
+                value: outputTokens,
+              });
+              await inngest.score({
+                name: 'query_writer_cost_usd',
+                value: costUsd,
+              });
 
-            return result;
-          }),
-        'claude-opus-4-8': () =>
-          step.run('query-writer', async () => {
-            const startedAt = Date.now();
-            const result = await anthropicClient.messages.create({
-              model: 'claude-opus-4-8',
-              max_tokens: 4096,
-              ...queryWriterBody,
-            });
-            const latencyMs = Date.now() - startedAt;
+              return result;
+            }),
+          'claude-opus-4-8': () =>
+            step.run('query-writer', async () => {
+              const startedAt = Date.now();
+              const result = await anthropicClient.messages.create({
+                model: 'claude-opus-4-8',
+                max_tokens: 4096,
+                ...queryWriterBody,
+              });
+              const latencyMs = Date.now() - startedAt;
 
-            const inputTokens = result.usage.input_tokens;
-            const outputTokens = result.usage.output_tokens;
-            const pricing = QUERY_WRITER_PRICING['claude-opus-4-8'];
-            const costUsd = calculateCostUsd(
-              inputTokens,
-              outputTokens,
-              pricing,
-            );
+              const inputTokens = result.usage.input_tokens;
+              const outputTokens = result.usage.output_tokens;
+              const pricing = QUERY_WRITER_PRICING['claude-opus-4-8'];
+              const costUsd = calculateCostUsd(
+                inputTokens,
+                outputTokens,
+                pricing,
+              );
 
-            await inngest.score({
-              name: 'query_writer_latency_ms',
-              value: latencyMs,
-            });
-            await inngest.score({
-              name: 'query_writer_output_tokens',
-              value: outputTokens,
-            });
-            await inngest.score({
-              name: 'query_writer_cost_usd',
-              value: costUsd,
-            });
+              await inngest.score({
+                name: 'query_writer_latency_ms',
+                value: latencyMs,
+              });
+              await inngest.score({
+                name: 'query_writer_output_tokens',
+                value: outputTokens,
+              });
+              await inngest.score({
+                name: 'query_writer_cost_usd',
+                value: costUsd,
+              });
 
-            return result;
-          }),
+              return result;
+            }),
+        },
+        select: experiment.weighted({
+          'claude-sonnet-4-5': 50,
+          'claude-opus-4-8': 50,
+        }),
+        withVariant: true,
       },
-      select: experiment.weighted({
-        'claude-sonnet-4-5': 50,
-        'claude-opus-4-8': 50,
-      }),
-    });
+    );
 
     const sqlResult = await step.run('extract-query-writer-result', () => {
       return parseQueryWriterResult(queryWriterResult);
+    });
+
+    // Immediate, run-scoped success scores (decoupled from the experiment;
+    // variant rides along as the `isOpus` bool). Memoized so they write once.
+    await step.run('emit-immediate-scores', async () => {
+      for (const score of buildImmediateScores({
+        sql: sqlResult.sql,
+        variant,
+      })) {
+        await inngest.score(score);
+      }
     });
 
     await step.realtime.publish(
@@ -308,6 +324,7 @@ export const runInsightsAgent = inngest.createFunction(
       event: 'run.completed',
       data: {
         threadId,
+        runId,
         sql: sqlResult.sql,
         title: sqlResult.title,
         reasoning: sqlResult.reasoning,
