@@ -48,13 +48,11 @@ export const Route = createFileRoute('/api/query-feedback')({
             headers: { 'Content-Type': 'application/json' },
           });
         } catch (error) {
+          // Log the detail server-side; return a generic message so internal
+          // error specifics (upstream URLs, client internals) don't leak.
+          console.error('query-feedback handler failed', error);
           return new Response(
-            JSON.stringify({
-              error:
-                error instanceof Error
-                  ? error.message
-                  : 'Failed to record feedback',
-            }),
+            JSON.stringify({ error: 'Failed to record feedback' }),
             { status: 500, headers: { 'Content-Type': 'application/json' } },
           );
         }
