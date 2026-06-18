@@ -29,7 +29,7 @@ type BaseTableProps<T> = {
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: Row<T>) => void;
   onCellClick?: (rowIndex: number, columnId: string, value: unknown) => void;
-  getRowHref?: (row: Row<T>) => string;
+  getRowHref?: (row: Row<T>) => string | undefined;
   blankState?: React.ReactNode;
   cellClassName?: string;
   enableColumnSizing?: boolean;
