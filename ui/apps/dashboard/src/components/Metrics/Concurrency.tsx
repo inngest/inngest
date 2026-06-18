@@ -8,6 +8,7 @@ import type { VolumeMetricsQuery } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { borderColor } from '@/utils/tailwind';
 import type { EntityLookup } from './Dashboard';
+import { ZERO_ID } from './metricAggregation';
 
 import {
   getLineChartOptions,
@@ -15,8 +16,6 @@ import {
   lineColors,
   seriesOptions,
 } from './utils';
-
-const zeroID = '00000000-0000-0000-0000-000000000000';
 
 export const mapConcurrency = (
   { stepRunning: { metrics: runningMetrics } }: VolumeMetricsQuery['workspace'],
@@ -33,7 +32,7 @@ export const mapConcurrency = (
     xAxis: getXAxis(runningMetrics),
     series: [
       ...runningMetrics
-        .filter(({ id }) => id !== zeroID)
+        .filter(({ id }) => id !== ZERO_ID)
         .map((f, i) => ({
           ...seriesOptions,
           name: entities[f.id]?.name,

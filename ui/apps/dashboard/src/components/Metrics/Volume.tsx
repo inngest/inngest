@@ -16,6 +16,7 @@ import {
   ConnectWorkerTotalCapacity,
 } from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
+import { sumScopedMetricData } from './metricAggregation';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
@@ -33,8 +34,6 @@ export type MetricsFilters = {
   isMarketplace: boolean;
 };
 
-// accountConcurrency is the unscoped account-level gauge, read directly as a single series.
-// This avoids the gauge stacking problem where per-function maxes are summed (SYS-722).
 const GetVolumeMetrics = graphql(`
   query VolumeMetrics(
     $workspaceId: ID!
@@ -298,6 +297,10 @@ export const MetricsVolume = ({
 
   error && console.error('Error fetcthing metrics data for', variables, error);
 
+  const accountConcurrency = data
+    ? sumScopedMetricData(data.workspace.stepRunning.metrics)
+    : undefined;
+
   return (
     <div className="item-start flex h-full w-full flex-col items-start">
       <div
@@ -327,7 +330,7 @@ export const MetricsVolume = ({
               isMarketplace={isMarketplace}
             />
             <AccountConcurrency
-              accountConcurrency={data?.accountConcurrency}
+              accountConcurrency={accountConcurrency}
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />

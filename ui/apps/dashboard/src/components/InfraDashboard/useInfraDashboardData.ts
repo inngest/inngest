@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import {
+  latestMetricDataValue,
+  sumScopedMetricData,
+} from '@/components/Metrics/metricAggregation';
 import { graphql } from '@/gql';
 import {
   GetBillableExecutionsDocument,
@@ -39,9 +43,8 @@ export const TIME_RANGE_OPTIONS: TimeRangeOption[] = [
   { id: 'month', name: 'This month' },
 ];
 
-const zeroID = '00000000-0000-0000-0000-000000000000';
 const cacheTTL = 60 * 60 * 1000;
-const cacheVersion = 2;
+const cacheVersion = 3;
 const functionCountPageSize = 1;
 const topFunctionsUsagePageSize = 1000;
 const topFunctionsLimit = 50;
@@ -222,7 +225,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       appIDs: [],
       from: range.from.toISOString(),
       functionIDs: [],
-      scope: MetricsScope.App,
+      scope: MetricsScope.Fn,
       until: range.until.toISOString(),
       workspaceId: env.id,
     },
@@ -263,11 +266,10 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     const backlogDepth = latestBucketMetricTotal(
       volume.data?.workspace.backlog.metrics,
     );
-    const currentConcurrency = latestBucketMetricTotal(
-      volume.data?.workspace.stepRunning.metrics.filter(
-        ({ id }) => id !== zeroID,
-      ),
+    const accountConcurrency = sumScopedMetricData(
+      volume.data?.workspace.stepRunning.metrics,
     );
+    const currentConcurrency = latestMetricDataValue(accountConcurrency);
     const proPlanAmountCents = pickCheapestEnabledProPlanAmount(
       availablePlans.data?.plans,
     );
@@ -322,9 +324,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       sdkRequests:
         sumMetricValues(volume.data?.workspace.sdkThroughputStarted.metrics) ||
         sumMetricValues(volume.data?.workspace.sdkThroughputEnded.metrics),
-      stepRunning: latestMetricTotal(
-        volume.data?.workspace.stepRunning.metrics,
-      ),
+      stepRunning: currentConcurrency,
       topFunctions: buildTopFunctionRows({
         limit: topFunctionsLimit,
         usage: usageRows,
@@ -335,9 +335,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       workerPercentUsed:
         volume.data?.workspace.workerPercentageUsed.metrics.at(0)?.data.at(-1)
           ?.value ?? null,
-      totalAccountConcurrency: volume.data?.accountConcurrency
-        ? sumDataValues(volume.data.accountConcurrency.data)
-        : 0,
+      totalAccountConcurrency: sumDataValues(accountConcurrency),
     };
   }, [
     availablePlans.data?.plans,
@@ -354,7 +352,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     functions.data?.workspace.workflows.page,
     lookups.data?.envBySlug?.apps,
     lookups.data?.envBySlug?.workflows.data.length,
-    volume.data?.accountConcurrency,
     volume.data?.workspace.backlog.metrics,
     volume.data?.workspace.runsThroughput.metrics,
     volume.data?.workspace.sdkThroughputEnded.metrics,
