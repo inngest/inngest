@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { Error } from '@inngest/components/Error/Error';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
+import { gql, type TypedDocumentNode } from 'urql';
 
-import { graphql } from '@/gql';
-import { MetricsScope } from '@/gql/graphql';
+import {
+  MetricsScope,
+  type VolumeMetricsQuery,
+  type VolumeMetricsQueryVariables,
+} from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
@@ -34,7 +38,26 @@ export type MetricsFilters = {
   isMarketplace: boolean;
 };
 
-const GetVolumeMetrics = graphql(`
+type AllFunctionConcurrencyMetrics = {
+  metrics: Array<{
+    id: string;
+    data: Array<{
+      value: number;
+      bucket: string;
+    }>;
+  }>;
+};
+
+type VolumeMetricsWithAllFunctionConcurrencyQuery = {
+  workspace: VolumeMetricsQuery['workspace'] & {
+    allFunctionConcurrency: AllFunctionConcurrencyMetrics;
+  };
+};
+
+const GetVolumeMetrics: TypedDocumentNode<
+  VolumeMetricsWithAllFunctionConcurrencyQuery,
+  VolumeMetricsQueryVariables
+> = gql`
   query VolumeMetrics(
     $workspaceId: ID!
     $from: Time!
@@ -43,17 +66,23 @@ const GetVolumeMetrics = graphql(`
     $until: Time
     $scope: MetricsScope!
   ) {
-    accountConcurrency: metrics(opts: { name: "steps_running", from: $from, to: $until }) {
-      data {
-        bucket
-        value
-      }
-      from
-      to
-      granularity
-    }
-
     workspace(id: $workspaceId) {
+      allFunctionConcurrency: scopedMetrics(
+        filter: {
+          name: "steps_running"
+          scope: FN
+          from: $from
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          data {
+            value
+            bucket
+          }
+        }
+      }
       runsThroughput: scopedMetrics(
         filter: {
           name: "function_run_ended_total"
@@ -258,7 +287,7 @@ const GetVolumeMetrics = graphql(`
       }
     }
   }
-`);
+`;
 
 export const MetricsVolume = ({
   from,
@@ -298,7 +327,7 @@ export const MetricsVolume = ({
   error && console.error('Error fetcthing metrics data for', variables, error);
 
   const accountConcurrency = data
-    ? sumScopedMetricData(data.workspace.stepRunning.metrics)
+    ? sumScopedMetricData(data.workspace.allFunctionConcurrency.metrics)
     : undefined;
 
   return (
