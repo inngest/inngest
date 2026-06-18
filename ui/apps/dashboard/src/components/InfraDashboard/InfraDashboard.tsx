@@ -831,6 +831,10 @@ function InfraFlowPanel({
       (tier) =>
         tier.id === (currentInfraTierId ?? placeholders.defaultInfraTierId),
     ) ?? placeholders.infraTiers[0];
+  const clampedCurrentConcurrency = Math.min(
+    Math.max(currentConcurrency, 0),
+    infraPlan.execConcurrencyLimit,
+  );
 
   return (
     <section className="border-subtle bg-canvasSubtle relative z-0 mb-10 min-h-[280px] shrink-0 overflow-visible rounded-md border p-4 md:p-6">
@@ -891,8 +895,8 @@ function InfraFlowPanel({
           label="Executors"
           primaryLabel="Concurrency in use"
           primaryHint="~ Approx."
-          primaryValue={formatCompactNumber(currentConcurrency)}
-          progressValue={currentConcurrency}
+          primaryValue={formatCompactNumber(clampedCurrentConcurrency)}
+          progressValue={clampedCurrentConcurrency}
           limit={infraPlan.execConcurrencyLimit}
         />
       </div>
@@ -923,10 +927,10 @@ function FlowNode({
     progressValue ?? Number(primaryValue.replace(/[^\d.]/g, ''));
   const progressPercent =
     Number.isFinite(numericPrimary) && typeof limit === 'number' && limit > 0
-      ? (numericPrimary / limit) * 100
+      ? (Math.min(Math.max(numericPrimary, 0), limit) / limit) * 100
       : null;
   const progress =
-    progressPercent === null ? 28 : Math.max(8, Math.min(100, progressPercent));
+    progressPercent === null ? 0 : Math.min(100, Math.max(1, progressPercent));
   const progressColor =
     progressPercent !== null && progressPercent >= 90
       ? 'bg-errorContrast'
