@@ -50,7 +50,7 @@
     "@tanstack/query-core": "5.90.2",
     "@tanstack/react-query": "^5.66.5",
     "@tanstack/react-query-devtools": "^5.84.2",
-    "@tanstack/react-router": "^1.168.26",
+    "@tanstack/react-router": "^1.170.6",
     "@tanstack/react-router-devtools": "^1.167.0",
     "@tanstack/react-router-ssr-query": "^1.167.0",
     "@tanstack/react-start": "1.168.8",

@@ -132,7 +132,7 @@ importers:
         version: 0.100.1(zod@4.2.1)
       '@clerk/tanstack-react-start':
         specifier: ^0.29.11
-        version: 0.29.13(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/react-start@1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 0.29.13(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/react-start@1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@graphql-typed-document-node/core':
         specifier: ^3.2.0
         version: 3.2.0(graphql@16.8.1)
@@ -185,14 +185,14 @@ importers:
         specifier: ^5.84.2
         version: 5.90.2(@tanstack/react-query@5.90.2(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router':
-        specifier: ^1.168.26
-        version: 1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^1.170.6
+        version: 1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router-devtools':
         specifier: ^1.167.0
-        version: 1.167.0(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(csstype@3.2.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 1.167.0(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(csstype@3.2.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router-ssr-query':
         specifier: ^1.167.0
-        version: 1.167.0(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.2.0))(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 1.167.0(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.2.0))(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-start':
         specifier: 1.168.8
         version: 1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9)
@@ -417,14 +417,14 @@ importers:
         specifier: ^5.84.2
         version: 5.90.2(@tanstack/react-query@5.90.2(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router':
-        specifier: ^1.168.26
-        version: 1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^1.170.6
+        version: 1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router-devtools':
         specifier: ^1.167.0
-        version: 1.167.0(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(csstype@3.2.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 1.167.0(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(csstype@3.2.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router-ssr-query':
         specifier: ^1.167.0
-        version: 1.167.0(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.2.0))(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 1.167.0(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.2.0))(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-start':
         specifier: 1.168.8
         version: 1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9)
@@ -560,7 +560,7 @@ importers:
     dependencies:
       '@clerk/tanstack-react-start':
         specifier: ^0.29.11
-        version: 0.29.13(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/react-start@1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 0.29.13(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/react-start@1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@graphql-typed-document-node/core':
         specifier: ^3.2.0
         version: 3.2.0(graphql@16.8.1)
@@ -583,14 +583,14 @@ importers:
         specifier: ^5.84.2
         version: 5.90.2(@tanstack/react-query@5.90.2(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router':
-        specifier: ^1.168.26
-        version: 1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^1.170.6
+        version: 1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router-devtools':
         specifier: ^1.167.0
-        version: 1.167.0(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(csstype@3.2.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 1.167.0(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(csstype@3.2.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-router-ssr-query':
         specifier: ^1.167.0
-        version: 1.167.0(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.2.0))(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        version: 1.167.0(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.2.0))(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-start':
         specifier: 1.168.8
         version: 1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9)
@@ -809,8 +809,8 @@ importers:
         specifier: ^5.51.11
         version: 5.51.11(react@18.2.0)
       '@tanstack/react-router':
-        specifier: ^1.168.26
-        version: 1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+        specifier: ^1.170.6
+        version: 1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-table':
         specifier: ^8.21.3
         version: 8.21.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -5949,13 +5949,6 @@ packages:
       react: '>=18.0.0 || >=19.0.0'
       react-dom: '>=18.0.0 || >=19.0.0'
 
-  '@tanstack/react-router@1.170.16':
-    resolution: {integrity: sha512-w6eq1IJklujs1tESazaK/FxH0+H2l8vm/QPuu1cD3oRW/ubgKneQpd7b64ti/8gUyEimzimJQZDmJr6YHfP5+g==}
-    engines: {node: '>=20.19'}
-    peerDependencies:
-      react: '>=18.0.0 || >=19.0.0'
-      react-dom: '>=18.0.0 || >=19.0.0'
-
   '@tanstack/react-router@1.170.6':
     resolution: {integrity: sha512-tGQkOjcMESBbfw+iz9zE/ivcuw4D2zdhW8PA4wMmpOyA2bLiqpc6bg5MnJPxamdXoO3GZBiHYOOoEwi5qxpPgA==}
     engines: {node: '>=20.19'}
@@ -10218,10 +10211,6 @@ packages:
     resolution: {integrity: sha512-lKwV/1brpG6mBUFHtb7NUmtABCb2WZZmm2wNiOA5hAb8VdCS4B3dtMWyvcoViccwAW/COERjXLt0zP1zXUN26g==}
     engines: {node: '>=10'}
 
-  minimatch@9.0.5:
-    resolution: {integrity: sha512-G6T0ZX48xgozx7587koeX9Ys2NYy6Gmv//P89sEte9V9whIapMNF4idKxnW2QtCcLiTWlb/wfCabAtAFWhhBow==}
-    engines: {node: '>=16 || 14 >=14.17'}
-
   minimatch@9.0.9:
     resolution: {integrity: sha512-OBwBN9AL4dqmETlpS2zasx+vTeWclWzkblfZk7KTA5j3jeOONz/tRCnZomUyvNg83wL5Zv9Ss6HMJXAgL8R2Yg==}
     engines: {node: '>=16 || 14 >=14.17'}
@@ -12497,10 +12486,6 @@ packages:
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
-  undici@7.16.0:
-    resolution: {integrity: sha512-QEg3HPMll0o3t2ourKwOeUAZ159Kn9mx5pnzHRQO8+Wixmh88YdZRiIwat0iNzNNXn0yoEtXJqFpyW7eM8BV7g==}
-    engines: {node: '>=20.18.1'}
-
   undici@7.28.0:
     resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
     engines: {node: '>=20.18.1'}
@@ -14422,13 +14407,13 @@ snapshots:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
-  '@clerk/tanstack-react-start@0.29.13(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/react-start@1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@clerk/tanstack-react-start@0.29.13(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/react-start@1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
       '@clerk/backend': 2.33.5(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@clerk/clerk-react': 5.61.8(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@clerk/shared': 3.47.7(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@clerk/types': 4.101.25(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@tanstack/react-router': 1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@tanstack/react-router': 1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/react-start': 1.168.8(crossws@0.4.6(srvx@0.11.13))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(vite@7.3.5(@types/node@24.9.2)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.39.0)(tsx@4.20.6)(yaml@2.9.0))(webpack@5.99.9)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -14720,7 +14705,7 @@ snapshots:
     dependencies:
       '@eslint/object-schema': 2.1.7
       debug: 4.4.3
-      minimatch: 9.0.5
+      minimatch: 10.1.2
     transitivePeerDependencies:
       - supports-color
 
@@ -14741,7 +14726,7 @@ snapshots:
       ignore: 5.3.2
       import-fresh: 3.3.0
       js-yaml: 4.1.1
-      minimatch: 9.0.5
+      minimatch: 10.1.2
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
       - supports-color
@@ -19207,9 +19192,9 @@ snapshots:
       '@tanstack/query-core': 5.90.2
       react: 18.2.0
 
-  '@tanstack/react-router-devtools@1.167.0(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(csstype@3.2.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@tanstack/react-router-devtools@1.167.0(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(csstype@3.2.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
-      '@tanstack/react-router': 1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@tanstack/react-router': 1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/router-devtools-core': 1.168.0(@tanstack/router-core@1.171.13)(csstype@3.2.3)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -19218,25 +19203,16 @@ snapshots:
     transitivePeerDependencies:
       - csstype
 
-  '@tanstack/react-router-ssr-query@1.167.0(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.2.0))(@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+  '@tanstack/react-router-ssr-query@1.167.0(@tanstack/query-core@5.90.2)(@tanstack/react-query@5.90.2(react@18.2.0))(@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(@tanstack/router-core@1.171.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
       '@tanstack/query-core': 5.90.2
       '@tanstack/react-query': 5.90.2(react@18.2.0)
-      '@tanstack/react-router': 1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@tanstack/react-router': 1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@tanstack/router-ssr-query-core': 1.169.0(@tanstack/query-core@5.90.2)(@tanstack/router-core@1.171.13)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
     transitivePeerDependencies:
       - '@tanstack/router-core'
-
-  '@tanstack/react-router@1.170.16(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
-    dependencies:
-      '@tanstack/history': 1.162.0
-      '@tanstack/react-store': 0.9.3(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@tanstack/router-core': 1.171.13
-      isbot: 5.1.31
-      react: 18.2.0
-      react-dom: 18.2.0(react@18.2.0)
 
   '@tanstack/react-router@1.170.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
@@ -20230,7 +20206,7 @@ snapshots:
       ts-morph: 12.0.0
       ts-node: 10.9.1(@types/node@16.18.11)(typescript@4.9.5)
       typescript: 4.9.5
-      undici: 7.16.0
+      undici: 7.28.0
     transitivePeerDependencies:
       - '@swc/core'
       - '@swc/wasm'
@@ -22371,7 +22347,7 @@ snapshots:
       estraverse: 5.3.0
       hasown: 2.0.2
       jsx-ast-utils: 3.3.5
-      minimatch: 9.0.5
+      minimatch: 9.0.9
       object.entries: 1.1.9
       object.fromentries: 2.0.8
       object.values: 1.2.1
@@ -22428,7 +22404,7 @@ snapshots:
       is-glob: 4.0.3
       json-stable-stringify-without-jsonify: 1.0.1
       lodash.merge: 4.6.2
-      minimatch: 9.0.5
+      minimatch: 9.0.9
       natural-compare: 1.4.0
       optionator: 0.9.4
     optionalDependencies:
@@ -22979,7 +22955,7 @@ snapshots:
       cosmiconfig: 8.0.0
       graphql: 16.8.1
       jiti: 1.17.1
-      minimatch: 9.0.5
+      minimatch: 9.0.9
       string-env-interpolation: 1.0.1
       tslib: 2.7.0
     transitivePeerDependencies:
@@ -24648,10 +24624,6 @@ snapshots:
       brace-expansion: 4.0.1
 
   minimatch@5.1.6:
-    dependencies:
-      brace-expansion: 4.0.1
-
-  minimatch@9.0.5:
     dependencies:
       brace-expansion: 4.0.1
 
@@ -27516,9 +27488,6 @@ snapshots:
   undici-types@6.21.0: {}
 
   undici-types@7.16.0: {}
-
-  undici@7.16.0:
-    optional: true
 
   undici@7.28.0: {}
 
