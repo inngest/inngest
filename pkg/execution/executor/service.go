@@ -646,7 +646,7 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
-	if err != nil && err != queue.ErrQueueItemExists {
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 		return err
 	}
 	l.Info("re-enqueued eager cancellation of finish timeout", "requeueAt", requeueAt)
@@ -732,7 +732,7 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 	item.JobID = &jobID
 	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
-	if err != nil && err != queue.ErrQueueItemExists {
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 		return err
 	}
 	l.Info("re-enqueued eager cancellation of start timeout", "requeueAt", requeueAt)
@@ -935,7 +935,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
 
 		accountID := consts.DevServerAccountID
-		envID := cqrsFn.EnvID
+		envID := consts.DevServerEnvID
 		appID := cqrsFn.AppID
 
 		for _, cronExpr := range fn.ScheduleExpressions() {
@@ -1033,7 +1033,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			l.Info("Breaking cron cycle, function does not exist")
+			l.Debug("Breaking cron cycle, function does not exist")
 			// function doesn't exist, no action needed
 			return nil
 		}
@@ -1041,7 +1041,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	}
 	// function is archived/deleted, so don't do anything
 	if fn.IsArchived() {
-		l.Info("Breaking cron cycle, function is archived")
+		l.Debug("Breaking cron cycle, function is archived")
 		return nil
 	}
 
@@ -1051,13 +1051,13 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("error converting function to config: %w", err)
 	}
 	if conf.FunctionVersion > ci.FunctionVersion {
-		l.Info("Breaking cron cycle, function version was upgraded")
+		l.Debug("Breaking cron cycle, function version was upgraded")
 		return nil
 	}
 
 	// ensure that the function has the same cron expression.
 	if !conf.HasCronExpression(ci.Expression) {
-		l.Info("Breaking cron cycle, cron trigger no longer exists")
+		l.Debug("Breaking cron cycle, cron trigger no longer exists")
 		return nil
 	}
 

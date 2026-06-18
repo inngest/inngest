@@ -21,6 +21,7 @@ local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
 
 local keyPartitionFn    = KEYS[6] -- queue:sorted:$workflowID - zset
+local keyEarliestPeekTime = KEYS[7]
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
@@ -52,7 +53,9 @@ end
 -- Update the "at" time of the job
 item.at = jobScore
 item.wt = jobScore
+item.pt = nil
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
+redis.call("DEL", keyEarliestPeekTime)
 
 requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountID)
 

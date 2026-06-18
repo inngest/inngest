@@ -349,13 +349,22 @@ func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
 		return nil, err
 	}
-	return opts, nil
+	return opts, opts.Validate()
 }
 
 type InvokeFunctionOpts struct {
 	FunctionID string       `json:"function_id"`
 	Payload    *event.Event `json:"payload,omitempty"`
 	Timeout    string       `json:"timeout"`
+}
+
+func (i *InvokeFunctionOpts) Validate() error {
+	if i.Payload == nil {
+		return nil
+	}
+	// Mirrors the session checks in Event.Validate() at API ingest; invocation
+	// events are constructed by the executor and never pass through the API.
+	return i.Payload.Meta.Sessions.Validate()
 }
 
 func (i *InvokeFunctionOpts) UnmarshalAny(a any) error {

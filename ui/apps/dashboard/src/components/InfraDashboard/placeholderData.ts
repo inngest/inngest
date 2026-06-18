@@ -22,7 +22,6 @@ export type InfraTier = {
   description: string;
   availability: string;
   sla: string;
-  dispatchP99: string;
   compliance?: string;
   notes?: string[];
 };
@@ -71,10 +70,10 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
     {
       id: 'free',
       name: 'Free pool',
-      description: 'Included with IN-XS on the free tier',
+      description:
+        'Shared infrastructure pooled across users; included with IN-XS',
       availability: 'Free',
       sla: '99.5%',
-      dispatchP99: '< 2.5s',
     },
     {
       id: 'shared',
@@ -82,15 +81,13 @@ export const INFRA_DASHBOARD_PLACEHOLDERS: InfraDashboardPlaceholders = {
       description: 'Included with IN-S and up',
       availability: 'Included',
       sla: '99.9%',
-      dispatchP99: '< 750ms',
     },
     {
       id: 'dedicated',
       name: 'Dedicated cluster',
-      description: 'Your isolated event stream, queues, and executor infra',
+      description: 'Your isolated executor, queues, and event stream infra',
       availability: 'from $2,899/mo',
       sla: '99.99%',
-      dispatchP99: '< 500ms',
       compliance: 'SOC 2 / HIPAA',
       notes: [
         'Dedicated queue shards and execution infrastructure',

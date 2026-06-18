@@ -107,7 +107,7 @@ var keyFieldMap = map[string]attrMapping{
 		convention: openinference,
 	},
 	"llm.model_name": {
-		field:      "model",
+		field:      "responseModel",
 		convention: openinference,
 	},
 	// llm.system identifies the AI product/vendor (openai, anthropic, ...),
@@ -126,12 +126,15 @@ var keyFieldMap = map[string]attrMapping{
 	// ---------------------------------------------------------------------------
 	// Vercel AI SDK (native telemetry, `ai.*`)
 	// ---------------------------------------------------------------------------
-	// The AI SDK emits its own spans. A call produces a parent ai.<op> span
-	// (ai.* only) plus a child ai.<op>.do<Op> span that ALSO carries a partial
-	// gen_ai.* set. vercel ranks below semconv/openinference so gen_ai.* stays
-	// authoritative on the child where both are present (their values agree);
-	// these mappings are what make the ai.*-only parent and embeddings spans
-	// extractable, and they supply ai.usage.totalTokens (gen_ai omits a total).
+	// The Vercel AI SDK emits its own spans. A call produces an outer ai.<op> span
+	// (ai.* only) plus an inner ai.<op>.do<Op> span that ALSO carries a partial
+	// gen_ai.* set; the ai.* usage values are duplicated on both.
+	//
+	// For most Vercel spans, we only use gen_ai.* attributes and ignore ai.*
+	// attributes to avoid double counting when we aggregate.
+	//
+	// However, Vercel's embedding spans lack any gen_ai.* attributes. For this
+	// special case, we do parse ai.* attributes.
 	"ai.model.id": {
 		field:      "model",
 		convention: vercel,
@@ -180,7 +183,7 @@ var keyFieldMap = map[string]attrMapping{
 	// Langfuse (`langfuse.*`, via @langfuse/openai + LangfuseSpanProcessor)
 	// ---------------------------------------------------------------------------
 	"langfuse.observation.model.name": {
-		field:      "model",
+		field:      "responseModel",
 		convention: langfuse,
 	},
 	// usage_details is a single JSON blob ({"input":N,"output":N,"total":N,...}).
@@ -295,6 +298,26 @@ func compareByRank(a, b parsedAttr) int {
 func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) (foundAny bool) {
 	potentialAttrs := map[string][]parsedAttr{}
 
+	// The Vercel AI SDK emits its own spans. A call produces an outer ai.<op> span
+	// (ai.* only) plus an inner ai.<op>.do<Op> span that ALSO carries a partial
+	// gen_ai.* set; the ai.* usage values are duplicated on both.
+	//
+	// For most Vercel spans, we only use gen_ai.* attributes and ignore ai.*
+	// attributes to avoid double counting when we aggregate.
+	//
+	// However, Vercel's embedding spans lack any gen_ai.* attributes. For this
+	// special case, we do parse ai.* attributes.
+	//
+	// We parse only the inner embed to avoid double counting.
+	isVercelEmbedInner := false
+	for _, attr := range attributes {
+		if attr.Key == "ai.operationId" &&
+			attr.Value.GetStringValue() == "ai.embed.doEmbed" {
+			isVercelEmbedInner = true
+			break
+		}
+	}
+
 	// addAttr records a matched attribute as a candidate for its canonical field.
 	addAttr := func(m attrMapping, value *v1.AnyValue) {
 		potentialAttrs[m.field] = append(
@@ -310,6 +333,11 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 	for _, attr := range attributes {
 		mapping, ok := keyFieldMap[attr.Key]
 		if !ok {
+			continue
+		}
+
+		// Honor vercel ai.* keys only on the inner embeddings span (see above).
+		if mapping.convention == vercel && !isVercelEmbedInner {
 			continue
 		}
 

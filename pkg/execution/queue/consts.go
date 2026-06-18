@@ -52,13 +52,14 @@ const (
 	DefaultQueuePeekMax  int64 = 750
 	AbsoluteQueuePeekMax int64 = 5000
 
-	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
-	QueuePeekEWMALen        int   = 10
-	QueueLeaseDuration            = 30 * time.Second
-	RoleLeaseDuration             = 10 * time.Second
-	RoleLeaseMax                  = 20 * time.Second
-	ShardLeaseDuration            = 10 * time.Second
-	ShardLeaseMax                 = 20 * time.Second
+	QueuePeekCurrMultiplier      int64 = 4 // threshold 25%
+	QueuePeekEWMALen             int   = 10
+	QueueLeaseDuration                 = 30 * time.Second
+	QueueItemEarliestPeekTimeTTL       = 7 * 24 * time.Hour
+	RoleLeaseDuration                  = 10 * time.Second
+	RoleLeaseMax                       = 20 * time.Second
+	ShardLeaseDuration                 = 10 * time.Second
+	ShardLeaseMax                      = 20 * time.Second
 
 	PriorityMax     uint = 0
 	PriorityDefault uint = 5

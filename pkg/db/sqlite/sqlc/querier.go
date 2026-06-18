@@ -47,6 +47,7 @@ type Querier interface {
 	GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*GetFunctionRunsFromEventsRow, error)
 	GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*GetFunctionRunsTimeboundRow, error)
 	GetFunctions(ctx context.Context) ([]*Function, error)
+	GetFunctionsByApp(ctx context.Context, arg GetFunctionsByAppParams) ([]*Function, error)
 	GetHistoryItem(ctx context.Context, id ulid.ULID) (*History, error)
 	GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*GetLatestExecutionSpanByStepIDRow, error)
 	GetLatestQueueSnapshotChunks(ctx context.Context) ([]*GetLatestQueueSnapshotChunksRow, error)
@@ -61,7 +62,7 @@ type Querier interface {
 	// status. Child/step spans never decide run status.
 	GetRuns(ctx context.Context, arg GetRunsParams) ([]*GetRunsRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*GetSpanBySpanIDRow, error)
-	GetSpanOutput(ctx context.Context, ids []string) ([]*GetSpanOutputRow, error)
+	GetSpanOutput(ctx context.Context, arg GetSpanOutputParams) ([]*GetSpanOutputRow, error)
 	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*GetSpansByDebugRunIDRow, error)
 	GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*GetSpansByDebugSessionIDRow, error)
 	GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error)
@@ -98,6 +99,8 @@ type Querier interface {
 	// Traces
 	//
 	InsertTrace(ctx context.Context, arg InsertTraceParams) error
+	// Terminal status codes (matches enums.runStatusCode in pkg/enums/run_status.go):
+	//   50=Overflowed, 300=Completed, 400=Failed, 500=Cancelled, 600=Skipped.
 	InsertTraceRun(ctx context.Context, arg InsertTraceRunParams) error
 	//
 	// Worker Connections

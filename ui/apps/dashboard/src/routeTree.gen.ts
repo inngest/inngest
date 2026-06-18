@@ -56,6 +56,7 @@ import { Route as AuthedSettingsIntegrationsNeonIndexRouteImport } from './route
 import { Route as AuthedSettingsIntegrationsDatadogIndexRouteImport } from './routes/_authed/settings/integrations/datadog/index'
 import { Route as AuthedIntegrationsVercelCallbackIndexRouteImport } from './routes/_authed/integrations/vercel/callback/index'
 import { Route as AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/unattached-syncs/index'
+import { Route as AuthedEnvEnvSlugScoresIndexRouteImport } from './routes/_authed/env/$envSlug/scores/index'
 import { Route as AuthedEnvEnvSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/runs/index'
 import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_authed/env/$envSlug/metrics/index'
 import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index'
@@ -357,6 +358,12 @@ const AuthedEnvEnvSlugUnattachedSyncsIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => AuthedEnvEnvSlugUnattachedSyncsRouteRoute,
+  } as any)
+const AuthedEnvEnvSlugScoresIndexRoute =
+  AuthedEnvEnvSlugScoresIndexRouteImport.update({
+    id: '/scores/',
+    path: '/scores/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any)
 const AuthedEnvEnvSlugRunsIndexRoute =
   AuthedEnvEnvSlugRunsIndexRouteImport.update({
@@ -693,6 +700,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
   '/env/$envSlug/metrics/': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/env/$envSlug/runs/': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/env/$envSlug/scores/': typeof AuthedEnvEnvSlugScoresIndexRoute
   '/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/integrations/vercel/callback/': typeof AuthedIntegrationsVercelCallbackIndexRoute
   '/settings/integrations/datadog/': typeof AuthedSettingsIntegrationsDatadogIndexRoute
@@ -774,6 +782,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageIndexRoute
   '/env/$envSlug/metrics': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/env/$envSlug/runs': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/env/$envSlug/scores': typeof AuthedEnvEnvSlugScoresIndexRoute
   '/env/$envSlug/unattached-syncs': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/integrations/vercel/callback': typeof AuthedIntegrationsVercelCallbackIndexRoute
   '/settings/integrations/datadog': typeof AuthedSettingsIntegrationsDatadogIndexRoute
@@ -870,6 +879,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
   '/_authed/env/$envSlug/metrics/': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/_authed/env/$envSlug/runs/': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/_authed/env/$envSlug/scores/': typeof AuthedEnvEnvSlugScoresIndexRoute
   '/_authed/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/_authed/integrations/vercel/callback/': typeof AuthedIntegrationsVercelCallbackIndexRoute
   '/_authed/settings/integrations/datadog/': typeof AuthedSettingsIntegrationsDatadogIndexRoute
@@ -966,6 +976,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage/'
     | '/env/$envSlug/metrics/'
     | '/env/$envSlug/runs/'
+    | '/env/$envSlug/scores/'
     | '/env/$envSlug/unattached-syncs/'
     | '/integrations/vercel/callback/'
     | '/settings/integrations/datadog/'
@@ -1047,6 +1058,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage'
     | '/env/$envSlug/metrics'
     | '/env/$envSlug/runs'
+    | '/env/$envSlug/scores'
     | '/env/$envSlug/unattached-syncs'
     | '/integrations/vercel/callback'
     | '/settings/integrations/datadog'
@@ -1142,6 +1154,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/manage/'
     | '/_authed/env/$envSlug/metrics/'
     | '/_authed/env/$envSlug/runs/'
+    | '/_authed/env/$envSlug/scores/'
     | '/_authed/env/$envSlug/unattached-syncs/'
     | '/_authed/integrations/vercel/callback/'
     | '/_authed/settings/integrations/datadog/'
@@ -1530,6 +1543,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/env/$envSlug/unattached-syncs/'
       preLoaderRoute: typeof AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugUnattachedSyncsRouteRoute
+    }
+    '/_authed/env/$envSlug/scores/': {
+      id: '/_authed/env/$envSlug/scores/'
+      path: '/scores'
+      fullPath: '/env/$envSlug/scores/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugScoresIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/env/$envSlug/runs/': {
       id: '/_authed/env/$envSlug/runs/'
@@ -2173,6 +2193,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugInsightsIndexRoute: typeof AuthedEnvEnvSlugInsightsIndexRoute
   AuthedEnvEnvSlugMetricsIndexRoute: typeof AuthedEnvEnvSlugMetricsIndexRoute
   AuthedEnvEnvSlugRunsIndexRoute: typeof AuthedEnvEnvSlugRunsIndexRoute
+  AuthedEnvEnvSlugScoresIndexRoute: typeof AuthedEnvEnvSlugScoresIndexRoute
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute: typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   AuthedEnvEnvSlugEventsEventIDIndexRoute: typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
   AuthedEnvEnvSlugRunsRunIDIndexRoute: typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
@@ -2200,6 +2221,7 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugInsightsIndexRoute: AuthedEnvEnvSlugInsightsIndexRoute,
   AuthedEnvEnvSlugMetricsIndexRoute: AuthedEnvEnvSlugMetricsIndexRoute,
   AuthedEnvEnvSlugRunsIndexRoute: AuthedEnvEnvSlugRunsIndexRoute,
+  AuthedEnvEnvSlugScoresIndexRoute: AuthedEnvEnvSlugScoresIndexRoute,
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute:
     AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute,
   AuthedEnvEnvSlugEventsEventIDIndexRoute:

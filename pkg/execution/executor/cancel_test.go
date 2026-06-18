@@ -85,7 +85,7 @@ type missingMetadataRunService struct {
 	err     error
 }
 
-func (m *missingMetadataRunService) LoadMetadata(context.Context, sv2.ID) (sv2.Metadata, error) {
+func (m *missingMetadataRunService) LoadMetadata(context.Context, sv2.ID, ...sv2.LoadMetadataOption) (sv2.Metadata, error) {
 	return sv2.Metadata{}, m.err
 }
 

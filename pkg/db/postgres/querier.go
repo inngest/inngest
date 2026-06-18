@@ -165,6 +165,19 @@ func (pq *pgQuerier) GetAppFunctionsBySlug(ctx context.Context, name string) ([]
 	return convertSlice(rows, functionFromPG), nil
 }
 
+func (pq *pgQuerier) GetFunctionsByApp(ctx context.Context, arg db.GetFunctionsByAppParams) ([]*db.Function, error) {
+	rows, err := pq.q.GetFunctionsByApp(ctx, sqlc.GetFunctionsByAppParams{
+		AppID:     arg.AppID,
+		AppName:   arg.AppName,
+		Cursor:    arg.Cursor,
+		LimitRows: int32(arg.LimitRows),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromPG), nil
+}
+
 func (pq *pgQuerier) GetFunctionByID(ctx context.Context, id uuid.UUID) (*db.Function, error) {
 	r, err := pq.q.GetFunctionByID(ctx, id)
 	if err != nil {
@@ -731,8 +744,8 @@ func (pq *pgQuerier) GetStepSpanByStepID(ctx context.Context, arg db.GetStepSpan
 	}, nil
 }
 
-func (pq *pgQuerier) GetSpanOutput(ctx context.Context, ids []string) ([]*db.SpanOutputRow, error) {
-	rows, err := pq.q.GetSpanOutput(ctx, ids)
+func (pq *pgQuerier) GetSpanOutput(ctx context.Context, runID string, ids []string) ([]*db.SpanOutputRow, error) {
+	rows, err := pq.q.GetSpanOutput(ctx, sqlc.GetSpanOutputParams{RunID: runID, Ids: ids})
 	if err != nil {
 		return nil, err
 	}

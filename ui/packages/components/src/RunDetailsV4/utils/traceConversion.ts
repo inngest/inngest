@@ -318,6 +318,10 @@ export function traceRollup(root: Trace): Trace {
       continue;
     }
 
+    if (finalSpan?.groupID == child.groupID) {
+      finalSpan = null;
+    }
+
     if (!steps.get(child.stepID)) {
       stepOrder.push(child.stepID);
     }

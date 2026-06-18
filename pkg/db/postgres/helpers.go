@@ -23,6 +23,11 @@ func (h *helpers) EventIDsExpr() sqexp.Expression {
 	return sq.L("MAX(spans.event_ids::text)").As("event_ids")
 }
 
+func (h *helpers) RootEventIDsExpr() sqexp.Expression {
+	// PostgreSQL: cast JSONB to text to match ParseEventIDs' double-decode.
+	return sq.L("spans.event_ids::text").As("event_ids")
+}
+
 func (h *helpers) BuildEventJoin(q *sq.SelectDataset) *sq.SelectDataset {
 	// PostgreSQL: jsonb_array_elements_text for unnesting.
 	// event_ids is JSONB containing a JSON string (double-encoded), e.g. "[\"uuid\"]" or ""

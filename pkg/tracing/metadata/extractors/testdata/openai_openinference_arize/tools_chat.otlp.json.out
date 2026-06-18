@@ -1,9 +1,9 @@
 SPAN OpenAI Chat Completions
 {
-  "model": "gpt-4.1-nano-2025-04-14",
+  "model": "",
   "system": "openai",
   "operation_name": "",
-  "response_model": "",
+  "response_model": "gpt-4.1-nano-2025-04-14",
   "response_id": "",
   "finish_reasons": [
     "tool_calls"

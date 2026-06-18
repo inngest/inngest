@@ -31,6 +31,15 @@ func IncrQueueItemProcessedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueItemEarliestPeekTimeCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_item_earliest_peek_time_total",
+		Description: "Total number of queue items considered for earliest peek time stamping",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueuePartitionLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -636,6 +645,21 @@ func IncrAPICacheMiss(ctx context.Context, opts CounterOpt) {
 		MetricName:  "http_api_cache_miss",
 		Description: "The number of times a HTTP API request is not served from cache",
 		Tags:        opts.Tags,
+	})
+}
+
+func IncrTTLUpsertCounter(ctx context.Context, status string, opts CounterOpt) {
+	tags := map[string]any{}
+	for k, v := range opts.Tags {
+		tags[k] = v
+	}
+	tags["status"] = status
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "ttlupsert_total",
+		Description: "Total number of ttlupsert calls by outcome status",
+		Tags:        tags,
 	})
 }
 

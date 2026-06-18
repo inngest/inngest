@@ -21,10 +21,10 @@ type Service struct {
 	apiv2.UnimplementedV2Server
 	signingKeys    SigningKeysProvider
 	eventKeys      EventKeysProvider
+	apps           AppProvider
 	functions      FunctionProvider
 	functionConfig FunctionConfigProvider
-	runs           FunctionRunReader
-	runList        RunsReader
+	runs           RunProvider
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
@@ -36,10 +36,10 @@ type Service struct {
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
+	Apps                AppProvider
 	Functions           FunctionProvider
 	FunctionConfig      FunctionConfigProvider
-	FunctionRuns        FunctionRunReader
-	RunList             RunsReader
+	Runs                RunProvider
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
@@ -54,10 +54,10 @@ func NewService(opts ServiceOptions) *Service {
 	return &Service{
 		signingKeys:    opts.SigningKeysProvider,
 		eventKeys:      opts.EventKeysProvider,
+		apps:           opts.Apps,
 		functions:      opts.Functions,
 		functionConfig: opts.FunctionConfig,
-		runs:           opts.FunctionRuns,
-		runList:        opts.RunList,
+		runs:           opts.Runs,
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,

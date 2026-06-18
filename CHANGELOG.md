@@ -2,6 +2,90 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.30.0] - 2026-06-17
+
+### 🚀 Features
+
+- V2 api rerun (#4410)
+
+## [v1.29.0] - 2026-06-17
+
+### 🚀 Features
+
+- *(queue)* Track earliest peek time before Constraint API (#4391)
+
+### 🐛 Bug Fixes
+
+- Queue item cleanup race in non-key-queues postgres cancel path (#4337)
+- *(dashboard)* Use distinct speedometer icon for sidebar Overview (#4429)
+- *(tests)* Widen timing tolerance from 10ms to 100ms in TestStartAll/TestSingleSvcError (#4115)
+- Alias conflicting grpc import (#4436)
+- *(tests)* Replace 50ms settle delay with deterministic clock.BlockUntil() in TestQueueItemProcessWithConstraintChecks (#4434)
+- *(queue)* Ignore already-leased partitions during scan (#4438)
+- Keep completed runs from being reported as reverted (#4247)
+- *(tests)* Increase WaitForRunStatus timeouts in all affected E2E tests (#4435)
+- Make WaitForRunStatus tolerate transient not found GQL errors (#4206)
+- *(executor)* Always SavePending after parallel ops to coalesce discovery (#4021)
+- Scope GetSpanOutput query by run_id to prevent cross-run data leak (#4441)
+- *(scoring)* Improve scoring dashboard ui (#4433)
+
+### 🧪 Testing
+
+- *(cqrs)* Cover all terminal trace run statuses (#4446)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(tests)* Fix flaky test status (#4439)
+- *(tests)* Flaky test fix (#4440)
+- Ttl upsert pkg (#4432)
+- *(release)* V1.29.0 (#4428)
+
+## [v1.28.0] - 2026-06-16
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.28.0 (#4373)
+
+## [v1.27.1] - 2026-06-16
+
+### 🚀 Features
+
+- Implements v2 api/cli get function (#4353)
+- *(queue)* Enable shard ForEach using feature flag (#4375)
+- Deterministic finalized step span IDs  (#4370)
+- *(experiments)* Change experiment_name -> name in metadata (#4355)
+- *(metadata)* Use deterministic step span IDs (#4386)
+- Rest v2 api get functions  (#4385)
+- V2 rest api get app (#4389)
+
+### 🐛 Bug Fixes
+
+- Return consistent function ids across v2 endpoints (#4377)
+- *(release)* Mark prerelease tags as non-latest (#4380)
+- State leak when new state is created but ErrQueueItemExists is hit (#4394)
+- Exact matching on ErrQueueItemExists causing unnecessary retries (#4400)
+- Properly identify the response AI model while parsing OTel attributes (EXE-1837) (#4398)
+- Don't double count Vercel SDK AI spans (EXE-1837) (#4399)
+- *(pauses)* Filter deleted block pauses during iteration (#4358)
+- *(queue)* Fix Semaphore Key Queues edge case (#4411)
+- *(queue)* Self-heal stale global partition pointers (#4244)
+- *(devserver)* Reapply postgres connection pool settings (#4392)
+- *(cron)* Set envid on health check resync path (#4419)
+
+### ⚡ Performance
+
+- Add state metadata option to skip fetching stack & step metadata (#4393)
+- Improvements for OSS filters (#4299)
+
+### 🧪 Testing
+
+- Synchronize compaction in TestCompactionSkipsPhantomBlocks (#4382)
+
+### ⚙️ Miscellaneous Tasks
+
+- Measure non-atomic state idempotency claim races (#4365)
+- Log warning on hitting the duplicate state metric (#4388)
+
 ## [v1.27.0] - 2026-06-09
 
 ### 🚀 Features
@@ -32,6 +116,11 @@ All notable changes to this project will be documented in this file.
 
 - Update v2 /runs to use latest trace span structures (#4346)
 - Expand batch buffer wait metric buckets (#3867)
+- *(release)* V1.27.0 (#4347)
+
+### ◀️ Revert
+
+- "feat: Deterministic finalized step span IDs" (#4360)
 
 ## [v1.26.0] - 2026-06-05
 

@@ -7,6 +7,7 @@ import (
 
 	sq "github.com/doug-martin/goqu/v9"
 	sqexp "github.com/doug-martin/goqu/v9/exp"
+	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
 	"github.com/inngest/inngest/pkg/run"
 )
@@ -21,6 +22,10 @@ func (h *helpers) CELConverter() run.ExprSQLConverter { return run.SpanEventSQLi
 
 func (h *helpers) EventIDsExpr() sqexp.Expression {
 	return sq.L("MAX(spans.event_ids)").As("event_ids")
+}
+
+func (h *helpers) RootEventIDsExpr() sqexp.Expression {
+	return sq.L("spans.event_ids").As("event_ids")
 }
 
 func (h *helpers) BuildEventJoin(q *sq.SelectDataset) *sq.SelectDataset {
@@ -45,5 +50,6 @@ func (h *helpers) ParseTime(s string) (time.Time, error) {
 	if idx := strings.Index(s, " m="); idx != -1 {
 		s = s[:idx]
 	}
-	return time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", s)
+	// Aggregates return stored Go time strings; direct DATETIME reads return RFC3339.
+	return dateutil.ParseString(s)
 }

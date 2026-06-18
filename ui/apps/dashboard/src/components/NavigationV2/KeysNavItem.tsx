@@ -46,7 +46,7 @@ export default function KeysNavItem({
                   : 'hover:bg-canvasSubtle text-muted',
               )}
             >
-              <RiKey2Line className="h-[14px] w-[14px]" />
+              <RiKey2Line className="h-[16px] w-[16px]" />
             </button>
           </PopoverTrigger>
         </OptionalTooltip>
@@ -110,14 +110,12 @@ function KeysAccordion({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className={cn(
-          'my-0.5 flex h-7 w-full flex-row items-center gap-2 self-stretch rounded px-1 text-left',
-          active
-            ? 'bg-canvasSubtle text-basis'
-            : 'hover:bg-canvasSubtle text-muted',
+          'my-0.5 flex h-7 w-full flex-row items-center gap-2 self-stretch rounded px-2 text-left',
+          'hover:bg-canvasSubtle text-muted',
         )}
       >
         <span className="flex shrink-0">
-          <RiKey2Line className="h-[14px] w-[14px]" />
+          <RiKey2Line className="h-[16px] w-[16px]" />
         </span>
         <span className="text-sm leading-tight">Keys</span>
         <span className="ml-auto flex shrink-0">

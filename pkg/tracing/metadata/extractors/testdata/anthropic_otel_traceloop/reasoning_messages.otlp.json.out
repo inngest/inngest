@@ -1,0 +1,14 @@
+SPAN chat claude-sonnet-4-6
+{
+  "model": "claude-sonnet-4-6",
+  "system": "anthropic",
+  "operation_name": "chat",
+  "response_model": "claude-sonnet-4-6",
+  "response_id": "",
+  "finish_reasons": [
+    "stop"
+  ],
+  "input_tokens": 52,
+  "output_tokens": 500,
+  "total_tokens": 552
+}

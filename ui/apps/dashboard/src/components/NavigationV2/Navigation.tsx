@@ -5,9 +5,11 @@ import NavSection from './NavSection';
 import {
   experimentsItem,
   manage,
-  observe,
+  monitor,
+  scoresItem,
   workflow,
   type NavGroupConfig,
+  type NavItemConfig,
 } from './navItems';
 import type { FileRouteTypes } from '@tanstack/react-router';
 
@@ -22,10 +24,19 @@ export const getNavRoute = (activeEnv: EnvType, link: string) =>
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   const experimentsEnabled = useBooleanFlag('experimentation-steps');
+  const scoresEnabled = useBooleanFlag('scoring-dashboard');
+
+  const aiItems: NavItemConfig[] = [];
+  if (experimentsEnabled.value) {
+    aiItems.push(experimentsItem);
+  }
+  if (scoresEnabled.value) {
+    aiItems.push(scoresItem);
+  }
 
   const ai: NavGroupConfig = {
     heading: 'AI',
-    items: experimentsEnabled.value ? [experimentsItem] : [],
+    items: aiItems,
   };
 
   if (!activeEnv) {
@@ -34,21 +45,16 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
 
   return (
     <div
-      className={`text-basis flex h-full flex-col pl-3 pr-2 ${
-        collapsed ? 'gap-2' : 'gap-4'
-      }`}
+      className={`text-basis flex h-full flex-col pl-3 pr-3 pt-1 ${collapsed ? 'gap-6' : 'gap-4'
+        }`}
     >
-      <NavSection
-        group={observe}
-        activeEnv={activeEnv}
-        collapsed={collapsed}
-        first
-      />
       <NavSection
         group={workflow}
         activeEnv={activeEnv}
         collapsed={collapsed}
+        first
       />
+      <NavSection group={monitor} activeEnv={activeEnv} collapsed={collapsed} />
       <NavSection group={ai} activeEnv={activeEnv} collapsed={collapsed} />
       <NavSection
         group={manage}

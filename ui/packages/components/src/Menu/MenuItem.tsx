@@ -43,7 +43,7 @@ export const MenuItem = ({
             'my-0.5 flex items-center rounded',
             collapsed
               ? 'mx-auto h-8 w-8 justify-center'
-              : 'h-7 w-full flex-row gap-2 self-stretch px-1',
+              : 'h-7 w-full flex-row gap-2 self-stretch px-2',
             comingSoon
               ? 'text-disabled hover:bg-disabled cursor-not-allowed'
               : active
@@ -53,7 +53,9 @@ export const MenuItem = ({
           )}
         >
           <span className="flex shrink-0">{icon}</span>
-          {!collapsed && <span className="text-sm leading-tight">{text}</span>}
+          {!collapsed && (
+            <span className="truncate whitespace-nowrap text-sm leading-tight">{text}</span>
+          )}
           {!collapsed && beta && (
             <Pill kind="primary" appearance="solid" className="ml-auto h-4 px-1.5 text-[10px]">
               Beta

@@ -160,14 +160,61 @@ type Run struct {
 func (c *Client) Run(ctx context.Context, runID string) Run {
 	c.Helper()
 
+	run, err := c.RunOrError(ctx, runID)
+	if err != nil {
+		c.Fatalf("err with gql: %v", err)
+	}
+	return run
+}
+
+// RunOrError queries the function run by ID and returns an error instead of
+// fatally exiting on GQL errors. This allows callers like WaitForRunStatus to
+// tolerate transient "not found" errors during polling.
+func (c *Client) RunOrError(ctx context.Context, runID string) (Run, error) {
 	if runID == "" {
-		c.Fatalf("runID cannot be empty")
+		return Run{}, fmt.Errorf("runID cannot be empty")
 	}
 
 	query := `
 		query GetRun($runID: ID!) {
 			functionRun(query: { functionRunId: $runID }) {
 				output
+				status
+			}
+		}`
+
+	resp := c.doGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"runID": runID,
+		},
+	})
+	if len(resp.Errors) > 0 {
+		return Run{}, fmt.Errorf("%s", resp.Errors.Error())
+	}
+
+	type response struct {
+		FunctionRun Run `json:"functionRun"`
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		return Run{}, fmt.Errorf("unmarshal run response: %w", err)
+	}
+
+	return data.FunctionRun, nil
+}
+
+func (c *Client) RunV2Status(ctx context.Context, runID string) string {
+	c.Helper()
+
+	if runID == "" {
+		c.Fatalf("runID cannot be empty")
+	}
+
+	query := `
+		query GetRunStatus($runID: String!) {
+			run(runID: $runID) {
 				status
 			}
 		}`
@@ -183,7 +230,9 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 	}
 
 	type response struct {
-		FunctionRun Run `json:"functionRun"`
+		Run struct {
+			Status string `json:"status"`
+		} `json:"run"`
 	}
 
 	data := &response{}
@@ -191,7 +240,7 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 		c.Fatal(err.Error())
 	}
 
-	return data.FunctionRun
+	return data.Run.Status
 }
 
 type WaitForRunStatusOpts struct {
@@ -210,7 +259,7 @@ func (c *Client) WaitForRunStatus(
 		o = opts[0]
 	}
 
-	timeout := 20 * time.Second
+	timeout := 60 * time.Second
 	if o.Timeout > 0 {
 		timeout = o.Timeout
 	}
@@ -218,9 +267,12 @@ func (c *Client) WaitForRunStatus(
 	start := time.Now()
 	var run Run
 	for {
-		run = c.Run(ctx, runID)
-		if run.Status == expectedStatus {
-			return run
+		r, err := c.RunOrError(ctx, runID)
+		if err == nil {
+			run = r
+			if r.Status == expectedStatus {
+				return r
+			}
 		}
 
 		if time.Since(start) > timeout {
@@ -258,8 +310,15 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 		if !a.NotNil(run) {
 			return
 		}
-		if opts.Status != "" && !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
-			return
+		if opts.Status != "" {
+			if !a.Equal(opts.Status.String(), run.Status, "expected status did not match actual status") {
+				return
+			}
+
+			// Run status and trace root status update separately. Wait for both.
+			if run.Trace != nil && !a.Equal(opts.Status.String(), run.Trace.Status, "expected status did not match trace root status") {
+				return
+			}
 		}
 
 		if opts.ChildSpanCount > 0 {

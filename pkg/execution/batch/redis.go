@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -345,7 +346,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 		Payload:     opts.ScheduleBatchPayload,
 		QueueName:   &queueName,
 	}, opts.At, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID, "function_id", opts.FunctionID)
 		return nil
 	}

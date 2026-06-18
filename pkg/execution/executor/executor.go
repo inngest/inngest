@@ -2,6 +2,7 @@ package executor
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -724,7 +725,7 @@ func (e *executor) createEagerCancellationForTimeout(ctx context.Context, since 
 		QueueName:   &queueName,
 	}, enqueueAt, queue.EnqueueOpts{})
 
-	if err != nil && err != queue.ErrQueueItemExists {
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 		l.Trace("Error enqueueing system job", "error", err.Error())
 		return err
 	}
@@ -1023,11 +1024,16 @@ func (e *executor) schedule(
 	var eventName *string
 
 	evts := make([]json.RawMessage, len(req.Events))
+	sessions := meta.EventSessions{}
 	for n, item := range req.Events {
 		evt := item.GetEvent()
 		if eventName == nil {
 			name := evt.Name
 			eventName = &name
+		}
+
+		for name, id := range evt.Meta.Sessions {
+			sessions = append(sessions, meta.EventSession{Key: name, ID: id})
 		}
 
 		// serialize this data to the span at the same time
@@ -1036,6 +1042,17 @@ func (e *executor) schedule(
 			return nil, nil, fmt.Errorf("error marshalling event: %w", err)
 		}
 		evts[n] = byt
+	}
+
+	var droppedSessions int
+	sessions, droppedSessions = normalizeRunSessions(sessions)
+	if droppedSessions > 0 {
+		logger.StdlibLogger(ctx).Warn(
+			"dropping sessions over per-run limit",
+			"dropped", droppedSessions,
+			"limit", consts.MaxRunSessions,
+			"function_id", req.Function.ID,
+		)
 	}
 
 	// Evaluate the run priority based off of the input event data.
@@ -1359,6 +1376,9 @@ func (e *executor) schedule(
 		),
 		Seed: []byte(metadata.ID.RunID[:]),
 	}
+	if len(sessions) > 0 {
+		meta.AddAttr(runSpanOpts.Attributes, meta.Attrs.Sessions, &sessions)
+	}
 	if req.RunMode == enums.RunModeSync {
 		// XXX: If this is a sync run, always add the start time to the span. We do this
 		// because sync runs have already started by the time we call Schedule; they're
@@ -1516,10 +1536,10 @@ func (e *executor) schedule(
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	queueSpan.End()
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		// no-op
-	case queue.ErrQueueItemExists:
+	case errors.Is(err, queue.ErrQueueItemExists):
 		// If the item already exists in the queue, we can safely ignore this
 		// entire schedule request; it's basically a retry and we should not
 		// persist this for the user.
@@ -1530,6 +1550,27 @@ func (e *executor) schedule(
 					"has_schedule_idempotency_key": req.IdempotencyKey != nil,
 				},
 			})
+
+			// Determine whether the duplicate item belongs to this same run.
+			// If it does, keep state. Otherwise delete it to avoid leaking state.
+			var existsErr queue.QueueItemExistsError
+			keepState := errors.As(err, &existsErr) && existsErr.RunID != nil && *existsErr.RunID == metadata.ID.RunID
+
+			var ownerRunID string
+			if existsErr.RunID != nil {
+				ownerRunID = existsErr.RunID.String()
+			}
+
+			if !keepState {
+				if deleteErr := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID)); deleteErr != nil {
+					l.Error("error deleting run state after queue duplicate, this has likely leaked state", deleteErr,
+						"run_id", metadata.ID.RunID.String(),
+						"account_id", req.AccountID.String(),
+						"workspace_id", req.WorkspaceID.String(),
+						"event_internal_id", req.Events[0].GetInternalID().String(),
+					)
+				}
+			}
 
 			var triggeringEventName string
 			if eventName != nil {
@@ -1570,14 +1611,16 @@ func (e *executor) schedule(
 				"run_mode", req.RunMode,
 				"queue_at", at,
 				"scheduled_at", scheduledAt,
+				"queue_duplicate_owner_run_id", ownerRunID,
+				"new_state_deleted", !keepState,
 			)
 		}
 		return &metadata.ID.RunID, nil, state.ErrIdentifierExists
 
-	case queue.ErrQueueItemSingletonExists:
-		err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
-		if err != nil {
-			l.ReportError(err, "error deleting function state")
+	case errors.Is(err, queue.ErrQueueItemSingletonExists):
+		deleteErr := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
+		if deleteErr != nil {
+			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
 		return nil, nil, ErrFunctionSkipped
 
@@ -2095,6 +2138,16 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		"run_id", i.md.ID.RunID.String(),
 		"workflow_id", i.md.ID.FunctionID.String(),
 	)
+
+	// invalid checkpoints can returnsonly empty OpcodeNone entries.  that response
+	// cannot advance or complete the run, so redo step discovery.
+	if i.resp.Err == nil && len(i.resp.Generator) > 0 && allEmptyNoneOps(i.resp.Generator) {
+		l.Warn("re-driving run after empty no-op generator response",
+			"gen_count", len(i.resp.Generator),
+			"stack_len", len(i.md.Stack),
+		)
+		return e.restartDiscovery(ctx, i)
+	}
 
 	for _, e := range e.lifecycles {
 		go e.OnStepFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, i.resp, nil)
@@ -3343,7 +3396,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				return nil
 			}
 
-			if err != nil && err != queue.ErrQueueItemExists {
+			if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 				nextStepSpan.Drop()
 				return fmt.Errorf("error enqueueing after pause: %w", err)
 			}
@@ -3469,8 +3522,17 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	groups := opGroups(resp.Generator)
 
-	// We only save pending steps if there's >= 1 step planned op.
-	if hasPlanOp(resp.Generator) && i.md.ShouldCoalesceParallelism(resp) {
+	// Save pending step IDs so that SaveStep can atomically track which
+	// parallel branches are still outstanding.  When the last branch
+	// completes, SaveStep returns hasPendingSteps=false and a single
+	// discovery step is enqueued.
+	//
+	// Previously this was gated on ShouldCoalesceParallelism (RequestVersion
+	// >= 2), which left the pending set empty for older SDKs.  With an empty
+	// pending set every step completion saw hasPendingSteps=false and
+	// enqueued its own discovery step, causing the final sequential step
+	// after a parallel group to execute more than once.
+	if hasPlanOp(resp.Generator) {
 		if err := e.smv2.SavePending(ctx, i.md.ID, groups.NonLazyIDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
@@ -3612,6 +3674,40 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
 }
 
+// allEmptyNoneOps reports whether every non-nil opcode is an empty OpcodeNone.
+func allEmptyNoneOps(gen []*state.GeneratorOpcode) bool {
+	for _, op := range gen {
+		if op == nil {
+			continue
+		}
+		if op.Op != enums.OpcodeNone || op.ID != "" {
+			return false
+		}
+	}
+	return true
+}
+
+// restartDiscovery enqueues discovery after a response with no executable ops
+// and no completion result.
+func (e *executor) restartDiscovery(ctx context.Context, i *runInstance) error {
+	groupID := uuid.New().String()
+
+	outgoing := "redrive-" + groupID
+	// reload metadata to include steps checkpointed during this execution.
+	if md, err := e.smv2.LoadMetadata(ctx, i.md.ID); err == nil && len(md.Stack) > 0 {
+		outgoing = md.Stack[len(md.Stack)-1]
+	}
+
+	return e.maybeEnqueueDiscoveryStep(
+		state.WithGroupID(ctx, groupID),
+		i,
+		state.GeneratorOpcode{ID: outgoing},
+		queue.PayloadEdge{Edge: i.edge},
+		groupID,
+		false,
+	)
+}
+
 func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, groupID string, hasPendingSteps bool) error {
 	// Enqueue the next discovery step to continue execution.
 	nextEdge := inngest.Edge{
@@ -3666,7 +3762,7 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 		if err != nil {
 			span.Drop()
 
-			if err == queue.ErrQueueItemExists {
+			if errors.Is(err, queue.ErrQueueItemExists) {
 				return nil
 			}
 
@@ -3981,7 +4077,7 @@ func (e *executor) handleStepFailed(ctx context.Context, runCtx execution.RunCon
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err == queue.ErrQueueItemExists {
+		if errors.Is(err, queue.ErrQueueItemExists) {
 			span.Drop()
 			return nil
 		}
@@ -4165,7 +4261,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, adjustedStartTime, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
 		return nil
 	}
@@ -4274,7 +4370,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
 		PassthroughJobId: true,
 	})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
 		return nil
 	}
@@ -4302,7 +4398,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		return fmt.Errorf("error creating gateway request: %w", err)
 	}
 
-	//TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
+	// TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
 
 	// If the opcode contains streaming data, we should fetch a JWT with perms
 	// for us to stream then add streaming data to the serializable request.
@@ -4450,7 +4546,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 				span.Drop()
 			}
 
-			if err == queue.ErrQueueItemExists {
+			if errors.Is(err, queue.ErrQueueItemExists) {
 				return nil
 			}
 
@@ -4482,7 +4578,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 		return fmt.Errorf("error parsing ai gateway step: %w", err)
 	}
 
-	//TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
+	// TODO: maybe emit a StepPlanned span here to indicate that we're about to run a gateway call, and include the URL as an attribute?
 
 	// NOTE:  It's the responsibility of `trace_lifecycle` to parse the gateway request,
 	// then generate an aigateway.ParsedInferenceRequest to store in the history store.
@@ -4693,7 +4789,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				span.Drop()
 			}
 
-			if err == queue.ErrQueueItemExists {
+			if errors.Is(err, queue.ErrQueueItemExists) {
 				return nil
 			}
 
@@ -4867,7 +4963,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		if span != nil {
 			span.Drop()
 		}
@@ -5036,7 +5132,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		if span != nil {
 			span.Drop()
 		}
@@ -5264,7 +5360,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		span.Drop()
 		return nil
 	}
@@ -5439,7 +5535,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Ensure to delete batch when Schedule worked, we already processed it, or the function was paused
 	shouldDeleteBatch := err == nil ||
-		err == queue.ErrQueueItemExists ||
+		errors.Is(err, queue.ErrQueueItemExists) ||
 		errors.Is(err, ErrFunctionSkipped) ||
 		errors.Is(err, ErrFunctionSkippedIdempotency) ||
 		errors.Is(err, state.ErrIdentifierExists)
@@ -5452,7 +5548,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Don't bother if it's already there
 	// If function is paused, we do not schedule runs
-	if err == queue.ErrQueueItemExists ||
+	if errors.Is(err, queue.ErrQueueItemExists) ||
 		errors.Is(err, ErrFunctionSkipped) ||
 		errors.Is(err, ErrFunctionSkippedIdempotency) {
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
@@ -6054,4 +6150,30 @@ func updateDeferSpans(
 			&parentFnSlug,
 		)
 	}
+}
+
+// normalizeRunSessions dedupes, sorts, and caps the session pairs collected
+// from a run's triggering events. Sorting makes the run's session label
+// deterministic across retries, since map and batch iteration order are not.
+// Returns the number of pairs dropped by the cap.
+func normalizeRunSessions(pairs meta.EventSessions) (meta.EventSessions, int) {
+	if len(pairs) == 0 {
+		return nil, 0
+	}
+
+	slices.SortFunc(pairs, func(a, b meta.EventSession) int {
+		if c := cmp.Compare(a.Key, b.Key); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
+	pairs = slices.Compact(pairs)
+
+	dropped := 0
+	if len(pairs) > consts.MaxRunSessions {
+		dropped = len(pairs) - consts.MaxRunSessions
+		pairs = pairs[:consts.MaxRunSessions]
+	}
+
+	return pairs, dropped
 }

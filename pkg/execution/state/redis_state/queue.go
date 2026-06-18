@@ -288,7 +288,14 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	case 0:
 		return i, nil
 	case 1:
-		return i, osqueue.ErrQueueItemExists
+		var runID *ulid.ULID
+		if existing, loadErr := q.LoadQueueItem(ctx, i.ID); loadErr == nil {
+			id := existing.Data.Identifier.RunID
+			runID = &id
+		} else if loadErr != osqueue.ErrQueueItemNotFound {
+			return i, loadErr
+		}
+		return i, osqueue.QueueItemExists(i.ID, runID)
 	case 2:
 		return i, osqueue.ErrQueueItemSingletonExists
 	default:
@@ -365,6 +372,7 @@ func (q *queue) RemoveQueueItem(ctx context.Context, scope osqueue.Scope, partit
 	keys := []string{
 		q.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, partitionID, ""),
 		q.RedisClient.kg.QueueItem(),
+		q.RedisClient.kg.QueueItemEarliestPeekTime(itemID),
 	}
 
 	// If partitionID is a valid function UUID, append status index keys so the
@@ -420,6 +428,42 @@ func (q *queue) LoadQueueItem(ctx context.Context, itemID string) (*osqueue.Queu
 	qi.Data.JobID = &qi.ID
 
 	return qi, nil
+}
+
+func (q *queue) SetEarliestPeekTime(ctx context.Context, item osqueue.QueueItem, at time.Time) (time.Time, error) {
+	if item.ID == "" {
+		return time.Time{}, fmt.Errorf("cannot set earliest peek time for queue item with empty ID")
+	}
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetEarliestPeekTime"), redis_telemetry.ScopeQueue)
+
+	at = time.UnixMilli(at.UnixMilli())
+	client := q.RedisClient.Client()
+	key := q.RedisClient.kg.QueueItemEarliestPeekTime(item.ID)
+	value := strconv.FormatInt(at.UnixMilli(), 10)
+
+	prev, err := client.Do(ctx, client.B().
+		Set().
+		Key(key).
+		Value(value).
+		Nx().
+		Get().
+		Ex(osqueue.QueueItemEarliestPeekTimeTTL).
+		Build(),
+	).ToString()
+	if err == rueidis.Nil {
+		return at, nil
+	}
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not set earliest peek time: %w", err)
+	}
+
+	ms, err := strconv.ParseInt(prev, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not parse earliest peek time %q: %w", prev, err)
+	}
+
+	return time.UnixMilli(ms), nil
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
@@ -767,6 +811,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		q.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
 		partitionZsetKey(fnPartition, q.RedisClient.kg),
+		q.RedisClient.kg.QueueItemEarliestPeekTime(jobID),
 	}
 
 	args, err := StrSlice([]any{
@@ -867,11 +912,18 @@ func (q *queue) Lease(
 		kg.PartitionScavengerIndex(o.ShadowPartition.PartitionID),
 	}
 
+	setEarliestPeekTime := "0"
+	if q.ItemEarliestPeekTimeConfig(ctx, q.Name(), item).Enabled {
+		setEarliestPeekTime = "1"
+	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		o.ShadowPartition.PartitionID,
 		leaseID.String(),
 		now.UnixMilli(),
+		setEarliestPeekTime,
+		item.EarliestPeekTime,
 	})
 	if err != nil {
 		return nil, err
@@ -1204,6 +1256,25 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 	return nil
 }
 
+// cleanupNilPartitionInGlobal is invoked when we peek a missing partition in the global partitions pointer zset.
+// This ensures a stale global partition pointer does not halt the queue scanner.
+//
+// Safe under concurrent deletes: partitionRequeue.lua atomically ZREMs the pointer before HDEL'ing
+// metadata, so a missing partition here is a stale pointer (migration/legacy), not a transient race.
+func (q *queue) cleanupNilPartitionInGlobal(ctx context.Context, partitionKey string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInGlobal"), redis_telemetry.ScopeQueue)
+
+	l := logger.StdlibLogger(ctx)
+	l.Warn("removing global partitions pointer to missing partition", "partition", partitionKey)
+
+	cmd := q.RedisClient.Client().B().Zrem().Key(q.RedisClient.kg.GlobalPartitionIndex()).Member(partitionKey).Build()
+	if err := q.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
+		return fmt.Errorf("failed to remove nil partition from global partitions pointer queue: %w", err)
+	}
+
+	return nil
+}
+
 // cleanupEmptyAccount is invoked when we peek an account without any partitions in the account pointer zset.
 // This happens when old executors process default function partitions and .
 // This ensures we gracefully handle inconsistencies created by the backwards compatible (keep using global partitions pointer _and_ account partitions) key queues implementation.
@@ -1370,19 +1441,21 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	if len(missingPartitions) > 0 {
-		if accountId == nil {
-			return nil, fmt.Errorf("encountered missing partitions in partition pointer queue %q", partitionKey)
-		}
-
 		eg := errgroup.Group{}
 		for _, partitionId := range missingPartitions {
 			id := partitionId
 			eg.Go(func() error {
+				if accountId == nil {
+					return q.cleanupNilPartitionInGlobal(ctx, id)
+				}
 				return q.cleanupNilPartitionInAccount(ctx, *accountId, id)
 			})
 		}
 
 		if err := eg.Wait(); err != nil {
+			if accountId == nil {
+				return nil, fmt.Errorf("error cleaning up nil partitions in global pointer queue: %w", err)
+			}
 			return nil, fmt.Errorf("error cleaning up nil partitions in account pointer queue: %w", err)
 		}
 	}

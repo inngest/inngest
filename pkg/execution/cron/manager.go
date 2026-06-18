@@ -3,6 +3,7 @@ package cron
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"time"
 
@@ -189,11 +190,11 @@ func (c *manager) Sync(ctx context.Context, ci CronItem) error {
 		Payload:     ci,
 		QueueName:   &kind,
 	}, at, queue.EnqueueOpts{})
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		l.Debug("cron-sync enqueued", "jobID", jobID, "at", at)
 		return nil
-	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
+	case errors.Is(err, queue.ErrQueueItemExists) || errors.Is(err, queue.ErrQueueItemSingletonExists):
 		l.Debug("cron-sync item already exists", "jobID", jobID, "at", at)
 		return nil
 	default:
@@ -232,11 +233,11 @@ func (c *manager) EnqueueHealthCheck(ctx context.Context, ci CronItem) error {
 		QueueName:   &kind,
 	}, now, queue.EnqueueOpts{})
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		l.Debug("adhoc cron-health-check enqueued", "jobID", jobID)
 		return nil
-	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
+	case errors.Is(err, queue.ErrQueueItemExists) || errors.Is(err, queue.ErrQueueItemSingletonExists):
 		l.Debug("adhoc cron-health-check already exists", "jobID", jobID)
 		return nil
 	default:
@@ -268,11 +269,11 @@ func (c *manager) EnqueueNextHealthCheck(ctx context.Context) error {
 		QueueName: &kind,
 	}, nextCheck, queue.EnqueueOpts{})
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		l.Debug("cron-health-check enqueued")
 		return nil
-	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
+	case errors.Is(err, queue.ErrQueueItemExists) || errors.Is(err, queue.ErrQueueItemSingletonExists):
 		l.Debug("cron-health-check already exists")
 		return nil
 	default:
@@ -382,10 +383,10 @@ func (c *manager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, err
 
 	l = l.With("from", from, "next", next, "JobID", jobID, "enqueueAt", enqueueAt, "jitter", jitter)
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		l.Debug("cron ScheduleNext success")
-	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
+	case errors.Is(err, queue.ErrQueueItemExists) || errors.Is(err, queue.ErrQueueItemSingletonExists):
 		l.Debug("cron ScheduleNext already exists")
 	default:
 		l.ReportError(err, "error enqueueing cron for next schedule")

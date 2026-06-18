@@ -66,8 +66,6 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
-	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/metrics"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -195,7 +193,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		Helpers() driverhelp.DialectHelpers
 	}
 	if opts.PostgresURI != "" {
-		db, err := dbpostgres.Open(ctx, dbpostgres.Options{URI: opts.PostgresURI})
+		// Pool settings are in minutes, mirroring the postgres-conn-max-* flags.
+		db, err := dbpostgres.Open(ctx, dbpostgres.Options{
+			URI:             opts.PostgresURI,
+			MaxIdleConns:    opts.PostgresMaxIdleConns,
+			MaxOpenConns:    opts.PostgresMaxOpenConns,
+			ConnMaxIdleTime: time.Duration(opts.PostgresConnMaxIdleTime) * time.Minute,
+			ConnMaxLifetime: time.Duration(opts.PostgresConnMaxLifetime) * time.Minute,
+		})
 		if err != nil {
 			return err
 		}
@@ -487,8 +492,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
-	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
-
 	tp := tracing.NewSqlcTracerProvider(adapter.Q())
 
 	url := opts.Config.CoreAPI.Addr
@@ -520,7 +523,6 @@ func start(ctx context.Context, opts StartOpts) error {
 				history.NewLifecycleListener(
 					nil,
 					hd,
-					hmw,
 				),
 				Lifecycle{
 					Cqrs:       dbcqrs,
@@ -610,7 +612,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	)
 
 	// The devserver embeds the event API.
-	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, nil)
+	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, nil)
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
@@ -633,7 +635,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Queue:          ds.Queue,
 		EventHandler:   ds.HandleEvent,
 		Executor:       ds.Executor,
-		HistoryReader:  memory_reader.NewReader(),
+		HistoryReader:  cqrsmanager.NewHistoryReader(adapter),
 		DisableGraphQL: &opts.NoUI,
 		ConnectOpts: connectv0.Opts{
 			GroupManager:               connectionManager,
@@ -723,9 +725,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	serviceOpts := apiv2.ServiceOptions{
 		SigningKeysProvider: apiv2.NewSigningKeysProvider(opts.SigningKey),
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
+		Apps:                NewAppProvider(dbcqrs),
 		Functions:           NewFunctionProvider(dbcqrs),
-		FunctionRuns:        NewFunctionRunReader(dbcqrs),
-		RunList:             NewRunsReader(adapter.Q()),
+		Runs:                NewRunProvider(dbcqrs, adapter.Q(), exec),
 		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
