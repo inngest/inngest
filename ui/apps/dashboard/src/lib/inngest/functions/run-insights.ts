@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
 import { insightsChannel } from '../realtime';
+import { insightsJudgeScorer } from './scoring/insights-judge';
 import { buildImmediateScores } from './scoring/insights-scores';
 import {
   buildSystemPrompt as buildEventMatcherPrompt,
@@ -43,7 +44,7 @@ export const runInsightsAgent = inngest.createFunction(
     name: 'Insights SQL Agent',
     triggers: [{ event: 'insights-agent/chat.requested' }],
   },
-  async ({ event, step, group, runId }) => {
+  async ({ event, step, group, runId, defer }) => {
     const {
       threadId: providedThreadId,
       userMessage,
@@ -336,6 +337,18 @@ export const runInsightsAgent = inngest.createFunction(
       },
       timestamp: Date.now(),
     });
+
+    // Defer the LLM-as-judge off the critical path.
+    if (sqlResult.sql) {
+      defer('judge', {
+        function: insightsJudgeScorer,
+        data: {
+          question: userMessage.content,
+          sql: sqlResult.sql,
+          summary,
+        },
+      });
+    }
 
     return {
       success: true,
