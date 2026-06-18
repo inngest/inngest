@@ -34,7 +34,7 @@ export const announcements: Announcement[] = [
   {
     id: 'insight-queries-2026-06',
     title: 'Introducing defer ( )',
-    body: "Schedule follow up work that doesn't block the current run.",
+    body: 'Schedule runs when the parent run finishes.',
     imageUrl: '/images/announcements/defer-dark.png',
     imageUrlDark: '/images/announcements/defer-dark.png',
     cta: {
