@@ -33,7 +33,8 @@ export default function AnnouncementStack({
 }: {
   collapsed: boolean;
 }) {
-  const { announcements, dismiss, isReady } = useAnnouncements();
+  const { announcements, dismiss, trackClick, trackView, isReady } =
+    useAnnouncements();
   const reduceMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -45,6 +46,17 @@ export default function AnnouncementStack({
       setActiveIndex(0);
     }
   }, [announcements.length, activeIndex]);
+
+  // Count each card that surfaces to the front as a view (deduped per session
+  // inside trackView). Skip while collapsed or pre-hydration — nothing is shown.
+  const frontId =
+    announcements.length > 0
+      ? announcements[activeIndex % announcements.length]?.id
+      : undefined;
+  useEffect(() => {
+    if (collapsed || !isReady || !frontId) return;
+    trackView(frontId);
+  }, [collapsed, isReady, frontId, trackView]);
 
   // Hidden when collapsed, before hydration, or once everything is dismissed.
   if (collapsed || !isReady || announcements.length === 0) {
@@ -103,6 +115,9 @@ export default function AnnouncementStack({
                 announcement={announcement}
                 isFront={isFront}
                 onDismiss={isFront ? () => dismiss(announcement.id) : undefined}
+                onCtaClick={
+                  isFront ? () => trackClick(announcement.id) : undefined
+                }
               />
             </motion.div>
           );

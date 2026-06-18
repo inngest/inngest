@@ -24,10 +24,13 @@ const CARD_CLASS =
 export default function AnnouncementCard({
   announcement,
   onDismiss,
+  onCtaClick,
   isFront = true,
 }: {
   announcement: Announcement;
   onDismiss?: () => void;
+  /** Fired when the front card's CTA link is clicked. */
+  onCtaClick?: () => void;
   /** Background (peeking) cards drop their interactive controls — they're occluded. */
   isFront?: boolean;
 }) {
@@ -99,6 +102,7 @@ export default function AnnouncementCard({
         target={ctaIsExternal ? '_blank' : undefined}
         rel={ctaIsExternal ? 'noopener noreferrer' : undefined}
         className={`${CARD_CLASS} hover:border-muted transition-colors`}
+        onClick={onCtaClick}
       >
         {content}
       </a>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Announcement } from './announcements';
-import { isWithinWindow } from './useAnnouncements';
+import { isWithinWindow, nextViewedAfter } from './useAnnouncements';
 
 const base: Announcement = { id: 'x', title: 't', body: 'b' };
 const now = Date.parse('2026-06-15T12:00:00Z');
@@ -60,5 +60,23 @@ describe('isWithinWindow', () => {
       true,
     );
     expect(isWithinWindow({ ...base, endDate: 'nonsense' }, now)).toBe(true);
+  });
+});
+
+describe('nextViewedAfter', () => {
+  it('appends a newly viewed id', () => {
+    expect(nextViewedAfter([], 'a')).toEqual(['a']);
+    expect(nextViewedAfter(['a'], 'b')).toEqual(['a', 'b']);
+  });
+
+  it('returns null when the id was already viewed this session', () => {
+    expect(nextViewedAfter(['a'], 'a')).toBeNull();
+    expect(nextViewedAfter(['a', 'b'], 'b')).toBeNull();
+  });
+
+  it('does not mutate the input list', () => {
+    const viewed = ['a'];
+    nextViewedAfter(viewed, 'b');
+    expect(viewed).toEqual(['a']);
   });
 });

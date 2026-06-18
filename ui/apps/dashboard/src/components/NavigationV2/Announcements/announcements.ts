@@ -32,7 +32,7 @@ export type Announcement = {
 
 export const announcements: Announcement[] = [
   {
-    id: 'insight-queries-2026-06',
+    id: 'announcing-defer-2026-06',
     title: 'Introducing defer ( )',
     body: 'Schedule runs when the parent run finishes.',
     imageUrl: '/images/announcements/defer-dark.png',
