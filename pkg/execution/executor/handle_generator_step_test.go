@@ -90,6 +90,42 @@ func TestMaybeEnqueueDiscoveryStepCoalesces(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("%s-%s-discover", runID, ck), *q.enqueued[0].JobID)
 }
 
+func TestHandleGeneratorStepPlanned_StampsCoalesceKey(t *testing.T) {
+	runID := ulid.MustNew(ulid.Now(), nil)
+	stepIDs := []string{"step-a", "step-b", "step-c"}
+	ck := computeParallelCoalesceKey(runID.String(), stepIDs)
+
+	q := &stubQueue{}
+	e := &executor{
+		queue:          q,
+		log:            logger.From(context.Background()),
+		tracerProvider: tracing.NewNoopTracerProvider(),
+	}
+
+	rc := &mockRunContext{md: sv2.Metadata{
+		ID:     sv2.ID{RunID: runID, FunctionID: uuid.New()},
+		Config: *sv2.InitConfig(&sv2.Config{}),
+	}}
+
+	group := OpcodeGroup{ParallelCoalesceKey: ck}
+	edge := queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}
+
+	for _, id := range stepIDs {
+		err := e.handleGeneratorStepPlanned(
+			context.Background(), rc,
+			state.GeneratorOpcode{Op: enums.OpcodeStepPlanned, ID: id},
+			edge, group,
+		)
+		require.NoError(t, err)
+	}
+
+	require.Len(t, q.enqueued, len(stepIDs))
+	for _, item := range q.enqueued {
+		require.NotNil(t, item.ParallelCoalesceKey)
+		require.Equal(t, ck, *item.ParallelCoalesceKey)
+	}
+}
+
 // EXE-1625: when the SDK responds with a step that the checkpoint path
 // already saved with different bytes, SaveStep returns ErrDuplicateResponse.
 // The executor must still enqueue the next discovery edge or the run
