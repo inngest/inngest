@@ -33,10 +33,10 @@ export type Announcement = {
 export const announcements: Announcement[] = [
   {
     id: 'insight-queries-2026-06',
-    title: 'Introducing defer()',
-    body: 'Pause follow-up functions without losing the parent link.',
-    imageUrl: '/images/announcements/defer-dark.svg',
-    imageUrlDark: '/images/announcements/defer-dark.svg',
+    title: 'Introducing defer ( )',
+    body: "Schedule follow up work that doesn't block the current run.",
+    imageUrl: '/images/announcements/defer-dark.png',
+    imageUrlDark: '/images/announcements/defer-dark.png',
     cta: {
       label: 'Learn more',
       href: 'https://www.inngest.com/blog/announcing-defer',
@@ -44,12 +44,13 @@ export const announcements: Announcement[] = [
     startDate: '2026-06-01T00:00:00Z',
     endDate: '2026-07-01T00:00:00Z',
   },
+
   // {
   //   id: 'dashboards-2026-06',
-  //   title: 'Step-level insights',
+  //   title: 'Announcing insights',
   //   body: 'Query runs and step data across your project',
-  //   imageUrl: '/images/announcements/step-light.svg',
-  //   imageUrlDark: '/images/announcements/step-dark.svg',
+  //   // imageUrl: '/images/announcements/defer-dark.png',
+  //   // imageUrlDark: '/images/announcements/step-dark.svg',
   //   cta: { label: 'Explore dashboards', href: 'https://www.inngest.com/docs' },
   //   startDate: '2026-06-01T00:00:00Z',
   //   endDate: '2026-07-01T00:00:00Z',
