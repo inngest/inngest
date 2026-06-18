@@ -90,6 +90,42 @@ func TestMaybeEnqueueDiscoveryStepCoalesces(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("%s-%s-discover", runID, ck), *q.enqueued[0].JobID)
 }
 
+// A non-atomic SaveStep lets all N concurrent completions see hasPendingSteps=false.
+// The coalesce key must still reduce them to one discovery enqueue.
+func TestHandleGeneratorStep_ConcurrentCompletionsCoalesce(t *testing.T) {
+	runID := ulid.MustNew(ulid.Now(), nil)
+	ck := computeParallelCoalesceKey(runID.String(), []string{"step-a", "step-b"})
+
+	q := &dedupeQueue{}
+	e := &executor{
+		smv2:           &stubRunService{}, // always returns hasPendingSteps=false
+		queue:          q,
+		log:            logger.From(context.Background()),
+		tracerProvider: tracing.NewNoopTracerProvider(),
+	}
+
+	rc := &mockRunContext{
+		md: sv2.Metadata{
+			ID:     sv2.ID{RunID: runID, FunctionID: uuid.New()},
+			Config: *sv2.InitConfig(&sv2.Config{}),
+		},
+		lifecycleItem: queue.Item{ParallelCoalesceKey: &ck},
+	}
+
+	edge := queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}
+	for _, stepID := range []string{"step-a", "step-b"} {
+		err := e.handleGeneratorStep(
+			context.Background(), rc,
+			state.GeneratorOpcode{Op: enums.OpcodeStepRun, ID: stepID, Data: json.RawMessage(`null`)},
+			edge,
+		)
+		require.NoError(t, err)
+	}
+
+	require.Len(t, q.enqueued, 1)
+	require.Equal(t, fmt.Sprintf("%s-%s-discover", runID, ck), *q.enqueued[0].JobID)
+}
+
 func TestHandleGeneratorStepPlanned_StampsCoalesceKey(t *testing.T) {
 	runID := ulid.MustNew(ulid.Now(), nil)
 	stepIDs := []string{"step-a", "step-b", "step-c"}
