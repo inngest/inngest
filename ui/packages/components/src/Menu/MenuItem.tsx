@@ -24,7 +24,7 @@ export const MenuItem = ({
   icon: ReactNode;
   collapsed: boolean;
   href?: string;
-  to?: LinkComponentProps['to'];
+  to?: LinkComponentProps['to'] | string;
   exact?: boolean;
   prefetch?: false | 'intent' | 'viewport' | 'render';
   comingSoon?: boolean;

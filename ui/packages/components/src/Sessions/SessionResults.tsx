@@ -19,6 +19,8 @@ const DEFAULT_RANGE = '7d';
 // TODO: Replace with the sessions docs URL and include a ref param for dashboard traffic.
 const DOCS_URL = 'ui/packages/components/src/Sessions/SessionResults.tsx';
 
+type RoutePath = LinkComponentProps['to'] | string;
+
 type SessionResultsProps = {
   envID: string;
   // Max selectable range in days, from the account's history entitlement.
@@ -28,8 +30,8 @@ type SessionResultsProps = {
   start?: string;
   end?: string;
   pathCreator: {
-    session: (params: { sessionKey: string; sessionId: string }) => LinkComponentProps['to'];
-    function: (params: { functionSlug: string }) => LinkComponentProps['to'];
+    session: (params: { sessionKey: string; sessionId: string }) => RoutePath;
+    function: (params: { functionSlug: string }) => RoutePath;
   };
   getSessions: (params: {
     sessionKey: string;
@@ -144,7 +146,7 @@ export function SessionResults({
                   to: pathCreator.session({
                     sessionKey: row.original.sessionKey,
                     sessionId: row.original.sessionId,
-                  }),
+                  }) as LinkComponentProps['to'],
                 })
               }
               getRowHref={(row) =>

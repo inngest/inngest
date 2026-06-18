@@ -7,8 +7,10 @@ import { createColumnHelper } from '@tanstack/react-table';
 
 const columnHelper = createColumnHelper<Session>();
 
+type RoutePath = LinkComponentProps['to'] | string;
+
 type PathCreator = {
-  function: (params: { functionSlug: string }) => LinkComponentProps['to'];
+  function: (params: { functionSlug: string }) => RoutePath;
 };
 
 export function useColumns({ pathCreator }: { pathCreator: PathCreator }) {
