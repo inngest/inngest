@@ -91,7 +91,7 @@ export default function SideBar({
           <Navigation collapsed={collapsed} activeEnv={activeEnv} />
         </div>
 
-        <div className="shrink-0 pl-3 pr-2">
+        <div className="shrink-0 pl-3 pr-3">
           <SeatOverageWidget collapsed={collapsed} />
           {/* The onboarding widget takes priority over marketing announcements. */}
           {isWidgetOpen ? (

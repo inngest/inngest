@@ -31,16 +31,19 @@ export type Announcement = {
 };
 
 export const announcements: Announcement[] = [
-  // {
-  //   id: 'insight-queries-2026-06',
-  //   title: 'Score function runs',
-  //   body: 'Score runs & compare data using the scoring dashboard.',
-  //   imageUrl: '/images/announcements/score-light.svg',
-  //   imageUrlDark: '/images/announcements/score-dark.svg',
-  //   cta: { label: 'Learn more', href: 'https://www.inngest.com/docs' },
-  //   startDate: '2026-06-01T00:00:00Z',
-  //   endDate: '2026-07-01T00:00:00Z',
-  // },
+  {
+    id: 'insight-queries-2026-06',
+    title: 'Introducing defer()',
+    body: 'Pause follow-up functions without losing the parent link.',
+    imageUrl: '/images/announcements/defer-dark.svg',
+    imageUrlDark: '/images/announcements/defer-dark.svg',
+    cta: {
+      label: 'Learn more',
+      href: 'https://www.inngest.com/blog/announcing-defer',
+    },
+    startDate: '2026-06-01T00:00:00Z',
+    endDate: '2026-07-01T00:00:00Z',
+  },
   // {
   //   id: 'dashboards-2026-06',
   //   title: 'Step-level insights',

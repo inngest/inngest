@@ -12,7 +12,7 @@ import type { Announcement } from './announcements';
 // Every card renders at this fixed inner height so the stack and its flip/
 // dismiss transitions never jump between cards with vs. without an image.
 // Kept as a literal class string (not interpolated) so Tailwind can see it.
-export const CARD_CONTENT_HEIGHT_CLASS = 'h-[198px]';
+export const CARD_CONTENT_HEIGHT_CLASS = 'h-[194px]';
 
 // Fixed height for the top illustration slot. Cards without an image leave it
 // blank so the title/body still line up vertically across cards in the stack.
@@ -64,7 +64,7 @@ export default function AnnouncementCard({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                icon={<RiSubtractLine className="text-subtle" />}
+                icon={<RiSubtractLine className="text-light" />}
                 kind="secondary"
                 appearance="ghost"
                 size="small"
@@ -86,7 +86,7 @@ export default function AnnouncementCard({
       <div className="px-2 pb-6">
         <p className="mt-3 truncate text-base">{title}</p>
 
-        <p className="text-muted mt-0.5 line-clamp-2 text-sm">{body}</p>
+        <p className="text-muted mt-0.5 line-clamp-2 text-[13px]">{body}</p>
       </div>
     </div>
   );
