@@ -256,6 +256,24 @@ export const pathCreator = {
   runs({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/runs`;
   },
+  sessions({ envSlug, sessionKey }: { envSlug: string; sessionKey?: string }) {
+    return sessionKey
+      ? `/env/${envSlug}/sessions/${encodeURIComponent(sessionKey)}`
+      : `/env/${envSlug}/sessions`;
+  },
+  session({
+    envSlug,
+    sessionKey,
+    sessionId,
+  }: {
+    envSlug: string;
+    sessionKey: string;
+    sessionId: string;
+  }) {
+    return `/env/${envSlug}/sessions/${encodeURIComponent(
+      sessionKey,
+    )}/${encodeURIComponent(sessionId)}`;
+  },
   signingKeys({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/manage/signing-key`;
   },
