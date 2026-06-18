@@ -27,3 +27,17 @@ export const sumScopedMetricData = (
     value: totals.get(bucket) ?? 0,
   }));
 };
+
+export const latestMetricDataValue = (
+  data?: Array<Pick<MetricsData, 'bucket' | 'value'>>,
+): number => {
+  let latest: Pick<MetricsData, 'bucket' | 'value'> | undefined;
+
+  for (const point of data ?? []) {
+    if (!latest || Date.parse(point.bucket) > Date.parse(latest.bucket)) {
+      latest = point;
+    }
+  }
+
+  return latest?.value ?? 0;
+};
