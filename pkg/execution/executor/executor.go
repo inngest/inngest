@@ -2022,8 +2022,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			})
 		}()
 
-		// XX: This is going to drop any sleep requests, because ExecutionDriverResponseAttrs
-		// forces the drop field if resp.IsDiscoveryResponse() is true.
 		responseAttrs := tracing.ExecutionDriverResponseAttrs(resp)
 
 		updateOpts := &tracing.UpdateSpanOptions{
