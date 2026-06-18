@@ -379,7 +379,7 @@ func CheckConstraints(
 	constraints []constraintapi.ConstraintItem,
 	conditionalTracer trace.ConditionalTracer,
 ) (checkResult, error) {
-	ctx, span := conditionalTracer.NewSpan(ctx, "executor.CheckConstraints", req.AccountID, req.WorkspaceID, req.Function.ID)
+	ctx, span := conditionalTracer.NewUserSpan(ctx, "executor.CheckConstraints", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
 
 	l := logger.StdlibLogger(ctx)

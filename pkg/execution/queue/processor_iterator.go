@@ -174,8 +174,7 @@ func (p *ProcessorIterator) stampRemainingEarliestPeekTimes(ctx context.Context,
 func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
 	l := logger.StdlibLogger(ctx).With("partition", p.Partition, "item", item)
 
-	partitionIdentifier := p.Partition.Identifier()
-	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
+	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", TraceScopeFromQueueItem(*item, p.Queue.Shard().Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
 	span.SetAttributes(attribute.String("item_kind", item.Data.Kind))

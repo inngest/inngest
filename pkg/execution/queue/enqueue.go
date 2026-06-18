@@ -75,7 +75,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		qi.AtMS -= factor
 	}
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Enqueue.select_shard", item.Identifier.AccountID, item.Identifier.WorkspaceID, item.Identifier.WorkflowID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Enqueue.select_shard", TraceScopeFromQueueItem(qi, opts.ForceQueueShardName))
 	shard, err := q.selectShard(ctx, opts.ForceQueueShardName, qi)
 	span.End()
 	if err != nil {
