@@ -12,3 +12,8 @@ export type Session = {
   lastActiveAt: string;
   functions: SessionFunction[];
 };
+
+export type SessionKey = {
+  sessionKey: string;
+  createdAt: string;
+};
