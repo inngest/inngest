@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.31.0] - 2026-06-18
+
+### 🚀 Features
+
+- Session server parse + emit (#4404)
+
+### 🐛 Bug Fixes
+
+- *(traces)* Deduplicate nonstep/step spans in trace view (#4448)
+
+### ♻️ Refactoring
+
+- *(devServer)* New Information Architecture (#4395)
+
 ## [v1.30.0] - 2026-06-17
 
 ### 🚀 Features
