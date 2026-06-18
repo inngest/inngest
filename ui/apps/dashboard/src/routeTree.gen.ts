@@ -14,6 +14,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportIndexRouteImport } from './routes/support/index'
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support-tickets'
 import { Route as ApiSentryRouteImport } from './routes/api/sentry'
+import { Route as ApiQueryFeedbackRouteImport } from './routes/api/query-feedback'
 import { Route as ApiInngestRouteImport } from './routes/api/inngest'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -126,6 +127,11 @@ const ApiSupportTicketsRoute = ApiSupportTicketsRouteImport.update({
 const ApiSentryRoute = ApiSentryRouteImport.update({
   id: '/api/sentry',
   path: '/api/sentry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiQueryFeedbackRoute = ApiQueryFeedbackRouteImport.update({
+  id: '/api/query-feedback',
+  path: '/api/query-feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiInngestRoute = ApiInngestRouteImport.update({
@@ -655,6 +661,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/inngest': typeof ApiInngestRoute
+  '/api/query-feedback': typeof ApiQueryFeedbackRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
   '/support/': typeof SupportIndexRoute
@@ -749,6 +756,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/inngest': typeof ApiInngestRoute
+  '/api/query-feedback': typeof ApiQueryFeedbackRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
   '/support': typeof SupportIndexRoute
@@ -834,6 +842,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/inngest': typeof ApiInngestRoute
+  '/api/query-feedback': typeof ApiQueryFeedbackRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
   '/support/': typeof SupportIndexRoute
@@ -931,6 +940,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/csp-report'
     | '/api/inngest'
+    | '/api/query-feedback'
     | '/api/sentry'
     | '/api/support-tickets'
     | '/support/'
@@ -1025,6 +1035,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/csp-report'
     | '/api/inngest'
+    | '/api/query-feedback'
     | '/api/sentry'
     | '/api/support-tickets'
     | '/support'
@@ -1109,6 +1120,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/csp-report'
     | '/api/inngest'
+    | '/api/query-feedback'
     | '/api/sentry'
     | '/api/support-tickets'
     | '/support/'
@@ -1203,6 +1215,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiCspReportRoute: typeof ApiCspReportRoute
   ApiInngestRoute: typeof ApiInngestRoute
+  ApiQueryFeedbackRoute: typeof ApiQueryFeedbackRoute
   ApiSentryRoute: typeof ApiSentryRoute
   ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute
   SupportIndexRoute: typeof SupportIndexRoute
@@ -1248,6 +1261,13 @@ declare module '@tanstack/react-router' {
       path: '/api/sentry'
       fullPath: '/api/sentry'
       preLoaderRoute: typeof ApiSentryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/query-feedback': {
+      id: '/api/query-feedback'
+      path: '/api/query-feedback'
+      fullPath: '/api/query-feedback'
+      preLoaderRoute: typeof ApiQueryFeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/inngest': {
@@ -2276,6 +2296,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiCspReportRoute: ApiCspReportRoute,
   ApiInngestRoute: ApiInngestRoute,
+  ApiQueryFeedbackRoute: ApiQueryFeedbackRoute,
   ApiSentryRoute: ApiSentryRoute,
   ApiSupportTicketsRoute: ApiSupportTicketsRoute,
   SupportIndexRoute: SupportIndexRoute,
