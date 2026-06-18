@@ -3522,6 +3522,18 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	groups := opGroups(resp.Generator)
 
+	nonLazyIDs := groups.NonLazyIDs()
+
+	// When scheduling multiple parallel steps, compute a stable coalesceKey
+	// shared by all queue items in this batch.  Every concurrent fan-in
+	// completion will derive the same discovery JobID from this key, so the
+	// queue's idempotency check ensures only one discovery step is enqueued.
+	if len(nonLazyIDs) > 1 {
+		ck := computeParallelCoalesceKey(i.md.ID.RunID.String(), nonLazyIDs)
+		groups.PriorityGroup.ParallelCoalesceKey = ck
+		groups.OtherGroup.ParallelCoalesceKey = ck
+	}
+
 	// Save pending step IDs so that SaveStep can atomically track which
 	// parallel branches are still outstanding.  When the last branch
 	// completes, SaveStep returns hasPendingSteps=false and a single
@@ -3533,7 +3545,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// enqueued its own discovery step, causing the final sequential step
 	// after a parallel group to execute more than once.
 	if hasPlanOp(resp.Generator) {
-		if err := e.smv2.SavePending(ctx, i.md.ID, groups.NonLazyIDs()); err != nil {
+		if err := e.smv2.SavePending(ctx, i.md.ID, nonLazyIDs); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
 	}
@@ -3573,7 +3585,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 					)
 				}
 			}()
-			return e.HandleGenerator(ctx, i, copied)
+			return e.handleGeneratorOp(ctx, i, copied, group)
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -3593,6 +3605,10 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 }
 
 func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode) error {
+	return e.handleGeneratorOp(ctx, runCtx, gen, OpcodeGroup{})
+}
+
+func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, group OpcodeGroup) error {
 	// Grab the edge that triggered this step execution.
 	lifecycleItem := runCtx.LifecycleItem()
 	edge, ok := lifecycleItem.Payload.(queue.PayloadEdge)
@@ -3619,7 +3635,7 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	case enums.OpcodeStepError:
 		return e.handleStepError(ctx, runCtx, gen, edge)
 	case enums.OpcodeStepPlanned:
-		return e.handleGeneratorStepPlanned(ctx, runCtx, gen, edge)
+		return e.handleGeneratorStepPlanned(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeSleep:
 		return e.handleGeneratorSleep(ctx, runCtx, gen, edge)
 	case enums.OpcodeWaitForEvent:
@@ -3716,7 +3732,15 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 	}
 
 	now := e.now()
-	jobID := fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
+	ck := runCtx.LifecycleItem().ParallelCoalesceKey
+	var jobID string
+	// Race mode fires discovery after every completion, not just the last — skip
+	// coalescing so each branch schedules its own independent discovery step.
+	if ck != nil && *ck != "" && gen.ParallelMode() != enums.ParallelModeRace {
+		jobID = fmt.Sprintf("%s-%s-discover", runCtx.Metadata().ID.RunID, *ck)
+	} else {
+		jobID = fmt.Sprintf("%s-%s", runCtx.Metadata().IdempotencyKey(), gen.ID)
+	}
 
 	nextItem := queue.Item{
 		JobID:                 &jobID,
@@ -3763,6 +3787,9 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 			span.Drop()
 
 			if errors.Is(err, queue.ErrQueueItemExists) {
+				if ck != nil && gen.ParallelMode() != enums.ParallelModeRace {
+					metrics.IncrDiscoveryCoalesceDedupCount(ctx, metrics.CounterOpt{PkgName: pkgName})
+				}
 				return nil
 			}
 
@@ -4173,7 +4200,7 @@ func (e *executor) handleGeneratorSyncFunctionFinished(ctx context.Context, runC
 	return err
 }
 
-func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	nextEdge := inngest.Edge{
 		// Planned generator IDs are the same as the actual OpcodeStep IDs.
 		// We can't set edge.Edge.Outgoing here because the step hasn't yet ran.
@@ -4216,6 +4243,10 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 		},
 		Metadata:     make(map[string]any),
 		ParallelMode: gen.ParallelMode(),
+	}
+	if group.ParallelCoalesceKey != "" {
+		ck := group.ParallelCoalesceKey
+		nextItem.ParallelCoalesceKey = &ck
 	}
 
 	md := runCtx.Metadata()
