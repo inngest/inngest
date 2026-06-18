@@ -1,9 +1,5 @@
 import { useEffect, useState } from 'react';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-
-export const NAVIGATION_V2_FLAG = 'navigation-v2';
-
 const NAV_OVERRIDE_KEY = 'navVersion';
 const NAV_QUERY_PARAM = 'nav';
 
@@ -19,8 +15,8 @@ function parseOverride(value: string | null): NavOverride {
 }
 
 // Reads a manual navigation-version override from localStorage, persisting one
-// first if a `?nav=v1|v2` query param is present. The override always wins over
-// the LaunchDarkly flag, so once you opt in via the query param you keep seeing
+// first if a `?nav=v1|v2` query param is present. The override takes precedence
+// over the default (V2), so once you opt in via the query param you keep seeing
 // that version on subsequent visits (until you pass the other value).
 function readNavOverride(): NavOverride {
   if (typeof window === 'undefined') {
@@ -41,34 +37,26 @@ function readNavOverride(): NavOverride {
   }
 }
 
-// Whether the redesigned (V2) navigation is enabled for the current account.
-// Defaults to false (old navigation) until LaunchDarkly identifies the account,
-// so accounts not targeted for the flag always render the old nav. A manual
-// `?nav=v1|v2` override (see readNavOverride) takes precedence over the flag.
+// The redesigned (V2) navigation is now the default for all accounts. A manual
+// `?nav=v1` override (see readNavOverride) still lets a user fall back to the
+// old navigation as a safety valve; passing `?nav=v2` returns to the default.
 export function useNavigationV2State(): NavigationV2State {
-  // Default false: until LaunchDarkly serves an explicit `true` for this
-  // account, the old navigation is always used.
-  const { isReady: flagReady, value: flagValue } = useBooleanFlag(
-    NAVIGATION_V2_FLAG,
-    false,
-  );
-
   // Resolved after mount to stay SSR/hydration-safe — no window access during
-  // the first render, so the initial markup matches the flag-driven default.
+  // the first render, so the initial markup matches the default (V2).
   const [override, setOverride] = useState<NavOverride | undefined>(undefined);
   useEffect(() => {
     setOverride(readNavOverride());
   }, []);
 
   if (override === undefined) {
-    return { isReady: false, value: flagValue };
+    return { isReady: false, value: true };
   }
 
   if (override) {
     return { isReady: true, value: override === 'v2' };
   }
 
-  return { isReady: flagReady, value: flagValue };
+  return { isReady: true, value: true };
 }
 
 export function useNavigationV2(): boolean {
