@@ -438,3 +438,9 @@ export function useInsightsChatProvider(): ContextValue {
     );
   return ctx;
 }
+
+// Non-throwing variant for components that also render outside the chat
+// provider (e.g. the editor when the AI helper is disabled).
+export function useInsightsChatProviderOptional(): ContextValue | undefined {
+  return useContext(InsightsChatContext);
+}
