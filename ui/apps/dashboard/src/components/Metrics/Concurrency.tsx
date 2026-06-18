@@ -4,7 +4,7 @@ import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
-import type { VolumeMetricsQuery } from '@/gql/graphql';
+import type { MetricsData, ScopedMetric } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { borderColor } from '@/utils/tailwind';
 import type { EntityLookup } from './Dashboard';
@@ -17,11 +17,18 @@ import {
   seriesOptions,
 } from './utils';
 
+type ConcurrencyMetric = Pick<ScopedMetric, 'id'> & {
+  tagName?: string | null;
+  tagValue?: string | null;
+  data: Array<Pick<MetricsData, 'bucket' | 'value'>>;
+};
+
 export const mapConcurrency = (
-  { stepRunning: { metrics: runningMetrics } }: VolumeMetricsQuery['workspace'],
+  runningMetrics: ConcurrencyMetric[],
   entities: EntityLookup,
 ) => {
   const dark = isDark();
+  const visibleMetrics = runningMetrics.filter(({ id }) => id !== ZERO_ID);
 
   const metrics = {
     yAxis: {
@@ -31,41 +38,39 @@ export const mapConcurrency = (
     },
     xAxis: getXAxis(runningMetrics),
     series: [
-      ...runningMetrics
-        .filter(({ id }) => id !== ZERO_ID)
-        .map((f, i) => ({
-          ...seriesOptions,
-          name: entities[f.id]?.name,
-          data: f.data.map(({ value }) => value),
-          itemStyle: {
-            color: resolveColor(
-              lineColors[i % lineColors.length][0],
-              dark,
-              lineColors[0]?.[1],
-            ),
-          },
-        })),
+      ...visibleMetrics.map((f, i) => ({
+        ...seriesOptions,
+        name: entities[f.id]?.name,
+        data: f.data.map(({ value }) => value),
+        itemStyle: {
+          color: resolveColor(
+            lineColors[i % lineColors.length][0],
+            dark,
+            lineColors[0]?.[1],
+          ),
+        },
+      })),
     ],
   };
 
   return getLineChartOptions(
     metrics,
-    runningMetrics.length
-      ? runningMetrics.map(({ id }) => ({ name: entities[id]?.name }))
+    visibleMetrics.length
+      ? visibleMetrics.map(({ id }) => ({ name: entities[id]?.name }))
       : ['No Data Found'],
   );
 };
 
 export const Concurrency = ({
-  workspace,
+  metrics,
   entities,
   isMarketplace = false,
 }: {
-  workspace?: VolumeMetricsQuery['workspace'];
+  metrics?: ConcurrencyMetric[];
   entities: EntityLookup;
   isMarketplace: boolean;
 }) => {
-  const chartOptions = workspace && mapConcurrency(workspace, entities);
+  const chartOptions = metrics && mapConcurrency(metrics, entities);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">

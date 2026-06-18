@@ -20,7 +20,10 @@ import {
   ConnectWorkerTotalCapacity,
 } from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
-import { sumScopedMetricData } from './metricAggregation';
+import {
+  sumScopedMetricData,
+  sumScopedMetricsByGroup,
+} from './metricAggregation';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
@@ -296,6 +299,7 @@ export const MetricsVolume = ({
   selectedFns = [],
   autoRefresh = false,
   entities,
+  functions,
   scope,
   concurrencyLimit,
   isMarketplace = false,
@@ -330,6 +334,18 @@ export const MetricsVolume = ({
     ? sumScopedMetricData(data.workspace.allFunctionConcurrency.metrics)
     : undefined;
 
+  const appConcurrency = data
+    ? sumScopedMetricsByGroup(
+        data.workspace.allFunctionConcurrency.metrics,
+        ({ id }) => functions[id]?.appID,
+      )
+    : undefined;
+
+  const concurrencyMetrics =
+    scope === MetricsScope.App
+      ? appConcurrency
+      : data?.workspace.stepRunning.metrics;
+
   return (
     <div className="item-start flex h-full w-full flex-col items-start">
       <div
@@ -354,7 +370,7 @@ export const MetricsVolume = ({
             <Backlog workspace={data?.workspace} entities={entities} />
 
             <Concurrency
-              workspace={data?.workspace}
+              metrics={concurrencyMetrics}
               entities={entities}
               isMarketplace={isMarketplace}
             />
