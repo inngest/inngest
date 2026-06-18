@@ -2,11 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.31.0] - 2026-06-18
+
+### 🚀 Features
+
+- Session server parse + emit (#4404)
+- Add sessions dashboard UI (#4403)
+
+### 🐛 Bug Fixes
+
+- *(traces)* Deduplicate nonstep/step spans in trace view (#4448)
+- *(extended traces)* Reparent orphaned extended trace spans using span attributes (#4443)
+- *(trace view)* Fix the ordering/timestamps of finalization spans (#4456)
+
+### 💼 Other
+
+- *(npm)* Address UI dependency alerts (#4260)
+
+### 🚜 Refactor
+
+- *(devServer)* New Information Architecture (#4395)
+
 ## [v1.30.0] - 2026-06-17
 
 ### 🚀 Features
 
 - V2 api rerun (#4410)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.30.0 (#4450)
 
 ## [v1.29.0] - 2026-06-17
 
