@@ -981,6 +981,15 @@ func IncrExecutorHandleGeneratorCount(ctx context.Context, op string, opts Count
 	})
 }
 
+func IncrDiscoveryCoalesceDedupCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_discovery_coalesce_dedup_total",
+		Description: "Total number of duplicate discovery steps deduplicated via parallel coalesce key",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectProxyLeaseExpiredCount(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

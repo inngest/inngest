@@ -3184,7 +3184,12 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		}
 		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
 		// execution.
-		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
+		var jobID string
+		if pause.ParallelCoalesceKey != "" && pause.ParallelMode != enums.ParallelModeRace {
+			jobID = fmt.Sprintf("%s-%s-discover", md.ID.RunID, pause.ParallelCoalesceKey)
+		} else {
+			jobID = fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
+		}
 		nextItem := queue.Item{
 			JobID: &jobID,
 			// Add a new group ID for the child;  this will be a new step.
@@ -3351,8 +3356,14 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// running the job may occur prior to saving state data.
 			//
 			// NOTE: This has an "-event" prefix so that it does not conflict
-			// with the timeout job ID.
-			jobID := fmt.Sprintf("%s-%s-event", md.IdempotencyKey(), pause.DataKey)
+			// with the timeout job ID. When a coalesce key is present, both
+			// paths share the same "-discover" job ID so ErrQueueItemExists deduplicates.
+			var jobID string
+			if pause.ParallelCoalesceKey != "" && pause.ParallelMode != enums.ParallelModeRace {
+				jobID = fmt.Sprintf("%s-%s-discover", md.ID.RunID, pause.ParallelCoalesceKey)
+			} else {
+				jobID = fmt.Sprintf("%s-%s-event", md.IdempotencyKey(), pause.DataKey)
+			}
 			nextItem := queue.Item{
 				JobID: &jobID,
 				// Add a new group ID for the child;  this will be a new step.
@@ -3639,15 +3650,15 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 	case enums.OpcodeSleep:
 		return e.handleGeneratorSleep(ctx, runCtx, gen, edge)
 	case enums.OpcodeWaitForEvent:
-		return e.handleGeneratorWaitForEvent(ctx, runCtx, gen, edge)
+		return e.handleGeneratorWaitForEvent(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeInvokeFunction:
-		return e.handleGeneratorInvokeFunction(ctx, runCtx, gen, edge)
+		return e.handleGeneratorInvokeFunction(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeAIGateway:
 		return e.handleGeneratorAIGateway(ctx, runCtx, gen, edge)
 	case enums.OpcodeGateway:
 		return e.handleGeneratorGateway(ctx, runCtx, gen, edge)
 	case enums.OpcodeWaitForSignal:
-		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge)
+		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeRunComplete:
 		return e.handleGeneratorFunctionFinished(ctx, runCtx, gen, edge)
 	case enums.OpcodeSyncRunComplete:
@@ -4843,7 +4854,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 	return err
 }
 
-func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	opts, err := gen.SignalOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse signal opts: %w", err)
@@ -4890,8 +4901,9 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
-		ParallelMode: gen.ParallelMode(),
-		CreatedAt:    now,
+		ParallelMode:        gen.ParallelMode(),
+		ParallelCoalesceKey: group.ParallelCoalesceKey,
+		CreatedAt:           now,
 	}
 
 	// Enqueue a job that will timeout the pause.
@@ -5019,7 +5031,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	return err
 }
 
-func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	if e.handleInvokeEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
 	}
@@ -5090,8 +5102,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
-		ParallelMode: gen.ParallelMode(),
-		CreatedAt:    now,
+		ParallelMode:        gen.ParallelMode(),
+		ParallelCoalesceKey: group.ParallelCoalesceKey,
+		CreatedAt:           now,
 	}
 
 	// Enqueue a job that will timeout the pause.
@@ -5203,7 +5216,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	return err
 }
 
-func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	opts, err := gen.WaitForEventOpts()
 	if err != nil {
 		return fmt.Errorf("unable to parse wait for event opts: %w", err)
@@ -5312,8 +5325,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
-		ParallelMode: gen.ParallelMode(),
-		CreatedAt:    now,
+		ParallelMode:        gen.ParallelMode(),
+		ParallelCoalesceKey: group.ParallelCoalesceKey,
+		CreatedAt:           now,
 	}
 
 	// SDK-based event coordination is called both when an event is received
