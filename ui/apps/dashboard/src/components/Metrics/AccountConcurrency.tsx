@@ -5,13 +5,15 @@ import { Link } from '@inngest/components/Link';
 import { resolveColor } from '@inngest/components/utils/colors';
 import { isDark } from '@inngest/components/utils/theme';
 
-import type { VolumeMetricsQuery } from '@/gql/graphql';
+import type { MetricsData } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { borderColor } from '@/utils/tailwind';
 import { getLineChartOptions, lineColors, seriesOptions } from './utils';
 
+type AccountConcurrencyData = Array<Pick<MetricsData, 'bucket' | 'value'>>;
+
 type Props = {
-  accountConcurrency: VolumeMetricsQuery['accountConcurrency'] | undefined;
+  accountConcurrency: AccountConcurrencyData | undefined;
   limit?: number;
   isMarketplace: boolean;
 };
@@ -71,7 +73,7 @@ function createChartOption({
   accountConcurrency,
 }: {
   limit: number | undefined;
-  accountConcurrency: VolumeMetricsQuery['accountConcurrency'];
+  accountConcurrency: AccountConcurrencyData;
 }): React.ComponentProps<typeof Chart>['option'] {
   const dark = isDark();
 
@@ -79,7 +81,7 @@ function createChartOption({
     {
       ...seriesOptions,
       name: 'Account Concurrency',
-      data: accountConcurrency.data.map(({ value }) => value),
+      data: accountConcurrency.map(({ value }) => value),
       itemStyle: {
         color: resolveColor(lineColors[0][0], dark, lineColors[0]?.[1]),
       },
@@ -115,7 +117,7 @@ function createChartOption({
     });
   }
 
-  const xAxisData = accountConcurrency.data.map(({ bucket }) => bucket);
+  const xAxisData = accountConcurrency.map(({ bucket }) => bucket);
 
   return getLineChartOptions(
     {

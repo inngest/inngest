@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { sumScopedMetricData } from '@/components/Metrics/metricAggregation';
 import { graphql } from '@/gql';
 import {
   GetBillableExecutionsDocument,
@@ -335,9 +336,9 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       workerPercentUsed:
         volume.data?.workspace.workerPercentageUsed.metrics.at(0)?.data.at(-1)
           ?.value ?? null,
-      totalAccountConcurrency: volume.data?.accountConcurrency
-        ? sumDataValues(volume.data.accountConcurrency.data)
-        : 0,
+      totalAccountConcurrency: sumDataValues(
+        sumScopedMetricData(volume.data?.workspace.stepRunning.metrics),
+      ),
     };
   }, [
     availablePlans.data?.plans,
@@ -354,7 +355,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     functions.data?.workspace.workflows.page,
     lookups.data?.envBySlug?.apps,
     lookups.data?.envBySlug?.workflows.data.length,
-    volume.data?.accountConcurrency,
     volume.data?.workspace.backlog.metrics,
     volume.data?.workspace.runsThroughput.metrics,
     volume.data?.workspace.sdkThroughputEnded.metrics,
