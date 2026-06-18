@@ -15,6 +15,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -85,7 +86,18 @@ func (q *queue) BacklogRefill(
 	}
 
 	partitionID := sp.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRefill", osqueue.TraceScopeFromPartitionIdentifier(partitionID))
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionID.AccountID,
+		EnvID:     partitionID.EnvID,
+		FnID:      partitionID.FunctionID,
+	})
+	if partitionID.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionID.SystemQueueName,
+			QueueShardName: q.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRefill", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
 	span.SetAttributes(attribute.String("backlog_id", b.BacklogID))
@@ -191,7 +203,18 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *osqueue.QueueBacklo
 	}
 
 	partitionID := sp.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRequeue", osqueue.TraceScopeFromPartitionIdentifier(partitionID))
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionID.AccountID,
+		EnvID:     partitionID.EnvID,
+		FnID:      partitionID.FunctionID,
+	})
+	if partitionID.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionID.SystemQueueName,
+			QueueShardName: q.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.BacklogRequeue", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
 	span.SetAttributes(attribute.String("backlog_id", backlog.BacklogID))

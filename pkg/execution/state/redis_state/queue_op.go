@@ -45,7 +45,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 	partition := osqueue.ItemShadowPartition(ctx, i)
 	backlog := osqueue.ItemBacklog(ctx, i)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Dequeue", osqueue.TraceScopeFromQueueItem(i))
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Dequeue", osqueue.TraceScopeFromQueueItem(i, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", partition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -176,7 +176,7 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 	fnPartition := osqueue.ItemPartition(ctx, i)
 	shadowPartition := osqueue.ItemShadowPartition(ctx, i)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Requeue", osqueue.TraceScopeFromQueueItem(i))
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Requeue", osqueue.TraceScopeFromQueueItem(i, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))

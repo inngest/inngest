@@ -14,7 +14,9 @@ type Scope interface {
 }
 
 type SystemScope struct {
-	QueueName *string
+	QueueName      *string
+	QueueShardName string
+	ItemKind       string
 }
 
 func (SystemScope) traceScope() {}
@@ -79,6 +81,12 @@ func setScopeAttributes(span trace.Span, scope Scope) {
 	case SystemScope:
 		if s.QueueName != nil {
 			span.SetAttributes(attribute.String("queue_name", *s.QueueName))
+		}
+		if s.QueueShardName != "" {
+			span.SetAttributes(attribute.String("queue_shard", s.QueueShardName))
+		}
+		if s.ItemKind != "" {
+			span.SetAttributes(attribute.String("item_kind", s.ItemKind))
 		}
 	}
 }
