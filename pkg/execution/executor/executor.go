@@ -2022,12 +2022,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			})
 		}()
 
-		// XX: This is going to drop any sleep requests, because DriverResponseAttrs
+		// XX: This is going to drop any sleep requests, because ExecutionDriverResponseAttrs
 		// forces the drop field if resp.IsDiscoveryResponse() is true.
-		// NOTE: we should make this not emit output if we also emit a step span containing the output.
-		// We're emitting both for now to be safe and ensure we don't lose data,
-		// but ideally the step span should be the one emitting output if it's present, and this span should not emit output in that case. This is because the step span is the one that will be visible to users, and we don't want to have duplicate output attributes on both spans. The step span will also have more context about the step, so it makes more sense for it to have the output.
-		responseAttrs := tracing.DriverResponseAttrs(resp, nil)
+		responseAttrs := tracing.ExecutionDriverResponseAttrs(resp)
 
 		updateOpts := &tracing.UpdateSpanOptions{
 			Debug:      &tracing.SpanDebugData{Location: "executor.ExecutePost"},
