@@ -3555,7 +3555,7 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// pending set every step completion saw hasPendingSteps=false and
 	// enqueued its own discovery step, causing the final sequential step
 	// after a parallel group to execute more than once.
-	if hasPlanOp(resp.Generator) {
+	if hasPlanOp(resp.Generator) && len(nonLazyIDs) > 1 {
 		if err := e.smv2.SavePending(ctx, i.md.ID, nonLazyIDs); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
