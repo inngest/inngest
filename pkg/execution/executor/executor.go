@@ -458,6 +458,15 @@ type BacklogSizeLimit struct {
 
 type BacklogSizeLimitFn func(ctx context.Context, accountID, envID, fnID uuid.UUID) BacklogSizeLimit
 
+type AccountPlanMetricTagResolver func(ctx context.Context, accountID uuid.UUID) string
+
+func WithAccountPlanMetricTagResolver(resolver AccountPlanMetricTagResolver) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).accountPlanMetricTagResolver = resolver
+		return nil
+	}
+}
+
 func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).conditionalTracer = tracer
@@ -515,6 +524,8 @@ type executor struct {
 	stateSizeLimit func(sv2.ID) int
 
 	functionBacklogSizeLimit BacklogSizeLimitFn
+
+	accountPlanMetricTagResolver AccountPlanMetricTagResolver
 
 	shards queue.ShardRegistry
 

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/constraintapi"
@@ -37,6 +38,11 @@ const cancelationGracePeriod = 10 * time.Second
 const (
 	runStateDeleteStatusSuccess = "success"
 	runStateDeleteStatusFailed  = "failed"
+
+	runStateAccountPlanFree       = "free"
+	runStateAccountPlanSelfServe  = "self_serve"
+	runStateAccountPlanEnterprise = "enterprise"
+	runStateAccountPlanUnknown    = "unknown"
 )
 
 // Finalize performs run finalization, which involves sending the function
@@ -178,19 +184,21 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 		)
 	}
 
+	metricTags := e.finalizeMetricTags(ctx, status, opts)
+
 	metrics.HistogramRunStateResidenceDuration(ctx, e.now().Sub(opts.Metadata.ID.RunID.Timestamp()), metrics.HistogramOpt{
 		PkgName: pkgName,
-		Tags:    finalizeDeleteMetricTags(status, opts.Optional.Reason, deleteStatus),
+		Tags:    finalizeDeleteMetricTags(metricTags, deleteStatus),
 	})
 
 	metrics.HistogramRunStateStepCount(ctx, int64(opts.Metadata.Metrics.StepCount), metrics.HistogramOpt{
 		PkgName: pkgName,
-		Tags:    finalizeMetricTags(status, opts.Optional.Reason),
+		Tags:    metricTags,
 	})
 
 	metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
-		Tags:    finalizeMetricTags(status, opts.Optional.Reason),
+		Tags:    metricTags,
 	})
 
 	e.finalizeRemoveJobs(ctx, opts)
@@ -215,17 +223,41 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 	return nil
 }
 
-func finalizeMetricTags(status enums.StepStatus, reason string) map[string]any {
+func (e *executor) finalizeMetricTags(ctx context.Context, status enums.StepStatus, opts execution.FinalizeOpts) map[string]any {
 	return map[string]any{
-		"reason": reason,
-		"status": status.String(),
+		"account_plan": e.accountPlanMetricTag(ctx, opts),
+		"reason":       opts.Optional.Reason,
+		"status":       status.String(),
 	}
 }
 
-func finalizeDeleteMetricTags(status enums.StepStatus, reason, deleteStatus string) map[string]any {
-	tags := finalizeMetricTags(status, reason)
+func finalizeDeleteMetricTags(base map[string]any, deleteStatus string) map[string]any {
+	tags := make(map[string]any, len(base)+1)
+	for key, val := range base {
+		tags[key] = val
+	}
 	tags["delete_status"] = deleteStatus
 	return tags
+}
+
+func (e *executor) accountPlanMetricTag(ctx context.Context, opts execution.FinalizeOpts) string {
+	if e.accountPlanMetricTagResolver == nil {
+		return runStateAccountPlanUnknown
+	}
+	return normalizeAccountPlanMetricTag(e.accountPlanMetricTagResolver(ctx, opts.Metadata.ID.Tenant.AccountID))
+}
+
+func normalizeAccountPlanMetricTag(plan string) string {
+	switch strings.TrimSpace(plan) {
+	case runStateAccountPlanFree:
+		return runStateAccountPlanFree
+	case runStateAccountPlanSelfServe:
+		return runStateAccountPlanSelfServe
+	case runStateAccountPlanEnterprise:
+		return runStateAccountPlanEnterprise
+	default:
+		return runStateAccountPlanUnknown
+	}
 }
 
 func (e *executor) claimFinalization(ctx context.Context, md sv2.Metadata) sv2.FinalizationClaim {
