@@ -62,6 +62,9 @@ type Event struct {
 	Timestamp int64  `json:"ts,omitempty"`
 	Version   string `json:"v,omitempty"`
 
+	// Meta carries event meta shared across runs triggered by this event.
+	Meta EventMeta `json:"meta,omitempty,omitzero"`
+
 	// User represents user-specific information for the event.
 	//
 	// Deprecated:  this will be removed in favour of storing everything within data.
@@ -125,6 +128,11 @@ func (e Event) Map() map[string]any {
 	if e.Version != "" {
 		data["v"] = e.Version
 	}
+	if len(e.Meta.Sessions) > 0 {
+		data["meta"] = map[string]any{
+			"sessions": e.Meta.Sessions,
+		}
+	}
 
 	return data
 }
@@ -143,6 +151,10 @@ func (e Event) Validate(ctx context.Context) error {
 		if t.After(endTimestamp) {
 			return errors.New("timestamp is after Jan 1, 2100")
 		}
+	}
+
+	if err := e.Meta.Sessions.Validate(); err != nil {
+		return err
 	}
 
 	return nil
