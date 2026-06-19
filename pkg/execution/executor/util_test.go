@@ -362,6 +362,38 @@ func TestOpcodeGroups_IDs_ExcludesLazyOps(t *testing.T) {
 	}
 }
 
+func TestComputeParallelCoalesceKey(t *testing.T) {
+	t.Run("deterministic", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"step-a", "step-b"})
+		b := computeParallelCoalesceKey("run-1", []string{"step-a", "step-b"})
+		require.Equal(t, a, b)
+	})
+
+	t.Run("order independent", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"step-a", "step-b"})
+		b := computeParallelCoalesceKey("run-1", []string{"step-b", "step-a"})
+		require.Equal(t, a, b)
+	})
+
+	t.Run("different step sets produce different keys", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"step-a", "step-b"})
+		b := computeParallelCoalesceKey("run-1", []string{"step-a", "step-c"})
+		require.NotEqual(t, a, b)
+	})
+
+	t.Run("different run IDs produce different keys", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"step-a"})
+		b := computeParallelCoalesceKey("run-2", []string{"step-a"})
+		require.NotEqual(t, a, b)
+	})
+
+	t.Run("no length extension collision", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"ab", "c"})
+		b := computeParallelCoalesceKey("run-1", []string{"a", "bc"})
+		require.NotEqual(t, a, b)
+	})
+}
+
 func TestAllEmptyNoneOps(t *testing.T) {
 	tests := []struct {
 		name string
