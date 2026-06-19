@@ -30,12 +30,15 @@ type Props = {
   name: string;
   series: ScoreSeries | undefined;
   isLoading: boolean;
+  // Resolved per-score color; the numeric line uses it so the chart matches the
+  // sidebar toggle. Falls back to the palette's blue when absent.
+  color?: string;
   // The `Error` import above is the banner component and shadows the global
   // Error type, so type this as what Dashboard actually passes.
   error?: CombinedError;
 };
 
-export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
+export const ScoreCard = ({ name, series, isLoading, color, error }: Props) => {
   const [aggregation, setAggregation] = useState<AggregationKey>('avg');
 
   const option = useMemo(() => {
@@ -43,7 +46,7 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
     const buckets = series.buckets;
     const dark = isDark();
 
-    const color = (i: number) =>
+    const lineColor = (i: number) =>
       resolveColor(
         lineColors[i % lineColors.length][0],
         dark,
@@ -76,7 +79,7 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
               showAllSymbol: true,
               symbol: 'circle',
               symbolSize: 8,
-              itemStyle: { color: color(2) },
+              itemStyle: { color: color ?? lineColor(2) },
             },
           ]
         : [
@@ -85,14 +88,14 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
               type: 'bar' as const,
               stack: 'count',
               data: buckets.map((b) => b.trueCount ?? 0),
-              itemStyle: { color: color(1) },
+              itemStyle: { color: lineColor(1) },
             },
             {
               name: 'false',
               type: 'bar' as const,
               stack: 'count',
               data: buckets.map((b) => b.falseCount ?? 0),
-              itemStyle: { color: color(3) },
+              itemStyle: { color: lineColor(3) },
             },
           ];
 
@@ -113,12 +116,12 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
       },
       chartSeries.map((s) => s.name),
     );
-  }, [series, name, aggregation]);
+  }, [series, name, aggregation, color]);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-hidden rounded-md border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
-        <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
+        <div className="text-muted flex w-full flex-row items-center gap-x-2 font-mono text-base">
           {name}
         </div>
       </div>
