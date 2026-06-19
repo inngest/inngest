@@ -31,6 +31,23 @@ const mapFailed = (
   return mapEntityLines(failed, entities);
 };
 
+// SQL carried by the "Open in Insights" deep link. Kept local so the chart
+// doesn't depend on a matching entry inside the Insights templates module —
+// renaming or removing a built-in template can't silently break this button.
+const INSIGHTS_QUERY = `SELECT
+    data.function_id AS function_id,
+    COUNT(*) as failed_count
+FROM
+    events
+WHERE
+    name = 'inngest/function.failed'
+    AND ts > toUnixTimestamp64Milli(subtractDays(now64(), 1))
+GROUP BY
+    function_id
+ORDER BY
+    failed_count DESC`;
+const INSIGHTS_QUERY_NAME = 'Failed function runs (24h)';
+
 export const FailedFunctions = ({
   workspace,
   entities,
@@ -68,11 +85,15 @@ export const FailedFunctions = ({
           appearance="outlined"
           icon={<RiArrowRightUpLine />}
           iconSide="left"
-          label="View all"
+          label="Open in Insights"
           to={
-            `${pathCreator.runs({
+            `${pathCreator.insights({
               envSlug: env.slug,
-            })}?filterStatus=%5B"FAILED"%5D` as FileRouteTypes['to']
+            })}?sql=${encodeURIComponent(
+              INSIGHTS_QUERY,
+            )}&name=${encodeURIComponent(
+              INSIGHTS_QUERY_NAME,
+            )}` as FileRouteTypes['to']
           }
         />
       </div>
