@@ -46,7 +46,7 @@ func (q *queueProducer) selectShard(ctx context.Context, shardName string, qi Qu
 		queueItemKind = &qi.Data.Kind
 	}
 
-	selected, err := q.shards.Resolve(ctx, qi.Data.Identifier.AccountID, queueItemKind)
+	selected, err := q.shards.Resolve(ctx, ScopeFromQueueItem(qi), queueItemKind)
 	if err != nil {
 		l.Error("error selecting shard", "error", err, "item", qi)
 		return nil, fmt.Errorf("could not select shard: %w", err)

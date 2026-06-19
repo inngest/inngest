@@ -740,7 +740,11 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	shard, err := s.shards.Resolve(ctx, c.AccountID, c.QueueName)
+	shard, err := s.shards.Resolve(ctx, queue.Scope{
+		AccountID:  c.AccountID,
+		EnvID:      c.WorkspaceID,
+		FunctionID: c.FunctionID,
+	}, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
@@ -836,7 +840,12 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	shard, err := s.shards.Resolve(ctx, c.AccountID, c.QueueName)
+	scope := queue.Scope{
+		AccountID:  c.AccountID,
+		EnvID:      c.WorkspaceID,
+		FunctionID: c.FunctionID,
+	}
+	shard, err := s.shards.Resolve(ctx, scope, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
@@ -1174,7 +1183,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 
 	// Retrieve current queue shard for sleep item. The account might have been migrated
 	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
-	shard, err := s.shards.Resolve(ctx, item.Identifier.AccountID, nil)
+	shard, err := s.shards.Resolve(ctx, queue.Scope{AccountID: item.Identifier.AccountID}, nil)
 	if err != nil {
 		return fmt.Errorf("could not retrieve queue shard for job promotion:%w", err)
 	}

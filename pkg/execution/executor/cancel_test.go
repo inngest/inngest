@@ -106,7 +106,7 @@ type missingShardRegistry struct {
 	queue.ShardRegistry
 }
 
-func (missingShardRegistry) Resolve(context.Context, uuid.UUID, *string) (queue.QueueShard, error) {
+func (missingShardRegistry) Resolve(context.Context, queue.Scope, *string) (queue.QueueShard, error) {
 	return nil, errors.New("missing shard")
 }
 

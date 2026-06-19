@@ -258,7 +258,7 @@ func (q *queueProcessor) forAccountShards(ctx context.Context, accountID uuid.UU
 		return q.shards.ForEach(ctx, fn)
 	}
 
-	shard, err := q.shards.Resolve(ctx, accountID, nil)
+	shard, err := q.shards.Resolve(ctx, Scope{AccountID: accountID}, nil)
 	if err != nil {
 		return fmt.Errorf("could not resolve account shard: %w", err)
 	}

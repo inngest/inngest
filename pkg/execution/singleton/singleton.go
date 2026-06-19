@@ -70,7 +70,7 @@ func hash(res any, id uuid.UUID) string {
 //
 // - If the mode is SingletonModeCancel, it attempts to release the lock and returns the run ID that was released.
 func singleton(ctx context.Context, shards queue.ShardRegistry, scope queue.Scope, key string, s inngest.Singleton) (*ulid.ULID, error) {
-	shard, err := shards.Resolve(ctx, scope.AccountID, nil)
+	shard, err := shards.Resolve(ctx, scope, nil)
 	if err != nil {
 		return nil, err
 	}

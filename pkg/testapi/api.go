@@ -83,18 +83,19 @@ func (t *TestAPI) GetQueueSize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shard, err := t.options.QueueShards.Resolve(ctx, parsedAccountId, nil)
+	scope := queue.Scope{
+		AccountID:  parsedAccountId,
+		EnvID:      consts.DevServerEnvID,
+		FunctionID: parsedFnId,
+	}
+	shard, err := t.options.QueueShards.Resolve(ctx, scope, nil)
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))
 		return
 	}
 
-	count, err := shard.PartitionSize(ctx, queue.Scope{
-		AccountID:  parsedAccountId,
-		EnvID:      consts.DevServerEnvID,
-		FunctionID: parsedFnId,
-	}, parsedFnId.String(), time.Now().Add(2*365*24*time.Hour))
+	count, err := shard.PartitionSize(ctx, scope, parsedFnId.String(), time.Now().Add(2*365*24*time.Hour))
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))

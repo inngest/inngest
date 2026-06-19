@@ -131,8 +131,8 @@ func TestGetQueueItemByRunIDResolvesShardFromScope(t *testing.T) {
 			accountShard.Name(): accountShard,
 		},
 		queue.WithPrimary(defaultShard),
-		queue.WithShardSelector(func(ctx context.Context, id uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			if id == accountID {
+		queue.WithShardSelector(func(ctx context.Context, scope queue.Scope, queueName *string) (queue.QueueShard, error) {
+			if scope.AccountID == accountID {
 				return accountShard, nil
 			}
 			return defaultShard, nil
