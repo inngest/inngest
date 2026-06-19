@@ -42,6 +42,7 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
   const ai: NavGroupConfig = {
     heading: 'AI',
     items: aiItems,
+    beta: true,
   };
 
   if (!activeEnv) {
