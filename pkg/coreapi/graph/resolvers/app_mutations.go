@@ -3,7 +3,10 @@ package resolvers
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,13 +111,20 @@ func (r *mutationResolver) InvokeFunction(
 	ctx context.Context,
 	data map[string]any,
 	functionSlug string,
+	meta map[string]any,
 	user map[string]any,
 	debugSessionID *ulid.ULID,
 	debugRunID *ulid.ULID,
 ) (*bool, error) {
+	eventMeta, err := eventMetaFromMap(meta)
+	if err != nil {
+		return nil, err
+	}
+
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
 		Event: event.Event{
 			Data: data,
+			Meta: eventMeta,
 			User: user,
 		},
 		FnID:           functionSlug,
@@ -133,11 +143,82 @@ func (r *mutationResolver) InvokeFunction(
 	defer span.End()
 
 	sent := false
-	_, err := r.EventHandler(ctx, &evt.Event, nil)
+	_, err = r.EventHandler(ctx, &evt.Event, nil)
 	if err != nil {
 		return &sent, err
 	}
 
 	sent = true
 	return &sent, nil
+}
+
+func eventMetaFromMap(input map[string]any) (event.EventMeta, error) {
+	if len(input) == 0 {
+		return event.EventMeta{}, nil
+	}
+
+	for key := range input {
+		if key != "sessions" {
+			return event.EventMeta{}, fmt.Errorf("event meta %q is not supported", key)
+		}
+	}
+
+	rawSessions, ok := input["sessions"]
+	if !ok || rawSessions == nil {
+		return event.EventMeta{}, nil
+	}
+
+	sessions, ok := rawSessions.(map[string]any)
+	if !ok {
+		return event.EventMeta{}, fmt.Errorf("event meta sessions must be an object")
+	}
+
+	eventSessions, err := eventSessionsFromMap(sessions)
+	if err != nil {
+		return event.EventMeta{}, err
+	}
+
+	return event.EventMeta{Sessions: eventSessions}, nil
+}
+
+func eventSessionsFromMap(input map[string]any) (event.Sessions, error) {
+	if len(input) == 0 {
+		return nil, nil
+	}
+
+	sessions := make(event.Sessions, len(input))
+	for key, value := range input {
+		id, err := eventSessionIDFromValue(key, value)
+		if err != nil {
+			return nil, err
+		}
+
+		sessions[key] = id
+	}
+
+	if err := sessions.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid sessions: %w", err)
+	}
+
+	return sessions, nil
+}
+
+func eventSessionIDFromValue(key string, value any) (string, error) {
+	switch v := value.(type) {
+	case string:
+		return v, nil
+	case json.Number:
+		return v.String(), nil
+	case int:
+		return strconv.Itoa(v), nil
+	case int64:
+		return strconv.FormatInt(v, 10), nil
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return "", fmt.Errorf("session %q must be a finite number", key)
+		}
+		return strconv.FormatFloat(v, 'f', -1, 64), nil
+	default:
+		return "", fmt.Errorf("session %q must be a string or number", key)
+	}
 }

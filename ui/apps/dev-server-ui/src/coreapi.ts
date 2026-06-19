@@ -218,6 +218,7 @@ export const INVOKE_FUNCTION = gql`
   mutation InvokeFunction(
     $functionSlug: String!
     $data: Map
+    $meta: Map
     $user: Map
     $debugSessionID: ULID = null
     $debugRunID: ULID = null
@@ -225,6 +226,7 @@ export const INVOKE_FUNCTION = gql`
     invokeFunction(
       data: $data
       functionSlug: $functionSlug
+      meta: $meta
       user: $user
       debugSessionID: $debugSessionID
       debugRunID: $debugRunID

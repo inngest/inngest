@@ -72,6 +72,16 @@ func TestUnmarshalJSON(t *testing.T) {
 		r.EqualError(err, `event session "active" must be a string or number`)
 	})
 
+	t.Run("preserves numeric session precision", func(t *testing.T) {
+		r := require.New(t)
+
+		var evt Event
+		err := json.Unmarshal([]byte(`{"name":"test/event","data":{},"meta":{"sessions":{"conversation_id":9007199254740993}}}`), &evt)
+		r.NoError(err)
+
+		r.Equal(Sessions{"conversation_id": "9007199254740993"}, evt.Meta.Sessions)
+	})
+
 	t.Run("omits empty meta when marshalled", func(t *testing.T) {
 		r := require.New(t)
 

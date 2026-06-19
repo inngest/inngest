@@ -9,6 +9,7 @@ type Mutation {
   invokeFunction(
     data: Map
     functionSlug: String!
+    meta: Map
     user: Map
     debugSessionID: ULID
     debugRunID: ULID
