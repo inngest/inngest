@@ -33,13 +33,13 @@ export default function NavSection({
       {collapsed ? (
         !first && <hr className="border-subtle mx-auto mb-1 w-6" />
       ) : (
-        <div className="text-muted leading-4.5 mb-1 flex items-center gap-1.5 px-2 text-xs font-medium">
+        <div className="text-muted leading-4.5 mb-1 flex items-center px-2 text-xs font-medium">
           {group.heading}
           {group.beta && (
             <Pill
               kind="primary"
               appearance="solid"
-              className="h-4 px-1.5 text-[10px]"
+              className="ml-auto h-4 px-1.5 text-[10px]"
             >
               Beta
             </Pill>
