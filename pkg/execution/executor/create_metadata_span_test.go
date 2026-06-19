@@ -26,12 +26,13 @@ import (
 type mockRunContext struct {
 	md            sv2.Metadata
 	lifecycleItem queue.Item
+	httpClient    exechttp.RequestExecutor
 }
 
 func (m *mockRunContext) Metadata() *sv2.Metadata                                              { return &m.md }
 func (m *mockRunContext) DriverResponse() *state.DriverResponse                                { return nil }
 func (m *mockRunContext) Events() []json.RawMessage                                            { return nil }
-func (m *mockRunContext) HTTPClient() exechttp.RequestExecutor                                 { return nil }
+func (m *mockRunContext) HTTPClient() exechttp.RequestExecutor                                 { return m.httpClient }
 func (m *mockRunContext) ExecutionSpan() *meta.SpanReference                                   { return &meta.SpanReference{} }
 func (m *mockRunContext) ParentSpan() *meta.SpanReference                                      { return &meta.SpanReference{} }
 func (m *mockRunContext) GroupID() string                                                      { return "" }

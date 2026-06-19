@@ -82,7 +82,7 @@ func TestMaybeEnqueueDiscoveryStepCoalesces(t *testing.T) {
 	edge := queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}
 
 	for i := 0; i < 3; i++ {
-		err := e.maybeEnqueueDiscoveryStep(context.Background(), rc, gen, edge, uuid.New().String(), false)
+		err := e.maybeEnqueueDiscoveryStep(context.Background(), rc, gen, edge, uuid.New().String(), false, rc.LifecycleItem().ParallelCoalesceKey)
 		require.NoError(t, err)
 	}
 
