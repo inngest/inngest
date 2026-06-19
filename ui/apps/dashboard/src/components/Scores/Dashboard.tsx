@@ -1,13 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 import { Error } from '@inngest/components/Error/Error';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
-import {
-  HelperPanelControl,
-  HelperPanelFrame,
-  type HelperItem,
-} from '@inngest/components/HelperPanelControl';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { resolveColor } from '@inngest/components/utils/colors';
@@ -201,15 +196,6 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
     return m;
   }, [availableScores]);
 
-  const [panelOpen, setPanelOpen] = useState(true);
-  const helperItems: HelperItem[] = [
-    {
-      title: SCORES_PANEL,
-      icon: <InsightsIcon className="h-5 w-5" />,
-      action: () => setPanelOpen((open) => !open),
-    },
-  ];
-
   const [{ data: seriesData, fetching: seriesFetching, error: seriesError }] =
     useQuery({
       query: ScoreTimeSeriesDocument,
@@ -318,13 +304,13 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
           </div>
         </div>
       </div>
-      {!filterError && panelOpen && (
+      {!filterError && (
         <aside className="border-subtle flex w-[300px] shrink-0 flex-col overflow-hidden border-l">
-          <HelperPanelFrame
-            title={SCORES_PANEL}
-            icon={<InsightsIcon className="h-5 w-5" />}
-            onClose={() => setPanelOpen(false)}
-          >
+          <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center gap-2 border-b px-3">
+            <InsightsIcon className="h-5 w-5" />
+            <div className="text-sm font-normal">{SCORES_PANEL}</div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <Legend
               scores={availableScores}
               disabled={disabled}
@@ -332,14 +318,8 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
               onToggle={toggleScore}
               isLoading={namesFetching}
             />
-          </HelperPanelFrame>
+          </div>
         </aside>
-      )}
-      {!filterError && (
-        <HelperPanelControl
-          items={helperItems}
-          activeTitle={panelOpen ? SCORES_PANEL : null}
-        />
       )}
     </div>
   );
