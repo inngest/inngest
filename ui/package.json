@@ -119,14 +119,6 @@
       "uuid@<11.1.1": ">=11.1.1",
       "uuid@>=13.0.0 <13.0.1": ">=13.0.1",
       "js-cookie@<=3.0.5": ">=3.0.7"
-    },
-    "onlyBuiltDependencies": [
-      "@sentry/cli",
-      "esbuild"
-    ],
-    "ignoredBuiltDependencies": [
-      "@clerk/shared",
-      "core-js-pure"
-    ]
+    }
   }
 }
