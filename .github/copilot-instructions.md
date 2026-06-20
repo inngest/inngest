@@ -32,7 +32,7 @@ See `/docs/DEVSERVER_ARCHITECTURE.md` for detailed architecture information.
 ### Prerequisites
 
 - **Go 1.24+**: Main backend language
-- **Node.js & pnpm**: UI development (pnpm@11.7.0)
+- **Node.js & pnpm**: UI development (pnpm@11.8.0)
 - **GoReleaser**: For building the CLI
 - **GolangCI-Lint**: Code linting
 - **Protocol Buffers & buf**: API definitions
