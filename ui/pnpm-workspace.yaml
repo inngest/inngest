@@ -1,3 +1,10 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+allowBuilds:
+  '@clerk/shared': false
+  core-js-pure: false
+  esbuild: false
+  protobufjs: false
+  sharp: false
+  unrs-resolver: false
