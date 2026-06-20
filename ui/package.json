@@ -18,14 +18,14 @@
     "turbo": "^2.9.14"
   },
   "engines": {
-    "node": "20.x",
-    "pnpm": "10.x"
+    "node": "24.x",
+    "pnpm": "11.x"
   },
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
-  "packageManager": "pnpm@10.18.2",
+  "packageManager": "pnpm@11.7.0",
   "private": true,
   "pnpm": {
     "overrides": {

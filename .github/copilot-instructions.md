@@ -5,6 +5,7 @@ This document provides guidance for GitHub Copilot when working with the Inngest
 ## Project Overview
 
 Inngest is a durable functions platform that replaces queues, state management, and scheduling. The repository contains:
+
 - **Go Backend**: The core Inngest server, CLI, and execution engine
 - **TypeScript/Next.js UI**: Dashboard and Dev Server UI applications
 - **Protocol Buffers**: API definitions using buf
@@ -13,6 +14,7 @@ Inngest is a durable functions platform that replaces queues, state management, 
 ### Architecture
 
 The system consists of several key components:
+
 - **Event API**: Receives events from SDKs via HTTP requests
 - **Event Stream**: Buffers events between API and Runner
 - **Runner**: Schedules function runs, manages state, and handles event-driven logic
@@ -30,7 +32,7 @@ See `/docs/DEVSERVER_ARCHITECTURE.md` for detailed architecture information.
 ### Prerequisites
 
 - **Go 1.24+**: Main backend language
-- **Node.js & pnpm**: UI development (pnpm@10.18.2)
+- **Node.js & pnpm**: UI development (pnpm@11.7.0)
 - **GoReleaser**: For building the CLI
 - **GolangCI-Lint**: Code linting
 - **Protocol Buffers & buf**: API definitions
@@ -97,12 +99,12 @@ cd ui && pnpm lint
 ### TypeScript/UI Code
 
 - **Location**: `/ui` directory (monorepo with pnpm workspaces)
-- **Apps**: 
+- **Apps**:
   - `ui/apps/dashboard/`: Inngest Cloud dashboard
   - `ui/apps/dev-server-ui/`: Dev Server UI
 - **Packages**: `ui/packages/components/`: Shared components
 - **Style**: Use Tailwind CSS with color token system
-- **Naming**: 
+- **Naming**:
   - Use `ID` (not `Id`) for abbreviations: `environmentID`
   - Follow product nomenclature (e.g., "environment" not "workspace")
   - Use US English spelling (except "Cancelled" for legacy)
@@ -132,6 +134,7 @@ See `/docs/IMPLEMENTING_NEW_REST_API_V2_ENDPOINTS.md` for REST API v2 guidelines
 ### Making Pull Requests
 
 See `/docs/PULL_REQUEST_GUIDELINES.md`:
+
 - Keep changes small and atomic
 - Focus on one issue or feature per PR
 - Write clear descriptions
@@ -188,6 +191,7 @@ See `/docs/RELEASING.md` for release procedures.
 ## Code Owners
 
 See `CODEOWNERS` file for team ownership:
+
 - UI: @anafilipadealmeida @amh4r @djfarrelly @jacobheric
 - Execution: @tonyhb @darwin67 @BrunoScheufler @KiKoS0 @jpwilliams
 - State: @tonyhb @darwin67 @BrunoScheufler @KiKoS0

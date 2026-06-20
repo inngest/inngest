@@ -14,7 +14,7 @@ The Inngest Support Portal is a customer support application built with TanStack
 - **Theme**: `next-themes` for dark/light mode
 - **Server**: Nitro v3.0.1-alpha.1
 - **Build Tool**: Vite v7.1.10
-- **Package Manager**: pnpm v10.18.2
+- **Package Manager**: pnpm v11.7.0
 
 ## Project Structure
 
