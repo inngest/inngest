@@ -158,10 +158,6 @@ func (m Update) ValidateAllowed() error {
 		return err
 	}
 
-	if m.Kind().IsScoped(KindInngestScore) {
-		return validateNamedScoreValue(m.Kind(), m.RawUpdate.Values)
-	}
-
 	return nil
 }
 

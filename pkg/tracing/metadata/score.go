@@ -30,29 +30,31 @@ func validateScoreName(name string) error {
 // inngest.score.<name> kind family. The user-supplied name lives in the kind
 // suffix (analogous to userland.<name>), so values carries exactly one entry
 // keyed "value" containing a finite number or boolean.
-func validateNamedScoreValue(kind Kind, values Values) error {
-	if len(values) != 1 {
-		return fmt.Errorf("score %q must have exactly one entry keyed \"value\": %w", kind, ErrScoreValueInvalid)
-	}
+func validateNamedScoreValue(values Values) error {
+	for name, raw := range values {
+		var valueHolder struct {
+			Value any `json:"value"`
+		}
 
-	raw, ok := values["value"]
-	if !ok {
-		return fmt.Errorf("score %q value key must be \"value\": %w", kind, ErrScoreValueInvalid)
-	}
+		if err := json.Unmarshal(raw, &valueHolder); err != nil {
+			return fmt.Errorf("invalid score value: %w", ErrScoreValueInvalid)
+		}
 
-	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return fmt.Errorf("invalid score value for kind %q: %w", kind, ErrScoreValueInvalid)
-	}
+		if err := validateScoreName(name); err != nil {
+			return fmt.Errorf("invalid score value: %w", err)
+		}
 
-	switch v := value.(type) {
-	case bool:
-		return nil
-	case float64:
-		if !math.IsNaN(v) && !math.IsInf(v, 0) {
+		switch v := valueHolder.Value.(type) {
+		case bool:
 			return nil
+		case float64:
+			if !math.IsNaN(v) && !math.IsInf(v, 0) {
+				return nil
+			}
+		default:
+			return fmt.Errorf("invalid score value: %w", ErrScoreValueInvalid)
 		}
 	}
 
-	return fmt.Errorf("invalid score value for kind %q: %w", kind, ErrScoreValueInvalid)
+	return fmt.Errorf("invalid score values: %w", ErrScoreValueInvalid)
 }

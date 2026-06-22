@@ -51,6 +51,7 @@ var allowedInngestKinds = map[Kind]bool{
 	"inngest.response_headers": true,
 	"inngest.warnings":         true,
 	"inngest.experiment":       true,
+	"inngest.score":            true,
 }
 
 // ValidateAllowed checks that the kind is valid and, if it uses the inngest.*
@@ -69,15 +70,5 @@ func (k Kind) ValidateAllowed() error {
 	if allowedInngestKinds[k] {
 		return nil
 	}
-	if k.IsScoped(KindInngestScore) {
-		return validateScoreName(string(k)[len(KindInngestScore)+1:])
-	}
 	return ErrKindNotAllowed
-}
-
-// IsScoped reports whether k uses base + "." as a prefix and carries a
-// non-empty suffix (e.g. base="inngest.score", k="inngest.score.accuracy").
-func (k Kind) IsScoped(base Kind) bool {
-	prefix := string(base) + "."
-	return len(string(k)) > len(prefix) && strings.HasPrefix(string(k), prefix)
 }
