@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 )
 
 //tygo:generate
@@ -36,7 +37,9 @@ func validateNamedScoreValue(values Values) error {
 			Value any `json:"value"`
 		}
 
-		if err := json.Unmarshal(raw, &valueHolder); err != nil {
+		dec := json.NewDecoder(strings.NewReader(string(raw)))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&valueHolder); err != nil {
 			return fmt.Errorf("invalid score value: %w", ErrScoreValueInvalid)
 		}
 
@@ -46,15 +49,15 @@ func validateNamedScoreValue(values Values) error {
 
 		switch v := valueHolder.Value.(type) {
 		case bool:
-			return nil
+			continue
 		case float64:
 			if !math.IsNaN(v) && !math.IsInf(v, 0) {
-				return nil
+				continue
 			}
 		default:
 			return fmt.Errorf("invalid score value: %w", ErrScoreValueInvalid)
 		}
 	}
 
-	return fmt.Errorf("invalid score values: %w", ErrScoreValueInvalid)
+	return nil
 }
