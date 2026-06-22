@@ -56,8 +56,8 @@ import { Route as AuthedSettingsIntegrationsNeonIndexRouteImport } from './route
 import { Route as AuthedSettingsIntegrationsDatadogIndexRouteImport } from './routes/_authed/settings/integrations/datadog/index'
 import { Route as AuthedIntegrationsVercelCallbackIndexRouteImport } from './routes/_authed/integrations/vercel/callback/index'
 import { Route as AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/unattached-syncs/index'
-import { Route as AuthedEnvEnvSlugScoresIndexRouteImport } from './routes/_authed/env/$envSlug/scores/index'
 import { Route as AuthedEnvEnvSlugSessionsIndexRouteImport } from './routes/_authed/env/$envSlug/sessions/index'
+import { Route as AuthedEnvEnvSlugScoresIndexRouteImport } from './routes/_authed/env/$envSlug/scores/index'
 import { Route as AuthedEnvEnvSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/runs/index'
 import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_authed/env/$envSlug/metrics/index'
 import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index'
@@ -362,16 +362,16 @@ const AuthedEnvEnvSlugUnattachedSyncsIndexRoute =
     path: '/',
     getParentRoute: () => AuthedEnvEnvSlugUnattachedSyncsRouteRoute,
   } as any)
-const AuthedEnvEnvSlugScoresIndexRoute =
-  AuthedEnvEnvSlugScoresIndexRouteImport.update({
-    id: '/scores/',
-    path: '/scores/',
-    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
-  } as any)
 const AuthedEnvEnvSlugSessionsIndexRoute =
   AuthedEnvEnvSlugSessionsIndexRouteImport.update({
     id: '/sessions/',
     path: '/sessions/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
+const AuthedEnvEnvSlugScoresIndexRoute =
+  AuthedEnvEnvSlugScoresIndexRouteImport.update({
+    id: '/scores/',
+    path: '/scores/',
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any)
 const AuthedEnvEnvSlugRunsIndexRoute =
@@ -1583,18 +1583,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugUnattachedSyncsRouteRoute
     }
-    '/_authed/env/$envSlug/scores/': {
-      id: '/_authed/env/$envSlug/scores/'
-      path: '/scores'
-      fullPath: '/env/$envSlug/scores/'
-      preLoaderRoute: typeof AuthedEnvEnvSlugScoresIndexRouteImport
-      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
-    }
     '/_authed/env/$envSlug/sessions/': {
       id: '/_authed/env/$envSlug/sessions/'
       path: '/sessions'
       fullPath: '/env/$envSlug/sessions/'
       preLoaderRoute: typeof AuthedEnvEnvSlugSessionsIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
+    '/_authed/env/$envSlug/scores/': {
+      id: '/_authed/env/$envSlug/scores/'
+      path: '/scores'
+      fullPath: '/env/$envSlug/scores/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugScoresIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/env/$envSlug/runs/': {
