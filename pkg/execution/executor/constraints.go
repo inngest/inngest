@@ -321,7 +321,7 @@ func (e *executor) evaluateFnConcurrency(
 						"function_id", functionID,
 					)
 				}
-				sem.UsageValue = util.XXHash(evaluated)
+				sem.EvaluatedKeyHash = util.XXHash(evaluated)
 			} else {
 				sem.ID = constraintapi.SemaphoreIDFn(functionID)
 			}

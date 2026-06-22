@@ -798,15 +798,16 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
-			Log:             l,
-			DB:              ds.Data,
-			Queue:           rq,
-			State:           ds.State,
-			Cron:            croner,
-			ShardRegistry:   shardRegistry,
-			Port:            ds.Opts.DebugAPIPort,
-			PauseManager:    pauseMgr,
-			CapacityManager: cm,
+			Log:              l,
+			DB:               ds.Data,
+			Queue:            rq,
+			State:            ds.State,
+			Cron:             croner,
+			ShardRegistry:    shardRegistry,
+			Port:             ds.Opts.DebugAPIPort,
+			PauseManager:     pauseMgr,
+			CapacityManager:  cm,
+			SemaphoreManager: semaphores,
 			// Dependencies for batching and debounce insights
 			BatchManager: batcher,
 			Debouncer:    debouncer,

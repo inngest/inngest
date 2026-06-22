@@ -37,8 +37,8 @@ func TestConfigProtoRoundTrip(t *testing.T) {
 		Context:       map[string]any{"user": "test", "count": float64(42)},
 		Semaphores: []constraintapi.Semaphore{
 			{ID: "app:app-uuid", Weight: 1, Release: constraintapi.SemaphoreReleaseAuto},
-			{ID: "fn:fn-uuid", UsageValue: "uv1", Weight: 2, Release: constraintapi.SemaphoreReleaseManual},
-			{ID: "fnkey:hash123", UsageValue: "uv2", Weight: 3, Release: constraintapi.SemaphoreReleaseManual},
+			{ID: "fn:fn-uuid", EvaluatedKeyHash: "uv1", Weight: 2, Release: constraintapi.SemaphoreReleaseManual},
+			{ID: "fnkey:hash123", EvaluatedKeyHash: "uv2", Weight: 3, Release: constraintapi.SemaphoreReleaseManual},
 		},
 	})
 
@@ -74,7 +74,7 @@ func TestConfigProtoRoundTrip(t *testing.T) {
 	require.Equal(t, len(original.Semaphores), len(roundTripped.Semaphores))
 	for i := range original.Semaphores {
 		assert.Equal(t, original.Semaphores[i].ID, roundTripped.Semaphores[i].ID)
-		assert.Equal(t, original.Semaphores[i].UsageValue, roundTripped.Semaphores[i].UsageValue)
+		assert.Equal(t, original.Semaphores[i].EvaluatedKeyHash, roundTripped.Semaphores[i].EvaluatedKeyHash)
 		assert.Equal(t, original.Semaphores[i].Weight, roundTripped.Semaphores[i].Weight)
 		assert.Equal(t, original.Semaphores[i].Release, roundTripped.Semaphores[i].Release)
 	}
@@ -186,7 +186,7 @@ func TestV1FromMetadata_IncludesSemaphores(t *testing.T) {
 			EventIDs:        []ulid.ULID{ulid.Make()},
 			Semaphores: []constraintapi.Semaphore{
 				{ID: "app:app-1", Weight: 1, Release: constraintapi.SemaphoreReleaseAuto},
-				{ID: "fn:fn-1", UsageValue: "uv", Weight: 2, Release: constraintapi.SemaphoreReleaseManual},
+				{ID: "fn:fn-1", EvaluatedKeyHash: "uv", Weight: 2, Release: constraintapi.SemaphoreReleaseManual},
 			},
 		}),
 	}
@@ -197,7 +197,7 @@ func TestV1FromMetadata_IncludesSemaphores(t *testing.T) {
 	assert.Equal(t, "app:app-1", v1.Semaphores[0].ID)
 	assert.Equal(t, constraintapi.SemaphoreReleaseAuto, v1.Semaphores[0].Release)
 	assert.Equal(t, "fn:fn-1", v1.Semaphores[1].ID)
-	assert.Equal(t, "uv", v1.Semaphores[1].UsageValue)
+	assert.Equal(t, "uv", v1.Semaphores[1].EvaluatedKeyHash)
 	assert.Equal(t, int64(2), v1.Semaphores[1].Weight)
 	assert.Equal(t, constraintapi.SemaphoreReleaseManual, v1.Semaphores[1].Release)
 }

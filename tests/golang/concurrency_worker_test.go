@@ -11,10 +11,14 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/connect/rest"
+	"github.com/inngest/inngest/pkg/consts"
+	dbgpb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // TestWorkerConcurrency tests that connect worker concurrency limits the number of
@@ -76,10 +80,16 @@ func TestWorkerConcurrency(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for the worker to be connected and synced
+	var appID string
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		a := assert.New(collect)
 		resp, err := http.Get(fmt.Sprintf("%s/v0/connect/envs/dev/conns", DEV_URL))
 		a.NoError(err)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+
 		var reply rest.ShowConnsReply
 		err = json.NewDecoder(resp.Body).Decode(&reply)
 		a.NoError(err)
@@ -87,11 +97,32 @@ func TestWorkerConcurrency(t *testing.T) {
 		if len(reply.Data) > 0 {
 			// Verify at least one worker group is synced
 			a.GreaterOrEqual(len(reply.Data[0].SyncedWorkerGroups), 1, "worker should be synced")
+			for id := range reply.Data[0].SyncedWorkerGroups {
+				appID = id
+				break
+			}
 		}
 	}, 10*time.Second, 500*time.Millisecond)
+	require.NotEmpty(t, appID, "worker connection should expose synced app ID")
 
 	// Give time for semaphore capacity to propagate and gateway routing to stabilize
-	<-time.After(10 * time.Second)
+	debugClient, debugConn := newDebugClient(t)
+	defer debugConn.Close()
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		a := assert.New(collect)
+		level, err := debugClient.GetAppSemaphoreLevel(ctx, &dbgpb.AppSemaphoreLevelRequest{
+			AccountId: consts.DevServerAccountID.String(),
+			AppId:     appID,
+		})
+		a.NoError(err)
+		if err != nil || level.GetLevel() == nil {
+			return
+		}
+		a.Equal(maxConcurrency, level.GetLevel().GetCapacity())
+		a.Equal(int64(0), level.GetLevel().GetUsage())
+		a.Equal(maxConcurrency, level.GetLevel().GetRemaining())
+	}, 10*time.Second, 500*time.Millisecond)
 
 	// Send multiple events
 	for i := 0; i < numEvents; i++ {
@@ -107,6 +138,20 @@ func TestWorkerConcurrency(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&inProgress) == 1
 	}, 60*time.Second, 100*time.Millisecond, "function should start")
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		a := assert.New(collect)
+		level, err := debugClient.GetAppSemaphoreLevel(ctx, &dbgpb.AppSemaphoreLevelRequest{
+			AccountId: consts.DevServerAccountID.String(),
+			AppId:     appID,
+		})
+		a.NoError(err)
+		if err != nil || level.GetLevel() == nil {
+			return
+		}
+		a.Equal(maxConcurrency, level.GetLevel().GetCapacity())
+		a.Equal(int64(1), level.GetLevel().GetUsage())
+		a.Equal(int64(0), level.GetLevel().GetRemaining())
+	}, 10*time.Second, 100*time.Millisecond)
 
 	// During execution, never exceed limit
 	totalDuration := time.Duration(numEvents*stepDuration+5) * time.Second
@@ -121,4 +166,32 @@ func TestWorkerConcurrency(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&total) == int32(numEvents)
 	}, 5*time.Second, 100*time.Millisecond, "all runs should complete")
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		a := assert.New(collect)
+		level, err := debugClient.GetAppSemaphoreLevel(ctx, &dbgpb.AppSemaphoreLevelRequest{
+			AccountId: consts.DevServerAccountID.String(),
+			AppId:     appID,
+		})
+		a.NoError(err)
+		if err != nil || level.GetLevel() == nil {
+			return
+		}
+		a.Equal(maxConcurrency, level.GetLevel().GetCapacity())
+		a.Equal(int64(0), level.GetLevel().GetUsage())
+		a.Equal(maxConcurrency, level.GetLevel().GetRemaining())
+	}, 10*time.Second, 100*time.Millisecond)
+}
+
+func newDebugClient(t *testing.T) (dbgpb.DebugClient, *grpc.ClientConn) {
+	t.Helper()
+
+	addr := os.Getenv("DEBUG_API_ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:7777"
+	}
+
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+
+	return dbgpb.NewDebugClient(conn), conn
 }

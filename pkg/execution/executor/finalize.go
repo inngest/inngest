@@ -103,7 +103,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 					ctx,
 					opts.Metadata.ID.Tenant.AccountID,
 					sem.ID,
-					sem.UsageValue,
+					sem.EvaluatedKeyHash,
 					opts.Metadata.ID.RunID.String(),
 					sem.Weight,
 				)
