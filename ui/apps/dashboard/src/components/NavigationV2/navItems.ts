@@ -23,6 +23,7 @@ export type NavItemConfig = {
 export type NavGroupConfig = {
   heading: string;
   items: NavItemConfig[];
+  beta?: boolean;
 };
 
 export const workflow: NavGroupConfig = {
@@ -49,21 +50,18 @@ export const experimentsItem: NavItemConfig = {
   label: 'Experiments',
   route: 'experiments',
   Icon: ExperimentsIcon,
-  beta: true,
 };
 
 export const scoresItem: NavItemConfig = {
   label: 'Scores',
   route: 'scores',
   Icon: InsightsIcon,
-  beta: true,
 };
 
 export const sessionsItem: NavItemConfig = {
   label: 'Sessions',
   route: 'sessions',
   Icon: SessionsIcon,
-  beta: true,
 };
 
 export const manage: NavGroupConfig = {
