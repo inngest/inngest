@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 
+import { trackInsightsResultsDownloaded } from '@/components/Insights/tracking';
 import type { InsightsFetchResult } from '../../InsightsStateMachineContext/types';
 
 /**
@@ -178,6 +179,7 @@ export function useDownloadInsightsResults(
     const filename = sanitizeQueryName(queryName || 'insights-query');
     const timestamp = generateTimestamp();
     downloadFile(csv, `${filename}-${timestamp}.csv`, 'text/csv');
+    trackInsightsResultsDownloaded({ data, format: 'csv', queryName });
   }, [data, queryName]);
 
   const downloadAsJSON = useCallback(() => {
@@ -187,6 +189,7 @@ export function useDownloadInsightsResults(
     const filename = sanitizeQueryName(queryName || 'insights-query');
     const timestamp = generateTimestamp();
     downloadFile(json, `${filename}-${timestamp}.json`, 'application/json');
+    trackInsightsResultsDownloaded({ data, format: 'json', queryName });
   }, [data, queryName]);
 
   const download = useCallback(

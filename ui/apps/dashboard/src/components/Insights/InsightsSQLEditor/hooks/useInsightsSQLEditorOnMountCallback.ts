@@ -44,7 +44,7 @@ export function useInsightsSQLEditorOnMountCallback(): UseInsightsSQLEditorOnMou
           combo: { keyCode: monaco.KeyCode.Enter, metaOrCtrl: true },
           handler: () => {
             if (getCanRunQuery(latestQueryRef.current, isRunningRef.current))
-              runQuery();
+              runQuery({ trigger: 'keyboard' });
           },
         },
         {

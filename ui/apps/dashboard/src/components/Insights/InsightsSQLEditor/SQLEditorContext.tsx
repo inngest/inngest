@@ -11,11 +11,12 @@ import * as Sentry from '@sentry/tanstackstart-react';
 import type { SQLEditorInstance } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
+import type { InsightsQueryRunTrigger } from '../tracking';
 import { formatSQL } from './utils';
 
 type SQLEditorContextValue = {
   editorRef: React.MutableRefObject<SQLEditorInstance | null>;
-  setQueryAndRun: (sql: string) => void;
+  setQueryAndRun: (sql: string, trigger?: InsightsQueryRunTrigger) => void;
   setQuery: (sql: string) => void;
   formatQuery: () => void;
 };
@@ -57,7 +58,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
   }, [editorRef]);
 
   const setQueryAndRun = useCallback(
-    (sql: string) => {
+    (sql: string, trigger: InsightsQueryRunTrigger = 'ai_assistant') => {
       // Format the SQL using our custom formatter
       const formattedSql = formatSQL(sql.trim());
 
@@ -72,7 +73,7 @@ export function SQLEditorProvider({ children }: SQLEditorProviderProps) {
       // Run the query immediately - state is now guaranteed to be synced
       queueMicrotask(() => {
         try {
-          runQuery();
+          runQuery({ trigger });
         } catch (error) {
           Sentry.captureException(error);
         }
@@ -112,7 +113,7 @@ export function useSQLEditorInstance(): {
 }
 
 export function useSQLEditorActions(): {
-  setQueryAndRun: (sql: string) => void;
+  setQueryAndRun: (sql: string, trigger?: InsightsQueryRunTrigger) => void;
   setQuery: (sql: string) => void;
   formatQuery: () => void;
 } | null {
