@@ -51,8 +51,8 @@ func validateNamedScoreValue(values Values) error {
 		case bool:
 			continue
 		case float64:
-			if !math.IsNaN(v) && !math.IsInf(v, 0) {
-				continue
+			if math.IsNaN(v) || math.IsInf(v, 0) {
+				return fmt.Errorf("invalid score value: %w", ErrScoreValueInvalid)
 			}
 		default:
 			return fmt.Errorf("invalid score value: %w", ErrScoreValueInvalid)
