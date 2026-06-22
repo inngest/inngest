@@ -7,6 +7,7 @@ import { useNavigate } from '@tanstack/react-router';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import type { FunctionStatusMetricsQuery } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 import type { EntityLookup } from './Dashboard';
 import { FailedRate } from './FailedRate';
 import { getLineChartOptions, mapEntityLines, sum } from './utils';
@@ -95,8 +96,7 @@ export const FailedFunctions = ({
           // all ASCII control chars — including the SQL's newlines.
           onClick={() =>
             navigate({
-              to: '/env/$envSlug/insights',
-              params: { envSlug: env.slug },
+              to: pathCreator.insights({ envSlug: env.slug }),
               search: {
                 sql: INSIGHTS_QUERY,
                 name: INSIGHTS_QUERY_NAME,
