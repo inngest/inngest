@@ -10,7 +10,6 @@ import { pathCreator } from '@/utils/urls';
 import type { EntityLookup } from './Dashboard';
 import { FailedRate } from './FailedRate';
 import { getLineChartOptions, mapEntityLines, sum } from './utils';
-import type { FileRouteTypes } from '@tanstack/react-router';
 
 export type CompletedType =
   FunctionStatusMetricsQuery['workspace']['completed'];
@@ -86,15 +85,19 @@ export const FailedFunctions = ({
           icon={<RiArrowRightUpLine />}
           iconSide="left"
           label="Open in Insights"
-          to={
-            `${pathCreator.insights({
-              envSlug: env.slug,
-            })}?sql=${encodeURIComponent(
-              INSIGHTS_QUERY,
-            )}&name=${encodeURIComponent(
-              INSIGHTS_QUERY_NAME,
-            )}` as FileRouteTypes['to']
-          }
+          // Use `href` (plain anchor) rather than `to` (TanStack Link).
+          // Passing `?sql=...` inside `to` causes TanStack's path resolver to
+          // treat the query string as part of the pathname; the SQL's `%0A`
+          // is then percent-decoded into raw `\n`, which @tanstack/history's
+          // sanitizePath strips out (along with all ASCII control chars).
+          // The result is SQL that lands in the editor on a single line.
+          // With a plain href the URL is delivered verbatim to the browser
+          // and parsed correctly on the receiving side.
+          href={`${pathCreator.insights({
+            envSlug: env.slug,
+          })}?sql=${encodeURIComponent(
+            INSIGHTS_QUERY,
+          )}&name=${encodeURIComponent(INSIGHTS_QUERY_NAME)}`}
         />
       </div>
       <div className="flex h-full flex-row items-center">

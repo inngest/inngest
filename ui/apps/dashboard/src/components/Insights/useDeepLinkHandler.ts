@@ -95,7 +95,7 @@ export function useDeepLinkHandler({
         explanation: '',
         templateKind: 'time',
       };
-      actions.createTabFromQuery(template);
+      actions.createTabFromQuery(template, { runOnMount: true });
 
       // Clear the deep-link params from the URL so refresh/bookmark doesn't
       // respawn duplicate tabs.
