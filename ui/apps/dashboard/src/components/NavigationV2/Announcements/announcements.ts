@@ -52,7 +52,7 @@ export const announcements: Announcement[] = [
     imageUrl: '/images/announcements/experiment-light.png',
     imageUrlDark: '/images/announcements/experiment-dark.png',
     cta: {
-      label: 'Explore dashboards',
+      label: 'Explore experiments',
       href: 'https://www.inngest.com/blog/introducing-group-experiment',
     },
     startDate: '2026-06-23T00:00:00Z',
