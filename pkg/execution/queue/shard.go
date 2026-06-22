@@ -21,7 +21,7 @@ type QueueShard interface {
 	ShardAssignmentConfig() ShardAssignmentConfig
 }
 
-func (q *QueueProducer) defaultQueueNameForItemKind(kind string) *string {
+func (q *queueProducer) defaultQueueNameForItemKind(kind string) *string {
 	var queueName *string
 	if name, ok := q.queueKindMapping[kind]; ok {
 		queueName = &name
@@ -29,7 +29,7 @@ func (q *QueueProducer) defaultQueueNameForItemKind(kind string) *string {
 	return queueName
 }
 
-func (q *QueueProducer) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
+func (q *queueProducer) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
 	l := logger.StdlibLogger(ctx)
 
 	// If the caller wants us to enqueue the job to a specific queue shard, use that.

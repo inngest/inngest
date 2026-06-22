@@ -68,12 +68,13 @@ func New(
 		quit:         make(chan error, o.numWorkers),
 
 		shards: shards,
-		queueProducer: NewProducer(shards, ProducerOpts{
-			clock:              o.Clock,
-			queueKindMapping:   o.queueKindMapping,
-			enableJobPromotion: o.enableJobPromotion,
-			conditionalTracer:  o.ConditionalTracer,
-		}),
+		queueProducer: NewProducer(
+			shards,
+			WithProducerClock(o.Clock),
+			WithProducerKindToQueueMapping(o.queueKindMapping),
+			WithProducerJobPromotion(o.enableJobPromotion),
+			WithProducerConditionalTracer(o.ConditionalTracer),
+		),
 
 		peekSizeCache: ccache.New(ccache.Configure[int64]().MaxSize(50_000)),
 
@@ -168,10 +169,6 @@ func (q *queueProcessor) GetShadowContinuations() map[string]ShadowContinuation 
 	defer q.shadowContinuesLock.Unlock()
 
 	return q.shadowContinues
-}
-
-func (q *queueProcessor) QueueProducer() Producer {
-	return q.queueProducer
 }
 
 func (q *queueProcessor) ClearShadowContinuations() {
