@@ -144,6 +144,13 @@ export function ScoreSummaryCard({
                 iconType="circle"
                 iconSize={8}
                 wrapperStyle={{ fontSize: 12 }}
+                // Keep the colored dot but render the label in the muted text
+                // tone instead of the series color (recharts' default).
+                formatter={(value: string) => (
+                  <span style={{ color: 'rgb(var(--color-foreground-muted))' }}>
+                    {value}
+                  </span>
+                )}
               />
               {enabledMetrics.map((m, i) => (
                 <Bar

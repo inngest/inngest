@@ -366,7 +366,6 @@ export function ExperimentDetailPage({
                         scoringConfig={scoring.metrics}
                         metricRanges={metricRanges}
                         onUpdateMetric={scoring.updateMetric}
-                        pointsLeft={scoring.pointsLeft}
                         onOpenInsights={onOpenInsights}
                         showInactive={showInactive}
                         onShowInactiveChange={setShowInactive}
@@ -398,7 +397,6 @@ export function ExperimentDetailPage({
                   metrics={scoring.metrics}
                   metricRanges={metricRanges}
                   onUpdateMetric={scoring.updateMetric}
-                  pointsLeft={scoring.pointsLeft}
                 />
               )}
             </HelperPanelFrame>

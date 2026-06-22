@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 
@@ -12,9 +12,9 @@ const DEBOUNCE_MS = 600;
 /**
  * Manages local scoring-config state with debounced persistence.
  *
- * Every mutator (`updateMetric`, `enableMetric`) applies optimistically and
- * schedules a save after DEBOUNCE_MS of inactivity. The save is skipped when
- * the local state matches the last-known server state.
+ * Every `updateMetric` call applies optimistically and schedules a save after
+ * DEBOUNCE_MS of inactivity. The save is skipped when the local state matches
+ * the last-known server state.
  */
 export function useScoringConfig(functionID: string, experimentName: string) {
   const scoring = useExperimentScoringConfig(functionID, experimentName);
@@ -73,27 +73,9 @@ export function useScoringConfig(functionID: string, experimentName: string) {
     [],
   );
 
-  const enableMetric = useCallback((key: string) => {
-    setLocalMetrics((prev) =>
-      prev
-        ? prev.map((m) => (m.key === key ? { ...m, enabled: true } : m))
-        : prev,
-    );
-  }, []);
-
-  const pointsLeft = useMemo(() => {
-    if (!localMetrics) return 100;
-    const allocated = localMetrics
-      .filter((m) => m.enabled)
-      .reduce((sum, m) => sum + m.points, 0);
-    return 100 - allocated;
-  }, [localMetrics]);
-
   return {
     metrics: localMetrics,
     updateMetric,
-    enableMetric,
-    pointsLeft,
     isSaving: updateScoring.isPending,
     isPending: scoring.isPending,
     error: updateScoring.error ?? scoring.error,
