@@ -335,6 +335,138 @@ func TestDebounce(t *testing.T) {
 	})
 }
 
+func TestDebounceUpdateMissingTimeoutRespectsEventTimestamp(t *testing.T) {
+	tests := []struct {
+		name         string
+		incomingAt   func(time.Time) time.Time
+		incomingName string
+		expectedName string
+	}{
+		{
+			name:         "older event preserves stored debounce and restores timeout job",
+			incomingAt:   func(storedAt time.Time) time.Time { return storedAt.Add(-2 * time.Second) },
+			incomingName: "older",
+			expectedName: "stored",
+		},
+		{
+			name:         "newer event updates stored debounce and restores timeout job",
+			incomingAt:   func(storedAt time.Time) time.Time { return storedAt.Add(2 * time.Second) },
+			incomingName: "newer",
+			expectedName: "newer",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			unshardedCluster := miniredis.RunT(t)
+
+			unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+				InitAddress:  []string{unshardedCluster.Addr()},
+				DisableCache: true,
+			})
+			require.NoError(t, err)
+
+			unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+			debounceClient := unshardedClient.Debounce()
+
+			fakeClock := clockwork.NewFakeClock()
+
+			opts := []queue.QueueOpt{
+				queue.WithKindToQueueMapping(map[string]string{
+					queue.KindDebounce: queue.KindDebounce,
+				}),
+				queue.WithClock(fakeClock),
+			}
+
+			shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+
+			shardRegistry, err := queue.NewSingleShardRegistry(shard)
+			require.NoError(t, err)
+
+			q, err := queue.New(context.Background(), "debounce-missing-timeout-test", shardRegistry, opts...)
+			require.NoError(t, err)
+			kg := shard.Client().KeyGenerator()
+
+			deb, err := NewDebouncerWithMigration(DebouncerOpts{
+				Shards:           shardRegistry,
+				PrimaryShardName: shard.Name(),
+				Queue:            q,
+				Clock:            fakeClock,
+			})
+			require.NoError(t, err)
+			redisDebouncer := deb.(debouncer)
+
+			ctx := context.Background()
+			accountID, workspaceID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+			scope := testScope(accountID, workspaceID, functionID)
+
+			fn := inngest.Function{
+				ID: functionID,
+				Debounce: &inngest.Debounce{
+					Period: "10s",
+				},
+			}
+
+			storedAt := fakeClock.Now().Add(2 * time.Second)
+			storedEventID := ulid.MustNew(ulid.Timestamp(storedAt), rand.Reader)
+			storedDI := DebounceItem{
+				AccountID:   accountID,
+				WorkspaceID: workspaceID,
+				AppID:       appID,
+				FunctionID:  functionID,
+				EventID:     storedEventID,
+				Event: event.Event{
+					Name:      "stored",
+					ID:        storedEventID.String(),
+					Timestamp: storedAt.UnixMilli(),
+				},
+			}
+
+			byt, err := json.Marshal(storedDI)
+			require.NoError(t, err)
+
+			debounceID := ulid.MustNew(ulid.Timestamp(fakeClock.Now()), rand.Reader)
+			existingID, err := shard.DebounceCreate(ctx, scope, functionID.String(), debounceID, byt, 10*time.Second)
+			require.NoError(t, err)
+			require.Nil(t, existingID)
+
+			incomingAt := tt.incomingAt(storedAt)
+			incomingEventID := ulid.MustNew(ulid.Timestamp(incomingAt), rand.Reader)
+			err = redisDebouncer.Debounce(ctx, DebounceItem{
+				AccountID:   accountID,
+				WorkspaceID: workspaceID,
+				AppID:       appID,
+				FunctionID:  functionID,
+				EventID:     incomingEventID,
+				Event: event.Event{
+					Name:      tt.incomingName,
+					ID:        incomingEventID.String(),
+					Timestamp: incomingAt.UnixMilli(),
+				},
+			}, fn)
+			require.NoError(t, err)
+
+			debounceIDs, err := unshardedCluster.HKeys(debounceClient.KeyGenerator().Debounce(ctx))
+			require.NoError(t, err)
+			require.Equal(t, []string{debounceID.String()}, debounceIDs)
+
+			var stored DebounceItem
+			err = json.Unmarshal([]byte(unshardedCluster.HGet(debounceClient.KeyGenerator().Debounce(ctx), debounceID.String())), &stored)
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedName, stored.Event.Name)
+			if tt.expectedName == "stored" {
+				require.Equal(t, storedAt.UnixMilli(), stored.Event.Timestamp)
+			} else {
+				require.Equal(t, incomingAt.UnixMilli(), stored.Event.Timestamp)
+			}
+
+			queueItemIDs, err := unshardedCluster.HKeys(kg.QueueItem())
+			require.NoError(t, err)
+			require.Equal(t, []string{queue.HashID(ctx, debounceID.String())}, queueItemIDs)
+		})
+	}
+}
+
 // TestJITDebounceMigration verifies the JIT migration flow for debounces works.
 func TestJITDebounceMigration(t *testing.T) {
 	unshardedCluster := miniredis.RunT(t)

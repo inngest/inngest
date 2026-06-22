@@ -52,9 +52,31 @@ local function get_queue_item(queueKey, queueID)
 	return nil
 end
 
+-- Get the debounce before checking the timeout queue item. If the queue item is
+-- missing, we may still need to preserve the existing debounce payload.
+local existing = redis.call("HGET", keyDbc, debounceID)
+local existingDebounce = nil
+local isOutOfOrder = false
+
+if existing ~= false then
+	-- Decode the debounce, and check whether the existing event timestamp is
+	-- greater than the current event timestamp. If so, don't update the debounce.
+	existingDebounce = cjson.decode(existing)
+	if existingDebounce ~= nil and existingDebounce.e ~= nil and existingDebounce.e.ts ~= nil and existingDebounce.e.ts > eventTime then
+		isOutOfOrder = true
+	end
+end
+
 -- Check that the queue item is not leased (ie. this debounce is not in progress)
 local item = get_queue_item(keyQueueHash, queueJobID)
 if item == nil then
+	if isOutOfOrder then
+		-- The timeout job is missing, but the stored event occurs after the
+		-- event we're updating. Return not found so the caller restores the
+		-- timeout job without replacing the stored debounce item.
+		return -3
+	end
+
 	-- The queue item was not found. return not found but set the debounce in the hash map
   -- for lookup
   redis.call("SETEX", keyPtr, ttl, debounceID)
@@ -67,25 +89,20 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 	return -1
 end
 
--- Get the debounce
-local existing = redis.call("HGET", keyDbc, debounceID)
-if existing ~= false then
-	-- Decode the debounce, and check whether the existing event ID is > the current event ID.  If so,
-	-- don't update the debounce.
-	local item = cjson.decode(existing)
-	if item ~= nil and item.e ~= nil and item.e.ts > eventTime then
-		-- The stored event occurs after the event we're updating, so do nothing.
-		return -2
-	end
+if isOutOfOrder then
+	-- The stored event occurs after the event we're updating, so do nothing.
+	return -2
+end
 
+if existingDebounce ~= nil then
 	-- Also, if there's an existing debounce, ensure that we respect the max timeout
 	-- for the debounce.  We don't want to keep pushing a debounce out indefinitely,
 	-- so if (now + new TTL in seconds) > the debounce's max time, use the debounce's
 	-- max time instead.
-	if item ~= nil and item.t ~= nil and item.t > 0 then
+	if existingDebounce.t ~= nil and existingDebounce.t > 0 then
 		local nextTTL = currentTime + (ttl  * 1000)
-		if nextTTL > item.t then
-			ttl = math.floor((item.t - currentTime) / 1000)
+		if nextTTL > existingDebounce.t then
+			ttl = math.floor((existingDebounce.t - currentTime) / 1000)
 			if ttl <= 0 then
 				-- Ensure we always use a minimum.
 				ttl = 1
@@ -99,7 +116,7 @@ if existing ~= false then
 		--
 		-- This makes updates transactional.
 		local next = cjson.decode(debounce)
-		next.t = item.t
+		next.t = existingDebounce.t
 		debounce = cjson.encode(next)
 	end
 end
