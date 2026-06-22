@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useMonaco } from '@monaco-editor/react';
 import type { languages } from 'monaco-editor';
-import { format } from 'sql-formatter';
+import { clickhouse, formatDialect } from 'sql-formatter';
 
 export function useSQLFormatter() {
   const monaco = useMonaco();
@@ -15,10 +15,9 @@ export function useSQLFormatter() {
         const text = model.getValue();
 
         try {
-          const formatted = format(text, {
-            language: 'sql',
+          const formatted = formatDialect(text, {
+            dialect: clickhouse,
             tabWidth: 2,
-            keywordCase: 'upper',
             linesBetweenQueries: 2,
           });
 
