@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
+import { formatSQL } from '@/components/Insights/InsightsSQLEditor/utils';
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 import type { QueryTemplate } from '@/components/Insights/types';
@@ -82,16 +83,13 @@ export function useDeepLinkHandler({
 
       // Synthesize a QueryTemplate so the tab manager's template branch picks
       // it up and honors the name (the snapshot branch ignores name and falls
-      // back to the "untitled" label).
-      //
-      // Pass the SQL through unchanged: the deep-link caller already owns the
-      // formatting, and running it through sql-formatter mangles ClickHouse
-      // function calls (e.g. `toUnixTimestamp64Milli(...)` becomes
-      // `toUnixTimestamp64Milli (...)` with a space before the paren).
+      // back to the "untitled" label). formatSQL now uses the ClickHouse
+      // dialect, so formatting the incoming SQL no longer mangles function
+      // calls like `toUnixTimestamp64Milli(...)`.
       const template: QueryTemplate = {
         id: `deeplink-${ulid()}`,
         name: nameFromUrl ?? DEEP_LINK_DEFAULT_NAME,
-        query: sqlFromUrl,
+        query: formatSQL(sqlFromUrl),
         explanation: '',
         templateKind: 'time',
       };
