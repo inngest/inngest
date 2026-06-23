@@ -12,12 +12,12 @@ const (
 	KindInngestScore Kind = "inngest.score"
 )
 
-// validateScoreName checks the user-supplied suffix of an inngest.score.<name>
-// kind for characters that downstream consumers can't safely round-trip.
-// Mirrors the SDK validation and the monorepo MetricKeyRegex: rejects control
-// characters (0x00-0x1F, 0x7F) and the single quote (which would silently
-// drop in cloud variant aggregation because MetricKeyRegex excludes it for
-// SQL-injection defense). Overall length is bounded by Kind.Validate.
+// validateScoreName checks a user-supplied score name (a key in the
+// inngest.score values map) for characters that downstream consumers can't
+// safely round-trip. Mirrors the SDK validation and the monorepo
+// MetricKeyRegex: rejects control characters (0x00-0x1F, 0x7F) and the single
+// quote (which would silently drop in cloud variant aggregation because
+// MetricKeyRegex excludes it for SQL-injection defense).
 func validateScoreName(name string) error {
 	for _, r := range name {
 		if r < 0x20 || r == 0x7f || r == '\'' {
@@ -27,10 +27,10 @@ func validateScoreName(name string) error {
 	return nil
 }
 
-// validateNamedScoreValue applies the value-shape rules for the
-// inngest.score.<name> kind family. The user-supplied name lives in the kind
-// suffix (analogous to userland.<name>), so values carries exactly one entry
-// keyed "value" containing a finite number or boolean.
+// validateNamedScoreValue applies the value-shape rules for the inngest.score
+// kind. Each entry in the values map is keyed by a user-supplied score name
+// (analogous to userland.<name>) and carries a single "value" field holding a
+// finite number or boolean.
 func validateNamedScoreValue(values Values) error {
 	for name, raw := range values {
 		var valueHolder struct {
