@@ -9,11 +9,13 @@ const sessionsQuery = graphql(`
   query Sessions(
     $workspaceID: ID!
     $sessionKey: String!
+    $sessionIdSearch: String
     $timeRange: TimeRangeInput
   ) {
     sessions(
       workspaceID: $workspaceID
       sessionKey: $sessionKey
+      sessionIdSearch: $sessionIdSearch
       timeRange: $timeRange
     ) {
       sessionKey
@@ -32,6 +34,7 @@ const sessionsQuery = graphql(`
 
 type GetSessionsParams = {
   sessionKey: string;
+  sessionIdSearch?: string;
   startTime: string;
   endTime: string;
 };
@@ -42,7 +45,7 @@ export function useSessions() {
 
   return useCallback(
     async (params: GetSessionsParams): Promise<Session[]> => {
-      const { sessionKey, startTime, endTime } = params;
+      const { sessionKey, sessionIdSearch, startTime, endTime } = params;
 
       const result = await client
         .query(
@@ -50,6 +53,7 @@ export function useSessions() {
           {
             workspaceID: envID,
             sessionKey,
+            sessionIdSearch: sessionIdSearch || undefined,
             timeRange: { from: startTime, to: endTime },
           },
           { requestPolicy: 'network-only' },
