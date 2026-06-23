@@ -59,9 +59,11 @@ const INFO_PANEL = 'Info';
 const SCORING_PANEL = 'Scoring formula';
 type PanelKey = typeof INFO_PANEL | typeof SCORING_PANEL;
 
-// TimeFilter's longest preset is "Last 30 days". Don't default the range
-// past that even if the account's history retention is longer.
-const MAX_DEFAULT_DAYS = 30;
+// TimeFilter's longest preset is "Last 30 days", but we want to default
+// to 7 days to improve initial page load time.
+// Don't default the range past that even if the account's
+// history retention is longer.
+const MAX_DEFAULT_DAYS = 7;
 
 function rangeToTimeRange(range: RangeChangeProps): ExperimentTimeRange {
   if (range.type === 'absolute') return { from: range.start, to: range.end };
