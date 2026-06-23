@@ -97,6 +97,45 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_CreateScoreAcceptsArrayBody(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01KVDHCS8VTWZHBAHTMYJHBPKJ")
+	stepID := "b436f063682815df5b5fd9780200a9e4e8d4f0b3"
+	provider := &fakeScoreProvider{}
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Scores: provider}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+
+	body := `[{"name":"accuracy","value":0.95,"step_id":"` + stepID + `"}]`
+	req := httptest.NewRequest(http.MethodPost, "/v2/runs/"+runID.String()+"/scores", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NotNil(t, provider.params)
+	require.Equal(t, runID, provider.params.RunID)
+	require.Len(t, provider.params.Scores, 1)
+	require.Equal(t, &stepID, provider.params.Scores[0].StepID)
+	require.Equal(t, "accuracy", provider.params.Scores[0].Name)
+	require.Equal(t, 0.95, provider.params.Scores[0].Value)
+
+	var response struct {
+		Data []struct {
+			RunID  string  `json:"runId"`
+			Name   string  `json:"name"`
+			Value  float64 `json:"value"`
+			StepID string  `json:"stepId"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	require.Len(t, response.Data, 1)
+	require.Equal(t, runID.String(), response.Data[0].RunID)
+	require.Equal(t, "accuracy", response.Data[0].Name)
+	require.Equal(t, 0.95, response.Data[0].Value)
+	require.Equal(t, stepID, response.Data[0].StepID)
+}
+
 func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	ctx := context.Background()
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")

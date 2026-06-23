@@ -35,6 +35,7 @@ const (
 	V2_GetEventRuns_FullMethodName             = "/api.v2.V2/GetEventRuns"
 	V2_Rerun_FullMethodName                    = "/api.v2.V2/Rerun"
 	V2_GetApp_FullMethodName                   = "/api.v2.V2/GetApp"
+	V2_CreateScore_FullMethodName              = "/api.v2.V2/CreateScore"
 	V2_SyncApp_FullMethodName                  = "/api.v2.V2/SyncApp"
 	V2_GetFunctionTrace_FullMethodName         = "/api.v2.V2/GetFunctionTrace"
 	V2_GetFunction_FullMethodName              = "/api.v2.V2/GetFunction"
@@ -74,6 +75,7 @@ type V2Client interface {
 	GetEventRuns(ctx context.Context, in *GetEventRunsRequest, opts ...grpc.CallOption) (*GetEventRunsResponse, error)
 	Rerun(ctx context.Context, in *RerunRequest, opts ...grpc.CallOption) (*RerunResponse, error)
 	GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.CallOption) (*GetAppResponse, error)
+	CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
 	GetFunction(ctx context.Context, in *GetFunctionRequest, opts ...grpc.CallOption) (*GetFunctionResponse, error)
@@ -258,6 +260,16 @@ func (c *v2Client) GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.C
 	return out, nil
 }
 
+func (c *v2Client) CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateScoreResponse)
+	err := c.cc.Invoke(ctx, V2_CreateScore_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SyncAppResponse)
@@ -421,6 +433,7 @@ type V2Server interface {
 	GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error)
 	Rerun(context.Context, *RerunRequest) (*RerunResponse, error)
 	GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error)
+	CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
 	GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error)
@@ -492,6 +505,9 @@ func (UnimplementedV2Server) Rerun(context.Context, *RerunRequest) (*RerunRespon
 }
 func (UnimplementedV2Server) GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetApp not implemented")
+}
+func (UnimplementedV2Server) CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateScore not implemented")
 }
 func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncApp not implemented")
@@ -844,6 +860,24 @@ func _V2_GetApp_Handler(srv interface{}, ctx context.Context, dec func(interface
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_CreateScore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateScoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateScore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateScore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateScore(ctx, req.(*CreateScoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_SyncApp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SyncAppRequest)
 	if err := dec(in); err != nil {
@@ -1166,6 +1200,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetApp",
 			Handler:    _V2_GetApp_Handler,
+		},
+		{
+			MethodName: "CreateScore",
+			Handler:    _V2_CreateScore_Handler,
 		},
 		{
 			MethodName: "SyncApp",
