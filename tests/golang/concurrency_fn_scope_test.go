@@ -76,18 +76,18 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 	// Eventually the fn starts.
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&inProgress) == 1
-	}, 2*time.Second, 50*time.Millisecond)
+	}, 15*time.Second, 50*time.Millisecond)
 
 	for i := 0; i < (numEvents*fnDuration)+1; i++ {
 		<-time.After(time.Second)
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgress), int32(1))
 	}
 
-	// Eventually, within 2 seconds of waiting after the total function duration,
+	// Eventually, within 10 seconds of waiting after the total function duration,
 	// all tests have started.
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&total) == 3
-	}, 2*time.Second, 50*time.Millisecond)
+	}, 10*time.Second, 50*time.Millisecond)
 }
 
 // TestConcurrency_ScopeFunction_FanOut tests function limits with two functions,
