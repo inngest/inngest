@@ -52,7 +52,7 @@ export function SessionKeys({
 
   return (
     <div className="bg-canvasBase text-basis flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
-      <div className="flex flex-col gap-4 px-3 pb-3 pt-6">
+      <div className="flex flex-col gap-4 px-3 py-3">
         <form
           className="w-full max-w-[360px]"
           onSubmit={(e) => {
