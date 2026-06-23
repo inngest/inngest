@@ -124,6 +124,9 @@ func TestWorkerConcurrency(t *testing.T) {
 		a.Equal(maxConcurrency, level.GetLevel().GetRemaining())
 	}, 10*time.Second, 500*time.Millisecond)
 
+	// Give time for semaphore capacity to propagate and gateway routing to stabilize
+	<-time.After(10 * time.Second)
+
 	// Send multiple events
 	for i := 0; i < numEvents; i++ {
 		_, err := inngestClient.Send(context.Background(), inngestgo.Event{
