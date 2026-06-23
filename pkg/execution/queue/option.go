@@ -446,6 +446,7 @@ type QueueOptions struct {
 	PeekEWMALen int
 	// queueKindMapping stores a map of job kind => queue names
 	queueKindMapping        map[string]string
+	queueProducer           Producer
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
 	peekSizeForFunctions    map[string]int64
@@ -599,6 +600,12 @@ func WithInstrumentInterval(t time.Duration) QueueOpt {
 func WithEnableJobPromotion(enable bool) QueueOpt {
 	return func(q *QueueOptions) {
 		q.enableJobPromotion = enable
+	}
+}
+
+func WithQueueProducer(producer Producer) QueueOpt {
+	return func(q *QueueOptions) {
+		q.queueProducer = producer
 	}
 }
 
