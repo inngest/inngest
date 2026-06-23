@@ -227,11 +227,13 @@ export function ExperimentDetailPage({
   const helperItems: HelperItem[] = [
     {
       title: INFO_PANEL,
+      label: 'INFO',
       icon: <RiFlaskLine className="h-4 w-4" />,
       action: () => togglePanel(INFO_PANEL),
     },
     {
       title: SCORING_PANEL,
+      label: 'SCORING FORMULA',
       icon: <RiListOrdered2 className="h-4 w-4" />,
       action: () => togglePanel(SCORING_PANEL),
     },
@@ -258,7 +260,7 @@ export function ExperimentDetailPage({
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pb-10 pt-4">
-          <h1 className="text-basis text-lg font-semibold">{experimentName}</h1>
+          <h1 className="text-basis text-lg">{experimentName}</h1>
 
           {!rangeReady ? (
             <>
