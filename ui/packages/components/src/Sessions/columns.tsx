@@ -24,6 +24,15 @@ export function useColumns({ pathCreator }: { pathCreator: PathCreator }) {
         </TextCell>
       ),
     }),
+    columnHelper.accessor('sessionKey', {
+      header: 'Session Key',
+      enableSorting: false,
+      cell: ({ row }) => (
+        <TextCell>
+          <span className="font-mono">{row.original.sessionKey}</span>
+        </TextCell>
+      ),
+    }),
     columnHelper.accessor('runCount', {
       header: 'Number of runs',
       enableSorting: false,
