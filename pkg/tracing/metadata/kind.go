@@ -19,6 +19,10 @@ const (
 	KindPrefixUserland = "userland."
 )
 
+const (
+	KindInngestExperiment Kind = "inngest.experiment"
+)
+
 func (k Kind) String() string {
 	return string(k)
 }
@@ -50,8 +54,8 @@ var allowedInngestKinds = map[Kind]bool{
 	"inngest.http.timing":      true,
 	"inngest.response_headers": true,
 	"inngest.warnings":         true,
-	"inngest.experiment":       true,
-	"inngest.score":            true,
+	KindInngestExperiment:      true,
+	KindInngestScore:           true,
 }
 
 // ValidateAllowed checks that the kind is valid and, if it uses the inngest.*
