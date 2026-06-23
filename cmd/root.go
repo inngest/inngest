@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/inngest/inngest/cmd/apiv2cli"
 	"github.com/inngest/inngest/cmd/devserver"
@@ -33,7 +34,7 @@ func init() {
 var globalFlags = []cli.Flag{
 	&cli.BoolFlag{
 		Name:  "json",
-		Usage: "Output logs as JSON.  Set to true if stdout is not a TTY.",
+		Usage: "Output logs as JSON.  Defaults to true when stdout is not a TTY; set --json=false to force human-readable output.",
 	},
 	&cli.BoolFlag{
 		Name:  "verbose",
@@ -47,6 +48,46 @@ var globalFlags = []cli.Flag{
 	},
 }
 
+// resolveLogHandler determines the LOG_HANDLER value to apply from the --json
+// flag, whether stdout is a TTY, and the current LOG_HANDLER env value. It
+// returns "json" or "dev", or "" to leave the current LOG_HANDLER untouched.
+//
+// Priority:
+//  1. --json=true: always "json".
+//  2. --json=false: force the human-readable "dev" handler, but only when the
+//     current handler would otherwise produce JSON. An explicit non-JSON
+//     handler (e.g. LOG_HANDLER=text) is already what the user asked for, so it
+//     is preserved. This is what lets --json=false override the non-TTY JSON
+//     default (#4379).
+//  3. --json not set, non-TTY: default to "json" (machine-readable logs for
+//     pipes, Docker, turbo, etc.). Matches the previous default behavior, which
+//     forced JSON in non-TTY contexts regardless of any prior LOG_HANDLER.
+//  4. --json not set, TTY: leave unchanged so a configured LOG_HANDLER env var
+//     (or the default dev handler) applies.
+func resolveLogHandler(jsonSet, jsonValue, isTTY bool, current string) string {
+	if jsonSet {
+		if jsonValue {
+			return "json"
+		}
+		if isJSONHandler(current) {
+			return "dev"
+		}
+		// Already a human-readable handler (dev/text); honor the user's choice.
+		return ""
+	}
+	if !isTTY {
+		return "json"
+	}
+	return ""
+}
+
+// isJSONHandler reports whether a LOG_HANDLER value resolves to JSON output.
+// An empty/unset value resolves to the human-readable dev handler, so it is not
+// considered JSON here.
+func isJSONHandler(handler string) bool {
+	return strings.ToLower(strings.TrimSpace(handler)) == "json"
+}
+
 func execute() {
 	app := &cli.Command{
 		Name: "inngest",
@@ -58,10 +99,11 @@ func execute() {
 		)),
 		Version: inngestversion.Print(),
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			// Set LOG_HANDLER environment variable based on --json flag
-			// This ensures the logger respects the JSON output setting
-			if cmd.Bool("json") {
-				os.Setenv("LOG_HANDLER", "json")
+			// Resolve the log handler from the --json flag and TTY state. This
+			// runs after flags are parsed, so an explicit --json=false can
+			// override the non-TTY default of JSON output (see #4379).
+			if handler := resolveLogHandler(cmd.IsSet("json"), cmd.Bool("json"), isatty.IsTerminal(os.Stdout.Fd()), os.Getenv("LOG_HANDLER")); handler != "" {
+				os.Setenv("LOG_HANDLER", handler)
 			}
 
 			if os.Getenv("LOG_LEVEL") == "" {
@@ -98,11 +140,6 @@ func execute() {
 			start.Command(),
 			alpha(),
 		},
-	}
-
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		// Always use JSON when not in a terminal
-		os.Setenv("LOG_HANDLER", "json")
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
