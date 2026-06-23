@@ -100,5 +100,6 @@ func (cr *connectApiRouter) setup() {
 	cr.Group(func(r chi.Router) {
 		r.Post("/start", cr.start)
 		r.Post("/flush", cr.flushBuffer)
+		r.Post("/extend-lease", cr.extendLease)
 	})
 }
