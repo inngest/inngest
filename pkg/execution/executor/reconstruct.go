@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -109,7 +110,12 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 		}
 
 		var data any
-		_ = json.Unmarshal(output.Data, &data)
+		// Decode with UseNumber so large integers in step output (e.g.
+		// snowflake IDs) survive the reconstruct path without being
+		// truncated through float64. Same gap as #4058 in redis_state.Load.
+		dec := json.NewDecoder(bytes.NewReader(output.Data))
+		dec.UseNumber()
+		_ = dec.Decode(&data)
 
 		memoizedStep := state.MemoizedStep{
 			ID:   stepID,
