@@ -36,7 +36,7 @@ func (q *queueProducer) selectShard(ctx context.Context, shardName string, qi Qu
 	if shardName != "" {
 		shard, err := q.shards.ByName(shardName)
 		if err != nil {
-			return nil, fmt.Errorf("tried to force invalid queue shard %q", shardName)
+			return q.shards.Primary(), fmt.Errorf("tried to force invalid queue shard %q", shardName)
 		}
 		return shard, nil
 	}
@@ -49,7 +49,7 @@ func (q *queueProducer) selectShard(ctx context.Context, shardName string, qi Qu
 	selected, err := q.shards.Resolve(ctx, qi.Data.Identifier.AccountID, queueItemKind)
 	if err != nil {
 		l.Error("error selecting shard", "error", err, "item", qi)
-		return nil, fmt.Errorf("could not select shard: %w", err)
+		return q.shards.Primary(), nil
 	}
 	return selected, nil
 }
