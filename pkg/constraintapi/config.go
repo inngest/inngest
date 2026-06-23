@@ -7,12 +7,13 @@ import "github.com/inngest/inngest/pkg/enums"
 type Semaphore struct {
 	// ID is the semaphore identifier, always prefixed:
 	//   app:<uuid>                — worker concurrency
+	//   acct:<uuid>               — account concurrency
 	//   fn:<uuid>                 — function concurrency (no key)
 	//   fnkey:<xxhash(fnID+expr)> — function concurrency with key expression
 	ID string `json:"id"`
 
 	// EvaluatedKeyHash is the xxhash of the evaluated expression result.
-	// Empty for keyless semaphores (app:, fn:).
+	// Empty for keyless semaphores (app:, acct:, fn:).
 	EvaluatedKeyHash string `json:"uv,omitempty"`
 
 	// Weight is the number of units to acquire (default 1).

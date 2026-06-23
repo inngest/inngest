@@ -1982,6 +1982,61 @@ func TestConstraintItem_IsFunctionLevelConstraint(t *testing.T) {
 			description: "concurrency with nil pointer should not be function-level",
 		},
 
+		// Semaphore Constraints
+		{
+			name: "semaphore account scope",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindSemaphore,
+				Semaphore: &SemaphoreConstraint{
+					ID: SemaphoreIDAccount(uuid.New()),
+				},
+			},
+			expected:    false,
+			description: "account-scoped semaphore should not be function-level",
+		},
+		{
+			name: "semaphore function scope",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindSemaphore,
+				Semaphore: &SemaphoreConstraint{
+					ID: SemaphoreIDFn(uuid.New()),
+				},
+			},
+			expected:    true,
+			description: "function-scoped semaphore should be function-level",
+		},
+		{
+			name: "semaphore function key scope",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindSemaphore,
+				Semaphore: &SemaphoreConstraint{
+					ID: SemaphoreIDFnKey(uuid.New(), "event.data.user_id"),
+				},
+			},
+			expected:    true,
+			description: "function-keyed semaphore should be function-level",
+		},
+		{
+			name: "semaphore app scope",
+			constraint: ConstraintItem{
+				Kind: ConstraintKindSemaphore,
+				Semaphore: &SemaphoreConstraint{
+					ID: SemaphoreIDApp(uuid.New()),
+				},
+			},
+			expected:    false,
+			description: "app-scoped semaphore should not be function-level",
+		},
+		{
+			name: "semaphore constraint with nil pointer",
+			constraint: ConstraintItem{
+				Kind:      ConstraintKindSemaphore,
+				Semaphore: nil,
+			},
+			expected:    false,
+			description: "semaphore with nil pointer should not be function-level",
+		},
+
 		// Unknown/Default Cases
 		{
 			name: "unknown constraint kind",

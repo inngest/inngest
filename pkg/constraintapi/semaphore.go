@@ -2,6 +2,7 @@ package constraintapi
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/util"
@@ -11,7 +12,7 @@ type SemaphoreReleaseMode int
 
 const (
 	// SemaphoreReleaseAuto decrements the semaphore counter when the constraint lease is released.
-	// Used for worker concurrency where each step independently acquires and releases.
+	// Used for per-item worker and account concurrency.
 	SemaphoreReleaseAuto SemaphoreReleaseMode = 0
 
 	// SemaphoreReleaseManual requires explicit release via the SemaphoreManager API.
@@ -19,20 +20,33 @@ const (
 	SemaphoreReleaseManual SemaphoreReleaseMode = 1
 )
 
+const (
+	semaphorePrefixApp     = "app:"
+	semaphorePrefixAccount = "acct:"
+	semaphorePrefixFn      = "fn:"
+	semaphorePrefixFnKey   = "fnkey:"
+	semaphorePrefixHash    = "hash:"
+)
+
 // SemaphoreIDApp returns the semaphore ID for worker concurrency (per-app).
 func SemaphoreIDApp(appID uuid.UUID) string {
-	return fmt.Sprintf("app:%s", appID)
+	return fmt.Sprintf("%s%s", semaphorePrefixApp, appID)
+}
+
+// SemaphoreIDAccount returns the semaphore ID for account-scoped concurrency.
+func SemaphoreIDAccount(accountID uuid.UUID) string {
+	return fmt.Sprintf("%s%s", semaphorePrefixAccount, accountID)
 }
 
 // SemaphoreIDFn returns the semaphore ID for function concurrency (no key).
 func SemaphoreIDFn(functionID uuid.UUID) string {
-	return fmt.Sprintf("fn:%s", functionID)
+	return fmt.Sprintf("%s%s", semaphorePrefixFn, functionID)
 }
 
 // SemaphoreIDFnKey returns the semaphore ID for function concurrency with a key expression.
 // The ID is a hash of the function ID + the raw (unevaluated) expression.
 func SemaphoreIDFnKey(functionID uuid.UUID, expression string) string {
-	return fmt.Sprintf("fnkey:%s", util.XXHash(functionID.String()+expression))
+	return fmt.Sprintf("%s%s", semaphorePrefixFnKey, util.XXHash(functionID.String()+expression))
 }
 
 // SemaphoreConstraint represents a semaphore-based capacity constraint.
@@ -41,6 +55,7 @@ func SemaphoreIDFnKey(functionID uuid.UUID, expression string) string {
 type SemaphoreConstraint struct {
 	// ID is the unevaluated semaphore name, always prefixed:
 	//   app:<uuid>    — worker concurrency
+	//   acct:<uuid>   — account concurrency
 	//   fn:<uuid>     — function concurrency
 	//   fnkey:<xxhash(fnID + expression)> — hash of function ID & unevaluated expression
 	ID string
@@ -62,6 +77,33 @@ func (s *SemaphoreConstraint) UsageKey(accountID uuid.UUID) string {
 
 func (s *SemaphoreConstraint) CapacityKey(accountID uuid.UUID) string {
 	return fmt.Sprintf("{cs}:%s:sem:%s:cap", accountScope(accountID), s.ID)
+}
+
+func (s *SemaphoreConstraint) IsAccountConcurrency() bool {
+	return s != nil && isAccountConcurrencySemaphore(s.ID, s.EvaluatedKeyHash)
+}
+
+func (s *SemaphoreConstraint) IsFunctionConcurrency() bool {
+	return s != nil && isFunctionConcurrencySemaphore(s.ID, s.EvaluatedKeyHash)
+}
+
+func (s *SemaphoreConstraint) IsFunctionScoped() bool {
+	return s != nil &&
+		(strings.HasPrefix(s.ID, semaphorePrefixFn) ||
+			strings.HasPrefix(s.ID, semaphorePrefixFnKey) ||
+			strings.HasPrefix(s.ID, semaphorePrefixHash))
+}
+
+func (s Semaphore) IsAccountConcurrency() bool {
+	return isAccountConcurrencySemaphore(s.ID, s.EvaluatedKeyHash)
+}
+
+func isAccountConcurrencySemaphore(id, evaluatedKeyHash string) bool {
+	return evaluatedKeyHash == "" && strings.HasPrefix(id, semaphorePrefixAccount)
+}
+
+func isFunctionConcurrencySemaphore(id, evaluatedKeyHash string) bool {
+	return evaluatedKeyHash == "" && strings.HasPrefix(id, semaphorePrefixFn)
 }
 
 func (s *SemaphoreConstraint) PrettyString() string {

@@ -95,6 +95,10 @@ var (
 	// Unlike partition/account limits, this is per-item (only start jobs carry semaphores),
 	// so the iterator should skip the item and continue scanning.
 	ErrSemaphoreLimit = fmt.Errorf("at semaphore capacity limit")
+
+	// ErrHaltingSemaphoreLimit represents a semaphore limit which halts
+	// partition processing.
+	ErrHaltingSemaphoreLimit = fmt.Errorf("at halting semaphore limit")
 )
 
 var (

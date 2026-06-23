@@ -84,6 +84,31 @@ func TestRateLimitKeyExpressionHashConsistency(t *testing.T) {
 	}
 }
 
+func TestEvaluateConcurrencySemaphoresAccountFlag(t *testing.T) {
+	ctx := context.Background()
+	accountID, fnID := uuid.New(), uuid.New()
+	previous := constraintapi.AccountSemaphoreEnabled
+	constraintapi.AccountSemaphoreEnabled = nil
+	t.Cleanup(func() {
+		constraintapi.AccountSemaphoreEnabled = previous
+	})
+
+	e := &executor{}
+	require.Empty(t, e.evaluateConcurrencySemaphores(ctx, accountID, fnID, nil, nil))
+
+	constraintapi.AccountSemaphoreEnabled = func(context.Context, uuid.UUID) bool { return true }
+	semaphores := e.evaluateConcurrencySemaphores(ctx, accountID, fnID, []inngest.FnConcurrency{{Limit: 2}}, nil)
+	require.Len(t, semaphores, 2)
+
+	require.Equal(t, constraintapi.SemaphoreIDAccount(accountID), semaphores[0].ID)
+	require.Equal(t, constraintapi.SemaphoreReleaseAuto, semaphores[0].Release)
+	require.Equal(t, int64(1), semaphores[0].Weight)
+
+	require.Equal(t, constraintapi.SemaphoreIDFn(fnID), semaphores[1].ID)
+	require.Equal(t, constraintapi.SemaphoreReleaseManual, semaphores[1].Release)
+	require.Equal(t, int64(1), semaphores[1].Weight)
+}
+
 // TestScheduleConstraintCacheDoesNotDropRetriesOnExhaustion exercises the
 // silent-drop-on-retry case (SYS-820): when a Schedule attempt is rate
 // limited, the in-process constraint cache stores the "exhausted" decision.

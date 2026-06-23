@@ -116,6 +116,7 @@ func ConvertLimitingConstraint(
 		// Account concurrency
 		case
 			c.Kind == constraintapi.ConstraintKindConcurrency &&
+				c.Concurrency != nil &&
 				c.Concurrency.Scope == enums.ConcurrencyScopeAccount &&
 				c.Concurrency.KeyExpressionHash == "":
 			constraint = enums.QueueConstraintAccountConcurrency
@@ -123,6 +124,7 @@ func ConvertLimitingConstraint(
 		// Function concurrency
 		case
 			c.Kind == constraintapi.ConstraintKindConcurrency &&
+				c.Concurrency != nil &&
 				c.Concurrency.Scope == enums.ConcurrencyScopeFn &&
 				c.Concurrency.KeyExpressionHash == "":
 			constraint = enums.QueueConstraintFunctionConcurrency
@@ -131,6 +133,7 @@ func ConvertLimitingConstraint(
 		case
 			len(constraints.Concurrency.CustomConcurrencyKeys) > 0 &&
 				c.Kind == constraintapi.ConstraintKindConcurrency &&
+				c.Concurrency != nil &&
 				c.Concurrency.Mode == constraints.Concurrency.CustomConcurrencyKeys[0].Mode &&
 				c.Concurrency.Scope == constraints.Concurrency.CustomConcurrencyKeys[0].Scope &&
 				c.Concurrency.KeyExpressionHash == constraints.Concurrency.CustomConcurrencyKeys[0].HashedKeyExpression:
@@ -140,6 +143,7 @@ func ConvertLimitingConstraint(
 		case
 			len(constraints.Concurrency.CustomConcurrencyKeys) > 1 &&
 				c.Kind == constraintapi.ConstraintKindConcurrency &&
+				c.Concurrency != nil &&
 				c.Concurrency.Mode == constraints.Concurrency.CustomConcurrencyKeys[1].Mode &&
 				c.Concurrency.Scope == constraints.Concurrency.CustomConcurrencyKeys[1].Scope &&
 				c.Concurrency.KeyExpressionHash == constraints.Concurrency.CustomConcurrencyKeys[1].HashedKeyExpression:
@@ -152,8 +156,17 @@ func ConvertLimitingConstraint(
 
 		// Semaphore
 		case
-			c.Kind == constraintapi.ConstraintKindSemaphore:
-			constraint = enums.QueueConstraintSemaphore
+			c.Kind == constraintapi.ConstraintKindSemaphore &&
+				c.Semaphore != nil:
+
+			switch {
+			case c.Semaphore.IsAccountConcurrency():
+				return enums.QueueConstraintHaltingSemaphore
+			case c.Semaphore.IsFunctionConcurrency():
+				return enums.QueueConstraintHaltingSemaphore
+			default:
+				constraint = enums.QueueConstraintSemaphore
+			}
 		}
 	}
 
@@ -306,6 +319,12 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	}
 
 	if len(res.Leases) == 0 {
+		if constraint == enums.QueueConstraintNotLimited {
+			return &BacklogRefillConstraintCheckResult{
+				ItemsToRefill: itemIDs,
+			}, nil
+		}
+
 		return &BacklogRefillConstraintCheckResult{
 			ItemsToRefill:      nil,
 			LimitingConstraint: constraint,
@@ -510,6 +529,10 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	span.SetAttributes(attribute.String("limiting_constraint", constraint.String()))
 
 	if len(res.Leases) == 0 {
+		if constraint == enums.QueueConstraintNotLimited {
+			return ItemLeaseConstraintCheckResult{}, nil
+		}
+
 		span.SetAttributes(attribute.Bool("constrained", true))
 
 		return ItemLeaseConstraintCheckResult{

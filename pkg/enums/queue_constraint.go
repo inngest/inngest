@@ -17,5 +17,10 @@ const (
 	QueueConstraintCustomConcurrencyKey1 QueueConstraint = 3
 	QueueConstraintCustomConcurrencyKey2 QueueConstraint = 4
 	QueueConstraintThrottle              QueueConstraint = 5
-	QueueConstraintSemaphore             QueueConstraint = 6
+	// QueueConstraintSemaphore is an item-local semaphore limit. Processors may
+	// skip the current item and continue scanning the partition.
+	QueueConstraintSemaphore QueueConstraint = 6
+	// QueueConstraintHaltingSemaphore is a semaphore limit with partition-wide
+	// FIFO semantics. Processors must stop scanning the partition.
+	QueueConstraintHaltingSemaphore QueueConstraint = 7
 )

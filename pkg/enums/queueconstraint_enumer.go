@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _QueueConstraintName = "not_limitedaccount_concurrencyfunction_concurrencycustom_concurrency_key1custom_concurrency_key2throttlesemaphore"
+const _QueueConstraintName = "not_limitedaccount_concurrencyfunction_concurrencycustom_concurrency_key1custom_concurrency_key2throttlesemaphorehalting_semaphore"
 
-var _QueueConstraintIndex = [...]uint8{0, 11, 30, 50, 73, 96, 104, 113}
+var _QueueConstraintIndex = [...]uint8{0, 11, 30, 50, 73, 96, 104, 113, 130}
 
-const _QueueConstraintLowerName = "not_limitedaccount_concurrencyfunction_concurrencycustom_concurrency_key1custom_concurrency_key2throttlesemaphore"
+const _QueueConstraintLowerName = "not_limitedaccount_concurrencyfunction_concurrencycustom_concurrency_key1custom_concurrency_key2throttlesemaphorehalting_semaphore"
 
 func (i QueueConstraint) String() string {
 	if i < 0 || i >= QueueConstraint(len(_QueueConstraintIndex)-1) {
@@ -32,9 +32,10 @@ func _QueueConstraintNoOp() {
 	_ = x[QueueConstraintCustomConcurrencyKey2-(4)]
 	_ = x[QueueConstraintThrottle-(5)]
 	_ = x[QueueConstraintSemaphore-(6)]
+	_ = x[QueueConstraintHaltingSemaphore-(7)]
 }
 
-var _QueueConstraintValues = []QueueConstraint{QueueConstraintNotLimited, QueueConstraintAccountConcurrency, QueueConstraintFunctionConcurrency, QueueConstraintCustomConcurrencyKey1, QueueConstraintCustomConcurrencyKey2, QueueConstraintThrottle, QueueConstraintSemaphore}
+var _QueueConstraintValues = []QueueConstraint{QueueConstraintNotLimited, QueueConstraintAccountConcurrency, QueueConstraintFunctionConcurrency, QueueConstraintCustomConcurrencyKey1, QueueConstraintCustomConcurrencyKey2, QueueConstraintThrottle, QueueConstraintSemaphore, QueueConstraintHaltingSemaphore}
 
 var _QueueConstraintNameToValueMap = map[string]QueueConstraint{
 	_QueueConstraintName[0:11]:         QueueConstraintNotLimited,
@@ -51,6 +52,8 @@ var _QueueConstraintNameToValueMap = map[string]QueueConstraint{
 	_QueueConstraintLowerName[96:104]:  QueueConstraintThrottle,
 	_QueueConstraintName[104:113]:      QueueConstraintSemaphore,
 	_QueueConstraintLowerName[104:113]: QueueConstraintSemaphore,
+	_QueueConstraintName[113:130]:      QueueConstraintHaltingSemaphore,
+	_QueueConstraintLowerName[113:130]: QueueConstraintHaltingSemaphore,
 }
 
 var _QueueConstraintNames = []string{
@@ -61,6 +64,7 @@ var _QueueConstraintNames = []string{
 	_QueueConstraintName[73:96],
 	_QueueConstraintName[96:104],
 	_QueueConstraintName[104:113],
+	_QueueConstraintName[113:130],
 }
 
 // QueueConstraintString retrieves an enum value from the enum constants string name.

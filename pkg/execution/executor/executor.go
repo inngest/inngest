@@ -1182,10 +1182,12 @@ func (e *executor) schedule(
 	}
 
 	// Evaluate concurrency keys to use initially
+	var fnConcurrency []inngest.FnConcurrency
 	if req.Function.Concurrency != nil {
 		metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID, req.Function.Concurrency.Limits, evtMap)
-		metadata.Config.Semaphores = e.evaluateFnConcurrency(ctx, req.AccountID, req.Function.ID, req.Function.Concurrency.Fn, evtMap)
+		fnConcurrency = req.Function.Concurrency.Fn
 	}
+	metadata.Config.Semaphores = e.evaluateConcurrencySemaphores(ctx, req.AccountID, req.Function.ID, fnConcurrency, evtMap)
 
 	//
 	// Create throttle information prior to creating state.  This is used in the queue.

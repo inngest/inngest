@@ -2,7 +2,6 @@ package constraintapi
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -217,10 +216,7 @@ func (ci ConstraintItem) IsFunctionLevelConstraint() bool {
 	case ConstraintKindConcurrency:
 		return ci.Concurrency != nil && ci.Concurrency.Scope == enums.ConcurrencyScopeFn
 	case ConstraintKindSemaphore:
-		// XXX: Revisit when we add scopes to semaphores.
-		// For now, app-scoped semaphores (worker concurrency) are not function-level;
-		// all others (fn:, hash:) are.
-		return ci.Semaphore != nil && !strings.HasPrefix(ci.Semaphore.ID, "app:")
+		return ci.Semaphore.IsFunctionScoped()
 	default:
 		return false
 	}

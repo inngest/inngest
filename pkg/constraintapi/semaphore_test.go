@@ -40,6 +40,123 @@ func newSemaphoreTestEnv(t *testing.T) (*redisCapacityManager, *miniredis.Minire
 	return cm, r, rc, clock
 }
 
+func setAccountSemaphoreEnabled(t *testing.T, fn UseAccountSemaphoreFn) {
+	t.Helper()
+	previous := AccountSemaphoreEnabled
+	AccountSemaphoreEnabled = fn
+	t.Cleanup(func() {
+		AccountSemaphoreEnabled = previous
+	})
+}
+
+func TestSemaphoreIDAccount(t *testing.T) {
+	accountID := uuid.New()
+	require.Equal(t, fmt.Sprintf("acct:%s", accountID), SemaphoreIDAccount(accountID))
+}
+
+func TestAccountSemaphoreAcquireFeatureFlag(t *testing.T) {
+	ctx := context.Background()
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	sem := SemaphoreConstraint{
+		ID:      SemaphoreIDAccount(accountID),
+		Weight:  1,
+		Release: SemaphoreReleaseAuto,
+	}
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores: []Semaphore{{
+			ID:      sem.ID,
+			Weight:  1,
+			Release: SemaphoreReleaseAuto,
+		}},
+	}
+	constraints := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}}
+
+	t.Run("disabled filters account semaphore", func(t *testing.T) {
+		cm, r, _, clock := newSemaphoreTestEnv(t)
+		setAccountSemaphoreEnabled(t, func(context.Context, uuid.UUID) bool { return false })
+
+		resp, err := cm.Acquire(ctx, &CapacityAcquireRequest{
+			AccountID:            accountID,
+			IdempotencyKey:       "disabled",
+			Constraints:          constraints,
+			Amount:               1,
+			EnvID:                envID,
+			FunctionID:           fnID,
+			Configuration:        config,
+			LeaseIdempotencyKeys: []string{"disabled-lease"},
+			CurrentTime:          clock.Now(),
+			Duration:             5 * time.Second,
+			MaximumLifetime:      time.Hour,
+			Source: LeaseSource{
+				Service:           ServiceExecutor,
+				Location:          CallerLocationItemLease,
+				RunProcessingMode: RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.Empty(t, resp.Leases)
+		require.Empty(t, resp.ExhaustedConstraints)
+		require.False(t, r.Exists(sem.UsageKey(accountID)))
+	})
+
+	t.Run("enabled checks account semaphore", func(t *testing.T) {
+		cm, r, _, clock := newSemaphoreTestEnv(t)
+		setAccountSemaphoreEnabled(t, func(context.Context, uuid.UUID) bool { return true })
+		require.NoError(t, r.Set(sem.CapacityKey(accountID), "1"))
+
+		resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "enabled-1")
+		require.Len(t, resp.Leases, 1)
+		usage, err := r.Get(sem.UsageKey(accountID))
+		require.NoError(t, err)
+		require.Equal(t, "1", usage)
+
+		clock.Advance(time.Second)
+		resp = acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "enabled-2")
+		require.Empty(t, resp.Leases)
+		require.Len(t, resp.ExhaustedConstraints, 1)
+		require.Equal(t, ConstraintKindSemaphore, resp.ExhaustedConstraints[0].Kind)
+	})
+}
+
+func TestAccountSemaphoreCheckFeatureFlag(t *testing.T) {
+	ctx := context.Background()
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	sem := SemaphoreConstraint{
+		ID:      SemaphoreIDAccount(accountID),
+		Weight:  1,
+		Release: SemaphoreReleaseAuto,
+	}
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores: []Semaphore{{
+			ID:      sem.ID,
+			Weight:  1,
+			Release: SemaphoreReleaseAuto,
+		}},
+	}
+	constraints := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}}
+
+	cm, r, _, _ := newSemaphoreTestEnv(t)
+	setAccountSemaphoreEnabled(t, func(context.Context, uuid.UUID) bool { return false })
+
+	resp, userErr, internalErr := cm.Check(ctx, &CapacityCheckRequest{
+		AccountID:     accountID,
+		Constraints:   constraints,
+		EnvID:         envID,
+		FunctionID:    fnID,
+		Configuration: config,
+	})
+	require.NoError(t, userErr)
+	require.NoError(t, internalErr)
+	require.NotNil(t, resp)
+	require.Empty(t, resp.ExhaustedConstraints)
+	require.Empty(t, resp.LimitingConstraints)
+	require.False(t, r.Exists(sem.UsageKey(accountID)))
+}
+
 func acquireWithSemaphore(
 	t *testing.T,
 	cm *redisCapacityManager,

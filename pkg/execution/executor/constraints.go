@@ -273,24 +273,33 @@ type checkResult struct {
 
 // stepSemaphores returns the auto-release semaphores from run metadata that should
 // be added to every step queue item (not just the start job). This is used for
-// worker concurrency where each step independently acquires and releases a slot.
+// per-item concurrency where each queue item independently acquires and releases a slot.
 func stepSemaphores(md sv2.Metadata) []constraintapi.Semaphore {
 	return constraintapi.AutoReleaseSemaphores(md.Config.Semaphores)
 }
 
-// evaluateFnConcurrency evaluates function concurrency limits against event data
-// and returns the corresponding semaphore entries to store in run metadata.
-func (e *executor) evaluateFnConcurrency(
+// evaluateConcurrencySemaphores returns semaphore entries to store in run metadata.
+// Auto-release semaphores are copied onto every queue item and released per item.
+func (e *executor) evaluateConcurrencySemaphores(
 	ctx context.Context,
 	accountID, functionID uuid.UUID,
 	fnLimits []inngest.FnConcurrency,
 	evtMap map[string]any,
 ) []constraintapi.Semaphore {
-	if len(fnLimits) == 0 {
+	useAccountSemaphore := constraintapi.AccountSemaphoreConcurrencyEnabled(ctx, accountID)
+	if len(fnLimits) == 0 && !useAccountSemaphore {
 		return nil
 	}
 
-	semaphores := make([]constraintapi.Semaphore, 0, len(fnLimits))
+	semaphores := make([]constraintapi.Semaphore, 0, len(fnLimits)+1)
+	if useAccountSemaphore {
+		semaphores = append(semaphores, constraintapi.Semaphore{
+			ID:      constraintapi.SemaphoreIDAccount(accountID),
+			Weight:  1,
+			Release: constraintapi.SemaphoreReleaseAuto,
+		})
+	}
+
 	for _, fc := range fnLimits {
 		scope := fc.EffectiveScope()
 

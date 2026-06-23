@@ -566,6 +566,8 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 }
 
 func TestConvertLimitingConstraint(t *testing.T) {
+	accountID, fnID := uuid.New(), uuid.New()
+
 	tests := []struct {
 		name                string
 		constraints         PartitionConstraintConfig
@@ -605,6 +607,91 @@ func TestConvertLimitingConstraint(t *testing.T) {
 				},
 			},
 			expected: enums.QueueConstraintFunctionConcurrency,
+		},
+		{
+			name:        "account scoped semaphore constraint",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindSemaphore,
+					Semaphore: &constraintapi.SemaphoreConstraint{
+						ID: constraintapi.SemaphoreIDAccount(accountID),
+					},
+				},
+			},
+			expected: enums.QueueConstraintHaltingSemaphore,
+		},
+		{
+			name:        "function scoped semaphore constraint",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindSemaphore,
+					Semaphore: &constraintapi.SemaphoreConstraint{
+						ID: constraintapi.SemaphoreIDFn(fnID),
+					},
+				},
+			},
+			expected: enums.QueueConstraintHaltingSemaphore,
+		},
+		{
+			name:        "keyed function scoped semaphore constraint",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindSemaphore,
+					Semaphore: &constraintapi.SemaphoreConstraint{
+						ID:               constraintapi.SemaphoreIDFn(fnID),
+						EvaluatedKeyHash: "user-hash",
+					},
+				},
+			},
+			expected: enums.QueueConstraintSemaphore,
+		},
+		{
+			name:        "function key semaphore constraint",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindSemaphore,
+					Semaphore: &constraintapi.SemaphoreConstraint{
+						ID: constraintapi.SemaphoreIDFnKey(fnID, "event.data.user_id"),
+					},
+				},
+			},
+			expected: enums.QueueConstraintSemaphore,
+		},
+		{
+			name:        "app scoped semaphore constraint",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindSemaphore,
+					Semaphore: &constraintapi.SemaphoreConstraint{
+						ID: constraintapi.SemaphoreIDApp(uuid.New()),
+					},
+				},
+			},
+			expected: enums.QueueConstraintSemaphore,
+		},
+		{
+			name:        "halting semaphore takes precedence over item semaphore",
+			constraints: PartitionConstraintConfig{},
+			limitingConstraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindSemaphore,
+					Semaphore: &constraintapi.SemaphoreConstraint{
+						ID: constraintapi.SemaphoreIDAccount(accountID),
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindSemaphore,
+					Semaphore: &constraintapi.SemaphoreConstraint{
+						ID: constraintapi.SemaphoreIDApp(uuid.New()),
+					},
+				},
+			},
+			expected: enums.QueueConstraintHaltingSemaphore,
 		},
 		{
 			name: "custom concurrency key 1",

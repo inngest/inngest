@@ -162,23 +162,35 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints  flexibleIntArray          `json:"lc"`
-	ExhaustedConstraints flexibleIntArray          `json:"ec"`
-	FairnessReduction    int                       `json:"fr"`
-	RetryAt              int                       `json:"ra"`
-	Debug                flexibleStringArray       `json:"d"`
-	CacheHit             int                       `json:"ch"`
+	LimitingConstraints  flexibleIntArray    `json:"lc"`
+	ExhaustedConstraints flexibleIntArray    `json:"ec"`
+	FairnessReduction    int                 `json:"fr"`
+	RetryAt              int                 `json:"ra"`
+	Debug                flexibleStringArray `json:"d"`
+	CacheHit             int                 `json:"ch"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
+	originalReq := req
 
 	requestID, err := ulid.New(ulid.Timestamp(r.clock.Now()), rand.Reader)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
 	}
 
-	// Validate request
+	req = r.filterDisabledAccountSemaphoreAcquireRequest(ctx, req)
+	if len(req.Constraints) == 0 {
+		if err := originalReq.Valid(); err != nil {
+			return nil, errs.Wrap(0, false, "invalid request: %w", err)
+		}
+		// the only requested constraint was a filtered acct semaphore so this is ok
+		return &CapacityAcquireResponse{
+			RequestID: requestID,
+		}, nil
+	}
+
+	// validate after filtering so disabled acct semaphores are ignored
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
@@ -544,4 +556,16 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	default:
 		return nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
+}
+
+func (r *redisCapacityManager) filterDisabledAccountSemaphoreAcquireRequest(ctx context.Context, req *CapacityAcquireRequest) *CapacityAcquireRequest {
+	filteredConstraints, filteredConfig, changed := filterDisabledAccountSemaphoreRequest(ctx, req.AccountID, req.Constraints, req.Configuration)
+	if !changed {
+		return req
+	}
+
+	filteredReq := *req
+	filteredReq.Constraints = filteredConstraints
+	filteredReq.Configuration = filteredConfig
+	return &filteredReq
 }
