@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useSQLEditorActions } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import {
+  postQueryFeedback,
+  sqlWasEdited,
+} from '@/components/Insights/queryFeedback';
 import { Conversation, ConversationContent } from './Conversation';
 import { EmptyState } from './EmptyState';
 import { useInsightsChatProvider } from './InsightsChatProvider';
@@ -72,8 +76,12 @@ type InsightsChatProps = {
 };
 
 export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
-  const { query: currentSql, queryName: tabTitle } =
-    useInsightsStateMachineContext();
+  const {
+    query: currentSql,
+    queryName: tabTitle,
+    status: executionStatus,
+    data: executionData,
+  } = useInsightsStateMachineContext();
 
   const editorActions = useSQLEditorActions();
 
@@ -86,6 +94,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     sendMessageToThread,
     getThreadFlags,
     getLatestGeneratedSql,
+    getLatestRunId,
     latestSqlVersion,
     setThreadClientState,
     eventTypes,
@@ -110,6 +119,37 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
 
     editorActions.setQueryAndRun(latest);
   }, [currentThreadId, agentThreadId, latestSqlVersion]);
+
+  // Report each execution outcome as deferred feedback on the originating run.
+  const reportedFeedbackRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentThreadId !== agentThreadId) return;
+    if (executionStatus !== 'success' && executionStatus !== 'error') return;
+    const runId = getLatestRunId(agentThreadId);
+    if (!runId) return;
+
+    const key = `${runId}:${executionStatus}:${currentSql}`;
+    if (reportedFeedbackRef.current === key) return;
+    reportedFeedbackRef.current = key;
+
+    void postQueryFeedback({
+      runId,
+      executedOk: executionStatus === 'success',
+      rowCount: executionData?.rows?.length ?? 0,
+      userEdited: sqlWasEdited(
+        getLatestGeneratedSql(agentThreadId),
+        currentSql,
+      ),
+    });
+  }, [
+    currentThreadId,
+    agentThreadId,
+    executionStatus,
+    executionData,
+    currentSql,
+    getLatestRunId,
+    getLatestGeneratedSql,
+  ]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {

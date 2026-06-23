@@ -18,6 +18,7 @@ import type { InsightsQueryStatement } from '@/gql/graphql';
 import { isQuerySnapshot, isQueryTemplate } from '../queries';
 import { SHOW_DOCS_CONTROL_PANEL_BUTTON } from '../temp-flags';
 import { InsightsAIHelperProvider } from '../InsightsAIHelperContext';
+import { postQueryFeedback } from '../queryFeedback';
 import { InsightsHelperPanel } from './InsightsHelperPanel/InsightsHelperPanel';
 import {
   InsightsHelperPanelControl,
@@ -502,6 +503,10 @@ function TabsWithAIHelper({
     async (prompt: string) => {
       // Get the thread ID for the active tab
       const threadId = getAgentThreadIdForTab(activeTabId);
+
+      // The sole caller is "Fix with AI" — a strong negative signal on the run.
+      const runId = chatProvider.getLatestRunId(threadId);
+      if (runId) void postQueryFeedback({ runId, fixWithAi: true });
 
       // Set the current thread ID FIRST, before opening the panel
       // This ensures the InsightsChat component has the correct thread ID when it mounts

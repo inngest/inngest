@@ -7,7 +7,10 @@ import {
 } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSaveLine } from '@remixicon/react';
+import { useCallback } from 'react';
 
+import { useInsightsChatProviderOptional } from '../InsightsTabManager/InsightsHelperPanel/features/InsightsChat/InsightsChatProvider';
+import { postQueryFeedback, sqlWasEdited } from '../queryFeedback';
 import { KeyboardShortcutTooltip } from '../KeyboardShortcutTooltip';
 import type { Tab } from '../types';
 import { useSaveTab } from './SaveTabContext';
@@ -21,11 +24,23 @@ export function InsightsSQLEditorSaveQueryButton({
   tab,
 }: InsightsSQLEditorSaveQueryButtonProps) {
   const { canSave, isSaving, saveTab } = useSaveTab(tab);
+  const chat = useInsightsChatProviderOptional();
+
+  // Saving an unmodified AI-generated query is a strong positive signal.
+  const handleSave = useCallback(() => {
+    saveTab();
+    const threadId = chat?.currentThreadId;
+    if (!chat || !threadId) return;
+    const runId = chat.getLatestRunId(threadId);
+    if (!runId) return;
+    if (sqlWasEdited(chat.getLatestGeneratedSql(threadId), tab.query)) return;
+    void postQueryFeedback({ runId, saved: true });
+  }, [saveTab, chat, tab.query]);
 
   useDocumentShortcuts([
     {
       combo: { alt: true, code: 'KeyS', metaOrCtrl: true },
-      handler: saveTab,
+      handler: handleSave,
     },
   ]);
 
@@ -48,7 +63,7 @@ export function InsightsSQLEditorSaveQueryButton({
             label="Save"
             loading={isSaving}
             onClick={() => {
-              saveTab();
+              handleSave();
             }}
             size="medium"
           />

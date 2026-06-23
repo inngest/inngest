@@ -35,6 +35,7 @@ type ContextValue = {
   // Per-thread UI flags and derived SQL
   getThreadFlags: (threadId: string) => ThreadFlags;
   getLatestGeneratedSql: (threadId: string) => string | undefined;
+  getLatestRunId: (threadId: string) => string | undefined;
   latestSqlVersion: number;
 
   // Client-state per thread
@@ -73,6 +74,8 @@ export function InsightsChatProvider({
   // Latest generated SQL per thread
   const latestSqlByThreadRef = useRef<Map<string, string>>(new Map());
   const [latestSqlVersion, setLatestSqlVersion] = useState(0);
+  // Latest Inngest run id per thread, for attributing query feedback to a run
+  const latestRunIdByThreadRef = useRef<Map<string, string>>(new Map());
 
   // Per-thread client state map
   const threadClientStateRef = useRef<Map<string, ClientState>>(new Map());
@@ -94,6 +97,10 @@ export function InsightsChatProvider({
     },
     [],
   );
+
+  const getLatestRunId = useCallback((threadId: string): string | undefined => {
+    return latestRunIdByThreadRef.current.get(threadId);
+  }, []);
 
   // Realtime subscription
   const { messages: realtimeMessages, connectionStatus } = useInsightsRealtime({
@@ -142,6 +149,12 @@ export function InsightsChatProvider({
           }
 
           case 'run.completed': {
+            const completedRunId =
+              typeof evt.data.runId === 'string' ? evt.data.runId : undefined;
+            if (completedRunId) {
+              latestRunIdByThreadRef.current.set(tid, completedRunId);
+            }
+
             // Build assistant message from the completed run
             const parts: Message['parts'] = [];
 
@@ -369,6 +382,7 @@ export function InsightsChatProvider({
       return next;
     });
     latestSqlByThreadRef.current.delete(threadId);
+    latestRunIdByThreadRef.current.delete(threadId);
   }, []);
 
   const messages = useMemo(
@@ -386,6 +400,7 @@ export function InsightsChatProvider({
       sendMessageToThread,
       getThreadFlags: getFlags,
       getLatestGeneratedSql,
+      getLatestRunId,
       latestSqlVersion,
       setThreadClientState,
       eventTypes: eventsData?.names ?? [],
@@ -400,6 +415,7 @@ export function InsightsChatProvider({
       sendMessageToThread,
       getFlags,
       getLatestGeneratedSql,
+      getLatestRunId,
       latestSqlVersion,
       setThreadClientState,
       eventsData?.names,
@@ -421,4 +437,10 @@ export function useInsightsChatProvider(): ContextValue {
       'useInsightsChatProvider must be used within InsightsChatProvider',
     );
   return ctx;
+}
+
+// Non-throwing variant for components that also render outside the chat
+// provider (e.g. the editor when the AI helper is disabled).
+export function useInsightsChatProviderOptional(): ContextValue | undefined {
+  return useContext(InsightsChatContext);
 }
