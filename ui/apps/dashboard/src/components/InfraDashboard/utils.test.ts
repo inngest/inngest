@@ -875,7 +875,7 @@ describe('infra dashboard top functions', () => {
 describe('MenuItem exact matching', () => {
   it('matches dashboard routes exactly while ignoring query and trailing slash', () => {
     expect(
-      isMenuItemActive('/env/production/?nav=v2', '/env/production', true),
+      isMenuItemActive('/env/production/?range=24h', '/env/production', true),
     ).toBe(true);
     expect(
       isMenuItemActive('/env/production/apps', '/env/production', true),

@@ -3,7 +3,7 @@ import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 
 import type { ProfileDisplayType } from '@/queries/server/profile';
 import type { Environment } from '@/utils/environments';
-import Environments from '../NavigationV2/Environments';
+import Environments from '../Navigation/Environments';
 import AvatarMenu from './AvatarMenu';
 import OrgButton from './OrgButton';
 import { OrgMenu } from './OrgMenu';

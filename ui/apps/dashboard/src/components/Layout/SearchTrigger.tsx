@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RiSearchLine } from '@remixicon/react';
 
-import { QuickSearchModal } from '../NavigationV2/QuickSearch/QuickSearchModal';
+import { QuickSearchModal } from '../Navigation/QuickSearch/QuickSearchModal';
 
 export default function SearchTrigger({
   envSlug,

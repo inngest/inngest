@@ -1,7 +1,7 @@
 import { Image } from '@unpic/react';
 
 import type { ProfileDisplayType } from '@/queries/server/profile';
-import { ProfileMenu } from '../NavigationV2/ProfileMenu';
+import { ProfileMenu } from '../Navigation/ProfileMenu';
 
 export default function AvatarMenu({
   profile,

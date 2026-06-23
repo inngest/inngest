@@ -198,7 +198,7 @@ warning doesn't suppress a later, more severe notice. CTA button uses
 ### 3. Mount in the layout
 
 `src/components/Layout/Layout.tsx` is the only authenticated layout (there is no
-`LayoutV2` in the current tree). `<PaymentStatusBanner />` is mounted right after
+`Layout` in the current tree). `<PaymentStatusBanner />` is mounted right after
 `<ActiveBanners />`:
 
 ```tsx

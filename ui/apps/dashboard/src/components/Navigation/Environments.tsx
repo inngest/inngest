@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 import { Listbox } from '@headlessui/react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import {
@@ -45,8 +47,8 @@ const useSwitchablePathname = (): string => {
     return '/functions';
   }
 
-  if (pathname.match(/^\/billing\/.+$/)) {
-    return '/apps';
+  if (pathname.match(/^\/billing(?:\/|$)/)) {
+    return '/';
   }
 
   // Deploys should always move to the root resource level
@@ -64,7 +66,7 @@ const useSwitchablePathname = (): string => {
   }
 
   if (segments.length === 0) {
-    return '/functions'; // default if selected from /env
+    return '/';
   }
 
   return '/' + segments.join('/');
@@ -89,12 +91,12 @@ const SelectedDisplay = ({
   collapsed: boolean;
 }) => (
   <span
-    className={`flex flex-row items-center ${
+    className={`flex h-full flex-row items-center leading-none ${
       collapsed ? '' : 'min-w-0 truncate'
     }`}
   >
     {selected ? (
-      <span className="block">
+      <span className="flex h-full items-center leading-none">
         {selected.type === EnvironmentType.BranchParent
           ? selectedName('Branch Environments', collapsed)
           : selectedName(selected.name, collapsed)}
@@ -102,7 +104,7 @@ const SelectedDisplay = ({
     ) : (
       <>
         {!collapsed && <RiCloudLine className="mr-2 h-4 w-4" />}
-        <span className="block">
+        <span className="flex h-full items-center leading-none">
           {selectedName('All Environments', collapsed)}
         </span>
       </>
@@ -128,9 +130,15 @@ export default function EnvironmentSelectMenu({
 }: EnvironmentSelectMenuProps) {
   const navigate = useNavigate();
   type ListboxValue = Environment | null | 'view_all' | 'sync_branch';
-  const selected: ListboxValue = activeEnv ?? null;
+  const [selected, setSelected] = useState<ListboxValue>(null);
   const nextPathname = useSwitchablePathname();
   const [{ data: envs = [], error }] = useEnvironments();
+
+  //
+  // Sync selected state with activeEnv from route
+  useEffect(() => {
+    setSelected(activeEnv || null);
+  }, [activeEnv]);
 
   if (error) {
     console.error('error fetching envs', error);
@@ -177,28 +185,24 @@ export default function EnvironmentSelectMenu({
   return (
     <Listbox value={selected} onChange={onSelect}>
       {({ open }) => (
-        <div className="bg-canvasBase relative flex">
+        <div className="relative flex h-8 items-center">
           <OptionalTooltip tooltip={collapsed && tooltip(selectedEnv)}>
+            {/* Trigger styled inline to match the breadcrumb look in the
+                top bar: flat, transparent, hover:bg-canvasMuted, text-basis.
+                If the env switcher ever gets mounted somewhere else we'll
+                want to introduce a variant prop here. */}
             <Listbox.Button
-              className={`border-muted bg-canvasBase text-primary-intense hover:bg-canvasSubtle px-2 ${
-                collapsed ? `w-8` : !activeEnv ? 'w-[196px]' : 'w-[158px]'
-              } h-8 overflow-hidden rounded border text-sm ${
-                open && 'border-primary-intense'
-              }`}
+              className={`text-basis hover:bg-canvasMuted flex h-8 items-center gap-1.5 rounded px-2 text-sm leading-none ${
+                collapsed ? 'w-8 justify-center' : ''
+              } ${open ? 'bg-canvasMuted' : ''}`}
             >
-              <div
-                className={`flex flex-row items-center  ${
-                  collapsed ? 'justify-center' : 'justify-between'
-                }`}
-              >
-                <SelectedDisplay selected={selectedEnv} collapsed={collapsed} />
-                {!collapsed && (
-                  <RiExpandUpDownLine
-                    className="text-muted h-4 w-4"
-                    aria-hidden="true"
-                  />
-                )}
-              </div>
+              <SelectedDisplay selected={selectedEnv} collapsed={collapsed} />
+              {!collapsed && (
+                <RiExpandUpDownLine
+                  className="text-muted h-4 w-4 shrink-0"
+                  aria-hidden="true"
+                />
+              )}
             </Listbox.Button>
           </OptionalTooltip>
 
