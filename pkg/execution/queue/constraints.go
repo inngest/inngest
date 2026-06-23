@@ -447,10 +447,10 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		constraintItems = append(constraintItems, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindSemaphore,
 			Semaphore: &constraintapi.SemaphoreConstraint{
-				ID:         sem.ID,
-				UsageValue: sem.UsageValue,
-				Weight:     sem.Weight,
-				Release:    sem.Release,
+				ID:               sem.ID,
+				EvaluatedKeyHash: sem.EvaluatedKeyHash,
+				Weight:           sem.Weight,
+				Release:          sem.Release,
 			},
 		})
 		config.Semaphores = append(config.Semaphores, sem)

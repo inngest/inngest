@@ -481,7 +481,7 @@ func ThrottleConstraintFromProto(pbConstraint *pb.ThrottleConstraint) ThrottleCo
 func SemaphoreToProto(s Semaphore) *pb.Semaphore {
 	return &pb.Semaphore{
 		Id:         s.ID,
-		UsageValue: s.UsageValue,
+		UsageValue: s.EvaluatedKeyHash,
 		Weight:     s.Weight,
 		Release:    SemaphoreReleaseModeToProto(s.Release),
 	}
@@ -492,17 +492,17 @@ func SemaphoreFromProto(pbSem *pb.Semaphore) Semaphore {
 		return Semaphore{}
 	}
 	return Semaphore{
-		ID:         pbSem.Id,
-		UsageValue: pbSem.UsageValue,
-		Weight:     pbSem.Weight,
-		Release:    SemaphoreReleaseModeFromProto(pbSem.Release),
+		ID:               pbSem.Id,
+		EvaluatedKeyHash: pbSem.UsageValue,
+		Weight:           pbSem.Weight,
+		Release:          SemaphoreReleaseModeFromProto(pbSem.Release),
 	}
 }
 
 func SemaphoreConstraintToProto(constraint SemaphoreConstraint) *pb.SemaphoreConstraint {
 	return &pb.SemaphoreConstraint{
 		Id:         constraint.ID,
-		UsageValue: constraint.UsageValue,
+		UsageValue: constraint.EvaluatedKeyHash,
 		Weight:     constraint.Weight,
 		Release:    SemaphoreReleaseModeToProto(constraint.Release),
 	}
@@ -513,10 +513,10 @@ func SemaphoreConstraintFromProto(pbConstraint *pb.SemaphoreConstraint) Semaphor
 		return SemaphoreConstraint{}
 	}
 	return SemaphoreConstraint{
-		ID:         pbConstraint.Id,
-		UsageValue: pbConstraint.UsageValue,
-		Weight:     pbConstraint.Weight,
-		Release:    SemaphoreReleaseModeFromProto(pbConstraint.Release),
+		ID:               pbConstraint.Id,
+		EvaluatedKeyHash: pbConstraint.UsageValue,
+		Weight:           pbConstraint.Weight,
+		Release:          SemaphoreReleaseModeFromProto(pbConstraint.Release),
 	}
 }
 

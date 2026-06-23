@@ -375,7 +375,7 @@ func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string
 		if ci.Semaphore == nil {
 			return ""
 		}
-		return fmt.Sprintf("%s:s:%s:%s", accountID, ci.Semaphore.ID, ci.Semaphore.UsageValue)
+		return fmt.Sprintf("%s:s:%s:%s", accountID, ci.Semaphore.ID, ci.Semaphore.EvaluatedKeyHash)
 
 	default:
 		return ""
