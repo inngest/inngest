@@ -13,11 +13,7 @@ function Home() {
   const [{ data: defaultEnv, fetching }] = useDefaultEnvironment();
 
   // Forward into the environment subtree as soon as the default-env query
-  // settles. We intentionally don't gate on the navigation-version flag here:
-  // it only resolves once LaunchDarkly identifies a signed-in user, so gating
-  // on it would deadlock signed-out visitors on this skeleton and never let the
-  // _authed guard redirect them to sign-in. The /env/$envSlug index route makes
-  // the v1/v2 decision once the user is authenticated.
+  // settles so the _authed guard can handle signed-out visitors.
   useEffect(() => {
     if (fetching) {
       return;

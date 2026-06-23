@@ -48,7 +48,7 @@ export default function OnboardingWidget({
           className="border-muted border"
           collapsed={collapsed}
           text="Onboarding guide"
-          icon={<RiBookReadLine className="h-[18px] w-[18px]" />}
+          icon={<RiBookReadLine className="h-[14px] w-[14px]" />}
         />
       )}
 
