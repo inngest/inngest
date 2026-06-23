@@ -30,7 +30,7 @@ import {
   formatMilliseconds,
   parseDuration,
 } from '@inngest/components/utils/date';
-import { RiRefreshLine } from '@remixicon/react';
+import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
@@ -39,6 +39,8 @@ import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { type SessionRun, useSessionRuns } from './useSessionRuns';
 
 const DEFAULT_RANGE = '7d';
+const DOCS_URL =
+  'https://website-git-jakob-sessions-docs-inngest.vercel.app/docs/features/events-triggers/sessions';
 
 const columnHelper = createColumnHelper<SessionRun>();
 
@@ -205,12 +207,12 @@ export function SessionRuns({
               lastDays
                 ? { type: 'relative', duration: parseDuration(lastDays) }
                 : startTimeParam && endTimeParam
-                  ? {
-                      type: 'absolute',
-                      start: new Date(startTimeParam),
-                      end: new Date(endTimeParam),
-                    }
-                  : { type: 'relative', duration: parseDuration(DEFAULT_RANGE) }
+                ? {
+                    type: 'absolute',
+                    start: new Date(startTimeParam),
+                    end: new Date(endTimeParam),
+                  }
+                : { type: 'relative', duration: parseDuration(DEFAULT_RANGE) }
             }
           />
           <RunsStatusFilter
@@ -233,7 +235,15 @@ export function SessionRuns({
                 <TableBlankState
                   icon={<SessionsIcon />}
                   title={`No runs found for ${sessionId}`}
-                  actions={null}
+                  actions={
+                    <Button
+                      label="Go to docs"
+                      href={DOCS_URL}
+                      target="_blank"
+                      icon={<RiExternalLinkLine />}
+                      iconSide="left"
+                    />
+                  }
                 />
               }
               expandedIDs={expandedRunIDs}

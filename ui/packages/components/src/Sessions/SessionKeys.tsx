@@ -1,12 +1,16 @@
+import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Search } from '@inngest/components/Forms/Search';
 import { Table, TableBlankState, TextCell } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
 import { type SessionKey } from '@inngest/components/types/session';
+import { RiExternalLinkLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 const columnHelper = createColumnHelper<SessionKey>();
+const DOCS_URL =
+  'https://website-git-jakob-sessions-docs-inngest.vercel.app/docs/features/events-triggers/sessions';
 
 const columns = [
   columnHelper.accessor('sessionKey', {
@@ -84,7 +88,15 @@ export function SessionKeys({
             blankState={
               <TableBlankState
                 icon={<SessionsIcon />}
-                actions={null}
+                actions={
+                  <Button
+                    label="Go to docs"
+                    href={DOCS_URL}
+                    target="_blank"
+                    icon={<RiExternalLinkLine />}
+                    iconSide="left"
+                  />
+                }
                 title={search ? `No session key found for "${search}"` : 'No sessions found'}
                 description="Session keys appear here after events are sent with session meta."
               />
