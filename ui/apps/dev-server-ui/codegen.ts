@@ -21,6 +21,9 @@ const codegenConfig: CodegenConfig = {
   overwrite: true,
   schema: '../../../pkg/coreapi/**/*.graphql',
   documents: 'src/**/*',
+  hooks: {
+    afterOneFileWrite: ['prettier --write'],
+  },
   generates: {
     //
     // a type-only version without the rtk-query dep so the cross-app
