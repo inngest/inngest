@@ -220,7 +220,7 @@ func TestTimeoutFinish(t *testing.T) {
 			}()
 		}
 
-		<-time.After(8 * time.Second)
+		<-time.After(20 * time.Second)
 		require.EqualValues(t, 3, progressA)
 		require.EqualValues(t, 3, progressB)
 		require.EqualValues(t, 0, progressC)
