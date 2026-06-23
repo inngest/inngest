@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
@@ -18,6 +18,7 @@ import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import { useColumns } from './columns';
 
 const DEFAULT_RANGE = '7d';
+const SEARCH_DEBOUNCE_MS = 300;
 // TODO: Replace with the sessions docs URL and include a ref param for dashboard traffic.
 const DOCS_URL = 'ui/packages/components/src/Sessions/SessionResults.tsx';
 
@@ -58,8 +59,13 @@ export function SessionResults({
   const navigate = useNavigate();
   const columns = useColumns({ pathCreator });
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const trimmedSearch = search.trim();
-  const deferredSearch = useDeferredValue(trimmedSearch);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(trimmedSearch), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [trimmedSearch]);
 
   const batchUpdate = useBatchedSearchParams();
 
@@ -87,15 +93,15 @@ export function SessionResults({
         });
       }
     },
-    [batchUpdate]
+    [batchUpdate],
   );
 
   const { data, error, isPending, isFetching, refetch } = useQuery({
-    queryKey: ['sessions', envID, sessionKey, deferredSearch, startTime, endTime],
+    queryKey: ['sessions', envID, sessionKey, debouncedSearch, startTime, endTime],
     queryFn: () =>
       getSessions({
         sessionKey,
-        sessionIdSearch: deferredSearch,
+        sessionIdSearch: debouncedSearch,
         startTime,
         endTime,
       }),
@@ -119,12 +125,12 @@ export function SessionResults({
               last
                 ? { type: 'relative', duration: parseDuration(last) }
                 : start && end
-                ? {
-                    type: 'absolute',
-                    start: new Date(start),
-                    end: new Date(end),
-                  }
-                : { type: 'relative', duration: parseDuration(DEFAULT_RANGE) }
+                  ? {
+                      type: 'absolute',
+                      start: new Date(start),
+                      end: new Date(end),
+                    }
+                  : { type: 'relative', duration: parseDuration(DEFAULT_RANGE) }
             }
           />
         </SelectGroup>
