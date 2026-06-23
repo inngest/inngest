@@ -55,7 +55,7 @@ export const announcements: Announcement[] = [
       label: 'Explore experiments',
       href: 'https://www.inngest.com/blog/introducing-group-experiment',
     },
-    startDate: '2026-06-23T00:00:00Z',
-    endDate: '2026-07-23T00:00:00Z',
+    startDate: '2026-06-23T17:05:00Z',
+    endDate: '2026-07-23T17:05:00Z',
   },
 ];
