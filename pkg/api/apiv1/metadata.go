@@ -117,6 +117,29 @@ type AddRunMetadataRequest struct {
 	Metadata []metadata.Update `json:"metadata"`
 }
 
+type AddRunMetadataOpts struct {
+	State          statev2.RunService
+	TracerProvider tracing.TracerProvider
+	TraceReader    cqrs.TraceReader
+}
+
+func AddRunMetadata(ctx context.Context, opts AddRunMetadataOpts, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
+	tracerProvider := opts.TracerProvider
+	if tracerProvider == nil {
+		tracerProvider = tracing.NewNoopTracerProvider()
+	}
+	r := router{
+		API: &API{
+			opts: Opts{
+				State:          opts.State,
+				TracerProvider: tracerProvider,
+				TraceReader:    opts.TraceReader,
+			},
+		},
+	}
+	return r.AddRunMetadata(ctx, auth, runID, req)
+}
+
 func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
 	if err := metadata.ValidateUpdatesAllowed(req.Metadata); err != nil {
 		return publicerr.Wrap(err, 400, "Invalid metadata")
