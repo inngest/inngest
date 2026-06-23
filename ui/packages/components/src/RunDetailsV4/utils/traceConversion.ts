@@ -75,25 +75,33 @@ function getStyleForTrace(trace: Trace): BarStyleKey {
 }
 
 /**
- * Calculate timing breakdown for a step.run span
+ * Calculate timing breakdown for a step.run span.
+ *
+ * For in-progress spans (no `endedAt`), `executionMs`/`totalMs` are returned
+ * as `null`. The render path must recompute them live against `Date.now()`
+ * — baking a `Date.now()` snapshot here would freeze inside the upstream
+ * `useMemo` and visually misallocate width to the Inngest segment.
  */
 function calculateTimingBreakdown(
   trace: Trace
-): { inngestMs: number; executionMs: number; totalMs: number } | undefined {
+): { inngestMs: number; executionMs: number | null; totalMs: number | null } | undefined {
   if (!trace.queuedAt) return undefined;
 
   const queuedAt = new Date(trace.queuedAt).getTime();
   const startedAt = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
-  const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : Date.now();
+  const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : null;
 
-  // Calculate durations
-  const inngestMs = startedAt
-    ? Math.max(0, startedAt - queuedAt)
-    : Math.max(0, Date.now() - queuedAt);
-  const executionMs = startedAt ? Math.max(0, endedAt - startedAt) : 0;
-  const totalMs = startedAt ? inngestMs + executionMs : Date.now() - queuedAt;
+  // Inngest-side overhead is fixed once `startedAt` exists; without `startedAt`
+  // we cannot bake a value (would drift with Date.now), so leave it as 0 and
+  // let the render path treat the whole bar as in-progress.
+  const inngestMs = startedAt != null ? Math.max(0, startedAt - queuedAt) : 0;
 
-  return { inngestMs, executionMs, totalMs };
+  if (endedAt == null) {
+    return { inngestMs, executionMs: null, totalMs: null };
+  }
+
+  const executionMs = startedAt != null ? Math.max(0, endedAt - startedAt) : 0;
+  return { inngestMs, executionMs, totalMs: inngestMs + executionMs };
 }
 
 /**
@@ -103,7 +111,7 @@ function calculateTimingBreakdown(
 function getTimingFromMetadata(
   trace: Trace,
   metadata?: SpanMetadata[]
-): { inngestMs: number; executionMs: number; totalMs: number } | null {
+): { inngestMs: number; executionMs: number | null; totalMs: number | null } | null {
   if (!metadata) return null;
 
   const timing = metadata.find((m): m is SpanMetadataInngestTiming => m.kind === 'inngest.timing');
@@ -112,14 +120,17 @@ function getTimingFromMetadata(
 
   const inngestMs = timing.values.total_inngest_ms ?? 0;
 
-  // Execution time is still derived from span timestamps since the metadata
-  // captures Inngest-side overhead, not SDK execution duration.
+  // Execution time is derived from span timestamps. For in-progress spans
+  // we return null so the render path computes it live against Date.now().
   const startedAt = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
-  const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : Date.now();
-  const executionMs = startedAt ? Math.max(0, endedAt - startedAt) : 0;
-  const totalMs = inngestMs + executionMs;
+  const endedAt = trace.endedAt ? new Date(trace.endedAt).getTime() : null;
 
-  return { inngestMs, executionMs, totalMs };
+  if (endedAt == null) {
+    return { inngestMs, executionMs: null, totalMs: null };
+  }
+
+  const executionMs = startedAt != null ? Math.max(0, endedAt - startedAt) : 0;
+  return { inngestMs, executionMs, totalMs: inngestMs + executionMs };
 }
 
 /**
@@ -461,17 +472,26 @@ export function traceToTimelineData(
 ): TimelineData {
   const { orgName, leftWidth = TIMELINE_CONSTANTS.DEFAULT_LEFT_WIDTH, functionSlug } = options;
 
-  // Calculate min/max time from the entire trace tree
+  // Calculate min/max time from the entire trace tree. `maxTime` stays null
+  // while the run is in progress so callers substitute a live `Date.now()`
+  // — baking a snapshot here would freeze inside the upstream useMemo.
   let minTime = new Date(trace.queuedAt);
-  let maxTime = trace.endedAt ? new Date(trace.endedAt) : new Date();
+  let maxTime: Date | null = trace.endedAt ? new Date(trace.endedAt) : null;
+  let anyInProgress = !trace.endedAt;
 
   traceWalk(trace, (t) => {
     minTime = min([minTime, new Date(t.queuedAt)]);
     const endedAt = t.endedAt ? new Date(t.endedAt) : null;
     if (endedAt) {
-      maxTime = max([endedAt, maxTime]);
+      maxTime = maxTime ? max([endedAt, maxTime]) : endedAt;
+    } else {
+      anyInProgress = true;
     }
   });
+
+  if (anyInProgress) {
+    maxTime = null;
+  }
 
   // Run startedAt timestamp for computing per-step discovery time
   const runStartedAtMs = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
@@ -491,12 +511,16 @@ export function traceToTimelineData(
   // Sum execution time from all step children, and attribute the rest to Inngest overhead.
   // For children without a timingBreakdown (sleep, waitForEvent, invoke, etc.),
   // use their wall-clock duration as execution time so it isn't misattributed as overhead.
-  if (rootBar.endTime) {
+  // Only roll up the root bar's timingBreakdown for fully-completed runs.
+  // While any child is in-progress, both the run duration and child execution
+  // sums are live (Date.now()-dependent); baking them here would freeze
+  // inside useMemo. The renderer handles the in-progress root via segments.
+  if (rootBar.endTime && !anyInProgress) {
     const runDurationMs = rootBar.endTime.getTime() - rootBar.startTime.getTime();
     if (runDurationMs > 0) {
       let totalExecutionMs = 0;
       for (const child of rootBar.children ?? []) {
-        if (child.timingBreakdown) {
+        if (child.timingBreakdown?.executionMs != null) {
           totalExecutionMs += child.timingBreakdown.executionMs;
         } else if (child.endTime) {
           totalExecutionMs += Math.max(0, child.endTime.getTime() - child.startTime.getTime());

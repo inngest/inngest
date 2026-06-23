@@ -3,7 +3,7 @@
  * Feature: 001-composable-timeline-bar
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { Trace } from '../types';
 import { traceToTimelineData } from './traceConversion';
@@ -94,7 +94,11 @@ describe('traceConversion', () => {
       expect(result.maxTime).toEqual(new Date('2024-01-01T00:00:20Z'));
     });
 
-    it('handles trace with null endedAt (in progress)', () => {
+    it('leaves maxTime null for in-progress runs so renderer substitutes live now', () => {
+      // For in-progress runs we deliberately don't bake `Date.now()` here.
+      // Doing so would freeze inside the upstream useMemo and let the
+      // Inngest sub-bar grow with the parent. The Timeline component is
+      // responsible for substituting a fresh `Date.now()` each render.
       const trace = createTrace({
         isRoot: true,
         endedAt: null,
@@ -102,9 +106,127 @@ describe('traceConversion', () => {
 
       const result = traceToTimelineData(trace, { runID: 'run-1' });
 
-      // maxTime should be roughly "now" - just check it's a valid date
-      expect(result.maxTime).toBeInstanceOf(Date);
-      expect(result.maxTime.getTime()).toBeGreaterThan(result.minTime.getTime());
+      expect(result.maxTime).toBeNull();
+    });
+
+    it('leaves maxTime null when any child is still in-progress', () => {
+      const trace = createTrace({
+        isRoot: true,
+        endedAt: '2024-01-01T00:00:30Z',
+        childrenSpans: [
+          createTrace({
+            spanID: 'child-1',
+            stepOp: 'RUN',
+            endedAt: '2024-01-01T00:00:05Z',
+          }),
+          createTrace({
+            spanID: 'child-2',
+            stepOp: 'RUN',
+            endedAt: null,
+          }),
+        ],
+      });
+
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.maxTime).toBeNull();
+    });
+  });
+
+  describe('in-progress timing breakdown', () => {
+    it('still bakes executionMs/totalMs for fully completed step.run spans', () => {
+      const trace = createTrace({
+        isRoot: true,
+        endedAt: '2024-01-01T00:00:10Z',
+        childrenSpans: [
+          createTrace({
+            spanID: 'done-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:00Z',
+            startedAt: '2024-01-01T00:00:02Z',
+            endedAt: '2024-01-01T00:00:07Z',
+          }),
+        ],
+      });
+
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+      const child = result.bars[0]?.children?.[0];
+
+      expect(child?.timingBreakdown?.inngestMs).toBe(2000);
+      expect(child?.timingBreakdown?.executionMs).toBe(5000);
+      expect(child?.timingBreakdown?.totalMs).toBe(7000);
+    });
+
+    it('produces identical in-progress output regardless of system time', async () => {
+      // If `calculateTimingBreakdown` accidentally re-introduces a Date.now()
+      // capture, this test fails: the two results would differ.
+      const trace = createTrace({
+        isRoot: true,
+        endedAt: null,
+        childrenSpans: [
+          createTrace({
+            spanID: 'in-progress-step',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:00Z',
+            startedAt: '2024-01-01T00:00:00.050Z',
+            endedAt: null,
+          }),
+        ],
+      });
+
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2024-01-01T00:00:01Z'));
+        const early = traceToTimelineData(trace, { runID: 'run-1' });
+
+        vi.setSystemTime(new Date('2024-01-01T00:05:00Z'));
+        const late = traceToTimelineData(trace, { runID: 'run-1' });
+
+        const earlyChild = early.bars[0]?.children?.[0]?.timingBreakdown;
+        const lateChild = late.bars[0]?.children?.[0]?.timingBreakdown;
+
+        expect(earlyChild).toEqual(lateChild);
+        expect(earlyChild?.executionMs).toBeNull();
+        expect(earlyChild?.totalMs).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('skips the root timingBreakdown roll-up when any child is in-progress', () => {
+      // The root roll-up at traceToTimelineData sums child execution times to
+      // derive root inngest/execution; with an in-progress child that sum
+      // would be partly Date.now()-dependent. We refuse to bake it.
+      // The real root span has stepOp: null (it's not a step.run itself), so
+      // its own calculateTimingBreakdown returns undefined, leaving any value
+      // on rootBar.timingBreakdown attributable to the roll-up.
+      const trace = createTrace({
+        isRoot: true,
+        stepOp: null,
+        endedAt: null,
+        childrenSpans: [
+          createTrace({
+            spanID: 'done',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:00Z',
+            startedAt: '2024-01-01T00:00:00.010Z',
+            endedAt: '2024-01-01T00:00:05Z',
+          }),
+          createTrace({
+            spanID: 'in-progress',
+            stepOp: 'RUN',
+            queuedAt: '2024-01-01T00:00:05Z',
+            startedAt: '2024-01-01T00:00:05.010Z',
+            endedAt: null,
+          }),
+        ],
+      });
+
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+      const root = result.bars[0];
+
+      // No frozen executionMs/totalMs on the root either.
+      expect(root?.timingBreakdown).toBeUndefined();
     });
   });
 
