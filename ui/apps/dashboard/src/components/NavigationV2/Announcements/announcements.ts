@@ -32,20 +32,6 @@ export type Announcement = {
 
 export const announcements: Announcement[] = [
   {
-    id: 'announcing-defer-2026-06',
-    title: 'Introducing defer ( )',
-    body: 'Schedule runs when the parent run finishes.',
-    imageUrl: '/images/announcements/defer-dark.png',
-    imageUrlDark: '/images/announcements/defer-dark.png',
-    cta: {
-      label: 'Learn more',
-      href: 'https://www.inngest.com/blog/announcing-defer',
-    },
-    startDate: '2026-06-01T00:00:00Z',
-    endDate: '2026-07-01T00:00:00Z',
-  },
-
-  {
     id: 'group-experiment-2026-06',
     title: 'group.experiment ( )',
     body: 'Safely test variants in production',
@@ -57,5 +43,18 @@ export const announcements: Announcement[] = [
     },
     startDate: '2026-06-23T17:05:00Z',
     endDate: '2026-07-23T17:05:00Z',
+  },
+  {
+    id: 'announcing-defer-2026-06',
+    title: 'Introducing defer ( )',
+    body: 'Schedule runs when the parent run finishes.',
+    imageUrl: '/images/announcements/defer-light.png',
+    imageUrlDark: '/images/announcements/defer-dark.png',
+    cta: {
+      label: 'Learn more',
+      href: 'https://www.inngest.com/blog/announcing-defer',
+    },
+    startDate: '2026-06-01T00:00:00Z',
+    endDate: '2026-07-01T00:00:00Z',
   },
 ];
