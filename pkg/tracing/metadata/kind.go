@@ -41,9 +41,9 @@ func (k Kind) Validate() error {
 
 // allowedInngestKinds is the set of inngest-prefixed metadata kinds that SDK
 // clients are permitted to set. Any inngest.* kind not in this set is rejected
-// to prevent spoofing of internal metadata. Score kinds carry a user-supplied
-// name in their suffix (KindInngestScore + "." + name) and are gated by
-// IsScoped below rather than this map.
+// to prevent spoofing of internal metadata. The score kind is the bare
+// constant inngest.score; the user-supplied score name is a key in the values
+// map, not a kind suffix.
 var allowedInngestKinds = map[Kind]bool{
 	"inngest.ai":               true,
 	"inngest.http":             true,
@@ -56,10 +56,9 @@ var allowedInngestKinds = map[Kind]bool{
 
 // ValidateAllowed checks that the kind is valid and, if it uses the inngest.*
 // prefix, that it belongs to the allowlist. Userland kinds pass without
-// restriction. Score kinds (inngest.score.<name>) are accepted with any
-// non-empty suffix so the name appears as the outer Map key in storage,
-// mirroring how userland.<name> works — except for characters that the cloud
-// variant aggregation would silently drop (see validateScoreName).
+// restriction. The score kind inngest.score is allowlisted like the others;
+// the user-supplied score name is a key in the values map (validated by
+// validateScoreName), not a kind suffix.
 func (k Kind) ValidateAllowed() error {
 	if err := k.Validate(); err != nil {
 		return err

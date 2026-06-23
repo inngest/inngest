@@ -1,8 +1,9 @@
-import type {
-  SpanMetadataKind as GeneratedSpanMetadataKind,
-  SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
-  SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
-  Warnings,
+import {
+  KindInngestScore,
+  type SpanMetadataKind as GeneratedSpanMetadataKind,
+  type SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
+  type SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
+  type Warnings,
 } from '../generated/index';
 
 export type Trace = {
@@ -142,7 +143,8 @@ export type SpanMetadataInngestScore = {
   scope: SpanMetadataScope;
   kind: SpanMetadataKindInngestScore;
   updatedAt: string;
-  values: { value: number | boolean };
+  // Map of user-supplied score name to its value.
+  values: Record<string, { value: number | boolean }>;
 };
 
 export type SpanMetadataUserland = {
@@ -245,5 +247,5 @@ export function isExperimentMetadata(md: SpanMetadata): md is SpanMetadataInnges
 }
 
 export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScore {
-  return md.kind.startsWith('inngest.score.');
+  return md.kind === KindInngestScore;
 }
