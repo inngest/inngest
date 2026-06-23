@@ -15,7 +15,7 @@ const MAX_VISIBLE = 3;
 // each card's top edge actually peeks above the one in front of it.
 const DEPTH_STYLES = [
   { scale: 1, y: 0, opacity: 1, rotate: 0 },
-  { scale: 0.9, y: -28, opacity: 0.9, rotate: 0 },
+  { scale: 0.9, y: -30, opacity: 0.9, rotate: 0 },
   { scale: 0.7, y: -15, opacity: 0.9, rotate: 0 },
 ] as const;
 

@@ -19,7 +19,7 @@ export const CARD_CONTENT_HEIGHT_CLASS = 'h-[194px]';
 const CARD_IMAGE_HEIGHT_CLASS = 'h-[110px]';
 
 const CARD_CLASS =
-  'group text-basis bg-canvasSubtle border-subtle block overflow-hidden rounded border leading-tight shadow-md';
+  'group text-basis bg-canvasSubtle border-muted block overflow-hidden rounded border leading-tight shadow-md';
 
 export default function AnnouncementCard({
   announcement,
@@ -67,7 +67,7 @@ export default function AnnouncementCard({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                icon={<RiSubtractLine className="text-light" />}
+                icon={<RiSubtractLine className="text-subtle" />}
                 kind="secondary"
                 appearance="ghost"
                 size="small"
