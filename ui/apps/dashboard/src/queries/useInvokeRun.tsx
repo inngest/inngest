@@ -8,11 +8,12 @@ export const useInvokeRun = () => {
   const env = useEnvironment();
   const [, invokeFunction] = useMutation(InvokeFunctionOnboardingDocument);
 
-  return async ({ functionSlug, data, user, envID }: InvokeRunPayload) => {
+  return async ({ functionSlug, data, meta, user, envID }: InvokeRunPayload) => {
     return await invokeFunction({
       envID: envID ? envID : env.id,
       data,
       functionSlug,
+      meta,
       user,
     });
   };

@@ -21,6 +21,7 @@ type Props = {
   onConfirm: (payload: {
     data: Record<string, unknown>;
     user: Record<string, unknown> | null;
+    meta: { sessions: Record<string, string> } | null;
   }) => void;
 };
 
@@ -42,7 +43,7 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
         payload = parseCode(rawPayload);
         localStorage.setItem(LOCAL_STORAGE_KEY, rawPayload);
       } else {
-        payload = { data: {}, user: null };
+        payload = { data: {}, user: null, meta: null };
       }
 
       onConfirm(payload);

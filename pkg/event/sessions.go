@@ -1,10 +1,10 @@
 package event
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/inngest/inngest/pkg/consts"
 )
@@ -28,8 +28,11 @@ func (s *Sessions) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+
 	raw := map[string]any{}
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if err := dec.Decode(&raw); err != nil {
 		return err
 	}
 
@@ -38,8 +41,8 @@ func (s *Sessions) UnmarshalJSON(data []byte) error {
 		switch v := value.(type) {
 		case string:
 			out[name] = v
-		case float64:
-			out[name] = strconv.FormatFloat(v, 'f', -1, 64)
+		case json.Number:
+			out[name] = v.String()
 		default:
 			// Booleans are intentionally rejected: a boolean is only ever two
 			// values, i.e. a low-cardinality label, not a session ID.
