@@ -6,6 +6,8 @@ import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
 import { type SessionKey } from '@inngest/components/types/session';
 import { createColumnHelper } from '@tanstack/react-table';
 
+import { SessionsEmptyState } from './SessionsEmptyState';
+
 const columnHelper = createColumnHelper<SessionKey>();
 
 const columns = [
@@ -49,6 +51,10 @@ export function SessionKeys({
   getSessionKeyHref,
 }: SessionKeysProps) {
   const trimmedSearch = search.trim();
+
+  if (!error && !trimmedSearch && sessionKeys.length === 0) {
+    return <SessionsEmptyState isLoading={isLoading} />;
+  }
 
   return (
     <div className="bg-canvasBase text-basis flex flex-1 flex-col overflow-hidden focus-visible:outline-none">

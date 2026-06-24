@@ -20,6 +20,7 @@ export type TabsProps = {
   content: string;
   readOnly?: boolean;
   language?: string;
+  wordWrap?: 'on' | 'off';
 };
 
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
@@ -30,7 +31,12 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const monaco = useMonaco();
-  const activeTabContent = currentTabContent || { content: '', readOnly: true, language: 'json' };
+  const activeTabContent: TabsProps = currentTabContent || {
+    title: '',
+    content: '',
+    readOnly: true,
+    language: 'json',
+  };
 
   useEffect(() => {
     // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
@@ -108,7 +114,7 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
                 top: 10,
                 bottom: 10,
               },
-              wordWrap: 'off',
+              wordWrap: activeTabContent.wordWrap ?? 'off',
               wrappingStrategy: 'advanced',
               overviewRulerLanes: 0,
             }}
