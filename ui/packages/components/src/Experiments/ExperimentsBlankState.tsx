@@ -5,7 +5,7 @@ import { TableBlankState } from '../Table/TableBlankState';
 import { ExperimentsIcon } from '../icons/sections/Experiments';
 
 const DOCS_URL =
-  'https://www.inngest.com/docs/features/inngest-functions/steps-workflows/running-experiments';
+  'https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments';
 
 type Props = {
   title: React.ReactNode;
