@@ -1,7 +1,9 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
+import { Search } from '@inngest/components/Forms/Search';
+import { SelectGroup } from '@inngest/components/Select/Select';
 import { Table, TableBlankState } from '@inngest/components/Table';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import { useBatchedSearchParams } from '@inngest/components/hooks/useSearchParams';
@@ -16,6 +18,7 @@ import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import { useColumns } from './columns';
 
 const DEFAULT_RANGE = '7d';
+const SEARCH_DEBOUNCE_MS = 300;
 // TODO: Replace with the sessions docs URL and include a ref param for dashboard traffic.
 const DOCS_URL = 'ui/packages/components/src/Sessions/SessionResults.tsx';
 
@@ -35,6 +38,7 @@ type SessionResultsProps = {
   };
   getSessions: (params: {
     sessionKey: string;
+    sessionIdSearch?: string;
     startTime: string;
     endTime: string;
   }) => Promise<Session[]>;
@@ -54,6 +58,14 @@ export function SessionResults({
 }: SessionResultsProps) {
   const navigate = useNavigate();
   const columns = useColumns({ pathCreator });
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const trimmedSearch = search.trim();
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(trimmedSearch), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  }, [trimmedSearch]);
 
   const batchUpdate = useBatchedSearchParams();
 
@@ -81,12 +93,18 @@ export function SessionResults({
         });
       }
     },
-    [batchUpdate]
+    [batchUpdate],
   );
 
   const { data, error, isPending, isFetching, refetch } = useQuery({
-    queryKey: ['sessions', envID, sessionKey, startTime, endTime],
-    queryFn: () => getSessions({ sessionKey, startTime, endTime }),
+    queryKey: ['sessions', envID, sessionKey, debouncedSearch, startTime, endTime],
+    queryFn: () =>
+      getSessions({
+        sessionKey,
+        sessionIdSearch: debouncedSearch,
+        startTime,
+        endTime,
+      }),
     refetchOnWindowFocus: false,
   });
 
@@ -94,25 +112,52 @@ export function SessionResults({
 
   return (
     <div className="bg-canvasBase text-basis flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
-      <div className="flex flex-col gap-4 px-3 pb-3 pt-6">
-        <h1 className="text-basis text-xl font-medium">
-          <span className="font-mono">{sessionKey}</span> Results
-        </h1>
-        <TimeFilter
-          daysAgoMax={maxRangeDays}
-          onDaysChange={onDaysChange}
-          defaultValue={
-            last
-              ? { type: 'relative', duration: parseDuration(last) }
-              : start && end
-              ? {
-                  type: 'absolute',
-                  start: new Date(start),
-                  end: new Date(end),
-                }
-              : { type: 'relative', duration: parseDuration(DEFAULT_RANGE) }
-          }
-        />
+      <div className="flex flex-col gap-1.5 px-3 py-3 md:flex-row md:items-center">
+        <SelectGroup>
+          <span className="border-muted bg-modalBase text-muted box-content flex h-[24px] items-center rounded border px-2 text-xs">
+            Time range
+          </span>
+          <TimeFilter
+            className="rounded-l-none border-l-0"
+            daysAgoMax={maxRangeDays}
+            onDaysChange={onDaysChange}
+            defaultValue={
+              last
+                ? { type: 'relative', duration: parseDuration(last) }
+                : start && end
+                  ? {
+                      type: 'absolute',
+                      start: new Date(start),
+                      end: new Date(end),
+                    }
+                  : { type: 'relative', duration: parseDuration(DEFAULT_RANGE) }
+            }
+          />
+        </SelectGroup>
+        <form
+          className="w-full max-w-[360px]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (trimmedSearch) {
+              navigate({
+                to: pathCreator.session({
+                  sessionKey,
+                  sessionId: trimmedSearch,
+                }) as LinkComponentProps['to'],
+              });
+            }
+          }}
+        >
+          <Search
+            name="sessionId"
+            placeholder="Search by session identifier"
+            value={search}
+            maxLength={512}
+            autoFocus
+            className="w-full"
+            onUpdate={setSearch}
+          />
+        </form>
       </div>
       <div className="flex-1 overflow-y-auto">
         {error ? (
@@ -126,7 +171,11 @@ export function SessionResults({
               blankState={
                 <TableBlankState
                   icon={<SessionsIcon />}
-                  title={`No sessions found for "${sessionKey}"`}
+                  title={
+                    trimmedSearch
+                      ? `No session identifier found for "${trimmedSearch}"`
+                      : `No sessions found for "${sessionKey}"`
+                  }
                   actions={
                     <>
                       <Button appearance="outlined" label="Edit search" onClick={onEditSearch} />
