@@ -101,7 +101,13 @@ if enableCacheInvalidation then
 			local sl = (scope == 2 and "a") or (scope == 1 and "e") or "f"
 			local cacheKey
 			if c.c.h ~= nil and c.c.h ~= "" then
-				cacheKey = accountID .. ":c:" .. sl .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+				if scope == 0 then
+					cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.f .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+				elseif scope == 1 then
+					cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.e .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+				else
+					cacheKey = accountID .. ":c:" .. sl .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+				end
 			elseif scope == 0 then
 				cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.f
 			elseif scope == 1 then
