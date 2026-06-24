@@ -116,9 +116,8 @@ homebrew_casks:
           name: homebrew-tap
           branch: main
 
-    # auto only uploads stable releases to homebrew-tap
-    # set to false temporarily if testing prereleases too
-    skip_upload: auto
+    # Temporarily disabled for prerelease tap testing.
+    skip_upload: false
 
     homepage: "https://www.inngest.com/"
     description: "Inngest CLI and development server"
