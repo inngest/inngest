@@ -424,6 +424,12 @@ export const tableEntries: SchemaEntry[] = [
         },
         {
           kind: 'value',
+          name: 'status',
+          path: 'runs.status',
+          type: 'String',
+        },
+        {
+          kind: 'value',
           name: 'queued_at',
           path: 'runs.queued_at',
           type: 'DateTime',
@@ -463,6 +469,34 @@ export const tableEntries: SchemaEntry[] = [
           name: 'error',
           path: 'runs.error',
           type: 'JSON',
+        },
+        attributesNode('runs', 'attributes'),
+        metadataNode('runs', 'inngest'),
+        metadataNode('runs', 'metadata'),
+        {
+          kind: 'array',
+          name: 'sessions',
+          path: 'runs.sessions',
+          element: {
+            kind: 'object',
+            name: 'session',
+            path: 'runs.sessions',
+            type: 'object',
+            children: [
+              {
+                kind: 'value',
+                name: 'key',
+                path: 'runs.sessions.key',
+                type: 'String',
+              },
+              {
+                kind: 'value',
+                name: 'id',
+                path: 'runs.sessions.id',
+                type: 'String',
+              },
+            ],
+          },
         },
       ],
     },
