@@ -280,7 +280,7 @@ func (q *queueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart 
 			switch limitingConstraint {
 			case enums.QueueConstraintNotLimited:
 				// continue with next backlog
-			case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency:
+			case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency, enums.QueueConstraintHaltingSemaphore:
 				l.Trace("limited by concurrency, requeueing shadow partition in the future",
 					"scope", limitingConstraint,
 				)

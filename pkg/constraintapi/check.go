@@ -93,8 +93,18 @@ type checkScriptResponse struct {
 // Check implements CapacityManager.
 func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequest) (*CapacityCheckResponse, errs.UserError, errs.InternalError) {
 	l := logger.StdlibLogger(ctx)
+	originalReq := req
 
-	// Validate request
+	req = r.filterDisabledAccountSemaphoreCheckRequest(ctx, req)
+	if len(req.Constraints) == 0 {
+		if err := originalReq.Valid(); err != nil {
+			return nil, nil, errs.Wrap(0, false, "invalid request: %w", err)
+		}
+		// the only requested constraint was a filtered acct semaphore so this is ok
+		return &CapacityCheckResponse{}, nil, nil
+	}
+
+	// validate after filtering so disabled acct semaphores are ignored
 	if err := req.Valid(); err != nil {
 		return nil, nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
@@ -212,4 +222,17 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 	default:
 		return nil, nil, errs.Wrap(0, false, "unexpected status code %v", parsedResponse.Status)
 	}
+}
+
+func (r *redisCapacityManager) filterDisabledAccountSemaphoreCheckRequest(ctx context.Context, req *CapacityCheckRequest) *CapacityCheckRequest {
+	// Keep account semaphore rollout decisions centralized in constraintapi.
+	filteredConstraints, filteredConfig, changed := filterDisabledAccountSemaphoreRequest(ctx, req.AccountID, req.Constraints, req.Configuration)
+	if !changed {
+		return req
+	}
+
+	filteredReq := *req
+	filteredReq.Constraints = filteredConstraints
+	filteredReq.Configuration = filteredConfig
+	return &filteredReq
 }

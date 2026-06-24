@@ -9,6 +9,7 @@ capacity checks.  They power worker concurrency and function concurrency.
 Semaphore names are always prefixed to avoid collisions:
 
 - `app:<uuid>` — worker concurrency (one per app, capacity managed by connect lifecycle)
+- `acct:<uuid>` — account-scoped concurrency
 - `fn:<uuid>` — function concurrency (one per function)
 - `hash:<xxhash>` — user-defined names (xxhash of user string)
 

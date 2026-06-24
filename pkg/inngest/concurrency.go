@@ -186,7 +186,7 @@ type FnConcurrency struct {
 
 	// ID represents the pre-computed semaphore ID for this concurrency limit.
 	// Set internally during registration (e.g., "app:<appID>" for connect apps).
-	// For fn-scoped limits without a pre-set ID, evaluateFnConcurrency computes it.
+	// For fn-scoped limits without a pre-set ID, the executor computes it.
 	ID string `json:"id,omitempty"`
 }
 

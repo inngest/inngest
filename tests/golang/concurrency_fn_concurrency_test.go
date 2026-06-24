@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestFnConcurrency tests function-level concurrency via semaphores.
+// TestSemaphoreFnConcurrency tests function-level concurrency via semaphores.
 // Unlike step concurrency, the limit is held for the ENTIRE run — across
 // all steps. Only one run should execute at a time with limit=1.
-func TestFnConcurrency(t *testing.T) {
+func TestSemaphoreFnConcurrency(t *testing.T) {
 	c := client.New(t)
 	c.ResetAll(t)
 

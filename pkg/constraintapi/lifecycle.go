@@ -15,18 +15,25 @@ type OnCapacityLeaseAcquiredData struct {
 	AppID      uuid.UUID
 	FunctionID uuid.UUID
 
+	Status       int
+	CacheEnabled bool
+	CacheHit     bool
+
 	Configuration ConstraintConfig
 	Constraints   []ConstraintItem
 
 	RequestedAmount int
+	GrantedAmount   int
 	Duration        time.Duration
 	Source          LeaseSource
+	RequestAttempt  int
 
 	GrantedLeases        []CapacityLease
 	LimitingConstraints  []ConstraintItem
 	ExhaustedConstraints []ConstraintItem
 	FairnessReduction    int
 	RetryAfter           time.Time
+	Debug                []string
 }
 
 type OnCapacityLeaseExtendedData struct {

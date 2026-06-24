@@ -332,6 +332,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(1))
 	case enums.QueueConstraintCustomConcurrencyKey2:
 		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(2))
+	case enums.QueueConstraintHaltingSemaphore:
+		err = ErrHaltingSemaphoreLimit
 	case enums.QueueConstraintSemaphore:
 		err = ErrSemaphoreLimit
 	default:
@@ -425,9 +427,14 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		}
 
 		return nil
-	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
+	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit, ErrHaltingSemaphoreLimit:
 		p.IsCustomKeyLimitOnly.Store(false)
-		p.IsSemaphoreLimitOnly.Store(false)
+
+		if cause != ErrHaltingSemaphoreLimit {
+			// halting semaphores should only delay by 1s so that we repeek relatively quickly.  if this
+			// is another concurrency limit, mark this as non-semaphore so we can delay > 1s
+			p.IsSemaphoreLimitOnly.Store(false)
+		}
 
 		p.CtrConcurrency.Add(1)
 		// Since the queue is at capacity on a fn or account level, no
@@ -458,6 +465,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 				p.Partition.AccountID,
 				p.Partition.EnvID,
 			)
+		case ErrHaltingSemaphoreLimit:
+			status = "halting_semaphore_limit"
 		}
 
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
