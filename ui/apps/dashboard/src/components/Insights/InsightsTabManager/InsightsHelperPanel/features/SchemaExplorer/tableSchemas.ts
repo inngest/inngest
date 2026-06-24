@@ -188,6 +188,12 @@ const extendedTraceSpansTable = (table: string): SchemaEntry => ({
       },
       {
         kind: 'value',
+        name: 'trace_id',
+        path: `${table}.trace_id`,
+        type: 'String',
+      },
+      {
+        kind: 'value',
         name: 'span_id',
         path: `${table}.span_id`,
         type: 'String',
