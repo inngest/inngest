@@ -16,8 +16,8 @@ const (
 	MethodBinary   Method = "binary"
 )
 
-// EnvInstallMethod lets installers declare the channel explicitly,
-// bypassing path-based heuristics. Homebrew formula and install.sh set this.
+// EnvInstallMethod lets callers override install-method detection.
+// Packaged installs are normally detected from os.Executable().
 const EnvInstallMethod = "INNGEST_INSTALL_METHOD"
 
 // Detect returns the install method, preferring the env override and
