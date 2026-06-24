@@ -1,4 +1,4 @@
-package batch
+package golang
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
-	testgolang "github.com/inngest/inngest/tests/golang"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/oklog/ulid/v2"
@@ -31,7 +30,7 @@ type BatchEvent = inngestgo.GenericEvent[BatchEventData]
 func TestBatchEvents(t *testing.T) {
 	ctx := context.Background()
 	c := client.New(t)
-	inngestClient, server, registerFuncs := testgolang.NewSDKHandler(t, "batch")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
 	defer server.Close()
 
 	var (
@@ -111,7 +110,7 @@ func TestBatchEvents(t *testing.T) {
 
 func TestMunsonRepro(t *testing.T) {
 	ctx := context.Background()
-	inngestClient, server, registerFuncs := testgolang.NewSDKHandler(t, "batch")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
 	defer server.Close()
 
 	var (
@@ -169,7 +168,7 @@ func TestMunsonRepro(t *testing.T) {
 
 func TestBatchWithConditionalTrigger(t *testing.T) {
 	ctx := context.Background()
-	inngestClient, server, registerFuncs := testgolang.NewSDKHandler(t, "batch")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
 	defer server.Close()
 
 	var (
@@ -212,7 +211,7 @@ func TestBatchWithConditionalTrigger(t *testing.T) {
 
 func TestConditionalBatching(t *testing.T) {
 	ctx := context.Background()
-	inngestClient, server, registerFuncs := testgolang.NewSDKHandler(t, "batch")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
 	defer server.Close()
 
 	var (
@@ -258,7 +257,7 @@ func TestConditionalBatching(t *testing.T) {
 
 func TestConditionalBatchingWithEventTriggerCondition(t *testing.T) {
 	ctx := context.Background()
-	inngestClient, server, registerFuncs := testgolang.NewSDKHandler(t, "batch")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
 	defer server.Close()
 
 	var (
@@ -306,7 +305,7 @@ func TestConditionalBatchingWithEventTriggerCondition(t *testing.T) {
 
 func TestBatchInvoke(t *testing.T) {
 	ctx := context.Background()
-	inngestClient, server, registerFuncs := testgolang.NewSDKHandler(t, "batchinvoke")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batchinvoke")
 	defer server.Close()
 
 	var (
@@ -401,7 +400,7 @@ func TestBatchKeyEvents(t *testing.T) {
 	type BatchEventWithKey = inngestgo.GenericEvent[BatchEventDataWithUserId]
 
 	ctx := context.Background()
-	inngestClient, server, registerFuncs := testgolang.NewSDKHandler(t, "user-notifications")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "user-notifications")
 	defer server.Close()
 
 	var totalEvents int32
