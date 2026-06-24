@@ -87,8 +87,7 @@ notarize:
         issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
         key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
         key: "{{ .Env.MACOS_NOTARY_KEY }}"
-        wait: true
-        timeout: 20m
+        wait: false
 
 snapshot:
   version_template: "{{ incpatch .Tag }}-next"
@@ -107,8 +106,15 @@ homebrew_casks:
     repository:
       owner: inngest
       name: homebrew-tap
-      branch: main
+      branch: "goreleaser/{{ .ProjectName }}-{{ .Tag }}"
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: inngest
+          name: homebrew-tap
+          branch: main
 
     # auto only uploads stable releases to homebrew-tap
     # set to false temporarily if testing prereleases too
