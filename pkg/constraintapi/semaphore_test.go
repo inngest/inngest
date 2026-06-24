@@ -474,6 +474,70 @@ func TestSemaphoreManager(t *testing.T) {
 	})
 }
 
+// TestSemaphoreManualReleaseRetryDeadlock reproduces the start-job retry deadlock:
+// attempt 0's normal release leaves the counter incremented (rel=1), and attempt 1
+// cannot acquire because there's no live lease for the scavenger to force-release.
+func TestSemaphoreManualReleaseRetryDeadlock(t *testing.T) {
+	cm, r, _, clock := newSemaphoreTestEnv(t)
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+	sem := SemaphoreConstraint{
+		ID:      "fn:" + fnID.String(),
+		Weight:  1,
+		Release: SemaphoreReleaseManual,
+	}
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores:      []Semaphore{{ID: sem.ID, Weight: 1, Release: SemaphoreReleaseManual}},
+	}
+	constraints := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}}
+
+	require.NoError(t, r.Set(sem.CapacityKey(accountID), "1"))
+	usageKey := sem.UsageKey(accountID)
+
+	resp0 := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "item-x-attempt-0")
+	require.Len(t, resp0.Leases, 1)
+	val, _ := r.Get(usageKey)
+	require.Equal(t, "1", val)
+
+	// Location=item_lease (not LeaseScavenge) → release.lua keeps rel=1 counter.
+	_, releaseErr := cm.Release(context.Background(), &CapacityReleaseRequest{
+		AccountID:      accountID,
+		IdempotencyKey: "item-x-attempt-0-release",
+		LeaseID:        resp0.Leases[0].LeaseID,
+		LeaseIssuedAt:  clock.Now(),
+		Source: LeaseSource{
+			Service:           ServiceExecutor,
+			Location:          CallerLocationItemLease,
+			RunProcessingMode: RunProcessingModeBackground,
+		},
+	})
+	require.NoError(t, releaseErr)
+	val, _ = r.Get(usageKey)
+	require.Equal(t, "1", val)
+
+	// Push past op idempotency TTL (5s) and lease expiry so attempt 1 is a fresh
+	// Acquire and the scavenger would have had its chance.
+	clock.Advance(20 * time.Second)
+	r.FastForward(20 * time.Second)
+	r.SetTime(clock.Now())
+
+	// No live lease references the semaphore, so the scavenger can't force-release it.
+	scavRes, err := cm.Scavenge(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 0, scavRes.ReclaimedLeases)
+	val, _ = r.Get(usageKey)
+	require.Equal(t, "1", val)
+
+	resp1 := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "item-x-attempt-1")
+	require.Empty(t, resp1.Leases)
+	require.Len(t, resp1.ExhaustedConstraints, 1)
+	require.Equal(t, ConstraintKindSemaphore, resp1.ExhaustedConstraints[0].Kind)
+
+	val, _ = r.Get(usageKey)
+	require.Equal(t, "1", val)
+}
+
 // TestSemaphoreScavengeManualRelease verifies that the scavenger force-releases
 // manual-release semaphores when a constraint lease expires.  Without this,
 // a crashed executor holding a manual-release semaphore would deadlock all
