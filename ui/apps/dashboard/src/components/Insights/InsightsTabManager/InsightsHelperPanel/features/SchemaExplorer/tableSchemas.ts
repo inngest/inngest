@@ -246,18 +246,6 @@ const extendedTraceSpansTable = (table: string): SchemaEntry => ({
         path: `${table}.service_name`,
         type: 'String',
       },
-      {
-        kind: 'value',
-        name: 'output',
-        path: `${table}.output`,
-        type: 'JSON',
-      },
-      {
-        kind: 'value',
-        name: 'error',
-        path: `${table}.error`,
-        type: 'JSON',
-      },
       attributesNode(table, 'attributes'),
       metadataNode(table, 'inngest'),
       metadataNode(table, 'metadata'),
