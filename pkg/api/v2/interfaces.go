@@ -119,3 +119,137 @@ type FunctionTraceReader interface {
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error)
 }
+
+type TimeRange struct {
+	From time.Time
+	To   time.Time
+}
+
+type ExperimentListOpts struct {
+	Cursor *ExperimentCursor
+	Limit  int
+}
+
+type ExperimentDetailOpts struct {
+	FunctionID     string
+	ExperimentName string
+	TimeRange      *TimeRange
+	Variant        *string
+}
+
+type Experiment struct {
+	Name              string
+	FunctionID        string
+	FunctionSlug      string
+	SelectionStrategy string
+	Variants          []string
+	TotalRuns         int
+	FirstSeen         time.Time
+	LastSeen          time.Time
+}
+
+type ExperimentDetail struct {
+	Name              string
+	Variants          []ExperimentVariantMetrics
+	VariantWeights    []ExperimentVariantWeight
+	FirstSeen         time.Time
+	LastSeen          time.Time
+	SelectionStrategy string
+}
+
+type ExperimentVariantMetrics struct {
+	VariantName string
+	RunCount    int
+	Metrics     []ExperimentVariantMetric
+}
+
+type ExperimentVariantMetric struct {
+	Key string
+	Avg float64
+	Min float64
+	Max float64
+}
+
+type ExperimentVariantWeight struct {
+	VariantName string
+	Weight      float64
+}
+
+type ExperimentListResult struct {
+	Experiments []Experiment
+	HasMore     bool
+}
+
+type ExperimentCursor struct {
+	LastSeen   time.Time
+	FunctionID string
+	Name       string
+}
+
+type ExperimentProvider interface {
+	ListExperiments(ctx context.Context, opts ExperimentListOpts) (*ExperimentListResult, error)
+	GetExperiment(ctx context.Context, opts ExperimentDetailOpts) (*ExperimentDetail, error)
+}
+
+type SessionCursor struct {
+	LastActiveAt time.Time
+	SessionID    string
+}
+
+type SessionListOpts struct {
+	SessionKey string
+	Cursor     *SessionCursor
+	Limit      int
+}
+
+type SessionRunCursor struct {
+	QueuedAt time.Time
+	RunID    string
+}
+
+type SessionRunsOpts struct {
+	SessionKey string
+	SessionID  string
+	Cursor     *SessionRunCursor
+	Limit      int
+}
+
+type SessionGroup struct {
+	SessionKey     string
+	SessionID      string
+	RunCount       int
+	FailedRunCount int
+	FailureRate    float64
+	LastActiveAt   time.Time
+	Functions      []SessionFunction
+}
+
+type SessionFunction struct {
+	Slug string
+	Name string
+}
+
+type SessionRun struct {
+	ID           string
+	FunctionSlug string
+	EventName    *string
+	Status       string
+	QueuedAt     time.Time
+	StartedAt    *time.Time
+	EndedAt      *time.Time
+}
+
+type SessionListResult struct {
+	Sessions []SessionGroup
+	HasMore  bool
+}
+
+type SessionRunsResult struct {
+	Runs    []SessionRun
+	HasMore bool
+}
+
+type SessionProvider interface {
+	ListSessions(ctx context.Context, opts SessionListOpts) (*SessionListResult, error)
+	ListSessionRuns(ctx context.Context, opts SessionRunsOpts) (*SessionRunsResult, error)
+}

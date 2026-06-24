@@ -36,6 +36,8 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Apps"         description: "Sync and manage" }
   tags: { name: "Functions"    description: "Invoke and manage functions" }
   tags: { name: "Runs"         description: "Inspect function runs" }
+  tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
+  tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
 };
 
@@ -1620,6 +1622,78 @@ service V2 {
       }
     };
   }
+
+  rpc ListExperiments(ListExperimentsRequest) returns (ListExperimentsResponse) {
+    option (google.api.http) = {
+      get: "/experiments"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List experiments"
+      tags: "Experiments"
+      tags: "Beta"
+      description: "Lists observed experiments in the authenticated environment."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetExperiment(GetExperimentRequest) returns (GetExperimentResponse) {
+    option (google.api.http) = {
+      get: "/experiments/{function_id}/{experiment_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get experiment aggregates"
+      tags: "Experiments"
+      tags: "Beta"
+      description: "Fetches variant run counts and score aggregates for one experiment on one function."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+    option (google.api.http) = {
+      get: "/sessions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List sessions"
+      tags: "Sessions"
+      tags: "Beta"
+      description: "Lists session IDs for one session key in the authenticated environment."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSessionRuns(ListSessionRunsRequest) returns (ListSessionRunsResponse) {
+    option (google.api.http) = {
+      get: "/sessions/{session_key}/{session_id}/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List session runs"
+      tags: "Sessions"
+      tags: "Beta"
+      description: "Lists runs associated with one session ID in the authenticated environment."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -2680,4 +2754,146 @@ message InsightsEventSchema {
       description: "JSON Schema describing the shape of this event's data, represented as a nested JSON object"
     }
   ];
+}
+
+message ListExperimentsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of experiments to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message ListExperimentsResponse {
+  repeated Experiment data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message Experiment {
+  string name = 1;
+  string function_id = 2;
+  string function_slug = 3;
+  string selection_strategy = 4;
+  repeated string variants = 5;
+  int32 variant_count = 6;
+  int32 total_runs = 7;
+  google.protobuf.Timestamp first_seen = 8;
+  google.protobuf.Timestamp last_seen = 9;
+}
+
+message GetExperimentRequest {
+  string function_id = 1;
+  string experiment_name = 2;
+  optional string variant = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional variant name to restrict the aggregate response."
+    }
+  ];
+}
+
+message GetExperimentResponse {
+  ExperimentDetail data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message ExperimentDetail {
+  string name = 1;
+  repeated ExperimentVariantMetrics variants = 2;
+  repeated ExperimentVariantWeight variant_weights = 3;
+  google.protobuf.Timestamp first_seen = 4;
+  google.protobuf.Timestamp last_seen = 5;
+  string selection_strategy = 6;
+}
+
+message ExperimentVariantMetrics {
+  string variant_name = 1;
+  int32 run_count = 2;
+  repeated ExperimentVariantMetric metrics = 3;
+}
+
+message ExperimentVariantMetric {
+  string key = 1;
+  double avg = 2;
+  double min = 3;
+  double max = 4;
+}
+
+message ExperimentVariantWeight {
+  string variant_name = 1;
+  double weight = 2;
+}
+
+message ListSessionsRequest {
+  string session_key = 1;
+  optional string cursor = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of sessions to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message ListSessionsResponse {
+  repeated SessionGroup data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message SessionGroup {
+  string session_key = 1;
+  string session_id = 2;
+  int32 run_count = 3;
+  int32 failed_run_count = 4;
+  double failure_rate = 5;
+  google.protobuf.Timestamp last_active_at = 6;
+  repeated SessionFunction functions = 7;
+}
+
+message SessionFunction {
+  string slug = 1;
+  string name = 2;
+}
+
+message ListSessionRunsRequest {
+  string session_key = 1;
+  string session_id = 2;
+  optional string cursor = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of session runs to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message ListSessionRunsResponse {
+  repeated SessionRun data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message SessionRun {
+  string id = 1;
+  string function_slug = 2;
+  optional string event_name = 3;
+  string status = 4;
+  google.protobuf.Timestamp queued_at = 5;
+  optional google.protobuf.Timestamp started_at = 6;
+  optional google.protobuf.Timestamp ended_at = 7;
 }

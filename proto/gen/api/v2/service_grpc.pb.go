@@ -44,6 +44,10 @@ const (
 	V2_ListInsightsEventSchemas_FullMethodName = "/api.v2.V2/ListInsightsEventSchemas"
 	V2_QueryInsightsPrompt_FullMethodName      = "/api.v2.V2/QueryInsightsPrompt"
 	V2_QueryInsights_FullMethodName            = "/api.v2.V2/QueryInsights"
+	V2_ListExperiments_FullMethodName          = "/api.v2.V2/ListExperiments"
+	V2_GetExperiment_FullMethodName            = "/api.v2.V2/GetExperiment"
+	V2_ListSessions_FullMethodName             = "/api.v2.V2/ListSessions"
+	V2_ListSessionRuns_FullMethodName          = "/api.v2.V2/ListSessionRuns"
 )
 
 // V2Client is the client API for V2 service.
@@ -78,6 +82,10 @@ type V2Client interface {
 	ListInsightsEventSchemas(ctx context.Context, in *ListInsightsEventSchemasRequest, opts ...grpc.CallOption) (*ListInsightsEventSchemasResponse, error)
 	QueryInsightsPrompt(ctx context.Context, in *QueryInsightsPromptRequest, opts ...grpc.CallOption) (*QueryInsightsPromptResponse, error)
 	QueryInsights(ctx context.Context, in *QueryInsightsRequest, opts ...grpc.CallOption) (*QueryInsightsResponse, error)
+	ListExperiments(ctx context.Context, in *ListExperimentsRequest, opts ...grpc.CallOption) (*ListExperimentsResponse, error)
+	GetExperiment(ctx context.Context, in *GetExperimentRequest, opts ...grpc.CallOption) (*GetExperimentResponse, error)
+	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
+	ListSessionRuns(ctx context.Context, in *ListSessionRunsRequest, opts ...grpc.CallOption) (*ListSessionRunsResponse, error)
 }
 
 type v2Client struct {
@@ -338,6 +346,46 @@ func (c *v2Client) QueryInsights(ctx context.Context, in *QueryInsightsRequest, 
 	return out, nil
 }
 
+func (c *v2Client) ListExperiments(ctx context.Context, in *ListExperimentsRequest, opts ...grpc.CallOption) (*ListExperimentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListExperimentsResponse)
+	err := c.cc.Invoke(ctx, V2_ListExperiments_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetExperiment(ctx context.Context, in *GetExperimentRequest, opts ...grpc.CallOption) (*GetExperimentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetExperimentResponse)
+	err := c.cc.Invoke(ctx, V2_GetExperiment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSessionsResponse)
+	err := c.cc.Invoke(ctx, V2_ListSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListSessionRuns(ctx context.Context, in *ListSessionRunsRequest, opts ...grpc.CallOption) (*ListSessionRunsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSessionRunsResponse)
+	err := c.cc.Invoke(ctx, V2_ListSessionRuns_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -370,6 +418,10 @@ type V2Server interface {
 	ListInsightsEventSchemas(context.Context, *ListInsightsEventSchemasRequest) (*ListInsightsEventSchemasResponse, error)
 	QueryInsightsPrompt(context.Context, *QueryInsightsPromptRequest) (*QueryInsightsPromptResponse, error)
 	QueryInsights(context.Context, *QueryInsightsRequest) (*QueryInsightsResponse, error)
+	ListExperiments(context.Context, *ListExperimentsRequest) (*ListExperimentsResponse, error)
+	GetExperiment(context.Context, *GetExperimentRequest) (*GetExperimentResponse, error)
+	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
+	ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -454,6 +506,18 @@ func (UnimplementedV2Server) QueryInsightsPrompt(context.Context, *QueryInsights
 }
 func (UnimplementedV2Server) QueryInsights(context.Context, *QueryInsightsRequest) (*QueryInsightsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryInsights not implemented")
+}
+func (UnimplementedV2Server) ListExperiments(context.Context, *ListExperimentsRequest) (*ListExperimentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListExperiments not implemented")
+}
+func (UnimplementedV2Server) GetExperiment(context.Context, *GetExperimentRequest) (*GetExperimentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetExperiment not implemented")
+}
+func (UnimplementedV2Server) ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSessions not implemented")
+}
+func (UnimplementedV2Server) ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSessionRuns not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -926,6 +990,78 @@ func _V2_QueryInsights_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_ListExperiments_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListExperimentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListExperiments(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListExperiments_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListExperiments(ctx, req.(*ListExperimentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetExperiment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetExperimentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetExperiment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetExperiment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetExperiment(ctx, req.(*GetExperimentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListSessions(ctx, req.(*ListSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListSessionRuns_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSessionRunsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListSessionRuns(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListSessionRuns_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListSessionRuns(ctx, req.(*ListSessionRunsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1032,6 +1168,22 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryInsights",
 			Handler:    _V2_QueryInsights_Handler,
+		},
+		{
+			MethodName: "ListExperiments",
+			Handler:    _V2_ListExperiments_Handler,
+		},
+		{
+			MethodName: "GetExperiment",
+			Handler:    _V2_GetExperiment_Handler,
+		},
+		{
+			MethodName: "ListSessions",
+			Handler:    _V2_ListSessions_Handler,
+		},
+		{
+			MethodName: "ListSessionRuns",
+			Handler:    _V2_ListSessionRuns_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
