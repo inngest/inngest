@@ -432,6 +432,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 				EnvID:                req.EnvID,
 				AppID:                req.AppID,
 				FunctionID:           req.FunctionID,
+				Status:               parsedResponse.Status,
+				CacheEnabled:         cacheEnabled,
+				CacheHit:             parsedResponse.CacheHit != 0,
 				Configuration:        req.Configuration,
 				Constraints:          req.Constraints,
 				LimitingConstraints:  limitingConstraints,
@@ -439,9 +442,12 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 				FairnessReduction:    parsedResponse.FairnessReduction,
 				RetryAfter:           retryAfter,
 				RequestedAmount:      req.Amount,
+				GrantedAmount:        parsedResponse.Granted,
 				Duration:             req.Duration,
 				Source:               req.Source,
+				RequestAttempt:       req.RequestAttempt,
 				GrantedLeases:        leases,
+				Debug:                []string(parsedResponse.Debug),
 			})
 			if err != nil {
 				return nil, errs.Wrap(0, false, "acquire lifecycle failed: %w", err)
