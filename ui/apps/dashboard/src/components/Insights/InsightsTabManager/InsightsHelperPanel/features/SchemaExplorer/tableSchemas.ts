@@ -366,6 +366,12 @@ export const tableEntries: SchemaEntry[] = [
         },
         {
           kind: 'value',
+          name: 'v',
+          path: 'events.v',
+          type: 'String',
+        },
+        {
+          kind: 'value',
           name: 'ts',
           path: 'events.ts',
           type: 'Integer',
