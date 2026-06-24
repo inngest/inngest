@@ -429,7 +429,12 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		return nil
 	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit, ErrHaltingSemaphoreLimit:
 		p.IsCustomKeyLimitOnly.Store(false)
-		p.IsSemaphoreLimitOnly.Store(false)
+
+		if cause != ErrHaltingSemaphoreLimit {
+			// halting semaphores should only delay by 1s so that we repeek relatively quickly.  if this
+			// is another concurrency limit, mark this as non-semaphore so we can delay > 1s
+			p.IsSemaphoreLimitOnly.Store(false)
+		}
 
 		p.CtrConcurrency.Add(1)
 		// Since the queue is at capacity on a fn or account level, no
