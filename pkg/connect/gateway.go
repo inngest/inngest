@@ -1204,6 +1204,12 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			if ctx.Err() != nil {
 				return nil, &ErrDraining
 			}
+			if serr, ok := err.(connecterrors.SocketError); ok {
+				return nil, &serr
+			}
+			if serr, ok := err.(*connecterrors.SocketError); ok {
+				return nil, serr
+			}
 
 			return nil, &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
