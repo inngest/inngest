@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"errors"
 
-	apiv2 "github.com/inngest/inngest/pkg/api/v2"
+	"github.com/inngest/inngest/pkg/api/metadatawriter"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/oklog/ulid/v2"
 )
 
-func scoreMetadataLoader(data runProviderDataReader) apiv2.MissingScoreMetadataLoader {
+func scoreMetadataLoader(data runProviderDataReader) metadatawriter.MissingStateLoader {
 	return func(ctx context.Context, id statev2.ID) (*statev2.Metadata, error) {
 		fnrun, err := data.GetFunctionRun(ctx, id.Tenant.AccountID, id.Tenant.EnvID, id.RunID)
 		if err != nil {

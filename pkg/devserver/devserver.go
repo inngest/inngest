@@ -734,7 +734,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		Scores: apiv2.NewStateScoreProvider(apiv2.StateScoreProviderOptions{
 			State:          smv2,
 			TracerProvider: tp,
-			TraceReader:    dbcqrs,
 			Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
 				return consts.DevServerAccountID, consts.DevServerEnvID, nil
 			},
