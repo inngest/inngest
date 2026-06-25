@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { ExperimentVariantMetrics } from '@inngest/components/Experiments';
 import {
   Bar,
@@ -221,9 +221,18 @@ type HoverLineProps = {
   hoverX: number | null;
   /** Hovered row — snapping is restricted to this row's values. */
   activeRow: RowData | null;
+  hoverValueRef: { current: number | null };
+  chartWidthRef: { current: number };
 };
 
-function HoverLine({ xAxisMap, yAxisMap, hoverX, activeRow }: HoverLineProps) {
+function HoverLine({
+  xAxisMap,
+  yAxisMap,
+  hoverX,
+  activeRow,
+  hoverValueRef,
+  chartWidthRef,
+}: HoverLineProps) {
   if (hoverX === null || !xAxisMap || !yAxisMap) return null;
 
   const xAxis = Object.values(xAxisMap)[0];
@@ -259,6 +268,11 @@ function HoverLine({ xAxisMap, yAxisMap, hoverX, activeRow }: HoverLineProps) {
   const chartRight = xAxis.x + xAxis.width;
   plotX = Math.min(Math.max(plotX, chartLeft), chartRight);
 
+  // Keep refs in sync with the post-snap, post-clamp position so the tooltip
+  // reads the same data-space value the line lands on.
+  chartWidthRef.current = xAxis.width;
+  hoverValueRef.current = scale?.invert?.(plotX) ?? null;
+
   return (
     <line
       x1={plotX}
@@ -290,7 +304,12 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
 
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [activeRow, setActiveRow] = useState<RowData | null>(null);
-  const tooltipContent = useMemo(() => makeBoxPlotTooltip(domain), [domain]);
+  const hoverValueRef = useRef<number | null>(null);
+  const chartWidthRef = useRef<number>(0);
+  const tooltipContent = useMemo(
+    () => makeBoxPlotTooltip(domain, hoverValueRef, chartWidthRef),
+    [domain],
+  );
 
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
@@ -343,7 +362,14 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
           background={<BackgroundLineShape />}
         />
         <Customized
-          component={<HoverLine hoverX={hoverX} activeRow={activeRow} />}
+          component={
+            <HoverLine
+              hoverX={hoverX}
+              activeRow={activeRow}
+              hoverValueRef={hoverValueRef}
+              chartWidthRef={chartWidthRef}
+            />
+          }
         />
       </RechartsBarChart>
     </ResponsiveContainer>
