@@ -2,7 +2,9 @@ package checkpoint
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -1036,6 +1038,45 @@ func TestCheckpointSyncSteps_DuplicateSaveSuppressesStepFinishedMetric(t *testin
 	mocks.metrics.AssertNotCalled(t, "OnStepFinished")
 }
 
+func TestCheckpointerFnRetriesNotFoundLookup(t *testing.T) {
+	ctx := context.Background()
+	fnID := uuid.New()
+	reader := &retryFnReader{
+		errs: []error{cqrs.ErrNotFound},
+	}
+	c := checkpointer{Opts: Opts{FnReader: reader}}
+
+	fn, err := c.fn(ctx, fnID)
+
+	require.NoError(t, err)
+	require.NotNil(t, fn)
+	require.Equal(t, 2, reader.calls)
+	require.Equal(t, fnID, reader.seen[0])
+	require.Equal(t, fnID, reader.seen[1])
+}
+
+func TestIsRetryableFunctionLookupError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "context canceled", err: context.Canceled, want: false},
+		{name: "deadline exceeded", err: context.DeadlineExceeded, want: false},
+		{name: "cqrs not found", err: cqrs.ErrNotFound, want: true},
+		{name: "sql no rows", err: sql.ErrNoRows, want: true},
+		{name: "wrapped not found text", err: errors.New("function not found"), want: true},
+		{name: "unrelated", err: errors.New("database unavailable"), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isRetryableFunctionLookupError(tt.err))
+		})
+	}
+}
+
 //
 //
 // Testing utils.
@@ -1088,7 +1129,7 @@ func setupSyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*testS
 	}
 
 	// Setup mock expectations
-	mocks.fnReader.On("GetFunctionByInternalUUID", ctx, fnID).Return(&mockConfigFunction{}, nil)
+	mocks.fnReader.On("GetFunctionByInternalUUID", mock.Anything, fnID).Return(&mockConfigFunction{}, nil)
 
 	// LoadMetadata should NOT be called since syncCheckpoint.Metadata is already set
 	mocks.state.AssertNotCalled(t, "LoadMetadata")
@@ -1127,6 +1168,28 @@ type testSyncData struct {
 	stepOpcodes    []state.GeneratorOpcode
 	syncCheckpoint SyncCheckpoint
 	checkpointer   Checkpointer
+}
+
+type retryFnReader struct {
+	cqrs.FunctionReader
+	errs  []error
+	calls int
+	seen  []uuid.UUID
+}
+
+func (r *retryFnReader) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
+	r.calls++
+	r.seen = append(r.seen, fnID)
+
+	if len(r.errs) > 0 {
+		err := r.errs[0]
+		r.errs = r.errs[1:]
+		return nil, err
+	}
+
+	return &cqrs.Function{
+		Config: json.RawMessage(`{}`),
+	}, nil
 }
 
 // mockExecutor mocks the executor interface
