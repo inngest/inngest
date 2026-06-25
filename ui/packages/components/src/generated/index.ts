@@ -43,7 +43,7 @@ export const KindInngestAI = 'inngest.ai';
 export interface AIMetadata {
   input_tokens: number /* int64 */;
   output_tokens: number /* int64 */;
-  model: string;
+  request_model: string;
   provider: string;
   operation_name: string;
   /**

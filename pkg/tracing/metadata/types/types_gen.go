@@ -25,7 +25,7 @@ const (
 type AIMetadata struct {
 	InputTokens	int64	`json:"input_tokens"`
 	OutputTokens	int64	`json:"output_tokens"`
-	Model		string	`json:"model"`
+	RequestModel	string	`json:"request_model"`
 	Provider	string	`json:"provider"`
 	OperationName	string	`json:"operation_name"`
 
