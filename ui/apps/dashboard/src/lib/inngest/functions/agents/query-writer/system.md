@@ -46,8 +46,8 @@ Pick the table that matches the user's intent before writing SQL. The selected e
 
 - `events` — the raw event stream (one row per event ingested). Use for event volumes, event payload fields (`data.*`), and what triggered runs.
 - `runs` — function executions (one row per run). Use for run `status` (`Queued`/`Running`/`Failed`/`Cancelled`/`Completed`), durations, inputs/outputs, and function-level failures.
-- `steps` — the latest attempt of each step. Use for step `status`/`type`, step-level failures, **scores**, and **experiments** (see below).
-- `step_attempts` — every step attempt including retries (same schema as `steps`). Use for retry analysis.
+- `steps` — the latest attempt of each step. Use for step `status`/`type`, step-level failures, **scores**, **experiments**, and **AI token usage / model / cost** (see below).
+- `step_attempts` — every step attempt including retries (same schema as `steps`). Use for retry analysis and for true **token usage / cost totals** (retries consume tokens too).
 - `extended_trace_spans` — OpenTelemetry spans for runs/steps. Use for low-level span timing and hierarchy; also carries scores.
 
 Scores and experiments have **no dedicated table** — query them on `steps` (or `extended_trace_spans` for scores) via the `inngest` metadata column, as described in _Querying Scores_ and _Querying Experiments_ below.
@@ -106,8 +106,12 @@ You may **only** query the following tables:
 
 ## Common columns
 
-- `app_id` - The app ID as defined in your app
-- `function_id` - The "fully qualified" function ID. This is the app ID concatenated to the function ID as defined in your app with a `-` (e.g., `my-app-my-function`)
+`app_id` and `function_id` are stored as **UUIDs** on `runs`, `steps`, `step_attempts`, and `extended_trace_spans`. **Write them as slug strings** with `=` or `IN` and the system translates the slug to the UUID for you — never compare them against a raw UUID.
+
+- `app_id` - The app slug as defined in your app
+- `function_id` - The "fully qualified" function slug: the app slug concatenated to the function slug with a `-` (e.g., `my-app-my-function`)
+
+Because these are UUIDs underneath, slug translation only happens for `=` / `IN` with a **complete** slug. See _Pattern Matching_ for why partial matches (`LIKE`) on these columns fail.
 
 ## Metadata columns
 
@@ -251,6 +255,40 @@ GROUP BY variant
 
 The experiment's `selection_strategy`/`variant_weights` live only on the selection span — read them with the filter `attributes['_inngest.step.run.type'] = 'group.experiment'`.
 
+## Querying AI / Token Usage
+
+Token usage, model, latency, and cost from `step.ai` / AI Gateway calls live in the `inngest` metadata column under the `ai` key, on the **`steps`** and **`step_attempts`** tables (one entry per inference step). They are **not** on `runs` or `events` — querying those for tokens returns no results.
+
+Available fields under `inngest['ai'].values[...]` (read numeric ones with a `::Float64` cast):
+
+- `input_tokens` — prompt tokens (always present)
+- `output_tokens` — completion tokens (always present)
+- `total_tokens` — **often absent**; do not rely on it (a missing value yields `0`/`NaN`). Compute the total as `input_tokens + output_tokens` instead.
+- `model` / `response_model` — the requested / serving model name
+- `latency_ms`, `estimated_cost`
+
+Use `step_attempts` for true usage/cost totals (retries consume tokens too); use `steps` for the latest attempt only. Only inference steps carry the `ai` key — other rows return NULL for these and are ignored by `SUM`.
+
+**Total token usage over the last 1 day** (compute total from input + output, not `total_tokens`):
+
+```sql
+SELECT SUM(inngest['ai'].values['input_tokens']::Float64)
+     + SUM(inngest['ai'].values['output_tokens']::Float64) AS total_tokens
+FROM step_attempts
+WHERE queued_at >= now() - INTERVAL 1 DAY
+```
+
+**Token usage broken down by model:**
+
+```sql
+SELECT inngest['ai'].values['model'] AS model,
+       SUM(inngest['ai'].values['input_tokens']::Float64) AS input_tokens,
+       SUM(inngest['ai'].values['output_tokens']::Float64) AS output_tokens
+FROM step_attempts
+WHERE queued_at >= now() - INTERVAL 7 DAY
+GROUP BY model
+```
+
 # Critical SQL Restrictions
 
 You are working with a **restricted subset of ClickHouse SQL**. The parser has severe limitations. Violating these rules will cause the query to fail.
@@ -316,6 +354,13 @@ WHERE ts_dt > now() - INTERVAL 30 MINUTE
 WHERE ts > toUnixTimestamp(subtractDays(now(), 7)) * 1000
 ```
 
+**Method 3 - Absolute date ranges (recommended for specific dates)**: compare the DateTime/`_dt` column to a **plain string literal**. Do **not** wrap the literal in `toDateTime`, `parseDateTime*`, `parseDateTime64BestEffort`, or `toUnixTimestamp` — those cannot be used as a DateTime here and will fail.
+
+```sql
+WHERE queued_at >= '2026-06-01 00:00:00' AND queued_at < '2026-06-02 00:00:00'
+WHERE received_at_dt BETWEEN '2026-06-14' AND '2026-06-15'
+```
+
 Supported INTERVAL units: `YEAR`, `QUARTER`, `MONTH`, `WEEK`, `DAY`, `HOUR`, `MINUTE`, `SECOND`, `MILLISECOND`, `MICROSECOND`, `NANOSECOND`
 
 ### WITH Expression Aliases
@@ -354,6 +399,8 @@ WHERE like(name, 'user%')
 WHERE ilike(data.email, '%@example.com')
 ```
 
+**Never** use `LIKE`, `ILIKE`, `match`, `position`, `substring`, or any string function on `function_id` or `app_id` (or their aliases). These are UUID columns; slug→UUID translation only happens for `=` / `IN` with a **complete** slug, so a partial pattern is compared against a UUID and fails with _"Illegal type UUID of argument of function like"_. To match a full function/app name, use `function_id = 'my-app-my-function'` or `function_id IN ('app-a-fn-x', 'app-b-fn-y')`. To match _part_ of a name, filter a name-bearing column instead — `triggering_event_name` on `runs`, `name` on `events` — never the id.
+
 ### IN Operator
 
 ```sql
@@ -380,6 +427,8 @@ Always use **single quotes** (`'`) for string literals. Never use double quotes 
 Backticks (`` ` ``) are **only** for quoting a Map-key identifier that contains a dot or other special character in dot-path access — e.g. `` inngest.`score.my-metric`.values.value `` (see _Querying Scores_). Never use backticks to quote string literals.
 
 # Aggregation Functions
+
+Every selected column that is **not** inside an aggregate function must appear in `GROUP BY` (otherwise the query fails with _"... is not under aggregate function and not in GROUP BY"_). The simplest safe option is **`GROUP BY ALL`**, which groups by every non-aggregated select expression.
 
 ## Basic Aggregates
 
