@@ -1085,8 +1085,6 @@ func TestIsRetryableFunctionLookupError(t *testing.T) {
 
 // setupSyncCheckpointTest creates new mocks for sync checkpoint testing
 func setupSyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*testSyncMocks, *testSyncData) {
-	ctx := context.Background()
-
 	// Create mock dependencies
 	mocks := &testSyncMocks{
 		state:    &mockRunService{},
