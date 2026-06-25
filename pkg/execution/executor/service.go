@@ -1183,7 +1183,11 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 
 	// Retrieve current queue shard for sleep item. The account might have been migrated
 	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
-	shard, err := s.shards.Resolve(ctx, queue.Scope{AccountID: item.Identifier.AccountID}, nil)
+	shard, err := s.shards.Resolve(ctx, queue.Scope{
+		AccountID:  item.Identifier.AccountID,
+		FunctionID: item.Identifier.WorkflowID,
+		EnvID:      item.Identifier.WorkspaceID,
+	}, nil)
 	if err != nil {
 		return fmt.Errorf("could not retrieve queue shard for job promotion:%w", err)
 	}
