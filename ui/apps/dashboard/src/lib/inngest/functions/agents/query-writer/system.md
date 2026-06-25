@@ -259,7 +259,7 @@ The experiment's `selection_strategy`/`variant_weights` live only on the selecti
 
 Token usage, model, latency, and cost from `step.ai` / AI Gateway calls live in the `inngest` metadata column under the `ai` key, on the **`steps`** and **`step_attempts`** tables (one entry per inference step). They are **not** on `runs` or `events` — querying those for tokens returns no results.
 
-Available fields under `inngest['ai'].values[...]` (read numeric ones with a `::Float64` cast):
+Available fields, read with **dot syntax** (`inngest.ai.values.<field>`) like the other metadata sections above — not bracket indexing. Cast numeric ones with `::Float64`:
 
 - `input_tokens` — prompt tokens (always present)
 - `output_tokens` — completion tokens (always present)
@@ -272,8 +272,8 @@ Use `step_attempts` for true usage/cost totals (retries consume tokens too); use
 **Total token usage over the last 1 day** (compute total from input + output, not `total_tokens`):
 
 ```sql
-SELECT SUM(inngest['ai'].values['input_tokens']::Float64)
-     + SUM(inngest['ai'].values['output_tokens']::Float64) AS total_tokens
+SELECT SUM(inngest.ai.values.input_tokens::Float64)
+     + SUM(inngest.ai.values.output_tokens::Float64) AS total_tokens
 FROM step_attempts
 WHERE queued_at >= now() - INTERVAL 1 DAY
 ```
@@ -281,9 +281,9 @@ WHERE queued_at >= now() - INTERVAL 1 DAY
 **Token usage broken down by model:**
 
 ```sql
-SELECT inngest['ai'].values['model'] AS model,
-       SUM(inngest['ai'].values['input_tokens']::Float64) AS input_tokens,
-       SUM(inngest['ai'].values['output_tokens']::Float64) AS output_tokens
+SELECT inngest.ai.values.model AS model,
+       SUM(inngest.ai.values.input_tokens::Float64) AS input_tokens,
+       SUM(inngest.ai.values.output_tokens::Float64) AS output_tokens
 FROM step_attempts
 WHERE queued_at >= now() - INTERVAL 7 DAY
 GROUP BY model
@@ -399,7 +399,9 @@ WHERE like(name, 'user%')
 WHERE ilike(data.email, '%@example.com')
 ```
 
-**Never** use `LIKE`, `ILIKE`, `match`, `position`, `substring`, or any string function on `function_id` or `app_id` (or their aliases). These are UUID columns; slug→UUID translation only happens for `=` / `IN` with a **complete** slug, so a partial pattern is compared against a UUID and fails with _"Illegal type UUID of argument of function like"_. To match a full function/app name, use `function_id = 'my-app-my-function'` or `function_id IN ('app-a-fn-x', 'app-b-fn-y')`. To match _part_ of a name, filter a name-bearing column instead — `triggering_event_name` on `runs`, `name` on `events` — never the id.
+`function_id` and `app_id` (and their aliases) are **UUID** columns. They may appear **only** as `= '<slug>'` or `IN ('<slug>', …)`; slug→UUID translation happens only for those operators with a **complete** slug. You must **never** wrap them in any function. That includes `LIKE`/`ILIKE`/`match`/`position`/`substring`/`lower`/`upper`/`concat` and every other string or scalar function. Any of these fails with _"Illegal type UUID of argument of function …"_.
+
+There is **no** function-name or app-name text column, so you **cannot substring-match a function or app by name**. If the user gives a partial or approximate function name, match the full slug exactly with `function_id = 'my-app-my-function'` (or list likely slugs with `IN (...)`) — never improvise a pattern match. Substring matching is only possible on genuine name columns: `triggering_event_name` on `runs`, `name` on `events` (those are event names, not function names).
 
 ### IN Operator
 
