@@ -4,11 +4,36 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
+
+type mockProducer struct {
+	called atomic.Bool
+}
+
+func (m *mockProducer) Enqueue(context.Context, Item, time.Time, EnqueueOpts) error {
+	m.called.Store(true)
+	return nil
+}
+
+func TestProcessorWithQueueProducerOverridesDefaultProducer(t *testing.T) {
+	ctx := context.Background()
+	shard := &mockShardForIterator{name: "shard-a"}
+	registry, err := NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	producer := &mockProducer{}
+	q, err := New(ctx, "test", registry, WithQueueProducer(producer))
+	require.NoError(t, err)
+
+	err = q.Enqueue(ctx, Item{}, time.Now(), EnqueueOpts{})
+	require.NoError(t, err)
+	require.True(t, producer.called.Load())
+}
 
 func TestProcessorAccountShardReadsResolveByDefault(t *testing.T) {
 	ctx := context.Background()

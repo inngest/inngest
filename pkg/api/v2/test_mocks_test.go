@@ -11,9 +11,9 @@ import (
 
 var _ AppProvider = (*mockAppProvider)(nil)
 var _ FunctionProvider = (*mockFunctionProvider)(nil)
-var _ FunctionRunReader = (*mockFunctionRunReader)(nil)
-var _ RunsReader = (*mockRunsReader)(nil)
+var _ RunProvider = (*mockRunProvider)(nil)
 var _ FunctionTraceReader = (*mockFunctionTraceReader)(nil)
+var _ RateLimitProvider = (*mockRateLimitProvider)(nil)
 
 type mockAppProvider struct {
 	mock.Mock
@@ -47,24 +47,26 @@ func (m *mockFunctionProvider) GetFunctions(ctx context.Context, appID string, o
 	return result, args.Error(1)
 }
 
-type mockFunctionRunReader struct {
+type mockRunProvider struct {
 	mock.Mock
 }
 
-func (m *mockFunctionRunReader) GetFunctionRun(ctx context.Context, runID ulid.ULID, opts GetFunctionRunOpts) (*cqrs.FunctionRun, error) {
+func (m *mockRunProvider) GetRun(ctx context.Context, runID ulid.ULID, opts GetRunOpts) (*cqrs.FunctionRun, error) {
 	args := m.Called(ctx, runID, opts)
 	run, _ := args.Get(0).(*cqrs.FunctionRun)
 	return run, args.Error(1)
 }
 
-type mockRunsReader struct {
-	mock.Mock
-}
-
-func (m *mockRunsReader) GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error) {
+func (m *mockRunProvider) GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error) {
 	args := m.Called(ctx, opts)
 	result, _ := args.Get(0).(*GetRunsResult)
 	return result, args.Error(1)
+}
+
+func (m *mockRunProvider) Rerun(ctx context.Context, runID ulid.ULID, opts RerunOpts) (ulid.ULID, error) {
+	args := m.Called(ctx, runID, opts)
+	runID, _ = args.Get(0).(ulid.ULID)
+	return runID, args.Error(1)
 }
 
 type mockFunctionTraceReader struct {
@@ -81,4 +83,14 @@ func (m *mockFunctionTraceReader) GetSpanOutput(ctx context.Context, id cqrs.Spa
 	args := m.Called(ctx, id)
 	output, _ := args.Get(0).(*cqrs.SpanOutput)
 	return output, args.Error(1)
+}
+
+type mockRateLimitProvider struct {
+	mock.Mock
+}
+
+func (m *mockRateLimitProvider) CheckRateLimit(ctx context.Context, method string) RateLimitResult {
+	args := m.Called(ctx, method)
+	result, _ := args.Get(0).(RateLimitResult)
+	return result
 }

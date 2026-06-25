@@ -373,6 +373,11 @@ type Item struct {
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
 
+	// ParallelCoalesceKey is a stable key shared by all queue items in the same
+	// parallel batch.  When set, all fan-in completions derive the same
+	// discovery job ID so that only one succeeds via queue-level idempotency.
+	ParallelCoalesceKey *string `json:"pck,omitempty"`
+
 	// Semaphores stores evaluated semaphore constraints for this queue item.
 	// Only present on start jobs for function concurrency, or on all items
 	// for worker concurrency (app-scoped semaphores).
@@ -497,6 +502,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
 		PriorityFactor        *int64                    `json:"pf,omitempty"`
 		ParallelMode          enums.ParallelMode        `json:"pm,omitempty"`
+		ParallelCoalesceKey   *string                   `json:"pck,omitempty"`
 		Semaphores            []constraintapi.Semaphore `json:"sem,omitempty"`
 	}
 	temp := &kind{}
@@ -519,6 +525,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.PriorityFactor = temp.PriorityFactor
 	i.QueueName = temp.QueueName
 	i.ParallelMode = temp.ParallelMode
+	i.ParallelCoalesceKey = temp.ParallelCoalesceKey
 	i.Semaphores = temp.Semaphores
 
 	// Save this for custom unmarshalling of other jobs.  This is overwritten

@@ -114,7 +114,7 @@ func (e *executor) Finalize(ctx context.Context, opts execution.FinalizeOpts) er
 					ctx,
 					opts.Metadata.ID.Tenant.AccountID,
 					sem.ID,
-					sem.UsageValue,
+					sem.EvaluatedKeyHash,
 					opts.Metadata.ID.RunID.String(),
 					sem.Weight,
 				)
@@ -542,12 +542,15 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 			"status": opts.Status(),
 		}
 
-		// Add an `inngest/function.finished` event.
+		// Add an `inngest/function.finished` event.  Lifecycle events carry
+		// the sessions of the event they report on, so that runs triggered by
+		// them (eg. onFailure handlers) stay in the same sessions.
 		freshEvents = append(freshEvents, event.Event{
 			ID:        ulid.MustNew(uint64(now.UnixMilli()), rand.Reader).String(),
 			Name:      event.FnFinishedName,
 			Timestamp: now.UnixMilli(),
 			Data:      data,
+			Meta:      runEvt.Meta,
 		})
 
 		switch opts.Status() {
@@ -557,6 +560,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 				Name:      event.FnCancelledName,
 				Timestamp: now.UnixMilli(),
 				Data:      data,
+				Meta:      runEvt.Meta,
 			})
 		case enums.StepStatusFailed:
 			// Legacy - send inngest/function.failed, except for when the function has been cancelled.
@@ -565,6 +569,7 @@ func (e *executor) finalizeEvents(ctx context.Context, opts execution.FinalizeOp
 				Name:      event.FnFailedName,
 				Timestamp: now.UnixMilli(),
 				Data:      data,
+				Meta:      runEvt.Meta,
 			})
 		}
 	}

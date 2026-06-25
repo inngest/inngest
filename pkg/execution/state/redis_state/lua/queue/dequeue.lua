@@ -31,8 +31,10 @@ local singletonRunKey          = KEYS[17]
 
 local keyPartitionScavengerIndex  = KEYS[18]
 
-local keyItemIndexA            = KEYS[19]   -- custom item index 1
-local keyItemIndexB            = KEYS[20]  -- custom item index 2
+local keyEarliestPeekTime      = KEYS[19]
+
+local keyItemIndexA            = KEYS[20]   -- custom item index 1
+local keyItemIndexB            = KEYS[21]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -56,6 +58,7 @@ if item == nil then
 end
 
 redis.call("HDEL", keyQueueMap, queueID)
+redis.call("DEL", keyEarliestPeekTime)
 
 -- TODO Are these calls safe? Should we check for present keys?
 redis.call("ZREM", keyReadyQueue, queueID)

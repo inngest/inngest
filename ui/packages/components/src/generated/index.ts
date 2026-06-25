@@ -4,10 +4,9 @@ type error = string;
 
 // Span metadata kind types (derived from generated constants)
 export type SpanMetadataKindUserland = `userland.${string}`;
-// Score kinds embed the user-supplied score name in the suffix
-// (e.g. `inngest.score.accuracy`). The KindInngestScore constant is
-// the base prefix, not a complete kind.
-export type SpanMetadataKindInngestScore = `${typeof KindInngestScore}.${string}`;
+// The score kind is the constant `inngest.score`; user-supplied score
+// names are the keys of the values map, not a kind suffix.
+export type SpanMetadataKindInngestScore = typeof KindInngestScore;
 export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestHTTP

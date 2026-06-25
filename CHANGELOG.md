@@ -2,7 +2,113 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.33.0] - 2026-06-23
+
+### 🚀 Features
+
+- *(debugapi)* Add semaphore routes to the debug API (#4488)
+- *(sessions)* Allow sessions in invoke button (#4489)
+- Insights ai experiments updates (#4492)
+
+### 🚜 Refactor
+
+- *(queue)* Make Producer configurable in Queue (#4078)
+
+## [v1.32.0] - 2026-06-22
+
+### 🚀 Features
+
+- *(tracing)* Allow system queue tracing (#4442)
+- *(score)* Make score kind constant (#4482)
+- *(sessions)* Sessions page optimization (#4480)
+
+### 🐛 Bug Fixes
+
+- *(support)* Fix local dev deps misalignment (#4472)
+- Update experiments docs links (#4481)
+- *(dashboard)* Drop vite back down until we can test thoroughly (#4486)
+
+### ⚙️ Miscellaneous Tasks
+
+- Dedup parallel fan-in discovery via coalesce key (#4452)
+- *(insights)* Add "Open in Insights" button on Failed Functions chart on the Metrics page (#4046)
+- *(metrics)* Add counter to checkpoint ops (#4478)
+- *(release)* V1.32.0 (#4469)
+
+## [v1.31.0] - 2026-06-18
+
+### 🚀 Features
+
+- Session server parse + emit (#4404)
+- Add sessions dashboard UI (#4403)
+
+### 🐛 Bug Fixes
+
+- *(traces)* Deduplicate nonstep/step spans in trace view (#4448)
+- *(extended traces)* Reparent orphaned extended trace spans using span attributes (#4443)
+- *(trace view)* Fix the ordering/timestamps of finalization spans (#4456)
+
+### 💼 Other
+
+- *(npm)* Address UI dependency alerts (#4260)
+
+### 🚜 Refactor
+
+- *(devServer)* New Information Architecture (#4395)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.31.0 (#4451)
+
+## [v1.30.0] - 2026-06-17
+
+### 🚀 Features
+
+- V2 api rerun (#4410)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.30.0 (#4450)
+
+## [v1.29.0] - 2026-06-17
+
+### 🚀 Features
+
+- *(queue)* Track earliest peek time before Constraint API (#4391)
+
+### 🐛 Bug Fixes
+
+- Queue item cleanup race in non-key-queues postgres cancel path (#4337)
+- *(dashboard)* Use distinct speedometer icon for sidebar Overview (#4429)
+- *(tests)* Widen timing tolerance from 10ms to 100ms in TestStartAll/TestSingleSvcError (#4115)
+- Alias conflicting grpc import (#4436)
+- *(tests)* Replace 50ms settle delay with deterministic clock.BlockUntil() in TestQueueItemProcessWithConstraintChecks (#4434)
+- *(queue)* Ignore already-leased partitions during scan (#4438)
+- Keep completed runs from being reported as reverted (#4247)
+- *(tests)* Increase WaitForRunStatus timeouts in all affected E2E tests (#4435)
+- Make WaitForRunStatus tolerate transient not found GQL errors (#4206)
+- *(executor)* Always SavePending after parallel ops to coalesce discovery (#4021)
+- Scope GetSpanOutput query by run_id to prevent cross-run data leak (#4441)
+- *(scoring)* Improve scoring dashboard ui (#4433)
+
+### 🧪 Testing
+
+- *(cqrs)* Cover all terminal trace run statuses (#4446)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(tests)* Fix flaky test status (#4439)
+- *(tests)* Flaky test fix (#4440)
+- Ttl upsert pkg (#4432)
+- *(release)* V1.29.0 (#4428)
+
 ## [v1.28.0] - 2026-06-16
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.28.0 (#4373)
+
+## [v1.27.1] - 2026-06-16
 
 ### 🚀 Features
 

@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { anthropic, experiment } from 'inngest';
+import { createScorer } from 'inngest/experimental';
 import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
@@ -36,13 +37,78 @@ type ChatEventData = {
   history?: Array<Record<string, unknown>>;
 };
 
+// Deferred LLM-as-judge: rates how well the generated SQL fits the user's chat
+// context (0 = poor fit, 1 = perfect fit). Runs after the parent run finalizes;
+// passing `experiment` on the defer call attributes the score to the selected
+// query-writer-model variant.
+export const insightsJudgeScorer = createScorer(
+  inngest,
+  { id: 'insights-judge-relevance' },
+  async ({ event, step }) => {
+    const { sql, chatContext } = event.data as {
+      sql: string;
+      chatContext: string;
+    };
+
+    const result = await step.ai.infer('judge-relevance', {
+      model: anthropic({
+        model: 'claude-haiku-4-5',
+        defaultParameters: { max_tokens: 1024 },
+      }),
+      body: {
+        system:
+          "You evaluate a SQL query an assistant generated against the user's " +
+          'chat context. Rate how well the query fits what the user asked for, ' +
+          'then call submit_score with a number from 0 (poor fit) to 1 ' +
+          '(perfect fit).',
+        messages: [
+          {
+            role: 'user' as const,
+            content: `User chat context:\n${chatContext}\n\nGenerated SQL:\n${sql}`,
+          },
+        ],
+        tools: [
+          {
+            name: 'submit_score' as const,
+            description: 'Submit the relevance score for the generated SQL.',
+            input_schema: {
+              type: 'object' as const,
+              properties: {
+                relevance: {
+                  type: 'number',
+                  description:
+                    'How well the SQL fits the user request, 0 to 1.',
+                },
+              },
+              required: ['relevance'],
+            },
+          },
+        ],
+        tool_choice: { type: 'tool' as const, name: 'submit_score' },
+      },
+    });
+
+    const toolUse = (
+      result as {
+        content: Array<{ type: string; name?: string; input?: unknown }>;
+      }
+    ).content.find(
+      (block) => block.type === 'tool_use' && block.name === 'submit_score',
+    );
+    const relevance = (toolUse?.input as { relevance?: number } | undefined)
+      ?.relevance;
+
+    return { name: 'insights_judge_relevance', value: relevance ?? 0 };
+  },
+);
+
 export const runInsightsAgent = inngest.createFunction(
   {
     id: 'run-insights-agent',
     name: 'Insights SQL Agent',
     triggers: [{ event: 'insights-agent/chat.requested' }],
   },
-  async ({ event, step, group }) => {
+  async ({ event, step, group, defer }) => {
     const {
       threadId: providedThreadId,
       userMessage,
@@ -180,85 +246,102 @@ export const runInsightsAgent = inngest.createFunction(
 
     const anthropicClient = new Anthropic();
 
-    const queryWriterResult = await group.experiment('query-writer-model', {
-      variants: {
-        'claude-sonnet-4-5': () =>
-          step.run('query-writer', async () => {
-            const startedAt = Date.now();
-            const result = await anthropicClient.messages.create({
-              model: 'claude-sonnet-4-5',
-              max_tokens: 4096,
-              ...queryWriterBody,
-            });
-            const latencyMs = Date.now() - startedAt;
+    const { result: queryWriterResult, experimentRef } = await group.experiment(
+      'query-writer-model',
+      {
+        variants: {
+          'claude-sonnet-4-5': () =>
+            step.run('query-writer', async () => {
+              const startedAt = Date.now();
+              const result = await anthropicClient.messages.create({
+                model: 'claude-sonnet-4-5',
+                max_tokens: 4096,
+                ...queryWriterBody,
+              });
+              const latencyMs = Date.now() - startedAt;
 
-            const inputTokens = result.usage.input_tokens;
-            const outputTokens = result.usage.output_tokens;
-            const pricing = QUERY_WRITER_PRICING['claude-sonnet-4-5'];
-            const costUsd = calculateCostUsd(
-              inputTokens,
-              outputTokens,
-              pricing,
-            );
+              const inputTokens = result.usage.input_tokens;
+              const outputTokens = result.usage.output_tokens;
+              const pricing = QUERY_WRITER_PRICING['claude-sonnet-4-5'];
+              const costUsd = calculateCostUsd(
+                inputTokens,
+                outputTokens,
+                pricing,
+              );
 
-            await inngest.score({
-              name: 'query_writer_latency_ms',
-              value: latencyMs,
-            });
-            await inngest.score({
-              name: 'query_writer_output_tokens',
-              value: outputTokens,
-            });
-            await inngest.score({
-              name: 'query_writer_cost_usd',
-              value: costUsd,
-            });
+              await inngest.score({
+                name: 'query_writer_latency_ms',
+                value: latencyMs,
+              });
+              await inngest.score({
+                name: 'query_writer_output_tokens',
+                value: outputTokens,
+              });
+              await inngest.score({
+                name: 'query_writer_cost_usd',
+                value: costUsd,
+              });
 
-            return result;
-          }),
-        'claude-opus-4-8': () =>
-          step.run('query-writer', async () => {
-            const startedAt = Date.now();
-            const result = await anthropicClient.messages.create({
-              model: 'claude-opus-4-8',
-              max_tokens: 4096,
-              ...queryWriterBody,
-            });
-            const latencyMs = Date.now() - startedAt;
+              return result;
+            }),
+          'claude-opus-4-8': () =>
+            step.run('query-writer', async () => {
+              const startedAt = Date.now();
+              const result = await anthropicClient.messages.create({
+                model: 'claude-opus-4-8',
+                max_tokens: 4096,
+                ...queryWriterBody,
+              });
+              const latencyMs = Date.now() - startedAt;
 
-            const inputTokens = result.usage.input_tokens;
-            const outputTokens = result.usage.output_tokens;
-            const pricing = QUERY_WRITER_PRICING['claude-opus-4-8'];
-            const costUsd = calculateCostUsd(
-              inputTokens,
-              outputTokens,
-              pricing,
-            );
+              const inputTokens = result.usage.input_tokens;
+              const outputTokens = result.usage.output_tokens;
+              const pricing = QUERY_WRITER_PRICING['claude-opus-4-8'];
+              const costUsd = calculateCostUsd(
+                inputTokens,
+                outputTokens,
+                pricing,
+              );
 
-            await inngest.score({
-              name: 'query_writer_latency_ms',
-              value: latencyMs,
-            });
-            await inngest.score({
-              name: 'query_writer_output_tokens',
-              value: outputTokens,
-            });
-            await inngest.score({
-              name: 'query_writer_cost_usd',
-              value: costUsd,
-            });
+              await inngest.score({
+                name: 'query_writer_latency_ms',
+                value: latencyMs,
+              });
+              await inngest.score({
+                name: 'query_writer_output_tokens',
+                value: outputTokens,
+              });
+              await inngest.score({
+                name: 'query_writer_cost_usd',
+                value: costUsd,
+              });
 
-            return result;
-          }),
+              return result;
+            }),
+        },
+        select: experiment.weighted({
+          'claude-sonnet-4-5': 50,
+          'claude-opus-4-8': 50,
+        }),
       },
-      select: experiment.weighted({
-        'claude-sonnet-4-5': 50,
-        'claude-opus-4-8': 50,
-      }),
-    });
+    );
 
     const sqlResult = await step.run('extract-query-writer-result', () => {
       return parseQueryWriterResult(queryWriterResult);
+    });
+
+    // Fire-and-forget LLM-as-judge scoring the SQL's fit to the user's chat
+    // context, attributed to the selected query-writer-model variant.
+    const chatContext = [
+      ...(history || [])
+        .map((m) => `${String(m.role ?? '')}: ${String(m.content ?? '')}`)
+        .filter((line) => line.trim() !== ':'),
+      `user: ${userMessage.content}`,
+    ].join('\n');
+    defer('judge-relevance', {
+      function: insightsJudgeScorer,
+      experiment: experimentRef,
+      data: { sql: sqlResult.sql, chatContext },
     });
 
     await step.realtime.publish(

@@ -1,11 +1,11 @@
 import { Children, isValidElement, useEffect, useRef, useState } from 'react';
+import { Link, type LinkProps } from '@inngest/components/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiTimeLine } from '@remixicon/react';
-import { Link, type LinkComponentProps } from '@tanstack/react-router';
 
 export type PillKind = 'default' | 'info' | 'warning' | 'primary' | 'error' | 'secondary';
 export type PillAppearance = 'solid' | 'outlined' | 'solidBright';
@@ -23,8 +23,8 @@ export function Pill({
 }: {
   children: React.ReactNode;
   className?: string;
-  href?: LinkComponentProps['href'];
-  to?: LinkComponentProps['to'];
+  href?: LinkProps['href'];
+  to?: LinkProps['to'];
   appearance?: PillAppearance;
   kind?: PillKind;
   icon?: React.ReactNode;
@@ -39,7 +39,7 @@ export function Pill({
   const hiddenTextRef = useRef<HTMLSpanElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
-  const pillColors = getPillColors({ kind, appearance, clickable: !!href });
+  const pillColors = getPillColors({ kind, appearance, clickable: !!href || !!to });
   const classNames = cn(
     'inline-flex items-center gap-0.5 h-5 px-2 text-xs leading-none font-medium truncate max-w-full',
     pillColors,

@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -192,8 +193,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		shadowPartition = osqueue.ItemShadowPartition(ctx, i)
 	}
 
-	partitionID := defaultPartition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", osqueue.TraceScopeFromQueueItem(i, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -372,6 +372,7 @@ func (q *queue) RemoveQueueItem(ctx context.Context, scope osqueue.Scope, partit
 	keys := []string{
 		q.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, partitionID, ""),
 		q.RedisClient.kg.QueueItem(),
+		q.RedisClient.kg.QueueItemEarliestPeekTime(itemID),
 	}
 
 	// If partitionID is a valid function UUID, append status index keys so the
@@ -427,6 +428,42 @@ func (q *queue) LoadQueueItem(ctx context.Context, itemID string) (*osqueue.Queu
 	qi.Data.JobID = &qi.ID
 
 	return qi, nil
+}
+
+func (q *queue) SetEarliestPeekTime(ctx context.Context, item osqueue.QueueItem, at time.Time) (time.Time, error) {
+	if item.ID == "" {
+		return time.Time{}, fmt.Errorf("cannot set earliest peek time for queue item with empty ID")
+	}
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetEarliestPeekTime"), redis_telemetry.ScopeQueue)
+
+	at = time.UnixMilli(at.UnixMilli())
+	client := q.RedisClient.Client()
+	key := q.RedisClient.kg.QueueItemEarliestPeekTime(item.ID)
+	value := strconv.FormatInt(at.UnixMilli(), 10)
+
+	prev, err := client.Do(ctx, client.B().
+		Set().
+		Key(key).
+		Value(value).
+		Nx().
+		Get().
+		Ex(osqueue.QueueItemEarliestPeekTimeTTL).
+		Build(),
+	).ToString()
+	if err == rueidis.Nil {
+		return at, nil
+	}
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not set earliest peek time: %w", err)
+	}
+
+	ms, err := strconv.ParseInt(prev, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not parse earliest peek time %q: %w", prev, err)
+	}
+
+	return time.UnixMilli(ms), nil
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
@@ -774,6 +811,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		q.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
 		partitionZsetKey(fnPartition, q.RedisClient.kg),
+		q.RedisClient.kg.QueueItemEarliestPeekTime(jobID),
 	}
 
 	args, err := StrSlice([]any{
@@ -844,8 +882,7 @@ func (q *queue) Lease(
 		o.Constraints = q.PartitionConstraintConfigGetter(ctx, o.ShadowPartition.Identifier())
 	}
 
-	partitionID := o.ShadowPartition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Lease", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Lease", osqueue.TraceScopeFromQueueItem(item, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", o.ShadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", item.ID))
@@ -874,11 +911,18 @@ func (q *queue) Lease(
 		kg.PartitionScavengerIndex(o.ShadowPartition.PartitionID),
 	}
 
+	setEarliestPeekTime := "0"
+	if q.ItemEarliestPeekTimeConfig(ctx, q.Name(), item).Enabled {
+		setEarliestPeekTime = "1"
+	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		o.ShadowPartition.PartitionID,
 		leaseID.String(),
 		now.UnixMilli(),
+		setEarliestPeekTime,
+		item.EarliestPeekTime,
 	})
 	if err != nil {
 		return nil, err
@@ -979,8 +1023,7 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 
 	partition := osqueue.ItemShadowPartition(ctx, i)
 
-	partitionID := partition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ExtendLease", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ExtendLease", osqueue.TraceScopeFromQueueItem(i, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", partition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -1054,7 +1097,19 @@ func (q *queue) PartitionLease(
 ) (*ulid.ULID, error) {
 	l := logger.StdlibLogger(ctx)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", p.AccountID, p.Identifier().EnvID, p.Identifier().FunctionID)
+	partitionID := p.Identifier()
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionID.AccountID,
+		EnvID:     partitionID.EnvID,
+		FnID:      partitionID.FunctionID,
+	})
+	if partitionID.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionID.SystemQueueName,
+			QueueShardName: q.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.ID))
 
@@ -1682,7 +1737,19 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition, at time.Time, forceAt bool) error {
 	l := logger.StdlibLogger(ctx)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionRequeue", p.AccountID, p.Identifier().EnvID, p.Identifier().FunctionID)
+	partitionID := p.Identifier()
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionID.AccountID,
+		EnvID:     partitionID.EnvID,
+		FnID:      partitionID.FunctionID,
+	})
+	if partitionID.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionID.SystemQueueName,
+			QueueShardName: q.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionRequeue", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.ID))
 

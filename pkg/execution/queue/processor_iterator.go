@@ -70,7 +70,7 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	p.IsSemaphoreLimitOnly.Store(true)
 
 	eg := errgroup.Group{}
-	for _, i := range p.Items {
+	for idx, i := range p.Items {
 		if i == nil {
 			// THIS SHOULD NEVER HAPPEN. Skip gracefully and log error
 			logger.StdlibLogger(ctx).Error("nil queue item in partition", "partition", p.Partition)
@@ -97,6 +97,18 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 			// NOTE: ignore if the queue item is not found
 			if errors.Is(err, ErrQueueItemNotFound) {
 				continue
+			}
+
+			// If item processing was terminated early due to user constraints,
+			// set the earliest peek time for the remaining items.
+			// This ensures accurate tracking of peeked items waiting for
+			// user constraint capacity to become available (user latency).
+			if errors.Is(err, ErrProcessNoUserConstraintCapacity) {
+				config := p.Queue.Options().ItemEarliestPeekTimeConfig(ctx, p.Queue.Shard().Name(), *i)
+				if config.Enabled {
+					// Stamp remaining items from next item on (idx+1)
+					p.stampRemainingEarliestPeekTimes(ctx, idx+1, config.BulkStampLimit)
+				}
 			}
 			// always break on the first error;  if processing returns an error we
 			// always assume that we stop iterating.
@@ -127,11 +139,42 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	return err
 }
 
+// stampRemainingEarliestPeekTimes iterates over a slice of items starting from start and up to limit.
+func (p *ProcessorIterator) stampRemainingEarliestPeekTimes(ctx context.Context, start, limit int) {
+	if limit <= 0 || start >= len(p.Items) {
+		return
+	}
+
+	peekTime := p.StaticTime
+	if peekTime.IsZero() {
+		peekTime = p.Queue.Clock().Now()
+	}
+
+	l := logger.StdlibLogger(ctx).With("partition", p.Partition)
+	attempts := 0
+	for _, item := range p.Items[start:] {
+		if attempts >= limit {
+			return
+		}
+		if item == nil || item.EarliestPeekTime != 0 {
+			continue
+		}
+
+		attempts++
+		earliestPeekTime, err := p.Queue.Shard().SetEarliestPeekTime(ctx, *item, peekTime)
+		if err != nil {
+			l.Warn("could not set earliest peek time for remaining item", "item", item, "error", err)
+			continue
+		}
+
+		item.EarliestPeekTime = earliestPeekTime.UnixMilli()
+	}
+}
+
 func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
 	l := logger.StdlibLogger(ctx).With("partition", p.Partition, "item", item)
 
-	partitionIdentifier := p.Partition.Identifier()
-	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
+	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", TraceScopeFromQueueItem(*item, p.Queue.Shard().Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
 	span.SetAttributes(attribute.String("item_kind", item.Data.Kind))
@@ -184,6 +227,25 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 
 		release()
 	}()
+
+	// In case the item has no earliest peek time set and stamping is enabled,
+	// call SetEarliestPeekTime before verifying and user constraints.
+	// This is intentionally called AFTER queue worker capacity; unlike user constraints,
+	// worker capacity counts towards system latency, not user latency.
+	if item.EarliestPeekTime == 0 && p.Queue.Options().ItemEarliestPeekTimeConfig(ctx, p.Queue.Shard().Name(), *item).Enabled {
+		peekTime := p.StaticTime
+		if peekTime.IsZero() {
+			peekTime = p.Queue.Clock().Now()
+		}
+
+		earliestPeekTime, err := p.Queue.Shard().SetEarliestPeekTime(ctx, *item, peekTime)
+		if err != nil {
+			span.RecordError(err)
+			l.Warn("could not set earliest peek time", "error", err)
+		} else {
+			item.EarliestPeekTime = earliestPeekTime.UnixMilli()
+		}
+	}
 
 	//
 	// Before we can do any work on the queue item, we need to check if all the constraints have capacity.
@@ -298,7 +360,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 	//
 	// Anyway, here we set the first peek item to the item's start time if there was a
 	// peek since the job was added.
-	if p.Partition.Last > 0 && p.Partition.Last > item.AtMS {
+	if item.EarliestPeekTime == 0 && p.Partition.Last > 0 && p.Partition.Last > item.AtMS {
 		// Fudge the earliest peek time because we know this wasn't peeked and so
 		// the peek time wasn't set;  but, as we were still processing jobs after
 		// the job was added this item was concurrency-limited.
@@ -332,8 +394,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		errTags["lease"] = leaseID.String()
 	}
 
-	switch cause {
-	case ErrQueueItemThrottled:
+	switch {
+	case errors.Is(cause, ErrQueueItemThrottled):
 		p.IsCustomKeyLimitOnly.Store(false)
 		p.IsSemaphoreLimitOnly.Store(false)
 
@@ -363,7 +425,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		}
 
 		return nil
-	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
+	case errors.Is(cause, ErrPartitionConcurrencyLimit), errors.Is(cause, ErrAccountConcurrencyLimit), errors.Is(cause, ErrSystemConcurrencyLimit):
 		p.IsCustomKeyLimitOnly.Store(false)
 		p.IsSemaphoreLimitOnly.Store(false)
 
@@ -376,15 +438,15 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		// only safe thing to do when we hit a function or account level
 		// concurrency key.
 		var status string
-		switch cause {
-		case ErrSystemConcurrencyLimit:
+		switch {
+		case errors.Is(cause, ErrSystemConcurrencyLimit):
 			status = "system_concurrency_limit"
-		case ErrPartitionConcurrencyLimit:
+		case errors.Is(cause, ErrPartitionConcurrencyLimit):
 			status = "partition_concurrency_limit"
 			if p.Partition.FunctionID != nil {
 				p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
 			}
-		case ErrAccountConcurrencyLimit:
+		case errors.Is(cause, ErrAccountConcurrencyLimit):
 			status = "account_concurrency_limit"
 			// For backwards compatibility, we report on the function level as well
 			if p.Partition.FunctionID != nil {
@@ -422,8 +484,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			})
 		}
 
-		return fmt.Errorf("concurrency hit: %w", ErrProcessStopIterator)
-	case ErrConcurrencyLimitCustomKey:
+		return fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
+	case errors.Is(cause, ErrConcurrencyLimitCustomKey):
 		p.IsSemaphoreLimitOnly.Store(false)
 		p.CtrConcurrency.Add(1)
 
@@ -459,7 +521,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			})
 		}
 		return nil
-	case ErrSemaphoreLimit:
+	case errors.Is(cause, ErrSemaphoreLimit):
 		// Semaphore capacity exhausted for this specific item (e.g., start job with fn concurrency).
 		// Skip this item and continue scanning — other items without semaphores (step 2, etc.)
 		// can still be processed.
@@ -469,7 +531,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
-	case ErrQueueItemNotFound:
+	case errors.Is(cause, ErrQueueItemNotFound):
 		// This is an okay error.  Move to the next job item.
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
@@ -477,7 +539,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
-	case ErrQueueItemAlreadyLeased:
+	case errors.Is(cause, ErrQueueItemAlreadyLeased):
 		// This is an okay error.  Move to the next job item.
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{

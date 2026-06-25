@@ -53,10 +53,14 @@ You should return an **empty array** `[]` in these specific cases:
    - Examples: "How many events do we have?", "What events are available?", "Show me all events", "Count events by type"
 
 2. **Query Updates Without Event Filtering:** When there is a `currentQuery` that does NOT filter by event name (no `WHERE name = ...` clause), and the user's intent is to modify that existing query rather than create a new one.
+
    - Examples:
      - Current query: `SELECT * FROM events LIMIT 100`
      - User says: "add a time filter for last 7 days" → Return `[]` (preserve the non-event-specific nature)
      - User says: "show only login events" → Return `['login']` (user wants event filtering now)
+
+3. **Non-Event Subjects:** When the question is about function runs, steps, retries, traces/spans, scores, or experiments rather than raw events. These are answered from other tables, so selecting event names would mislead the downstream query writer.
+   - Examples: "how many functions failed", "which steps retry the most", "average accuracy score", "compare experiment variants" → Return `[]`
 
 **IMPORTANT:** If the current query already has event filtering (e.g., `WHERE name = 'user_login'`) but the user's request doesn't mention events, you should STILL return the currently filtered events to preserve the existing filter.
 

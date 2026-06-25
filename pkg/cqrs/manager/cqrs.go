@@ -544,7 +544,7 @@ fragmentLoop:
 
 	// If this span has finished, set a preliminary output ID.
 	if (outputSpanID != nil && *outputSpanID != "") || (inputSpanID != nil && *inputSpanID != "") {
-		newSpan.OutputID, err = encodeSpanOutputID(outputSpanID, inputSpanID)
+		newSpan.OutputID, err = encodeSpanOutputID(newSpan.RunID.String(), outputSpanID, inputSpanID)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
 			return nil, err
@@ -567,6 +567,15 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	// Maps OTEL span IDs to their owning dynamic span ID.  Parent references
 	// in the DB use OTEL span IDs, but the span tree is keyed by dynamic IDs.
 	otelToDynamic := make(map[string]string)
+
+	// Lookup maps for reparenting orphaned extended trace (userland) spans.
+	// Keyed by stepID+attempt → dynamic span ID, populated during the first pass.
+	// executor.step is the preferred parent; executor.execution is the fallback.
+	stepSpanByKey := make(map[extendedTraceKey]string)
+	execSpanByKey := make(map[extendedTraceKey]string)
+	// Dynamic span IDs of all userland spans, used to detect interior nodes of
+	// extended trace subtrees during the parent-child pass.
+	userlandDynIDs := make(map[string]struct{})
 
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
@@ -592,6 +601,28 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		}
 
 		spanMap.Set(newSpan.SpanID, newSpan)
+
+		if newSpan.Attributes != nil {
+			// Track all userland spans so we can detect interior subtree nodes later.
+			if newSpan.Attributes.IsUserland != nil && *newSpan.Attributes.IsUserland {
+				userlandDynIDs[newSpan.SpanID] = struct{}{}
+			}
+
+			// Index step and execution spans so orphaned extended trace spans can be
+			// reparented to their matching attempt during the parent-child pass below.
+			// Both stepID and attempt must be present; without attempt there is no
+			// unambiguous target to attach to.
+			if newSpan.Attributes.StepID != nil && *newSpan.Attributes.StepID != "" &&
+				newSpan.Attributes.StepAttempt != nil {
+				key := newExtendedTraceKey(*newSpan.Attributes.StepID, *newSpan.Attributes.StepAttempt)
+				switch newSpan.Name {
+				case meta.SpanNameStep:
+					stepSpanByKey[key] = newSpan.SpanID
+				case meta.SpanNameExecution:
+					execSpanByKey[key] = newSpan.SpanID
+				}
+			}
+		}
 	}
 
 	// resolveDynamic looks up a dynamic span ID for the given ID, which may
@@ -631,7 +662,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
 				// We've found the span ID that we need to target for
 				// this span. So let's use it!
-				span.OutputID, err = encodeSpanOutputID(targetSpanID, nil)
+				span.OutputID, err = encodeSpanOutputID(span.RunID.String(), targetSpanID, nil)
 				if err != nil {
 					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
 					return nil, err
@@ -672,6 +703,53 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 			item, _ := spanMap.Get(span.SpanID)
 			parent.Children = append(parent.Children, item)
+		} else if span.Attributes != nil &&
+			span.Attributes.IsUserland != nil && *span.Attributes.IsUserland &&
+			span.Attributes.StepID != nil && *span.Attributes.StepID != "" &&
+			span.Attributes.StepAttempt != nil {
+			// Orphaned extended trace (userland) span. Only reparent if this is
+			// the root of its subtree: if the unresolvable parent is itself a
+			// userland span, this is an interior node and must not be lifted to a
+			// step/execution parent.
+			parentID := ""
+			if span.ParentSpanID != nil {
+				parentID = *span.ParentSpanID
+			}
+			parentIsUserland := false
+			if parentID != "" {
+				if _, ok := userlandDynIDs[parentID]; ok {
+					parentIsUserland = true
+				} else if dynID, ok := otelToDynamic[parentID]; ok {
+					_, parentIsUserland = userlandDynIDs[dynID]
+				}
+			}
+			if parentIsUserland {
+				logger.StdlibLogger(ctx).Warn(
+					"lost lineage detected",
+					"spanID", span.SpanID,
+					"parentSpanID", parentID,
+				)
+			} else {
+				// Subtree root: reparent to the matching step or execution span.
+				// Attempt must be present; without it there is no unambiguous target.
+				key := newExtendedTraceKey(*span.Attributes.StepID, *span.Attributes.StepAttempt)
+				parentDynID, found := stepSpanByKey[key]
+				if !found {
+					parentDynID, found = execSpanByKey[key]
+				}
+				if found {
+					parent, _ := spanMap.Get(parentDynID)
+					item, _ := spanMap.Get(span.SpanID)
+					parent.Children = append(parent.Children, item)
+				} else {
+					logger.StdlibLogger(ctx).Warn(
+						"lost lineage detected for extended trace span",
+						"spanID", span.SpanID,
+						"stepID", *span.Attributes.StepID,
+						"stepAttempt", *span.Attributes.StepAttempt,
+					)
+				}
+			}
 		} else {
 			logger.StdlibLogger(ctx).Warn(
 				"lost lineage detected",
@@ -811,7 +889,18 @@ func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
 	}
 }
 
-func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, error) {
+// extendedTraceKey is the map key used when indexing and reparenting orphaned
+// extended trace spans. A zero Attempt means no attempt was recorded.
+type extendedTraceKey struct {
+	StepID  string
+	Attempt int
+}
+
+func newExtendedTraceKey(stepID string, attempt int) extendedTraceKey {
+	return extendedTraceKey{StepID: stepID, Attempt: attempt}
+}
+
+func encodeSpanOutputID(runID string, outputSpanID *string, inputSpanID *string) (*string, error) {
 	p := true
 	osid := ""
 	if outputSpanID != nil {
@@ -819,6 +908,7 @@ func encodeSpanOutputID(outputSpanID *string, inputSpanID *string) (*string, err
 	}
 
 	id := &cqrs.SpanIdentifier{
+		RunID:       runID,
 		SpanID:      osid,
 		InputSpanID: inputSpanID,
 		Preview:     &p,
@@ -2191,7 +2281,11 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 		return nil, fmt.Errorf("span ID or input span ID is required to retrieve output")
 	}
 
-	rows, err := w.q.GetSpanOutput(ctx, ids)
+	if opts.RunID == "" {
+		return nil, fmt.Errorf("run ID is required to retrieve span output")
+	}
+
+	rows, err := w.q.GetSpanOutput(ctx, opts.RunID, ids)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving span output: %w", err)
 	}

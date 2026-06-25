@@ -10,6 +10,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -27,7 +28,18 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	shard := q.Shard()
 
 	partitionIdentifier := p.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionIdentifier.AccountID,
+		EnvID:     partitionIdentifier.EnvID,
+		FnID:      partitionIdentifier.FunctionID,
+	})
+	if partitionIdentifier.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionIdentifier.SystemQueueName,
+			QueueShardName: shard.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("queue_shard", shard.Name()))
 

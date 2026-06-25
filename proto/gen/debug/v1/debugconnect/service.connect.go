@@ -51,6 +51,22 @@ const (
 	DebugBlockDeletedProcedure = "/debug.v1.Debug/BlockDeleted"
 	// DebugCheckConstraintsProcedure is the fully-qualified name of the Debug's CheckConstraints RPC.
 	DebugCheckConstraintsProcedure = "/debug.v1.Debug/CheckConstraints"
+	// DebugGetSemaphoreLevelProcedure is the fully-qualified name of the Debug's GetSemaphoreLevel RPC.
+	DebugGetSemaphoreLevelProcedure = "/debug.v1.Debug/GetSemaphoreLevel"
+	// DebugGetAppSemaphoreLevelProcedure is the fully-qualified name of the Debug's
+	// GetAppSemaphoreLevel RPC.
+	DebugGetAppSemaphoreLevelProcedure = "/debug.v1.Debug/GetAppSemaphoreLevel"
+	// DebugGetFunctionSemaphoreLevelProcedure is the fully-qualified name of the Debug's
+	// GetFunctionSemaphoreLevel RPC.
+	DebugGetFunctionSemaphoreLevelProcedure = "/debug.v1.Debug/GetFunctionSemaphoreLevel"
+	// DebugSetSemaphoreLevelProcedure is the fully-qualified name of the Debug's SetSemaphoreLevel RPC.
+	DebugSetSemaphoreLevelProcedure = "/debug.v1.Debug/SetSemaphoreLevel"
+	// DebugSetAppSemaphoreLevelProcedure is the fully-qualified name of the Debug's
+	// SetAppSemaphoreLevel RPC.
+	DebugSetAppSemaphoreLevelProcedure = "/debug.v1.Debug/SetAppSemaphoreLevel"
+	// DebugSetFunctionSemaphoreLevelProcedure is the fully-qualified name of the Debug's
+	// SetFunctionSemaphoreLevel RPC.
+	DebugSetFunctionSemaphoreLevelProcedure = "/debug.v1.Debug/SetFunctionSemaphoreLevel"
 	// DebugGetBatchInfoProcedure is the fully-qualified name of the Debug's GetBatchInfo RPC.
 	DebugGetBatchInfoProcedure = "/debug.v1.Debug/GetBatchInfo"
 	// DebugDeleteBatchProcedure is the fully-qualified name of the Debug's DeleteBatch RPC.
@@ -99,6 +115,18 @@ type DebugClient interface {
 	BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error)
 	// CheckConstraints invokes Check() on the configured capacity manager
 	CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error)
+	// GetSemaphoreLevel reads a single account-scoped semaphore by explicit name.
+	GetSemaphoreLevel(context.Context, *connect.Request[v1.SemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error)
+	// GetAppSemaphoreLevel reads the worker concurrency semaphore for an app.
+	GetAppSemaphoreLevel(context.Context, *connect.Request[v1.AppSemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error)
+	// GetFunctionSemaphoreLevel reads the function concurrency semaphore for a function.
+	GetFunctionSemaphoreLevel(context.Context, *connect.Request[v1.FunctionSemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error)
+	// SetSemaphoreLevel overrides capacity for a single account-scoped semaphore by explicit name.
+	SetSemaphoreLevel(context.Context, *connect.Request[v1.SetSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error)
+	// SetAppSemaphoreLevel overrides worker concurrency capacity for an app.
+	SetAppSemaphoreLevel(context.Context, *connect.Request[v1.SetAppSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error)
+	// SetFunctionSemaphoreLevel overrides function concurrency capacity for a function.
+	SetFunctionSemaphoreLevel(context.Context, *connect.Request[v1.SetFunctionSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error)
 	// GetBatchInfo retrieves information about the current batch for a function and batch key.
 	GetBatchInfo(context.Context, *connect.Request[v1.BatchInfoRequest]) (*connect.Response[v1.BatchInfoResponse], error)
 	// DeleteBatch deletes a batch for a function and batch key.
@@ -184,6 +212,42 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("CheckConstraints")),
 			connect.WithClientOptions(opts...),
 		),
+		getSemaphoreLevel: connect.NewClient[v1.SemaphoreLevelRequest, v1.SemaphoreLevelResponse](
+			httpClient,
+			baseURL+DebugGetSemaphoreLevelProcedure,
+			connect.WithSchema(debugMethods.ByName("GetSemaphoreLevel")),
+			connect.WithClientOptions(opts...),
+		),
+		getAppSemaphoreLevel: connect.NewClient[v1.AppSemaphoreLevelRequest, v1.SemaphoreLevelResponse](
+			httpClient,
+			baseURL+DebugGetAppSemaphoreLevelProcedure,
+			connect.WithSchema(debugMethods.ByName("GetAppSemaphoreLevel")),
+			connect.WithClientOptions(opts...),
+		),
+		getFunctionSemaphoreLevel: connect.NewClient[v1.FunctionSemaphoreLevelRequest, v1.SemaphoreLevelResponse](
+			httpClient,
+			baseURL+DebugGetFunctionSemaphoreLevelProcedure,
+			connect.WithSchema(debugMethods.ByName("GetFunctionSemaphoreLevel")),
+			connect.WithClientOptions(opts...),
+		),
+		setSemaphoreLevel: connect.NewClient[v1.SetSemaphoreLevelRequest, v1.SetSemaphoreLevelResponse](
+			httpClient,
+			baseURL+DebugSetSemaphoreLevelProcedure,
+			connect.WithSchema(debugMethods.ByName("SetSemaphoreLevel")),
+			connect.WithClientOptions(opts...),
+		),
+		setAppSemaphoreLevel: connect.NewClient[v1.SetAppSemaphoreLevelRequest, v1.SetSemaphoreLevelResponse](
+			httpClient,
+			baseURL+DebugSetAppSemaphoreLevelProcedure,
+			connect.WithSchema(debugMethods.ByName("SetAppSemaphoreLevel")),
+			connect.WithClientOptions(opts...),
+		),
+		setFunctionSemaphoreLevel: connect.NewClient[v1.SetFunctionSemaphoreLevelRequest, v1.SetSemaphoreLevelResponse](
+			httpClient,
+			baseURL+DebugSetFunctionSemaphoreLevelProcedure,
+			connect.WithSchema(debugMethods.ByName("SetFunctionSemaphoreLevel")),
+			connect.WithClientOptions(opts...),
+		),
 		getBatchInfo: connect.NewClient[v1.BatchInfoRequest, v1.BatchInfoResponse](
 			httpClient,
 			baseURL+DebugGetBatchInfoProcedure,
@@ -261,26 +325,32 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 
 // debugClient implements DebugClient.
 type debugClient struct {
-	getPartition        *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
-	getPartitionStatus  *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
-	getQueueItem        *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
-	getPause            *connect.Client[v1.PauseRequest, v1.PauseResponse]
-	getIndex            *connect.Client[v1.IndexRequest, v1.IndexResponse]
-	blockPeek           *connect.Client[v1.BlockPeekRequest, v1.BlockPeekResponse]
-	blockDeleted        *connect.Client[v1.BlockDeletedRequest, v1.BlockDeletedResponse]
-	checkConstraints    *connect.Client[v11.CapacityCheckRequest, v1.CheckConstraintsResponse]
-	getBatchInfo        *connect.Client[v1.BatchInfoRequest, v1.BatchInfoResponse]
-	deleteBatch         *connect.Client[v1.DeleteBatchRequest, v1.DeleteBatchResponse]
-	runBatch            *connect.Client[v1.RunBatchRequest, v1.RunBatchResponse]
-	getSingletonInfo    *connect.Client[v1.SingletonInfoRequest, v1.SingletonInfoResponse]
-	deleteSingletonLock *connect.Client[v1.DeleteSingletonLockRequest, v1.DeleteSingletonLockResponse]
-	getDebounceInfo     *connect.Client[v1.DebounceInfoRequest, v1.DebounceInfoResponse]
-	deleteDebounce      *connect.Client[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse]
-	runDebounce         *connect.Client[v1.RunDebounceRequest, v1.RunDebounceResponse]
-	deleteDebounceByID  *connect.Client[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse]
-	getShadowPartition  *connect.Client[v1.ShadowPartitionRequest, v1.ShadowPartitionResponse]
-	getBacklogs         *connect.Client[v1.BacklogsRequest, v1.BacklogsResponse]
-	getBacklogSize      *connect.Client[v1.BacklogSizeRequest, v1.BacklogSizeResponse]
+	getPartition              *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
+	getPartitionStatus        *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
+	getQueueItem              *connect.Client[v1.QueueItemRequest, v1.QueueItemResponse]
+	getPause                  *connect.Client[v1.PauseRequest, v1.PauseResponse]
+	getIndex                  *connect.Client[v1.IndexRequest, v1.IndexResponse]
+	blockPeek                 *connect.Client[v1.BlockPeekRequest, v1.BlockPeekResponse]
+	blockDeleted              *connect.Client[v1.BlockDeletedRequest, v1.BlockDeletedResponse]
+	checkConstraints          *connect.Client[v11.CapacityCheckRequest, v1.CheckConstraintsResponse]
+	getSemaphoreLevel         *connect.Client[v1.SemaphoreLevelRequest, v1.SemaphoreLevelResponse]
+	getAppSemaphoreLevel      *connect.Client[v1.AppSemaphoreLevelRequest, v1.SemaphoreLevelResponse]
+	getFunctionSemaphoreLevel *connect.Client[v1.FunctionSemaphoreLevelRequest, v1.SemaphoreLevelResponse]
+	setSemaphoreLevel         *connect.Client[v1.SetSemaphoreLevelRequest, v1.SetSemaphoreLevelResponse]
+	setAppSemaphoreLevel      *connect.Client[v1.SetAppSemaphoreLevelRequest, v1.SetSemaphoreLevelResponse]
+	setFunctionSemaphoreLevel *connect.Client[v1.SetFunctionSemaphoreLevelRequest, v1.SetSemaphoreLevelResponse]
+	getBatchInfo              *connect.Client[v1.BatchInfoRequest, v1.BatchInfoResponse]
+	deleteBatch               *connect.Client[v1.DeleteBatchRequest, v1.DeleteBatchResponse]
+	runBatch                  *connect.Client[v1.RunBatchRequest, v1.RunBatchResponse]
+	getSingletonInfo          *connect.Client[v1.SingletonInfoRequest, v1.SingletonInfoResponse]
+	deleteSingletonLock       *connect.Client[v1.DeleteSingletonLockRequest, v1.DeleteSingletonLockResponse]
+	getDebounceInfo           *connect.Client[v1.DebounceInfoRequest, v1.DebounceInfoResponse]
+	deleteDebounce            *connect.Client[v1.DeleteDebounceRequest, v1.DeleteDebounceResponse]
+	runDebounce               *connect.Client[v1.RunDebounceRequest, v1.RunDebounceResponse]
+	deleteDebounceByID        *connect.Client[v1.DeleteDebounceByIDRequest, v1.DeleteDebounceByIDResponse]
+	getShadowPartition        *connect.Client[v1.ShadowPartitionRequest, v1.ShadowPartitionResponse]
+	getBacklogs               *connect.Client[v1.BacklogsRequest, v1.BacklogsResponse]
+	getBacklogSize            *connect.Client[v1.BacklogSizeRequest, v1.BacklogSizeResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -321,6 +391,36 @@ func (c *debugClient) BlockDeleted(ctx context.Context, req *connect.Request[v1.
 // CheckConstraints calls debug.v1.Debug.CheckConstraints.
 func (c *debugClient) CheckConstraints(ctx context.Context, req *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error) {
 	return c.checkConstraints.CallUnary(ctx, req)
+}
+
+// GetSemaphoreLevel calls debug.v1.Debug.GetSemaphoreLevel.
+func (c *debugClient) GetSemaphoreLevel(ctx context.Context, req *connect.Request[v1.SemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error) {
+	return c.getSemaphoreLevel.CallUnary(ctx, req)
+}
+
+// GetAppSemaphoreLevel calls debug.v1.Debug.GetAppSemaphoreLevel.
+func (c *debugClient) GetAppSemaphoreLevel(ctx context.Context, req *connect.Request[v1.AppSemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error) {
+	return c.getAppSemaphoreLevel.CallUnary(ctx, req)
+}
+
+// GetFunctionSemaphoreLevel calls debug.v1.Debug.GetFunctionSemaphoreLevel.
+func (c *debugClient) GetFunctionSemaphoreLevel(ctx context.Context, req *connect.Request[v1.FunctionSemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error) {
+	return c.getFunctionSemaphoreLevel.CallUnary(ctx, req)
+}
+
+// SetSemaphoreLevel calls debug.v1.Debug.SetSemaphoreLevel.
+func (c *debugClient) SetSemaphoreLevel(ctx context.Context, req *connect.Request[v1.SetSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error) {
+	return c.setSemaphoreLevel.CallUnary(ctx, req)
+}
+
+// SetAppSemaphoreLevel calls debug.v1.Debug.SetAppSemaphoreLevel.
+func (c *debugClient) SetAppSemaphoreLevel(ctx context.Context, req *connect.Request[v1.SetAppSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error) {
+	return c.setAppSemaphoreLevel.CallUnary(ctx, req)
+}
+
+// SetFunctionSemaphoreLevel calls debug.v1.Debug.SetFunctionSemaphoreLevel.
+func (c *debugClient) SetFunctionSemaphoreLevel(ctx context.Context, req *connect.Request[v1.SetFunctionSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error) {
+	return c.setFunctionSemaphoreLevel.CallUnary(ctx, req)
 }
 
 // GetBatchInfo calls debug.v1.Debug.GetBatchInfo.
@@ -402,6 +502,18 @@ type DebugHandler interface {
 	BlockDeleted(context.Context, *connect.Request[v1.BlockDeletedRequest]) (*connect.Response[v1.BlockDeletedResponse], error)
 	// CheckConstraints invokes Check() on the configured capacity manager
 	CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error)
+	// GetSemaphoreLevel reads a single account-scoped semaphore by explicit name.
+	GetSemaphoreLevel(context.Context, *connect.Request[v1.SemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error)
+	// GetAppSemaphoreLevel reads the worker concurrency semaphore for an app.
+	GetAppSemaphoreLevel(context.Context, *connect.Request[v1.AppSemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error)
+	// GetFunctionSemaphoreLevel reads the function concurrency semaphore for a function.
+	GetFunctionSemaphoreLevel(context.Context, *connect.Request[v1.FunctionSemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error)
+	// SetSemaphoreLevel overrides capacity for a single account-scoped semaphore by explicit name.
+	SetSemaphoreLevel(context.Context, *connect.Request[v1.SetSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error)
+	// SetAppSemaphoreLevel overrides worker concurrency capacity for an app.
+	SetAppSemaphoreLevel(context.Context, *connect.Request[v1.SetAppSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error)
+	// SetFunctionSemaphoreLevel overrides function concurrency capacity for a function.
+	SetFunctionSemaphoreLevel(context.Context, *connect.Request[v1.SetFunctionSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error)
 	// GetBatchInfo retrieves information about the current batch for a function and batch key.
 	GetBatchInfo(context.Context, *connect.Request[v1.BatchInfoRequest]) (*connect.Response[v1.BatchInfoResponse], error)
 	// DeleteBatch deletes a batch for a function and batch key.
@@ -481,6 +593,42 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		DebugCheckConstraintsProcedure,
 		svc.CheckConstraints,
 		connect.WithSchema(debugMethods.ByName("CheckConstraints")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetSemaphoreLevelHandler := connect.NewUnaryHandler(
+		DebugGetSemaphoreLevelProcedure,
+		svc.GetSemaphoreLevel,
+		connect.WithSchema(debugMethods.ByName("GetSemaphoreLevel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetAppSemaphoreLevelHandler := connect.NewUnaryHandler(
+		DebugGetAppSemaphoreLevelProcedure,
+		svc.GetAppSemaphoreLevel,
+		connect.WithSchema(debugMethods.ByName("GetAppSemaphoreLevel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugGetFunctionSemaphoreLevelHandler := connect.NewUnaryHandler(
+		DebugGetFunctionSemaphoreLevelProcedure,
+		svc.GetFunctionSemaphoreLevel,
+		connect.WithSchema(debugMethods.ByName("GetFunctionSemaphoreLevel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugSetSemaphoreLevelHandler := connect.NewUnaryHandler(
+		DebugSetSemaphoreLevelProcedure,
+		svc.SetSemaphoreLevel,
+		connect.WithSchema(debugMethods.ByName("SetSemaphoreLevel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugSetAppSemaphoreLevelHandler := connect.NewUnaryHandler(
+		DebugSetAppSemaphoreLevelProcedure,
+		svc.SetAppSemaphoreLevel,
+		connect.WithSchema(debugMethods.ByName("SetAppSemaphoreLevel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	debugSetFunctionSemaphoreLevelHandler := connect.NewUnaryHandler(
+		DebugSetFunctionSemaphoreLevelProcedure,
+		svc.SetFunctionSemaphoreLevel,
+		connect.WithSchema(debugMethods.ByName("SetFunctionSemaphoreLevel")),
 		connect.WithHandlerOptions(opts...),
 	)
 	debugGetBatchInfoHandler := connect.NewUnaryHandler(
@@ -573,6 +721,18 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 			debugBlockDeletedHandler.ServeHTTP(w, r)
 		case DebugCheckConstraintsProcedure:
 			debugCheckConstraintsHandler.ServeHTTP(w, r)
+		case DebugGetSemaphoreLevelProcedure:
+			debugGetSemaphoreLevelHandler.ServeHTTP(w, r)
+		case DebugGetAppSemaphoreLevelProcedure:
+			debugGetAppSemaphoreLevelHandler.ServeHTTP(w, r)
+		case DebugGetFunctionSemaphoreLevelProcedure:
+			debugGetFunctionSemaphoreLevelHandler.ServeHTTP(w, r)
+		case DebugSetSemaphoreLevelProcedure:
+			debugSetSemaphoreLevelHandler.ServeHTTP(w, r)
+		case DebugSetAppSemaphoreLevelProcedure:
+			debugSetAppSemaphoreLevelHandler.ServeHTTP(w, r)
+		case DebugSetFunctionSemaphoreLevelProcedure:
+			debugSetFunctionSemaphoreLevelHandler.ServeHTTP(w, r)
 		case DebugGetBatchInfoProcedure:
 			debugGetBatchInfoHandler.ServeHTTP(w, r)
 		case DebugDeleteBatchProcedure:
@@ -636,6 +796,30 @@ func (UnimplementedDebugHandler) BlockDeleted(context.Context, *connect.Request[
 
 func (UnimplementedDebugHandler) CheckConstraints(context.Context, *connect.Request[v11.CapacityCheckRequest]) (*connect.Response[v1.CheckConstraintsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.CheckConstraints is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetSemaphoreLevel(context.Context, *connect.Request[v1.SemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetSemaphoreLevel is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetAppSemaphoreLevel(context.Context, *connect.Request[v1.AppSemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetAppSemaphoreLevel is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetFunctionSemaphoreLevel(context.Context, *connect.Request[v1.FunctionSemaphoreLevelRequest]) (*connect.Response[v1.SemaphoreLevelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetFunctionSemaphoreLevel is not implemented"))
+}
+
+func (UnimplementedDebugHandler) SetSemaphoreLevel(context.Context, *connect.Request[v1.SetSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.SetSemaphoreLevel is not implemented"))
+}
+
+func (UnimplementedDebugHandler) SetAppSemaphoreLevel(context.Context, *connect.Request[v1.SetAppSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.SetAppSemaphoreLevel is not implemented"))
+}
+
+func (UnimplementedDebugHandler) SetFunctionSemaphoreLevel(context.Context, *connect.Request[v1.SetFunctionSemaphoreLevelRequest]) (*connect.Response[v1.SetSemaphoreLevelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.SetFunctionSemaphoreLevel is not implemented"))
 }
 
 func (UnimplementedDebugHandler) GetBatchInfo(context.Context, *connect.Request[v1.BatchInfoRequest]) (*connect.Response[v1.BatchInfoResponse], error) {

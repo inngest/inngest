@@ -373,7 +373,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	ctx, span := q.Options().ConditionalTracer.NewSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	ctx, span := q.Options().ConditionalTracer.NewUserSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	defer span.End()
 
 	idempotencyKey := item.ID
@@ -447,10 +447,10 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		constraintItems = append(constraintItems, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindSemaphore,
 			Semaphore: &constraintapi.SemaphoreConstraint{
-				ID:         sem.ID,
-				UsageValue: sem.UsageValue,
-				Weight:     sem.Weight,
-				Release:    sem.Release,
+				ID:               sem.ID,
+				EvaluatedKeyHash: sem.EvaluatedKeyHash,
+				Weight:           sem.Weight,
+				Release:          sem.Release,
 			},
 		})
 		config.Semaphores = append(config.Semaphores, sem)

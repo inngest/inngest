@@ -544,6 +544,7 @@ export type MutationInvokeFunctionArgs = {
   debugRunID: InputMaybe<Scalars['ULID']>;
   debugSessionID: InputMaybe<Scalars['ULID']>;
   functionSlug: Scalars['String'];
+  meta: InputMaybe<Scalars['Map']>;
   user: InputMaybe<Scalars['Map']>;
 };
 
@@ -1290,6 +1291,7 @@ export type DeleteAppMutation = { __typename?: 'Mutation'; deleteApp: string };
 export type InvokeFunctionMutationVariables = Exact<{
   functionSlug: Scalars['String'];
   data: InputMaybe<Scalars['Map']>;
+  meta: InputMaybe<Scalars['Map']>;
   user: InputMaybe<Scalars['Map']>;
   debugSessionID?: InputMaybe<Scalars['ULID']>;
   debugRunID?: InputMaybe<Scalars['ULID']>;

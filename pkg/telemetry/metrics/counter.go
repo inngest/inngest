@@ -31,6 +31,15 @@ func IncrQueueItemProcessedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueItemEarliestPeekTimeCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_item_earliest_peek_time_total",
+		Description: "Total number of queue items considered for earliest peek time stamping",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueuePartitionLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -968,6 +977,31 @@ func IncrExecutorHandleGeneratorCount(ctx context.Context, op string, opts Count
 		PkgName:     opts.PkgName,
 		MetricName:  "executor_handle_generator_total",
 		Description: "Total number of executor handle generator calls",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrDiscoveryCoalesceDedupCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_discovery_coalesce_dedup_total",
+		Description: "Total number of duplicate discovery steps deduplicated via parallel coalesce key",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrCheckpointSDKOpcodeCounter(ctx context.Context, op string, mode string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	opts.Tags["op"] = op
+	opts.Tags["mode"] = mode
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "checkpoint_sdk_opcodes_total",
+		Description: "Total number of SDK opcodes processed via checkpointing",
 		Tags:        opts.Tags,
 	})
 }

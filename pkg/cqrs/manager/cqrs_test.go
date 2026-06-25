@@ -1561,64 +1561,82 @@ func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
 }
 
 func TestCQRSInsertTraceRun_PreservesTerminalStateAgainstStaleNonTerminalWrite(t *testing.T) {
-	ctx := context.Background()
-	appID := uuid.New()
-
-	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
-	defer cleanup()
-
-	accountID := uuid.New()
-	workspaceID := uuid.New()
-	functionID := uuid.New()
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-	now := time.Now().UTC().Truncate(time.Second)
-	terminalOutput := []byte(`{"status":"done"}`)
-
-	terminal := &cqrs.TraceRun{
-		AccountID:   accountID,
-		WorkspaceID: workspaceID,
-		AppID:       appID,
-		FunctionID:  functionID,
-		TraceID:     "trace-terminal-" + runID.String(),
-		RunID:       runID.String(),
-		QueuedAt:    now.Add(-2 * time.Minute),
-		StartedAt:   now.Add(-1 * time.Minute),
-		EndedAt:     now,
-		SourceID:    "terminal-source",
-		TriggerIDs:  []string{"evt-terminal"},
-		Output:      terminalOutput,
-		Status:      enums.RunStatusCompleted,
+	terminalStatuses := []enums.RunStatus{
+		enums.RunStatusCompleted,
+		enums.RunStatusFailed,
+		enums.RunStatusCancelled,
+		enums.RunStatusOverflowed,
+		enums.RunStatusSkipped,
+	}
+	staleStatuses := []enums.RunStatus{
+		enums.RunStatusScheduled,
+		enums.RunStatusRunning,
 	}
 
-	stale := &cqrs.TraceRun{
-		AccountID:   accountID,
-		WorkspaceID: workspaceID,
-		AppID:       appID,
-		FunctionID:  functionID,
-		TraceID:     "trace-stale-" + runID.String(),
-		RunID:       runID.String(),
-		QueuedAt:    now.Add(-3 * time.Minute),
-		StartedAt:   now.Add(-2 * time.Minute),
-		SourceID:    "stale-source",
-		TriggerIDs:  []string{"evt-stale"},
-		Status:      enums.RunStatusRunning,
+	for _, terminalStatus := range terminalStatuses {
+		for _, staleStatus := range staleStatuses {
+			t.Run(fmt.Sprintf("%s_then_%s", terminalStatus, staleStatus), func(t *testing.T) {
+				ctx := context.Background()
+				appID := uuid.New()
+
+				cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+				defer cleanup()
+
+				accountID := uuid.New()
+				workspaceID := uuid.New()
+				functionID := uuid.New()
+				runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+				now := time.Now().UTC().Truncate(time.Second)
+				terminalOutput := []byte(fmt.Sprintf(`{"status":%q}`, terminalStatus.String()))
+
+				terminal := &cqrs.TraceRun{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					FunctionID:  functionID,
+					TraceID:     "trace-terminal-" + runID.String(),
+					RunID:       runID.String(),
+					QueuedAt:    now.Add(-2 * time.Minute),
+					StartedAt:   now.Add(-1 * time.Minute),
+					EndedAt:     now,
+					SourceID:    "terminal-source",
+					TriggerIDs:  []string{"evt-terminal"},
+					Output:      terminalOutput,
+					Status:      terminalStatus,
+				}
+
+				stale := &cqrs.TraceRun{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					FunctionID:  functionID,
+					TraceID:     "trace-stale-" + runID.String(),
+					RunID:       runID.String(),
+					QueuedAt:    now.Add(-3 * time.Minute),
+					StartedAt:   now.Add(-2 * time.Minute),
+					SourceID:    "stale-source",
+					TriggerIDs:  []string{"evt-stale"},
+					Status:      staleStatus,
+				}
+
+				require.NoError(t, cm.InsertTraceRun(ctx, terminal))
+				require.NoError(t, cm.InsertTraceRun(ctx, stale))
+
+				got, err := cm.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+				require.NoError(t, err)
+
+				assert.Equal(t, terminal.TraceID, got.TraceID)
+				assert.Equal(t, terminal.QueuedAt.UnixMilli(), got.QueuedAt.UnixMilli())
+				assert.Equal(t, terminal.StartedAt.UnixMilli(), got.StartedAt.UnixMilli())
+				assert.Equal(t, terminal.EndedAt.UnixMilli(), got.EndedAt.UnixMilli())
+				assert.Equal(t, terminal.SourceID, got.SourceID)
+				assert.Equal(t, terminal.TriggerIDs, got.TriggerIDs)
+				assert.Equal(t, terminalOutput, got.Output)
+				assert.Equal(t, terminalStatus, got.Status)
+			})
+		}
 	}
-
-	require.NoError(t, cm.InsertTraceRun(ctx, terminal))
-	require.NoError(t, cm.InsertTraceRun(ctx, stale))
-
-	got, err := cm.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
-	require.NoError(t, err)
-
-	assert.Equal(t, terminal.TraceID, got.TraceID)
-	assert.Equal(t, terminal.QueuedAt.UnixMilli(), got.QueuedAt.UnixMilli())
-	assert.Equal(t, terminal.StartedAt.UnixMilli(), got.StartedAt.UnixMilli())
-	assert.Equal(t, terminal.EndedAt.UnixMilli(), got.EndedAt.UnixMilli())
-	assert.Equal(t, terminal.SourceID, got.SourceID)
-	assert.Equal(t, terminal.TriggerIDs, got.TriggerIDs)
-	assert.Equal(t, terminalOutput, got.Output)
-	assert.Equal(t, enums.RunStatusCompleted, got.Status)
 }
 
 // Invariant from TLA RunStateProjection ("terminal states are monotonic"):
@@ -2666,11 +2684,270 @@ func TestSpanOutputReadBack(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{SpanID: spanID})
+	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{RunID: runID, SpanID: spanID})
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted
 	assert.Contains(t, string(out.Data), `"num":42`, "output should contain raw JSON, not double-encoded")
+}
+
+// TestExtendedTraceReparenting verifies that orphaned userland spans (extended
+// trace spans whose parent OTEL span ID is no longer in the tree) are
+// reparented to their matching step or execution span by stepID + attempt.
+func TestExtendedTraceReparenting(t *testing.T) {
+	// stepAttrs returns JSON attributes for a step/exec span.
+	stepAttrs := func(stepID string, attempt int) []byte {
+		b, _ := json.Marshal(map[string]any{
+			"_inngest.step.id":      stepID,
+			"_inngest.step.attempt": attempt,
+		})
+		return b
+	}
+
+	// userlandAttrs returns JSON attributes for an orphaned extended trace span.
+	userlandAttrs := func(stepID string, attempt int) []byte {
+		b, _ := json.Marshal(map[string]any{
+			"_inngest.userland":     true,
+			"_inngest.step.id":      stepID,
+			"_inngest.step.attempt": attempt,
+		})
+		return b
+	}
+
+	t.Run("reparents to executor.step by stepID and attempt", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-abc", 0),
+		})
+		// Orphaned: parent "stale-otel-id" is not in the span map.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-abc", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		step := result.Children[0]
+		assert.Equal(t, "dyn-step", step.SpanID)
+		require.Len(t, step.Children, 1, "extended trace span should be reparented under executor.step")
+		assert.Equal(t, "dyn-userland", step.Children[0].SpanID)
+	})
+
+	t.Run("falls back to executor.execution when no executor.step exists", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-exec", Name: meta.SpanNameExecution,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-xyz", 0),
+		})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-xyz", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		exec := result.Children[0]
+		assert.Equal(t, "dyn-exec", exec.SpanID)
+		require.Len(t, exec.Children, 1, "extended trace span should fall back to executor.execution")
+		assert.Equal(t, "dyn-userland", exec.Children[0].SpanID)
+	})
+
+	t.Run("drops orphaned span when no matching step or execution span exists", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		// No step or exec span for "step-no-match".
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-no-match", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Empty(t, result.Children, "orphaned extended trace span with no match should be dropped")
+	})
+
+	t.Run("each attempt's span is reparented to its own attempt", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+
+		for _, attempt := range []int{0, 1} {
+			insertTestSpan(t, cm, testSpanFields{
+				RunID:        runIDStr,
+				DynamicSpanID: fmt.Sprintf("dyn-step-%d", attempt),
+				Name:         meta.SpanNameStep,
+				ParentSpanID: "dyn-run",
+				Attributes:   stepAttrs("step-retry", attempt),
+			})
+			insertTestSpan(t, cm, testSpanFields{
+				RunID:        runIDStr,
+				DynamicSpanID: fmt.Sprintf("dyn-userland-%d", attempt),
+				Name:         "userland",
+				ParentSpanID: "stale-otel-id",
+				Attributes:   userlandAttrs("step-retry", attempt),
+			})
+		}
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Children, 2)
+
+		bySpanID := make(map[string]*cqrs.OtelSpan, 2)
+		for _, child := range result.Children {
+			bySpanID[child.SpanID] = child
+		}
+
+		step0 := bySpanID["dyn-step-0"]
+		require.NotNil(t, step0)
+		require.Len(t, step0.Children, 1, "attempt 0 extended trace span should be under attempt 0 step")
+		assert.Equal(t, "dyn-userland-0", step0.Children[0].SpanID)
+
+		step1 := bySpanID["dyn-step-1"]
+		require.NotNil(t, step1)
+		require.Len(t, step1.Children, 1, "attempt 1 extended trace span should be under attempt 1 step")
+		assert.Equal(t, "dyn-userland-1", step1.Children[0].SpanID)
+	})
+
+	t.Run("does not reparent when attempt attribute is missing", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-abc", 0),
+		})
+		// Orphaned userland span with stepID but no attempt attribute.
+		noAttemptAttrs, _ := json.Marshal(map[string]any{
+			"_inngest.userland": true,
+			"_inngest.step.id":  "step-abc",
+		})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: noAttemptAttrs,
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		assert.Empty(t, result.Children[0].Children, "userland span missing attempt should not be reparented")
+	})
+
+	t.Run("userland span with valid parent reference uses normal lineage", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-linked", 0),
+		})
+		// Valid parent reference — should use normal lineage, not reparenting.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "dyn-step", Attributes: userlandAttrs("step-linked", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		step := result.Children[0]
+		assert.Equal(t, "dyn-step", step.SpanID)
+		require.Len(t, step.Children, 1, "userland span with valid parent should attach via normal lineage")
+		assert.Equal(t, "dyn-userland", step.Children[0].SpanID)
+	})
+
+	t.Run("only subtree root is reparented, not interior nodes", func(t *testing.T) {
+		// A three-span userland subtree: root → child → grandchild.
+		// root's inngest parent ("stale-otel-id") is absent from the tree.
+		// child and grandchild have parents within the userland subtree.
+		// Only root should be reparented; child and grandchild attach normally.
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-sub", 0),
+		})
+		// Subtree root: orphaned from inngest tree, should be reparented to dyn-step.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-root", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-sub", 0),
+		})
+		// Interior node: parent is the userland root above; resolves via spanMap normally.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-child", Name: "userland",
+			ParentSpanID: "dyn-ul-root", Attributes: userlandAttrs("step-sub", 0),
+		})
+		// Leaf: parent is the interior node; resolves via spanMap normally.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-grandchild", Name: "userland",
+			ParentSpanID: "dyn-ul-child", Attributes: userlandAttrs("step-sub", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		step := result.Children[0]
+		assert.Equal(t, "dyn-step", step.SpanID)
+
+		require.Len(t, step.Children, 1, "only the userland subtree root should be reparented under executor.step")
+		root := step.Children[0]
+		assert.Equal(t, "dyn-ul-root", root.SpanID)
+
+		require.Len(t, root.Children, 1, "interior node should be attached under the subtree root")
+		child := root.Children[0]
+		assert.Equal(t, "dyn-ul-child", child.SpanID)
+
+		require.Len(t, child.Children, 1, "grandchild should be attached under the interior node")
+		assert.Equal(t, "dyn-ul-grandchild", child.Children[0].SpanID)
+	})
 }
 
 //

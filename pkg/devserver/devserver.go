@@ -604,7 +604,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithExecutionManager(dbcqrs),
 		runner.WithPauseManager(pauseMgr),
 		runner.WithStateManager(sm),
-		runner.WithRunnerQueue(rq),
 		runner.WithBatchManager(batcher),
 		runner.WithCronManager(croner),
 		runner.WithPublisher(pb),
@@ -614,7 +613,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// The devserver embeds the event API.
 	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hd, nil)
 	ds.State = sm
-	ds.Queue = rq
 	ds.Executor = exec
 	ds.SemaphoreManager = semaphores
 	ds.CronSyncer = croner
@@ -632,7 +630,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 		Runner:         ds.Runner,
 		State:          ds.State,
-		Queue:          ds.Queue,
+		Queue:          rq,
 		EventHandler:   ds.HandleEvent,
 		Executor:       ds.Executor,
 		HistoryReader:  cqrsmanager.NewHistoryReader(adapter),
@@ -663,7 +661,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			AuthMiddleware:    authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware: caching,
 			FunctionReader:    ds.Data,
-			JobQueueReader:    ds.Queue.(queue.JobQueueReader),
+			JobQueueReader:    rq,
 			Executor:          ds.Executor,
 			Queue:             rq,
 			QueueShards:       shardRegistry,
@@ -727,8 +725,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		EventKeysProvider:   apiv2.NewEventKeysProvider(opts.EventKeys),
 		Apps:                NewAppProvider(dbcqrs),
 		Functions:           NewFunctionProvider(dbcqrs),
-		FunctionRuns:        NewFunctionRunReader(dbcqrs),
-		RunList:             NewRunsReader(adapter.Q()),
+		Runs:                NewRunProvider(dbcqrs, adapter.Q(), exec),
 		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
@@ -799,15 +796,16 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if os.Getenv("DEBUG") != "" {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
-			Log:             l,
-			DB:              ds.Data,
-			Queue:           rq,
-			State:           ds.State,
-			Cron:            croner,
-			ShardRegistry:   shardRegistry,
-			Port:            ds.Opts.DebugAPIPort,
-			PauseManager:    pauseMgr,
-			CapacityManager: cm,
+			Log:              l,
+			DB:               ds.Data,
+			Queue:            rq,
+			State:            ds.State,
+			Cron:             croner,
+			ShardRegistry:    shardRegistry,
+			Port:             ds.Opts.DebugAPIPort,
+			PauseManager:     pauseMgr,
+			CapacityManager:  cm,
+			SemaphoreManager: semaphores,
 			// Dependencies for batching and debounce insights
 			BatchManager: batcher,
 			Debouncer:    debouncer,

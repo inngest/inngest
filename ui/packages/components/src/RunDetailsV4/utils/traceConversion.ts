@@ -3,7 +3,7 @@
  * Feature: 001-composable-timeline-bar
  */
 
-import { toMaybeDate } from '@inngest/components/utils/date';
+import { maxDateString, toMaybeDate } from '@inngest/components/utils/date';
 import { max, min } from 'date-fns';
 
 import { KindInngestExperiment } from '../../generated';
@@ -302,6 +302,8 @@ export function traceRollup(root: Trace): Trace {
   const steps = new Map<string, Map<number, Trace>>();
   const rolledUpRunChildren: Trace[] = [];
   const groupedSpans = new Map<string, Map<number, Trace>>();
+  let lastStepEndedAt: Date | null = null;
+  let lastStep: Trace | null = null;
   let finalSpan: Trace | null = null;
   for (const child of root.childrenSpans ?? []) {
     if (child.outputID && !child.stepID) {
@@ -318,8 +320,18 @@ export function traceRollup(root: Trace): Trace {
       continue;
     }
 
+    if (finalSpan?.groupID == child.groupID) {
+      finalSpan = null;
+    }
+
     if (!steps.get(child.stepID)) {
       stepOrder.push(child.stepID);
+    }
+
+    const endedAt = toMaybeDate(child.endedAt);
+    if (!lastStepEndedAt || (endedAt && endedAt > lastStepEndedAt)) {
+      lastStepEndedAt = endedAt;
+      lastStep = child;
     }
 
     const attempts = steps.get(child.stepID) ?? new Map<number, Trace>();
@@ -390,6 +402,9 @@ export function traceRollup(root: Trace): Trace {
     const maxAttemptTrace = attempts.get(maxAttempt) as Trace;
     if (attempts.size == 1) {
       maxAttemptTrace.name = 'Finalization';
+      maxAttemptTrace.queuedAt = maxDateString(maxAttemptTrace.queuedAt, lastStep?.endedAt);
+      maxAttemptTrace.scheduledAt = maxDateString(maxAttemptTrace.scheduledAt, lastStep?.endedAt);
+      maxAttemptTrace.startedAt = maxDateString(maxAttemptTrace.startedAt, lastStep?.endedAt);
       rolledUpRunChildren.push(maxAttemptTrace);
     } else {
       // Create a virtual span to represent the finalization as a whole with all attempts
@@ -400,9 +415,9 @@ export function traceRollup(root: Trace): Trace {
         spanID: `final-rollup`, // virtual span
         groupID: maxAttemptTrace.groupID,
         attempts: maxAttemptTrace.attempts,
-        queuedAt: minAttemptTrace.queuedAt,
-        scheduledAt: minAttemptTrace.scheduledAt,
-        startedAt: minAttemptTrace.startedAt,
+        queuedAt: maxDateString(minAttemptTrace.queuedAt, lastStep?.endedAt),
+        scheduledAt: maxDateString(minAttemptTrace.scheduledAt, lastStep?.endedAt),
+        startedAt: maxDateString(minAttemptTrace.startedAt, lastStep?.endedAt),
         endedAt: maxAttemptTrace.endedAt,
         status: maxAttemptTrace.status,
         outputID: maxAttemptTrace.outputID,

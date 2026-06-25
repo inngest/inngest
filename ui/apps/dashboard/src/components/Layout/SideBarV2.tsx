@@ -4,6 +4,7 @@ import { IconPanelLeftClose } from '@inngest/components/icons/PanelLeftClose';
 import { IconPanelLeftOpen } from '@inngest/components/icons/PanelLeftOpen';
 
 import type { Environment } from '@/utils/environments';
+import AnnouncementStack from '../NavigationV2/Announcements/AnnouncementStack';
 import Navigation from '../NavigationV2/Navigation';
 import OnboardingWidget from '../NavigationV2/OnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
@@ -83,13 +84,24 @@ export default function SideBar({
       } shrink-0 overflow-visible border-r`}
       ref={navRef}
     >
-      <div className="flex grow flex-col justify-between">
-        <Navigation collapsed={collapsed} activeEnv={activeEnv} />
+      <div className="flex min-h-0 grow flex-col justify-between">
+        {/* Nav list scrolls on short screens; min-h-0 lets the flex child
+            actually overflow instead of pushing the bottom widgets off-screen. */}
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+          <Navigation collapsed={collapsed} activeEnv={activeEnv} />
+        </div>
 
-        <div className="pl-3 pr-2">
+        <div className="shrink-0 pl-3 pr-3">
           <SeatOverageWidget collapsed={collapsed} />
-          {isWidgetOpen && (
+          {/* The onboarding widget takes priority over marketing announcements. */}
+          {isWidgetOpen ? (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
+          ) : (
+            // Marketing announcements are tall and non-essential — drop them on
+            // short viewports so the nav + collapse toggle stay reachable.
+            <div className="[@media(max-height:720px)]:hidden">
+              <AnnouncementStack collapsed={collapsed} />
+            </div>
           )}
 
           {/* Discreet, icon-only collapse toggle pinned to the sidebar foot.

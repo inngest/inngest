@@ -123,12 +123,12 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	}
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
-	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(functionRun, nil).Once()
+	runs := &mockRunProvider{}
+	runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(functionRun, nil).Once()
 
 	handler, err := newTestHTTPHandler(ctx, ServiceOptions{
-		Functions:    functions,
-		FunctionRuns: runs,
+		Functions: functions,
+		Runs:      runs,
 	}, HTTPHandlerOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -148,6 +148,71 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	run := body["data"].(map[string]any)
 	require.Equal(t, "COMPLETED", run["status"])
+}
+
+func TestHTTPGateway_Rerun(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	newRunID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4d0")
+
+	rerun := &mockRunProvider{}
+	rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(newRunID, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Runs: rerun}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		rerun.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/runs/"+runID.String()+"/rerun", nil)
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	data := response["data"].(map[string]any)
+	require.Equal(t, newRunID.String(), data["runId"])
+}
+
+func TestHTTPGateway_RerunFromStepNotImplemented(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	body, err := json.Marshal(map[string]any{
+		"fromStep": map[string]any{
+			"stepId": "step-1",
+			"input": []any{
+				map[string]any{"foo": "bar"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	rerun := &mockRunProvider{}
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Runs: rerun}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		rerun.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/runs/"+runID.String()+"/rerun", strings.NewReader(string(body)))
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusNotImplemented, rec.Code)
+
+	var response errorResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	require.Len(t, response.Errors, 1)
+	require.Equal(t, apiv2base.ErrorNotImplemented, response.Errors[0].Code)
+	require.Equal(t, "Rerun from step is not yet implemented", response.Errors[0].Message)
 }
 
 func TestHTTPGateway_GetApp(t *testing.T) {

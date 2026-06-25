@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -745,12 +746,12 @@ func TestService_GetFunctionRun(t *testing.T) {
 	}
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
-	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(run, nil).Once()
+	runs := &mockRunProvider{}
+	runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(run, nil).Once()
 
 	service := NewService(ServiceOptions{
-		Functions:    functions,
-		FunctionRuns: runs,
+		Functions: functions,
+		Runs:      runs,
 	})
 	t.Cleanup(func() {
 		functions.AssertExpectations(t)
@@ -792,15 +793,15 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("returns not found when run is missing", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(nil, errors.New("missing")).Once()
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(nil, errors.New("missing")).Once()
 		t.Cleanup(func() {
 			runs.AssertExpectations(t)
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    &mockFunctionProvider{},
-			FunctionRuns: runs,
+			Functions: &mockFunctionProvider{},
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -812,8 +813,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("returns not found when function is missing", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(run, nil).Once()
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(run, nil).Once()
 		functions := &mockFunctionProvider{}
 		functions.On("GetFunction", mock.Anything, functionID.String()).Return(inngest.DeployedFunction{}, errors.New("missing")).Once()
 		t.Cleanup(func() {
@@ -822,8 +823,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    functions,
-			FunctionRuns: runs,
+			Functions: functions,
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -844,8 +845,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		outputID, err := outputIdentifier.Encode()
 		require.NoError(t, err)
 
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
 			RunID:        runID,
 			RunStartedAt: startedAt,
 			FunctionID:   functionID,
@@ -872,7 +873,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 		service := NewService(ServiceOptions{
 			Functions:      functions,
-			FunctionRuns:   runs,
+			Runs:           runs,
 			FunctionTraces: traces,
 		})
 
@@ -887,8 +888,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("does not fall back to run output", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
 			RunID:        runID,
 			RunStartedAt: startedAt,
 			FunctionID:   functionID,
@@ -905,8 +906,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    functions,
-			FunctionRuns: runs,
+			Functions: functions,
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -948,7 +949,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	}
 
 	t.Run("returns mapped event runs", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID:       eventID,
 			Limit:         defaultEventRunsLimit,
@@ -958,7 +959,7 @@ func TestService_GetEventRuns(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId:       eventID.String(),
 			IncludeOutput: boolPtr(true),
@@ -979,7 +980,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("passes pagination to reader", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
 			Limit:   1,
@@ -993,7 +994,7 @@ func TestService_GetEventRuns(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		limit := int32(1)
 
 		first, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
@@ -1028,7 +1029,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("validates event id format", func(t *testing.T) {
-		service := NewService(ServiceOptions{RunList: &mockRunsReader{}})
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: "not-a-ulid",
 		})
@@ -1038,7 +1039,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("returns internal error when reader fails", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
 			Limit:   defaultEventRunsLimit,
@@ -1047,7 +1048,7 @@ func TestService_GetEventRuns(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: eventID.String(),
 		})
@@ -1057,7 +1058,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("validates pagination", func(t *testing.T) {
-		service := NewService(ServiceOptions{RunList: &mockRunsReader{}})
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
 		invalidLimit := int32(maxEventRunsLimit + 1)
 
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
@@ -1067,6 +1068,131 @@ func TestService_GetEventRuns(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Limit cannot exceed 40")
+	})
+}
+
+func TestService_Rerun(t *testing.T) {
+	runID := ulid.MustParse("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	newRunID := ulid.MustParse("01BX5ZZKBKACTAV9WEVGEMMVRZ")
+
+	t.Run("reruns a run", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(newRunID, nil).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, newRunID.String(), resp.Data.RunId)
+		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("rejects from step opts", func(t *testing.T) {
+		input, err := structpb.NewList([]any{map[string]any{"foo": "bar"}})
+		require.NoError(t, err)
+
+		rerun := &mockRunProvider{}
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+			FromStep: &apiv2.RerunFromStep{
+				StepId: "step-1",
+				Input:  input,
+			},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Rerun from step is not yet implemented")
+	})
+
+	t.Run("requires run id", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run ID is required")
+	})
+
+	t.Run("validates run id format", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: "not-a-ulid",
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run ID must be a valid ULID")
+	})
+
+	t.Run("rejects empty from step opts", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId:    runID.String(),
+			FromStep: &apiv2.RerunFromStep{},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Rerun from step is not yet implemented")
+	})
+
+	t.Run("maps missing run", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(ulid.ULID{}, ErrRunNotFound).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run not found")
+	})
+
+	t.Run("maps cron rerun unsupported", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(ulid.ULID{}, ErrCronRerunNotSupported).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Rerunning cron-triggered runs is not yet supported")
+	})
+
+	t.Run("applies rate limit", func(t *testing.T) {
+		rateLimiter := &mockRateLimitProvider{}
+		rateLimiter.On("CheckRateLimit", mock.Anything, apiv2.V2_Rerun_FullMethodName).
+			Return(RateLimitResult{Limited: true}).Once()
+		t.Cleanup(func() {
+			rateLimiter.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Runs:              &mockRunProvider{},
+			RateLimitProvider: rateLimiter,
+		})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "API rate limit exceeded")
 	})
 }
 

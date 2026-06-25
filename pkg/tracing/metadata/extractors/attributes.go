@@ -3,7 +3,6 @@ package extractors
 import (
 	"cmp"
 	"encoding/json"
-	"regexp"
 	"slices"
 
 	"github.com/inngest/inngest/pkg/util"
@@ -127,12 +126,15 @@ var keyFieldMap = map[string]attrMapping{
 	// ---------------------------------------------------------------------------
 	// Vercel AI SDK (native telemetry, `ai.*`)
 	// ---------------------------------------------------------------------------
-	// The AI SDK emits its own spans. A call produces a parent ai.<op> span
-	// (ai.* only) plus a child ai.<op>.do<Op> span that ALSO carries a partial
-	// gen_ai.* set. vercel ranks below semconv/openinference so gen_ai.* stays
-	// authoritative on the child where both are present (their values agree);
-	// these mappings are what make the ai.*-only parent and embeddings spans
-	// extractable, and they supply ai.usage.totalTokens (gen_ai omits a total).
+	// The Vercel AI SDK emits its own spans. A call produces an outer ai.<op> span
+	// (ai.* only) plus an inner ai.<op>.do<Op> span that ALSO carries a partial
+	// gen_ai.* set; the ai.* usage values are duplicated on both.
+	//
+	// For most Vercel spans, we only use gen_ai.* attributes and ignore ai.*
+	// attributes to avoid double counting when we aggregate.
+	//
+	// However, Vercel's embedding spans lack any gen_ai.* attributes. For this
+	// special case, we do parse ai.* attributes.
 	"ai.model.id": {
 		field:      "model",
 		convention: vercel,
@@ -293,42 +295,28 @@ func compareByRank(a, b parsedAttr) int {
 	)
 }
 
-// vercelProviderCallSegment matches the `.do<Op>` segment (e.g. `.doGenerate`,
-// `.doStream`, `.doEmbed`) that the Vercel AI SDK appends to the provider-call
-// (leaf) span's operationId. The framework rollup span lacks this segment.
-//
-// @see https://ai-sdk.dev/docs/ai-sdk-core/telemetry
-var vercelProviderCallSegment = regexp.MustCompile(`\.do[A-Z]`)
-
-// isVercelRollupSpan reports whether the span is a Vercel AI SDK framework
-// rollup (wrapper) span.
-//
-// The Vercel AI SDK emits a span *tree*: a framework rollup span
-// (`ai.generateText`) whose children are the provider-call (leaf) spans
-// (`ai.generateText.doGenerate`). Both carry overlapping usage data, so
-// extracting from both would double count. We choose to skip the rollup span.
-//
-// Only Vercel AI SDK spans carry `ai.operationId`; among them, the
-// provider-call leaf has a `.do*` segment and the rollup does not.
-func isVercelRollupSpan(attributes []*v1.KeyValue) bool {
-	for _, attr := range attributes {
-		if attr.Key != "ai.operationId" {
-			continue
-		}
-		op := attr.Value.GetStringValue()
-		return op != "" && !vercelProviderCallSegment.MatchString(op)
-	}
-	return false
-}
-
 func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) (foundAny bool) {
-	// The Vercel AI SDK's rollup span duplicates its provider-call child's
-	// usage; skip it to avoid double counting.
-	if isVercelRollupSpan(attributes) {
-		return false
-	}
-
 	potentialAttrs := map[string][]parsedAttr{}
+
+	// The Vercel AI SDK emits its own spans. A call produces an outer ai.<op> span
+	// (ai.* only) plus an inner ai.<op>.do<Op> span that ALSO carries a partial
+	// gen_ai.* set; the ai.* usage values are duplicated on both.
+	//
+	// For most Vercel spans, we only use gen_ai.* attributes and ignore ai.*
+	// attributes to avoid double counting when we aggregate.
+	//
+	// However, Vercel's embedding spans lack any gen_ai.* attributes. For this
+	// special case, we do parse ai.* attributes.
+	//
+	// We parse only the inner embed to avoid double counting.
+	isVercelEmbedInner := false
+	for _, attr := range attributes {
+		if attr.Key == "ai.operationId" &&
+			attr.Value.GetStringValue() == "ai.embed.doEmbed" {
+			isVercelEmbedInner = true
+			break
+		}
+	}
 
 	// addAttr records a matched attribute as a candidate for its canonical field.
 	addAttr := func(m attrMapping, value *v1.AnyValue) {
@@ -345,6 +333,11 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 	for _, attr := range attributes {
 		mapping, ok := keyFieldMap[attr.Key]
 		if !ok {
+			continue
+		}
+
+		// Honor vercel ai.* keys only on the inner embeddings span (see above).
+		if mapping.convention == vercel && !isVercelEmbedInner {
 			continue
 		}
 

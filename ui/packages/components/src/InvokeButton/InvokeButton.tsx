@@ -10,6 +10,7 @@ type Props = {
   btnAction: (payload: {
     data: Record<string, unknown>;
     user: Record<string, unknown> | null;
+    meta: { sessions: Record<string, string> } | null;
   }) => void;
 };
 
@@ -23,7 +24,11 @@ export function InvokeButton({
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const onConfirm = useCallback(
-    (payload: { data: Record<string, unknown>; user: Record<string, unknown> | null }) => {
+    (payload: {
+      data: Record<string, unknown>;
+      user: Record<string, unknown> | null;
+      meta: { sessions: Record<string, string> } | null;
+    }) => {
       setIsModalOpen(false);
       btnAction(payload);
     },

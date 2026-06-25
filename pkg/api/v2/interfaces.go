@@ -69,12 +69,8 @@ type EventPublisher interface {
 	Publish(ctx context.Context, event event.TrackedEvent) error
 }
 
-type GetFunctionRunOpts struct {
+type GetRunOpts struct {
 	IncludeOutput bool
-}
-
-type FunctionRunReader interface {
-	GetFunctionRun(ctx context.Context, runID ulid.ULID, opts GetFunctionRunOpts) (*cqrs.FunctionRun, error)
 }
 
 type GetRunsOpts struct {
@@ -104,8 +100,19 @@ type GetRunsResult struct {
 	HasMore bool
 }
 
-type RunsReader interface {
+type RunProvider interface {
+	GetRun(ctx context.Context, runID ulid.ULID, opts GetRunOpts) (*cqrs.FunctionRun, error)
 	GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error)
+	Rerun(ctx context.Context, runID ulid.ULID, opts RerunOpts) (ulid.ULID, error)
+}
+
+type RerunOpts struct {
+	FromStep *RerunFromStep
+}
+
+type RerunFromStep struct {
+	StepID string
+	Input  json.RawMessage
 }
 
 type FunctionTraceReader interface {

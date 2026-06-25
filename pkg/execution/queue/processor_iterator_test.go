@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"iter"
 	"sync"
 	"sync/atomic"
@@ -67,6 +68,9 @@ type mockShardForIterator struct {
 	runningCountCalls       int32
 	statusCount             int64
 	statusCountCalls        int32
+	earliestPeekTimes       sync.Map
+	earliestPeekTimeCalls   int32
+	earliestPeekTimeErr     error
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -99,6 +103,15 @@ func (m *mockShardForIterator) ItemLeaseConstraintCheck(
 func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error) {
 	id := ulid.Make()
 	return &id, nil
+}
+
+func (m *mockShardForIterator) SetEarliestPeekTime(ctx context.Context, item QueueItem, at time.Time) (time.Time, error) {
+	atomic.AddInt32(&m.earliestPeekTimeCalls, 1)
+	if m.earliestPeekTimeErr != nil {
+		return time.Time{}, m.earliestPeekTimeErr
+	}
+	actual, _ := m.earliestPeekTimes.LoadOrStore(item.ID, at)
+	return actual.(time.Time), nil
 }
 
 func (m *mockShardForIterator) Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
@@ -728,4 +741,196 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 	// With atomic operations, this should now be deterministic
 	require.False(t, isCustomKeyLimitOnly,
 		"IsCustomKeyLimitOnly should be false when function concurrency limits are hit")
+}
+
+func TestProcessorIteratorUsesPartitionLastEarliestPeekFallbackWhenFlagDisabled(t *testing.T) {
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+	envID := uuid.New()
+	at := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+
+	shard := &mockShardForIterator{
+		name: "test-shard",
+	}
+	mockProc := &mockQueueProcessor{
+		shard:     shard,
+		clock:     clockwork.NewRealClock(),
+		sem:       util.NewTrackingSemaphore(1),
+		workers:   make(chan ProcessItem, 1),
+		shadowMap: make(map[string]ShadowContinuation),
+		opts:      NewQueueOptions(),
+		constraintResultFunc: func() enums.QueueConstraint {
+			return enums.QueueConstraintFunctionConcurrency
+		},
+	}
+
+	partition := &QueuePartition{
+		ID:         fnID.String(),
+		AccountID:  accountID,
+		EnvID:      &envID,
+		FunctionID: &fnID,
+		Last:       at.Add(time.Second).UnixMilli(),
+	}
+	item := &QueueItem{
+		ID:          ulid.Make().String(),
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		AtMS:        at.UnixMilli(),
+		Data: Item{
+			Kind: KindEdge,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       ulid.Make(),
+			},
+		},
+	}
+
+	iter := ProcessorIterator{
+		Partition:  partition,
+		Items:      []*QueueItem{item},
+		Queue:      mockProc,
+		StaticTime: at.Add(2 * time.Second),
+	}
+
+	err := iter.Process(ctx, item)
+	require.ErrorIs(t, err, ErrProcessNoUserConstraintCapacity)
+	require.ErrorIs(t, err, ErrProcessStopIterator)
+	require.Equal(t, item.AtMS, item.EarliestPeekTime)
+	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
+}
+
+func TestProcessorIteratorSkipsEarliestPeekTimeWhenNoWorkerCapacity(t *testing.T) {
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+	envID := uuid.New()
+	at := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+	peekTime := at.Add(2 * time.Second)
+
+	shard := &mockShardForIterator{
+		name: "test-shard",
+	}
+	opts := NewQueueOptions()
+	WithQueueItemEarliestPeekTimeEnabled(func(ctx context.Context, shardName string, acctID, gotEnvID, gotFnID uuid.UUID) QueueItemEarliestPeekTimeConfig {
+		return QueueItemEarliestPeekTimeConfig{
+			Enabled:        true,
+			BulkStampLimit: 0,
+		}
+	})(opts)
+
+	mockProc := &mockQueueProcessor{
+		shard:     shard,
+		clock:     clockwork.NewRealClock(),
+		sem:       util.NewTrackingSemaphore(1),
+		workers:   make(chan ProcessItem, 1),
+		shadowMap: make(map[string]ShadowContinuation),
+		opts:      opts,
+	}
+
+	require.NoError(t, mockProc.sem.Acquire(ctx, 1))
+
+	partition := &QueuePartition{
+		ID:         fnID.String(),
+		AccountID:  accountID,
+		EnvID:      &envID,
+		FunctionID: &fnID,
+		Last:       at.Add(time.Second).UnixMilli(),
+	}
+	item := &QueueItem{
+		ID:          ulid.Make().String(),
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		AtMS:        at.UnixMilli(),
+		Data: Item{
+			Kind: KindEdge,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       ulid.Make(),
+			},
+		},
+	}
+
+	iter := ProcessorIterator{
+		Partition:  partition,
+		Items:      []*QueueItem{item},
+		Queue:      mockProc,
+		StaticTime: peekTime,
+	}
+
+	err := iter.Process(ctx, item)
+	require.ErrorIs(t, err, ErrProcessNoCapacity)
+	require.Zero(t, item.EarliestPeekTime)
+	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
+}
+
+func TestProcessorIteratorContinuesWhenEarliestPeekTimeStampFails(t *testing.T) {
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+	envID := uuid.New()
+	at := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+
+	shard := &mockShardForIterator{
+		name:                "test-shard",
+		earliestPeekTimeErr: errors.New("redis unavailable"),
+	}
+	opts := NewQueueOptions()
+	WithQueueItemEarliestPeekTimeEnabled(func(ctx context.Context, shardName string, acctID, gotEnvID, gotFnID uuid.UUID) QueueItemEarliestPeekTimeConfig {
+		return QueueItemEarliestPeekTimeConfig{
+			Enabled: true,
+		}
+	})(opts)
+
+	workers := make(chan ProcessItem, 1)
+	mockProc := &mockQueueProcessor{
+		shard:     shard,
+		clock:     clockwork.NewRealClock(),
+		sem:       util.NewTrackingSemaphore(1),
+		workers:   workers,
+		shadowMap: make(map[string]ShadowContinuation),
+		opts:      opts,
+	}
+
+	partition := &QueuePartition{
+		ID:         fnID.String(),
+		AccountID:  accountID,
+		EnvID:      &envID,
+		FunctionID: &fnID,
+	}
+	item := &QueueItem{
+		ID:          ulid.Make().String(),
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		AtMS:        at.UnixMilli(),
+		Data: Item{
+			Kind: KindEdge,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       ulid.Make(),
+			},
+		},
+	}
+
+	iter := ProcessorIterator{
+		Partition:  partition,
+		Items:      []*QueueItem{item},
+		Queue:      mockProc,
+		StaticTime: at.Add(2 * time.Second),
+	}
+
+	err := iter.Process(ctx, item)
+	require.NoError(t, err)
+	require.Zero(t, item.EarliestPeekTime)
+	require.Equal(t, int32(1), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
+	require.Len(t, workers, 1)
 }

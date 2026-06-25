@@ -29,6 +29,18 @@ service Debug {
   rpc BlockDeleted(BlockDeletedRequest) returns (BlockDeletedResponse) {}
   // CheckConstraints invokes Check() on the configured capacity manager
   rpc CheckConstraints(constraintapi.v1.CapacityCheckRequest) returns (CheckConstraintsResponse);
+  // GetSemaphoreLevel reads a single account-scoped semaphore by explicit name.
+  rpc GetSemaphoreLevel(SemaphoreLevelRequest) returns (SemaphoreLevelResponse) {}
+  // GetAppSemaphoreLevel reads the worker concurrency semaphore for an app.
+  rpc GetAppSemaphoreLevel(AppSemaphoreLevelRequest) returns (SemaphoreLevelResponse) {}
+  // GetFunctionSemaphoreLevel reads the function concurrency semaphore for a function.
+  rpc GetFunctionSemaphoreLevel(FunctionSemaphoreLevelRequest) returns (SemaphoreLevelResponse) {}
+  // SetSemaphoreLevel overrides capacity for a single account-scoped semaphore by explicit name.
+  rpc SetSemaphoreLevel(SetSemaphoreLevelRequest) returns (SetSemaphoreLevelResponse) {}
+  // SetAppSemaphoreLevel overrides worker concurrency capacity for an app.
+  rpc SetAppSemaphoreLevel(SetAppSemaphoreLevelRequest) returns (SetSemaphoreLevelResponse) {}
+  // SetFunctionSemaphoreLevel overrides function concurrency capacity for a function.
+  rpc SetFunctionSemaphoreLevel(SetFunctionSemaphoreLevelRequest) returns (SetSemaphoreLevelResponse) {}
 
   // GetBatchInfo retrieves information about the current batch for a function and batch key.
   rpc GetBatchInfo(BatchInfoRequest) returns (BatchInfoResponse) {}
@@ -55,4 +67,3 @@ service Debug {
   // GetBacklogSize retrieves the number of items in a specific backlog
   rpc GetBacklogSize(BacklogSizeRequest) returns (BacklogSizeResponse) {}
 }
-

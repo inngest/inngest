@@ -714,16 +714,16 @@ func TestConstraintConfigConversion(t *testing.T) {
 				Throttle: []ThrottleConfig{},
 				Semaphores: []Semaphore{
 					{
-						ID:         "app:test-app",
-						UsageValue: "run-abc",
-						Weight:     2,
-						Release:    SemaphoreReleaseAuto,
+						ID:               "app:test-app",
+						EvaluatedKeyHash: "run-abc",
+						Weight:           2,
+						Release:          SemaphoreReleaseAuto,
 					},
 					{
-						ID:         "fn:test-fn",
-						UsageValue: "run-def",
-						Weight:     1,
-						Release:    SemaphoreReleaseManual,
+						ID:               "fn:test-fn",
+						EvaluatedKeyHash: "run-def",
+						Weight:           1,
+						Release:          SemaphoreReleaseManual,
 					},
 				},
 			},
@@ -881,10 +881,10 @@ func TestConstraintItemConversion(t *testing.T) {
 			input: ConstraintItem{
 				Kind: kindSemaphore,
 				Semaphore: &SemaphoreConstraint{
-					ID:         "app:test-id",
-					UsageValue: "run-123",
-					Weight:     3,
-					Release:    SemaphoreReleaseManual,
+					ID:               "app:test-id",
+					EvaluatedKeyHash: "run-123",
+					Weight:           3,
+					Release:          SemaphoreReleaseManual,
 				},
 			},
 			expected: &pb.ConstraintItem{

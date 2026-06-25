@@ -4,6 +4,9 @@ import { Error } from '@inngest/components/Error/Error';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -19,13 +22,25 @@ import { useRouterState } from '@tanstack/react-router';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { lineColors } from '@/components/Metrics/utils';
 import { graphql } from '@/gql';
-import { GetAccountEntitlementsDocument } from '@/gql/graphql';
+import { GetAccountEntitlementsDocument, ScoreKind } from '@/gql/graphql';
 import { Legend } from './Legend';
 import { ScoreCard } from './ScoreCard';
 import type { ScoreSeries } from './types';
 
 const DEFAULT_DURATION = { hours: 24 };
+const SCORES_PANEL = 'Scores';
+
+// Red (lineColors[3]) is reserved for boolean `false` bars and must never be
+// used for a numeric line chart (nor any near-red hue). Numeric scores cycle
+// through this red-free subset of the metrics palette.
+const NUMERIC_LINE_COLORS = [
+  lineColors[2], // blue
+  lineColors[4], // purple
+  lineColors[1], // green
+  lineColors[0], // amber
+];
 
 const ScoresLookupDocument = graphql(`
   query ScoresLookup($envSlug: String!, $page: Int, $pageSize: Int) {
@@ -53,6 +68,7 @@ const ScoreNamesDocument = graphql(`
       filter: $filter
     ) {
       name
+      kind
     }
   }
 `);
@@ -167,6 +183,19 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
     next.length ? setDisabled(next) : removeDisabled();
   };
 
+  // One stable color per score, assigned by position in the full available
+  // list so a score keeps its color regardless of which others are toggled
+  // off. Reuses the metrics palette; cycles when there are more than 5 scores.
+  const scoreColors = useMemo(() => {
+    const dark = isDark();
+    const m = new Map<string, string>();
+    availableScores.forEach((s, i) => {
+      const [token, hex] = NUMERIC_LINE_COLORS[i % NUMERIC_LINE_COLORS.length];
+      m.set(s.name, resolveColor(token, dark, hex));
+    });
+    return m;
+  }, [availableScores]);
+
   const [{ data: seriesData, fetching: seriesFetching, error: seriesError }] =
     useQuery({
       query: ScoreTimeSeriesDocument,
@@ -187,6 +216,25 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
     return m;
   }, [seriesData]);
 
+  // Toggle tint: numeric scores match their per-score line color; boolean
+  // scores use the same green as their `true` bars (lineColors[1]) so every
+  // boolean follows the shared green/red pattern. `kind` comes from the score
+  // names query so the correct color is known on first paint (no flip once the
+  // time series loads).
+  const toggleColors = useMemo(() => {
+    const dark = isDark();
+    const booleanGreen = resolveColor(lineColors[1][0], dark, lineColors[1][1]);
+    const m = new Map<string, string>();
+    for (const s of availableScores) {
+      const isBoolean = s.kind === ScoreKind.Boolean;
+      m.set(
+        s.name,
+        isBoolean ? booleanGreen : scoreColors.get(s.name) ?? booleanGreen,
+      );
+    }
+    return m;
+  }, [availableScores, scoreColors]);
+
   const defaultRange =
     parsedStart && parsedEnd
       ? {
@@ -204,63 +252,75 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
   const filterError = lookupError ?? namesError;
 
   return (
-    <div className="flex h-full w-full flex-col">
-      <div className="bg-canvasBase flex flex-row items-center gap-1.5 px-3 py-[9px]">
-        <TimeFilter
-          daysAgoMax={daysAgoMax}
-          defaultValue={defaultRange}
-          onDaysChange={(r: RangeChangeProps) => {
-            batchUpdate({
-              duration:
-                r.type === 'relative' ? durationToString(r.duration) : null,
-              start: r.type === 'absolute' ? r.start.toISOString() : null,
-              end: r.type === 'absolute' ? r.end.toISOString() : null,
-            });
-          }}
-        />
-        {lookupFetching ? (
-          <Skeleton className="block h-6 w-60" />
-        ) : (
-          <EntityFilter
-            type="function"
-            onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
-            selectedEntities={selectedFns || []}
-            entities={functions}
+    <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="bg-canvasBase flex flex-row items-center gap-1.5 px-3 py-[9px]">
+          <TimeFilter
+            daysAgoMax={daysAgoMax}
+            defaultValue={defaultRange}
+            onDaysChange={(r: RangeChangeProps) => {
+              batchUpdate({
+                duration:
+                  r.type === 'relative' ? durationToString(r.duration) : null,
+                start: r.type === 'absolute' ? r.start.toISOString() : null,
+                end: r.type === 'absolute' ? r.end.toISOString() : null,
+              });
+            }}
           />
-        )}
-      </div>
-      {filterError && (
-        <Error message="There was an error fetching scores filter data." />
-      )}
-      <div className="bg-canvasBase flex flex-row gap-4 px-4 pb-6">
-        <div className="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
-          {visibleScores.length === 0 && !isLoading && !namesError ? (
-            <div className="text-muted col-span-full py-10 text-center text-sm">
-              {availableScores.length === 0
-                ? 'No scores recorded in this range.'
-                : 'No scores selected.'}
-            </div>
+          {lookupFetching ? (
+            <Skeleton className="block h-6 w-60" />
           ) : (
-            visibleScores.map((s) => (
-              <ScoreCard
-                key={s.name}
-                name={s.name}
-                series={seriesByName.get(s.name)}
-                isLoading={seriesFetching}
-                error={seriesError}
-              />
-            ))
+            <EntityFilter
+              type="function"
+              onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
+              selectedEntities={selectedFns || []}
+              entities={functions}
+            />
           )}
         </div>
-        {!filterError && (
-          <Legend
-            scores={availableScores}
-            disabled={disabled}
-            onToggle={toggleScore}
-            isLoading={namesFetching}
-          />
+        {filterError && (
+          <Error message="There was an error fetching scores filter data." />
         )}
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-6 [&::-webkit-scrollbar]:hidden">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {visibleScores.length === 0 && !isLoading && !namesError ? (
+              <div className="text-muted col-span-full py-10 text-center text-sm">
+                {availableScores.length === 0
+                  ? 'No scores recorded in this range.'
+                  : 'No scores selected.'}
+              </div>
+            ) : (
+              visibleScores.map((s) => (
+                <ScoreCard
+                  key={s.name}
+                  name={s.name}
+                  series={seriesByName.get(s.name)}
+                  color={scoreColors.get(s.name)}
+                  isLoading={seriesFetching}
+                  error={seriesError}
+                />
+              ))
+            )}
+          </div>
+        </div>
       </div>
+      {!filterError && (
+        <aside className="border-subtle flex w-[300px] shrink-0 flex-col overflow-hidden border-l">
+          <div className="border-subtle flex h-[49px] shrink-0 flex-row items-center gap-2 border-b px-3">
+            <InsightsIcon className="h-5 w-5" />
+            <div className="text-sm font-normal">{SCORES_PANEL}</div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <Legend
+              scores={availableScores}
+              disabled={disabled}
+              colors={toggleColors}
+              onToggle={toggleScore}
+              isLoading={namesFetching}
+            />
+          </div>
+        </aside>
+      )}
     </div>
   );
 };

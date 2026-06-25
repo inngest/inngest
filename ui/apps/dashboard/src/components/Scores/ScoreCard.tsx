@@ -12,6 +12,7 @@ import {
   lineColors,
   seriesOptions,
 } from '@/components/Metrics/utils';
+import { borderColor } from '@/utils/tailwind';
 import { ScoreKind, type MetricsResponse } from '@/gql/graphql';
 import type { ScoreSeries } from './types';
 
@@ -29,12 +30,15 @@ type Props = {
   name: string;
   series: ScoreSeries | undefined;
   isLoading: boolean;
+  // Resolved per-score color; the numeric line uses it so the chart matches the
+  // sidebar toggle. Falls back to the palette's blue when absent.
+  color?: string;
   // The `Error` import above is the banner component and shadows the global
   // Error type, so type this as what Dashboard actually passes.
   error?: CombinedError;
 };
 
-export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
+export const ScoreCard = ({ name, series, isLoading, color, error }: Props) => {
   const [aggregation, setAggregation] = useState<AggregationKey>('avg');
 
   const option = useMemo(() => {
@@ -42,7 +46,7 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
     const buckets = series.buckets;
     const dark = isDark();
 
-    const color = (i: number) =>
+    const lineColor = (i: number) =>
       resolveColor(
         lineColors[i % lineColors.length][0],
         dark,
@@ -55,18 +59,27 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
       data: buckets.map((b) => ({ bucket: b.bucketStart, value: 0 })),
     } as MetricsResponse);
 
+    const numericData = buckets.map((b) => b[aggregation]);
+    const nonNullCount = numericData.filter((v) => v != null).length;
+
     const chartSeries =
       series.kind === ScoreKind.Numeric
         ? [
             {
               ...seriesOptions,
               name,
-              data: buckets.map((b) => b[aggregation]),
+              data: numericData,
               // The server's dense buckets carry null aggregates for empty
               // intervals; bridge them so sparse data still draws continuous
               // lines like the metrics dashboard.
               connectNulls: true,
-              itemStyle: { color: color(2) },
+              // A lone point draws no line, so mark it; showAllSymbol overrides
+              // ECharts hiding symbols as "crowded" across the dense buckets.
+              showSymbol: nonNullCount <= 1,
+              showAllSymbol: true,
+              symbol: 'circle',
+              symbolSize: 8,
+              itemStyle: { color: color ?? lineColor(2) },
             },
           ]
         : [
@@ -75,27 +88,40 @@ export const ScoreCard = ({ name, series, isLoading, error }: Props) => {
               type: 'bar' as const,
               stack: 'count',
               data: buckets.map((b) => b.trueCount ?? 0),
-              itemStyle: { color: color(1) },
+              itemStyle: { color: lineColor(1) },
             },
             {
               name: 'false',
               type: 'bar' as const,
               stack: 'count',
               data: buckets.map((b) => b.falseCount ?? 0),
-              itemStyle: { color: color(3) },
+              itemStyle: { color: lineColor(3) },
             },
           ];
 
     return getLineChartOptions(
-      { xAxis, series: chartSeries },
+      {
+        xAxis,
+        series: chartSeries,
+        ...(series.kind === ScoreKind.Numeric && {
+          yAxis: {
+            type: 'value' as const,
+            scale: true,
+            splitNumber: 4,
+            splitLine: {
+              lineStyle: { color: resolveColor(borderColor.subtle, dark) },
+            },
+          },
+        }),
+      },
       chartSeries.map((s) => s.name),
     );
-  }, [series, name, aggregation]);
+  }, [series, name, aggregation, color]);
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-hidden rounded-md border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
-        <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
+        <div className="text-muted flex w-full flex-row items-center gap-x-2 font-mono text-base">
           {name}
         </div>
       </div>

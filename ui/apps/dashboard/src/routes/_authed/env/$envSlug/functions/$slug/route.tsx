@@ -48,14 +48,17 @@ function FunctionComponent() {
   const invokeAction = useCallback(
     ({
       data,
+      meta,
       user,
     }: {
       data: Record<string, unknown>;
+      meta: { sessions: Record<string, string> } | null;
       user: Record<string, unknown> | null;
     }) => {
       invokeFunction({
         envID: env.id,
         data,
+        meta,
         user,
         functionSlug,
       });

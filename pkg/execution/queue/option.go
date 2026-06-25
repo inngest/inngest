@@ -44,6 +44,20 @@ type AccountShardIterationEnabled func(ctx context.Context, accountID uuid.UUID)
 // be ignored for an account while semaphores are rolled out.
 type DisableSemaphoreConstraintChecks func(ctx context.Context, accountID uuid.UUID) bool
 
+// QueueItemEarliestPeekTimeConfig controls earliest-peek-time side-key stamping.
+// Items already visited by the iterator are stamped individually when Enabled is
+// true. BulkStampLimit is only the additional tail budget used if the iterator
+// stops early after hitting account or function concurrency, and is ignored
+// unless Enabled is true.
+type QueueItemEarliestPeekTimeConfig struct {
+	Enabled        bool
+	BulkStampLimit int
+}
+
+// QueueItemEarliestPeekTimeEnabled returns the earliest-peek-time side-key
+// stamping config for a queue item scope.
+type QueueItemEarliestPeekTimeEnabled func(ctx context.Context, shardName string, acctID, envID, fnID uuid.UUID) QueueItemEarliestPeekTimeConfig
+
 func WithName(name string) QueueProcessorOpt {
 	return func(q *queueProcessor) {
 		q.name = name
@@ -88,6 +102,33 @@ func WithAccountShardIterationEnabled(f AccountShardIterationEnabled) QueueOpt {
 			q.AccountShardIterationEnabled = f
 		}
 	}
+}
+
+func WithQueueItemEarliestPeekTimeEnabled(f QueueItemEarliestPeekTimeEnabled) QueueOpt {
+	return func(q *QueueOptions) {
+		if f != nil {
+			q.QueueItemEarliestPeekTimeEnabled = f
+		}
+	}
+}
+
+func (o QueueOptions) ItemEarliestPeekTimeConfig(ctx context.Context, shardName string, item QueueItem) QueueItemEarliestPeekTimeConfig {
+	if o.QueueItemEarliestPeekTimeEnabled == nil {
+		return QueueItemEarliestPeekTimeConfig{}
+	}
+
+	config := o.QueueItemEarliestPeekTimeEnabled(
+		ctx,
+		shardName,
+		item.Data.Identifier.AccountID,
+		item.Data.Identifier.WorkspaceID,
+		item.FunctionID,
+	)
+	if config.BulkStampLimit < 0 {
+		config.BulkStampLimit = 0
+	}
+
+	return config
 }
 
 func WithIdempotencyTTL(t time.Duration) QueueOpt {
@@ -357,11 +398,12 @@ type QueueRunMode struct {
 }
 
 type QueueOptions struct {
-	PartitionPriorityFinder      PartitionPriorityFinder
-	AccountPriorityFinder        AccountPriorityFinder
-	AccountExists                AccountExists
-	PartitionPausedGetter        PartitionPausedGetter
-	AccountShardIterationEnabled AccountShardIterationEnabled
+	PartitionPriorityFinder          PartitionPriorityFinder
+	AccountPriorityFinder            AccountPriorityFinder
+	AccountExists                    AccountExists
+	PartitionPausedGetter            PartitionPausedGetter
+	AccountShardIterationEnabled     AccountShardIterationEnabled
+	QueueItemEarliestPeekTimeEnabled QueueItemEarliestPeekTimeEnabled
 
 	lifecycles QueueLifecycleListeners
 
@@ -404,6 +446,7 @@ type QueueOptions struct {
 	PeekEWMALen int
 	// queueKindMapping stores a map of job kind => queue names
 	queueKindMapping        map[string]string
+	queueProducer           Producer
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
 	peekSizeForFunctions    map[string]int64
@@ -557,6 +600,12 @@ func WithInstrumentInterval(t time.Duration) QueueOpt {
 func WithEnableJobPromotion(enable bool) QueueOpt {
 	return func(q *QueueOptions) {
 		q.enableJobPromotion = enable
+	}
+}
+
+func WithQueueProducer(producer Producer) QueueOpt {
+	return func(q *QueueOptions) {
+		q.queueProducer = producer
 	}
 }
 
@@ -782,6 +831,9 @@ func NewQueueOptions(
 		},
 		AllowKeyQueues: func(ctx context.Context, acctID, envID, fnID uuid.UUID) bool {
 			return false
+		},
+		QueueItemEarliestPeekTimeEnabled: func(ctx context.Context, shardName string, acctID, envID, fnID uuid.UUID) QueueItemEarliestPeekTimeConfig {
+			return QueueItemEarliestPeekTimeConfig{}
 		},
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5

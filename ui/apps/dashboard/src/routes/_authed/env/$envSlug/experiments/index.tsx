@@ -25,7 +25,7 @@ function ExperimentsInfo() {
       text="View and compare experiment variants across your functions."
       action={
         <Link
-          href="https://www.inngest.com/docs/features/step-experimentation"
+          href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments"
           target="_blank"
         >
           Learn about experiments
