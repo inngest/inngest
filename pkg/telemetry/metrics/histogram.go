@@ -105,7 +105,7 @@ var (
 		31_536_000_000, // 365d
 	}
 
-	runStateStepCountBoundaries = []float64{1, 2, 5, 10, 15, 20}
+	runStateStepCountBoundaries = []float64{1, 2, 5, 10, 15, 20, 50, 100, 250, 500, 1000}
 )
 
 func HistogramQueueItemLatency(ctx context.Context, value int64, opts HistogramOpt) {
@@ -714,17 +714,14 @@ func HistogramRunStateResidenceDuration(ctx context.Context, dur time.Duration, 
 }
 
 func HistogramRunStateStepCount(ctx context.Context, count int64, opts HistogramOpt) {
-	switch {
-	case count < 0:
+	if count < 0 {
 		count = 0
-	case count > 20:
-		count = 20
 	}
 
 	RecordIntHistogramMetric(ctx, count, HistogramOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "run_state_step_count",
-		Description: "Distribution of completed step count per finalized run, capped at 20",
+		Description: "Distribution of completed step count per finalized run",
 		Tags:        opts.Tags,
 		Boundaries:  runStateStepCountBoundaries,
 	})

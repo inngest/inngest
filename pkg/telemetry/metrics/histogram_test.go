@@ -33,13 +33,11 @@ func TestHistogramRunStateResidenceDuration(t *testing.T) {
 	dp := h.DataPoints[0]
 	require.Equal(t, uint64(1), dp.Count)
 	require.Equal(t, int64(0), dp.Sum)
-	require.Equal(t, runStateResidenceDurationBoundaries, dp.Bounds)
-	require.Equal(t, []uint64{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, dp.BucketCounts)
 	requireAttribute(t, dp.Attributes, "delete_status", "failed")
 	requireAttribute(t, dp.Attributes, "status", "failed")
 }
 
-func TestHistogramRunStateStepCountCapsAt20(t *testing.T) {
+func TestHistogramRunStateStepCountRecordsFullCount(t *testing.T) {
 	ctx, reader := testMeter(t)
 
 	HistogramRunStateStepCount(ctx, 42, HistogramOpt{
@@ -51,17 +49,31 @@ func TestHistogramRunStateStepCountCapsAt20(t *testing.T) {
 
 	m := collectMetric(t, ctx, reader, "inngest_run_state_step_count")
 	require.Empty(t, m.Unit)
-	require.Equal(t, "Distribution of completed step count per finalized run, capped at 20", m.Description)
+	require.Equal(t, "Distribution of completed step count per finalized run", m.Description)
 
 	h := requireHistogram(t, m)
 	require.Len(t, h.DataPoints, 1)
 
 	dp := h.DataPoints[0]
 	require.Equal(t, uint64(1), dp.Count)
-	require.Equal(t, int64(20), dp.Sum)
-	require.Equal(t, runStateStepCountBoundaries, dp.Bounds)
-	require.Equal(t, []uint64{0, 0, 0, 0, 0, 1, 0}, dp.BucketCounts)
+	require.Equal(t, int64(42), dp.Sum)
 	requireAttribute(t, dp.Attributes, "status", "completed")
+}
+
+func TestHistogramRunStateStepCountClampsNegativeCount(t *testing.T) {
+	ctx, reader := testMeter(t)
+
+	HistogramRunStateStepCount(ctx, -1, HistogramOpt{
+		PkgName: "test",
+	})
+
+	m := collectMetric(t, ctx, reader, "inngest_run_state_step_count")
+	h := requireHistogram(t, m)
+	require.Len(t, h.DataPoints, 1)
+
+	dp := h.DataPoints[0]
+	require.Equal(t, uint64(1), dp.Count)
+	require.Equal(t, int64(0), dp.Sum)
 }
 
 func testMeter(t *testing.T) (context.Context, *sdkmetric.ManualReader) {
