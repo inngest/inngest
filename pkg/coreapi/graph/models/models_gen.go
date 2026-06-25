@@ -416,6 +416,36 @@ type RunsV2OrderBy struct {
 	Direction RunsOrderByDirection `json:"direction"`
 }
 
+type SessionFunction struct {
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
+type SessionGroup struct {
+	SessionKey     string             `json:"sessionKey"`
+	SessionID      string             `json:"sessionId"`
+	RunCount       int                `json:"runCount"`
+	FailedRunCount int                `json:"failedRunCount"`
+	FailureRate    float64            `json:"failureRate"`
+	LastActiveAt   time.Time          `json:"lastActiveAt"`
+	Functions      []*SessionFunction `json:"functions"`
+}
+
+type SessionKey struct {
+	SessionKey string    `json:"sessionKey"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type SessionRun struct {
+	ID           string     `json:"id"`
+	FunctionSlug string     `json:"functionSlug"`
+	EventName    *string    `json:"eventName,omitempty"`
+	Status       string     `json:"status"`
+	QueuedAt     time.Time  `json:"queuedAt"`
+	StartedAt    *time.Time `json:"startedAt,omitempty"`
+	EndedAt      *time.Time `json:"endedAt,omitempty"`
+}
+
 type SingletonConfiguration struct {
 	Mode SingletonMode `json:"mode"`
 	Key  *string       `json:"key,omitempty"`
@@ -481,6 +511,11 @@ type ThrottleConfiguration struct {
 	Key    *string `json:"key,omitempty"`
 	Limit  int     `json:"limit"`
 	Period string  `json:"period"`
+}
+
+type TimeRangeInput struct {
+	From  time.Time  `json:"from"`
+	Until *time.Time `json:"until,omitempty"`
 }
 
 type UpdateAppInput struct {

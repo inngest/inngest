@@ -35,6 +35,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/ttlupsert"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 )
@@ -65,15 +66,17 @@ func New(adapter dbpkg.Adapter) cqrs.Manager {
 	// Force goqu to use prepared statements for consistency with sqlc
 	sq.SetDefaultPrepared(true)
 	return wrapper{
-		adapter: helperAdapter,
-		q:       helperAdapter.Q(),
+		adapter:           helperAdapter,
+		q:                 helperAdapter.Q(),
+		sessionKeyUpserts: newSessionKeyUpserter(),
 	}
 }
 
 type wrapper struct {
-	adapter adapterWithHelpers
-	q       dbpkg.Querier
-	tx      *sql.Tx
+	adapter           adapterWithHelpers
+	q                 dbpkg.Querier
+	tx                *sql.Tx
+	sessionKeyUpserts ttlupsert.Upserter[cqrs.SessionKeyRecord]
 }
 
 var (
@@ -1010,8 +1013,9 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 	}
 
 	return &wrapper{
-		adapter: txWithHelpers,
-		q:       txAdapter.Q(),
+		adapter:           txWithHelpers,
+		q:                 txAdapter.Q(),
+		sessionKeyUpserts: w.sessionKeyUpserts,
 	}, nil
 }
 
