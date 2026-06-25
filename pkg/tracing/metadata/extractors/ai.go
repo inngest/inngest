@@ -93,15 +93,23 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		latencyMs = &serverProcessingMs
 	}
 
+	// prefer the response model (the model that actually served the request)
+	// for cost estimation, falling back to the requested model.
+	costModel := parsedOutput.Model
+	if costModel == "" {
+		costModel = parsedInput.Model
+	}
+
 	aiMd := &AIMetadata{
 		RequestModel:  parsedInput.Model,
+		ResponseModel: parsedOutput.Model,
 		Provider:      req.Format,
 		OperationName: "",
 
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
 		TotalTokens:   &totalTokens,
-		EstimatedCost: EstimateCost(parsedInput.Model, inputTokens, outputTokens),
+		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
 		LatencyMs:     latencyMs,
 	}
 
