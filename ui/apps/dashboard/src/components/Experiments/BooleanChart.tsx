@@ -131,7 +131,10 @@ function HoverLine({ xAxisMap, yAxisMap, hoverX, activeRow }: HoverLineProps) {
   let plotX = hoverX;
 
   if (activeRow && scale) {
-    plotX = scale(activeRow.value);
+    const snapPx = scale(activeRow.value);
+    if (Math.abs(snapPx - hoverX) <= 4) {
+      plotX = snapPx;
+    }
   }
 
   plotX = Math.min(Math.max(plotX, xAxis.x), xAxis.x + xAxis.width);
