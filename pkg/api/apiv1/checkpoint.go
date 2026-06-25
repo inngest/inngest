@@ -481,7 +481,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 	config := input.FnConfig(auth.WorkspaceID())
 	key := fnID.String() + ":" + util.XXHash(config)
 
-	ran, err := a.upserted.Upsert(ctx, key, func(ctx context.Context) error {
+	_, err := a.upserted.Upsert(ctx, key, func(ctx context.Context) error {
 		app, err := a.AppCreator.UpsertApp(ctx, cqrs.UpsertAppParams{
 			ID:     appID,
 			Name:   input.AppSlug(),
@@ -502,6 +502,14 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 			Config:    config,
 			CreatedAt: time.UnixMilli(input.Event.Timestamp),
 		})
+
+		if err == nil {
+			logger.StdlibLogger(ctx).Debug("upserted fn",
+				"function_id", fnID,
+				"app_id", appID,
+			)
+		}
+
 		return err
 	})
 	if err != nil {
@@ -510,16 +518,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 			"function_id", fnID,
 			"app_id", appID,
 		)
-		return
 	}
-	if !ran {
-		return
-	}
-
-	logger.StdlibLogger(ctx).Debug("upserted fn",
-		"function_id", fnID,
-		"app_id", appID,
-	)
 }
 
 func newCheckpointSyncUpserter() ttlupsert.Upserter[string] {
