@@ -7,76 +7,138 @@ type TooltipEntry = {
   dataKey?: string | number;
   value?: number | string | Array<number | string>;
   color?: string;
-  payload: BoxPlotData;
+  payload?: BoxPlotData;
 };
 
-type Props = {
+type RechartsContentProps = {
   active?: boolean;
   payload?: TooltipEntry[];
   /** Falls back to `payload[0].payload.variantName` when not provided. */
   label?: string | number;
+  coordinate?: { x?: number; y?: number };
+  viewBox?: { x?: number; y?: number; width?: number; height?: number };
 };
 
+type StatEntry = {
+  key: string;
+  label: ReactElement | string;
+  valueFn: (p: BoxPlotData) => number;
+};
+
+const ALL_STATS: StatEntry[] = [
+  { key: 'avg', label: 'Avg', valueFn: (p) => p.avg },
+  { key: 'stddev', label: 'StdDev', valueFn: (p) => p.stddev },
+  {
+    key: 'z_neg1',
+    label: (
+      <>
+        Z<sub>-1</sub>
+      </>
+    ),
+    valueFn: (p) => p.avg - p.stddev,
+  },
+  {
+    key: 'z_pos1',
+    label: (
+      <>
+        Z<sub>+1</sub>
+      </>
+    ),
+    valueFn: (p) => p.avg + p.stddev,
+  },
+  { key: 'min', label: 'Min', valueFn: (p) => p.min },
+  { key: 'q1', label: 'Q1', valueFn: (p) => p.q1 },
+  { key: 'med', label: 'Median', valueFn: (p) => p.med },
+  { key: 'q3', label: 'Q3', valueFn: (p) => p.q3 },
+  { key: 'max', label: 'Max', valueFn: (p) => p.max },
+];
+
+// Snap candidates — excludes stddev which is a magnitude, not a chart position
+const SNAP_STATS = ALL_STATS.filter((s) => s.key !== 'stddev');
+
 /**
- * Themed recharts tooltip that uses semantic Tailwind tokens so it stays
- * readable in both light and dark mode. Recharts' default renders white-on-white
- * text in dark mode.
+ * Returns all stat keys that share the nearest snap position to `hoverValue`.
+ * Multiple keys are returned when two stats land on the same value (e.g. min === q1).
  */
-export function BoxPlotTooltip({ active, payload, label }: Props) {
-  if (!active || !payload?.length) return null;
+function nearestStatKeys(hoverValue: number, p: BoxPlotData): string[] {
+  let bestDist = Infinity;
+  let bestValue: number | null = null;
 
-  const first = payload[0];
-  const title = label ?? first?.payload?.variantName ?? '';
+  for (const stat of SNAP_STATS) {
+    const v = stat.valueFn(p);
+    if (v < p.min || v > p.max) continue;
+    const dist = Math.abs(v - hoverValue);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestValue = v;
+    }
+  }
 
-  const statGroups: [ReactElement | string, (_: BoxPlotData) => string][][] = [
-    [
-      ['Avg', (p) => formatMetricValue(p.avg)],
-      ['StdDev', (p) => formatMetricValue(p.stddev)],
-      [
-        <>
-          Z<sub>-1</sub>
-        </>,
-        (p) => formatMetricValue(p.avg - p.stddev),
-      ],
-      [
-        <>
-          Z<sub>1</sub>
-        </>,
-        (p) => formatMetricValue(p.avg + p.stddev),
-      ],
-    ],
-    [
-      ['Min', (p) => formatMetricValue(p.min)],
-      ['Q1', (p) => formatMetricValue(p.q1)],
-      ['Median', (p) => formatMetricValue(p.med)],
-      ['Q3', (p) => formatMetricValue(p.q3)],
-      ['Max', (p) => formatMetricValue(p.max)],
-    ],
-  ];
+  if (bestValue === null) return [];
 
-  return (
-    <div className="bg-canvasBase border-subtle shadow-tooltip rounded-md border px-3 py-2 text-xs shadow-md">
-      {title && (
-        <div className="text-basis mb-1.5 text-sm font-medium">{title}</div>
-      )}
-      <div className="flex flex-col gap-1">
-        {payload.map((p, i) => (
-          <div key={i} className="flex flex-col gap-2">
-            {statGroups.map((group, j) => (
-              <div key={j} className="flex gap-2">
-                {group.map(([label, valueFn], k) => (
-                  <div key={k} className="flex gap-2 items-center">
+  const EPSILON = 1e-9;
+  return SNAP_STATS.filter((s) => {
+    const v = s.valueFn(p);
+    return v >= p.min && v <= p.max && Math.abs(v - bestValue) < EPSILON;
+  }).map((s) => s.key);
+}
+
+/**
+ * Returns a recharts Tooltip content component with the domain baked in so it
+ * can convert pixel coordinates to data-space values and show only the nearest
+ * named datapoint(s) under the cursor.
+ */
+export function makeBoxPlotTooltip(domain: [number, number]) {
+  return function BoxPlotTooltipContent({
+    active,
+    payload,
+    label,
+    coordinate,
+    viewBox,
+  }: RechartsContentProps) {
+    if (!active || !payload?.length) return null;
+
+    const first = payload[0];
+    const title = label ?? first?.payload?.variantName ?? '';
+
+    const cx = coordinate?.x;
+    const vx = viewBox?.x ?? 0;
+    const vw = viewBox?.width;
+    const hoverValue =
+      cx != null && vw != null && vw > 0
+        ? domain[0] + ((cx - vx) / vw) * (domain[1] - domain[0])
+        : null;
+
+    return (
+      <div className="bg-canvasBase border-subtle shadow-tooltip rounded-md border px-3 py-2 text-xs shadow-md">
+        {title && (
+          <div className="text-basis mb-1.5 text-sm font-medium">{title}</div>
+        )}
+        <div className="flex flex-col gap-1">
+          {payload.map((p, i) => {
+            if (!p.payload) return null;
+            const data = p.payload;
+            const keys =
+              hoverValue !== null ? nearestStatKeys(hoverValue, data) : [];
+            const stats = ALL_STATS.filter((s) => keys.includes(s.key));
+
+            if (stats.length === 0) return null;
+
+            return (
+              <div key={i} className="flex gap-3">
+                {stats.map(({ key, label, valueFn }) => (
+                  <div key={key} className="flex gap-1.5 items-center">
                     <span className="text-muted">{label}</span>
-                    <span className="text-basis tabular-nums">
-                      {valueFn(p.payload)}
+                    <span className="text-basis tabular-nums font-semibold">
+                      {formatMetricValue(valueFn(data))}
                     </span>
                   </div>
                 ))}
               </div>
-            ))}
-          </div>
-        ))}
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 }

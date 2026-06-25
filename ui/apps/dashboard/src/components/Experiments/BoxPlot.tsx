@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ExperimentVariantMetrics } from '@inngest/components/Experiments';
 import {
   Bar,
@@ -15,11 +15,13 @@ import {
   colorForVariant,
   subtleColorForVariant,
 } from '@/lib/experiments/colors';
-import { BoxPlotTooltip } from './BoxPlotTooltip';
+import { makeBoxPlotTooltip } from './BoxPlotTooltip';
 import { VariantAxisTick } from './VariantAxisTick';
 
 const BOX_HEIGHT = 10;
 const LINE_HEIGHT = 2;
+/** Snap within this many pixels of a named data point. */
+const SNAP_PX = 4;
 
 export type RowData = {
   variantName: string;
@@ -100,7 +102,7 @@ function BoxShape({
   }
 
   const cy = y + height / 2;
-  const cyLine = cy + LINE_HEIGHT / 2;
+  const cyLine = cy + LINE_HEIGHT / 4;
 
   const quantiles = [
     payload.min,
@@ -110,14 +112,14 @@ function BoxShape({
     payload.max,
   ];
   const quantileOffsets = quantiles.map(
-    (q) => ((payload.min + q) / range) * width,
+    (q) => ((q - payload.min) / range) * width,
   );
   const quantileXs = quantileOffsets.map((offset) => x + offset);
 
   const zscores = [-1, 0, 1].map((z) => payload.avg + z * payload.stddev);
   const zOffsets = zscores
     .filter((z) => z >= payload.min && z <= payload.max)
-    .map((z) => ((payload.min + z) / range) * width);
+    .map((z) => ((z - payload.min) / range) * width);
   const zXs = zOffsets.map((offset) => x + offset);
 
   return (
@@ -148,7 +150,7 @@ function BoxShape({
         y1={cyLine}
         y2={cyLine}
         stroke={payload?.color}
-        strokeWidth={2}
+        strokeWidth={LINE_HEIGHT}
       />
       <line
         x1={quantileXs[3]}
@@ -192,34 +194,77 @@ function BackgroundLineShape({
   );
 }
 
-type HoverLineProps = {
-  xAxisMap?: Record<
-    string,
-    { x: number; width: number; height: number; y: number }
-  >;
-  yAxisMap?: Record<string, { y: number; height: number }>;
-  hoverX: number | null;
+const SNAP_VALUE_FNS: ((r: RowData) => number)[] = [
+  (r) => r.min,
+  (r) => r.q1,
+  (r) => r.med,
+  (r) => r.q3,
+  (r) => r.max,
+  (r) => r.avg,
+  (r) => r.avg - r.stddev,
+  (r) => r.avg + r.stddev,
+];
+
+type RechartScale = { (v: number): number; invert?: (px: number) => number };
+type AxisEntry = {
+  x: number;
+  width: number;
+  y: number;
+  height: number;
+  scale?: RechartScale;
 };
 
-function HoverLine({ xAxisMap, yAxisMap, hoverX }: HoverLineProps) {
+type HoverLineProps = {
+  xAxisMap?: Record<string, AxisEntry>;
+  yAxisMap?: Record<string, { y: number; height: number }>;
+  /** Raw cursor x in SVG space. */
+  hoverX: number | null;
+  /** Hovered row — snapping is restricted to this row's values. */
+  activeRow: RowData | null;
+};
+
+function HoverLine({ xAxisMap, yAxisMap, hoverX, activeRow }: HoverLineProps) {
   if (hoverX === null || !xAxisMap || !yAxisMap) return null;
 
   const xAxis = Object.values(xAxisMap)[0];
   const yAxis = Object.values(yAxisMap)[0];
   if (!xAxis || !yAxis) return null;
 
+  const scale = xAxis.scale;
+  let plotX = hoverX;
+
+  if (activeRow && scale) {
+    // Compare and snap entirely in pixel space using recharts' own scale —
+    // scale(v) returns the exact SVG x that recharts uses for that data value.
+    let bestDist = Infinity;
+    let bestPx: number | null = null;
+
+    for (const fn of SNAP_VALUE_FNS) {
+      const v = fn(activeRow);
+      if (v < activeRow.min || v > activeRow.max) continue;
+      const px = scale(v);
+      const dist = Math.abs(px - hoverX);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPx = px;
+      }
+    }
+
+    if (bestDist <= SNAP_PX && bestPx !== null) {
+      plotX = bestPx;
+    }
+  }
+
   const chartLeft = xAxis.x;
   const chartRight = xAxis.x + xAxis.width;
-  const plotX = Math.min(Math.max(hoverX, chartLeft), chartRight);
-  const y1 = yAxis.y;
-  const y2 = yAxis.y + yAxis.height;
+  plotX = Math.min(Math.max(plotX, chartLeft), chartRight);
 
   return (
     <line
       x1={plotX}
       x2={plotX}
-      y1={y1}
-      y2={y2}
+      y1={yAxis.y}
+      y2={yAxis.y + yAxis.height}
       stroke="rgb(var(--color-foreground-subtle))"
       strokeWidth={1}
       strokeDasharray="3 3"
@@ -242,7 +287,10 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
     entry.min,
     entry.max,
   ];
+
   const [hoverX, setHoverX] = useState<number | null>(null);
+  const [activeRow, setActiveRow] = useState<RowData | null>(null);
+  const tooltipContent = useMemo(() => makeBoxPlotTooltip(domain), [domain]);
 
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
@@ -252,9 +300,20 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
         barSize={BOX_HEIGHT * 2}
         margin={{ top: 0, right: 0, bottom: 0, left: 4 }}
         onMouseMove={(state) => {
-          setHoverX(state.isTooltipActive ? state.chartX ?? null : null);
+          if (!state.isTooltipActive) {
+            setHoverX(null);
+            setActiveRow(null);
+            return;
+          }
+          setHoverX(state.chartX ?? null);
+          setActiveRow(
+            (state.activePayload?.[0]?.payload as RowData | undefined) ?? null,
+          );
         }}
-        onMouseLeave={() => setHoverX(null)}
+        onMouseLeave={() => {
+          setHoverX(null);
+          setActiveRow(null);
+        }}
       >
         <XAxis
           type="number"
@@ -272,7 +331,7 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
           interval={0}
         />
         <Tooltip
-          content={<BoxPlotTooltip />}
+          content={tooltipContent}
           cursor={{ fill: 'rgb(var(--color-background-canvas-subtle))' }}
           allowEscapeViewBox={{ x: true, y: true }}
           wrapperStyle={{ zIndex: 50, outline: 'none' }}
@@ -283,7 +342,9 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
           shape={<BoxShape />}
           background={<BackgroundLineShape />}
         />
-        <Customized component={<HoverLine hoverX={hoverX} />} />
+        <Customized
+          component={<HoverLine hoverX={hoverX} activeRow={activeRow} />}
+        />
       </RechartsBarChart>
     </ResponsiveContainer>
   );

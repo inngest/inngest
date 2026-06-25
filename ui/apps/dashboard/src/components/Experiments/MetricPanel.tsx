@@ -1,17 +1,17 @@
 import { useMemo } from 'react';
 import { Card } from '@inngest/components/Card';
 import { Pill } from '@inngest/components/Pill';
-import type {
-  ExperimentScoringMetric,
-  ExperimentVariantMetrics,
+import {
+  ScoreKind,
+  type ExperimentScoringMetric,
+  type ExperimentVariantMetrics,
 } from '@inngest/components/Experiments';
 import { RiTrophyLine } from '@remixicon/react';
 
 import { truncateCenter } from '@/lib/experiments/chart';
 import { findExtremum } from '@/lib/experiments/score';
-import { BoxPlot, rowsForMetric } from './BoxPlot';
 import { BooleanChart } from './BooleanChart';
-import type { Metric } from '@sentry/tanstackstart-react';
+import { BoxPlot, rowsForMetric } from './BoxPlot';
 
 type Props = {
   metric: ExperimentScoringMetric;
