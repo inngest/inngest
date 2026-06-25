@@ -851,6 +851,7 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 	}
 
 	items, err := shard.ItemsByPartition(ctx, queue.Scope{
+	items, err := shard.ItemsByPartition(ctx, queue.Scope{
 		AccountID:  c.AccountID,
 		EnvID:      c.WorkspaceID,
 		FunctionID: c.FunctionID,

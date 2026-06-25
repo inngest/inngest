@@ -3437,33 +3437,31 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
-		if q, ok := e.queue.(queue.QueueManager); ok {
-			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
-			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
-			shard, err := e.shards.Resolve(ctx, queue.Scope{
-				AccountID:  md.ID.Tenant.AccountID,
-				EnvID:      md.ID.Tenant.EnvID,
-				FunctionID: md.ID.FunctionID,
-			}, nil)
-			if err != nil {
-				return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
-			}
+		// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
+		// this is _not_ a system partition and lives on the account shard, which we need to retrieve
+		shard, err := e.shards.Resolve(ctx, queue.Scope{
+			AccountID:  md.ID.Tenant.AccountID,
+			EnvID:      md.ID.Tenant.EnvID,
+			FunctionID: md.ID.FunctionID,
+		}, nil)
+		if err != nil {
+			return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
+		}
 
-			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-			err = q.Dequeue(ctx, shard, queue.QueueItem{
-				ID:         queue.HashID(ctx, jobID),
-				FunctionID: md.ID.FunctionID,
-				Data: queue.Item{
-					Kind:       queue.KindPause,
-					Identifier: sv2.V1FromMetadata(md),
-				},
-			})
-			if err != nil {
-				if errors.Is(err, queue.ErrQueueItemNotFound) {
-					logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name, "pause", pause)
-				} else {
-					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
-				}
+		jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
+		err = shard.Dequeue(ctx, queue.QueueItem{
+			ID:         queue.HashID(ctx, jobID),
+			FunctionID: md.ID.FunctionID,
+			Data: queue.Item{
+				Kind:       queue.KindPause,
+				Identifier: sv2.V1FromMetadata(md),
+			},
+		})
+		if err != nil {
+			if errors.Is(err, queue.ErrQueueItemNotFound) {
+				logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name(), "pause", pause)
+			} else {
+				logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
 			}
 		}
 

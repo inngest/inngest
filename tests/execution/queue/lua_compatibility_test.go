@@ -131,7 +131,7 @@ func TestLuaCompatibility(t *testing.T) {
 				// Initialize queue
 				shardRegistry, err := queue.NewSingleShardRegistry(shard)
 				require.NoError(t, err)
-				q, err := queue.New(
+				_, err = queue.New(
 					context.Background(),
 					"test-queue",
 					shardRegistry)
@@ -191,7 +191,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// - Requeue item
 				requeueTime := now.Add(5 * time.Second)
-				err = q.Requeue(ctx, shard, enqueuedItem, requeueTime)
+				err = shard.Requeue(ctx, enqueuedItem, requeueTime)
 				require.NoError(t, err)
 
 				// - Requeue partition
@@ -203,7 +203,7 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NoError(t, err, "Failed to peek partition after requeue on %s", serverType)
 				require.NotEmpty(t, peekedAfterRequeue, "Should find items in partition after requeue on %s", serverType)
 
-				err = q.Dequeue(ctx, shard, enqueuedItem)
+				err = shard.Dequeue(ctx, enqueuedItem)
 				require.NoError(t, err)
 
 				peekedAfterDequeue, err := shard.Peek(ctx, qp, requeueTime.Add(5*time.Second), 10)

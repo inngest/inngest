@@ -242,6 +242,10 @@ type JobQueueReader interface {
 	// status queue.
 	StatusCount(ctx context.Context, scope Scope, status string) (int64, error)
 
+	// PartitionBacklogSize returns the point-in-time backlog size of the partition.
+	// This sums the size of all backlogs in that partition.
+	PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error)
+
 	// RunJobs reads items in the queue for a specific run.
 	RunJobs(ctx context.Context, queueShardName string, scope Scope, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }

@@ -102,9 +102,7 @@ func (fq *fakeQueue) reset() {
 }
 
 func (fq *fakeQueue) Dequeue(ctx context.Context, queueShard redis_state.RedisQueueShard, i queue.QueueItem) error {
-	qm := fq.Queue.(queue.QueueManager)
-
-	err := qm.Dequeue(ctx, queueShard, i)
+	err := queueShard.Dequeue(ctx, i)
 
 	fq.lock.Lock()
 	logger.StdlibLogger(ctx).Info("called fakeQueue.Dequeue()", "i", i, "err", err)
@@ -694,10 +692,10 @@ func TestFinalize(t *testing.T) {
 		require.Equal(t, int64(1), testQueue.dequeuedCalledRun[run2.ID.RunID])
 		testQueue.lock.Unlock()
 
-		err = rq.Dequeue(ctx, queueShard, item2)
+		err = queueShard.Dequeue(ctx, item2)
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 
-		err = rq.Requeue(ctx, queueShard, item2, time.Now())
+		err = queueShard.Requeue(ctx, item2, time.Now())
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 	})
 }

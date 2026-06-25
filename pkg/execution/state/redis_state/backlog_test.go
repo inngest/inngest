@@ -1157,7 +1157,7 @@ func TestBacklogsByPartition(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r.FlushAll()
 
-			q, shard := newQueue(
+			_, shard := newQueue(
 				t, rc,
 				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return true
@@ -1200,7 +1200,7 @@ func TestBacklogsByPartition(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			items, err := q.BacklogsByPartition(ctx, shard, fnID.String(), tc.from, tc.until,
+			items, err := shard.BacklogsByPartition(ctx, fnID.String(), tc.from, tc.until,
 				osqueue.WithQueueItemIterBatchSize(tc.batchSize),
 			)
 			require.NoError(t, err)
@@ -1219,7 +1219,7 @@ func TestBacklogSize(t *testing.T) {
 	_, rc := initRedis(t)
 	defer rc.Close()
 
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
 			return osqueue.PartitionConstraintConfig{
@@ -1270,7 +1270,7 @@ func TestBacklogSize(t *testing.T) {
 	}
 	require.NotEmpty(t, backlogID)
 
-	size, err := q.BacklogSize(ctx, shard, backlogID)
+	size, err := shard.BacklogSize(ctx, backlogID)
 	require.NoError(t, err)
 
 	require.EqualValues(t, count, size)

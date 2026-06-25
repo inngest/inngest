@@ -29,7 +29,7 @@ func TestQueueScavenge(t *testing.T) {
 	t.Run("in-progress items must be added to scavenger index", func(t *testing.T) {
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithClock(clock),
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
@@ -90,7 +90,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 		// Dequeue item and check scavenger index was cleaned up
-		err = q.Dequeue(ctx, shard, item)
+		err = shard.Dequeue(ctx, item)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
@@ -338,7 +338,7 @@ func TestQueueScavenge(t *testing.T) {
 		t.Run("update to next earliest item in scavenger index", func(t *testing.T) {
 			r.FlushAll()
 
-			q, shard := newQueue(
+			_, shard := newQueue(
 				t, rc,
 				osqueue.WithClock(clock),
 				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
@@ -393,7 +393,7 @@ func TestQueueScavenge(t *testing.T) {
 
 			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
-			err = q.Requeue(ctx, shard, item1, clock.Now().Add(time.Minute))
+			err = shard.Requeue(ctx, item1, clock.Now().Add(time.Minute))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID2)
 
@@ -414,7 +414,7 @@ func TestQueueScavenge(t *testing.T) {
 		t.Run("update to next earliest item in scavenger index", func(t *testing.T) {
 			r.FlushAll()
 
-			q, shard := newQueue(
+			_, shard := newQueue(
 				t, rc,
 				osqueue.WithClock(clock),
 				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
@@ -469,7 +469,7 @@ func TestQueueScavenge(t *testing.T) {
 
 			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
-			err = q.Dequeue(ctx, shard, item1)
+			err = shard.Dequeue(ctx, item1)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID2)
 

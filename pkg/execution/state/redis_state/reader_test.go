@@ -29,7 +29,7 @@ func TestItemsByPartitionOnEmptyPartition(t *testing.T) {
 	t.Run("test empty partition", func(t *testing.T) {
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return true
@@ -37,7 +37,7 @@ func TestItemsByPartitionOnEmptyPartition(t *testing.T) {
 			osqueue.WithClock(clock),
 		)
 
-		_, err := q.ItemsByPartition(ctx, shard, osqueue.Scope{
+		_, err := shard.ItemsByPartition(ctx, osqueue.Scope{
 			AccountID:  uuid.New(),
 			EnvID:      uuid.New(),
 			FunctionID: uuid.New(),
@@ -144,7 +144,7 @@ func TestItemsByPartition(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r.FlushAll()
 
-			q, shard := newQueue(
+			_, shard := newQueue(
 				t, rc,
 				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return tc.keyQueuesEnabled
@@ -179,7 +179,7 @@ func TestItemsByPartition(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), tc.from, tc.until,
+			items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), tc.from, tc.until,
 				osqueue.WithQueueItemIterBatchSize(tc.batchSize),
 			)
 			require.NoError(t, err)
@@ -204,7 +204,7 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 	acctID, wsID := uuid.New(), uuid.New()
 	systemScope := osqueue.Scope{IsSystem: true, AccountID: acctID, EnvID: wsID}
 
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return false
@@ -239,7 +239,7 @@ func TestItemsByPartitionWithSystemQueue(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	items, err := q.ItemsByPartition(ctx, shard, systemScope, systemQueueName, time.Time{}, clock.Now().Add(1*time.Hour),
+	items, err := shard.ItemsByPartition(ctx, systemScope, systemQueueName, time.Time{}, clock.Now().Add(1*time.Hour),
 		osqueue.WithQueueItemIterBatchSize(100),
 		osqueue.WithQueueItemIterEnableBacklog(false),
 	)
@@ -331,7 +331,7 @@ func TestItemsByPartitionLeasedItems(t *testing.T) {
 	t.Run("should skip leased items but continue iterating remaining items", func(t *testing.T) {
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -351,7 +351,7 @@ func TestItemsByPartitionLeasedItems(t *testing.T) {
 			leaseQueueItem(t, rc, kg, id, leaseExpiry)
 		}
 
-		items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+		items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
 			osqueue.WithQueueItemIterBatchSize(100),
 			osqueue.WithQueueItemIterEnableBacklog(false),
 		)
@@ -368,7 +368,7 @@ func TestItemsByPartitionLeasedItems(t *testing.T) {
 	t.Run("should iterate past a fully-leased first batch to reach unleased items", func(t *testing.T) {
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -391,7 +391,7 @@ func TestItemsByPartitionLeasedItems(t *testing.T) {
 			leaseQueueItem(t, rc, kg, id, leaseExpiry)
 		}
 
-		items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+		items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
 			osqueue.WithQueueItemIterBatchSize(batchSize),
 			osqueue.WithQueueItemIterEnableBacklog(false),
 		)
@@ -407,7 +407,7 @@ func TestItemsByPartitionLeasedItems(t *testing.T) {
 	t.Run("items at different milliseconds with leased entries across batch boundary", func(t *testing.T) {
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -428,7 +428,7 @@ func TestItemsByPartitionLeasedItems(t *testing.T) {
 		leaseQueueItem(t, rc, kg, ids[2], leaseExpiry)
 		leaseQueueItem(t, rc, kg, ids[3], leaseExpiry)
 
-		items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+		items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
 			osqueue.WithQueueItemIterBatchSize(batchSize),
 			osqueue.WithQueueItemIterEnableBacklog(false),
 		)
@@ -501,7 +501,7 @@ func TestItemsByPartitionMissingHashItems(t *testing.T) {
 	t.Run("should iterate past items missing from hash to reach remaining items", func(t *testing.T) {
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -525,7 +525,7 @@ func TestItemsByPartitionMissingHashItems(t *testing.T) {
 			deleteQueueItemFromHash(t, rc, kg, id)
 		}
 
-		items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+		items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
 			osqueue.WithQueueItemIterBatchSize(batchSize),
 			osqueue.WithQueueItemIterEnableBacklog(false),
 		)
@@ -543,7 +543,7 @@ func TestItemsByPartitionMissingHashItems(t *testing.T) {
 	t.Run("should handle all items missing from hash without panicking", func(t *testing.T) {
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -561,7 +561,7 @@ func TestItemsByPartitionMissingHashItems(t *testing.T) {
 			deleteQueueItemFromHash(t, rc, kg, id)
 		}
 
-		items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
+		items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Minute),
 			osqueue.WithQueueItemIterBatchSize(100),
 			osqueue.WithQueueItemIterEnableBacklog(false),
 		)
@@ -626,7 +626,7 @@ func TestItemsByPartitionScoreParsing(t *testing.T) {
 		// would regress to epoch+1ms and the iterator would loop forever.
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -658,7 +658,7 @@ func TestItemsByPartitionScoreParsing(t *testing.T) {
 		// Use a channel + timeout to detect an infinite loop.
 		done := make(chan int, 1)
 		go func() {
-			items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+			items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
 				osqueue.WithQueueItemIterBatchSize(batchSize),
 				osqueue.WithQueueItemIterEnableBacklog(false),
 			)
@@ -683,7 +683,7 @@ func TestItemsByPartitionScoreParsing(t *testing.T) {
 		// will be 0. The iterator must break instead of regressing to epoch+1ms.
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -713,7 +713,7 @@ func TestItemsByPartitionScoreParsing(t *testing.T) {
 
 		done := make(chan int, 1)
 		go func() {
-			items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+			items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
 				osqueue.WithQueueItemIterBatchSize(100),
 				osqueue.WithQueueItemIterEnableBacklog(false),
 			)
@@ -813,7 +813,7 @@ func TestItemsByPartitionAtMSDivergence(t *testing.T) {
 		// causing the iterator cursor to jump past all remaining items.
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -840,7 +840,7 @@ func TestItemsByPartitionAtMSDivergence(t *testing.T) {
 
 		done := make(chan int, 1)
 		go func() {
-			items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+			items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
 				osqueue.WithQueueItemIterBatchSize(batchSize),
 				osqueue.WithQueueItemIterEnableBacklog(false),
 			)
@@ -866,7 +866,7 @@ func TestItemsByPartitionAtMSDivergence(t *testing.T) {
 		// later batches because the cursor jumped ahead.
 		r.FlushAll()
 
-		q, shard := newQueue(
+		_, shard := newQueue(
 			t, rc,
 			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 				return false
@@ -890,7 +890,7 @@ func TestItemsByPartitionAtMSDivergence(t *testing.T) {
 
 		done := make(chan int, 1)
 		go func() {
-			items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+			items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
 				osqueue.WithQueueItemIterBatchSize(batchSize),
 				osqueue.WithQueueItemIterEnableBacklog(false),
 			)
@@ -920,7 +920,7 @@ func TestItemsByBacklog(t *testing.T) {
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
@@ -1010,7 +1010,7 @@ func TestItemsByBacklog(t *testing.T) {
 			}
 			require.NotEmpty(t, backlogID)
 
-			items, err := q.ItemsByBacklog(ctx, shard, backlogID, tc.from, tc.until,
+			items, err := shard.ItemsByBacklog(ctx, backlogID, tc.from, tc.until,
 				osqueue.WithQueueItemIterBatchSize(tc.batchSize),
 			)
 			require.NoError(t, err)
@@ -1038,7 +1038,7 @@ func TestItemsByBacklogZeroCursor(t *testing.T) {
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
@@ -1092,7 +1092,7 @@ func TestItemsByBacklogZeroCursor(t *testing.T) {
 
 		done := make(chan int, 1)
 		go func() {
-			items, err := q.ItemsByBacklog(ctx, shard, backlogID, time.Time{}, clock.Now().Add(time.Hour),
+			items, err := shard.ItemsByBacklog(ctx, backlogID, time.Time{}, clock.Now().Add(time.Hour),
 				osqueue.WithQueueItemIterBatchSize(100),
 			)
 			if err != nil {
@@ -1160,7 +1160,7 @@ func TestItemsByBacklogZeroCursor(t *testing.T) {
 
 		done := make(chan int, 1)
 		go func() {
-			items, err := q.ItemsByBacklog(ctx, shard, backlogID, time.Time{}, clock.Now().Add(time.Hour),
+			items, err := shard.ItemsByBacklog(ctx, backlogID, time.Time{}, clock.Now().Add(time.Hour),
 				osqueue.WithQueueItemIterBatchSize(batchSize),
 			)
 			if err != nil {
@@ -1201,7 +1201,7 @@ func TestItemsByPartitionBacklogZeroCursor(t *testing.T) {
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 	scope := osqueue.Scope{AccountID: acctId, EnvID: wsID, FunctionID: fnID}
 
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return true
@@ -1251,7 +1251,7 @@ func TestItemsByPartitionBacklogZeroCursor(t *testing.T) {
 
 		done := make(chan int, 1)
 		go func() {
-			items, err := q.ItemsByPartition(ctx, shard, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
+			items, err := shard.ItemsByPartition(ctx, scope, fnID.String(), time.Time{}, clock.Now().Add(time.Hour),
 				osqueue.WithQueueItemIterBatchSize(100),
 				osqueue.WithQueueItemIterEnableBacklog(true),
 			)
@@ -1419,7 +1419,7 @@ func TestItemExists(t *testing.T) {
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 	scope := osqueue.Scope{AccountID: acctId, EnvID: wsID, FunctionID: fnID}
 
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 			return false
@@ -1453,7 +1453,7 @@ func TestItemExists(t *testing.T) {
 		enqueued, err := enqueue(ctx, shard, jobID)
 		require.NoError(t, err)
 
-		exists, err := q.ItemExists(ctx, shard, scope, enqueued.ID)
+		exists, err := shard.ItemExists(ctx, scope, enqueued.ID)
 		require.NoError(t, err)
 		require.True(t, exists, "item should exist")
 	})
@@ -1463,7 +1463,7 @@ func TestItemExists(t *testing.T) {
 
 		nonExistentJobID := ulid.MustNew(ulid.Now(), rand.Reader).String()
 
-		exists, err := q.ItemExists(ctx, shard, scope, nonExistentJobID)
+		exists, err := shard.ItemExists(ctx, scope, nonExistentJobID)
 		require.NoError(t, err)
 		require.False(t, exists, "item should not exist")
 	})
@@ -1476,16 +1476,16 @@ func TestItemExists(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify it exists
-		exists, err := q.ItemExists(ctx, shard, scope, enqueued.ID)
+		exists, err := shard.ItemExists(ctx, scope, enqueued.ID)
 		require.NoError(t, err)
 		require.True(t, exists)
 
 		// Dequeue the item
-		err = q.Dequeue(ctx, shard, enqueued)
+		err = shard.Dequeue(ctx, enqueued)
 		require.NoError(t, err)
 
 		// Should no longer exist
-		exists, err = q.ItemExists(ctx, shard, scope, enqueued.ID)
+		exists, err = shard.ItemExists(ctx, scope, enqueued.ID)
 		require.NoError(t, err)
 		require.False(t, exists, "dequeued item should not exist")
 	})

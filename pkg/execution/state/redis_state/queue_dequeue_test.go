@@ -406,7 +406,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 
 	clock := clockwork.NewFakeClock()
 
-	q, shard := newQueue(
+	_, shard := newQueue(
 		t, rc,
 		osqueue.WithClock(clock),
 		osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
@@ -444,7 +444,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 
-	err = q.Dequeue(ctx, shard, item)
+	err = shard.Dequeue(ctx, item)
 	require.NoError(t, err)
 
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))

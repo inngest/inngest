@@ -68,7 +68,7 @@ func TestPartitionByID(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r.FlushAll()
 
-			q, shard := newQueue(
+			_, shard := newQueue(
 				t, rc,
 				osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
 					return tc.keyQueues
@@ -100,7 +100,7 @@ func TestPartitionByID(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			res, err := q.PartitionByID(ctx, shard, osqueue.Scope{
+			res, err := shard.PartitionByID(ctx, osqueue.Scope{
 				AccountID:  acctId,
 				EnvID:      wsID,
 				FunctionID: fnID,
