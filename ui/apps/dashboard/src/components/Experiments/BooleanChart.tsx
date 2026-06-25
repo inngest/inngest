@@ -104,20 +104,37 @@ function BackgroundLineShape({
   );
 }
 
-type HoverLineProps = {
-  xAxisMap?: Record<string, { x: number; width: number }>;
-  yAxisMap?: Record<string, { y: number; height: number }>;
-  hoverX: number | null;
+type RechartScale = { (v: number): number };
+type AxisEntry = {
+  x: number;
+  width: number;
+  y: number;
+  height: number;
+  scale?: RechartScale;
 };
 
-function HoverLine({ xAxisMap, yAxisMap, hoverX }: HoverLineProps) {
+type HoverLineProps = {
+  xAxisMap?: Record<string, AxisEntry>;
+  yAxisMap?: Record<string, { y: number; height: number }>;
+  hoverX: number | null;
+  activeRow: RowData | null;
+};
+
+function HoverLine({ xAxisMap, yAxisMap, hoverX, activeRow }: HoverLineProps) {
   if (hoverX === null || !xAxisMap || !yAxisMap) return null;
 
   const xAxis = Object.values(xAxisMap)[0];
   const yAxis = Object.values(yAxisMap)[0];
   if (!xAxis || !yAxis) return null;
 
-  const plotX = Math.min(Math.max(hoverX, xAxis.x), xAxis.x + xAxis.width);
+  const scale = xAxis.scale;
+  let plotX = hoverX;
+
+  if (activeRow && scale) {
+    plotX = scale(activeRow.value);
+  }
+
+  plotX = Math.min(Math.max(plotX, xAxis.x), xAxis.x + xAxis.width);
 
   return (
     <line
@@ -144,6 +161,7 @@ export function BooleanChart({ rows, domain, metricDisplayName }: Props) {
     rows.map((r) => r.variantName),
   );
   const [hoverX, setHoverX] = useState<number | null>(null);
+  const [activeRow, setActiveRow] = useState<RowData | null>(null);
 
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
@@ -153,9 +171,20 @@ export function BooleanChart({ rows, domain, metricDisplayName }: Props) {
         barSize={DOT_RADIUS * 2}
         margin={{ top: 0, right: DOT_RADIUS + 2, bottom: 0, left: 4 }}
         onMouseMove={(state) => {
-          setHoverX(state.isTooltipActive ? state.chartX ?? null : null);
+          if (!state.isTooltipActive) {
+            setHoverX(null);
+            setActiveRow(null);
+            return;
+          }
+          setHoverX(state.chartX ?? null);
+          setActiveRow(
+            (state.activePayload?.[0]?.payload as RowData | undefined) ?? null,
+          );
         }}
-        onMouseLeave={() => setHoverX(null)}
+        onMouseLeave={() => {
+          setHoverX(null);
+          setActiveRow(null);
+        }}
       >
         <XAxis
           type="number"
@@ -191,7 +220,9 @@ export function BooleanChart({ rows, domain, metricDisplayName }: Props) {
             />
           ))}
         </Bar>
-        <Customized component={<HoverLine hoverX={hoverX} />} />
+        <Customized
+          component={<HoverLine hoverX={hoverX} activeRow={activeRow} />}
+        />
       </BarChart>
     </ResponsiveContainer>
   );

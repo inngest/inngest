@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Card } from '@inngest/components/Card';
 import { Pill } from '@inngest/components/Pill';
 import {
-  ScoreKind,
   type ExperimentScoringMetric,
   type ExperimentVariantMetrics,
 } from '@inngest/components/Experiments';

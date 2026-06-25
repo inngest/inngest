@@ -57,10 +57,15 @@ const ALL_STATS: StatEntry[] = [
 const SNAP_STATS = ALL_STATS.filter((s) => s.key !== 'stddev');
 
 /**
- * Returns all stat keys that share the nearest snap position to `hoverValue`.
- * Multiple keys are returned when two stats land on the same value (e.g. min === q1).
+ * Returns all stat keys within `proximityThreshold` (data-space units) of the
+ * nearest snap position to `hoverValue`. Covers both exact overlaps (e.g.
+ * min === q1) and stats that are visually close together.
  */
-function nearestStatKeys(hoverValue: number, p: BoxPlotData): string[] {
+function nearestStatKeys(
+  hoverValue: number,
+  p: BoxPlotData,
+  proximityThreshold: number,
+): string[] {
   let bestDist = Infinity;
   let bestValue: number | null = null;
 
@@ -76,10 +81,11 @@ function nearestStatKeys(hoverValue: number, p: BoxPlotData): string[] {
 
   if (bestValue === null) return [];
 
-  const EPSILON = 1e-9;
   return SNAP_STATS.filter((s) => {
     const v = s.valueFn(p);
-    return v >= p.min && v <= p.max && Math.abs(v - bestValue) < EPSILON;
+    return (
+      v >= p.min && v <= p.max && Math.abs(v - bestValue) <= proximityThreshold
+    );
   }).map((s) => s.key);
 }
 
@@ -104,10 +110,14 @@ export function makeBoxPlotTooltip(domain: [number, number]) {
     const cx = coordinate?.x;
     const vx = viewBox?.x ?? 0;
     const vw = viewBox?.width;
+    const domainRange = domain[1] - domain[0];
     const hoverValue =
       cx != null && vw != null && vw > 0
-        ? domain[0] + ((cx - vx) / vw) * (domain[1] - domain[0])
+        ? domain[0] + ((cx - vx) / vw) * domainRange
         : null;
+    // 8px expressed in data-space so nearby stats are grouped together
+    const proximityThreshold =
+      vw != null && vw > 0 ? (8 / vw) * domainRange : 0;
 
     return (
       <div className="bg-canvasBase border-subtle shadow-tooltip rounded-md border px-3 py-2 text-xs shadow-md">
@@ -119,7 +129,9 @@ export function makeBoxPlotTooltip(domain: [number, number]) {
             if (!p.payload) return null;
             const data = p.payload;
             const keys =
-              hoverValue !== null ? nearestStatKeys(hoverValue, data) : [];
+              hoverValue !== null
+                ? nearestStatKeys(hoverValue, data, proximityThreshold)
+                : [];
             const stats = ALL_STATS.filter((s) => keys.includes(s.key));
 
             if (stats.length === 0) return null;
