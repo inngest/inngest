@@ -29,7 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/karlseguin/ccache/v2"
+	"github.com/inngest/inngest/pkg/util/ttlupsert"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -96,9 +96,9 @@ type checkpointAPI struct {
 
 	checkpointer checkpoint.Checkpointer
 
-	// upserted tracks fn IDs and their associated config in memory once upserted, allowing
-	// us to prevent DB queries from hitting the DB each time a sync fn begins.
-	upserted *ccache.Cache
+	// upserted tracks fn IDs and their associated config in memory once upserted,
+	// allowing us to prevent DB queries from hitting the DB each time a sync fn begins.
+	upserted ttlupsert.Upserter[string]
 	// runClaimsSecret is the secret for creating run claims JWTs
 	runClaimsSecret []byte
 	// outputReader allows us to read run output for a given env / run ID
@@ -122,7 +122,7 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 	api := checkpointAPI{
 		Router:          chi.NewRouter(),
 		Opts:            o,
-		upserted:        ccache.New(ccache.Configure().MaxSize(10_000)),
+		upserted:        newCheckpointSyncUpserter(),
 		runClaimsSecret: o.CheckpointOpts.RunJWTSecret,
 		outputReader:    o.CheckpointOpts.RunOutputReader,
 		checkpointer:    c,
@@ -479,66 +479,53 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 	fnID := input.FnID(appID)
 
 	config := input.FnConfig(auth.WorkspaceID())
+	key := fnID.String() + ":" + util.XXHash(config)
 
-	if item := a.upserted.Get(fnID.String()); item != nil {
-		// This item is in the LRU cache and has already been inserted;
-		// don't bother to upsert the app and only update the function configuration.
-		if util.XXHash(config) == item.Value().(string) {
-			return
-		}
-		_, err := a.FunctionCreator.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
-			Config: config,
-			ID:     fnID,
+	ran, err := a.upserted.Upsert(ctx, key, func(ctx context.Context) error {
+		app, err := a.AppCreator.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:     appID,
+			Name:   input.AppSlug(),
+			Url:    input.AppURL(),
+			Method: enums.AppMethodAPI.String(),
 		})
 		if err != nil {
-			logger.StdlibLogger(ctx).Error("failed to update fn config",
-				"error", err,
-				"app_id", input.AppID(auth.WorkspaceID()),
-			)
+			return err
 		}
-		return
-	}
 
-	app, err := a.AppCreator.UpsertApp(ctx, cqrs.UpsertAppParams{
-		ID:     appID,
-		Name:   input.AppSlug(),
-		Url:    input.AppURL(),
-		Method: enums.AppMethodAPI.String(),
+		_, err = a.FunctionCreator.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
+			ID:        fnID,
+			AccountID: auth.AccountID(),
+			EnvID:     auth.WorkspaceID(),
+			AppID:     app.ID,
+			Name:      input.FnSlug(),
+			Slug:      input.FnSlug(),
+			Config:    config,
+			CreatedAt: time.UnixMilli(input.Event.Timestamp),
+		})
+		return err
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("failed to upsert app",
+		logger.StdlibLogger(ctx).Error("failed to upsert sync checkpoint data",
 			"error", err,
-			"app_id", input.AppID(auth.WorkspaceID()),
+			"function_id", fnID,
+			"app_id", appID,
 		)
 		return
 	}
-
-	_, err = a.FunctionCreator.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
-		ID:        fnID,
-		AccountID: auth.AccountID(),
-		EnvID:     auth.WorkspaceID(),
-		AppID:     app.ID,
-		Name:      input.FnSlug(),
-		Slug:      input.FnSlug(),
-		Config:    config,
-		CreatedAt: time.UnixMilli(input.Event.Timestamp),
-	})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("failed to upsert function",
-			"error", err,
-			"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
-			"app_id", app.ID,
-		)
+	if !ran {
 		return
 	}
-
-	// Hash the config so that we can quickly compare whether we upsert when memoizing
-	// this upsert routine.
-	a.upserted.Set(fnID.String(), util.XXHash(config), time.Hour*24)
 
 	logger.StdlibLogger(ctx).Debug("upserted fn",
-		"error", err,
-		"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
-		"app_id", app.ID,
+		"function_id", fnID,
+		"app_id", appID,
+	)
+}
+
+func newCheckpointSyncUpserter() ttlupsert.Upserter[string] {
+	return ttlupsert.NewWithKey(
+		func(key string) string { return key },
+		ttlupsert.WithTTL(time.Hour*24),
+		ttlupsert.WithCapacity(10_000),
 	)
 }
