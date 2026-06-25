@@ -126,6 +126,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 		require.True(t, hasMember(t, r, kg.GlobalAccountIndex(), accountId.String()))
 	})
 
+	// TODO: Update this test once pause timeouts only go to system queue
 	t.Run("pause timeouts should belong to fn queue", func(t *testing.T) {
 		r.FlushAll()
 
