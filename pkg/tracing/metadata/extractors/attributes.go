@@ -1,383 +1,65 @@
 package extractors
 
 import (
-	"cmp"
-	"encoding/json"
-	"slices"
+	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 
 	"github.com/inngest/inngest/pkg/util"
-	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 )
 
-// convention identifies a namespace of attributes and orders which should win
-// when multiple namespaces are present. Lower numbers will override higher
-// numbers.
-type convention int
-
-const (
-	// langfuse ranks first: Langfuse states its langfuse.* keys always
-	// take precedence over the generic conventions on spans it instrumented.
-	langfuse      convention = 1
-	semconv       convention = 2
-	openinference convention = 3
-	vercel        convention = 4
-)
-
-// langfuseUsagePrefix namespaces the synthetic scalar keys that
-// expandLangfuseUsageDetails emits from the langfuse.observation.usage_details
-// JSON blob. The double underscore marks them as derived, not wire attributes.
-const langfuseUsagePrefix = "__langfuse.usage_details."
-
-// attrMapping records the canonical field a source attribute key maps to, the
-// convention it belongs to, and a keyRank tiebreak used to order keys within
-// the same convention (lower wins; 0 = default).
+// extractAIMetadataFromAttributes reads the OpenTelemetry GenAI semantic
+// convention (`gen_ai.*`) attributes off a span into md, returning false when
+// the span carries none of the recognized attributes.
 //
-// A mapping is either scalar (field set, expand nil) or composite (expand set,
-// field empty): a composite mapping carries no value of its own — its expand
-// func explodes the attribute into synthetic child KeyValues that are matched
-// back through keyFieldMap like any other attribute.
-type attrMapping struct {
-	field      string
-	convention convention
-	keyRank    int
-	expand     func(v *v1.AnyValue) []*v1.KeyValue
-}
-
-var keyFieldMap = map[string]attrMapping{
-	// ---------------------------------------------------------------------------
-	// Open Telementry Semantic Conventions
-	// ---------------------------------------------------------------------------
-	"gen_ai.usage.input_tokens": {
-		field:      "inputTokens",
-		convention: semconv,
-	},
-	"gen_ai.usage.output_tokens": {
-		field:      "outputTokens",
-		convention: semconv,
-	},
-	"gen_ai.usage.total_tokens": {
-		field:      "totalTokens",
-		convention: semconv,
-	},
-	"gen_ai.request.model": {
-		field:      "model",
-		convention: semconv,
-	},
-	"gen_ai.provider.name": {
-		field:      "providerName",
-		convention: semconv,
-	},
-	"gen_ai.system": {
-		// deprecated in semconv in favor of gen_ai.provider.name; both are
-		// semconv, so this keyRank places it behind its replacement.
-		field:      "providerName",
-		convention: semconv,
-		keyRank:    1,
-	},
-	"gen_ai.operation.name": {
-		field:      "operationName",
-		convention: semconv,
-	},
-	"gen_ai.response.model": {
-		field:      "responseModel",
-		convention: semconv,
-	},
-	"gen_ai.response.id": {
-		field:      "responseId",
-		convention: semconv,
-	},
-	"gen_ai.response.finish_reasons": {
-		field:      "finishReasons",
-		convention: semconv,
-	},
-
-	// ---------------------------------------------------------------------------
-	// Open Inference
-	// ---------------------------------------------------------------------------
-	"llm.token_count.prompt": {
-		field:      "inputTokens",
-		convention: openinference,
-	},
-	"llm.token_count.completion": {
-		field:      "outputTokens",
-		convention: openinference,
-	},
-	"llm.token_count.total": {
-		field:      "totalTokens",
-		convention: openinference,
-	},
-	"llm.model_name": {
-		field:      "responseModel",
-		convention: openinference,
-	},
-	// llm.system identifies the AI product/vendor (openai, anthropic, ...),
-	// matching the semantics of the deprecated semconv gen_ai.system.
-	"llm.system": {
-		field:      "providerName",
-		convention: openinference,
-	},
-	// OpenInference emits a single scalar finish reason rather than the semconv
-	// gen_ai.response.finish_reasons array.
-	"llm.finish_reason": {
-		field:      "finishReasons",
-		convention: openinference,
-	},
-
-	// ---------------------------------------------------------------------------
-	// Vercel AI SDK (native telemetry, `ai.*`)
-	// ---------------------------------------------------------------------------
-	// The Vercel AI SDK emits its own spans. A call produces an outer ai.<op> span
-	// (ai.* only) plus an inner ai.<op>.do<Op> span that ALSO carries a partial
-	// gen_ai.* set; the ai.* usage values are duplicated on both.
-	//
-	// For most Vercel spans, we only use gen_ai.* attributes and ignore ai.*
-	// attributes to avoid double counting when we aggregate.
-	//
-	// However, Vercel's embedding spans lack any gen_ai.* attributes. For this
-	// special case, we do parse ai.* attributes.
-	"ai.model.id": {
-		field:      "model",
-		convention: vercel,
-	},
-	// ai.model.provider is the provider + API surface, e.g. "openai.responses"
-	// (not bare "openai"); stored faithfully, no normalization.
-	"ai.model.provider": {
-		field:      "providerName",
-		convention: vercel,
-	},
-	"ai.usage.inputTokens": {
-		field:      "inputTokens",
-		convention: vercel,
-	},
-	"ai.usage.outputTokens": {
-		field:      "outputTokens",
-		convention: vercel,
-	},
-	"ai.usage.totalTokens": {
-		field:      "totalTokens",
-		convention: vercel,
-	},
-	// Embeddings spans emit only a single ai.usage.tokens count (no input/output
-	// split, no gen_ai.*). Map it to inputTokens so the total derives, matching
-	// the official-OTel embeddings case.
-	"ai.usage.tokens": {
-		field:      "inputTokens",
-		convention: vercel,
-	},
-	"ai.response.model": {
-		field:      "responseModel",
-		convention: vercel,
-	},
-	"ai.response.id": {
-		field:      "responseId",
-		convention: vercel,
-	},
-	// ai.response.finishReason is a single scalar string (like OpenInference);
-	// the finishReasons setter already handles the scalar case.
-	"ai.response.finishReason": {
-		field:      "finishReasons",
-		convention: vercel,
-	},
-
-	// ---------------------------------------------------------------------------
-	// Langfuse (`langfuse.*`, via @langfuse/openai + LangfuseSpanProcessor)
-	// ---------------------------------------------------------------------------
-	"langfuse.observation.model.name": {
-		field:      "responseModel",
-		convention: langfuse,
-	},
-	// usage_details is a single JSON blob ({"input":N,"output":N,"total":N,...}).
-	// It carries no value of its own: expand explodes it into synthetic scalar
-	// children, which are matched back through keyFieldMap below.
-	"langfuse.observation.usage_details": {
-		convention: langfuse,
-		expand:     expandLangfuseUsageDetails,
-	},
-	langfuseUsagePrefix + "input": {
-		field:      "inputTokens",
-		convention: langfuse,
-	},
-	langfuseUsagePrefix + "output": {
-		field:      "outputTokens",
-		convention: langfuse,
-	},
-	langfuseUsagePrefix + "total": {
-		field:      "totalTokens",
-		convention: langfuse,
-	},
-}
-
-// expandLangfuseUsageDetails parses the langfuse.observation.usage_details JSON
-// blob and emits one synthetic scalar KeyValue per integer entry, keyed under
-// langfuseUsagePrefix. keyFieldMap does further processing on the keys emitted.
-// matching does.
-func expandLangfuseUsageDetails(v *v1.AnyValue) []*v1.KeyValue {
-	raw := v.GetStringValue()
-	if raw == "" {
-		return nil
-	}
-
-	var counts map[string]json.Number
-	if err := json.Unmarshal([]byte(raw), &counts); err != nil {
-		return nil
-	}
-
-	out := make([]*v1.KeyValue, 0, len(counts))
-	for k, num := range counts {
-		n, err := num.Int64()
-		if err != nil {
-			// non-integer entry (shouldn't happen for token counts); skip.
-			continue
-		}
-		out = append(out, &v1.KeyValue{
-			Key:   langfuseUsagePrefix + k,
-			Value: &v1.AnyValue{Value: &v1.AnyValue_IntValue{IntValue: n}},
-		})
-	}
-	return out
-}
-
-var metadataFieldSetters = map[string]func(v *v1.AnyValue, md *AIMetadata){
-	"inputTokens": func(v *v1.AnyValue, md *AIMetadata) {
-		md.InputTokens = v.GetIntValue()
-	},
-	"outputTokens": func(v *v1.AnyValue, md *AIMetadata) {
-		md.OutputTokens = v.GetIntValue()
-	},
-	"totalTokens": func(v *v1.AnyValue, md *AIMetadata) {
-		md.TotalTokens = util.ToPtr(v.GetIntValue())
-	},
-	"model": func(v *v1.AnyValue, md *AIMetadata) {
-		md.Model = v.GetStringValue()
-	},
-	"providerName": func(v *v1.AnyValue, md *AIMetadata) {
-		md.System = v.GetStringValue()
-	},
-	"operationName": func(v *v1.AnyValue, md *AIMetadata) {
-		md.OperationName = v.GetStringValue()
-	},
-	"responseModel": func(v *v1.AnyValue, md *AIMetadata) {
-		md.ResponseModel = v.GetStringValue()
-	},
-	"responseId": func(v *v1.AnyValue, md *AIMetadata) {
-		md.ResponseID = v.GetStringValue()
-	},
-	"finishReasons": func(v *v1.AnyValue, md *AIMetadata) {
-		// semconv gen_ai.response.finish_reasons is an array (one per choice);
-		// OpenInference's llm.finish_reason is a single scalar string. Handle
-		// both and store the values raw (no tool_call/tool_calls normalization).
-		if arr := v.GetArrayValue(); arr != nil {
-			reasons := make([]string, 0, len(arr.GetValues()))
-			for _, val := range arr.GetValues() {
-				reasons = append(reasons, val.GetStringValue())
-			}
-			md.FinishReasons = reasons
-		} else if s := v.GetStringValue(); s != "" {
-			md.FinishReasons = []string{s}
-		}
-	},
-}
-
-// parsedAttr records a key, value, the convention it came from, and its
-// keyRank tiebreak within that convention.
-type parsedAttr struct {
-	value      *v1.AnyValue
-	convention convention
-	keyRank    int
-}
-
-// compareByRank computes the overall ordering of two parsedAttrs.
-// We order first by convention and break ties with keyRank.
-func compareByRank(a, b parsedAttr) int {
-	return cmp.Or(
-		cmp.Compare(a.convention, b.convention),
-		cmp.Compare(a.keyRank, b.keyRank),
-	)
-}
-
+// Each supported attribute appears at most once on a span, so we index by key
+// and read the fields we care about; everything else is ignored.
 func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) (foundAny bool) {
-	potentialAttrs := map[string][]parsedAttr{}
-
-	// The Vercel AI SDK emits its own spans. A call produces an outer ai.<op> span
-	// (ai.* only) plus an inner ai.<op>.do<Op> span that ALSO carries a partial
-	// gen_ai.* set; the ai.* usage values are duplicated on both.
-	//
-	// For most Vercel spans, we only use gen_ai.* attributes and ignore ai.*
-	// attributes to avoid double counting when we aggregate.
-	//
-	// However, Vercel's embedding spans lack any gen_ai.* attributes. For this
-	// special case, we do parse ai.* attributes.
-	//
-	// We parse only the inner embed to avoid double counting.
-	isVercelEmbedInner := false
+	byKey := make(map[string]*v1.AnyValue, len(attributes))
 	for _, attr := range attributes {
-		if attr.Key == "ai.operationId" &&
-			attr.Value.GetStringValue() == "ai.embed.doEmbed" {
-			isVercelEmbedInner = true
-			break
+		byKey[attr.Key] = attr.Value
+	}
+
+	read := func(key string, set func(v *v1.AnyValue)) {
+		if v, ok := byKey[key]; ok {
+			set(v)
+			foundAny = true
 		}
 	}
 
-	// addAttr records a matched attribute as a candidate for its canonical field.
-	addAttr := func(m attrMapping, value *v1.AnyValue) {
-		potentialAttrs[m.field] = append(
-			potentialAttrs[m.field],
-			parsedAttr{
-				value:      value,
-				convention: m.convention,
-				keyRank:    m.keyRank,
-			},
-		)
-	}
+	read("gen_ai.request.model", func(v *v1.AnyValue) { md.Model = v.GetStringValue() })
+	read("gen_ai.operation.name", func(v *v1.AnyValue) { md.OperationName = v.GetStringValue() })
+	read("gen_ai.response.model", func(v *v1.AnyValue) { md.ResponseModel = v.GetStringValue() })
+	read("gen_ai.response.id", func(v *v1.AnyValue) { md.ResponseID = v.GetStringValue() })
 
-	for _, attr := range attributes {
-		mapping, ok := keyFieldMap[attr.Key]
-		if !ok {
-			continue
-		}
+	read("gen_ai.usage.input_tokens", func(v *v1.AnyValue) { md.InputTokens = v.GetIntValue() })
+	read("gen_ai.usage.output_tokens", func(v *v1.AnyValue) { md.OutputTokens = v.GetIntValue() })
+	read("gen_ai.usage.total_tokens", func(v *v1.AnyValue) { md.TotalTokens = util.ToPtr(v.GetIntValue()) })
 
-		// Honor vercel ai.* keys only on the inner embeddings span (see above).
-		if mapping.convention == vercel && !isVercelEmbedInner {
-			continue
-		}
-
-		// Composite mapping: explode the attribute into synthetic children and
-		// match each back through keyFieldMap, so they flow through the same
-		// per-field precedence as everything else. Children carry their own
-		// mapping's convention/keyRank, and unmapped children are ignored.
-		if mapping.expand != nil {
-			for _, child := range mapping.expand(attr.Value) {
-				if childMapping, ok := keyFieldMap[child.Key]; ok {
-					addAttr(childMapping, child.Value)
+	read("gen_ai.response.finish_reasons", func(v *v1.AnyValue) {
+		// semconv defines finish_reasons as an array (one entry per choice), but
+		// some instrumentations (e.g. LangSmith) emit a single scalar string;
+		// both are accepted. Empty entries are dropped and the field is left
+		// unset when none remain. Values are stored raw (no tool_call/tool_calls
+		// normalization).
+		var reasons []string
+		if arr := v.GetArrayValue(); arr != nil {
+			for _, val := range arr.GetValues() {
+				if s := val.GetStringValue(); s != "" {
+					reasons = append(reasons, s)
 				}
 			}
-			continue
+		} else if s := v.GetStringValue(); s != "" {
+			reasons = []string{s}
 		}
-
-		addAttr(mapping, attr.Value)
-	}
-
-	if len(potentialAttrs) == 0 {
-		return false
-	}
-
-	for field, attrs := range potentialAttrs {
-		if len(attrs) == 0 {
-			continue
+		if len(reasons) > 0 {
+			md.FinishReasons = reasons
 		}
+	})
 
-		// Reduce our list of attrs to the highest-priority one.
-		chosenAttr := slices.MinFunc(attrs, compareByRank)
-
-		metadataFieldSetter, ok := metadataFieldSetters[field]
-		if !ok {
-			// log an error for the unexpected field
-			continue
-		}
-
-		metadataFieldSetter(chosenAttr.value, md)
-		foundAny = true
-	}
+	// Provider: gen_ai.provider.name is canonical and gen_ai.system is its
+	// deprecated predecessor. Read system first so the canonical key overwrites
+	// it whenever both are present.
+	read("gen_ai.system", func(v *v1.AnyValue) { md.System = v.GetStringValue() })
+	read("gen_ai.provider.name", func(v *v1.AnyValue) { md.System = v.GetStringValue() })
 
 	return foundAny
 }
