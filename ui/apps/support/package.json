@@ -20,7 +20,7 @@
     "@tanstack/query-core": "5.90.2",
     "@tanstack/react-query": "^5.66.5",
     "@tanstack/react-query-devtools": "^5.84.2",
-    "@tanstack/react-router": "^1.170.6",
+    "@tanstack/react-router": "^1.170.16",
     "@tanstack/react-router-devtools": "^1.167.0",
     "@tanstack/react-router-ssr-query": "^1.167.0",
     "@tanstack/react-start": "1.168.26",
@@ -51,6 +51,7 @@
     "unified": "^11.0.5",
     "unist-util-visit": "^5.0.0",
     "urql": "^4.0.5",
+    "use-sync-external-store": "1.6.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
