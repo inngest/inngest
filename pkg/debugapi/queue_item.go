@@ -67,7 +67,7 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 			return nil, fmt.Errorf("could not find queue shard %q", req.QueueShard)
 		}
 	} else {
-		shard, err = d.shards.Resolve(ctx, scope.AccountID, nil)
+		shard, err = d.shards.Resolve(ctx, scope, nil)
 		if err != nil {
 			return nil, fmt.Errorf("could not resolve queue shard for account %q: %w", scope.AccountID, err)
 		}

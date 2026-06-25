@@ -335,7 +335,11 @@ func (e *executor) buildDeferEvents(
 func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.FinalizeOpts) {
 	l := logger.StdlibLogger(ctx)
 
-	shard, err := e.shards.Resolve(ctx, opts.Metadata.ID.Tenant.AccountID, nil)
+	shard, err := e.shards.Resolve(ctx, queue.Scope{
+		AccountID:  opts.Metadata.ID.Tenant.AccountID,
+		EnvID:      opts.Metadata.ID.Tenant.EnvID,
+		FunctionID: opts.Metadata.ID.FunctionID,
+	}, nil)
 	if err != nil {
 		return
 	}

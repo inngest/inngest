@@ -22,9 +22,9 @@ import (
 type racingShard struct {
 	queue.ShardOperations // embed to satisfy the large interface
 
-	mu       sync.Mutex
+	mu sync.Mutex
 	// items currently in the queue, keyed by ID
-	items    map[string]*queue.QueueItem
+	items map[string]*queue.QueueItem
 	// sweepCount tracks how many times RunJobs has been called
 	sweepCount int
 	// injectAfterSweep maps sweep number -> items to inject after that sweep completes
@@ -81,7 +81,7 @@ func (r *racingShardRegistry) ByName(name string) (queue.QueueShard, error) {
 	return r.shard, nil
 }
 func (r *racingShardRegistry) ByGroup(string) []queue.QueueShard { return nil }
-func (r *racingShardRegistry) Resolve(_ context.Context, _ uuid.UUID, _ *string) (queue.QueueShard, error) {
+func (r *racingShardRegistry) Resolve(_ context.Context, _ queue.Scope, _ *string) (queue.QueueShard, error) {
 	return r.shard, nil
 }
 func (r *racingShardRegistry) ForEach(ctx context.Context, fn func(context.Context, queue.QueueShard) error) error {
@@ -93,8 +93,8 @@ type racingQueueShard struct {
 	*racingShard
 }
 
-func (s *racingQueueShard) Name() string                 { return "test" }
-func (s *racingQueueShard) Kind() enums.QueueShardKind   { return enums.QueueShardKindRedis }
+func (s *racingQueueShard) Name() string               { return "test" }
+func (s *racingQueueShard) Kind() enums.QueueShardKind { return enums.QueueShardKindRedis }
 func (s *racingQueueShard) ShardAssignmentConfig() queue.ShardAssignmentConfig {
 	return queue.ShardAssignmentConfig{}
 }
@@ -108,7 +108,7 @@ func TestFinalizeRemoveJobs_CatchesPostSweepEnqueue(t *testing.T) {
 	racedItem := &queue.QueueItem{ID: "item-raced"}
 
 	shard := &racingShard{
-		items:            map[string]*queue.QueueItem{"item-1": initialItem},
+		items: map[string]*queue.QueueItem{"item-1": initialItem},
 		injectAfterSweep: map[int][]*queue.QueueItem{
 			1: {racedItem}, // inject after first sweep
 		},
