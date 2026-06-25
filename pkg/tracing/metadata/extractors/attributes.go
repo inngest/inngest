@@ -58,8 +58,8 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 	// Provider: gen_ai.provider.name is canonical and gen_ai.system is its
 	// deprecated predecessor. Read system first so the canonical key overwrites
 	// it whenever both are present.
-	read("gen_ai.system", func(v *v1.AnyValue) { md.System = v.GetStringValue() })
-	read("gen_ai.provider.name", func(v *v1.AnyValue) { md.System = v.GetStringValue() })
+	read("gen_ai.system", func(v *v1.AnyValue) { md.Provider = v.GetStringValue() })
+	read("gen_ai.provider.name", func(v *v1.AnyValue) { md.Provider = v.GetStringValue() })
 
 	return foundAny
 }
