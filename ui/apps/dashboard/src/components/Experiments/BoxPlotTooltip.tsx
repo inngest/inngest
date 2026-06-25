@@ -106,6 +106,7 @@ export function makeBoxPlotTooltip(domain: [number, number]) {
 
     const first = payload[0];
     const title = label ?? first?.payload?.variantName ?? '';
+    const metricName = first?.name;
 
     const cx = coordinate?.x;
     const vx = viewBox?.x ?? 0;
@@ -121,8 +122,9 @@ export function makeBoxPlotTooltip(domain: [number, number]) {
 
     return (
       <div className="bg-canvasBase border-subtle shadow-tooltip rounded-md border px-3 py-2 text-xs shadow-md">
-        {title && (
-          <div className="text-basis mb-1.5 text-sm font-medium">{title}</div>
+        {title && <div className="text-basis text-sm font-medium">{title}</div>}
+        {metricName && (
+          <div className="text-muted mb-1.5 text-xs">{metricName}</div>
         )}
         <div className="flex flex-col gap-1">
           {payload.map((p, i) => {
