@@ -92,10 +92,7 @@ function nearestStatKeys(
 
   for (const flank of [below, above]) {
     if (!flank) continue;
-    // Include the flank and any stats co-located within the same threshold.
-    candidates
-      .filter((c) => Math.abs(c.v - flank.v) <= proximityThreshold)
-      .forEach((c) => result.add(c.key));
+    result.add(flank.key);
   }
 
   return [...result];
