@@ -44,7 +44,7 @@ export interface AIMetadata {
   input_tokens: number /* int64 */;
   output_tokens: number /* int64 */;
   model: string;
-  system: string;
+  provider: string;
   operation_name: string;
   /**
    * Response identity. ResponseModel is the model that served the request (may

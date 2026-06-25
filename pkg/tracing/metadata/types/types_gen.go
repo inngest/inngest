@@ -26,7 +26,7 @@ type AIMetadata struct {
 	InputTokens	int64	`json:"input_tokens"`
 	OutputTokens	int64	`json:"output_tokens"`
 	Model		string	`json:"model"`
-	System		string	`json:"system"`
+	Provider	string	`json:"provider"`
 	OperationName	string	`json:"operation_name"`
 
 	// Response identity. ResponseModel is the model that served the request (may
