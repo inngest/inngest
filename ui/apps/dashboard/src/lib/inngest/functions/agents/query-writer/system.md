@@ -267,7 +267,7 @@ Available fields, read with **dot syntax** (`inngest.ai.values.<field>`) like th
 - `model` / `response_model` — the requested / serving model name
 - `latency_ms`, `estimated_cost`
 
-Use `step_attempts` for true usage/cost totals (retries consume tokens too); use `steps` for the latest attempt only. Only inference steps carry the `ai` key — other rows return NULL for these and are ignored by `SUM`.
+Use `step_attempts` for true usage/cost totals (retries consume tokens too); use `steps` for the latest attempt only. Step attempts without the `ai` key return NULL for these and are ignored by `SUM`.
 
 **Total token usage over the last 1 day** (compute total from input + output, not `total_tokens`):
 
