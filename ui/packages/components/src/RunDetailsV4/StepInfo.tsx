@@ -217,6 +217,8 @@ export const StepInfo = ({
   const prettyShortError = usePrettyShortError(result?.error);
   const showRerunFromStep =
     !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
+  const editableInput =
+    trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY' || Boolean(result?.input);
 
   const responseHeaderMetadata = trace.metadata?.filter(
     (md) => md.kind === 'inngest.response_headers'
@@ -323,6 +325,7 @@ export const StepInfo = ({
               runID={runID}
               stepID={trace.stepID!}
               input={prettyInput || result?.input || ''}
+              editableInput={editableInput}
             />
           </>
         )}
