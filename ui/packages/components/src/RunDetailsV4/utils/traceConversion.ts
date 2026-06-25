@@ -384,6 +384,8 @@ export function traceRollup(root: Trace): Trace {
         (a, b) => (a.attempts ?? 0) - (b.attempts ?? 0)
       ),
 
+      metadata: maxAttemptTrace.metadata,
+
       userlandSpan: null,
     };
 
@@ -427,6 +429,8 @@ export function traceRollup(root: Trace): Trace {
         childrenSpans: Array.from(attempts.values()).sort(
           (a, b) => (a.attempts ?? 0) - (b.attempts ?? 0)
         ),
+
+        metadata: maxAttemptTrace.metadata,
 
         stepInfo: null,
         userlandSpan: null,
