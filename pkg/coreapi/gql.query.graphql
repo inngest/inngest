@@ -39,6 +39,10 @@ type Query {
   runTrigger(runID: String!): RunTraceTrigger!
   runTrace(runID: String!): RunTraceSpan!
 
+  sessionKeys(search: String): [SessionKey!]!
+  sessions(sessionKey: String!, sessionIdSearch: String, timeRange: TimeRangeInput): [SessionGroup!]!
+  sessionRuns(sessionKey: String!, sessionId: String!, timeRange: TimeRangeInput): [SessionRun!]!
+
   debugRun(query: DebugRunQuery!): DebugRun
   debugSession(query: DebugSessionQuery!): DebugSession
 
@@ -89,6 +93,11 @@ input DebugSessionQuery {
 input FunctionRunQuery {
   workspaceId: ID! = "local"
   functionRunId: ID!
+}
+
+input TimeRangeInput {
+  from: Time!
+  until: Time
 }
 
 input FunctionRunsQuery {

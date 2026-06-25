@@ -306,6 +306,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if err != nil {
 		return err
 	}
+	_ = s.cqrs.RecordSessionKeys(ctx, tracked.GetWorkspaceID(), tracked.GetEvent().Meta.Sessions)
 
 	l := s.log.With(
 		"event", tracked.GetEvent().Name,

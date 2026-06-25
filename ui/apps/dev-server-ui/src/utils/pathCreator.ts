@@ -13,6 +13,21 @@ export const pathCreator = {
   runPopout({ runID }: { runID: string }): string {
     return `/run?runID=${runID}`;
   },
+  sessions({ sessionKey }: { sessionKey?: string }): string {
+    if (!sessionKey) {
+      return '/sessions';
+    }
+    return `/sessions/${encodeURIComponent(sessionKey)}`;
+  },
+  session({
+    sessionKey,
+    sessionId,
+  }: {
+    sessionKey: string;
+    sessionId: string;
+  }): string {
+    return `${this.sessions({ sessionKey })}/${encodeURIComponent(sessionId)}`;
+  },
   debugger({
     functionSlug,
     runID,
