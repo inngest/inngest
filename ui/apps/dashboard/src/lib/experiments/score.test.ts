@@ -10,6 +10,7 @@ const metric = (
   over: Partial<ExperimentScoringMetric>,
 ): ExperimentScoringMetric => ({
   key: 'tokens',
+  kind: 'NUMERIC',
   enabled: true,
   points: 10,
   minValue: 0,
