@@ -195,13 +195,15 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		return nil, nil
 	}
 
-	// get model name, try response.modelId first, then request.body.model
-	var model string
+	var requestModel string
+	var responseModel string
 	if firstStep != nil {
 		if firstStep.Response != nil && firstStep.Response.ModelID != "" {
-			model = firstStep.Response.ModelID
-		} else if firstStep.Request != nil && firstStep.Request.Body.Model != "" {
-			model = firstStep.Request.Body.Model
+			responseModel = firstStep.Response.ModelID
+		}
+
+		if firstStep.Request != nil && firstStep.Request.Body.Model != "" {
+			requestModel = firstStep.Request.Body.Model
 		}
 	}
 
@@ -223,14 +225,22 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		latencyMs = &stepDurationMs
 	}
 
+	// prefer the response model (the model that actually served the request)
+	// for cost estimation, falling back to the requested model.
+	costModel := responseModel
+	if costModel == "" {
+		costModel = requestModel
+	}
+
 	aiMd := &AIMetadata{
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
 		TotalTokens:   &totalTokens,
-		RequestModel:  model,
+		RequestModel:  requestModel,
+		ResponseModel: responseModel,
 		Provider:      "vercel-ai",
 		LatencyMs:     latencyMs,
-		EstimatedCost: EstimateCost(model, inputTokens, outputTokens),
+		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
 	}
 
 	return []metadata.Structured{aiMd}, nil

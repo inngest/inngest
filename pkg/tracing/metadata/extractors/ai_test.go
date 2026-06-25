@@ -252,7 +252,8 @@ func TestExtractAIOutputMetadata_VercelAISDK(t *testing.T) {
 	assert.Equal(t, 440.0, data["total_tokens"], "Should extract total tokens")
 
 	// Verify request model
-	assert.Equal(t, "gpt-4-turbo-2024-04-09", data["request_model"], "Should extract request model from response.modelId")
+	assert.Equal(t, "gpt-4-turbo", data["request_model"], "Should extract request model from request.modelId")
+	assert.Equal(t, "gpt-4-turbo-2024-04-09", data["response_model"], "Should extract response model from response.modelId")
 
 	// Verify provider
 	assert.Equal(t, "vercel-ai", data["provider"], "Should set provider to vercel-ai")
