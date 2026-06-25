@@ -394,8 +394,8 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		errTags["lease"] = leaseID.String()
 	}
 
-	switch cause {
-	case ErrQueueItemThrottled:
+	switch {
+	case errors.Is(cause, ErrQueueItemThrottled):
 		p.IsCustomKeyLimitOnly.Store(false)
 		p.IsSemaphoreLimitOnly.Store(false)
 
@@ -425,7 +425,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		}
 
 		return nil
-	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
+	case errors.Is(cause, ErrPartitionConcurrencyLimit), errors.Is(cause, ErrAccountConcurrencyLimit), errors.Is(cause, ErrSystemConcurrencyLimit):
 		p.IsCustomKeyLimitOnly.Store(false)
 		p.IsSemaphoreLimitOnly.Store(false)
 
@@ -438,15 +438,15 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		// only safe thing to do when we hit a function or account level
 		// concurrency key.
 		var status string
-		switch cause {
-		case ErrSystemConcurrencyLimit:
+		switch {
+		case errors.Is(cause, ErrSystemConcurrencyLimit):
 			status = "system_concurrency_limit"
-		case ErrPartitionConcurrencyLimit:
+		case errors.Is(cause, ErrPartitionConcurrencyLimit):
 			status = "partition_concurrency_limit"
 			if p.Partition.FunctionID != nil {
 				p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
 			}
-		case ErrAccountConcurrencyLimit:
+		case errors.Is(cause, ErrAccountConcurrencyLimit):
 			status = "account_concurrency_limit"
 			// For backwards compatibility, we report on the function level as well
 			if p.Partition.FunctionID != nil {
@@ -485,7 +485,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 		}
 
 		return fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
-	case ErrConcurrencyLimitCustomKey:
+	case errors.Is(cause, ErrConcurrencyLimitCustomKey):
 		p.IsSemaphoreLimitOnly.Store(false)
 		p.CtrConcurrency.Add(1)
 
@@ -521,7 +521,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			})
 		}
 		return nil
-	case ErrSemaphoreLimit:
+	case errors.Is(cause, ErrSemaphoreLimit):
 		// Semaphore capacity exhausted for this specific item (e.g., start job with fn concurrency).
 		// Skip this item and continue scanning — other items without semaphores (step 2, etc.)
 		// can still be processed.
@@ -531,7 +531,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
-	case ErrQueueItemNotFound:
+	case errors.Is(cause, ErrQueueItemNotFound):
 		// This is an okay error.  Move to the next job item.
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
@@ -539,7 +539,7 @@ func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error 
 			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
 		})
 		return nil
-	case ErrQueueItemAlreadyLeased:
+	case errors.Is(cause, ErrQueueItemAlreadyLeased):
 		// This is an okay error.  Move to the next job item.
 		p.CtrSuccess.Add(1) // count as a success for stats purposes.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
