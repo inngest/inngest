@@ -3437,8 +3437,12 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
-		// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
-		// this is _not_ a system partition and lives on the account shard, which we need to retrieve
+		if e.shards == nil {
+			return cleanup()
+		}
+
+		// Timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent).
+		// This is not a system partition and lives on the account shard.
 		shard, err := e.shards.Resolve(ctx, queue.Scope{
 			AccountID:  md.ID.Tenant.AccountID,
 			EnvID:      md.ID.Tenant.EnvID,

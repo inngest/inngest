@@ -200,6 +200,11 @@ func (q *queueProcessor) Workers() chan ProcessItem {
 	return q.workers
 }
 
+// Enqueue implements Producer.
+func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
+	return q.queueProducer.Enqueue(ctx, item, at, opts)
+}
+
 // LoadQueueItem implements QueueManager.
 func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error) {
 	shard, err := q.shards.ByName(shardName)

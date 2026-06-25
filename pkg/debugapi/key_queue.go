@@ -22,6 +22,10 @@ func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartiti
 	if fnID, parseErr := uuid.Parse(req.GetPartitionId()); parseErr == nil {
 		scope.FunctionID = fnID
 	}
+	shard, err := d.shards.Resolve(ctx, scope, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error finding shard: %w", err)
+	}
 	pt, err := shard.PartitionByID(ctx, scope, req.GetPartitionId())
 	if err != nil {
 		if errors.Is(err, queue.ErrPartitionNotFound) {

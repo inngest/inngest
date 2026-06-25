@@ -850,12 +850,7 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
 
-	items, err := shard.ItemsByPartition(ctx, queue.Scope{
-	items, err := shard.ItemsByPartition(ctx, queue.Scope{
-		AccountID:  c.AccountID,
-		EnvID:      c.WorkspaceID,
-		FunctionID: c.FunctionID,
-	}, c.FunctionID.String(), from, c.StartedBefore)
+	items, err := shard.ItemsByPartition(ctx, scope, c.FunctionID.String(), from, c.StartedBefore)
 	if err != nil {
 		return fmt.Errorf("error retrieving partition items: %w", err)
 	}
