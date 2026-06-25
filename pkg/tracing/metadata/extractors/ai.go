@@ -24,7 +24,7 @@ const (
 type AIMetadata struct {
 	InputTokens   int64  `json:"input_tokens"`
 	OutputTokens  int64  `json:"output_tokens"`
-	Model         string `json:"model"`
+	RequestModel  string `json:"model"`
 	Provider      string `json:"provider"`
 	OperationName string `json:"operation_name"`
 
@@ -94,7 +94,7 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 	}
 
 	aiMd := &AIMetadata{
-		Model:         parsedInput.Model,
+		RequestModel:  parsedInput.Model,
 		Provider:      req.Format,
 		OperationName: "",
 
@@ -227,7 +227,7 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
 		TotalTokens:   &totalTokens,
-		Model:         model,
+		RequestModel:  model,
 		Provider:      "vercel-ai",
 		LatencyMs:     latencyMs,
 		EstimatedCost: EstimateCost(model, inputTokens, outputTokens),

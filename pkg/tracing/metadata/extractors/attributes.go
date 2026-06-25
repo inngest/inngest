@@ -25,7 +25,7 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 		}
 	}
 
-	read("gen_ai.request.model", func(v *v1.AnyValue) { md.Model = v.GetStringValue() })
+	read("gen_ai.request.model", func(v *v1.AnyValue) { md.RequestModel = v.GetStringValue() })
 	read("gen_ai.operation.name", func(v *v1.AnyValue) { md.OperationName = v.GetStringValue() })
 	read("gen_ai.response.model", func(v *v1.AnyValue) { md.ResponseModel = v.GetStringValue() })
 	read("gen_ai.response.id", func(v *v1.AnyValue) { md.ResponseID = v.GetStringValue() })
