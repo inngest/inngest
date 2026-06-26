@@ -41,7 +41,13 @@ func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) (md AIMetada
 		md.TotalTokens = &totalTokens
 	}
 
-	md.EstimatedCost = EstimateCost(md.RequestModel, md.InputTokens, md.OutputTokens)
+	// prefer the response model (the model that actually served the request)
+	// for cost estimation, falling back to the requested model.
+	costModel := md.ResponseModel
+	if costModel == "" {
+		costModel = md.RequestModel
+	}
+	md.EstimatedCost = EstimateCost(costModel, md.InputTokens, md.OutputTokens)
 
 	return md, true
 }
