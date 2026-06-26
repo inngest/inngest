@@ -272,8 +272,8 @@ Use `step_attempts` for true usage/cost totals (retries consume tokens too); use
 **Total token usage over the last 1 day** (compute total from input + output, not `total_tokens`):
 
 ```sql
-SELECT SUM(inngest.ai.values.input_tokens::Float64)
-     + SUM(inngest.ai.values.output_tokens::Float64) AS total_tokens
+SELECT SUM(inngest.ai.values.input_tokens)
+     + SUM(inngest.ai.values.output_tokens) AS total_tokens
 FROM step_attempts
 WHERE queued_at >= now() - INTERVAL 1 DAY
 ```
