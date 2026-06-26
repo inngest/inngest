@@ -1,16 +1,20 @@
 import { useState } from 'react';
+import { RiRefreshLine } from '@remixicon/react';
 
+import { Button } from '../Button';
 import CommandBlock, { type TabsProps } from '../CodeBlock/CommandBlock';
 import { Link } from '../Link';
-import { IconSpinner } from '../icons/Spinner';
 import {
   DOCS_URL,
   INTRO_DESCRIPTION,
   STEPS,
-  TRACK_OUTCOME_TAB,
   USE_CASES,
   VARIANT_TABS,
 } from './experimentsEmptyStateContent';
+
+type Props = {
+  onRefresh?: () => void;
+};
 
 function CodeExample({ tabs }: { tabs: TabsProps[] }) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.title ?? '');
@@ -36,7 +40,7 @@ function Step({
   number: number;
   title: string;
   description: string;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-4">
@@ -51,7 +55,7 @@ function Step({
   );
 }
 
-export function ExperimentsEmptyState() {
+export function ExperimentsEmptyState({ onRefresh }: Props) {
   return (
     <div className="bg-canvasBase flex flex-1 flex-col items-center overflow-auto px-6 py-12">
       <div className="mx-auto flex w-full max-w-[800px] flex-col gap-10">
@@ -77,10 +81,20 @@ export function ExperimentsEmptyState() {
           ))}
         </div>
 
-        {/* Empty / still-looking indicator */}
-        <div className="bg-info text-info dark:bg-info/40 flex items-center gap-2 rounded-md px-4 py-3 text-sm">
-          <IconSpinner className="fill-info h-4 w-4" />
-          No experiments found
+        {/* Empty-results indicator */}
+        <div className="bg-info text-info dark:bg-info/40 flex items-center justify-between gap-2 rounded-md px-4 py-3 text-sm">
+          No experiments available
+          {onRefresh && (
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              size="small"
+              label="Refresh"
+              icon={<RiRefreshLine />}
+              iconSide="left"
+              onClick={onRefresh}
+            />
+          )}
         </div>
 
         <hr className="border-subtle" />
@@ -93,9 +107,7 @@ export function ExperimentsEmptyState() {
             <CodeExample tabs={VARIANT_TABS} />
           </Step>
 
-          <Step number={2} title={STEPS.two.title} description={STEPS.two.description}>
-            <CodeExample tabs={[TRACK_OUTCOME_TAB]} />
-          </Step>
+          <Step number={2} title={STEPS.two.title} description={STEPS.two.description} />
         </div>
       </div>
     </div>

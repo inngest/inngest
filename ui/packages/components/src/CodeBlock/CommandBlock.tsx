@@ -53,6 +53,15 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
 
     monaco.languages.register({ id: 'shell' });
     monaco.languages.setMonarchTokensProvider('shell', shellLanguageTokens);
+
+    // These are read-only snippet viewers, so suppress the TypeScript worker's
+    // diagnostics. Without this, free identifiers like `event` resolve to the
+    // deprecated DOM global and render with a strikethrough.
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+      noSuggestionDiagnostics: true,
+    });
   }, [monaco, dark]);
 
   const handleEditorDidMount = (editor: MonacoEditorType) => {
@@ -81,6 +90,9 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
             onChange={updateEditorHeight}
             options={{
               readOnly: activeTabContent.readOnly || true,
+              // Deprecated symbols render with a strikethrough via semantic
+              // tokens; disable semantic highlighting for these static snippets.
+              'semanticHighlighting.enabled': false,
               minimap: {
                 enabled: false,
               },

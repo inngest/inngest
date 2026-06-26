@@ -126,32 +126,6 @@ export const VARIANT_TABS: TabsProps[] = [
   { title: 'fixed ( )', content: FIXED, language: 'typescript', readOnly: true },
 ];
 
-const TRACK_OUTCOME = `const outcome = await group.experiment("email-copy", {
-  variants: {
-    short: () => step.run("short-copy", () => generateShortCopy(event.data)),
-    detailed: () =>
-      step.run("detailed-copy", () => generateDetailedCopy(event.data)),
-  },
-  select: experiment.bucket(event.data.userId, {
-    weights: { short: 50, detailed: 50 },
-  }),
-  withVariant: true,
-});
-await step.run("track-selected-variant", () =>
-  analytics.track("experiment.variant_selected", {
-    experiment: "email-copy",
-    variant: outcome.variant,
-    userId: event.data.userId,
-  })
-);`;
-
-export const TRACK_OUTCOME_TAB: TabsProps = {
-  title: 'track-outcome.ts',
-  content: TRACK_OUTCOME,
-  language: 'typescript',
-  readOnly: true,
-};
-
 export const STEPS = {
   one: {
     title: 'Declare your variants inside an inngest function and choose how runs are selected',
