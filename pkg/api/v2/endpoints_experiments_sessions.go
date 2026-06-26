@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -77,7 +78,13 @@ func (s *Service) GetExperiment(ctx context.Context, req *apiv2.GetExperimentReq
 		Variant:        req.Variant,
 	})
 	if err != nil {
+		if errors.Is(err, ErrExperimentNotFound) {
+			return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Experiment not found")
+		}
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch experiment")
+	}
+	if detail == nil {
+		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Experiment not found")
 	}
 
 	return &apiv2.GetExperimentResponse{
@@ -106,7 +113,9 @@ func (s *Service) ListSessions(ctx context.Context, req *apiv2.ListSessionsReque
 	}
 
 	result, err := s.sessions.ListSessions(ctx, SessionListOpts{
-		SessionKey: decodePathParam(req.SessionKey),
+		// SessionKey is a query param here (GET /sessions); grpc-gateway already
+		// unescapes it, so it must not be path-decoded again.
+		SessionKey: req.SessionKey,
 		Cursor:     cursor,
 		Limit:      limit,
 	})

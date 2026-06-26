@@ -6635,7 +6635,7 @@ type GetExperimentRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	FunctionId     string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	ExperimentName string                 `protobuf:"bytes,2,opt,name=experiment_name,json=experimentName,proto3" json:"experiment_name,omitempty"`
-	Variant        *string                `protobuf:"bytes,5,opt,name=variant,proto3,oneof" json:"variant,omitempty"`
+	Variant        *string                `protobuf:"bytes,3,opt,name=variant,proto3,oneof" json:"variant,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -8030,7 +8030,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\vfunction_id\x18\x01 \x01(\tR\n" +
 	"functionId\x12'\n" +
 	"\x0fexperiment_name\x18\x02 \x01(\tR\x0eexperimentName\x12]\n" +
-	"\avariant\x18\x05 \x01(\tB>\x92A;29Optional variant name to restrict the aggregate response.H\x00R\avariant\x88\x01\x01B\n" +
+	"\avariant\x18\x03 \x01(\tB>\x92A;29Optional variant name to restrict the aggregate response.H\x00R\avariant\x88\x01\x01B\n" +
 	"\n" +
 	"\b_variant\"{\n" +
 	"\x15GetExperimentResponse\x12,\n" +
