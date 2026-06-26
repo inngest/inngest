@@ -16,6 +16,10 @@ type Props = {
   onRefresh?: () => void;
 };
 
+// Fixed snippet viewport so the box keeps a stable height across tabs and the
+// whole page stays compact; taller variants scroll internally.
+const CODE_HEIGHT = 280;
+
 function CodeExample({ tabs }: { tabs: TabsProps[] }) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.title ?? '');
   const current = tabs.find((tab) => tab.title === activeTab) ?? tabs[0];
@@ -26,7 +30,7 @@ function CodeExample({ tabs }: { tabs: TabsProps[] }) {
         <CommandBlock.Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
         <CommandBlock.CopyButton content={current?.content} />
       </CommandBlock.Header>
-      <CommandBlock currentTabContent={current} />
+      <CommandBlock currentTabContent={current} height={CODE_HEIGHT} />
     </CommandBlock.Wrapper>
   );
 }

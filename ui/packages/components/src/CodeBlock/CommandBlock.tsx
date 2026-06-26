@@ -24,7 +24,15 @@ export type TabsProps = {
 
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
-const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) => {
+const CommandBlock = ({
+  currentTabContent,
+  height,
+}: {
+  currentTabContent?: TabsProps;
+  // When set, the editor is pinned to this fixed pixel height (content scrolls
+  // internally) instead of growing to fit. Keeps tabbed snippets from jumping.
+  height?: number;
+}) => {
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -72,7 +80,7 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
   const updateEditorHeight = () => {
     const editor = editorRef.current;
     if (editor) {
-      const contentHeight = Math.min(1000, editor.getContentHeight());
+      const contentHeight = height != null ? height : Math.min(1000, editor.getContentHeight());
       wrapperRef.current!.style.height = `${contentHeight}px`;
       editor.layout();
     }
@@ -113,7 +121,7 @@ const CommandBlock = ({ currentTabContent }: { currentTabContent?: TabsProps }) 
               scrollbar: {
                 verticalScrollbarSize: 10,
                 alwaysConsumeMouseWheel: false,
-                vertical: 'hidden',
+                vertical: height != null ? 'auto' : 'hidden',
                 horizontal: 'hidden',
               },
               padding: {
