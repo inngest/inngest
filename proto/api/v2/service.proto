@@ -2791,7 +2791,7 @@ message Experiment {
 message GetExperimentRequest {
   string function_id = 1;
   string experiment_name = 2;
-  optional string variant = 5 [
+  optional string variant = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Optional variant name to restrict the aggregate response."
     }
