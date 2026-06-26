@@ -42,7 +42,7 @@ export const monitor: NavGroupConfig = {
   heading: 'Monitor',
   items: [
     { label: 'Metrics', route: 'metrics', Icon: MetricsIcon },
-    { label: 'Insights', route: 'insights', Icon: InsightsIcon, beta: true },
+    { label: 'Insights', route: 'insights', Icon: InsightsIcon },
   ],
 };
 
