@@ -257,15 +257,18 @@ The experiment's `selection_strategy`/`variant_weights` live only on the selecti
 
 ## Querying AI / Token Usage
 
-Token usage, model, latency, and cost from `step.ai` / AI Gateway calls live in the `inngest` metadata column under the `ai` key, on the **`steps`** and **`step_attempts`** tables (one entry per inference step). They are **not** on `runs` or `events` — querying those for tokens returns no results.
+Token usage and model for LLM calls live in the `inngest` metadata column under the `ai` key, on the **`steps`** and **`step_attempts`** tables. This metadata comes from two sources that normalize into the same `ai` key: `step.ai.wrap`/`step.ai.infer`, and the **OTel AI-metadata extractor** for any LLM call instrumented with OpenTelemetry `gen_ai.*` / `ai.usage.*` / `llm.token_count.*` attributes (e.g. an LLM call inside a `step.run`). Token data is **not** on `runs` or `events` — querying those returns no results.
 
-Available fields, read with **dot syntax** (`inngest.ai.values.<field>`) like the other metadata sections above — not bracket indexing. Cast numeric ones with `::Float64`:
+Available fields, read with **dot syntax** (`inngest.ai.values.<field>`) like the other metadata sections above — not bracket indexing:
 
-- `input_tokens` — prompt tokens (always present)
-- `output_tokens` — completion tokens (always present)
-- `total_tokens` — **often absent**; do not rely on it (a missing value yields `0`/`NaN`). Compute the total as `input_tokens + output_tokens` instead.
+- `input_tokens` — prompt tokens
+- `output_tokens` — completion tokens
+- `total_tokens` — **often absent**; do not rely on it. Compute the total as `input_tokens + output_tokens` instead.
 - `model` / `response_model` — the requested / serving model name
-- `latency_ms`, `estimated_cost`
+
+Reference these fields **bare** in numeric and aggregate contexts (e.g. `SUM(inngest.ai.values.input_tokens)`) — the transpiler infers a null-safe `accurateCastOrNull(…, 'Float64')` for them. Do **not** add an explicit `::Float64` cast: it maps to a non-nullable `CAST` that errors when a value is missing or NULL. If you ever need an explicit cast, use `accurateCastOrNull(…, 'Float64')`.
+
+(Latency and cost are intentionally omitted: they exist only on the `step.ai` schema, which is still being unified with the OTel-extractor schema.)
 
 Use `step_attempts` for true usage/cost totals (retries consume tokens too); use `steps` for the latest attempt only. Step attempts without the `ai` key return NULL for these and are ignored by `SUM`.
 
@@ -399,7 +402,7 @@ WHERE like(name, 'user%')
 WHERE ilike(data.email, '%@example.com')
 ```
 
-`function_id` and `app_id` (and their aliases) are **UUID** columns. They may appear **only** as `= '<slug>'` or `IN ('<slug>', …)`; slug→UUID translation happens only for those operators with a **complete** slug. You must **never** wrap them in any function. That includes `LIKE`/`ILIKE`/`match`/`position`/`substring`/`lower`/`upper`/`concat` and every other string or scalar function. Any of these fails with _"Illegal type UUID of argument of function …"_.
+`function_id` and `app_id` (and their aliases) are **UUID** columns. You may select them, `GROUP BY` them, filter with `= '<slug>'` / `IN ('<slug>', …)` (slug→UUID translation happens for those operators with a **complete** slug), and aggregate them with counting/collecting functions — `COUNT(DISTINCT function_id)`, `uniq(function_id)`, `any(function_id)`, `groupArray(function_id)`, `groupUniqArray(function_id)`. What you must **never** do is apply a **string, pattern, or scalar** function to them — `LIKE`/`ILIKE`/`match`/`position`/`substring`/`lower`/`upper`/`concat`, arithmetic, etc. — each fails with _"Illegal type UUID of argument of function …"_.
 
 There is **no** function-name or app-name text column, so you **cannot substring-match a function or app by name**. If the user gives a partial or approximate function name, match the full slug exactly with `function_id = 'my-app-my-function'` (or list likely slugs with `IN (...)`) — never improvise a pattern match. Substring matching is only possible on genuine name columns: `triggering_event_name` on `runs`, `name` on `events` (those are event names, not function names).
 
