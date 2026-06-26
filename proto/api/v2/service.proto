@@ -1626,6 +1626,9 @@ service V2 {
   rpc ListExperiments(ListExperimentsRequest) returns (ListExperimentsResponse) {
     option (google.api.http) = {
       get: "/experiments"
+      additional_bindings: {
+        get: "/apps/{app_id}/functions/{function_id}/experiments"
+      }
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List experiments"
@@ -1643,7 +1646,7 @@ service V2 {
 
   rpc GetExperiment(GetExperimentRequest) returns (GetExperimentResponse) {
     option (google.api.http) = {
-      get: "/experiments/{function_id}/{experiment_name}"
+      get: "/apps/{app_id}/functions/{function_id}/experiments/{experiment_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get experiment aggregates"
@@ -1659,9 +1662,27 @@ service V2 {
     };
   }
 
-  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+  rpc ListSessionKeys(ListSessionKeysRequest) returns (ListSessionKeysResponse) {
     option (google.api.http) = {
       get: "/sessions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List session keys"
+      tags: "Sessions"
+      tags: "Beta"
+      description: "Lists session keys observed in the authenticated environment."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+    option (google.api.http) = {
+      get: "/sessions/{session_key}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List sessions"
@@ -1679,7 +1700,7 @@ service V2 {
 
   rpc ListSessionRuns(ListSessionRunsRequest) returns (ListSessionRunsResponse) {
     option (google.api.http) = {
-      get: "/sessions/{session_key}/{session_id}/runs"
+      get: "/sessions/{session_key}/{session_id=**}/runs"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List session runs"
@@ -1725,6 +1746,12 @@ message ErrorResponse {
 message ResponseMetadata {
   google.protobuf.Timestamp fetched_at = 1;
   google.protobuf.Timestamp cached_until = 2;
+  TimeRange time_range = 3;
+}
+
+message TimeRange {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp until = 2;
 }
 
 enum FunctionRunStatus {
@@ -1760,6 +1787,7 @@ enum TraceStepOp {
 message FunctionRef {
   string id = 1;
   string name = 2;
+  AppRef app = 3;
 }
 
 message AppRef {
@@ -2768,6 +2796,10 @@ message ListExperimentsRequest {
       default: "20"
     }
   ];
+  string app_id = 3;
+  string function_id = 4;
+  optional google.protobuf.Timestamp from = 5;
+  optional google.protobuf.Timestamp until = 6;
 }
 
 message ListExperimentsResponse {
@@ -2777,25 +2809,27 @@ message ListExperimentsResponse {
 }
 
 message Experiment {
-  string name = 1;
-  string function_id = 2;
-  string function_slug = 3;
-  string selection_strategy = 4;
-  repeated string variants = 5;
-  int32 variant_count = 6;
-  int32 total_runs = 7;
-  google.protobuf.Timestamp first_seen = 8;
-  google.protobuf.Timestamp last_seen = 9;
+  string id = 1;
+  FunctionRef function = 2;
+  string selection_strategy = 3;
+  repeated string variants = 4;
+  int32 variant_count = 5;
+  int32 total_runs = 6;
+  google.protobuf.Timestamp first_seen = 7;
+  google.protobuf.Timestamp last_seen = 8;
 }
 
 message GetExperimentRequest {
   string function_id = 1;
-  string experiment_name = 2;
+  string experiment_id = 2;
   optional string variant = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Optional variant name to restrict the aggregate response."
     }
   ];
+  string app_id = 4;
+  optional google.protobuf.Timestamp from = 5;
+  optional google.protobuf.Timestamp until = 6;
 }
 
 message GetExperimentResponse {
@@ -2804,7 +2838,7 @@ message GetExperimentResponse {
 }
 
 message ExperimentDetail {
-  string name = 1;
+  string id = 1;
   repeated ExperimentVariantMetrics variants = 2;
   repeated ExperimentVariantWeight variant_weights = 3;
   google.protobuf.Timestamp first_seen = 4;
@@ -2830,8 +2864,8 @@ message ExperimentVariantWeight {
   double weight = 2;
 }
 
-message ListSessionsRequest {
-  string session_key = 1;
+message ListSessionKeysRequest {
+  optional string search = 1;
   optional string cursor = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Pagination cursor from previous response"
@@ -2845,6 +2879,35 @@ message ListSessionsRequest {
   ];
 }
 
+message ListSessionKeysResponse {
+  repeated SessionKey data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message SessionKey {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+}
+
+message ListSessionsRequest {
+  string session_key = 1;
+  optional string search = 2;
+  optional string cursor = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of sessions to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+  optional google.protobuf.Timestamp from = 5;
+  optional google.protobuf.Timestamp until = 6;
+}
+
 message ListSessionsResponse {
   repeated SessionGroup data = 1;
   ResponseMetadata metadata = 2;
@@ -2852,18 +2915,12 @@ message ListSessionsResponse {
 }
 
 message SessionGroup {
-  string session_key = 1;
-  string session_id = 2;
-  int32 run_count = 3;
-  int32 failed_run_count = 4;
-  double failure_rate = 5;
-  google.protobuf.Timestamp last_active_at = 6;
-  repeated SessionFunction functions = 7;
-}
-
-message SessionFunction {
-  string slug = 1;
-  string name = 2;
+  string id = 1;
+  int32 run_count = 2;
+  int32 failed_run_count = 3;
+  double failure_rate = 4;
+  google.protobuf.Timestamp last_active_at = 5;
+  repeated FunctionRef functions = 6;
 }
 
 message ListSessionRunsRequest {
@@ -2880,6 +2937,8 @@ message ListSessionRunsRequest {
       default: "20"
     }
   ];
+  optional google.protobuf.Timestamp from = 5;
+  optional google.protobuf.Timestamp until = 6;
 }
 
 message ListSessionRunsResponse {
@@ -2890,9 +2949,9 @@ message ListSessionRunsResponse {
 
 message SessionRun {
   string id = 1;
-  string function_slug = 2;
+  FunctionRef function = 2;
   optional string event_name = 3;
-  string status = 4;
+  FunctionRunStatus status = 4;
   google.protobuf.Timestamp queued_at = 5;
   optional google.protobuf.Timestamp started_at = 6;
   optional google.protobuf.Timestamp ended_at = 7;

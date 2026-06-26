@@ -90,6 +90,8 @@ const (
 	V2ListExperimentsProcedure = "/api.v2.V2/ListExperiments"
 	// V2GetExperimentProcedure is the fully-qualified name of the V2's GetExperiment RPC.
 	V2GetExperimentProcedure = "/api.v2.V2/GetExperiment"
+	// V2ListSessionKeysProcedure is the fully-qualified name of the V2's ListSessionKeys RPC.
+	V2ListSessionKeysProcedure = "/api.v2.V2/ListSessionKeys"
 	// V2ListSessionsProcedure is the fully-qualified name of the V2's ListSessions RPC.
 	V2ListSessionsProcedure = "/api.v2.V2/ListSessions"
 	// V2ListSessionRunsProcedure is the fully-qualified name of the V2's ListSessionRuns RPC.
@@ -128,6 +130,7 @@ type V2Client interface {
 	QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error)
 	ListExperiments(context.Context, *connect.Request[v2.ListExperimentsRequest]) (*connect.Response[v2.ListExperimentsResponse], error)
 	GetExperiment(context.Context, *connect.Request[v2.GetExperimentRequest]) (*connect.Response[v2.GetExperimentResponse], error)
+	ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error)
 	ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error)
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
 }
@@ -305,6 +308,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetExperiment")),
 			connect.WithClientOptions(opts...),
 		),
+		listSessionKeys: connect.NewClient[v2.ListSessionKeysRequest, v2.ListSessionKeysResponse](
+			httpClient,
+			baseURL+V2ListSessionKeysProcedure,
+			connect.WithSchema(v2Methods.ByName("ListSessionKeys")),
+			connect.WithClientOptions(opts...),
+		),
 		listSessions: connect.NewClient[v2.ListSessionsRequest, v2.ListSessionsResponse](
 			httpClient,
 			baseURL+V2ListSessionsProcedure,
@@ -349,6 +358,7 @@ type v2Client struct {
 	queryInsights            *connect.Client[v2.QueryInsightsRequest, v2.QueryInsightsResponse]
 	listExperiments          *connect.Client[v2.ListExperimentsRequest, v2.ListExperimentsResponse]
 	getExperiment            *connect.Client[v2.GetExperimentRequest, v2.GetExperimentResponse]
+	listSessionKeys          *connect.Client[v2.ListSessionKeysRequest, v2.ListSessionKeysResponse]
 	listSessions             *connect.Client[v2.ListSessionsRequest, v2.ListSessionsResponse]
 	listSessionRuns          *connect.Client[v2.ListSessionRunsRequest, v2.ListSessionRunsResponse]
 }
@@ -488,6 +498,11 @@ func (c *v2Client) GetExperiment(ctx context.Context, req *connect.Request[v2.Ge
 	return c.getExperiment.CallUnary(ctx, req)
 }
 
+// ListSessionKeys calls api.v2.V2.ListSessionKeys.
+func (c *v2Client) ListSessionKeys(ctx context.Context, req *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error) {
+	return c.listSessionKeys.CallUnary(ctx, req)
+}
+
 // ListSessions calls api.v2.V2.ListSessions.
 func (c *v2Client) ListSessions(ctx context.Context, req *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error) {
 	return c.listSessions.CallUnary(ctx, req)
@@ -530,6 +545,7 @@ type V2Handler interface {
 	QueryInsights(context.Context, *connect.Request[v2.QueryInsightsRequest]) (*connect.Response[v2.QueryInsightsResponse], error)
 	ListExperiments(context.Context, *connect.Request[v2.ListExperimentsRequest]) (*connect.Response[v2.ListExperimentsResponse], error)
 	GetExperiment(context.Context, *connect.Request[v2.GetExperimentRequest]) (*connect.Response[v2.GetExperimentResponse], error)
+	ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error)
 	ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error)
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
 }
@@ -703,6 +719,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetExperiment")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2ListSessionKeysHandler := connect.NewUnaryHandler(
+		V2ListSessionKeysProcedure,
+		svc.ListSessionKeys,
+		connect.WithSchema(v2Methods.ByName("ListSessionKeys")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2ListSessionsHandler := connect.NewUnaryHandler(
 		V2ListSessionsProcedure,
 		svc.ListSessions,
@@ -771,6 +793,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListExperimentsHandler.ServeHTTP(w, r)
 		case V2GetExperimentProcedure:
 			v2GetExperimentHandler.ServeHTTP(w, r)
+		case V2ListSessionKeysProcedure:
+			v2ListSessionKeysHandler.ServeHTTP(w, r)
 		case V2ListSessionsProcedure:
 			v2ListSessionsHandler.ServeHTTP(w, r)
 		case V2ListSessionRunsProcedure:
@@ -890,6 +914,10 @@ func (UnimplementedV2Handler) ListExperiments(context.Context, *connect.Request[
 
 func (UnimplementedV2Handler) GetExperiment(context.Context, *connect.Request[v2.GetExperimentRequest]) (*connect.Response[v2.GetExperimentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetExperiment is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListSessionKeys is not implemented"))
 }
 
 func (UnimplementedV2Handler) ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error) {
