@@ -89,6 +89,14 @@ func WithLogger(l logger.Logger) ResolverOpts {
 	}
 }
 
+// WithLookupFunc overrides the default net.DefaultResolver.LookupIPAddr used
+// during DNS resolution.  This is primarily useful for testing.
+func WithLookupFunc(fn func(ctx context.Context, host string) ([]net.IPAddr, error)) ResolverOpts {
+	return func(r *resolver) {
+		r.lookupFunc = fn
+	}
+}
+
 type resolver struct {
 	// lookupTimeout defines the maximum allowed time allowed for a lookup.
 	lookupTimeout time.Duration
@@ -107,6 +115,9 @@ type resolver struct {
 
 	// l is an optional logger
 	l logger.Logger
+
+	// lookupFunc overrides net.DefaultResolver.LookupIPAddr for testing
+	lookupFunc func(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
 func (r *resolver) Dialer() Dialer {
@@ -255,8 +266,13 @@ func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
 
 	// should this utilize singleflight to reduce map lookups?
 	item, err := r.cache.Fetch(key, r.cacheTTL, func() (cacheType, error) {
-		// should this provide resolver override?
-		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		var addrs []net.IPAddr
+		var err error
+		if r.lookupFunc != nil {
+			addrs, err = r.lookupFunc(ctx, host)
+		} else {
+			addrs, err = net.DefaultResolver.LookupIPAddr(ctx, host)
+		}
 		if err != nil {
 			return nil, err
 		}
