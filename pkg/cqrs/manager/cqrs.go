@@ -655,6 +655,54 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		dynamicToOtelIDs[dynID] = append(dynamicToOtelIDs[dynID], otelID)
 	}
 
+	// Reparent userland (extended trace) spans by (stepID, attempt).
+	//
+	// The SDK parents userland spans via OTel context, whose parent_span_id
+	// linkage is unreliable across step attempts — e.g. an attempt-0 LLM span
+	// can point at the attempt-1 step span, which resolves fine and would
+	// otherwise leave the span on the wrong attempt. The trustworthy signal is
+	// the (stepID, attempt) attribute pair, so override the parent of each
+	// userland subtree ROOT to its matching step span (preferred) or execution
+	// span (fallback).
+	//
+	// Interior nodes of a userland subtree (whose parent is itself a userland
+	// span) are left untouched. The resolve-then-reparent loop below then
+	// attaches each span to the corrected parent.
+	parentIsUserland := func(parentID string) bool {
+		if parentID == "" {
+			return false
+		}
+		if _, ok := userlandDynIDs[parentID]; ok {
+			return true
+		}
+		if dynID, ok := otelToDynamic[parentID]; ok {
+			_, ok := userlandDynIDs[dynID]
+			return ok
+		}
+		return false
+	}
+	for _, span := range spanMap.AllFromFront() {
+		if span.Attributes == nil ||
+			(span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) ||
+			(span.Attributes.StepID == nil || *span.Attributes.StepID == "") ||
+			span.Attributes.StepAttempt == nil {
+			continue
+		}
+		// Only reparent roots of userland subtrees; interior nodes keep their parent.
+		if span.ParentSpanID != nil && parentIsUserland(*span.ParentSpanID) {
+			continue
+		}
+		key := newExtendedTraceKey(*span.Attributes.StepID, *span.Attributes.StepAttempt)
+		target, found := stepSpanByKey[key]
+		if !found {
+			target, found = execSpanByKey[key]
+		}
+		if found {
+			tid := target
+			span.ParentSpanID = &tid
+		}
+	}
+
 	for _, span := range spanMap.AllFromFront() {
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
