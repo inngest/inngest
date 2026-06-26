@@ -13,8 +13,7 @@ type SessionsEmptyStateProps = {
 };
 
 const DEFAULT_DOCS_URL =
-  // TODO: Replace with the sessions docs URL and include a ref param for dashboard traffic.
-  'https://website-git-jakob-sessions-docs-inngest.vercel.app/docs/features/events-triggers/sessions';
+  'https://www.inngest.com/docs/features/events-triggers/sessions?ref=app-empty-sessions';
 
 const example = `// Every run from this event joins the session
 await inngest.send({
@@ -25,7 +24,7 @@ await inngest.send({
   },
 });`;
 
-const prompt = `Read the docs about Inngest's sessions @https://website-git-jakob-sessions-docs-inngest.vercel.app/docs-markdown/features/events-triggers/sessions and tell me how I can leverage them in my functions to group runs across conversations, threads, or multi-stage pipelines`;
+const prompt = `Read the docs about Inngest's sessions @https://www.inngest.com/docs/features/events-triggers/sessions and tell me how I can leverage them in my functions to group runs across conversations, threads, or multi-stage pipelines`;
 
 const tabs: TabsProps[] = [
   {
