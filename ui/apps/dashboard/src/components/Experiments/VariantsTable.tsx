@@ -34,7 +34,6 @@ type Props = {
     key: string,
     patch: Partial<ExperimentScoringMetric>,
   ) => void;
-  pointsLeft: number;
   onOpenInsights: () => void;
   showInactive: boolean;
   onShowInactiveChange: (v: boolean) => void;
@@ -54,7 +53,6 @@ export function VariantsTable({
   scoringConfig,
   metricRanges,
   onUpdateMetric,
-  pointsLeft,
   onOpenInsights,
   showInactive,
   onShowInactiveChange,
@@ -77,13 +75,11 @@ export function VariantsTable({
   // render, so they read the latest values.
   const liveRef = useRef({
     enabledMetrics,
-    pointsLeft,
     onUpdateMetric,
     metricRanges,
   });
   liveRef.current = {
     enabledMetrics,
-    pointsLeft,
     onUpdateMetric,
     metricRanges,
   };
@@ -181,7 +177,6 @@ export function VariantsTable({
             return (
               <MetricColumnHeader
                 metric={metric}
-                pointsLeft={liveRef.current.pointsLeft}
                 onUpdateMetric={liveRef.current.onUpdateMetric}
                 range={liveRef.current.metricRanges?.[metricKey]}
               />

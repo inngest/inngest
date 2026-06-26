@@ -103,11 +103,11 @@ export function ScoreSummaryCard({
     >
       <Card.Header className="rounded-t-md border-b-0 py-2 pl-3 pr-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-basis text-sm font-medium">Score Summary</span>
+          <span className="text-basis text-sm">Score Summary</span>
           <ScoreCalculationExplainer />
         </div>
       </Card.Header>
-      <Card.Content className="flex gap-6 rounded-b-md px-2 py-0">
+      <Card.Content className="flex gap-6 rounded-b-md px-2 py-2">
         <div className="min-w-0 flex-1">
           <ResponsiveContainer width="100%" height={chartHeight}>
             <BarChart
@@ -144,6 +144,13 @@ export function ScoreSummaryCard({
                 iconType="circle"
                 iconSize={8}
                 wrapperStyle={{ fontSize: 12 }}
+                // Keep the colored dot but render the label in the muted text
+                // tone instead of the series color (recharts' default).
+                formatter={(value: string) => (
+                  <span style={{ color: 'rgb(var(--color-foreground-muted))' }}>
+                    {value}
+                  </span>
+                )}
               />
               {enabledMetrics.map((m, i) => (
                 <Bar
