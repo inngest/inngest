@@ -20,7 +20,7 @@ func (d *debugAPI) GetSingletonInfo(ctx context.Context, req *pb.SingletonInfoRe
 		singletonKey = scope.FunctionID.String() + "-" + req.GetSingletonKey()
 	}
 
-	shard, err := d.shards.Resolve(ctx, scope.AccountID, nil)
+	shard, err := d.shards.Resolve(ctx, scope, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve shard: %w", err)
 	}
@@ -56,7 +56,7 @@ func (d *debugAPI) DeleteSingletonLock(ctx context.Context, req *pb.DeleteSingle
 		singletonKey = scope.FunctionID.String() + "-" + req.GetSingletonKey()
 	}
 
-	shard, err := d.shards.Resolve(ctx, scope.AccountID, nil)
+	shard, err := d.shards.Resolve(ctx, scope, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve shard: %w", err)
 	}

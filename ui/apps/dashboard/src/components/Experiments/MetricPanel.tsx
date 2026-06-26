@@ -138,9 +138,7 @@ export function MetricPanel({ metric, variants }: Props) {
   return (
     <Card className="overflow-visible" contentClassName="overflow-visible">
       <Card.Header className="flex-row items-center justify-between rounded-t-md border-b-0 py-2 pl-3 pr-2">
-        <span className="text-basis text-sm font-medium">
-          {metric.displayName}
-        </span>
+        <span className="text-basis text-sm">{metric.displayName}</span>
         {winner && (
           <Pill
             kind="default"

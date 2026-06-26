@@ -128,7 +128,7 @@ export function Table<T>({
                       key={header.id}
                       className={cn(
                         isIconOnlyColumn ? '' : tableColumnStyles,
-                        'text-muted text-nowrap text-left text-xs font-medium',
+                        'text-muted whitespace-nowrap text-left text-xs font-medium',
                         enableColumnSizing ? 'overflow-hidden text-ellipsis' : ''
                       )}
                       style={

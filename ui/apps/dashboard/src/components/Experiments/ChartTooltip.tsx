@@ -5,7 +5,7 @@ type TooltipEntry = {
   dataKey?: string | number;
   value?: number | string | Array<number | string>;
   color?: string;
-  payload?: { variantName?: string };
+  payload?: { variantName?: string; total?: number };
 };
 
 type Props = {
@@ -25,11 +25,20 @@ export function ChartTooltip({ active, payload, label }: Props) {
 
   const first = payload[0];
   const title = label ?? first?.payload?.variantName ?? '';
+  const total = first?.payload?.total;
 
   return (
     <div className="bg-canvasBase border-subtle shadow-tooltip rounded-md border px-3 py-2 text-xs shadow-md">
       {title && (
         <div className="text-basis mb-1.5 text-sm font-medium">{title}</div>
+      )}
+      {typeof total === 'number' && (
+        <div className="border-subtle mb-1.5 flex items-baseline justify-between gap-3 border-b pb-1.5">
+          <span className="text-muted">Total</span>
+          <span className="text-basis text-sm font-semibold tabular-nums">
+            {formatMetricValue(total)}
+          </span>
+        </div>
       )}
       <div className="flex flex-col gap-1">
         {payload.map((p, i) => (

@@ -19,8 +19,8 @@ import { useColumns } from './columns';
 
 const DEFAULT_RANGE = '7d';
 const SEARCH_DEBOUNCE_MS = 300;
-// TODO: Replace with the sessions docs URL and include a ref param for dashboard traffic.
-const DOCS_URL = 'ui/packages/components/src/Sessions/SessionResults.tsx';
+const DOCS_URL =
+  'https://website-git-jakob-sessions-docs-inngest.vercel.app/docs/features/events-triggers/sessions';
 
 type RoutePath = LinkComponentProps['to'] | string;
 
@@ -93,7 +93,7 @@ export function SessionResults({
         });
       }
     },
-    [batchUpdate],
+    [batchUpdate]
   );
 
   const { data, error, isPending, isFetching, refetch } = useQuery({
@@ -125,12 +125,12 @@ export function SessionResults({
               last
                 ? { type: 'relative', duration: parseDuration(last) }
                 : start && end
-                  ? {
-                      type: 'absolute',
-                      start: new Date(start),
-                      end: new Date(end),
-                    }
-                  : { type: 'relative', duration: parseDuration(DEFAULT_RANGE) }
+                ? {
+                    type: 'absolute',
+                    start: new Date(start),
+                    end: new Date(end),
+                  }
+                : { type: 'relative', duration: parseDuration(DEFAULT_RANGE) }
             }
           />
         </SelectGroup>

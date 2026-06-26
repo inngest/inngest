@@ -70,8 +70,8 @@ func (s *removeQueueItemFailingShard) DebounceDeleteMigratingFlag(ctx context.Co
 
 // migrationShardSelector routes system queue items (queueName != nil) to the
 // new system shard and everything else to the default shard.
-func migrationShardSelector(defaultShard, newSystemShard queue.QueueShard) func(ctx context.Context, accountID uuid.UUID, queueName *string) (queue.QueueShard, error) {
-	return func(ctx context.Context, accountID uuid.UUID, queueName *string) (queue.QueueShard, error) {
+func migrationShardSelector(defaultShard, newSystemShard queue.QueueShard) func(ctx context.Context, scope queue.Scope, queueName *string) (queue.QueueShard, error) {
+	return func(ctx context.Context, scope queue.Scope, queueName *string) (queue.QueueShard, error) {
 		if queueName != nil {
 			return newSystemShard, nil
 		}

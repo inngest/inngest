@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/redis/rueidis"
@@ -38,8 +37,8 @@ func mapFromShards(shards ...osqueue.QueueShard) map[string]osqueue.QueueShard {
 	return shardMap
 }
 
-func alwaysSelectShard(shard osqueue.QueueShard) func(ctx context.Context, accountID uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
-	return func(ctx context.Context, accountID uuid.UUID, queueName *string) (osqueue.QueueShard, error) {
+func alwaysSelectShard(shard osqueue.QueueShard) func(ctx context.Context, scope osqueue.Scope, queueName *string) (osqueue.QueueShard, error) {
+	return func(ctx context.Context, scope osqueue.Scope, queueName *string) (osqueue.QueueShard, error) {
 		return shard, nil
 	}
 }

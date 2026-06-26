@@ -15,17 +15,16 @@ import (
 )
 
 func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartitionRequest) (*pb.ShadowPartitionResponse, error) {
-	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
-	if err != nil {
-		return nil, fmt.Errorf("error finding shard: %w", err)
-	}
-
 	scope := queue.Scope{
 		AccountID: consts.DevServerAccountID,
 		EnvID:     consts.DevServerEnvID,
 	}
 	if fnID, parseErr := uuid.Parse(req.GetPartitionId()); parseErr == nil {
 		scope.FunctionID = fnID
+	}
+	shard, err := d.shards.Resolve(ctx, scope, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
 	pt, err := d.queue.PartitionByID(ctx, shard, scope, req.GetPartitionId())
 	if err != nil {
@@ -65,7 +64,7 @@ func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartiti
 }
 
 func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*pb.BacklogsResponse, error) {
-	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, queue.Scope{AccountID: consts.DevServerAccountID}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
@@ -100,7 +99,7 @@ func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*p
 }
 
 func (d *debugAPI) GetBacklogSize(ctx context.Context, req *pb.BacklogSizeRequest) (*pb.BacklogSizeResponse, error) {
-	shard, err := d.shards.Resolve(ctx, consts.DevServerAccountID, nil)
+	shard, err := d.shards.Resolve(ctx, queue.Scope{AccountID: consts.DevServerAccountID}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}

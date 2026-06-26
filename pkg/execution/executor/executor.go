@@ -459,6 +459,15 @@ type BacklogSizeLimit struct {
 
 type BacklogSizeLimitFn func(ctx context.Context, accountID, envID, fnID uuid.UUID) BacklogSizeLimit
 
+type AccountPlanMetricTagResolver func(ctx context.Context, accountID uuid.UUID) string
+
+func WithAccountPlanMetricTagResolver(resolver AccountPlanMetricTagResolver) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).accountPlanMetricTagResolver = resolver
+		return nil
+	}
+}
+
 func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).conditionalTracer = tracer
@@ -516,6 +525,8 @@ type executor struct {
 	stateSizeLimit func(sv2.ID) int
 
 	functionBacklogSizeLimit BacklogSizeLimitFn
+
+	accountPlanMetricTagResolver AccountPlanMetricTagResolver
 
 	shards queue.ShardRegistry
 
@@ -3440,7 +3451,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if q, ok := e.queue.(queue.QueueManager); ok {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
-			shard, err := e.shards.Resolve(ctx, md.ID.Tenant.AccountID, nil)
+			shard, err := e.shards.Resolve(ctx, queue.Scope{
+				AccountID:  md.ID.Tenant.AccountID,
+				EnvID:      md.ID.Tenant.EnvID,
+				FunctionID: md.ID.FunctionID,
+			}, nil)
 			if err != nil {
 				return fmt.Errorf("could not find shard for pause timeout item for account %q: %w", md.ID.Tenant.AccountID, err)
 			}

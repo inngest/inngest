@@ -58,8 +58,8 @@ func TestProcessorAccountShardReadsResolveByDefault(t *testing.T) {
 			shardB.Name(): shardB,
 		},
 		WithPrimary(shardA),
-		WithShardSelector(func(_ context.Context, id uuid.UUID, _ *string) (QueueShard, error) {
-			require.Equal(t, accountID, id)
+		WithShardSelector(func(_ context.Context, scope Scope, _ *string) (QueueShard, error) {
+			require.Equal(t, accountID, scope.AccountID)
 			return shardB, nil
 		}),
 	)
@@ -119,7 +119,7 @@ func TestProcessorAccountShardReadsForEachWhenEnabled(t *testing.T) {
 			shardB.Name(): shardB,
 		},
 		WithPrimary(shardA),
-		WithShardSelector(func(context.Context, uuid.UUID, *string) (QueueShard, error) {
+		WithShardSelector(func(context.Context, Scope, *string) (QueueShard, error) {
 			return shardB, nil
 		}),
 	)
