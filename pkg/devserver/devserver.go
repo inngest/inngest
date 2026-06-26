@@ -413,26 +413,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create the batch manager. In production, a second BatchClient can be provided
 	// to enable zero-downtime migration between Redis clusters via
 	// batch.NewMigratingBatchManager.
-	//
-	// EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION controls the
-	// schedule-batch routing experiment: when "true", schedule-batch jobs go to
-	// a function-scoped system partition; otherwise they share the global
-	// schedule-batch partition.
-	splitBatchPartitionByFunction := os.Getenv("EXPERIMENTAL_SPLIT_BATCH_PARTITION_BY_FUNCTION") == "true"
-	batchOpts := []batch.RedisBatchManagerOpt{batch.WithLogger(l)}
-	if splitBatchPartitionByFunction {
-		batchOpts = append(batchOpts, batch.WithSplitBatchPartitionByFunction(func(_ context.Context, _ uuid.UUID) bool {
-			return true
-		}))
-	}
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batchOpts...)
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer, err := debounce.NewDebouncer(shardRegistry, queueShard.Name(), rq)
 	if err != nil {
 		return fmt.Errorf("could not create debounce manager: %w", err)
 	}
-	croner := cron.NewManager(queueShard, rq, l, cron.WithSplitCronPartitionByWorkspace(func(_ context.Context, _ uuid.UUID) bool {
-		return true
-	}))
+	croner := cron.NewManager(queueShard, rq, l)
 
 	sn := singleton.New(ctx, shardRegistry)
 

@@ -45,11 +45,6 @@ type managerOpt struct {
 
 	healthCheckLeadTimeSeconds int
 	healthCheckInterval        time.Duration
-
-	// splitCronPartitionByWorkspace, when non-nil and returning true for a
-	// given accountID, causes ScheduleNext to enqueue cron jobs to a
-	// workspace-scoped system partition rather than the shared cron partition.
-	splitCronPartitionByWorkspace func(ctx context.Context, accountID uuid.UUID) (enable bool)
 }
 
 func (opts *managerOpt) validate() {
@@ -105,15 +100,6 @@ func WithHealthCheckLeadTimeSeconds(leadTime int) ManagerOpt {
 			return
 		}
 		c.healthCheckLeadTimeSeconds = leadTime
-	}
-}
-
-// WithSplitCronPartitionByWorkspace registers a gate that controls whether
-// cron jobs are enqueued to a workspace-scoped system partition
-// (queue.KindCron:<workspaceID>) instead of the single shared cron partition.
-func WithSplitCronPartitionByWorkspace(fn func(ctx context.Context, accountID uuid.UUID) (enable bool)) ManagerOpt {
-	return func(c *managerOpt) {
-		c.splitCronPartitionByWorkspace = fn
 	}
 }
 
@@ -359,10 +345,7 @@ func (c *manager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, err
 
 	// enqueue new schedule
 	maxAttempts := consts.MaxRetries + 1
-	queueName := kind
-	if c.opt.splitCronPartitionByWorkspace != nil && c.opt.splitCronPartitionByWorkspace(ctx, ci.AccountID) {
-		queueName = fmt.Sprintf("%s:%s", queue.KindCron, ci.WorkspaceID)
-	}
+	queueName := fmt.Sprintf("%s:%s", queue.KindCron, ci.WorkspaceID)
 
 	err = c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
