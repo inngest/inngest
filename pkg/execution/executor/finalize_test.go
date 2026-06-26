@@ -144,6 +144,55 @@ func TestFinalizeRemoveJobs_CatchesPostSweepEnqueue(t *testing.T) {
 	require.Equal(t, int32(2), shard.dequeueCount.Load(), "should have dequeued 2 items total (initial + raced)")
 }
 
+func TestFinalizeMetricTagsIncludesAccountPlan(t *testing.T) {
+	accountID := uuid.New()
+	opts := execution.FinalizeOpts{
+		Metadata: sv2.Metadata{
+			ID: sv2.ID{
+				Tenant: sv2.Tenant{
+					AccountID: accountID,
+				},
+			},
+		},
+		Optional: execution.FinalizeOptional{
+			Reason: "test_reason",
+		},
+	}
+
+	e := &executor{
+		accountPlanMetricTagResolver: func(ctx context.Context, id uuid.UUID) string {
+			require.Equal(t, accountID, id)
+			return "self_serve"
+		},
+	}
+
+	tags := e.finalizeMetricTags(context.Background(), enums.StepStatusCompleted, opts)
+	require.Equal(t, map[string]any{
+		"account_plan": "self_serve",
+		"reason":       "test_reason",
+		"status":       "Completed",
+	}, tags)
+}
+
+func TestFinalizeMetricTagsDefaultsUnknownAccountPlan(t *testing.T) {
+	opts := execution.FinalizeOpts{}
+
+	t.Run("missing resolver", func(t *testing.T) {
+		tags := (&executor{}).finalizeMetricTags(context.Background(), enums.StepStatusCompleted, opts)
+		require.Equal(t, runStateAccountPlanUnknown, tags["account_plan"])
+	})
+
+	t.Run("unknown resolver value", func(t *testing.T) {
+		e := &executor{
+			accountPlanMetricTagResolver: func(context.Context, uuid.UUID) string {
+				return "pro"
+			},
+		}
+		tags := e.finalizeMetricTags(context.Background(), enums.StepStatusCompleted, opts)
+		require.Equal(t, runStateAccountPlanUnknown, tags["account_plan"])
+	})
+}
+
 func TestFinalizeRemoveJobs_CatchesMultipleRaceWindows(t *testing.T) {
 	// Verifies the bounded loop handles items injected across multiple sweeps.
 	// Sweep 1: removes item-1, item-2 injected during sweep
