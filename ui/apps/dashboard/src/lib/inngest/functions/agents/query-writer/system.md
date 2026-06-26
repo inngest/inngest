@@ -282,8 +282,8 @@ WHERE queued_at >= now() - INTERVAL 1 DAY
 
 ```sql
 SELECT inngest.ai.values.model AS model,
-       SUM(inngest.ai.values.input_tokens::Float64) AS input_tokens,
-       SUM(inngest.ai.values.output_tokens::Float64) AS output_tokens
+       SUM(inngest.ai.values.input_tokens) AS input_tokens,
+       SUM(inngest.ai.values.output_tokens) AS output_tokens
 FROM step_attempts
 WHERE queued_at >= now() - INTERVAL 7 DAY
 GROUP BY model
