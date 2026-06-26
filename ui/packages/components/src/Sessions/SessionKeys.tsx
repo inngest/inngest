@@ -57,7 +57,7 @@ export function SessionKeys({
   const trimmedSearch = search.trim();
 
   if (!error && !trimmedSearch && sessionKeys.length === 0) {
-    return <SessionsEmptyState isLoading={isLoading} />;
+    return <SessionsEmptyState />;
   }
 
   return (
