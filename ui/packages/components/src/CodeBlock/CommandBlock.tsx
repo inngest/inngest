@@ -120,7 +120,11 @@ const CommandBlock = ({
               },
               scrollbar: {
                 verticalScrollbarSize: 10,
-                alwaysConsumeMouseWheel: false,
+                // When pinned to a fixed height the editor scrolls internally,
+                // so it should consume the wheel rather than leak it to the
+                // page. Auto-height blocks don't scroll, so let the page handle
+                // the wheel as before.
+                alwaysConsumeMouseWheel: height != null,
                 vertical: height != null ? 'auto' : 'hidden',
                 horizontal: 'hidden',
               },
