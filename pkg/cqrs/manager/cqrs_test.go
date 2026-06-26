@@ -2802,18 +2802,18 @@ func TestExtendedTraceReparenting(t *testing.T) {
 
 		for _, attempt := range []int{0, 1} {
 			insertTestSpan(t, cm, testSpanFields{
-				RunID:        runIDStr,
+				RunID:         runIDStr,
 				DynamicSpanID: fmt.Sprintf("dyn-step-%d", attempt),
-				Name:         meta.SpanNameStep,
-				ParentSpanID: "dyn-run",
-				Attributes:   stepAttrs("step-retry", attempt),
+				Name:          meta.SpanNameStep,
+				ParentSpanID:  "dyn-run",
+				Attributes:    stepAttrs("step-retry", attempt),
 			})
 			insertTestSpan(t, cm, testSpanFields{
-				RunID:        runIDStr,
+				RunID:         runIDStr,
 				DynamicSpanID: fmt.Sprintf("dyn-userland-%d", attempt),
-				Name:         "userland",
-				ParentSpanID: "stale-otel-id",
-				Attributes:   userlandAttrs("step-retry", attempt),
+				Name:          "userland",
+				ParentSpanID:  "stale-otel-id",
+				Attributes:    userlandAttrs("step-retry", attempt),
 			})
 		}
 
