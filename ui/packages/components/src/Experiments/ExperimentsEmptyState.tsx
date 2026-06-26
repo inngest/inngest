@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { RiRefreshLine } from '@remixicon/react';
 
-import { Button } from '../Button';
 import CommandBlock, { type TabsProps } from '../CodeBlock/CommandBlock';
 import { Link } from '../Link';
+import { IconSpinner } from '../icons/Spinner';
 import {
   DOCS_URL,
   INTRO_DESCRIPTION,
@@ -11,10 +10,6 @@ import {
   USE_CASES,
   VARIANT_TABS,
 } from './experimentsEmptyStateContent';
-
-type Props = {
-  onRefresh?: () => void;
-};
 
 // Fixed snippet viewport so the box keeps a stable height across tabs and the
 // whole page stays compact; taller variants scroll internally.
@@ -59,7 +54,7 @@ function Step({
   );
 }
 
-export function ExperimentsEmptyState({ onRefresh }: Props) {
+export function ExperimentsEmptyState() {
   return (
     <div className="bg-canvasBase flex flex-1 flex-col items-center overflow-auto px-6 py-12">
       <div className="mx-auto flex w-full max-w-[800px] flex-col gap-10">
@@ -68,6 +63,12 @@ export function ExperimentsEmptyState({ onRefresh }: Props) {
           <h1 className="text-basis text-2xl">Experiments</h1>
           <p className="text-subtle text-sm leading-relaxed">{INTRO_DESCRIPTION}</p>
           <Link href={DOCS_URL}>Learn more about experiments</Link>
+        </div>
+
+        {/* Empty-results indicator */}
+        <div className="border-subtle text-subtle flex items-center gap-2 rounded-md border border-dashed px-4 py-3 text-sm">
+          <IconSpinner className="fill-subtle h-4 w-4" />
+          No experiments found
         </div>
 
         {/* Use cases */}
@@ -83,22 +84,6 @@ export function ExperimentsEmptyState({ onRefresh }: Props) {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Empty-results indicator */}
-        <div className="bg-info text-info dark:bg-info/40 flex items-center justify-between gap-2 rounded-md px-4 py-3 text-sm">
-          No experiments available
-          {onRefresh && (
-            <Button
-              kind="secondary"
-              appearance="outlined"
-              size="small"
-              label="Refresh"
-              icon={<RiRefreshLine />}
-              iconSide="left"
-              onClick={onRefresh}
-            />
-          )}
         </div>
 
         <hr className="border-subtle" />

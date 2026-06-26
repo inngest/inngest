@@ -77,7 +77,7 @@ function ExperimentsComponent() {
           breadcrumb={[{ text: 'All experiments' }]}
           infoIcon={<ExperimentsInfo />}
         />
-        <ExperimentsEmptyState onRefresh={() => refetch()} />
+        <ExperimentsEmptyState />
       </>
     );
   }
