@@ -96,7 +96,56 @@ func TestWaitForRunStatus_PermanentError(t *testing.T) {
 	require.True(t, mockT.failed, "expected WaitForRunStatus to fail on permanent errors")
 	assert.Contains(t, mockT.failMsg, "run-456", "failure message should contain the runID")
 	assert.Contains(t, mockT.failMsg, "COMPLETED", "failure message should mention expected status")
+	assert.Contains(t, mockT.failMsg, "history:", "failure message should contain status history")
+	assert.Contains(t, mockT.failMsg, "end", "failure message history should end with 'end'")
 	assert.GreaterOrEqual(t, int(callCount.Load()), 2, "expected multiple retry attempts before failing")
+}
+
+// TestWaitForRunStatus_HistoryShowsTransitions verifies that the timeout message
+// includes the status-transition history with timestamps.
+func TestWaitForRunStatus_HistoryShowsTransitions(t *testing.T) {
+	var callCount atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := callCount.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+
+		// Simulate QUEUED -> RUNNING but never COMPLETED.
+		status := "RUNNING"
+		if n <= 2 {
+			status = "QUEUED"
+		}
+
+		resp := map[string]any{
+			"data": map[string]any{
+				"functionRun": map[string]any{
+					"output": `""`,
+					"status": status,
+				},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := &Client{
+		Client:  srv.Client(),
+		T:       t,
+		APIHost: srv.URL,
+	}
+
+	mockT := &mockTestingT{}
+
+	ctx := context.Background()
+	c.WaitForRunStatus(ctx, mockT, "COMPLETED", "run-789", WaitForRunStatusOpts{
+		Timeout: 500 * time.Millisecond,
+	})
+
+	require.True(t, mockT.failed, "expected WaitForRunStatus to fail")
+	assert.Contains(t, mockT.failMsg, "history:")
+	assert.Contains(t, mockT.failMsg, "QUEUED")
+	assert.Contains(t, mockT.failMsg, "RUNNING")
+	assert.Contains(t, mockT.failMsg, "end")
 }
 
 // TestRunOrError_EmptyRunID verifies that RunOrError returns an error for empty runIDs.
@@ -126,3 +175,5 @@ func (m *mockTestingT) Errorf(format string, args ...interface{}) {
 func (m *mockTestingT) FailNow() {
 	m.failed = true
 }
+
+func (m *mockTestingT) Helper() {}
