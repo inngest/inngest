@@ -21,4 +21,11 @@ func TestResolveConnectGRPCIP(t *testing.T) {
 		require.NotEmpty(t, got)
 		require.NotNil(t, net.ParseIP(got), "expected a valid IP, got %q", got)
 	})
+
+	t.Run("ignores an invalid override and falls through to a valid IP", func(t *testing.T) {
+		t.Setenv("INNGEST_CONNECT_GATEWAY_GRPC_IP", "not-an-ip")
+		got := resolveConnectGRPCIP()
+		require.NotEqual(t, "not-an-ip", got)
+		require.NotNil(t, net.ParseIP(got), "expected a valid IP, got %q", got)
+	})
 }

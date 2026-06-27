@@ -23,13 +23,17 @@ const (
 
 // DefaultConnectGRPCIP is the IP a gateway/executor advertises to its peers for
 // inter-replica connect forwarding, so it must be routable from other replicas.
-// Resolution: INNGEST_CONNECT_GATEWAY_GRPC_IP, else the outbound interface IP,
-// else 127.0.0.1 (which only works single-replica).
+// Resolution: INNGEST_CONNECT_GATEWAY_GRPC_IP (if a valid IP), else the outbound
+// interface IP, else 127.0.0.1 (which only works single-replica).
 var DefaultConnectGRPCIP = resolveConnectGRPCIP()
 
 func resolveConnectGRPCIP() string {
+	// An explicit override wins, but only if it parses as an IP; a bad value
+	// falls through to auto-detect rather than advertising an unreachable address.
 	if ip := os.Getenv("INNGEST_CONNECT_GATEWAY_GRPC_IP"); ip != "" {
-		return ip
+		if parsed := net.ParseIP(ip); parsed != nil {
+			return parsed.String()
+		}
 	}
 	// UDP dial selects the egress interface without sending packets.
 	conn, err := net.Dial("udp", "8.8.8.8:80")
