@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 import CommandBlock, { type TabsProps } from '../CodeBlock/CommandBlock';
 import { Link } from '../Link';
-import { IconSpinner } from '../icons/Spinner';
 import {
   DOCS_URL,
   INTRO_DESCRIPTION,
@@ -66,9 +65,8 @@ export function ExperimentsEmptyState() {
         </div>
 
         {/* Empty-results indicator */}
-        <div className="border-subtle text-subtle flex items-center gap-2 rounded-md border border-dashed px-4 py-3 text-sm">
-          <IconSpinner className="fill-subtle h-4 w-4" />
-          No experiments found
+        <div className="border-subtle text-subtle rounded-md border border-dashed px-4 py-3 text-sm">
+          No experiments to show
         </div>
 
         {/* Use cases */}
