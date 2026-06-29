@@ -53,6 +53,34 @@ func (m *mockQueueProcessor) ClearShadowContinuations() {
 	m.shadowMap = make(map[string]ShadowContinuation)
 }
 
+func (m *mockQueueProcessor) ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time, constraints PartitionConstraintConfig) (*BacklogRefillResult, enums.QueueConstraint, error) {
+	return nil, enums.QueueConstraintNotLimited, nil
+}
+
+func (m *mockQueueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) NormalizeItem(ctx context.Context, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig, sourceBacklog *QueueBacklog, item QueueItem) (QueueItem, error) {
+	return item, nil
+}
+
+func (m *mockQueueProcessor) ProcessItem(ctx context.Context, i ProcessItem, f RunFunc) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+	return nil
+}
+
 // mockShardForIterator implements the minimal QueueShard interface methods used by ProcessorIterator
 type mockShardForIterator struct {
 	name                    string

@@ -47,7 +47,7 @@ func NewDebugAPI(o Opts) service.Service {
 type Opts struct {
 	Log              logger.Logger
 	DB               cqrs.Manager
-	Queue            queue.QueueManager
+	Queue            queue.JobQueueReader
 	State            state.Manager
 	Cron             cron.CronManager
 	PauseManager     pauses.Manager
@@ -72,7 +72,7 @@ type debugAPI struct {
 	shards queue.ShardRegistry
 
 	db     cqrs.Manager
-	queue  queue.QueueManager
+	queue  queue.JobQueueReader
 	state  state.Manager
 	croner cron.CronManager
 	pm     pauses.Manager
