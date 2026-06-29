@@ -1,6 +1,9 @@
 import Mustache from 'mustache';
 import { z } from 'zod';
 
+import { insightsSchemaCatalog } from '@/lib/insights/schema/catalog';
+import { renderInsightsSchemaForPrompt } from '@/lib/insights/schema/renderPrompt';
+
 import systemPrompt from './system.md?raw';
 
 // Zod schema for the generate_sql tool (structured output extraction)
@@ -55,6 +58,7 @@ export function buildSystemPrompt(params: {
     }));
 
   const promptContext = {
+    insightsSchema: renderInsightsSchemaForPrompt(insightsSchemaCatalog),
     hasSelectedEvents: selectedEventNames.length > 0,
     selectedEvents: selectedEventNames.join(', '),
     hasSchemas: selectedSchemas.length > 0,
