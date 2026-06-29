@@ -2802,18 +2802,18 @@ func TestExtendedTraceReparenting(t *testing.T) {
 
 		for _, attempt := range []int{0, 1} {
 			insertTestSpan(t, cm, testSpanFields{
-				RunID:        runIDStr,
+				RunID:         runIDStr,
 				DynamicSpanID: fmt.Sprintf("dyn-step-%d", attempt),
-				Name:         meta.SpanNameStep,
-				ParentSpanID: "dyn-run",
-				Attributes:   stepAttrs("step-retry", attempt),
+				Name:          meta.SpanNameStep,
+				ParentSpanID:  "dyn-run",
+				Attributes:    stepAttrs("step-retry", attempt),
 			})
 			insertTestSpan(t, cm, testSpanFields{
-				RunID:        runIDStr,
+				RunID:         runIDStr,
 				DynamicSpanID: fmt.Sprintf("dyn-userland-%d", attempt),
-				Name:         "userland",
-				ParentSpanID: "stale-otel-id",
-				Attributes:   userlandAttrs("step-retry", attempt),
+				Name:          "userland",
+				ParentSpanID:  "stale-otel-id",
+				Attributes:    userlandAttrs("step-retry", attempt),
 			})
 		}
 
@@ -3098,4 +3098,134 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 	}
 
 	return cm, cleanup
+}
+
+// TestCQRSGetSpanReparentsUserland covers userland (extended trace) span
+// reparenting in mapRootSpansFromRows.
+//
+// The SDK parents userland spans via OTel context, whose parent_span_id is
+// unreliable across step attempts — e.g. an attempt-0 LLM span can be
+// physically parented under the attempt-1 step span, which resolves fine and
+// would otherwise leave the span on the wrong attempt.
+//
+// The reader must reparent each userland subtree ROOT to the span matching its
+// (stepID, attempt) attributes, preferring executor.step and falling back to
+// executor.execution.
+func TestCQRSGetSpanReparentsUserland(t *testing.T) {
+	const stepID = "step1"
+	runAttr := []byte(`{"_inngest.dynamic.status":"Running"}`)
+	stepAttrs := func(id string, attempt int) []byte {
+		return fmt.Appendf(nil, `{"_inngest.step.id":%q,"_inngest.step.attempt":%d}`, id, attempt)
+	}
+	userlandAttrs := func(id string, attempt int) []byte {
+		return fmt.Appendf(nil, `{"_inngest.userland":true,"_inngest.step.id":%q,"_inngest.step.attempt":%d}`, id, attempt)
+	}
+	userlandNoAttempt := func(id string) []byte {
+		return fmt.Appendf(nil, `{"_inngest.userland":true,"_inngest.step.id":%q}`, id)
+	}
+
+	// span dynamic-id -> expected parent dynamic-id after the tree is built.
+	type expect struct{ span, parent string }
+
+	cases := []struct {
+		name    string
+		spans   []testSpanFields
+		expects []expect
+	}{
+		{
+			// Both LLM spans land under the attempt-1 step in
+			// the raw data; each must move to the step matching its own attempt.
+			name: "cross-attempt: each userland span moves to its own attempt's step",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step0", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "step1", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 1)},
+				{DynamicSpanID: "chat0", ParentSpanID: "step1", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+				{DynamicSpanID: "chat1", ParentSpanID: "step1", Name: "chat", Attributes: userlandAttrs(stepID, 1)},
+			},
+			expects: []expect{{"chat0", "step0"}, {"chat1", "step1"}},
+		},
+		{
+			name: "prefers executor.step over executor.execution",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "exec", ParentSpanID: "root", Name: meta.SpanNameExecution, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "ul", ParentSpanID: "root", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+			},
+			expects: []expect{{"ul", "step"}},
+		},
+		{
+			name: "falls back to executor.execution when no step matches",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "exec", ParentSpanID: "root", Name: meta.SpanNameExecution, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "ul", ParentSpanID: "root", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+			},
+			expects: []expect{{"ul", "exec"}},
+		},
+		{
+			name: "no reparent when attempt attribute missing",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "ul", ParentSpanID: "root", Name: "chat", Attributes: userlandNoAttempt(stepID)},
+			},
+			expects: []expect{{"ul", "root"}},
+		},
+		{
+			name: "no reparent when no step or execution matches the key",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs("other", 0)},
+				{DynamicSpanID: "ul", ParentSpanID: "root", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+			},
+			expects: []expect{{"ul", "root"}},
+		},
+		{
+			// Only the root of a userland subtree is reparented; an interior node
+			// whose parent is itself userland must keep its original parent.
+			name: "only subtree root reparented; interior userland node kept",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "ulroot", ParentSpanID: "root", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+				{DynamicSpanID: "ulchild", ParentSpanID: "ulroot", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+			},
+			expects: []expect{{"ulroot", "step"}, {"ulchild", "ulroot"}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cm, cleanup := initCQRS(t)
+			defer cleanup()
+
+			runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+			for _, s := range tc.spans {
+				s.RunID = runID
+				insertTestSpan(t, cm, s)
+			}
+
+			root, err := cm.GetSpansByRunID(t.Context(), ulid.MustParse(runID))
+			require.NoError(t, err)
+			require.NotNil(t, root)
+
+			// Build a child -> parent map keyed by dynamic span ID.
+			parentOf := map[string]string{}
+			var walk func(s *cqrs.OtelSpan)
+			walk = func(s *cqrs.OtelSpan) {
+				for _, c := range s.Children {
+					parentOf[c.SpanID] = s.SpanID
+					walk(c)
+				}
+			}
+			walk(root)
+
+			for _, e := range tc.expects {
+				assert.Equal(t, e.parent, parentOf[e.span],
+					"span %q should be parented under %q", e.span, e.parent)
+			}
+		})
+	}
 }
