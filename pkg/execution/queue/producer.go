@@ -1,6 +1,9 @@
 package queue
 
 import (
+	"context"
+	"time"
+
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/jonboulle/clockwork"
 )
@@ -60,4 +63,14 @@ func NewProducer(
 
 func (q *queueProducer) Clock() clockwork.Clock {
 	return q.clock
+}
+
+// Requeue implements QueueManager.
+func (q *queueProducer) Requeue(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
+	return shard.Requeue(ctx, i, at, opts...)
+}
+
+// RequeueByJobID implements QueueManager.
+func (q *queueProducer) RequeueByJobID(ctx context.Context, shard QueueShard, jobID string, at time.Time) error {
+	return shard.RequeueByJobID(ctx, jobID, at)
 }

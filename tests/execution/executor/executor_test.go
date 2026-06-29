@@ -101,10 +101,9 @@ func (fq *fakeQueue) reset() {
 	fq.lock.Unlock()
 }
 
-func (fq *fakeQueue) Dequeue(ctx context.Context, queueShard redis_state.RedisQueueShard, i queue.QueueItem) error {
-	qm := fq.Queue.(queue.QueueManager)
+func (fq *fakeQueue) Dequeue(ctx context.Context, queueShard queue.QueueShard, i queue.QueueItem, opts ...queue.DequeueOptionFn) error {
 
-	err := qm.Dequeue(ctx, queueShard, i)
+	err := fq.Queue.Dequeue(ctx, queueShard, i, opts...)
 
 	fq.lock.Lock()
 	logger.StdlibLogger(ctx).Info("called fakeQueue.Dequeue()", "i", i, "err", err)

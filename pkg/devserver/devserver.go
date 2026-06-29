@@ -585,6 +585,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithExecutionManager(dbcqrs),
 		executor.WithState(sm),
 		executor.WithServiceQueue(rq),
+		executor.WithServiceQueueProcessor(rq),
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),

@@ -70,6 +70,12 @@ func WithServiceQueue(q queue.Queue) func(s *svc) {
 	}
 }
 
+func WithServiceQueueProcessor(q queue.QueueProcessor) func(s *svc) {
+	return func(s *svc) {
+		s.queueProcessor = q
+	}
+}
+
 func WithServiceDebouncer(d debounce.Debouncer) func(s *svc) {
 	return func(s *svc) {
 		s.debouncer = d
@@ -138,6 +144,8 @@ type svc struct {
 	state state.Manager
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
+	// queueProcessor runs the function queue.
+	queueProcessor queue.QueueProcessor
 	// exec runs the specific actions.
 	exec      execution.Executor
 	debouncer debounce.Debouncer
@@ -168,6 +176,9 @@ func (s *svc) Pre(ctx context.Context) error {
 
 	if s.queue == nil {
 		return fmt.Errorf("no queue provided")
+	}
+	if s.queueProcessor == nil {
+		return fmt.Errorf("no queue processor provided")
 	}
 
 	finishHandler, err := s.getFinishHandler(ctx)
@@ -255,7 +266,7 @@ func (s *svc) isUnexpectedRunError(err error) bool {
 
 func (s *svc) Run(ctx context.Context) error {
 	s.log.Info("subscribing to function queue")
-	return s.queue.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
+	return s.queueProcessor.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()

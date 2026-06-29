@@ -41,6 +41,38 @@ func (m *mockQueueProcessor) ShadowPartitionWorkers() chan ShadowPartitionChanMs
 func (m *mockQueueProcessor) AddShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
 }
 
+func (m *mockQueueProcessor) Run(context.Context, RunFunc) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessItem(context.Context, ProcessItem, RunFunc) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessPartition(context.Context, *QueuePartition, uint, bool) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ScanShadowPartitions(context.Context, time.Time, chan ShadowPartitionChanMsg) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessShadowPartition(context.Context, *QueueShadowPartition, uint) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessShadowPartitionBacklog(context.Context, *QueueShadowPartition, *QueueBacklog, time.Time, PartitionConstraintConfig) (*BacklogRefillResult, enums.QueueConstraint, error) {
+	return nil, enums.QueueConstraintNotLimited, nil
+}
+
+func (m *mockQueueProcessor) NormalizeBacklog(context.Context, *QueueBacklog, *QueueShadowPartition, PartitionConstraintConfig) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) NormalizeItem(context.Context, *QueueShadowPartition, PartitionConstraintConfig, *QueueBacklog, QueueItem) (QueueItem, error) {
+	return QueueItem{}, nil
+}
+
 func (m *mockQueueProcessor) GetShadowContinuations() map[string]ShadowContinuation {
 	m.shadowMu.Lock()
 	defer m.shadowMu.Unlock()

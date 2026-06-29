@@ -300,19 +300,17 @@ func (q *queueProcessor) RemoveQueueItem(ctx context.Context, shardName string, 
 	return shard.RemoveQueueItem(ctx, scope, partitionID, itemID)
 }
 
-// Requeue implements QueueManager.
-func (q *queueProcessor) Requeue(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
-	return shard.Requeue(ctx, i, at, opts...)
-}
-
-// RequeueByJobID implements QueueManager.
-func (q *queueProcessor) RequeueByJobID(ctx context.Context, shard QueueShard, jobID string, at time.Time) error {
-	return shard.RequeueByJobID(ctx, jobID, at)
-}
-
 // Enqueue implements QueueManager.
 func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
 	return q.queueProducer.Enqueue(ctx, item, at, opts)
+}
+
+func (q *queueProcessor) Requeue(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
+	return q.queueProducer.Requeue(ctx, shard, i, at, opts...)
+}
+
+func (q *queueProcessor) RequeueByJobID(ctx context.Context, shard QueueShard, jobID string, at time.Time) error {
+	return q.queueProducer.RequeueByJobID(ctx, shard, jobID, at)
 }
 
 // TotalSystemQueueDepth implements QueueManager.

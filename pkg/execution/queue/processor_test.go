@@ -20,6 +20,14 @@ func (m *mockProducer) Enqueue(context.Context, Item, time.Time, EnqueueOpts) er
 	return nil
 }
 
+func (m *mockProducer) Requeue(context.Context, QueueShard, QueueItem, time.Time, ...RequeueOptionFn) error {
+	return nil
+}
+
+func (m *mockProducer) RequeueByJobID(context.Context, QueueShard, string, time.Time) error {
+	return nil
+}
+
 func TestProcessorWithQueueProducerOverridesDefaultProducer(t *testing.T) {
 	ctx := context.Background()
 	shard := &mockShardForIterator{name: "shard-a"}

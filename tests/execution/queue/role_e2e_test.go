@@ -26,7 +26,7 @@ func TestQueueRoleRequiresRoleLease(t *testing.T) {
 		runInterval:   20 * time.Millisecond,
 	}
 
-	_, rc, q, shard := newRoleQueue(t, role, osqueue.QueueRunMode{})
+	_, rc, qp, qm, shard := newRoleQueue(t, role, osqueue.QueueRunMode{})
 	defer rc.Close()
 
 	leaseID, err := shard.RoleLease(ctx, role.Name(), role.LeaseDuration())
@@ -34,7 +34,7 @@ func TestQueueRoleRequiresRoleLease(t *testing.T) {
 	require.NotNil(t, leaseID)
 
 	runCtx, cancel := context.WithCancel(ctx)
-	done := runQueueForRoleTest(runCtx, q, nil)
+	done := runQueueForRoleTest(runCtx, qp, nil)
 	defer func() {
 		cancel()
 		requireQueueStopped(t, done)
@@ -43,7 +43,7 @@ func TestQueueRoleRequiresRoleLease(t *testing.T) {
 	require.Never(t, func() bool {
 		return role.runCount.Load() > 0
 	}, 100*time.Millisecond, 5*time.Millisecond)
-	require.Nil(t, activeRoleStatus(q, role.Name()))
+	require.Nil(t, activeRoleStatus(qm, role.Name()))
 }
 
 func TestQueueRoleRenewKeepsRoleActive(t *testing.T) {
@@ -54,24 +54,24 @@ func TestQueueRoleRenewKeepsRoleActive(t *testing.T) {
 		runInterval:   25 * time.Millisecond,
 	}
 
-	_, rc, q, _ := newRoleQueue(t, role, osqueue.QueueRunMode{})
+	_, rc, qp, qm, _ := newRoleQueue(t, role, osqueue.QueueRunMode{})
 	defer rc.Close()
 
 	runCtx, cancel := context.WithCancel(ctx)
-	done := runQueueForRoleTest(runCtx, q, nil)
+	done := runQueueForRoleTest(runCtx, qp, nil)
 	defer func() {
 		cancel()
 		requireQueueStopped(t, done)
 	}()
 
 	require.Eventually(t, func() bool {
-		return activeRoleStatus(q, role.Name()) != nil && role.runCount.Load() > 0
+		return activeRoleStatus(qm, role.Name()) != nil && role.runCount.Load() > 0
 	}, time.Second, 5*time.Millisecond)
 
-	firstLease := activeRoleStatus(q, role.Name()).LeaseID
+	firstLease := activeRoleStatus(qm, role.Name()).LeaseID
 
 	require.Eventually(t, func() bool {
-		status := activeRoleStatus(q, role.Name())
+		status := activeRoleStatus(qm, role.Name())
 		return status != nil && status.LeaseID != firstLease
 	}, time.Second, 5*time.Millisecond)
 	require.Greater(t, role.runCount.Load(), int32(1))
@@ -85,25 +85,25 @@ func TestQueueRoleStopsRunningAfterLeaseLoss(t *testing.T) {
 		runInterval:   20 * time.Millisecond,
 	}
 
-	r, rc, q, _ := newRoleQueue(t, role, osqueue.QueueRunMode{})
+	r, rc, qp, qm, _ := newRoleQueue(t, role, osqueue.QueueRunMode{})
 	defer rc.Close()
 
 	runCtx, cancel := context.WithCancel(ctx)
-	done := runQueueForRoleTest(runCtx, q, nil)
+	done := runQueueForRoleTest(runCtx, qp, nil)
 	defer func() {
 		cancel()
 		requireQueueStopped(t, done)
 	}()
 
 	require.Eventually(t, func() bool {
-		return activeRoleStatus(q, role.Name()) != nil && role.runCount.Load() > 0
+		return activeRoleStatus(qm, role.Name()) != nil && role.runCount.Load() > 0
 	}, time.Second, 5*time.Millisecond)
 
 	otherLease := ulid.MustNew(ulid.Timestamp(time.Now().Add(time.Second)), rand.Reader)
 	require.NoError(t, r.Set(roleLeaseKey(role.Name()), otherLease.String()))
 
 	require.Eventually(t, func() bool {
-		return activeRoleStatus(q, role.Name()) == nil
+		return activeRoleStatus(qm, role.Name()) == nil
 	}, time.Second, 5*time.Millisecond)
 
 	afterLoss := role.runCount.Load()
@@ -121,14 +121,14 @@ func TestQueueRoleCanExcludeScanning(t *testing.T) {
 		excludesScanning: true,
 	}
 
-	_, rc, q, _ := newRoleQueue(t, role, osqueue.QueueRunMode{
+	_, rc, qp, qm, _ := newRoleQueue(t, role, osqueue.QueueRunMode{
 		Partition: true,
 	})
 	defer rc.Close()
 
 	var processed atomic.Int32
 	runCtx, cancel := context.WithCancel(ctx)
-	done := runQueueForRoleTest(runCtx, q, func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
+	done := runQueueForRoleTest(runCtx, qp, func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 		processed.Add(1)
 		return osqueue.RunResult{}, nil
 	})
@@ -138,11 +138,11 @@ func TestQueueRoleCanExcludeScanning(t *testing.T) {
 	}()
 
 	require.Eventually(t, func() bool {
-		return activeRoleStatus(q, role.Name()) != nil
+		return activeRoleStatus(qm, role.Name()) != nil
 	}, time.Second, 5*time.Millisecond)
 
 	item := roleTestItem()
-	require.NoError(t, q.Enqueue(ctx, item, time.Now(), osqueue.EnqueueOpts{}))
+	require.NoError(t, qm.Enqueue(ctx, item, time.Now(), osqueue.EnqueueOpts{}))
 
 	require.Never(t, func() bool {
 		return processed.Load() > 0
@@ -181,7 +181,7 @@ func (r *testQueueRole) Run(ctx context.Context, shard osqueue.QueueShard) error
 func (r *testQueueRole) OnLeaseTick(ctx context.Context, shard osqueue.QueueShard) {
 }
 
-func newRoleQueue(t *testing.T, role osqueue.QueueRole, runMode osqueue.QueueRunMode) (*miniredis.Miniredis, rueidis.Client, osqueue.Queue, osqueue.QueueShard) {
+func newRoleQueue(t *testing.T, role osqueue.QueueRole, runMode osqueue.QueueRunMode) (*miniredis.Miniredis, rueidis.Client, osqueue.QueueProcessor, osqueue.QueueManager, osqueue.QueueShard) {
 	t.Helper()
 
 	r := miniredis.RunT(t)
@@ -205,10 +205,10 @@ func newRoleQueue(t *testing.T, role osqueue.QueueRole, runMode osqueue.QueueRun
 	q, err := osqueue.New(context.Background(), "test", registry, options...)
 	require.NoError(t, err)
 
-	return r, rc, q, shard
+	return r, rc, q, q, shard
 }
 
-func runQueueForRoleTest(ctx context.Context, q osqueue.Queue, f osqueue.RunFunc) chan struct{} {
+func runQueueForRoleTest(ctx context.Context, q osqueue.QueueProcessor, f osqueue.RunFunc) chan struct{} {
 	if f == nil {
 		f = func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 			return osqueue.RunResult{}, nil
