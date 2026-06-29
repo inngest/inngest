@@ -33,7 +33,7 @@ func TestReconstructUsesExecutorStepSpans(t *testing.T) {
 	}
 
 	newState := &sv2.CreateState{}
-	err := reconstruct(context.Background(), fakeReconstructTraceReader{
+	_, err := reconstruct(context.Background(), fakeReconstructTraceReader{
 		root: root,
 		outputs: map[string]*cqrs.SpanOutput{
 			outputSpanID: {Data: []byte(`{"ok":true}`)},
@@ -75,7 +75,7 @@ func TestReconstructUsesHighestAttemptStepSpanForDuplicateStepIDs(t *testing.T) 
 	}
 
 	newState := &sv2.CreateState{}
-	err := reconstruct(context.Background(), fakeReconstructTraceReader{
+	_, err := reconstruct(context.Background(), fakeReconstructTraceReader{
 		root: root,
 		outputs: map[string]*cqrs.SpanOutput{
 			attempt0OutputSpanID: {Data: []byte(`"attempt 0"`)},
@@ -115,7 +115,7 @@ func TestReconstructOrdersStepsDeterministicallyWhenStartTimesMatch(t *testing.T
 	}
 
 	newState := &sv2.CreateState{}
-	err := reconstruct(context.Background(), fakeReconstructTraceReader{
+	_, err := reconstruct(context.Background(), fakeReconstructTraceReader{
 		root: root,
 		outputs: map[string]*cqrs.SpanOutput{
 			firstOutputSpanID:  {Data: []byte(`"first"`)},
@@ -150,7 +150,7 @@ func TestReconstructMemoizesSleepWithoutOutput(t *testing.T) {
 	}
 
 	newState := &sv2.CreateState{}
-	err := reconstruct(context.Background(), fakeReconstructTraceReader{root: root}, execution.ScheduleRequest{
+	_, err := reconstruct(context.Background(), fakeReconstructTraceReader{root: root}, execution.ScheduleRequest{
 		OriginalRunID: &runID,
 		FromStep: &execution.ScheduleRequestFromStep{
 			StepID: fromStepID,
@@ -179,7 +179,7 @@ func TestReconstructMemoizesTimedOutWaitWithoutOutput(t *testing.T) {
 	}
 
 	newState := &sv2.CreateState{}
-	err := reconstruct(context.Background(), fakeReconstructTraceReader{root: root}, execution.ScheduleRequest{
+	_, err := reconstruct(context.Background(), fakeReconstructTraceReader{root: root}, execution.ScheduleRequest{
 		OriginalRunID: &runID,
 		FromStep: &execution.ScheduleRequestFromStep{
 			StepID: fromStepID,
@@ -201,7 +201,7 @@ func TestReconstructPreservesFromStepInput(t *testing.T) {
 	}
 
 	newState := &sv2.CreateState{}
-	err := reconstruct(context.Background(), fakeReconstructTraceReader{root: root}, execution.ScheduleRequest{
+	_, err := reconstruct(context.Background(), fakeReconstructTraceReader{root: root}, execution.ScheduleRequest{
 		OriginalRunID: &runID,
 		FromStep: &execution.ScheduleRequestFromStep{
 			StepID: fromStepID,
@@ -215,7 +215,8 @@ func TestReconstructPreservesFromStepInput(t *testing.T) {
 	require.JSONEq(t, `[6,false]`, string(newState.StepInputs[0].Data.(json.RawMessage)))
 }
 
-func TestRerunFromStepEdgeTargetsSelectedGeneratorStep(t *testing.T) {
+func TestRerunFromStepEdgeTargetsRunnableStep(t *testing.T) {
+	stepOp := enums.OpcodeStepRun
 	edge := rerunFromStepEdge(execution.ScheduleRequest{
 		FromStep: &execution.ScheduleRequestFromStep{
 			StepID: "step-4",
@@ -224,6 +225,8 @@ func TestRerunFromStepEdgeTargetsSelectedGeneratorStep(t *testing.T) {
 		{ID: "step-1"},
 		{ID: "step-2"},
 		{ID: "step-3"},
+	}, &reconstructResult{
+		fromStepOp: &stepOp,
 	})
 
 	require.Equal(t, "step-3", edge.Outgoing)
@@ -231,12 +234,29 @@ func TestRerunFromStepEdgeTargetsSelectedGeneratorStep(t *testing.T) {
 	require.Equal(t, "step-4", edge.IncomingGeneratorStep)
 }
 
+func TestRerunFromStepEdgeDoesNotTargetPlannedStep(t *testing.T) {
+	stepOp := enums.OpcodeSleep
+	edge := rerunFromStepEdge(execution.ScheduleRequest{
+		FromStep: &execution.ScheduleRequestFromStep{
+			StepID: "sleep-step",
+		},
+	}, []state.MemoizedStep{
+		{ID: "step-1"},
+	}, &reconstructResult{
+		fromStepOp: &stepOp,
+	})
+
+	require.Equal(t, "step-1", edge.Outgoing)
+	require.Equal(t, "$trigger", edge.Incoming)
+	require.Empty(t, edge.IncomingGeneratorStep)
+}
+
 func TestRerunFromStepEdgeTargetsFirstStep(t *testing.T) {
 	edge := rerunFromStepEdge(execution.ScheduleRequest{
 		FromStep: &execution.ScheduleRequestFromStep{
 			StepID: "step-1",
 		},
-	}, nil)
+	}, nil, nil)
 
 	require.Empty(t, edge.Outgoing)
 	require.Equal(t, "$trigger", edge.Incoming)
@@ -244,7 +264,7 @@ func TestRerunFromStepEdgeTargetsFirstStep(t *testing.T) {
 }
 
 func TestRerunFromStepEdgeDefaultsToSource(t *testing.T) {
-	require.Equal(t, inngest.SourceEdge, rerunFromStepEdge(execution.ScheduleRequest{}, nil))
+	require.Equal(t, inngest.SourceEdge, rerunFromStepEdge(execution.ScheduleRequest{}, nil, nil))
 }
 
 type stepSpanOption func(*cqrs.OtelSpan)

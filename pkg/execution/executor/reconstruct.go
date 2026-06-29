@@ -15,13 +15,17 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
-func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.ScheduleRequest, newState *sv2.CreateState) error {
+type reconstructResult struct {
+	fromStepOp *enums.Opcode
+}
+
+func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.ScheduleRequest, newState *sv2.CreateState) (*reconstructResult, error) {
 	root, err := tr.GetSpansByRunID(ctx, *req.OriginalRunID)
 	if err != nil {
-		return fmt.Errorf("error loading original trace spans: %w", err)
+		return nil, fmt.Errorf("error loading original trace spans: %w", err)
 	}
 	if root == nil {
-		return fmt.Errorf("original run trace not found")
+		return nil, fmt.Errorf("original run trace not found")
 	}
 
 	//
@@ -29,7 +33,11 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 	stepsToCopy, foundStepToRunFrom := reconstructSteps(root, req.FromStep.StepID)
 
 	if !foundStepToRunFrom {
-		return fmt.Errorf("step to run from not found in original run")
+		return nil, fmt.Errorf("step to run from not found in original run")
+	}
+
+	result := &reconstructResult{
+		fromStepOp: stepsToCopy.fromStepOp(),
 	}
 
 	steps := []state.MemoizedStep{}
@@ -46,20 +54,20 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 				continue
 			}
 
-			return fmt.Errorf("step output not found in original run")
+			return nil, fmt.Errorf("step output not found in original run")
 		}
 
 		var outputIdentifier cqrs.SpanIdentifier
 		if err := outputIdentifier.Decode(*outputID); err != nil {
-			return fmt.Errorf("error decoding span output ID: %w", err)
+			return nil, fmt.Errorf("error decoding span output ID: %w", err)
 		}
 		if outputIdentifier.Preview == nil || !*outputIdentifier.Preview {
-			return fmt.Errorf("span output is not trace-v2 output")
+			return nil, fmt.Errorf("span output is not trace-v2 output")
 		}
 
 		output, err := tr.GetSpanOutput(ctx, outputIdentifier)
 		if err != nil {
-			return fmt.Errorf("error loading span output: %w", err)
+			return nil, fmt.Errorf("error loading span output: %w", err)
 		}
 
 		var data any
@@ -89,17 +97,21 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 		}
 	}
 
-	return nil
+	return result, nil
 }
+
+type reconstructStepsResult []reconstructStep
 
 type reconstructStep struct {
-	id       string
-	at       time.Time
-	attempt  int
-	stepSpan *cqrs.OtelSpan
+	id         string
+	at         time.Time
+	attempt    int
+	isFromStep bool
+	stepOp     *enums.Opcode
+	stepSpan   *cqrs.OtelSpan
 }
 
-func reconstructSteps(root *cqrs.OtelSpan, fromStepID string) ([]reconstructStep, bool) {
+func reconstructSteps(root *cqrs.OtelSpan, fromStepID string) (reconstructStepsResult, bool) {
 	stepsByID := map[string]reconstructStep{}
 	foundStepToRunFrom := false
 
@@ -122,10 +134,12 @@ func reconstructSteps(root *cqrs.OtelSpan, fromStepID string) ([]reconstructStep
 		}
 
 		next := reconstructStep{
-			id:       stepID,
-			at:       span.StartTime,
-			attempt:  reconstructStepAttempt(span),
-			stepSpan: span,
+			id:         stepID,
+			at:         span.StartTime,
+			attempt:    reconstructStepAttempt(span),
+			isFromStep: stepID == fromStepID,
+			stepOp:     span.Attributes.StepOp,
+			stepSpan:   span,
 		}
 
 		//
@@ -145,6 +159,15 @@ func reconstructSteps(root *cqrs.OtelSpan, fromStepID string) ([]reconstructStep
 	})
 
 	return steps, foundStepToRunFrom
+}
+
+func (r reconstructStepsResult) fromStepOp() *enums.Opcode {
+	for _, step := range r {
+		if step.isFromStep {
+			return step.stepOp
+		}
+	}
+	return nil
 }
 
 func reconstructStepPreferred(current, next reconstructStep) bool {
