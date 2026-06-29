@@ -114,3 +114,19 @@ clean: ## Remove build artifacts
 	rm -f __debug_bin*
 	rm -rf docs/openapi/v2/*
 	rm -rf docs/openapi/v3/*
+
+.PHONY: release-notes
+release-notes: ## Generate release notes between two versions (usage: make release-notes FROM=v1.0.0 TO=v1.1.0)
+	./tools/generate-release-notes.sh $(FROM) $(TO) | \
+	claude -p "Rewrite these as user-facing release notes in markdown.\
+  Rules:\
+  - Use **bold title** — short explanation format for each item\
+  - Group related commits into a single bullet point (e.g. multiple trace styling commits become one)\
+  - DO INCLUDE pull request numbers as references within parentheses (e.g. #1234)\
+  - Keep both Improvements and Bug Fixes sections\
+  - Ensure that all fixes are in the "Bug Fixes" section\
+  - Group bug fixes by theme when related (e.g. batching fixes together)\
+  - Be concise\
+  - DO NOT INCLUDE internal prefixes (feat:, fix:, SYS-, EXE-)\
+  - Use descriptive language, not commit-speak\
+  - DO INCLUDE full changelog within a <details> component"
