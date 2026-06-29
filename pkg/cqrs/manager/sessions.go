@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	sq "github.com/doug-martin/goqu/v9"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
-	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -57,12 +57,19 @@ func (w wrapper) recordSessionKey(ctx context.Context, record cqrs.SessionKeyRec
 		return nil
 	}
 
-	query := "INSERT INTO session_keys (workspace_id, session_key) VALUES (?, ?) ON CONFLICT (workspace_id, session_key) DO NOTHING"
-	if w.adapter.Dialect() == dbpkg.DialectPostgres {
-		query = "INSERT INTO session_keys (workspace_id, session_key) VALUES ($1, $2) ON CONFLICT (workspace_id, session_key) DO NOTHING"
+	sqlQuery, args, err := sq.Dialect(w.dialect()).
+		Insert("session_keys").
+		Rows(sq.Record{
+			"workspace_id": record.WorkspaceID.String(),
+			"session_key":  record.Key,
+		}).
+		OnConflict(sq.DoNothing()).
+		ToSQL()
+	if err != nil {
+		return fmt.Errorf("build record session key query: %w", err)
 	}
 
-	if _, err := w.adapter.Conn().ExecContext(ctx, query, record.WorkspaceID.String(), record.Key); err != nil {
+	if _, err := w.adapter.Conn().ExecContext(ctx, sqlQuery, args...); err != nil {
 		return fmt.Errorf("record session key: %w", err)
 	}
 	return nil
@@ -74,27 +81,23 @@ func (w wrapper) GetSessionKeys(ctx context.Context, workspaceID uuid.UUID, sear
 	}
 
 	search = strings.TrimSpace(search)
-	query := "SELECT session_key, created_at FROM session_keys WHERE workspace_id = ?"
-	args := []any{workspaceID.String()}
+	where := []sq.Expression{sq.C("workspace_id").Eq(workspaceID.String())}
 	if search != "" {
-		query += " AND LOWER(session_key) LIKE LOWER(?) ESCAPE '\\'"
-		args = append(args, "%"+escapeLikeSearch(search)+"%")
-	}
-	query += " ORDER BY created_at DESC LIMIT ?"
-	args = append(args, cqrs.SessionKeysLimit)
-
-	if w.adapter.Dialect() == dbpkg.DialectPostgres {
-		query = "SELECT session_key, created_at FROM session_keys WHERE workspace_id = $1"
-		args = []any{workspaceID.String()}
-		if search != "" {
-			query += " AND session_key ILIKE $2 ESCAPE '\\'"
-			args = append(args, "%"+escapeLikeSearch(search)+"%")
-		}
-		query += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d", len(args)+1)
-		args = append(args, cqrs.SessionKeysLimit)
+		where = append(where, sq.L("LOWER(session_key) LIKE LOWER(?) ESCAPE '\\'", "%"+escapeLikeSearch(search)+"%"))
 	}
 
-	rows, err := w.adapter.Conn().QueryContext(ctx, query, args...)
+	sqlQuery, args, err := sq.Dialect(w.dialect()).
+		From("session_keys").
+		Select("session_key", "created_at").
+		Where(where...).
+		Order(sq.C("created_at").Desc()).
+		Limit(uint(cqrs.SessionKeysLimit)).
+		ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("build get session keys query: %w", err)
+	}
+
+	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get session keys: %w", err)
 	}
@@ -245,28 +248,22 @@ func (w wrapper) sessionRuns(ctx context.Context, workspaceID uuid.UUID, tr cqrs
 		return nil, err
 	}
 
-	query := `
-SELECT s.run_id, s.start_time, s.end_time, s.status, s.attributes
-FROM spans s
-WHERE s.env_id = ?
-  AND s.name = ?
-  AND s.debug_run_id IS NULL
-ORDER BY s.start_time DESC
-LIMIT ?`
-	args := []any{workspaceID.String(), meta.SpanNameRun, limit}
-
-	if w.adapter.Dialect() == dbpkg.DialectPostgres {
-		query = `
-SELECT s.run_id, s.start_time, s.end_time, s.status, s.attributes
-FROM spans s
-WHERE s.env_id = $1
-  AND s.name = $2
-  AND s.debug_run_id IS NULL
-ORDER BY s.start_time DESC
-LIMIT $3`
+	sqlQuery, args, err := sq.Dialect(w.dialect()).
+		From("spans").
+		Select("run_id", "start_time", "end_time", "status", "attributes").
+		Where(
+			sq.C("env_id").Eq(workspaceID.String()),
+			sq.C("name").Eq(meta.SpanNameRun),
+			sq.C("debug_run_id").IsNull(),
+		).
+		Order(sq.C("start_time").Desc()).
+		Limit(uint(limit)).
+		ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("build session runs query: %w", err)
 	}
 
-	rows, err := w.adapter.Conn().QueryContext(ctx, query, args...)
+	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get session runs: %w", err)
 	}
@@ -332,28 +329,22 @@ LIMIT $3`
 }
 
 func (w wrapper) sessionTraceRuns(ctx context.Context, workspaceID uuid.UUID, tr cqrs.SessionTimeRange, limit int) (map[string]sessionTraceRun, error) {
-	query := `
-SELECT run_id, queued_at, started_at, ended_at, status
-FROM trace_runs
-WHERE workspace_id = ?
-  AND queued_at >= ?
-  AND queued_at <= ?
-ORDER BY queued_at DESC
-LIMIT ?`
-	args := []any{workspaceID.String(), tr.From.UnixMilli(), tr.Until.UnixMilli(), limit}
-
-	if w.adapter.Dialect() == dbpkg.DialectPostgres {
-		query = `
-SELECT run_id, queued_at, started_at, ended_at, status
-FROM trace_runs
-WHERE workspace_id = $1
-  AND queued_at >= $2
-  AND queued_at <= $3
-ORDER BY queued_at DESC
-LIMIT $4`
+	sqlQuery, args, err := sq.Dialect(w.dialect()).
+		From("trace_runs").
+		Select("run_id", "queued_at", "started_at", "ended_at", "status").
+		Where(
+			sq.C("workspace_id").Eq(workspaceID.String()),
+			sq.C("queued_at").Gte(tr.From.UnixMilli()),
+			sq.C("queued_at").Lte(tr.Until.UnixMilli()),
+		).
+		Order(sq.C("queued_at").Desc()).
+		Limit(uint(limit)).
+		ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("build session trace runs query: %w", err)
 	}
 
-	rows, err := w.adapter.Conn().QueryContext(ctx, query, args...)
+	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get session trace runs: %w", err)
 	}
