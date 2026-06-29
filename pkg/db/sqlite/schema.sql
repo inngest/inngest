@@ -165,15 +165,6 @@ CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_i
 CREATE INDEX idx_spans_status ON spans(status);
 CREATE INDEX idx_spans_run_status ON spans(run_id, status);
 CREATE INDEX idx_spans_account_status_time ON spans(account_id, status, start_time);
-CREATE TABLE session_keys (
-  workspace_id CHAR(36) NOT NULL,
-  session_key TEXT NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (workspace_id, session_key)
-);
-CREATE INDEX session_keys_workspace_created_at
-  ON session_keys (workspace_id, created_at DESC);
 CREATE TABLE worker_connections (
     account_id CHAR(36) NOT NULL,
     workspace_id CHAR(36) NOT NULL,
@@ -225,3 +216,12 @@ CREATE UNIQUE INDEX functions_app_id_slug_active_key
 CREATE UNIQUE INDEX apps_name_unique_key
     ON apps (name)
     WHERE name <> '';
+CREATE TABLE session_keys (
+  workspace_id CHAR(36) NOT NULL,
+  session_key TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (workspace_id, session_key)
+);
+CREATE INDEX session_keys_workspace_created_at
+  ON session_keys (workspace_id, created_at DESC);
