@@ -264,7 +264,7 @@ Available fields, read with **dot syntax** (`inngest.ai.values.<field>`) like th
 - `input_tokens` — prompt tokens
 - `output_tokens` — completion tokens
 - `total_tokens` — **often absent**; do not rely on it. Compute the total as `input_tokens + output_tokens` instead.
-- `model` / `response_model` — the requested / serving model name
+- either `model` (the request or response model) or `request_model` and `response_model`. Response models usually look like request models with a date version suffix.
 
 Reference these fields **bare** in numeric and aggregate contexts (e.g. `SUM(inngest.ai.values.input_tokens)`) — the transpiler infers a null-safe `accurateCastOrNull(…, 'Float64')` for them. Do **not** add an explicit `::Float64` cast: it maps to a non-nullable `CAST` that errors when a value is missing or NULL. If you ever need an explicit cast, use `accurateCastOrNull(…, 'Float64')`.
 
