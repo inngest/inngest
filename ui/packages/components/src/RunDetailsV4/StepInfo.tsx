@@ -15,7 +15,6 @@ import {
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
 import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
-import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
@@ -179,7 +178,6 @@ export const StepInfo = ({
   debug?: boolean;
   isDurableEndpoint?: boolean;
 }) => {
-  const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
@@ -215,8 +213,7 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
-  const showRerunFromStep =
-    !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
+  const showRerunFromStep = !isDurableEndpoint && !debug && runID && trace.stepID;
   const editableInput =
     trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY' || Boolean(result?.input);
 

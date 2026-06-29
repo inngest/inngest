@@ -613,16 +613,18 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 	return fmt.Sprintf("%s-%s", util.XXHash(req.Function.ID.String()), util.XXHash(key))
 }
 
-func rerunFromStepEdge(req execution.ScheduleRequest, memoizedSteps []state.MemoizedStep) inngest.Edge {
+func rerunFromStepEdge(req execution.ScheduleRequest, memoizedSteps []state.MemoizedStep, result *reconstructResult) inngest.Edge {
 	if req.FromStep == nil || req.FromStep.StepID == "" {
 		return inngest.SourceEdge
 	}
 
-	//
-	// IncomingGeneratorStep makes the first rerun request execute FromStep.
 	edge := inngest.Edge{
-		Incoming:              inngest.TriggerName,
-		IncomingGeneratorStep: req.FromStep.StepID,
+		Incoming: inngest.TriggerName,
+	}
+	if shouldTargetRerunFromStep(result) {
+		//
+		// Runnable steps should execute directly with any FromStep input override.
+		edge.IncomingGeneratorStep = req.FromStep.StepID
 	}
 	if len(memoizedSteps) > 0 {
 		//
@@ -630,6 +632,14 @@ func rerunFromStepEdge(req execution.ScheduleRequest, memoizedSteps []state.Memo
 		edge.Outgoing = memoizedSteps[len(memoizedSteps)-1].ID
 	}
 	return edge
+}
+
+func shouldTargetRerunFromStep(result *reconstructResult) bool {
+	if result == nil || result.fromStepOp == nil {
+		return true
+	}
+
+	return *result.fromStepOp == enums.OpcodeStep || *result.fromStepOp == enums.OpcodeStepRun
 }
 
 func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger, idempontenceKey string, evtMap map[string]any, id sv2.ID, req execution.ScheduleRequest) error {
@@ -1298,9 +1308,11 @@ func (e *executor) schedule(
 		Metadata: metadata,
 		Steps:    []state.MemoizedStep{},
 	}
+	var reconstructed *reconstructResult
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
-		if err := reconstruct(ctx, e.traceReader, req, &newState); err != nil {
+		reconstructed, err = reconstruct(ctx, e.traceReader, req, &newState)
+		if err != nil {
 			return nil, nil, fmt.Errorf("error reconstructing input state: %w", err)
 		}
 	}
@@ -1511,8 +1523,8 @@ func (e *executor) schedule(
 		Payload: queue.PayloadEdge{
 			//
 			// Reconstruction already populated state before FromStep, so the
-			// first queue item should execute FromStep itself.
-			Edge: rerunFromStepEdge(req, newState.Steps),
+			// first queue item should start at FromStep.
+			Edge: rerunFromStepEdge(req, newState.Steps, reconstructed),
 		},
 		Throttle:  throttle,
 		Metadata:  map[string]any{},
