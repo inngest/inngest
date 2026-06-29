@@ -44,19 +44,6 @@ export const announcements: Announcement[] = [
     startDate: '2026-06-30T17:05:00Z',
     endDate: '2026-07-30T17:05:00Z',
   },
-  // {
-  //   id: 'group-experiment-2026-06',
-  //   title: 'group.experiment ( )',
-  //   body: 'Safely test variants in production',
-  //   imageUrl: '/images/announcements/experiment-light.png',
-  //   imageUrlDark: '/images/announcements/experiment-dark.png',
-  //   cta: {
-  //     label: 'Explore experiments',
-  //     href: 'https://www.inngest.com/blog/introducing-group-experiment',
-  //   },
-  //   startDate: '2026-06-23T17:05:00Z',
-  //   endDate: '2026-07-23T17:05:00Z',
-  // },
   {
     id: 'announcing-defer-2026-06',
     title: 'Introducing defer ( )',
