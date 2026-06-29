@@ -613,6 +613,25 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 	return fmt.Sprintf("%s-%s", util.XXHash(req.Function.ID.String()), util.XXHash(key))
 }
 
+func rerunFromStepEdge(req execution.ScheduleRequest, memoizedSteps []state.MemoizedStep) inngest.Edge {
+	if req.FromStep == nil || req.FromStep.StepID == "" {
+		return inngest.SourceEdge
+	}
+
+	//
+	// IncomingGeneratorStep makes the first rerun request execute FromStep.
+	edge := inngest.Edge{
+		Incoming:              inngest.TriggerName,
+		IncomingGeneratorStep: req.FromStep.StepID,
+	}
+	if len(memoizedSteps) > 0 {
+		//
+		// Outgoing anchors the stack at the last reconstructed step.
+		edge.Outgoing = memoizedSteps[len(memoizedSteps)-1].ID
+	}
+	return edge
+}
+
 func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger, idempontenceKey string, evtMap map[string]any, id sv2.ID, req execution.ScheduleRequest) error {
 	for _, c := range req.Function.Cancel {
 		expires := e.now().Add(consts.CancelTimeout)
@@ -1490,7 +1509,10 @@ func (e *executor) schedule(
 		Attempt:               0,
 		MaxAttempts:           &maxAttempts,
 		Payload: queue.PayloadEdge{
-			Edge: inngest.SourceEdge,
+			//
+			// Reconstruction already populated state before FromStep, so the
+			// first queue item should execute FromStep itself.
+			Edge: rerunFromStepEdge(req, newState.Steps),
 		},
 		Throttle:  throttle,
 		Metadata:  map[string]any{},
