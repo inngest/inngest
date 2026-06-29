@@ -1,5 +1,6 @@
 import {
   KindInngestScore,
+  type AIMetadata,
   type SpanMetadataKind as GeneratedSpanMetadataKind,
   type SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
   type SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
@@ -60,13 +61,7 @@ export type SpanMetadataInngestAI = {
   scope: 'step_attempt' | 'extended_trace';
   kind: 'inngest.ai';
   updatedAt: string;
-  values: {
-    input_tokens?: number;
-    output_tokens?: number;
-    model: string;
-    system: string;
-    operation_name: string;
-  };
+  values: AIMetadata;
 };
 
 export type SpanMetadataInngestExperiment = {

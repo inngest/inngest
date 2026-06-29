@@ -4,8 +4,12 @@ import { KindInngestScore } from '../generated';
 type ScoreMetadata = {
   kind: string;
   updatedAt: string;
-  // Map of user-supplied score name to its value.
-  values: Record<string, unknown>;
+  // Loose structural supertype of every SpanMetadata arm so both the V3 and V4
+  // Trace types can be passed in. `object` (not Record<string, unknown>) is
+  // required because generated interface value types (e.g. AIMetadata) lack an
+  // implicit index signature; this type only filters by kind and reads via
+  // Object.entries, so the looser bound is sufficient.
+  values: object;
 };
 
 type ScoreRow = {
