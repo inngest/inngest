@@ -257,7 +257,7 @@ The experiment's `selection_strategy`/`variant_weights` live only on the selecti
 
 ## Querying AI / Token Usage
 
-Token usage and model for LLM calls live in the `inngest` metadata column under the `ai` key, on the **`steps`** and **`step_attempts`** tables. This metadata comes from two sources that normalize into the same `ai` key: `step.ai.wrap`/`step.ai.infer`, and the **OTel AI-metadata extractor** for any LLM call instrumented with OpenTelemetry `gen_ai.*` / `ai.usage.*` / `llm.token_count.*` attributes (e.g. an LLM call inside a `step.run`). Token data is **not** on `runs` or `events` — querying those returns no results.
+Token usage and model for LLM calls live in the `inngest` metadata column under the `ai` key, on the **`steps`** and **`step_attempts`** tables. This metadata comes from two sources that normalize into the same `ai` key: `step.ai.wrap`/`step.ai.infer`, and the **OTel AI-metadata extractor** for any LLM call instrumented with OpenTelemetry `gen_ai.*` attributes (e.g. an LLM call inside a `step.run`). Token data is **not** on `runs` or `events` — querying those returns no results.
 
 Available fields, read with **dot syntax** (`inngest.ai.values.<field>`) like the other metadata sections above — not bracket indexing:
 
