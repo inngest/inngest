@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.34.0] - 2026-06-29
+
+### 🚀 Features
+
+- *(sessions)* Add search to `/sessions/:sessionsKey` route (#4499)
+- *(sessions)* Design feedback (#4524)
+
+### 🐛 Bug Fixes
+
+- Custom concurrency cache keys (#4501)
+- Wrong experiments docs URL (#4503)
+- *(queue)* Handle wrapped iterator errors (#4507)
+- *(support)* Fix React hydration — UI interactions unresponsive (#4510)
+- *(metadata)* Show last attempt metadata for retry groups (#4513)
+- Support only OTel GenAI in Extended Traces AI Metadata Extractor (#4509)
+- *(dashboard)* Scoring formula slider interaction (#4484)
+- The display of extended traces for steps with multiple attempts (#4523)
+- Rerun from step (#4182)
+- *(rerun-from-step)* Enable rerun from step everywhere (#4531)
+
+### 🚜 Refactor
+
+- *(queue)* Resolve shards by scope instead of acctID (#4475)
+- *(session)* Session ui empty state refactor (#4508)
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump SDK from 4.8.0 to 4.10.0 (#4496)
+- *(release)* Use homebrew_casks with goreleaser (#3462)
+- *(sessions)* Sessions UI feedback (#4500)
+- *(release)* For homebrew installed inngest-cli, use homebrew-tap for latest version (#4511)
+- Adding metrics for run duration (#4445)
+
 ## [v1.33.0] - 2026-06-23
 
 ### 🚀 Features
@@ -13,6 +46,10 @@ All notable changes to this project will be documented in this file.
 ### 🚜 Refactor
 
 - *(queue)* Make Producer configurable in Queue (#4078)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.33.0 (#4490)
 
 ## [v1.32.0] - 2026-06-22
 
