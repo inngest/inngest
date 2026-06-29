@@ -30,10 +30,10 @@ export function ValueRow({
   const typeText = typeLabelOverride !== undefined ? typeLabelOverride : computed;
 
   return (
-    <div className="group flex items-center justify-between gap-2 rounded px-1 py-0.5">
+    <div className="group flex min-w-0 items-center justify-between gap-2 rounded px-1 py-0.5">
       <span
         className={cn(
-          'overflow-hidden text-ellipsis',
+          'min-w-0 flex-1 overflow-hidden text-ellipsis',
           'text-sm',
           boldName ? 'text-basis font-semibold' : 'text-subtle',
           'whitespace-nowrap'
@@ -43,7 +43,7 @@ export function ValueRow({
       </span>
       <button
         className={cn(
-          'hover:bg-canvasBase min-w-sm rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100'
+          'hover:bg-canvasBase min-w-sm shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100'
         )}
         onClick={handleCopyValue(node)}
         type="button"
@@ -51,9 +51,9 @@ export function ValueRow({
       >
         <RiFileCopyLine className="text-subtle h-3 w-3" />
       </button>
-      <div className="ml-auto flex items-baseline gap-1.5">
+      <div className="ml-auto flex min-w-0 max-w-[45%] shrink items-baseline gap-1.5">
         {Boolean(typeText) && (
-          <span className="text-muted min-w-0 whitespace-nowrap font-mono text-xs capitalize">
+          <span className="text-muted min-w-0 truncate whitespace-nowrap font-mono text-xs capitalize">
             {typeText}
           </span>
         )}

@@ -27,15 +27,19 @@ export function TableRow({ node }: TableRowProps): React.ReactElement {
   return (
     <div className="flex flex-col gap-1">
       <div
-        className="hover:bg-canvasSubtle group flex cursor-pointer items-center justify-between gap-2 rounded px-1 py-0.5"
+        className="hover:bg-canvasSubtle group flex min-w-0 cursor-pointer items-center justify-between gap-2 rounded px-1 py-0.5"
         onClick={handleToggle}
       >
         <CollapsibleRowWidget open={open} />
-        <span className={'text-subtle overflow-hidden text-ellipsis whitespace-nowrap text-sm'}>
+        <span
+          className={
+            'text-subtle min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm'
+          }
+        >
           {node.name}
         </span>
-        <div className="ml-auto flex items-baseline gap-1.5">
-          <span className="text-muted min-w-0 whitespace-nowrap font-mono text-xs capitalize">
+        <div className="ml-auto flex min-w-0 max-w-[45%] shrink items-baseline gap-1.5">
+          <span className="text-muted min-w-0 truncate whitespace-nowrap font-mono text-xs capitalize">
             {typeText}
           </span>
           <span className="self-baseline align-baseline text-xs leading-none">

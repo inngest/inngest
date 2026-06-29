@@ -2,11 +2,19 @@ import { useCallback, useRef, useState } from 'react';
 import { Search } from '@inngest/components/Forms/Search';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { SchemaViewer } from '@inngest/components/SchemaViewer/SchemaViewer';
+import type { RenderAdornmentFn } from '@inngest/components/SchemaViewer/AdornmentContext';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
+import { RiInformationLine } from '@remixicon/react';
 
 import { SchemaExplorerSwitcher } from './SchemaExplorerSwitcher';
 import { useSchemas } from './SchemasContext/SchemasContext';
 import { useSchemasInUse } from './useSchemasInUse';
-import { tableEntries } from './tableSchemas';
+import { tableEntries, tableMetadataByPath } from './tableSchemas';
+import type { InsightsSchemaMetadata } from '@/lib/insights/schema/types';
 
 export function SchemaExplorer() {
   const [search, setSearch] = useState('');
@@ -25,9 +33,25 @@ export function SchemaExplorer() {
 
   const { schemasInUse } = useSchemasInUse();
 
-  const renderEntry = useCallback((entry: (typeof entries)[number]) => {
-    return <SchemaViewer key={entry.key} node={entry.node} />;
+  const renderTableAdornment = useCallback<RenderAdornmentFn>((node) => {
+    const metadata = tableMetadataByPath[node.path];
+    if (!metadata) return null;
+
+    return <SchemaMetadataAdornment metadata={metadata} />;
   }, []);
+
+  const renderEntry = useCallback(
+    (entry: (typeof entries)[number]) => {
+      return (
+        <SchemaViewer
+          key={entry.key}
+          node={entry.node}
+          renderAdornment={renderTableAdornment}
+        />
+      );
+    },
+    [renderTableAdornment],
+  );
 
   return (
     <div
@@ -40,7 +64,11 @@ export function SchemaExplorer() {
         </div>
         <div className="flex flex-col gap-1">
           {tableEntries.map((tableEntry) => (
-            <SchemaViewer key={tableEntry.key} node={tableEntry.node} />
+            <SchemaViewer
+              key={tableEntry.key}
+              node={tableEntry.node}
+              renderAdornment={renderTableAdornment}
+            />
           ))}
         </div>
         {schemasInUse.length > 0 && (
@@ -83,5 +111,34 @@ export function SchemaExplorer() {
         />
       </div>
     </div>
+  );
+}
+
+function SchemaMetadataAdornment({
+  metadata,
+}: {
+  metadata: InsightsSchemaMetadata;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          aria-label={`Show ${metadata.title} details`}
+          className="text-light hover:text-basis inline-flex align-baseline"
+          onClick={(event) => event.stopPropagation()}
+          type="button"
+        >
+          <RiInformationLine className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-80 p-3 text-left text-xs" side="left">
+        <div className="flex flex-col gap-2">
+          <div>
+            <div className="text-onContrast font-medium">{metadata.title}</div>
+            <div className="text-onContrast/80">{metadata.description}</div>
+          </div>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 }
