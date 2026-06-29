@@ -1,15 +1,12 @@
-import { useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { AccordionList, AccordionPrimitive } from '@inngest/components/AccordionCard/AccordionList';
 import { InlineCode } from '@inngest/components/Code';
-import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
+import CommandBlock from '@inngest/components/CodeBlock/CommandBlock';
 import { Link } from '@inngest/components/Link';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
-import { RiAlertLine, RiExternalLinkLine, RiRouteLine, RiStackLine } from '@remixicon/react';
+import { RiAlertLine, RiArrowRightSLine, RiRouteLine, RiStackLine } from '@remixicon/react';
 
 type SessionsEmptyStateProps = {
   docsUrl?: string;
-  isLoading?: boolean;
 };
 
 const DEFAULT_DOCS_URL =
@@ -25,24 +22,6 @@ await inngest.send({
 });`;
 
 const prompt = `Read the docs about Inngest's sessions @https://www.inngest.com/docs/features/events-triggers/sessions and tell me how I can leverage them in my functions to group runs across conversations, threads, or multi-stage pipelines`;
-
-const tabs: TabsProps[] = [
-  {
-    title: 'Code',
-    content: example,
-    readOnly: true,
-    language: 'typescript',
-  },
-  {
-    title: 'Prompt',
-    content: prompt,
-    readOnly: true,
-    language: 'markdown',
-    wordWrap: 'on',
-  },
-];
-
-const defaultTab = tabs[0]!;
 
 const benefits = [
   {
@@ -63,80 +42,78 @@ const benefits = [
   },
 ];
 
-export function SessionsEmptyState({
-  docsUrl = DEFAULT_DOCS_URL,
-  isLoading = false,
-}: SessionsEmptyStateProps) {
-  const [activeTab, setActiveTab] = useState(defaultTab.title);
-  const currentTabContent = tabs.find((tab) => tab.title === activeTab) ?? defaultTab;
-
+export function SessionsEmptyState({ docsUrl = DEFAULT_DOCS_URL }: SessionsEmptyStateProps) {
   return (
-    <div className="bg-canvasBase text-basis flex flex-1 overflow-y-auto">
-      <section className="mx-auto mt-16 flex w-full max-w-[816px] flex-col px-6 pb-16">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="border-muted bg-canvasSubtle flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border">
-              <SessionsIcon className="text-subtle h-6 w-6" />
-            </div>
-            <div className="flex flex-1 items-center gap-2">
-              <h1 className="text-subtle text-2xl font-medium">Sessions</h1>
-              {isLoading && (
-                <div className="text-link flex items-center gap-1.5 text-sm">
-                  <IconSpinner className="fill-link h-4 w-4" />
-                  Waiting for your first session
-                </div>
-              )}
-            </div>
-            <div className="sm:ml-auto">
-              <Button
-                kind="primary"
-                appearance="outlined"
-                label="Go to docs"
-                icon={<RiExternalLinkLine />}
-                iconSide="left"
-                href={docsUrl}
-                target="_blank"
-              />
-            </div>
-          </div>
-          <p className="text-subtle max-w-[760px] text-base leading-6">
-            <span className="text-basis text-lg">Group related runs into sessions.</span>
-            <br />A session ties together every function run from the same conversation, job, or
-            user flow, so you can find and inspect them all by one ID.{' '}
-            <Link href={docsUrl} target="_blank" size="small" className="inline-block">
-              Learn more about sessions
-            </Link>
+    <div className="bg-canvasBase flex flex-1 flex-col items-center overflow-auto px-6 py-12">
+      <div className="mx-auto flex w-full max-w-[800px] flex-col gap-10">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-basis text-2xl">Sessions</h1>
+          <p className="text-subtle text-sm leading-relaxed">
+            Group related runs into sessions. A session ties together every function run from the
+            same conversation, job, or user flow, so you can find and inspect them all by one ID.
           </p>
+          <Link href={docsUrl} target="_blank">
+            Learn more about sessions
+          </Link>
         </div>
 
-        <div className="border-subtle bg-canvasBase mt-6 grid grid-cols-1 gap-6 rounded-md border p-4 md:grid-cols-3">
+        <div className="border-subtle text-subtle flex items-center gap-2 rounded-md border border-dashed px-4 py-3 text-sm">
+          <IconSpinner className="fill-subtle h-4 w-4" />
+          Searching for sessions
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-8 gap-y-6">
           {benefits.map(({ icon: Icon, iconClassName, title, description }) => (
-            <div key={title} className="flex flex-col gap-2">
-              <Icon className={`text-subtle h-6 w-6 ${iconClassName ?? ''}`} />
-              <div className="flex flex-col gap-1">
-                <h2 className="text-basis truncate text-base font-medium">{title}</h2>
-                <p className="text-muted text-sm leading-5">{description}</p>
+            <div key={title} className="flex items-start gap-3">
+              <div className="border-subtle bg-canvasSubtle text-basis flex h-10 w-10 shrink-0 items-center justify-center rounded-md border">
+                <Icon className={`h-5 w-5 ${iconClassName ?? ''}`} />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <p className="text-basis text-sm font-medium">{title}</p>
+                <p className="text-muted text-sm leading-relaxed">{description}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-12 flex flex-col gap-2">
-          <div>
-            <h2 className="text-basis text-lg font-medium">Get started</h2>
-            <p className="text-subtle text-base leading-6">
-              Add <InlineCode>meta.sessions</InlineCode> to any event
-            </p>
-          </div>
+        <hr className="border-subtle" />
+
+        <div className="flex flex-col gap-6">
+          <h2 className="text-basis text-lg">Get started</h2>
+
           <CommandBlock.Wrapper>
-            <CommandBlock.Header className="flex items-center justify-between pr-4">
-              <CommandBlock.Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
-              <CommandBlock.CopyButton content={currentTabContent.content} />
+            <CommandBlock.Header className="flex items-center justify-between px-4 py-2.5">
+              <p className="text-subtle text-sm">
+                add <InlineCode>meta.sessions</InlineCode> to any event
+              </p>
+              <CommandBlock.CopyButton content={example} />
             </CommandBlock.Header>
-            <CommandBlock currentTabContent={currentTabContent} />
+            <CommandBlock
+              currentTabContent={{
+                title: 'Code',
+                content: example,
+                readOnly: true,
+                language: 'typescript',
+              }}
+            />
           </CommandBlock.Wrapper>
+
+          <AccordionList type="multiple" defaultValue={[]}>
+            <AccordionList.Item value="prompt">
+              <AccordionPrimitive.Header className="data-[state=open]:border-subtle flex items-center justify-between pr-4 text-sm data-[state=open]:border-b">
+                <AccordionPrimitive.Trigger className="hover:bg-canvasSubtle group flex flex-1 items-center gap-1 px-3 py-4">
+                  <RiArrowRightSLine className="h-5 w-5 transition-transform duration-200 group-data-[state=open]:rotate-90" />
+                  <span className="text-subtle">Prompt for coding agent</span>
+                </AccordionPrimitive.Trigger>
+                <CommandBlock.CopyButton content={prompt} />
+              </AccordionPrimitive.Header>
+              <AccordionList.Content>
+                <p className="text-muted whitespace-pre-wrap text-sm leading-5">{prompt}</p>
+              </AccordionList.Content>
+            </AccordionList.Item>
+          </AccordionList>
         </div>
-      </section>
+      </div>
     </div>
   );
 }
