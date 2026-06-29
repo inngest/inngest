@@ -55,7 +55,6 @@ type PartitionLeaseOptions struct{}
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
 
 type QueueManager interface {
-	JobQueueReader
 	Queue
 
 	Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error
@@ -91,7 +90,18 @@ type QueueManager interface {
 
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context, queueShard QueueShard) (int64, error)
+}
 
+type KeyQueueProcessor interface {
+	ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error
+	ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error
+	ProcessShadowPartitionBacklog(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		refillUntil time.Time,
+		constraints PartitionConstraintConfig,
+	) (*BacklogRefillResult, enums.QueueConstraint, error)
 	NormalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error
 	NormalizeItem(
 		ctx context.Context,
@@ -100,27 +110,20 @@ type QueueManager interface {
 		sourceBacklog *QueueBacklog,
 		item QueueItem,
 	) (QueueItem, error)
-
-	ProcessItem(
-		ctx context.Context,
-		i ProcessItem,
-		f RunFunc,
-	) error
-	ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error
-
-	ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error
-	ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error
-
-	ProcessShadowPartitionBacklog(
+	BacklogRefillConstraintCheck(
 		ctx context.Context,
 		shadowPart *QueueShadowPartition,
 		backlog *QueueBacklog,
-		refillUntil time.Time,
 		constraints PartitionConstraintConfig,
-	) (*BacklogRefillResult, enums.QueueConstraint, error)
+		items []*QueueItem,
+		operationIdempotencyKey string,
+		now time.Time,
+	) (*BacklogRefillConstraintCheckResult, error)
 }
 
 type QueueProcessor interface {
+	KeyQueueProcessor
+
 	Shard() QueueShard
 	Clock() clockwork.Clock
 	Semaphore() util.TrackingSemaphore
@@ -132,16 +135,6 @@ type QueueProcessor interface {
 	GetShadowContinuations() map[string]ShadowContinuation
 	ClearShadowContinuations()
 
-	BacklogRefillConstraintCheck(
-		ctx context.Context,
-		shadowPart *QueueShadowPartition,
-		backlog *QueueBacklog,
-		constraints PartitionConstraintConfig,
-		items []*QueueItem,
-		operationIdempotencyKey string,
-		now time.Time,
-	) (*BacklogRefillConstraintCheckResult, error)
-
 	ItemLeaseConstraintCheck(
 		ctx context.Context,
 		shadowPart *QueueShadowPartition,
@@ -150,6 +143,13 @@ type QueueProcessor interface {
 		item *QueueItem,
 		now time.Time,
 	) (ItemLeaseConstraintCheckResult, error)
+
+	ProcessItem(
+		ctx context.Context,
+		i ProcessItem,
+		f RunFunc,
+	) error
+	ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error
 }
 
 // SingletonOperations is the per-shard surface for singleton lock state.
