@@ -284,7 +284,7 @@ WHERE queued_at >= now() - INTERVAL 1 DAY
 **Token usage broken down by model:**
 
 ```sql
-SELECT inngest.ai.values.model AS model,
+SELECT coalesce(inngest.ai.values.request_model, inngest.ai.values.model) AS model,
        SUM(inngest.ai.values.input_tokens) AS input_tokens,
        SUM(inngest.ai.values.output_tokens) AS output_tokens
 FROM step_attempts
