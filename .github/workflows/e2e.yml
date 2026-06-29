@@ -15,6 +15,7 @@ permissions:
 
 env:
   GOCOVERDIR: "coverage"
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
   ts:
@@ -116,15 +117,33 @@ jobs:
         with:
           go-version-file: ./go.mod
 
+      - name: Log in to Docker Hub
+        if: matrix.database == 'postgres' && env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Start postgres container
         if: matrix.database == 'postgres'
         run: |
-          docker run -d --name inngest-test-postgres \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=postgres \
-            -e POSTGRES_DB=inngest_test \
-            -p 5432:5432 \
-            postgres:17
+          for attempt in 1 2 3; do
+            if docker run -d --name inngest-test-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB=inngest_test \
+              -p 5432:5432 \
+              postgres:17; then
+              break
+            fi
+            echo "Attempt $attempt failed, retrying in 10s..."
+            docker rm -f inngest-test-postgres 2>/dev/null || true
+            sleep 10
+            if [ "$attempt" = "3" ]; then
+              echo "ERROR: Failed to start postgres after 3 attempts"
+              exit 1
+            fi
+          done
           # Wait for postgres to be ready
           for i in $(seq 1 30); do
             if docker exec inngest-test-postgres pg_isready -U postgres > /dev/null 2>&1; then
@@ -208,15 +227,33 @@ jobs:
         with:
           go-version-file: ./go.mod
 
+      - name: Log in to Docker Hub
+        if: matrix.database == 'postgres' && env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Start postgres container
         if: matrix.database == 'postgres'
         run: |
-          docker run -d --name inngest-test-postgres \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=postgres \
-            -e POSTGRES_DB=inngest_test \
-            -p 5432:5432 \
-            postgres:17
+          for attempt in 1 2 3; do
+            if docker run -d --name inngest-test-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB=inngest_test \
+              -p 5432:5432 \
+              postgres:17; then
+              break
+            fi
+            echo "Attempt $attempt failed, retrying in 10s..."
+            docker rm -f inngest-test-postgres 2>/dev/null || true
+            sleep 10
+            if [ "$attempt" = "3" ]; then
+              echo "ERROR: Failed to start postgres after 3 attempts"
+              exit 1
+            fi
+          done
           # Wait for postgres to be ready
           for i in $(seq 1 30); do
             if docker exec inngest-test-postgres pg_isready -U postgres > /dev/null 2>&1; then
@@ -295,15 +332,33 @@ jobs:
         with:
           go-version-file: ./go.mod
 
+      - name: Log in to Docker Hub
+        if: matrix.database == 'postgres' && env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Start postgres container
         if: matrix.database == 'postgres'
         run: |
-          docker run -d --name inngest-test-postgres \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=postgres \
-            -e POSTGRES_DB=inngest_test \
-            -p 5432:5432 \
-            postgres:17
+          for attempt in 1 2 3; do
+            if docker run -d --name inngest-test-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB=inngest_test \
+              -p 5432:5432 \
+              postgres:17; then
+              break
+            fi
+            echo "Attempt $attempt failed, retrying in 10s..."
+            docker rm -f inngest-test-postgres 2>/dev/null || true
+            sleep 10
+            if [ "$attempt" = "3" ]; then
+              echo "ERROR: Failed to start postgres after 3 attempts"
+              exit 1
+            fi
+          done
           # Wait for postgres to be ready
           for i in $(seq 1 30); do
             if docker exec inngest-test-postgres pg_isready -U postgres > /dev/null 2>&1; then
@@ -379,6 +434,13 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: ./go.mod
+
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Run execution tests
         run: go test ./tests/execution/... -v -count=1 -coverprofile=coverage.txt
