@@ -225,6 +225,7 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 
 		if !resp.IsSDK {
 			dr.SetError(ErrNotSDK)
+			dr.SetFinal() // non-SDK endpoint is a permanent config error, never retry
 		}
 		return dr, nil
 	}
@@ -252,8 +253,8 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 			"run_id", r.RunID.String(),
 			"url", r.URL.String(),
 		)
-		// TODO: Call dr.SetError and set dr.Output. We aren't doing that yet
-		// because we want to observe logs first
+		dr.SetError(ErrNotSDK)
+		dr.SetFinal() // non-SDK endpoint is a permanent config error, never retry
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -290,7 +291,9 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		// If we got a successful response but it wasn't from the SDK, then we
 		// need to fail the attempt. Otherwise, we may incorrectly mark the
 		// function run as "completed".
+		// This is a permanent configuration error — never retry.
 		dr.SetError(ErrNotSDK)
+		dr.SetFinal()
 	}
 
 	return dr, err
