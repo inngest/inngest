@@ -95,7 +95,7 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard for GetPartition: %w", err)
 	}
-	pt, err := d.queue.PartitionByID(ctx, shard, scope, req.GetId())
+	pt, err := d.queueReader.PartitionByID(ctx, shard, scope, req.GetId())
 	if err != nil {
 		if errors.Is(err, queue.ErrPartitionNotFound) {
 			return nil, status.Error(codes.NotFound, queue.ErrPartitionNotFound.Error())
