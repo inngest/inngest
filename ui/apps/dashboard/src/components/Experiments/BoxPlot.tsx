@@ -19,7 +19,8 @@ import { makeBoxPlotTooltip } from './BoxPlotTooltip';
 import { VariantAxisTick } from './VariantAxisTick';
 
 const BOX_HEIGHT = 10;
-const LINE_HEIGHT = 2;
+const LINE_HEIGHT = 1;
+const LINE_WIDTH = 1;
 /** Snap within this many pixels of a named data point. */
 const SNAP_PX = 4;
 
@@ -116,12 +117,6 @@ function BoxShape({
   );
   const quantileXs = quantileOffsets.map((offset) => x + offset);
 
-  const zscores = [-1, 0, 1].map((z) => payload.avg + z * payload.stddev);
-  const zOffsets = zscores
-    .filter((z) => z >= payload.min && z <= payload.max)
-    .map((z) => ((z - payload.min) / range) * width);
-  const zXs = zOffsets.map((offset) => x + offset);
-
   return (
     <g>
       <rect
@@ -131,7 +126,7 @@ function BoxShape({
         height={height}
         fill={payload?.subtleColor}
         stroke={payload?.color}
-        strokeWidth={2}
+        strokeWidth={LINE_WIDTH}
       />
       {quantileXs.map((qx, i) => (
         <line
@@ -141,7 +136,7 @@ function BoxShape({
           y1={y}
           y2={y + height}
           stroke={payload?.color}
-          strokeWidth={2}
+          strokeWidth={LINE_WIDTH}
         />
       ))}
       <line
@@ -158,20 +153,8 @@ function BoxShape({
         y1={cyLine}
         y2={cyLine}
         stroke={payload?.color}
-        strokeWidth={2}
+        strokeWidth={LINE_HEIGHT}
       />
-      {zXs.map((zx, i) => (
-        <line
-          key={`zscore-${i}`}
-          x1={zx}
-          x2={zx}
-          y1={y}
-          y2={y + height}
-          stroke={payload?.color}
-          strokeWidth={2}
-          strokeDasharray="2 2"
-        />
-      ))}
     </g>
   );
 }
@@ -200,9 +183,6 @@ const SNAP_VALUE_FNS: ((r: RowData) => number)[] = [
   (r) => r.med,
   (r) => r.q3,
   (r) => r.max,
-  (r) => r.avg,
-  (r) => r.avg - r.stddev,
-  (r) => r.avg + r.stddev,
 ];
 
 type RechartScale = { (v: number): number; invert?: (px: number) => number };
