@@ -99,7 +99,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 			Data:            o.Data,
 			HistoryReader:   o.HistoryReader,
 			Runner:          o.Runner,
-			Queue:           o.QueueReader,
+			QueueReader:     o.QueueReader,
 			EventHandler:    o.EventHandler,
 			Executor:        o.Executor,
 			ServerKind:      o.Config.GetServerKind(),
