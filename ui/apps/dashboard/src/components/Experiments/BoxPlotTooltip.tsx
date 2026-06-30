@@ -26,26 +26,6 @@ type StatEntry = {
 };
 
 const ALL_STATS: StatEntry[] = [
-  { key: 'avg', label: 'Avg', valueFn: (p) => p.avg },
-  { key: 'stddev', label: 'StdDev', valueFn: (p) => p.stddev },
-  {
-    key: 'z_neg1',
-    label: (
-      <>
-        Z<sub>-1</sub>
-      </>
-    ),
-    valueFn: (p) => p.avg - p.stddev,
-  },
-  {
-    key: 'z_pos1',
-    label: (
-      <>
-        Z<sub>+1</sub>
-      </>
-    ),
-    valueFn: (p) => p.avg + p.stddev,
-  },
   { key: 'min', label: 'Min', valueFn: (p) => p.min },
   { key: 'q1', label: 'Q1', valueFn: (p) => p.q1 },
   { key: 'med', label: 'Median', valueFn: (p) => p.med },

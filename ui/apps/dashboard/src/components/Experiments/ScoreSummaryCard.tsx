@@ -129,6 +129,8 @@ export function ScoreSummaryCard({
                 dataKey="variantName"
                 width={yAxisWidth}
                 tick={<VariantAxisTick />}
+                axisLine={false}
+                tickLine={false}
                 interval={0}
               />
               <Tooltip
