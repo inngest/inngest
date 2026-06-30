@@ -41,8 +41,8 @@ export const announcements: Announcement[] = [
       label: 'Learn more',
       href: 'https://www.inngest.com/blog/introducing-agent-evals',
     },
-    startDate: '2026-06-30T17:05:00Z',
-    endDate: '2026-07-30T17:05:00Z',
+    startDate: '2026-06-30T00:00:00Z',
+    endDate: '2026-07-30T00:00:00Z',
   },
   {
     id: 'announcing-defer-2026-06',
