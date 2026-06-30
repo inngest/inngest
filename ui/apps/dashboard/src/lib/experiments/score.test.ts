@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { scoreVariant } from './score';
-import type {
-  ExperimentScoringMetric,
-  VariantMetric,
+import {
+  type ExperimentScoringMetric,
+  ScoreKind,
+  type VariantMetric,
 } from '@inngest/components/Experiments';
 
 const metric = (
   over: Partial<ExperimentScoringMetric>,
 ): ExperimentScoringMetric => ({
   key: 'tokens',
-  kind: 'NUMERIC',
+  kind: ScoreKind.Numeric,
   enabled: true,
   points: 10,
   minValue: 0,
@@ -25,7 +26,11 @@ const metric = (
 const vm = (over: Partial<VariantMetric>): VariantMetric => ({
   key: 'tokens',
   avg: 5,
+  stddev: 1,
   min: 0,
+  q1: 2,
+  med: 5,
+  q3: 8,
   max: 10,
   ...over,
 });

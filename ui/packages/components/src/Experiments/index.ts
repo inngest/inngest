@@ -11,3 +11,4 @@ export type {
   VariantMetric,
   VariantWeight,
 } from './types';
+export { ScoreKind } from './types';
