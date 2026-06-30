@@ -117,6 +117,9 @@ func scoreInputFromFields(name string, rawValue *structpb.Value, stepID *string,
 	if stepID != nil && strings.TrimSpace(*stepID) == "" {
 		return ScoreInput{}, fmt.Errorf("Step ID must not be empty when provided")
 	}
+	if stepID != nil && experiment != nil {
+		return ScoreInput{}, fmt.Errorf("Experiment scores must be run-scoped")
+	}
 
 	// Apply the same name and value rules as SDK score submission before
 	// handing off to the provider.

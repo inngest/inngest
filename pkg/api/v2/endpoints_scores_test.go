@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
@@ -245,6 +244,24 @@ func TestCreateScore(t *testing.T) {
 			message: "scores[0]: Experiment variant is required",
 		},
 		{
+			name: "experiment with step id",
+			req: &apiv2.CreateScoreRequest{
+				RunId: runID.String(),
+				Scores: []*apiv2.CreateScoreInput{
+					{
+						Name:   "accuracy",
+						Value:  structpb.NewNumberValue(1),
+						StepId: &stepID,
+						Experiment: &apiv2.ScoreExperiment{
+							ExperimentName: "model-routing",
+							Variant:        "baseline",
+						},
+					},
+				},
+			},
+			message: "scores[0]: Experiment scores must be run-scoped",
+		},
+		{
 			name: "empty scores",
 			req: &apiv2.CreateScoreRequest{
 				RunId: runID.String(),
@@ -346,24 +363,6 @@ func TestScoreExperimentMetadataUpdate(t *testing.T) {
 		"name":    json.RawMessage(`"model-routing"`),
 		"variant": json.RawMessage(`"baseline"`),
 	}, update.RawUpdate.Values)
-}
-
-func TestScoreParentSpanRefHashesSDKStepID(t *testing.T) {
-	runID := ulid.MustParse("01KVDHCS8VTWZHBAHTMYJHBPKJ")
-	stepID := "step 1"
-	stableStepID := "b436f063682815df5b5fd9780200a9e4e8d4f0b3"
-	md := &statev2.Metadata{
-		ID: statev2.ID{RunID: runID},
-	}
-
-	ref, scope := scoreParentSpanRef(md, &stepID)
-	expected := tracing.FinalizedStepSpanRefFromMetadataAndStepID(md, stableStepID)
-
-	require.Equal(t, enums.MetadataScopeStep, scope)
-	require.NotNil(t, ref)
-	require.Equal(t, expected.DynamicSpanID, ref.DynamicSpanID)
-	require.Equal(t, expected.DynamicSpanTraceParent, ref.DynamicSpanTraceParent)
-	require.Equal(t, expected.TraceParent, ref.TraceParent)
 }
 
 func TestStateScoreProviderFlagDisabled(t *testing.T) {
@@ -475,6 +474,24 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 		})
 
 		require.ErrorIs(t, err, ErrScoreTargetNotFound)
+	})
+
+	t.Run("preserves state load errors", func(t *testing.T) {
+		loadErr := errors.New("state unavailable")
+		opts := baseOpts
+		opts.State = fakeScoreRunService{err: loadErr}
+		provider := NewStateScoreProvider(opts)
+		stepID := existingStepID
+
+		err := provider.CreateScores(context.Background(), CreateScoresParams{
+			RunID: runID,
+			Scores: []ScoreInput{
+				{StepID: &stepID, Name: "accuracy", Value: 1.0},
+			},
+		})
+
+		require.ErrorIs(t, err, loadErr)
+		require.NotErrorIs(t, err, ErrScoreTargetNotFound)
 	})
 
 	t.Run("falls back to trace validator", func(t *testing.T) {

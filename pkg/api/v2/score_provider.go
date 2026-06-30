@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing"
-	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 )
@@ -208,7 +207,7 @@ func (p *stateScoreProvider) validateStepTargets(ctx context.Context, id statev2
 		if err == nil {
 			md = &loaded
 		} else if !errors.Is(err, statev2.ErrRunNotFound) && !errors.Is(err, statev2.ErrMetadataNotFound) {
-			return fmt.Errorf("%w: %w", ErrScoreTargetNotFound, err)
+			return err
 		}
 	}
 
@@ -242,19 +241,13 @@ func (p *stateScoreProvider) validateStepTargets(ctx context.Context, id statev2
 func scoreStepExistsInState(md *statev2.Metadata, stepID string) bool {
 	traceStepID := scoreTraceStepID(stepID)
 	for _, candidate := range md.Stack {
+		// Older callers may send raw SDK step IDs, while finalized state stores
+		// step spans under their trace IDs.
 		if candidate == stepID || candidate == traceStepID {
 			return true
 		}
 	}
 	return false
-}
-
-func scoreParentSpanRef(stateMetadata *statev2.Metadata, stepID *string) (*meta.SpanReference, metadata.Scope) {
-	if stepID == nil {
-		return tracing.RunSpanRefFromMetadata(stateMetadata), enums.MetadataScopeRun
-	}
-
-	return tracing.FinalizedStepSpanRefFromMetadataAndStepID(stateMetadata, scoreTraceStepID(*stepID)), enums.MetadataScopeStep
 }
 
 func scoreTraceStepID(stepID string) string {
