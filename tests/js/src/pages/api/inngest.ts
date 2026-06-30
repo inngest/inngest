@@ -7,6 +7,8 @@ import { testCancel } from "@/inngest/sdk_cancel_test";
 import { testRetry } from "@/inngest/sdk_retry_test";
 import { testNonRetriableError } from "@/inngest/non_retryable";
 import { testParallelism } from "@/inngest/sdk_parallel_test";
+import { testParallelFanIn, sleepRandom } from "@/inngest/sdk_parallel_fan_in_test";
+import { testPromiseRaceWaits } from "@/inngest/sdk_promise_race_waits_test";
 import { testWaitForEvent } from "@/inngest/sdk_wait_for_event_test";
 
 export default serve({
@@ -18,6 +20,9 @@ export default serve({
     testRetry,
     testNonRetriableError,
     testParallelism,
+    testParallelFanIn,
+    sleepRandom,
+    testPromiseRaceWaits,
     testWaitForEvent,
   ],
 });
