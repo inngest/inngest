@@ -61,29 +61,6 @@ type QueueManager interface {
 	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
 
-	// ItemsByPartition returns a queue item iterator for a function within a specific time range
-	ItemsByPartition(ctx context.Context, queueShard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
-	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
-	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
-	// BacklogsByPartition returns an iterator for the partition's backlogs
-	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
-	// BacklogSize retrieves the number of items in the specified backlog
-	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
-	// BacklogByID retrieves a single backlog by its ID
-	BacklogByID(ctx context.Context, queueShard QueueShard, backlogID string) (*QueueBacklog, error)
-	// PartitionByID retrieves the partition by the partition ID
-	PartitionByID(ctx context.Context, queueShard QueueShard, scope Scope, partitionID string) (*PartitionInspectionResult, error)
-	// LoadQueueItem retrieves the queue item by the item ID.
-	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error)
-
-	// ItemExists checks if an item with jobID exists in the queue
-	ItemExists(ctx context.Context, queueShard QueueShard, scope Scope, jobID string) (bool, error)
-	// ItemsByRunID retrieves all queue items via runID
-	//
-	// NOTE
-	// The queue technically shouldn't know about runIDs, so we should make this more generic with certain type of indices in the future
-	ItemsByRunID(ctx context.Context, queueShard QueueShard, scope Scope, runID ulid.ULID) ([]*QueueItem, error)
-
 	// PartitionBacklogSize returns the point in time backlog size of the partition.
 	// This will sum the size of all backlogs in that partition
 	PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error)
