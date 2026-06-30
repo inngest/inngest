@@ -31,12 +31,13 @@ export function MetricPanel({ metric, variants }: Props) {
 
   const domain = useMemo<[number, number]>(() => {
     let hi = metric.maxValue;
+    let low = metric.minValue;
     for (const row of rows) {
-      hi = Math.max(hi, row.value);
+      hi = Math.max(hi, row.max);
+      low = Math.min(low, row.min);
     }
-    if (hi <= 0) hi = 1;
-    return [0, hi];
-  }, [rows, metric.maxValue]);
+    return [low, hi];
+  }, [rows, metric.minValue, metric.maxValue]);
 
   const plot = useMemo(() => {
     switch (metric.kind) {
