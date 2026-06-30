@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/syscode"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/stretchr/testify/require"
@@ -97,6 +98,32 @@ func TestHandleWorkerRequestAckRPCFailureIsNonFatal(t *testing.T) {
 	require.Nil(t, serr)
 }
 
+func TestWorkerRequestAckGRPCClientCreationFailureDoesNotCloseWebSocket(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{silent: true})
+	handshake(t, res)
+
+	executor := startAckExecutor(t, &ackExecutor{
+		pingReceived: make(chan struct{}, 1),
+		pingErr:      status.Error(codes.Unavailable, "ping unavailable"),
+	})
+	res.svc.grpcConfig.Executor.Port = executor.port
+
+	requestID := "test-worker-request-ack-client-creation-failure"
+	_, err := res.svc.stateManager.LeaseRequest(t.Context(), res.envID, requestID, 5*time.Second, testExecutorIP)
+	require.NoError(t, err)
+
+	err = wsproto.Write(t.Context(), res.ws, workerRequestAckMessage(t, res, requestID))
+	require.NoError(t, err)
+
+	select {
+	case <-executor.pingReceived:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for executor ping")
+	}
+
+	exchangeHeartbeat(t, res.ws, 2*time.Second)
+}
+
 func TestHandleWorkerRequestAckExecutorDoneIsNonFatal(t *testing.T) {
 	res := createTestingGateway(t)
 	handshake(t, res)
@@ -115,6 +142,59 @@ func TestHandleWorkerRequestAckExecutorDoneIsNonFatal(t *testing.T) {
 
 	serr := ch.handleWorkerRequestAck(workerRequestAckMessage(t, res, requestID))
 	require.Nil(t, serr)
+}
+
+func TestForwardSucceedsAfterWorkerRequestAckWhenExecutorAckFails(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{silent: true})
+	handshake(t, res)
+
+	executor := startAckExecutor(t, &ackExecutor{
+		ackReceived: make(chan *connectpb.AckMessage, 1),
+		err:         status.Error(codes.Unavailable, "ack unavailable"),
+	})
+	res.svc.grpcConfig.Executor.Port = executor.port
+
+	requestID := "test-forward-success-after-worker-ack"
+	_, err := res.svc.stateManager.LeaseRequest(t.Context(), res.envID, requestID, 5*time.Second, testExecutorIP)
+	require.NoError(t, err)
+
+	forwardResult := make(chan *connectpb.ForwardResponse, 1)
+	forwardErr := make(chan error, 1)
+	go func() {
+		resp, err := res.svc.Forward(t.Context(), &connectpb.ForwardRequest{
+			ConnectionID: res.connID.String(),
+			Data:         testGatewayExecutorRequestData(res, requestID),
+		})
+		forwardResult <- resp
+		forwardErr <- err
+	}()
+
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
+
+	err = wsproto.Write(t.Context(), res.ws, workerRequestAckMessage(t, res, requestID))
+	require.NoError(t, err)
+
+	select {
+	case err := <-forwardErr:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for Forward error")
+	}
+
+	select {
+	case resp := <-forwardResult:
+		require.True(t, resp.GetSuccess())
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for Forward response")
+	}
+
+	select {
+	case ack := <-executor.ackReceived:
+		require.Equal(t, requestID, ack.RequestId)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for executor ack")
+	}
 }
 
 func workerRequestAckMessage(t *testing.T, res testingResources, requestID string) *connectpb.ConnectMessage {
@@ -137,10 +217,12 @@ func workerRequestAckMessage(t *testing.T, res testingResources, requestID strin
 
 type ackExecutor struct {
 	connectpb.UnimplementedConnectExecutorServer
-	port        int
-	ackReceived chan *connectpb.AckMessage
-	success     *bool
-	err         error
+	port         int
+	ackReceived  chan *connectpb.AckMessage
+	success      *bool
+	err          error
+	pingReceived chan struct{}
+	pingErr      error
 }
 
 func startAckExecutor(t *testing.T, executor *ackExecutor) *ackExecutor {
@@ -182,6 +264,12 @@ func (s *ackExecutor) Ack(_ context.Context, msg *connectpb.AckMessage) (*connec
 }
 
 func (s *ackExecutor) Ping(_ context.Context, _ *connectpb.PingRequest) (*connectpb.PingResponse, error) {
+	if s.pingReceived != nil {
+		s.pingReceived <- struct{}{}
+	}
+	if s.pingErr != nil {
+		return nil, s.pingErr
+	}
 	return &connectpb.PingResponse{Message: "ok"}, nil
 }
 

@@ -28,6 +28,15 @@ func (c *connectionHandler) handleWorkerRequestAck(msg *connectpb.ConnectMessage
 		}
 	}
 
+	c.acceptWorkerRequestAck(&data)
+
+	// TODO Should we send a reverse ack to the worker to start processing the request?
+	return nil
+}
+
+func (c *connectionHandler) acceptWorkerRequestAck(data *connectpb.WorkerRequestAckData) {
+	// Option A: a parsed worker ACK means the gateway accepted local delivery.
+	// Executor notification happens afterwards and is best-effort.
 	if !c.completePendingAck(data.RequestId, nil) {
 		c.log.Warn(
 			"worker request ack received for unknown request ID",
@@ -37,6 +46,10 @@ func (c *connectionHandler) handleWorkerRequestAck(msg *connectpb.ConnectMessage
 		)
 	}
 
+	c.notifyExecutorWorkerRequestAck(data)
+}
+
+func (c *connectionHandler) notifyExecutorWorkerRequestAck(data *connectpb.WorkerRequestAckData) {
 	notifyCtx, notifyCancel := context.WithTimeout(context.Background(), workerRequestAckNotifyTimeout)
 	defer notifyCancel()
 
@@ -51,10 +64,10 @@ func (c *connectionHandler) handleWorkerRequestAck(msg *connectpb.ConnectMessage
 	case err == nil:
 	case errors.Is(err, state.ErrExecutorNotFound):
 		l.Debug("executor not found in lease, worker ack was likely picked up by polling")
-		return nil
+		return
 	default:
 		l.Warn("could not create grpc client to ack, executor will rely on timeout or polling", "err", err)
-		return nil
+		return
 	}
 
 	reply, err := grpcClient.Ack(notifyCtx, &connectpb.AckMessage{
@@ -63,13 +76,10 @@ func (c *connectionHandler) handleWorkerRequestAck(msg *connectpb.ConnectMessage
 	})
 	if err != nil {
 		l.Warn("could not ack message through gRPC, executor will rely on timeout or polling", "err", err)
-		return nil
+		return
 	}
 	if reply == nil || !reply.Success {
 		l.Warn("failed to ack, executor was likely done with the request")
 	}
 	l.Trace("worker acked message")
-
-	// TODO Should we send a reverse ack to the worker to start processing the request?
-	return nil
 }
