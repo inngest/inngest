@@ -158,8 +158,8 @@ func TestGetQueueItemByRunIDResolvesShardFromScope(t *testing.T) {
 	require.NoError(t, err)
 
 	d := &debugAPI{
-		queue:  q,
-		shards: shardRegistry,
+		queueReader: q,
+		shards:      shardRegistry,
 	}
 
 	resp, err := d.GetQueueItem(ctx, &pb.QueueItemRequest{
