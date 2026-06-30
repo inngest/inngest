@@ -3644,10 +3644,11 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 			continue
 		}
 		copied := *op
+		runInstanceCopy := *i
 		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
 			// parallel step individually.
-			i.item.GroupID = uuid.New().String()
+			runInstanceCopy.item.GroupID = uuid.New().String()
 		}
 		eg.Go(func() error {
 			defer func() {
@@ -3659,7 +3660,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 					)
 				}
 			}()
-			return e.handleGeneratorOp(ctx, i, copied, group)
+			return e.handleGeneratorOp(ctx, &runInstanceCopy, copied, group)
 		})
 	}
 	if err := eg.Wait(); err != nil {
