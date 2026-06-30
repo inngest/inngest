@@ -429,6 +429,7 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
 	accountID := uuid.New()
 	envID := uuid.New()
+	existingStepID := "generate-summary"
 
 	baseOpts := StateScoreProviderOptions{
 		State: fakeScoreRunService{
@@ -440,7 +441,7 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 						EnvID:     envID,
 					},
 				},
-				Stack: []string{"generate-summary"},
+				Stack: []string{scoreTraceStepID(existingStepID)},
 			},
 		},
 		Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
@@ -450,7 +451,7 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 
 	t.Run("accepts SDK step IDs from live state", func(t *testing.T) {
 		provider := NewStateScoreProvider(baseOpts)
-		stepID := "generate-summary"
+		stepID := existingStepID
 
 		err := provider.CreateScores(context.Background(), CreateScoresParams{
 			RunID: runID,
