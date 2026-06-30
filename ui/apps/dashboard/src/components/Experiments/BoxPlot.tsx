@@ -346,6 +346,8 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
           type="category"
           dataKey="variantName"
           width={yAxisWidth}
+          axisLine={false}
+          tickLine={false}
           tick={<VariantAxisTick />}
           interval={0}
         />
