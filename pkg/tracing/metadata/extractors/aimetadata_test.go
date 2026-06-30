@@ -77,8 +77,8 @@ func TestAIMetadataExtractor_CapturedFixtures(t *testing.T) {
 				enc := json.NewEncoder(&buf)
 				enc.SetIndent("", "  ")
 				require.NoError(t, enc.Encode(goldenAIMetadata{
-					Model:         md.Model,
-					System:        md.System,
+					Model:         md.RequestModel,
+					System:        md.Provider,
 					OperationName: md.OperationName,
 					ResponseModel: md.ResponseModel,
 					ResponseID:    md.ResponseID,

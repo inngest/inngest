@@ -49,7 +49,7 @@ func TestProviderPrefersProviderNameOverDeprecatedSystem(t *testing.T) {
 		var md AIMetadata
 		foundAny := extractAIMetadataFromAttributes(attrs, &md)
 		assert.True(t, foundAny)
-		assert.Equal(t, "anthropic", md.System,
+		assert.Equal(t, "anthropic", md.Provider,
 			"gen_ai.provider.name should win over deprecated gen_ai.system")
 	}
 }
