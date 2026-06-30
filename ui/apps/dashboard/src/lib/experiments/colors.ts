@@ -18,9 +18,9 @@ export const METRIC_PALETTE = [
  */
 export const METRIC_PALETTE_SUBTLE = [
   'rgb(var(--color-primary-3xSubtle))',
-  'rgb(var(--color-quaternary-cool-3xSubtle))',
   'rgb(var(--color-secondary-3xSubtle))',
   'rgb(var(--color-accent-3xSubtle))',
+  'rgb(var(--color-quaternary-cool-3xSubtle))',
   'rgb(var(--color-tertiary-3xSubtle))',
   'rgb(var(--color-quaternary-warmer-3xSubtle))',
 ] as const;
