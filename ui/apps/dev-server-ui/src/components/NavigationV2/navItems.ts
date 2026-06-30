@@ -4,6 +4,7 @@ import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
+import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
 
 export type NavItemConfig = {
   label: string;
@@ -24,6 +25,7 @@ export const workflow: NavGroupConfig = {
     { label: 'Apps', href: '/apps', Icon: AppsIcon },
     { label: 'Functions', href: '/functions', Icon: FunctionsIcon },
     { label: 'Runs', href: '/runs', Icon: RunsIcon },
+    { label: 'Sessions', href: '/sessions', Icon: SessionsIcon },
     { label: 'Events', href: '/events', Icon: EventLogsIcon },
   ],
 };
