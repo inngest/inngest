@@ -240,8 +240,9 @@ func (p *stateScoreProvider) validateStepTargets(ctx context.Context, id statev2
 }
 
 func scoreStepExistsInState(md *statev2.Metadata, stepID string) bool {
+	traceStepID := scoreTraceStepID(stepID)
 	for _, candidate := range md.Stack {
-		if candidate == stepID {
+		if candidate == stepID || candidate == traceStepID {
 			return true
 		}
 	}
