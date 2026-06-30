@@ -3276,6 +3276,13 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 		if err != nil {
 			if errors.Is(err, queue.ErrQueueItemExists) {
+				if pause.ParallelCoalesceKey != "" && pause.ParallelMode != enums.ParallelModeRace {
+					e.log.Debug("discovery enqueue after pause timeout deduped via coalesce key",
+						"run_id", md.ID.RunID.String(),
+						"job_id", jobID,
+						"coalesce_key", pause.ParallelCoalesceKey,
+					)
+				}
 				nextStepSpan.Drop()
 			} else {
 				_ = nextStepSpan.Send()
@@ -3452,12 +3459,25 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				return nil
 			}
 
-			if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
-				nextStepSpan.Drop()
-				return fmt.Errorf("error enqueueing after pause: %w", err)
+			if err != nil {
+				if errors.Is(err, queue.ErrQueueItemExists) {
+					if pause.ParallelCoalesceKey != "" && pause.ParallelMode != enums.ParallelModeRace {
+						e.log.Debug("discovery enqueue after pause resume deduped via coalesce key",
+							"run_id", md.ID.RunID.String(),
+							"job_id", jobID,
+							"coalesce_key", pause.ParallelCoalesceKey,
+							"parallel_mode", pause.ParallelMode,
+						)
+					}
+					// Another handler enqueued the discovery item; let it emit the span.
+					nextStepSpan.Drop()
+				} else {
+					nextStepSpan.Drop()
+					return fmt.Errorf("error enqueueing after pause: %w", err)
+				}
+			} else {
+				_ = nextStepSpan.Send()
 			}
-			// on successful enqueue, send the span
-			_ = nextStepSpan.Send()
 		}
 
 		// Only run lifecycles if we consumed the pause and enqueued next step.
@@ -3588,14 +3608,17 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// shared by all queue items in this batch.  Every concurrent fan-in
 	// completion will derive the same discovery JobID from this key, so the
 	// queue's idempotency check ensures only one discovery step is enqueued.
-	if len(nonLazyIDs) > 1 {
+	//
+	// Coalesce key and SavePending must agree.  Without SavePending populating
+	// pending_steps, every completion sees hasPendingSteps=false and races to
+	// enqueue discovery on the same coalesced JobID; one wins and the rest are
+	// silently deduped while their SaveSteps are still in flight, so the
+	// surviving discovery executes against incomplete state and the run wedges.
+	if hasPlanOp(resp.Generator) && len(nonLazyIDs) > 1 && i.md.ShouldCoalesceParallelism(resp) {
 		ck := computeParallelCoalesceKey(i.md.ID.RunID.String(), nonLazyIDs)
 		groups.PriorityGroup.ParallelCoalesceKey = ck
 		groups.OtherGroup.ParallelCoalesceKey = ck
-	}
 
-	// We only save pending steps if there's >= 1 step planned op.
-	if hasPlanOp(resp.Generator) && len(nonLazyIDs) > 1 && i.md.ShouldCoalesceParallelism(resp) {
 		if err := e.smv2.SavePending(ctx, i.md.ID, nonLazyIDs); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
@@ -3839,6 +3862,12 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 
 			if errors.Is(err, queue.ErrQueueItemExists) {
 				if coalesceKey != nil && gen.ParallelMode() != enums.ParallelModeRace {
+					e.log.Debug("discovery enqueue deduped via coalesce key",
+						"run_id", runCtx.Metadata().ID.RunID.String(),
+						"job_id", jobID,
+						"coalesce_key", *coalesceKey,
+						"parallel_mode", gen.ParallelMode(),
+					)
 					metrics.IncrDiscoveryCoalesceDedupCount(ctx, metrics.CounterOpt{PkgName: pkgName})
 				}
 				return nil

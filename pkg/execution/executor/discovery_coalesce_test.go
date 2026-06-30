@@ -177,6 +177,110 @@ func TestResumeCoalesceJobID(t *testing.T) {
 	}
 }
 
+// trackingRunSvc records SavePending invocations so tests can assert whether
+// pending-step tracking was populated for a given batch.
+type trackingRunSvc struct {
+	sv2.RunService
+	savePendingCalls [][]string
+}
+
+func (s *trackingRunSvc) UpdateMetadata(_ context.Context, _ sv2.ID, _ sv2.MutableConfig) error {
+	return nil
+}
+func (s *trackingRunSvc) SavePending(_ context.Context, _ sv2.ID, pending []string) error {
+	s.savePendingCalls = append(s.savePendingCalls, pending)
+	return nil
+}
+
+// Regression: when ShouldCoalesceParallelism is false (SDK reports V1),
+// the coalesce key must stay off the queue items. Otherwise concurrent
+// fan-in completions silently dedup on the same JobID while SaveSteps are
+// still in flight, and the surviving discovery runs against incomplete state.
+func TestHandleGeneratorResponse_NoCoalesceKeyWhenSDKReportsV1(t *testing.T) {
+	runID := ulid.MustNew(ulid.Now(), nil)
+	wsID, fnID, aID := uuid.New(), uuid.New(), uuid.New()
+
+	svc := &trackingRunSvc{}
+	q := &dedupeQueue{}
+	e := &executor{
+		smv2:           svc,
+		queue:          q,
+		log:            logger.From(context.Background()),
+		tracerProvider: tracing.NewNoopTracerProvider(),
+	}
+
+	md := sv2.Metadata{
+		ID:     sv2.ID{RunID: runID, FunctionID: fnID, Tenant: sv2.Tenant{EnvID: wsID, AccountID: aID}},
+		Config: *sv2.InitConfig(&sv2.Config{RequestVersion: 1}),
+	}
+	i := &runInstance{
+		md:   md,
+		edge: inngest.Edge{Incoming: "step"},
+		item: queue.Item{Payload: queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}},
+	}
+
+	stepIDs := []string{"step-a", "step-b", "step-c"}
+	gen := make([]*state.GeneratorOpcode, 0, len(stepIDs))
+	for _, id := range stepIDs {
+		gen = append(gen, &state.GeneratorOpcode{Op: enums.OpcodeStepPlanned, ID: id})
+	}
+	resp := &state.DriverResponse{Generator: gen, RequestVersion: 1}
+
+	require.NoError(t, e.HandleGeneratorResponse(context.Background(), i, resp))
+
+	require.Empty(t, svc.savePendingCalls, "SavePending must not be called when SDK reports V1")
+	require.Len(t, q.enqueued, len(stepIDs))
+	for _, item := range q.enqueued {
+		require.Nil(t, item.ParallelCoalesceKey,
+			"queue items must not carry a ParallelCoalesceKey when SDK reports V1 — silent dedup would wedge the run")
+	}
+}
+
+// Under V2, SavePending is called and every queue item carries the same
+// coalesce key, so concurrent fan-in completions safely dedup on one discovery.
+func TestHandleGeneratorResponse_StampsCoalesceKeyWhenSDKReportsV2(t *testing.T) {
+	runID := ulid.MustNew(ulid.Now(), nil)
+	wsID, fnID, aID := uuid.New(), uuid.New(), uuid.New()
+
+	svc := &trackingRunSvc{}
+	q := &dedupeQueue{}
+	e := &executor{
+		smv2:           svc,
+		queue:          q,
+		log:            logger.From(context.Background()),
+		tracerProvider: tracing.NewNoopTracerProvider(),
+	}
+
+	md := sv2.Metadata{
+		ID:     sv2.ID{RunID: runID, FunctionID: fnID, Tenant: sv2.Tenant{EnvID: wsID, AccountID: aID}},
+		Config: *sv2.InitConfig(&sv2.Config{RequestVersion: 2}),
+	}
+	i := &runInstance{
+		md:   md,
+		edge: inngest.Edge{Incoming: "step"},
+		item: queue.Item{Payload: queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}},
+	}
+
+	stepIDs := []string{"step-a", "step-b", "step-c"}
+	gen := make([]*state.GeneratorOpcode, 0, len(stepIDs))
+	for _, id := range stepIDs {
+		gen = append(gen, &state.GeneratorOpcode{Op: enums.OpcodeStepPlanned, ID: id})
+	}
+	resp := &state.DriverResponse{Generator: gen, RequestVersion: 2}
+
+	require.NoError(t, e.HandleGeneratorResponse(context.Background(), i, resp))
+
+	require.Len(t, svc.savePendingCalls, 1, "SavePending must be called exactly once for a parallel batch under V2")
+	require.ElementsMatch(t, stepIDs, svc.savePendingCalls[0])
+
+	expectedCK := computeParallelCoalesceKey(runID.String(), stepIDs)
+	require.Len(t, q.enqueued, len(stepIDs))
+	for _, item := range q.enqueued {
+		require.NotNil(t, item.ParallelCoalesceKey, "queue items must carry a ParallelCoalesceKey under V2")
+		require.Equal(t, expectedCK, *item.ParallelCoalesceKey, "all items in the batch must share the same coalesce key")
+	}
+}
+
 // TestAIGatewayCoalesceJobID verifies that concurrent AIGateway completions in the same
 // parallel batch coalesce to a single discovery enqueue even when SaveStep's non-atomic
 // pending check lets both see hasPendingSteps=false.
