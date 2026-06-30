@@ -78,10 +78,6 @@ func (a AllowAsyncDispatchValidation) Enabled(ctx context.Context, acctID uuid.U
 // (~10s) — longer windows let a fast-Requeue race slip past unfenced.
 const dispatchValidationSkipDuration = 10 * time.Second
 
-type queueItemLoader interface {
-	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
-}
-
 type Opts struct {
 	// State allows loading and mutating state from various checkpointing APIs.
 	State state.RunService
@@ -719,16 +715,7 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		return nil
 	}
 
-	loader, ok := c.Queue.(queueItemLoader)
-	if !ok {
-		// Fail open if the queue can't load items (e.g. mock or alt backend);
-		// the alternative is rejecting every fenced POST forever.
-		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping", "run_id", input.RunID)
-		result = "no_loader"
-		return nil
-	}
-
-	item, err := loader.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
+	item, err := c.Queue.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
 	if errors.Is(err, queue.ErrQueueItemNotFound) {
 		return fmt.Errorf("%w: queue item not found", ErrStaleDispatch)
 	}
