@@ -9,14 +9,16 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	apiv1 "github.com/inngest/inngest/pkg/api/apiv1"
-	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/api/metadatawriter"
 	"github.com/inngest/inngest/pkg/enums"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 )
+
+const scorePkgName = "apiv2.inngest"
 
 // ScoreAuthResolver returns the account and workspace a score should be
 // recorded under for the current request.
@@ -37,15 +39,12 @@ type ScoreStepTargetValidatorParams struct {
 // cannot prove that the step exists.
 type ScoreStepTargetValidator func(ctx context.Context, params ScoreStepTargetValidatorParams) error
 
-type MissingScoreMetadataLoader func(ctx context.Context, id statev2.ID) (*statev2.Metadata, error)
-
 type StateScoreProviderOptions struct {
 	State              statev2.RunService
 	TracerProvider     tracing.TracerProvider
-	TraceReader        cqrs.TraceReader
 	Auth               ScoreAuthResolver
 	Enabled            ScoresEnabledFlag
-	MissingStateLoader MissingScoreMetadataLoader
+	MissingStateLoader metadatawriter.MissingStateLoader
 	StepValidator      ScoreStepTargetValidator
 }
 
@@ -55,7 +54,6 @@ func NewStateScoreProvider(opts StateScoreProviderOptions) ScoreProvider {
 	return &stateScoreProvider{
 		state:              opts.State,
 		tracerProvider:     opts.TracerProvider,
-		traceReader:        opts.TraceReader,
 		auth:               opts.Auth,
 		enabled:            opts.Enabled,
 		missingStateLoader: opts.MissingStateLoader,
@@ -66,10 +64,9 @@ func NewStateScoreProvider(opts StateScoreProviderOptions) ScoreProvider {
 type stateScoreProvider struct {
 	state              statev2.RunService
 	tracerProvider     tracing.TracerProvider
-	traceReader        cqrs.TraceReader
 	auth               ScoreAuthResolver
 	enabled            ScoresEnabledFlag
-	missingStateLoader MissingScoreMetadataLoader
+	missingStateLoader metadatawriter.MissingStateLoader
 	stepValidator      ScoreStepTargetValidator
 }
 
@@ -99,95 +96,53 @@ func (p *stateScoreProvider) CreateScores(ctx context.Context, params CreateScor
 		return err
 	}
 
+	items := make([]metadatawriter.Item, 0, len(params.Scores)*2)
 	for _, score := range params.Scores {
-		updates, err := scoreMetadataUpdates(score)
+		update, err := ScoreMetadataUpdate(score.Name, score.Value)
 		if err != nil {
 			return err
 		}
-		err = apiv1.AddRunMetadata(ctx, apiv1.AddRunMetadataOpts{
-			State:          p.metadataState(),
-			TracerProvider: p.tracerProvider,
-			TraceReader:    p.traceReader,
-		}, scoreAuth{accountID: accountID, envID: envID}, params.RunID, &apiv1.AddRunMetadataRequest{
-			Target: apiv1.RunMetadataTarget{
-				StepID: score.StepID,
-			},
-			Metadata: updates,
-		})
-		switch {
-		case errors.Is(err, statev2.ErrRunNotFound), errors.Is(err, statev2.ErrMetadataNotFound):
-			return fmt.Errorf("%w: %s", ErrScoreTargetNotFound, params.RunID)
-		case err != nil:
-			return err
+		stepID := score.StepID
+		if score.Experiment != nil {
+			experimentUpdate, err := ScoreExperimentMetadataUpdate(*score.Experiment)
+			if err != nil {
+				return err
+			}
+			items = append(items, metadatawriter.Item{
+				Metadata: experimentUpdate,
+				Parent: func(md *statev2.Metadata) (*meta.SpanReference, metadata.Scope) {
+					return scoreParentSpanRef(md, stepID)
+				},
+			})
 		}
+		items = append(items, metadatawriter.Item{
+			Metadata: update,
+			Parent: func(md *statev2.Metadata) (*meta.SpanReference, metadata.Scope) {
+				return scoreParentSpanRef(md, stepID)
+			},
+		})
+	}
+
+	writer := metadatawriter.Writer{
+		State:              p.state,
+		TracerProvider:     p.tracerProvider,
+		MissingStateLoader: p.missingStateLoader,
+		PkgName:            scorePkgName,
+	}
+
+	err = writer.Write(ctx, metadatawriter.WriteRequest{
+		ID:       stateID,
+		Items:    items,
+		Location: "Service.CreateScore",
+	})
+	switch {
+	case errors.Is(err, statev2.ErrRunNotFound), errors.Is(err, statev2.ErrMetadataNotFound):
+		return fmt.Errorf("%w: %s", ErrScoreTargetNotFound, params.RunID)
+	case err != nil:
+		return err
 	}
 
 	return nil
-}
-
-func scoreMetadataUpdates(score ScoreInput) ([]metadata.Update, error) {
-	updates := make([]metadata.Update, 0, 2)
-	if score.Experiment != nil {
-		update, err := ScoreExperimentMetadataUpdate(*score.Experiment)
-		if err != nil {
-			return nil, err
-		}
-		updates = append(updates, update)
-	}
-
-	update, err := ScoreMetadataUpdate(score.Name, score.Value)
-	if err != nil {
-		return nil, err
-	}
-	updates = append(updates, update)
-	return updates, nil
-}
-
-func (p *stateScoreProvider) metadataState() statev2.RunService {
-	if p.missingStateLoader == nil {
-		return p.state
-	}
-	return scoreMetadataState{
-		RunService: p.state,
-		load:       p.missingStateLoader,
-	}
-}
-
-type scoreMetadataState struct {
-	statev2.RunService
-	load MissingScoreMetadataLoader
-}
-
-func (s scoreMetadataState) LoadMetadata(ctx context.Context, id statev2.ID, opts ...statev2.LoadMetadataOption) (statev2.Metadata, error) {
-	md, err := s.RunService.LoadMetadata(ctx, id, opts...)
-	if err == nil {
-		return md, nil
-	}
-	if !errors.Is(err, statev2.ErrRunNotFound) && !errors.Is(err, statev2.ErrMetadataNotFound) {
-		return statev2.Metadata{}, err
-	}
-
-	loaded, loadErr := s.load(ctx, id)
-	if loadErr != nil {
-		return statev2.Metadata{}, loadErr
-	}
-	if loaded == nil {
-		return statev2.Metadata{}, err
-	}
-	return *loaded, nil
-}
-
-type scoreAuth struct {
-	accountID uuid.UUID
-	envID     uuid.UUID
-}
-
-func (s scoreAuth) AccountID() uuid.UUID {
-	return s.accountID
-}
-
-func (s scoreAuth) WorkspaceID() uuid.UUID {
-	return s.envID
 }
 
 func (p *stateScoreProvider) validateStepTargets(ctx context.Context, id statev2.ID, scores []ScoreInput) error {
@@ -248,6 +203,14 @@ func scoreStepExistsInState(md *statev2.Metadata, stepID string) bool {
 		}
 	}
 	return false
+}
+
+func scoreParentSpanRef(stateMetadata *statev2.Metadata, stepID *string) (*meta.SpanReference, metadata.Scope) {
+	if stepID == nil {
+		return tracing.RunSpanRefFromMetadata(stateMetadata), enums.MetadataScopeRun
+	}
+
+	return tracing.FinalizedStepSpanRefFromMetadataAndStepID(stateMetadata, scoreTraceStepID(*stepID)), enums.MetadataScopeStep
 }
 
 func scoreTraceStepID(stepID string) string {
