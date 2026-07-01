@@ -962,7 +962,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 	fnName := "test-fn"
 	fnSlug := "test-app-test-fn"
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -993,7 +993,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 			_ = srv.ListenAndServe()
 		}()
 		t.Cleanup(func() {
-			_ = srv.Shutdown(ctx)
+			_ = srv.Shutdown(context.Background())
 		})
 
 		okReply, err := json.Marshal(sync.Reply{
@@ -1114,6 +1114,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 	t.Cleanup(func() {
 		_ = svc.Stop(context.Background())
 	})
+	t.Cleanup(cancel) // registered last = runs first (LIFO): cancels ctx before svc.Stop()
 
 	// Wait until fake API is up
 	maxAttempts := 10
