@@ -286,6 +286,8 @@ export function VariantsTable({
             </span>
           }
           cellClassName="py-2"
+          onRowMouseEnter={() => {}}
+          onRowMouseLeave={() => {}}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ExperimentVariantMetrics } from '@inngest/components/Experiments';
 import {
   Bar,
@@ -15,7 +15,7 @@ import {
   colorForVariant,
   subtleColorForVariant,
 } from '@/lib/experiments/colors';
-import { makeBoxPlotTooltip } from './BoxPlotTooltip';
+import { BoxPlotTooltip } from './BoxPlotTooltip';
 import { VariantAxisTick } from './VariantAxisTick';
 
 const BOX_HEIGHT = 10;
@@ -30,6 +30,7 @@ export type RowData = {
   /** Index of the variant in the shared list, used to pick a stable palette color. */
   variantIndex: number;
 
+  runCount: number;
   avg: number;
   stddev: number;
 
@@ -40,20 +41,24 @@ export type RowData = {
   max: number;
   color: string;
   subtleColor: string;
+  opacity: number;
 };
 
 export function rowsForMetric(
   variants: ExperimentVariantMetrics[],
   metricKey: string,
+  colorIndexForVariant?: Map<string, number>,
 ): RowData[] {
   return variants
     .map((v, variantIndex) => {
       const m = v.metrics.find((vm) => vm.key === metricKey);
+      const colorIndex = colorIndexForVariant?.get(v.variantName) ?? variantIndex;
       return m
         ? {
             variantName: v.variantName,
-            variantIndex,
+            variantIndex: colorIndex,
             value: m.avg,
+            runCount: v.runCount,
             avg: m.avg,
             stddev: m.stddev,
             min: m.min,
@@ -61,8 +66,9 @@ export function rowsForMetric(
             med: m.med,
             q3: m.q3,
             max: m.max,
-            color: colorForVariant(variantIndex),
-            subtleColor: subtleColorForVariant(variantIndex),
+            color: colorForVariant(colorIndex),
+            subtleColor: subtleColorForVariant(colorIndex),
+            opacity: 1,
           }
         : null;
     })
@@ -86,19 +92,20 @@ function BoxShape({
   payload,
 }: BarShapeProps) {
   if (payload === undefined) return null;
+  const opacity = payload.opacity ?? 1;
   const range = payload.max - payload.min;
   if (range === 0) {
+    const cy = y + height / 2;
+    const r = BOX_HEIGHT / 2;
     return (
-      <g>
-        <rect
-          x={x}
-          y={y}
-          width={width}
-          height={height}
-          fill={payload?.subtleColor}
-          stroke={payload?.color}
-        />
-      </g>
+      <>
+        {opacity < 1 && (
+          <circle cx={x} cy={cy} r={r} fill="rgb(var(--color-background-canvas-base))" />
+        )}
+        <g opacity={opacity}>
+          <circle cx={x} cy={cy} r={r} fill={payload.subtleColor} stroke={payload.color} strokeWidth={LINE_WIDTH} />
+        </g>
+      </>
     );
   }
 
@@ -118,44 +125,55 @@ function BoxShape({
   const quantileXs = quantileOffsets.map((offset) => x + offset);
 
   return (
-    <g>
-      <rect
-        x={quantileXs[1]}
-        y={y}
-        width={quantileXs[3] - quantileXs[1]}
-        height={height}
-        fill={payload?.subtleColor}
-        stroke={payload?.color}
-        strokeWidth={LINE_WIDTH}
-      />
-      {quantileXs.map((qx, i) => (
-        <line
-          key={`quantile-${i}`}
-          x1={qx}
-          x2={qx}
-          y1={y}
-          y2={y + height}
+    <>
+      {opacity < 1 && (
+        <rect
+          x={quantileXs[1]}
+          y={y}
+          width={quantileXs[3] - quantileXs[1]}
+          height={height}
+          fill="rgb(var(--color-background-canvas-base))"
+        />
+      )}
+      <g opacity={opacity}>
+        <rect
+          x={quantileXs[1]}
+          y={y}
+          width={quantileXs[3] - quantileXs[1]}
+          height={height}
+          fill={payload?.subtleColor}
           stroke={payload?.color}
           strokeWidth={LINE_WIDTH}
         />
-      ))}
-      <line
-        x1={quantileXs[0]}
-        x2={quantileXs[1]}
-        y1={cyLine}
-        y2={cyLine}
-        stroke={payload?.color}
-        strokeWidth={LINE_HEIGHT}
-      />
-      <line
-        x1={quantileXs[3]}
-        x2={quantileXs[4]}
-        y1={cyLine}
-        y2={cyLine}
-        stroke={payload?.color}
-        strokeWidth={LINE_HEIGHT}
-      />
-    </g>
+        {quantileXs.map((qx, i) => (
+          <line
+            key={`quantile-${i}`}
+            x1={qx}
+            x2={qx}
+            y1={y}
+            y2={y + height}
+            stroke={payload?.color}
+            strokeWidth={LINE_WIDTH}
+          />
+        ))}
+        <line
+          x1={quantileXs[0]}
+          x2={quantileXs[1]}
+          y1={cyLine}
+          y2={cyLine}
+          stroke={payload?.color}
+          strokeWidth={LINE_HEIGHT}
+        />
+        <line
+          x1={quantileXs[3]}
+          x2={quantileXs[4]}
+          y1={cyLine}
+          y2={cyLine}
+          stroke={payload?.color}
+          strokeWidth={LINE_HEIGHT}
+        />
+      </g>
+    </>
   );
 }
 
@@ -201,8 +219,6 @@ type HoverLineProps = {
   hoverX: number | null;
   /** Hovered row — snapping is restricted to this row's values. */
   activeRow: RowData | null;
-  hoverValueRef: { current: number | null };
-  chartWidthRef: { current: number };
 };
 
 function HoverLine({
@@ -210,8 +226,6 @@ function HoverLine({
   yAxisMap,
   hoverX,
   activeRow,
-  hoverValueRef,
-  chartWidthRef,
 }: HoverLineProps) {
   if (hoverX === null || !xAxisMap || !yAxisMap) return null;
 
@@ -248,11 +262,6 @@ function HoverLine({
   const chartRight = xAxis.x + xAxis.width;
   plotX = Math.min(Math.max(plotX, chartLeft), chartRight);
 
-  // Keep refs in sync with the post-snap, post-clamp position so the tooltip
-  // reads the same data-space value the line lands on.
-  chartWidthRef.current = xAxis.width;
-  hoverValueRef.current = scale?.invert?.(plotX) ?? null;
-
   return (
     <line
       x1={plotX}
@@ -271,47 +280,56 @@ type Props = {
   rows: RowData[];
   domain: [number, number];
   metricDisplayName: string;
+  hoveredVariantName?: string | null;
+  onVariantHover?: (name: string | null) => void;
 };
 
-export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
+export function BoxPlot({ rows, domain, metricDisplayName, hoveredVariantName, onVariantHover }: Props) {
   const { chartHeight, yAxisWidth } = computeChartSizing(
     rows.map((r) => r.variantName),
   );
+
+  const [hoverX, setHoverX] = useState<number | null>(null);
+  const [activeRow, setActiveRow] = useState<RowData | null>(null);
+
+  const displayRows = useMemo(
+    () =>
+      rows.map((r) => ({
+        ...r,
+        // Only dim when the highlight comes from another chart (this chart has no active row)
+        opacity: !hoveredVariantName || activeRow !== null || r.variantName === hoveredVariantName ? 1 : 0.25,
+      })),
+    [rows, hoveredVariantName, activeRow],
+  );
+
   const boxDataKey: (entry: RowData) => [number, number] = (entry) => [
     entry.min,
     entry.max,
   ];
 
-  const [hoverX, setHoverX] = useState<number | null>(null);
-  const [activeRow, setActiveRow] = useState<RowData | null>(null);
-  const hoverValueRef = useRef<number | null>(null);
-  const chartWidthRef = useRef<number>(0);
-  const tooltipContent = useMemo(
-    () => makeBoxPlotTooltip(domain, hoverValueRef, chartWidthRef),
-    [domain],
-  );
-
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
       <RechartsBarChart
-        data={rows}
+        data={displayRows}
         layout="vertical"
         barSize={BOX_HEIGHT * 2}
-        margin={{ top: 0, right: 0, bottom: 0, left: 4 }}
+        margin={{ top: 0, right: 16, bottom: 0, left: 4 }}
         onMouseMove={(state) => {
           if (!state.isTooltipActive) {
             setHoverX(null);
             setActiveRow(null);
+            onVariantHover?.(null);
             return;
           }
+          const row = (state.activePayload?.[0]?.payload as RowData | undefined) ?? null;
           setHoverX(state.chartX ?? null);
-          setActiveRow(
-            (state.activePayload?.[0]?.payload as RowData | undefined) ?? null,
-          );
+          setActiveRow(row);
+          onVariantHover?.(row?.variantName ?? null);
         }}
         onMouseLeave={() => {
           setHoverX(null);
           setActiveRow(null);
+          onVariantHover?.(null);
         }}
       >
         <XAxis
@@ -332,7 +350,7 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
           interval={0}
         />
         <Tooltip
-          content={tooltipContent}
+          content={<BoxPlotTooltip />}
           cursor={{ fill: 'rgb(var(--color-background-canvas-subtle))' }}
           allowEscapeViewBox={{ x: true, y: true }}
           wrapperStyle={{ zIndex: 50, outline: 'none' }}
@@ -344,14 +362,7 @@ export function BoxPlot({ rows, domain, metricDisplayName }: Props) {
           background={<BackgroundLineShape />}
         />
         <Customized
-          component={
-            <HoverLine
-              hoverX={hoverX}
-              activeRow={activeRow}
-              hoverValueRef={hoverValueRef}
-              chartWidthRef={chartWidthRef}
-            />
-          }
+          component={<HoverLine hoverX={hoverX} activeRow={activeRow} />}
         />
       </RechartsBarChart>
     </ResponsiveContainer>

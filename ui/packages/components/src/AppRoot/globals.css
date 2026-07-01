@@ -487,3 +487,7 @@ input[type='number'] {
   scrollbar-width: 10px;
   scrollbar-gutter: 10px;
 }
+
+.recharts-wrapper *:focus:not(:focus-visible) {
+  outline: none !important;
+}

@@ -14,13 +14,14 @@ import { Skeleton } from '@inngest/components/Skeleton';
 import { TableBlankState } from '@inngest/components/Table';
 import { ExperimentsIcon } from '@inngest/components/icons/sections/Experiments';
 import { subtractDuration } from '@inngest/components/utils/date';
-import { RiFlaskLine, RiListOrdered2, RiRefreshLine } from '@remixicon/react';
+import { RiFlaskLine, RiListOrdered2, RiRefreshLine, RiTrophyLine } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { ExperimentDetailToolbar } from '@/components/Experiments/ExperimentDetailToolbar';
 import { InfoSidebar } from '@/components/Experiments/InfoSidebar';
 import { MetricPanel } from '@/components/Experiments/MetricPanel';
+import { RunCountDonutCard } from '@/components/Experiments/RunCountDonutCard';
 import { ScoreSummaryCard } from '@/components/Experiments/ScoreSummaryCard';
 import { ScoringFormulaSidebar } from '@/components/Experiments/ScoringFormulaSidebar';
 import {
@@ -32,7 +33,8 @@ import { useScoringConfig } from '@/components/Experiments/useScoringConfig';
 import { VariantsTable } from '@/components/Experiments/VariantsTable';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { insightsUrl } from '@/lib/experiments/insightsUrl';
-import { findExtremum, scoreVariants } from '@/lib/experiments/score';
+import { truncateCenter } from '@/lib/experiments/chart';
+import { scoreVariants } from '@/lib/experiments/score';
 import {
   experimentTimeRangeToRangeChange,
   type ExperimentTimeRange as ExperimentUrlTimeRange,
@@ -134,6 +136,7 @@ export function ExperimentDetailPage({
 
   const [showInactive, setShowInactive] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(INFO_PANEL);
+  const [hoveredVariantName, setHoveredVariantName] = useState<string | null>(null);
 
   const queryRange = useMemo<ExperimentTimeRange>(() => {
     return rangeToTimeRange(range);
@@ -183,18 +186,29 @@ export function ExperimentDetailPage({
     };
   }, [detail.data, selectedAvailableVariants, selectedVariants.length]);
 
+  const variantColorIndex = useMemo(() => {
+    const map = new Map<string, number>();
+    detail.data?.variants.forEach((v, i) => map.set(v.variantName, i));
+    return map;
+  }, [detail.data?.variants]);
+
   // Score each variant once so downstream panels (VariantsTable,
   // ScoreSummaryCard, top-variant callout) share the same precomputed results.
   const scoredVariants = useMemo(() => {
     if (!filteredDetail || !scoring.metrics) return null;
-    return scoreVariants(filteredDetail.variants, scoring.metrics);
+    const scored = scoreVariants(filteredDetail.variants, scoring.metrics);
+    return [...scored].sort((a, b) => b.result.total - a.result.total);
   }, [filteredDetail, scoring.metrics]);
 
-  const topVariantName = useMemo(() => {
-    if (!scoredVariants) return null;
-    const top = findExtremum(scoredVariants, (s) => s.result.total);
-    return top?.variant.variantName ?? null;
-  }, [scoredVariants]);
+  // Variant order derived from score ranking so all charts share the same order.
+  const sortedVariants = useMemo(
+    () => scoredVariants?.map((sv) => sv.variant) ?? [],
+    [scoredVariants],
+  );
+
+  const topScoredVariant = scoredVariants?.[0] ?? null;
+
+  const topVariantName = topScoredVariant?.variant.variantName ?? null;
 
   // Per-metric min/max of observed avg values across all variants, so the
   // scoring inputs can offer a "fit to data" shortcut.
@@ -248,13 +262,6 @@ export function ExperimentDetailPage({
           {
             text: 'All experiments',
             href: pathCreator.experiments({ envSlug: environment.slug }),
-          },
-          {
-            text: functionName,
-            href: pathCreator.function({
-              envSlug: environment.slug,
-              functionSlug,
-            }),
           },
           { text: experimentName },
         ]}
@@ -348,19 +355,45 @@ export function ExperimentDetailPage({
                     />
                   )
                 ) : (
+                  <div className="flex flex-col gap-3">
+                    {topScoredVariant && (
+                      <div className="bg-primary-3xSubtle flex items-center gap-2 rounded px-3 py-1.5">
+                        <RiTrophyLine className="text-primary-intense h-4 w-4 shrink-0" />
+                        <span
+                          className="text-primary-intense min-w-0 flex-1 truncate text-sm"
+                          title={topScoredVariant.variant.variantName}
+                        >
+                          Recommended: {truncateCenter(topScoredVariant.variant.variantName)}
+                        </span>
+                      </div>
+                    )}
                   <div className="@container">
                     <div className="grid grid-cols-1 gap-3 @[800px]:grid-cols-2 @[1200px]:grid-cols-3">
-                      <ScoreSummaryCard
-                        className="col-span-full"
-                        scoredVariants={scoredVariants}
-                        metrics={scoring.metrics}
-                      />
+                      <div className="col-span-full flex flex-wrap gap-3">
+                        <RunCountDonutCard
+                          className="min-h-[250px] min-w-0 grow shrink basis-full @[800px]:basis-0"
+                          variants={sortedVariants}
+                          variantColorIndex={variantColorIndex}
+                          onVariantHover={setHoveredVariantName}
+                          highlightedVariantName={hoveredVariantName}
+                        />
+                        <ScoreSummaryCard
+                          className="min-h-[250px] min-w-0 grow shrink basis-full @[800px]:basis-0"
+                          scoredVariants={scoredVariants}
+                          metrics={scoring.metrics}
+                          hoveredVariantName={hoveredVariantName}
+                          onVariantHover={setHoveredVariantName}
+                        />
+                      </div>
 
                       {enabledMetrics.map((metric) => (
                         <MetricPanel
                           key={metric.key}
                           metric={metric}
-                          variants={filteredDetail.variants}
+                          variants={sortedVariants}
+                          variantColorIndex={variantColorIndex}
+                          hoveredVariantName={hoveredVariantName}
+                          onVariantHover={setHoveredVariantName}
                         />
                       ))}
 
@@ -375,6 +408,7 @@ export function ExperimentDetailPage({
                         onShowInactiveChange={setShowInactive}
                       />
                     </div>
+                  </div>
                   </div>
                 ))}
             </>
@@ -394,6 +428,12 @@ export function ExperimentDetailPage({
                 <InfoSidebar
                   detail={detail.data}
                   topVariantName={topVariantName}
+                  variantOrder={sortedVariants.map((v) => v.variantName)}
+                  functionName={functionName}
+                  functionHref={pathCreator.function({
+                    envSlug: environment.slug,
+                    functionSlug,
+                  })}
                 />
               )}
               {activePanel === SCORING_PANEL && scoring.metrics && (
