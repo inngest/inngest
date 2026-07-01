@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _QueueNormalizeReasonName = "unchangedthrottle_removedthrottle_key_changedcustom_concurrency_key_count_mismatchcustom_concurrency_key_not_found_on_shadow_partition"
+const _QueueNormalizeReasonName = "unchangedthrottle_removedthrottle_key_changedcustom_concurrency_key_count_mismatchcustom_concurrency_key_not_found_on_shadow_partitionthrottle_scope_changed"
 
-var _QueueNormalizeReasonIndex = [...]uint8{0, 9, 25, 45, 82, 134}
+var _QueueNormalizeReasonIndex = [...]uint8{0, 9, 25, 45, 82, 134, 156}
 
-const _QueueNormalizeReasonLowerName = "unchangedthrottle_removedthrottle_key_changedcustom_concurrency_key_count_mismatchcustom_concurrency_key_not_found_on_shadow_partition"
+const _QueueNormalizeReasonLowerName = "unchangedthrottle_removedthrottle_key_changedcustom_concurrency_key_count_mismatchcustom_concurrency_key_not_found_on_shadow_partitionthrottle_scope_changed"
 
 func (i QueueNormalizeReason) String() string {
 	if i < 0 || i >= QueueNormalizeReason(len(_QueueNormalizeReasonIndex)-1) {
@@ -30,21 +30,24 @@ func _QueueNormalizeReasonNoOp() {
 	_ = x[QueueNormalizeReasonThrottleKeyChanged-(2)]
 	_ = x[QueueNormalizeReasonCustomConcurrencyKeyCountMismatch-(3)]
 	_ = x[QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition-(4)]
+	_ = x[QueueNormalizeReasonThrottleScopeChanged-(5)]
 }
 
-var _QueueNormalizeReasonValues = []QueueNormalizeReason{QueueNormalizeReasonUnchanged, QueueNormalizeReasonThrottleRemoved, QueueNormalizeReasonThrottleKeyChanged, QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition}
+var _QueueNormalizeReasonValues = []QueueNormalizeReason{QueueNormalizeReasonUnchanged, QueueNormalizeReasonThrottleRemoved, QueueNormalizeReasonThrottleKeyChanged, QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition, QueueNormalizeReasonThrottleScopeChanged}
 
 var _QueueNormalizeReasonNameToValueMap = map[string]QueueNormalizeReason{
-	_QueueNormalizeReasonName[0:9]:         QueueNormalizeReasonUnchanged,
-	_QueueNormalizeReasonLowerName[0:9]:    QueueNormalizeReasonUnchanged,
-	_QueueNormalizeReasonName[9:25]:        QueueNormalizeReasonThrottleRemoved,
-	_QueueNormalizeReasonLowerName[9:25]:   QueueNormalizeReasonThrottleRemoved,
-	_QueueNormalizeReasonName[25:45]:       QueueNormalizeReasonThrottleKeyChanged,
-	_QueueNormalizeReasonLowerName[25:45]:  QueueNormalizeReasonThrottleKeyChanged,
-	_QueueNormalizeReasonName[45:82]:       QueueNormalizeReasonCustomConcurrencyKeyCountMismatch,
-	_QueueNormalizeReasonLowerName[45:82]:  QueueNormalizeReasonCustomConcurrencyKeyCountMismatch,
-	_QueueNormalizeReasonName[82:134]:      QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition,
-	_QueueNormalizeReasonLowerName[82:134]: QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition,
+	_QueueNormalizeReasonName[0:9]:          QueueNormalizeReasonUnchanged,
+	_QueueNormalizeReasonLowerName[0:9]:     QueueNormalizeReasonUnchanged,
+	_QueueNormalizeReasonName[9:25]:         QueueNormalizeReasonThrottleRemoved,
+	_QueueNormalizeReasonLowerName[9:25]:    QueueNormalizeReasonThrottleRemoved,
+	_QueueNormalizeReasonName[25:45]:        QueueNormalizeReasonThrottleKeyChanged,
+	_QueueNormalizeReasonLowerName[25:45]:   QueueNormalizeReasonThrottleKeyChanged,
+	_QueueNormalizeReasonName[45:82]:        QueueNormalizeReasonCustomConcurrencyKeyCountMismatch,
+	_QueueNormalizeReasonLowerName[45:82]:   QueueNormalizeReasonCustomConcurrencyKeyCountMismatch,
+	_QueueNormalizeReasonName[82:134]:       QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition,
+	_QueueNormalizeReasonLowerName[82:134]:  QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition,
+	_QueueNormalizeReasonName[134:156]:      QueueNormalizeReasonThrottleScopeChanged,
+	_QueueNormalizeReasonLowerName[134:156]: QueueNormalizeReasonThrottleScopeChanged,
 }
 
 var _QueueNormalizeReasonNames = []string{
@@ -53,6 +56,7 @@ var _QueueNormalizeReasonNames = []string{
 	_QueueNormalizeReasonName[25:45],
 	_QueueNormalizeReasonName[45:82],
 	_QueueNormalizeReasonName[82:134],
+	_QueueNormalizeReasonName[134:156],
 }
 
 // QueueNormalizeReasonString retrieves an enum value from the enum constants string name.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/stretchr/testify/require"
 )
 
@@ -526,6 +527,48 @@ func TestDuplicateCronExpressionRejected(t *testing.T) {
 	err := triggers.Validate(ctx)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "duplicate cron expression")
+}
+
+func TestThrottleScopeJSON(t *testing.T) {
+	t.Run("defaults to function scope", func(t *testing.T) {
+		var throttle Throttle
+		err := json.Unmarshal([]byte(`{"limit":10,"period":"1m","burst":2}`), &throttle)
+
+		require.NoError(t, err)
+		require.Equal(t, enums.ThrottleScopeFn, throttle.Scope)
+		require.Equal(t, time.Minute, throttle.Period)
+	})
+
+	t.Run("accepts account scope", func(t *testing.T) {
+		var throttle Throttle
+		err := json.Unmarshal([]byte(`{"limit":10,"period":"1m","burst":2,"scope":"account"}`), &throttle)
+
+		require.NoError(t, err)
+		require.Equal(t, enums.ThrottleScopeAccount, throttle.Scope)
+	})
+
+	t.Run("omits default scope when marshaling", func(t *testing.T) {
+		got, err := json.Marshal(Throttle{
+			Limit:  10,
+			Period: time.Minute,
+			Burst:  2,
+		})
+
+		require.NoError(t, err)
+		require.JSONEq(t, `{"limit":10,"period":"1m","burst":2}`, string(got))
+	})
+
+	t.Run("marshals account scope using SDK value", func(t *testing.T) {
+		got, err := json.Marshal(Throttle{
+			Limit:  10,
+			Period: time.Minute,
+			Burst:  2,
+			Scope:  enums.ThrottleScopeAccount,
+		})
+
+		require.NoError(t, err)
+		require.JSONEq(t, `{"limit":10,"period":"1m","burst":2,"scope":"account"}`, string(got))
+	})
 }
 
 func strptr(s string) *string { return &s }

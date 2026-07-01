@@ -1767,11 +1767,19 @@ message FunctionDebounceConfiguration {
   optional string key = 2;
 }
 
+enum FunctionThrottleScope {
+  FUNCTION_THROTTLE_SCOPE_UNSPECIFIED = 0;
+  FUNCTION_THROTTLE_SCOPE_ACCOUNT = 1;
+  FUNCTION_THROTTLE_SCOPE_ENVIRONMENT = 2;
+  FUNCTION_THROTTLE_SCOPE_FUNCTION = 3;
+}
+
 message FunctionThrottleConfiguration {
   int32 burst = 1;
   optional string key = 2;
   int32 limit = 3;
   string period = 4;
+  FunctionThrottleScope scope = 5;
 }
 
 message FunctionSingletonConfiguration {

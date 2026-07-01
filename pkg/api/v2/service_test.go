@@ -480,6 +480,7 @@ func TestService_GetFunction(t *testing.T) {
 				Limit:  5,
 				Burst:  2,
 				Period: time.Minute,
+				Scope:  enums.ThrottleScopeAccount,
 				Key:    &key,
 			},
 			Singleton: &inngest.Singleton{
@@ -525,6 +526,7 @@ func TestService_GetFunction(t *testing.T) {
 		require.Equal(t, int32(10), config.RateLimit.Limit)
 		require.Equal(t, "30s", config.Debounce.Period)
 		require.Equal(t, int32(2), config.Throttle.Burst)
+		require.Equal(t, apiv2.FunctionThrottleScope_FUNCTION_THROTTLE_SCOPE_ACCOUNT, config.Throttle.Scope)
 		require.Equal(t, apiv2.FunctionSingletonMode_FUNCTION_SINGLETON_MODE_CANCEL, config.Singleton.Mode)
 		require.Equal(t, singletonKey, config.Singleton.GetKey())
 	})

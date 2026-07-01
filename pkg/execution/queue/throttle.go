@@ -23,6 +23,10 @@ func (q PartitionConstraintConfig) HasOutdatedThrottle(qi QueueItem) enums.Outda
 
 	// Both item and constraint throttle are set but expression hash does not match
 	case itemThrottle != nil && constraintThrottle != nil:
+		if itemThrottle.Scope != constraintThrottle.Scope {
+			return enums.OutdatedThrottleReasonScopeMismatch
+		}
+
 		// If item has throttle set but no key expression hash, we should re-evaluate to avoid missing throttle key updates
 		if itemThrottle.KeyExpressionHash == "" {
 			return enums.OutdatedThrottleReasonMissingKeyExpressionHash
