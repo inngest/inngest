@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.35.0] - 2026-07-01
+
+### 🚀 Features
+
+- *(experiments)* Visualize numeric metrics using box plots (#4517)
+- *(function-view)* Show key queues setting (#4546)
+- *(experiments)* Update charts/layout to match new design (#4551)
+
+### 🐛 Bug Fixes
+
+- Should not coalesce parallel steps for the V1 execution engine (#4538)
+- *(experiments)* Fix boxplot colors (#4542)
+
+### ◀️ Revert
+
+- Always SavePending after parallel ops to coalesce discovery (#4021) (#4534)
+
 ## [v1.34.0] - 2026-06-29
 
 ### 🚀 Features
@@ -34,6 +51,7 @@ All notable changes to this project will be documented in this file.
 - *(sessions)* Sessions UI feedback (#4500)
 - *(release)* For homebrew installed inngest-cli, use homebrew-tap for latest version (#4511)
 - Adding metrics for run duration (#4445)
+- *(release)* V1.34.0 (#4497)
 
 ## [v1.33.0] - 2026-06-23
 
