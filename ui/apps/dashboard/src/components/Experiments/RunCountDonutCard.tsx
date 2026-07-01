@@ -69,7 +69,7 @@ export function RunCountDonutCard({ variants, className, variantColorIndex, onVa
         <span className="text-basis text-sm">Total Run Count</span>
       </Card.Header>
       <Card.Content className="flex items-center gap-4 px-3 py-2">
-        <div className="relative shrink" style={{ width: maxDonutSize, height: maxDonutSize }}>
+        <div className="relative aspect-square shrink min-w-0" style={{ width: maxDonutSize }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -113,7 +113,7 @@ export function RunCountDonutCard({ variants, className, variantColorIndex, onVa
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-center pr-4">
+        <div className="flex grow shrink-0 items-center justify-center pr-4">
           <div className="flex flex-col items-center justify-center gap-1.5">
             {variants.map((v, index) => (
               <div key={v.variantName} className="flex w-full items-center gap-1">

@@ -369,16 +369,16 @@ export function ExperimentDetailPage({
                     )}
                   <div className="@container">
                     <div className="grid grid-cols-1 gap-3 @[800px]:grid-cols-2 @[1200px]:grid-cols-3">
-                      <div className="col-span-full flex gap-3">
+                      <div className="col-span-full flex flex-wrap gap-3">
                         <RunCountDonutCard
-                          className="min-h-[250px] min-w-0 flex-1"
+                          className="min-h-[250px] min-w-0 grow shrink basis-full @[800px]:basis-0"
                           variants={sortedVariants}
                           variantColorIndex={variantColorIndex}
                           onVariantHover={setHoveredVariantName}
                           highlightedVariantName={hoveredVariantName}
                         />
                         <ScoreSummaryCard
-                          className="min-h-[250px] min-w-0 flex-1"
+                          className="min-h-[250px] min-w-0 grow shrink basis-full @[800px]:basis-0"
                           scoredVariants={scoredVariants}
                           metrics={scoring.metrics}
                           hoveredVariantName={hoveredVariantName}
