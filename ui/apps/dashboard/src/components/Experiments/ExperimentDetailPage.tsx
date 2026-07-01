@@ -263,13 +263,6 @@ export function ExperimentDetailPage({
             text: 'All experiments',
             href: pathCreator.experiments({ envSlug: environment.slug }),
           },
-          {
-            text: functionName,
-            href: pathCreator.function({
-              envSlug: environment.slug,
-              functionSlug,
-            }),
-          },
           { text: experimentName },
         ]}
       />
@@ -436,6 +429,11 @@ export function ExperimentDetailPage({
                   detail={detail.data}
                   topVariantName={topVariantName}
                   variantOrder={sortedVariants.map((v) => v.variantName)}
+                  functionName={functionName}
+                  functionHref={pathCreator.function({
+                    envSlug: environment.slug,
+                    functionSlug,
+                  })}
                 />
               )}
               {activePanel === SCORING_PANEL && scoring.metrics && (

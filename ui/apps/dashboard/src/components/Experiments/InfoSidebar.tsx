@@ -1,4 +1,5 @@
 import { Card } from '@inngest/components/Card';
+import { Link } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill';
 import {
   formatVariantWeight,
@@ -7,9 +8,11 @@ import {
   type ExperimentVariantMetrics,
 } from '@inngest/components/Experiments';
 import { truncateCenter } from '@/lib/experiments/chart';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiArrowLeftLine,
+  RiExternalLinkLine,
   RiFlaskLine,
   RiScalesLine,
   RiTrophyLine,
@@ -36,6 +39,8 @@ type Props = {
   detail: ExperimentDetail;
   topVariantName: string | null;
   variantOrder?: string[];
+  functionName: string;
+  functionHref: string;
 };
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -54,7 +59,9 @@ function IconTile({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function InfoSidebar({ detail, topVariantName, variantOrder }: Props) {
+export function InfoSidebar({
+  detail,
+  topVariantName, variantOrder, functionName, functionHref, }: Props) {
   const active = isActive(detail.lastSeen);
 
   return (
@@ -83,21 +90,38 @@ export function InfoSidebar({ detail, topVariantName, variantOrder }: Props) {
       </section>
 
       <section>
+        <SectionLabel>Function</SectionLabel>
+        <Card>
+          <Card.Content className="flex items-center gap-2 p-2">
+            <IconTile>
+              <FunctionsIcon className="text-muted h-[18px] w-[18px]" />
+            </IconTile>
+            <span
+              className="text-basis min-w-0 flex-1 truncate text-sm"
+              title={functionName}
+            >
+              {functionName}
+            </span>
+            <Link
+              href={functionHref}
+              iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
+            >
+              View
+            </Link>
+          </Card.Content>
+        </Card>
+      </section>
+
+      <section>
         <SectionLabel>Type</SectionLabel>
         <Card>
-          <Card.Content className="flex flex-col gap-2 p-2">
-            <div className="flex items-center gap-2">
-              <IconTile>
-                <RiScalesLine className="text-muted h-[18px] w-[18px]" />
-              </IconTile>
-              <span className="text-basis min-w-0 flex-1 truncate text-sm">
-                {detail.selectionStrategy}
-              </span>
-            </div>
-            <Pill kind="default" appearance="solid">
-              {detail.variants.length} variant
-              {detail.variants.length !== 1 ? 's' : ''}
-            </Pill>
+          <Card.Content className="flex items-center gap-2 p-2">
+            <IconTile>
+              <RiScalesLine className="text-muted h-[18px] w-[18px]" />
+            </IconTile>
+            <span className="text-basis min-w-0 flex-1 truncate text-sm">
+              {detail.selectionStrategy}
+            </span>
           </Card.Content>
         </Card>
       </section>
