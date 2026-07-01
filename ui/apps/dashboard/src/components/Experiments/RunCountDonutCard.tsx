@@ -104,12 +104,14 @@ export function RunCountDonutCard({ variants, className, variantColorIndex, onVa
             </PieChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-basis text-sm font-semibold leading-tight">
-              {(displayVariant?.runCount ?? totalRunCount).toLocaleString()}
-            </span>
-            <span className="text-muted text-[10px] leading-tight uppercase tracking-wide">
-              {displayVariant ? truncateCenter(displayVariant.variantName) : 'Total Runs'}
-            </span>
+            <div className="flex max-w-[38%] flex-col items-center text-center">
+              <span className="text-basis text-sm font-semibold leading-tight">
+                {(displayVariant?.runCount ?? totalRunCount).toLocaleString()}
+              </span>
+              <span className="text-muted text-[10px] leading-tight uppercase tracking-wide">
+                {displayVariant ? `${truncateCenter(displayVariant.variantName)} Runs` : 'Total Runs'}
+              </span>
+            </div>
           </div>
         </div>
 

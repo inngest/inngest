@@ -406,6 +406,8 @@ export function ExperimentDetailPage({
                         onOpenInsights={onOpenInsights}
                         showInactive={showInactive}
                         onShowInactiveChange={setShowInactive}
+                        hoveredVariantName={hoveredVariantName}
+                        onVariantHover={setHoveredVariantName}
                       />
                     </div>
                   </div>
