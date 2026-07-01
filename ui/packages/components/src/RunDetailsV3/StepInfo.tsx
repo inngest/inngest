@@ -4,7 +4,7 @@ import { Button } from '@inngest/components/Button/Button';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
-import { parseAIOutput } from '../AI/utils';
+import { getAIInfo, getAIInfoFromMetadata, parseAIOutput } from '../AI/utils';
 import {
   CodeElement,
   ElementWrapper,
@@ -176,6 +176,8 @@ export const StepInfo = ({
   });
 
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
+  const aiInfo =
+    getAIInfoFromMetadata(trace.metadata) ?? (aiOutput ? getAIInfo(aiOutput) : undefined);
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
@@ -283,7 +285,7 @@ export const StepInfo = ({
 
           {stepKindInfo}
 
-          {aiOutput && <AITrace aiOutput={aiOutput} />}
+          {aiInfo && <AITrace aiInfo={aiInfo} />}
         </div>
       )}
 

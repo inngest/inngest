@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
-import { parseAIOutput } from '../AI/utils';
+import { getAIInfo, parseAIOutput } from '../AI/utils';
 import {
   ElementWrapper,
   IDElement,
@@ -58,6 +58,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
+  const aiInfo = aiOutput ? getAIInfo(aiOutput) : undefined;
   const { pathCreator } = usePathCreator();
 
   return (
@@ -200,7 +201,7 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
               return <TimeElement date={endedAt} />;
             }}
           </OptimisticElementWrapper>
-          {aiOutput && <AITrace aiOutput={aiOutput} />}
+          {aiInfo && <AITrace aiInfo={aiInfo} />}
         </div>
       )}
     </div>
