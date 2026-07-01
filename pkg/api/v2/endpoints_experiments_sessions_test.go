@@ -10,8 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// Experiments and sessions are Insights/ClickHouse-backed products that the OSS
-// dev server cannot serve, so the endpoints always return 501 in OSS.
+// Experiments and sessions are production only features so 501 in OSS.
 func TestExperimentsSessionsNotImplementedInOSS(t *testing.T) {
 	service := NewService(ServiceOptions{})
 
@@ -21,9 +20,14 @@ func TestExperimentsSessionsNotImplementedInOSS(t *testing.T) {
 		require.ErrorContains(t, err, "Experiments not implemented in OSS")
 	})
 	t.Run("GetExperiment", func(t *testing.T) {
-		_, err := service.GetExperiment(context.Background(), &apiv2.GetExperimentRequest{FunctionId: "fn", ExperimentName: "exp"})
+		_, err := service.GetExperiment(context.Background(), &apiv2.GetExperimentRequest{AppId: "app", FunctionId: "fn", ExperimentId: "exp"})
 		require.Equal(t, codes.Unimplemented, status.Code(err))
 		require.ErrorContains(t, err, "Experiments not implemented in OSS")
+	})
+	t.Run("ListSessionKeys", func(t *testing.T) {
+		_, err := service.ListSessionKeys(context.Background(), &apiv2.ListSessionKeysRequest{})
+		require.Equal(t, codes.Unimplemented, status.Code(err))
+		require.ErrorContains(t, err, "Sessions not implemented in OSS")
 	})
 	t.Run("ListSessions", func(t *testing.T) {
 		_, err := service.ListSessions(context.Background(), &apiv2.ListSessionsRequest{SessionKey: "k"})

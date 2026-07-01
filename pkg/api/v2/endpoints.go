@@ -304,6 +304,10 @@ func (s *Service) GetExperiment(ctx context.Context, req *apiv2.GetExperimentReq
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Experiments not implemented in OSS")
 }
 
+func (s *Service) ListSessionKeys(ctx context.Context, req *apiv2.ListSessionKeysRequest) (*apiv2.ListSessionKeysResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
+}
+
 func (s *Service) ListSessions(ctx context.Context, req *apiv2.ListSessionsRequest) (*apiv2.ListSessionsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
 }

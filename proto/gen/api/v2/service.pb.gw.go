@@ -1001,7 +1001,76 @@ func local_request_V2_ListExperiments_0(ctx context.Context, marshaler runtime.M
 	return msg, metadata, err
 }
 
-var filter_V2_GetExperiment_0 = &utilities.DoubleArray{Encoding: map[string]int{"function_id": 0, "experiment_name": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
+var filter_V2_ListExperiments_1 = &utilities.DoubleArray{Encoding: map[string]int{"app_id": 0, "function_id": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
+
+func request_V2_ListExperiments_1(ctx context.Context, marshaler runtime.Marshaler, client V2Client, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListExperimentsRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["app_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "app_id")
+	}
+	protoReq.AppId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "app_id", err)
+	}
+	val, ok = pathParams["function_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "function_id")
+	}
+	protoReq.FunctionId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "function_id", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_V2_ListExperiments_1); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.ListExperiments(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_V2_ListExperiments_1(ctx context.Context, marshaler runtime.Marshaler, server V2Server, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListExperimentsRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["app_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "app_id")
+	}
+	protoReq.AppId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "app_id", err)
+	}
+	val, ok = pathParams["function_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "function_id")
+	}
+	protoReq.FunctionId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "function_id", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_V2_ListExperiments_1); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.ListExperiments(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+var filter_V2_GetExperiment_0 = &utilities.DoubleArray{Encoding: map[string]int{"app_id": 0, "function_id": 1, "experiment_id": 2}, Base: []int{1, 1, 2, 3, 0, 0, 0}, Check: []int{0, 1, 1, 1, 2, 3, 4}}
 
 func request_V2_GetExperiment_0(ctx context.Context, marshaler runtime.Marshaler, client V2Client, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
@@ -1012,7 +1081,15 @@ func request_V2_GetExperiment_0(ctx context.Context, marshaler runtime.Marshaler
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
 	}
-	val, ok := pathParams["function_id"]
+	val, ok := pathParams["app_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "app_id")
+	}
+	protoReq.AppId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "app_id", err)
+	}
+	val, ok = pathParams["function_id"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "function_id")
 	}
@@ -1020,13 +1097,13 @@ func request_V2_GetExperiment_0(ctx context.Context, marshaler runtime.Marshaler
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "function_id", err)
 	}
-	val, ok = pathParams["experiment_name"]
+	val, ok = pathParams["experiment_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "experiment_name")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "experiment_id")
 	}
-	protoReq.ExperimentName, err = runtime.String(val)
+	protoReq.ExperimentId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "experiment_name", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "experiment_id", err)
 	}
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
@@ -1044,7 +1121,15 @@ func local_request_V2_GetExperiment_0(ctx context.Context, marshaler runtime.Mar
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	val, ok := pathParams["function_id"]
+	val, ok := pathParams["app_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "app_id")
+	}
+	protoReq.AppId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "app_id", err)
+	}
+	val, ok = pathParams["function_id"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "function_id")
 	}
@@ -1052,13 +1137,13 @@ func local_request_V2_GetExperiment_0(ctx context.Context, marshaler runtime.Mar
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "function_id", err)
 	}
-	val, ok = pathParams["experiment_name"]
+	val, ok = pathParams["experiment_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "experiment_name")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "experiment_id")
 	}
-	protoReq.ExperimentName, err = runtime.String(val)
+	protoReq.ExperimentId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "experiment_name", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "experiment_id", err)
 	}
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
@@ -1070,15 +1155,59 @@ func local_request_V2_GetExperiment_0(ctx context.Context, marshaler runtime.Mar
 	return msg, metadata, err
 }
 
-var filter_V2_ListSessions_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+var filter_V2_ListSessionKeys_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+
+func request_V2_ListSessionKeys_0(ctx context.Context, marshaler runtime.Marshaler, client V2Client, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListSessionKeysRequest
+		metadata runtime.ServerMetadata
+	)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_V2_ListSessionKeys_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.ListSessionKeys(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_V2_ListSessionKeys_0(ctx context.Context, marshaler runtime.Marshaler, server V2Server, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ListSessionKeysRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_V2_ListSessionKeys_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.ListSessionKeys(ctx, &protoReq)
+	return msg, metadata, err
+}
+
+var filter_V2_ListSessions_0 = &utilities.DoubleArray{Encoding: map[string]int{"session_key": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
 func request_V2_ListSessions_0(ctx context.Context, marshaler runtime.Marshaler, client V2Client, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq ListSessionsRequest
 		metadata runtime.ServerMetadata
+		err      error
 	)
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["session_key"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "session_key")
+	}
+	protoReq.SessionKey, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "session_key", err)
 	}
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
@@ -1094,7 +1223,16 @@ func local_request_V2_ListSessions_0(ctx context.Context, marshaler runtime.Mars
 	var (
 		protoReq ListSessionsRequest
 		metadata runtime.ServerMetadata
+		err      error
 	)
+	val, ok := pathParams["session_key"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "session_key")
+	}
+	protoReq.SessionKey, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "session_key", err)
+	}
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
@@ -1700,13 +1838,33 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		}
 		forward_V2_ListExperiments_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_V2_ListExperiments_1, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ListExperiments", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/experiments"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_V2_ListExperiments_1(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_V2_ListExperiments_1(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_V2_GetExperiment_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/GetExperiment", runtime.WithHTTPPathPattern("/experiments/{function_id}/{experiment_name}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/GetExperiment", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/experiments/{experiment_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1720,13 +1878,33 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		}
 		forward_V2_GetExperiment_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_V2_ListSessionKeys_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ListSessionKeys", runtime.WithHTTPPathPattern("/sessions"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_V2_ListSessionKeys_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_V2_ListSessionKeys_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_V2_ListSessions_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ListSessions", runtime.WithHTTPPathPattern("/sessions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ListSessions", runtime.WithHTTPPathPattern("/sessions/{session_key}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2242,11 +2420,28 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		}
 		forward_V2_ListExperiments_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_V2_ListExperiments_1, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ListExperiments", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/experiments"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_V2_ListExperiments_1(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_V2_ListExperiments_1(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_V2_GetExperiment_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/GetExperiment", runtime.WithHTTPPathPattern("/experiments/{function_id}/{experiment_name}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/GetExperiment", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/experiments/{experiment_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2259,11 +2454,28 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		}
 		forward_V2_GetExperiment_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodGet, pattern_V2_ListSessionKeys_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ListSessionKeys", runtime.WithHTTPPathPattern("/sessions"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_V2_ListSessionKeys_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_V2_ListSessionKeys_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodGet, pattern_V2_ListSessions_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ListSessions", runtime.WithHTTPPathPattern("/sessions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ListSessions", runtime.WithHTTPPathPattern("/sessions/{session_key}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2323,8 +2535,10 @@ var (
 	pattern_V2_QueryInsightsPrompt_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"insights", "query", "prompt"}, ""))
 	pattern_V2_QueryInsights_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"insights", "query"}, ""))
 	pattern_V2_ListExperiments_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"experiments"}, ""))
-	pattern_V2_GetExperiment_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 1, 0, 4, 1, 5, 2}, []string{"experiments", "function_id", "experiment_name"}, ""))
-	pattern_V2_ListSessions_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"sessions"}, ""))
+	pattern_V2_ListExperiments_1          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"apps", "app_id", "functions", "function_id", "experiments"}, ""))
+	pattern_V2_GetExperiment_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"apps", "app_id", "functions", "function_id", "experiments", "experiment_id"}, ""))
+	pattern_V2_ListSessionKeys_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"sessions"}, ""))
+	pattern_V2_ListSessions_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"sessions", "session_key"}, ""))
 	pattern_V2_ListSessionRuns_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 1, 0, 4, 1, 5, 2, 2, 3}, []string{"sessions", "session_key", "session_id", "runs"}, ""))
 )
 
@@ -2355,7 +2569,9 @@ var (
 	forward_V2_QueryInsightsPrompt_0      = runtime.ForwardResponseMessage
 	forward_V2_QueryInsights_0            = runtime.ForwardResponseMessage
 	forward_V2_ListExperiments_0          = runtime.ForwardResponseMessage
+	forward_V2_ListExperiments_1          = runtime.ForwardResponseMessage
 	forward_V2_GetExperiment_0            = runtime.ForwardResponseMessage
+	forward_V2_ListSessionKeys_0          = runtime.ForwardResponseMessage
 	forward_V2_ListSessions_0             = runtime.ForwardResponseMessage
 	forward_V2_ListSessionRuns_0          = runtime.ForwardResponseMessage
 )
