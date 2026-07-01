@@ -2,8 +2,10 @@ package devserver
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
@@ -120,10 +122,72 @@ func TestRunProviderRerunUsesRunIDWhenOriginalRunIDIsMissing(t *testing.T) {
 	require.Equal(t, runID, *scheduler.req.OriginalRunID)
 }
 
+func TestScoreMetadataLoaderReconstructsFinalizedRunMetadata(t *testing.T) {
+	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
+	eventID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTR")
+	batchID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTS")
+	originalRunID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTT")
+	functionID := uuid.New()
+	appID := uuid.New()
+	startedAt := time.Date(2026, time.June, 18, 12, 0, 0, 0, time.UTC)
+
+	loader := scoreMetadataLoader(&stubRunProviderDataReader{
+		run: &cqrs.FunctionRun{
+			RunID:           runID,
+			RunStartedAt:    startedAt,
+			FunctionID:      functionID,
+			FunctionVersion: 7,
+			EventID:         eventID,
+			BatchID:         &batchID,
+			OriginalRunID:   &originalRunID,
+		},
+		fn: &cqrs.Function{
+			ID:    functionID,
+			AppID: appID,
+		},
+	})
+
+	md, err := loader(context.Background(), sv2.ID{
+		RunID: runID,
+		Tenant: sv2.Tenant{
+			AccountID: consts.DevServerAccountID,
+			EnvID:     consts.DevServerEnvID,
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, runID, md.ID.RunID)
+	require.Equal(t, functionID, md.ID.FunctionID)
+	require.Equal(t, consts.DevServerAccountID, md.ID.Tenant.AccountID)
+	require.Equal(t, consts.DevServerEnvID, md.ID.Tenant.EnvID)
+	require.Equal(t, appID, md.ID.Tenant.AppID)
+	require.Equal(t, 7, md.Config.FunctionVersion)
+	require.Equal(t, startedAt, md.Config.StartedAt)
+	require.Equal(t, []ulid.ULID{eventID}, md.Config.EventIDs)
+	require.Equal(t, &batchID, md.Config.BatchID)
+	require.Equal(t, &originalRunID, md.Config.OriginalRunID)
+}
+
+func TestScoreMetadataLoaderMapsMissingRowsToMetadataNotFound(t *testing.T) {
+	loader := scoreMetadataLoader(&stubRunProviderDataReader{runErr: sql.ErrNoRows})
+
+	md, err := loader(context.Background(), sv2.ID{
+		RunID: ulid.Make(),
+		Tenant: sv2.Tenant{
+			AccountID: consts.DevServerAccountID,
+			EnvID:     consts.DevServerEnvID,
+		},
+	})
+	require.Nil(t, md)
+	require.ErrorIs(t, err, sv2.ErrMetadataNotFound)
+}
+
 type stubRunProviderDataReader struct {
-	run *cqrs.FunctionRun
-	fn  *cqrs.Function
-	evt *cqrs.Event
+	run    *cqrs.FunctionRun
+	runErr error
+	fn     *cqrs.Function
+	fnErr  error
+	evt    *cqrs.Event
+	evtErr error
 }
 
 func (s *stubRunProviderDataReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
@@ -131,14 +195,23 @@ func (s *stubRunProviderDataReader) GetSpansByRunID(ctx context.Context, runID u
 }
 
 func (s *stubRunProviderDataReader) GetFunctionRun(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, runID ulid.ULID) (*cqrs.FunctionRun, error) {
+	if s.runErr != nil {
+		return nil, s.runErr
+	}
 	return s.run, nil
 }
 
 func (s *stubRunProviderDataReader) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
+	if s.fnErr != nil {
+		return nil, s.fnErr
+	}
 	return s.fn, nil
 }
 
 func (s *stubRunProviderDataReader) GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*cqrs.Event, error) {
+	if s.evtErr != nil {
+		return nil, s.evtErr
+	}
 	return s.evt, nil
 }
 

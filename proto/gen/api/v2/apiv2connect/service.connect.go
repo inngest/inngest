@@ -67,6 +67,8 @@ const (
 	V2RerunProcedure = "/api.v2.V2/Rerun"
 	// V2GetAppProcedure is the fully-qualified name of the V2's GetApp RPC.
 	V2GetAppProcedure = "/api.v2.V2/GetApp"
+	// V2CreateScoreProcedure is the fully-qualified name of the V2's CreateScore RPC.
+	V2CreateScoreProcedure = "/api.v2.V2/CreateScore"
 	// V2SyncAppProcedure is the fully-qualified name of the V2's SyncApp RPC.
 	V2SyncAppProcedure = "/api.v2.V2/SyncApp"
 	// V2GetFunctionTraceProcedure is the fully-qualified name of the V2's GetFunctionTrace RPC.
@@ -109,6 +111,7 @@ type V2Client interface {
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
 	Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
+	CreateScore(context.Context, *connect.Request[v2.CreateScoreRequest]) (*connect.Response[v2.CreateScoreResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
@@ -227,6 +230,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetApp")),
 			connect.WithClientOptions(opts...),
 		),
+		createScore: connect.NewClient[v2.CreateScoreRequest, v2.CreateScoreResponse](
+			httpClient,
+			baseURL+V2CreateScoreProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateScore")),
+			connect.WithClientOptions(opts...),
+		),
 		syncApp: connect.NewClient[v2.SyncAppRequest, v2.SyncAppResponse](
 			httpClient,
 			baseURL+V2SyncAppProcedure,
@@ -302,6 +311,7 @@ type v2Client struct {
 	getEventRuns             *connect.Client[v2.GetEventRunsRequest, v2.GetEventRunsResponse]
 	rerun                    *connect.Client[v2.RerunRequest, v2.RerunResponse]
 	getApp                   *connect.Client[v2.GetAppRequest, v2.GetAppResponse]
+	createScore              *connect.Client[v2.CreateScoreRequest, v2.CreateScoreResponse]
 	syncApp                  *connect.Client[v2.SyncAppRequest, v2.SyncAppResponse]
 	getFunctionTrace         *connect.Client[v2.GetFunctionTraceRequest, v2.GetFunctionTraceResponse]
 	getFunction              *connect.Client[v2.GetFunctionRequest, v2.GetFunctionResponse]
@@ -393,6 +403,11 @@ func (c *v2Client) GetApp(ctx context.Context, req *connect.Request[v2.GetAppReq
 	return c.getApp.CallUnary(ctx, req)
 }
 
+// CreateScore calls api.v2.V2.CreateScore.
+func (c *v2Client) CreateScore(ctx context.Context, req *connect.Request[v2.CreateScoreRequest]) (*connect.Response[v2.CreateScoreResponse], error) {
+	return c.createScore.CallUnary(ctx, req)
+}
+
 // SyncApp calls api.v2.V2.SyncApp.
 func (c *v2Client) SyncApp(ctx context.Context, req *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error) {
 	return c.syncApp.CallUnary(ctx, req)
@@ -459,6 +474,7 @@ type V2Handler interface {
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
 	Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
+	CreateScore(context.Context, *connect.Request[v2.CreateScoreRequest]) (*connect.Response[v2.CreateScoreResponse], error)
 	SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error)
 	GetFunctionTrace(context.Context, *connect.Request[v2.GetFunctionTraceRequest]) (*connect.Response[v2.GetFunctionTraceResponse], error)
 	GetFunction(context.Context, *connect.Request[v2.GetFunctionRequest]) (*connect.Response[v2.GetFunctionResponse], error)
@@ -573,6 +589,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetApp")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2CreateScoreHandler := connect.NewUnaryHandler(
+		V2CreateScoreProcedure,
+		svc.CreateScore,
+		connect.WithSchema(v2Methods.ByName("CreateScore")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2SyncAppHandler := connect.NewUnaryHandler(
 		V2SyncAppProcedure,
 		svc.SyncApp,
@@ -661,6 +683,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2RerunHandler.ServeHTTP(w, r)
 		case V2GetAppProcedure:
 			v2GetAppHandler.ServeHTTP(w, r)
+		case V2CreateScoreProcedure:
+			v2CreateScoreHandler.ServeHTTP(w, r)
 		case V2SyncAppProcedure:
 			v2SyncAppHandler.ServeHTTP(w, r)
 		case V2GetFunctionTraceProcedure:
@@ -750,6 +774,10 @@ func (UnimplementedV2Handler) Rerun(context.Context, *connect.Request[v2.RerunRe
 
 func (UnimplementedV2Handler) GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetApp is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateScore(context.Context, *connect.Request[v2.CreateScoreRequest]) (*connect.Response[v2.CreateScoreResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateScore is not implemented"))
 }
 
 func (UnimplementedV2Handler) SyncApp(context.Context, *connect.Request[v2.SyncAppRequest]) (*connect.Response[v2.SyncAppResponse], error) {

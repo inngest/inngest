@@ -3,6 +3,7 @@ package apiv2
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -83,6 +84,12 @@ func (m *mockFunctionTraceReader) GetSpanOutput(ctx context.Context, id cqrs.Spa
 	args := m.Called(ctx, id)
 	output, _ := args.Get(0).(*cqrs.SpanOutput)
 	return output, args.Error(1)
+}
+
+func (m *mockFunctionTraceReader) GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	args := m.Called(ctx, runID, stepID, accountID, workspaceID)
+	span, _ := args.Get(0).(*cqrs.OtelSpan)
+	return span, args.Error(1)
 }
 
 type mockRateLimitProvider struct {
