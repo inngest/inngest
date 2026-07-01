@@ -37,8 +37,6 @@ type Props = {
   onOpenInsights: () => void;
   showInactive: boolean;
   onShowInactiveChange: (v: boolean) => void;
-  hoveredVariantName?: string | null;
-  onVariantHover?: (name: string | null) => void;
   className?: string;
 };
 
@@ -58,8 +56,6 @@ export function VariantsTable({
   onOpenInsights,
   showInactive,
   onShowInactiveChange,
-  hoveredVariantName,
-  onVariantHover,
   className,
 }: Props) {
   const enabledMetrics = useMemo(
@@ -290,11 +286,8 @@ export function VariantsTable({
             </span>
           }
           cellClassName="py-2"
-          onRowMouseEnter={(row) => onVariantHover?.(row.original.variantName)}
-          onRowMouseLeave={() => onVariantHover?.(null)}
-          isRowHighlighted={(row) =>
-            hoveredVariantName != null && row.original.variantName === hoveredVariantName
-          }
+          onRowMouseEnter={() => {}}
+          onRowMouseLeave={() => {}}
         />
       </div>
     </div>
