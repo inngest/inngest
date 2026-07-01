@@ -97,123 +97,13 @@ Here is what the user is asking for:
 
 # Database Schema and Allowed Columns
 
-You may **only** query the following tables:
+Only query the tables and columns listed in the generated schema below.
 
-- `events`
-- `runs`
-- `steps`
-- `step_attempts`
-- `extended_trace_spans`
-- `metadata`
+Forbidden columns: `account_id` and `workspace_id` are injected automatically by the Insights query layer. Never reference them in SELECT, WHERE, GROUP BY, ORDER BY, JOIN, or any expression.
 
-## Common columns
+`app_id` and `function_id` are UUIDs under the hood, but user SQL must filter them by complete slug strings with `=` or `IN`. Do not compare them to raw UUIDs, and do not use string functions or pattern matching on them.
 
-`app_id` and `function_id` are stored as **UUIDs** on `runs`, `steps`, `step_attempts`, and `extended_trace_spans`. **Write them as slug strings** with `=` or `IN` and the system translates the slug to the UUID for you — never compare them against a raw UUID.
-
-- `app_id` - The app slug as defined in your app
-- `function_id` - The "fully qualified" function slug: the app slug concatenated to the function slug with a `-` (e.g., `my-app-my-function`)
-
-Because these are UUIDs underneath, slug translation only happens for `=` / `IN` with a **complete** slug. See _Pattern Matching_ for why partial matches (`LIKE`) on these columns fail.
-
-## Metadata columns
-
-Metadata can be accessed in the `inngest` and `metadata` columns.
-`inngest` contains system-defined/created metadata while `metadata` contains user-defined metadata.
-Both columns have the type `Map(String, Tuple(updated_at DateTime, values Dynamic))`.
-
-## `events` Schema
-
-- `id` - Unique identifier (string)
-- `name` - Event name/type (string)
-- `v` - Event version (number)
-- `ts` - Event timestamp in **milliseconds since epoch** (int64)
-- `ts_dt` - Event timestamp as DateTime
-- `received_at` - Ingestion timestamp in **milliseconds since epoch** (int64)
-- `received_at_dt` - Ingestion timestamp as DateTime
-- `data` - JSON payload containing event-specific properties (JSON String)
-
-## `runs` Schema
-
-- `id` - Unique identifier for the run (ULID)
-- `app_id` - The app ID as defined in your app (UUID)
-- `function_id` - The "fully qualified" function ID (UUID)
-- `triggering_event_name` - The name of the event trigger (String)
-- `status` - Run status: `Queued`, `Running`, `Failed`, `Cancelled`, `Completed` (String)
-- `queued_at` - When the run was queued (DateTime)
-- `started_at` - When the run started executing (NULL if it hasn't started yet) (DateTime)
-- `ended_at` - When the run ended (NULL if still running) (DateTime)
-- `inputs` - Array of input events (for batch functions or functions triggered by multiple events) (Array(JSON Strings))
-- `input` - Equivalent to `inputs[1]` (JSON String)
-- `output` - The output/return value from the function (NULL if not completed or no output) (JSONString)
-- `error` - Error details if the run failed (NULL if successful) (JSONString)
-- `attributes` - Raw attributes from the run span (Map(String, String))
-- `inngest` - System-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
-- `metadata` - User-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
-- `sessions` - Session associations from the triggering event, as an array of (key, id) pairs (Nested(key String, id String)). `key` names the session type and `id` is its value. Select `sessions` for the pairs, or `sessions.key` / `sessions.id` for the parallel key and value arrays.
-
-## `steps`/`step_attempts` Schema
-
-`steps` and `step_attempts` have identical schemas, but `steps` only contains the latest step attempt.
-
-- `run_id` - Unique identifier for the run (ULID)
-- `app_id` - The app ID as defined in your app (UUID)
-- `function_id` - The "fully qualified" function ID (UUID)
-- `type` - Step type: StepRun, StepPlanned, StepFailed, InvokeFunction, Sleep, AIGateway, StepError (String)
-- `name` - The name of the step which is the same as id unless an explicit display name is provided (String)
-- `id` - The id used when creating the step like `step.run('<id>', ...)` (String)
-- `loop_index` - The index for repeated steps (Int)
-- `attempt` - The attempt number for retried steps (Int)
-- `status` - Step status: `Queued`, `Running`, `Failed`, `Errored`, `Completed` (String)
-- `queued_at` - When the step was queued (DateTime)
-- `started_at` - When the step started executing (NULL if it hasn't started yet) (DateTime)
-- `ended_at` - When the step ended (NULL if still running) (DateTime)
-- `output` - The output/return value from the step (NULL if not completed or no output) (JSONString)
-- `error` - Error details if the step failed (NULL if successful) (JSONString)
-- `attributes` - Raw attributes from the step span (Map(String, String))
-- `inngest` - System-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
-- `metadata` - User-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
-
-## `extended_trace_spans` Schema
-
-- `run_id` - Unique identifier for the run (ULID)
-- `app_id` - The app ID as defined in your app (UUID)
-- `function_id` - The "fully qualified" function ID (UUID)
-- `step_id` - The id used when creating the step like `step.run('<id>', ...)` (String)
-- `step_index` - The index for repeated steps (Int)
-- `step_attempt` - The attempt number for retried steps (Int)
-- `trace_id` - The OpenTelemetry trace ID (String)
-- `span_id` - The OpenTelemetry span ID (String)
-- `parent_span_id` - The id of this span's parent (String)
-- `start_time` - The start of the span (DateTime)
-- `end_time` - The end of the span (DateTime)
-- `name` - The name of the span (String)
-- `kind` - The OpenTelemetry span kind of the span (String)
-- `scope_name` - The OpenTelemetry instrument scope name of the span (String)
-- `scope_version` - The OpenTelemetry instrument scope version of the span (String)
-- `service_name` - The OpenTelemetry service name of the span (String)
-- `attributes` - Raw attributes of the span (Map(String, String))
-- `inngest` - System-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
-- `metadata` - User-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
-
-## `metadata` Schema
-
-One row per span, holding that span's system and user metadata. Spans exist at three levels (see `level` below).
-
-- `run_id` - Unique identifier for the run (ULID)
-- `run_queued_at` - When the run was queued (DateTime)
-- `updated_at` - When the metadata row was last updated (DateTime)
-- `app_id` - The app ID as defined in your app (UUID)
-- `function_id` - The "fully qualified" function ID (UUID)
-- `step_id` - The id used when creating the step like `step.run('<id>', ...)` (String)
-- `step_index` - The index for repeated steps (Int)
-- `step_attempt` - The attempt number for retried steps (Int)
-- `span_id` - The OpenTelemetry span ID (String)
-- `level` - The span level, derived from the span name: one of `run`, `step`, or `extended_trace` (String; not a log level)
-- `step_type` - The step type from the `_inngest.step.type` attribute (e.g. `run`, `groupExperiment`) (String)
-- `inngest` - System-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
-- `metadata` - User-defined metadata (Map(String, Tuple(updated_at DateTime, values Dynamic)))
-
-**Forbidden columns**: Never reference `account_id` or `workspace_id` (these are injected automatically by the system).
+{{{insightsSchema}}}
 
 ## Querying Scores
 
