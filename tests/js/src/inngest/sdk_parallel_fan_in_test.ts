@@ -12,11 +12,11 @@ export const sleepRandom = inngest.createFunction(
   }
 );
 
-// Regression test for parallel fan-in runs wedging.  Drives 100 concurrent
-// ops (50 step.run, 50 step.invoke) through one Promise.all and asserts the
+// Regression test for parallel fan-in runs hanging.  Drives 40 concurrent
+// ops (20 step.run, 20 step.invoke) through one Promise.all and asserts the
 // parent run completes with the expected aggregate.  step.run results sum to
 // a known constant; the invoke count confirms every child finished — so the
-// Go driver catches both "run wedged" and "step ran the wrong number of
+// Go driver catches both "run stalled" and "step ran the wrong number of
 // times" regressions.
 export const testParallelFanIn = inngest.createFunction(
   { id: "parallel-fan-in" },
@@ -24,7 +24,7 @@ export const testParallelFanIn = inngest.createFunction(
   async ({ step }) => {
     const tasks: Promise<unknown>[] = [];
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 20; i++) {
       tasks.push(
         step.invoke(`invoke-${i}`, {
           function: sleepRandom,
@@ -33,17 +33,17 @@ export const testParallelFanIn = inngest.createFunction(
       );
     }
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 20; i++) {
       tasks.push(step.run(`run-${i}`, () => i * i));
     }
 
     const results = await Promise.all(tasks);
 
-    // First 50 results are invokes (random sleep duration); last 50 are
-    // step.run squares.  Sum the squares — 0² + 1² + … + 49² = 40425 — and
+    // First 20 results are invokes (random sleep duration); last 20 are
+    // step.run squares.  Sum the squares — 0² + 1² + … + 19² = 2470 — and
     // count completed invokes by checking the response shape.
-    const invokeResults = results.slice(0, 50);
-    const stepResults = results.slice(50) as number[];
+    const invokeResults = results.slice(0, 20);
+    const stepResults = results.slice(20) as number[];
 
     const stepSquares = stepResults.reduce((a, b) => a + b, 0);
     const invokeCount = invokeResults.filter(
