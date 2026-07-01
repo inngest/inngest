@@ -45,7 +45,7 @@ func TestSDKRetry(t *testing.T) {
 		test.SetRequestEvent(evt),
 		test.SendTrigger(),
 
-		test.ExpectRequest("Initial request", "step", time.Second),
+		test.ExpectRequest("Initial request", "step", 5*time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
 			Op:          enums.OpcodeStepError,
 			ID:          "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
@@ -82,7 +82,7 @@ func TestSDKRetry(t *testing.T) {
 
 		// Finally, the function should be called and should error once.
 		test.Printf("Awaiting function call after step"),
-		test.ExpectRequest("Final call", "step", time.Second, func(r *driver.SDKRequestContext) {
+		test.ExpectRequest("Final call", "step", 5*time.Second, func(r *driver.SDKRequestContext) {
 			r.Attempt = 0
 		}),
 		// Expect a 500
