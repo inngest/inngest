@@ -18,23 +18,6 @@ import {
   RiTrophyLine,
 } from '@remixicon/react';
 
-function formatDuration(from: Date): string {
-  const ms = Date.now() - from.getTime();
-  const minutes = Math.floor(ms / 60_000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) {
-    const remHours = hours % 24;
-    return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`;
-  }
-  if (hours > 0) {
-    const remMinutes = minutes % 60;
-    return remMinutes > 0 ? `${hours}h ${remMinutes}m` : `${hours}h`;
-  }
-  return `${minutes}m`;
-}
-
 type Props = {
   detail: ExperimentDetail;
   topVariantName: string | null;
