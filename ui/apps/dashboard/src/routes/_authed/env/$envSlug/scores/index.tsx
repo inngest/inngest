@@ -24,7 +24,7 @@ function ScoresInfo() {
       text="View score variants across your functions."
       action={
         <Link
-          href="https://www.inngest.com/docs/features/scoring" // TODO: actual docs URL
+          href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows/scoring"
           target="_blank"
         >
           Learn about scores

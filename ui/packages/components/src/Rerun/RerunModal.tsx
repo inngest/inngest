@@ -15,6 +15,7 @@ export type RerunModalType = {
   debugSessionID?: string;
   stepID: string;
   input: string;
+  editableInput?: boolean;
   redirect?: boolean;
 };
 
@@ -45,6 +46,7 @@ export const RerunModal = ({
   input,
   debugRunID,
   debugSessionID,
+  editableInput = true,
   redirect = true,
 }: RerunModalType) => {
   const { rerun } = useRerunFromStep();
@@ -64,45 +66,57 @@ export const RerunModal = ({
   }, [input]);
 
   return (
-    <Modal className="flex max-w-[1200px] flex-col p-6" isOpen={open} onClose={close}>
-      <div className="mb-6 flex flex-row items-center justify-between gap-6">
-        <div className="flex flex-col gap-2">
+    <Modal
+      className={`relative flex w-full flex-col p-6 ${
+        editableInput ? 'max-w-[1200px]' : 'max-w-lg'
+      }`}
+      isOpen={open}
+      onClose={close}
+    >
+      <RiCloseLine
+        className="text-subtle absolute right-6 top-6 h-6 w-6 cursor-pointer"
+        onClick={close}
+      />
+      <div className="mb-6 flex flex-row items-start justify-between gap-6">
+        <div className="flex flex-col gap-2 pr-10">
           <span className="text-basis text-xl">Rerun from step </span>
           <span className="text-subtle text-sm">
-            Rerun from step using a different input. A rerun step will appear as a new run. Previous
-            steps will be auto-populated with current run&apos;s data and subsequent steps will be
-            rerun.
+            {editableInput
+              ? 'Rerun from step using a different input. '
+              : 'This step type does not support input overrides. '}
+            A rerun step will appear as a new run. Previous steps will be auto-populated with
+            current run&apos;s data and subsequent steps will be rerun.
           </span>
         </div>
-        <RiCloseLine className="text-subtle h-5 w-5 cursor-pointer" onClick={close} />
       </div>
+      {editableInput && (
+        <div className="bg-canvasSubtle flex h-full w-full flex-row items-start">
+          <div className="h-full w-full">
+            <CodeBlock
+              actions={[]}
+              header={{
+                title: 'Previous Input',
+              }}
+              tab={{
+                content: input,
+              }}
+            />
+          </div>
 
-      <div className="bg-canvasSubtle flex h-full w-full flex-row items-start">
-        <div className="h-full w-full">
-          <CodeBlock
-            actions={[]}
-            header={{
-              title: 'Previous Input',
-            }}
-            tab={{
-              content: input,
-            }}
-          />
+          <div className="h-full w-full">
+            <CodeBlock
+              header={{
+                title: 'Input',
+              }}
+              tab={{
+                content: input,
+                readOnly: !editableInput,
+                handleChange: editableInput ? setNewInput : undefined,
+              }}
+            />
+          </div>
         </div>
-
-        <div className="h-full w-full">
-          <CodeBlock
-            header={{
-              title: 'Input',
-            }}
-            tab={{
-              content: input,
-              readOnly: false,
-              handleChange: setNewInput,
-            }}
-          />
-        </div>
-      </div>
+      )}
       <div className="mt-6 flex flex-row items-center justify-end gap-2">
         <div>{error && <span className="text-error">{error.message}</span>}</div>
         <Button kind="secondary" appearance="ghost" label="Cancel" onClick={() => setOpen(false)} />
@@ -116,7 +130,10 @@ export const RerunModal = ({
               runID,
               debugRunID,
               debugSessionID,
-              fromStep: { stepID, ...(newInput ? { input: patchInput(newInput) } : {}) },
+              fromStep: {
+                stepID,
+                ...(editableInput && newInput ? { input: patchInput(newInput) } : {}),
+              },
             });
 
             setLoading(false);

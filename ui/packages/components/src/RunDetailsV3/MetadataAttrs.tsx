@@ -27,13 +27,20 @@ const getKindLabel = (kind: SpanMetadataKind): string => {
   return `User Metadata (${kindName})`;
 };
 
-const MetadataAttrRow = ({
-  kind,
-  scope,
-  values,
-  updatedAt,
-  isLast,
-}: SpanMetadata & { isLast: boolean }) => {
+// Row props are intentionally decoupled from the SpanMetadata discriminated
+// union: the row renders values generically via Object.entries and never relies
+// on the kind/values correlation. Indexing the union keeps it permissive enough
+// to accept any arm's values (including generated interface types like
+// AIMetadata, which lack an implicit index signature).
+type MetadataAttrRowProps = {
+  kind: SpanMetadataKind;
+  scope: SpanMetadata['scope'];
+  values: SpanMetadata['values'];
+  updatedAt: string;
+  isLast: boolean;
+};
+
+const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAttrRowProps) => {
   return (
     <div className="flex flex-col justify-start gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4 pt-2">

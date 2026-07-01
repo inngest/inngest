@@ -52,9 +52,9 @@ function BillingPlansPage() {
     },
     {
       id: 'n/a',
-      slug: 'pro-2025-08-08',
+      slug: 'pro-2026-06-29',
       name: 'Pro',
-      amount: 7_500, // $75.00
+      amount: 9900,
       billingPeriod: 'month',
       entitlements: {
         concurrency: { limit: 100 },

@@ -115,7 +115,11 @@ const experimentDetailQuery = graphql(`
         metrics {
           key
           avg
+          stddev
           min
+          q1
+          med
+          q3
           max
         }
       }
@@ -138,6 +142,7 @@ const experimentScoringConfigQuery = graphql(`
       updatedAt
       metrics {
         key
+        kind
         enabled
         points
         minValue
@@ -221,6 +226,7 @@ const updateExperimentScoringConfigMutation = graphql(`
       updatedAt
       metrics {
         key
+        kind
         enabled
         points
         minValue

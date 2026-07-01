@@ -613,6 +613,35 @@ func idempotencyKey(req execution.ScheduleRequest, runID ulid.ULID) string {
 	return fmt.Sprintf("%s-%s", util.XXHash(req.Function.ID.String()), util.XXHash(key))
 }
 
+func rerunFromStepEdge(req execution.ScheduleRequest, memoizedSteps []state.MemoizedStep, result *reconstructResult) inngest.Edge {
+	if req.FromStep == nil || req.FromStep.StepID == "" {
+		return inngest.SourceEdge
+	}
+
+	edge := inngest.Edge{
+		Incoming: inngest.TriggerName,
+	}
+	if shouldTargetRerunFromStep(result) {
+		//
+		// Runnable steps should execute directly with any FromStep input override.
+		edge.IncomingGeneratorStep = req.FromStep.StepID
+	}
+	if len(memoizedSteps) > 0 {
+		//
+		// Outgoing anchors the stack at the last reconstructed step.
+		edge.Outgoing = memoizedSteps[len(memoizedSteps)-1].ID
+	}
+	return edge
+}
+
+func shouldTargetRerunFromStep(result *reconstructResult) bool {
+	if result == nil || result.fromStepOp == nil {
+		return true
+	}
+
+	return *result.fromStepOp == enums.OpcodeStep || *result.fromStepOp == enums.OpcodeStepRun
+}
+
 func (e *executor) createCancellationPauses(ctx context.Context, l logger.Logger, idempontenceKey string, evtMap map[string]any, id sv2.ID, req execution.ScheduleRequest) error {
 	for _, c := range req.Function.Cancel {
 		expires := e.now().Add(consts.CancelTimeout)
@@ -1279,9 +1308,11 @@ func (e *executor) schedule(
 		Metadata: metadata,
 		Steps:    []state.MemoizedStep{},
 	}
+	var reconstructed *reconstructResult
 
 	if req.OriginalRunID != nil && req.FromStep != nil && req.FromStep.StepID != "" {
-		if err := reconstruct(ctx, e.traceReader, req, &newState); err != nil {
+		reconstructed, err = reconstruct(ctx, e.traceReader, req, &newState)
+		if err != nil {
 			return nil, nil, fmt.Errorf("error reconstructing input state: %w", err)
 		}
 	}
@@ -1490,7 +1521,10 @@ func (e *executor) schedule(
 		Attempt:               0,
 		MaxAttempts:           &maxAttempts,
 		Payload: queue.PayloadEdge{
-			Edge: inngest.SourceEdge,
+			//
+			// Reconstruction already populated state before FromStep, so the
+			// first queue item should start at FromStep.
+			Edge: rerunFromStepEdge(req, newState.Steps, reconstructed),
 		},
 		Throttle:  throttle,
 		Metadata:  map[string]any{},
@@ -3242,6 +3276,13 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		err = e.queue.Enqueue(ctx, nextItem, e.now(), queue.EnqueueOpts{})
 		if err != nil {
 			if errors.Is(err, queue.ErrQueueItemExists) {
+				if pause.ParallelCoalesceKey != "" && pause.ParallelMode != enums.ParallelModeRace {
+					e.log.Debug("discovery enqueue after pause timeout deduped via coalesce key",
+						"run_id", md.ID.RunID.String(),
+						"job_id", jobID,
+						"coalesce_key", pause.ParallelCoalesceKey,
+					)
+				}
 				nextStepSpan.Drop()
 			} else {
 				_ = nextStepSpan.Send()
@@ -3418,12 +3459,25 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				return nil
 			}
 
-			if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
-				nextStepSpan.Drop()
-				return fmt.Errorf("error enqueueing after pause: %w", err)
+			if err != nil {
+				if errors.Is(err, queue.ErrQueueItemExists) {
+					if pause.ParallelCoalesceKey != "" && pause.ParallelMode != enums.ParallelModeRace {
+						e.log.Debug("discovery enqueue after pause resume deduped via coalesce key",
+							"run_id", md.ID.RunID.String(),
+							"job_id", jobID,
+							"coalesce_key", pause.ParallelCoalesceKey,
+							"parallel_mode", pause.ParallelMode,
+						)
+					}
+					// Another handler enqueued the discovery item; let it emit the span.
+					nextStepSpan.Drop()
+				} else {
+					nextStepSpan.Drop()
+					return fmt.Errorf("error enqueueing after pause: %w", err)
+				}
+			} else {
+				_ = nextStepSpan.Send()
 			}
-			// on successful enqueue, send the span
-			_ = nextStepSpan.Send()
 		}
 
 		// Only run lifecycles if we consumed the pause and enqueued next step.
@@ -3554,23 +3608,17 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 	// shared by all queue items in this batch.  Every concurrent fan-in
 	// completion will derive the same discovery JobID from this key, so the
 	// queue's idempotency check ensures only one discovery step is enqueued.
-	if len(nonLazyIDs) > 1 {
+	//
+	// Coalesce key and SavePending must agree.  Without SavePending populating
+	// pending_steps, every completion sees hasPendingSteps=false and races to
+	// enqueue discovery on the same coalesced JobID; one wins and the rest are
+	// silently deduped while their SaveSteps are still in flight, so the
+	// surviving discovery executes against incomplete state and the run wedges.
+	if hasPlanOp(resp.Generator) && len(nonLazyIDs) > 1 && i.md.ShouldCoalesceParallelism(resp) {
 		ck := computeParallelCoalesceKey(i.md.ID.RunID.String(), nonLazyIDs)
 		groups.PriorityGroup.ParallelCoalesceKey = ck
 		groups.OtherGroup.ParallelCoalesceKey = ck
-	}
 
-	// Save pending step IDs so that SaveStep can atomically track which
-	// parallel branches are still outstanding.  When the last branch
-	// completes, SaveStep returns hasPendingSteps=false and a single
-	// discovery step is enqueued.
-	//
-	// Previously this was gated on ShouldCoalesceParallelism (RequestVersion
-	// >= 2), which left the pending set empty for older SDKs.  With an empty
-	// pending set every step completion saw hasPendingSteps=false and
-	// enqueued its own discovery step, causing the final sequential step
-	// after a parallel group to execute more than once.
-	if hasPlanOp(resp.Generator) && len(nonLazyIDs) > 1 {
 		if err := e.smv2.SavePending(ctx, i.md.ID, nonLazyIDs); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
@@ -3596,10 +3644,11 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 			continue
 		}
 		copied := *op
+		runInstanceCopy := *i
 		if group.ShouldStartHistoryGroup {
 			// Give each opcode its own group ID, since we want to track each
 			// parallel step individually.
-			i.item.GroupID = uuid.New().String()
+			runInstanceCopy.item.GroupID = uuid.New().String()
 		}
 		eg.Go(func() error {
 			defer func() {
@@ -3611,7 +3660,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 					)
 				}
 			}()
-			return e.handleGeneratorOp(ctx, i, copied, group)
+			return e.handleGeneratorOp(ctx, &runInstanceCopy, copied, group)
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -3814,6 +3863,12 @@ func (e *executor) maybeEnqueueDiscoveryStep(ctx context.Context, runCtx executi
 
 			if errors.Is(err, queue.ErrQueueItemExists) {
 				if coalesceKey != nil && gen.ParallelMode() != enums.ParallelModeRace {
+					e.log.Debug("discovery enqueue deduped via coalesce key",
+						"run_id", runCtx.Metadata().ID.RunID.String(),
+						"job_id", jobID,
+						"coalesce_key", *coalesceKey,
+						"parallel_mode", gen.ParallelMode(),
+					)
 					metrics.IncrDiscoveryCoalesceDedupCount(ctx, metrics.CounterOpt{PkgName: pkgName})
 				}
 				return nil

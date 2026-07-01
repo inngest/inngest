@@ -410,11 +410,11 @@ input[type='number'] {
     --color-quaternary-cool-xIntense: var(--color-purplehaze-300);
     --color-quaternary-cool-3xIntense: var(--color-purplehaze-100);
 
-    --color-quarternary-warmer-3xSubtle: var(--color-citrus-900);
-    --color-quarternary-warmer-xSubtle: var(--color-citrus-700);
-    --color-quarternary-warmer-moderate: var(--color-citrus-500);
-    --color-quarternary-warmer-xIntense: var(--color-citrus-300);
-    --color-quarternary-warmer-3xIntense: var(--color-citrus-100);
+    --color-quaternary-warmer-3xSubtle: var(--color-citrus-900);
+    --color-quaternary-warmer-xSubtle: var(--color-citrus-700);
+    --color-quaternary-warmer-moderate: var(--color-citrus-500);
+    --color-quaternary-warmer-xIntense: var(--color-citrus-300);
+    --color-quaternary-warmer-3xIntense: var(--color-citrus-100);
 
     --color-accent-3xSubtle: var(--color-honey-900);
     --color-accent-2xSubtle: var(--color-honey-800);
