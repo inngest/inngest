@@ -15,12 +15,15 @@ import { BoxPlot, rowsForMetric } from './BoxPlot';
 type Props = {
   metric: ExperimentScoringMetric;
   variants: ExperimentVariantMetrics[];
+  variantColorIndex?: Map<string, number>;
+  hoveredVariantName?: string | null;
+  onVariantHover?: (name: string | null) => void;
 };
 
-export function MetricPanel({ metric, variants }: Props) {
+export function MetricPanel({ metric, variants, variantColorIndex, hoveredVariantName, onVariantHover }: Props) {
   const rows = useMemo(
-    () => rowsForMetric(variants, metric.key),
-    [variants, metric.key],
+    () => rowsForMetric(variants, metric.key, variantColorIndex),
+    [variants, metric.key, variantColorIndex],
   );
 
   const winner = useMemo(
@@ -47,6 +50,8 @@ export function MetricPanel({ metric, variants }: Props) {
             rows={rows}
             domain={domain}
             metricDisplayName={metric.displayName}
+            hoveredVariantName={hoveredVariantName}
+            onVariantHover={onVariantHover}
           />
         );
       case 'NUMERIC':
@@ -56,10 +61,12 @@ export function MetricPanel({ metric, variants }: Props) {
             rows={rows}
             domain={domain}
             metricDisplayName={metric.displayName}
+            hoveredVariantName={hoveredVariantName}
+            onVariantHover={onVariantHover}
           />
         );
     }
-  }, [metric.kind, rows, domain, metric.displayName]);
+  }, [metric.kind, rows, domain, metric.displayName, hoveredVariantName, onVariantHover]);
 
   return (
     <Card className="overflow-visible" contentClassName="overflow-visible">

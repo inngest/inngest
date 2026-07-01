@@ -6,6 +6,7 @@ import {
   type ExperimentDetail,
   type ExperimentVariantMetrics,
 } from '@inngest/components/Experiments';
+import { truncateCenter } from '@/lib/experiments/chart';
 import { cn } from '@inngest/components/utils/classNames';
 import {
   RiArrowLeftLine,
@@ -34,6 +35,7 @@ function formatDuration(from: Date): string {
 type Props = {
   detail: ExperimentDetail;
   topVariantName: string | null;
+  variantOrder?: string[];
 };
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -52,7 +54,7 @@ function IconTile({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function InfoSidebar({ detail, topVariantName }: Props) {
+export function InfoSidebar({ detail, topVariantName, variantOrder }: Props) {
   const active = isActive(detail.lastSeen);
 
   return (
@@ -69,9 +71,6 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
                 <span className="text-basis truncate text-sm font-medium">
                   {detail.name}
                 </span>
-                <span className="text-muted truncate text-xs">
-                  Running {formatDuration(detail.firstSeen)}
-                </span>
               </div>
               {active && (
                 <Pill kind="primary" appearance="outlined">
@@ -79,15 +78,6 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
                 </Pill>
               )}
             </div>
-            <p className="text-muted text-xs">
-              Started at {detail.firstSeen.toLocaleString()}
-            </p>
-            <p className="text-muted text-xs">
-              {detail.variants
-                .reduce((sum, v) => sum + v.runCount, 0)
-                .toLocaleString()}{' '}
-              total runs
-            </p>
           </Card.Content>
         </Card>
       </section>
@@ -112,7 +102,7 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
         </Card>
       </section>
 
-      <VariantsSection detail={detail} topVariantName={topVariantName} />
+      <VariantsSection detail={detail} topVariantName={topVariantName} variantOrder={variantOrder} />
     </div>
   );
 }
@@ -120,9 +110,11 @@ export function InfoSidebar({ detail, topVariantName }: Props) {
 function VariantsSection({
   detail,
   topVariantName,
+  variantOrder,
 }: {
   detail: ExperimentDetail;
   topVariantName: string | null;
+  variantOrder?: string[];
 }) {
   const isFixed = detail.selectionStrategy === 'fixed';
   const hasWeights = detail.variantWeights.length > 0;
@@ -136,6 +128,14 @@ function VariantsSection({
       )
     : null;
 
+  const sortedVariants = variantOrder
+    ? [...detail.variants].sort((a, b) => {
+        const ai = variantOrder.indexOf(a.variantName);
+        const bi = variantOrder.indexOf(b.variantName);
+        return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+      })
+    : detail.variants;
+
   return (
     <section>
       <div className="mb-2 flex items-center justify-between">
@@ -146,14 +146,14 @@ function VariantsSection({
       </div>
 
       <div className="border-subtle overflow-hidden rounded-md border">
-        {detail.variants.map((v, i) => {
+        {sortedVariants.map((v, i) => {
           const weight = detail.variantWeights.find(
             (w) => w.variantName === v.variantName,
           );
           const isTop = v.variantName === topVariantName;
           const isSelected =
             selectedFixedVariant?.variantName === v.variantName;
-          const isLast = i === detail.variants.length - 1;
+          const isLast = i === sortedVariants.length - 1;
 
           if (isFixed) {
             return (
@@ -172,7 +172,7 @@ function VariantsSection({
                   )}
                   title={v.variantName}
                 >
-                  {v.variantName}
+                  {truncateCenter(v.variantName)}
                 </span>
                 {isSelected && (
                   <RiArrowLeftLine className="text-muted h-4 w-4 shrink-0" />
@@ -189,27 +189,27 @@ function VariantsSection({
                 !isLast && 'border-subtle border-b',
               )}
             >
-              <span
-                className="text-muted min-w-0 flex-1 truncate"
-                title={v.variantName}
-              >
-                {v.variantName}
-              </span>
-              {isTop && (
-                <Pill
-                  kind="primary"
-                  appearance="solidBright"
-                  icon={<RiTrophyLine className="h-3 w-3" />}
-                  iconSide="iconOnly"
+              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <span
+                  className="text-muted truncate"
+                  title={v.variantName}
                 >
-                  {null}
-                </Pill>
-              )}
-              {weight != null && (
-                <span className="text-basis font-mono text-sm tabular-nums">
-                  {formatVariantWeight(weight.weight)}
+                  {truncateCenter(v.variantName)}
                 </span>
-              )}
+                {isTop && (
+                  <Pill
+                    kind="primary"
+                    appearance="solidBright"
+                    icon={<RiTrophyLine className="h-3 w-3" />}
+                    iconSide="iconOnly"
+                  >
+                    {null}
+                  </Pill>
+                )}
+              </div>
+              <span className="text-basis font-mono text-sm tabular-nums">
+               {weight != null ? formatVariantWeight(weight.weight): "-"}
+              </span>
             </div>
           );
         })}
