@@ -113,28 +113,30 @@ export function RunCountDonutCard({ variants, className, variantColorIndex, onVa
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 pl-0 pr-5">
-          {variants.map((v, index) => (
-            <div key={v.variantName} className="flex w-full items-center gap-1">
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full border"
-                style={{
-                  backgroundColor: subtleColorForVariant(variantColorIndex?.get(v.variantName) ?? index),
-                  borderColor: colorForVariant(variantColorIndex?.get(v.variantName) ?? index),
-                }}
-              />
-              <span
-                className="text-subtle min-w-0 flex-1 pr-3 text-left text-sm"
-                title={v.variantName}
-              >
-                {truncateCenter(v.variantName)}
-              </span>
-              <span className="text-basis shrink-0 pl-3 text-right text-sm tabular-nums">
-                {v.runCount.toLocaleString()}{' '}
-                <span className="text-muted">runs</span>
-              </span>
-            </div>
-          ))}
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex min-w-max flex-col items-center justify-center gap-1.5">
+            {variants.map((v, index) => (
+              <div key={v.variantName} className="flex w-full items-center gap-1">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full border"
+                  style={{
+                    backgroundColor: subtleColorForVariant(variantColorIndex?.get(v.variantName) ?? index),
+                    borderColor: colorForVariant(variantColorIndex?.get(v.variantName) ?? index),
+                  }}
+                />
+                <span
+                  className="text-subtle min-w-0 flex-1 pr-7 text-left text-sm"
+                  title={v.variantName}
+                >
+                  {truncateCenter(v.variantName)}
+                </span>
+                <span className="text-basis shrink-0 whitespace-nowrap text-right text-sm tabular-nums">
+                  {v.runCount.toLocaleString()}{' '}
+                  <span className="text-muted">runs</span>
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </Card.Content>
     </Card>
