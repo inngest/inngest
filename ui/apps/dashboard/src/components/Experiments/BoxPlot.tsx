@@ -95,17 +95,17 @@ function BoxShape({
   const opacity = payload.opacity ?? 1;
   const range = payload.max - payload.min;
   if (range === 0) {
+    const cy = y + height / 2;
+    const r = BOX_HEIGHT / 2;
     return (
-      <g opacity={opacity}>
-        <rect
-          x={x}
-          y={y}
-          width={width}
-          height={height}
-          fill={payload?.subtleColor}
-          stroke={payload?.color}
-        />
-      </g>
+      <>
+        {opacity < 1 && (
+          <circle cx={x} cy={cy} r={r} fill="rgb(var(--color-background-canvas-base))" />
+        )}
+        <g opacity={opacity}>
+          <circle cx={x} cy={cy} r={r} fill={payload.subtleColor} stroke={payload.color} strokeWidth={LINE_WIDTH} />
+        </g>
+      </>
     );
   }
 

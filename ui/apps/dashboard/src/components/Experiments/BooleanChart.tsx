@@ -20,7 +20,6 @@ import { BooleanChartTooltip } from './BooleanChartTooltip';
 import { VariantAxisTick } from './VariantAxisTick';
 
 const DOT_RADIUS = 5;
-const LINE_HEIGHT = 2;
 
 export type RowData = {
   variantName: string;
@@ -71,12 +70,13 @@ function LineDotShape({
       : 'rgb(var(--color-background-canvas-base))';
   return (
     <g opacity={payload?.opacity ?? 1}>
-      <rect
-        x={x}
-        y={cy - LINE_HEIGHT / 2}
-        width={width}
-        height={LINE_HEIGHT}
-        fill={fill}
+      <line
+        x1={x}
+        y1={cy}
+        x2={x + width}
+        y2={cy}
+        stroke={fill}
+        strokeWidth={1.25}
       />
       <circle
         cx={x + width}
@@ -84,7 +84,6 @@ function LineDotShape({
         r={DOT_RADIUS}
         fill={dotFill}
         stroke={fill}
-        strokeWidth={2}
       />
     </g>
   );
