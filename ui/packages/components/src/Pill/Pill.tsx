@@ -153,7 +153,7 @@ export const getPillColors = ({
   const solidPillStyles = {
     default: `bg-canvasMuted text-basis ${clickable ? 'hover:bg-surfaceMuted' : ''}`,
     primary: `bg-primary-intense text-alwaysWhite ${clickable ? 'hover:bg-primary-xIntense' : ''}`,
-    secondary: `bg-quarternary-warmer-xIntense text-alwaysWhite ${
+    secondary: `bg-quaternary-warmer-xIntense text-alwaysWhite ${
       clickable ? 'hover:bg-primary-xIntense' : ''
     }`,
     warning: `bg-accent-moderate text-alwaysWhite ${clickable ? 'hover:bg-accent-intense' : ''}`,

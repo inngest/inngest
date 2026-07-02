@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ExperimentVariantMetrics } from '@inngest/components/Experiments';
 import {
   Bar,
@@ -16,28 +16,31 @@ import {
   colorForVariant,
   subtleColorForVariant,
 } from '@/lib/experiments/colors';
-import { ChartTooltip } from './ChartTooltip';
+import { BooleanChartTooltip } from './BooleanChartTooltip';
 import { VariantAxisTick } from './VariantAxisTick';
 
 const DOT_RADIUS = 5;
-const LINE_HEIGHT = 2;
 
 export type RowData = {
   variantName: string;
   value: number;
   /** Index of the variant in the shared list, used to pick a stable palette color. */
   variantIndex: number;
+  runCount: number;
+  opacity: number;
 };
 
 export function rowsForMetric(
   variants: ExperimentVariantMetrics[],
   metricKey: string,
+  colorIndexForVariant?: Map<string, number>,
 ): RowData[] {
   return variants
     .map((v, variantIndex) => {
       const m = v.metrics.find((vm) => vm.key === metricKey);
+      const colorIndex = colorIndexForVariant?.get(v.variantName) ?? variantIndex;
       return m
-        ? { variantName: v.variantName, value: m.avg, variantIndex }
+        ? { variantName: v.variantName, value: m.avg, variantIndex: colorIndex, runCount: v.runCount, opacity: 1 }
         : null;
     })
     .filter((r): r is RowData => r !== null);
@@ -49,7 +52,7 @@ type BarShapeProps = {
   width?: number;
   height?: number;
   fill?: string;
-  payload?: { variantIndex?: number };
+  payload?: { variantIndex?: number; opacity?: number };
 };
 
 function LineDotShape({
@@ -66,13 +69,14 @@ function LineDotShape({
       ? subtleColorForVariant(payload.variantIndex)
       : 'rgb(var(--color-background-canvas-base))';
   return (
-    <g>
-      <rect
-        x={x}
-        y={cy - LINE_HEIGHT / 2}
-        width={width}
-        height={LINE_HEIGHT}
-        fill={fill}
+    <g opacity={payload?.opacity ?? 1}>
+      <line
+        x1={x}
+        y1={cy}
+        x2={x + width}
+        y2={cy}
+        stroke={fill}
+        strokeWidth={1.25}
       />
       <circle
         cx={x + width}
@@ -80,7 +84,6 @@ function LineDotShape({
         r={DOT_RADIUS}
         fill={dotFill}
         stroke={fill}
-        strokeWidth={2}
       />
     </g>
   );
@@ -91,7 +94,9 @@ function BackgroundLineShape({
   y = 0,
   width = 0,
   height = 0,
+  payload,
 }: BarShapeProps) {
+  if ((payload?.opacity ?? 1) < 1) return null;
   const cy = y + height / 2;
   return (
     <rect
@@ -157,36 +162,50 @@ type Props = {
   rows: RowData[];
   domain: [number, number];
   metricDisplayName: string;
+  hoveredVariantName?: string | null;
+  onVariantHover?: (name: string | null) => void;
 };
 
-export function BooleanChart({ rows, domain, metricDisplayName }: Props) {
+export function BooleanChart({ rows, domain, metricDisplayName, hoveredVariantName, onVariantHover }: Props) {
   const { chartHeight, yAxisWidth } = computeChartSizing(
     rows.map((r) => r.variantName),
   );
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [activeRow, setActiveRow] = useState<RowData | null>(null);
 
+  const displayRows = useMemo(
+    () =>
+      rows.map((r) => ({
+        ...r,
+        // Only dim when the highlight comes from another chart (this chart has no active row)
+        opacity: !hoveredVariantName || activeRow !== null || r.variantName === hoveredVariantName ? 1 : 0.25,
+      })),
+    [rows, hoveredVariantName, activeRow],
+  );
+
   return (
     <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart
-        data={rows}
+        data={displayRows}
         layout="vertical"
         barSize={DOT_RADIUS * 2}
-        margin={{ top: 0, right: DOT_RADIUS + 2, bottom: 0, left: 4 }}
+        margin={{ top: 0, right: 16, bottom: 0, left: 4 }}
         onMouseMove={(state) => {
           if (!state.isTooltipActive) {
             setHoverX(null);
             setActiveRow(null);
+            onVariantHover?.(null);
             return;
           }
+          const row = (state.activePayload?.[0]?.payload as RowData | undefined) ?? null;
           setHoverX(state.chartX ?? null);
-          setActiveRow(
-            (state.activePayload?.[0]?.payload as RowData | undefined) ?? null,
-          );
+          setActiveRow(row);
+          onVariantHover?.(row?.variantName ?? null);
         }}
         onMouseLeave={() => {
           setHoverX(null);
           setActiveRow(null);
+          onVariantHover?.(null);
         }}
       >
         <XAxis
@@ -202,10 +221,12 @@ export function BooleanChart({ rows, domain, metricDisplayName }: Props) {
           dataKey="variantName"
           width={yAxisWidth}
           tick={<VariantAxisTick />}
+          axisLine={false}
+          tickLine={false}
           interval={0}
         />
         <Tooltip
-          content={<ChartTooltip />}
+          content={<BooleanChartTooltip />}
           cursor={{ fill: 'rgb(var(--color-background-canvas-subtle))' }}
           allowEscapeViewBox={{ x: true, y: true }}
           wrapperStyle={{ zIndex: 50, outline: 'none' }}

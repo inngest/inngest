@@ -5,11 +5,10 @@
  */
 export const METRIC_PALETTE = [
   'rgb(var(--color-primary-moderate))',
-  'rgb(var(--color-secondary-xSubtle))',
-  'rgb(var(--color-accent-subtle))',
+  'rgb(var(--color-secondary-subtle))',
+  'rgb(var(--color-quaternary-warmer-moderate))',
   'rgb(var(--color-quaternary-cool-moderate))',
   'rgb(var(--color-tertiary-moderate))',
-  'rgb(var(--color-quaternary-warmer-moderate))',
 ] as const;
 
 /**
@@ -18,11 +17,10 @@ export const METRIC_PALETTE = [
  */
 export const METRIC_PALETTE_SUBTLE = [
   'rgb(var(--color-primary-3xSubtle))',
-  'rgb(var(--color-quaternary-cool-3xSubtle))',
   'rgb(var(--color-secondary-3xSubtle))',
-  'rgb(var(--color-accent-3xSubtle))',
-  'rgb(var(--color-tertiary-3xSubtle))',
   'rgb(var(--color-quaternary-warmer-3xSubtle))',
+  'rgb(var(--color-quaternary-cool-3xSubtle))',
+  'rgb(var(--color-tertiary-3xSubtle))',
 ] as const;
 
 export function colorForMetric(index: number): string {

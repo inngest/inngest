@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '@inngest/components/Card';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiTrophyLine } from '@remixicon/react';
 import {
   Bar,
   BarChart,
+  Cell,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -13,7 +13,7 @@ import {
   YAxis,
 } from 'recharts';
 
-import { computeChartSizing, truncateCenter } from '@/lib/experiments/chart';
+import { computeChartSizing } from '@/lib/experiments/chart';
 import { colorForMetric } from '@/lib/experiments/colors';
 import type { ScoredVariant } from '@/lib/experiments/score';
 import { ChartTooltip } from './ChartTooltip';
@@ -25,6 +25,7 @@ type BackgroundLineProps = {
   y?: number;
   width?: number;
   height?: number;
+  payload?: { opacity?: number };
 };
 
 function BackgroundLineShape({
@@ -32,7 +33,9 @@ function BackgroundLineShape({
   y = 0,
   width = 0,
   height = 0,
+  payload,
 }: BackgroundLineProps) {
+  if ((payload?.opacity ?? 1) < 1) return null;
   const cy = y + height / 2;
   return (
     <rect
@@ -49,11 +52,15 @@ type Props = {
   scoredVariants: ScoredVariant[];
   metrics: ExperimentScoringMetric[];
   className?: string;
+  hoveredVariantName?: string | null;
+  onVariantHover?: (name: string | null) => void;
 };
 
 type RowData = {
   variantName: string;
   total: number;
+  runCount: number;
+  opacity: number;
   [metricKey: string]: string | number;
 };
 
@@ -61,27 +68,33 @@ export function ScoreSummaryCard({
   scoredVariants,
   metrics,
   className,
+  hoveredVariantName,
+  onVariantHover,
 }: Props) {
+  const [activeVariantName, setActiveVariantName] = useState<string | null>(null);
+
   const enabledMetrics = useMemo(
     () => metrics.filter((m) => m.enabled),
     [metrics],
   );
 
-  const { rows, ranked } = useMemo(() => {
-    const built = scoredVariants.map(({ variant, result }) => {
+  // Only dim when the highlight comes from another chart (not from this one).
+  const effectiveHighlight = activeVariantName ? null : (hoveredVariantName ?? null);
+
+  const rows = useMemo(() => {
+    return scoredVariants.map(({ variant, result }) => {
       const row: RowData = {
         variantName: variant.variantName,
         total: result.total,
+        runCount: variant.runCount,
+        opacity: effectiveHighlight && variant.variantName !== effectiveHighlight ? 0.25 : 1,
       };
       for (const seg of result.segments) {
         row[seg.metricKey] = seg.contribution;
       }
-      return { variantName: variant.variantName, total: result.total, row };
+      return row;
     });
-
-    const sorted = [...built].sort((a, b) => b.total - a.total);
-    return { rows: built.map((b) => b.row), ranked: sorted };
-  }, [scoredVariants]);
+  }, [scoredVariants, effectiveHighlight]);
 
   const maxPossible = useMemo(
     () => enabledMetrics.reduce((acc, m) => acc + m.points, 0),
@@ -91,10 +104,8 @@ export function ScoreSummaryCard({
   const { chartHeight, yAxisWidth } = useMemo(() => {
     const sizing = computeChartSizing(rows.map((r) => r.variantName));
     // Reserve room for the metric legend below the bars.
-    return { ...sizing, chartHeight: sizing.chartHeight + 28 };
+    return { ...sizing, chartHeight: Math.max(200, sizing.chartHeight + 28) };
   }, [rows]);
-  const topVariant = ranked[0] ?? null;
-  const runnerUp = ranked[1] ?? null;
 
   return (
     <Card
@@ -115,6 +126,20 @@ export function ScoreSummaryCard({
               layout="vertical"
               barSize={10}
               margin={{ top: 0, right: 16, bottom: 0, left: 4 }}
+              onMouseMove={(state) => {
+                if (!state.isTooltipActive) {
+                  setActiveVariantName(null);
+                  onVariantHover?.(null);
+                  return;
+                }
+                const name = (state.activePayload?.[0]?.payload as RowData | undefined)?.variantName ?? null;
+                setActiveVariantName(name);
+                onVariantHover?.(name);
+              }}
+              onMouseLeave={() => {
+                setActiveVariantName(null);
+                onVariantHover?.(null);
+              }}
             >
               <XAxis
                 type="number"
@@ -129,6 +154,8 @@ export function ScoreSummaryCard({
                 dataKey="variantName"
                 width={yAxisWidth}
                 tick={<VariantAxisTick />}
+                axisLine={false}
+                tickLine={false}
                 interval={0}
               />
               <Tooltip
@@ -160,36 +187,14 @@ export function ScoreSummaryCard({
                   fill={colorForMetric(i)}
                   name={m.displayName}
                   background={i === 0 ? <BackgroundLineShape /> : undefined}
-                />
+                >
+                  {rows.map((row) => (
+                    <Cell key={row.variantName} fill={colorForMetric(i)} opacity={row.opacity} />
+                  ))}
+                </Bar>
               ))}
             </BarChart>
           </ResponsiveContainer>
-        </div>
-
-        {/* Callouts */}
-        <div className="flex w-64 shrink-0 flex-col gap-1">
-          {topVariant && (
-            <div className="bg-primary-3xSubtle flex items-center gap-2 rounded px-2 py-1">
-              <RiTrophyLine className="text-primary-intense h-[18px] w-[18px] shrink-0" />
-              <p
-                className="text-primary-intense min-w-0 truncate text-sm"
-                title={topVariant.variantName}
-              >
-                Recommended: {truncateCenter(topVariant.variantName)}
-              </p>
-            </div>
-          )}
-          {runnerUp && (
-            <div className="flex items-center gap-2 px-2 py-1">
-              <span className="text-subtle shrink-0 text-sm">#2</span>
-              <p
-                className="text-subtle min-w-0 truncate text-sm"
-                title={runnerUp.variantName}
-              >
-                Runner up: {truncateCenter(runnerUp.variantName)}
-              </p>
-            </div>
-          )}
         </div>
       </Card.Content>
     </Card>

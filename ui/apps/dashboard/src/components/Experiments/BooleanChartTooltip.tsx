@@ -1,8 +1,10 @@
-import type { RowData } from './BoxPlot';
+import type { RowData } from './BooleanChart';
 import { formatMetricValue } from './variantsTable/metricStats';
 
 type TooltipEntry = {
   name?: string | number;
+  value?: number | string | Array<number | string>;
+  color?: string;
   payload?: RowData;
 };
 
@@ -12,19 +14,13 @@ type Props = {
   label?: string | number;
 };
 
-export function BoxPlotTooltip({ active, payload, label }: Props) {
+export function BooleanChartTooltip({ active, payload, label }: Props) {
   if (!active || !payload?.length) return null;
   const first = payload[0];
   const data = first?.payload;
   if (!data) return null;
   const title = label ?? data.variantName ?? '';
-
-  const stats = [
-    { label: 'Average', value: formatMetricValue(data.avg) },
-    { label: 'Median', value: formatMetricValue(data.med) },
-    { label: 'Spread', value: `${formatMetricValue(data.q1)} – ${formatMetricValue(data.q3)}` },
-    { label: 'Min/Max', value: `${formatMetricValue(data.min)} – ${formatMetricValue(data.max)}` },
-  ];
+  const value = typeof first?.value === 'number' ? first.value : null;
 
   return (
     <div className="bg-canvasBase border-subtle shadow-tooltip rounded-md border px-3 py-2 text-xs shadow-md">
@@ -34,14 +30,12 @@ export function BoxPlotTooltip({ active, payload, label }: Props) {
           <span className="text-muted tabular-nums">{data.runCount.toLocaleString()} runs</span>
         </div>
       )}
-      <div className="flex flex-col gap-1">
-        {stats.map(({ label, value }) => (
-          <div key={label} className="flex items-baseline justify-between gap-4">
-            <span className="text-muted">{label}</span>
-            <span className="text-basis tabular-nums font-semibold">{value}</span>
-          </div>
-        ))}
-      </div>
+      {value !== null && (
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted">{first?.name}</span>
+          <span className="text-basis tabular-nums font-semibold">{formatMetricValue(value)}</span>
+        </div>
+      )}
     </div>
   );
 }
