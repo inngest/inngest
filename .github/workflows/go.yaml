@@ -56,10 +56,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
     runs-on: ${{ matrix.os }}
-    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}, db: ${{ matrix.database }}"
+    name: "Test / OS: ${{ matrix.os }}, db: ${{ matrix.database }}"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,11 +74,10 @@ jobs:
           go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1 -coverprofile=coverage.txt
         env:
           TEST_MODE: true
-          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
           TEST_DATABASE: "${{ matrix.database }}"
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: unit,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
+          flags: unit,db-${{ matrix.database }}
