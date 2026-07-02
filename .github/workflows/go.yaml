@@ -69,15 +69,29 @@ jobs:
         with:
           go-version-file: ./go.mod
 
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.13.0
+
       - name: Test
         run: |
-          go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1 -coverprofile=coverage.txt
+          gotestsum --junitfile=junit.xml --format=standard-verbose -- \
+            $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") \
+            -race -count=1 -coverprofile=coverage.txt
         env:
           TEST_MODE: true
           TEST_DATABASE: "${{ matrix.database }}"
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unit,db-${{ matrix.database }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
+          flags: unit,db-${{ matrix.database }}
+          report_type: test_results
