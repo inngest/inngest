@@ -24,22 +24,29 @@ describe('colorForMetric', () => {
 });
 
 describe('buildMetricColorMap', () => {
-  it('colors enabled metrics by their enabled-position, skipping disabled ones', () => {
+  it('colors metrics by their position in the full list', () => {
     const map = buildMetricColorMap([
-      { key: 'tokens', enabled: true },
-      { key: 'cost', enabled: false },
-      { key: 'accuracy', enabled: true },
+      { key: 'tokens' },
+      { key: 'cost' },
+      { key: 'accuracy' },
     ]);
-    // 'cost' is disabled, so 'accuracy' takes enabled-index 1 (matching the
-    // Score Summary chart, which only renders enabled segments).
     expect(map.tokens).toBe(colorForMetric(0));
-    expect(map.accuracy).toBe(colorForMetric(1));
-    expect(map.cost).toBeUndefined();
+    expect(map.cost).toBe(colorForMetric(1));
+    expect(map.accuracy).toBe(colorForMetric(2));
   });
 
-  it('returns an empty map when nothing is enabled', () => {
-    expect(buildMetricColorMap([{ key: 'tokens', enabled: false }])).toEqual(
-      {},
-    );
+  it('keeps each color stable regardless of enabled state', () => {
+    // A metric's color depends only on its list position, so disabling any
+    // metric never reshuffles the others' colors.
+    const map = buildMetricColorMap([
+      { key: 'tokens' },
+      { key: 'cost' },
+      { key: 'accuracy' },
+    ]);
+    expect(map.accuracy).toBe(colorForMetric(2));
+  });
+
+  it('returns an empty map for no metrics', () => {
+    expect(buildMetricColorMap([])).toEqual({});
   });
 });
