@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/redis/rueidis"
+	"github.com/sourcegraph/conc/pool"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -496,33 +496,50 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, scope osqueue.Scope, p
 		return 0, fmt.Errorf("could not prepare backlog iterator: %w", err)
 	}
 
-	bwg := sync.WaitGroup{}
+	count = boundedPartitionBacklogSize(ctx, backlogs, q.PartitionBacklogSizeConcurrency(), q.BacklogSize, func(err error, bl *osqueue.QueueBacklog) {
+		log.ReportError(err, "error retrieving backlog size",
+			logger.WithErrorReportTags(map[string]string{
+				"backlog":   bl.BacklogID,
+				"partition": bl.ShadowPartitionID,
+			}),
+		)
+	})
+
+	return count, nil
+}
+
+func boundedPartitionBacklogSize(
+	ctx context.Context,
+	backlogs iter.Seq[*osqueue.QueueBacklog],
+	concurrency int64,
+	sizeFn func(context.Context, string) (int64, error),
+	onError func(error, *osqueue.QueueBacklog),
+) int64 {
+	if concurrency < 1 {
+		concurrency = 1
+	}
+
+	var count int64
+	wg := pool.New().WithMaxGoroutines(int(concurrency))
 	for bl := range backlogs {
-		bwg.Add(1)
-		backlogID := bl.BacklogID
-
-		go func() {
-			defer bwg.Done()
-
-			size, err := q.BacklogSize(ctx, backlogID)
-			if errors.Is(err, context.Canceled) {
+		bl := bl
+		wg.Go(func() {
+			size, err := sizeFn(ctx, bl.BacklogID)
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return
 			}
 			if err != nil {
-				log.ReportError(err, "error retrieving backlog size",
-					logger.WithErrorReportTags(map[string]string{
-						"backlog":   bl.BacklogID,
-						"partition": bl.ShadowPartitionID,
-					}),
-				)
+				if onError != nil {
+					onError(err, bl)
+				}
 				return
 			}
 			atomic.AddInt64(&count, size)
-		}()
+		})
 	}
-	bwg.Wait()
+	wg.Wait()
 
-	return count, nil
+	return count
 }
 
 func (q *queue) BacklogByID(ctx context.Context, backlogID string) (*osqueue.QueueBacklog, error) {

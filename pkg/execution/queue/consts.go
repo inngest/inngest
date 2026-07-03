@@ -106,6 +106,7 @@ const (
 	defaultNumPartitionWorkers         int32 = 50
 	defaultBacklogNormalizationWorkers       = 10
 	defaultBacklogNormalizeConcurrency       = int64(20)
+	defaultPartitionBacklogSizeConcurrency   = int64(20)
 )
 
 const (
