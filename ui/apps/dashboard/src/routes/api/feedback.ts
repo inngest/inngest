@@ -1,18 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { auth } from '@clerk/tanstack-react-start/server';
 
+// Read lazily; validated inside the handler so a missing config only fails the
+// feedback endpoint rather than crashing the whole app at module-load time.
 const apiKey = process.env.NOTION_API_KEY;
 const databaseId = process.env.NOTION_FEEDBACK_DATABASE_ID;
-
-if (!apiKey) {
-  throw new Error('NOTION_API_KEY environment variable is not set');
-}
-
-if (!databaseId) {
-  throw new Error(
-    'NOTION_FEEDBACK_DATABASE_ID environment variable is not set',
-  );
-}
 
 // Non-secret, fixed per Clerk account. Points at the production instance so
 // feedback rows deep-link to the real user/org.
@@ -21,6 +13,19 @@ const CLERK_DASHBOARD_BASE =
 
 const NOTION_API_URL = 'https://api.notion.com/v1/pages';
 const NOTION_VERSION = '2022-06-28';
+
+// Notion caps each rich_text content segment at 2000 characters. Split long
+// feedback into multiple segments so nothing is lost (vs. a silent 400).
+const NOTION_RICH_TEXT_LIMIT = 2000;
+function toRichText(content: string) {
+  const segments: { text: { content: string } }[] = [];
+  for (let i = 0; i < content.length; i += NOTION_RICH_TEXT_LIMIT) {
+    segments.push({
+      text: { content: content.slice(i, i + NOTION_RICH_TEXT_LIMIT) },
+    });
+  }
+  return segments.length ? segments : [{ text: { content: '' } }];
+}
 
 export type RequestBody = {
   user: { name: string; email: string; clerkId: string };
@@ -33,6 +38,19 @@ export const Route = createFileRoute('/api/feedback')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (!apiKey || !databaseId) {
+          console.error(
+            'feedback endpoint is missing NOTION_API_KEY or NOTION_FEEDBACK_DATABASE_ID',
+          );
+          return new Response(
+            JSON.stringify({ error: 'Feedback is not configured' }),
+            {
+              status: 501,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          );
+        }
+
         const { userId } = await auth();
         if (!userId) {
           return new Response(
@@ -95,7 +113,7 @@ export const Route = createFileRoute('/api/feedback')({
                 object: 'block',
                 type: 'paragraph',
                 paragraph: {
-                  rich_text: [{ text: { content: feedback } }],
+                  rich_text: toRichText(feedback),
                 },
               },
             ],
