@@ -548,6 +548,10 @@ func (q *queue) BacklogByID(ctx context.Context, backlogID string) (*osqueue.Que
 func (q *queue) BacklogSize(ctx context.Context, backlogID string) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogSize"), redis_telemetry.ScopeQueue)
 
+	// We only want this specific call to last ~25ms, and if this times out so be it.
+	ctx, cancel := context.WithTimeout(ctx, 25*time.Millisecond)
+	defer cancel()
+
 	rc := q.RedisClient.Client()
 	cmd := rc.B().Zcard().Key(q.RedisClient.kg.BacklogSet(backlogID)).Build()
 	count, err := rc.Do(ctx, cmd).AsInt64()
