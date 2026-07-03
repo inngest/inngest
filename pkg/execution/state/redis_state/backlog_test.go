@@ -1282,7 +1282,7 @@ func TestBoundedPartitionBacklogSizeRespectsConcurrency(t *testing.T) {
 	ctx := context.Background()
 	const (
 		totalBacklogs = 10
-		concurrency  = int64(3)
+		concurrency   = int64(3)
 	)
 
 	backlogs := func(yield func(*osqueue.QueueBacklog) bool) {
@@ -1350,6 +1350,43 @@ func TestBoundedPartitionBacklogSizeRespectsConcurrency(t *testing.T) {
 	require.LessOrEqual(t, atomic.LoadInt64(&maxInFlight), concurrency)
 }
 
+func TestBoundedPartitionBacklogSizeIgnoresContextErrors(t *testing.T) {
+	ctx := context.Background()
+	backlogIDs := []string{"count", "deadline", "canceled", "error"}
+	backlogs := func(yield func(*osqueue.QueueBacklog) bool) {
+		for _, id := range backlogIDs {
+			if !yield(&osqueue.QueueBacklog{BacklogID: id}) {
+				return
+			}
+		}
+	}
+
+	var reported int64
+	count := boundedPartitionBacklogSize(
+		ctx,
+		backlogs,
+		int64(len(backlogIDs)),
+		func(_ context.Context, backlogID string) (int64, error) {
+			switch backlogID {
+			case "count":
+				return 2, nil
+			case "deadline":
+				return 0, context.DeadlineExceeded
+			case "canceled":
+				return 0, context.Canceled
+			default:
+				return 0, fmt.Errorf("backlog size failed")
+			}
+		},
+		func(error, *osqueue.QueueBacklog) {
+			atomic.AddInt64(&reported, 1)
+		},
+	)
+
+	require.Equal(t, int64(2), count)
+	require.Equal(t, int64(1), atomic.LoadInt64(&reported))
+}
+
 func TestPartitionBacklogSize(t *testing.T) {
 	r1, rc1 := initRedis(t)
 	defer rc1.Close()
@@ -1370,9 +1407,9 @@ func TestPartitionBacklogSize(t *testing.T) {
 		osqueue.WithAccountShardIterationEnabled(func(context.Context, uuid.UUID) bool {
 			return true
 		}),
-			osqueue.WithClock(clock),
-			osqueue.WithPartitionBacklogSizeConcurrency(2),
-		}
+		osqueue.WithClock(clock),
+		osqueue.WithPartitionBacklogSizeConcurrency(2),
+	}
 
 	shard1 := shardFromClient("one", rc1, opts...)
 	shard2 := shardFromClient("two", rc2, opts...)
