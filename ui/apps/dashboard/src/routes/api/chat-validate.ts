@@ -36,9 +36,10 @@ export const Route = createFileRoute('/api/chat-validate')({
             });
           }
 
-          const validationResult = validationResultSchema.safeParse(
-            await request.json(),
-          );
+          // Malformed JSON is a client error, not a 500: fall into the schema
+          // 400 below instead of the catch-all (which echoes error messages).
+          const body: unknown = await request.json().catch(() => null);
+          const validationResult = validationResultSchema.safeParse(body);
           if (!validationResult.success) {
             return new Response(
               JSON.stringify({

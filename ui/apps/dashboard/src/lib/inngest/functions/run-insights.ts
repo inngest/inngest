@@ -124,6 +124,29 @@ export const runInsightsAgent = inngest.createFunction(
     id: 'run-insights-agent',
     name: 'Insights SQL Agent',
     triggers: [{ event: 'insights-agent/chat.requested' }],
+    // Runs after all step retries exhaust; without it the chat UI spins
+    // forever waiting for a run.completed that will never arrive.
+    onFailure: async ({ event, step }) => {
+      const original = event.data.event.data as ChatEventData;
+      const targetChannel =
+        original.channelKey ||
+        (original.userId
+          ? `user:${original.userId}`
+          : `acct:${original.accountId}:${original.requestId}`);
+      await step.realtime.publish(
+        'publish-run-error',
+        insightsChannel(targetChannel).agent_stream,
+        {
+          event: 'error',
+          data: {
+            threadId: original.threadId ?? '',
+            error:
+              'The Insights agent could not complete this request. Please try again.',
+          },
+          timestamp: Date.now(),
+        },
+      );
+    },
   },
   async ({ event, step, group, defer, runId }) => {
     const {

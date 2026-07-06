@@ -149,6 +149,8 @@ export async function runAgentLoop(
     }
 
     // No tool_choice: the model freely picks between a tool call and final text.
+    // A thrown LLM call fails this attempt and Inngest retries the step; if all
+    // retries exhaust, the run fails and onFailure reports it to the UI.
     const response = (await step.run(`think-${iterations}`, () =>
       client.messages.create({
         model,
