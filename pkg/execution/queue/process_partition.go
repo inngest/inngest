@@ -14,6 +14,16 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+func partitionRequeueExtensionWithJitter() time.Duration {
+	maxJitterMS := PartitionRequeueMaxJitter.Milliseconds()
+	if maxJitterMS <= 0 {
+		return PartitionRequeueExtension
+	}
+
+	jitter := time.Duration(rnd.Uint64n(uint64(maxJitterMS))+1) * time.Millisecond
+	return PartitionRequeueExtension + jitter
+}
+
 // ProcessPartition processes a given partition, peeking jobs from the partition to run.
 //
 // It accepts a uint continuationCount which represents the number of times that the partition
@@ -348,11 +358,12 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
 	// for a minimum of 5 seconds.
 
-	// Requeue the partition, which reads the next unleased job or sets a time of
-	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
-	// about to be leased and processed by the worker.
+	// Requeue the partition, which reads the next unleased job or sets a fallback
+	// time with jitter. This is why we have to lease items above, else this may
+	// return an item that is about to be leased and processed by the worker.
+	requeueExtension := partitionRequeueExtensionWithJitter()
 	_, err = Duration(ctx, shard.Name(), "partition_requeue", q.Clock().Now(), func(ctx context.Context) (any, error) {
-		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(PartitionRequeueExtension), false)
+		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(requeueExtension), false)
 		return nil, err
 	})
 	if err == ErrPartitionGarbageCollected {
@@ -365,6 +376,6 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return err
 	}
 	span.SetAttributes(attribute.String("status", "requeue_default"))
-	span.SetAttributes(attribute.Int64("requeue_ms", PartitionRequeueExtension.Milliseconds()))
+	span.SetAttributes(attribute.Int64("requeue_ms", requeueExtension.Milliseconds()))
 	return nil
 }

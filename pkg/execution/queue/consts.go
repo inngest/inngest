@@ -19,6 +19,9 @@ const (
 	// PartitionRequeueExtension is the length of time that we extend a partition's
 	// vesting time when requeueing by default.
 	PartitionRequeueExtension = 30 * time.Second
+	// PartitionRequeueMaxJitter is the maximum positive jitter added to default
+	// partition requeues to avoid waking many idle partitions at the same time.
+	PartitionRequeueMaxJitter = 30 * time.Second
 
 	// PartitionConcurrencyLimitRequeueExtension is the length of time that a partition
 	// is requeued if there is no global or partition(function) capacity because of
