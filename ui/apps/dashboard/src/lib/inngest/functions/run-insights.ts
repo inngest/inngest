@@ -195,7 +195,11 @@ export const runInsightsAgent = inngest.createFunction(
       .map((m) => ({ role: m.role, content: m.content }));
 
     const draft: QueryDraft = { selectedEvents: [] };
-    const startedAt = Date.now();
+
+    // Memoized so it survives re-invocation: the run body re-executes after
+    // every suspend (waitForEvent in validate_query, checkpoint maxRuntime),
+    // and a bare Date.now() here would reset the latency clock each time.
+    const startedAt = await step.run('record-start', () => Date.now());
 
     const result = await runAgentLoop({
       step,
