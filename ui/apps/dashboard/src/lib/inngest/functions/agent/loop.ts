@@ -143,13 +143,10 @@ export async function runAgentLoop(
 
     // Nudge the model to wrap up on the last iteration. The nudge goes only
     // into this call's message list, never into the running conversation.
-    const turnMessages =
-      iterations === maxIterations
-        ? [
-            ...messages,
-            { role: 'user' as const, content: FINAL_ITERATION_NUDGE },
-          ]
-        : messages;
+    const turnMessages = [...messages];
+    if (iterations === maxIterations) {
+      turnMessages.push({ role: 'user', content: FINAL_ITERATION_NUDGE });
+    }
 
     // No tool_choice: the model freely picks between a tool call and final text.
     const response = (await step.run(`think-${iterations}`, () =>
@@ -188,11 +185,8 @@ export async function runAgentLoop(
 
       let outcome: ToolOutcome;
       if (toolUse.name === VALIDATE_QUERY && registry.has(VALIDATE_QUERY)) {
-        // Validation needs the durable primitives publish + waitForEvent,
-        // which cannot run inside step.run — so the loop handles it directly.
-        // The registry check keeps a hallucinated validate_query call on the
-        // headless path (tool not offered) from blocking in waitForEvent; it
-        // falls through to the Unknown tool observation instead.
+        // Validation uses durable primitives that can't nest inside step.run;
+        // the registry check drops hallucinated calls when the tool wasn't offered.
         validationAttempts++;
         outcome = await validateQuery({
           sql: String(input.sql ?? ''),
