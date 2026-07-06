@@ -231,6 +231,35 @@ describe('runAgentLoop', () => {
       ]);
     });
 
+    it('treats a hallucinated validate_query call as an unknown tool when not offered', async () => {
+      const step = fakeStep();
+      const publish = vi.fn(async () => {});
+      const client = fakeClient([
+        toolResponse('validate_query', { sql: 'SELECT 1' }),
+        textResponse('done'),
+      ]);
+      // validate_query deliberately NOT in tools (the headless path).
+      const res = await runAgentLoop({
+        ...baseArgs({ tools: [echoTool] }),
+        step: step as never,
+        client,
+        publish,
+      });
+
+      expect(publish).not.toHaveBeenCalled();
+      expect(step.waitForEvent).not.toHaveBeenCalled();
+      expect(res.validationAttempts).toBe(0);
+
+      const secondCall = (
+        client as { messages: { create: ReturnType<typeof vi.fn> } }
+      ).messages.create.mock.calls[1]?.[0] as {
+        messages: { content: [{ content: string }] }[];
+      };
+      expect(secondCall.messages[2]?.content[0]?.content).toContain(
+        'Unknown tool: validate_query',
+      );
+    });
+
     it('degrades gracefully when no validation result arrives (timeout)', async () => {
       const step = fakeStep(null);
       const client = fakeClient([

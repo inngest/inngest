@@ -173,9 +173,12 @@ export async function runAgentLoop(
       const input = (toolUse.input ?? {}) as Record<string, unknown>;
 
       let outcome: ToolOutcome;
-      if (toolUse.name === VALIDATE_QUERY) {
+      if (toolUse.name === VALIDATE_QUERY && registry.has(VALIDATE_QUERY)) {
         // Validation needs the durable primitives publish + waitForEvent,
         // which cannot run inside step.run — so the loop handles it directly.
+        // The registry check keeps a hallucinated validate_query call on the
+        // headless path (tool not offered) from blocking in waitForEvent; it
+        // falls through to the Unknown tool observation instead.
         validationAttempts++;
         outcome = await validateQuery({
           sql: String(input.sql ?? ''),
