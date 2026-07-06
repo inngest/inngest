@@ -97,6 +97,9 @@ export const Route = createFileRoute('/api/chat')({
               userMessage,
               userId,
               channelKey,
+              // The chat UI subscribes to the agent stream and can execute
+              // validate_query round trips on the agent's behalf.
+              canValidate: true,
             },
           });
 
