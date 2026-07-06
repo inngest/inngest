@@ -10,7 +10,6 @@ import {
   type InsightsClientState,
   type QueryDraft,
 } from './agent/loop';
-import { fetchLessons, newLessonEvents } from './agent/lessons';
 import { buildSystemPrompt } from './agent/system';
 import { insightsTools, validateQueryTool } from './agent/tools';
 
@@ -165,9 +164,6 @@ export const runInsightsAgent = inngest.createFunction(
       timestamp: Date.now(),
     });
 
-    // Pitfalls recorded from past runs' failed validations (see agent/lessons.ts).
-    const lessons = await step.run('fetch-lessons', () => fetchLessons());
-
     // Select the model once up front; the loop reuses it every iteration.
     const { result: model, experimentRef } = await group.experiment(
       'query-writer-model',
@@ -205,10 +201,7 @@ export const runInsightsAgent = inngest.createFunction(
       step,
       client: new Anthropic(),
       model,
-      system: buildSystemPrompt({
-        currentQuery: clientState.currentQuery,
-        lessons,
-      }),
+      system: buildSystemPrompt({ currentQuery: clientState.currentQuery }),
       messages: [
         ...historyMessages,
         { role: 'user', content: userMessage.content },
@@ -266,12 +259,6 @@ export const runInsightsAgent = inngest.createFunction(
         value: result.validationFailures.length,
       });
     });
-
-    // Record novel validation failures so future runs are prompted to avoid them.
-    const lessonEvents = newLessonEvents(result.validationFailures, lessons);
-    if (lessonEvents.length > 0) {
-      await step.sendEvent('record-lessons', lessonEvents);
-    }
 
     const summary =
       result.summary ||
