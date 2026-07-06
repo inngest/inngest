@@ -32,6 +32,7 @@ function baseArgs(overrides: Record<string, unknown> = {}) {
     draft: { selectedEvents: [] } as QueryDraft,
     publish: vi.fn(async () => {}),
     runId: 'run-1',
+    userId: 'user-1',
     ...overrides,
   };
 }
@@ -185,7 +186,7 @@ describe('runAgentLoop', () => {
         {
           event: 'insights-agent/validation.completed',
           timeout: '20s',
-          if: 'async.data.validationId == "run-1-1"',
+          if: 'async.data.validationId == "run-1-1" && async.data.userId == "user-1"',
         },
       );
       expect(res.validationAttempts).toBe(1);

@@ -8,17 +8,18 @@ import { inngest } from '@/lib/inngest/client';
 // the SQL with the user's own credentials and posts the outcome here, which
 // forwards it as the event the agent loop is waiting on (step.waitForEvent).
 const validationResultSchema = z.object({
-  validationId: z.string().min(1),
+  validationId: z.string().min(1).max(64),
   ok: z.boolean(),
-  columns: z.array(z.string()).optional(),
-  rowCount: z.number().optional(),
+  columns: z.array(z.string().max(256)).max(100).optional(),
+  rowCount: z.number().int().nonnegative().optional(),
   diagnostics: z
     .array(
       z.object({
-        code: z.string().optional(),
-        message: z.string(),
+        code: z.string().max(128).optional(),
+        message: z.string().max(2000),
       }),
     )
+    .max(20)
     .optional(),
 });
 
@@ -54,7 +55,10 @@ export const Route = createFileRoute('/api/chat-validate')({
 
           await inngest.send({
             name: 'insights-agent/validation.completed',
-            data: validationResult.data,
+            // userId comes from the Clerk session, never the request body —
+            // the agent's waitForEvent condition pins on it so only the run's
+            // initiating user can complete the validation.
+            data: { ...validationResult.data, userId },
           });
 
           return new Response(JSON.stringify({ success: true }), {

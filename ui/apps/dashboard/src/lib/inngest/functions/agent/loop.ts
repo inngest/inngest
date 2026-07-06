@@ -101,6 +101,10 @@ interface RunAgentLoopArgs {
     data: Record<string, unknown>,
   ) => Promise<unknown>;
   runId: string;
+  // Clerk id of the user whose browser may answer validate_query round trips.
+  // The wait condition pins on it so only that user's authenticated result can
+  // complete the validation. Empty string fails closed (nothing matches).
+  userId: string;
   maxIterations?: number;
 }
 
@@ -110,8 +114,18 @@ const FINAL_ITERATION_NUDGE =
 export async function runAgentLoop(
   args: RunAgentLoopArgs,
 ): Promise<AgentLoopResult> {
-  const { step, client, model, system, tools, ctx, draft, publish, runId } =
-    args;
+  const {
+    step,
+    client,
+    model,
+    system,
+    tools,
+    ctx,
+    draft,
+    publish,
+    runId,
+    userId,
+  } = args;
   const maxIterations = args.maxIterations ?? 12;
   const messages: AgentMessage[] = [...args.messages];
   const registry = new Map(tools.map((t) => [t.tool.name, t]));
@@ -183,6 +197,7 @@ export async function runAgentLoop(
         outcome = await validateQuery({
           sql: String(input.sql ?? ''),
           validationId: `${runId}-${toolCalls}`,
+          userId,
           step,
           publish,
           iterations,
@@ -235,13 +250,14 @@ export async function runAgentLoop(
 async function validateQuery(args: {
   sql: string;
   validationId: string;
+  userId: string;
   step: StepTools;
   publish: RunAgentLoopArgs['publish'];
   iterations: number;
   toolCalls: number;
   validationFailures: ValidationFailure[];
 }): Promise<ToolOutcome> {
-  const { sql, validationId, step, publish } = args;
+  const { sql, validationId, userId, step, publish } = args;
 
   await publish(
     `publish-validation.requested-${args.iterations}-${args.toolCalls}`,
@@ -249,10 +265,12 @@ async function validateQuery(args: {
     { validationId, sql },
   );
 
+  // userId is stamped server-side by /api/chat-validate from the poster's
+  // Clerk session, so only the initiating user can complete this validation.
   const completed = await step.waitForEvent(`wait-validation-${validationId}`, {
     event: VALIDATION_COMPLETED_EVENT,
     timeout: '20s',
-    if: `async.data.validationId == "${validationId}"`,
+    if: `async.data.validationId == "${validationId}" && async.data.userId == "${userId}"`,
   });
 
   if (!completed) {

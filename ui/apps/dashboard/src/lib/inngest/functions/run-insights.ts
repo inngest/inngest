@@ -222,6 +222,9 @@ export const runInsightsAgent = inngest.createFunction(
           timestamp: Date.now(),
         }),
       runId,
+      // Pins validate_query completions to the initiating user; empty (the
+      // headless path, which never offers the tool) fails closed.
+      userId: userId ?? '',
       maxIterations: 12,
     });
 
