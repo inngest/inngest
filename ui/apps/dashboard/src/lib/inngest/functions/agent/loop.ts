@@ -172,8 +172,10 @@ export async function runAgentLoop(
       .map((block) => block.text)
       .join('\n');
 
-    if (toolUses.length === 0) {
+    if (text) {
       summary = text;
+    }
+    if (toolUses.length === 0) {
       break;
     }
 

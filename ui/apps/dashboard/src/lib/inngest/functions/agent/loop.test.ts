@@ -142,6 +142,21 @@ describe('runAgentLoop', () => {
     expect(lastMessage?.content).toContain('final iteration');
   });
 
+  it('keeps text that accompanies a tool call on the final iteration', async () => {
+    const client = fakeClient([
+      {
+        content: [
+          { type: 'text', text: 'Here is your query.' },
+          { type: 'tool_use', id: 't1', name: 'echo', input: { msg: 'x' } },
+        ],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      },
+    ]);
+    const res = await runAgentLoop({ ...baseArgs(), client, maxIterations: 1 });
+
+    expect(res.summary).toBe('Here is your query.');
+  });
+
   describe('validate_query', () => {
     const validateTool: ToolDef = {
       tool: {
