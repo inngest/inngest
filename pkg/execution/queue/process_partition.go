@@ -355,6 +355,8 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return nil
 	}
 
+	noPeek := len(queue) == 0
+
 	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
 	// for a minimum of 5 seconds.
 
@@ -362,10 +364,10 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	// time with jitter. This is why we have to lease items above, else this may
 	// return an item that is about to be leased and processed by the worker.
 	requeueExtension := partitionRequeueExtensionWithJitter()
-	_, err = Duration(ctx, shard.Name(), "partition_requeue", q.Clock().Now(), func(ctx context.Context) (any, error) {
+	_, err = DurationWithTags(ctx, shard.Name(), "partition_requeue", q.Clock().Now(), func(ctx context.Context) (any, error) {
 		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(requeueExtension), false)
 		return nil, err
-	})
+	}, map[string]any{"no_peek": noPeek})
 	if err == ErrPartitionGarbageCollected {
 		q.removeContinue(ctx, p, false)
 		// Safe;  we're preventing this from wasting cycles in the future.
@@ -376,6 +378,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return err
 	}
 	span.SetAttributes(attribute.String("status", "requeue_default"))
+	span.SetAttributes(attribute.Bool("no_peek", noPeek))
 	span.SetAttributes(attribute.Int64("requeue_ms", requeueExtension.Milliseconds()))
 	return nil
 }
