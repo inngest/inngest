@@ -676,9 +676,22 @@
           },
           "period": {
             "type": "string"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/v2FunctionThrottleScope"
           }
         },
         "type": "object"
+      },
+      "v2FunctionThrottleScope": {
+        "default": "UNSPECIFIED",
+        "enum": [
+          "UNSPECIFIED",
+          "ACCOUNT",
+          "ENVIRONMENT",
+          "FUNCTION"
+        ],
+        "type": "string"
       },
       "v2FunctionTrace": {
         "properties": {

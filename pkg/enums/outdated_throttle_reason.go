@@ -25,4 +25,7 @@ const (
 
 	// Item is missing key expression hash (this applies to pre-key-queue items)
 	OutdatedThrottleReasonMissingKeyExpressionHash OutdatedThrottleReason = 4
+
+	// Both item and constraints have throttle configuration but the scope is different.
+	OutdatedThrottleReasonScopeMismatch OutdatedThrottleReason = 5
 )

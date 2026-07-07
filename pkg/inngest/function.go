@@ -12,7 +12,6 @@ import (
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
-	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
@@ -219,6 +218,9 @@ type Throttle struct {
 	Period time.Duration `json:"period"`
 	// Burst...
 	Burst uint `json:"burst"`
+	// Scope controls whether this throttle applies to this function, the environment,
+	// or the entire account. Defaults to function scope.
+	Scope enums.ThrottleScope `json:"scope,omitempty"`
 	// Key is an optional string to constrain throttling using event data.  For
 	// example, if you want to throttle incoming notifications based off of a user's
 	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
@@ -233,10 +235,11 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 
 	var err error
 	input := struct {
-		Limit  uint    `json:"limit"`
-		Period string  `json:"period"`
-		Burst  uint    `json:"burst"`
-		Key    *string `json:"key,omitempty"`
+		Limit  uint                `json:"limit"`
+		Period string              `json:"period"`
+		Burst  uint                `json:"burst"`
+		Scope  enums.ThrottleScope `json:"scope,omitempty"`
+		Key    *string             `json:"key,omitempty"`
 	}{}
 	if err = json.Unmarshal(in, &input); err != nil {
 		return err
@@ -244,6 +247,7 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 
 	t.Limit = input.Limit
 	t.Burst = input.Burst
+	t.Scope = input.Scope
 	t.Key = input.Key
 	t.Period, err = str2duration.ParseDuration(input.Period)
 
@@ -259,12 +263,30 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 }
 
 func (t Throttle) MarshalJSON() ([]byte, error) {
-	s := structs.New(t)
-	s.TagName = "json"
-	val := s.Map()
-	// convert period to a string.
-	val["period"] = str2duration.String(t.Period)
-	return json.Marshal(val)
+	return json.Marshal(struct {
+		Limit  uint    `json:"limit"`
+		Period string  `json:"period"`
+		Burst  uint    `json:"burst"`
+		Scope  string  `json:"scope,omitempty"`
+		Key    *string `json:"key,omitempty"`
+	}{
+		Limit:  t.Limit,
+		Period: str2duration.String(t.Period),
+		Burst:  t.Burst,
+		Scope:  throttleScopeString(t.Scope),
+		Key:    t.Key,
+	})
+}
+
+func throttleScopeString(scope enums.ThrottleScope) string {
+	switch scope {
+	case enums.ThrottleScopeEnv:
+		return "env"
+	case enums.ThrottleScopeAccount:
+		return "account"
+	default:
+		return ""
+	}
 }
 
 // Timeouts represents timeouts for the function. If any of the timeouts are hit, the function

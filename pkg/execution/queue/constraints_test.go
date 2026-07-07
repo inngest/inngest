@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -101,6 +102,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 			constraints: PartitionConstraintConfig{
 				FunctionVersion: 1,
 				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
 					Limit:                     10,
 					Burst:                     5,
 					Period:                    60,
@@ -117,6 +119,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
+						Scope:             enums.ThrottleScopeEnv,
 						Limit:             10,
 						Burst:             5,
 						Period:            60,
@@ -144,6 +147,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 					},
 				},
 				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeAccount,
 					Limit:                     20,
 					Burst:                     10,
 					Period:                    30,
@@ -168,6 +172,7 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 				},
 				Throttle: []constraintapi.ThrottleConfig{
 					{
+						Scope:             enums.ThrottleScopeAccount,
 						Limit:             20,
 						Burst:             10,
 						Period:            30,
@@ -187,7 +192,8 @@ func TestConstraintConfigFromConstraints(t *testing.T) {
 }
 
 func TestConstraintItemsFromBacklog(t *testing.T) {
-	accountID, fnID := uuid.New(), uuid.New()
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	evaluatedThrottleKeyHash := HashID(context.Background(), "customer1")
 	tests := []struct {
 		name        string
 		backlog     *QueueBacklog
@@ -226,6 +232,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 			name: "with throttle",
 			backlog: &QueueBacklog{
 				Throttle: &BacklogThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
 					ThrottleKeyExpressionHash: "throttle-expr-hash",
 					ThrottleKey:               "throttle-key-value",
 				},
@@ -237,6 +244,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 			},
 			constraints: PartitionConstraintConfig{
 				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
 					Limit:                     10,
 					Burst:                     5,
 					Period:                    60,
@@ -261,8 +269,58 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 				{
 					Kind: constraintapi.ConstraintKindThrottle,
 					Throttle: &constraintapi.ThrottleConstraint{
+						Scope:             enums.ThrottleScopeEnv,
 						KeyExpressionHash: "throttle-expr-hash",
 						EvaluatedKeyHash:  "throttle-key-value",
+					},
+				},
+			},
+		},
+		{
+			name: "with throttle whose backlog scope changed",
+			backlog: &QueueBacklog{
+				Throttle: &BacklogThrottle{
+					Scope:                     enums.ThrottleScopeFn,
+					ThrottleKeyExpressionHash: "throttle-expr-hash",
+					ThrottleKey:               HashID(context.Background(), fnID.String()) + "-" + evaluatedThrottleKeyHash,
+				},
+			},
+			sp: &QueueShadowPartition{
+				PartitionID: fnID.String(),
+				AccountID:   &accountID,
+				EnvID:       &envID,
+				FunctionID:  &fnID,
+			},
+			constraints: PartitionConstraintConfig{
+				Throttle: &PartitionThrottle{
+					Scope:                     enums.ThrottleScopeEnv,
+					Limit:                     10,
+					Burst:                     5,
+					Period:                    60,
+					ThrottleKeyExpressionHash: "throttle-expr-hash",
+				},
+			},
+			expected: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Mode:  enums.ConcurrencyModeStep,
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindThrottle,
+					Throttle: &constraintapi.ThrottleConstraint{
+						Scope:             enums.ThrottleScopeEnv,
+						KeyExpressionHash: "throttle-expr-hash",
+						EvaluatedKeyHash:  HashID(context.Background(), envID.String()) + "-" + evaluatedThrottleKeyHash,
 					},
 				},
 			},
@@ -559,7 +617,7 @@ func TestConstraintItemsFromBacklog(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := constraintItemsFromBacklog(tt.backlog, tt.constraints)
+			result := constraintItemsFromBacklog(tt.backlog, tt.constraints, tt.sp)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -965,7 +1023,7 @@ func TestConstraintItemsBacklogToLimitingConstraintRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Step 1: Generate constraint items from the backlog
-			constraintItems := constraintItemsFromBacklog(tt.backlog, tt.constraints)
+			constraintItems := constraintItemsFromBacklog(tt.backlog, tt.constraints, tt.sp)
 
 			// Step 2: Filter the constraint items to find the ones that would be limiting
 			// We simulate what the constraint API would return as limiting constraints
