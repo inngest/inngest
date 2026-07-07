@@ -245,6 +245,58 @@ func TestSyncNonSDKResponse(t *testing.T) {
 	require.NotNil(t, userErr)
 	require.NoError(t, internalErr)
 	require.Contains(t, userErr.Error(), "didn't receive SDK response")
+
+	// A non-SDK 2xx keeps the raw body untouched — no synthesized error.
+	require.Equal(t, []byte("not an SDK response"), userErr.Raw())
+}
+
+// A non-2xx response without SDK headers (proxy/gateway error, crash before
+// the SDK responded) must carry the synthesized fatal-upstream error as the
+// UserError's raw payload — the executor moves Raw() into
+// DriverResponse.Output, which is what the trace displays.
+func TestSyncNonSDKErrorResponse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(502)
+		_, _ = w.Write([]byte("Bad Gateway"))
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	d := &httpv2{Client: client}
+
+	u, _ := url.Parse(ts.URL)
+	fn := inngest.Function{
+		Driver: inngest.FunctionDriver{
+			URI: u.String(),
+			Metadata: map[string]any{
+				"type": "sync",
+			},
+		},
+	}
+
+	opts := driver.V2RequestOpts{
+		Fn:         fn,
+		SigningKey: []byte("test-key"),
+		Metadata: sv2.Metadata{
+			ID: sv2.ID{
+				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+			},
+		},
+		URL: u.String(),
+	}
+
+	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
+	require.Nil(t, resp)
+	require.NotNil(t, userErr)
+	require.NoError(t, internalErr)
+	require.Contains(t, userErr.Error(), "didn't receive SDK response")
+
+	var se sv1.StandardError
+	require.NoError(t, json.Unmarshal(userErr.Raw(), &se))
+	require.Equal(t, sv1.FatalServerErrorName, se.Name)
+	require.Contains(t, se.Message, "HTTP 502")
+	require.Contains(t, se.Stack, "Bad Gateway")
 }
 
 func TestSyncRequestErrors(t *testing.T) {
