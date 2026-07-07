@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.35.0] - 2026-07-07
+
+### 🚀 Features
+
+- *(experiments)* Visualize numeric metrics using box plots (#4517)
+- *(function-view)* Show key queues setting (#4546)
+- *(experiments)* Update charts/layout to match new design (#4551)
+- *(queue)* Jitter PartitionRequeue default case (#4561)
+- *(api)* Experiments api (#4504)
+
+### 🐛 Bug Fixes
+
+- Should not coalesce parallel steps for the V1 execution engine (#4538)
+- *(experiments)* Fix boxplot colors (#4542)
+
+### 🚜 Refactor
+
+- *(queue)* Clean up QueueManager interface (#4541)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(go)* Drop key-queues test matrix dimension (#4552)
+- Upload test results to CodeCov to analyze flake rates (#4545)
+- Use a depot runner for linting (#4554)
+- *(queue)* Add timeout to backlog size (#4556)
+- Track partition processing that yielded 0 peeks (#4562)
+- Cleanup unused queue injections (#4564)
+
+### ◀️ Revert
+
+- Always SavePending after parallel ops to coalesce discovery (#4021) (#4534)
+
 ## [v1.34.0] - 2026-06-29
 
 ### 🚀 Features
@@ -34,6 +66,7 @@ All notable changes to this project will be documented in this file.
 - *(sessions)* Sessions UI feedback (#4500)
 - *(release)* For homebrew installed inngest-cli, use homebrew-tap for latest version (#4511)
 - Adding metrics for run duration (#4445)
+- *(release)* V1.34.0 (#4497)
 
 ## [v1.33.0] - 2026-06-23
 
