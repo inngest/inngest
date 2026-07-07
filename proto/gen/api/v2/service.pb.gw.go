@@ -1864,7 +1864,7 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/GetExperiment", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/experiments/{experiment_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/GetExperiment", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2441,7 +2441,7 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/GetExperiment", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/experiments/{experiment_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/GetExperiment", runtime.WithHTTPPathPattern("/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2536,7 +2536,7 @@ var (
 	pattern_V2_QueryInsights_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"insights", "query"}, ""))
 	pattern_V2_ListExperiments_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"experiments"}, ""))
 	pattern_V2_ListExperiments_1          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"apps", "app_id", "functions", "function_id", "experiments"}, ""))
-	pattern_V2_GetExperiment_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"apps", "app_id", "functions", "function_id", "experiments", "experiment_id"}, ""))
+	pattern_V2_GetExperiment_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 3, 0, 4, 1, 5, 5}, []string{"apps", "app_id", "functions", "function_id", "experiments", "experiment_id"}, ""))
 	pattern_V2_ListSessionKeys_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"sessions"}, ""))
 	pattern_V2_ListSessions_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"sessions", "session_key"}, ""))
 	pattern_V2_ListSessionRuns_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 3, 0, 4, 1, 5, 2, 2, 3}, []string{"sessions", "session_key", "session_id", "runs"}, ""))

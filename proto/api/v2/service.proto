@@ -1646,7 +1646,7 @@ service V2 {
 
   rpc GetExperiment(GetExperimentRequest) returns (GetExperimentResponse) {
     option (google.api.http) = {
-      get: "/apps/{app_id}/functions/{function_id}/experiments/{experiment_id}"
+      get: "/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get experiment aggregates"

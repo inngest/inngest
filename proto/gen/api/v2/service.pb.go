@@ -8476,7 +8476,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xfe|\n" +
+	"\x04INFO\x10\x032\x81}\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -8932,13 +8932,13 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x10List experiments\x1a<Lists observed experiments in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02DZ4\x122/apps/{app_id}/functions/{function_id}/experiments\x12\f/experiments\x12\xb2\x02\n" +
-	"\rGetExperiment\x12\x1c.api.v2.GetExperimentRequest\x1a\x1d.api.v2.GetExperimentResponse\"\xe3\x01\x92A\x95\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02DZ4\x122/apps/{app_id}/functions/{function_id}/experiments\x12\f/experiments\x12\xb5\x02\n" +
+	"\rGetExperiment\x12\x1c.api.v2.GetExperimentRequest\x1a\x1d.api.v2.GetExperimentResponse\"\xe6\x01\x92A\x95\x01\n" +
 	"\vExperiments\n" +
 	"\x04Beta\x12\x19Get experiment aggregates\x1aSFetches variant run counts and score aggregates for one experiment on one function.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02D\x12B/apps/{app_id}/functions/{function_id}/experiments/{experiment_id}\x12\xdd\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02G\x12E/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}\x12\xdd\x01\n" +
 	"\x0fListSessionKeys\x12\x1e.api.v2.ListSessionKeysRequest\x1a\x1f.api.v2.ListSessionKeysResponse\"\x88\x01\x92At\n" +
 	"\bSessions\n" +
 	"\x04Beta\x12\x11List session keys\x1a=Lists session keys observed in the authenticated environment.b\x10\n" +
