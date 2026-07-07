@@ -29,10 +29,10 @@ importers:
         version: 18.0.10
       inngest:
         specifier: ^3
-        version: 3.54.2(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(typescript@5.6.3)(zod@3.25.76)
+        version: 3.54.2(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(typescript@5.8.3)(zod@3.25.76)
       inngest-v4:
         specifier: npm:inngest@^4
-        version: inngest@4.11.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)(typescript@5.6.3)(zod@3.25.76)
+        version: inngest@4.11.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)(typescript@5.8.3)(zod@3.25.76)
       next:
         specifier: 15.5.18
         version: 15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -43,8 +43,8 @@ importers:
         specifier: 18.2.0
         version: 18.2.0(react@18.2.0)
       typescript:
-        specifier: 5.6.3
-        version: 5.6.3
+        specifier: 5.8.3
+        version: 5.8.3
       zod:
         specifier: ^3.25.0
         version: 3.25.76
@@ -1406,13 +1406,8 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
-  typescript@5.6.3:
-    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
-    engines: {node: '>=14.17'}
-    hasBin: true
-
-  typescript@5.9.3:
-    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+  typescript@5.8.3:
+    resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -1591,7 +1586,7 @@ snapshots:
   '@inngest/ai@0.1.7':
     dependencies:
       '@types/node': 22.20.0
-      typescript: 5.9.3
+      typescript: 5.8.3
 
   '@isaacs/cliui@8.0.2':
     dependencies:
@@ -2624,7 +2619,7 @@ snapshots:
 
   inherits@2.0.4: {}
 
-  inngest@3.54.2(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(typescript@5.6.3)(zod@3.25.76):
+  inngest@3.54.2(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(typescript@5.8.3)(zod@3.25.76):
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@inngest/ai': 0.1.7
@@ -2654,13 +2649,13 @@ snapshots:
       zod: 3.25.76
     optionalDependencies:
       next: 15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      typescript: 5.6.3
+      typescript: 5.8.3
     transitivePeerDependencies:
       - '@opentelemetry/core'
       - encoding
       - supports-color
 
-  inngest@4.11.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)(typescript@5.6.3)(zod@3.25.76):
+  inngest@4.11.0(@opentelemetry/core@2.9.0(@opentelemetry/api@1.9.1))(next@15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(react@18.2.0)(typescript@5.8.3)(zod@3.25.76):
     dependencies:
       '@bufbuild/protobuf': 2.12.1
       '@inngest/ai': 0.1.7
@@ -2689,7 +2684,7 @@ snapshots:
     optionalDependencies:
       next: 15.5.18(@opentelemetry/api@1.9.1)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       react: 18.2.0
-      typescript: 5.6.3
+      typescript: 5.8.3
     transitivePeerDependencies:
       - '@opentelemetry/core'
       - encoding
@@ -2969,9 +2964,7 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  typescript@5.6.3: {}
-
-  typescript@5.9.3: {}
+  typescript@5.8.3: {}
 
   ulid@2.4.0: {}
 
