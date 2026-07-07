@@ -26,7 +26,7 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 			return nil, fmt.Errorf("could not find queue shard %q", shardName)
 		}
 
-		queueItem, err := d.queue.LoadQueueItem(ctx, shard.Name(), itemID)
+		queueItem, err := d.queueReader.LoadQueueItem(ctx, shard.Name(), itemID)
 		if err != nil {
 			if errors.Is(err, queue.ErrQueueItemNotFound) {
 				return nil, status.Error(codes.NotFound, "no item found with id")
@@ -73,7 +73,7 @@ func (d *debugAPI) GetQueueItem(ctx context.Context, req *pb.QueueItemRequest) (
 		}
 	}
 
-	items, err := d.queue.ItemsByRunID(ctx, shard, scope, runID)
+	items, err := d.queueReader.ItemsByRunID(ctx, shard, scope, runID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, fmt.Errorf("error retrieving queue items by runID: %w", err).Error())
 	}

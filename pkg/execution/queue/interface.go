@@ -55,35 +55,11 @@ type PartitionLeaseOptions struct{}
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
 
 type QueueManager interface {
-	JobQueueReader
 	Queue
 
 	Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error
 	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
-
-	// ItemsByPartition returns a queue item iterator for a function within a specific time range
-	ItemsByPartition(ctx context.Context, queueShard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
-	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
-	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
-	// BacklogsByPartition returns an iterator for the partition's backlogs
-	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
-	// BacklogSize retrieves the number of items in the specified backlog
-	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
-	// BacklogByID retrieves a single backlog by its ID
-	BacklogByID(ctx context.Context, queueShard QueueShard, backlogID string) (*QueueBacklog, error)
-	// PartitionByID retrieves the partition by the partition ID
-	PartitionByID(ctx context.Context, queueShard QueueShard, scope Scope, partitionID string) (*PartitionInspectionResult, error)
-	// LoadQueueItem retrieves the queue item by the item ID.
-	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error)
-
-	// ItemExists checks if an item with jobID exists in the queue
-	ItemExists(ctx context.Context, queueShard QueueShard, scope Scope, jobID string) (bool, error)
-	// ItemsByRunID retrieves all queue items via runID
-	//
-	// NOTE
-	// The queue technically shouldn't know about runIDs, so we should make this more generic with certain type of indices in the future
-	ItemsByRunID(ctx context.Context, queueShard QueueShard, scope Scope, runID ulid.ULID) ([]*QueueItem, error)
 
 	// PartitionBacklogSize returns the point in time backlog size of the partition.
 	// This will sum the size of all backlogs in that partition
@@ -91,7 +67,18 @@ type QueueManager interface {
 
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context, queueShard QueueShard) (int64, error)
+}
 
+type KeyQueueProcessor interface {
+	ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error
+	ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error
+	ProcessShadowPartitionBacklog(
+		ctx context.Context,
+		shadowPart *QueueShadowPartition,
+		backlog *QueueBacklog,
+		refillUntil time.Time,
+		constraints PartitionConstraintConfig,
+	) (*BacklogRefillResult, enums.QueueConstraint, error)
 	NormalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error
 	NormalizeItem(
 		ctx context.Context,
@@ -100,27 +87,20 @@ type QueueManager interface {
 		sourceBacklog *QueueBacklog,
 		item QueueItem,
 	) (QueueItem, error)
-
-	ProcessItem(
-		ctx context.Context,
-		i ProcessItem,
-		f RunFunc,
-	) error
-	ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error
-
-	ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error
-	ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error
-
-	ProcessShadowPartitionBacklog(
+	BacklogRefillConstraintCheck(
 		ctx context.Context,
 		shadowPart *QueueShadowPartition,
 		backlog *QueueBacklog,
-		refillUntil time.Time,
 		constraints PartitionConstraintConfig,
-	) (*BacklogRefillResult, enums.QueueConstraint, error)
+		items []*QueueItem,
+		operationIdempotencyKey string,
+		now time.Time,
+	) (*BacklogRefillConstraintCheckResult, error)
 }
 
 type QueueProcessor interface {
+	KeyQueueProcessor
+
 	Shard() QueueShard
 	Clock() clockwork.Clock
 	Semaphore() util.TrackingSemaphore
@@ -132,16 +112,6 @@ type QueueProcessor interface {
 	GetShadowContinuations() map[string]ShadowContinuation
 	ClearShadowContinuations()
 
-	BacklogRefillConstraintCheck(
-		ctx context.Context,
-		shadowPart *QueueShadowPartition,
-		backlog *QueueBacklog,
-		constraints PartitionConstraintConfig,
-		items []*QueueItem,
-		operationIdempotencyKey string,
-		now time.Time,
-	) (*BacklogRefillConstraintCheckResult, error)
-
 	ItemLeaseConstraintCheck(
 		ctx context.Context,
 		shadowPart *QueueShadowPartition,
@@ -150,6 +120,13 @@ type QueueProcessor interface {
 		item *QueueItem,
 		now time.Time,
 	) (ItemLeaseConstraintCheckResult, error)
+
+	ProcessItem(
+		ctx context.Context,
+		i ProcessItem,
+		f RunFunc,
+	) error
+	ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error
 }
 
 // SingletonOperations is the per-shard surface for singleton lock state.

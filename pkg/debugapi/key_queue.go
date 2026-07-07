@@ -26,7 +26,7 @@ func (d *debugAPI) GetShadowPartition(ctx context.Context, req *pb.ShadowPartiti
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
-	pt, err := d.queue.PartitionByID(ctx, shard, scope, req.GetPartitionId())
+	pt, err := d.queueReader.PartitionByID(ctx, shard, scope, req.GetPartitionId())
 	if err != nil {
 		if errors.Is(err, queue.ErrPartitionNotFound) {
 			return nil, status.Error(codes.NotFound, queue.ErrPartitionNotFound.Error())
@@ -70,7 +70,7 @@ func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*p
 	}
 
 	until := time.Now().Add(365 * 24 * time.Hour)
-	iter, err := d.queue.BacklogsByPartition(ctx, shard, req.GetPartitionId(), time.Time{}, until)
+	iter, err := d.queueReader.BacklogsByPartition(ctx, shard, req.GetPartitionId(), time.Time{}, until)
 	if err != nil {
 		return nil, fmt.Errorf("error listing backlogs: %w", err)
 	}
@@ -88,7 +88,7 @@ func (d *debugAPI) GetBacklogs(ctx context.Context, req *pb.BacklogsRequest) (*p
 			continue // keep counting but stop collecting
 		}
 
-		size, _ := d.queue.BacklogSize(ctx, shard, bl.BacklogID)
+		size, _ := d.queueReader.BacklogSize(ctx, shard, bl.BacklogID)
 		backlogs = append(backlogs, mapBacklogToProto(bl, size))
 	}
 
@@ -104,7 +104,7 @@ func (d *debugAPI) GetBacklogSize(ctx context.Context, req *pb.BacklogSizeReques
 		return nil, fmt.Errorf("error finding shard: %w", err)
 	}
 
-	size, err := d.queue.BacklogSize(ctx, shard, req.GetBacklogId())
+	size, err := d.queueReader.BacklogSize(ctx, shard, req.GetBacklogId())
 	if err != nil {
 		return nil, fmt.Errorf("error getting backlog size: %w", err)
 	}
@@ -114,7 +114,7 @@ func (d *debugAPI) GetBacklogSize(ctx context.Context, req *pb.BacklogSizeReques
 		ItemCount: size,
 	}
 
-	bl, err := d.queue.BacklogByID(ctx, shard, req.GetBacklogId())
+	bl, err := d.queueReader.BacklogByID(ctx, shard, req.GetBacklogId())
 	if err == nil {
 		resp.Backlog = mapBacklogToProto(bl, size)
 	}
