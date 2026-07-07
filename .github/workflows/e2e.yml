@@ -74,14 +74,15 @@ jobs:
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
           # Keep the v3 and v4 SDKs in separate processes (see the `suite`
-          # matrix comment): the v4 suite runs only the durable-endpoint tests,
-          # the v3 suite runs everything else.
+          # matrix comment): each suite is its own Go package so only one SDK
+          # major is exercised per job. v4 holds the durable-endpoint tests;
+          # v3 (the ./tests root package) holds everything else.
           if [ "${{ matrix.suite }}" = "v4" ]; then
-            TEST_FILTER="-run TestDurableEndpoint"
+            TEST_PKG="./tests/v4"
           else
-            TEST_FILTER="-skip TestDurableEndpoint"
+            TEST_PKG="./tests"
           fi
-          gotestsum --junitfile=junit.xml --format=standard-verbose -- $TEST_FILTER ./tests
+          gotestsum --junitfile=junit.xml --format=standard-verbose -- $TEST_PKG
         env:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
