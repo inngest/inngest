@@ -58,6 +58,24 @@ export interface AIMetadata {
   latency_ms?: number /* int64 */;
   total_tokens?: number /* int64 */;
   estimated_cost?: number /* float64 */;
+  /**
+   * Granular token usage. Cache semantics differ by provider: OpenAI reports
+   * cached tokens as a subset of InputTokens, whereas Anthropic reports them
+   * additively — values are stored raw and left unreconciled.
+   */
+  cache_read_tokens?: number /* int64 */;
+  cache_creation_tokens?: number /* int64 */;
+  reasoning_tokens?: number /* int64 */;
+  /**
+   * Request parameters. Pointers so an explicit zero (e.g. temperature 0 or
+   * seed 0) is distinguishable from an absent attribute.
+   */
+  temperature?: number /* float64 */;
+  top_p?: number /* float64 */;
+  max_tokens?: number /* int64 */;
+  frequency_penalty?: number /* float64 */;
+  presence_penalty?: number /* float64 */;
+  seed?: number /* int64 */;
 }
 /**
  * From experiment.go
