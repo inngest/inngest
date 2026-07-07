@@ -198,7 +198,7 @@ function TableRow(props: { env: Environment }) {
           <Switch
             checked={isAutoArchiveEnabled}
             className="block"
-            disabled={isModifying || env.isArchived}
+            disabled={isModifying}
             onClick={() => onClickAutoArchive(id, !isAutoArchiveEnabled)}
             title={
               isAutoArchiveEnabled
