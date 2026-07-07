@@ -18,7 +18,10 @@ export default function(_req: any, res: any) {
     testParallelism,
     testWaitForEvent,
   ].forEach(f => {
-    const data = f["getConfig"](new URL("http://127.0.0.1:3000/api/inngest"), "test-suite");
+    const data = f["getConfig"]({
+      baseUrl: new URL("http://127.0.0.1:3000/api/inngest"),
+      appPrefix: "test-suite",
+    });
     result.push(data[0]);
   })
 
