@@ -18,12 +18,18 @@ env:
 
 jobs:
   ts:
-    name: "TS SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "TS SDK / suite: ${{ matrix.suite }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [false, true]
+        # The v3 and v4 SDKs cannot share a process: they cache their
+        # AsyncLocalStorage under the same global symbol with incompatible
+        # shapes, so whichever runs second reads a corrupt store and crashes.
+        # Run the v3 (pages-router) tests and the v4 durable-endpoint tests in
+        # separate jobs so each Next.js process only ever loads one SDK major.
+        suite: [v3, v4]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -63,11 +69,19 @@ jobs:
           cd ../../
           echo "Running dev server"
           mkdir $GOCOVERDIR
-          nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt &
+          nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.suite }}-api.txt &
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
-          gotestsum --junitfile=junit.xml --format=standard-verbose -- ./tests
+          # Keep the v3 and v4 SDKs in separate processes (see the `suite`
+          # matrix comment): the v4 suite runs only the durable-endpoint tests,
+          # the v3 suite runs everything else.
+          if [ "${{ matrix.suite }}" = "v4" ]; then
+            TEST_FILTER="-run TestDurableEndpoint"
+          else
+            TEST_FILTER="-skip TestDurableEndpoint"
+          fi
+          gotestsum --junitfile=junit.xml --format=standard-verbose -- $TEST_FILTER ./tests
         env:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
@@ -86,15 +100,15 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api
-          path: /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt
+          name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.suite }}-api
+          path: /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.suite }}-api.txt
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }}
+          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }},suite-${{ matrix.suite }}
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -102,7 +116,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./junit.xml
-          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }}
+          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }},suite-${{ matrix.suite }}
           report_type: test_results
 
   # refs:
