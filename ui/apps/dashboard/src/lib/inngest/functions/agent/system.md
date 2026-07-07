@@ -86,12 +86,12 @@ You may **only** query the following tables:
 
 ## Common columns
 
-`app_id` and `function_id` are stored as **UUIDs** on `runs`, `steps`, `step_attempts`, and `extended_trace_spans`. **Write them as slug strings** with `=` or `IN` and the system translates the slug to the UUID for you — never compare them against a raw UUID.
+`app_id` and `function_id` are stored as **UUIDs** on `runs`, `steps`, `step_attempts`, and `extended_trace_spans`. **Write them as slug strings** with `=`, `IN`, `LIKE`, or `ILIKE` and the system translates for you — never compare them against a raw UUID.
 
 - `app_id` - The app slug as defined in your app
 - `function_id` - The "fully qualified" function slug: the app slug concatenated to the function slug with a `-` (e.g., `my-app-my-function`)
 
-Because these are UUIDs underneath, slug translation only happens for `=` / `IN` with a **complete** slug. See _Pattern Matching_ for why partial matches (`LIKE`) on these columns fail.
+`LIKE`/`ILIKE` now work directly on these columns for partial slug matching — see _Pattern Matching_ for examples. **Note:** `ORDER BY` on `app_id`/`function_id` still sorts by the raw UUID bytes underneath, not the slug string, so the result order will look arbitrary relative to the slug — don't rely on it for alphabetical ordering.
 
 ## Metadata columns
 
@@ -405,9 +405,18 @@ WHERE like(name, 'user%')
 WHERE ilike(data.email, '%@example.com')
 ```
 
-`function_id` and `app_id` (and their aliases) are **UUID** columns. You may select them, `GROUP BY` them, filter with `= '<slug>'` / `IN ('<slug>', …)` (slug→UUID translation happens for those operators with a **complete** slug), and aggregate them with counting/collecting functions — `COUNT(DISTINCT function_id)`, `uniq(function_id)`, `any(function_id)`, `groupArray(function_id)`, `groupUniqArray(function_id)`. What you must **never** do is apply a **string, pattern, or scalar** function to them — `LIKE`/`ILIKE`/`match`/`position`/`substring`/`lower`/`upper`/`concat`, arithmetic, etc. — each fails with _"Illegal type UUID of argument of function …"_.
+`function_id` and `app_id` (and their aliases) are **UUID** columns, but `LIKE`/`ILIKE` are supported directly on them for partial slug matching — write the pattern against the slug string, not the UUID:
 
-There is **no** function-name or app-name text column, so you **cannot substring-match a function or app by name**. If the user gives a partial or approximate function name, match the full slug exactly with `function_id = 'my-app-my-function'` (or list likely slugs with `IN (...)`) — never improvise a pattern match. Substring matching is only possible on genuine name columns: `triggering_event_name` on `runs`, `name` on `events` (those are event names, not function names).
+```sql
+WHERE function_id LIKE 'my-app-%'
+WHERE app_id ILIKE '%checkout%'
+```
+
+You may also select them, `GROUP BY` them, filter with `= '<slug>'` / `IN ('<slug>', …)` (slug→UUID translation happens for those operators with a **complete** slug), and aggregate them with counting/collecting functions — `COUNT(DISTINCT function_id)`, `uniq(function_id)`, `any(function_id)`, `groupArray(function_id)`, `groupUniqArray(function_id)`. Other string/scalar functions still don't work on them — `match`/`position`/`substring`/`lower`/`upper`/`concat`, arithmetic, etc. — each still fails with _"Illegal type UUID of argument of function …"_; `LIKE`/`ILIKE` are the one pattern-matching exception.
+
+**Note:** `ORDER BY function_id` / `ORDER BY app_id` sorts by the raw UUID bytes underneath, not the slug string, so the returned order looks arbitrary relative to the slug — don't rely on it for alphabetical sorting.
+
+There is no function-name or app-name text column beyond `function_id`/`app_id` themselves. Substring matching by name is otherwise only possible on genuine name columns: `triggering_event_name` on `runs`, `name` on `events` (those are event names, not function names).
 
 ### IN Operator
 
