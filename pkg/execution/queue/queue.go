@@ -101,8 +101,9 @@ type Unpauser interface {
 	UnpauseFunction(ctx context.Context, shard string, scope Scope) error
 }
 
-// AttemptResetter resets queue item attempts after a successful checkpoint.
 type AttemptResetter interface {
+	// ResetAttemptsByJobID sets retries to zero given a single job ID. This is
+	// important for checkpointing; a single job becomes shared amongst many steps.
 	ResetAttemptsByJobID(ctx context.Context, shard string, scope Scope, jobID string) error
 }
 

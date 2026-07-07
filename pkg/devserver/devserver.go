@@ -661,7 +661,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			AuthMiddleware:    authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware: caching,
 			FunctionReader:    ds.Data,
-			JobQueueReader:    rq,
 			Executor:          ds.Executor,
 			Queue:             rq,
 			QueueShards:       shardRegistry,
@@ -758,7 +757,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	if testapi.ShouldEnable() {
 		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
 			QueueShards:  shardRegistry,
-			Queue:        rq,
 			Executor:     exec,
 			StateManager: smv2,
 			ResetAll: func() {

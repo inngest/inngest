@@ -62,10 +62,6 @@ type QueueManager interface {
 	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
 
-	// ResetAttemptsByJobID sets retries to zero given a single job ID.  This is important for
-	// checkpointing;  a single job becomes shared amongst many  steps.
-	ResetAttemptsByJobID(ctx context.Context, shard string, scope Scope, jobID string) error
-
 	// ItemsByPartition returns a queue item iterator for a function within a specific time range
 	ItemsByPartition(ctx context.Context, queueShard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
