@@ -1,10 +1,10 @@
-import { testSdkFunctions } from "@/inngest/sdk_function";
-import { testSdkSteps } from "@/inngest/sdk_step_test";
-import { testCancel } from "@/inngest/sdk_cancel_test";
-import { testRetry } from "@/inngest/sdk_retry_test";
-import { testNonRetriableError } from "@/inngest/non_retryable";
-import { testParallelism } from "@/inngest/sdk_parallel_test";
-import { testWaitForEvent } from "@/inngest/sdk_wait_for_event_test";
+import { testSdkFunctions } from "@/v3/functions/sdk_function";
+import { testSdkSteps } from "@/v3/functions/sdk_step_test";
+import { testCancel } from "@/v3/functions/sdk_cancel_test";
+import { testRetry } from "@/v3/functions/sdk_retry_test";
+import { testNonRetriableError } from "@/v3/functions/non_retryable";
+import { testParallelism } from "@/v3/functions/sdk_parallel_test";
+import { testWaitForEvent } from "@/v3/functions/sdk_wait_for_event_test";
 
 export default function(_req: any, res: any) {
 
