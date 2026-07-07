@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04-4]
         database: [sqlite, postgres]
     runs-on: ${{ matrix.os }}
     name: "Test / OS: ${{ matrix.os }}, db: ${{ matrix.database }}"
