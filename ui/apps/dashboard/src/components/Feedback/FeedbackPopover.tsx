@@ -1,16 +1,31 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { useOrganization, useUser } from '@clerk/tanstack-react-start';
-import { Button } from '@inngest/components/Button';
 import { Textarea } from '@inngest/components/Forms/Textarea';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@inngest/components/Popover';
+import { Button } from '@inngest/components/Button';
 import { RiCheckLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
-export default function FeedbackPopover() {
+type Props = {
+  // Element rendered as the popover trigger (asChild), e.g. a bottom-bar link
+  // or a floating icon button. Lets multiple entry points share one dialog.
+  trigger: ReactNode;
+  align?: 'start' | 'center' | 'end';
+  side?: 'top' | 'bottom' | 'left' | 'right';
+  // Renders a leading "|" divider before the trigger (used in the bottom bar).
+  leadingDivider?: boolean;
+};
+
+export default function FeedbackPopover({
+  trigger,
+  align = 'start',
+  side = 'top',
+  leadingDivider = false,
+}: Props) {
   const { user } = useUser();
   const { organization } = useOrganization();
 
@@ -66,7 +81,7 @@ export default function FeedbackPopover() {
 
   return (
     <Fragment>
-      <span className="text-disabled">|</span>
+      {leadingDivider && <span className="text-disabled">|</span>}
       <Popover
         open={open}
         onOpenChange={(next) => {
@@ -77,8 +92,8 @@ export default function FeedbackPopover() {
           }
         }}
       >
-        <PopoverTrigger className="hover:text-basis">Feedback</PopoverTrigger>
-        <PopoverContent align="start" side="top" className="w-[380px] p-4">
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent align={align} side={side} className="w-[380px] p-4">
           <form onSubmit={onSubmit} className="flex flex-col gap-3">
             <p className="text-basis text-sm font-medium">Feedback</p>
             <Textarea

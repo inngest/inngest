@@ -5,6 +5,8 @@ import { Link } from '@inngest/components/Link';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { ClientOnly, createFileRoute } from '@tanstack/react-router';
 
+import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
+
 const ScoresDashboard = lazy(() =>
   import('@/components/Scores/Dashboard').then((m) => ({
     default: m.ScoresDashboard,
@@ -47,6 +49,7 @@ function ScoresComponent() {
           <ScoresDashboard envSlug={envSlug} />
         </ClientOnly>
       </div>
+      <FeedbackFloatingButton />
     </>
   );
 }

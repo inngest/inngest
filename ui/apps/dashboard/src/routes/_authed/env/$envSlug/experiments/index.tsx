@@ -11,6 +11,7 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 
+import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
 import { pathCreator } from '@/utils/urls';
 
@@ -70,6 +71,7 @@ function ExperimentsComponent() {
           infoIcon={<ExperimentsInfo />}
         />
         <ExperimentsEmptyState />
+        <FeedbackFloatingButton />
       </>
     );
   }
@@ -95,6 +97,7 @@ function ExperimentsComponent() {
           </>
         }
       />
+      <FeedbackFloatingButton />
     </>
   );
 }

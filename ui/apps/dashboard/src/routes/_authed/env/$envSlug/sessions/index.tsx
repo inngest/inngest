@@ -3,6 +3,7 @@ import { Header } from '@inngest/components/Header/Header';
 import { SessionKeys } from '@inngest/components/Sessions/SessionKeys';
 import { ClientOnly, createFileRoute } from '@tanstack/react-router';
 
+import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { SessionsInfo } from '@/components/Sessions/SessionsInfo';
 import { useSessionKeys } from '@/components/Sessions/useSessionKeys';
 import { pathCreator } from '@/utils/urls';
@@ -40,6 +41,7 @@ function SessionsPage() {
           }
         />
       </ClientOnly>
+      <FeedbackFloatingButton />
     </>
   );
 }

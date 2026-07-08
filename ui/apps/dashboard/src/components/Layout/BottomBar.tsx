@@ -29,7 +29,14 @@ export default function BottomBar() {
             </a>
           </Fragment>
         ))}
-        <FeedbackPopover />
+        <FeedbackPopover
+          leadingDivider
+          trigger={
+            <button type="button" className="hover:text-basis">
+              Feedback
+            </button>
+          }
+        />
         <span className="text-disabled">|</span>
         <a
           href="https://status.inngest.com"
