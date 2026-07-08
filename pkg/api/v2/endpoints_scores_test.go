@@ -88,8 +88,8 @@ func TestCreateScore(t *testing.T) {
 					Name:  "accuracy",
 					Value: structpb.NewNumberValue(0.98),
 					Experiment: &apiv2.ScoreExperiment{
-						ExperimentName: "model-routing",
-						Variant:        "baseline",
+						Id:      "model-routing",
+						Variant: "baseline",
 					},
 				},
 			},
@@ -103,7 +103,7 @@ func TestCreateScore(t *testing.T) {
 		require.Equal(t, "baseline", provider.params.Scores[0].Experiment.Variant)
 		require.Len(t, resp.Data, 1)
 		require.NotNil(t, resp.Data[0].Experiment)
-		require.Equal(t, "model-routing", resp.Data[0].Experiment.ExperimentName)
+		require.Equal(t, "model-routing", resp.Data[0].Experiment.Id)
 		require.Equal(t, "baseline", resp.Data[0].Experiment.Variant)
 	})
 
@@ -224,24 +224,58 @@ func TestCreateScore(t *testing.T) {
 			message: "scores[0]: Step ID must not be empty",
 		},
 		{
-			name: "experiment missing name",
+			name: "experiment missing id",
 			req: &apiv2.CreateScoreRequest{
 				RunId: runID.String(),
 				Scores: []*apiv2.CreateScoreInput{
 					{Name: "accuracy", Value: structpb.NewNumberValue(1), Experiment: &apiv2.ScoreExperiment{Variant: "baseline"}},
 				},
 			},
-			message: "scores[0]: Experiment name is required",
+			message: "scores[0]: Experiment ID is required",
 		},
 		{
 			name: "experiment missing variant",
 			req: &apiv2.CreateScoreRequest{
 				RunId: runID.String(),
 				Scores: []*apiv2.CreateScoreInput{
-					{Name: "accuracy", Value: structpb.NewNumberValue(1), Experiment: &apiv2.ScoreExperiment{ExperimentName: "model-routing"}},
+					{Name: "accuracy", Value: structpb.NewNumberValue(1), Experiment: &apiv2.ScoreExperiment{Id: "model-routing"}},
 				},
 			},
 			message: "scores[0]: Experiment variant is required",
+		},
+		{
+			name: "experiment id too long",
+			req: &apiv2.CreateScoreRequest{
+				RunId: runID.String(),
+				Scores: []*apiv2.CreateScoreInput{
+					{
+						Name:  "accuracy",
+						Value: structpb.NewNumberValue(1),
+						Experiment: &apiv2.ScoreExperiment{
+							Id:      strings.Repeat("a", metadata.MaxScoreNameByteLength+1),
+							Variant: "baseline",
+						},
+					},
+				},
+			},
+			message: "scores[0]: Experiment ID must be at most 128 UTF-8 bytes",
+		},
+		{
+			name: "experiment variant too long",
+			req: &apiv2.CreateScoreRequest{
+				RunId: runID.String(),
+				Scores: []*apiv2.CreateScoreInput{
+					{
+						Name:  "accuracy",
+						Value: structpb.NewNumberValue(1),
+						Experiment: &apiv2.ScoreExperiment{
+							Id:      "model-routing",
+							Variant: strings.Repeat("a", metadata.MaxScoreNameByteLength+1),
+						},
+					},
+				},
+			},
+			message: "scores[0]: Experiment variant must be at most 128 UTF-8 bytes",
 		},
 		{
 			name: "experiment with step id",
@@ -253,8 +287,8 @@ func TestCreateScore(t *testing.T) {
 						Value:  structpb.NewNumberValue(1),
 						StepId: &stepID,
 						Experiment: &apiv2.ScoreExperiment{
-							ExperimentName: "model-routing",
-							Variant:        "baseline",
+							Id:      "model-routing",
+							Variant: "baseline",
 						},
 					},
 				},
@@ -417,7 +451,7 @@ func TestStateScoreProviderUsesMetadataLoaderForFinalizedRun(t *testing.T) {
 	err := provider.CreateScores(context.Background(), CreateScoresParams{
 		RunID: runID,
 		Scores: []ScoreInput{
-			{Name: "accuracy", Value: 1.0},
+			testScoreInput(t, ScoreInput{Name: "accuracy", Value: 1.0}),
 		},
 	})
 	require.NoError(t, err)
@@ -455,7 +489,7 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 		err := provider.CreateScores(context.Background(), CreateScoresParams{
 			RunID: runID,
 			Scores: []ScoreInput{
-				{StepID: &stepID, Name: "accuracy", Value: 1.0},
+				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
 			},
 		})
 
@@ -469,7 +503,21 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 		err := provider.CreateScores(context.Background(), CreateScoresParams{
 			RunID: runID,
 			Scores: []ScoreInput{
-				{StepID: &stepID, Name: "accuracy", Value: 1.0},
+				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
+			},
+		})
+
+		require.ErrorIs(t, err, ErrScoreTargetNotFound)
+	})
+
+	t.Run("rejects already hashed step IDs", func(t *testing.T) {
+		provider := NewStateScoreProvider(baseOpts)
+		stepID := scoreTraceStepID(existingStepID)
+
+		err := provider.CreateScores(context.Background(), CreateScoresParams{
+			RunID: runID,
+			Scores: []ScoreInput{
+				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
 			},
 		})
 
@@ -486,7 +534,7 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 		err := provider.CreateScores(context.Background(), CreateScoresParams{
 			RunID: runID,
 			Scores: []ScoreInput{
-				{StepID: &stepID, Name: "accuracy", Value: 1.0},
+				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
 			},
 		})
 
@@ -514,13 +562,29 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 		err := provider.CreateScores(context.Background(), CreateScoresParams{
 			RunID: runID,
 			Scores: []ScoreInput{
-				{StepID: &stepID, Name: "accuracy", Value: 1.0},
+				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
 			},
 		})
 
 		require.NoError(t, err)
 		require.True(t, called)
 	})
+}
+
+func testScoreInput(t *testing.T, input ScoreInput) ScoreInput {
+	t.Helper()
+
+	updates := make([]metadata.Update, 0, 2)
+	if input.Experiment != nil {
+		update, err := ScoreExperimentMetadataUpdate(*input.Experiment)
+		require.NoError(t, err)
+		updates = append(updates, update)
+	}
+
+	update, err := ScoreMetadataUpdate(input.Name, input.Value)
+	require.NoError(t, err)
+	input.Metadata = append(updates, update)
+	return input
 }
 
 func testScoreInputs(count int) []*apiv2.CreateScoreInput {

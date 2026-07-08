@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -133,7 +134,8 @@ type ScoreInput struct {
 	Experiment *ScoreExperimentInput
 	Name       string
 	// Value is a finite float64 or a bool.
-	Value any
+	Value    any
+	Metadata []metadata.Update
 }
 
 // CreateScoresParams describes one or more scores recorded against a run.

@@ -16,6 +16,7 @@ var (
 	ErrMetadataSpanTooLarge    = errors.New("metadata span exceeds maximum size")
 	ErrRunMetadataSizeExceeded = errors.New("run cumulative metadata size exceeded")
 	ErrScoreNameInvalid        = errors.New("score name contains invalid characters")
+	ErrScoreNameTooLong        = errors.New("score name exceeds maximum length")
 	ErrScoreValueInvalid       = errors.New("score value must be a finite number or boolean")
 )
 

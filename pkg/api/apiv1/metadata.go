@@ -254,6 +254,15 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			return err
 		}
 	}
+	if parentSpanRef != nil && parentSpanRef.DynamicSpanID != "" {
+		if err := a.opts.TracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "router.AddRunMetadata.refreshTarget"},
+			Metadata:   stateMetadata,
+			TargetSpan: parentSpanRef,
+		}); err != nil {
+			return err
+		}
+	}
 
 	// Persist the cumulative metadata size delta back to the state store.
 	// Only persist when we successfully loaded from state; the fallback
@@ -391,6 +400,15 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 			addTenantIDs,
 		)
 		if err != nil {
+			return err
+		}
+	}
+	if parentSpanRef != nil && parentSpanRef.DynamicSpanID != "" {
+		if err := a.opts.TracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "router.AddRunMetadata.refreshTarget"},
+			Metadata:   stateMetadata,
+			TargetSpan: parentSpanRef,
+		}); err != nil {
 			return err
 		}
 	}

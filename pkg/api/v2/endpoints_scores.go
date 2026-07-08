@@ -16,7 +16,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const maxScoreBatchSize = 100
+const (
+	maxScoreBatchSize                 = 100
+	maxScoreExperimentFieldByteLength = metadata.MaxScoreNameByteLength
+)
 
 func (s *Service) CreateScore(ctx context.Context, req *apiv2.CreateScoreRequest) (*apiv2.CreateScoreResponse, error) {
 	if req.RunId == "" {
@@ -61,8 +64,8 @@ func (s *Service) CreateScore(ctx context.Context, req *apiv2.CreateScoreRequest
 		var experiment *apiv2.ScoreExperiment
 		if score.Experiment != nil {
 			experiment = &apiv2.ScoreExperiment{
-				ExperimentName: score.Experiment.ExperimentName,
-				Variant:        score.Experiment.Variant,
+				Id:      score.Experiment.ExperimentName,
+				Variant: score.Experiment.Variant,
 			}
 		}
 		scores = append(scores, &apiv2.Score{
@@ -121,34 +124,44 @@ func scoreInputFromFields(name string, rawValue *structpb.Value, stepID *string,
 		return ScoreInput{}, fmt.Errorf("Experiment scores must be run-scoped")
 	}
 
-	// Apply the same name and value rules as SDK score submission before
-	// handing off to the provider.
-	if _, err := ScoreMetadataUpdate(name, value); err != nil {
+	scoreUpdate, err := ScoreMetadataUpdate(name, value)
+	if err != nil {
 		return ScoreInput{}, fmt.Errorf("Score name or value is invalid; names must be at most %d UTF-8 bytes, must not contain control characters or single quotes, and values must be a finite number or boolean", metadata.MaxScoreNameByteLength)
 	}
 
+	updates := make([]metadata.Update, 0, 2)
 	var experimentInput *ScoreExperimentInput
 	if experiment != nil {
-		if strings.TrimSpace(experiment.ExperimentName) == "" {
-			return ScoreInput{}, fmt.Errorf("Experiment name is required when experiment is provided")
+		if strings.TrimSpace(experiment.Id) == "" {
+			return ScoreInput{}, fmt.Errorf("Experiment ID is required when experiment is provided")
+		}
+		if len(experiment.Id) > maxScoreExperimentFieldByteLength {
+			return ScoreInput{}, fmt.Errorf("Experiment ID must be at most %d UTF-8 bytes", maxScoreExperimentFieldByteLength)
 		}
 		if strings.TrimSpace(experiment.Variant) == "" {
 			return ScoreInput{}, fmt.Errorf("Experiment variant is required when experiment is provided")
 		}
+		if len(experiment.Variant) > maxScoreExperimentFieldByteLength {
+			return ScoreInput{}, fmt.Errorf("Experiment variant must be at most %d UTF-8 bytes", maxScoreExperimentFieldByteLength)
+		}
 		experimentInput = &ScoreExperimentInput{
-			ExperimentName: experiment.ExperimentName,
+			ExperimentName: experiment.Id,
 			Variant:        experiment.Variant,
 		}
-		if _, err := ScoreExperimentMetadataUpdate(*experimentInput); err != nil {
+		experimentUpdate, err := ScoreExperimentMetadataUpdate(*experimentInput)
+		if err != nil {
 			return ScoreInput{}, fmt.Errorf("Experiment metadata is invalid")
 		}
+		updates = append(updates, experimentUpdate)
 	}
+	updates = append(updates, scoreUpdate)
 
 	return ScoreInput{
 		StepID:     stepID,
 		Experiment: experimentInput,
 		Name:       name,
 		Value:      value,
+		Metadata:   updates,
 	}, nil
 }
 

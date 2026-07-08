@@ -24,7 +24,7 @@ const (
 // MetricKeyRegex excludes it for SQL-injection defense).
 func validateScoreName(name string) error {
 	if len(name) > MaxScoreNameByteLength {
-		return fmt.Errorf("invalid score name %q: %w", name, ErrScoreNameInvalid)
+		return fmt.Errorf("invalid score name %q: %w of %d UTF-8 bytes", name, ErrScoreNameTooLong, MaxScoreNameByteLength)
 	}
 
 	for _, r := range name {
