@@ -69,7 +69,9 @@ func TestSDKNoRetry(t *testing.T) {
 				"error": map[string]any{
 					"message": "no retry plz",
 					"name":    "NonRetriableError",
-					"noRetry": true,
+					// Newer SDKs report the failure as OpcodeStepFailed, which is
+					// inherently terminal, so the recorded error no longer carries
+					// a separate noRetry flag.
 					// stack is ignored for now, as it has absolute paths.
 				},
 			},
