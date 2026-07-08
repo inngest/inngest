@@ -18,7 +18,7 @@ env:
 
 jobs:
   ts:
-    name: "TS SDK / suite: ${{ matrix.suite }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "TS SDK / sdkVersion: ${{ matrix.sdkVersion }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
     strategy:
       fail-fast: false
       matrix:
@@ -29,7 +29,15 @@ jobs:
         # shapes, so whichever runs second reads a corrupt store and crashes.
         # Run the v3 (pages-router) tests and the v4 durable-endpoint tests in
         # separate jobs so each Next.js process only ever loads one SDK major.
-        suite: [v3, v4]
+        sdkVersion: [v3, v4]
+        # Each SDK major has its own Go test package; map the version to its
+        # package here so the run step never branches on the version string.
+        # Adding a future major is a new sdkVersion value plus one entry here.
+        include:
+          - sdkVersion: v3
+            pkg: ./tests
+          - sdkVersion: v4
+            pkg: ./tests/v4
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -69,20 +77,15 @@ jobs:
           cd ../../
           echo "Running dev server"
           mkdir $GOCOVERDIR
-          nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.suite }}-api.txt &
+          nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.sdkVersion }}-api.txt &
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
-          # Keep the v3 and v4 SDKs in separate processes (see the `suite`
-          # matrix comment): each suite is its own Go package so only one SDK
-          # major is exercised per job. v4 holds the durable-endpoint tests;
-          # v3 (the ./tests root package) holds everything else.
-          if [ "${{ matrix.suite }}" = "v4" ]; then
-            TEST_PKG="./tests/v4"
-          else
-            TEST_PKG="./tests"
-          fi
-          gotestsum --junitfile=junit.xml --format=standard-verbose -- $TEST_PKG
+          # Each SDK major runs in its own process (see the `sdkVersion` matrix
+          # comment) via its own Go package: v4 holds the durable-endpoint
+          # tests; v3 (the ./tests root package) holds everything else. The
+          # package is chosen by the matrix `pkg` mapping above.
+          gotestsum --junitfile=junit.xml --format=standard-verbose -- ${{ matrix.pkg }}
         env:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
@@ -101,15 +104,15 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.suite }}-api
-          path: /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.suite }}-api.txt
+          name: devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.sdkVersion }}-api
+          path: /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-${{ matrix.sdkVersion }}-api.txt
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }},suite-${{ matrix.suite }}
+          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }},sdk-${{ matrix.sdkVersion }}
 
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
@@ -117,7 +120,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./junit.xml
-          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }},suite-${{ matrix.suite }}
+          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }},sdk-${{ matrix.sdkVersion }}
           report_type: test_results
 
   # refs:
