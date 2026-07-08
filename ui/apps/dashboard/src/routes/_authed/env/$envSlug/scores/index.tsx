@@ -5,9 +5,6 @@ import { Link } from '@inngest/components/Link';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { ClientOnly, createFileRoute } from '@tanstack/react-router';
 
-import NotFound from '@/components/Error/NotFound';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-
 const ScoresDashboard = lazy(() =>
   import('@/components/Scores/Dashboard').then((m) => ({
     default: m.ScoresDashboard,
@@ -36,14 +33,6 @@ function ScoresInfo() {
 
 function ScoresComponent() {
   const { envSlug } = Route.useParams();
-  const scoresEnabled = useBooleanFlag('scoring-dashboard');
-
-  if (!scoresEnabled.isReady) {
-    return null;
-  }
-  if (!scoresEnabled.value) {
-    return <NotFound />;
-  }
 
   return (
     <>
