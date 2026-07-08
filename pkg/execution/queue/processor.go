@@ -265,7 +265,7 @@ func (q *queueProcessor) forAccountShards(ctx context.Context, accountID uuid.UU
 	return fn(ctx, shard)
 }
 
-// PartitionBacklogSize implements QueueManager.
+// PartitionBacklogSize implements JobQueueReader.
 func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
 	var totalCount int64
 
