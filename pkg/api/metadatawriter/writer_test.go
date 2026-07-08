@@ -30,10 +30,11 @@ func TestWriterPersistsMetadataSizeDeltaForLiveState(t *testing.T) {
 			},
 		},
 	}
+	tracer := &writerTracer{}
 
 	err := Writer{
 		State:          state,
-		TracerProvider: writerTracer{},
+		TracerProvider: tracer,
 		PkgName:        "metadatawriter.test",
 	}.Write(context.Background(), WriteRequest{
 		ID: state.md.ID,
@@ -45,6 +46,8 @@ func TestWriterPersistsMetadataSizeDeltaForLiveState(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Positive(t, state.incremented)
+	require.Len(t, tracer.updated, 1)
+	require.Equal(t, "parent", tracer.updated[0].TargetSpan.DynamicSpanID)
 }
 
 func TestWriterUsesFallbackWithoutPersistingMetadataSizeDelta(t *testing.T) {
@@ -53,10 +56,11 @@ func TestWriterUsesFallbackWithoutPersistingMetadataSizeDelta(t *testing.T) {
 	envID := uuid.New()
 	loaderCalled := false
 	state := &writerState{err: statev2.ErrMetadataNotFound}
+	tracer := &writerTracer{}
 
 	err := Writer{
 		State:          state,
-		TracerProvider: writerTracer{},
+		TracerProvider: tracer,
 		MissingStateLoader: func(ctx context.Context, id statev2.ID) (*statev2.Metadata, error) {
 			loaderCalled = true
 			require.Equal(t, runID, id.RunID)
@@ -90,6 +94,8 @@ func TestWriterUsesFallbackWithoutPersistingMetadataSizeDelta(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, loaderCalled)
 	require.Zero(t, state.incremented)
+	require.Len(t, tracer.updated, 1)
+	require.Equal(t, "parent", tracer.updated[0].TargetSpan.DynamicSpanID)
 }
 
 func testMetadataUpdate(t *testing.T) metadata.Update {
@@ -120,16 +126,19 @@ func (s *writerState) IncrementMetadataSize(ctx context.Context, id statev2.ID, 
 	return nil
 }
 
-type writerTracer struct{}
+type writerTracer struct {
+	updated []*tracing.UpdateSpanOptions
+}
 
-func (writerTracer) CreateSpan(ctx context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
+func (*writerTracer) CreateSpan(ctx context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
 	return &meta.SpanReference{DynamicSpanID: opts.DynamicSpanIDOverride}, nil
 }
 
-func (writerTracer) CreateDroppableSpan(context.Context, string, *tracing.CreateSpanOptions) (*tracing.DroppableSpan, error) {
+func (*writerTracer) CreateDroppableSpan(context.Context, string, *tracing.CreateSpanOptions) (*tracing.DroppableSpan, error) {
 	return nil, nil
 }
 
-func (writerTracer) UpdateSpan(context.Context, *tracing.UpdateSpanOptions) error {
+func (t *writerTracer) UpdateSpan(_ context.Context, opts *tracing.UpdateSpanOptions) error {
+	t.updated = append(t.updated, opts)
 	return nil
 }

@@ -92,6 +92,8 @@ func (w Writer) Write(ctx context.Context, req WriteRequest) error {
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &stateMetadata.ID.Tenant.AppID)
 	}
 
+	targetSpans := make([]*meta.SpanReference, 0, len(req.Items))
+	seenTargetSpans := map[string]struct{}{}
 	for _, item := range req.Items {
 		parentSpanRef, scope := item.Parent(stateMetadata)
 		if _, err := tracing.CreateMetadataSpan(
@@ -105,6 +107,21 @@ func (w Writer) Write(ctx context.Context, req WriteRequest) error {
 			scope,
 			addTenantIDs,
 		); err != nil {
+			return err
+		}
+		if parentSpanRef != nil && parentSpanRef.DynamicSpanID != "" {
+			if _, ok := seenTargetSpans[parentSpanRef.DynamicSpanID]; !ok {
+				seenTargetSpans[parentSpanRef.DynamicSpanID] = struct{}{}
+				targetSpans = append(targetSpans, parentSpanRef)
+			}
+		}
+	}
+	for _, targetSpan := range targetSpans {
+		if err := tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: req.Location + ".refreshTarget"},
+			Metadata:   stateMetadata,
+			TargetSpan: targetSpan,
+		}); err != nil {
 			return err
 		}
 	}
