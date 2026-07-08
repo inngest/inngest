@@ -18,7 +18,6 @@ export default function Monitor({
   collapsed: boolean;
 }) {
   const experimentsEnabled = useBooleanFlag('experimentation-steps');
-  const sessionsEnabled = useBooleanFlag('sessions-ui');
 
   return (
     <div className={`flex w-full flex-col  ${collapsed ? 'mt-2' : 'mt-5'}`}>
@@ -63,15 +62,13 @@ export default function Monitor({
           icon={<ExperimentsIcon className="h-[18px] w-[18px]" />}
         />
       )}
-      {sessionsEnabled.value && (
-        <MenuItem
-          to={getNavRoute(activeEnv, 'sessions')}
-          beta
-          collapsed={collapsed}
-          text="Sessions"
-          icon={<SessionsIcon className="h-[18px] w-[18px]" />}
-        />
-      )}
+      <MenuItem
+        to={getNavRoute(activeEnv, 'sessions')}
+        beta
+        collapsed={collapsed}
+        text="Sessions"
+        icon={<SessionsIcon className="h-[18px] w-[18px]" />}
+      />
     </div>
   );
 }
