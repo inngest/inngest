@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/printer"
 	"go/token"
@@ -286,5 +287,14 @@ func writeBarrelFile(output string, pkgName string, collected []collectedType) e
 		buf.WriteString("\n\n")
 	}
 
-	return os.WriteFile(output, buf.Bytes(), 0644)
+	// gofmt the collected output so the generated file is byte-stable
+	// regardless of how the extracted source was aligned. Without this the
+	// raw go/printer output uses unaligned tabs, and any editor format-on-save
+	// would re-align it and drift from `go generate`, breaking the CI gen check.
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("formatting generated source: %w", err)
+	}
+
+	return os.WriteFile(output, formatted, 0644)
 }
