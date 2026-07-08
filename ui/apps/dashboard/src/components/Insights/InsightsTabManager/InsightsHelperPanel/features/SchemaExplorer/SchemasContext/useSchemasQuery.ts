@@ -2,7 +2,6 @@ import { useCallback, useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { buildSchemaEntriesFromQueryData } from './queries';
 import type { SchemaEntry } from './types';
 import { useEventTypeSchemas } from './useEventTypeSchemas';
@@ -15,13 +14,10 @@ const MAX_SCHEMA_ITEMS = 800;
 const MAX_PAGES = 30;
 
 export function useSchemasQuery(search: string) {
-  const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
-
   const getEventTypeSchemas = useEventTypeSchemas();
   const env = useEnvironment();
 
   const query = useInfiniteQuery({
-    enabled: isSchemaWidgetEnabled.value,
     queryKey: [
       'schema-explorer-event-types',
       env.id,
