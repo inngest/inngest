@@ -265,7 +265,7 @@ func (q *queueProcessor) forAccountShards(ctx context.Context, accountID uuid.UU
 	return fn(ctx, shard)
 }
 
-// PartitionBacklogSize implements QueueManager.
+// PartitionBacklogSize implements JobQueueReader.
 func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
 	var totalCount int64
 
@@ -313,11 +313,6 @@ func (q *queueProcessor) RequeueByJobID(ctx context.Context, shard QueueShard, j
 // Enqueue implements QueueManager.
 func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
 	return q.queueProducer.Enqueue(ctx, item, at, opts)
-}
-
-// TotalSystemQueueDepth implements QueueManager.
-func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context, shard QueueShard) (int64, error) {
-	return shard.TotalSystemQueueDepth(ctx)
 }
 
 // OutstandingJobCount implements Queue.

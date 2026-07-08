@@ -60,13 +60,6 @@ type QueueManager interface {
 	Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error
 	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
-
-	// PartitionBacklogSize returns the point in time backlog size of the partition.
-	// This will sum the size of all backlogs in that partition
-	PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error)
-
-	// Total queue depth of all partitions including backlog and ready state items
-	TotalSystemQueueDepth(ctx context.Context, queueShard QueueShard) (int64, error)
 }
 
 type KeyQueueProcessor interface {
