@@ -91,93 +91,102 @@ func run(t *testing.T, test *Test) {
 	test.requests = make(chan http.Request)
 	test.responses = make(chan http.Response)
 
+	// Intercept all traffic between the executor and the SDK so we can assert
+	// on the messages passed in both directions (SDK responses, and the state
+	// the executor injects).
+	//
+	// This is a reverse proxy rather than a hand-rolled forwarder: we forward
+	// each request/response *verbatim* and only ever decode a copy for our own
+	// assertions. Letting net/http own the HTTP framing (Content-Length,
+	// chunked transfer, Content-Encoding, hop-by-hop headers) means the bytes
+	// the executor receives always match their headers — hand-copying headers
+	// while transforming the body is exactly how a gzipped body got forwarded
+	// with a stale gzip header before.
+	target := sdkURL
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			// Route to the real SDK endpoint, preserving the executor's query
+			// (fnId/stepId) and ignoring the inbound "/" path.
+			pr.Out.URL.Scheme = target.Scheme
+			pr.Out.URL.Host = target.Host
+			pr.Out.URL.Path = target.Path
+			pr.Out.URL.RawQuery = pr.In.URL.RawQuery
+			pr.Out.Host = target.Host
+		},
+		ModifyResponse: func(resp *http.Response) error {
+			// Read the body so we can capture it, then hand it straight back
+			// for forwarding: original bytes, original encoding, untouched.
+			raw, err := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if err != nil {
+				return err
+			}
+			resp.Body = io.NopCloser(bytes.NewReader(raw))
+
+			// Decode a copy purely for assertions/logging; never mutate resp.
+			decoded := raw
+			if resp.Header.Get("Content-Encoding") == "gzip" {
+				if zr, zerr := gzip.NewReader(bytes.NewReader(raw)); zerr == nil {
+					if d, derr := io.ReadAll(zr); derr == nil {
+						decoded = d
+					}
+					_ = zr.Close()
+				}
+			}
+
+			fmt.Printf(" ==> Received SDK response:\n\t%s\n\n", string(decoded))
+
+			respCopy := *resp
+			respCopy.Body = io.NopCloser(bytes.NewReader(decoded))
+			select {
+			case test.responses <- respCopy:
+			case <-time.After(time.Second):
+				// Fail from the test goroutine's perspective; calling
+				// require.FailNow here (a non-test goroutine) would only
+				// Goexit this handler, not fail the test.
+				t.Errorf("unexpected sdk response")
+			}
+			return nil
+		},
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			t.Errorf("error forwarding request to SDK: %v", err)
+			w.WriteHeader(http.StatusBadGateway)
+		},
+	}
+
 	// Create a new server on a random port that listens on 0.0.0.0.
 	// This means we cannot use httptest.NewServer
 	mux := http.NewServeMux()
-
-	// Start a new test server which will intercept all requests between the executor and the SDK.
-	//
-	// This allows us to assert that the messages passed are as we expect, including:
-	//
-	// - Responses from the SDK
-	// - State injected via the executor.
-	//
-	// We can also randomly inject faults by disregarding the SDK's response and throwing a 500.
-	mux.HandleFunc("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Ignore ping requests
 		if r.Method == http.MethodPut {
 			_ = r.Body.Close()
 			return
 		}
 
+		// Capture the executor's request body for assertions, then restore it
+		// so the proxy forwards the request unchanged.
 		byt, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		fmt.Printf(" ==> Received executor request:\n\t%s\n", string(byt))
-
-		// Recreate reader to re-read in assertion, then pass to assertion.
 		_ = r.Body.Close()
+		if err != nil {
+			t.Errorf("error reading executor request: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		r.Body = io.NopCloser(bytes.NewReader(byt))
 
+		fmt.Printf(" ==> Received executor request:\n\t%s\n", string(byt))
+
+		reqCopy := *r
+		reqCopy.Body = io.NopCloser(bytes.NewReader(byt))
 		select {
-		case test.requests <- *r:
-			// do nothing, success
+		case test.requests <- reqCopy:
 		case <-time.After(time.Second):
-			require.Fail(t, "unexpected executor request")
+			t.Errorf("unexpected executor request")
 		}
 
-		// Forward this request on to the SDK.
-		url := sdkURL
-		url.RawQuery = r.URL.RawQuery
-		req, err := http.NewRequest(http.MethodPost, url.String(), bytes.NewReader(byt))
-		require.NoError(t, err)
-		req.ContentLength = r.ContentLength
-		req.Header = r.Header
-		sdkResponse, err := http.DefaultClient.Do(req)
-		require.NoError(t, err)
-
-		rdr := sdkResponse.Body
-		if sdkResponse.Header.Get("content-encoding") == "gzip" {
-			rdr, _ = gzip.NewReader(sdkResponse.Body)
-		}
-
-		// Read the response.
-		byt, err = io.ReadAll(rdr)
-		require.NoError(t, err)
-
-		_ = sdkResponse.Body.Close()
-		sdkResponse.Body = io.NopCloser(bytes.NewReader(byt))
-
-		fmt.Printf(" ==> Received SDK response:\n\t%s\n", string(byt))
-		fmt.Println("")
-
-		select {
-		case test.responses <- *sdkResponse:
-			// do nothing, success
-		case <-time.After(time.Second):
-			require.Fail(t, "unexpected sdk response")
-		}
-
-		// Forward the response from the SDK to the executor.
-
-		for header, values := range sdkResponse.Header {
-			// We've already read the full body into `byt` (decompressing it
-			// above if it was gzipped), so the SDK's framing headers no longer
-			// describe what we're about to write. Skip them and let net/http
-			// recompute Content-Length and framing for the decoded body;
-			// forwarding a stale Content-Encoding/Content-Length would make the
-			// executor read a body that doesn't match its headers.
-			switch http.CanonicalHeaderKey(header) {
-			case "Content-Encoding", "Content-Length", "Transfer-Encoding":
-				continue
-			}
-			// Multi-headers not supported
-			w.Header().Add(header, values[0])
-		}
-
-		w.WriteHeader(sdkResponse.StatusCode)
-		_, err = w.Write(byt)
-		require.NoError(t, err)
-	}))
+		proxy.ServeHTTP(w, r)
+	})
 	port := rand.Int63n(10000) + 40000
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
