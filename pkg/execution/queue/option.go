@@ -208,6 +208,22 @@ func (o QueueOptions) PartitionBacklogSizeConcurrency() int64 {
 	return o.partitionBacklogSizeConcurrency
 }
 
+// WithPausedRequeueExtension overrides how far into the future a paused
+// partition is requeued once it is confirmed paused in the database. When not
+// set (or non-positive), PartitionPausedRequeueExtension is used.
+func WithPausedRequeueExtension(d time.Duration) QueueOpt {
+	return func(q *QueueOptions) {
+		q.pausedRequeueExtension = d
+	}
+}
+
+func (o QueueOptions) PausedRequeueExtension() time.Duration {
+	if o.pausedRequeueExtension <= 0 {
+		return PartitionPausedRequeueExtension
+	}
+	return o.pausedRequeueExtension
+}
+
 func WithPeekConcurrencyMultiplier(m int64) QueueOpt {
 	return func(q *QueueOptions) {
 		q.peekCurrMultiplier = m
@@ -500,6 +516,11 @@ type QueueOptions struct {
 	backlogRefillLimit              int64
 	backlogNormalizeConcurrency     int64
 	partitionBacklogSizeConcurrency int64
+
+	// pausedRequeueExtension is how far into the future a paused partition is
+	// requeued when it is confirmed paused in the database. Falls back to
+	// PartitionPausedRequeueExtension when unset.
+	pausedRequeueExtension time.Duration
 
 	NormalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	RefreshItemThrottle                       RefreshItemThrottleFn
