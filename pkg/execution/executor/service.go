@@ -64,15 +64,10 @@ func WithExecutorOpts(opts ...ExecutorOpt) func(s *svc) {
 	}
 }
 
-func WithServiceQueue(q queue.Queue) func(s *svc) {
-	return func(s *svc) {
-		s.queue = q
-	}
-}
-
 func WithServiceQueueProcessor(qp queue.QueueProcessor) func(s *svc) {
 	return func(s *svc) {
 		s.queueProcessor = qp
+		s.queue = qp.Queue()
 	}
 }
 
