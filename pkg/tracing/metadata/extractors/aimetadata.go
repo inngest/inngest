@@ -41,7 +41,7 @@ func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) (md AIMetada
 		md.TotalTokens = &totalTokens
 	}
 
-	md.EstimatedCost = EstimateCost(md.Model, md.InputTokens, md.OutputTokens)
+	md.EstimatedCost = EstimateCost(md.RequestModel, md.InputTokens, md.OutputTokens)
 
 	return md, true
 }
