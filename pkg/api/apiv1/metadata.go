@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/api/metadatawriter"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -117,29 +118,6 @@ type AddRunMetadataRequest struct {
 	Metadata []metadata.Update `json:"metadata"`
 }
 
-type AddRunMetadataOpts struct {
-	State          statev2.RunService
-	TracerProvider tracing.TracerProvider
-	TraceReader    cqrs.TraceReader
-}
-
-func AddRunMetadata(ctx context.Context, opts AddRunMetadataOpts, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
-	tracerProvider := opts.TracerProvider
-	if tracerProvider == nil {
-		tracerProvider = tracing.NewNoopTracerProvider()
-	}
-	r := router{
-		API: &API{
-			opts: Opts{
-				State:          opts.State,
-				TracerProvider: tracerProvider,
-				TraceReader:    opts.TraceReader,
-			},
-		},
-	}
-	return r.AddRunMetadata(ctx, auth, runID, req)
-}
-
 func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
 	if err := metadata.ValidateUpdatesAllowed(req.Metadata); err != nil {
 		return publicerr.Wrap(err, 400, "Invalid metadata")
@@ -162,124 +140,61 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		},
 	}
 
-	var stateMetadata *statev2.Metadata
-	loadedFromState := false
-	if a.opts.State != nil {
-		md, err := a.opts.State.LoadMetadata(ctx, partialID)
-		if errors.Is(err, statev2.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound) {
-			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-local limit",
-				"error", err,
-				"run_id", runID.String(),
-			)
-		} else if err != nil {
-			return publicerr.Wrap(err, 500, "Unable to load run metadata")
-		} else {
-			stateMetadata = &md
-			loadedFromState = true
-		}
+	err := metadatawriter.Writer{
+		State:          a.opts.State,
+		TracerProvider: a.opts.TracerProvider,
+		PkgName:        pkgName,
+		// Missing state fallback is part of the existing SDK metadata contract.
+		AllowMissingState: true,
+	}.Write(ctx, metadatawriter.WriteRequest{
+		ID: partialID,
+		Items: metadatawriter.NewItems(req.Metadata, func(stateMetadata *statev2.Metadata) (*meta.SpanReference, metadata.Scope) {
+			return deterministicMetadataParent(runID, &req.Target, stateMetadata)
+		}),
+		Location: "router.AddRunMetadata",
+	})
+	if errors.Is(err, metadatawriter.ErrLoadMetadata) {
+		return publicerr.Wrap(err, 500, "Unable to load run metadata")
 	}
+	return err
+}
 
-	// Missing state uses a request-local fallback so this write still enforces
-	// the cumulative size limit within the request.
-	if stateMetadata == nil {
-		stateMetadata = &statev2.Metadata{ID: partialID}
-	}
-	statev2.InitConfig(&stateMetadata.Config)
-
-	// Build the parent span reference and determine scope. For run-scoped and
-	// step-scoped metadata the span reference is computed deterministically from
-	// the run/step IDs, removing any dependency on ClickHouse. The
-	// extended-trace case still looks up the user-created span by its ID.
-	var parentSpanRef *meta.SpanReference
-	var scope metadata.Scope
-
+// deterministicMetadataParent builds the parent span reference and determines
+// scope for runs created after deterministic span IDs were deployed. For
+// run-scoped and step-scoped metadata the span reference is computed from the
+// run/step IDs, removing any dependency on ClickHouse.
+func deterministicMetadataParent(runID ulid.ULID, target *RunMetadataTarget, stateMetadata *statev2.Metadata) (*meta.SpanReference, metadata.Scope) {
 	switch {
-	case req.Target.StepID == nil:
-		scope = enums.MetadataScopeRun
-		parentSpanRef = tracing.RunSpanRefFromMetadata(stateMetadata)
+	case target.StepID == nil:
+		return tracing.RunSpanRefFromMetadata(stateMetadata), enums.MetadataScopeRun
 
-	case req.Target.StepAttempt == nil || req.Target.SpanID == nil:
-		scope = enums.MetadataScopeStep
-
+	case target.StepAttempt == nil || target.SpanID == nil:
 		var hashedStepID string
-		if req.Target.StepIndex == nil || *req.Target.StepIndex == 0 {
-			sum := sha1.Sum([]byte(*req.Target.StepID))
+		if target.StepIndex == nil || *target.StepIndex == 0 {
+			sum := sha1.Sum([]byte(*target.StepID))
 			hashedStepID = hex.EncodeToString(sum[:])
 		} else {
-			sum := sha1.Sum(fmt.Appendf(nil, "%s:%d", *req.Target.StepID, *req.Target.StepIndex))
+			sum := sha1.Sum(fmt.Appendf(nil, "%s:%d", *target.StepID, *target.StepIndex))
 			hashedStepID = hex.EncodeToString(sum[:])
 		}
 
-		if req.Target.StepAttempt == nil || *req.Target.StepAttempt < 0 {
-			parentSpanRef = tracing.FinalizedStepSpanRefFromMetadataAndStepID(stateMetadata, hashedStepID)
-		} else {
-			parentSpanRef = tracing.RetryStepSpanRefFromMetadataAndStepID(stateMetadata, hashedStepID, *req.Target.StepAttempt)
+		if target.StepAttempt == nil || *target.StepAttempt < 0 {
+			return tracing.FinalizedStepSpanRefFromMetadataAndStepID(stateMetadata, hashedStepID), enums.MetadataScopeStep
 		}
+		return tracing.RetryStepSpanRefFromMetadataAndStepID(stateMetadata, hashedStepID, *target.StepAttempt), enums.MetadataScopeStep
 
 	default:
-		scope = enums.MetadataScopeExtendedTrace
 		// The TraceID is the same for all spans in the run and is derived
 		// deterministically from the runID. The span itself is referenced by
 		// the caller-supplied SpanID, so no ClickHouse lookup is needed.
 		traceID := tracing.DeterministicSpanConfig(runID[:]).TraceID.String()
-		spanID := *req.Target.SpanID
-		parentSpanRef = &meta.SpanReference{
+		spanID := *target.SpanID
+		return &meta.SpanReference{
 			TraceParent:            fmt.Sprintf("00-%s-%s-00", traceID, spanID),
 			DynamicSpanID:          spanID,
 			DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", traceID, spanID),
-		}
+		}, enums.MetadataScopeExtendedTrace
 	}
-
-	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
-		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, util.ToPtr(auth.AccountID()))
-		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID()))
-		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &stateMetadata.ID.FunctionID)
-		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &stateMetadata.ID.RunID)
-		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &stateMetadata.ID.Tenant.AppID)
-	}
-
-	for _, md := range req.Metadata {
-		_, err := tracing.CreateMetadataSpan(
-			ctx,
-			a.opts.TracerProvider,
-			parentSpanRef,
-			"router.AddRunMetadata",
-			pkgName,
-			stateMetadata,
-			md,
-			scope,
-			addTenantIDs,
-		)
-		if err != nil {
-			return err
-		}
-	}
-	if parentSpanRef != nil && parentSpanRef.DynamicSpanID != "" {
-		if err := a.opts.TracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			Debug:      &tracing.SpanDebugData{Location: "router.AddRunMetadata.refreshTarget"},
-			Metadata:   stateMetadata,
-			TargetSpan: parentSpanRef,
-		}); err != nil {
-			return err
-		}
-	}
-
-	// Persist the cumulative metadata size delta back to the state store.
-	// Only persist when we successfully loaded from state; the fallback
-	// Metadata is request-local and has no backing store to update.
-	if loadedFromState {
-		if delta := stateMetadata.Metrics.SwapMetadataSizeDelta(); delta > 0 {
-			if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, stateMetadata.ID, delta); err != nil {
-				logger.StdlibLogger(ctx).Error("failed to persist metadata size delta",
-					"error", err,
-					"run_id", runID.String(),
-					"delta", delta,
-				)
-			}
-		}
-	}
-
-	return nil
 }
 
 // addRunMetadataLegacy is the original implementation for runs created before
@@ -349,86 +264,29 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 		},
 	}
 
-	var stateMetadata *statev2.Metadata
-	loadedFromState := false
-	if a.opts.State != nil {
-		md, err := a.opts.State.LoadMetadata(ctx, stateID)
-		if errors.Is(err, statev2.ErrRunNotFound) || errors.Is(err, statev2.ErrMetadataNotFound) {
-			logger.StdlibLogger(ctx).Warn("failed to load run metadata for size limit check, falling back to request-local limit",
-				"error", err,
-				"run_id", runID.String(),
-			)
-		} else if err != nil {
-			return publicerr.Wrap(err, 500, "Unable to load run metadata")
-		} else {
-			stateMetadata = &md
-			loadedFromState = true
-		}
-	}
-
-	// Missing state uses a request-local fallback so this write still enforces
-	// the cumulative size limit within the request.
-	if stateMetadata == nil {
-		stateMetadata = &statev2.Metadata{ID: stateID}
-	}
-	statev2.InitConfig(&stateMetadata.Config)
-
 	parentSpanRef := &meta.SpanReference{
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
 		DynamicSpanID:          parentSpan.SpanID,
 		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
 	}
 
-	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
-		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, util.ToPtr(auth.AccountID()))
-		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID()))
-		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &parentSpan.FunctionID)
-		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &parentSpan.RunID)
-		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &parentSpan.AppID)
+	err = metadatawriter.Writer{
+		State:          a.opts.State,
+		TracerProvider: a.opts.TracerProvider,
+		PkgName:        pkgName,
+		// Missing state fallback is part of the existing SDK metadata contract.
+		AllowMissingState: true,
+	}.Write(ctx, metadatawriter.WriteRequest{
+		ID: stateID,
+		Items: metadatawriter.NewItems(req.Metadata, func(*statev2.Metadata) (*meta.SpanReference, metadata.Scope) {
+			return parentSpanRef, scope
+		}),
+		Location: "router.AddRunMetadata",
+	})
+	if errors.Is(err, metadatawriter.ErrLoadMetadata) {
+		return publicerr.Wrap(err, 500, "Unable to load run metadata")
 	}
-
-	for _, md := range req.Metadata {
-		_, err = tracing.CreateMetadataSpan(
-			ctx,
-			a.opts.TracerProvider,
-			parentSpanRef,
-			"router.AddRunMetadata",
-			pkgName,
-			stateMetadata,
-			md,
-			scope,
-			addTenantIDs,
-		)
-		if err != nil {
-			return err
-		}
-	}
-	if parentSpanRef != nil && parentSpanRef.DynamicSpanID != "" {
-		if err := a.opts.TracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			Debug:      &tracing.SpanDebugData{Location: "router.AddRunMetadata.refreshTarget"},
-			Metadata:   stateMetadata,
-			TargetSpan: parentSpanRef,
-		}); err != nil {
-			return err
-		}
-	}
-
-	// Persist the cumulative metadata size delta back to the state store.
-	// Only persist when we successfully loaded from state; the fallback
-	// Metadata is request-local and has no backing store to update.
-	if loadedFromState {
-		if delta := stateMetadata.Metrics.SwapMetadataSizeDelta(); delta > 0 {
-			if err := statev2.TryIncrementMetadataSize(ctx, a.opts.State, stateID, delta); err != nil {
-				logger.StdlibLogger(ctx).Error("failed to persist metadata size delta",
-					"error", err,
-					"run_id", runID.String(),
-					"delta", delta,
-				)
-			}
-		}
-	}
-
-	return nil
+	return err
 }
 
 func (a router) getParentSpan(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, target *RunMetadataTarget) (*cqrs.OtelSpan, metadata.Scope, error) {

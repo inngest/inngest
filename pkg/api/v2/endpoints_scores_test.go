@@ -510,20 +510,6 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 		require.ErrorIs(t, err, ErrScoreTargetNotFound)
 	})
 
-	t.Run("rejects already hashed step IDs", func(t *testing.T) {
-		provider := NewStateScoreProvider(baseOpts)
-		stepID := scoreTraceStepID(existingStepID)
-
-		err := provider.CreateScores(context.Background(), CreateScoresParams{
-			RunID: runID,
-			Scores: []ScoreInput{
-				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
-			},
-		})
-
-		require.ErrorIs(t, err, ErrScoreTargetNotFound)
-	})
-
 	t.Run("preserves state load errors", func(t *testing.T) {
 		loadErr := errors.New("state unavailable")
 		opts := baseOpts
@@ -568,6 +554,32 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 
 		require.NoError(t, err)
 		require.True(t, called)
+	})
+}
+
+func TestScoreStepIDForSpan(t *testing.T) {
+	stepID := "generate-summary"
+	traceStepID := scoreTraceStepID(stepID)
+
+	t.Run("uses hashed step ID from state", func(t *testing.T) {
+		got, ok := scoreStepIDForSpan(&statev2.Metadata{Stack: []string{traceStepID}}, stepID)
+
+		require.True(t, ok)
+		require.Equal(t, traceStepID, got)
+	})
+
+	t.Run("uses raw step ID from state", func(t *testing.T) {
+		got, ok := scoreStepIDForSpan(&statev2.Metadata{Stack: []string{stepID}}, stepID)
+
+		require.True(t, ok)
+		require.Equal(t, stepID, got)
+	})
+
+	t.Run("does not accept already hashed trace step IDs", func(t *testing.T) {
+		got, ok := scoreStepIDForSpan(&statev2.Metadata{Stack: []string{traceStepID}}, traceStepID)
+
+		require.False(t, ok)
+		require.Empty(t, got)
 	})
 }
 
