@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.36.0] - 2026-07-08
+
+### 🚀 Features
+
+- Differentiate between request and response model for AI Metadata extraction with ai.step.* (#4518)
+
+### 🐛 Bug Fixes
+
+- *(release)* Open homebrew-tap PRs as ready for review (non-draft) (#4576)
+- Update AI Metadata field names (#4516)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(go)* Move one unit test job to Depot (#4568)
+
+### 🛡️ Security
+
+- Address Go vulnerabilities (#4570)
+
 ## [v1.35.0] - 2026-07-07
 
 ### 🚀 Features
@@ -29,6 +48,7 @@ All notable changes to this project will be documented in this file.
 - *(queue)* Add timeout to backlog size (#4556)
 - Track partition processing that yielded 0 peeks (#4562)
 - Cleanup unused queue injections (#4564)
+- *(release)* V1.35.0 (#4535)
 
 ### ◀️ Revert
 
