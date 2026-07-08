@@ -201,6 +201,10 @@ func (q *queueProcessor) Workers() chan ProcessItem {
 	return q.workers
 }
 
+func (q *queueProcessor) Queue() Queue {
+	return q
+}
+
 // BacklogSize implements JobQueueReader.
 func (q *queueProcessor) BacklogSize(ctx context.Context, shard QueueShard, backlogID string) (int64, error) {
 	return shard.BacklogSize(ctx, backlogID)

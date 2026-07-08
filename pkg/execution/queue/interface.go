@@ -97,6 +97,7 @@ type QueueProcessor interface {
 	// job will automatically be retried.
 	Run(context.Context, RunFunc) error
 
+	Queue() Queue
 	Shard() QueueShard
 	Clock() clockwork.Clock
 	Semaphore() util.TrackingSemaphore
