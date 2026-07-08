@@ -186,7 +186,15 @@ func (d httpv2) sync(ctx context.Context, sl sv2.StateLoader, opts driver.V2Requ
 
 	// We must also assert that we had an Inngest-specific response.
 	if !headers.IsSDK(resp.Header) {
-		return nil, errs.WrapResponseAsUser(0, true, resp.Body, "didn't receive SDK response: %w", err), nil
+		raw := resp.Body
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			// A non-2xx with no SDK headers means a proxy/gateway error or a
+			// crash before the SDK could respond. Synthesize a clear
+			// user-facing error; the executor moves Raw() into
+			// DriverResponse.Output, so this is what the trace shows.
+			raw = state.FatalUpstreamError(resp.StatusCode, resp.Body, resp.Header.Get("Content-Type"))
+		}
+		return nil, errs.WrapResponseAsUser(0, true, raw, "didn't receive SDK response: %w", err), nil
 	}
 
 	// We always expect opcodes from the API endpoint.  Whenever we re-enter a sync function,
