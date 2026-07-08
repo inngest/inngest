@@ -59,14 +59,13 @@ jobs:
           cd ./tests/js
           pnpm install --frozen-lockfile
           pnpm dev &
-          sleep 5
+          "$GITHUB_WORKSPACE/scripts/wait-for-healthy.sh" "SDK app" "$SDK_URL"
           cd ../../
           echo "Running dev server"
           mkdir $GOCOVERDIR
           nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt &
           echo "Ran dev server"
-          sleep 5
-          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
           gotestsum --junitfile=junit.xml --format=standard-verbose -- ./tests
         env:
           INNGEST_SIGNING_KEY: test
@@ -166,8 +165,7 @@ jobs:
             nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
           fi
           echo "Ran dev server"
-          sleep 5
-          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
 
           gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} -junit-dir test-results ./tests/golang -- -v -count=1
         env:
@@ -267,8 +265,7 @@ jobs:
             nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
           fi
           echo "Ran dev server"
-          sleep 5
-          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
 
           gotestsum --junitfile=junit.xml --format=standard-verbose -- ./tests/batch/... -count=1
         env:
@@ -366,8 +363,7 @@ jobs:
             nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
           fi
           echo "Ran dev server"
-          sleep 5
-          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
 
           gotestsum --junitfile=junit.xml --format=standard-verbose -- ./tests/api/... -count=1
         env:
