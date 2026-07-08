@@ -51,6 +51,16 @@ Three Redis hashes per run, all under a shared `{...:runID}` hash tag so multi-k
 3. Meta entry stays. `saveDefer.lua` is insert-only (any existing entry is a no-op), so SDK retransmits of the original DeferAdd dedupe automatically.
 4. Finalize skips Aborted entries.
 
+This path relies on SDKs following a few rules (the TS SDK handles all of them in `sanitizeOutgoingOps`):
+
+- **Always ship the abort**, even if the SDK cancelled the matching `DeferAdd` in its local buffer before it ever shipped. The `Defers` map in `SDKRequest` can be stale (a dying attempt's in-flight checkpoint or a parallel sibling's response can land after the map was built), so "not in the map" doesn't mean "never landed". Skip the abort and the deferred run might schedule anyway.
+- **Never ship a `DeferAdd` and `DeferAbort` for the same hashedID in one response.** They race in the executor's priority-group errgroup and the abort can be processed first. Drop the add, keep the abort.
+- Aborts for unknown targets are fine (and expected, given the always-ship rule). `SetDeferStatus` returns `state.ErrDeferNotFound`, `AbortFromOp` downgrades it to a debug log, and all three ingestion paths (executor, sync checkpoint, async checkpoint) treat it as a no-op.
+
+## Terminal failure path
+
+When a function rejects with buffered defers, the rejection arrives as `OpcodeRunError` in the same op batch instead of the classic function-rejected response. The classic body can't carry ops, and the rejection is the run's last message, so this is the only way the buffered defers survive. Like `RunComplete`, it's neither lazy nor priority, so the defer ops in the batch persist first. The executor then owns the retry decision: retryable errors requeue at attempt+1; terminal errors finalize the run as Failed, emit `inngest/function.failed`, and schedule any AfterRun defers. Async request/response mode only: it's not in `opcodeSyncMap`, so both checkpoint paths reject it.
+
 ## Unhappy path (soft-fail)
 
 A defer must never fail its parent run. Each rejection logs a warning, increments `IncrDefersRejectedCounter` (with a `reason` tag), and writes a `Rejected` sentinel where possible so SDK retransmits dedupe.
@@ -67,6 +77,18 @@ A defer must never fail its parent run. Each rejection logs a warning, increment
 ### E2E test for `run_type = Defer` assignment
 
 Write a real Dev Server + Go SDK test that schedules a deferred run and asserts the child's `run_type` is `Defer`. Blocked on deferred-function support in the Go SDK.
+
+### Aborted tombstone for unknown-target aborts
+
+UI polish, not correctness: the always-ship rule plus the backend's unknown-target tolerance already guarantee an aborted defer never schedules. The SDK's `.abort()` has shipped, so this can land any time.
+
+**Problem.** An abort whose `DeferAdd` never landed (cancelled in the SDK's buffer before shipping, rejected at the count cap with no sentinel, or lost to a failed checkpoint) hits "defer not found", and `AbortFromOp` returns before any span work. Identical user code then shows an `ABORTED` chip or nothing, depending on whether a checkpoint happened to fire between `defer()` and `.abort()`.
+
+**Proposed fix.**
+
+- `setDeferStatus.lua`: when the target is missing and the new status is Aborted, upsert an Aborted meta entry instead of returning 0. Apply the same `MaxDefersPerRun` guard as `saveDefer.lua`; without it, aborts against arbitrary IDs are an unbounded meta-hash write path.
+- `AbortFromOp`: emit the `executor.defer` span on the tombstone path (today the early `nil` return on `ErrDeferNotFound` skips the span work, which is why the chip is missing).
+- `DeferAbortOpts`: add optional `fn_slug` and userland-ID fields so the tombstone and span render with a function name. The SDK already sends both (`opts: { target_hashed_id, fn_slug, id }`); the backend currently parses only `target_hashed_id`, so this needs no SDK protocol rev — just start reading the fields.
 
 ### Suppress SDK retransmits after `MaxDefersPerRun` is hit
 

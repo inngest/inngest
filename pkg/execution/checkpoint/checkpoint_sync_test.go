@@ -432,7 +432,7 @@ func TestCheckpointSyncSteps(t *testing.T) {
 
 		mocks.state.
 			On("SetDeferStatus", ctx, testData.metadata.ID, "never-added", enums.DeferStatusAborted).
-			Return(fmt.Errorf("defer not found for hashedID %q", "never-added"))
+			Return(fmt.Errorf("%w for hashedID %q", sv1.ErrDeferNotFound, "never-added"))
 
 		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
 		require.NoError(err, "missing-target DeferAbort must NOT fail the parent run; soft-fail with log")
@@ -467,6 +467,28 @@ func TestCheckpointSyncSteps(t *testing.T) {
 		mocks.tracer.AssertExpectations(t)
 		mocks.queue.AssertExpectations(t)
 		mocks.executor.AssertExpectations(t)
+	})
+
+	t.Run("run error is rejected", func(t *testing.T) {
+		// OpcodeRunError is async request/response mode only; it must never
+		// arrive via a sync checkpoint. CheckpointSyncSteps rejects it instead
+		// of routing it through the sync->async default branch.
+		ctx := context.Background()
+		require := require.New(t)
+
+		op := state.GeneratorOpcode{
+			ID:    "run-error",
+			Op:    enums.OpcodeRunError,
+			Error: &state.UserError{Name: "CustomError", Message: "boom"},
+		}
+
+		mocks, testData := setupSyncCheckpointTest(t, op)
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.Error(err, "OpcodeRunError must be rejected by the sync checkpoint path")
+
+		mocks.executor.AssertNotCalled(t, "HandleGenerator", mock.Anything, mock.Anything, mock.Anything)
+		mocks.queue.AssertNotCalled(t, "Enqueue")
 	})
 
 	t.Run("step output too large", func(t *testing.T) {

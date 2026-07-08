@@ -475,12 +475,14 @@ const (
 	FinalizeResponseRunComplete FinalizeResponseType = iota
 	FinalizeResponseAPI
 	FinalizeResponseDriver
+	FinalizeResponseRunError
 )
 
 // FinalizeResponse is a union containing one of:
 // 1. an enums.OpcodeRunComplete (for async fns),
 // 2. or a apiresult.APIResponse (for sync fns)
 // 3. A DriverResponse for SDKs not using opcode responses.
+// 4. an enums.OpcodeRunError (for async fns that failed).
 type FinalizeResponse struct {
 	// Type indicates the field to use.
 	Type FinalizeResponseType
@@ -491,6 +493,8 @@ type FinalizeResponse struct {
 	DriverResponse state.DriverResponse
 	// APIResponse exists for HTTP-based sync functions.
 	APIResponse apiresult.APIResult
+	// RunError exists with an enums.OpcodeRunError enum.
+	RunError state.GeneratorOpcode
 }
 
 // FinalizeOptional represents optional fields that improve performance of the
@@ -521,6 +525,8 @@ func (f FinalizeOpts) Status() enums.StepStatus {
 	switch f.Response.Type {
 	case FinalizeResponseRunComplete:
 		return enums.StepStatusCompleted
+	case FinalizeResponseRunError:
+		return enums.StepStatusFailed
 	case FinalizeResponseAPI:
 		// XXX: all statuses are currently completed except for 5XX
 		if f.Response.APIResponse.StatusCode >= 500 {

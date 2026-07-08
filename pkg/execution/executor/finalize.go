@@ -619,6 +619,8 @@ func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {
 		return apiAttributes(f.Response.APIResponse)
 	case execution.FinalizeResponseRunComplete:
 		return runCompleteAttrs(f.Response.RunComplete)
+	case execution.FinalizeResponseRunError:
+		return runErrorAttrs(f.Response.RunError)
 	case execution.FinalizeResponseDriver:
 		return tracing.DriverResponseAttrs(&f.Response.DriverResponse, nil)
 	}
@@ -650,9 +652,36 @@ func runCompleteAttrs(gen state.GeneratorOpcode) *meta.SerializableAttrs {
 
 	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, inngestgo.Ptr(200)) // Must be to have this code.  It's an async fn.
+
+	data := gen.Data
+	if len(data) == 0 {
+		// Serialize an empty result as JSON null so the wrapped output below
+		// stays valid JSON.
+		data = json.RawMessage("null")
+	}
 	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(gen.Data)))
 	// XXX: We always wrap trace output with {"data":T} or {"error":T} for consistency with steps.
-	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(gen.Data)))
+	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(data)))
+
+	rawAttrs = rawAttrs.Merge(tracing.GeneratorAttrs(&gen))
+
+	return rawAttrs
+}
+
+func runErrorAttrs(gen state.GeneratorOpcode) *meta.SerializableAttrs {
+	rawAttrs := meta.NewAttrSet()
+
+	meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, inngestgo.Ptr(true))
+	// This is the transport status of the SDK's opcode response (as in
+	// runCompleteAttrs), not the run outcome; the span status carries failure.
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, inngestgo.Ptr(200))
+
+	if errByt, err := json.Marshal(gen.Error); err == nil {
+		meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, inngestgo.Ptr(len(errByt)))
+		meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(fmt.Sprintf(`{%q:%s}`, execution.StateErrorKey, errByt)))
+	} else {
+		rawAttrs.AddErr(fmt.Errorf("failed to marshal run error: %w", err))
+	}
 
 	rawAttrs = rawAttrs.Merge(tracing.GeneratorAttrs(&gen))
 

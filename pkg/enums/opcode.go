@@ -28,6 +28,7 @@ const (
 
 	OpcodeDeferAdd
 	OpcodeDeferAbort
+	OpcodeRunError
 )
 
 // opcodeSyncMap explicitly represents the sync opcodes that can be checkpointed.
@@ -40,7 +41,7 @@ var opcodeSyncMap = map[Opcode]struct{}{
 	OpcodeSyncRunComplete: {},
 	OpcodeStepFailed:      {},
 	OpcodeDeferAdd:        {},
-	OpcodeDeferAbort:     {},
+	OpcodeDeferAbort:      {},
 }
 
 // OpcodeIsSync returns whether the given opcode is synchronous.  This

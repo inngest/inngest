@@ -132,8 +132,10 @@ func SaveFromOp(
 	return nil
 }
 
-// AbortFromOp flips the target defer's status to Aborted. Errors are
-// surfaced (no soft-fail).
+// AbortFromOp flips the target defer's status to Aborted. Unknown-target
+// aborts are benign — the SDK contract requires shipping aborts even for
+// locally-cancelled DeferAdds that never landed — so ErrDeferNotFound returns
+// nil with a debug log. Other errors are surfaced.
 //
 // On success: updates the existing executor.defer span to status=Aborted via
 // UpdateSpan. The span identity is reconstructed from (parentRunID, hashedID),
@@ -153,6 +155,10 @@ func AbortFromOp(
 	}
 
 	if err := rs.SetDeferStatus(ctx, md.ID, opts.TargetHashedID, enums.DeferStatusAborted); err != nil {
+		if errors.Is(err, state.ErrDeferNotFound) {
+			log.Debug("abort for unknown defer", "hashed_id", opts.TargetHashedID)
+			return nil
+		}
 		log.Error("error aborting defer", "error", err)
 		return fmt.Errorf("error aborting defer: %w", err)
 	}

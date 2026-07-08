@@ -9,8 +9,10 @@ import (
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
@@ -155,3 +157,57 @@ func (s *stubRunProviderScheduler) Schedule(ctx context.Context, req execution.S
 var _ runProviderDataReader = (*stubRunProviderDataReader)(nil)
 var _ apiv2.FunctionScheduler = (*stubRunProviderScheduler)(nil)
 var _ event.TrackedEvent = (*cqrs.Event)(nil)
+
+func TestPublicRunOutput(t *testing.T) {
+	userErr := &state.UserError{Name: "CustomError", Message: "step blew up"}
+
+	opcodeOutput := func(t *testing.T, ops []*state.GeneratorOpcode) []byte {
+		t.Helper()
+		raw, err := json.Marshal(ops)
+		require.NoError(t, err)
+		return raw
+	}
+
+	t.Run("RunComplete opcode array returns the bare data", func(t *testing.T) {
+		raw := opcodeOutput(t, []*state.GeneratorOpcode{{
+			Op:   enums.OpcodeRunComplete,
+			Data: json.RawMessage(`{"ok":true}`),
+		}})
+		require.JSONEq(t, `{"ok":true}`, string(publicRunOutput(raw)))
+	})
+
+	t.Run("RunError opcode array returns the wrapped error", func(t *testing.T) {
+		raw := opcodeOutput(t, []*state.GeneratorOpcode{{
+			Op:    enums.OpcodeRunError,
+			Error: userErr,
+		}})
+		require.JSONEq(t,
+			`{"error":{"name":"CustomError","message":"step blew up"}}`,
+			string(publicRunOutput(raw)))
+	})
+
+	t.Run("parity with a plain (non-opcode) rejection", func(t *testing.T) {
+		// A plain rejection stores the wrapped error that GetTraceFunctionOutput
+		// produces for the run span, which publicRunOutput passes through
+		// untouched. The same user error arriving as an OpcodeRunError array
+		// must yield the same public output.
+		output, err := json.Marshal(userErr)
+		require.NoError(t, err)
+		crashMsg := "sdk crashed"
+		resp := state.DriverResponse{
+			Err:    &crashMsg,
+			Output: json.RawMessage(output),
+		}
+		plainStored, err := resp.GetTraceFunctionOutput()
+		require.NoError(t, err)
+
+		runErrorRaw := opcodeOutput(t, []*state.GeneratorOpcode{{
+			Op:    enums.OpcodeRunError,
+			Error: userErr,
+		}})
+
+		require.JSONEq(t,
+			string(publicRunOutput([]byte(plainStored))),
+			string(publicRunOutput(runErrorRaw)))
+	})
+}

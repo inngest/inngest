@@ -2361,6 +2361,9 @@ func (f *functionFinishedData) setResponse(resp execution.FinalizeResponse) {
 		// run complete is always raw data.
 		f.Result = resp.RunComplete.Data
 
+	case execution.FinalizeResponseRunError:
+		f.Error = resp.RunError.Error
+
 	case execution.FinalizeResponseAPI:
 		f.Result = resp.APIResponse
 
@@ -3725,6 +3728,8 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeRunComplete:
 		return e.handleGeneratorFunctionFinished(ctx, runCtx, gen, edge)
+	case enums.OpcodeRunError:
+		return e.handleGeneratorRunError(ctx, runCtx, gen, edge)
 	case enums.OpcodeSyncRunComplete:
 		// This is an API-based function executed synchronously that had
 		// an async conversion.  The result must always be in the shape of
@@ -3930,12 +3935,6 @@ func (e *executor) handleGeneratorDeferAdd(ctx context.Context, runCtx execution
 }
 
 func (e *executor) handleGeneratorDeferAbort(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
-	// If the SDK emits `[DeferAdd("X"), DeferAbort("X")]` in one response, the
-	// two ops race within the priority group's errgroup. If DeferAbort runs
-	// first it will error. We don't guard against this here (e.g. by writing a
-	// cancelled tombstone when the defer is absent) because emitting an
-	// DeferAdd and DeferAbort for the same hashed ID in a single response is
-	// an SDK bug, and the cost of handling it isn't worth the complexity.
 	if err := defers.AbortFromOp(ctx, e.smv2, e.tracerProvider, e.log, runCtx.Metadata(), gen); err != nil {
 		return err
 	}
@@ -4232,6 +4231,66 @@ func (e *executor) handleGeneratorFunctionFinished(ctx context.Context, runCtx e
 				runCtx.LifecycleItem(),
 				evts,
 				*resp,
+			)
+		}
+	}
+
+	return err
+}
+
+func (e *executor) handleGeneratorRunError(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	if gen.Error == nil {
+		logger.StdlibLogger(ctx).Error("OpcodeRunError handled without user error", "gen", gen)
+		return fmt.Errorf("no user error defined in OpcodeRunError")
+	}
+
+	if IsStepRetryable(&gen, runCtx) {
+		return e.scheduleRunErrorRetry(ctx, runCtx, gen)
+	}
+
+	return e.finalizeRunError(ctx, runCtx, gen)
+}
+
+func (e *executor) scheduleRunErrorRetry(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode) error {
+	e.emitNonStepSpan(ctx, runCtx, &gen, nil, enums.StepStatusErrored)
+	runCtx.IncrementAttempt()
+	for _, l := range e.lifecycles {
+		lifecycleItem := runCtx.LifecycleItem()
+		go l.OnStepScheduled(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, &gen.Name)
+	}
+	return fmt.Errorf("%w: %s: %s", ErrHandledStepError, gen.Error.Name, gen.Error.Message)
+}
+
+func (e *executor) finalizeRunError(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode) error {
+	md := runCtx.Metadata()
+	evts := runCtx.Events()
+
+	e.emitNonStepSpan(ctx, runCtx, &gen, nil, enums.StepStatusFailed)
+
+	err := e.Finalize(ctx, execution.FinalizeOpts{
+		Metadata: *md,
+		Response: execution.FinalizeResponse{
+			Type:     execution.FinalizeResponseRunError,
+			RunError: gen,
+		},
+		Optional: execution.FinalizeOptional{
+			InputEvents: evts,
+		},
+	})
+
+	if resp := runCtx.DriverResponse(); resp != nil {
+		failResp := *resp
+		failResp.SetError(fmt.Errorf("%s: %s", gen.Error.Name, gen.Error.Message))
+		failResp.SetFinal()
+		failResp.UserError = gen.Error
+		failResp.Output = gen.Error
+		for _, l := range e.lifecycles {
+			go l.OnFunctionFinished(
+				context.WithoutCancel(ctx),
+				*md,
+				runCtx.LifecycleItem(),
+				evts,
+				failResp,
 			)
 		}
 	}

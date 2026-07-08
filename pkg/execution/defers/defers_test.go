@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -23,6 +24,7 @@ type fakeRunService struct {
 	saveDeferErr         error
 	savedDefer           *statev2.Defer
 	savedDeferCalls      int
+	setDeferStatusErr    error
 	setDeferStatusHashed string
 	setDeferStatusValue  enums.DeferStatus
 }
@@ -36,7 +38,7 @@ func (f *fakeRunService) SaveDefer(_ context.Context, _ statev2.ID, d statev2.De
 func (f *fakeRunService) SetDeferStatus(_ context.Context, _ statev2.ID, hashedID string, status enums.DeferStatus) error {
 	f.setDeferStatusHashed = hashedID
 	f.setDeferStatusValue = status
-	return nil
+	return f.setDeferStatusErr
 }
 
 func runMetadata() *statev2.Metadata {
@@ -145,5 +147,28 @@ func TestAbortFromOp(t *testing.T) {
 
 		r.Error(err)
 		r.Empty(fake.setDeferStatusHashed)
+	})
+
+	t.Run("unknown-target abort is benign", func(t *testing.T) {
+		r := require.New(t)
+		fake := &fakeRunService{
+			setDeferStatusErr: fmt.Errorf("%w for hashedID %q", state.ErrDeferNotFound, "never-added"),
+		}
+		err := AbortFromOp(context.Background(), fake, nil, logger.VoidLogger(), runMetadata(),
+			abortOp(t, state.DeferAbortOpts{TargetHashedID: "never-added"}))
+
+		r.NoError(err)
+		r.Equal("never-added", fake.setDeferStatusHashed)
+	})
+
+	t.Run("surfaces infra error from SetDeferStatus", func(t *testing.T) {
+		r := require.New(t)
+		fake := &fakeRunService{
+			setDeferStatusErr: fmt.Errorf("redis unavailable"),
+		}
+		err := AbortFromOp(context.Background(), fake, nil, logger.VoidLogger(), runMetadata(),
+			abortOp(t, state.DeferAbortOpts{TargetHashedID: "some-defer"}))
+
+		r.Error(err)
 	})
 }

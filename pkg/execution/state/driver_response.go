@@ -299,7 +299,7 @@ func (r *DriverResponse) UpdateOpcodeError(op *GeneratorOpcode, err UserError) {
 // return false if it's a step result.
 func (r *DriverResponse) IsFunctionResult() bool {
 	for _, op := range r.Generator {
-		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete {
+		if op.Op == enums.OpcodeRunComplete || op.Op == enums.OpcodeSyncRunComplete || op.Op == enums.OpcodeRunError {
 			// Always a result...
 			return true
 		}
@@ -377,6 +377,13 @@ func (r *DriverResponse) GetTraceFunctionOutput() (string, error) {
 			// us from unmarshalling and remarshalling.
 			data := fmt.Sprintf(`{"data":%s}`, op.Data)
 			return data, nil
+		}
+		if op.Op == enums.OpcodeRunError {
+			errByt, err := json.Marshal(op.Error)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf(`{"error":%s}`, errByt), nil
 		}
 	}
 

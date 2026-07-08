@@ -985,7 +985,7 @@ func (m shardedMgr) SetDeferStatus(ctx context.Context, accountId uuid.UUID, fnI
 		return fmt.Errorf("error setting defer status: %w", err)
 	}
 	if result == 0 {
-		return fmt.Errorf("defer not found for hashedID %q", hashedID)
+		return fmt.Errorf("%w for hashedID %q", state.ErrDeferNotFound, hashedID)
 	}
 	return nil
 }

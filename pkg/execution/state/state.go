@@ -31,6 +31,7 @@ var (
 	ErrInvokePauseNotFound = fmt.Errorf("invoke pause not found")
 	ErrPauseNotInBuffer    = fmt.Errorf("pause not in buffer")
 	ErrRunNotFound         = fmt.Errorf("run not found in state store")
+	ErrDeferNotFound       = fmt.Errorf("defer not found")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
 	ErrPauseLeased         = fmt.Errorf("pause already leased")

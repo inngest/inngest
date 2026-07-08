@@ -334,6 +334,11 @@ func (l traceLifecycle) OnFunctionFinished(
 
 	switch resp.StatusCode {
 	case 200, 206:
+		if resp.Err != nil {
+			span.SetStatus(codes.Error, resp.Error())
+			span.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusFailed.ToCode()))
+			break
+		}
 		span.SetStatus(codes.Ok, "success")
 		span.SetAttributes(attribute.Int64(consts.OtelSysFunctionStatusCode, enums.RunStatusCompleted.ToCode()))
 	default: // everything else are errors

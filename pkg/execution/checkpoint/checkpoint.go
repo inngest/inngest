@@ -422,6 +422,13 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				)
 			}
 
+		case enums.OpcodeRunError:
+			// OpcodeRunError is async request/response mode only and must never
+			// arrive via a checkpoint; reject it here as checkpointAsyncSteps does,
+			// rather than letting it fall through the sync->async default.
+			l.Error("cannot checkpoint opcode", "op", op.Op)
+			return fmt.Errorf("cannot checkpoint opcode: %s", op.Op)
+
 		default:
 			// This is an async opcode (sleep, waitForEvent, invoke, etc.) that causes
 			// the run to transition from sync to async mode. Track this on the run span

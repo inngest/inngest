@@ -272,8 +272,9 @@ func publicRunOutput(raw []byte) json.RawMessage {
 	}
 
 	var opcodes []struct {
-		Op   string          `json:"op"`
-		Data json.RawMessage `json:"data"`
+		Op    string          `json:"op"`
+		Data  json.RawMessage `json:"data"`
+		Error json.RawMessage `json:"error"`
 	}
 	if err := json.Unmarshal(output, &opcodes); err != nil {
 		return util.EnsureJSON(output)
@@ -282,6 +283,13 @@ func publicRunOutput(raw []byte) json.RawMessage {
 	for i := len(opcodes) - 1; i >= 0; i-- {
 		if opcodes[i].Op == enums.OpcodeRunComplete.String() || opcodes[i].Op == enums.OpcodeSyncRunComplete.String() {
 			return util.EnsureJSON(opcodes[i].Data)
+		}
+		if opcodes[i].Op == enums.OpcodeRunError.String() {
+			wrapped, err := json.Marshal(map[string]json.RawMessage{execution.StateErrorKey: opcodes[i].Error})
+			if err != nil {
+				return util.EnsureJSON(output)
+			}
+			return util.EnsureJSON(wrapped)
 		}
 	}
 
