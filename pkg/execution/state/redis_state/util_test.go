@@ -44,7 +44,7 @@ func alwaysSelectShard(shard osqueue.QueueShard) func(ctx context.Context, scope
 }
 
 type queueImpl interface {
-	osqueue.QueueManager
+	osqueue.Queue
 	osqueue.QueueProcessor
 }
 

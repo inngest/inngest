@@ -81,6 +81,10 @@ func (m *mockQueueProcessor) ProcessPartition(ctx context.Context, p *QueueParti
 	return nil
 }
 
+func (m *mockQueueProcessor) Run(ctx context.Context, f RunFunc) error {
+	return nil
+}
+
 // mockShardForIterator implements the minimal QueueShard interface methods used by ProcessorIterator
 type mockShardForIterator struct {
 	name                    string

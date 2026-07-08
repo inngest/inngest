@@ -54,14 +54,6 @@ type PartitionLeaseOptions struct{}
 
 type PartitionLeaseOpt func(o *PartitionLeaseOptions)
 
-type QueueManager interface {
-	Queue
-
-	Dequeue(ctx context.Context, queueShard QueueShard, i QueueItem, opts ...DequeueOptionFn) error
-	Requeue(ctx context.Context, queueShard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
-	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
-}
-
 type KeyQueueProcessor interface {
 	ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error
 	ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error
@@ -93,6 +85,17 @@ type KeyQueueProcessor interface {
 
 type QueueProcessor interface {
 	KeyQueueProcessor
+
+	// Run is a blocking function which listens to the queue and executes the
+	// given function each time a new Item becomes available.
+	//
+	// If the error from RunFunc is of type QuitError, the Run function will
+	// always requeue the job as a retry and terminate.
+	//
+	// If the error from RunFunc is of type RetryableError, the job will be
+	// re-enqueued if Retryable() returns true. For all other errors, the
+	// job will automatically be retried.
+	Run(context.Context, RunFunc) error
 
 	Shard() QueueShard
 	Clock() clockwork.Clock

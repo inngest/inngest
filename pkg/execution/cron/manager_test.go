@@ -675,6 +675,14 @@ func (p *captureProducer) Enqueue(_ context.Context, item queue.Item, at time.Ti
 	return nil
 }
 
+func (p *captureProducer) Requeue(context.Context, string, queue.QueueItem, time.Time, ...queue.RequeueOptionFn) error {
+	return nil
+}
+
+func (p *captureProducer) RequeueByJobID(context.Context, string, string, time.Time) error {
+	return nil
+}
+
 func TestScheduleNextQueueName(t *testing.T) {
 	ctx := context.Background()
 	accountID := uuid.New()

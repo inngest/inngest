@@ -201,47 +201,52 @@ func (q *queueProcessor) Workers() chan ProcessItem {
 	return q.workers
 }
 
-// BacklogSize implements QueueManager.
+// BacklogSize implements JobQueueReader.
 func (q *queueProcessor) BacklogSize(ctx context.Context, shard QueueShard, backlogID string) (int64, error) {
 	return shard.BacklogSize(ctx, backlogID)
 }
 
-// BacklogByID implements QueueManager.
+// BacklogByID implements JobQueueReader.
 func (q *queueProcessor) BacklogByID(ctx context.Context, shard QueueShard, backlogID string) (*QueueBacklog, error) {
 	return shard.BacklogByID(ctx, backlogID)
 }
 
-// BacklogsByPartition implements QueueManager.
+// BacklogsByPartition implements JobQueueReader.
 func (q *queueProcessor) BacklogsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
 	return shard.BacklogsByPartition(ctx, partitionID, from, until, opts...)
 }
 
-// Dequeue implements QueueManager.
-func (q *queueProcessor) Dequeue(ctx context.Context, shard QueueShard, i QueueItem, opts ...DequeueOptionFn) error {
+// Dequeue implements Consumer.
+func (q *queueProcessor) Dequeue(ctx context.Context, shardName string, i QueueItem, opts ...DequeueOptionFn) error {
+	shard, err := q.shards.ByName(shardName)
+	if err != nil {
+		return err
+	}
+
 	return shard.Dequeue(ctx, i, opts...)
 }
 
-// ItemExists implements QueueManager.
+// ItemExists implements JobQueueReader.
 func (q *queueProcessor) ItemExists(ctx context.Context, shard QueueShard, scope Scope, jobID string) (bool, error) {
 	return shard.ItemExists(ctx, scope, jobID)
 }
 
-// ItemsByBacklog implements QueueManager.
+// ItemsByBacklog implements JobQueueReader.
 func (q *queueProcessor) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
 	return shard.ItemsByBacklog(ctx, backlogID, from, until, opts...)
 }
 
-// ItemsByPartition implements QueueManager.
+// ItemsByPartition implements JobQueueReader.
 func (q *queueProcessor) ItemsByPartition(ctx context.Context, shard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
 	return shard.ItemsByPartition(ctx, scope, partitionID, from, until, opts...)
 }
 
-// ItemsByRunID implements QueueManager.
+// ItemsByRunID implements JobQueueReader.
 func (q *queueProcessor) ItemsByRunID(ctx context.Context, shard QueueShard, scope Scope, runID ulid.ULID) ([]*QueueItem, error) {
 	return shard.ItemsByRunID(ctx, scope, runID)
 }
 
-// LoadQueueItem implements QueueManager.
+// LoadQueueItem implements JobQueueReader.
 func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error) {
 	shard, err := q.shards.ByName(shardName)
 	if err != nil {
@@ -285,12 +290,12 @@ func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, scope Scope, 
 	return totalCount, nil
 }
 
-// PartitionByID implements QueueManager.
+// PartitionByID implements JobQueueReader.
 func (q *queueProcessor) PartitionByID(ctx context.Context, shard QueueShard, scope Scope, partitionID string) (*PartitionInspectionResult, error) {
 	return shard.PartitionByID(ctx, scope, partitionID)
 }
 
-// RemoveQueueItem implements QueueManager.
+// RemoveQueueItem implements JobQueueReader.
 func (q *queueProcessor) RemoveQueueItem(ctx context.Context, shardName string, scope Scope, partitionID string, itemID string) error {
 	shard, err := q.shards.ByName(shardName)
 	if err != nil {
@@ -300,17 +305,17 @@ func (q *queueProcessor) RemoveQueueItem(ctx context.Context, shardName string, 
 	return shard.RemoveQueueItem(ctx, scope, partitionID, itemID)
 }
 
-// Requeue implements QueueManager.
-func (q *queueProcessor) Requeue(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
-	return shard.Requeue(ctx, i, at, opts...)
+// Requeue implements Producer.
+func (q *queueProcessor) Requeue(ctx context.Context, shardName string, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
+	return q.queueProducer.Requeue(ctx, shardName, i, at, opts...)
 }
 
-// RequeueByJobID implements QueueManager.
-func (q *queueProcessor) RequeueByJobID(ctx context.Context, shard QueueShard, jobID string, at time.Time) error {
-	return shard.RequeueByJobID(ctx, jobID, at)
+// RequeueByJobID implements Producer.
+func (q *queueProcessor) RequeueByJobID(ctx context.Context, shardName string, jobID string, at time.Time) error {
+	return q.queueProducer.RequeueByJobID(ctx, shardName, jobID, at)
 }
 
-// Enqueue implements QueueManager.
+// Enqueue implements Producer.
 func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
 	return q.queueProducer.Enqueue(ctx, item, at, opts)
 }
