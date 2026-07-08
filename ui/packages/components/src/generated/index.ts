@@ -48,7 +48,7 @@ export interface AIMetadata {
   operation_name: string;
   /**
    * Response identity. ResponseModel is the model that served the request (may
-   * differ from the requested Model, e.g. a dated snapshot). FinishReasons is
+   * differ from the RequestModel, e.g. a dated snapshot). FinishReasons is
    * stored raw per emitter — note OpenAI's native "tool_calls" is emitted as
    * the singular "tool_call" by some instrumentations.
    */
