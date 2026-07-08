@@ -8,9 +8,9 @@ set -euo pipefail
 
 name="$1"
 url="$2"
-tries="${3:-10}"
+max_seconds="${3:-10}"
 
-for i in $(seq 1 "$tries"); do
+for i in $(seq 1 "$max_seconds"); do
   if curl -fsS "$url" >/dev/null 2>&1; then
     echo "$name is ready (after ${i}s): $url"
     exit 0
@@ -18,5 +18,5 @@ for i in $(seq 1 "$tries"); do
   sleep 1
 done
 
-echo "ERROR: $name failed to become healthy after ${tries}s: $url" >&2
+echo "ERROR: $name failed to become healthy after ${max_seconds}s: $url" >&2
 exit 1
