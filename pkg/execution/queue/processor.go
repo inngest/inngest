@@ -315,11 +315,6 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 	return q.queueProducer.Enqueue(ctx, item, at, opts)
 }
 
-// TotalSystemQueueDepth implements QueueManager.
-func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context, shard QueueShard) (int64, error) {
-	return shard.TotalSystemQueueDepth(ctx)
-}
-
 // OutstandingJobCount implements Queue.
 func (q *queueProcessor) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
 	var totalCount int64
