@@ -49,7 +49,11 @@ jobs:
         with:
           node-version: "20"
           cache: pnpm
-          cache-dependency-path: tests/js/pnpm-lock.yaml
+          # Key on both lockfiles this job installs: the UI build (the largest
+          # install, via make build-ui) and the tests/js E2E deps.
+          cache-dependency-path: |
+            ui/pnpm-lock.yaml
+            tests/js/pnpm-lock.yaml
 
       - name: Build UI
         run: make build-ui
