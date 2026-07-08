@@ -26,7 +26,6 @@ export const getNavRoute = (activeEnv: EnvType, link: string) =>
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   const experimentsEnabled = useBooleanFlag('experimentation-steps');
   const scoresEnabled = useBooleanFlag('scoring-dashboard');
-  const sessionsEnabled = useBooleanFlag('sessions-ui');
 
   const aiItems: NavItemConfig[] = [];
   if (experimentsEnabled.value) {
@@ -35,9 +34,7 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
   if (scoresEnabled.value) {
     aiItems.push(scoresItem);
   }
-  if (sessionsEnabled.value) {
-    aiItems.push(sessionsItem);
-  }
+  aiItems.push(sessionsItem);
 
   const ai: NavGroupConfig = {
     heading: 'AI',
