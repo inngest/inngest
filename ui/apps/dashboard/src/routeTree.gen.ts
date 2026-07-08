@@ -15,6 +15,7 @@ import { Route as SupportIndexRouteImport } from './routes/support/index'
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support-tickets'
 import { Route as ApiSentryRouteImport } from './routes/api/sentry'
 import { Route as ApiInngestRouteImport } from './routes/api/inngest'
+import { Route as ApiFeedbackRouteImport } from './routes/api/feedback'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
 import { Route as ApiChatValidateRouteImport } from './routes/api/chat-validate'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -135,6 +136,11 @@ const ApiSentryRoute = ApiSentryRouteImport.update({
 const ApiInngestRoute = ApiInngestRouteImport.update({
   id: '/api/inngest',
   path: '/api/inngest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFeedbackRoute = ApiFeedbackRouteImport.update({
+  id: '/api/feedback',
+  path: '/api/feedback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiCspReportRoute = ApiCspReportRouteImport.update({
@@ -682,6 +688,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
@@ -780,6 +787,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
@@ -869,6 +877,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
@@ -970,6 +979,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
@@ -1068,6 +1078,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
@@ -1156,6 +1167,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
@@ -1254,6 +1266,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiChatValidateRoute: typeof ApiChatValidateRoute
   ApiCspReportRoute: typeof ApiCspReportRoute
+  ApiFeedbackRoute: typeof ApiFeedbackRoute
   ApiInngestRoute: typeof ApiInngestRoute
   ApiSentryRoute: typeof ApiSentryRoute
   ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute
@@ -1307,6 +1320,13 @@ declare module '@tanstack/react-router' {
       path: '/api/inngest'
       fullPath: '/api/inngest'
       preLoaderRoute: typeof ApiInngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/feedback': {
+      id: '/api/feedback'
+      path: '/api/feedback'
+      fullPath: '/api/feedback'
+      preLoaderRoute: typeof ApiFeedbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/csp-report': {
@@ -2364,6 +2384,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiChatValidateRoute: ApiChatValidateRoute,
   ApiCspReportRoute: ApiCspReportRoute,
+  ApiFeedbackRoute: ApiFeedbackRoute,
   ApiInngestRoute: ApiInngestRoute,
   ApiSentryRoute: ApiSentryRoute,
   ApiSupportTicketsRoute: ApiSupportTicketsRoute,
