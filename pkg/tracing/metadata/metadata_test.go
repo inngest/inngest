@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -86,9 +87,10 @@ func TestUpdateValidateAllowedNamedScoreValue(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		update  Update
-		wantErr error
+		name       string
+		update     Update
+		wantErr    error
+		wantErrMsg string
 	}{
 		{
 			name: "single finite numeric score is valid",
@@ -140,7 +142,18 @@ func TestUpdateValidateAllowedNamedScoreValue(t *testing.T) {
 				Op:     enums.MetadataOpcodeMerge,
 				Values: Values{"name'with'quotes": json.RawMessage(`{"value":0.5}`)},
 			}},
-			wantErr: ErrScoreNameInvalid,
+			wantErr:    ErrScoreNameInvalid,
+			wantErrMsg: "contains invalid characters",
+		},
+		{
+			name: "score name over byte limit is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{strings.Repeat("a", MaxScoreNameByteLength+1): json.RawMessage(`{"value":0.5}`)},
+			}},
+			wantErr:    ErrScoreNameTooLong,
+			wantErrMsg: "score name exceeds maximum length",
 		},
 		{
 			name: "extra keys alongside value are rejected",
@@ -213,6 +226,9 @@ func TestUpdateValidateAllowedNamedScoreValue(t *testing.T) {
 			err := tt.update.ValidateAllowed()
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
+				if tt.wantErrMsg != "" {
+					require.ErrorContains(t, err, tt.wantErrMsg)
+				}
 				return
 			}
 

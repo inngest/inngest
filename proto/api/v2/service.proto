@@ -2564,15 +2564,15 @@ message CreateScoreInput {
   ];
   optional ScoreExperiment experiment = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional experiment context. When provided, the score is recorded with the same experiment metadata emitted by the SDK's score.experiment API. Experiment scores should be run-scoped for experiment aggregate and detail APIs."
+      description: "Optional experiment context. When provided, the score is recorded with the same experiment metadata emitted by the SDK's score.experiment API. Experiment scores must be run-scoped for experiment aggregate and detail APIs."
     }
   ];
 }
 
 message ScoreExperiment {
-  string experiment_name = 1 [
+  string id = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Experiment name"
+      description: "Experiment ID"
       example: "\"model-routing\""
     }
   ];

@@ -36,9 +36,10 @@ func (r metadataTraceReader) GetLatestExecutionSpanByStepID(context.Context, uli
 }
 
 type metadataTracerProvider struct {
-	t      *testing.T
-	wantID statev2.ID
-	called bool
+	t       *testing.T
+	wantID  statev2.ID
+	called  bool
+	updated []*tracing.UpdateSpanOptions
 }
 
 type metadataStateLoader struct {
@@ -70,8 +71,9 @@ func (p *metadataTracerProvider) CreateDroppableSpan(context.Context, string, *t
 	return nil, errors.New("unexpected CreateDroppableSpan call")
 }
 
-func (p *metadataTracerProvider) UpdateSpan(context.Context, *tracing.UpdateSpanOptions) error {
-	return errors.New("unexpected UpdateSpan call")
+func (p *metadataTracerProvider) UpdateSpan(_ context.Context, opts *tracing.UpdateSpanOptions) error {
+	p.updated = append(p.updated, opts)
+	return nil
 }
 
 // newRunID returns a ULID with the current time (new path).
@@ -123,6 +125,8 @@ func TestAddRunMetadataNewPathUsesStateForTenantIDs(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, tp.called)
+	require.Len(t, tp.updated, 1)
+	require.NotNil(t, tp.updated[0].TargetSpan)
 }
 
 // TestAddRunMetadataNewPathFallbackToPartialIDWhenStateMissing verifies that
@@ -159,6 +163,8 @@ func TestAddRunMetadataNewPathFallbackToPartialIDWhenStateMissing(t *testing.T) 
 	})
 	require.NoError(t, err)
 	require.True(t, tp.called)
+	require.Len(t, tp.updated, 1)
+	require.NotNil(t, tp.updated[0].TargetSpan)
 }
 
 func TestAddRunMetadataReturnsTransientStateLoadError(t *testing.T) {

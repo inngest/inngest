@@ -100,9 +100,8 @@ func (p *stateScoreProvider) CreateScores(ctx context.Context, params CreateScor
 	}
 
 	for _, score := range params.Scores {
-		updates, err := scoreMetadataUpdates(score)
-		if err != nil {
-			return err
+		if len(score.Metadata) == 0 {
+			return errors.New("score metadata is required")
 		}
 		err = apiv1.AddRunMetadata(ctx, apiv1.AddRunMetadataOpts{
 			State:          p.metadataState(),
@@ -112,7 +111,7 @@ func (p *stateScoreProvider) CreateScores(ctx context.Context, params CreateScor
 			Target: apiv1.RunMetadataTarget{
 				StepID: score.StepID,
 			},
-			Metadata: updates,
+			Metadata: score.Metadata,
 		})
 		switch {
 		case errors.Is(err, statev2.ErrRunNotFound), errors.Is(err, statev2.ErrMetadataNotFound):
@@ -123,24 +122,6 @@ func (p *stateScoreProvider) CreateScores(ctx context.Context, params CreateScor
 	}
 
 	return nil
-}
-
-func scoreMetadataUpdates(score ScoreInput) ([]metadata.Update, error) {
-	updates := make([]metadata.Update, 0, 2)
-	if score.Experiment != nil {
-		update, err := ScoreExperimentMetadataUpdate(*score.Experiment)
-		if err != nil {
-			return nil, err
-		}
-		updates = append(updates, update)
-	}
-
-	update, err := ScoreMetadataUpdate(score.Name, score.Value)
-	if err != nil {
-		return nil, err
-	}
-	updates = append(updates, update)
-	return updates, nil
 }
 
 func (p *stateScoreProvider) metadataState() statev2.RunService {
@@ -241,9 +222,12 @@ func (p *stateScoreProvider) validateStepTargets(ctx context.Context, id statev2
 func scoreStepExistsInState(md *statev2.Metadata, stepID string) bool {
 	traceStepID := scoreTraceStepID(stepID)
 	for _, candidate := range md.Stack {
-		// Older callers may send raw SDK step IDs, while finalized state stores
-		// step spans under their trace IDs.
-		if candidate == stepID || candidate == traceStepID {
+		// live run state contains raw sdk step ids while finalized trace lookup
+		// stores step spans under hashed trace step ids.
+		if candidate == stepID && !isSHA1Hex(stepID) {
+			return true
+		}
+		if candidate == traceStepID {
 			return true
 		}
 	}
@@ -253,6 +237,14 @@ func scoreStepExistsInState(md *statev2.Metadata, stepID string) bool {
 func scoreTraceStepID(stepID string) string {
 	sum := sha1.Sum([]byte(stepID))
 	return hex.EncodeToString(sum[:])
+}
+
+func isSHA1Hex(value string) bool {
+	if len(value) != sha1.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }
 
 // ScoreMetadataUpdate builds and validates the metadata update for a named

@@ -5476,11 +5476,11 @@ func (x *CreateScoreInput) GetExperiment() *ScoreExperiment {
 }
 
 type ScoreExperiment struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ExperimentName string                 `protobuf:"bytes,1,opt,name=experiment_name,json=experimentName,proto3" json:"experiment_name,omitempty"`
-	Variant        string                 `protobuf:"bytes,2,opt,name=variant,proto3" json:"variant,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Variant       string                 `protobuf:"bytes,2,opt,name=variant,proto3" json:"variant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ScoreExperiment) Reset() {
@@ -5513,9 +5513,9 @@ func (*ScoreExperiment) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{79}
 }
 
-func (x *ScoreExperiment) GetExperimentName() string {
+func (x *ScoreExperiment) GetId() string {
 	if x != nil {
-		return x.ExperimentName
+		return x.Id
 	}
 	return ""
 }
@@ -8508,20 +8508,20 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x06_error\"\xfd\x02\n" +
 	"\x12CreateScoreRequest\x12d\n" +
 	"\x06run_id\x18\x01 \x01(\tBM\x92AJ2*Run ID (ULID) of the function run to scoreJ\x1c\"01JLW1NNJ69KCD1KMJEXAMPLE0\"R\x05runId\x12\x80\x02\n" +
-	"\x06scores\x18\x02 \x03(\v2\x18.api.v2.CreateScoreInputB\xcd\x01\x92A\xc9\x012\xc6\x01Scores to record for the run. The REST request body is this array. Writes are applied in order and are not atomic; if a later score fails, earlier scores may already be recorded. Maximum 100 scores.R\x06scores\"\x9b\x05\n" +
+	"\x06scores\x18\x02 \x03(\v2\x18.api.v2.CreateScoreInputB\xcd\x01\x92A\xc9\x012\xc6\x01Scores to record for the run. The REST request body is this array. Writes are applied in order and are not atomic; if a later score fails, earlier scores may already be recorded. Maximum 100 scores.R\x06scores\"\x99\x05\n" +
 	"\x10CreateScoreInput\x12P\n" +
 	"\x04name\x18\x01 \x01(\tB<\x92A92+Score name; must be at most 128 UTF-8 bytesJ\n" +
 	"\"accuracy\"R\x04name\x12j\n" +
 	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueB<\x92A921Score value; must be a finite number or a booleanJ\x040.95R\x05value\x12\x85\x01\n" +
-	"\astep_id\x18\x03 \x01(\tBg\x92Ad2NOptional SDK step ID; attaches the score to a specific step instead of the runJ\x12\"generate-summary\"H\x00R\x06stepId\x88\x01\x01\x12\xa5\x02\n" +
+	"\astep_id\x18\x03 \x01(\tBg\x92Ad2NOptional SDK step ID; attaches the score to a specific step instead of the runJ\x12\"generate-summary\"H\x00R\x06stepId\x88\x01\x01\x12\xa3\x02\n" +
 	"\n" +
-	"experiment\x18\x04 \x01(\v2\x17.api.v2.ScoreExperimentB\xe6\x01\x92A\xe2\x012\xdf\x01Optional experiment context. When provided, the score is recorded with the same experiment metadata emitted by the SDK's score.experiment API. Experiment scores should be run-scoped for experiment aggregate and detail APIs.H\x01R\n" +
+	"experiment\x18\x04 \x01(\v2\x17.api.v2.ScoreExperimentB\xe4\x01\x92A\xe0\x012\xdd\x01Optional experiment context. When provided, the score is recorded with the same experiment metadata emitted by the SDK's score.experiment API. Experiment scores must be run-scoped for experiment aggregate and detail APIs.H\x01R\n" +
 	"experiment\x88\x01\x01B\n" +
 	"\n" +
 	"\b_step_idB\r\n" +
-	"\v_experiment\"\xa0\x01\n" +
-	"\x0fScoreExperiment\x12N\n" +
-	"\x0fexperiment_name\x18\x01 \x01(\tB%\x92A\"2\x0fExperiment nameJ\x0f\"model-routing\"R\x0eexperimentName\x12=\n" +
+	"\v_experiment\"\x85\x01\n" +
+	"\x0fScoreExperiment\x123\n" +
+	"\x02id\x18\x01 \x01(\tB#\x92A 2\rExperiment IDJ\x0f\"model-routing\"R\x02id\x12=\n" +
 	"\avariant\x18\x02 \x01(\tB#\x92A 2\x12Experiment variantJ\n" +
 	"\"baseline\"R\avariant\"n\n" +
 	"\x13CreateScoreResponse\x12!\n" +
