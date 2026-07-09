@@ -39,9 +39,6 @@ local function debug(...)
 		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
-local function operationIdempotencyResponse(encoded)
-	return { 1, encoded }
-end
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
 	if count == nil then
@@ -199,7 +196,7 @@ local results = call("MGET", keyOperationIdempotency, keyRequestState)
 local opIdempotency = results[1]
 local existingRequestState = results[2]
 if opIdempotency ~= nil and opIdempotency ~= false then
-	return operationIdempotencyResponse(opIdempotency)
+	return { 1, opIdempotency }
 end
 if existingRequestState ~= nil and existingRequestState ~= false and existingRequestState ~= "" then
 	local res = {}

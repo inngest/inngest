@@ -90,10 +90,6 @@ local function debug(...)
 	end
 end
 
-local function operationIdempotencyResponse(encoded)
-	return { 1, encoded }
-end
-
 ---@param key string
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
@@ -118,7 +114,7 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 
 	-- Return idempotency state to user (same as initial response)
-	return operationIdempotencyResponse(opIdempotency)
+	return { 1, opIdempotency }
 end
 
 -- Check if lease already expired

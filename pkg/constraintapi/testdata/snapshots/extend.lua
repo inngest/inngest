@@ -70,9 +70,6 @@ local function debug(...)
 		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
-local function operationIdempotencyResponse(encoded)
-	return { 1, encoded }
-end
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
 	if count == nil then
@@ -91,7 +88,7 @@ end
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
-	return operationIdempotencyResponse(opIdempotency)
+	return { 1, opIdempotency }
 end
 if decode_ulid_time(currentLeaseID) < nowMS then
 	local res = {}

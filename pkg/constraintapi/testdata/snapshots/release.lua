@@ -23,9 +23,6 @@ local function debug(...)
 		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
-local function operationIdempotencyResponse(encoded)
-	return { 1, encoded }
-end
 local function toInteger(value)
 	return math.floor(value + 0.5) 
 end
@@ -47,7 +44,7 @@ end
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
-	return operationIdempotencyResponse(opIdempotency)
+	return { 1, opIdempotency }
 end
 local requestID = call("HGET", keyLeaseDetails, "req")
 if requestID == false or requestID == nil or requestID == "" then

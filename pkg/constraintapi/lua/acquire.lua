@@ -68,10 +68,6 @@ local function debug(...)
 	end
 end
 
-local function operationIdempotencyResponse(encoded)
-	return { 1, encoded }
-end
-
 ---@param key string
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
@@ -117,7 +113,7 @@ local existingRequestState = results[2]
 
 if opIdempotency ~= nil and opIdempotency ~= false then
 	-- Return idempotency state to user (same as initial response)
-	return operationIdempotencyResponse(opIdempotency)
+	return { 1, opIdempotency }
 end
 
 -- If the same request state is still in progress (active leases), we cannot acquire more leases for the same request

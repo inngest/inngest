@@ -37,10 +37,6 @@ local function debug(...)
 	end
 end
 
-local function operationIdempotencyResponse(encoded)
-	return { 1, encoded }
-end
-
 --- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
 ---@param value number
 ---@return integer
@@ -72,7 +68,7 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 
 	-- Return idempotency state to user (same as initial response)
-	return operationIdempotencyResponse(opIdempotency)
+	return { 1, opIdempotency }
 end
 
 -- Release is idempotent by lease ID. If another caller (e.g. the lease
