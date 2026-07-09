@@ -209,6 +209,7 @@ local limitingConstraints = {}
 local exhaustedConstraints = {}
 local exhaustedSet = {}
 local retryAt = 0
+local concurrencyUsageCache = {}
 local constraintUsage = {}
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 local cacheEnabled = cacheMaxTTL > 0
@@ -271,6 +272,7 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
 		addConstraintUsage(constraintUsage, index, value.c.l, inProgressLeases)
+		concurrencyUsageCache[index] = inProgressLeases
 	elseif value.k == 3 then
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
@@ -355,7 +357,7 @@ for i, value in ipairs(constraints) do
 			updates[(j - 1) * 2 + 2] = initialLeaseID
 		end
 		call("ZADD", value.c.ilk, unpack(updates))
-		local inProgressLeases = getConcurrencyCount(value.c.ilk)
+		local inProgressLeases = (concurrencyUsageCache[i] or 0) + granted
 		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
 		addConstraintUsage(constraintUsage, i, value.c.l, inProgressLeases)

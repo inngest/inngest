@@ -155,6 +155,12 @@ local exhaustedSet = {}
 -- that have been exhausted.
 local retryAt = 0
 
+-- Cache concurrency usage from the first pass to avoid redundant ZCOUNT in the
+-- update pass. Redis Lua is atomic, and Acquire uses freshly generated lease IDs,
+-- so post-ZADD usage is the first-pass usage plus the granted amount.
+---@type table<integer, integer>
+local concurrencyUsageCache = {}
+
 ---@type { i: integer, l: integer, u: integer }[]
 local constraintUsage = {}
 
@@ -235,6 +241,7 @@ for index, value in ipairs(constraints) do
 		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
 		addConstraintUsage(constraintUsage, index, value.c.l, inProgressLeases)
+		concurrencyUsageCache[index] = inProgressLeases
 	elseif value.k == 3 then
 		-- throttle
 		-- allow consuming all capacity in one request (for generating multiple leases)
@@ -358,7 +365,7 @@ for i, value in ipairs(constraints) do
 		-- batch-update concurrency
 		call("ZADD", value.c.ilk, unpack(updates))
 
-		local inProgressLeases = getConcurrencyCount(value.c.ilk)
+		local inProgressLeases = (concurrencyUsageCache[i] or 0) + granted
 		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
 		addConstraintUsage(constraintUsage, i, value.c.l, inProgressLeases)
