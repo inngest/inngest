@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -34,7 +33,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -62,28 +60,6 @@ func (f *fakeLifecycle) OnFunctionScheduled(
 	evt []event.TrackedEvent,
 ) {
 	f.work <- &hookData{runID: md.ID.RunID}
-}
-
-func createInmemoryRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, error) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// If tick is lower than the default, tick every 50ms.  This lets us save
-	// CPU for standard dev-server testing.
-	poll := 150 * time.Millisecond
-
-	go func() {
-		for range time.Tick(poll) {
-			r.FastForward(poll)
-		}
-	}()
-	return r, rc, nil
 }
 
 type fakeQueue struct {
@@ -698,28 +674,6 @@ func TestFinalize(t *testing.T) {
 		err = rq.Requeue(ctx, queueShard.Name(), item2, time.Now())
 		require.ErrorIs(t, err, queue.ErrQueueItemNotFound)
 	})
-}
-
-// mockDriverV1 implements driver.DriverV1 for testing
-type mockDriverV1 struct {
-	response *state.DriverResponse
-	err      error
-	t        *testing.T
-}
-
-func (m *mockDriverV1) Name() string { return "http" }
-
-func (m *mockDriverV1) Execute(
-	ctx context.Context,
-	sl statev2.StateLoader,
-	md statev2.Metadata,
-	item queue.Item,
-	edge inngest.Edge,
-	step inngest.Step,
-	stackIndex int,
-	attempt int,
-) (*state.DriverResponse, error) {
-	return m.response, m.err
 }
 
 // This tests a scenario where a run used to hang when retrying an invoke and the invoke's pause was already created.
