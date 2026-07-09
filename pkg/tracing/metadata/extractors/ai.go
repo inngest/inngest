@@ -39,6 +39,22 @@ type AIMetadata struct {
 	LatencyMs     *int64   `json:"latency_ms,omitempty"`
 	TotalTokens   *int64   `json:"total_tokens,omitempty"`
 	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
+
+	// Granular token usage. Cache semantics differ by provider: OpenAI reports
+	// cached tokens as a subset of InputTokens, whereas Anthropic reports them
+	// additively — values are stored raw and left unreconciled.
+	CacheReadTokens     *int64 `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens *int64 `json:"cache_creation_tokens,omitempty"`
+	ReasoningTokens     *int64 `json:"reasoning_tokens,omitempty"`
+
+	// Request parameters. Pointers so an explicit zero (e.g. temperature 0 or
+	// seed 0) is distinguishable from an absent attribute.
+	Temperature      *float64 `json:"temperature,omitempty"`
+	TopP             *float64 `json:"top_p,omitempty"`
+	MaxTokens        *int64   `json:"max_tokens,omitempty"`
+	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
+	PresencePenalty  *float64 `json:"presence_penalty,omitempty"`
+	Seed             *int64   `json:"seed,omitempty"`
 }
 
 func (ms AIMetadata) Kind() metadata.Kind {
