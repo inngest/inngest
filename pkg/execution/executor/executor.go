@@ -1802,12 +1802,15 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// This also marks the sleep item as completed.
 	isSleepResume := item.Kind == queue.KindSleep && item.Attempt == 0
 	if isSleepResume {
+		// New sleep items don't store span refs; reconstruct deterministically and rehydrate
+		// item.Metadata so downstream reads find them.
+		target := tracing.SleepStepSpanRefResolve(&item, id.RunID)
 		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    e.now(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.SleepResume"},
 			QueueItem:  &item,
 			Status:     enums.StepStatusCompleted,
-			TargetSpan: tracing.SpanRefFromQueueItem(&item),
+			TargetSpan: target,
 		})
 		if err != nil {
 			l.Debug("error updating sleep resume span", "error", err)
@@ -4425,7 +4428,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 		Attempt:               0,
 		MaxAttempts:           runCtx.MaxAttempts(),
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-		Metadata:              make(map[string]any),
 		ParallelMode:          gen.ParallelMode(),
 	}
 
@@ -4437,17 +4439,19 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 
 	// Create a new span that we'll use to record the sleep as complete.
 	// This is going to be attached to the same parent (the discovery step that started this sleep).
+	sleepStepSpanID := tracing.DeterministicSpanConfig(tracing.SleepStepDynamicSeed(gen.ID)).SpanID
+	discoverySpanID := tracing.DeterministicSpanConfig(tracing.SleepDiscoveryDynamicSeed(gen.ID)).SpanID
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
-			Carriers:    []map[string]any{nextItem.Metadata},
-			FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
-			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorSleep"},
-			Metadata:    metadata,
-			QueueItem:   &nextItem,
-			Parent:      runCtx.RootSpan(),
-			Attributes:  attrs,
+			FollowsFrom:           tracing.SpanRefFromQueueItem(&lifecycleItem),
+			Debug:                 &tracing.SpanDebugData{Location: "executor.handleGeneratorSleep"},
+			Metadata:              metadata,
+			QueueItem:             &nextItem,
+			Parent:                runCtx.RootSpan(),
+			Attributes:            attrs,
+			DynamicSpanIDOverride: sleepStepSpanID.String(),
 		},
 	)
 	if err != nil {
@@ -4461,7 +4465,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	// Doing that here allows us to make this deterministic.  In the future, if we had deterministic
 	// span IDs we could remove this.
 	{
-		discoveryRef, err := e.tracerProvider.CreateSpan(
+		_, err := e.tracerProvider.CreateSpan(
 			ctx,
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -4469,17 +4473,15 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 				Metadata:    metadata,
 				FollowsFrom: tracing.SpanRefFromQueueItem(&lifecycleItem),
 				// Always from the root span.
-				Parent:    tracing.RunSpanRefFromMetadata(metadata),
-				QueueItem: &nextItem,
-				StartTime: until,
+				Parent:                tracing.RunSpanRefFromMetadata(metadata),
+				QueueItem:             &nextItem,
+				StartTime:             until,
+				DynamicSpanIDOverride: discoverySpanID.String(),
 			},
 		)
 		if err != nil {
 			e.log.Debug("error creating span discovery step after sleep", "error", err)
 		}
-		// Plumb this into the queue item manually, unfortunately.
-		byt, _ := json.Marshal(discoveryRef)
-		nextItem.Metadata["discovery"] = string(byt)
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
