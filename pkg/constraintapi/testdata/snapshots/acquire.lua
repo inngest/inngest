@@ -40,12 +40,7 @@ local function debug(...)
 	end
 end
 local function operationIdempotencyResponse(encoded)
-	local res = cjson.decode(encoded)
-	if not res then
-		return encoded
-	end
-	res["oih"] = 1
-	return cjson.encode(res)
+	return { 1, encoded }
 end
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")

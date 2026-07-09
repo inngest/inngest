@@ -103,7 +103,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		"args", args,
 	)
 
-	rawRes, internalErr := executeLuaScript(
+	rawRes, operationIdempotencyHit, internalErr := executeLuaScript(
 		ctx,
 		"release",
 		r.shardName,
@@ -121,6 +121,9 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	err = json.Unmarshal(rawRes, &parsedResponse)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid response structure: %w", err)
+	}
+	if operationIdempotencyHit {
+		parsedResponse.OperationIdempotencyHit = 1
 	}
 
 	res := &CapacityReleaseResponse{

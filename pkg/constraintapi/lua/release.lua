@@ -38,12 +38,7 @@ local function debug(...)
 end
 
 local function operationIdempotencyResponse(encoded)
-	local res = cjson.decode(encoded)
-	if not res then
-		return encoded
-	end
-	res["oih"] = 1
-	return cjson.encode(res)
+	return { 1, encoded }
 end
 
 --- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization

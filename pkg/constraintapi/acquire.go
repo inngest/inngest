@@ -332,7 +332,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		"prepared acquire call",
 	)
 
-	rawRes, internalErr := executeLuaScript(
+	rawRes, operationIdempotencyHit, internalErr := executeLuaScript(
 		ctx,
 		"acquire",
 		r.shardName,
@@ -350,6 +350,9 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	err = json.Unmarshal(rawRes, &parsedResponse)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid response structure: %w", err)
+	}
+	if operationIdempotencyHit {
+		parsedResponse.OperationIdempotencyHit = 1
 	}
 
 	leases := make([]CapacityLease, len(parsedResponse.GrantedLeases))

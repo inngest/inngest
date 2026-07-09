@@ -83,7 +83,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		"args", args,
 	)
 
-	rawRes, internalErr := executeLuaScript(
+	rawRes, operationIdempotencyHit, internalErr := executeLuaScript(
 		ctx,
 		"extend",
 		r.shardName,
@@ -101,6 +101,9 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	err = json.Unmarshal(rawRes, &parsedResponse)
 	if err != nil {
 		return nil, errs.Wrap(0, false, "invalid response structure: %w", err)
+	}
+	if operationIdempotencyHit {
+		parsedResponse.OperationIdempotencyHit = 1
 	}
 
 	res := &CapacityExtendLeaseResponse{

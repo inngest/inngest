@@ -444,12 +444,14 @@ func executeLuaScript(
 	clock clockwork.Clock,
 	keys []string,
 	args []string,
-) ([]byte, errs.InternalError) {
+) ([]byte, bool, errs.InternalError) {
 	// Get current time for duration metrics
 	start := clock.Now()
 
-	// Execute script and convert response to bytes (we return JSON from all scripts)
-	rawRes, err := scripts[name].Exec(ctx, client, keys, args).AsBytes()
+	// Execute script and convert response to bytes (we return JSON from all scripts).
+	// Operation idempotency replays may return {1, json} to mark the replay
+	// without decoding and re-encoding the cached JSON inside Redis.
+	rawRes, operationIdempotencyHit, err := luaScriptResponseBytes(scripts[name].Exec(ctx, client, keys, args))
 
 	status, retry := luaError(err)
 
@@ -466,10 +468,37 @@ func executeLuaScript(
 	})
 
 	if err != nil {
-		return nil, errs.Wrap(0, retry, "%s script failed: %w", name, err)
+		return nil, false, errs.Wrap(0, retry, "%s script failed: %w", name, err)
 	}
 
-	return rawRes, nil
+	return rawRes, operationIdempotencyHit, nil
+}
+
+func luaScriptResponseBytes(result rueidis.RedisResult) ([]byte, bool, error) {
+	rawRes, err := result.AsBytes()
+	if err == nil {
+		return rawRes, false, nil
+	}
+
+	values, arrayErr := result.ToArray()
+	if arrayErr != nil {
+		return nil, false, err
+	}
+	if len(values) != 2 {
+		return nil, false, err
+	}
+
+	hit, hitErr := values[0].AsInt64()
+	if hitErr != nil {
+		return nil, false, hitErr
+	}
+
+	rawRes, rawErr := values[1].AsBytes()
+	if rawErr != nil {
+		return nil, false, rawErr
+	}
+
+	return rawRes, hit != 0, nil
 }
 
 func luaError(err error) (status string, retry bool) {
