@@ -1979,7 +1979,8 @@ func TestCapacityReleaseResponseConversion(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 
 			// Test round trip
-			backConverted := CapacityReleaseResponseFromProto(result)
+			backConverted, err := CapacityReleaseResponseFromProto(result)
+			require.NoError(t, err)
 			assert.Equal(t, tt.input, backConverted)
 		})
 	}

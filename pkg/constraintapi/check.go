@@ -144,7 +144,7 @@ func (r *redisCapacityManager) Check(ctx context.Context, req *CapacityCheckRequ
 		"args", args,
 	)
 
-	rawRes, internalErr := executeLuaScript(
+	rawRes, _, internalErr := executeLuaScript(
 		ctx,
 		"check",
 		r.shardName,

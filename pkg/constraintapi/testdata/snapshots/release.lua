@@ -11,10 +11,11 @@ local keyLeaseDetails = KEYS[4]
 local scopedKeyPrefix = ARGV[1]
 local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
-local operationIdempotencyTTL = tonumber(ARGV[4])
-local enableDebugLogs = tonumber(ARGV[5]) == 1
-local forceReleaseSemaphores = tonumber(ARGV[6]) == 1
-local enableCacheInvalidation = ARGV[7] == "1"
+local nowMS = tonumber(ARGV[4]) 
+local operationIdempotencyTTL = tonumber(ARGV[5])
+local enableDebugLogs = tonumber(ARGV[6]) == 1
+local forceReleaseSemaphores = tonumber(ARGV[7]) == 1
+local enableCacheInvalidation = ARGV[8] == "1"
 local debugLogs = {}
 local function debug(...)
 	if enableDebugLogs then
@@ -25,17 +26,31 @@ end
 local function toInteger(value)
 	return math.floor(value + 0.5) 
 end
+local function getConcurrencyCount(key)
+	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+local function addConcurrencyUsage(target, index, value)
+	local usage = {}
+	usage["i"] = index
+	usage["l"] = value.c.l or 0
+	usage["u"] = getConcurrencyCount(value.c.ilk)
+	table.insert(target, usage)
+end
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
-	return opIdempotency
+	return { 1, opIdempotency }
 end
 local requestID = call("HGET", keyLeaseDetails, "req")
 if requestID == false or requestID == nil or requestID == "" then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local keyRequestState = string.format("%s:rs:%s", scopedKeyPrefix, requestID)
 local requestStateStr = call("GET", keyRequestState)
@@ -43,7 +58,7 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	local res = {}
 	res["s"] = 2
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local requestDetails = cjson.decode(requestStateStr)
 if not requestDetails then
@@ -53,10 +68,12 @@ local constraints = requestDetails.s
 if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
-for _, c in ipairs(constraints) do
+local constraintUsage = {}
+for index, c in ipairs(constraints) do
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
 		call("ZREM", c.c.ilk, currentLeaseID)
+		addConcurrencyUsage(constraintUsage, index, c)
 	elseif c.k == 4 then
 		if c.sem.rel == 0 or forceReleaseSemaphores then
 			local weight = c.sem.w
@@ -90,7 +107,10 @@ res["d"] = debugLogs
 res["r"] = requestDetails.a
 res["e"] = requestDetails.e
 res["f"] = requestDetails.f
+res["ai"] = requestDetails.ai
 res["m"] = requestDetails.m
+res["sc"] = constraints
+res["cu"] = constraintUsage
 local encoded = cjson.encode(res)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 if enableCacheInvalidation then
@@ -122,4 +142,4 @@ if enableCacheInvalidation then
 		call("DEL", unpack(cacheKeysToDelete))
 	end
 end
-return encoded
+return { 0, encoded }

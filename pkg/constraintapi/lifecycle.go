@@ -22,23 +22,35 @@ type OnCapacityLeaseAcquiredData struct {
 	Duration        time.Duration
 	Source          LeaseSource
 
-	GrantedLeases        []CapacityLease
-	LimitingConstraints  []ConstraintItem
-	ExhaustedConstraints []ConstraintItem
-	FairnessReduction    int
-	RetryAfter           time.Time
+	GrantedLeases           []CapacityLease
+	LimitingConstraints     []ConstraintItem
+	ExhaustedConstraints    []ConstraintItem
+	FairnessReduction       int
+	RetryAfter              time.Time
+	Usage                   []ConstraintUsage
+	OperationIdempotencyHit bool
 }
 
 type OnCapacityLeaseExtendedData struct {
-	AccountID  uuid.UUID
-	OldLeaseID ulid.ULID
-	NewLeaseID ulid.ULID
-	Duration   time.Duration
+	AccountID               uuid.UUID
+	EnvID                   uuid.UUID
+	AppID                   uuid.UUID
+	FunctionID              uuid.UUID
+	OldLeaseID              ulid.ULID
+	NewLeaseID              ulid.ULID
+	Duration                time.Duration
+	Usage                   []ConstraintUsage
+	OperationIdempotencyHit bool
 }
 
 type OnCapacityLeaseReleasedData struct {
-	AccountID uuid.UUID
-	LeaseID   ulid.ULID
+	AccountID               uuid.UUID
+	EnvID                   uuid.UUID
+	AppID                   uuid.UUID
+	FunctionID              uuid.UUID
+	LeaseID                 ulid.ULID
+	Usage                   []ConstraintUsage
+	OperationIdempotencyHit bool
 }
 
 type ConstraintAPILifecycleHooks interface {
