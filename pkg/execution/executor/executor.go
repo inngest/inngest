@@ -3510,7 +3510,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
-		if q, ok := e.queue.(queue.QueueManager); ok {
+		if e.shards != nil {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
 			// this is _not_ a system partition and lives on the account shard, which we need to retrieve
 			shard, err := e.shards.Resolve(ctx, queue.Scope{
@@ -3523,7 +3523,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 
 			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
-			err = q.Dequeue(ctx, shard, queue.QueueItem{
+			err = e.queue.Dequeue(ctx, shard.Name(), queue.QueueItem{
 				ID:         queue.HashID(ctx, jobID),
 				FunctionID: md.ID.FunctionID,
 				Data: queue.Item{
