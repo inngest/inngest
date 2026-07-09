@@ -50,7 +50,7 @@ if requestID == false or requestID == nil or requestID == "" then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local keyRequestState = string.format("%s:rs:%s", scopedKeyPrefix, requestID)
 local requestStateStr = call("GET", keyRequestState)
@@ -58,7 +58,7 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	local res = {}
 	res["s"] = 2
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local requestDetails = cjson.decode(requestStateStr)
 if not requestDetails then
@@ -142,4 +142,4 @@ if enableCacheInvalidation then
 		call("DEL", unpack(cacheKeysToDelete))
 	end
 end
-return encoded
+return { 0, encoded }

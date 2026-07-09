@@ -93,14 +93,14 @@ if decode_ulid_time(currentLeaseID) < nowMS then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local leaseDetails = call("HMGET", keyOldLeaseDetails, "lik", "req", "rid")
 if leaseDetails == false or leaseDetails == nil or not leaseDetails[1] or not leaseDetails[2] then
 	local res = {}
 	res["s"] = 2
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local hashedLeaseIdempotencyKey = leaseDetails[1]
 local requestID = leaseDetails[2]
@@ -112,7 +112,7 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	local res = {}
 	res["s"] = 3
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local requestDetails = cjson.decode(requestStateStr)
 if not requestDetails then
@@ -149,4 +149,4 @@ res["sc"] = constraints
 res["cu"] = constraintUsage
 local encoded = cjson.encode(res)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
-return encoded
+return { 0, encoded }

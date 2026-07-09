@@ -202,7 +202,7 @@ if existingRequestState ~= nil and existingRequestState ~= false and existingReq
 	local res = {}
 	res["s"] = 4
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local availableCapacity = requested
 local limitingConstraints = {}
@@ -254,7 +254,7 @@ if cacheEnabled then
 		res["d"] = debugLogs
 		res["fr"] = 0
 		res["ch"] = 1
-		return cjson.encode(res)
+		return { 0, cjson.encode(res) }
 	end
 end
 for index, value in ipairs(constraints) do
@@ -330,7 +330,7 @@ if availableCapacity <= 0 then
 	res["fr"] = fairnessReduction
 	res["ch"] = 0
 	res["cu"] = constraintUsage
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local granted = availableCapacity
 local grantedLeases = {}
@@ -442,4 +442,4 @@ result["ch"] = 0
 result["cu"] = constraintUsage
 local encoded = cjson.encode(result)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
-return encoded
+return { 0, encoded }

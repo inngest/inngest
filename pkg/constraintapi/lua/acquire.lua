@@ -123,7 +123,7 @@ if existingRequestState ~= nil and existingRequestState ~= false and existingReq
 	res["s"] = 4
 	res["d"] = debugLogs
 
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 
 -- TODO: Is the operation related to a single idempotency key that is still valid? Return that
@@ -218,7 +218,7 @@ if cacheEnabled then
 		res["d"] = debugLogs
 		res["fr"] = 0
 		res["ch"] = 1
-		return cjson.encode(res)
+		return { 0, cjson.encode(res) }
 	end
 end
 
@@ -318,7 +318,7 @@ if availableCapacity <= 0 then
 	res["ch"] = 0
 	res["cu"] = constraintUsage
 
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 
 local granted = availableCapacity
@@ -494,4 +494,4 @@ local encoded = cjson.encode(result)
 -- Set operation idempotency TTL
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 
-return encoded
+return { 0, encoded }

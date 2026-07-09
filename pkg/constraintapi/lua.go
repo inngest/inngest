@@ -475,22 +475,20 @@ func executeLuaScript(
 }
 
 func luaScriptResponseBytes(result rueidis.RedisResult) ([]byte, bool, error) {
-	rawRes, err := result.AsBytes()
-	if err == nil {
-		return rawRes, false, nil
-	}
-
 	values, arrayErr := result.ToArray()
 	if arrayErr != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("invalid lua response: expected [operation_idempotency_hit, json]: %w", arrayErr)
 	}
 	if len(values) != 2 {
-		return nil, false, err
+		return nil, false, fmt.Errorf("invalid lua response: expected 2 tuple values, got %d", len(values))
 	}
 
 	hit, hitErr := values[0].AsInt64()
 	if hitErr != nil {
 		return nil, false, hitErr
+	}
+	if hit != 0 && hit != 1 {
+		return nil, false, fmt.Errorf("invalid lua response: operation idempotency hit must be 0 or 1, got %d", hit)
 	}
 
 	rawRes, rawErr := values[1].AsBytes()
