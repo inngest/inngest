@@ -38,7 +38,6 @@ local function addConcurrencyUsage(target, index, value)
 	usage["i"] = index
 	usage["l"] = value.c.l or 0
 	usage["u"] = getConcurrencyCount(value.c.ilk)
-	usage["c"] = value
 	table.insert(target, usage)
 end
 local opIdempotency = call("GET", keyOperationIdempotency)
@@ -110,6 +109,7 @@ res["e"] = requestDetails.e
 res["f"] = requestDetails.f
 res["ai"] = requestDetails.ai
 res["m"] = requestDetails.m
+res["sc"] = constraints
 res["cu"] = constraintUsage
 local encoded = cjson.encode(res)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))

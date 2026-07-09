@@ -7,6 +7,18 @@ type scriptConstraintUsage struct {
 	Constraint SerializedConstraintItem `json:"c,omitempty"`
 }
 
+func constraintItemsFromSerialized(values []SerializedConstraintItem) []ConstraintItem {
+	if len(values) == 0 {
+		return nil
+	}
+
+	constraints := make([]ConstraintItem, len(values))
+	for i, v := range values {
+		constraints[i] = v.ToConstraintItem()
+	}
+	return constraints
+}
+
 func constraintUsageFromScript(values []scriptConstraintUsage, constraints []ConstraintItem) []ConstraintUsage {
 	if len(values) == 0 {
 		return nil

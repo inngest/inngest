@@ -1,6 +1,7 @@
 package constraintapi
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -172,6 +173,73 @@ func TestCapacityOperationIdempotencyReplaysAreMarked(t *testing.T) {
 	require.True(t, releaseReplay.OperationIdempotencyHit)
 }
 
+func TestCapacityOperationUsageCachesUseStoredConstraints(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	cm, r, clock, ctx := newTestSetup(t, nil)
+	previousDebugLogs := enableDebugLogs
+	enableDebugLogs = false
+	t.Cleanup(func() {
+		enableDebugLogs = previousDebugLogs
+	})
+	cm.enableDebugLogs = false
+
+	config := ConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: ConcurrencyConfig{
+			FunctionConcurrency: 3,
+		},
+	}
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeFn,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+	}
+
+	acquireReq := makeAcquireRequest(accountID, envID, fnID, clock, config, constraints, "cache-compact-acquire")
+	acquireResp, err := cm.Acquire(ctx, acquireReq)
+	require.NoError(t, err)
+	require.Len(t, acquireResp.Leases, 1)
+
+	extendReq := &CapacityExtendLeaseRequest{
+		IdempotencyKey: "cache-compact-extend",
+		AccountID:      accountID,
+		LeaseID:        acquireResp.Leases[0].LeaseID,
+		Duration:       5 * time.Second,
+	}
+	extendResp, err := cm.ExtendLease(ctx, extendReq)
+	require.NoError(t, err)
+	require.NotNil(t, extendResp.LeaseID)
+
+	extendRaw, redisErr := r.Get(cm.keyOperationIdempotency(accountID, "ext", extendReq.IdempotencyKey))
+	require.NoError(t, redisErr)
+	requireUsageCacheUsesStoredConstraints(t, extendRaw)
+
+	extendReplay, err := cm.ExtendLease(ctx, extendReq)
+	require.NoError(t, err)
+	require.True(t, extendReplay.OperationIdempotencyHit)
+
+	releaseReq := &CapacityReleaseRequest{
+		IdempotencyKey: "cache-compact-release",
+		AccountID:      accountID,
+		LeaseID:        *extendResp.LeaseID,
+	}
+	releaseResp, err := cm.Release(ctx, releaseReq)
+	require.NoError(t, err)
+	requireConcurrencyUsage(t, releaseResp.Usage, enums.ConcurrencyScopeFn, 0, 3)
+
+	releaseRaw, redisErr := r.Get(cm.keyOperationIdempotency(accountID, "rel", releaseReq.IdempotencyKey))
+	require.NoError(t, redisErr)
+	requireUsageCacheUsesStoredConstraints(t, releaseRaw)
+
+	releaseReplay, err := cm.Release(ctx, releaseReq)
+	require.NoError(t, err)
+	require.True(t, releaseReplay.OperationIdempotencyHit)
+}
+
 func requireConcurrencyUsage(
 	t *testing.T,
 	usage []ConstraintUsage,
@@ -194,4 +262,21 @@ func requireConcurrencyUsage(
 	}
 
 	require.Failf(t, "missing concurrency usage", "scope=%s usage=%+v", scope, usage)
+}
+
+func requireUsageCacheUsesStoredConstraints(t *testing.T, raw string) {
+	t.Helper()
+
+	var cached struct {
+		ConstraintUsage   []scriptConstraintUsage    `json:"cu"`
+		StoredConstraints []SerializedConstraintItem `json:"sc"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(raw), &cached))
+	require.NotEmpty(t, cached.ConstraintUsage)
+	require.NotEmpty(t, cached.StoredConstraints)
+
+	for _, usage := range cached.ConstraintUsage {
+		require.Positive(t, usage.Index)
+		require.Zero(t, usage.Constraint)
+	}
 }

@@ -13,14 +13,15 @@ import (
 )
 
 type extendLeaseScriptResponse struct {
-	Status                  int                     `json:"s"`
-	Debug                   flexibleStringArray     `json:"d"`
-	LeaseID                 ulid.ULID               `json:"lid"`
-	EnvID                   string                  `json:"e,omitempty"`
-	AppID                   string                  `json:"ai,omitempty"`
-	FunctionID              string                  `json:"f,omitempty"`
-	ConstraintUsage         []scriptConstraintUsage `json:"cu"`
-	OperationIdempotencyHit int                     `json:"oih"`
+	Status                  int                        `json:"s"`
+	Debug                   flexibleStringArray        `json:"d"`
+	LeaseID                 ulid.ULID                  `json:"lid"`
+	EnvID                   string                     `json:"e,omitempty"`
+	AppID                   string                     `json:"ai,omitempty"`
+	FunctionID              string                     `json:"f,omitempty"`
+	StoredConstraints       []SerializedConstraintItem `json:"sc"`
+	ConstraintUsage         []scriptConstraintUsage    `json:"cu"`
+	OperationIdempotencyHit int                        `json:"oih"`
 }
 
 // ExtendLease implements CapacityManager.
@@ -108,7 +109,7 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 
 	res := &CapacityExtendLeaseResponse{
 		AccountID:               req.AccountID,
-		Usage:                   constraintUsageFromScript(parsedResponse.ConstraintUsage, nil),
+		Usage:                   constraintUsageFromScript(parsedResponse.ConstraintUsage, constraintItemsFromSerialized(parsedResponse.StoredConstraints)),
 		OperationIdempotencyHit: parsedResponse.OperationIdempotencyHit != 0,
 		internalDebugState:      parsedResponse,
 	}
