@@ -1800,17 +1800,22 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for `tools.sleep` within generator functions.
 	//
 	// This also marks the sleep item as completed.
-	isSleepResume := item.Kind == queue.KindSleep && item.Attempt == 0
+	isSleep := item.Kind == queue.KindSleep
+	// New sleep items don't store span refs; reconstruct deterministically and rehydrate
+	// item.Metadata so downstream reads find them. Even on retries.
+	var sleepStepRef *meta.SpanReference
+	if isSleep {
+		sleepStepRef = tracing.SleepStepSpanRefResolve(&item, id.RunID)
+	}
+
+	isSleepResume := isSleep && item.Attempt == 0
 	if isSleepResume {
-		// New sleep items don't store span refs; reconstruct deterministically and rehydrate
-		// item.Metadata so downstream reads find them.
-		target := tracing.SleepStepSpanRefResolve(&item, id.RunID)
 		err := e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
 			EndTime:    e.now(),
 			Debug:      &tracing.SpanDebugData{Location: "executor.SleepResume"},
 			QueueItem:  &item,
 			Status:     enums.StepStatusCompleted,
-			TargetSpan: target,
+			TargetSpan: sleepStepRef,
 		})
 		if err != nil {
 			l.Debug("error updating sleep resume span", "error", err)
@@ -4464,6 +4469,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	//
 	// Doing that here allows us to make this deterministic.  In the future, if we had deterministic
 	// span IDs we could remove this.
+	// TODO: dsids are now deterministic, this pre-creation can move to resume time.
 	{
 		_, err := e.tracerProvider.CreateSpan(
 			ctx,
