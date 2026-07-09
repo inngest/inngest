@@ -13,9 +13,14 @@ import (
 )
 
 type extendLeaseScriptResponse struct {
-	Status  int                 `json:"s"`
-	Debug   flexibleStringArray `json:"d"`
-	LeaseID ulid.ULID           `json:"lid"`
+	Status                  int                     `json:"s"`
+	Debug                   flexibleStringArray     `json:"d"`
+	LeaseID                 ulid.ULID               `json:"lid"`
+	EnvID                   string                  `json:"e,omitempty"`
+	AppID                   string                  `json:"ai,omitempty"`
+	FunctionID              string                  `json:"f,omitempty"`
+	ConstraintUsage         []scriptConstraintUsage `json:"cu"`
+	OperationIdempotencyHit int                     `json:"oih"`
 }
 
 // ExtendLease implements CapacityManager.
@@ -99,10 +104,34 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 	}
 
 	res := &CapacityExtendLeaseResponse{
-		internalDebugState: parsedResponse,
+		AccountID:               req.AccountID,
+		Usage:                   constraintUsageFromScript(parsedResponse.ConstraintUsage, nil),
+		OperationIdempotencyHit: parsedResponse.OperationIdempotencyHit != 0,
+		internalDebugState:      parsedResponse,
 	}
 	if parsedResponse.LeaseID != ulid.Zero {
 		res.LeaseID = &parsedResponse.LeaseID
+	}
+	if parsedResponse.EnvID != "" {
+		envID, err := uuid.Parse(parsedResponse.EnvID)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "invalid env_id in response: %w", err)
+		}
+		res.EnvID = envID
+	}
+	if parsedResponse.AppID != "" {
+		appID, err := uuid.Parse(parsedResponse.AppID)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "invalid app_id in response: %w", err)
+		}
+		res.AppID = appID
+	}
+	if parsedResponse.FunctionID != "" {
+		functionID, err := uuid.Parse(parsedResponse.FunctionID)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "invalid function_id in response: %w", err)
+		}
+		res.FunctionID = functionID
 	}
 
 	switch parsedResponse.Status {
@@ -119,10 +148,15 @@ func (r *redisCapacityManager) ExtendLease(ctx context.Context, req *CapacityExt
 		if len(r.lifecycles) > 0 {
 			for _, hook := range r.lifecycles {
 				err := hook.OnCapacityLeaseExtended(ctx, OnCapacityLeaseExtendedData{
-					AccountID:  req.AccountID,
-					Duration:   req.Duration,
-					OldLeaseID: req.LeaseID,
-					NewLeaseID: parsedResponse.LeaseID,
+					AccountID:               req.AccountID,
+					EnvID:                   res.EnvID,
+					AppID:                   res.AppID,
+					FunctionID:              res.FunctionID,
+					Duration:                req.Duration,
+					OldLeaseID:              req.LeaseID,
+					NewLeaseID:              parsedResponse.LeaseID,
+					Usage:                   res.Usage,
+					OperationIdempotencyHit: res.OperationIdempotencyHit,
 				})
 				if err != nil {
 					return nil, errs.Wrap(0, false, "extend lifecycle failed: %w", err)

@@ -68,6 +68,15 @@ local function debug(...)
 	end
 end
 
+local function operationIdempotencyResponse(encoded)
+	local res = cjson.decode(encoded)
+	if not res then
+		return encoded
+	end
+	res["oih"] = 1
+	return cjson.encode(res)
+end
+
 ---@param key string
 local function getConcurrencyCount(key)
 	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
@@ -82,6 +91,19 @@ end
 ---@return integer
 local function toInteger(value)
 	return math.floor(value + 0.5) -- Round to nearest integer
+end
+
+local function usageFromCapacity(limit, capacity)
+	limit = limit or 0
+	return math.max(math.min(limit - capacity, limit), 0)
+end
+
+local function addConstraintUsage(target, index, limit, used)
+	local usage = {}
+	usage["i"] = index
+	usage["l"] = toInteger(limit or 0)
+	usage["u"] = toInteger(math.max(used or 0, 0))
+	table.insert(target, usage)
 end
 
 -- $include(helper/gcra.lua)
@@ -105,7 +127,7 @@ local existingRequestState = results[2]
 
 if opIdempotency ~= nil and opIdempotency ~= false then
 	-- Return idempotency state to user (same as initial response)
-	return opIdempotency
+	return operationIdempotencyResponse(opIdempotency)
 end
 
 -- If the same request state is still in progress (active leases), we cannot acquire more leases for the same request
@@ -150,6 +172,9 @@ local retryAt = 0
 -- Cache concurrency capacity from first pass to avoid redundant ZCOUNT in second pass
 ---@type table<integer, integer>
 local concurrencyCapacityCache = {}
+
+---@type { i: integer, l: integer, u: integer }[]
+local constraintUsage = {}
 
 -- Skip GCRA if constraint check idempotency key is present
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
@@ -221,11 +246,13 @@ for index, value in ipairs(constraints) do
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
 		constraintCapacity = rlRes["remaining"] or 0
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000) -- convert from ns to ms
+		addConstraintUsage(constraintUsage, index, value.r.l, rlRes["u"] or usageFromCapacity(value.r.l, constraintCapacity))
 	elseif value.k == 2 then
 		-- concurrency
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
+		addConstraintUsage(constraintUsage, index, value.c.l, usageFromCapacity(value.c.l, constraintCapacity))
 
 		-- Cache capacity to avoid redundant ZCOUNT in second pass
 		concurrencyCapacityCache[index] = constraintCapacity
@@ -236,6 +263,7 @@ for index, value in ipairs(constraints) do
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"] or 0
 		constraintRetryAt = toInteger(throttleRes["retry_at"]) -- already in ms
+		addConstraintUsage(constraintUsage, index, value.t.l, usageFromCapacity(value.t.l, constraintCapacity))
 	elseif value.k == 4 then
 		-- semaphore
 		local usage = tonumber(call("GET", value.sem.k)) or 0
@@ -250,6 +278,7 @@ for index, value in ipairs(constraints) do
 		else
 			constraintCapacity = math.floor(remaining / weight)
 		end
+		addConstraintUsage(constraintUsage, index, capacity, usage)
 	end
 
 	-- Track if constraint is exhausted before granting
@@ -301,6 +330,7 @@ if availableCapacity <= 0 then
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
 	res["ch"] = 0
+	res["cu"] = constraintUsage
 
 	return cjson.encode(res)
 end
@@ -324,6 +354,7 @@ local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
 retryAt = 0
 
 -- Update constraint state
+constraintUsage = {}
 for i, value in ipairs(constraints) do
 	local constraintRetryAt = 0
 	local constraintCapacity = 0
@@ -335,6 +366,7 @@ for i, value in ipairs(constraints) do
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, granted)
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000)
 		constraintCapacity = rlRes["remaining"] or 0
+		addConstraintUsage(constraintUsage, i, value.r.l, rlRes["u"] or usageFromCapacity(value.r.l, constraintCapacity))
 	elseif value.k == 2 then
 		-- concurrency
 		local updates = {}
@@ -351,6 +383,7 @@ for i, value in ipairs(constraints) do
 		-- instead of redundant ZCOUNT queries. We know we just added 'granted' leases.
 		constraintCapacity = concurrencyCapacityCache[i] - granted
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
+		addConstraintUsage(constraintUsage, i, value.c.l, usageFromCapacity(value.c.l, constraintCapacity))
 	elseif value.k == 3 then
 		-- update throttle: consume 1 unit
 		-- allow consuming all capacity in one request (for generating multiple leases)
@@ -358,6 +391,7 @@ for i, value in ipairs(constraints) do
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, granted)
 		constraintRetryAt = toInteger(throttleRes["retry_at"])
 		constraintCapacity = throttleRes["remaining"] or 0
+		addConstraintUsage(constraintUsage, i, value.t.l, usageFromCapacity(value.t.l, constraintCapacity))
 	elseif value.k == 4 then
 		-- semaphore: increment usage counter
 		local weight = value.sem.w
@@ -372,6 +406,7 @@ for i, value in ipairs(constraints) do
 		else
 			constraintCapacity = math.floor(remaining / weight)
 		end
+		addConstraintUsage(constraintUsage, i, capacity, newUsage)
 	end
 
 	-- If we used up capacity after the update,
@@ -467,6 +502,7 @@ result["ra"] = retryAt -- include retryAt to hint when next capacity is availabl
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
 result["ch"] = 0
+result["cu"] = constraintUsage
 
 local encoded = cjson.encode(result)
 

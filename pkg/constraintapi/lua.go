@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
@@ -124,6 +125,49 @@ type SerializedConstraintItem struct {
 
 	// Semaphore constraint (only populated when Kind=4)
 	Semaphore *SerializedSemaphoreConstraint `json:"sem,omitempty"`
+}
+
+func (ci SerializedConstraintItem) ToConstraintItem() ConstraintItem {
+	switch ci.Kind {
+	case 1:
+		if ci.RateLimit == nil {
+			return ConstraintItem{}
+		}
+		return ConstraintItem{
+			Kind: ConstraintKindRateLimit,
+			RateLimit: &RateLimitConstraint{
+				Scope:             enums.RateLimitScope(ci.RateLimit.Scope),
+				KeyExpressionHash: ci.RateLimit.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.RateLimit.EvaluatedKeyHash,
+			},
+		}
+	case 2:
+		if ci.Concurrency == nil {
+			return ConstraintItem{}
+		}
+		return ConstraintItem{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Mode:              enums.ConcurrencyMode(ci.Concurrency.Mode),
+				Scope:             enums.ConcurrencyScope(ci.Concurrency.Scope),
+				KeyExpressionHash: ci.Concurrency.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.Concurrency.EvaluatedKeyHash,
+			},
+		}
+	case 3:
+		if ci.Throttle == nil {
+			return ConstraintItem{}
+		}
+		return ConstraintItem{
+			Kind: ConstraintKindThrottle,
+			Throttle: &ThrottleConstraint{
+				Scope:             enums.ThrottleScope(ci.Throttle.Scope),
+				KeyExpressionHash: ci.Throttle.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.Throttle.EvaluatedKeyHash,
+			},
+		}
+	}
+	return ConstraintItem{}
 }
 
 // SerializedSemaphoreConstraint represents a minimal version of SemaphoreConstraint

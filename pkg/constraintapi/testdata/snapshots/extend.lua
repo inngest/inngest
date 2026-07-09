@@ -70,10 +70,33 @@ local function debug(...)
 		table.insert(debugLogs, table.concat(args, " "))
 	end
 end
+local function operationIdempotencyResponse(encoded)
+	local res = cjson.decode(encoded)
+	if not res then
+		return encoded
+	end
+	res["oih"] = 1
+	return cjson.encode(res)
+end
+local function getConcurrencyCount(key)
+	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+local function addConcurrencyUsage(target, index, value)
+	local usage = {}
+	usage["i"] = index
+	usage["l"] = value.c.l or 0
+	usage["u"] = getConcurrencyCount(value.c.ilk)
+	usage["c"] = value
+	table.insert(target, usage)
+end
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
-	return opIdempotency
+	return operationIdempotencyResponse(opIdempotency)
 end
 if decode_ulid_time(currentLeaseID) < nowMS then
 	local res = {}
@@ -108,10 +131,12 @@ local constraints = requestDetails.s
 if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
-for _, value in ipairs(constraints) do
+local constraintUsage = {}
+for index, value in ipairs(constraints) do
 	if value.k == 2 then
 		call("ZREM", value.c.ilk, currentLeaseID)
 		call("ZADD", value.c.ilk, tostring(leaseExpiryMS), newLeaseID)
+		addConcurrencyUsage(constraintUsage, index, value)
 	end
 end
 call("HSET", keyNewLeaseDetails, "lik", hashedLeaseIdempotencyKey, "rid", leaseRunID, "req", requestID)
@@ -126,6 +151,10 @@ local res = {}
 res["s"] = 4
 res["d"] = debugLogs
 res["lid"] = newLeaseID
+res["e"] = requestDetails.e
+res["f"] = requestDetails.f
+res["ai"] = requestDetails.ai
+res["cu"] = constraintUsage
 local encoded = cjson.encode(res)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 return encoded

@@ -21,10 +21,11 @@ local keyLeaseDetails = KEYS[4]
 local scopedKeyPrefix = ARGV[1]
 local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
-local operationIdempotencyTTL = tonumber(ARGV[4])--[[@as integer]]
-local enableDebugLogs = tonumber(ARGV[5]) == 1
-local forceReleaseSemaphores = tonumber(ARGV[6]) == 1
-local enableCacheInvalidation = ARGV[7] == "1"
+local nowMS = tonumber(ARGV[4]) --[[@as integer]]
+local operationIdempotencyTTL = tonumber(ARGV[5])--[[@as integer]]
+local enableDebugLogs = tonumber(ARGV[6]) == 1
+local forceReleaseSemaphores = tonumber(ARGV[7]) == 1
+local enableCacheInvalidation = ARGV[8] == "1"
 
 ---@type string[]
 local debugLogs = {}
@@ -36,11 +37,38 @@ local function debug(...)
 	end
 end
 
+local function operationIdempotencyResponse(encoded)
+	local res = cjson.decode(encoded)
+	if not res then
+		return encoded
+	end
+	res["oih"] = 1
+	return cjson.encode(res)
+end
+
 --- toInteger ensures a value is stored as an integer to prevent Redis scientific notation serialization
 ---@param value number
 ---@return integer
 local function toInteger(value)
 	return math.floor(value + 0.5) -- Round to nearest integer
+end
+
+---@param key string
+local function getConcurrencyCount(key)
+	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+
+local function addConcurrencyUsage(target, index, value)
+	local usage = {}
+	usage["i"] = index
+	usage["l"] = value.c.l or 0
+	usage["u"] = getConcurrencyCount(value.c.ilk)
+	usage["c"] = value
+	table.insert(target, usage)
 end
 
 -- Handle operation idempotency
@@ -49,7 +77,7 @@ if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 
 	-- Return idempotency state to user (same as initial response)
-	return opIdempotency
+	return operationIdempotencyResponse(opIdempotency)
 end
 
 -- Release is idempotent by lease ID. If another caller (e.g. the lease
@@ -91,11 +119,15 @@ if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
 
-for _, c in ipairs(constraints) do
+---@type { i: integer, l: integer, u: integer, c: table }[]
+local constraintUsage = {}
+
+for index, c in ipairs(constraints) do
 	-- for concurrency constraints
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
 		call("ZREM", c.c.ilk, currentLeaseID)
+		addConcurrencyUsage(constraintUsage, index, c)
 	elseif c.k == 4 then
 		-- semaphore: decrement for auto-release, or when force-released by the scavenger
 		if c.sem.rel == 0 or forceReleaseSemaphores then
@@ -143,7 +175,9 @@ res["d"] = debugLogs
 res["r"] = requestDetails.a
 res["e"] = requestDetails.e
 res["f"] = requestDetails.f
+res["ai"] = requestDetails.ai
 res["m"] = requestDetails.m
+res["cu"] = constraintUsage
 
 local encoded = cjson.encode(res)
 

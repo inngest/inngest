@@ -24,12 +24,18 @@ type releaseScriptResponse struct {
 	// FunctionID from the request state
 	FunctionID string `json:"f,omitempty"`
 
+	// AppID from the request state
+	AppID string `json:"ai,omitempty"`
+
 	// Metadata from the request state
 	Metadata *struct {
 		SourceService           int `json:"ss,omitempty"`
 		SourceLocation          int `json:"sl,omitempty"`
 		SourceRunProcessingMode int `json:"sm,omitempty"`
 	} `json:"m,omitempty"`
+
+	ConstraintUsage         []scriptConstraintUsage `json:"cu"`
+	OperationIdempotencyHit int                     `json:"oih"`
 }
 
 // Release implements CapacityManager.
@@ -47,6 +53,8 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		"source", req.Source,
 		"shard", r.shardName,
 	)
+
+	now := r.clock.Now()
 
 	keys := []string{
 		r.keyOperationIdempotency(req.AccountID, "rel", req.IdempotencyKey),
@@ -78,6 +86,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 		scopedKeyPrefix,
 		req.AccountID,
 		req.LeaseID.String(),
+		now.UnixMilli(),
 		int(r.operationIdempotencyTTL.Seconds()),
 		enableDebugLogsVal,
 		forceReleaseSemaphores,
@@ -115,8 +124,10 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	}
 
 	res := &CapacityReleaseResponse{
-		AccountID:          req.AccountID,
-		internalDebugState: parsedResponse,
+		AccountID:               req.AccountID,
+		Usage:                   constraintUsageFromScript(parsedResponse.ConstraintUsage, nil),
+		OperationIdempotencyHit: parsedResponse.OperationIdempotencyHit != 0,
+		internalDebugState:      parsedResponse,
 	}
 
 	// Parse EnvID if present
@@ -135,6 +146,14 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 			return nil, errs.Wrap(0, false, "invalid function_id in response: %w", err)
 		}
 		res.FunctionID = functionID
+	}
+
+	if parsedResponse.AppID != "" {
+		appID, err := uuid.Parse(parsedResponse.AppID)
+		if err != nil {
+			return nil, errs.Wrap(0, false, "invalid app_id in response: %w", err)
+		}
+		res.AppID = appID
 	}
 
 	// Parse metadata if present
@@ -160,8 +179,13 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {
 			err := hook.OnCapacityLeaseReleased(ctx, OnCapacityLeaseReleasedData{
-				AccountID: req.AccountID,
-				LeaseID:   req.LeaseID,
+				AccountID:               req.AccountID,
+				EnvID:                   res.EnvID,
+				AppID:                   res.AppID,
+				FunctionID:              res.FunctionID,
+				LeaseID:                 req.LeaseID,
+				Usage:                   res.Usage,
+				OperationIdempotencyHit: res.OperationIdempotencyHit,
 			})
 			if err != nil {
 				return nil, errs.Wrap(0, false, "release lifecycle failed: %w", err)

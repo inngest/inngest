@@ -90,13 +90,40 @@ local function debug(...)
 	end
 end
 
+local function operationIdempotencyResponse(encoded)
+	local res = cjson.decode(encoded)
+	if not res then
+		return encoded
+	end
+	res["oih"] = 1
+	return cjson.encode(res)
+end
+
+---@param key string
+local function getConcurrencyCount(key)
+	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+
+local function addConcurrencyUsage(target, index, value)
+	local usage = {}
+	usage["i"] = index
+	usage["l"] = value.c.l or 0
+	usage["u"] = getConcurrencyCount(value.c.ilk)
+	usage["c"] = value
+	table.insert(target, usage)
+end
+
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 
 	-- Return idempotency state to user (same as initial response)
-	return opIdempotency
+	return operationIdempotencyResponse(opIdempotency)
 end
 
 -- Check if lease already expired
@@ -149,11 +176,15 @@ if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
 
-for _, value in ipairs(constraints) do
+---@type { i: integer, l: integer, u: integer, c: table }[]
+local constraintUsage = {}
+
+for index, value in ipairs(constraints) do
 	-- for concurrency constraints, update score to new expiry
 	if value.k == 2 then
 		call("ZREM", value.c.ilk, currentLeaseID)
 		call("ZADD", value.c.ilk, tostring(leaseExpiryMS), newLeaseID)
+		addConcurrencyUsage(constraintUsage, index, value)
 	end
 end
 
@@ -177,6 +208,10 @@ local res = {}
 res["s"] = 4
 res["d"] = debugLogs
 res["lid"] = newLeaseID
+res["e"] = requestDetails.e
+res["f"] = requestDetails.f
+res["ai"] = requestDetails.ai
+res["cu"] = constraintUsage
 
 local encoded = cjson.encode(res)
 

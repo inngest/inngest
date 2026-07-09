@@ -162,12 +162,14 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints  flexibleIntArray          `json:"lc"`
-	ExhaustedConstraints flexibleIntArray          `json:"ec"`
-	FairnessReduction    int                       `json:"fr"`
-	RetryAt              int                       `json:"ra"`
-	Debug                flexibleStringArray       `json:"d"`
-	CacheHit             int                       `json:"ch"`
+	LimitingConstraints     flexibleIntArray        `json:"lc"`
+	ExhaustedConstraints    flexibleIntArray        `json:"ec"`
+	FairnessReduction       int                     `json:"fr"`
+	RetryAt                 int                     `json:"ra"`
+	Debug                   flexibleStringArray     `json:"d"`
+	CacheHit                int                     `json:"ch"`
+	ConstraintUsage         []scriptConstraintUsage `json:"cu"`
+	OperationIdempotencyHit int                     `json:"oih"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -382,6 +384,8 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}
 	}
 
+	constraintUsage := constraintUsageFromScript(parsedResponse.ConstraintUsage, sortedConstraints)
+
 	// Record centralized cache hit/miss metric only when caching is enabled
 	if cacheEnabled {
 		cacheOp := "miss"
@@ -416,20 +420,22 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 	if len(r.lifecycles) > 0 {
 		for _, hook := range r.lifecycles {
 			err := hook.OnCapacityLeaseAcquired(ctx, OnCapacityLeaseAcquiredData{
-				AccountID:            req.AccountID,
-				EnvID:                req.EnvID,
-				AppID:                req.AppID,
-				FunctionID:           req.FunctionID,
-				Configuration:        req.Configuration,
-				Constraints:          req.Constraints,
-				LimitingConstraints:  limitingConstraints,
-				ExhaustedConstraints: exhaustedConstraints,
-				FairnessReduction:    parsedResponse.FairnessReduction,
-				RetryAfter:           retryAfter,
-				RequestedAmount:      req.Amount,
-				Duration:             req.Duration,
-				Source:               req.Source,
-				GrantedLeases:        leases,
+				AccountID:               req.AccountID,
+				EnvID:                   req.EnvID,
+				AppID:                   req.AppID,
+				FunctionID:              req.FunctionID,
+				Configuration:           req.Configuration,
+				Constraints:             req.Constraints,
+				LimitingConstraints:     limitingConstraints,
+				ExhaustedConstraints:    exhaustedConstraints,
+				FairnessReduction:       parsedResponse.FairnessReduction,
+				RetryAfter:              retryAfter,
+				RequestedAmount:         req.Amount,
+				Duration:                req.Duration,
+				Source:                  req.Source,
+				GrantedLeases:           leases,
+				Usage:                   constraintUsage,
+				OperationIdempotencyHit: parsedResponse.OperationIdempotencyHit != 0,
 			})
 			if err != nil {
 				return nil, errs.Wrap(0, false, "acquire lifecycle failed: %w", err)
@@ -510,13 +516,15 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 		// success or idempotency
 		return &CapacityAcquireResponse{
-			RequestID:            requestID,
-			Leases:               leases,
-			LimitingConstraints:  limitingConstraints,
-			ExhaustedConstraints: exhaustedConstraints,
-			FairnessReduction:    parsedResponse.FairnessReduction,
-			RetryAfter:           retryAfter,
-			internalDebugState:   parsedResponse,
+			RequestID:               requestID,
+			Leases:                  leases,
+			LimitingConstraints:     limitingConstraints,
+			ExhaustedConstraints:    exhaustedConstraints,
+			FairnessReduction:       parsedResponse.FairnessReduction,
+			Usage:                   constraintUsage,
+			OperationIdempotencyHit: parsedResponse.OperationIdempotencyHit != 0,
+			RetryAfter:              retryAfter,
+			internalDebugState:      parsedResponse,
 		}, nil
 
 	case 2:
@@ -528,13 +536,15 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 
 		// lacking capacity
 		return &CapacityAcquireResponse{
-			RequestID:            requestID,
-			Leases:               leases,
-			LimitingConstraints:  limitingConstraints,
-			ExhaustedConstraints: exhaustedConstraints,
-			RetryAfter:           retryAfter,
-			FairnessReduction:    parsedResponse.FairnessReduction,
-			internalDebugState:   parsedResponse,
+			RequestID:               requestID,
+			Leases:                  leases,
+			LimitingConstraints:     limitingConstraints,
+			ExhaustedConstraints:    exhaustedConstraints,
+			RetryAfter:              retryAfter,
+			FairnessReduction:       parsedResponse.FairnessReduction,
+			Usage:                   constraintUsage,
+			OperationIdempotencyHit: parsedResponse.OperationIdempotencyHit != 0,
+			internalDebugState:      parsedResponse,
 		}, nil
 
 	case 4:
