@@ -2,9 +2,13 @@ package dnscache
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -17,21 +21,44 @@ func TestDNSCache(t *testing.T) {
 	ctx := context.Background()
 	l := logger.StdlibLogger(ctx)
 
-	ttl := 2 * time.Second
+	ttl := time.Second
 
 	cachedResolver := New(
 		WithCacheTTL(ttl),
 		WithLogger(l),
 	)
 
+	// Use a local TLS server so the test doesn't depend on external DNS or
+	// third-party sites; requests still go through the caching resolver's
+	// dialer and perform a real TLS handshake.
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	certpool := x509.NewCertPool()
+	certpool.AddCert(srv.Certificate())
+
 	c := http.Client{
 		Transport: &http.Transport{
 			DialContext: cachedResolver.Dialer(),
+			// The httptest certificate is valid for "example.com" but not
+			// "localhost", so pin the verification/SNI name while dialing the
+			// hosts under test.
+			TLSClientConfig: &tls.Config{
+				RootCAs:    certpool,
+				ServerName: "example.com",
+			},
 		},
 	}
 
-	// inngest and vercel use SNI
-	hosts := []string{"www.example.com", "www.inngest.com", "vercel.com"}
+	u, err := url.Parse(srv.URL)
+	require.NoError(t, err)
+	port := u.Port()
+
+	// localhost exercises a name lookup (via the hosts file, no external
+	// DNS); the IP literal exercises the resolver's literal fast path.
+	hosts := []string{"localhost", "127.0.0.1"}
 
 	for _, host := range hosts {
 		t.Run(host, func(t *testing.T) {
@@ -40,8 +67,9 @@ func TestDNSCache(t *testing.T) {
 			})
 
 			t.Run("request", func(t *testing.T) {
-				resp, err := c.Get(fmt.Sprintf("https://%s", host))
+				resp, err := c.Get(fmt.Sprintf("https://%s", net.JoinHostPort(host, port)))
 				require.NoError(t, err)
+				defer resp.Body.Close()
 				require.EqualValues(t, 200, resp.StatusCode)
 			})
 
