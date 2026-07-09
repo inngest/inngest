@@ -38,14 +38,22 @@ jobs:
       - name: Install gotestsum
         run: go install gotest.tools/gotestsum@v1.13.0
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
+      # pnpm must be set up before setup-node so the "pnpm" cache can resolve
+      # the pnpm store path.
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.18.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          # Key on both lockfiles this job installs: the UI build (the largest
+          # install, via make build-ui) and the tests/js E2E deps.
+          cache-dependency-path: |
+            ui/pnpm-lock.yaml
+            tests/js/pnpm-lock.yaml
 
       - name: Build UI
         run: make build-ui
