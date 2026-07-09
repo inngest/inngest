@@ -88,11 +88,6 @@ local function toInteger(value)
 	return math.floor(value + 0.5) -- Round to nearest integer
 end
 
-local function usageFromCapacity(limit, capacity)
-	limit = limit or 0
-	return math.max(math.min(limit - capacity, limit), 0)
-end
-
 local function addConstraintUsage(target, index, limit, used)
 	local usage = {}
 	usage["i"] = index
@@ -163,10 +158,6 @@ local exhaustedSet = {}
 -- The retry time MUST be recomputed after updating state to account for constraints
 -- that have been exhausted.
 local retryAt = 0
-
--- Cache concurrency capacity from first pass to avoid redundant ZCOUNT in second pass
----@type table<integer, integer>
-local concurrencyCapacityCache = {}
 
 ---@type { i: integer, l: integer, u: integer }[]
 local constraintUsage = {}
@@ -241,16 +232,13 @@ for index, value in ipairs(constraints) do
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
 		constraintCapacity = rlRes["remaining"] or 0
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000) -- convert from ns to ms
-		addConstraintUsage(constraintUsage, index, value.r.l, rlRes["u"] or usageFromCapacity(value.r.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, index, value.r.l, rlRes["u"])
 	elseif value.k == 2 then
 		-- concurrency
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
-		addConstraintUsage(constraintUsage, index, value.c.l, usageFromCapacity(value.c.l, constraintCapacity))
-
-		-- Cache capacity to avoid redundant ZCOUNT in second pass
-		concurrencyCapacityCache[index] = constraintCapacity
+		addConstraintUsage(constraintUsage, index, value.c.l, inProgressLeases)
 	elseif value.k == 3 then
 		-- throttle
 		-- allow consuming all capacity in one request (for generating multiple leases)
@@ -258,7 +246,7 @@ for index, value in ipairs(constraints) do
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"] or 0
 		constraintRetryAt = toInteger(throttleRes["retry_at"]) -- already in ms
-		addConstraintUsage(constraintUsage, index, value.t.l, usageFromCapacity(value.t.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, index, value.t.l, throttleRes["u"])
 	elseif value.k == 4 then
 		-- semaphore
 		local usage = tonumber(call("GET", value.sem.k)) or 0
@@ -361,7 +349,7 @@ for i, value in ipairs(constraints) do
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, granted)
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000)
 		constraintCapacity = rlRes["remaining"] or 0
-		addConstraintUsage(constraintUsage, i, value.r.l, rlRes["u"] or usageFromCapacity(value.r.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, i, value.r.l, rlRes["u"])
 	elseif value.k == 2 then
 		-- concurrency
 		local updates = {}
@@ -374,11 +362,10 @@ for i, value in ipairs(constraints) do
 		-- batch-update concurrency
 		call("ZADD", value.c.ilk, unpack(updates))
 
-		-- Reuse cached capacity from first pass and reduce by granted amount
-		-- instead of redundant ZCOUNT queries. We know we just added 'granted' leases.
-		constraintCapacity = concurrencyCapacityCache[i] - granted
+		local inProgressLeases = getConcurrencyCount(value.c.ilk)
+		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
-		addConstraintUsage(constraintUsage, i, value.c.l, usageFromCapacity(value.c.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, i, value.c.l, inProgressLeases)
 	elseif value.k == 3 then
 		-- update throttle: consume 1 unit
 		-- allow consuming all capacity in one request (for generating multiple leases)
@@ -386,7 +373,7 @@ for i, value in ipairs(constraints) do
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, granted)
 		constraintRetryAt = toInteger(throttleRes["retry_at"])
 		constraintCapacity = throttleRes["remaining"] or 0
-		addConstraintUsage(constraintUsage, i, value.t.l, usageFromCapacity(value.t.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, i, value.t.l, throttleRes["u"])
 	elseif value.k == 4 then
 		-- semaphore: increment usage counter
 		local weight = value.sem.w

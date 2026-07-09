@@ -52,10 +52,6 @@ end
 local function toInteger(value)
 	return math.floor(value + 0.5) 
 end
-local function usageFromCapacity(limit, capacity)
-	limit = limit or 0
-	return math.max(math.min(limit - capacity, limit), 0)
-end
 local function addConstraintUsage(target, index, limit, used)
 	local usage = {}
 	usage["i"] = index
@@ -216,7 +212,6 @@ local limitingConstraints = {}
 local exhaustedConstraints = {}
 local exhaustedSet = {}
 local retryAt = 0
-local concurrencyCapacityCache = {}
 local constraintUsage = {}
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 local cacheEnabled = cacheMaxTTL > 0
@@ -273,19 +268,18 @@ for index, value in ipairs(constraints) do
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
 		constraintCapacity = rlRes["remaining"] or 0
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000) 
-		addConstraintUsage(constraintUsage, index, value.r.l, rlRes["u"] or usageFromCapacity(value.r.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, index, value.r.l, rlRes["u"])
 	elseif value.k == 2 then
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
-		addConstraintUsage(constraintUsage, index, value.c.l, usageFromCapacity(value.c.l, constraintCapacity))
-		concurrencyCapacityCache[index] = constraintCapacity
+		addConstraintUsage(constraintUsage, index, value.c.l, inProgressLeases)
 	elseif value.k == 3 then
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"] or 0
 		constraintRetryAt = toInteger(throttleRes["retry_at"]) 
-		addConstraintUsage(constraintUsage, index, value.t.l, usageFromCapacity(value.t.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, index, value.t.l, throttleRes["u"])
 	elseif value.k == 4 then
 		local usage = tonumber(call("GET", value.sem.k)) or 0
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
@@ -355,7 +349,7 @@ for i, value in ipairs(constraints) do
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, granted)
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000)
 		constraintCapacity = rlRes["remaining"] or 0
-		addConstraintUsage(constraintUsage, i, value.r.l, rlRes["u"] or usageFromCapacity(value.r.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, i, value.r.l, rlRes["u"])
 	elseif value.k == 2 then
 		local updates = {}
 		for j = 1, granted, 1 do
@@ -364,15 +358,16 @@ for i, value in ipairs(constraints) do
 			updates[(j - 1) * 2 + 2] = initialLeaseID
 		end
 		call("ZADD", value.c.ilk, unpack(updates))
-		constraintCapacity = concurrencyCapacityCache[i] - granted
+		local inProgressLeases = getConcurrencyCount(value.c.ilk)
+		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
-		addConstraintUsage(constraintUsage, i, value.c.l, usageFromCapacity(value.c.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, i, value.c.l, inProgressLeases)
 	elseif value.k == 3 then
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, granted)
 		constraintRetryAt = toInteger(throttleRes["retry_at"])
 		constraintCapacity = throttleRes["remaining"] or 0
-		addConstraintUsage(constraintUsage, i, value.t.l, usageFromCapacity(value.t.l, constraintCapacity))
+		addConstraintUsage(constraintUsage, i, value.t.l, throttleRes["u"])
 	elseif value.k == 4 then
 		local weight = value.sem.w
 		if not weight or weight <= 0 then

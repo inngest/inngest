@@ -74,6 +74,47 @@ func TestCapacityOperationUsageObservations(t *testing.T) {
 	requireConcurrencyUsage(t, releaseResp.Usage, enums.ConcurrencyScopeFn, 0, 3)
 }
 
+func TestAcquireConcurrencyUsageCanExceedCurrentLimit(t *testing.T) {
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	cm, _, clock, ctx := newTestSetup(t, nil)
+
+	constraints := []ConstraintItem{
+		{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Scope: enums.ConcurrencyScopeFn,
+				Mode:  enums.ConcurrencyModeStep,
+			},
+		},
+	}
+
+	initialConfig := ConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: ConcurrencyConfig{
+			FunctionConcurrency: 3,
+		},
+	}
+	initialReq := makeAcquireRequest(accountID, envID, fnID, clock, initialConfig, constraints, "usage-over-limit-fill")
+	initialReq.Amount = 3
+	initialReq.LeaseIdempotencyKeys = []string{"item0", "item1", "item2"}
+	initialResp, err := cm.Acquire(ctx, initialReq)
+	require.NoError(t, err)
+	require.Len(t, initialResp.Leases, 3)
+	requireConcurrencyUsage(t, initialResp.Usage, enums.ConcurrencyScopeFn, 3, 3)
+
+	loweredConfig := ConstraintConfig{
+		FunctionVersion: 2,
+		Concurrency: ConcurrencyConfig{
+			FunctionConcurrency: 2,
+		},
+	}
+	rejectedReq := makeAcquireRequest(accountID, envID, fnID, clock, loweredConfig, constraints, "usage-over-limit-reject")
+	rejectedResp, err := cm.Acquire(ctx, rejectedReq)
+	require.NoError(t, err)
+	require.Empty(t, rejectedResp.Leases)
+	requireConcurrencyUsage(t, rejectedResp.Usage, enums.ConcurrencyScopeFn, 3, 2)
+}
+
 func TestCapacityOperationIdempotencyReplaysAreMarked(t *testing.T) {
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 	cm, _, clock, ctx := newTestSetup(t, nil)
