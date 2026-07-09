@@ -130,6 +130,9 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 	if svc.queueProcessor == nil {
 		panic("queue processor must be provided for executor service")
 	}
+	if svc.queue == nil {
+		panic("queue must be provided for executor service")
+	}
 
 	return svc
 }
