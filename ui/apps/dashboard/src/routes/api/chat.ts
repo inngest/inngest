@@ -101,6 +101,9 @@ export const Route = createFileRoute('/api/chat')({
               // validate_query round trips on the agent's behalf.
               canValidate: true,
             },
+            // Groups every run for this conversation under one session in
+            // the dashboard's AI > Sessions view.
+            meta: threadId ? { sessions: { thread_id: threadId } } : undefined,
           });
 
           return new Response(
