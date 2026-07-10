@@ -549,6 +549,80 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Equal(t, constraintapi.RunProcessingModeDurableEndpoint, releaseResp.CreationSource.RunProcessingMode)
 			})
 
+			t.Run("constraint API accepts empty usage arrays", func(t *testing.T) {
+				shard := setup(t)
+
+				rc := shard.Client().Client()
+
+				cm, err := constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClock(clockwork.NewRealClock()),
+					constraintapi.WithEnableDebugLogs(false),
+					constraintapi.WithClient(rc),
+					constraintapi.WithShardName("test"),
+				)
+				require.NoError(t, err)
+
+				t.Run("acquire", func(t *testing.T) {
+					accountID, envID, functionID := uuid.New(), uuid.New(), uuid.New()
+					config, constraints := constraintAPIEmptyUsageConfig()
+
+					firstReq := constraintAPIEmptyUsageAcquireRequest(accountID, envID, functionID, config, constraints, "empty-usage-acquire")
+					firstResp, err := cm.Acquire(ctx, firstReq)
+					require.NoError(t, err)
+					require.Len(t, firstResp.Leases, 1)
+					require.NotEmpty(t, firstResp.Usage)
+
+					// Reuse the same idempotency key with a different request
+					// fingerprint. Operation idempotency misses, while the real
+					// constraint-check idempotency marker from firstReq makes
+					// acquire.lua skip GCRA and return an empty Lua table for cu.
+					skippedConfig := config
+					skippedConfig.FunctionVersion++
+					skippedReq := constraintAPIEmptyUsageAcquireRequest(accountID, envID, functionID, skippedConfig, constraints, firstReq.IdempotencyKey)
+
+					resp, err := cm.Acquire(ctx, skippedReq)
+					require.NoError(t, err)
+					require.Len(t, resp.Leases, 1)
+					require.Empty(t, resp.Usage)
+				})
+
+				t.Run("extend", func(t *testing.T) {
+					accountID, envID, functionID := uuid.New(), uuid.New(), uuid.New()
+					config, constraints := constraintAPIEmptyUsageConfig()
+
+					acquireResp, err := cm.Acquire(ctx, constraintAPIEmptyUsageAcquireRequest(accountID, envID, functionID, config, constraints, "empty-usage-extend-acquire"))
+					require.NoError(t, err)
+					require.Len(t, acquireResp.Leases, 1)
+
+					extendResp, err := cm.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+						IdempotencyKey: "empty-usage-extend",
+						AccountID:      accountID,
+						LeaseID:        acquireResp.Leases[0].LeaseID,
+						Duration:       5 * time.Second,
+					})
+					require.NoError(t, err)
+					require.NotNil(t, extendResp.LeaseID)
+					require.Empty(t, extendResp.Usage)
+				})
+
+				t.Run("release", func(t *testing.T) {
+					accountID, envID, functionID := uuid.New(), uuid.New(), uuid.New()
+					config, constraints := constraintAPIEmptyUsageConfig()
+
+					acquireResp, err := cm.Acquire(ctx, constraintAPIEmptyUsageAcquireRequest(accountID, envID, functionID, config, constraints, "empty-usage-release-acquire"))
+					require.NoError(t, err)
+					require.Len(t, acquireResp.Leases, 1)
+
+					releaseResp, err := cm.Release(ctx, &constraintapi.CapacityReleaseRequest{
+						IdempotencyKey: "empty-usage-release",
+						AccountID:      accountID,
+						LeaseID:        acquireResp.Leases[0].LeaseID,
+					})
+					require.NoError(t, err)
+					require.Empty(t, releaseResp.Usage)
+				})
+			})
+
 			t.Run("acquire cache hit on exhausted constraint", func(t *testing.T) {
 				shard := setup(t)
 
@@ -761,5 +835,58 @@ func TestLuaCompatibility(t *testing.T) {
 				require.False(t, acquire3Resp.RetryAfter.IsZero(), "RetryAfter should be set when capacity is exhausted")
 			})
 		})
+	}
+}
+
+func constraintAPIEmptyUsageConfig() (constraintapi.ConstraintConfig, []constraintapi.ConstraintItem) {
+	config := constraintapi.ConstraintConfig{
+		FunctionVersion: 1,
+		RateLimit: []constraintapi.RateLimitConfig{
+			{
+				Scope:             enums.RateLimitScopeFn,
+				KeyExpressionHash: "expr",
+				Limit:             120,
+				Period:            60,
+			},
+		},
+	}
+	constraints := []constraintapi.ConstraintItem{
+		{
+			Kind: constraintapi.ConstraintKindRateLimit,
+			RateLimit: &constraintapi.RateLimitConstraint{
+				Scope:             enums.RateLimitScopeFn,
+				KeyExpressionHash: "expr",
+				EvaluatedKeyHash:  "value",
+			},
+		},
+	}
+	return config, constraints
+}
+
+func constraintAPIEmptyUsageAcquireRequest(
+	accountID uuid.UUID,
+	envID uuid.UUID,
+	functionID uuid.UUID,
+	config constraintapi.ConstraintConfig,
+	constraints []constraintapi.ConstraintItem,
+	idempotencyKey string,
+) *constraintapi.CapacityAcquireRequest {
+	return &constraintapi.CapacityAcquireRequest{
+		IdempotencyKey:       idempotencyKey,
+		AccountID:            accountID,
+		EnvID:                envID,
+		FunctionID:           functionID,
+		Configuration:        config,
+		Constraints:          constraints,
+		Amount:               1,
+		LeaseIdempotencyKeys: []string{"item-" + idempotencyKey},
+		CurrentTime:          time.Now(),
+		Duration:             5 * time.Second,
+		MaximumLifetime:      time.Hour,
+		Source: constraintapi.LeaseSource{
+			Service:           constraintapi.ServiceAPI,
+			Location:          constraintapi.CallerLocationItemLease,
+			RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+		},
 	}
 }
