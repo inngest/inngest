@@ -228,6 +228,13 @@ type capturingQueue struct {
 	queue.Queue
 	mu       sync.Mutex
 	enqueued []capturedEnqueue
+
+	// enqueueOverride, when non-nil, replaces the delegated Enqueue call: its
+	// return value is handed back to the caller instead of ever reaching the
+	// wrapped queue. This lets tests deterministically provoke queue-level
+	// errors (eg. queue.ErrQueueItemExists) that would otherwise require a
+	// genuine race between concurrent schedulers.
+	enqueueOverride func(item queue.Item) error
 }
 
 type capturedEnqueue struct {
@@ -238,7 +245,12 @@ type capturedEnqueue struct {
 func (q *capturingQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {
 	q.mu.Lock()
 	q.enqueued = append(q.enqueued, capturedEnqueue{item: item, at: at})
+	override := q.enqueueOverride
 	q.mu.Unlock()
+
+	if override != nil {
+		return override(item)
+	}
 	return q.Queue.Enqueue(ctx, item, at, opts)
 }
 
@@ -344,9 +356,15 @@ func (s *saveStepCapturingState) calls() []capturedSaveStep {
 type lifecycleRecorder struct {
 	execution.NoopLifecyceListener
 
+	functionScheduled   chan functionScheduledCall
 	functionStarted     chan functionStartedCall
 	functionFinished    chan functionFinishedCall
 	waitForEventResumed chan waitForEventResumedCall
+}
+
+type functionScheduledCall struct {
+	md   statev2.Metadata
+	item queue.Item
 }
 
 type functionStartedCall struct {
@@ -368,10 +386,20 @@ type waitForEventResumedCall struct {
 
 func newLifecycleRecorder() *lifecycleRecorder {
 	return &lifecycleRecorder{
+		functionScheduled:   make(chan functionScheduledCall, 16),
 		functionStarted:     make(chan functionStartedCall, 16),
 		functionFinished:    make(chan functionFinishedCall, 16),
 		waitForEventResumed: make(chan waitForEventResumedCall, 16),
 	}
+}
+
+func (r *lifecycleRecorder) OnFunctionScheduled(
+	ctx context.Context,
+	md statev2.Metadata,
+	item queue.Item,
+	evts []event.TrackedEvent,
+) {
+	r.functionScheduled <- functionScheduledCall{md: md, item: item}
 }
 
 func (r *lifecycleRecorder) OnFunctionStarted(
@@ -400,6 +428,24 @@ func (r *lifecycleRecorder) OnWaitForEventResumed(
 	req execution.ResumeRequest,
 ) {
 	r.waitForEventResumed <- waitForEventResumedCall{md: md, pause: pause, req: req}
+}
+
+// drainFunctionScheduled waits up to timeout for exactly n OnFunctionScheduled
+// calls, failing the test if that count isn't reached in time.
+func (r *lifecycleRecorder) drainFunctionScheduled(t *testing.T, n int, timeout time.Duration) []functionScheduledCall {
+	t.Helper()
+	calls := make([]functionScheduledCall, 0, n)
+	deadline := time.After(timeout)
+	for len(calls) < n {
+		select {
+		case c := <-r.functionScheduled:
+			calls = append(calls, c)
+		case <-deadline:
+			require.Len(t, calls, n, "timed out waiting for OnFunctionScheduled calls")
+			return calls
+		}
+	}
+	return calls
 }
 
 // drainFunctionStarted waits up to timeout for exactly n OnFunctionStarted
