@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'vitest';
 
-import { getAIInfo, type OpenAIOutput } from './utils';
+import { getAIInfo, getAIInfoFromMetadata, type OpenAIOutput } from './utils';
 
 const googleOutput = {
   body: {
@@ -377,8 +377,8 @@ describe('parseAIOutput', (t) => {
 
     assert.deepStrictEqual(aiInfo, {
       model: 'gpt-4o-mini-2024-07-18',
-      promptTokens: 16,
-      completionTokens: 18,
+      inputTokens: 16,
+      outputTokens: 18,
       totalTokens: 34,
     });
   });
@@ -387,10 +387,10 @@ describe('parseAIOutput', (t) => {
     const aiInfo = getAIInfo(vercelOutput);
 
     assert.deepStrictEqual(aiInfo, {
-      completionTokens: 19,
-      promptTokens: 16,
-      totalTokens: 35,
       model: 'gpt-4o-mini-2024-07-18',
+      inputTokens: 16,
+      outputTokens: 19,
+      totalTokens: 35,
     });
   });
 
@@ -398,10 +398,10 @@ describe('parseAIOutput', (t) => {
     const aiInfo = getAIInfo(anthropicOutput);
 
     assert.deepStrictEqual(aiInfo, {
-      completionTokens: 35,
-      promptTokens: 17,
-      totalTokens: 52,
       model: 'claude-3-5-sonnet-20241022',
+      inputTokens: 17,
+      outputTokens: 35,
+      totalTokens: 52,
     });
   });
 
@@ -409,10 +409,95 @@ describe('parseAIOutput', (t) => {
     const aiInfo = getAIInfo(googleOutput);
 
     assert.deepStrictEqual(aiInfo, {
-      completionTokens: 17,
-      promptTokens: 9,
-      totalTokens: 26,
       model: 'gemini-1.5-flash-001',
+      inputTokens: 9,
+      outputTokens: 17,
+      totalTokens: 26,
+    });
+  });
+
+  it('ignores nested cost fields when direct usage tokens exist', () => {
+    const aiInfo = getAIInfo({
+      model: 'claude-opus-4-1',
+      usage: {
+        cacheRead: 0,
+        cacheWrite: 3258,
+        cost: {
+          cacheread: 0,
+          cachewrite: 0.061087,
+          input: 0.000045,
+          output: 0.00765,
+          total: 0.0687825,
+        },
+        input: 3,
+        output: 102,
+        totaltokens: 3363,
+      },
+    });
+
+    assert.deepStrictEqual(aiInfo, {
+      model: 'claude-opus-4-1',
+      inputTokens: 3,
+      outputTokens: 102,
+      totalTokens: 3363,
+    });
+  });
+});
+
+describe('getAIInfoFromMetadata', () => {
+  it('prefers step_attempt metadata and returns canonical fields', () => {
+    const aiInfo = getAIInfoFromMetadata([
+      {
+        kind: 'inngest.ai',
+        scope: 'extended_trace',
+        updatedAt: '2026-01-01T00:00:00Z',
+        values: {
+          input_tokens: 8,
+          output_tokens: 13,
+          total_tokens: 21,
+          model: 'old-model',
+        },
+      },
+      {
+        kind: 'inngest.ai',
+        scope: 'step_attempt',
+        updatedAt: '2026-01-01T00:00:01Z',
+        values: {
+          input_tokens: 16,
+          output_tokens: 19,
+          total_tokens: 35,
+          model: 'gpt-4o-mini-2024-07-18',
+        },
+      },
+    ]);
+
+    assert.deepStrictEqual(aiInfo, {
+      model: 'gpt-4o-mini-2024-07-18',
+      inputTokens: 16,
+      outputTokens: 19,
+      totalTokens: 35,
+    });
+  });
+
+  it('computes total tokens when canonical metadata omits it', () => {
+    const aiInfo = getAIInfoFromMetadata([
+      {
+        kind: 'inngest.ai',
+        scope: 'step_attempt',
+        updatedAt: '2026-01-01T00:00:01Z',
+        values: {
+          input_tokens: 7,
+          output_tokens: 5,
+          model: 'claude-sonnet-4-5',
+        },
+      },
+    ]);
+
+    assert.deepStrictEqual(aiInfo, {
+      model: 'claude-sonnet-4-5',
+      inputTokens: 7,
+      outputTokens: 5,
+      totalTokens: 12,
     });
   });
 });
