@@ -135,8 +135,9 @@ Tier 2 diffs become legible against a smaller surrounding file.
       0%/thin functions)
 - [ ] Add characterization tests for `schedule`'s branch exits (rate-limit /
       debounce / skip) before extracting
-- [ ] Add `BenchmarkSchedule` in `tests/execution/executor` and capture a
-      `benchstat` baseline
+- [x] Add `BenchmarkSchedule` in `tests/execution/executor` and capture a
+      `benchstat` baseline (354.7µs/op ± 4%, 661.3KiB/op, 3.455k allocs/op;
+      `schedule_bench_test.go`)
 
 `schedule` (currently ~lines 934–1684, 750 lines) is a mostly linear pipeline,
 but it has fragile early returns and span/state cleanup. Prefer a private

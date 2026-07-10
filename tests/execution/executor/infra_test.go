@@ -55,7 +55,7 @@ type deferTestInfra struct {
 	rq            queue.Queue
 }
 
-func newDeferTestInfra(t *testing.T) *deferTestInfra {
+func newDeferTestInfra(t testing.TB) *deferTestInfra {
 	t.Helper()
 	ctx := logger.WithStdlib(context.Background(), logger.VoidLogger())
 
@@ -144,7 +144,7 @@ func newDeferTestInfra(t *testing.T) *deferTestInfra {
 // newExecutor builds an executor wired to the shared infra. Pass a non-nil
 // driver to drive Execute() calls; pass nil when only the checkpointer will
 // be used.
-func (i *deferTestInfra) newExecutor(t *testing.T, driver *mockDriverV1) execution.Executor {
+func (i *deferTestInfra) newExecutor(t testing.TB, driver *mockDriverV1) execution.Executor {
 	t.Helper()
 	return i.newExecutorWithQueue(t, i.rq, driver)
 }
@@ -153,7 +153,7 @@ func (i *deferTestInfra) newExecutor(t *testing.T, driver *mockDriverV1) executi
 // discovery-enqueue tests that wrap the shared queue in enqueueCountingQueue.
 // extraOpts are appended last, so they can override any default above (e.g.
 // swapping in a capturing statev2.RunService or a fake exechttp.RequestExecutor).
-func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, driver *mockDriverV1, extraOpts ...executor.ExecutorOpt) execution.Executor {
+func (i *deferTestInfra) newExecutorWithQueue(t testing.TB, q queue.Queue, driver *mockDriverV1, extraOpts ...executor.ExecutorOpt) execution.Executor {
 	t.Helper()
 
 	opts := []executor.ExecutorOpt{
@@ -190,7 +190,7 @@ func (i *deferTestInfra) newCheckpointer(t *testing.T, exec execution.Executor) 
 }
 
 // scheduleRun kicks off a fresh run and returns its metadata.
-func (i *deferTestInfra) scheduleRun(t *testing.T, exec execution.Executor) *statev2.Metadata {
+func (i *deferTestInfra) scheduleRun(t testing.TB, exec execution.Executor) *statev2.Metadata {
 	t.Helper()
 	now := time.Now()
 	evtID := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
@@ -507,7 +507,7 @@ func (r *lifecycleRecorder) drainWaitForEventResumed(t *testing.T, n int, timeou
 	return calls
 }
 
-func createInmemoryRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, error) {
+func createInmemoryRedis(t testing.TB) (*miniredis.Miniredis, rueidis.Client, error) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
