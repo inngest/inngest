@@ -3610,6 +3610,13 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 
 	groups := opGroups(resp.Generator)
 
+	// One handling timestamp for the whole response: handlers run
+	// concurrently below, so per-handler clocks would give parallel opcodes
+	// distinct span queue times and a nondeterministic trace order.
+	handledAt := e.now()
+	groups.PriorityGroup.HandledAt = handledAt
+	groups.OtherGroup.HandledAt = handledAt
+
 	nonLazyIDs := groups.NonLazyIDs()
 
 	// When scheduling multiple parallel steps, compute a stable coalesceKey
@@ -5064,7 +5071,17 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		ParallelMode: gen.ParallelMode(),
 	}
 	attrs := tracing.GeneratorAttrs(&gen)
-	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
+	// The invoke is queued the moment this opcode is handled. Do NOT stamp
+	// the reporting request's queue times here: with checkpointing that
+	// request predates sibling steps executed within it, and the trace UI
+	// sorts run children by queuedAt — a stale stamp prepends the invoke span
+	// with a phantom queued segment.
+	handledAt := group.HandledAt
+	if handledAt.IsZero() {
+		// Not handled as part of a response group (e.g. checkpoint API).
+		handledAt = now
+	}
+	tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
 	// Always correlate the triggering event ID with the invoked step.
 	meta.AddAttr(attrs, meta.Attrs.StepInvokeTriggerEventID, &evt.ID)
 	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusInvoking))
