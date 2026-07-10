@@ -3698,6 +3698,17 @@ func (e *executor) HandleGenerator(ctx context.Context, runCtx execution.RunCont
 	return e.handleGeneratorOp(ctx, runCtx, gen, OpcodeGroup{})
 }
 
+// opcodeHandledAt returns the time async-opcode handlers stamp as their step
+// span's queue time: the group's shared handling time when the opcode arrived
+// in an SDK response (keeping parallel opcodes' trace order deterministic),
+// else the handler's own clock (e.g. opcodes fed via the checkpoint API).
+func (e *executor) opcodeHandledAt(group OpcodeGroup) time.Time {
+	if !group.HandledAt.IsZero() {
+		return group.HandledAt
+	}
+	return e.now()
+}
+
 func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, group OpcodeGroup) error {
 	// Grab the edge that triggered this step execution.
 	lifecycleItem := runCtx.LifecycleItem()
@@ -3727,7 +3738,7 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 	case enums.OpcodeStepPlanned:
 		return e.handleGeneratorStepPlanned(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeSleep:
-		return e.handleGeneratorSleep(ctx, runCtx, gen, edge)
+		return e.handleGeneratorSleep(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeWaitForEvent:
 		return e.handleGeneratorWaitForEvent(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeInvokeFunction:
@@ -4369,7 +4380,15 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 	}
 
 	attrs := tracing.GeneratorAttrs(&gen)
-	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
+	// The planned step is queued the moment this opcode is handled (its own
+	// queue item's EnqueuedAt is only stamped at Enqueue, below). The queued
+	// segment still covers any wait for a concurrency slot: handling time →
+	// execution start. See OpcodeGroup.HandledAt, which avoids a stale
+	// queuedAt inherited from the request.
+	{
+		handledAt := e.opcodeHandledAt(group)
+		tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
+	}
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -4406,7 +4425,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, runCtx execut
 
 // handleSleep handles the sleep opcode, ensuring that we enqueue the function to rerun
 // at the correct time.
-func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {
 	dur, err := gen.SleepDuration()
 	if err != nil {
 		return err
@@ -4446,7 +4465,13 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	lifecycleItem := runCtx.LifecycleItem()
 	metadata := runCtx.Metadata()
 	attrs := tracing.GeneratorAttrs(&gen)
-	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
+	// The sleep begins the moment this opcode is handled — not when the
+	// reporting request was enqueued. See OpcodeGroup.HandledAt, which avoids
+	// a stale queuedAt inherited from the request.
+	{
+		handledAt := e.opcodeHandledAt(group)
+		tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
+	}
 	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusSleeping))
 
 	// Create a new span that we'll use to record the sleep as complete.
@@ -4870,7 +4895,13 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 
 	lifecycleItem := runCtx.LifecycleItem()
 	attrs := tracing.GeneratorAttrs(&gen)
-	tracing.AddQueueTimestampAttrs(attrs, lifecycleItem)
+	// The wait begins the moment this opcode is handled — not when the
+	// reporting request was enqueued. See OpcodeGroup.HandledAt, which avoids
+	// a stale queuedAt inherited from the request.
+	{
+		handledAt := e.opcodeHandledAt(group)
+		tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
+	}
 	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusWaiting))
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -5076,11 +5107,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	// request predates sibling steps executed within it, and the trace UI
 	// sorts run children by queuedAt — a stale stamp prepends the invoke span
 	// with a phantom queued segment.
-	handledAt := group.HandledAt
-	if handledAt.IsZero() {
-		// Not handled as part of a response group (e.g. checkpoint API).
-		handledAt = now
-	}
+	handledAt := e.opcodeHandledAt(group)
 	tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
 	// Always correlate the triggering event ID with the invoked step.
 	meta.AddAttr(attrs, meta.Attrs.StepInvokeTriggerEventID, &evt.ID)
@@ -5307,7 +5334,13 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		ParallelMode: gen.ParallelMode(),
 	}
 	attrs := tracing.GeneratorAttrs(&gen)
-	tracing.AddQueueTimestampAttrs(attrs, runCtx.LifecycleItem())
+	// The wait begins the moment this opcode is handled — not when the
+	// reporting request was enqueued. See OpcodeGroup.HandledAt, which avoids
+	// a stale queuedAt inherited from the request.
+	{
+		handledAt := e.opcodeHandledAt(group)
+		tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
+	}
 	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusWaiting))
 
 	lifecycleItem := runCtx.LifecycleItem()
