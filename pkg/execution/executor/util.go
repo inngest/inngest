@@ -42,6 +42,18 @@ type OpcodeGroup struct {
 	// start a new history group. This is true if the overall list of opcodes
 	// received from an SDK Call Request contains more than one opcode.
 	ShouldStartHistoryGroup bool
+	// HandledAt is when the executor began handling the SDK response this
+	// group came from. Async-opcode handlers stamp it as their step span's
+	// queuedAt: it is the moment the executor creates the op's event, pause,
+	// or queue item — the earliest instant the step exists to wait on
+	// anything — so the span's queued segment measures real wait (handling →
+	// execution/resume start). The reporting request's enqueue time would be
+	// wrong here: it can predate sibling steps executed within that request
+	// (stale inherited queuedAt). A single timestamp shared across the group keeps the trace
+	// order of concurrently-handled parallel opcodes deterministic. Zero when
+	// an opcode is handled outside a response group (e.g. the checkpoint
+	// API); handlers fall back to their own clock.
+	HandledAt time.Time
 	// ParallelCoalesceKey is a stable key shared by all items in this parallel
 	// batch.  When non-empty, handlers use it to derive a deterministic
 	// discovery JobID so concurrent fan-in completions deduplicate to one step.
