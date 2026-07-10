@@ -337,6 +337,94 @@ func (s *saveStepCapturingState) calls() []capturedSaveStep {
 	return out
 }
 
+// lifecycleRecorder is an execution.LifecycleListener that records selected
+// hook invocations onto buffered channels. The executor fires lifecycle hooks
+// from goroutines (`go e.OnX(...)` at each call site), so tests must drain
+// these channels with a timeout rather than asserting on call timing.
+type lifecycleRecorder struct {
+	execution.NoopLifecyceListener
+
+	functionStarted  chan functionStartedCall
+	functionFinished chan functionFinishedCall
+}
+
+type functionStartedCall struct {
+	md   statev2.Metadata
+	item queue.Item
+}
+
+type functionFinishedCall struct {
+	md   statev2.Metadata
+	item queue.Item
+	resp state.DriverResponse
+}
+
+func newLifecycleRecorder() *lifecycleRecorder {
+	return &lifecycleRecorder{
+		functionStarted:  make(chan functionStartedCall, 16),
+		functionFinished: make(chan functionFinishedCall, 16),
+	}
+}
+
+func (r *lifecycleRecorder) OnFunctionStarted(
+	ctx context.Context,
+	md statev2.Metadata,
+	item queue.Item,
+	evts []json.RawMessage,
+) {
+	r.functionStarted <- functionStartedCall{md: md, item: item}
+}
+
+func (r *lifecycleRecorder) OnFunctionFinished(
+	ctx context.Context,
+	md statev2.Metadata,
+	item queue.Item,
+	evts []json.RawMessage,
+	resp state.DriverResponse,
+) {
+	r.functionFinished <- functionFinishedCall{md: md, item: item, resp: resp}
+}
+
+// drainFunctionStarted waits up to timeout for exactly n OnFunctionStarted
+// calls, failing the test if that count isn't reached in time.
+func (r *lifecycleRecorder) drainFunctionStarted(t *testing.T, n int, timeout time.Duration) []functionStartedCall {
+	t.Helper()
+	calls := make([]functionStartedCall, 0, n)
+	deadline := time.After(timeout)
+	for len(calls) < n {
+		select {
+		case c := <-r.functionStarted:
+			calls = append(calls, c)
+		case <-deadline:
+			require.Len(t, calls, n, "timed out waiting for OnFunctionStarted calls")
+			return calls
+		}
+	}
+	return calls
+}
+
+// requireNoFunctionStarted asserts that no OnFunctionStarted call arrives
+// within wait, used to pin the item.Attempt==0 gate from the other side.
+func (r *lifecycleRecorder) requireNoFunctionStarted(t *testing.T, wait time.Duration) {
+	t.Helper()
+	select {
+	case c := <-r.functionStarted:
+		t.Fatalf("unexpected OnFunctionStarted call: %+v", c)
+	case <-time.After(wait):
+	}
+}
+
+// requireNoFunctionFinished asserts that no OnFunctionFinished call arrives
+// within wait, used to pin that a code path returned before finalization.
+func (r *lifecycleRecorder) requireNoFunctionFinished(t *testing.T, wait time.Duration) {
+	t.Helper()
+	select {
+	case c := <-r.functionFinished:
+		t.Fatalf("unexpected OnFunctionFinished call: %+v", c)
+	case <-time.After(wait):
+	}
+}
+
 func createInmemoryRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, error) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -359,11 +447,16 @@ func createInmemoryRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, er
 	return r, rc, nil
 }
 
-// mockDriverV1 implements driver.DriverV1 for testing
+// mockDriverV1 implements driver.DriverV1 for testing. calls tracks how many
+// times Execute was invoked, so tests can assert the driver was never reached
+// (e.g. when the executor fails to resolve a runtime driver beforehand).
 type mockDriverV1 struct {
 	response *state.DriverResponse
 	err      error
 	t        *testing.T
+
+	mu    sync.Mutex
+	calls int
 }
 
 func (m *mockDriverV1) Name() string { return "http" }
@@ -378,5 +471,14 @@ func (m *mockDriverV1) Execute(
 	stackIndex int,
 	attempt int,
 ) (*state.DriverResponse, error) {
+	m.mu.Lock()
+	m.calls++
+	m.mu.Unlock()
 	return m.response, m.err
+}
+
+func (m *mockDriverV1) callCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.calls
 }
