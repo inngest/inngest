@@ -882,8 +882,8 @@ describe('traceConversion', () => {
     // Case B: the step 5xx's on every attempt, so its ID is never learned. The
     // server emits a pre-grouped backend span (no groupID, holds the attempts)
     // plus loose per-attempt spans. The grouped attempts have no step to
-    // attribute to -> "Function error"; the backend passthrough still renders
-    // alongside it (de-duping it is intentionally out of scope here).
+    // attribute to -> "Function error", and the redundant backend passthrough
+    // is dropped (EXE-1992).
     it('labels never-resolved failed attempts "Function error", not "Finalization"', () => {
       const root = createTrace({
         isRoot: true,
@@ -894,6 +894,10 @@ describe('traceConversion', () => {
         stepOp: null,
         groupID: 'g-root',
         childrenSpans: [
+          // Backend group span: no groupID, holds the attempts. It duplicates
+          // the loose per-attempt spans below (the same terminal failure
+          // surfaced twice). Once those roll into a "Function error" group,
+          // this redundant "Finalization" passthrough is dropped (EXE-1992).
           createTrace({
             spanID: 'backend-group',
             name: 'Finalization',
@@ -969,7 +973,12 @@ describe('traceConversion', () => {
       // The rolled-up loose attempts are now surfaced as a function error.
       expect(rollup?.name).toBe('Function error');
       expect(rollup?.childrenSpans).toHaveLength(3);
-      expect(childNames(out)).toEqual(['Finalization', 'Function error']);
+
+      // EXE-1992: the duplicate groupID-less "Finalization" passthrough is
+      // dropped once the attempts roll into "Function error", leaving it as
+      // the only run child.
+      expect(out.childrenSpans).toHaveLength(1);
+      expect(childNames(out)).toEqual(['Function error']);
     });
 
     // The final discovery itself can retry: the request after the last step
@@ -1059,8 +1068,10 @@ describe('traceConversion', () => {
 
     // Case C: a single pre-SDK failure (e.g. retries: 0). The lone FAILED
     // nonstep is labeled "Function error" (status-based naming: the group is
-    // where the run failed); the backend passthrough renders alongside it.
-    it('renders a single failed pre-stepID attempt alongside its backend passthrough', () => {
+    // where the run failed), and the groupID-less passthrough must still be
+    // de-duped — otherwise a redundant "Finalization" span renders alongside
+    // it (EXE-1992 with a single attempt).
+    it('de-dupes the finalization passthrough for a single failed pre-stepID attempt', () => {
       const root = createTrace({
         isRoot: true,
         spanID: 'run',
@@ -1095,12 +1106,14 @@ describe('traceConversion', () => {
 
       const out = traceRollup(structuredClone(root));
 
-      expect(out.childrenSpans).toHaveLength(2);
-      expect(childNames(out)).toEqual(['Finalization', 'Function error']);
+      // Exactly one terminal span; the duplicate passthrough is gone.
+      expect(out.childrenSpans).toHaveLength(1);
+      expect(childNames(out)).toEqual(['Function error']);
     });
 
     // Case D: a groupID-less finalization span with NO failed pre-SDK attempt
-    // group to duplicate is kept — the happy path depends on it.
+    // group to duplicate must be KEPT. Guards the drop from degrading into a
+    // blunt "always remove" (which would still pass the failure cases above).
     it('keeps a groupID-less finalization when no terminal failure is rendered', () => {
       const root = createTrace({
         isRoot: true,
