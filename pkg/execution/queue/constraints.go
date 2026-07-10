@@ -2,7 +2,9 @@ package queue
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -488,6 +490,13 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		},
 	})
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIError.String(), metrics.CounterOpt{
+				PkgName: pkgName,
+			})
+			return ItemLeaseConstraintCheckResult{}, nil
+		}
+
 		span.RecordError(err)
 		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item, "function_id", *shadowPart.FunctionID)
 		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIError.String(), metrics.CounterOpt{
