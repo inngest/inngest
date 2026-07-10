@@ -503,8 +503,8 @@ describe('traceConversion', () => {
       const result = traceRollup(root);
 
       expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['s2', 's1']);
-      expect(result.childrenSpans?.[1]).toBe(step1);
-      expect(step1.name).toBe('test-step'); // no "Attempt N" renaming
+      expect(result.childrenSpans?.[1]).toEqual(step1); // clone of the input span
+      expect(result.childrenSpans?.[1]?.name).toBe('test-step'); // no "Attempt N" renaming
     });
 
     it('rolls up a multi-attempt step into a virtual span', () => {
@@ -676,8 +676,8 @@ describe('traceConversion', () => {
       const result = traceRollup(root);
 
       expect(result.childrenSpans).toHaveLength(1);
-      expect(result.childrenSpans?.[0]).toBe(outputSpan);
-      expect(outputSpan.name).toBe('test-step');
+      expect(result.childrenSpans?.[0]).toEqual(outputSpan); // clone of the input span
+      expect(result.childrenSpans?.[0]?.name).toBe('test-step');
     });
 
     it('drops spans without a stepID/outputID and step spans with null attempts', () => {
@@ -1136,6 +1136,65 @@ describe('traceConversion', () => {
       const out = traceRollup(structuredClone(root));
 
       expect(childNames(out)).toContain('Finalization');
+    });
+    // traceRollup must NOT mutate its input. The result is memoized against the
+    // trace object, so on a re-render the memo re-runs traceRollup(trace) on the
+    // same object; if that object had been mutated into the rolled-up shape, the
+    // "Function error" group would collapse to a single span and get relabeled
+    // "Finalization". Non-mutation keeps every call operating on pristine input.
+    it('does not mutate its input, so repeated calls are stable', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        status: 'FAILED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-root',
+            outputID: 'o1',
+          }),
+          createTrace({
+            spanID: 'n2',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 2,
+            groupID: 'g-root',
+            outputID: 'o2',
+          }),
+        ],
+      });
+      const frozen = JSON.stringify(root);
+
+      const first = traceRollup(root);
+      // Input is untouched: the rollup operates on a clone.
+      expect(JSON.stringify(root)).toBe(frozen);
+      expect(childNames(first)).toContain('Function error');
+
+      // Re-running on the same (still-pristine) input yields the same labels —
+      // this is what the memoized render does across re-renders/polls.
+      const second = traceRollup(root);
+      expect(childNames(second)).toEqual(childNames(first));
     });
   });
 });

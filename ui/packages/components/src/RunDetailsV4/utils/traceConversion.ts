@@ -498,6 +498,15 @@ function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null
 // display in the timeline while still allowing users to see
 // individual attempts when they expand the step details.
 export function traceRollup(root: Trace): Trace {
+  // Operate on a clone so we never mutate the caller's (cached) trace. The
+  // rolled-up result is memoized against the trace object; without this, a
+  // re-render would feed our own output back in and roll it up a second time
+  // (which, e.g., collapses the multi-attempt "Function error" group into a
+  // single-span group and relabels it — see rollupFinalization's size === 1
+  // branch). The helpers below rename/reshape spans in place, which is safe
+  // precisely because they only ever see this clone.
+  root = structuredClone(root);
+
   const { stepOrder, steps, passthrough, finalizationAttempts, lastStep } = collectRollupGroups(
     root.childrenSpans ?? []
   );
