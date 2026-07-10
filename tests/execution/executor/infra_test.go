@@ -217,6 +217,41 @@ func (q *enqueueCountingQueue) Enqueue(ctx context.Context, item queue.Item, at 
 	return q.Queue.Enqueue(ctx, item, at, opts)
 }
 
+// capturingQueue wraps a queue.Queue and retains every enqueued item alongside
+// its scheduled time, so tests can assert on what was enqueued (kind, payload)
+// rather than merely counting calls. Extends the enqueueCountingQueue idea.
+type capturingQueue struct {
+	queue.Queue
+	mu       sync.Mutex
+	enqueued []capturedEnqueue
+}
+
+type capturedEnqueue struct {
+	item queue.Item
+	at   time.Time
+}
+
+func (q *capturingQueue) Enqueue(ctx context.Context, item queue.Item, at time.Time, opts queue.EnqueueOpts) error {
+	q.mu.Lock()
+	q.enqueued = append(q.enqueued, capturedEnqueue{item: item, at: at})
+	q.mu.Unlock()
+	return q.Queue.Enqueue(ctx, item, at, opts)
+}
+
+// itemsOfKind returns a copy of the captured items matching the given kind.
+func (q *capturingQueue) itemsOfKind(kind string) []queue.Item {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	var out []queue.Item
+	for _, c := range q.enqueued {
+		if c.item.Kind == kind {
+			out = append(out, c.item)
+		}
+	}
+	return out
+}
+
 // pendingCapturingState wraps a real RunService and captures every SavePending
 // call so tests can assert on what the executor handed off to the state layer.
 // All other methods pass through.
