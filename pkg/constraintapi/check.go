@@ -77,17 +77,14 @@ func buildCheckRequestData(req *CapacityCheckRequest) (
 }
 
 type checkScriptResponse struct {
-	Status               int              `json:"s"`
-	AvailableCapacity    int              `json:"a"`
-	LimitingConstraints  flexibleIntArray `json:"lc"`
-	ExhaustedConstraints flexibleIntArray `json:"ec"`
-	ConstraintUsage      []struct {
-		Usage int `json:"u"`
-		Limit int `json:"l"`
-	} `json:"cu"`
-	FairnessReduction int                 `json:"fr"`
-	RetryAt           int                 `json:"ra"`
-	Debug             flexibleStringArray `json:"d"`
+	Status               int                               `json:"s"`
+	AvailableCapacity    int                               `json:"a"`
+	LimitingConstraints  flexibleIntArray                  `json:"lc"`
+	ExhaustedConstraints flexibleIntArray                  `json:"ec"`
+	ConstraintUsage      flexibleCheckConstraintUsageArray `json:"cu"`
+	FairnessReduction    int                               `json:"fr"`
+	RetryAt              int                               `json:"ra"`
+	Debug                flexibleStringArray               `json:"d"`
 }
 
 // Check implements CapacityManager.

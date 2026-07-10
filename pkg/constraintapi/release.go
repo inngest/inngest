@@ -34,9 +34,9 @@ type releaseScriptResponse struct {
 		SourceRunProcessingMode int `json:"sm,omitempty"`
 	} `json:"m,omitempty"`
 
-	ConstraintUsage         []scriptConstraintUsage    `json:"cu"`
-	StoredConstraints       []SerializedConstraintItem `json:"sc"`
-	OperationIdempotencyHit int                        `json:"oih"`
+	ConstraintUsage         flexibleConstraintUsageArray `json:"cu"`
+	StoredConstraints       []SerializedConstraintItem   `json:"sc"`
+	OperationIdempotencyHit int                          `json:"oih"`
 }
 
 // Release implements CapacityManager.
@@ -129,7 +129,7 @@ func (r *redisCapacityManager) Release(ctx context.Context, req *CapacityRelease
 
 	res := &CapacityReleaseResponse{
 		AccountID:               req.AccountID,
-		Usage:                   constraintUsageFromScript(parsedResponse.ConstraintUsage, constraintItemsFromSerialized(parsedResponse.StoredConstraints)),
+		Usage:                   constraintUsageFromScript([]scriptConstraintUsage(parsedResponse.ConstraintUsage), constraintItemsFromSerialized(parsedResponse.StoredConstraints)),
 		OperationIdempotencyHit: parsedResponse.OperationIdempotencyHit != 0,
 		internalDebugState:      parsedResponse,
 	}

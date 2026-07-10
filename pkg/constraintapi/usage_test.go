@@ -268,8 +268,8 @@ func requireUsageCacheUsesStoredConstraints(t *testing.T, raw string) {
 	t.Helper()
 
 	var cached struct {
-		ConstraintUsage   []scriptConstraintUsage    `json:"cu"`
-		StoredConstraints []SerializedConstraintItem `json:"sc"`
+		ConstraintUsage   flexibleConstraintUsageArray `json:"cu"`
+		StoredConstraints []SerializedConstraintItem   `json:"sc"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(raw), &cached))
 	require.NotEmpty(t, cached.ConstraintUsage)
