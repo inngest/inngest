@@ -321,6 +321,14 @@ type RollupGroups = {
  * grouped by groupID. A group later claimed by a step span becomes extra
  * attempts of that step; a group that never matches a step is the run's
  * finalization.
+ *
+ * Classification is ORDER-SENSITIVE, deliberately: a grouped no-stepID span
+ * is adopted by a step only when the step span appears LATER in
+ * childrenSpans than the grouped span (see the `finalSpan?.groupID ==
+ * child.groupID` check below). The happy path relies on this ordering — the
+ * genuine finalization span shares the last step's groupID, and is only
+ * classified as finalization (rather than being claimed as an extra attempt
+ * of that step) because the server emits it after that step.
  */
 function collectRollupGroups(children: Trace[]): RollupGroups {
   const stepOrder: string[] = [];
@@ -461,6 +469,11 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
  *   which implies a normal wind-down.
  * - Still running: default to "Finalization" rather than flickering "Function
  *   error" on in-flight runs.
+ *
+ * Only a FAILED terminal status flips the label to "Function error" —
+ * CANCELLED or any other non-COMPLETED terminal state deliberately keeps
+ * "Finalization", matching the pre-existing default and avoiding label
+ * flicker for groups that aren't cleanly resolved as failures.
  */
 function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null): Trace {
   const { first, last } = attemptBounds(attempts);
