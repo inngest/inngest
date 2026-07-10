@@ -344,8 +344,9 @@ func (s *saveStepCapturingState) calls() []capturedSaveStep {
 type lifecycleRecorder struct {
 	execution.NoopLifecyceListener
 
-	functionStarted  chan functionStartedCall
-	functionFinished chan functionFinishedCall
+	functionStarted     chan functionStartedCall
+	functionFinished    chan functionFinishedCall
+	waitForEventResumed chan waitForEventResumedCall
 }
 
 type functionStartedCall struct {
@@ -359,10 +360,17 @@ type functionFinishedCall struct {
 	resp state.DriverResponse
 }
 
+type waitForEventResumedCall struct {
+	md    statev2.Metadata
+	pause state.Pause
+	req   execution.ResumeRequest
+}
+
 func newLifecycleRecorder() *lifecycleRecorder {
 	return &lifecycleRecorder{
-		functionStarted:  make(chan functionStartedCall, 16),
-		functionFinished: make(chan functionFinishedCall, 16),
+		functionStarted:     make(chan functionStartedCall, 16),
+		functionFinished:    make(chan functionFinishedCall, 16),
+		waitForEventResumed: make(chan waitForEventResumedCall, 16),
 	}
 }
 
@@ -383,6 +391,15 @@ func (r *lifecycleRecorder) OnFunctionFinished(
 	resp state.DriverResponse,
 ) {
 	r.functionFinished <- functionFinishedCall{md: md, item: item, resp: resp}
+}
+
+func (r *lifecycleRecorder) OnWaitForEventResumed(
+	ctx context.Context,
+	md statev2.Metadata,
+	pause state.Pause,
+	req execution.ResumeRequest,
+) {
+	r.waitForEventResumed <- waitForEventResumedCall{md: md, pause: pause, req: req}
 }
 
 // drainFunctionStarted waits up to timeout for exactly n OnFunctionStarted
@@ -423,6 +440,25 @@ func (r *lifecycleRecorder) requireNoFunctionFinished(t *testing.T, wait time.Du
 		t.Fatalf("unexpected OnFunctionFinished call: %+v", c)
 	case <-time.After(wait):
 	}
+}
+
+// drainWaitForEventResumed waits up to timeout for exactly n
+// OnWaitForEventResumed calls, failing the test if that count isn't reached
+// in time.
+func (r *lifecycleRecorder) drainWaitForEventResumed(t *testing.T, n int, timeout time.Duration) []waitForEventResumedCall {
+	t.Helper()
+	calls := make([]waitForEventResumedCall, 0, n)
+	deadline := time.After(timeout)
+	for len(calls) < n {
+		select {
+		case c := <-r.waitForEventResumed:
+			calls = append(calls, c)
+		case <-deadline:
+			require.Len(t, calls, n, "timed out waiting for OnWaitForEventResumed calls")
+			return calls
+		}
+	}
+	return calls
 }
 
 func createInmemoryRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, error) {
