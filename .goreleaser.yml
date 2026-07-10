@@ -110,7 +110,6 @@ homebrew_casks:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
       pull_request:
         enabled: true
-        draft: true
         base:
           owner: inngest
           name: homebrew-tap

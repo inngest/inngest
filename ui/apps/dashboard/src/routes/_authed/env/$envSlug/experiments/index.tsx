@@ -11,9 +11,8 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 
-import NotFound from '@/components/Error/NotFound';
+import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/experiments/')({
@@ -44,10 +43,8 @@ function ExperimentsComponent() {
     setIsMounted(true);
   }, []);
 
-  const experimentsEnabled = useBooleanFlag('experimentation-steps');
-
   const { data, isPending, error, refetch } = useExperimentsList({
-    enabled: isMounted && experimentsEnabled.value,
+    enabled: isMounted,
   });
 
   const handleRowClick = useCallback(
@@ -63,10 +60,6 @@ function ExperimentsComponent() {
     [navigate, envSlug],
   );
 
-  if (experimentsEnabled.isReady && !experimentsEnabled.value) {
-    return <NotFound />;
-  }
-
   const showEmptyState =
     !isPending && !error && Array.isArray(data) && data.length === 0;
 
@@ -78,6 +71,7 @@ function ExperimentsComponent() {
           infoIcon={<ExperimentsInfo />}
         />
         <ExperimentsEmptyState />
+        <FeedbackFloatingButton />
       </>
     );
   }
@@ -103,6 +97,7 @@ function ExperimentsComponent() {
           </>
         }
       />
+      <FeedbackFloatingButton />
     </>
   );
 }

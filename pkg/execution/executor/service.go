@@ -64,9 +64,10 @@ func WithExecutorOpts(opts ...ExecutorOpt) func(s *svc) {
 	}
 }
 
-func WithServiceQueue(q queue.Queue) func(s *svc) {
+func WithServiceQueueProcessor(qp queue.QueueProcessor) func(s *svc) {
 	return func(s *svc) {
-		s.queue = q
+		s.queueProcessor = qp
+		s.queue = qp.Queue()
 	}
 }
 
@@ -126,6 +127,12 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 	if svc.shards == nil {
 		panic("shard registry must be provided for executor service")
 	}
+	if svc.queueProcessor == nil {
+		panic("queue processor must be provided for executor service")
+	}
+	if svc.queue == nil {
+		panic("queue must be provided for executor service")
+	}
 
 	return svc
 }
@@ -138,6 +145,8 @@ type svc struct {
 	state state.Manager
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
+	// queueProcessor owns queue worker lifecycle.
+	queueProcessor queue.QueueProcessor
 	// exec runs the specific actions.
 	exec      execution.Executor
 	debouncer debounce.Debouncer
@@ -255,7 +264,7 @@ func (s *svc) isUnexpectedRunError(err error) bool {
 
 func (s *svc) Run(ctx context.Context) error {
 	s.log.Info("subscribing to function queue")
-	return s.queue.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
+	return s.queueProcessor.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()

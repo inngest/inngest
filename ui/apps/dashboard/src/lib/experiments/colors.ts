@@ -35,23 +35,20 @@ export function subtleColorForVariant(index: number): string {
   return METRIC_PALETTE_SUBTLE[index % METRIC_PALETTE_SUBTLE.length];
 }
 
-type MetricLike = { key: string; enabled: boolean };
+type MetricLike = { key: string };
 
 /**
- * Maps each enabled metric's key to its chart color. Colors are assigned by
- * position among *enabled* metrics (not the full list) so the result lines up
- * exactly with the Score Summary chart, which colors its stacked segments the
- * same way. Disabled metrics are omitted (callers fall back to a neutral tone).
+ * Maps each metric's key to its chart color. Colors are assigned by position in
+ * the full metrics list so a metric keeps the same color regardless of whether
+ * it (or any other metric) is enabled. The Score Summary chart builds its
+ * segment colors from the same map, so the two views stay in sync.
  */
 export function buildMetricColorMap(
   metrics: MetricLike[],
 ): Record<string, string> {
   const map: Record<string, string> = {};
-  let enabledIndex = 0;
-  for (const metric of metrics) {
-    if (!metric.enabled) continue;
-    map[metric.key] = colorForMetric(enabledIndex);
-    enabledIndex += 1;
-  }
+  metrics.forEach((metric, index) => {
+    map[metric.key] = colorForMetric(index);
+  });
   return map;
 }

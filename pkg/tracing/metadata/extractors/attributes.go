@@ -1,6 +1,8 @@
 package extractors
 
 import (
+	"strconv"
+
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 
 	"github.com/inngest/inngest/pkg/util"
@@ -25,7 +27,7 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 		}
 	}
 
-	read("gen_ai.request.model", func(v *v1.AnyValue) { md.Model = v.GetStringValue() })
+	read("gen_ai.request.model", func(v *v1.AnyValue) { md.RequestModel = v.GetStringValue() })
 	read("gen_ai.operation.name", func(v *v1.AnyValue) { md.OperationName = v.GetStringValue() })
 	read("gen_ai.response.model", func(v *v1.AnyValue) { md.ResponseModel = v.GetStringValue() })
 	read("gen_ai.response.id", func(v *v1.AnyValue) { md.ResponseID = v.GetStringValue() })
@@ -58,8 +60,56 @@ func extractAIMetadataFromAttributes(attributes []*v1.KeyValue, md *AIMetadata) 
 	// Provider: gen_ai.provider.name is canonical and gen_ai.system is its
 	// deprecated predecessor. Read system first so the canonical key overwrites
 	// it whenever both are present.
-	read("gen_ai.system", func(v *v1.AnyValue) { md.System = v.GetStringValue() })
-	read("gen_ai.provider.name", func(v *v1.AnyValue) { md.System = v.GetStringValue() })
+	read("gen_ai.system", func(v *v1.AnyValue) { md.Provider = v.GetStringValue() })
+	read("gen_ai.provider.name", func(v *v1.AnyValue) { md.Provider = v.GetStringValue() })
+
+	// Granular token usage.
+	read("gen_ai.usage.cache_read.input_tokens", func(v *v1.AnyValue) { md.CacheReadTokens = intFromAny(v) })
+	read("gen_ai.usage.cache_creation.input_tokens", func(v *v1.AnyValue) { md.CacheCreationTokens = intFromAny(v) })
+	read("gen_ai.usage.reasoning.output_tokens", func(v *v1.AnyValue) { md.ReasoningTokens = intFromAny(v) })
+
+	// Request parameters.
+	read("gen_ai.request.temperature", func(v *v1.AnyValue) { md.Temperature = floatFromAny(v) })
+	read("gen_ai.request.top_p", func(v *v1.AnyValue) { md.TopP = floatFromAny(v) })
+	read("gen_ai.request.max_tokens", func(v *v1.AnyValue) { md.MaxTokens = intFromAny(v) })
+	read("gen_ai.request.frequency_penalty", func(v *v1.AnyValue) { md.FrequencyPenalty = floatFromAny(v) })
+	read("gen_ai.request.presence_penalty", func(v *v1.AnyValue) { md.PresencePenalty = floatFromAny(v) })
+	read("gen_ai.request.seed", func(v *v1.AnyValue) { md.Seed = intFromAny(v) })
 
 	return foundAny
+}
+
+// intFromAny coerces an OTLP attribute to *int64. OTLP encoders are
+// inconsistent about int-vs-double-vs-string for numeric values, so we accept
+// an int, a double, or a numeric string (mirroring the JS SDK's Number()
+// coercion). Returns nil when the value can't be read as a number.
+func intFromAny(v *v1.AnyValue) *int64 {
+	switch v.GetValue().(type) {
+	case *v1.AnyValue_IntValue:
+		return util.ToPtr(v.GetIntValue())
+	case *v1.AnyValue_DoubleValue:
+		return util.ToPtr(int64(v.GetDoubleValue()))
+	case *v1.AnyValue_StringValue:
+		if n, err := strconv.ParseFloat(v.GetStringValue(), 64); err == nil {
+			return util.ToPtr(int64(n))
+		}
+	}
+	return nil
+}
+
+// floatFromAny coerces an OTLP attribute to *float64, accepting a double, an
+// int, or a numeric string. Returns nil when the value can't be read as a
+// number.
+func floatFromAny(v *v1.AnyValue) *float64 {
+	switch v.GetValue().(type) {
+	case *v1.AnyValue_DoubleValue:
+		return util.ToPtr(v.GetDoubleValue())
+	case *v1.AnyValue_IntValue:
+		return util.ToPtr(float64(v.GetIntValue()))
+	case *v1.AnyValue_StringValue:
+		if n, err := strconv.ParseFloat(v.GetStringValue(), 64); err == nil {
+			return util.ToPtr(n)
+		}
+	}
+	return nil
 }

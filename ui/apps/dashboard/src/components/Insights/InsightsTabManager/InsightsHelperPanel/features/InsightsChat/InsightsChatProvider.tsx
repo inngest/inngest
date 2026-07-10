@@ -15,6 +15,7 @@ import {
   sendChatMessage,
   type ClientState,
 } from './useInsightsAgent';
+import { useFetchInsights } from '@/components/Insights/InsightsStateMachineContext/useFetchInsights';
 import { useEventTypeSchemas } from '../SchemaExplorer/SchemasContext/useEventTypeSchemas';
 import type { InsightsRealtimeEvent, Message } from './types';
 
@@ -100,6 +101,62 @@ export function InsightsChatProvider({
     channelKey,
     enabled: !!channelKey,
   });
+
+  // The browser half of the agent's validate_query round trip: run the
+  // candidate SQL with this user's credentials, then report the outcome so
+  // the waiting agent run can self-correct.
+  const { fetchInsights } = useFetchInsights();
+  const validateSql = useCallback(
+    async (validationId: string, sql: string) => {
+      let result: {
+        ok: boolean;
+        columns?: string[];
+        rowCount?: number;
+        diagnostics?: { code?: string; message: string }[];
+      };
+      try {
+        const res = await fetchInsights(
+          { query: sql, queryName: 'agent-validation' },
+          () => {},
+        );
+        const errors = res.diagnostics.filter((d) => d.severity === 'error');
+        result =
+          errors.length > 0
+            ? {
+                ok: false,
+                diagnostics: errors.map((d) => ({
+                  code: d.code,
+                  message: d.message,
+                })),
+              }
+            : {
+                ok: true,
+                columns: res.columns.map((c) => c.name),
+                rowCount: res.rows.length,
+              };
+      } catch (error) {
+        result = {
+          ok: false,
+          diagnostics: [
+            {
+              message: error instanceof Error ? error.message : 'Query failed',
+            },
+          ],
+        };
+      }
+
+      try {
+        await fetch('/api/chat-validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ validationId, ...result }),
+        });
+      } catch {
+        // Nothing to do — the agent times out and proceeds unvalidated.
+      }
+    },
+    [fetchInsights],
+  );
 
   // Derive loading status from connection state
   const status: 'ready' | 'loading' = useMemo(() => {
@@ -200,6 +257,17 @@ export function InsightsChatProvider({
             break;
           }
 
+          case 'validation.requested': {
+            const validationId =
+              typeof evt.data.validationId === 'string'
+                ? evt.data.validationId
+                : undefined;
+            const sql =
+              typeof evt.data.sql === 'string' ? evt.data.sql : undefined;
+            if (validationId && sql) void validateSql(validationId, sql);
+            break;
+          }
+
           case 'error': {
             // Add error as an assistant message
             const errorMessage =
@@ -230,7 +298,7 @@ export function InsightsChatProvider({
         // Silently handle event processing errors
       }
     }
-  }, [realtimeMessages.delta]);
+  }, [realtimeMessages.delta, validateSql]);
 
   // Fetch event types and schemas using the same hook as SchemaExplorer
   const getEventTypeSchemas = useEventTypeSchemas();

@@ -3,9 +3,7 @@ import { Header } from '@inngest/components/Header/Header';
 import { SessionResults } from '@inngest/components/Sessions/SessionResults';
 import { ClientOnly, createFileRoute } from '@tanstack/react-router';
 
-import NotFound from '@/components/Error/NotFound';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { SessionsInfo } from '@/components/Sessions/SessionsInfo';
 import { useSessions } from '@/components/Sessions/useSessions';
 import { pathCreator } from '@/utils/urls';
@@ -37,7 +35,6 @@ function SessionResultsPage() {
   const envID = useEnvironment().id;
   const features = useAccountFeatures();
   const getSessions = useSessions();
-  const sessionsEnabled = useBooleanFlag('sessions-ui');
   const decodedSessionKey = decodeURIComponent(sessionKey);
 
   const internalPathCreator = useMemo(
@@ -53,10 +50,6 @@ function SessionResultsPage() {
     }),
     [envSlug],
   );
-
-  if (sessionsEnabled.isReady && !sessionsEnabled.value) {
-    return <NotFound />;
-  }
 
   return (
     <>

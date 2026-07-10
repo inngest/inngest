@@ -1,12 +1,13 @@
 import { Fragment } from 'react';
 
 import { useSystemStatus } from '../Support/SystemStatus';
+import FeedbackPopover from '../Feedback/FeedbackPopover';
 import SystemStatusIcon from '../Navigation/SystemStatusIcon';
 
 const links = [
-  { label: 'Support', href: 'https://support.inngest.com' },
   { label: 'Docs', href: 'https://www.inngest.com/docs?ref=app-bottom-bar' },
   { label: 'Changelog', href: 'https://www.inngest.com/changelog' },
+  { label: 'Support', href: 'https://support.inngest.com' },
 ];
 
 export default function BottomBar() {
@@ -28,6 +29,14 @@ export default function BottomBar() {
             </a>
           </Fragment>
         ))}
+        <FeedbackPopover
+          leadingDivider
+          trigger={
+            <button type="button" className="hover:text-basis">
+              Feedback
+            </button>
+          }
+        />
         <span className="text-disabled">|</span>
         <a
           href="https://status.inngest.com"

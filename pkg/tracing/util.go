@@ -494,6 +494,72 @@ func NonStepDynamicSeed(item queue.Item) []byte {
 	return fmt.Appendf(nil, "nonstep:%s:%d", item.GroupID, item.Attempt)
 }
 
+// SleepStepDynamicSeed derives the dynamic_span_id seed for a sleep step's
+// own span.
+func SleepStepDynamicSeed(stepID string) []byte {
+	return fmt.Appendf(nil, "sleep-step:%s", stepID)
+}
+
+// SleepDiscoveryDynamicSeed derives the dynamic_span_id seed for the
+// post-sleep discovery placeholder span.
+func SleepDiscoveryDynamicSeed(stepID string) []byte {
+	return fmt.Appendf(nil, "sleep-discovery:%s", stepID)
+}
+
+// SleepStepSpanRef reconstructs the SpanReference for a sleep step's own span
+func SleepStepSpanRef(runID ulid.ULID, stepID string) *meta.SpanReference {
+	cfg := DeterministicSpanConfig(runID[:])
+	stepSpanID := DeterministicSpanConfig(SleepStepDynamicSeed(stepID)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID:          stepSpanID.String(),
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
+	}
+}
+
+// SleepDiscoverySpanRef reconstructs the SpanReference for the post-sleep
+// discovery placeholder span.
+func SleepDiscoverySpanRef(runID ulid.ULID, stepID string) *meta.SpanReference {
+	cfg := DeterministicSpanConfig(runID[:])
+	spanID := DeterministicSpanConfig(SleepDiscoveryDynamicSeed(stepID)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID:          spanID.String(),
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), spanID.String()),
+	}
+}
+
+// SleepStepSpanRefResolve returns the sleep step's span ref for a resumed
+// sleep item. Legacy items carry the ref in item.Metadata[PropagationKey];
+// new items have it reconstructed deterministically and rehydrated
+// (along with the "discovery" ref) into item.Metadata so
+// downstream reads work uniformly. Returns nil if neither path is available.
+func SleepStepSpanRefResolve(item *queue.Item, runID ulid.ULID) *meta.SpanReference {
+	if ref := SpanRefFromQueueItem(item); ref != nil {
+		return ref
+	}
+	payload, ok := item.Payload.(queue.PayloadEdge)
+	if !ok || payload.Edge.Outgoing == "" {
+		return nil
+	}
+	ref := SleepStepSpanRef(runID, payload.Edge.Outgoing)
+	if ref == nil {
+		return nil
+	}
+	if item.Metadata == nil {
+		item.Metadata = map[string]any{}
+	}
+	if byt, err := json.Marshal(ref); err == nil {
+		item.Metadata[meta.PropagationKey] = string(byt)
+	}
+	if disc := SleepDiscoverySpanRef(runID, payload.Edge.Outgoing); disc != nil {
+		if byt, err := json.Marshal(disc); err == nil {
+			item.Metadata["discovery"] = string(byt)
+		}
+	}
+	return ref
+}
+
 // DeferSpanSeed returns the deterministic seed used to identify the
 // executor.defer span.
 func DeferSpanSeed(parentRunID ulid.ULID, hashedDeferID string) []byte {

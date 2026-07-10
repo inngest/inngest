@@ -15,7 +15,9 @@ import { Route as SupportIndexRouteImport } from './routes/support/index'
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support-tickets'
 import { Route as ApiSentryRouteImport } from './routes/api/sentry'
 import { Route as ApiInngestRouteImport } from './routes/api/inngest'
+import { Route as ApiFeedbackRouteImport } from './routes/api/feedback'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
+import { Route as ApiChatValidateRouteImport } from './routes/api/chat-validate'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup'
 import { Route as authSwitchOrganizationRouteImport } from './routes/(auth)/switch-organization'
@@ -136,9 +138,19 @@ const ApiInngestRoute = ApiInngestRouteImport.update({
   path: '/api/inngest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFeedbackRoute = ApiFeedbackRouteImport.update({
+  id: '/api/feedback',
+  path: '/api/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCspReportRoute = ApiCspReportRouteImport.update({
   id: '/api/csp-report',
   path: '/api/csp-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatValidateRoute = ApiChatValidateRouteImport.update({
+  id: '/api/chat-validate',
+  path: '/api/chat-validate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -674,7 +686,9 @@ export interface FileRoutesByFullPath {
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
@@ -771,7 +785,9 @@ export interface FileRoutesByTo {
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
@@ -859,7 +875,9 @@ export interface FileRoutesById {
   '/(auth)/switch-organization': typeof authSwitchOrganizationRoute
   '/(auth)/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
@@ -959,7 +977,9 @@ export interface FileRouteTypes {
     | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
+    | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
@@ -1056,7 +1076,9 @@ export interface FileRouteTypes {
     | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
+    | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
@@ -1143,7 +1165,9 @@ export interface FileRouteTypes {
     | '/(auth)/switch-organization'
     | '/(auth)/user-setup'
     | '/api/chat'
+    | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
@@ -1240,7 +1264,9 @@ export interface RootRouteChildren {
   authSwitchOrganizationRoute: typeof authSwitchOrganizationRoute
   authUserSetupRoute: typeof authUserSetupRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiChatValidateRoute: typeof ApiChatValidateRoute
   ApiCspReportRoute: typeof ApiCspReportRoute
+  ApiFeedbackRoute: typeof ApiFeedbackRoute
   ApiInngestRoute: typeof ApiInngestRoute
   ApiSentryRoute: typeof ApiSentryRoute
   ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute
@@ -1296,11 +1322,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/feedback': {
+      id: '/api/feedback'
+      path: '/api/feedback'
+      fullPath: '/api/feedback'
+      preLoaderRoute: typeof ApiFeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/csp-report': {
       id: '/api/csp-report'
       path: '/api/csp-report'
       fullPath: '/api/csp-report'
       preLoaderRoute: typeof ApiCspReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat-validate': {
+      id: '/api/chat-validate'
+      path: '/api/chat-validate'
+      fullPath: '/api/chat-validate'
+      preLoaderRoute: typeof ApiChatValidateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -2342,7 +2382,9 @@ const rootRouteChildren: RootRouteChildren = {
   authSwitchOrganizationRoute: authSwitchOrganizationRoute,
   authUserSetupRoute: authUserSetupRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiChatValidateRoute: ApiChatValidateRoute,
   ApiCspReportRoute: ApiCspReportRoute,
+  ApiFeedbackRoute: ApiFeedbackRoute,
   ApiInngestRoute: ApiInngestRoute,
   ApiSentryRoute: ApiSentryRoute,
   ApiSupportTicketsRoute: ApiSupportTicketsRoute,

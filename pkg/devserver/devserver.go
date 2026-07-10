@@ -584,7 +584,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		opts.Config,
 		executor.WithExecutionManager(dbcqrs),
 		executor.WithState(sm),
-		executor.WithServiceQueue(rq),
+		executor.WithServiceQueueProcessor(rq),
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
@@ -630,7 +630,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 		Runner:         ds.Runner,
 		State:          ds.State,
-		Queue:          rq,
+		QueueReader:    rq,
 		EventHandler:   ds.HandleEvent,
 		Executor:       ds.Executor,
 		HistoryReader:  cqrsmanager.NewHistoryReader(adapter),
@@ -661,7 +661,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			AuthMiddleware:    authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware: caching,
 			FunctionReader:    ds.Data,
-			JobQueueReader:    rq,
 			Executor:          ds.Executor,
 			Queue:             rq,
 			QueueShards:       shardRegistry,
@@ -758,7 +757,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	if testapi.ShouldEnable() {
 		mounts = append(mounts, api.Mount{At: "/test", Handler: testapi.New(testapi.Options{
 			QueueShards:  shardRegistry,
-			Queue:        rq,
 			Executor:     exec,
 			StateManager: smv2,
 			ResetAll: func() {
@@ -798,7 +796,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
 			Log:              l,
 			DB:               ds.Data,
-			Queue:            rq,
+			QueueReader:      rq,
 			State:            ds.State,
 			Cron:             croner,
 			ShardRegistry:    shardRegistry,

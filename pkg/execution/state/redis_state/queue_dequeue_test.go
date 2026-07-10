@@ -444,7 +444,7 @@ func TestQueueDequeueWithDisabledConstraintUpdates(t *testing.T) {
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 	require.False(t, r.Exists(kg.Concurrency("account", accountID.String())))
 
-	err = q.Dequeue(ctx, shard, item)
+	err = q.Dequeue(ctx, shard.Name(), item)
 	require.NoError(t, err)
 
 	require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))

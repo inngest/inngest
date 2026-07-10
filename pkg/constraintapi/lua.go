@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
 	"github.com/jonboulle/clockwork"
@@ -124,6 +125,49 @@ type SerializedConstraintItem struct {
 
 	// Semaphore constraint (only populated when Kind=4)
 	Semaphore *SerializedSemaphoreConstraint `json:"sem,omitempty"`
+}
+
+func (ci SerializedConstraintItem) ToConstraintItem() ConstraintItem {
+	switch ci.Kind {
+	case 1:
+		if ci.RateLimit == nil {
+			return ConstraintItem{}
+		}
+		return ConstraintItem{
+			Kind: ConstraintKindRateLimit,
+			RateLimit: &RateLimitConstraint{
+				Scope:             enums.RateLimitScope(ci.RateLimit.Scope),
+				KeyExpressionHash: ci.RateLimit.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.RateLimit.EvaluatedKeyHash,
+			},
+		}
+	case 2:
+		if ci.Concurrency == nil {
+			return ConstraintItem{}
+		}
+		return ConstraintItem{
+			Kind: ConstraintKindConcurrency,
+			Concurrency: &ConcurrencyConstraint{
+				Mode:              enums.ConcurrencyMode(ci.Concurrency.Mode),
+				Scope:             enums.ConcurrencyScope(ci.Concurrency.Scope),
+				KeyExpressionHash: ci.Concurrency.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.Concurrency.EvaluatedKeyHash,
+			},
+		}
+	case 3:
+		if ci.Throttle == nil {
+			return ConstraintItem{}
+		}
+		return ConstraintItem{
+			Kind: ConstraintKindThrottle,
+			Throttle: &ThrottleConstraint{
+				Scope:             enums.ThrottleScope(ci.Throttle.Scope),
+				KeyExpressionHash: ci.Throttle.KeyExpressionHash,
+				EvaluatedKeyHash:  ci.Throttle.EvaluatedKeyHash,
+			},
+		}
+	}
+	return ConstraintItem{}
 }
 
 // SerializedSemaphoreConstraint represents a minimal version of SemaphoreConstraint
@@ -400,12 +444,14 @@ func executeLuaScript(
 	clock clockwork.Clock,
 	keys []string,
 	args []string,
-) ([]byte, errs.InternalError) {
+) ([]byte, bool, errs.InternalError) {
 	// Get current time for duration metrics
 	start := clock.Now()
 
-	// Execute script and convert response to bytes (we return JSON from all scripts)
-	rawRes, err := scripts[name].Exec(ctx, client, keys, args).AsBytes()
+	// Execute script and convert response to bytes (we return JSON from all scripts).
+	// Operation idempotency replays may return {1, json} to mark the replay
+	// without decoding and re-encoding the cached JSON inside Redis.
+	rawRes, operationIdempotencyHit, err := luaScriptResponseBytes(scripts[name].Exec(ctx, client, keys, args))
 
 	status, retry := luaError(err)
 
@@ -422,10 +468,35 @@ func executeLuaScript(
 	})
 
 	if err != nil {
-		return nil, errs.Wrap(0, retry, "%s script failed: %w", name, err)
+		return nil, false, errs.Wrap(0, retry, "%s script failed: %w", name, err)
 	}
 
-	return rawRes, nil
+	return rawRes, operationIdempotencyHit, nil
+}
+
+func luaScriptResponseBytes(result rueidis.RedisResult) ([]byte, bool, error) {
+	values, arrayErr := result.ToArray()
+	if arrayErr != nil {
+		return nil, false, fmt.Errorf("invalid lua response: expected [operation_idempotency_hit, json]: %w", arrayErr)
+	}
+	if len(values) != 2 {
+		return nil, false, fmt.Errorf("invalid lua response: expected 2 tuple values, got %d", len(values))
+	}
+
+	hit, hitErr := values[0].AsInt64()
+	if hitErr != nil {
+		return nil, false, hitErr
+	}
+	if hit != 0 && hit != 1 {
+		return nil, false, fmt.Errorf("invalid lua response: operation idempotency hit must be 0 or 1, got %d", hit)
+	}
+
+	rawRes, rawErr := values[1].AsBytes()
+	if rawErr != nil {
+		return nil, false, rawErr
+	}
+
+	return rawRes, hit != 0, nil
 }
 
 func luaError(err error) (status string, retry bool) {

@@ -24,12 +24,12 @@ const (
 type AIMetadata struct {
 	InputTokens   int64  `json:"input_tokens"`
 	OutputTokens  int64  `json:"output_tokens"`
-	Model         string `json:"model"`
-	System        string `json:"system"`
+	RequestModel  string `json:"request_model"`
+	Provider      string `json:"provider"`
 	OperationName string `json:"operation_name"`
 
 	// Response identity. ResponseModel is the model that served the request (may
-	// differ from the requested Model, e.g. a dated snapshot). FinishReasons is
+	// differ from the RequestModel, e.g. a dated snapshot). FinishReasons is
 	// stored raw per emitter — note OpenAI's native "tool_calls" is emitted as
 	// the singular "tool_call" by some instrumentations.
 	ResponseModel string   `json:"response_model,omitempty"`
@@ -39,6 +39,22 @@ type AIMetadata struct {
 	LatencyMs     *int64   `json:"latency_ms,omitempty"`
 	TotalTokens   *int64   `json:"total_tokens,omitempty"`
 	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
+
+	// Granular token usage. Cache semantics differ by provider: OpenAI reports
+	// cached tokens as a subset of InputTokens, whereas Anthropic reports them
+	// additively — values are stored raw and left unreconciled.
+	CacheReadTokens     *int64 `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens *int64 `json:"cache_creation_tokens,omitempty"`
+	ReasoningTokens     *int64 `json:"reasoning_tokens,omitempty"`
+
+	// Request parameters. Pointers so an explicit zero (e.g. temperature 0 or
+	// seed 0) is distinguishable from an absent attribute.
+	Temperature      *float64 `json:"temperature,omitempty"`
+	TopP             *float64 `json:"top_p,omitempty"`
+	MaxTokens        *int64   `json:"max_tokens,omitempty"`
+	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
+	PresencePenalty  *float64 `json:"presence_penalty,omitempty"`
+	Seed             *int64   `json:"seed,omitempty"`
 }
 
 func (ms AIMetadata) Kind() metadata.Kind {
@@ -93,15 +109,23 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		latencyMs = &serverProcessingMs
 	}
 
+	// prefer the response model (the model that actually served the request)
+	// for cost estimation, falling back to the requested model.
+	costModel := parsedOutput.Model
+	if costModel == "" {
+		costModel = parsedInput.Model
+	}
+
 	aiMd := &AIMetadata{
-		Model:         parsedInput.Model,
-		System:        req.Format,
+		RequestModel:  parsedInput.Model,
+		ResponseModel: parsedOutput.Model,
+		Provider:      req.Format,
 		OperationName: "",
 
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
 		TotalTokens:   &totalTokens,
-		EstimatedCost: EstimateCost(parsedInput.Model, inputTokens, outputTokens),
+		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
 		LatencyMs:     latencyMs,
 	}
 
@@ -195,13 +219,15 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		return nil, nil
 	}
 
-	// get model name, try response.modelId first, then request.body.model
-	var model string
+	var requestModel string
+	var responseModel string
 	if firstStep != nil {
 		if firstStep.Response != nil && firstStep.Response.ModelID != "" {
-			model = firstStep.Response.ModelID
-		} else if firstStep.Request != nil && firstStep.Request.Body.Model != "" {
-			model = firstStep.Request.Body.Model
+			responseModel = firstStep.Response.ModelID
+		}
+
+		if firstStep.Request != nil && firstStep.Request.Body.Model != "" {
+			requestModel = firstStep.Request.Body.Model
 		}
 	}
 
@@ -223,14 +249,22 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		latencyMs = &stepDurationMs
 	}
 
+	// prefer the response model (the model that actually served the request)
+	// for cost estimation, falling back to the requested model.
+	costModel := responseModel
+	if costModel == "" {
+		costModel = requestModel
+	}
+
 	aiMd := &AIMetadata{
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
 		TotalTokens:   &totalTokens,
-		Model:         model,
-		System:        "vercel-ai",
+		RequestModel:  requestModel,
+		ResponseModel: responseModel,
+		Provider:      "vercel-ai",
 		LatencyMs:     latencyMs,
-		EstimatedCost: EstimateCost(model, inputTokens, outputTokens),
+		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
 	}
 
 	return []metadata.Structured{aiMd}, nil

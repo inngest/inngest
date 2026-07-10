@@ -10,5 +10,14 @@ SPAN chat claude-sonnet-4-6
   ],
   "input_tokens": 52,
   "output_tokens": 500,
-  "total_tokens": 552
+  "total_tokens": 552,
+  "cache_read_tokens": 0,
+  "cache_creation_tokens": 0,
+  "reasoning_tokens": null,
+  "temperature": null,
+  "top_p": null,
+  "max_tokens": 4096,
+  "frequency_penalty": null,
+  "presence_penalty": null,
+  "seed": null
 }

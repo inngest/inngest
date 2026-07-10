@@ -14,7 +14,7 @@ import {
 } from 'recharts';
 
 import { computeChartSizing } from '@/lib/experiments/chart';
-import { colorForMetric } from '@/lib/experiments/colors';
+import { buildMetricColorMap } from '@/lib/experiments/colors';
 import type { ScoredVariant } from '@/lib/experiments/score';
 import { ChartTooltip } from './ChartTooltip';
 import { ScoreCalculationExplainer } from './ScoreCalculationExplainer';
@@ -71,15 +71,23 @@ export function ScoreSummaryCard({
   hoveredVariantName,
   onVariantHover,
 }: Props) {
-  const [activeVariantName, setActiveVariantName] = useState<string | null>(null);
+  const [activeVariantName, setActiveVariantName] = useState<string | null>(
+    null,
+  );
 
   const enabledMetrics = useMemo(
     () => metrics.filter((m) => m.enabled),
     [metrics],
   );
 
+  // Color by each metric's stable position in the full list so segment colors
+  // match the Scoring formula sidebar and don't shift when a metric is toggled.
+  const colorMap = useMemo(() => buildMetricColorMap(metrics), [metrics]);
+
   // Only dim when the highlight comes from another chart (not from this one).
-  const effectiveHighlight = activeVariantName ? null : (hoveredVariantName ?? null);
+  const effectiveHighlight = activeVariantName
+    ? null
+    : hoveredVariantName ?? null;
 
   const rows = useMemo(() => {
     return scoredVariants.map(({ variant, result }) => {
@@ -87,7 +95,10 @@ export function ScoreSummaryCard({
         variantName: variant.variantName,
         total: result.total,
         runCount: variant.runCount,
-        opacity: effectiveHighlight && variant.variantName !== effectiveHighlight ? 0.25 : 1,
+        opacity:
+          effectiveHighlight && variant.variantName !== effectiveHighlight
+            ? 0.25
+            : 1,
       };
       for (const seg of result.segments) {
         row[seg.metricKey] = seg.contribution;
@@ -132,7 +143,9 @@ export function ScoreSummaryCard({
                   onVariantHover?.(null);
                   return;
                 }
-                const name = (state.activePayload?.[0]?.payload as RowData | undefined)?.variantName ?? null;
+                const name =
+                  (state.activePayload?.[0]?.payload as RowData | undefined)
+                    ?.variantName ?? null;
                 setActiveVariantName(name);
                 onVariantHover?.(name);
               }}
@@ -184,12 +197,16 @@ export function ScoreSummaryCard({
                   key={m.key}
                   dataKey={m.key}
                   stackId="score"
-                  fill={colorForMetric(i)}
+                  fill={colorMap[m.key]}
                   name={m.displayName}
                   background={i === 0 ? <BackgroundLineShape /> : undefined}
                 >
                   {rows.map((row) => (
-                    <Cell key={row.variantName} fill={colorForMetric(i)} opacity={row.opacity} />
+                    <Cell
+                      key={row.variantName}
+                      fill={colorMap[m.key]}
+                      opacity={row.opacity}
+                    />
                   ))}
                 </Bar>
               ))}
