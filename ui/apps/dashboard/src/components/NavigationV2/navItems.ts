@@ -8,6 +8,7 @@ import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { OverviewIcon } from '@inngest/components/icons/sections/Overview';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
+import { ScoresIcon } from '@inngest/components/icons/sections/Scores';
 import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
 import { WebhooksIcon } from '@inngest/components/icons/sections/Webhooks';
 
@@ -55,7 +56,7 @@ export const experimentsItem: NavItemConfig = {
 export const scoresItem: NavItemConfig = {
   label: 'Scores',
   route: 'scores',
-  Icon: InsightsIcon,
+  Icon: ScoresIcon,
 };
 
 export const sessionsItem: NavItemConfig = {
