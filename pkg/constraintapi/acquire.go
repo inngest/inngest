@@ -162,14 +162,14 @@ type acquireScriptResponse struct {
 		LeaseID             ulid.ULID `json:"lid"`
 		LeaseIdempotencyKey string    `json:"lik"`
 	} `json:"l"`
-	LimitingConstraints     flexibleIntArray        `json:"lc"`
-	ExhaustedConstraints    flexibleIntArray        `json:"ec"`
-	FairnessReduction       int                     `json:"fr"`
-	RetryAt                 int                     `json:"ra"`
-	Debug                   flexibleStringArray     `json:"d"`
-	CacheHit                int                     `json:"ch"`
-	ConstraintUsage         []scriptConstraintUsage `json:"cu"`
-	OperationIdempotencyHit int                     `json:"oih"`
+	LimitingConstraints     flexibleIntArray             `json:"lc"`
+	ExhaustedConstraints    flexibleIntArray             `json:"ec"`
+	FairnessReduction       int                          `json:"fr"`
+	RetryAt                 int                          `json:"ra"`
+	Debug                   flexibleStringArray          `json:"d"`
+	CacheHit                int                          `json:"ch"`
+	ConstraintUsage         flexibleConstraintUsageArray `json:"cu"`
+	OperationIdempotencyHit int                          `json:"oih"`
 }
 
 func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquireRequest) (*CapacityAcquireResponse, errs.InternalError) {
@@ -387,7 +387,7 @@ func (r *redisCapacityManager) Acquire(ctx context.Context, req *CapacityAcquire
 		}
 	}
 
-	constraintUsage := constraintUsageFromScript(parsedResponse.ConstraintUsage, sortedConstraints)
+	constraintUsage := constraintUsageFromScript([]scriptConstraintUsage(parsedResponse.ConstraintUsage), sortedConstraints)
 
 	// Record centralized cache hit/miss metric only when caching is enabled
 	if cacheEnabled {
