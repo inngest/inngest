@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/checkpoint"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -150,7 +151,9 @@ func (i *deferTestInfra) newExecutor(t *testing.T, driver *mockDriverV1) executi
 
 // newExecutorWithQueue is newExecutor with an overridable queue, used by the
 // discovery-enqueue tests that wrap the shared queue in enqueueCountingQueue.
-func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, driver *mockDriverV1) execution.Executor {
+// extraOpts are appended last, so they can override any default above (e.g.
+// swapping in a capturing statev2.RunService or a fake exechttp.RequestExecutor).
+func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, driver *mockDriverV1, extraOpts ...executor.ExecutorOpt) execution.Executor {
 	t.Helper()
 
 	opts := []executor.ExecutorOpt{
@@ -165,6 +168,7 @@ func (i *deferTestInfra) newExecutorWithQueue(t *testing.T, q queue.Queue, drive
 	if driver != nil {
 		opts = append(opts, executor.WithDriverV1(driver))
 	}
+	opts = append(opts, extraOpts...)
 
 	exec, err := executor.NewExecutor(opts...)
 	require.NoError(t, err)
@@ -275,6 +279,61 @@ func (s *pendingCapturingState) calls() [][]string {
 	for i, c := range s.captured {
 		out[i] = append([]string(nil), c...)
 	}
+	return out
+}
+
+// scriptedHTTPExecutor is a fake exechttp.RequestExecutor, injected via
+// executor.WithHTTPClient, that returns the same scripted response/error for
+// every DoRequest call. This drives AIGateway inference-request failure paths
+// without a real HTTP round trip.
+type scriptedHTTPExecutor struct {
+	resp *exechttp.Response
+	err  error
+
+	mu    sync.Mutex
+	calls int
+}
+
+func (s *scriptedHTTPExecutor) DoRequest(ctx context.Context, r exechttp.SerializableRequest) (*exechttp.Response, error) {
+	s.mu.Lock()
+	s.calls++
+	s.mu.Unlock()
+	return s.resp, s.err
+}
+
+func (s *scriptedHTTPExecutor) callCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls
+}
+
+// saveStepCapturingState wraps a real RunService and captures every SaveStep
+// call so tests can assert on exactly what payload the executor persisted.
+// Mirrors pendingCapturingState above.
+type saveStepCapturingState struct {
+	statev2.RunService
+	mu       sync.Mutex
+	captured []capturedSaveStep
+}
+
+type capturedSaveStep struct {
+	id     statev2.ID
+	stepID string
+	data   []byte
+}
+
+func (s *saveStepCapturingState) SaveStep(ctx context.Context, id statev2.ID, stepID string, data []byte) (bool, error) {
+	s.mu.Lock()
+	s.captured = append(s.captured, capturedSaveStep{id: id, stepID: stepID, data: append([]byte(nil), data...)})
+	s.mu.Unlock()
+	return s.RunService.SaveStep(ctx, id, stepID, data)
+}
+
+func (s *saveStepCapturingState) calls() []capturedSaveStep {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]capturedSaveStep, len(s.captured))
+	copy(out, s.captured)
 	return out
 }
 
