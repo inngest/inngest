@@ -1,0 +1,45 @@
+syntax = "proto3";
+package queue.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "queue/v1/types.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/queue/v1;queue";
+
+service ProducerService {
+  rpc Enqueue(EnqueueRequest) returns (EnqueueResponse) {}
+  rpc Requeue(RequeueRequest) returns (RequeueResponse) {}
+  rpc RequeueByJobID(RequeueByJobIDRequest) returns (RequeueByJobIDResponse) {}
+}
+
+message EnqueueRequest {
+  Item item = 1;
+  google.protobuf.Timestamp at = 2;
+  EnqueueOptions opts = 3;
+}
+
+message EnqueueResponse {}
+
+message RequeueRequest {
+  string shard_name = 1;
+  QueueItem item = 2;
+  google.protobuf.Timestamp at = 3;
+}
+
+message RequeueResponse {}
+
+message RequeueByJobIDRequest {
+  string shard_name = 1;
+  string job_id = 2;
+  google.protobuf.Timestamp at = 3;
+}
+
+message RequeueByJobIDResponse {}
+
+message EnqueueOptions {
+  bool passthrough_job_id = 1;
+  string force_queue_shard_name = 2;
+  string normalize_from_backlog_id = 3;
+  optional google.protobuf.Duration idempotency_period = 4;
+}
