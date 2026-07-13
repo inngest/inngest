@@ -300,8 +300,14 @@ type RollupGroups = {
   stepOrder: string[];
   /** attempt spans per stepID, keyed by attempt number */
   steps: Map<string, Map<number, Trace>>;
-  /** spans emitted unchanged (output spans with no stepID or groupID) */
-  passthrough: Trace[];
+  /**
+   * Finalization-type spans (output, no stepID) that also carry no groupID,
+   * so they can't be rolled into a step or finalization group. Usually
+   * emitted unchanged, but dropped when the finalization rollup renders the
+   * same terminal failure — the duplicate is the server's relabeled discovery
+   * span mirroring the grouped failed attempts (EXE-1992).
+   */
+  ungroupedFinalizations: Trace[];
   /** attempt spans of the trailing group that never matched a step, if any */
   finalizationAttempts: Map<number, Trace> | null;
   /** step span with the latest endedAt; finalization can't start before it ends */
@@ -315,11 +321,19 @@ type RollupGroups = {
  * grouped by groupID. A group later claimed by a step span becomes extra
  * attempts of that step; a group that never matches a step is the run's
  * finalization.
+ *
+ * Classification is ORDER-SENSITIVE, deliberately: a grouped no-stepID span
+ * is adopted by a step only when the step span appears LATER in
+ * childrenSpans than the grouped span (see the `finalSpan?.groupID ==
+ * child.groupID` check below). The happy path relies on this ordering — the
+ * genuine finalization span shares the last step's groupID, and is only
+ * classified as finalization (rather than being claimed as an extra attempt
+ * of that step) because the server emits it after that step.
  */
 function collectRollupGroups(children: Trace[]): RollupGroups {
   const stepOrder: string[] = [];
   const steps = new Map<string, Map<number, Trace>>();
-  const passthrough: Trace[] = [];
+  const ungroupedFinalizations: Trace[] = [];
   const groupedSpans = new Map<string, Map<number, Trace>>();
   let lastStepEndedAt: Date | null = null;
   let lastStep: Trace | null = null;
@@ -333,7 +347,7 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
         attempts.set(child.attempts ?? 0, child);
         groupedSpans.set(child.groupID, attempts);
       } else {
-        passthrough.push(child);
+        ungroupedFinalizations.push(child);
       }
       continue;
     }
@@ -372,7 +386,7 @@ function collectRollupGroups(children: Trace[]): RollupGroups {
     ? groupedSpans.get(finalSpan.groupID) ?? null
     : null;
 
-  return { stepOrder, steps, passthrough, finalizationAttempts, lastStep };
+  return { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep };
 }
 
 /** First (lowest attempt number) and last (highest) attempt spans of a group */
@@ -455,6 +469,11 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
  *   which implies a normal wind-down.
  * - Still running: default to "Finalization" rather than flickering "Function
  *   error" on in-flight runs.
+ *
+ * Only a FAILED terminal status flips the label to "Function error" —
+ * CANCELLED or any other non-COMPLETED terminal state deliberately keeps
+ * "Finalization", matching the pre-existing default and avoiding label
+ * flicker for groups that aren't cleanly resolved as failures.
  */
 function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null): Trace {
   const { first, last } = attemptBounds(attempts);
@@ -507,11 +526,10 @@ export function traceRollup(root: Trace): Trace {
   // precisely because they only ever see this clone.
   root = structuredClone(root);
 
-  const { stepOrder, steps, passthrough, finalizationAttempts, lastStep } = collectRollupGroups(
-    root.childrenSpans ?? []
-  );
+  const { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep } =
+    collectRollupGroups(root.childrenSpans ?? []);
 
-  const rolledUpRunChildren: Trace[] = [...passthrough];
+  const rolledUpRunChildren: Trace[] = [];
 
   for (const stepID of stepOrder) {
     const attempts = steps.get(stepID);
@@ -521,8 +539,20 @@ export function traceRollup(root: Trace): Trace {
     rolledUpRunChildren.push(rollupStepAttempts(stepID, attempts));
   }
 
+  let finalization: Trace | null = null;
   if (finalizationAttempts) {
-    rolledUpRunChildren.push(rollupFinalization(finalizationAttempts, lastStep));
+    finalization = rollupFinalization(finalizationAttempts, lastStep);
+    rolledUpRunChildren.push(finalization);
+  }
+
+  // Emit ungrouped finalization spans only when they don't duplicate a
+  // terminal failure already rendered as the finalization rollup (the single
+  // "Finalization" or the multi-attempt "Function error") — that duplicate is
+  // the server's relabeled discovery span mirroring the grouped failed
+  // attempts (EXE-1992); the grouped attempts already carry the terminal
+  // error output. A COMPLETED finalization is legitimate and left alone.
+  if (finalization?.status !== 'FAILED') {
+    rolledUpRunChildren.push(...ungroupedFinalizations);
   }
 
   const sortingKey = (trace: Trace) =>
