@@ -8505,15 +8505,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_started_atB\x0f\n" +
 	"\r_completed_atB\t\n" +
 	"\a_resultB\b\n" +
-	"\x06_error\"\xfd\x02\n" +
+	"\x06_error\"\x97\x04\n" +
 	"\x12CreateScoreRequest\x12d\n" +
-	"\x06run_id\x18\x01 \x01(\tBM\x92AJ2*Run ID (ULID) of the function run to scoreJ\x1c\"01JLW1NNJ69KCD1KMJEXAMPLE0\"R\x05runId\x12\x80\x02\n" +
-	"\x06scores\x18\x02 \x03(\v2\x18.api.v2.CreateScoreInputB\xcd\x01\x92A\xc9\x012\xc6\x01Scores to record for the run. The REST request body is this array. Writes are applied in order and are not atomic; if a later score fails, earlier scores may already be recorded. Maximum 100 scores.R\x06scores\"\x99\x05\n" +
+	"\x06run_id\x18\x01 \x01(\tBM\x92AJ2*Run ID (ULID) of the function run to scoreJ\x1c\"01JLW1NNJ69KCD1KMJEXAMPLE0\"R\x05runId\x12\x9a\x03\n" +
+	"\x06scores\x18\x02 \x03(\v2\x18.api.v2.CreateScoreInputB\xe7\x02\x92A\xe3\x022\xe0\x02Scores to record for the run. The REST request body is this array. Writes are applied in order and are not atomic; if a later score fails, earlier scores may already be recorded. Score writes are best-effort: run and step targets are not validated before writing, and scores for targets that do not exist may not surface in queries. Maximum 100 scores.R\x06scores\"\xe9\x05\n" +
 	"\x10CreateScoreInput\x12P\n" +
 	"\x04name\x18\x01 \x01(\tB<\x92A92+Score name; must be at most 128 UTF-8 bytesJ\n" +
 	"\"accuracy\"R\x04name\x12j\n" +
-	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueB<\x92A921Score value; must be a finite number or a booleanJ\x040.95R\x05value\x12\x85\x01\n" +
-	"\astep_id\x18\x03 \x01(\tBg\x92Ad2NOptional SDK step ID; attaches the score to a specific step instead of the runJ\x12\"generate-summary\"H\x00R\x06stepId\x88\x01\x01\x12\xa3\x02\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueB<\x92A921Score value; must be a finite number or a booleanJ\x040.95R\x05value\x12\xd5\x01\n" +
+	"\astep_id\x18\x03 \x01(\tB\xb6\x01\x92A\xb2\x012\x9b\x01Optional SDK step ID; attaches the score to a specific step instead of the run. Step targets are recorded best-effort and are not validated before writing.J\x12\"generate-summary\"H\x00R\x06stepId\x88\x01\x01\x12\xa3\x02\n" +
 	"\n" +
 	"experiment\x18\x04 \x01(\v2\x17.api.v2.ScoreExperimentB\xe4\x01\x92A\xe0\x012\xdd\x01Optional experiment context. When provided, the score is recorded with the same experiment metadata emitted by the SDK's score.experiment API. Experiment scores must be run-scoped for experiment aggregate and detail APIs.H\x01R\n" +
 	"experiment\x88\x01\x01B\n" +

@@ -2,9 +2,7 @@ package devserver
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -733,7 +731,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		Scores: apiv2.NewStateScoreProvider(apiv2.StateScoreProviderOptions{
 			State:          smv2,
 			TracerProvider: tp,
-			TraceReader:    dbcqrs,
 			Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
 				return consts.DevServerAccountID, consts.DevServerEnvID, nil
 			},
@@ -741,13 +738,6 @@ func start(ctx context.Context, opts StartOpts) error {
 				return enableStepMetadata
 			},
 			MissingStateLoader: scoreMetadataLoader(dbcqrs),
-			StepValidator: func(ctx context.Context, params apiv2.ScoreStepTargetValidatorParams) error {
-				_, err := dbcqrs.GetStepSpanByStepID(ctx, params.RunID, params.TraceStepID, params.AccountID, params.EnvID)
-				if errors.Is(err, sql.ErrNoRows) {
-					return apiv2.ErrScoreTargetNotFound
-				}
-				return err
-			},
 		}),
 	}
 

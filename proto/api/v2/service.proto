@@ -2538,7 +2538,7 @@ message CreateScoreRequest {
   ];
   repeated CreateScoreInput scores = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Scores to record for the run. The REST request body is this array. Writes are applied in order and are not atomic; if a later score fails, earlier scores may already be recorded. Maximum 100 scores."
+      description: "Scores to record for the run. The REST request body is this array. Writes are applied in order and are not atomic; if a later score fails, earlier scores may already be recorded. Score writes are best-effort: run and step targets are not validated before writing, and scores for targets that do not exist may not surface in queries. Maximum 100 scores."
     }
   ];
 }
@@ -2558,7 +2558,7 @@ message CreateScoreInput {
   ];
   optional string step_id = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional SDK step ID; attaches the score to a specific step instead of the run"
+      description: "Optional SDK step ID; attaches the score to a specific step instead of the run. Step targets are recorded best-effort and are not validated before writing."
       example: "\"generate-summary\""
     }
   ];

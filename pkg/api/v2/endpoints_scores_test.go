@@ -341,7 +341,6 @@ func TestCreateScore(t *testing.T) {
 		message string
 	}{
 		{name: "scores not enabled", err: ErrScoresNotEnabled, message: "Scores are not enabled"},
-		{name: "target not found", err: ErrScoreTargetNotFound, message: "Run or step not found"},
 		{name: "span too large", err: metadata.ErrMetadataSpanTooLarge, message: "metadata size limit"},
 		{name: "run size exceeded", err: metadata.ErrRunMetadataSizeExceeded, message: "metadata size limit"},
 		{name: "internal error", err: errors.New("boom"), message: "Unable to record score"},
@@ -458,7 +457,7 @@ func TestStateScoreProviderUsesMetadataLoaderForFinalizedRun(t *testing.T) {
 	require.True(t, loaderCalled)
 }
 
-func TestStateScoreProviderRejectsMissingRun(t *testing.T) {
+func TestStateScoreProviderRecordsMissingRunBestEffort(t *testing.T) {
 	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
 	accountID := uuid.New()
 	envID := uuid.New()
@@ -482,7 +481,7 @@ func TestStateScoreProviderRejectsMissingRun(t *testing.T) {
 		},
 	})
 
-	require.ErrorIs(t, err, ErrScoreTargetNotFound)
+	require.NoError(t, err)
 	require.True(t, loaderCalled)
 }
 
@@ -525,13 +524,13 @@ func TestStateScoreProviderForwardsMetadataSizeIncrement(t *testing.T) {
 	require.Positive(t, state.incrementDelta)
 }
 
-func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
+func TestStateScoreProviderRecordsStepTargetsBestEffort(t *testing.T) {
 	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
 	accountID := uuid.New()
 	envID := uuid.New()
-	existingStepID := "generate-summary"
+	stepID := "missing-step"
 
-	baseOpts := StateScoreProviderOptions{
+	provider := NewStateScoreProvider(StateScoreProviderOptions{
 		State: fakeScoreRunService{
 			metadata: statev2.Metadata{
 				ID: statev2.ID{
@@ -541,101 +540,22 @@ func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 						EnvID:     envID,
 					},
 				},
-				Stack: []string{scoreTraceStepID(existingStepID)},
+				Stack: []string{"existing-step"},
 			},
 		},
 		Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
 			return accountID, envID, nil
 		},
-	}
-
-	t.Run("accepts SDK step IDs from live state", func(t *testing.T) {
-		provider := NewStateScoreProvider(baseOpts)
-		stepID := existingStepID
-
-		err := provider.CreateScores(context.Background(), CreateScoresParams{
-			RunID: runID,
-			Scores: []ScoreInput{
-				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
-			},
-		})
-
-		require.NoError(t, err)
 	})
 
-	t.Run("rejects missing step IDs", func(t *testing.T) {
-		provider := NewStateScoreProvider(baseOpts)
-		stepID := "missing-step"
-
-		err := provider.CreateScores(context.Background(), CreateScoresParams{
-			RunID: runID,
-			Scores: []ScoreInput{
-				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
-			},
-		})
-
-		require.ErrorIs(t, err, ErrScoreTargetNotFound)
+	err := provider.CreateScores(context.Background(), CreateScoresParams{
+		RunID: runID,
+		Scores: []ScoreInput{
+			testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
+		},
 	})
 
-	t.Run("rejects already hashed step IDs", func(t *testing.T) {
-		provider := NewStateScoreProvider(baseOpts)
-		stepID := scoreTraceStepID(existingStepID)
-
-		err := provider.CreateScores(context.Background(), CreateScoresParams{
-			RunID: runID,
-			Scores: []ScoreInput{
-				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
-			},
-		})
-
-		require.ErrorIs(t, err, ErrScoreTargetNotFound)
-	})
-
-	t.Run("preserves state load errors", func(t *testing.T) {
-		loadErr := errors.New("state unavailable")
-		opts := baseOpts
-		opts.State = fakeScoreRunService{err: loadErr}
-		provider := NewStateScoreProvider(opts)
-		stepID := existingStepID
-
-		err := provider.CreateScores(context.Background(), CreateScoresParams{
-			RunID: runID,
-			Scores: []ScoreInput{
-				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
-			},
-		})
-
-		require.ErrorIs(t, err, loadErr)
-		require.NotErrorIs(t, err, ErrScoreTargetNotFound)
-	})
-
-	t.Run("falls back to trace validator", func(t *testing.T) {
-		called := false
-		opts := baseOpts
-		opts.State = fakeScoreRunService{err: statev2.ErrMetadataNotFound}
-		opts.StepValidator = func(ctx context.Context, params ScoreStepTargetValidatorParams) error {
-			called = true
-			require.Equal(t, runID, params.RunID)
-			require.Equal(t, "generate-summary", params.StepID)
-			require.Equal(t, scoreTraceStepID("generate-summary"), params.TraceStepID)
-			return nil
-		}
-		opts.MissingStateLoader = func(ctx context.Context, id statev2.ID) (*statev2.Metadata, error) {
-			return &statev2.Metadata{ID: id}, nil
-		}
-		provider := NewStateScoreProvider(opts)
-		stepID := "generate-summary"
-
-		err := provider.CreateScores(context.Background(), CreateScoresParams{
-			RunID: runID,
-			Scores: []ScoreInput{
-				testScoreInput(t, ScoreInput{StepID: &stepID, Name: "accuracy", Value: 1.0}),
-			},
-		})
-
-		require.NoError(t, err)
-		require.True(t, called)
-	})
+	require.NoError(t, err)
 }
 
 func testScoreInput(t *testing.T, input ScoreInput) ScoreInput {

@@ -51,8 +51,6 @@ func (s *Service) CreateScore(ctx context.Context, req *apiv2.CreateScoreRequest
 	switch {
 	case errors.Is(err, ErrScoresNotEnabled):
 		return nil, s.base.NewError(http.StatusForbidden, apiv2base.ErrorAccessDenied, "Scores are not enabled for this account")
-	case errors.Is(err, ErrScoreTargetNotFound):
-		return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Run or step not found")
 	case errors.Is(err, metadata.ErrMetadataSpanTooLarge), errors.Is(err, metadata.ErrRunMetadataSizeExceeded):
 		return nil, s.base.NewError(http.StatusRequestEntityTooLarge, apiv2base.ErrorValidationError, "Score exceeds the run metadata size limit")
 	case err != nil:

@@ -145,8 +145,9 @@ type CreateScoresParams struct {
 }
 
 type ScoreProvider interface {
-	// CreateScores records one or more scores for a run or step. Implementations return
-	// ErrScoresNotEnabled when the account cannot submit scores and
-	// ErrScoreTargetNotFound when the targeted run or step does not exist.
+	// CreateScores records one or more scores for a run or step. Score writes
+	// are best-effort; targets are not validated before writing, and scores for
+	// missing runs or steps may not surface in queries. Implementations return
+	// ErrScoresNotEnabled when the account cannot submit scores.
 	CreateScores(ctx context.Context, params CreateScoresParams) error
 }
