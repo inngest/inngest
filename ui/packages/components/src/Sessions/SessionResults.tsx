@@ -19,8 +19,7 @@ import { useColumns } from './columns';
 
 const DEFAULT_RANGE = '7d';
 const SEARCH_DEBOUNCE_MS = 300;
-const DOCS_URL =
-  'https://website-git-jakob-sessions-docs-inngest.vercel.app/docs/features/events-triggers/sessions';
+const DOCS_URL = 'https://www.inngest.com/docs/features/events-triggers/sessions';
 
 type RoutePath = LinkComponentProps['to'] | string;
 

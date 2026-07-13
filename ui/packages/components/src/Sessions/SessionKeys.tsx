@@ -11,8 +11,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { SessionsEmptyState } from './SessionsEmptyState';
 
 const columnHelper = createColumnHelper<SessionKey>();
-const DOCS_URL =
-  'https://website-git-jakob-sessions-docs-inngest.vercel.app/docs/features/events-triggers/sessions';
+const DOCS_URL = 'https://www.inngest.com/docs/features/events-triggers/sessions';
 
 const columns = [
   columnHelper.accessor('sessionKey', {

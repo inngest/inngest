@@ -6,7 +6,7 @@ export const SessionsInfo = () => (
     text="Sessions group runs that share a session ID, sent on an event's sessions field as a map of session keys to session IDs."
     action={
       <Link
-        href="ui/apps/dashboard/src/components/Sessions/SessionsInfo.tsx"
+        href="https://www.inngest.com/docs/features/events-triggers/sessions"
         target="_blank"
       >
         Learn about sessions

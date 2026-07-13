@@ -40,7 +40,7 @@ import { type SessionRun, useSessionRuns } from './useSessionRuns';
 
 const DEFAULT_RANGE = '7d';
 const DOCS_URL =
-  'https://website-git-jakob-sessions-docs-inngest.vercel.app/docs/features/events-triggers/sessions';
+  'https://www.inngest.com/docs/features/events-triggers/sessions';
 
 const columnHelper = createColumnHelper<SessionRun>();
 
