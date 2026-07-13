@@ -294,6 +294,13 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		},
 	})
 	if err != nil {
+		if errors.Is(err, constraintapi.ErrAccountNotFound) {
+			metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonAccountMissing.String(), metrics.CounterOpt{
+				PkgName: pkgName,
+			})
+			return nil, nil
+		}
+
 		logger.StdlibLogger(ctx).Error("acquiring capacity lease failed", "err", err, "method", "backlogRefillConstraintCheck", "functionID", *shadowPart.FunctionID)
 		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,

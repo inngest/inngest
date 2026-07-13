@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _BacklogRefillConstraintCheckReasonName = "constraint_api_uninitializedid_nilacquire_on_refill_disabledconstraint_api_error"
+const _BacklogRefillConstraintCheckReasonName = "constraint_api_uninitializedid_nilacquire_on_refill_disabledconstraint_api_erroraccount_missing"
 
-var _BacklogRefillConstraintCheckReasonIndex = [...]uint8{0, 28, 34, 60, 80}
+var _BacklogRefillConstraintCheckReasonIndex = [...]uint8{0, 28, 34, 60, 80, 95}
 
-const _BacklogRefillConstraintCheckReasonLowerName = "constraint_api_uninitializedid_nilacquire_on_refill_disabledconstraint_api_error"
+const _BacklogRefillConstraintCheckReasonLowerName = "constraint_api_uninitializedid_nilacquire_on_refill_disabledconstraint_api_erroraccount_missing"
 
 func (i BacklogRefillConstraintCheckReason) String() string {
 	if i < 0 || i >= BacklogRefillConstraintCheckReason(len(_BacklogRefillConstraintCheckReasonIndex)-1) {
@@ -29,9 +29,10 @@ func _BacklogRefillConstraintCheckReasonNoOp() {
 	_ = x[BacklogRefillConstraintCheckReasonIDNil-(1)]
 	_ = x[BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled-(2)]
 	_ = x[BacklogRefillConstraintCheckReasonConstraintAPIError-(3)]
+	_ = x[BacklogRefillConstraintCheckReasonAccountMissing-(4)]
 }
 
-var _BacklogRefillConstraintCheckReasonValues = []BacklogRefillConstraintCheckReason{BacklogRefillConstraintCheckReasonConstraintAPIUninitialized, BacklogRefillConstraintCheckReasonIDNil, BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled, BacklogRefillConstraintCheckReasonConstraintAPIError}
+var _BacklogRefillConstraintCheckReasonValues = []BacklogRefillConstraintCheckReason{BacklogRefillConstraintCheckReasonConstraintAPIUninitialized, BacklogRefillConstraintCheckReasonIDNil, BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled, BacklogRefillConstraintCheckReasonConstraintAPIError, BacklogRefillConstraintCheckReasonAccountMissing}
 
 var _BacklogRefillConstraintCheckReasonNameToValueMap = map[string]BacklogRefillConstraintCheckReason{
 	_BacklogRefillConstraintCheckReasonName[0:28]:       BacklogRefillConstraintCheckReasonConstraintAPIUninitialized,
@@ -42,6 +43,8 @@ var _BacklogRefillConstraintCheckReasonNameToValueMap = map[string]BacklogRefill
 	_BacklogRefillConstraintCheckReasonLowerName[34:60]: BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled,
 	_BacklogRefillConstraintCheckReasonName[60:80]:      BacklogRefillConstraintCheckReasonConstraintAPIError,
 	_BacklogRefillConstraintCheckReasonLowerName[60:80]: BacklogRefillConstraintCheckReasonConstraintAPIError,
+	_BacklogRefillConstraintCheckReasonName[80:95]:      BacklogRefillConstraintCheckReasonAccountMissing,
+	_BacklogRefillConstraintCheckReasonLowerName[80:95]: BacklogRefillConstraintCheckReasonAccountMissing,
 }
 
 var _BacklogRefillConstraintCheckReasonNames = []string{
@@ -49,6 +52,7 @@ var _BacklogRefillConstraintCheckReasonNames = []string{
 	_BacklogRefillConstraintCheckReasonName[28:34],
 	_BacklogRefillConstraintCheckReasonName[34:60],
 	_BacklogRefillConstraintCheckReasonName[60:80],
+	_BacklogRefillConstraintCheckReasonName[80:95],
 }
 
 // BacklogRefillConstraintCheckReasonString retrieves an enum value from the enum constants string name.
