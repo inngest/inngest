@@ -490,3 +490,69 @@ func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
 		assert.Equal(t, "step-output", *result.OutputID)
 	})
 }
+
+// TestConvertRunSpanToGQL_AttemptQueueTimePropagation pins the sibling-derived
+// queue times for a step's attempt children (see the lastStepQueueTime chain in
+// convertRunSpanToGQL): the first attempt inherits the step span's queuedAt,
+// and each subsequent attempt is queued at the previous attempt's endedAt.
+func TestConvertRunSpanToGQL_AttemptQueueTimePropagation(t *testing.T) {
+	tr := &traceReader{}
+	ctx := context.Background()
+
+	stepQueuedAt := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	attempt0End := stepQueuedAt.Add(2 * time.Second)
+	attempt1End := stepQueuedAt.Add(5 * time.Second)
+
+	// Give both attempts their own (bogus) queuedAt values to prove the
+	// propagation overrides them.
+	bogus := stepQueuedAt.Add(-time.Hour)
+
+	failed := enums.StepStatusFailed
+	completed := enums.StepStatusCompleted
+
+	span := &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			Name:      meta.SpanNameStep,
+			SpanID:    "step-span",
+			StartTime: stepQueuedAt,
+		},
+		Attributes: &meta.ExtractedValues{
+			QueuedAt: &stepQueuedAt,
+		},
+		Children: []*cqrs.OtelSpan{
+			{
+				RawOtelSpan: cqrs.RawOtelSpan{
+					Name:      meta.SpanNameExecution,
+					SpanID:    "attempt-0",
+					StartTime: stepQueuedAt.Add(time.Second),
+				},
+				Attributes: &meta.ExtractedValues{
+					DynamicStatus: &failed,
+					QueuedAt:      &bogus,
+					EndedAt:       &attempt0End,
+				},
+			},
+			{
+				RawOtelSpan: cqrs.RawOtelSpan{
+					Name:      meta.SpanNameExecution,
+					SpanID:    "attempt-1",
+					StartTime: attempt0End,
+				},
+				Attributes: &meta.ExtractedValues{
+					DynamicStatus: &completed,
+					QueuedAt:      &bogus,
+					EndedAt:       &attempt1End,
+				},
+			},
+		},
+	}
+
+	result, err := tr.convertRunSpanToGQL(ctx, span)
+	require.NoError(t, err)
+	require.Len(t, result.ChildrenSpans, 2)
+
+	assert.Equal(t, stepQueuedAt, result.ChildrenSpans[0].QueuedAt,
+		"first attempt should inherit the step span's queuedAt")
+	assert.Equal(t, attempt0End, result.ChildrenSpans[1].QueuedAt,
+		"second attempt should be queued at the first attempt's endedAt")
+}
