@@ -16,35 +16,35 @@ type queueProducer struct {
 	shards ShardRegistry
 }
 
-type ProducerOpt func(*queueProducer)
+type producerOpt func(*queueProducer)
 
-func WithProducerClock(clock clockwork.Clock) ProducerOpt {
+func withProducerClock(clock clockwork.Clock) producerOpt {
 	return func(q *queueProducer) {
 		q.clock = clock
 	}
 }
 
-func WithProducerKindToQueueMapping(mapping map[string]string) ProducerOpt {
+func withProducerKindToQueueMapping(mapping map[string]string) producerOpt {
 	return func(q *queueProducer) {
 		q.queueKindMapping = mapping
 	}
 }
 
-func WithProducerJobPromotion(enable bool) ProducerOpt {
+func withProducerJobPromotion(enable bool) producerOpt {
 	return func(q *queueProducer) {
 		q.enableJobPromotion = enable
 	}
 }
 
-func WithProducerConditionalTracer(tracer trace.ConditionalTracer) ProducerOpt {
+func withProducerConditionalTracer(tracer trace.ConditionalTracer) producerOpt {
 	return func(q *queueProducer) {
 		q.conditionalTracer = tracer
 	}
 }
 
-func NewProducer(
+func newProducer(
 	shards ShardRegistry,
-	opts ...ProducerOpt,
+	opts ...producerOpt,
 ) Producer {
 	q := &queueProducer{
 		clock:             clockwork.NewRealClock(),
