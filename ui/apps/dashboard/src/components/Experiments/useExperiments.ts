@@ -11,6 +11,10 @@ import type {
   ExperimentScoringConfig,
   ExperimentScoringMetric,
 } from '@inngest/components/Experiments';
+import {
+  trackExperimentDetailViewed,
+  trackExperimentsListViewed,
+} from './tracking';
 
 export type ExperimentTimeRange = { from: Date; to: Date };
 
@@ -65,7 +69,7 @@ export function useExperimentsList({
     const data = await runQuery(client, experimentsQuery, {
       workspaceID: environment.id,
     });
-    return data.experiments.map((exp) => ({
+    const items = data.experiments.map((exp) => ({
       experimentName: exp.name,
       functionId: exp.functionID,
       functionSlug: exp.functionSlug,
@@ -75,6 +79,13 @@ export function useExperimentsList({
       firstSeen: new Date(exp.firstSeen),
       lastSeen: new Date(exp.lastSeen),
     }));
+
+    trackExperimentsListViewed({
+      experimentCount: items.length,
+      functionCount: new Set(items.map((item) => item.functionId)).size,
+    });
+
+    return items;
   }, [client, environment.id]);
 
   return useQuery<ExperimentListItem[]>({
@@ -242,6 +253,7 @@ const updateExperimentScoringConfigMutation = graphql(`
 
 export function useExperimentDetail(
   functionID: string,
+  functionSlug: string,
   experimentName: string,
   range: ExperimentTimeRange,
   variantFilter: string | null,
@@ -253,6 +265,9 @@ export function useExperimentDetail(
   const toIso = range.to.toISOString();
 
   const queryFn = useCallback(async (): Promise<ExperimentDetail | null> => {
+    const startedAt = performance.now();
+    const durationMs = () => Math.round(performance.now() - startedAt);
+
     const result = await client
       .query(
         experimentDetailQuery,
@@ -274,13 +289,30 @@ export function useExperimentDetail(
     const isNoDataInRange = result.error?.graphQLErrors.some((e) =>
       e.message.includes('null which the schema does not allow'),
     );
-    if (isNoDataInRange) return null;
+    if (isNoDataInRange) {
+      trackExperimentDetailViewed({
+        experimentName,
+        functionSlug,
+        durationMs: durationMs(),
+        result: 'no_runs',
+      });
+      return null;
+    }
 
-    if (result.error) throw result.error;
+    if (result.error) {
+      trackExperimentDetailViewed({
+        experimentName,
+        functionSlug,
+        durationMs: durationMs(),
+        result: 'error',
+        errorType: result.error.networkError ? 'network' : 'graphql',
+      });
+      throw result.error;
+    }
     if (!result.data) throw new Error('No data returned');
 
     const d = result.data.experimentDetail;
-    return {
+    const detail: ExperimentDetail = {
       name: d.name,
       firstSeen: new Date(d.firstSeen),
       lastSeen: new Date(d.lastSeen),
@@ -292,10 +324,23 @@ export function useExperimentDetail(
         metrics: v.metrics,
       })),
     };
+
+    trackExperimentDetailViewed({
+      experimentName,
+      functionSlug,
+      durationMs: durationMs(),
+      result: detail.variants.length === 0 ? 'no_variant_data' : 'success',
+      selectionStrategy: detail.selectionStrategy,
+      variantCount: detail.variants.length,
+      runCount: detail.variants.reduce((sum, v) => sum + v.runCount, 0),
+    });
+
+    return detail;
   }, [
     client,
     environment.id,
     functionID,
+    functionSlug,
     experimentName,
     fromIso,
     toIso,

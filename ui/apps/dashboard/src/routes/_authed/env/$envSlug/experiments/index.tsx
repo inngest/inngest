@@ -13,6 +13,7 @@ import { Link } from '@inngest/components/Link';
 
 import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
+import { trackExperimentDocsLinkOpened } from '@/components/Experiments/tracking';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/experiments/')({
@@ -27,6 +28,7 @@ function ExperimentsInfo() {
         <Link
           href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments"
           target="_blank"
+          onClick={() => trackExperimentDocsLinkOpened()}
         >
           Learn about experiments
         </Link>

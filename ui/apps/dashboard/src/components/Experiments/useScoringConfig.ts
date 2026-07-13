@@ -3,6 +3,10 @@ import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 
 import {
+  SCORING_METRIC_CHANGED_FIELDS,
+  trackExperimentScoringWeightUpdated,
+} from './tracking';
+import {
   useExperimentScoringConfig,
   useUpdateExperimentScoringConfig,
 } from './useExperiments';
@@ -16,7 +20,11 @@ const DEBOUNCE_MS = 600;
  * DEBOUNCE_MS of inactivity. The save is skipped when the local state matches
  * the last-known server state.
  */
-export function useScoringConfig(functionID: string, experimentName: string) {
+export function useScoringConfig(
+  functionID: string,
+  functionSlug: string,
+  experimentName: string,
+) {
   const scoring = useExperimentScoringConfig(functionID, experimentName);
   const updateScoring = useUpdateExperimentScoringConfig(
     functionID,
@@ -56,7 +64,31 @@ export function useScoringConfig(functionID: string, experimentName: string) {
     const serverMetrics = serverMetricsRef.current;
     if (!current || !serverMetrics) return;
     if (JSON.stringify(current) === JSON.stringify(serverMetrics)) return;
-    mutateRef.current(current);
+
+    const previousByKey = new Map(serverMetrics.map((m) => [m.key, m]));
+    mutateRef.current(current, {
+      onSuccess: () => {
+        for (const metric of current) {
+          const previous = previousByKey.get(metric.key);
+          if (!previous) continue;
+
+          const changedFields = SCORING_METRIC_CHANGED_FIELDS.filter(
+            ([field]) => previous[field] !== metric[field],
+          ).map(([, snakeField]) => snakeField);
+          if (changedFields.length === 0) continue;
+
+          trackExperimentScoringWeightUpdated({
+            experimentName,
+            functionSlug,
+            metricKey: metric.key,
+            metricKind: metric.kind,
+            enabled: metric.enabled,
+            points: metric.points,
+            changedFields,
+          });
+        }
+      },
+    });
   }, DEBOUNCE_MS);
 
   useEffect(() => {
