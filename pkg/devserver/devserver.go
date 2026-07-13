@@ -592,9 +592,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceLogger(l),
 		executor.WithServiceShardRegistry(shardRegistry),
 		executor.WithServicePublisher(pb),
-		executor.WithServiceEnableKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-			return enableKeyQueues
-		}),
 	)
 
 	runner := runner.NewService(

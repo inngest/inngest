@@ -101,12 +101,6 @@ func WithServiceShardRegistry(shards queue.ShardRegistry) func(s *svc) {
 	}
 }
 
-func WithServiceEnableKeyQueues(kq func(ctx context.Context, acctID uuid.UUID) bool) func(*svc) {
-	return func(s *svc) {
-		s.allowKeyQueues = kq
-	}
-}
-
 func WithServicePublisher(p pubsub.Publisher) func(*svc) {
 	return func(s *svc) {
 		s.publisher = p
@@ -117,9 +111,6 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{
 		config: c,
 		log:    logger.StdlibLogger(context.Background()),
-		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		},
 	}
 	for _, o := range opts {
 		o(svc)
@@ -160,8 +151,6 @@ type svc struct {
 	shards queue.ShardRegistry
 
 	publisher pubsub.Publisher
-
-	allowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 }
 
 func (s *svc) Name() string {
