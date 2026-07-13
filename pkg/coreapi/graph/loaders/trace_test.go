@@ -394,3 +394,99 @@ func TestConvertRunSpanToGQL_MetadataPromotion(t *testing.T) {
 		assert.Empty(t, result.ChildrenSpans[0].Metadata, "step should not have trailing discovery metadata")
 	})
 }
+
+func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
+	tr := &traceReader{}
+	ctx := context.Background()
+
+	completed := enums.StepStatusCompleted
+	failed := enums.StepStatusFailed
+
+	intPtr := func(i int) *int { return &i }
+
+	execChild := func(spanID string, attempt int, status enums.StepStatus, functionOutput bool, outputID string) *cqrs.OtelSpan {
+		attrs := &meta.ExtractedValues{
+			DynamicStatus: &status,
+			StepAttempt:   intPtr(attempt),
+		}
+		if functionOutput {
+			attrs.IsFunctionOutput = boolPtr(true)
+			attrs.StepID = strPtr("fn-hash")
+		}
+		return &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameExecution, SpanID: spanID},
+			Attributes:  attrs,
+			OutputID:    strPtr(outputID),
+		}
+	}
+
+	t.Run("retried finalization group carries no StepID or OutputID", func(t *testing.T) {
+		// The final discovery request fails once and succeeds on retry: the
+		// discovery span has one FAILED exec child and one COMPLETED exec
+		// child marked as function output. The loose executor.nonstep
+		// siblings (parented to the run root, not present here) carry the
+		// same attempts, so this group must not masquerade as a step or
+		// carry the output — clients render finalization from the nonstep
+		// spans and drop this shape (matching the cloud renderer).
+		discovery := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery, SpanID: "disc"},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				execChild("exec-0", 0, failed, false, "output-0"),
+				execChild("exec-1", 1, completed, true, "output-1"),
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, discovery)
+		require.NoError(t, err)
+		assert.Equal(t, FinalizationSpanName, result.Name)
+		assert.Nil(t, result.StepID, "finalization group must not carry a step ID")
+		assert.Nil(t, result.OutputID, "finalization group must not carry an output ID")
+		// The per-attempt children keep their identity and outputs.
+		require.Len(t, result.ChildrenSpans, 2)
+		assert.Equal(t, "Attempt 0", result.ChildrenSpans[0].Name)
+		assert.Equal(t, "Attempt 1", result.ChildrenSpans[1].Name)
+		require.NotNil(t, result.ChildrenSpans[1].OutputID)
+		assert.Equal(t, "output-1", *result.ChildrenSpans[1].OutputID)
+	})
+
+	t.Run("single-attempt finalization group is also cleared", func(t *testing.T) {
+		discovery := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStepDiscovery, SpanID: "disc"},
+			Attributes:  &meta.ExtractedValues{},
+			Children: []*cqrs.OtelSpan{
+				execChild("exec-0", 0, completed, true, "output-0"),
+			},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, discovery)
+		require.NoError(t, err)
+		assert.Equal(t, FinalizationSpanName, result.Name)
+		assert.Nil(t, result.StepID)
+		assert.Nil(t, result.OutputID)
+	})
+
+	t.Run("real step keeps its StepID and OutputID", func(t *testing.T) {
+		// Guard against over-clearing: a step span whose exec child is NOT a
+		// function output must keep step identity and output.
+		child := execChild("exec-0", 0, completed, false, "step-output")
+		child.Attributes.StepID = strPtr("step-1")
+
+		step := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{Name: meta.SpanNameStep, SpanID: "step"},
+			Attributes: &meta.ExtractedValues{
+				StepName: strPtr("my-step"),
+				StepID:   strPtr("step-1"),
+			},
+			Children: []*cqrs.OtelSpan{child},
+		}
+
+		result, err := tr.convertRunSpanToGQL(ctx, step)
+		require.NoError(t, err)
+		assert.Equal(t, "my-step", result.Name)
+		require.NotNil(t, result.StepID)
+		assert.Equal(t, "step-1", *result.StepID)
+		require.NotNil(t, result.OutputID)
+		assert.Equal(t, "step-output", *result.OutputID)
+	})
+}
