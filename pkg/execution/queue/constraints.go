@@ -491,7 +491,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIError.String(), metrics.CounterOpt{
+			metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonAccountMissing.String(), metrics.CounterOpt{
 				PkgName: pkgName,
 			})
 			return ItemLeaseConstraintCheckResult{}, nil
