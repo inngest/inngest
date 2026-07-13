@@ -476,6 +476,7 @@ type QueueOptions struct {
 	// queueKindMapping stores a map of job kind => queue names
 	queueKindMapping        map[string]string
 	queueProducer           Producer
+	queueConsumer           Consumer
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
 	peekSizeForFunctions    map[string]int64
@@ -641,6 +642,12 @@ func WithEnableJobPromotion(enable bool) QueueOpt {
 func WithQueueProducer(producer Producer) QueueOpt {
 	return func(q *QueueOptions) {
 		q.queueProducer = producer
+	}
+}
+
+func WithQueueConsumer(consumer Consumer) QueueOpt {
+	return func(q *QueueOptions) {
+		q.queueConsumer = consumer
 	}
 }
 

@@ -97,6 +97,9 @@ func New(
 	if o.queueProducer != nil {
 		qp.Producer = o.queueProducer
 	}
+	if o.queueConsumer != nil {
+		qp.Consumer = o.queueConsumer
+	}
 	qp.configureQueueRoles()
 
 	return qp, nil
