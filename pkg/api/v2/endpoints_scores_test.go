@@ -458,6 +458,73 @@ func TestStateScoreProviderUsesMetadataLoaderForFinalizedRun(t *testing.T) {
 	require.True(t, loaderCalled)
 }
 
+func TestStateScoreProviderRejectsMissingRun(t *testing.T) {
+	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
+	accountID := uuid.New()
+	envID := uuid.New()
+	loaderCalled := false
+
+	provider := NewStateScoreProvider(StateScoreProviderOptions{
+		State: fakeScoreRunService{err: statev2.ErrMetadataNotFound},
+		Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
+			return accountID, envID, nil
+		},
+		MissingStateLoader: func(ctx context.Context, id statev2.ID) (*statev2.Metadata, error) {
+			loaderCalled = true
+			return nil, statev2.ErrMetadataNotFound
+		},
+	})
+
+	err := provider.CreateScores(context.Background(), CreateScoresParams{
+		RunID: runID,
+		Scores: []ScoreInput{
+			testScoreInput(t, ScoreInput{Name: "accuracy", Value: 1.0}),
+		},
+	})
+
+	require.ErrorIs(t, err, ErrScoreTargetNotFound)
+	require.True(t, loaderCalled)
+}
+
+func TestStateScoreProviderForwardsMetadataSizeIncrement(t *testing.T) {
+	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
+	accountID := uuid.New()
+	envID := uuid.New()
+	state := &fakeScoreIncrementingRunService{
+		metadata: statev2.Metadata{
+			ID: statev2.ID{
+				RunID: runID,
+				Tenant: statev2.Tenant{
+					AccountID: accountID,
+					EnvID:     envID,
+				},
+			},
+		},
+	}
+
+	provider := NewStateScoreProvider(StateScoreProviderOptions{
+		State: state,
+		Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
+			return accountID, envID, nil
+		},
+		MissingStateLoader: func(ctx context.Context, id statev2.ID) (*statev2.Metadata, error) {
+			require.Fail(t, "missing state loader should not run when state metadata loads")
+			return nil, nil
+		},
+	})
+
+	err := provider.CreateScores(context.Background(), CreateScoresParams{
+		RunID: runID,
+		Scores: []ScoreInput{
+			testScoreInput(t, ScoreInput{Name: "accuracy", Value: 1.0}),
+		},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, runID, state.incrementID.RunID)
+	require.Positive(t, state.incrementDelta)
+}
+
 func TestStateScoreProviderValidatesStepTargets(t *testing.T) {
 	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
 	accountID := uuid.New()
@@ -606,4 +673,21 @@ type fakeScoreRunService struct {
 
 func (f fakeScoreRunService) LoadMetadata(ctx context.Context, id statev2.ID, _ ...statev2.LoadMetadataOption) (statev2.Metadata, error) {
 	return f.metadata, f.err
+}
+
+type fakeScoreIncrementingRunService struct {
+	statev2.RunService
+	metadata       statev2.Metadata
+	incrementID    statev2.ID
+	incrementDelta int
+}
+
+func (f *fakeScoreIncrementingRunService) LoadMetadata(ctx context.Context, id statev2.ID, _ ...statev2.LoadMetadataOption) (statev2.Metadata, error) {
+	return f.metadata, nil
+}
+
+func (f *fakeScoreIncrementingRunService) IncrementMetadataSize(ctx context.Context, id statev2.ID, delta int) error {
+	f.incrementID = id
+	f.incrementDelta += delta
+	return nil
 }

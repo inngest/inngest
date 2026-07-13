@@ -95,6 +95,10 @@ func (p *stateScoreProvider) CreateScores(ctx context.Context, params CreateScor
 		},
 	}
 
+	if err := p.validateRunTarget(ctx, stateID); err != nil {
+		return err
+	}
+
 	if err := p.validateStepTargets(ctx, stateID, params.Scores); err != nil {
 		return err
 	}
@@ -158,6 +162,13 @@ func (s scoreMetadataState) LoadMetadata(ctx context.Context, id statev2.ID, opt
 	return *loaded, nil
 }
 
+func (s scoreMetadataState) IncrementMetadataSize(ctx context.Context, id statev2.ID, delta int) error {
+	if inc, ok := s.RunService.(statev2.MetadataSizeIncrementer); ok {
+		return inc.IncrementMetadataSize(ctx, id, delta)
+	}
+	return nil
+}
+
 type scoreAuth struct {
 	accountID uuid.UUID
 	envID     uuid.UUID
@@ -169,6 +180,18 @@ func (s scoreAuth) AccountID() uuid.UUID {
 
 func (s scoreAuth) WorkspaceID() uuid.UUID {
 	return s.envID
+}
+
+func (p *stateScoreProvider) validateRunTarget(ctx context.Context, id statev2.ID) error {
+	_, err := p.metadataState().LoadMetadata(ctx, id, statev2.OmitStackAndStepMetrics())
+	switch {
+	case errors.Is(err, statev2.ErrRunNotFound), errors.Is(err, statev2.ErrMetadataNotFound):
+		return fmt.Errorf("%w: %s", ErrScoreTargetNotFound, id.RunID)
+	case err != nil:
+		return err
+	default:
+		return nil
+	}
 }
 
 func (p *stateScoreProvider) validateStepTargets(ctx context.Context, id statev2.ID, scores []ScoreInput) error {
