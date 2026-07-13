@@ -291,21 +291,41 @@ function traceToBarData(
   };
 }
 
-// traceRollup groups attempts by stepID and groupID
-// (for spans without stepIDs, typically finalization spans or failures hitting the SDK entirely)
-// and creates virtual "rollup" spans that represent the entire step/finalization
-// with all attempts grouped together. This simplifies the trace for
-// display in the timeline while still allowing users to see
-// individual attempts when they expand the step details.
-export function traceRollup(root: Trace): Trace {
+/**
+ * Attempt spans bucketed for rollup, produced by a single pass over the
+ * run's direct children.
+ */
+type RollupGroups = {
+  /** stepIDs in first-seen order, so rollups keep the original span order */
+  stepOrder: string[];
+  /** attempt spans per stepID, keyed by attempt number */
+  steps: Map<string, Map<number, Trace>>;
+  /** spans emitted unchanged (output spans with no stepID or groupID) */
+  passthrough: Trace[];
+  /** attempt spans of the trailing group that never matched a step, if any */
+  finalizationAttempts: Map<number, Trace> | null;
+  /** step span with the latest endedAt; finalization can't start before it ends */
+  lastStep: Trace | null;
+};
+
+/**
+ * Classify the run's direct children for rollup.
+ *
+ * Spans with an outputID but no stepID (network failures, finalization) are
+ * grouped by groupID. A group later claimed by a step span becomes extra
+ * attempts of that step; a group that never matches a step is the run's
+ * finalization.
+ */
+function collectRollupGroups(children: Trace[]): RollupGroups {
   const stepOrder: string[] = [];
   const steps = new Map<string, Map<number, Trace>>();
-  const rolledUpRunChildren: Trace[] = [];
+  const passthrough: Trace[] = [];
   const groupedSpans = new Map<string, Map<number, Trace>>();
   let lastStepEndedAt: Date | null = null;
   let lastStep: Trace | null = null;
   let finalSpan: Trace | null = null;
-  for (const child of root.childrenSpans ?? []) {
+
+  for (const child of children) {
     if (child.outputID && !child.stepID) {
       if (child.groupID) {
         finalSpan = child;
@@ -313,13 +333,15 @@ export function traceRollup(root: Trace): Trace {
         attempts.set(child.attempts ?? 0, child);
         groupedSpans.set(child.groupID, attempts);
       } else {
-        rolledUpRunChildren.push(child);
+        passthrough.push(child);
       }
       continue;
-    } else if (!child.stepID || child.attempts === null) {
+    }
+    if (!child.stepID || child.attempts === null) {
       continue;
     }
 
+    // The grouped spans we saw belong to this step, not finalization
     if (finalSpan?.groupID == child.groupID) {
       finalSpan = null;
     }
@@ -346,102 +368,137 @@ export function traceRollup(root: Trace): Trace {
     steps.set(child.stepID, attempts);
   }
 
+  const finalizationAttempts = finalSpan?.groupID
+    ? groupedSpans.get(finalSpan.groupID) ?? null
+    : null;
+
+  return { stepOrder, steps, passthrough, finalizationAttempts, lastStep };
+}
+
+/** First (lowest attempt number) and last (highest) attempt spans of a group */
+function attemptBounds(attempts: Map<number, Trace>): {
+  first: Trace;
+  last: Trace;
+  lastAttempt: number;
+} {
+  const lastAttempt = Math.max(...attempts.keys());
+  return {
+    first: attempts.get(Math.min(...attempts.keys())) as Trace,
+    last: attempts.get(lastAttempt) as Trace,
+    lastAttempt,
+  };
+}
+
+/**
+ * Rename each attempt span (in place) to "Attempt N" and return them ordered
+ * by attempt number, for nesting under a rollup span.
+ */
+function toAttemptChildren(attempts: Map<number, Trace>): Trace[] {
+  for (const attempt of attempts.values()) {
+    attempt.name = `Attempt ${attempt.attempts}`;
+  }
+  return Array.from(attempts.values()).sort((a, b) => (a.attempts ?? 0) - (b.attempts ?? 0));
+}
+
+/**
+ * Roll up a step's attempts into a single span: a single attempt passes
+ * through unchanged; multiple attempts get a virtual span that spans the
+ * first attempt's queue time to the last attempt's end, carries the last
+ * attempt's status/output, and nests the attempts as children.
+ */
+function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace {
+  const { first, last, lastAttempt } = attemptBounds(attempts);
+  if (attempts.size === 1) {
+    return last;
+  }
+
+  const name = last.name; // capture before toAttemptChildren renames the attempts
+  return {
+    isRoot: false,
+    isUserland: false,
+    spanID: `${stepID}-rollup`, // virtual span
+    groupID: last.groupID,
+    name,
+    attempts: lastAttempt,
+    stepID: stepID,
+    queuedAt: first.queuedAt,
+    scheduledAt: first.scheduledAt,
+    startedAt: first.startedAt,
+    endedAt: last.endedAt,
+    status: last.status,
+    outputID: last.outputID,
+    debugRunID: last.debugRunID,
+    debugSessionID: last.debugSessionID,
+    stepInfo: last.stepInfo,
+    childrenSpans: toAttemptChildren(attempts),
+    metadata: last.metadata,
+    userlandSpan: null,
+  };
+}
+
+/**
+ * Roll up the finalization group's attempts into a single "Finalization"
+ * span. Finalization spans can carry queue timestamps from before the last
+ * step finished, so start timestamps are clamped to the last step's end to
+ * keep the timeline ordered.
+ */
+function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null): Trace {
+  const { first, last } = attemptBounds(attempts);
+  const notBefore = lastStep?.endedAt;
+
+  if (attempts.size === 1) {
+    last.name = 'Finalization';
+    last.queuedAt = maxDateString(last.queuedAt, notBefore);
+    last.scheduledAt = maxDateString(last.scheduledAt, notBefore);
+    last.startedAt = maxDateString(last.startedAt, notBefore);
+    return last;
+  }
+
+  return {
+    isRoot: false,
+    isUserland: false,
+    name: 'Finalization',
+    spanID: `final-rollup`, // virtual span
+    groupID: last.groupID,
+    attempts: last.attempts,
+    queuedAt: maxDateString(first.queuedAt, notBefore),
+    scheduledAt: maxDateString(first.scheduledAt, notBefore),
+    startedAt: maxDateString(first.startedAt, notBefore),
+    endedAt: last.endedAt,
+    status: last.status,
+    outputID: last.outputID,
+    debugRunID: last.debugRunID,
+    debugSessionID: last.debugSessionID,
+    childrenSpans: toAttemptChildren(attempts),
+    metadata: last.metadata,
+    stepInfo: null,
+    userlandSpan: null,
+  };
+}
+
+// traceRollup groups attempts by stepID and groupID
+// (for spans without stepIDs, typically finalization spans or failures hitting the SDK entirely)
+// and creates virtual "rollup" spans that represent the entire step/finalization
+// with all attempts grouped together. This simplifies the trace for
+// display in the timeline while still allowing users to see
+// individual attempts when they expand the step details.
+export function traceRollup(root: Trace): Trace {
+  const { stepOrder, steps, passthrough, finalizationAttempts, lastStep } = collectRollupGroups(
+    root.childrenSpans ?? []
+  );
+
+  const rolledUpRunChildren: Trace[] = [...passthrough];
+
   for (const stepID of stepOrder) {
     const attempts = steps.get(stepID);
     if (!attempts) {
       continue;
     }
-
-    const minAttempt = Math.min(...attempts.keys());
-    const minAttemptTrace = attempts.get(minAttempt) as Trace;
-    const maxAttempt = Math.max(...attempts.keys());
-    const maxAttemptTrace = attempts.get(maxAttempt) as Trace;
-    if (attempts.size == 1) {
-      rolledUpRunChildren.push(maxAttemptTrace);
-      continue;
-    }
-
-    // Create a virtual span to represent the step as a whole with all attempts
-    const virtualSpan: Trace = {
-      isRoot: false,
-      isUserland: false,
-      spanID: `${stepID}-rollup`, // virtual span
-      groupID: maxAttemptTrace.groupID,
-      name: maxAttemptTrace.name,
-      attempts: maxAttempt,
-      stepID: stepID,
-      queuedAt: minAttemptTrace.queuedAt,
-      scheduledAt: minAttemptTrace.scheduledAt,
-      startedAt: minAttemptTrace.startedAt,
-      endedAt: maxAttemptTrace.endedAt,
-      status: maxAttemptTrace.status,
-      outputID: maxAttemptTrace.outputID,
-      debugRunID: maxAttemptTrace.debugRunID,
-      debugSessionID: maxAttemptTrace.debugSessionID,
-      stepInfo: maxAttemptTrace.stepInfo,
-
-      childrenSpans: Array.from(attempts.values()).sort(
-        (a, b) => (a.attempts ?? 0) - (b.attempts ?? 0)
-      ),
-
-      metadata: maxAttemptTrace.metadata,
-
-      userlandSpan: null,
-    };
-
-    for (const attempt of attempts.values()) {
-      attempt.name = `Attempt ${attempt.attempts}`;
-    }
-
-    rolledUpRunChildren.push(virtualSpan);
+    rolledUpRunChildren.push(rollupStepAttempts(stepID, attempts));
   }
 
-  if (finalSpan && finalSpan.groupID && groupedSpans.has(finalSpan.groupID)) {
-    const attempts = groupedSpans.get(finalSpan.groupID) as Map<number, Trace>;
-    const minAttempt = Math.min(...attempts.keys());
-    const minAttemptTrace = attempts.get(minAttempt) as Trace;
-    const maxAttempt = Math.max(...attempts.keys());
-    const maxAttemptTrace = attempts.get(maxAttempt) as Trace;
-    if (attempts.size == 1) {
-      maxAttemptTrace.name = 'Finalization';
-      maxAttemptTrace.queuedAt = maxDateString(maxAttemptTrace.queuedAt, lastStep?.endedAt);
-      maxAttemptTrace.scheduledAt = maxDateString(maxAttemptTrace.scheduledAt, lastStep?.endedAt);
-      maxAttemptTrace.startedAt = maxDateString(maxAttemptTrace.startedAt, lastStep?.endedAt);
-      rolledUpRunChildren.push(maxAttemptTrace);
-    } else {
-      // Create a virtual span to represent the finalization as a whole with all attempts
-      const virtualSpan: Trace = {
-        isRoot: false,
-        isUserland: false,
-        name: 'Finalization',
-        spanID: `final-rollup`, // virtual span
-        groupID: maxAttemptTrace.groupID,
-        attempts: maxAttemptTrace.attempts,
-        queuedAt: maxDateString(minAttemptTrace.queuedAt, lastStep?.endedAt),
-        scheduledAt: maxDateString(minAttemptTrace.scheduledAt, lastStep?.endedAt),
-        startedAt: maxDateString(minAttemptTrace.startedAt, lastStep?.endedAt),
-        endedAt: maxAttemptTrace.endedAt,
-        status: maxAttemptTrace.status,
-        outputID: maxAttemptTrace.outputID,
-        debugRunID: maxAttemptTrace.debugRunID,
-        debugSessionID: maxAttemptTrace.debugSessionID,
-
-        childrenSpans: Array.from(attempts.values()).sort(
-          (a, b) => (a.attempts ?? 0) - (b.attempts ?? 0)
-        ),
-
-        metadata: maxAttemptTrace.metadata,
-
-        stepInfo: null,
-        userlandSpan: null,
-      };
-
-      for (const attempt of attempts.values()) {
-        attempt.name = `Attempt ${attempt.attempts}`;
-      }
-
-      rolledUpRunChildren.push(virtualSpan);
-    }
+  if (finalizationAttempts) {
+    rolledUpRunChildren.push(rollupFinalization(finalizationAttempts, lastStep));
   }
 
   const sortingKey = (trace: Trace) =>
