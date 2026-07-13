@@ -18,7 +18,7 @@ describe('traceConversion', () => {
     name: 'test-step',
     outputID: null,
     queuedAt: '2024-01-01T00:00:00Z',
-    scheduledAt: null,
+    scheduledAt: '2024-01-01T00:00:00Z',
     spanID: 'span-1',
     stepID: 'step-1',
     startedAt: '2024-01-01T00:00:02Z',
@@ -503,8 +503,8 @@ describe('traceConversion', () => {
       const result = traceRollup(root);
 
       expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['s2', 's1']);
-      expect(result.childrenSpans?.[1]).toBe(step1);
-      expect(step1.name).toBe('test-step'); // no "Attempt N" renaming
+      expect(result.childrenSpans?.[1]).toEqual(step1); // clone of the input span
+      expect(result.childrenSpans?.[1]?.name).toBe('test-step'); // no "Attempt N" renaming
     });
 
     it('rolls up a multi-attempt step into a virtual span', () => {
@@ -615,7 +615,7 @@ describe('traceConversion', () => {
       expect(finalization?.endedAt).toBe('2024-01-01T00:00:11Z');
     });
 
-    it('rolls up a multi-attempt finalization into a final-rollup virtual span', () => {
+    it('rolls up a multi-attempt unmatched group into a final-rollup virtual span', () => {
       const step = createTrace({
         spanID: 's1',
         stepID: 'step-1',
@@ -652,6 +652,8 @@ describe('traceConversion', () => {
       expect(result.childrenSpans).toHaveLength(2);
       const finalization = result.childrenSpans?.[1];
       expect(finalization?.spanID).toBe('final-rollup');
+      // The group ends COMPLETED, so this is a genuine (retried) finalization
+      // — not a "Function error"
       expect(finalization?.name).toBe('Finalization');
       // Start clamped to the last step's end, end from the last attempt
       expect(finalization?.queuedAt).toBe('2024-01-01T00:00:10Z');
@@ -674,8 +676,8 @@ describe('traceConversion', () => {
       const result = traceRollup(root);
 
       expect(result.childrenSpans).toHaveLength(1);
-      expect(result.childrenSpans?.[0]).toBe(outputSpan);
-      expect(outputSpan.name).toBe('test-step');
+      expect(result.childrenSpans?.[0]).toEqual(outputSpan); // clone of the input span
+      expect(result.childrenSpans?.[0]?.name).toBe('test-step');
     });
 
     it('drops spans without a stepID/outputID and step spans with null attempts', () => {
@@ -819,9 +821,10 @@ describe('traceConversion', () => {
     // the SDK responded each time (the outputs hold the user's actual error),
     // so this is the run's terminal work. The span shape is identical to Case
     // B's pre-SDK deaths minus the backend group span — the client cannot
-    // tell them apart — but the intended label differs. Locks in the current
-    // "Finalization" label for exhausted-retry function errors.
-    it('labels an exhausted-retry function error as "Finalization"', () => {
+    // tell them apart — which is exactly why the label is the neutral
+    // "Function error": truthful whether the group holds the function's own
+    // error or attempts that died before the SDK responded.
+    it('labels an exhausted-retry function error as "Function error"', () => {
       const root = createTrace({
         isRoot: true,
         spanID: 'run',
@@ -868,7 +871,7 @@ describe('traceConversion', () => {
       const rollup = out.childrenSpans?.find((c) => c.spanID === 'final-rollup');
 
       expect(out.childrenSpans).toHaveLength(1);
-      expect(rollup?.name).toBe('Finalization');
+      expect(rollup?.name).toBe('Function error');
       expect(rollup?.childrenSpans?.map((c) => c.name)).toEqual([
         'Attempt 0',
         'Attempt 1',
@@ -878,10 +881,10 @@ describe('traceConversion', () => {
 
     // Case B: the step 5xx's on every attempt, so its ID is never learned. The
     // server emits a pre-grouped backend span (no groupID, holds the attempts)
-    // plus loose per-attempt spans. Current behavior: the loose attempts roll
-    // into a "Finalization" group, so the run renders two "Finalization"
-    // spans — the backend passthrough duplicates the rollup.
-    it('rolls never-resolved failed attempts into a "Finalization" group', () => {
+    // plus loose per-attempt spans. The grouped attempts have no step to
+    // attribute to -> "Function error"; the backend passthrough still renders
+    // alongside it (de-duping it is intentionally out of scope here).
+    it('labels never-resolved failed attempts "Function error", not "Finalization"', () => {
       const root = createTrace({
         isRoot: true,
         spanID: 'run',
@@ -963,12 +966,10 @@ describe('traceConversion', () => {
       const out = traceRollup(structuredClone(root));
       const rollup = out.childrenSpans?.find((c) => c.spanID === 'final-rollup');
 
-      expect(rollup?.name).toBe('Finalization');
+      // The rolled-up loose attempts are now surfaced as a function error.
+      expect(rollup?.name).toBe('Function error');
       expect(rollup?.childrenSpans).toHaveLength(3);
-
-      // Current behavior: the backend passthrough is kept, duplicating the
-      // rolled-up group.
-      expect(childNames(out)).toEqual(['Finalization', 'Finalization']);
+      expect(childNames(out)).toEqual(['Finalization', 'Function error']);
     });
 
     // The final discovery itself can retry: the request after the last step
@@ -976,8 +977,9 @@ describe('traceConversion', () => {
     // trace: the server emits a pre-grouped "Finalization" span (with a stepID
     // and no groupID) plus the loose per-attempt spans. Current behavior: the
     // pre-grouped span passes through via the steps map and the loose attempts
-    // roll into a second "Finalization" group.
-    it('rolls a retried-but-successful finalization into a "Finalization" group', () => {
+    // roll into a group ending COMPLETED — a genuine (retried) finalization,
+    // not an unresolved step.
+    it('labels a retried-but-successful finalization "Finalization", not "Function error"', () => {
       const root = createTrace({
         isRoot: true,
         spanID: 'run',
@@ -1050,15 +1052,14 @@ describe('traceConversion', () => {
       expect(rollup?.status).toBe('COMPLETED');
       expect(rollup?.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
 
-      // Current behavior: the backend pre-grouped span renders alongside the
-      // rollup, so the finalization appears twice.
+      // The backend pre-grouped span still renders alongside the rollup
+      // (de-duped server-side; out of scope for the client rollup).
       expect(childNames(out)).toEqual(['Finalization', 'work', 'Finalization']);
     });
 
-    // Case C: a single pre-SDK failure (e.g. retries: 0). The lone nonstep is
-    // relabeled "Finalization" via the single-attempt branch, and the backend
-    // passthrough renders alongside it — the same duplication as above with a
-    // single attempt.
+    // Case C: a single pre-SDK failure (e.g. retries: 0). The lone FAILED
+    // nonstep is labeled "Function error" (status-based naming: the group is
+    // where the run failed); the backend passthrough renders alongside it.
     it('renders a single failed pre-stepID attempt alongside its backend passthrough', () => {
       const root = createTrace({
         isRoot: true,
@@ -1095,7 +1096,7 @@ describe('traceConversion', () => {
       const out = traceRollup(structuredClone(root));
 
       expect(out.childrenSpans).toHaveLength(2);
-      expect(childNames(out)).toEqual(['Finalization', 'Finalization']);
+      expect(childNames(out)).toEqual(['Finalization', 'Function error']);
     });
 
     // Case D: a groupID-less finalization span with NO failed pre-SDK attempt
@@ -1135,6 +1136,65 @@ describe('traceConversion', () => {
       const out = traceRollup(structuredClone(root));
 
       expect(childNames(out)).toContain('Finalization');
+    });
+    // traceRollup must NOT mutate its input. The result is memoized against the
+    // trace object, so on a re-render the memo re-runs traceRollup(trace) on the
+    // same object; if that object had been mutated into the rolled-up shape, the
+    // "Function error" group would collapse to a single span and get relabeled
+    // "Finalization". Non-mutation keeps every call operating on pristine input.
+    it('does not mutate its input, so repeated calls are stable', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        status: 'FAILED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-root',
+            outputID: 'o1',
+          }),
+          createTrace({
+            spanID: 'n2',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 2,
+            groupID: 'g-root',
+            outputID: 'o2',
+          }),
+        ],
+      });
+      const frozen = JSON.stringify(root);
+
+      const first = traceRollup(root);
+      // Input is untouched: the rollup operates on a clone.
+      expect(JSON.stringify(root)).toBe(frozen);
+      expect(childNames(first)).toContain('Function error');
+
+      // Re-running on the same (still-pristine) input yields the same labels —
+      // this is what the memoized render does across re-renders/polls.
+      const second = traceRollup(root);
+      expect(childNames(second)).toEqual(childNames(first));
     });
   });
 });

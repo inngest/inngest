@@ -437,17 +437,32 @@ function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace
 }
 
 /**
- * Roll up the finalization group's attempts into a single "Finalization"
- * span. Finalization spans can carry queue timestamps from before the last
- * step finished, so start timestamps are clamped to the last step's end to
- * keep the timeline ordered.
+ * Roll up the trailing unmatched group's attempts into a single span. These
+ * spans can carry queue timestamps from before the last step finished, so
+ * start timestamps are clamped to the last step's end to keep the timeline
+ * ordered.
+ *
+ * Naming is decided by how the group ended, not by attempt count — the final
+ * discovery itself can retry (e.g. the app 500s on the final request, then
+ * succeeds), so multiple attempts don't imply an unresolved step:
+ * - Ends COMPLETED: only the finalization can produce the function's output
+ *   with no stepID (a step that succeeds gets a stepID and is claimed out of
+ *   the trailing group), so this is genuinely "Finalization".
+ * - Ends FAILED: this group is the site of the run's failure, but the client
+ *   can't tell why — the attempts may have died before the SDK identified the
+ *   work, or the SDK may have returned the function's own terminal error.
+ *   "Function error" is neutral and truthful for both, unlike "Finalization",
+ *   which implies a normal wind-down.
+ * - Still running: default to "Finalization" rather than flickering "Function
+ *   error" on in-flight runs.
  */
 function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null): Trace {
   const { first, last } = attemptBounds(attempts);
   const notBefore = lastStep?.endedAt;
+  const name = last.status === 'FAILED' ? 'Function error' : 'Finalization';
 
   if (attempts.size === 1) {
-    last.name = 'Finalization';
+    last.name = name;
     last.queuedAt = maxDateString(last.queuedAt, notBefore);
     last.scheduledAt = maxDateString(last.scheduledAt, notBefore);
     last.startedAt = maxDateString(last.startedAt, notBefore);
@@ -457,7 +472,7 @@ function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null
   return {
     isRoot: false,
     isUserland: false,
-    name: 'Finalization',
+    name,
     spanID: `final-rollup`, // virtual span
     groupID: last.groupID,
     attempts: last.attempts,
@@ -483,6 +498,15 @@ function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null
 // display in the timeline while still allowing users to see
 // individual attempts when they expand the step details.
 export function traceRollup(root: Trace): Trace {
+  // Operate on a clone so we never mutate the caller's (cached) trace. The
+  // rolled-up result is memoized against the trace object; without this, a
+  // re-render would feed our own output back in and roll it up a second time
+  // (which, e.g., collapses the multi-attempt "Function error" group into a
+  // single-span group and relabels it — see rollupFinalization's size === 1
+  // branch). The helpers below rename/reshape spans in place, which is safe
+  // precisely because they only ever see this clone.
+  root = structuredClone(root);
+
   const { stepOrder, steps, passthrough, finalizationAttempts, lastStep } = collectRollupGroups(
     root.childrenSpans ?? []
   );
