@@ -1392,4 +1392,82 @@ describe('traceConversion', () => {
       expect(childNames(second)).toEqual(childNames(first));
     });
   });
+
+  describe('traceRollup child ordering', () => {
+    // Single-attempt step children survive rollup as-is, so these fixtures
+    // exercise the run-children sort directly.
+    const createStep = (overrides: Partial<Trace> = {}): Trace =>
+      createTrace({ attempts: 0, ...overrides });
+
+    it('sorts children by queuedAt ascending regardless of input order', () => {
+      const root = createTrace({
+        isRoot: true,
+        stepID: null,
+        childrenSpans: [
+          createStep({
+            spanID: 'later',
+            stepID: 'later',
+            queuedAt: '2024-01-01T00:00:05Z',
+            startedAt: '2024-01-01T00:00:05Z',
+          }),
+          createStep({
+            spanID: 'earlier',
+            stepID: 'earlier',
+            queuedAt: '2024-01-01T00:00:01Z',
+            startedAt: '2024-01-01T00:00:01Z',
+          }),
+        ],
+      });
+
+      const result = traceRollup(root);
+      expect(result.childrenSpans?.map((s) => s.spanID)).toEqual(['earlier', 'later']);
+    });
+
+    it('keeps input order for tied queuedAt values (stable sort)', () => {
+      // Parallel steps planned in one SDK response share one queuedAt; their
+      // waterfall order must stay deterministic (storage order), not flip by
+      // sort implementation detail.
+      const tied = '2024-01-01T00:00:01Z';
+      const root = createTrace({
+        isRoot: true,
+        stepID: null,
+        childrenSpans: [
+          createStep({ spanID: 'p1', stepID: 'p1', queuedAt: tied }),
+          createStep({ spanID: 'p2', stepID: 'p2', queuedAt: tied }),
+          createStep({ spanID: 'p3', stepID: 'p3', queuedAt: tied }),
+          createStep({ spanID: 'p4', stepID: 'p4', queuedAt: tied }),
+        ],
+      });
+
+      const result = traceRollup(root);
+      expect(result.childrenSpans?.map((s) => s.spanID)).toEqual(['p1', 'p2', 'p3', 'p4']);
+    });
+
+    it('falls back to startedAt when queuedAt is missing', () => {
+      const root = createTrace({
+        isRoot: true,
+        stepID: null,
+        childrenSpans: [
+          createStep({
+            spanID: 'started-later',
+            stepID: 'started-later',
+            queuedAt: '',
+            startedAt: '2024-01-01T00:00:08Z',
+          }),
+          createStep({
+            spanID: 'queued-earlier',
+            stepID: 'queued-earlier',
+            queuedAt: '2024-01-01T00:00:02Z',
+            startedAt: '2024-01-01T00:00:02Z',
+          }),
+        ],
+      });
+
+      const result = traceRollup(root);
+      expect(result.childrenSpans?.map((s) => s.spanID)).toEqual([
+        'queued-earlier',
+        'started-later',
+      ]);
+    });
+  });
 });
