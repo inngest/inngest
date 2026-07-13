@@ -2,7 +2,6 @@ package queue
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -490,7 +489,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		},
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, constraintapi.ErrAccountNotFound) {
 			metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonAccountMissing.String(), metrics.CounterOpt{
 				PkgName: pkgName,
 			})
