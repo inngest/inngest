@@ -11,10 +11,7 @@ import type {
   ExperimentScoringConfig,
   ExperimentScoringMetric,
 } from '@inngest/components/Experiments';
-import {
-  trackExperimentDetailViewed,
-  trackExperimentsListViewed,
-} from './tracking';
+import { trackExperimentDetailViewed } from './tracking';
 
 export type ExperimentTimeRange = { from: Date; to: Date };
 
@@ -79,11 +76,6 @@ export function useExperimentsList({
       firstSeen: new Date(exp.firstSeen),
       lastSeen: new Date(exp.lastSeen),
     }));
-
-    trackExperimentsListViewed({
-      experimentCount: items.length,
-      functionCount: new Set(items.map((item) => item.functionId)).size,
-    });
 
     return items;
   }, [client, environment.id]);

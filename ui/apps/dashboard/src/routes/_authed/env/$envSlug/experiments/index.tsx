@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
 import { InlineCode } from '@inngest/components/Code';
@@ -13,7 +13,10 @@ import { Link } from '@inngest/components/Link';
 
 import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
-import { trackExperimentDocsLinkOpened } from '@/components/Experiments/tracking';
+import {
+  trackExperimentDocsLinkOpened,
+  trackExperimentsListViewed,
+} from '@/components/Experiments/tracking';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/experiments/')({
@@ -48,6 +51,18 @@ function ExperimentsComponent() {
   const { data, isPending, error, refetch } = useExperimentsList({
     enabled: isMounted,
   });
+
+  const hasTrackedListViewed = useRef(false);
+  useEffect(() => {
+    if (hasTrackedListViewed.current) return;
+    if (isPending || error || !Array.isArray(data)) return;
+
+    hasTrackedListViewed.current = true;
+    trackExperimentsListViewed({
+      experimentCount: data.length,
+      functionCount: new Set(data.map((item) => item.functionId)).size,
+    });
+  }, [data, isPending, error]);
 
   const handleRowClick = useCallback(
     (row: ExperimentListItem) => {
