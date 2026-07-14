@@ -14,7 +14,12 @@ import { Skeleton } from '@inngest/components/Skeleton';
 import { TableBlankState } from '@inngest/components/Table';
 import { ExperimentsIcon } from '@inngest/components/icons/sections/Experiments';
 import { subtractDuration } from '@inngest/components/utils/date';
-import { RiFlaskLine, RiListOrdered2, RiRefreshLine, RiTrophyLine } from '@remixicon/react';
+import {
+  RiFlaskLine,
+  RiListOrdered2,
+  RiRefreshLine,
+  RiTrophyLine,
+} from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -40,6 +45,11 @@ import {
   type ExperimentTimeRange as ExperimentUrlTimeRange,
 } from '@/lib/experiments/urlState';
 import { pathCreator } from '@/utils/urls';
+import {
+  trackExperimentOpenedInInsights,
+  trackExperimentTimeRangeChanged,
+  trackExperimentVariantFilterChanged,
+} from '@/components/Experiments/tracking';
 
 type Props = {
   experimentName: string;
@@ -136,7 +146,9 @@ export function ExperimentDetailPage({
 
   const [showInactive, setShowInactive] = useState(false);
   const [activePanel, setActivePanel] = useState<PanelKey | null>(INFO_PANEL);
-  const [hoveredVariantName, setHoveredVariantName] = useState<string | null>(null);
+  const [hoveredVariantName, setHoveredVariantName] = useState<string | null>(
+    null,
+  );
 
   const queryRange = useMemo<ExperimentTimeRange>(() => {
     return rangeToTimeRange(range);
@@ -144,12 +156,13 @@ export function ExperimentDetailPage({
 
   const detail = useExperimentDetail(
     functionID,
+    functionSlug,
     experimentName,
     queryRange,
     null,
     { enabled: rangeReady },
   );
-  const scoring = useScoringConfig(functionID, experimentName);
+  const scoring = useScoringConfig(functionID, functionSlug, experimentName);
   const insightsQuery = useExperimentInsightsQuery(
     functionID,
     experimentName,
@@ -161,9 +174,63 @@ export function ExperimentDetailPage({
     setActivePanel((panel) => (panel === key ? null : key));
   }, []);
 
+  const handleRangeChange = useCallback(
+    (nextRange: RangeChangeProps) => {
+      const { from, to } = rangeToTimeRange(nextRange);
+      const rangeDays = Math.round(
+        (to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000),
+      );
+      trackExperimentTimeRangeChanged({
+        experimentName,
+        functionSlug,
+        rangeDays,
+        hitMaxRange: rangeDays >= daysAgoMax,
+      });
+      onTimeRangeChange(nextRange);
+    },
+    [onTimeRangeChange, experimentName, functionSlug, daysAgoMax],
+  );
+
   const availableVariants = useMemo(
     () => detail.data?.variants.map((v) => v.variantName) ?? [],
     [detail.data],
+  );
+
+  const handleSelectedVariantsChange = useCallback(
+    (variants: string[]) => {
+      const available = new Set(availableVariants);
+      const matchingCount = variants.filter((v) => available.has(v)).length;
+      trackExperimentVariantFilterChanged({
+        experimentName,
+        functionSlug,
+        filterType: 'variant_selection',
+        selectedVariantCount: variants.length,
+        availableVariantCount: availableVariants.length,
+        resultedInEmpty: variants.length > 0 && matchingCount === 0,
+      });
+      onSelectedVariantsChange(variants);
+    },
+    [onSelectedVariantsChange, experimentName, functionSlug, availableVariants],
+  );
+
+  const handleShowInactiveChange = useCallback(
+    (next: boolean) => {
+      trackExperimentVariantFilterChanged({
+        experimentName,
+        functionSlug,
+        filterType: 'show_inactive',
+        selectedVariantCount: selectedVariants.length,
+        availableVariantCount: availableVariants.length,
+        resultedInEmpty: false,
+      });
+      setShowInactive(next);
+    },
+    [
+      experimentName,
+      functionSlug,
+      selectedVariants.length,
+      availableVariants.length,
+    ],
   );
 
   const selectedAvailableVariants = useMemo(() => {
@@ -237,8 +304,21 @@ export function ExperimentDetailPage({
   const onOpenInsights = useCallback(() => {
     const sql = insightsQuery.data;
     if (!sql) return;
+    trackExperimentOpenedInInsights({
+      experimentName,
+      functionSlug,
+      variantCount: detail.data?.variants.length ?? 0,
+      selectedVariantCount: selectedVariants.length,
+    });
     window.open(insightsUrl(environment.slug, sql), '_blank');
-  }, [insightsQuery.data, environment.slug]);
+  }, [
+    insightsQuery.data,
+    environment.slug,
+    experimentName,
+    functionSlug,
+    detail.data,
+    selectedVariants.length,
+  ]);
 
   const helperItems: HelperItem[] = [
     {
@@ -280,10 +360,10 @@ export function ExperimentDetailPage({
             <>
               <ExperimentDetailToolbar
                 range={range}
-                onRangeChange={onTimeRangeChange}
+                onRangeChange={handleRangeChange}
                 daysAgoMax={daysAgoMax}
                 selectedVariants={selectedVariants}
-                onSelectedVariantsChange={onSelectedVariantsChange}
+                onSelectedVariantsChange={handleSelectedVariantsChange}
                 availableVariants={availableVariants}
               />
 
@@ -328,7 +408,7 @@ export function ExperimentDetailPage({
                             kind="primary"
                             appearance="solid"
                             label="Clear variant filter"
-                            onClick={() => onSelectedVariantsChange([])}
+                            onClick={() => handleSelectedVariantsChange([])}
                           />
                           <Button
                             kind="primary"
@@ -363,52 +443,53 @@ export function ExperimentDetailPage({
                           className="text-primary-intense min-w-0 flex-1 truncate text-sm"
                           title={topScoredVariant.variant.variantName}
                         >
-                          Recommended: {truncateCenter(topScoredVariant.variant.variantName)}
+                          Recommended:{' '}
+                          {truncateCenter(topScoredVariant.variant.variantName)}
                         </span>
                       </div>
                     )}
-                  <div className="@container">
-                    <div className="grid grid-cols-1 gap-3 @[800px]:grid-cols-2 @[1200px]:grid-cols-3">
-                      <div className="col-span-full flex flex-wrap gap-3">
-                        <RunCountDonutCard
-                          className="min-h-[250px] min-w-0 grow shrink basis-full @[800px]:basis-0"
-                          variants={sortedVariants}
-                          variantColorIndex={variantColorIndex}
-                          onVariantHover={setHoveredVariantName}
-                          highlightedVariantName={hoveredVariantName}
-                        />
-                        <ScoreSummaryCard
-                          className="min-h-[250px] min-w-0 grow shrink basis-full @[800px]:basis-0"
+                    <div className="@container">
+                      <div className="grid grid-cols-1 gap-3 @[800px]:grid-cols-2 @[1200px]:grid-cols-3">
+                        <div className="col-span-full flex flex-wrap gap-3">
+                          <RunCountDonutCard
+                            className="min-h-[250px] min-w-0 grow shrink basis-full @[800px]:basis-0"
+                            variants={sortedVariants}
+                            variantColorIndex={variantColorIndex}
+                            onVariantHover={setHoveredVariantName}
+                            highlightedVariantName={hoveredVariantName}
+                          />
+                          <ScoreSummaryCard
+                            className="min-h-[250px] min-w-0 grow shrink basis-full @[800px]:basis-0"
+                            scoredVariants={scoredVariants}
+                            metrics={scoring.metrics}
+                            hoveredVariantName={hoveredVariantName}
+                            onVariantHover={setHoveredVariantName}
+                          />
+                        </div>
+
+                        {enabledMetrics.map((metric) => (
+                          <MetricPanel
+                            key={metric.key}
+                            metric={metric}
+                            variants={sortedVariants}
+                            variantColorIndex={variantColorIndex}
+                            hoveredVariantName={hoveredVariantName}
+                            onVariantHover={setHoveredVariantName}
+                          />
+                        ))}
+
+                        <VariantsTable
+                          className="col-span-full"
                           scoredVariants={scoredVariants}
-                          metrics={scoring.metrics}
-                          hoveredVariantName={hoveredVariantName}
-                          onVariantHover={setHoveredVariantName}
+                          scoringConfig={scoring.metrics}
+                          metricRanges={metricRanges}
+                          onUpdateMetric={scoring.updateMetric}
+                          onOpenInsights={onOpenInsights}
+                          showInactive={showInactive}
+                          onShowInactiveChange={handleShowInactiveChange}
                         />
                       </div>
-
-                      {enabledMetrics.map((metric) => (
-                        <MetricPanel
-                          key={metric.key}
-                          metric={metric}
-                          variants={sortedVariants}
-                          variantColorIndex={variantColorIndex}
-                          hoveredVariantName={hoveredVariantName}
-                          onVariantHover={setHoveredVariantName}
-                        />
-                      ))}
-
-                      <VariantsTable
-                        className="col-span-full"
-                        scoredVariants={scoredVariants}
-                        scoringConfig={scoring.metrics}
-                        metricRanges={metricRanges}
-                        onUpdateMetric={scoring.updateMetric}
-                        onOpenInsights={onOpenInsights}
-                        showInactive={showInactive}
-                        onShowInactiveChange={setShowInactive}
-                      />
                     </div>
-                  </div>
                   </div>
                 ))}
             </>
