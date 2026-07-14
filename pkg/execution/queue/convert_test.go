@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // TestQueueItemProtoRoundTrip guards against dropping persisted queue item
@@ -193,6 +194,61 @@ func TestItemProtoRoundTrip_NilOptionalFields(t *testing.T) {
 	require.Equal(t, json.RawMessage(`null`), roundTripped.Payload)
 	require.Equal(t, original.WorkspaceID, roundTripped.WorkspaceID)
 	require.Equal(t, original.Identifier.RunID, roundTripped.Identifier.RunID)
+}
+
+// TestEnqueueRequestTimeContract guards the enqueue boundary: scheduled time is
+// carried by EnqueueRequest.at, not by Item.At, and enqueue time is assigned by
+// the queue rather than producer-provided Item.EnqueuedAt.
+func TestEnqueueRequestTimeContract(t *testing.T) {
+	itemAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	itemEnqueuedAt := time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC)
+
+	requestAt := time.Date(2026, 1, 2, 4, 0, 0, 0, time.UTC)
+
+	msg, err := ItemToProto(Item{
+		WorkspaceID: uuid.New(),
+		Kind:        KindEdge,
+		Identifier:  validIdentifier(),
+		Payload:     json.RawMessage(`{"edge":"step"}`),
+		At:          itemAt,
+		EnqueuedAt:  itemEnqueuedAt,
+	})
+	require.NoError(t, err)
+
+	req := &pb.EnqueueRequest{
+		Item: msg,
+		At:   timestamppb.New(requestAt),
+	}
+
+	roundTripped, err := ItemFromProto(req.GetItem())
+	require.NoError(t, err)
+
+	// roundTripped.At and EnqueuedAt are zero because the enqueue proto request
+	// does not carry those times and hence cannot be re-constructed from the item proto.
+	require.True(t, roundTripped.At.IsZero())
+	require.True(t, roundTripped.EnqueuedAt.IsZero())
+	require.Equal(t, requestAt, req.GetAt().AsTime())
+}
+
+// TestQueueItemFromProtoReconstructsItemTimes guards the dequeue/requeue
+// boundary: item runtime times are derived from the outer QueueItem envelope.
+func TestQueueItemFromProtoReconstructsItemTimes(t *testing.T) {
+	at := time.Date(2026, 1, 2, 4, 0, 0, 0, time.UTC)
+	enqueuedAt := time.Date(2026, 1, 2, 3, 0, 0, 0, time.UTC)
+
+	item, err := QueueItemFromProto(&pb.QueueItem{
+		AtMs:        at.UnixMilli(),
+		EnqueuedAt:  enqueuedAt.UnixMilli(),
+		FunctionId:  uuid.NewString(),
+		WorkspaceId: uuid.NewString(),
+		Data: &pb.Item{
+			WorkspaceId: uuid.NewString(),
+			Identifier:  validIdentifierProto(),
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, at.UnixMilli(), item.Data.At.UnixMilli())
+	require.Equal(t, enqueuedAt.UnixMilli(), item.Data.EnqueuedAt.UnixMilli())
 }
 
 // TestEnqueueOptionsProtoRoundTrip guards producer option drift between the Go
@@ -426,7 +482,9 @@ func TestLeafProtoRoundTrips(t *testing.T) {
 	_, err = SingletonFromProto(&pb.Singleton{Mode: "unknown"})
 	require.ErrorContains(t, err, "singleton mode")
 
-	keys := []state.CustomConcurrency{{Key: "key", Hash: "hash", Limit: 1}}
+	keys := []state.CustomConcurrency{
+		{Key: "key", Hash: "hash", Limit: 1, UnhashedEvaluatedKeyValue: "customer-1"},
+	}
 	require.Equal(t, keys, CustomConcurrencySliceFromProto(CustomConcurrencySliceToProto(keys)))
 	require.Nil(t, CustomConcurrencySliceToProto(nil))
 	require.Nil(t, CustomConcurrencySliceFromProto(nil))
@@ -630,9 +688,7 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 			"Key",
 			"Hash",
 			"Limit",
-		},
-		ignored: map[string]string{
-			"UnhashedEvaluatedKeyValue": "runtime-only evaluated value, intentionally not sent through queue proxy",
+			"UnhashedEvaluatedKeyValue",
 		},
 	})
 
@@ -702,6 +758,17 @@ func validIdentifierProto() *pb.Identifier {
 		AccountId:       uuid.NewString(),
 		WorkspaceId:     uuid.NewString(),
 		AppId:           uuid.NewString(),
+	}
+}
+
+func validIdentifier() state.Identifier {
+	return state.Identifier{
+		RunID:       ulid.Make(),
+		WorkflowID:  uuid.New(),
+		EventID:     ulid.Make(),
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		AppID:       uuid.New(),
 	}
 }
 

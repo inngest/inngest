@@ -575,12 +575,13 @@ func (x *Identifier) GetSemaphores() []*Semaphore {
 }
 
 type CustomConcurrency struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Hash          string                 `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
-	Limit         int64                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	Key                       string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Hash                      string                 `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	Limit                     int64                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	UnhashedEvaluatedKeyValue string                 `protobuf:"bytes,4,opt,name=unhashed_evaluated_key_value,json=unhashedEvaluatedKeyValue,proto3" json:"unhashed_evaluated_key_value,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *CustomConcurrency) Reset() {
@@ -632,6 +633,13 @@ func (x *CustomConcurrency) GetLimit() int64 {
 		return x.Limit
 	}
 	return 0
+}
+
+func (x *CustomConcurrency) GetUnhashedEvaluatedKeyValue() string {
+	if x != nil {
+		return x.UnhashedEvaluatedKeyValue
+	}
+	return ""
 }
 
 type Semaphore struct {
@@ -1026,11 +1034,12 @@ const file_queue_v1_types_proto_rawDesc = "" +
 	"\x10_original_run_idB\f\n" +
 	"\n" +
 	"_replay_idB\x12\n" +
-	"\x10_priority_factor\"O\n" +
+	"\x10_priority_factor\"\x90\x01\n" +
 	"\x11CustomConcurrency\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
 	"\x04hash\x18\x02 \x01(\tR\x04hash\x12\x14\n" +
-	"\x05limit\x18\x03 \x01(\x03R\x05limit\"{\n" +
+	"\x05limit\x18\x03 \x01(\x03R\x05limit\x12?\n" +
+	"\x1cunhashed_evaluated_key_value\x18\x04 \x01(\tR\x19unhashedEvaluatedKeyValue\"{\n" +
 	"\tSemaphore\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x12evaluated_key_hash\x18\x02 \x01(\tR\x10evaluatedKeyHash\x12\x16\n" +

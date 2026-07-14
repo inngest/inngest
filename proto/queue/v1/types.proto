@@ -72,6 +72,7 @@ message CustomConcurrency {
   string key = 1;
   string hash = 2;
   int64 limit = 3;
+  string unhashed_evaluated_key_value = 4;
 }
 
 message Semaphore {

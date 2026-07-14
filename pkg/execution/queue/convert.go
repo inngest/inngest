@@ -396,9 +396,10 @@ func CustomConcurrencySliceToProto(keys []state.CustomConcurrency) []*pb.CustomC
 	result := make([]*pb.CustomConcurrency, len(keys))
 	for i, key := range keys {
 		result[i] = &pb.CustomConcurrency{
-			Key:   key.Key,
-			Hash:  key.Hash,
-			Limit: int64(key.Limit),
+			Key:                       key.Key,
+			Hash:                      key.Hash,
+			Limit:                     int64(key.Limit),
+			UnhashedEvaluatedKeyValue: key.UnhashedEvaluatedKeyValue,
 		}
 	}
 	return result
@@ -411,9 +412,10 @@ func CustomConcurrencySliceFromProto(keys []*pb.CustomConcurrency) []state.Custo
 	result := make([]state.CustomConcurrency, len(keys))
 	for i, key := range keys {
 		result[i] = state.CustomConcurrency{
-			Key:   key.GetKey(),
-			Hash:  key.GetHash(),
-			Limit: int(key.GetLimit()),
+			Key:                       key.GetKey(),
+			Hash:                      key.GetHash(),
+			Limit:                     int(key.GetLimit()),
+			UnhashedEvaluatedKeyValue: key.GetUnhashedEvaluatedKeyValue(),
 		}
 	}
 	return result
