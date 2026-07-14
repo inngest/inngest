@@ -8,7 +8,7 @@ import type { ScoreKind } from '@inngest/components/Experiments';
  */
 
 type ExperimentEventName =
-  | 'Experiments List Viewed'
+  | 'Experiment List Viewed'
   | 'Experiment Detail Viewed'
   | 'Experiment Opened In Insights'
   | 'Experiment Scoring Weight Updated'
@@ -57,7 +57,7 @@ export function trackExperimentsListViewed({
   experimentCount: number;
   functionCount: number;
 }) {
-  trackExperimentsEvent('Experiments List Viewed', {
+  trackExperimentsEvent('Experiment List Viewed', {
     experiment_count: experimentCount,
     function_count: functionCount,
     has_experiments: experimentCount > 0,
