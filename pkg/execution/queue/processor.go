@@ -71,7 +71,7 @@ func New(
 			WithProducerJobPromotion(o.enableJobPromotion),
 			WithProducerConditionalTracer(o.ConditionalTracer),
 		),
-		Consumer:        newQueueConsumer(shards),
+		Consumer:        NewConsumer(shards),
 		JobQueueReader:  newJobQueueReader(shards, o.AccountShardIterationEnabled),
 		Migrator:        newQueueMigrator(shards, o.Clock),
 		Unpauser:        newQueueUnpauser(shards),
