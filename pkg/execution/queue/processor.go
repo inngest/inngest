@@ -64,12 +64,12 @@ func New(
 		quit:         make(chan error, o.numWorkers),
 
 		shards: shards,
-		Producer: newProducer(
+		Producer: NewProducer(
 			shards,
-			withProducerClock(o.Clock),
-			withProducerKindToQueueMapping(o.queueKindMapping),
-			withProducerJobPromotion(o.enableJobPromotion),
-			withProducerConditionalTracer(o.ConditionalTracer),
+			WithProducerClock(o.Clock),
+			WithProducerKindToQueueMapping(o.queueKindMapping),
+			WithProducerJobPromotion(o.enableJobPromotion),
+			WithProducerConditionalTracer(o.ConditionalTracer),
 		),
 		Consumer:        newQueueConsumer(shards),
 		JobQueueReader:  newJobQueueReader(shards, o.AccountShardIterationEnabled),
