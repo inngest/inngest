@@ -460,7 +460,14 @@ func TestCapacityLeaseProtoRoundTrip(t *testing.T) {
 // TestLeafProtoRoundTrips guards small direct converters that are easy to
 // accidentally break while changing queue metadata fields.
 func TestLeafProtoRoundTrips(t *testing.T) {
-	throttle := &Throttle{Key: "key", Limit: 1, Burst: 2, Period: 3, KeyExpressionHash: "hash"}
+	throttle := &Throttle{
+		Key:                 "key",
+		Limit:               1,
+		Burst:               2,
+		Period:              3,
+		UnhashedThrottleKey: "customer-1",
+		KeyExpressionHash:   "hash",
+	}
 	require.Equal(t, throttle, ThrottleFromProto(ThrottleToProto(throttle)))
 	require.Nil(t, ThrottleToProto(nil))
 	require.Nil(t, ThrottleFromProto(nil))
@@ -650,9 +657,7 @@ func TestProtoConversionFieldCoverage(t *testing.T) {
 			"Burst",
 			"Period",
 			"KeyExpressionHash",
-		},
-		ignored: map[string]string{
-			"UnhashedThrottleKey": "runtime-only evaluated key, intentionally not sent through queue proxy",
+			"UnhashedThrottleKey",
 		},
 	})
 

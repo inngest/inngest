@@ -811,14 +811,15 @@ func (x *RunInfo) GetScavengeCount() int64 {
 }
 
 type Throttle struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	Key               string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Limit             int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	Burst             int64                  `protobuf:"varint,3,opt,name=burst,proto3" json:"burst,omitempty"`
-	Period            int64                  `protobuf:"varint,4,opt,name=period,proto3" json:"period,omitempty"`
-	KeyExpressionHash string                 `protobuf:"bytes,5,opt,name=key_expression_hash,json=keyExpressionHash,proto3" json:"key_expression_hash,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Key                 string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Limit               int64                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	Burst               int64                  `protobuf:"varint,3,opt,name=burst,proto3" json:"burst,omitempty"`
+	Period              int64                  `protobuf:"varint,4,opt,name=period,proto3" json:"period,omitempty"`
+	KeyExpressionHash   string                 `protobuf:"bytes,5,opt,name=key_expression_hash,json=keyExpressionHash,proto3" json:"key_expression_hash,omitempty"`
+	UnhashedThrottleKey string                 `protobuf:"bytes,6,opt,name=unhashed_throttle_key,json=unhashedThrottleKey,proto3" json:"unhashed_throttle_key,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Throttle) Reset() {
@@ -882,6 +883,13 @@ func (x *Throttle) GetPeriod() int64 {
 func (x *Throttle) GetKeyExpressionHash() string {
 	if x != nil {
 		return x.KeyExpressionHash
+	}
+	return ""
+}
+
+func (x *Throttle) GetUnhashedThrottleKey() string {
+	if x != nil {
+		return x.UnhashedThrottleKey
 	}
 	return ""
 }
@@ -1054,13 +1062,14 @@ const file_queue_v1_types_proto_rawDesc = "" +
 	"\x15refilled_from_backlog\x18\x06 \x01(\tR\x13refilledFromBacklog\x12C\n" +
 	"\x0ecapacity_lease\x18\a \x01(\v2\x17.queue.v1.CapacityLeaseH\x00R\rcapacityLease\x88\x01\x01\x12%\n" +
 	"\x0escavenge_count\x18\b \x01(\x03R\rscavengeCountB\x11\n" +
-	"\x0f_capacity_lease\"\x90\x01\n" +
+	"\x0f_capacity_lease\"\xc4\x01\n" +
 	"\bThrottle\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x03R\x05limit\x12\x14\n" +
 	"\x05burst\x18\x03 \x01(\x03R\x05burst\x12\x16\n" +
 	"\x06period\x18\x04 \x01(\x03R\x06period\x12.\n" +
-	"\x13key_expression_hash\x18\x05 \x01(\tR\x11keyExpressionHash\"1\n" +
+	"\x13key_expression_hash\x18\x05 \x01(\tR\x11keyExpressionHash\x122\n" +
+	"\x15unhashed_throttle_key\x18\x06 \x01(\tR\x13unhashedThrottleKey\"1\n" +
 	"\tSingleton\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
 	"\x04mode\x18\x02 \x01(\tR\x04modeB5Z3github.com/inngest/inngest/proto/gen/queue/v1;queueb\x06proto3"

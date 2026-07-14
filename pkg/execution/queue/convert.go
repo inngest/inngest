@@ -344,11 +344,12 @@ func ThrottleToProto(throttle *Throttle) *pb.Throttle {
 		return nil
 	}
 	return &pb.Throttle{
-		Key:               throttle.Key,
-		Limit:             int64(throttle.Limit),
-		Burst:             int64(throttle.Burst),
-		Period:            int64(throttle.Period),
-		KeyExpressionHash: throttle.KeyExpressionHash,
+		Key:                 throttle.Key,
+		Limit:               int64(throttle.Limit),
+		Burst:               int64(throttle.Burst),
+		Period:              int64(throttle.Period),
+		KeyExpressionHash:   throttle.KeyExpressionHash,
+		UnhashedThrottleKey: throttle.UnhashedThrottleKey,
 	}
 }
 
@@ -357,11 +358,12 @@ func ThrottleFromProto(msg *pb.Throttle) *Throttle {
 		return nil
 	}
 	return &Throttle{
-		Key:               msg.GetKey(),
-		Limit:             int(msg.GetLimit()),
-		Burst:             int(msg.GetBurst()),
-		Period:            int(msg.GetPeriod()),
-		KeyExpressionHash: msg.GetKeyExpressionHash(),
+		Key:                 msg.GetKey(),
+		Limit:               int(msg.GetLimit()),
+		Burst:               int(msg.GetBurst()),
+		Period:              int(msg.GetPeriod()),
+		KeyExpressionHash:   msg.GetKeyExpressionHash(),
+		UnhashedThrottleKey: msg.GetUnhashedThrottleKey(),
 	}
 }
 

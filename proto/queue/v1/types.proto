@@ -99,6 +99,7 @@ message Throttle {
   int64 burst = 3;
   int64 period = 4;
   string key_expression_hash = 5;
+  string unhashed_throttle_key = 6;
 }
 
 message Singleton {
