@@ -25,6 +25,7 @@ func TestParseOutput(t *testing.T) {
 			input:       `{"id":"msg_01AWkeVsTqhLbsS2MDmjGJxj","type":"message","role":"assistant","model":"claude-3-5-haiku-20241022","content":[{"type":"text","text":"I see 'pvlib/pvsystem.py' looks relevant. Let's examine the exact code for the PVSystem class:"},{"type":"tool_use","id":"toolu_014WnC1qhZZRtKf4kENoVEnx","name":"read_file","input":{"filename":"pvlib/pvsystem.py"}}],"stop_reason":"tool_use","stop_sequence":null,"usage":{"input_tokens":7947,"output_tokens":90}} `,
 			expected: ParsedInferenceResponse{
 				ID:         "msg_01AWkeVsTqhLbsS2MDmjGJxj",
+				Model:      "claude-3-5-haiku-20241022",
 				TokensIn:   7947,
 				TokensOut:  90,
 				StopReason: "tool_use",

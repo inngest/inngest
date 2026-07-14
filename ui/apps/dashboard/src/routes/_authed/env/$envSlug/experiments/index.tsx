@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
 import { InlineCode } from '@inngest/components/Code';
 import {
+  ExperimentsEmptyState,
   ExperimentsTable,
   type ExperimentListItem,
 } from '@inngest/components/Experiments';
@@ -10,9 +11,8 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 
-import NotFound from '@/components/Error/NotFound';
+import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/experiments/')({
@@ -25,7 +25,7 @@ function ExperimentsInfo() {
       text="View and compare experiment variants across your functions."
       action={
         <Link
-          href="https://www.inngest.com/docs/features/step-experimentation"
+          href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments"
           target="_blank"
         >
           Learn about experiments
@@ -35,7 +35,7 @@ function ExperimentsInfo() {
   );
 }
 
-export default function ExperimentsComponent() {
+function ExperimentsComponent() {
   const { envSlug } = Route.useParams();
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
@@ -43,10 +43,8 @@ export default function ExperimentsComponent() {
     setIsMounted(true);
   }, []);
 
-  const experimentsEnabled = useBooleanFlag('experimentation-steps');
-
   const { data, isPending, error, refetch } = useExperimentsList({
-    enabled: isMounted && experimentsEnabled.value,
+    enabled: isMounted,
   });
 
   const handleRowClick = useCallback(
@@ -62,8 +60,20 @@ export default function ExperimentsComponent() {
     [navigate, envSlug],
   );
 
-  if (experimentsEnabled.isReady && !experimentsEnabled.value) {
-    return <NotFound />;
+  const showEmptyState =
+    !isPending && !error && Array.isArray(data) && data.length === 0;
+
+  if (showEmptyState) {
+    return (
+      <>
+        <Header
+          breadcrumb={[{ text: 'All experiments' }]}
+          infoIcon={<ExperimentsInfo />}
+        />
+        <ExperimentsEmptyState />
+        <FeedbackFloatingButton />
+      </>
+    );
   }
 
   return (
@@ -87,6 +97,7 @@ export default function ExperimentsComponent() {
           </>
         }
       />
+      <FeedbackFloatingButton />
     </>
   );
 }

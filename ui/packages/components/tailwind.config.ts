@@ -212,6 +212,13 @@ const config = {
         primary:
           '-4px 8px 12px -5px rgba(46, 46, 46, 0.08), 4px 8px 12px -5px rgba(46, 46, 46, 0.08), -2px 24px 12px -20px rgba(46, 46, 46, 0.02);',
         floating: '0 0 0 0.5px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(255, 255, 255, 0.15)',
+        // Soft elevation used by new IA chrome (sidebar+content card).
+        xs: '0 1px 2px 0 rgba(0, 0, 0, 0.04), 0 1px 1px 0 rgba(0, 0, 0, 0.03)',
+      },
+      borderWidth: {
+        // 0.5px utility for new IA chrome (cards, dividers). Renders as a
+        // crisp hairline on hi-DPI displays.
+        hairline: '0.5px',
       },
       outlineOffset: {
         3: '3px',

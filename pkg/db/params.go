@@ -54,6 +54,13 @@ type UpdateFunctionConfigParams struct {
 	ID     uuid.UUID
 }
 
+type GetFunctionsByAppParams struct {
+	AppID     uuid.UUID
+	AppName   string
+	Cursor    uuid.UUID
+	LimitRows int64
+}
+
 // InsertEventParams are the parameters for inserting an event.
 type InsertEventParams struct {
 	InternalID ulid.ULID
@@ -115,6 +122,13 @@ type GetFunctionRunsTimeboundParams struct {
 	After  time.Time
 	Before time.Time
 	Limit  int64
+}
+
+type GetRunsParams struct {
+	EventID       ulid.ULID
+	Limit         int64
+	Cursor        ulid.ULID
+	IncludeOutput bool
 }
 
 // InsertHistoryParams are the parameters for inserting a history record.

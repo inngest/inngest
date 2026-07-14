@@ -8,6 +8,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -144,6 +145,35 @@ func TestInvokeFunctionOpts_Expires(t *testing.T) {
 		got, err := opts.Expires()
 		require.NoError(t, err)
 		assert.WithinDuration(t, now.AddDate(1, 0, 0), got, time.Second)
+	})
+}
+
+func TestInvokeFunctionOpts_Validate(t *testing.T) {
+	t.Run("accepts nil payload", func(t *testing.T) {
+		opts := InvokeFunctionOpts{}
+		require.NoError(t, opts.Validate())
+	})
+
+	t.Run("accepts valid payload sessions", func(t *testing.T) {
+		opts := InvokeFunctionOpts{
+			Payload: &event.Event{
+				Meta: event.EventMeta{
+					Sessions: event.Sessions{"conversation_id": "conversation_1234"},
+				},
+			},
+		}
+		require.NoError(t, opts.Validate())
+	})
+
+	t.Run("rejects too many payload sessions", func(t *testing.T) {
+		opts := InvokeFunctionOpts{
+			Payload: &event.Event{
+				Meta: event.EventMeta{
+					Sessions: event.Sessions{"a": "1", "b": "2", "c": "3", "d": "4", "e": "5", "f": "6"},
+				},
+			},
+		}
+		require.EqualError(t, opts.Validate(), "event sessions can include at most 5 entries")
 	})
 }
 

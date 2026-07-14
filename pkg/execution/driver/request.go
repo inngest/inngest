@@ -15,17 +15,10 @@ type sdkRequestIDCtxKey struct{}
 
 type sdkJobIDCtxKey struct{}
 
-// DispatchRequestID is the single source of truth for the request ID the
-// executor (producer) stamps on outbound SDK requests and the checkpoint
-// validator (consumer) recomputes when fencing stale dispatches.
-func DispatchRequestID(ts time.Time, runID ulid.ULID, generationID int) ulid.ULID {
-	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", runID, generationID))
-}
-
-// DispatchRequestIDEntropy returns the entropy portion of the dispatch
-// RequestID; the timestamp doesn't participate in fencing.
-func DispatchRequestIDEntropy(runID ulid.ULID, generationID int) []byte {
-	return DispatchRequestID(time.Unix(0, 0), runID, generationID).Entropy()
+// DispatchRequestID is the single source of truth for the per-dispatch
+// GenerationID the executor stamps on outbound SDK requests.
+func DispatchRequestID(ts time.Time, jobID string, generationID int) ulid.ULID {
+	return util.MustDeterministicULID(ts, fmt.Appendf(nil, "%s:%d", jobID, generationID))
 }
 
 // WithRequestIDs stores the per-outbound request ID and stable job ID for SDK
@@ -111,6 +104,9 @@ type SDKRequestContext struct {
 
 	// RequestID is a unique ID generated for each outbound SDK request.
 	RequestID string `json:"request_id,omitempty"`
+
+	// GenerationID is the ID of the current generation of the request.
+	GenerationID int `json:"generation_id,omitempty"`
 
 	// JobID is the stable queue item ID for the current job.
 	JobID string `json:"job_id,omitempty"`

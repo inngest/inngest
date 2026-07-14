@@ -3,8 +3,11 @@ package executor
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
+	"sort"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -14,6 +17,23 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+// computeParallelCoalesceKey returns a stable hex string derived from the runID and
+// the sorted set of step IDs in a parallel batch.  Sorting ensures the key is
+// identical regardless of the order the SDK returns the opcodes.
+func computeParallelCoalesceKey(runID string, stepIDs []string) string {
+	sorted := make([]string, len(stepIDs))
+	copy(sorted, stepIDs)
+	sort.Strings(sorted)
+
+	h := xxhash.New()
+	_, _ = h.Write([]byte(runID))
+	for _, id := range sorted {
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(id))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // OpcodeGroup is a group of opcodes that can be processed in parallel.
 type OpcodeGroup struct {
 	// Opcodes is the list of opcodes in the group.
@@ -22,6 +42,10 @@ type OpcodeGroup struct {
 	// start a new history group. This is true if the overall list of opcodes
 	// received from an SDK Call Request contains more than one opcode.
 	ShouldStartHistoryGroup bool
+	// ParallelCoalesceKey is a stable key shared by all items in this parallel
+	// batch.  When non-empty, handlers use it to derive a deterministic
+	// discovery JobID so concurrent fan-in completions deduplicate to one step.
+	ParallelCoalesceKey string
 }
 
 // OpcodeGroups groups opcodes by processing priority. The priority group runs
@@ -136,4 +160,23 @@ func CreateInvokeFailedEvent(ctx context.Context, opts execution.InvokeFailHandl
 	logger.StdlibLogger(ctx).Debug("function finished event", "event", evt)
 
 	return evt
+}
+
+func IsStepRetryable(gen *state.GeneratorOpcode, runCtx execution.RunContext) bool {
+	if gen.Op == enums.OpcodeStepFailed {
+		// This is a step that is already marked as failed.
+		return false
+	}
+
+	if gen.Error.NoRetry {
+		// This is a NonRetryableError thrown in a step.
+		return false
+	}
+	if !runCtx.ShouldRetry() {
+		// This is the last attempt as per the attempt in the queue, which
+		// means we've failed N times, and so it is not retryable.
+		return false
+	}
+
+	return true
 }

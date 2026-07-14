@@ -3,6 +3,7 @@
  * Feature: 001-composable-timeline-bar
  */
 
+import { maxDateString, toMaybeDate } from '@inngest/components/utils/date';
 import { max, min } from 'date-fns';
 
 import { KindInngestExperiment } from '../../generated';
@@ -29,6 +30,10 @@ import { TIMELINE_CONSTANTS } from './timing';
  */
 function isStepRunSpan(trace: Trace): boolean {
   return trace.stepOp === 'RUN' || trace.stepType === 'RUN' || isStepInfoRun(trace.stepInfo);
+}
+
+function isNonStepSpan(trace: Trace): boolean {
+  return !trace.stepOp && !trace.stepType;
 }
 
 /**
@@ -174,9 +179,7 @@ function tracesToBarData(
     if (bar.endTime) {
       const endMs = bar.endTime.getTime();
       latestCompletedSiblingEndMs =
-        latestCompletedSiblingEndMs === null
-          ? endMs
-          : Math.max(latestCompletedSiblingEndMs, endMs);
+        latestCompletedSiblingEndMs === null ? endMs : Math.max(latestCompletedSiblingEndMs, endMs);
     }
 
     bars.push(bar);
@@ -218,9 +221,9 @@ function traceToBarData(
   discoveryStartAtMs?: number | null,
   functionSlug?: string
 ): TimelineBarData {
-  const isStepRun = isStepRunSpan(trace) && !trace.isUserland;
+  const shouldShowTiming = (isStepRunSpan(trace) || isNonStepSpan(trace)) && !trace.isUserland;
   // Prefer server-computed timing from metadata, fall back to span-timestamp calculation
-  let timingBreakdown = isStepRun
+  let timingBreakdown = shouldShowTiming
     ? getTimingFromMetadata(trace, trace.metadata) ?? calculateTimingBreakdown(trace)
     : undefined;
 
@@ -239,15 +242,15 @@ function traceToBarData(
     : undefined;
 
   // Per-step Inngest overhead breakdown (discovery + metadata timing)
-  const inngestBreakdown = isStepRun
+  const inngestBreakdown = shouldShowTiming
     ? getInngestBreakdown(trace, discoveryStartAtMs ?? null) ?? undefined
     : undefined;
 
   const traceStartedAtMs = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
   const traceQueuedAtMs = trace.queuedAt ? new Date(trace.queuedAt).getTime() : null;
   const childDiscoveryStartAtMs = trace.isRoot
-    ? (traceStartedAtMs ?? discoveryStartAtMs)
-    : (traceStartedAtMs ?? traceQueuedAtMs ?? discoveryStartAtMs);
+    ? traceStartedAtMs ?? discoveryStartAtMs
+    : traceStartedAtMs ?? traceQueuedAtMs ?? discoveryStartAtMs;
 
   // Check if this step has experiment metadata
   const hasExperiment = trace.metadata?.some((m) => m.kind === KindInngestExperiment) ?? false;
@@ -256,7 +259,7 @@ function traceToBarData(
   const experimentMd = trace.metadata?.find(isExperimentMetadata);
   const experimentMetadata = experimentMd
     ? {
-        experimentName: experimentMd.values.experiment_name,
+        experimentName: experimentMd.values.experiment_name ?? experimentMd.values.name,
         variantSelected: experimentMd.values.variant,
         availableVariants: experimentMd.values.available_variants,
         variantWeights: experimentMd.values.variant_weights,
@@ -286,6 +289,277 @@ function traceToBarData(
     hasExperiment,
     experimentMetadata,
   };
+}
+
+/**
+ * Attempt spans bucketed for rollup, produced by a single pass over the
+ * run's direct children.
+ */
+type RollupGroups = {
+  /** stepIDs in first-seen order, so rollups keep the original span order */
+  stepOrder: string[];
+  /** attempt spans per stepID, keyed by attempt number */
+  steps: Map<string, Map<number, Trace>>;
+  /**
+   * Finalization-type spans (output, no stepID) that also carry no groupID,
+   * so they can't be rolled into a step or finalization group. Usually
+   * emitted unchanged, but dropped when the finalization rollup renders the
+   * same terminal failure — the duplicate is the server's relabeled discovery
+   * span mirroring the grouped failed attempts (EXE-1992).
+   */
+  ungroupedFinalizations: Trace[];
+  /** attempt spans of the trailing group that never matched a step, if any */
+  finalizationAttempts: Map<number, Trace> | null;
+  /** step span with the latest endedAt; finalization can't start before it ends */
+  lastStep: Trace | null;
+};
+
+/**
+ * Classify the run's direct children for rollup.
+ *
+ * Spans with an outputID but no stepID (network failures, finalization) are
+ * grouped by groupID. A group later claimed by a step span becomes extra
+ * attempts of that step; a group that never matches a step is the run's
+ * finalization.
+ *
+ * Classification is ORDER-SENSITIVE, deliberately: a grouped no-stepID span
+ * is adopted by a step only when the step span appears LATER in
+ * childrenSpans than the grouped span (see the `finalSpan?.groupID ==
+ * child.groupID` check below). The happy path relies on this ordering — the
+ * genuine finalization span shares the last step's groupID, and is only
+ * classified as finalization (rather than being claimed as an extra attempt
+ * of that step) because the server emits it after that step.
+ */
+function collectRollupGroups(children: Trace[]): RollupGroups {
+  const stepOrder: string[] = [];
+  const steps = new Map<string, Map<number, Trace>>();
+  const ungroupedFinalizations: Trace[] = [];
+  const groupedSpans = new Map<string, Map<number, Trace>>();
+  let lastStepEndedAt: Date | null = null;
+  let lastStep: Trace | null = null;
+  let finalSpan: Trace | null = null;
+
+  for (const child of children) {
+    if (child.outputID && !child.stepID) {
+      if (child.groupID) {
+        finalSpan = child;
+        const attempts = groupedSpans.get(child.groupID) ?? new Map<number, Trace>();
+        attempts.set(child.attempts ?? 0, child);
+        groupedSpans.set(child.groupID, attempts);
+      } else {
+        ungroupedFinalizations.push(child);
+      }
+      continue;
+    }
+    if (!child.stepID || child.attempts === null) {
+      continue;
+    }
+
+    // The grouped spans we saw belong to this step, not finalization
+    if (finalSpan?.groupID == child.groupID) {
+      finalSpan = null;
+    }
+
+    if (!steps.get(child.stepID)) {
+      stepOrder.push(child.stepID);
+    }
+
+    const endedAt = toMaybeDate(child.endedAt);
+    if (!lastStepEndedAt || (endedAt && endedAt > lastStepEndedAt)) {
+      lastStepEndedAt = endedAt;
+      lastStep = child;
+    }
+
+    const attempts = steps.get(child.stepID) ?? new Map<number, Trace>();
+    if (child.groupID) {
+      // Associate any other spans with the same groupID (IE network failures/similar) with this step
+      for (const [attempt, attemptSpan] of groupedSpans.get(child.groupID) ?? []) {
+        attempts.set(attempt, attemptSpan);
+      }
+    }
+
+    attempts.set(child.attempts, child);
+    steps.set(child.stepID, attempts);
+  }
+
+  const finalizationAttempts = finalSpan?.groupID
+    ? groupedSpans.get(finalSpan.groupID) ?? null
+    : null;
+
+  return { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep };
+}
+
+/** First (lowest attempt number) and last (highest) attempt spans of a group */
+function attemptBounds(attempts: Map<number, Trace>): {
+  first: Trace;
+  last: Trace;
+  lastAttempt: number;
+} {
+  const lastAttempt = Math.max(...attempts.keys());
+  return {
+    first: attempts.get(Math.min(...attempts.keys())) as Trace,
+    last: attempts.get(lastAttempt) as Trace,
+    lastAttempt,
+  };
+}
+
+/**
+ * Rename each attempt span (in place) to "Attempt N" and return them ordered
+ * by attempt number, for nesting under a rollup span.
+ */
+function toAttemptChildren(attempts: Map<number, Trace>): Trace[] {
+  for (const attempt of attempts.values()) {
+    attempt.name = `Attempt ${attempt.attempts}`;
+  }
+  return Array.from(attempts.values()).sort((a, b) => (a.attempts ?? 0) - (b.attempts ?? 0));
+}
+
+/**
+ * Roll up a step's attempts into a single span: a single attempt passes
+ * through unchanged; multiple attempts get a virtual span that spans the
+ * first attempt's queue time to the last attempt's end, carries the last
+ * attempt's status/output, and nests the attempts as children.
+ */
+function rollupStepAttempts(stepID: string, attempts: Map<number, Trace>): Trace {
+  const { first, last, lastAttempt } = attemptBounds(attempts);
+  if (attempts.size === 1) {
+    return last;
+  }
+
+  const name = last.name; // capture before toAttemptChildren renames the attempts
+  return {
+    isRoot: false,
+    isUserland: false,
+    spanID: `${stepID}-rollup`, // virtual span
+    groupID: last.groupID,
+    name,
+    attempts: lastAttempt,
+    stepID: stepID,
+    queuedAt: first.queuedAt,
+    scheduledAt: first.scheduledAt,
+    startedAt: first.startedAt,
+    endedAt: last.endedAt,
+    status: last.status,
+    outputID: last.outputID,
+    debugRunID: last.debugRunID,
+    debugSessionID: last.debugSessionID,
+    stepInfo: last.stepInfo,
+    childrenSpans: toAttemptChildren(attempts),
+    metadata: last.metadata,
+    userlandSpan: null,
+  };
+}
+
+/**
+ * Roll up the trailing unmatched group's attempts into a single span. These
+ * spans can carry queue timestamps from before the last step finished, so
+ * start timestamps are clamped to the last step's end to keep the timeline
+ * ordered.
+ *
+ * Naming is decided by how the group ended, not by attempt count — the final
+ * discovery itself can retry (e.g. the app 500s on the final request, then
+ * succeeds), so multiple attempts don't imply an unresolved step:
+ * - Ends COMPLETED: only the finalization can produce the function's output
+ *   with no stepID (a step that succeeds gets a stepID and is claimed out of
+ *   the trailing group), so this is genuinely "Finalization".
+ * - Ends FAILED: this group is the site of the run's failure, but the client
+ *   can't tell why — the attempts may have died before the SDK identified the
+ *   work, or the SDK may have returned the function's own terminal error.
+ *   "Function error" is neutral and truthful for both, unlike "Finalization",
+ *   which implies a normal wind-down.
+ * - Still running: default to "Finalization" rather than flickering "Function
+ *   error" on in-flight runs.
+ *
+ * Only a FAILED terminal status flips the label to "Function error" —
+ * CANCELLED or any other non-COMPLETED terminal state deliberately keeps
+ * "Finalization", matching the pre-existing default and avoiding label
+ * flicker for groups that aren't cleanly resolved as failures.
+ */
+function rollupFinalization(attempts: Map<number, Trace>, lastStep: Trace | null): Trace {
+  const { first, last } = attemptBounds(attempts);
+  const notBefore = lastStep?.endedAt;
+  const name = last.status === 'FAILED' ? 'Function error' : 'Finalization';
+
+  if (attempts.size === 1) {
+    last.name = name;
+    last.queuedAt = maxDateString(last.queuedAt, notBefore);
+    last.scheduledAt = maxDateString(last.scheduledAt, notBefore);
+    last.startedAt = maxDateString(last.startedAt, notBefore);
+    return last;
+  }
+
+  return {
+    isRoot: false,
+    isUserland: false,
+    name,
+    spanID: `final-rollup`, // virtual span
+    groupID: last.groupID,
+    attempts: last.attempts,
+    queuedAt: maxDateString(first.queuedAt, notBefore),
+    scheduledAt: maxDateString(first.scheduledAt, notBefore),
+    startedAt: maxDateString(first.startedAt, notBefore),
+    endedAt: last.endedAt,
+    status: last.status,
+    outputID: last.outputID,
+    debugRunID: last.debugRunID,
+    debugSessionID: last.debugSessionID,
+    childrenSpans: toAttemptChildren(attempts),
+    metadata: last.metadata,
+    stepInfo: null,
+    userlandSpan: null,
+  };
+}
+
+// traceRollup groups attempts by stepID and groupID
+// (for spans without stepIDs, typically finalization spans or failures hitting the SDK entirely)
+// and creates virtual "rollup" spans that represent the entire step/finalization
+// with all attempts grouped together. This simplifies the trace for
+// display in the timeline while still allowing users to see
+// individual attempts when they expand the step details.
+export function traceRollup(root: Trace): Trace {
+  // Operate on a clone so we never mutate the caller's (cached) trace. The
+  // rolled-up result is memoized against the trace object; without this, a
+  // re-render would feed our own output back in and roll it up a second time
+  // (which, e.g., collapses the multi-attempt "Function error" group into a
+  // single-span group and relabels it — see rollupFinalization's size === 1
+  // branch). The helpers below rename/reshape spans in place, which is safe
+  // precisely because they only ever see this clone.
+  root = structuredClone(root);
+
+  const { stepOrder, steps, ungroupedFinalizations, finalizationAttempts, lastStep } =
+    collectRollupGroups(root.childrenSpans ?? []);
+
+  const rolledUpRunChildren: Trace[] = [];
+
+  for (const stepID of stepOrder) {
+    const attempts = steps.get(stepID);
+    if (!attempts) {
+      continue;
+    }
+    rolledUpRunChildren.push(rollupStepAttempts(stepID, attempts));
+  }
+
+  let finalization: Trace | null = null;
+  if (finalizationAttempts) {
+    finalization = rollupFinalization(finalizationAttempts, lastStep);
+    rolledUpRunChildren.push(finalization);
+  }
+
+  // Emit ungrouped finalization spans only when they don't duplicate a
+  // terminal failure already rendered as the finalization rollup (the single
+  // "Finalization" or the multi-attempt "Function error") — that duplicate is
+  // the server's relabeled discovery span mirroring the grouped failed
+  // attempts (EXE-1992); the grouped attempts already carry the terminal
+  // error output. A COMPLETED finalization is legitimate and left alone.
+  if (finalization?.status !== 'FAILED') {
+    rolledUpRunChildren.push(...ungroupedFinalizations);
+  }
+
+  const sortingKey = (trace: Trace) =>
+    toMaybeDate(trace.queuedAt)?.getTime() ?? toMaybeDate(trace.startedAt)?.getTime() ?? 0;
+  root.childrenSpans = rolledUpRunChildren.sort((a, b) => sortingKey(a) - sortingKey(b));
+
+  return root;
 }
 
 /**

@@ -16,11 +16,13 @@ import (
 // ExtractedValues mirrors the Attrs struct but with actual pointer types
 // instead of attr wrappers. This allows for type-safe access to deserialized values.
 type ExtractedValues struct {
-	StartedAt *time.Time
 	QueuedAt *time.Time
+	ScheduledAt *time.Time
+	StartedAt *time.Time
 	EndedAt *time.Time
 	AccountID *uuid.UUID
 	AppID *uuid.UUID
+	AppName *string
 	BatchID *ulid.ULID
 	BatchTimestamp *time.Time
 	CronSchedule *string
@@ -28,6 +30,7 @@ type ExtractedValues struct {
 	EnvID *uuid.UUID
 	EventIDs *[]string
 	EventsInput *string
+	Sessions *EventSessions
 	TriggeringEventName *string
 	FunctionID *uuid.UUID
 	FunctionName *string
@@ -86,6 +89,7 @@ type ExtractedValues struct {
 	StepGatewayResponseOutputSizeBytes *int
 	RequestID *string
 	JobID *string
+	GroupID *string
 	RequestURL *string
 	ResponseHeaders *headers.Compact
 	ResponseStatusCode *int

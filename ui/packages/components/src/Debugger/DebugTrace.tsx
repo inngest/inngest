@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
-import { InlineSpans } from '../RunDetailsV3/InlineSpans';
-import { StepType } from '../RunDetailsV3/StepType';
-import { TimelineHeader } from '../RunDetailsV3/TimelineHeader';
-import { type Trace } from '../RunDetailsV3/types';
-import { getSpanName, traceHasChildren, useStepSelection } from '../RunDetailsV3/utils';
+import { InlineSpans } from '../RunDetailsShared/InlineSpans';
+import { StepType } from '../RunDetailsShared/StepType';
+import { TimelineHeader } from '../RunDetailsShared/TimelineHeader';
+import { type Trace } from '../RunDetailsShared/types';
+import { getSpanName, traceHasChildren, useStepSelection } from '../RunDetailsShared/utils';
 import { overlayDebugRuns } from './utils';
 
 type Props = {

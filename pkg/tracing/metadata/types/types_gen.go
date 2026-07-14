@@ -23,15 +23,39 @@ const (
 
 // From ai.go
 type AIMetadata struct {
-	InputTokens	int64	`json:"input_tokens"`
-	OutputTokens	int64	`json:"output_tokens"`
-	Model		string	`json:"model"`
-	System		string	`json:"system"`
-	OperationName	string	`json:"operation_name"`
+	InputTokens   int64  `json:"input_tokens"`
+	OutputTokens  int64  `json:"output_tokens"`
+	RequestModel  string `json:"request_model"`
+	Provider      string `json:"provider"`
+	OperationName string `json:"operation_name"`
 
-	LatencyMs	*int64		`json:"latency_ms,omitempty"`
-	TotalTokens	*int64		`json:"total_tokens,omitempty"`
-	EstimatedCost	*float64	`json:"estimated_cost,omitempty"`
+	// Response identity. ResponseModel is the model that served the request (may
+	// differ from the RequestModel, e.g. a dated snapshot). FinishReasons is
+	// stored raw per emitter — note OpenAI's native "tool_calls" is emitted as
+	// the singular "tool_call" by some instrumentations.
+	ResponseModel string   `json:"response_model,omitempty"`
+	ResponseID    string   `json:"response_id,omitempty"`
+	FinishReasons []string `json:"finish_reasons,omitempty"`
+
+	LatencyMs     *int64   `json:"latency_ms,omitempty"`
+	TotalTokens   *int64   `json:"total_tokens,omitempty"`
+	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
+
+	// Granular token usage. Cache semantics differ by provider: OpenAI reports
+	// cached tokens as a subset of InputTokens, whereas Anthropic reports them
+	// additively — values are stored raw and left unreconciled.
+	CacheReadTokens     *int64 `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens *int64 `json:"cache_creation_tokens,omitempty"`
+	ReasoningTokens     *int64 `json:"reasoning_tokens,omitempty"`
+
+	// Request parameters. Pointers so an explicit zero (e.g. temperature 0 or
+	// seed 0) is distinguishable from an absent attribute.
+	Temperature      *float64 `json:"temperature,omitempty"`
+	TopP             *float64 `json:"top_p,omitempty"`
+	MaxTokens        *int64   `json:"max_tokens,omitempty"`
+	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
+	PresencePenalty  *float64 `json:"presence_penalty,omitempty"`
+	Seed             *int64   `json:"seed,omitempty"`
 }
 
 // From experiment.go
@@ -41,11 +65,11 @@ const (
 
 // From experiment.go
 type ExperimentMetadata struct {
-	ExperimentName		string			`json:"experiment_name"`
-	Variant			string			`json:"variant"`
-	SelectionStrategy	string			`json:"selection_strategy"`
-	AvailableVariants	[]string		`json:"available_variants,omitempty"`
-	VariantWeights		map[string]float64	`json:"variant_weights,omitempty"`
+	ExperimentName    string             `json:"name"`
+	Variant           string             `json:"variant"`
+	SelectionStrategy string             `json:"selection_strategy"`
+	AvailableVariants []string           `json:"available_variants,omitempty"`
+	VariantWeights    map[string]float64 `json:"variant_weights,omitempty"`
 }
 
 // From http.go
@@ -55,14 +79,14 @@ const (
 
 // From http.go
 type HTTPMetadata struct {
-	ResponseContentType	*string	`json:"response_content_type,omitempty"`
-	RequestContentType	*string	`json:"request_content_type,omitempty"`
-	Method			string	`json:"method"`
-	RequestSize		*int64	`json:"request_size,omitempty"`
-	ResponseSize		*int64	`json:"response_size,omitempty"`
-	ResponseStatus		*int64	`json:"response_status,omitempty"`
-	Domain			*string	`json:"domain,omitempty"`
-	Path			*string	`json:"path,omitempty"`
+	ResponseContentType *string `json:"response_content_type,omitempty"`
+	RequestContentType  *string `json:"request_content_type,omitempty"`
+	Method              string  `json:"method"`
+	RequestSize         *int64  `json:"request_size,omitempty"`
+	ResponseSize        *int64  `json:"response_size,omitempty"`
+	ResponseStatus      *int64  `json:"response_status,omitempty"`
+	Domain              *string `json:"domain,omitempty"`
+	Path                *string `json:"path,omitempty"`
 }
 
 // From httptiming.go
@@ -74,20 +98,19 @@ const (
 // HTTPTimingMetadata contains detailed HTTP connection timing phases
 // from httpstat, capturing the duration of each phase in the HTTP
 // request lifecycle.
-//
 type HTTPTimingMetadata struct {
 	// DNSLookupMs is the time spent resolving the domain name.
-	DNSLookupMs	int64	`json:"dns_lookup_ms"`
+	DNSLookupMs int64 `json:"dns_lookup_ms"`
 	// TCPConnectionMs is the time spent establishing the TCP connection.
-	TCPConnectionMs	int64	`json:"tcp_connection_ms"`
+	TCPConnectionMs int64 `json:"tcp_connection_ms"`
 	// TLSHandshakeMs is the time spent on TLS negotiation.
-	TLSHandshakeMs	int64	`json:"tls_handshake_ms"`
+	TLSHandshakeMs int64 `json:"tls_handshake_ms"`
 	// ServerProcessingMs is the time from request sent to first byte received (TTFB).
-	ServerProcessingMs	int64	`json:"server_processing_ms"`
+	ServerProcessingMs int64 `json:"server_processing_ms"`
 	// ContentTransferMs is the time spent downloading the response body.
-	ContentTransferMs	int64	`json:"content_transfer_ms"`
+	ContentTransferMs int64 `json:"content_transfer_ms"`
 	// TotalMs is the total request duration.
-	TotalMs	int64	`json:"total_ms"`
+	TotalMs int64 `json:"total_ms"`
 }
 
 // From response_headers.go
@@ -106,18 +129,16 @@ const (
 // From timing.go
 // TimingMetadata contains high-level timing categories for a step execution:
 // queue delay, system processing overhead, and network total.
-//
 type TimingMetadata struct {
 	// QueueDelayMs is the sojourn delay caused by concurrency limits, throttle,
 	// or other user-defined concurrency constraints.
-	QueueDelayMs	*int64	`json:"queue_delay_ms,omitempty"`
+	QueueDelayMs *int64 `json:"queue_delay_ms,omitempty"`
 	// SystemLatencyMs is the processing delay excluding sojourn latency
 	// (time from queue lease to execution start).
-	SystemLatencyMs	*int64	`json:"system_latency_ms,omitempty"`
+	SystemLatencyMs *int64 `json:"system_latency_ms,omitempty"`
 	// NetworkTotalMs is the total HTTP request duration from httpstat,
 	// covering the full SDK call lifecycle.
-	NetworkTotalMs	*int64	`json:"network_total_ms,omitempty"`
+	NetworkTotalMs *int64 `json:"network_total_ms,omitempty"`
 	// TotalInngestMs is the sum of Inngest-side overhead (queue delay + system latency).
-	TotalInngestMs	*int64	`json:"total_inngest_ms,omitempty"`
+	TotalInngestMs *int64 `json:"total_inngest_ms,omitempty"`
 }
-

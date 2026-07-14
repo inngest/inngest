@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db"
 	sqlc "github.com/inngest/inngest/pkg/db/sqlite/sqlc"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -158,6 +161,19 @@ func (sq *sqliteQuerier) GetAppFunctions(ctx context.Context, appID uuid.UUID) (
 
 func (sq *sqliteQuerier) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*db.Function, error) {
 	rows, err := sq.q.GetAppFunctionsBySlug(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return convertSlice(rows, functionFromSQLite), nil
+}
+
+func (sq *sqliteQuerier) GetFunctionsByApp(ctx context.Context, arg db.GetFunctionsByAppParams) ([]*db.Function, error) {
+	rows, err := sq.q.GetFunctionsByApp(ctx, sqlc.GetFunctionsByAppParams{
+		AppID:     arg.AppID,
+		AppName:   arg.AppName,
+		Cursor:    arg.Cursor,
+		LimitRows: arg.LimitRows,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -331,6 +347,99 @@ func (sq *sqliteQuerier) GetFunctionRunsFromEvents(ctx context.Context, eventIds
 		out[i] = functionRunRowFromSQLite(&r.FunctionRun, &r.FunctionFinish)
 	}
 	return out, nil
+}
+
+func (sq *sqliteQuerier) GetRuns(ctx context.Context, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
+	rows, err := sq.q.GetRuns(ctx, sqlc.GetRunsParams{
+		Name:        meta.SpanNameRun,
+		CursorRunID: arg.Cursor.String(),
+		EventID:     arg.EventID.String(),
+		LimitRows:   arg.Limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return scanSpanRunListRows(rows, arg)
+}
+
+func scanSpanRunListRows(rows []*sqlc.GetRunsRow, arg db.GetRunsParams) ([]*db.RunListItemRow, error) {
+	out := make([]*db.RunListItemRow, 0, len(rows))
+	for _, r := range rows {
+		parsedRunID, err := ulid.Parse(r.RunID)
+		if err != nil {
+			return nil, err
+		}
+		parsedFunctionID, err := uuid.Parse(r.FunctionID)
+		if err != nil {
+			return nil, err
+		}
+		parsedAppID, err := uuid.Parse(r.AppID)
+		if err != nil {
+			return nil, err
+		}
+
+		statusText := r.Status
+		status := db.RunStatusFromSpanStatus(statusText)
+
+		batchIDText := valueString(r.BatchID)
+		var batchID ulid.ULID
+		if batchIDText != "" {
+			batchID, _ = ulid.Parse(batchIDText)
+		}
+
+		cronSchedule := valueString(r.CronSchedule)
+		triggerType := "event"
+		if cronSchedule != "" {
+			triggerType = "cron"
+		}
+		var output []byte
+		outputText := valueString(r.Output)
+		if arg.IncludeOutput && outputText != "" {
+			output = []byte(outputText)
+		}
+		startTime := toTime(r.StartTime)
+		endTime := toTime(r.EndTime)
+
+		out = append(out, &db.RunListItemRow{
+			FunctionRun: db.FunctionRun{
+				RunID:        parsedRunID,
+				RunStartedAt: startTime,
+				FunctionID:   parsedFunctionID,
+				TriggerType:  triggerType,
+				EventID:      arg.EventID,
+				BatchID:      batchID,
+				Cron:         sql.NullString{String: cronSchedule, Valid: cronSchedule != ""},
+			},
+			FunctionFinish: db.FunctionFinish{
+				RunID:              parsedRunID,
+				Status:             sql.NullString{String: status.String(), Valid: statusText != ""},
+				CompletedStepCount: sql.NullInt64{Int64: 1, Valid: true},
+				CreatedAt:          sql.NullTime{Time: endTime, Valid: enums.RunStatusEnded(status)},
+			},
+			Output:         output,
+			FunctionSlug:   valueString(r.FunctionSlug),
+			FunctionName:   valueString(r.FunctionName),
+			FunctionConfig: "{}",
+			FunctionAppID:  parsedAppID,
+			AppName:        r.AppName,
+		})
+	}
+
+	return out, nil
+}
+
+func valueString(v any) string {
+	switch val := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return val
+	case []byte:
+		return string(val)
+	default:
+		return fmt.Sprint(val)
+	}
 }
 
 func (sq *sqliteQuerier) GetFunctionRunsTimebound(ctx context.Context, arg db.GetFunctionRunsTimeboundParams) ([]*db.FunctionRunRow, error) {
@@ -556,8 +665,8 @@ func (sq *sqliteQuerier) GetStepSpanByStepID(ctx context.Context, arg db.GetStep
 	}, nil
 }
 
-func (sq *sqliteQuerier) GetSpanOutput(ctx context.Context, ids []string) ([]*db.SpanOutputRow, error) {
-	rows, err := sq.q.GetSpanOutput(ctx, ids)
+func (sq *sqliteQuerier) GetSpanOutput(ctx context.Context, runID string, ids []string) ([]*db.SpanOutputRow, error) {
+	rows, err := sq.q.GetSpanOutput(ctx, sqlc.GetSpanOutputParams{RunID: runID, Ids: ids})
 	if err != nil {
 		return nil, err
 	}

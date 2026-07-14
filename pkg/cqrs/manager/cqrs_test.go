@@ -16,6 +16,7 @@ import (
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -1084,7 +1085,10 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create functions for TARGET app
-	targetFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	targetFnIDs := []uuid.UUID{
+		uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+	}
 	for i, fnID := range targetFnIDs {
 		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
@@ -1100,7 +1104,10 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 	}
 
 	// Create functions for OTHER app (should NOT be returned)
-	otherFnIDs := []uuid.UUID{uuid.New(), uuid.New()}
+	otherFnIDs := []uuid.UUID{
+		uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+	}
 	for i, fnID := range otherFnIDs {
 		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
 			ID:        fnID,
@@ -1157,6 +1164,18 @@ func TestCQRSGetFunctionsByAppExternalID(t *testing.T) {
 		functions, err := cm.GetFunctionsByAppExternalID(ctx, workspaceID, "non-existent-app")
 		require.NoError(t, err)
 		assert.Empty(t, functions, "Should return empty result for non-existent app")
+	})
+
+	t.Run("pages functions for target app in id order", func(t *testing.T) {
+		functions, err := cm.GetFunctionsByApp(ctx, cqrs.GetFunctionsByAppOpts{
+			WorkspaceID: workspaceID,
+			AppName:     targetAppExternalID,
+			Cursor:      targetFnIDs[0],
+			Limit:       1,
+		})
+		require.NoError(t, err)
+		require.Len(t, functions, 1)
+		require.Equal(t, targetFnIDs[1], functions[0].ID)
 	})
 }
 
@@ -1397,6 +1416,13 @@ func TestCQRSUpdateFunctionConfig(t *testing.T) {
 // Trace Run Tests
 //
 
+func TestTraceRunStatusFromDB(t *testing.T) {
+	assert.Equal(t, enums.RunStatusCompleted, traceRunStatusFromDB(enums.RunStatusCompleted.ToCode()))
+	assert.Equal(t, enums.RunStatusCompleted, traceRunStatusFromDB(int64(enums.RunStatusCompleted)))
+	assert.Equal(t, enums.RunStatusScheduled, traceRunStatusFromDB(int64(enums.RunStatusScheduled)))
+	assert.ElementsMatch(t, []int64{enums.RunStatusCompleted.ToCode(), int64(enums.RunStatusCompleted)}, traceRunStatusDBValues(enums.RunStatusCompleted))
+}
+
 func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.New()
@@ -1532,6 +1558,169 @@ func TestCQRSGetTraceRunsByTriggerID(t *testing.T) {
 		assert.Contains(t, runIDs, run1ID.String())
 		assert.Contains(t, runIDs, run2ID.String())
 	})
+}
+
+func TestCQRSInsertTraceRun_PreservesTerminalStateAgainstStaleNonTerminalWrite(t *testing.T) {
+	terminalStatuses := []enums.RunStatus{
+		enums.RunStatusCompleted,
+		enums.RunStatusFailed,
+		enums.RunStatusCancelled,
+		enums.RunStatusOverflowed,
+		enums.RunStatusSkipped,
+	}
+	staleStatuses := []enums.RunStatus{
+		enums.RunStatusScheduled,
+		enums.RunStatusRunning,
+	}
+
+	for _, terminalStatus := range terminalStatuses {
+		for _, staleStatus := range staleStatuses {
+			t.Run(fmt.Sprintf("%s_then_%s", terminalStatus, staleStatus), func(t *testing.T) {
+				ctx := context.Background()
+				appID := uuid.New()
+
+				cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+				defer cleanup()
+
+				accountID := uuid.New()
+				workspaceID := uuid.New()
+				functionID := uuid.New()
+				runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+				now := time.Now().UTC().Truncate(time.Second)
+				terminalOutput := []byte(fmt.Sprintf(`{"status":%q}`, terminalStatus.String()))
+
+				terminal := &cqrs.TraceRun{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					FunctionID:  functionID,
+					TraceID:     "trace-terminal-" + runID.String(),
+					RunID:       runID.String(),
+					QueuedAt:    now.Add(-2 * time.Minute),
+					StartedAt:   now.Add(-1 * time.Minute),
+					EndedAt:     now,
+					SourceID:    "terminal-source",
+					TriggerIDs:  []string{"evt-terminal"},
+					Output:      terminalOutput,
+					Status:      terminalStatus,
+				}
+
+				stale := &cqrs.TraceRun{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					FunctionID:  functionID,
+					TraceID:     "trace-stale-" + runID.String(),
+					RunID:       runID.String(),
+					QueuedAt:    now.Add(-3 * time.Minute),
+					StartedAt:   now.Add(-2 * time.Minute),
+					SourceID:    "stale-source",
+					TriggerIDs:  []string{"evt-stale"},
+					Status:      staleStatus,
+				}
+
+				require.NoError(t, cm.InsertTraceRun(ctx, terminal))
+				require.NoError(t, cm.InsertTraceRun(ctx, stale))
+
+				got, err := cm.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+				require.NoError(t, err)
+
+				assert.Equal(t, terminal.TraceID, got.TraceID)
+				assert.Equal(t, terminal.QueuedAt.UnixMilli(), got.QueuedAt.UnixMilli())
+				assert.Equal(t, terminal.StartedAt.UnixMilli(), got.StartedAt.UnixMilli())
+				assert.Equal(t, terminal.EndedAt.UnixMilli(), got.EndedAt.UnixMilli())
+				assert.Equal(t, terminal.SourceID, got.SourceID)
+				assert.Equal(t, terminal.TriggerIDs, got.TriggerIDs)
+				assert.Equal(t, terminalOutput, got.Output)
+				assert.Equal(t, terminalStatus, got.Status)
+			})
+		}
+	}
+}
+
+// Invariant from TLA RunStateProjection ("terminal states are monotonic"):
+// once a terminal status has been written for a run_id, no subsequent read
+// returns a non-terminal status, regardless of the order writes arrive in.
+func TestCQRSInsertTraceRun_TerminalMonotonicityUnderAllOrderings(t *testing.T) {
+	base := []enums.RunStatus{
+		enums.RunStatusScheduled,
+		enums.RunStatusRunning,
+		enums.RunStatusCompleted,
+		enums.RunStatusCancelled,
+	}
+
+	var perms [][]enums.RunStatus
+	var permute func([]enums.RunStatus, int)
+	permute = func(arr []enums.RunStatus, k int) {
+		if k == len(arr)-1 {
+			cpy := make([]enums.RunStatus, len(arr))
+			copy(cpy, arr)
+			perms = append(perms, cpy)
+			return
+		}
+		for i := k; i < len(arr); i++ {
+			arr[k], arr[i] = arr[i], arr[k]
+			permute(arr, k+1)
+			arr[k], arr[i] = arr[i], arr[k]
+		}
+	}
+	arr := make([]enums.RunStatus, len(base))
+	copy(arr, base)
+	permute(arr, 0)
+
+	for _, perm := range perms {
+		name := ""
+		for i, s := range perm {
+			if i > 0 {
+				name += "-"
+			}
+			name += s.String()
+		}
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			appID := uuid.New()
+			cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+			defer cleanup()
+
+			accountID := uuid.New()
+			workspaceID := uuid.New()
+			functionID := uuid.New()
+			runID := ulid.MustNew(ulid.Now(), rand.Reader)
+			now := time.Now().UTC().Truncate(time.Second)
+
+			sawTerminal := false
+			for i, s := range perm {
+				tr := &cqrs.TraceRun{
+					AccountID:   accountID,
+					WorkspaceID: workspaceID,
+					AppID:       appID,
+					FunctionID:  functionID,
+					TraceID:     fmt.Sprintf("trace-%d-%s", i, runID.String()),
+					RunID:       runID.String(),
+					QueuedAt:    now,
+					StartedAt:   now,
+					EndedAt:     now,
+					SourceID:    "test-source",
+					TriggerIDs:  []string{"evt-test"},
+					Status:      s,
+				}
+				require.NoError(t, cm.InsertTraceRun(ctx, tr))
+
+				got, err := cm.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+				require.NoError(t, err)
+
+				if enums.RunStatusEnded(s) {
+					sawTerminal = true
+				}
+				if sawTerminal {
+					assert.True(t, enums.RunStatusEnded(got.Status),
+						"step %d (write %s): after observing terminal, got %s",
+						i, s, got.Status)
+				}
+			}
+		})
+	}
 }
 
 func TestCQRSGetTraceRunsPagination(t *testing.T) {
@@ -1671,6 +1860,659 @@ func TestCQRSGetTraceRunsExcludesSkipped(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, runs, 1, "Skipped runs should be excluded from the runs list")
 	assert.Equal(t, completedRunID, runs[0].RunID)
+}
+
+func TestCQRSGetTraceRunsPreviewScopesRootLookupAndCount(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	otherAccountID := uuid.New()
+	otherWorkspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+
+	completedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         completedRunID,
+		DynamicSpanID: "dyn-completed",
+		Name:          "executor.run",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	failedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         failedRunID,
+		DynamicSpanID: "dyn-failed",
+		Name:          "executor.run",
+		Status:        enums.RunStatusFailed.String(),
+		StartTime:     baseTime.Add(time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	// This fragment shares a dynamic span ID with another tenant's root span,
+	// but it has no root in the requested tenant and must not become a run.
+	leakedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         leakedRunID,
+		DynamicSpanID: "dyn-shared",
+		Name:          "EXTEND",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime.Add(2 * time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		DynamicSpanID: "dyn-shared",
+		Name:          "executor.run",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime.Add(2 * time.Second),
+		AccountID:     otherAccountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         otherWorkspaceID.String(),
+	})
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		DynamicSpanID: "dyn-skipped",
+		Name:          "executor.run",
+		Status:        enums.RunStatusSkipped.String(),
+		StartTime:     baseTime.Add(3 * time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Items:   1,
+		Preview: true,
+	}
+
+	firstPage, err := cm.GetTraceRuns(ctx, opt)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1)
+
+	countOpt := opt
+	countOpt.Cursor = firstPage[0].Cursor
+	count, err := cm.GetTraceRunsCount(ctx, countOpt)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count, "count should ignore cursor and exclude cross-tenant root matches")
+
+	countOpt.Filter.Status = []enums.RunStatus{enums.RunStatusCompleted}
+	statusCount, err := cm.GetTraceRunsCount(ctx, countOpt)
+	require.NoError(t, err)
+	assert.Equal(t, 1, statusCount)
+
+	listOpt := opt
+	listOpt.Items = 0
+	runs, err := cm.GetTraceRuns(ctx, listOpt)
+	require.NoError(t, err)
+	require.Len(t, runs, 2)
+
+	runIDs := []string{runs[0].RunID, runs[1].RunID}
+	assert.Contains(t, runIDs, completedRunID)
+	assert.Contains(t, runIDs, failedRunID)
+	assert.NotContains(t, runIDs, leakedRunID)
+}
+
+func TestCQRSGetTraceRunsNonPreviewScopesTenant(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	otherAccountID := uuid.New()
+	otherWorkspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	targetRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	err := cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+		AccountID:   accountID,
+		WorkspaceID: workspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		TraceID:     "trace-target",
+		RunID:       targetRunID,
+		QueuedAt:    baseTime,
+		StartedAt:   baseTime,
+		EndedAt:     baseTime.Add(time.Second),
+		Status:      enums.RunStatusCompleted,
+	})
+	require.NoError(t, err)
+
+	err = cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+		AccountID:   otherAccountID,
+		WorkspaceID: otherWorkspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		TraceID:     "trace-other",
+		RunID:       ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		QueuedAt:    baseTime,
+		StartedAt:   baseTime,
+		EndedAt:     baseTime.Add(time.Second),
+		Status:      enums.RunStatusCompleted,
+	})
+	require.NoError(t, err)
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+	}
+
+	runs, err := cm.GetTraceRuns(ctx, opt)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, targetRunID, runs[0].RunID)
+
+	count, err := cm.GetTraceRunsCount(ctx, opt)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}
+
+func TestCQRSGetTraceRunsPreviewEndedAtUsesTraceRuns(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	otherAccountID := uuid.New()
+	otherWorkspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+
+	runIDs := make([]string, 2)
+	for i := range runIDs {
+		runIDs[i] = ulid.MustNew(ulid.Now(), rand.Reader).String()
+		status := enums.RunStatusCompleted
+		if i == 1 {
+			status = enums.RunStatusRunning
+		}
+		err := cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       appID,
+			FunctionID:  functionID,
+			TraceID:     fmt.Sprintf("trace-ended-%d", i),
+			RunID:       runIDs[i],
+			QueuedAt:    baseTime,
+			StartedAt:   baseTime,
+			EndedAt:     baseTime.Add(time.Duration(i+1) * time.Second),
+			Status:      status,
+		})
+		require.NoError(t, err)
+	}
+
+	for _, span := range []testSpanFields{
+		{
+			RunID:         runIDs[1],
+			DynamicSpanID: "ended-stale-root",
+			Name:          meta.SpanNameRun,
+			Status:        enums.RunStatusRunning.String(),
+			StartTime:     baseTime,
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    functionID.String(),
+			EnvID:         workspaceID.String(),
+		},
+		{
+			RunID:         runIDs[1],
+			DynamicSpanID: "ended-stale-root",
+			Name:          meta.SpanNameRun,
+			Status:        enums.RunStatusCompleted.String(),
+			StartTime:     baseTime.Add(2 * time.Second),
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    functionID.String(),
+			EnvID:         workspaceID.String(),
+		},
+	} {
+		insertTestSpan(t, cm, span)
+	}
+
+	err := cm.InsertTraceRun(ctx, &cqrs.TraceRun{
+		AccountID:   otherAccountID,
+		WorkspaceID: otherWorkspaceID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		TraceID:     "trace-other-ended",
+		RunID:       ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		QueuedAt:    baseTime,
+		StartedAt:   baseTime,
+		EndedAt:     baseTime.Add(3 * time.Second),
+		Status:      enums.RunStatusCompleted,
+	})
+	require.NoError(t, err)
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeEndedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeEndedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Items:   1,
+		Preview: true,
+	}
+
+	firstPage, err := cm.GetTraceRuns(ctx, opt)
+	require.NoError(t, err)
+	require.Len(t, firstPage, 1)
+	assert.Equal(t, runIDs[1], firstPage[0].RunID)
+	assert.Equal(t, accountID, firstPage[0].AccountID)
+	assert.Equal(t, workspaceID, firstPage[0].WorkspaceID)
+	assert.Equal(t, enums.RunStatusCompleted, firstPage[0].Status)
+
+	countOpt := opt
+	countOpt.Cursor = firstPage[0].Cursor
+	count, err := cm.GetTraceRunsCount(ctx, countOpt)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	secondOpt := opt
+	secondOpt.Cursor = firstPage[0].Cursor
+	secondPage, err := cm.GetTraceRuns(ctx, secondOpt)
+	require.NoError(t, err)
+	require.Len(t, secondPage, 1)
+	assert.Equal(t, runIDs[0], secondPage[0].RunID)
+}
+
+func TestCQRSGetSpanRunsCELJoinQualifiesTenantFilters(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	eventID := "evt-cel-tenant-filter"
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	require.NoError(t, cm.InsertEvent(ctx, cqrs.Event{
+		ID:        ulid.MustNew(ulid.Now(), rand.Reader),
+		EventID:   eventID,
+		EventName: "app/cel.match",
+		EventData: map[string]any{"tenant": "target"},
+		EventUser: map[string]any{},
+		EventTS:   baseTime.UnixMilli(),
+	}))
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-cel-tenant-filter",
+		Name:          meta.SpanNameRun,
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+		EventIDs:      []byte(fmt.Sprintf(`["%s"]`, eventID)),
+	})
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+			CEL:         `event.data.tenant == "target"`,
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Preview: true,
+	}
+
+	runs, err := cm.GetTraceRuns(ctx, opt)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, runID, runs[0].RunID)
+
+	count, err := cm.GetTraceRunsCount(ctx, opt)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}
+
+// Root-page results must derive end_time/status from EXTEND spans.
+func TestCQRSGetSpanRunsEnrichmentFromExtendSpans(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+
+	extendedRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         extendedRunID,
+		DynamicSpanID: "dyn-extended",
+		Name:          "executor.run",
+		Status:        enums.RunStatusRunning.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         extendedRunID,
+		DynamicSpanID: "dyn-extended",
+		Name:          "EXTEND",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime.Add(5 * time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	rootOnlyRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         rootOnlyRunID,
+		DynamicSpanID: "dyn-rootonly",
+		Name:          "executor.run",
+		Status:        enums.RunStatusFailed.String(),
+		StartTime:     baseTime.Add(time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Preview: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 2)
+
+	byRun := map[string]*cqrs.TraceRun{}
+	for _, r := range runs {
+		byRun[r.RunID] = r
+	}
+
+	extended := byRun[extendedRunID]
+	require.NotNil(t, extended)
+	assert.Equal(t, enums.RunStatusCompleted, extended.Status)
+	assert.Equal(t, baseTime, extended.StartedAt.UTC())
+	assert.GreaterOrEqual(t, extended.EndedAt.Sub(extended.StartedAt), 5*time.Second)
+
+	rootOnly := byRun[rootOnlyRunID]
+	require.NotNil(t, rootOnly)
+	assert.Equal(t, enums.RunStatusFailed, rootOnly.Status)
+	assert.Less(t, rootOnly.EndedAt.Sub(rootOnly.StartedAt), time.Second)
+}
+
+func TestCQRSGetSpanRunsEnrichmentIncludesExtendSpansAfterPageWindow(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	until := baseTime.Add(time.Minute)
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-post-window-extend",
+		Name:          "executor.run",
+		Status:        enums.RunStatusRunning.String(),
+		StartTime:     until.Add(-time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-post-window-extend",
+		Name:          "EXTEND",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     until.Add(5 * time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	runs, err := cm.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       until,
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Preview: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+
+	assert.Equal(t, runID, runs[0].RunID)
+	assert.Equal(t, enums.RunStatusCompleted, runs[0].Status)
+	assert.True(t, runs[0].EndedAt.UTC().After(until), "end_time should come from the post-window EXTEND span")
+}
+
+// Status filters match final run status, not any historical span row.
+func TestCQRSGetSpanRunsFinalStatusFilter(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+
+	runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-1",
+		Name:          "executor.run",
+		Status:        enums.RunStatusFailed.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID,
+		DynamicSpanID: "dyn-1",
+		Name:          "EXTEND",
+		Status:        enums.RunStatusCompleted.String(),
+		StartTime:     baseTime.Add(5 * time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	baseOpt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Preview: true,
+	}
+
+	completedOpt := baseOpt
+	completedOpt.Filter.Status = []enums.RunStatus{enums.RunStatusCompleted}
+	completedRuns, err := cm.GetTraceRuns(ctx, completedOpt)
+	require.NoError(t, err)
+	require.Len(t, completedRuns, 1, "final status Completed should match")
+	assert.Equal(t, runID, completedRuns[0].RunID)
+	completedCount, err := cm.GetTraceRunsCount(ctx, completedOpt)
+	require.NoError(t, err)
+	assert.Equal(t, 1, completedCount)
+
+	failedOpt := baseOpt
+	failedOpt.Filter.Status = []enums.RunStatus{enums.RunStatusFailed}
+	failedRuns, err := cm.GetTraceRuns(ctx, failedOpt)
+	require.NoError(t, err)
+	require.Empty(t, failedRuns, "a run whose final status is Completed must not match Failed")
+	failedCount, err := cm.GetTraceRunsCount(ctx, failedOpt)
+	require.NoError(t, err)
+	assert.Equal(t, 0, failedCount)
+}
+
+// Cursor pagination must not skip or duplicate root-page results.
+func TestCQRSGetSpanRunsFastPathPagination(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+
+	cm, cleanup := initCQRS(t, withInitCQRSOptApp(appID))
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+
+	const total = 5
+	wantOrder := make([]string, 0, total)
+	for i := 0; i < total; i++ {
+		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:         runID,
+			DynamicSpanID: fmt.Sprintf("dyn-%d", i),
+			Name:          "executor.run",
+			Status:        enums.RunStatusCompleted.String(),
+			StartTime:     baseTime.Add(time.Duration(i) * time.Second),
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    functionID.String(),
+			EnvID:         workspaceID.String(),
+		})
+		wantOrder = append([]string{runID}, wantOrder...)
+	}
+
+	opt := cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			FunctionID:  []uuid.UUID{functionID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+		},
+		Order: []cqrs.GetTraceRunOrder{
+			{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc},
+		},
+		Items:   2,
+		Preview: true,
+	}
+
+	count, err := cm.GetTraceRunsCount(ctx, opt)
+	require.NoError(t, err)
+	assert.Equal(t, total, count)
+
+	var got []string
+	cursor := ""
+	for page := 0; page < total+1; page++ {
+		pageOpt := opt
+		pageOpt.Cursor = cursor
+		runs, err := cm.GetTraceRuns(ctx, pageOpt)
+		require.NoError(t, err)
+		if len(runs) == 0 {
+			break
+		}
+		for _, r := range runs {
+			got = append(got, r.RunID)
+		}
+		if len(runs) < int(opt.Items) {
+			break
+		}
+		cursor = runs[len(runs)-1].Cursor
+		require.NotEmpty(t, cursor, "cursor required to continue pagination")
+	}
+
+	assert.Equal(t, wantOrder, got, "every run returned once, in descending start order")
 }
 
 //
@@ -1842,11 +2684,270 @@ func TestSpanOutputReadBack(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{SpanID: spanID})
+	out, err := cm.GetSpanOutput(t.Context(), cqrs.SpanIdentifier{RunID: runID, SpanID: spanID})
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	// After the data/error unwrapping in GetSpanOutput, "data" key is extracted
 	assert.Contains(t, string(out.Data), `"num":42`, "output should contain raw JSON, not double-encoded")
+}
+
+// TestExtendedTraceReparenting verifies that orphaned userland spans (extended
+// trace spans whose parent OTEL span ID is no longer in the tree) are
+// reparented to their matching step or execution span by stepID + attempt.
+func TestExtendedTraceReparenting(t *testing.T) {
+	// stepAttrs returns JSON attributes for a step/exec span.
+	stepAttrs := func(stepID string, attempt int) []byte {
+		b, _ := json.Marshal(map[string]any{
+			"_inngest.step.id":      stepID,
+			"_inngest.step.attempt": attempt,
+		})
+		return b
+	}
+
+	// userlandAttrs returns JSON attributes for an orphaned extended trace span.
+	userlandAttrs := func(stepID string, attempt int) []byte {
+		b, _ := json.Marshal(map[string]any{
+			"_inngest.userland":     true,
+			"_inngest.step.id":      stepID,
+			"_inngest.step.attempt": attempt,
+		})
+		return b
+	}
+
+	t.Run("reparents to executor.step by stepID and attempt", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-abc", 0),
+		})
+		// Orphaned: parent "stale-otel-id" is not in the span map.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-abc", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		step := result.Children[0]
+		assert.Equal(t, "dyn-step", step.SpanID)
+		require.Len(t, step.Children, 1, "extended trace span should be reparented under executor.step")
+		assert.Equal(t, "dyn-userland", step.Children[0].SpanID)
+	})
+
+	t.Run("falls back to executor.execution when no executor.step exists", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-exec", Name: meta.SpanNameExecution,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-xyz", 0),
+		})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-xyz", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		exec := result.Children[0]
+		assert.Equal(t, "dyn-exec", exec.SpanID)
+		require.Len(t, exec.Children, 1, "extended trace span should fall back to executor.execution")
+		assert.Equal(t, "dyn-userland", exec.Children[0].SpanID)
+	})
+
+	t.Run("drops orphaned span when no matching step or execution span exists", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		// No step or exec span for "step-no-match".
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-no-match", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Empty(t, result.Children, "orphaned extended trace span with no match should be dropped")
+	})
+
+	t.Run("each attempt's span is reparented to its own attempt", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+
+		for _, attempt := range []int{0, 1} {
+			insertTestSpan(t, cm, testSpanFields{
+				RunID:         runIDStr,
+				DynamicSpanID: fmt.Sprintf("dyn-step-%d", attempt),
+				Name:          meta.SpanNameStep,
+				ParentSpanID:  "dyn-run",
+				Attributes:    stepAttrs("step-retry", attempt),
+			})
+			insertTestSpan(t, cm, testSpanFields{
+				RunID:         runIDStr,
+				DynamicSpanID: fmt.Sprintf("dyn-userland-%d", attempt),
+				Name:          "userland",
+				ParentSpanID:  "stale-otel-id",
+				Attributes:    userlandAttrs("step-retry", attempt),
+			})
+		}
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Children, 2)
+
+		bySpanID := make(map[string]*cqrs.OtelSpan, 2)
+		for _, child := range result.Children {
+			bySpanID[child.SpanID] = child
+		}
+
+		step0 := bySpanID["dyn-step-0"]
+		require.NotNil(t, step0)
+		require.Len(t, step0.Children, 1, "attempt 0 extended trace span should be under attempt 0 step")
+		assert.Equal(t, "dyn-userland-0", step0.Children[0].SpanID)
+
+		step1 := bySpanID["dyn-step-1"]
+		require.NotNil(t, step1)
+		require.Len(t, step1.Children, 1, "attempt 1 extended trace span should be under attempt 1 step")
+		assert.Equal(t, "dyn-userland-1", step1.Children[0].SpanID)
+	})
+
+	t.Run("does not reparent when attempt attribute is missing", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-abc", 0),
+		})
+		// Orphaned userland span with stepID but no attempt attribute.
+		noAttemptAttrs, _ := json.Marshal(map[string]any{
+			"_inngest.userland": true,
+			"_inngest.step.id":  "step-abc",
+		})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: noAttemptAttrs,
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		assert.Empty(t, result.Children[0].Children, "userland span missing attempt should not be reparented")
+	})
+
+	t.Run("userland span with valid parent reference uses normal lineage", func(t *testing.T) {
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-linked", 0),
+		})
+		// Valid parent reference — should use normal lineage, not reparenting.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-userland", Name: "userland",
+			ParentSpanID: "dyn-step", Attributes: userlandAttrs("step-linked", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		step := result.Children[0]
+		assert.Equal(t, "dyn-step", step.SpanID)
+		require.Len(t, step.Children, 1, "userland span with valid parent should attach via normal lineage")
+		assert.Equal(t, "dyn-userland", step.Children[0].SpanID)
+	})
+
+	t.Run("only subtree root is reparented, not interior nodes", func(t *testing.T) {
+		// A three-span userland subtree: root → child → grandchild.
+		// root's inngest parent ("stale-otel-id") is absent from the tree.
+		// child and grandchild have parents within the userland subtree.
+		// Only root should be reparented; child and grandchild attach normally.
+		cm, cleanup := initCQRS(t)
+		defer cleanup()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+		runIDStr := runID.String()
+
+		insertTestSpan(t, cm, testSpanFields{RunID: runIDStr, DynamicSpanID: "dyn-run", Name: meta.SpanNameRun})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-step", Name: meta.SpanNameStep,
+			ParentSpanID: "dyn-run", Attributes: stepAttrs("step-sub", 0),
+		})
+		// Subtree root: orphaned from inngest tree, should be reparented to dyn-step.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-root", Name: "userland",
+			ParentSpanID: "stale-otel-id", Attributes: userlandAttrs("step-sub", 0),
+		})
+		// Interior node: parent is the userland root above; resolves via spanMap normally.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-child", Name: "userland",
+			ParentSpanID: "dyn-ul-root", Attributes: userlandAttrs("step-sub", 0),
+		})
+		// Leaf: parent is the interior node; resolves via spanMap normally.
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runIDStr, DynamicSpanID: "dyn-ul-grandchild", Name: "userland",
+			ParentSpanID: "dyn-ul-child", Attributes: userlandAttrs("step-sub", 0),
+		})
+
+		result, err := cm.GetSpansByRunID(t.Context(), runID)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.Len(t, result.Children, 1)
+		step := result.Children[0]
+		assert.Equal(t, "dyn-step", step.SpanID)
+
+		require.Len(t, step.Children, 1, "only the userland subtree root should be reparented under executor.step")
+		root := step.Children[0]
+		assert.Equal(t, "dyn-ul-root", root.SpanID)
+
+		require.Len(t, root.Children, 1, "interior node should be attached under the subtree root")
+		child := root.Children[0]
+		assert.Equal(t, "dyn-ul-child", child.SpanID)
+
+		require.Len(t, child.Children, 1, "grandchild should be attached under the interior node")
+		assert.Equal(t, "dyn-ul-grandchild", child.Children[0].SpanID)
+	})
 }
 
 //
@@ -1868,6 +2969,7 @@ type testSpanFields struct {
 	EnvID          string    // default: "env"
 	Attributes     []byte    // JSON attributes (optional)
 	Output         []byte    // JSON output (optional)
+	EventIDs       []byte    // JSON array of event IDs (optional)
 }
 
 // There aren't any functions exposed on cqrs.Manager that write to the new spans table
@@ -1918,6 +3020,7 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		DebugSessionID: sql.NullString{String: spanFields.DebugSessionID, Valid: spanFields.DebugSessionID != ""},
 		Attributes:     spanFields.Attributes,
 		Output:         spanFields.Output,
+		EventIds:       spanFields.EventIDs,
 	})
 	require.NoError(t, err)
 }
@@ -1995,4 +3098,134 @@ func initCQRS(t *testing.T, opts ...withInitCQRSOpt) (cqrs.Manager, func()) {
 	}
 
 	return cm, cleanup
+}
+
+// TestCQRSGetSpanReparentsUserland covers userland (extended trace) span
+// reparenting in mapRootSpansFromRows.
+//
+// The SDK parents userland spans via OTel context, whose parent_span_id is
+// unreliable across step attempts — e.g. an attempt-0 LLM span can be
+// physically parented under the attempt-1 step span, which resolves fine and
+// would otherwise leave the span on the wrong attempt.
+//
+// The reader must reparent each userland subtree ROOT to the span matching its
+// (stepID, attempt) attributes, preferring executor.step and falling back to
+// executor.execution.
+func TestCQRSGetSpanReparentsUserland(t *testing.T) {
+	const stepID = "step1"
+	runAttr := []byte(`{"_inngest.dynamic.status":"Running"}`)
+	stepAttrs := func(id string, attempt int) []byte {
+		return fmt.Appendf(nil, `{"_inngest.step.id":%q,"_inngest.step.attempt":%d}`, id, attempt)
+	}
+	userlandAttrs := func(id string, attempt int) []byte {
+		return fmt.Appendf(nil, `{"_inngest.userland":true,"_inngest.step.id":%q,"_inngest.step.attempt":%d}`, id, attempt)
+	}
+	userlandNoAttempt := func(id string) []byte {
+		return fmt.Appendf(nil, `{"_inngest.userland":true,"_inngest.step.id":%q}`, id)
+	}
+
+	// span dynamic-id -> expected parent dynamic-id after the tree is built.
+	type expect struct{ span, parent string }
+
+	cases := []struct {
+		name    string
+		spans   []testSpanFields
+		expects []expect
+	}{
+		{
+			// Both LLM spans land under the attempt-1 step in
+			// the raw data; each must move to the step matching its own attempt.
+			name: "cross-attempt: each userland span moves to its own attempt's step",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step0", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "step1", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 1)},
+				{DynamicSpanID: "chat0", ParentSpanID: "step1", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+				{DynamicSpanID: "chat1", ParentSpanID: "step1", Name: "chat", Attributes: userlandAttrs(stepID, 1)},
+			},
+			expects: []expect{{"chat0", "step0"}, {"chat1", "step1"}},
+		},
+		{
+			name: "prefers executor.step over executor.execution",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "exec", ParentSpanID: "root", Name: meta.SpanNameExecution, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "ul", ParentSpanID: "root", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+			},
+			expects: []expect{{"ul", "step"}},
+		},
+		{
+			name: "falls back to executor.execution when no step matches",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "exec", ParentSpanID: "root", Name: meta.SpanNameExecution, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "ul", ParentSpanID: "root", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+			},
+			expects: []expect{{"ul", "exec"}},
+		},
+		{
+			name: "no reparent when attempt attribute missing",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "ul", ParentSpanID: "root", Name: "chat", Attributes: userlandNoAttempt(stepID)},
+			},
+			expects: []expect{{"ul", "root"}},
+		},
+		{
+			name: "no reparent when no step or execution matches the key",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs("other", 0)},
+				{DynamicSpanID: "ul", ParentSpanID: "root", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+			},
+			expects: []expect{{"ul", "root"}},
+		},
+		{
+			// Only the root of a userland subtree is reparented; an interior node
+			// whose parent is itself userland must keep its original parent.
+			name: "only subtree root reparented; interior userland node kept",
+			spans: []testSpanFields{
+				{DynamicSpanID: "root", Name: meta.SpanNameRun, Attributes: runAttr},
+				{DynamicSpanID: "step", ParentSpanID: "root", Name: meta.SpanNameStep, Attributes: stepAttrs(stepID, 0)},
+				{DynamicSpanID: "ulroot", ParentSpanID: "root", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+				{DynamicSpanID: "ulchild", ParentSpanID: "ulroot", Name: "chat", Attributes: userlandAttrs(stepID, 0)},
+			},
+			expects: []expect{{"ulroot", "step"}, {"ulchild", "ulroot"}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cm, cleanup := initCQRS(t)
+			defer cleanup()
+
+			runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+			for _, s := range tc.spans {
+				s.RunID = runID
+				insertTestSpan(t, cm, s)
+			}
+
+			root, err := cm.GetSpansByRunID(t.Context(), ulid.MustParse(runID))
+			require.NoError(t, err)
+			require.NotNil(t, root)
+
+			// Build a child -> parent map keyed by dynamic span ID.
+			parentOf := map[string]string{}
+			var walk func(s *cqrs.OtelSpan)
+			walk = func(s *cqrs.OtelSpan) {
+				for _, c := range s.Children {
+					parentOf[c.SpanID] = s.SpanID
+					walk(c)
+				}
+			}
+			walk(root)
+
+			for _, e := range tc.expects {
+				assert.Equal(t, e.parent, parentOf[e.span],
+					"span %q should be parented under %q", e.span, e.parent)
+			}
+		})
+	}
 }

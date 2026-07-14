@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -26,10 +25,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-func requestIDForGeneration(runID ulid.ULID, generationID int) string {
-	return driver.DispatchRequestID(time.Now(), runID, generationID).String()
-}
 
 func TestCheckpointAsyncSteps(t *testing.T) {
 	t.Run("three step runs", func(t *testing.T) {
@@ -467,7 +462,7 @@ func TestCheckpointAsyncSteps_RequestStartedAtGate(t *testing.T) {
 			}
 			mocks, testData := setupAsyncCheckpointTest(t, op)
 
-			testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 4)
+			testData.asyncCheckpoint.GenerationID = 4
 			testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(tc.ageOffset).UnixMilli()
 
 			if tc.expectLoad {
@@ -527,7 +522,7 @@ func TestCheckpointAsyncSteps_ValidationDisabledBypassesGate(t *testing.T) {
 	}
 	mocks, testData := setupAsyncCheckpointTestWithValidation(t, false, op)
 
-	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
+	testData.asyncCheckpoint.GenerationID = 1
 	testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(-time.Hour).UnixMilli()
 
 	expectedData, err := json.Marshal(map[string]any{
@@ -561,7 +556,7 @@ func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
 	}
 	mocks, testData := setupAsyncCheckpointTest(t, op)
 
-	testData.asyncCheckpoint.RequestID = requestIDForGeneration(testData.asyncCheckpoint.RunID, 1)
+	testData.asyncCheckpoint.GenerationID = 1
 	// Nil-from-HGET means the dispatch the SDK is serving no longer exists,
 	// which is exactly the stale case.
 	mocks.queue.On("LoadQueueItem", ctx, "shard-1", "job-123").Return(nil, queue.ErrQueueItemNotFound)
@@ -574,6 +569,48 @@ func TestCheckpointAsyncSteps_QueueItemNotFoundFailsBeforeSave(t *testing.T) {
 	mocks.tracer.AssertNotCalled(t, "CreateSpan")
 	mocks.queue.AssertNotCalled(t, "ResetAttemptsByJobID")
 	mocks.state.AssertExpectations(t)
+	mocks.queue.AssertExpectations(t)
+}
+
+// TestCheckpointAsyncSteps_BackCompatNoGenerationID covers older SDKs that
+// don't echo a GenerationID. Even with an ancient RequestStartedAt, the
+// validator must short-circuit and the checkpoint must complete (SaveStep
+// called) so existing deployments keep working through the rollout.
+func TestCheckpointAsyncSteps_BackCompatNoGenerationID(t *testing.T) {
+	ctx := context.Background()
+	require := require.New(t)
+
+	op := state.GeneratorOpcode{
+		ID:   "step-1",
+		Op:   enums.OpcodeStepRun,
+		Data: json.RawMessage(`{"result":"ok"}`),
+	}
+	mocks, testData := setupAsyncCheckpointTest(t, op)
+
+	// GenerationID==0 (zero-value) and an ancient RequestStartedAt that would
+	// otherwise force a queue load.
+	testData.asyncCheckpoint.GenerationID = 0
+	testData.asyncCheckpoint.RequestStartedAt = time.Now().Add(-time.Hour).UnixMilli()
+
+	expectedData, err := json.Marshal(map[string]any{
+		"data": json.RawMessage(`{"result":"ok"}`),
+	})
+	require.NoError(err)
+	mocks.state.On("SaveStep", ctx, testData.metadata.ID, op.ID, expectedData).Return(false, nil)
+	mocks.tracer.
+		On("CreateSpan", mock.Anything, meta.SpanNameStep, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+		Return(&meta.SpanReference{}, nil)
+	mocks.queue.On("ResetAttemptsByJobID", ctx, "shard-1", testData.scope, "job-123").Return(nil)
+
+	err = testData.checkpointer.CheckpointAsyncSteps(ctx, testData.asyncCheckpoint)
+	require.NoError(err)
+
+	// LoadQueueItem must not have been called; the validator bailed before
+	// reaching the loader.
+	mocks.queue.AssertNotCalled(t, "LoadQueueItem")
+	mocks.state.AssertCalled(t, "SaveStep", ctx, testData.metadata.ID, op.ID, expectedData)
+	mocks.state.AssertExpectations(t)
+	mocks.tracer.AssertExpectations(t)
 	mocks.queue.AssertExpectations(t)
 }
 
@@ -668,7 +705,7 @@ type mockRunService struct {
 	mock.Mock
 }
 
-func (m *mockRunService) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, error) {
+func (m *mockRunService) LoadMetadata(ctx context.Context, id state.ID, _ ...state.LoadMetadataOption) (state.Metadata, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(state.Metadata), args.Error(1)
 }

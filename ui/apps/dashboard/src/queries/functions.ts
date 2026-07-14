@@ -16,8 +16,19 @@ const GetFunctionsUsageDocument = graphql(`
           totalPages
         }
         data {
+          app {
+            name
+            externalID
+          }
           id
           slug
+          name
+          isPaused
+          isArchived
+          triggers {
+            type
+            value
+          }
           dailyStarts: usage(opts: { period: "hour", range: "day" }, event: "started") {
             total
             data {
@@ -203,6 +214,7 @@ const GetFunctionDocument = graphql(`
             mode
           }
         }
+        keyQueuesEnabled
       }
     }
   }

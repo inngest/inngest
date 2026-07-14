@@ -62,6 +62,10 @@ type V2RequestOpts struct {
 	// RequestID is a unique ID generated for each outbound SDK request.
 	RequestID string
 
+	// GenerationID is the monotonic dispatch generation for this SDK request.
+	// The SDK echoes this back so the API can fence stale dispatches.
+	GenerationID int
+
 	// JobID is the stable queue item ID for this SDK request.
 	JobID string
 
@@ -165,6 +169,7 @@ func MarshalV1(
 			RunID:        md.ID.RunID,
 			QueueItemRef: queueItemRef,
 			RequestID:    RequestIDFromContext(ctx),
+			GenerationID: queue.GenerationIDFromContext(ctx),
 			JobID:        JobIDFromContext(ctx),
 			Stack: &FunctionStack{
 				Stack:   md.Stack,

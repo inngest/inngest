@@ -81,7 +81,12 @@ export const convertLookup = (entities?: EntityType[]): EntityLookup | {} =>
     ? entities.reduce(
         (acc, v) => ({
           ...acc,
-          [v.id]: { id: v.id, name: v.name, slug: v.slug },
+          [v.id]: {
+            id: v.id,
+            name: v.name,
+            slug: v.slug,
+            appID: v.appID ?? v.app?.id,
+          },
         }),
         {},
       )
@@ -189,12 +194,16 @@ export const getLineChartOptions = (
   };
 };
 
+type MetricWithBuckets = {
+  data: Array<Pick<MetricsData, 'bucket'>>;
+};
+
 export const getXAxis = (
-  metrics: ScopedMetric[] | MetricsResponse | undefined,
+  metrics: MetricWithBuckets[] | Pick<MetricsResponse, 'data'> | undefined,
 ) => {
   const dark = isDark();
 
-  let series: MetricsData[] | undefined;
+  let series: Array<Pick<MetricsData, 'bucket'>> | undefined;
   if (Array.isArray(metrics)) {
     if (metrics[0]?.data) {
       series = metrics[0].data;

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -441,31 +442,40 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 			},
 		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
 			released := make(chan struct{})
-			go func() {
+			var advancerDone sync.WaitGroup
+			advancerDone.Go(func() {
 				for {
 					select {
-					case <-ctx.Done():
-						return
 					case <-released:
 						return
 					case <-time.After(time.Second):
-						// Ensure we tick the extend at least once
+						// Wait until both the queue-item lease ticker and the
+						// capacity-lease extend ticker are blocked on the clock
+						// before advancing. This ensures the extend goroutine has
+						// finished processing and is ready for the next tick.
+						clock.BlockUntil(2)
 						clock.Advance(time.Second)
 					}
 				}
-			}()
+			})
 
 			<-time.After(3 * time.Second)
 
 			// Release the capacity early
 			require.NotNil(t, ri.CapacityLease)
 
+			// Stop clock advances and wait for the advancer goroutine to exit
+			// before releasing the lease. This prevents advancing after the
+			// lease is released, which would cause the extend goroutine to see
+			// a stale/released lease. Note that a tick fired by the final
+			// advance may still be buffered in the extend ticker's channel;
+			// ProcessItem handles that race by discarding extend failures once
+			// the lease has been released.
+			close(released)
+			advancerDone.Wait()
+
 			err := ri.CapacityLease.Release()
 			require.NoError(t, err)
-			close(released) // stop clock advances after release
-
-			// Give the extend goroutine time to observe the cancelled context
-			<-time.After(50 * time.Millisecond)
 
 			// And do some more processing before returning
 			<-time.After(500 * time.Millisecond)
@@ -483,6 +493,106 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 
 		// Expect exactly 2 release calls
 		require.Equal(t, 2, len(cmLifecycles.ReleaseCalls))
+	})
+
+	t.Run("with constraint api and early release racing extend tick", func(t *testing.T) {
+		reset()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+			osqueue.WithCapacityManager(cm),
+			// make lease extensions more frequent
+			osqueue.WithCapacityLeaseExtendInterval(time.Second),
+			osqueue.WithLogger(l),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		p := osqueue.ItemPartition(ctx, qi)
+
+		// Acquire a lease
+		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			AccountID:            accountID,
+			EnvID:                envID,
+			IdempotencyKey:       qi.ID,
+			FunctionID:           fnID,
+			LeaseIdempotencyKeys: []string{qi.ID},
+			Amount:               1,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					AccountConcurrency:  5,
+					FunctionConcurrency: 2,
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeAccount,
+					},
+				},
+				{
+					Kind: constraintapi.ConstraintKindConcurrency,
+					Concurrency: &constraintapi.ConcurrencyConstraint{
+						Scope: enums.ConcurrencyScopeFn,
+					},
+				},
+			},
+			CurrentTime:     clock.Now(),
+			Duration:        10 * time.Second,
+			MaximumLifetime: time.Minute,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.CallerLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Leases, 1)
+
+		var counter int64
+
+		err = q.ProcessItem(ctx, osqueue.ProcessItem{
+			I: qi,
+			P: p,
+			CapacityLease: &osqueue.CapacityLease{
+				LeaseID:    resp.Leases[0].LeaseID,
+				IssuedAtMS: clock.Now().UnixMilli(),
+			},
+		}, func(ctx context.Context, ri osqueue.RunInfo, i osqueue.Item) (osqueue.RunResult, error) {
+			require.NotNil(t, ri.CapacityLease)
+
+			// Fire the capacity-lease extend ticker, then release the lease
+			// immediately, before the extend goroutine has necessarily
+			// consumed the tick. The tick stays buffered in the ticker
+			// channel, so the extend goroutine can observe it after Release()
+			// cancelled the extend context and released the lease.
+			// ProcessItem must treat the resulting stale tick (or in-flight
+			// extension failure) as benign instead of requeueing the item and
+			// aborting the handler.
+			clock.BlockUntil(2)
+			clock.Advance(time.Second)
+
+			err := ri.CapacityLease.Release()
+			require.NoError(t, err)
+
+			// And do some more processing before returning
+			<-time.After(100 * time.Millisecond)
+			atomic.AddInt64(&counter, 1)
+			return osqueue.RunResult{}, nil
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, 1, int(counter))
+
+		service.Wait()
 	})
 }
 

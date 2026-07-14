@@ -35,7 +35,7 @@ func (q *queueProcessor) ProcessItem(
 		"run_id", i.I.Data.Identifier.RunID,
 	)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", accountID, envID, fnID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", TraceScopeFromQueueItem(i.I, shard.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", i.P.ID))
 	span.SetAttributes(attribute.String("item_id", i.I.ID))
@@ -217,6 +217,13 @@ func (q *queueProcessor) ProcessItem(
 				case <-extendCapacityLeaseCtx.Done():
 					return
 				case <-extendCapacityLeaseTick.Chan():
+					if extendCapacityLeaseCtx.Err() != nil {
+						// The capacity lease was released early (or the job
+						// finished) after this tick was buffered. Don't extend
+						// a lease we no longer hold.
+						return
+					}
+
 					if ctx.Err() != nil {
 						// Don't extend lease when the ctx is done.
 						return
@@ -246,6 +253,15 @@ func (q *queueProcessor) ProcessItem(
 						LeaseIssuedAt: capacityLeaseID.issuedAt(),
 					})
 					if err != nil {
+						if extendCapacityLeaseCtx.Err() != nil {
+							// The lease was released early while this extension
+							// was in flight; releaseCapacityLease cancels the
+							// context before releasing, so a failure observed
+							// after cancellation is expected and must not
+							// requeue the item.
+							return
+						}
+
 						l.ReportError(
 							err,
 							"error extending capacity lease",
@@ -264,6 +280,14 @@ func (q *queueProcessor) ProcessItem(
 					}
 
 					if res.LeaseID == nil {
+						if extendCapacityLeaseCtx.Err() != nil {
+							// The lease was released early while this extension
+							// was in flight (release wins over extend on the
+							// capacity manager); this is expected and must not
+							// requeue the item.
+							return
+						}
+
 						// Lease could not be extended
 						l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi, "partition", p)
 						errCh <- AlwaysRetryError(fmt.Errorf("failed to extend capacity lease, no new lease ID received"))

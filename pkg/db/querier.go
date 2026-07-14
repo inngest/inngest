@@ -33,6 +33,7 @@ type Querier interface {
 	DeleteFunctionsByIDs(ctx context.Context, ids []uuid.UUID) error
 	GetAppFunctions(ctx context.Context, appID uuid.UUID) ([]*Function, error)
 	GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Function, error)
+	GetFunctionsByApp(ctx context.Context, arg GetFunctionsByAppParams) ([]*Function, error)
 	GetFunctionByID(ctx context.Context, id uuid.UUID) (*Function, error)
 	GetFunctionBySlug(ctx context.Context, slug string) (*Function, error)
 	GetFunctionByAppNameAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
@@ -57,6 +58,7 @@ type Querier interface {
 	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*FunctionRunRow, error)
 	GetFunctionRuns(ctx context.Context) ([]*FunctionRunRow, error)
 	GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*FunctionRunRow, error)
+	GetRuns(ctx context.Context, arg GetRunsParams) ([]*RunListItemRow, error)
 	GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*FunctionRunRow, error)
 	GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*FunctionFinish, error)
 
@@ -81,7 +83,7 @@ type Querier interface {
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*SpanRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*SpanRow, error)
 	GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStepIDParams) (*SpanRow, error)
-	GetSpanOutput(ctx context.Context, ids []string) ([]*SpanOutputRow, error)
+	GetSpanOutput(ctx context.Context, runID string, ids []string) ([]*SpanOutputRow, error)
 	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*SpanRow, error)
 	GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*SpanRow, error)
 

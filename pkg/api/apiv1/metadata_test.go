@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
@@ -19,20 +21,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type metadataFallbackTraceReader struct {
+// metadataTraceReader stubs the trace reader for legacy-path tests.
+type metadataTraceReader struct {
 	cqrs.TraceReader
 	span *cqrs.OtelSpan
 }
 
-func (r metadataFallbackTraceReader) GetRunSpanByRunID(context.Context, ulid.ULID, uuid.UUID, uuid.UUID) (*cqrs.OtelSpan, error) {
+func (r metadataTraceReader) GetRunSpanByRunID(context.Context, ulid.ULID, uuid.UUID, uuid.UUID) (*cqrs.OtelSpan, error) {
 	return r.span, nil
 }
 
-func (r metadataFallbackTraceReader) GetLatestExecutionSpanByStepID(context.Context, ulid.ULID, string, uuid.UUID, uuid.UUID) (*cqrs.OtelSpan, error) {
+func (r metadataTraceReader) GetLatestExecutionSpanByStepID(context.Context, ulid.ULID, string, uuid.UUID, uuid.UUID) (*cqrs.OtelSpan, error) {
 	return r.span, nil
 }
 
-type metadataFallbackTracerProvider struct {
+type metadataTracerProvider struct {
 	t      *testing.T
 	wantID statev2.ID
 	called bool
@@ -43,15 +46,14 @@ type metadataStateLoader struct {
 	loadMetadata func(context.Context, statev2.ID) (statev2.Metadata, error)
 }
 
-func (s metadataStateLoader) LoadMetadata(ctx context.Context, id statev2.ID) (statev2.Metadata, error) {
+func (s metadataStateLoader) LoadMetadata(ctx context.Context, id statev2.ID, _ ...statev2.LoadMetadataOption) (statev2.Metadata, error) {
 	if s.loadMetadata != nil {
 		return s.loadMetadata(ctx, id)
 	}
-
 	return statev2.Metadata{}, errors.New("unexpected LoadMetadata call")
 }
 
-func (p *metadataFallbackTracerProvider) CreateSpan(_ context.Context, _ string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
+func (p *metadataTracerProvider) CreateSpan(_ context.Context, _ string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
 	p.called = true
 
 	require.NotNil(p.t, opts.Metadata)
@@ -64,20 +66,34 @@ func (p *metadataFallbackTracerProvider) CreateSpan(_ context.Context, _ string,
 	return &meta.SpanReference{}, nil
 }
 
-func (p *metadataFallbackTracerProvider) CreateDroppableSpan(context.Context, string, *tracing.CreateSpanOptions) (*tracing.DroppableSpan, error) {
+func (p *metadataTracerProvider) CreateDroppableSpan(context.Context, string, *tracing.CreateSpanOptions) (*tracing.DroppableSpan, error) {
 	return nil, errors.New("unexpected CreateDroppableSpan call")
 }
 
-func (p *metadataFallbackTracerProvider) UpdateSpan(context.Context, *tracing.UpdateSpanOptions) error {
+func (p *metadataTracerProvider) UpdateSpan(context.Context, *tracing.UpdateSpanOptions) error {
 	return errors.New("unexpected UpdateSpan call")
 }
 
-func TestAddRunMetadataFallbackInitializesStateMetadata(t *testing.T) {
+// newRunID returns a ULID with the current time (new path).
+func newRunID() ulid.ULID {
+	return ulid.Make()
+}
+
+// preDeterministicSpanIDRunID returns a ULID timestamped before deterministicSpanIDCutoff (legacy path).
+func preDeterministicSpanIDRunID() ulid.ULID {
+	ts := ulid.Timestamp(deterministicSpanIDCutoff.Add(-time.Hour))
+	return ulid.MustNew(ts, rand.New(rand.NewSource(0)))
+}
+
+// TestAddRunMetadataNewPathUsesStateForTenantIDs verifies that on the new path
+// the FunctionID and AppID attached to the metadata span come from the state
+// store, not from a ClickHouse span query.
+func TestAddRunMetadataNewPathUsesStateForTenantIDs(t *testing.T) {
 	ctx := t.Context()
 	auth, err := apiv1auth.NilAuthFinder(ctx)
 	require.NoError(t, err)
 
-	runID := ulid.Make()
+	runID := newRunID()
 	functionID := uuid.New()
 	appID := uuid.New()
 	wantID := statev2.ID{
@@ -90,16 +106,10 @@ func TestAddRunMetadataFallbackInitializesStateMetadata(t *testing.T) {
 		},
 	}
 
-	tp := &metadataFallbackTracerProvider{t: t, wantID: wantID}
+	tp := &metadataTracerProvider{t: t, wantID: wantID}
 	r := router{API: &API{opts: Opts{
-		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				TraceID: "00000000000000000000000000000001",
-				SpanID:  "0000000000000001",
-			},
-			RunID:      runID,
-			FunctionID: functionID,
-			AppID:      appID,
+		State: metadataStateLoader{loadMetadata: func(_ context.Context, _ statev2.ID) (statev2.Metadata, error) {
+			return statev2.Metadata{ID: wantID}, nil
 		}},
 		TracerProvider: tp,
 	}}}
@@ -115,39 +125,29 @@ func TestAddRunMetadataFallbackInitializesStateMetadata(t *testing.T) {
 	require.True(t, tp.called)
 }
 
-func TestAddRunMetadataFallbackInitializesMissingStateMetadata(t *testing.T) {
+// TestAddRunMetadataNewPathFallbackToPartialIDWhenStateMissing verifies that
+// when the state store has no record for the run, the metadata span is still
+// created using the partial ID (zero FunctionID/AppID).
+func TestAddRunMetadataNewPathFallbackToPartialIDWhenStateMissing(t *testing.T) {
 	ctx := t.Context()
 	auth, err := apiv1auth.NilAuthFinder(ctx)
 	require.NoError(t, err)
 
-	runID := ulid.Make()
-	functionID := uuid.New()
-	appID := uuid.New()
+	runID := newRunID()
 	wantID := statev2.ID{
-		RunID:      runID,
-		FunctionID: functionID,
+		RunID: runID,
 		Tenant: statev2.Tenant{
-			AppID:     appID,
 			EnvID:     auth.WorkspaceID(),
 			AccountID: auth.AccountID(),
 		},
 	}
 
-	tp := &metadataFallbackTracerProvider{t: t, wantID: wantID}
+	tp := &metadataTracerProvider{t: t, wantID: wantID}
 	r := router{API: &API{opts: Opts{
-		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				TraceID: "00000000000000000000000000000001",
-				SpanID:  "0000000000000001",
-			},
-			RunID:      runID,
-			FunctionID: functionID,
-			AppID:      appID,
-		}},
-		TracerProvider: tp,
 		State: metadataStateLoader{loadMetadata: func(context.Context, statev2.ID) (statev2.Metadata, error) {
 			return statev2.Metadata{}, statev2.ErrMetadataNotFound
 		}},
+		TracerProvider: tp,
 	}}}
 
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
@@ -166,19 +166,10 @@ func TestAddRunMetadataReturnsTransientStateLoadError(t *testing.T) {
 	auth, err := apiv1auth.NilAuthFinder(ctx)
 	require.NoError(t, err)
 
-	runID := ulid.Make()
+	runID := newRunID()
 	loadErr := errors.New("temporary state load failure")
-	tp := &metadataFallbackTracerProvider{t: t}
+	tp := &metadataTracerProvider{t: t}
 	r := router{API: &API{opts: Opts{
-		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				TraceID: "00000000000000000000000000000001",
-				SpanID:  "0000000000000001",
-			},
-			RunID:      runID,
-			FunctionID: uuid.New(),
-			AppID:      uuid.New(),
-		}},
 		TracerProvider: tp,
 		State: metadataStateLoader{loadMetadata: func(context.Context, statev2.ID) (statev2.Metadata, error) {
 			return statev2.Metadata{}, loadErr
@@ -205,7 +196,7 @@ func TestAddRunMetadataAllowsScoreMetadata(t *testing.T) {
 	auth, err := apiv1auth.NilAuthFinder(ctx)
 	require.NoError(t, err)
 
-	runID := ulid.Make()
+	runID := newRunID()
 	functionID := uuid.New()
 	appID := uuid.New()
 	stepID := "score-step"
@@ -219,16 +210,10 @@ func TestAddRunMetadataAllowsScoreMetadata(t *testing.T) {
 		},
 	}
 
-	tp := &metadataFallbackTracerProvider{t: t, wantID: wantID}
+	tp := &metadataTracerProvider{t: t, wantID: wantID}
 	r := router{API: &API{opts: Opts{
-		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				TraceID: "00000000000000000000000000000001",
-				SpanID:  "0000000000000001",
-			},
-			RunID:      runID,
-			FunctionID: functionID,
-			AppID:      appID,
+		State: metadataStateLoader{loadMetadata: func(_ context.Context, _ statev2.ID) (statev2.Metadata, error) {
+			return statev2.Metadata{ID: wantID}, nil
 		}},
 		TracerProvider: tp,
 	}}}
@@ -236,9 +221,9 @@ func TestAddRunMetadataAllowsScoreMetadata(t *testing.T) {
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Target: RunMetadataTarget{StepID: &stepID},
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore + ".passed",
+			Kind:   metadata.KindInngestScore,
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"value": json.RawMessage(`true`)},
+			Values: metadata.Values{"passed": json.RawMessage(`{"value": true}`)},
 		}}},
 	})
 	require.NoError(t, err)
@@ -250,17 +235,8 @@ func TestAddRunMetadataRejectsInvalidScoreMetadata(t *testing.T) {
 	auth, err := apiv1auth.NilAuthFinder(ctx)
 	require.NoError(t, err)
 
-	runID := ulid.Make()
+	runID := newRunID()
 	r := router{API: &API{opts: Opts{
-		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				TraceID: "00000000000000000000000000000001",
-				SpanID:  "0000000000000001",
-			},
-			RunID:      runID,
-			FunctionID: uuid.New(),
-			AppID:      uuid.New(),
-		}},
 		State: metadataStateLoader{loadMetadata: func(context.Context, statev2.ID) (statev2.Metadata, error) {
 			require.Fail(t, "LoadMetadata should not be called for invalid metadata")
 			return statev2.Metadata{}, nil
@@ -269,9 +245,9 @@ func TestAddRunMetadataRejectsInvalidScoreMetadata(t *testing.T) {
 
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore + ".score",
+			Kind:   metadata.KindInngestScore,
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"value": json.RawMessage(`{"nested":1}`)},
+			Values: metadata.Values{"score": json.RawMessage(`{"value": {"nested":1}}`)},
 		}}},
 	})
 	require.ErrorIs(t, err, metadata.ErrScoreValueInvalid)
@@ -282,7 +258,7 @@ func TestAddRunMetadataAllowsRunScopedScoreMetadata(t *testing.T) {
 	auth, err := apiv1auth.NilAuthFinder(ctx)
 	require.NoError(t, err)
 
-	runID := ulid.Make()
+	runID := newRunID()
 	functionID := uuid.New()
 	appID := uuid.New()
 	wantID := statev2.ID{
@@ -295,9 +271,67 @@ func TestAddRunMetadataAllowsRunScopedScoreMetadata(t *testing.T) {
 		},
 	}
 
-	tp := &metadataFallbackTracerProvider{t: t, wantID: wantID}
+	tp := &metadataTracerProvider{t: t, wantID: wantID}
 	r := router{API: &API{opts: Opts{
-		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
+		State: metadataStateLoader{loadMetadata: func(_ context.Context, _ statev2.ID) (statev2.Metadata, error) {
+			return statev2.Metadata{ID: wantID}, nil
+		}},
+		TracerProvider: tp,
+	}}}
+
+	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+			Kind:   metadata.KindInngestScore,
+			Op:     enums.MetadataOpcodeMerge,
+			Values: metadata.Values{"accuracy": json.RawMessage(`{"value": 1}`)},
+		}}},
+	})
+	require.NoError(t, err)
+	require.True(t, tp.called)
+}
+
+func TestAddRunMetadataRejectsDisallowedInngestKind(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := newRunID()
+	r := router{API: &API{opts: Opts{}}}
+
+	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+			Kind:   "inngest.internal",
+			Op:     enums.MetadataOpcodeMerge,
+			Values: metadata.Values{"score": json.RawMessage(`1`)},
+		}}},
+	})
+	require.ErrorIs(t, err, metadata.ErrKindNotAllowed)
+}
+
+// TestAddRunMetadataLegacyPathForOldRuns verifies that run IDs created before
+// deterministicSpanIDCutoff are routed through the legacy ClickHouse query
+// path (getParentSpan with retry).
+func TestAddRunMetadataLegacyPathForOldRuns(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := preDeterministicSpanIDRunID()
+	functionID := uuid.New()
+	appID := uuid.New()
+	wantID := statev2.ID{
+		RunID:      runID,
+		FunctionID: functionID,
+		Tenant: statev2.Tenant{
+			AppID:     appID,
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
+	}
+
+	tp := &metadataTracerProvider{t: t, wantID: wantID}
+	r := router{API: &API{opts: Opts{
+		TraceReader: metadataTraceReader{span: &cqrs.OtelSpan{
 			RawOtelSpan: cqrs.RawOtelSpan{
 				TraceID: "00000000000000000000000000000001",
 				SpanID:  "0000000000000001",
@@ -311,39 +345,11 @@ func TestAddRunMetadataAllowsRunScopedScoreMetadata(t *testing.T) {
 
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore + ".accuracy",
+			Kind:   "userland.scores",
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"value": json.RawMessage(`1`)},
+			Values: metadata.Values{"score": json.RawMessage(`{"value":1}`)},
 		}}},
 	})
 	require.NoError(t, err)
 	require.True(t, tp.called)
-}
-
-func TestAddRunMetadataRejectsDisallowedInngestKind(t *testing.T) {
-	ctx := t.Context()
-	auth, err := apiv1auth.NilAuthFinder(ctx)
-	require.NoError(t, err)
-
-	runID := ulid.Make()
-	r := router{API: &API{opts: Opts{
-		TraceReader: metadataFallbackTraceReader{span: &cqrs.OtelSpan{
-			RawOtelSpan: cqrs.RawOtelSpan{
-				TraceID: "00000000000000000000000000000001",
-				SpanID:  "0000000000000001",
-			},
-			RunID:      runID,
-			FunctionID: uuid.New(),
-			AppID:      uuid.New(),
-		}},
-	}}}
-
-	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
-		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   "inngest.internal",
-			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"score": json.RawMessage(`1`)},
-		}}},
-	})
-	require.ErrorIs(t, err, metadata.ErrKindNotAllowed)
 }

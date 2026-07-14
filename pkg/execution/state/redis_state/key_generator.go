@@ -125,6 +125,9 @@ type QueueKeyGenerator interface {
 	// QueueItem returns the key for the hash containing all items within a
 	// queue for a function.
 	QueueItem() string
+	// QueueItemEarliestPeekTime returns the key storing the first time a queue
+	// item was observed by the processor iterator.
+	QueueItemEarliestPeekTime(itemID string) string
 
 	//
 	// Partition keys
@@ -637,4 +640,8 @@ type queueItemKeyGenerator struct {
 
 func (u queueItemKeyGenerator) QueueItem() string {
 	return fmt.Sprintf("{%s}:queue:item", u.queueDefaultKey)
+}
+
+func (u queueItemKeyGenerator) QueueItemEarliestPeekTime(itemID string) string {
+	return fmt.Sprintf("{%s}:queue:item:peek:%s", u.queueDefaultKey, itemID)
 }

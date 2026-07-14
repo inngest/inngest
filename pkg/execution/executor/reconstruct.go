@@ -4,115 +4,77 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
-func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.ScheduleRequest, newState *sv2.CreateState) error {
+type reconstructResult struct {
+	fromStepOp *enums.Opcode
+}
 
-	// Load the original run state and copy the state from the original
-	// run to the new run.
-	origTraceRun, err := tr.GetTraceRun(ctx, cqrs.TraceRunIdentifier{
-		RunID:       *req.OriginalRunID,
-		WorkspaceID: req.WorkspaceID,
-		AppID:       req.AppID,
-		FunctionID:  req.Function.ID,
-		AccountID:   req.AccountID,
-	})
+func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.ScheduleRequest, newState *sv2.CreateState) (*reconstructResult, error) {
+	root, err := tr.GetSpansByRunID(ctx, *req.OriginalRunID)
 	if err != nil {
-		return fmt.Errorf("error loading original trace run: %w", err)
+		return nil, fmt.Errorf("error loading original trace spans: %w", err)
+	}
+	if root == nil {
+		return nil, fmt.Errorf("original run trace not found")
 	}
 
-	spans, err := tr.GetTraceSpansByRun(ctx, cqrs.TraceRunIdentifier{
-		AccountID:   req.AccountID,
-		WorkspaceID: req.WorkspaceID,
-		AppID:       req.AppID,
-		FunctionID:  req.Function.ID,
-		TraceID:     origTraceRun.TraceID,
-		RunID:       *req.OriginalRunID,
-	})
-	if err != nil {
-		return fmt.Errorf("error loading trace spans: %w", err)
-	}
-
-	// Get the stack and organize spans by step IDs
-	var stack []string
-	stepSpans := map[string]*cqrs.Span{}
-	foundStepToRunFrom := false
-
-	for _, span := range spans {
-		if stepID, ok := span.SpanAttributes[consts.OtelSysStepID]; ok && stepID != "" {
-			stepSpans[stepID] = span
-			if stepID == req.FromStep.StepID {
-				foundStepToRunFrom = true
-			}
-		}
-		if span.SpanName == consts.OtelExecFnOk || span.SpanName == consts.OtelExecFnErr {
-			stack, _ = tr.GetSpanStack(ctx, cqrs.SpanIdentifier{
-				AccountID:   req.AccountID,
-				WorkspaceID: req.WorkspaceID,
-				AppID:       req.AppID,
-				FunctionID:  req.Function.ID,
-				TraceID:     origTraceRun.TraceID,
-				SpanID:      span.SpanID,
-			})
-		}
-	}
-
-	if len(stack) == 0 {
-		// This can happen for older runs that don't save the stack; we
-		// shouldn't try to recover from this as we could accidentally
-		// make the run resolve to a different path without it.
-		return fmt.Errorf("stack not found in original run")
-	}
+	//
+	// executor.step spans identify completed step order and output IDs.
+	stepsToCopy, foundStepToRunFrom := reconstructSteps(root, req.FromStep.StepID)
 
 	if !foundStepToRunFrom {
-		// This implementation has been given a step to run from that
-		// doesn't exist in this run.  This is a bad request.
-		return fmt.Errorf("step to run from not found in original run")
+		return nil, fmt.Errorf("step to run from not found in original run")
+	}
+
+	result := &reconstructResult{
+		fromStepOp: stepsToCopy.fromStepOp(),
 	}
 
 	steps := []state.MemoizedStep{}
 
-	// Copy the state from the original run to the new run.
-	for _, stepID := range stack {
-		if stepID == req.FromStep.StepID {
-			// We've reached the step to run from, so we can stop
-			// copying
-
+	for _, step := range stepsToCopy {
+		if step.id == req.FromStep.StepID {
 			break
 		}
 
-		span, ok := stepSpans[stepID]
-		if !ok {
-			// This signifies that the step was present in the stack but
-			// we couldn't find the span that represents it. This
-			// indicates a data integrity issue and we should not
-			// attempt to recover from this.
-			return fmt.Errorf("step found in stack but span not found in original run")
+		outputID := step.stepSpan.GetOutputID()
+		if outputID == nil {
+			if isNoOutputStep(step.stepSpan) {
+				steps = append(steps, state.MemoizedStep{ID: step.id, Data: nil})
+				continue
+			}
+
+			return nil, fmt.Errorf("step output not found in original run")
 		}
 
-		output, err := tr.LegacyGetSpanOutput(ctx, cqrs.SpanIdentifier{
-			AccountID:   req.AccountID,
-			WorkspaceID: req.WorkspaceID,
-			AppID:       req.AppID,
-			FunctionID:  req.Function.ID,
-			TraceID:     origTraceRun.TraceID,
-			SpanID:      span.SpanID,
-		})
+		var outputIdentifier cqrs.SpanIdentifier
+		if err := outputIdentifier.Decode(*outputID); err != nil {
+			return nil, fmt.Errorf("error decoding span output ID: %w", err)
+		}
+		if outputIdentifier.Preview == nil || !*outputIdentifier.Preview {
+			return nil, fmt.Errorf("span output is not trace-v2 output")
+		}
+
+		output, err := tr.GetSpanOutput(ctx, outputIdentifier)
 		if err != nil {
-			return fmt.Errorf("error loading span output: %w", err)
+			return nil, fmt.Errorf("error loading span output: %w", err)
 		}
 
 		var data any
 		_ = json.Unmarshal(output.Data, &data)
 
 		memoizedStep := state.MemoizedStep{
-			ID:   stepID,
+			ID:   step.id,
 			Data: map[string]any{"data": data},
 		}
 		if output.IsError {
@@ -124,7 +86,9 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 
 	newState.Steps = steps
 
-	if req.FromStep != nil && req.FromStep.Input != nil {
+	if req.FromStep.Input != nil {
+		//
+		// Rerun from step can alter input for FromStep, so keep it out of completed step output.
 		newState.StepInputs = []state.MemoizedStep{
 			{
 				ID:   req.FromStep.StepID,
@@ -133,5 +97,132 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 		}
 	}
 
+	return result, nil
+}
+
+type reconstructStepsResult []reconstructStep
+
+type reconstructStep struct {
+	id         string
+	at         time.Time
+	attempt    int
+	isFromStep bool
+	stepOp     *enums.Opcode
+	stepSpan   *cqrs.OtelSpan
+}
+
+func reconstructSteps(root *cqrs.OtelSpan, fromStepID string) (reconstructStepsResult, bool) {
+	stepsByID := map[string]reconstructStep{}
+	foundStepToRunFrom := false
+
+	walkOtelSpans(root, func(span *cqrs.OtelSpan) {
+		if span == nil || span.Attributes == nil {
+			return
+		}
+
+		if span.Name != meta.SpanNameStep {
+			return
+		}
+
+		if span.Attributes.StepID == nil || *span.Attributes.StepID == "" {
+			return
+		}
+
+		stepID := *span.Attributes.StepID
+		if stepID == fromStepID {
+			foundStepToRunFrom = true
+		}
+
+		next := reconstructStep{
+			id:         stepID,
+			at:         span.StartTime,
+			attempt:    reconstructStepAttempt(span),
+			isFromStep: stepID == fromStepID,
+			stepOp:     span.Attributes.StepOp,
+			stepSpan:   span,
+		}
+
+		//
+		// Retries can produce more than one span for a step ID; use the latest attempt.
+		if current, ok := stepsByID[stepID]; !ok || reconstructStepPreferred(current, next) {
+			stepsByID[stepID] = next
+		}
+	})
+
+	steps := make([]reconstructStep, 0, len(stepsByID))
+	for _, step := range stepsByID {
+		steps = append(steps, step)
+	}
+
+	sort.SliceStable(steps, func(i, j int) bool {
+		return reconstructStepLess(steps[i], steps[j])
+	})
+
+	return steps, foundStepToRunFrom
+}
+
+func (r reconstructStepsResult) fromStepOp() *enums.Opcode {
+	for _, step := range r {
+		if step.isFromStep {
+			return step.stepOp
+		}
+	}
 	return nil
+}
+
+func reconstructStepPreferred(current, next reconstructStep) bool {
+	if current.attempt != next.attempt {
+		return current.attempt < next.attempt
+	}
+
+	return reconstructStepLess(current, next)
+}
+
+func reconstructStepLess(a, b reconstructStep) bool {
+	if !a.at.Equal(b.at) {
+		return a.at.Before(b.at)
+	}
+
+	if a.attempt != b.attempt {
+		return a.attempt < b.attempt
+	}
+
+	if a.stepSpan.GetSpanID() != b.stepSpan.GetSpanID() {
+		return a.stepSpan.GetSpanID() < b.stepSpan.GetSpanID()
+	}
+
+	return a.id < b.id
+}
+
+func reconstructStepAttempt(span *cqrs.OtelSpan) int {
+	if span.Attributes.StepAttempt == nil {
+		return 0
+	}
+
+	return *span.Attributes.StepAttempt
+}
+
+func walkOtelSpans(span *cqrs.OtelSpan, fn func(*cqrs.OtelSpan)) {
+	if span == nil {
+		return
+	}
+
+	fn(span)
+	for _, child := range span.Children {
+		walkOtelSpans(child, fn)
+	}
+}
+
+func isNoOutputStep(span *cqrs.OtelSpan) bool {
+	if span == nil || span.Attributes == nil || span.Attributes.StepOp == nil {
+		return false
+	}
+
+	if *span.Attributes.StepOp == enums.OpcodeSleep {
+		return true
+	}
+
+	return span.Attributes.StepWaitExpired != nil &&
+		*span.Attributes.StepWaitExpired &&
+		(*span.Attributes.StepOp == enums.OpcodeWaitForEvent || *span.Attributes.StepOp == enums.OpcodeWaitForSignal)
 }

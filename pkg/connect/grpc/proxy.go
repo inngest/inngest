@@ -149,7 +149,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		"app_id", opts.Data.AppId,
 	)
 
-	traceCtx, span := i.tracer.NewSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID, opts.FunctionID)
+	traceCtx, span := i.tracer.NewUserSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID, opts.FunctionID)
 	span.SetAttributes(attribute.Bool("inngest.system", true))
 	defer span.End()
 

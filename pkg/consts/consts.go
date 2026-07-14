@@ -50,6 +50,19 @@ const (
 	// MaxRunMetadataSize is the maximum cumulative metadata size per function run in bytes (1 MB).
 	MaxRunMetadataSize = 1024 * 1024
 
+	// MaxUserlandTraceBodySize bounds the /v1/traces/userland request body. The
+	// cap gate runs only after the body is read and parsed (it needs the parsed
+	// spans to meter ingress bytes), so without this an over-cap or abusive
+	// account would force unbounded read+parse on every request before the 429 —
+	// the amplification the old pre-read cap gate prevented. Generous enough for
+	// a full OTLP userland span batch; well below anything that would pressure
+	// the API.
+	MaxUserlandTraceBodySize = 8 * 1024 * 1024 // 8MB
+
+	// MaxConcurrentRejectedTraceRecorders caps the background goroutine pool that
+	// runs the over-cap /v1/traces/userland ExtendedTraceRejectedRecorder.
+	MaxConcurrentRejectedTraceRecorders = 1000
+
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
 	MaxRetries = 20
@@ -109,6 +122,18 @@ const (
 
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000
+
+	// MaxEventSessions is the maximum number of sessions on a single event.
+	MaxEventSessions = 5
+	// MaxRunSessions is the maximum number of sessions on a single run. A run
+	// aggregates the sessions of every event that triggered it (eg. when
+	// batching), so its bound is larger than MaxEventSessions. It keeps the
+	// run's session label a small fraction of the span metadata budget.
+	MaxRunSessions = 25
+	// MaxEventSessionKeyLength is the maximum number of bytes in a session key.
+	MaxEventSessionKeyLength = 128
+	// MaxEventSessionIDLength is the maximum number of bytes in a session ID.
+	MaxEventSessionIDLength = 512
 
 	InngestEventDataPrefix = "_inngest"
 	// InvokeSlugKey is the data key used to store the fn name when invoking a function

@@ -39,13 +39,20 @@ const getKindLabel = (kind: SpanMetadataKind): string => {
   return `User Metadata (${kindName})`;
 };
 
-const MetadataAttrRow = ({
-  kind,
-  scope,
-  values,
-  updatedAt,
-  isLast,
-}: SpanMetadata & { isLast: boolean }) => {
+// Row props are intentionally decoupled from the SpanMetadata discriminated
+// union: the row renders values generically via Object.entries and never relies
+// on the kind/values correlation. Indexing the union keeps it permissive enough
+// to accept any arm's values (including generated interface types like
+// AIMetadata, which lack an implicit index signature).
+type MetadataAttrRowProps = {
+  kind: SpanMetadataKind;
+  scope: SpanMetadata['scope'];
+  values: SpanMetadata['values'];
+  updatedAt: string;
+  isLast: boolean;
+};
+
+const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAttrRowProps) => {
   const sortedEntries = useMemo(
     () =>
       Object.entries(values ?? {}).sort(([a], [b]) => {
@@ -77,7 +84,7 @@ const MetadataAttrRow = ({
           isLast ? '' : 'border-muted border-b pb-4'
         } mt-2 flex max-h-full flex-col gap-2 overflow-hidden`}
       >
-        <div className="text-muted bg-canvasSubtle sticky top-0 flex flex-row px-4 py-2 text-sm font-medium leading-tight">
+        <div className="text-muted bg-canvasSubtle sticky top-0 flex flex-row px-4 py-2 text-xs font-medium leading-tight">
           <div className="w-48">Key</div>
           <div className="">Value</div>
         </div>

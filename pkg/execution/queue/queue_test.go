@@ -14,6 +14,26 @@ type retryableError struct {
 	retry bool
 }
 
+func TestPartitionBacklogSizeConcurrencyOption(t *testing.T) {
+	t.Run("default", func(t *testing.T) {
+		opts := NewQueueOptions()
+		require.Equal(t, defaultPartitionBacklogSizeConcurrency, opts.PartitionBacklogSizeConcurrency())
+	})
+
+	t.Run("custom", func(t *testing.T) {
+		opts := NewQueueOptions(WithPartitionBacklogSizeConcurrency(7))
+		require.Equal(t, int64(7), opts.PartitionBacklogSizeConcurrency())
+	})
+
+	t.Run("invalid falls back to default", func(t *testing.T) {
+		opts := NewQueueOptions(WithPartitionBacklogSizeConcurrency(0))
+		require.Equal(t, defaultPartitionBacklogSizeConcurrency, opts.PartitionBacklogSizeConcurrency())
+
+		opts = NewQueueOptions(WithPartitionBacklogSizeConcurrency(-1))
+		require.Equal(t, defaultPartitionBacklogSizeConcurrency, opts.PartitionBacklogSizeConcurrency())
+	})
+}
+
 func (r retryableError) Retryable() bool {
 	return r.retry
 }

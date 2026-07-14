@@ -361,3 +361,80 @@ func TestOpcodeGroups_IDs_ExcludesLazyOps(t *testing.T) {
 		})
 	}
 }
+
+func TestComputeParallelCoalesceKey(t *testing.T) {
+	t.Run("deterministic", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"step-a", "step-b"})
+		b := computeParallelCoalesceKey("run-1", []string{"step-a", "step-b"})
+		require.Equal(t, a, b)
+	})
+
+	t.Run("order independent", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"step-a", "step-b"})
+		b := computeParallelCoalesceKey("run-1", []string{"step-b", "step-a"})
+		require.Equal(t, a, b)
+	})
+
+	t.Run("different step sets produce different keys", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"step-a", "step-b"})
+		b := computeParallelCoalesceKey("run-1", []string{"step-a", "step-c"})
+		require.NotEqual(t, a, b)
+	})
+
+	t.Run("different run IDs produce different keys", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"step-a"})
+		b := computeParallelCoalesceKey("run-2", []string{"step-a"})
+		require.NotEqual(t, a, b)
+	})
+
+	t.Run("no length extension collision", func(t *testing.T) {
+		a := computeParallelCoalesceKey("run-1", []string{"ab", "c"})
+		b := computeParallelCoalesceKey("run-1", []string{"a", "bc"})
+		require.NotEqual(t, a, b)
+	})
+}
+
+func TestAllEmptyNoneOps(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []*state.GeneratorOpcode
+		want bool
+	}{
+		{
+			name: "all zero-value none ops",
+			in:   []*state.GeneratorOpcode{{}, {}},
+			want: true,
+		},
+		{
+			name: "explicit none ops with empty ids",
+			in:   []*state.GeneratorOpcode{{Op: enums.OpcodeNone}, {Op: enums.OpcodeNone}},
+			want: true,
+		},
+		{
+			name: "nil entries are ignored",
+			in:   []*state.GeneratorOpcode{nil, {Op: enums.OpcodeNone}},
+			want: true,
+		},
+		{
+			name: "none op with a step id is not corruption",
+			in:   []*state.GeneratorOpcode{{Op: enums.OpcodeNone, ID: "step-1"}},
+			want: false,
+		},
+		{
+			name: "real step op",
+			in:   []*state.GeneratorOpcode{{Op: enums.OpcodeStepRun, ID: "step-1"}},
+			want: false,
+		},
+		{
+			name: "mixed none and real op",
+			in:   []*state.GeneratorOpcode{{Op: enums.OpcodeNone}, {Op: enums.OpcodeStepRun, ID: "step-1"}},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, allEmptyNoneOps(tc.in))
+		})
+	}
+}

@@ -36,6 +36,8 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Apps"         description: "Sync and manage" }
   tags: { name: "Functions"    description: "Invoke and manage functions" }
   tags: { name: "Runs"         description: "Inspect function runs" }
+  tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
+  tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
 };
 
@@ -1049,6 +1051,61 @@ service V2 {
     };
   }
 
+  rpc GetEventRuns(GetEventRunsRequest) returns (GetEventRunsResponse) {
+    option (google.api.http) = {
+      get: "/events/{event_id}/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get event runs"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Lists function runs triggered by a specific event"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc Rerun(RerunRequest) returns (RerunResponse) {
+    option (google.api.http) = {
+      post: "/runs/{run_id}/rerun"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Rerun function run"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Creates a new run using the original run's triggering event data"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetApp(GetAppRequest) returns (GetAppResponse) {
+    option (google.api.http) = {
+      get: "/apps/{app_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get app"
+      tags: "Apps"
+      tags: "Beta"
+      description: "Fetches details for a single app, including sync metadata and function count"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc SyncApp(SyncAppRequest) returns (SyncAppResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/syncs",
@@ -1154,6 +1211,42 @@ service V2 {
       tags: "Runs"
       tags: "Beta"
       description: "Fetches the trace tree for a single function run"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetFunction(GetFunctionRequest) returns (GetFunctionResponse) {
+    option (google.api.http) = {
+      get: "/apps/{app_id}/functions/{function_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get function"
+      description: "Fetches function configuration and status details for a function within an app"
+      tags: "Functions"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetFunctions(GetFunctionsRequest) returns (GetFunctionsResponse) {
+    option (google.api.http) = {
+      get: "/apps/{app_id}/functions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get functions"
+      description: "Lists function configuration and status details for an app"
+      tags: "Functions"
+      tags: "Beta"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -1310,6 +1403,7 @@ service V2 {
       summary: "List insights tables"
       tags: "Insights"
       tags: "Beta"
+      tags: "Internal"
       description: "Lists the available tables that can be queried via the Insights query endpoint."
       security: {
         security_requirement: {
@@ -1372,6 +1466,7 @@ service V2 {
       summary: "List event type schemas"
       tags: "Insights"
       tags: "Beta"
+      tags: "Internal"
       description: "Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON."
       security: {
         security_requirement: {
@@ -1446,6 +1541,7 @@ service V2 {
       summary: "Generate insights query from prompt"
       tags: "Insights"
       tags: "Beta"
+      tags: "Internal"
       description: "Translates a natural language prompt into an Insights SQL query."
       security: {
         security_requirement: {
@@ -1531,6 +1627,7 @@ service V2 {
       summary: "Query insights"
       tags: "Insights"
       tags: "Beta"
+      tags: "Internal"
       description: "Query Insights using the provided SQL query."
       security: {
         security_requirement: {
@@ -1617,6 +1714,99 @@ service V2 {
       }
     };
   }
+
+  rpc ListExperiments(ListExperimentsRequest) returns (ListExperimentsResponse) {
+    option (google.api.http) = {
+      get: "/experiments"
+      additional_bindings: {
+        get: "/apps/{app_id}/functions/{function_id}/experiments"
+      }
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List experiments"
+      tags: "Experiments"
+      tags: "Beta"
+      description: "Lists observed experiments in the authenticated environment."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetExperiment(GetExperimentRequest) returns (GetExperimentResponse) {
+    option (google.api.http) = {
+      get: "/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get experiment aggregates"
+      tags: "Experiments"
+      tags: "Beta"
+      description: "Fetches variant run counts and score aggregates for one experiment on one function."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSessionKeys(ListSessionKeysRequest) returns (ListSessionKeysResponse) {
+    option (google.api.http) = {
+      get: "/sessions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List session keys"
+      tags: "Sessions"
+      tags: "Beta"
+      description: "Lists session keys observed in the authenticated environment."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+    option (google.api.http) = {
+      get: "/sessions/{session_key}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List sessions"
+      tags: "Sessions"
+      tags: "Beta"
+      description: "Lists session IDs for one session key in the authenticated environment."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSessionRuns(ListSessionRunsRequest) returns (ListSessionRunsResponse) {
+    option (google.api.http) = {
+      get: "/sessions/{session_key}/{session_id=**}/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List session runs"
+      tags: "Sessions"
+      tags: "Beta"
+      description: "Lists runs associated with one session ID in the authenticated environment."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -1648,6 +1838,12 @@ message ErrorResponse {
 message ResponseMetadata {
   google.protobuf.Timestamp fetched_at = 1;
   google.protobuf.Timestamp cached_until = 2;
+  TimeRange time_range = 3;
+}
+
+message TimeRange {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp until = 2;
 }
 
 enum FunctionRunStatus {
@@ -1683,10 +1879,122 @@ enum TraceStepOp {
 message FunctionRef {
   string id = 1;
   string name = 2;
+  AppRef app = 3;
 }
 
 message AppRef {
   string id = 1;
+}
+
+enum FunctionTriggerType {
+  FUNCTION_TRIGGER_TYPE_UNSPECIFIED = 0;
+  FUNCTION_TRIGGER_TYPE_EVENT = 1;
+  FUNCTION_TRIGGER_TYPE_CRON = 2;
+}
+
+enum FunctionConcurrencyScope {
+  FUNCTION_CONCURRENCY_SCOPE_UNSPECIFIED = 0;
+  FUNCTION_CONCURRENCY_SCOPE_ACCOUNT = 1;
+  FUNCTION_CONCURRENCY_SCOPE_ENVIRONMENT = 2;
+  FUNCTION_CONCURRENCY_SCOPE_FUNCTION = 3;
+}
+
+enum FunctionSingletonMode {
+  FUNCTION_SINGLETON_MODE_UNSPECIFIED = 0;
+  FUNCTION_SINGLETON_MODE_SKIP = 1;
+  FUNCTION_SINGLETON_MODE_CANCEL = 2;
+}
+
+message FunctionApp {
+  string id = 1;
+  reserved 2, 3, 4;
+  reserved "external_id", "name", "latest_sync";
+}
+
+message FunctionTrigger {
+  FunctionTriggerType type = 1;
+  string value = 2;
+  optional string if = 3;
+}
+
+message FunctionFailureHandler {
+  string slug = 1;
+  string name = 2;
+}
+
+message FunctionCancellationConfiguration {
+  string event = 1;
+  optional string timeout = 2;
+  optional string condition = 3;
+}
+
+message FunctionRetryConfiguration {
+  int32 value = 1;
+  optional bool is_default = 2;
+}
+
+message FunctionEventsBatchConfiguration {
+  int32 max_size = 1;
+  string timeout = 2;
+  optional string key = 3;
+}
+
+message FunctionConcurrencyLimitConfiguration {
+  int32 value = 1;
+  optional bool is_plan_limit = 2;
+}
+
+message FunctionConcurrencyConfiguration {
+  FunctionConcurrencyScope scope = 1;
+  FunctionConcurrencyLimitConfiguration limit = 2;
+  optional string key = 3;
+}
+
+message FunctionRateLimitConfiguration {
+  int32 limit = 1;
+  string period = 2;
+  optional string key = 3;
+}
+
+message FunctionDebounceConfiguration {
+  string period = 1;
+  optional string key = 2;
+}
+
+message FunctionThrottleConfiguration {
+  int32 burst = 1;
+  optional string key = 2;
+  int32 limit = 3;
+  string period = 4;
+}
+
+message FunctionSingletonConfiguration {
+  FunctionSingletonMode mode = 1;
+  optional string key = 2;
+}
+
+message FunctionConfiguration {
+  repeated FunctionCancellationConfiguration cancellations = 1;
+  FunctionRetryConfiguration retries = 2;
+  optional string priority = 3;
+  optional FunctionEventsBatchConfiguration events_batch = 4;
+  repeated FunctionConcurrencyConfiguration concurrency = 5;
+  optional FunctionRateLimitConfiguration rate_limit = 6;
+  optional FunctionDebounceConfiguration debounce = 7;
+  optional FunctionThrottleConfiguration throttle = 8;
+  optional FunctionSingletonConfiguration singleton = 9;
+}
+
+message Function {
+  string id = 1;
+  string name = 2;
+  string slug = 3;
+  bool is_paused = 4;
+  bool is_archived = 5;
+  FunctionApp app = 6;
+  repeated FunctionTrigger triggers = 7;
+  optional FunctionFailureHandler failure_handler = 8;
+  FunctionConfiguration configuration = 9;
 }
 
 message RunTrigger {
@@ -1718,6 +2026,62 @@ message GetFunctionRunRequest {
 message GetFunctionRunResponse {
   FunctionRun data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message GetEventRunsRequest {
+  string event_id = 1;
+  optional bool include_output = 2;
+  optional string cursor = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of runs to return per page (min: 1, max: 40)"
+      default: "20"
+    }
+  ];
+}
+
+message GetEventRunsResponse {
+  repeated FunctionRun data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message RerunRequest {
+  string run_id = 1;
+  optional RerunFromStep from_step = 2;
+}
+
+message RerunFromStep {
+  string step_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Step ID to rerun from"
+      example: "\"step-1\""
+    }
+  ];
+  optional google.protobuf.ListValue input = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional replacement step input as a JSON array"
+      example: "[{\"foo\": \"bar\"}]"
+    }
+  ];
+}
+
+message RerunResponse {
+  RerunData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message RerunData {
+  string run_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "New run ID created by the rerun"
+      example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
+    }
+  ];
 }
 
 message TraceSpanMetadata {
@@ -1756,6 +2120,161 @@ message GetFunctionTraceRequest {
 message GetFunctionTraceResponse {
   FunctionTrace data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message GetFunctionRequest {
+  string app_id = 1;
+  string function_id = 2;
+}
+
+message GetFunctionResponse {
+  Function data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+enum AppMethod {
+  APP_METHOD_UNSPECIFIED = 0;
+  APP_METHOD_SERVE = 1;
+  APP_METHOD_CONNECT = 2;
+  APP_METHOD_API = 3;
+}
+
+message App {
+  reserved 5, 6, 7, 8, 13;
+  reserved "sdk_language", "sdk_version", "framework", "url", "error";
+
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The user-defined app ID"
+      example: "\"my-app\""
+    }
+  ];
+  string name = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "App name"
+      example: "\"my-app\""
+    }
+  ];
+  AppMethod method = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "How the app communicates with Inngest"
+    }
+  ];
+  optional string app_version = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "User-defined app version, if set"
+    }
+  ];
+  google.protobuf.Timestamp created_at = 9 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp when the app was first synced"
+    }
+  ];
+  bool is_archived = 10 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether the app is archived"
+    }
+  ];
+  optional google.protobuf.Timestamp archived_at = 11 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp when the app was archived (if archived)"
+    }
+  ];
+  int32 function_count = 12 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of functions in the app"
+    }
+  ];
+  optional AppSync latest_sync = 14 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Latest sync metadata for the app, if available"
+    }
+  ];
+}
+
+message AppSync {
+  reserved 2, 3, 10;
+  reserved "started_at", "completed_at", "function_count";
+
+  optional string status = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Status of the latest sync"
+    }
+  ];
+  optional google.protobuf.Timestamp synced_at = 11 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Timestamp for the latest sync, if available"
+    }
+  ];
+  optional string sdk_language = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Language of the SDK that synced the app"
+      example: "\"typescript\""
+    }
+  ];
+  optional string sdk_version = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Version of the SDK that synced the app"
+      example: "\"3.22.0\""
+    }
+  ];
+  optional string framework = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Framework used by the app, if reported by the SDK"
+      example: "\"nextjs\""
+    }
+  ];
+  optional string url = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "URL of the Inngest endpoint in the app, if synced via URL"
+      example: "\"https://example.com/api/inngest\""
+    }
+  ];
+  optional string error = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Most recent sync or connectivity error for the app, if any"
+    }
+  ];
+  optional string app_version = 9 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "App version reported by the latest sync, if set"
+    }
+  ];
+}
+
+message GetAppRequest {
+  string app_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "The user-defined app ID"
+      example: "\"my-app\""
+    }
+  ];
+}
+
+message GetAppResponse {
+  App data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message GetFunctionsRequest {
+  string app_id = 1;
+  optional string cursor = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of functions to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message GetFunctionsResponse {
+  repeated Function data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
 }
 
 message CreateAccountRequest {
@@ -2392,4 +2911,177 @@ message InsightsEventSchema {
       description: "JSON Schema describing the shape of this event's data, represented as a nested JSON object"
     }
   ];
+}
+
+message ListExperimentsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of experiments to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+  string app_id = 3;
+  string function_id = 4;
+  optional google.protobuf.Timestamp from = 5;
+  optional google.protobuf.Timestamp until = 6;
+}
+
+message ListExperimentsResponse {
+  repeated Experiment data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message Experiment {
+  string id = 1;
+  FunctionRef function = 2;
+  string selection_strategy = 3;
+  repeated string variants = 4;
+  int32 variant_count = 5;
+  int32 total_runs = 6;
+  google.protobuf.Timestamp first_seen = 7;
+  google.protobuf.Timestamp last_seen = 8;
+}
+
+message GetExperimentRequest {
+  string function_id = 1;
+  string experiment_id = 2;
+  optional string variant = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional variant name to restrict the aggregate response."
+    }
+  ];
+  string app_id = 4;
+  optional google.protobuf.Timestamp from = 5;
+  optional google.protobuf.Timestamp until = 6;
+}
+
+message GetExperimentResponse {
+  ExperimentDetail data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message ExperimentDetail {
+  string id = 1;
+  repeated ExperimentVariantMetrics variants = 2;
+  repeated ExperimentVariantWeight variant_weights = 3;
+  google.protobuf.Timestamp first_seen = 4;
+  google.protobuf.Timestamp last_seen = 5;
+  string selection_strategy = 6;
+}
+
+message ExperimentVariantMetrics {
+  string variant_name = 1;
+  int32 run_count = 2;
+  repeated ExperimentVariantMetric metrics = 3;
+}
+
+message ExperimentVariantMetric {
+  string key = 1;
+  double avg = 2;
+  double min = 3;
+  double max = 4;
+}
+
+message ExperimentVariantWeight {
+  string variant_name = 1;
+  double weight = 2;
+}
+
+message ListSessionKeysRequest {
+  optional string search = 1;
+  optional string cursor = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of sessions to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+}
+
+message ListSessionKeysResponse {
+  repeated SessionKey data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message SessionKey {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+}
+
+message ListSessionsRequest {
+  string session_key = 1;
+  optional string search = 2;
+  optional string cursor = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of sessions to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+  optional google.protobuf.Timestamp from = 5;
+  optional google.protobuf.Timestamp until = 6;
+}
+
+message ListSessionsResponse {
+  repeated SessionGroup data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message SessionGroup {
+  string id = 1;
+  int32 run_count = 2;
+  int32 failed_run_count = 3;
+  double failure_rate = 4;
+  google.protobuf.Timestamp last_active_at = 5;
+  repeated FunctionRef functions = 6;
+}
+
+message ListSessionRunsRequest {
+  string session_key = 1;
+  string session_id = 2;
+  optional string cursor = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of session runs to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+  optional google.protobuf.Timestamp from = 5;
+  optional google.protobuf.Timestamp until = 6;
+}
+
+message ListSessionRunsResponse {
+  repeated SessionRun data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message SessionRun {
+  string id = 1;
+  FunctionRef function = 2;
+  optional string event_name = 3;
+  FunctionRunStatus status = 4;
+  google.protobuf.Timestamp queued_at = 5;
+  optional google.protobuf.Timestamp started_at = 6;
+  optional google.protobuf.Timestamp ended_at = 7;
 }

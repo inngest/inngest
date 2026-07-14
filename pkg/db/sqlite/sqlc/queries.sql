@@ -109,6 +109,17 @@ SELECT * FROM functions WHERE app_id = ? AND archived_at IS NULL;
 -- name: GetAppFunctionsBySlug :many
 SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.archived_at IS NULL;
 
+-- name: GetFunctionsByApp :many
+SELECT functions.* FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE (@app_id = '00000000-0000-0000-0000-000000000000' OR functions.app_id = @app_id)
+  AND (@app_name = '' OR apps.name = @app_name)
+  AND (@cursor = '00000000-0000-0000-0000-000000000000' OR functions.id > @cursor)
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL
+ORDER BY functions.id ASC
+LIMIT CASE WHEN @limit_rows > 0 THEN @limit_rows ELSE -1 END;
+
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
 
@@ -172,6 +183,80 @@ LIMIT ?;
 SELECT sqlc.embed(function_runs), sqlc.embed(function_finishes) FROM function_runs
 LEFT JOIN function_finishes ON function_finishes.run_id = function_runs.run_id
 WHERE function_runs.event_id IN (sqlc.slice('event_ids'));
+
+-- name: GetRuns :many
+-- Mirrors the span-runs grouping the GraphQL runs list uses (GetSpanRuns): a
+-- run is its executor.run root row plus extension rows sharing the root's
+-- dynamic_span_id, and the latest row in that group carries the run's current
+-- status. Child/step spans never decide run status.
+WITH run_roots AS (
+  SELECT
+    spans.run_id,
+    spans.dynamic_span_id,
+    spans.function_id,
+    spans.app_id,
+    spans.start_time AS root_start_time,
+    spans.end_time AS root_end_time,
+    CAST(spans.output AS TEXT) AS root_output,
+    COALESCE(spans.attributes->>'$."_inngest.function.slug"', '') AS function_slug,
+    COALESCE(spans.attributes->>'$."_inngest.function.name"', '') AS function_name,
+    COALESCE(apps.name, '') AS app_name,
+    COALESCE(spans.attributes->>'$."_inngest.batch.id"', '') AS batch_id,
+    COALESCE(spans.attributes->>'$."_inngest.cron.schedule"', '') AS cron_schedule
+  FROM spans
+  LEFT JOIN apps ON apps.id = spans.app_id AND apps.archived_at IS NULL
+  WHERE spans.name = @name
+    AND spans.debug_run_id IS NULL
+    AND spans.run_id > @cursor_run_id
+    AND INSTR(CAST(spans.event_ids AS TEXT), @event_id) > 0
+  ORDER BY spans.run_id
+  LIMIT @limit_rows
+)
+SELECT
+  run_roots.run_id,
+  run_roots.function_id,
+  run_roots.app_id,
+  CAST(COALESCE((
+    SELECT MIN(group_spans.start_time)
+    FROM spans group_spans
+    WHERE group_spans.run_id = run_roots.run_id
+      AND group_spans.dynamic_span_id = run_roots.dynamic_span_id
+      AND group_spans.debug_run_id IS NULL
+  ), run_roots.root_start_time) AS TEXT) AS start_time,
+  CAST(COALESCE((
+    SELECT MAX(group_spans.end_time)
+    FROM spans group_spans
+    WHERE group_spans.run_id = run_roots.run_id
+      AND group_spans.dynamic_span_id = run_roots.dynamic_span_id
+      AND group_spans.debug_run_id IS NULL
+  ), run_roots.root_end_time) AS TEXT) AS end_time,
+  CAST(COALESCE((
+    SELECT status_spans.status
+    FROM spans status_spans
+    WHERE status_spans.run_id = run_roots.run_id
+      AND status_spans.dynamic_span_id = run_roots.dynamic_span_id
+      AND status_spans.debug_run_id IS NULL
+    ORDER BY status_spans.end_time DESC
+    LIMIT 1
+  ), '') AS TEXT) AS status,
+  COALESCE((
+    SELECT CAST(output_lookup.output AS TEXT)
+    FROM spans output_lookup
+    WHERE output_lookup.run_id = run_roots.run_id
+      AND output_lookup.output IS NOT NULL
+      AND output_lookup.debug_run_id IS NULL
+    ORDER BY
+      CASE WHEN COALESCE(CAST(output_lookup.attributes->>'$."_inngest.is.function.output"' AS TEXT), '') IN ('true', '1') THEN 0 ELSE 1 END,
+      output_lookup.end_time DESC
+    LIMIT 1
+  ), run_roots.root_output, '') AS output,
+  run_roots.function_slug,
+  run_roots.function_name,
+  run_roots.app_name,
+  run_roots.batch_id,
+  run_roots.cron_schedule
+FROM run_roots
+ORDER BY run_roots.run_id;
 
 -- name: GetFunctionRunFinishesByRunIDs :many
 SELECT * FROM function_finishes WHERE run_id IN (sqlc.slice('run_ids'));
@@ -279,7 +364,13 @@ DO UPDATE SET
     has_ai = CASE
                  WHEN trace_runs.has_ai = 1 THEN 1
                  ELSE excluded.has_ai
-             END;
+             END
+-- Terminal status codes (matches enums.runStatusCode in pkg/enums/run_status.go):
+--   50=Overflowed, 300=Completed, 400=Failed, 500=Cancelled, 600=Skipped.
+WHERE NOT (
+    trace_runs.status IN (50, 300, 400, 500, 600)
+    AND excluded.status NOT IN (50, 300, 400, 500, 600)
+);
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;
@@ -434,6 +525,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -456,6 +549,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -478,6 +573,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -494,7 +591,7 @@ SELECT
   COALESCE(CAST(input AS TEXT), '') AS input,
   COALESCE(CAST(output AS TEXT), '') AS output
 FROM spans
-WHERE span_id IN (sqlc.slice('ids'))
+WHERE run_id = sqlc.arg(run_id) AND span_id IN (sqlc.slice('ids'))
 LIMIT 2;
 
 -- name: GetRunSpanByRunID :one
@@ -507,6 +604,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -530,6 +629,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -562,6 +663,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -588,6 +691,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -616,6 +721,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -642,6 +749,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -669,6 +778,8 @@ SELECT
   s.parent_span_id,
   json_group_array(json_object(
     'span_id', s.span_id,
+    'start_time', s.start_time,
+    'end_time', s.end_time,
     'name', s.name,
     'attributes', s.attributes,
     'links', s.links,

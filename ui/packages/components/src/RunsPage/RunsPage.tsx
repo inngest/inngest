@@ -22,7 +22,6 @@ import useLocalStorage from 'react-use/lib/useLocalStorage';
 import CodeSearch from '../CodeSearch/CodeSearch';
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import { RunDetailsV4 } from '../RunDetailsV4';
 import {
   useBatchedSearchParams,
@@ -42,8 +41,8 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'tracesPreview' | 'runDetailsV4' | 'isDeferred'>;
-  getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
+  features: Pick<Features, 'history' | 'tracesPreview' | 'isDeferred'>;
+  getTrigger: React.ComponentProps<typeof RunDetailsV4>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
@@ -247,28 +246,17 @@ export function RunsPage({
     (rowData: Run) => {
       return (
         <div className={`border-subtle `}>
-          {features.runDetailsV4 ? (
-            <RunDetailsV4
-              initialRunData={rowData}
-              getTrigger={getTrigger}
-              pollInterval={pollInterval}
-              runID={rowData.id}
-              standalone={false}
-            />
-          ) : (
-            <RunDetailsV3
-              initialRunData={rowData}
-              getTrigger={getTrigger}
-              pollInterval={pollInterval}
-              runID={rowData.id}
-              standalone={false}
-              newStack={true}
-            />
-          )}
+          <RunDetailsV4
+            initialRunData={rowData}
+            getTrigger={getTrigger}
+            pollInterval={pollInterval}
+            runID={rowData.id}
+            standalone={false}
+          />
         </div>
       );
     },
-    [getTrigger, pollInterval, features.tracesPreview, features.runDetailsV4]
+    [getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {

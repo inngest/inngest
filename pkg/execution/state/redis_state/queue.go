@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -192,8 +193,7 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 		shadowPartition = osqueue.ItemShadowPartition(ctx, i)
 	}
 
-	partitionID := defaultPartition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.EnqueueItem", osqueue.TraceScopeFromQueueItem(i, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -288,7 +288,14 @@ func (q *queue) EnqueueItem(ctx context.Context, i osqueue.QueueItem, at time.Ti
 	case 0:
 		return i, nil
 	case 1:
-		return i, osqueue.ErrQueueItemExists
+		var runID *ulid.ULID
+		if existing, loadErr := q.LoadQueueItem(ctx, i.ID); loadErr == nil {
+			id := existing.Data.Identifier.RunID
+			runID = &id
+		} else if loadErr != osqueue.ErrQueueItemNotFound {
+			return i, loadErr
+		}
+		return i, osqueue.QueueItemExists(i.ID, runID)
 	case 2:
 		return i, osqueue.ErrQueueItemSingletonExists
 	default:
@@ -365,6 +372,7 @@ func (q *queue) RemoveQueueItem(ctx context.Context, scope osqueue.Scope, partit
 	keys := []string{
 		q.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, partitionID, ""),
 		q.RedisClient.kg.QueueItem(),
+		q.RedisClient.kg.QueueItemEarliestPeekTime(itemID),
 	}
 
 	// If partitionID is a valid function UUID, append status index keys so the
@@ -420,6 +428,42 @@ func (q *queue) LoadQueueItem(ctx context.Context, itemID string) (*osqueue.Queu
 	qi.Data.JobID = &qi.ID
 
 	return qi, nil
+}
+
+func (q *queue) SetEarliestPeekTime(ctx context.Context, item osqueue.QueueItem, at time.Time) (time.Time, error) {
+	if item.ID == "" {
+		return time.Time{}, fmt.Errorf("cannot set earliest peek time for queue item with empty ID")
+	}
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetEarliestPeekTime"), redis_telemetry.ScopeQueue)
+
+	at = time.UnixMilli(at.UnixMilli())
+	client := q.RedisClient.Client()
+	key := q.RedisClient.kg.QueueItemEarliestPeekTime(item.ID)
+	value := strconv.FormatInt(at.UnixMilli(), 10)
+
+	prev, err := client.Do(ctx, client.B().
+		Set().
+		Key(key).
+		Value(value).
+		Nx().
+		Get().
+		Ex(osqueue.QueueItemEarliestPeekTimeTTL).
+		Build(),
+	).ToString()
+	if err == rueidis.Nil {
+		return at, nil
+	}
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not set earliest peek time: %w", err)
+	}
+
+	ms, err := strconv.ParseInt(prev, 10, 64)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not parse earliest peek time %q: %w", prev, err)
+	}
+
+	return time.UnixMilli(ms), nil
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
@@ -767,6 +811,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 		q.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
 		partitionZsetKey(fnPartition, q.RedisClient.kg),
+		q.RedisClient.kg.QueueItemEarliestPeekTime(jobID),
 	}
 
 	args, err := StrSlice([]any{
@@ -837,8 +882,7 @@ func (q *queue) Lease(
 		o.Constraints = q.PartitionConstraintConfigGetter(ctx, o.ShadowPartition.Identifier())
 	}
 
-	partitionID := o.ShadowPartition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Lease", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Lease", osqueue.TraceScopeFromQueueItem(item, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", o.ShadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", item.ID))
@@ -867,11 +911,18 @@ func (q *queue) Lease(
 		kg.PartitionScavengerIndex(o.ShadowPartition.PartitionID),
 	}
 
+	setEarliestPeekTime := "0"
+	if q.ItemEarliestPeekTimeConfig(ctx, q.Name(), item).Enabled {
+		setEarliestPeekTime = "1"
+	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		o.ShadowPartition.PartitionID,
 		leaseID.String(),
 		now.UnixMilli(),
+		setEarliestPeekTime,
+		item.EarliestPeekTime,
 	})
 	if err != nil {
 		return nil, err
@@ -972,8 +1023,7 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 
 	partition := osqueue.ItemShadowPartition(ctx, i)
 
-	partitionID := partition.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ExtendLease", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ExtendLease", osqueue.TraceScopeFromQueueItem(i, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", partition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -1047,7 +1097,19 @@ func (q *queue) PartitionLease(
 ) (*ulid.ULID, error) {
 	l := logger.StdlibLogger(ctx)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", p.AccountID, p.Identifier().EnvID, p.Identifier().FunctionID)
+	partitionID := p.Identifier()
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionID.AccountID,
+		EnvID:     partitionID.EnvID,
+		FnID:      partitionID.FunctionID,
+	})
+	if partitionID.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionID.SystemQueueName,
+			QueueShardName: q.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionLease", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.ID))
 
@@ -1199,6 +1261,25 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 	err := q.cleanupEmptyAccount(ctx, accountId)
 	if err != nil {
 		return fmt.Errorf("failed to check for and clean up empty account: %w", err)
+	}
+
+	return nil
+}
+
+// cleanupNilPartitionInGlobal is invoked when we peek a missing partition in the global partitions pointer zset.
+// This ensures a stale global partition pointer does not halt the queue scanner.
+//
+// Safe under concurrent deletes: partitionRequeue.lua atomically ZREMs the pointer before HDEL'ing
+// metadata, so a missing partition here is a stale pointer (migration/legacy), not a transient race.
+func (q *queue) cleanupNilPartitionInGlobal(ctx context.Context, partitionKey string) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "cleanupNilPartitionInGlobal"), redis_telemetry.ScopeQueue)
+
+	l := logger.StdlibLogger(ctx)
+	l.Warn("removing global partitions pointer to missing partition", "partition", partitionKey)
+
+	cmd := q.RedisClient.Client().B().Zrem().Key(q.RedisClient.kg.GlobalPartitionIndex()).Member(partitionKey).Build()
+	if err := q.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
+		return fmt.Errorf("failed to remove nil partition from global partitions pointer queue: %w", err)
 	}
 
 	return nil
@@ -1370,19 +1451,21 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	if len(missingPartitions) > 0 {
-		if accountId == nil {
-			return nil, fmt.Errorf("encountered missing partitions in partition pointer queue %q", partitionKey)
-		}
-
 		eg := errgroup.Group{}
 		for _, partitionId := range missingPartitions {
 			id := partitionId
 			eg.Go(func() error {
+				if accountId == nil {
+					return q.cleanupNilPartitionInGlobal(ctx, id)
+				}
 				return q.cleanupNilPartitionInAccount(ctx, *accountId, id)
 			})
 		}
 
 		if err := eg.Wait(); err != nil {
+			if accountId == nil {
+				return nil, fmt.Errorf("error cleaning up nil partitions in global pointer queue: %w", err)
+			}
 			return nil, fmt.Errorf("error cleaning up nil partitions in account pointer queue: %w", err)
 		}
 	}
@@ -1465,7 +1548,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				// in case the function was unpaused in the last 60s.
 				if !info.Stale {
 					// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
-					err := q.PartitionRequeue(ctx, item, q.Clock.Now().Truncate(time.Second).Add(osqueue.PartitionPausedRequeueExtension), true)
+					err := q.PartitionRequeue(ctx, item, q.Clock.Now().Truncate(time.Second).Add(q.PausedRequeueExtension()), true)
 					if err != nil && !errors.Is(err, osqueue.ErrPartitionGarbageCollected) {
 						l.Error("failed to push back paused partition", "error", err, "partition", item)
 					} else {
@@ -1654,7 +1737,19 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, p *osqueue.QueuePartition, at time.Time, forceAt bool) error {
 	l := logger.StdlibLogger(ctx)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionRequeue", p.AccountID, p.Identifier().EnvID, p.Identifier().FunctionID)
+	partitionID := p.Identifier()
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionID.AccountID,
+		EnvID:     partitionID.EnvID,
+		FnID:      partitionID.FunctionID,
+	})
+	if partitionID.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionID.SystemQueueName,
+			QueueShardName: q.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.partitionRequeue", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", p.ID))
 

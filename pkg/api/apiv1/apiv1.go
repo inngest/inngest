@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -18,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/tracing"
+	"golang.org/x/sync/semaphore"
 )
 
 // Opts represents options for the APIv1 router.
@@ -40,8 +42,6 @@ type Opts struct {
 	Queue queue.Queue
 	// FunctionReader reads functions from a backing store.
 	FunctionReader cqrs.FunctionReader
-	// JobQueueReader reads information around a function run's job queues.
-	JobQueueReader queue.JobQueueReader
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
 	CancellationReadWriter cqrs.CancellationReadWriter
 	// QueueShards exposes the shard topology and selector for the API.
@@ -52,6 +52,19 @@ type Opts struct {
 	TraceReader cqrs.TraceReader
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
 	MetricsMiddleware api.MetricsMiddleware
+
+	// ExtendedTraceCapCheck is consulted after /v1/traces/userland reads and
+	// parses a valid payload, but before it writes spans. Implementations return
+	// a decision, not an immediate rejection: over-cap payloads are parsed so
+	// callers can account for rejected bytes/spans before the handler returns
+	// 429. Nil hook means "always accept" — the right default for self-host,
+	// which has no billing relationship.
+	ExtendedTraceCapCheck ExtendedTraceCapChecker
+	// ExtendedTraceRejectedRecorder is called after an over-cap payload is
+	// successfully parsed, before the handler returns 429. Cloud uses this to
+	// record customer_execution_metrics and Redis overage counters without
+	// writing rejected spans to ClickHouse/Kafka. Nil hook is a no-op.
+	ExtendedTraceRejectedRecorder ExtendedTraceRejectedRecorder
 
 	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
 	AppCreator cqrs.AppCreator
@@ -90,7 +103,10 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 
 	// Create the HTTP implementation, which wraps the handler.  We do ths to code
 	// share and split the HTTP concerns from the actual logic, eg. to share to GQL.
-	impl := &API{opts: o}
+	impl := &API{
+		opts:                     o,
+		rejectedTraceRecorderSem: semaphore.NewWeighted(consts.MaxConcurrentRejectedTraceRecorders),
+	}
 
 	instance := &router{
 		Router: r,
@@ -103,6 +119,11 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 
 type API struct {
 	opts Opts
+
+	// rejectedTraceRecorderSem bounds the goroutine pool that runs the
+	// ExtendedTraceRejectedRecorder, capping concurrent calls. Initialized by
+	// AddRoutes.
+	rejectedTraceRecorderSem *semaphore.Weighted
 }
 
 type router struct {

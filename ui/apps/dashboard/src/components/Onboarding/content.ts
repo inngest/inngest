@@ -40,8 +40,7 @@ export const onboardingWidgetContent: OnboardingWidgetContent = {
     },
   },
   tooltip: {
-    close:
-      "Close this widget. Reopen from the 'Help & Feedback' menu, if needed.",
+    close: 'Close this widget. Reopen from the organisation menu, if needed.',
   },
 };
 

@@ -373,7 +373,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		return ItemLeaseConstraintCheckResult{}, nil
 	}
 
-	ctx, span := q.Options().ConditionalTracer.NewSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
+	ctx, span := q.Options().ConditionalTracer.NewUserSpan(ctx, "queue.ItemLeaseConstraintCheck", *shadowPart.AccountID, *shadowPart.EnvID, *shadowPart.FunctionID)
 	defer span.End()
 
 	idempotencyKey := item.ID
@@ -400,7 +400,7 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			},
 		})
 
-		if len(item.Data.Semaphores) == 0 {
+		if len(item.Data.Semaphores) == 0 || q.semaphoreConstraintChecksDisabled(ctx, *shadowPart.AccountID) {
 			// backlog lease covers everything, no semaphores — skip Acquire entirely.
 			span.SetAttributes(attribute.Bool("valid_lease", true))
 			return ItemLeaseConstraintCheckResult{
@@ -447,10 +447,10 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		constraintItems = append(constraintItems, constraintapi.ConstraintItem{
 			Kind: constraintapi.ConstraintKindSemaphore,
 			Semaphore: &constraintapi.SemaphoreConstraint{
-				ID:         sem.ID,
-				UsageValue: sem.UsageValue,
-				Weight:     sem.Weight,
-				Release:    sem.Release,
+				ID:               sem.ID,
+				EvaluatedKeyHash: sem.EvaluatedKeyHash,
+				Weight:           sem.Weight,
+				Release:          sem.Release,
 			},
 		})
 		config.Semaphores = append(config.Semaphores, sem)
@@ -532,6 +532,14 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 
 func hasValidCapacityLease(item *QueueItem, now time.Time) bool {
 	return item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
+}
+
+func (q *queueProcessor) semaphoreConstraintChecksDisabled(ctx context.Context, accountID uuid.UUID) bool {
+	if q.DisableSemaphoreConstraintChecks == nil {
+		return false
+	}
+
+	return q.DisableSemaphoreConstraintChecks(ctx, accountID)
 }
 
 func constraintItemsFromBacklog(backlog *QueueBacklog, latestConstraints PartitionConstraintConfig) []constraintapi.ConstraintItem {

@@ -340,11 +340,9 @@ func TestAPI_GetWebsocketUpgrade(t *testing.T) {
 
 		// Check if subscription was cleaned up
 		// Note: With websockets using context.Background() for Poll, cleanup may not happen immediately on context cancellation
-		finalSubCount := subCount(bc)
-
 		// Allow for either immediate cleanup or eventual cleanup
-		if finalSubCount > 0 {
-			t.Logf("Subscription still active after context timeout (expected for websocket implementation)")
-		}
+		require.Eventually(t, func() bool {
+			return subCount(bc) == 0
+		}, 2*time.Second, 10*time.Millisecond, "topic goroutines should be stopped")
 	})
 }

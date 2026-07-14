@@ -56,7 +56,6 @@ function RunsComponent() {
   );
   const { value: tracesPreviewEnabled, isReady: tracesPreviewFlagReady } =
     booleanFlag('traces-preview', true, true);
-  const { value: v4Enabled } = booleanFlag('run-details-v4', false, true);
 
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [preview, setPreview] = useState(false);
@@ -253,7 +252,6 @@ function RunsComponent() {
         features={{
           history: Number.MAX_SAFE_INTEGER,
           tracesPreview: tracesPreviewEnabled,
-          runDetailsV4: v4Enabled,
           isDeferred: true,
         }}
         hasMore={hasNextPage ?? false}

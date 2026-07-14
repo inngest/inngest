@@ -1,4 +1,5 @@
 import SplitView from '@/components/SignIn/SplitView';
+import { canonicalLink } from '@/utils/urls';
 import { SignUp } from '@clerk/tanstack-react-start';
 import { createFileRoute } from '@tanstack/react-router';
 import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
@@ -17,6 +18,9 @@ const getAnonymousId = () => {
 
 export const Route = createFileRoute('/(auth)/sign-up/$')({
   component: RouteComponent,
+  head: () => ({
+    links: [canonicalLink('/sign-up')],
+  }),
 });
 
 function RouteComponent() {

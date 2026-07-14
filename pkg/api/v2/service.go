@@ -21,8 +21,10 @@ type Service struct {
 	apiv2.UnimplementedV2Server
 	signingKeys    SigningKeysProvider
 	eventKeys      EventKeysProvider
+	apps           AppProvider
 	functions      FunctionProvider
-	runs           FunctionRunReader
+	functionConfig FunctionConfigProvider
+	runs           RunProvider
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
@@ -34,8 +36,10 @@ type Service struct {
 type ServiceOptions struct {
 	SigningKeysProvider SigningKeysProvider
 	EventKeysProvider   EventKeysProvider
+	Apps                AppProvider
 	Functions           FunctionProvider
-	FunctionRuns        FunctionRunReader
+	FunctionConfig      FunctionConfigProvider
+	Runs                RunProvider
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
@@ -50,8 +54,10 @@ func NewService(opts ServiceOptions) *Service {
 	return &Service{
 		signingKeys:    opts.SigningKeysProvider,
 		eventKeys:      opts.EventKeysProvider,
+		apps:           opts.Apps,
 		functions:      opts.Functions,
-		runs:           opts.FunctionRuns,
+		functionConfig: opts.FunctionConfig,
+		runs:           opts.Runs,
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
@@ -153,9 +159,11 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	}
 
 	r.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Strip /api/v2 prefix and forward to gateway
+		// Strip supported v2 prefixes and forward to gateway
 		originalPath := req.URL.Path
 		if after, ok := strings.CutPrefix(req.URL.Path, "/api/v2"); ok {
+			req.URL.Path = after
+		} else if after, ok := strings.CutPrefix(req.URL.Path, "/v2"); ok {
 			req.URL.Path = after
 		}
 

@@ -1,5 +1,6 @@
 import { SignOutButton } from '@/components/Auth/SignOutButton';
 import SplitView from '@/components/SignIn/SplitView';
+import { canonicalLink } from '@/utils/urls';
 import { useAuth } from '@clerk/tanstack-react-start';
 
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -7,6 +8,10 @@ import { useEffect } from 'react';
 
 export const Route = createFileRoute('/(auth)/sign-out')({
   component: RouteComponent,
+  head: () => ({
+    links: [canonicalLink('/sign-out')],
+    meta: [{ name: 'robots', content: 'noindex' }],
+  }),
 });
 
 function RouteComponent() {

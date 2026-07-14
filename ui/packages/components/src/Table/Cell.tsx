@@ -1,3 +1,4 @@
+import { Link, type LinkProps } from '@inngest/components/Link';
 import {
   Pill,
   PillContent,
@@ -10,8 +11,9 @@ import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiSparkling2Fill } from '@remixicon/react';
+import { type LinkComponentProps } from '@tanstack/react-router';
 
-import { useDynamicRunData } from '../RunDetailsV3/utils';
+import { useDynamicRunData } from '../RunDetailsShared/utils';
 
 const cellStyles = 'text-basis text-sm';
 
@@ -37,15 +39,25 @@ export function AICell({ children }: React.PropsWithChildren) {
   );
 }
 
+export function LinkCell({ children, href, ...props }: React.PropsWithChildren<LinkProps>) {
+  return (
+    <Link href={href} {...props}>
+      {children}
+    </Link>
+  );
+}
+
 export function PillCell({
   children,
   type,
   appearance = 'outlined',
+  href,
 }: PillContentProps & {
   appearance?: PillAppearance;
+  href?: LinkComponentProps['href'];
 }) {
   return (
-    <Pill appearance={appearance}>
+    <Pill appearance={appearance} href={href}>
       <PillContent type={type}>{children}</PillContent>
     </Pill>
   );

@@ -67,6 +67,7 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 
 		// Remove internal schema-only paths used only to force schema generation
 		removeInternalPaths(&v2Doc)
+		removeInternalOperations(&v2Doc)
 
 		// Convert to OpenAPI v3
 		v3Doc, err := openapi2conv.ToV3(&v2Doc)
@@ -164,6 +165,65 @@ func removeInternalPaths(doc *openapi2.T) {
 			delete(doc.Paths, path)
 		}
 	}
+}
+
+func removeInternalOperations(doc *openapi2.T) {
+	if doc.Paths == nil {
+		return
+	}
+
+	for path, pathItem := range doc.Paths {
+		if pathItem == nil {
+			continue
+		}
+
+		if hasTag(pathItem.Get, "Internal") {
+			pathItem.Get = nil
+		}
+		if hasTag(pathItem.Post, "Internal") {
+			pathItem.Post = nil
+		}
+		if hasTag(pathItem.Put, "Internal") {
+			pathItem.Put = nil
+		}
+		if hasTag(pathItem.Patch, "Internal") {
+			pathItem.Patch = nil
+		}
+		if hasTag(pathItem.Delete, "Internal") {
+			pathItem.Delete = nil
+		}
+		if hasTag(pathItem.Options, "Internal") {
+			pathItem.Options = nil
+		}
+		if hasTag(pathItem.Head, "Internal") {
+			pathItem.Head = nil
+		}
+
+		if pathItem.Get == nil &&
+			pathItem.Post == nil &&
+			pathItem.Put == nil &&
+			pathItem.Patch == nil &&
+			pathItem.Delete == nil &&
+			pathItem.Options == nil &&
+			pathItem.Head == nil {
+			delete(doc.Paths, path)
+			continue
+		}
+
+		doc.Paths[path] = pathItem
+	}
+}
+
+func hasTag(op *openapi2.Operation, tag string) bool {
+	if op == nil {
+		return false
+	}
+	for _, t := range op.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
 }
 
 // hasCustomStatusCodes checks if an operation has custom success status codes (2xx, non-200)

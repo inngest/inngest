@@ -44,8 +44,12 @@ type AsyncCheckpoint struct {
 	// QueueItemRef represents the queue item ID that's currently leased while
 	// executing the SDK.
 	QueueItemRef string `json:"qi_id"`
-	// RequestID is the dispatch ULID the SDK echoes back; see validateAsyncDispatch.
+	// RequestID is the dispatch ULID the SDK echoes back. It is logged and
+	// passed through for tracing; fencing is performed against GenerationID.
 	RequestID string `json:"request_id"`
+	// GenerationID is the dispatch generation the SDK echos back, which is used to ensure
+	// that checkpoints from stale dispatches aren't processed
+	GenerationID int `json:"generation_id,omitempty"`
 	// RequestStartedAt is the unix-millisecond epoch when the SDK began
 	// processing the dispatched request. See validateAsyncDispatch.
 	RequestStartedAt int64 `json:"request_started_at"`

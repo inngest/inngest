@@ -31,6 +31,15 @@ func IncrQueueItemProcessedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueItemEarliestPeekTimeCounter(ctx context.Context, count int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, count, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_item_earliest_peek_time_total",
+		Description: "Total number of queue items considered for earliest peek time stamping",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueuePartitionLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -144,6 +153,18 @@ func IncrExecutorScheduleCount(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "executor_scheduled_total",
 		Description: "Total number of executor schedule calls",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrScheduleFreshStateQueueDuplicateCounter(ctx context.Context, opts CounterOpt) {
+	// This should not happen for Redis state: run-level idempotency is claimed
+	// atomically before state creation, so a duplicate should adopt the
+	// existing run ID instead of creating fresh state.
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "schedule_fresh_state_queue_duplicate_total",
+		Description: "Fresh run states created before queue idempotency rejected the schedule",
 		Tags:        opts.Tags,
 	})
 }
@@ -627,6 +648,21 @@ func IncrAPICacheMiss(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrTTLUpsertCounter(ctx context.Context, status string, opts CounterOpt) {
+	tags := map[string]any{}
+	for k, v := range opts.Tags {
+		tags[k] = v
+	}
+	tags["status"] = status
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "ttlupsert_total",
+		Description: "Total number of ttlupsert calls by outcome status",
+		Tags:        tags,
+	})
+}
+
 func IncrTLSSessionCacheLookup(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -941,6 +977,31 @@ func IncrExecutorHandleGeneratorCount(ctx context.Context, op string, opts Count
 		PkgName:     opts.PkgName,
 		MetricName:  "executor_handle_generator_total",
 		Description: "Total number of executor handle generator calls",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrDiscoveryCoalesceDedupCount(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "executor_discovery_coalesce_dedup_total",
+		Description: "Total number of duplicate discovery steps deduplicated via parallel coalesce key",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrCheckpointSDKOpcodeCounter(ctx context.Context, op string, mode string, opts CounterOpt) {
+	if opts.Tags == nil {
+		opts.Tags = map[string]any{}
+	}
+
+	opts.Tags["op"] = op
+	opts.Tags["mode"] = mode
+
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "checkpoint_sdk_opcodes_total",
+		Description: "Total number of SDK opcodes processed via checkpointing",
 		Tags:        opts.Tags,
 	})
 }

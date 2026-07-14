@@ -94,9 +94,9 @@ func TestAIMetadataExtractor_OpenAISpan(t *testing.T) {
 	assert.Equal(t, 97.0, data["output_tokens"], "Should extract output tokens")
 
 	// Verify model and operation data
-	assert.Equal(t, "gpt-4", data["model"], "Should extract request model")
+	assert.Equal(t, "gpt-4", data["request_model"], "Should extract request model")
 	assert.Equal(t, "chat", data["operation_name"], "Should extract operation name")
-	assert.Equal(t, "openai", data["system"], "Should extract AI system")
+	assert.Equal(t, "openai", data["provider"], "Should extract AI provider")
 }
 
 func TestAIMetadataExtractor_NonAISpan(t *testing.T) {
@@ -251,11 +251,12 @@ func TestExtractAIOutputMetadata_VercelAISDK(t *testing.T) {
 	assert.Equal(t, 429.0, data["output_tokens"], "Should extract output tokens")
 	assert.Equal(t, 440.0, data["total_tokens"], "Should extract total tokens")
 
-	// Verify model
-	assert.Equal(t, "gpt-4-turbo-2024-04-09", data["model"], "Should extract model from response.modelId")
+	// Verify request model
+	assert.Equal(t, "gpt-4-turbo", data["request_model"], "Should extract request model from request.modelId")
+	assert.Equal(t, "gpt-4-turbo-2024-04-09", data["response_model"], "Should extract response model from response.modelId")
 
-	// Verify system
-	assert.Equal(t, "vercel-ai", data["system"], "Should set system to vercel-ai")
+	// Verify provider
+	assert.Equal(t, "vercel-ai", data["provider"], "Should set provider to vercel-ai")
 
 	// Verify latency (from openai-processing-ms header)
 	assert.Equal(t, 24314.0, data["latency_ms"], "Should extract latency from OpenAI header")

@@ -1,3 +1,5 @@
+import { useOrganization } from '@clerk/tanstack-react-start';
+import { Alert } from '@inngest/components/Alert';
 import { Link } from '@inngest/components/Link';
 import { createFileRoute } from '@tanstack/react-router';
 
@@ -24,6 +26,8 @@ export const Route = createFileRoute('/_authed/billing/plans/')({
 
 function BillingPlansPage() {
   const { currentPlan } = Route.useLoaderData();
+  const { isLoaded: orgLoaded, membership } = useOrganization();
+  const isAdmin = membership?.role === 'org:admin';
 
   const refetchCurrentPlan = async () => {
     return await getCurrentPlan();
@@ -48,9 +52,9 @@ function BillingPlansPage() {
     },
     {
       id: 'n/a',
-      slug: 'pro-2025-08-08',
+      slug: 'pro-2026-06-29',
       name: 'Pro',
-      amount: 7_500, // $75.00
+      amount: 9900,
       billingPeriod: 'month',
       entitlements: {
         concurrency: { limit: 100 },
@@ -78,6 +82,12 @@ function BillingPlansPage() {
 
   return (
     <>
+      {orgLoaded && !isAdmin && (
+        <Alert severity="info" showIcon className="mb-8">
+          Only organization admins can change your plan. Ask an admin to upgrade
+          your account.
+        </Alert>
+      )}
       {currentPlan.isLegacy && (
         <div className="mb-8">
           <HorizontalPlanCard

@@ -68,6 +68,7 @@ func TestRequestAndJobIDHeaders(t *testing.T) {
 	input := []byte(`{"event":{"name":"hi","data":{}}}`)
 	requestID := "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	jobID := "job-123"
+	generationID := 7
 
 	var receivedHeaders http.Header
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -80,13 +81,15 @@ func TestRequestAndJobIDHeaders(t *testing.T) {
 
 	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
 	_, _, err := do(context.Background(), client, Request{
-		URL:       parseURL(ts.URL),
-		Input:     input,
-		RequestID: requestID,
-		JobID:     jobID,
+		URL:          parseURL(ts.URL),
+		Input:        input,
+		RequestID:    requestID,
+		GenerationID: generationID,
+		JobID:        jobID,
 	})
 	require.NoError(t, err)
 	require.Equal(t, requestID, receivedHeaders.Get(headers.HeaderKeyRequestID))
+	require.Equal(t, "7", receivedHeaders.Get(headers.HeaderKeyGenerationID))
 	require.Equal(t, jobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 }
 
@@ -294,6 +297,56 @@ func TestExecuteDriverRequest_DecodesBrotliGeneratorResponse(t *testing.T) {
 	require.Len(t, dr.Generator, 1)
 	require.Equal(t, enums.OpcodeStepRun, dr.Generator[0].Op)
 	require.Equal(t, "step-id", dr.Generator[0].ID)
+}
+
+// A transport-level 5xx with no structured Inngest error (proxy/gateway error,
+// crash, timeout) must surface a clear synthesized error in the trace, while
+// leaving dr.Err intact so retry behavior is unchanged.
+func TestHandleHttpResponse_FatalUpstreamError(t *testing.T) {
+	r := require.New(t)
+
+	resp := &Response{
+		Body:       []byte("Bad Gateway"),
+		StatusCode: 502,
+		IsSDK:      false,
+		Header:     http.Header{"Content-Type": []string{"text/plain"}},
+	}
+
+	dr, _ := HandleHttpResponse(context.Background(), Request{}, resp)
+	r.NotNil(dr)
+
+	// Retry signal preserved.
+	r.NotNil(dr.Err)
+	r.Contains(*dr.Err, "invalid status code: 502")
+
+	// Output replaced with the synthesized user-facing error.
+	se := dr.StandardError()
+	r.Equal(state.FatalServerErrorName, se.Name)
+	r.Contains(se.Message, "HTTP 502")
+	r.Contains(se.Stack, "Bad Gateway")
+}
+
+// A 5xx from an SDK must be preserved, not overwritten with the synthesized
+// fatal-upstream copy. SDKs return real function/step errors as non-2xx with a
+// top-level serialized error body (not wrapped under an "error" key), so the
+// guard is the SDK-header check, not the body shape.
+func TestHandleHttpResponse_SDKErrorNotClobbered(t *testing.T) {
+	r := require.New(t)
+
+	resp := &Response{
+		Body:       []byte(`{"name":"MyError","message":"boom","stack":"at fn (app.ts:1:1)","__serialized":true}`),
+		StatusCode: 500,
+		IsSDK:      true,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+	}
+
+	dr, _ := HandleHttpResponse(context.Background(), Request{}, resp)
+	r.NotNil(dr)
+
+	se := dr.StandardError()
+	r.Equal("MyError", se.Name)
+	r.Equal("boom", se.Message)
+	r.NotEqual(state.FatalServerErrorName, se.Name)
 }
 
 func TestHandleHttpResponse_DecompressesGzipBody(t *testing.T) {

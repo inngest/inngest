@@ -85,7 +85,7 @@ type missingMetadataRunService struct {
 	err     error
 }
 
-func (m *missingMetadataRunService) LoadMetadata(context.Context, sv2.ID) (sv2.Metadata, error) {
+func (m *missingMetadataRunService) LoadMetadata(context.Context, sv2.ID, ...sv2.LoadMetadataOption) (sv2.Metadata, error) {
 	return sv2.Metadata{}, m.err
 }
 
@@ -106,7 +106,7 @@ type missingShardRegistry struct {
 	queue.ShardRegistry
 }
 
-func (missingShardRegistry) Resolve(context.Context, uuid.UUID, *string) (queue.QueueShard, error) {
+func (missingShardRegistry) Resolve(context.Context, queue.Scope, *string) (queue.QueueShard, error) {
 	return nil, errors.New("missing shard")
 }
 

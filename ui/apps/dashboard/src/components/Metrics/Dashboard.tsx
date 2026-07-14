@@ -16,10 +16,14 @@ import {
   toDate,
   type DurationType,
 } from '@inngest/components/utils/date';
-import { useQuery } from 'urql';
+import { gql, useQuery, type TypedDocumentNode } from 'urql';
 
 import { graphql } from '@/gql';
-import { GetAccountEntitlementsDocument, MetricsScope } from '@/gql/graphql';
+import {
+  GetAccountEntitlementsDocument,
+  MetricsScope,
+  type MetricsLookupsQueryVariables,
+} from '@/gql/graphql';
 import { MetricsOverview } from './Overview';
 import { MetricsVolume } from './Volume';
 import { convertLookup } from './utils';
@@ -28,6 +32,11 @@ export type EntityType = {
   id: string;
   name: string;
   slug?: string;
+  app?: {
+    id: string;
+    name: string;
+  } | null;
+  appID?: string;
 };
 
 export type EntityLookup = { [id: string]: EntityType };
@@ -64,7 +73,40 @@ const getDefaultRange = (
         duration: duration ? duration : DEFAULT_DURATION,
       };
 
-const MetricsLookupDocument = graphql(`
+type MetricsLookupQuery = {
+  envBySlug: {
+    apps: Array<{
+      externalID: string;
+      id: string;
+      name: string;
+      isArchived: boolean;
+      functions: Array<{
+        id: string;
+      }>;
+    }>;
+    workflows: {
+      data: Array<{
+        name: string;
+        id: string;
+        slug: string;
+        app: {
+          id: string;
+          name: string;
+        };
+      }>;
+      page: {
+        page: number;
+        totalPages: number | null;
+        perPage: number;
+      };
+    };
+  } | null;
+};
+
+const MetricsLookupDocument: TypedDocumentNode<
+  MetricsLookupQuery,
+  MetricsLookupsQueryVariables
+> = gql`
   query MetricsLookups($envSlug: String!, $page: Int, $pageSize: Int) {
     envBySlug(slug: $envSlug) {
       apps {
@@ -72,12 +114,19 @@ const MetricsLookupDocument = graphql(`
         id
         name
         isArchived
+        functions {
+          id
+        }
       }
       workflows @paginated(perPage: $pageSize, page: $page) {
         data {
           name
           id
           slug
+          app {
+            id
+            name
+          }
         }
         page {
           page
@@ -87,7 +136,7 @@ const MetricsLookupDocument = graphql(`
       }
     }
   }
-`);
+`;
 
 const AccountConcurrencyLookupDocument = graphql(`
   query AccountConcurrencyLookup {
@@ -140,6 +189,13 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
     }));
 
   const functions = data?.envBySlug?.workflows.data;
+  const functionsFromApps = data?.envBySlug?.apps.flatMap((app) =>
+    app.functions.map((fn) => ({
+      id: fn.id,
+      name: fn.id,
+      appID: app.id,
+    })),
+  );
 
   const logRetention = accountData?.account.entitlements.history.limit || 7;
   const concurrencyLimit =
@@ -150,7 +206,10 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
 
   const envLookup =
     apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
-  const mappedFunctions = convertLookup(functions);
+  const mappedFunctions = {
+    ...convertLookup(functionsFromApps),
+    ...convertLookup(functions),
+  };
   const mappedApps = convertLookup(apps);
   const mappedEntities = envLookup ? mappedApps : mappedFunctions;
 

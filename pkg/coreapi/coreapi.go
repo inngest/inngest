@@ -39,7 +39,7 @@ type Options struct {
 	Logger         logger.Logger
 	Runner         runner.Runner
 	State          state.Manager
-	Queue          queue.JobQueueReader
+	QueueReader    queue.JobQueueReader
 	EventHandler   api.EventHandler
 	Executor       execution.Executor
 	HistoryReader  history_reader.Reader
@@ -99,7 +99,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 			Data:            o.Data,
 			HistoryReader:   o.HistoryReader,
 			Runner:          o.Runner,
-			Queue:           o.Queue,
+			QueueReader:     o.QueueReader,
 			EventHandler:    o.EventHandler,
 			Executor:        o.Executor,
 			ServerKind:      o.Config.GetServerKind(),
@@ -200,8 +200,6 @@ func (a CoreAPI) TrackEvent(w http.ResponseWriter, r *http.Request) {
 	eventName, ok := requestBody["eventName"].(string)
 	if ok {
 		tel.SendEvent(ctx, eventName, metadata)
-	} else {
-		tel.SendMetadata(ctx, metadata)
 	}
 
 	w.WriteHeader(http.StatusOK)

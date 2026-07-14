@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
 
-import { Link } from '../Link';
 import type { RunDeferSummary, RunDeferredFromSummary } from '../SharedContext/useGetRunLinkage';
 import { usePathCreator } from '../SharedContext/usePathCreator';
-import { IDCell, PillCell, StatusCell } from '../Table/Cell';
+import { IDCell, LinkCell, PillCell, StatusCell } from '../Table/Cell';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 type Props = {
@@ -27,7 +26,7 @@ export const LinkedRuns = ({ defers, siblingDefers, deferredFrom }: Props) => {
 const sectionBorder = 'border-muted mb-2 border-b pb-2';
 const tableClass = 'w-full table-fixed border-separate border-spacing-0';
 const theadClass = 'text-muted bg-canvasSubtle';
-const thClass = 'px-2 py-2 text-left text-sm font-medium leading-tight first:pl-4 last:pr-4';
+const thClass = 'px-2 py-2 text-left text-xs font-medium leading-tight first:pl-4 last:pr-4';
 const tdClass = 'min-w-0 truncate px-2 py-2 text-sm leading-tight first:pl-4 last:pr-4';
 
 type Column = { header: string; width?: string };
@@ -80,15 +79,18 @@ const ParentRunsSection = ({ parents }: { parents: RunDeferredFromSummary[] }) =
             {p.run ? <StatusCell status={p.run.status} /> : <MutedDash />}
           </td>
           <td className={tdClass}>
-            <Link href={pathCreator.runPopout({ runID: p.runID })}>
-              <IDCell>{p.runID}</IDCell>
-            </Link>
+            <LinkCell href={pathCreator.runPopout({ runID: p.runID })}>
+              <span className="font-mono">{p.runID}</span>
+            </LinkCell>
           </td>
           <td className={tdClass}>
             {p.function ? (
-              <Link href={pathCreator.function({ functionSlug: p.function.slug })}>
-                <PillCell type="FUNCTION">{p.function.name || p.function.slug}</PillCell>
-              </Link>
+              <PillCell
+                type="FUNCTION"
+                href={pathCreator.function({ functionSlug: p.function.slug })}
+              >
+                {p.function.name || p.function.slug}
+              </PillCell>
             ) : (
               <OptionalTooltip tooltip="Parent function unavailable">
                 <MutedDash />
@@ -131,17 +133,17 @@ const DefersSection = ({ title, defers }: { title: string; defers: RunDeferSumma
             </td>
             <td className={tdClass}>
               {d.run ? (
-                <Link href={pathCreator.runPopout({ runID: d.run.id })}>
-                  <IDCell>{d.run.id}</IDCell>
-                </Link>
+                <LinkCell href={pathCreator.runPopout({ runID: d.run.id })}>
+                  <span className="font-mono">{d.run.id}</span>
+                </LinkCell>
               ) : (
                 <MutedDash />
               )}
             </td>
             <td className={tdClass}>
-              <Link href={pathCreator.function({ functionSlug: fnSlug })}>
-                <PillCell type="FUNCTION">{fnName}</PillCell>
-              </Link>
+              <PillCell href={pathCreator.function({ functionSlug: fnSlug })} type="FUNCTION">
+                {fnName}
+              </PillCell>
             </td>
           </tr>
         );

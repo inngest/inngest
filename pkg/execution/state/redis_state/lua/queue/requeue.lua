@@ -28,8 +28,10 @@ local keyAccountShadowPartitionSet       = KEYS[14]
 
 local keyPartitionScavengerIndex  = KEYS[15]
 
-local keyItemIndexA           = KEYS[16]          -- custom item index 1
-local keyItemIndexB           = KEYS[17]          -- custom item index 2
+local keyEarliestPeekTime     = KEYS[16]
+
+local keyItemIndexA           = KEYS[17]          -- custom item index 1
+local keyItemIndexB           = KEYS[18]          -- custom item index 2
 
 local queueID             = ARGV[1]           -- id
 local queueItem           = ARGV[2]
@@ -60,6 +62,7 @@ end
 
 -- Update the queue item with a nil lease, at, atMS, etc.
 redis.call("HSET", queueKey, queueID, queueItem)
+redis.call("DEL", keyEarliestPeekTime)
 
 -- Remove item from ready queue
 redis.call("ZREM", keyReadyQueue, item.id)

@@ -97,6 +97,26 @@ func TestFunctionRefID(t *testing.T) {
 		}))
 	})
 
+	t.Run("trims app prefix when configured slug matches deployed slug", func(t *testing.T) {
+		require.Equal(t, "function-slug", functionRefID(inngest.DeployedFunction{
+			Slug:    "app-function-slug",
+			AppName: "app",
+			Function: inngest.Function{
+				Slug: "app-function-slug",
+			},
+		}))
+	})
+
+	t.Run("does not trim bare configured slug that starts with app id", func(t *testing.T) {
+		require.Equal(t, "app-function-slug", functionRefID(inngest.DeployedFunction{
+			Slug:    "app-app-function-slug",
+			AppName: "app",
+			Function: inngest.Function{
+				Slug: "app-function-slug",
+			},
+		}))
+	})
+
 	t.Run("falls back to deployed slug", func(t *testing.T) {
 		require.Equal(t, "function-slug", functionRefID(inngest.DeployedFunction{
 			Slug: "function-slug",

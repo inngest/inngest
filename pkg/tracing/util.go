@@ -73,6 +73,39 @@ func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableA
 	return rawAttrs
 }
 
+// DriverResponseOutputAttrs extracts output-related attributes from the given `DriverResponse`.
+// This is used for extracting output details for non-step spans like finalization or network/top-level
+// function error spans.
+func DriverResponseOutputAttrs(resp *state.DriverResponse) *meta.SerializableAttrs {
+	rawAttrs := meta.NewAttrSet()
+
+	if resp == nil {
+		return rawAttrs
+	}
+
+	fnOutput, err := resp.GetTraceFunctionOutput()
+	if err != nil {
+		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
+	} else if fnOutput != "" {
+		isFunctionOutput := true
+		meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, &isFunctionOutput)
+		meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, &fnOutput)
+	}
+
+	if resp.Retryable() {
+		meta.AddAttr(rawAttrs, meta.Attrs.Retryable, inngestgo.Ptr(true))
+	}
+
+	size := resp.OutputSize
+	if size == 0 && fnOutput != "" {
+		size = len(fnOutput)
+	}
+
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
+
+	return rawAttrs
+}
+
 // DriverResponseAttrs applies details from the given `DriverResponse` to the
 // given span. This is used for adding additional details to the span after the
 // execution has completed.
@@ -258,6 +291,8 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	case enums.OpcodeStepPlanned:
 		{
 			// Nothing yet (there are defaults above)
+			status := enums.StepStatusQueued
+			meta.AddAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 		}
 
 	case enums.OpcodeWaitForEvent:
@@ -393,7 +428,7 @@ func SpanRefFromPause(p *state.Pause) *meta.SpanReference {
 // _userland_) this step should be under.
 //
 // A single exception is maybe the very first execution, but also with that we
-// shoud have the run span inside the queue item's metadata.
+// should have the run span inside the queue item's metadata.
 func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 	if md == nil {
 		return nil
@@ -411,6 +446,118 @@ func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 		DynamicSpanTraceParent: fmt.Sprintf("00-%s-0000000000000000-00", cfg.TraceID.String()),
 		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
 	}
+}
+
+// FinalizedStepDynamicSeed returns the deterministic seed used to derive an
+// executor.step row's dynamic_span_id for a finalized step.
+func FinalizedStepDynamicSeed(stepID string) []byte {
+	return []byte(stepID)
+}
+
+func FinalizedStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID string) *meta.SpanReference {
+	if md == nil {
+		return nil
+	}
+
+	cfg := DeterministicSpanConfig(md.ID.RunID[:])
+	stepSpanID := DeterministicSpanConfig(FinalizedStepDynamicSeed(stepID)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID:          stepSpanID.String(),
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
+	}
+}
+
+// RetryStepDynamicSeed returns the deterministic seed used to derive an
+// executor.step row's dynamic_span_id for a retry attempt.
+func RetryStepDynamicSeed(stepID string, attempt int) []byte {
+	return fmt.Appendf(nil, "%s:%d", stepID, attempt)
+}
+
+func RetryStepSpanRefFromMetadataAndStepID(md *statev2.Metadata, stepID string, attempt int) *meta.SpanReference {
+	if md == nil {
+		return nil
+	}
+
+	cfg := DeterministicSpanConfig(md.ID.RunID[:])
+	stepSpanID := DeterministicSpanConfig(RetryStepDynamicSeed(stepID, attempt)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID:          stepSpanID.String(),
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
+	}
+}
+
+// NonStepDynamicSeed returns the deterministic seed used to derive a dynamic span ID for non-step spans
+// execution (previously called Finalization).
+func NonStepDynamicSeed(item queue.Item) []byte {
+	return fmt.Appendf(nil, "nonstep:%s:%d", item.GroupID, item.Attempt)
+}
+
+// SleepStepDynamicSeed derives the dynamic_span_id seed for a sleep step's
+// own span.
+func SleepStepDynamicSeed(stepID string) []byte {
+	return fmt.Appendf(nil, "sleep-step:%s", stepID)
+}
+
+// SleepDiscoveryDynamicSeed derives the dynamic_span_id seed for the
+// post-sleep discovery placeholder span.
+func SleepDiscoveryDynamicSeed(stepID string) []byte {
+	return fmt.Appendf(nil, "sleep-discovery:%s", stepID)
+}
+
+// SleepStepSpanRef reconstructs the SpanReference for a sleep step's own span
+func SleepStepSpanRef(runID ulid.ULID, stepID string) *meta.SpanReference {
+	cfg := DeterministicSpanConfig(runID[:])
+	stepSpanID := DeterministicSpanConfig(SleepStepDynamicSeed(stepID)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID:          stepSpanID.String(),
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), stepSpanID.String()),
+	}
+}
+
+// SleepDiscoverySpanRef reconstructs the SpanReference for the post-sleep
+// discovery placeholder span.
+func SleepDiscoverySpanRef(runID ulid.ULID, stepID string) *meta.SpanReference {
+	cfg := DeterministicSpanConfig(runID[:])
+	spanID := DeterministicSpanConfig(SleepDiscoveryDynamicSeed(stepID)).SpanID
+	return &meta.SpanReference{
+		DynamicSpanID:          spanID.String(),
+		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), cfg.SpanID.String()),
+		TraceParent:            fmt.Sprintf("00-%s-%s-00", cfg.TraceID.String(), spanID.String()),
+	}
+}
+
+// SleepStepSpanRefResolve returns the sleep step's span ref for a resumed
+// sleep item. Legacy items carry the ref in item.Metadata[PropagationKey];
+// new items have it reconstructed deterministically and rehydrated
+// (along with the "discovery" ref) into item.Metadata so
+// downstream reads work uniformly. Returns nil if neither path is available.
+func SleepStepSpanRefResolve(item *queue.Item, runID ulid.ULID) *meta.SpanReference {
+	if ref := SpanRefFromQueueItem(item); ref != nil {
+		return ref
+	}
+	payload, ok := item.Payload.(queue.PayloadEdge)
+	if !ok || payload.Edge.Outgoing == "" {
+		return nil
+	}
+	ref := SleepStepSpanRef(runID, payload.Edge.Outgoing)
+	if ref == nil {
+		return nil
+	}
+	if item.Metadata == nil {
+		item.Metadata = map[string]any{}
+	}
+	if byt, err := json.Marshal(ref); err == nil {
+		item.Metadata[meta.PropagationKey] = string(byt)
+	}
+	if disc := SleepDiscoverySpanRef(runID, payload.Edge.Outgoing); disc != nil {
+		if byt, err := json.Marshal(disc); err == nil {
+			item.Metadata["discovery"] = string(byt)
+		}
+	}
+	return ref
 }
 
 // DeferSpanSeed returns the deterministic seed used to identify the

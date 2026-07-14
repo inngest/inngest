@@ -1,20 +1,1376 @@
 {
-  "openapi": "3.0.3",
+  "components": {
+    "schemas": {
+      "V2InvokeFunctionBody": {
+        "properties": {
+          "data": {
+            "description": "JSON object containing the input data for the function",
+            "example": {
+              "message": "Hello, World!"
+            },
+            "type": "object"
+          },
+          "idempotencyKey": {
+            "description": "Optional idempotency key to handle duplicate requests within a given idempotency period.",
+            "example": "user-action-123",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "V2PatchEnvBody": {
+        "properties": {
+          "isArchived": {
+            "description": "Updates the archived status of the environment. Set to true to archive the environment or false to unarchive it.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "V2SyncAppBody": {
+        "properties": {
+          "url": {
+            "description": "URL for the Inngest endpoint in the app",
+            "example": "https://example.com/api/inngest",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "protobufAny": {
+        "additionalProperties": {},
+        "properties": {
+          "@type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "protobufNullValue": {
+        "default": "NULL_VALUE",
+        "description": "`NullValue` is a singleton enumeration to represent the null value for the\n`Value` type union.\n\nThe JSON representation for `NullValue` is JSON `null`.\n\n - NULL_VALUE: Null value.",
+        "enum": [
+          "NULL_VALUE"
+        ],
+        "type": "string"
+      },
+      "rpcStatus": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/protobufAny"
+            },
+            "type": "array"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2Account": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2AppRef": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateAccountData": {
+        "properties": {
+          "apiKey": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateAccountRequest": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateAccountResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2CreateAccountData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateEnvRequest": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateEnvResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Env"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateWebhookRequest": {
+        "properties": {
+          "eventFilter": {
+            "$ref": "#/components/schemas/v2EventFilter"
+          },
+          "name": {
+            "description": "Descriptive name for the webhook",
+            "example": "Payment Processing Webhook",
+            "type": "string"
+          },
+          "response": {
+            "description": "Optional inline JS function which is called to respond to GET requests",
+            "example": "function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };",
+            "type": "string"
+          },
+          "transform": {
+            "description": "The inline JS transform function for incoming events",
+            "example": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2CreateWebhookResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Webhook"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2Env": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isArchived": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/v2EnvType"
+          }
+        },
+        "type": "object"
+      },
+      "v2EnvType": {
+        "default": "PRODUCTION",
+        "enum": [
+          "PRODUCTION",
+          "TEST",
+          "BRANCH"
+        ],
+        "type": "string"
+      },
+      "v2Error": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2ErrorResponse": {
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/v2Error"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2EventFilter": {
+        "properties": {
+          "events": {
+            "description": "Allow or deny specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied.",
+            "example": [
+              "orders/payment.created",
+              "orders/*"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "filter": {
+            "$ref": "#/components/schemas/v2FilterType"
+          }
+        },
+        "type": "object"
+      },
+      "v2EventKey": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountEnvsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2Env"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountEventKeysResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2EventKey"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Account"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountSigningKeysResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2SigningKey"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2FetchAccountsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2Account"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2FilterType": {
+        "default": "ALLOW",
+        "enum": [
+          "ALLOW",
+          "DENY"
+        ],
+        "type": "string"
+      },
+      "v2Function": {
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/v2FunctionApp"
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/v2FunctionConfiguration"
+          },
+          "failureHandler": {
+            "$ref": "#/components/schemas/v2FunctionFailureHandler"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isArchived": {
+            "type": "boolean"
+          },
+          "isPaused": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "triggers": {
+            "items": {
+              "$ref": "#/components/schemas/v2FunctionTrigger"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionApp": {
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionCancellationConfiguration": {
+        "properties": {
+          "condition": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "timeout": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionConcurrencyConfiguration": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "limit": {
+            "$ref": "#/components/schemas/v2FunctionConcurrencyLimitConfiguration"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/v2FunctionConcurrencyScope"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionConcurrencyLimitConfiguration": {
+        "properties": {
+          "isPlanLimit": {
+            "type": "boolean"
+          },
+          "value": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionConcurrencyScope": {
+        "default": "UNSPECIFIED",
+        "enum": [
+          "UNSPECIFIED",
+          "ACCOUNT",
+          "ENVIRONMENT",
+          "FUNCTION"
+        ],
+        "type": "string"
+      },
+      "v2FunctionConfiguration": {
+        "properties": {
+          "cancellations": {
+            "items": {
+              "$ref": "#/components/schemas/v2FunctionCancellationConfiguration"
+            },
+            "type": "array"
+          },
+          "concurrency": {
+            "items": {
+              "$ref": "#/components/schemas/v2FunctionConcurrencyConfiguration"
+            },
+            "type": "array"
+          },
+          "debounce": {
+            "$ref": "#/components/schemas/v2FunctionDebounceConfiguration"
+          },
+          "eventsBatch": {
+            "$ref": "#/components/schemas/v2FunctionEventsBatchConfiguration"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "rateLimit": {
+            "$ref": "#/components/schemas/v2FunctionRateLimitConfiguration"
+          },
+          "retries": {
+            "$ref": "#/components/schemas/v2FunctionRetryConfiguration"
+          },
+          "singleton": {
+            "$ref": "#/components/schemas/v2FunctionSingletonConfiguration"
+          },
+          "throttle": {
+            "$ref": "#/components/schemas/v2FunctionThrottleConfiguration"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionDebounceConfiguration": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionEventsBatchConfiguration": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "maxSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "timeout": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionFailureHandler": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionRateLimitConfiguration": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "limit": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "period": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionRef": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionRetryConfiguration": {
+        "properties": {
+          "isDefault": {
+            "type": "boolean"
+          },
+          "value": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionRun": {
+        "properties": {
+          "app": {
+            "$ref": "#/components/schemas/v2AppRef"
+          },
+          "durationMs": {
+            "format": "uint64",
+            "type": "string"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "function": {
+            "$ref": "#/components/schemas/v2FunctionRef"
+          },
+          "id": {
+            "type": "string"
+          },
+          "output": {
+            "type": "object"
+          },
+          "queuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/v2FunctionRunStatus"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/v2RunTrigger"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionRunStatus": {
+        "default": "UNSPECIFIED",
+        "enum": [
+          "UNSPECIFIED",
+          "QUEUED",
+          "RUNNING",
+          "COMPLETED",
+          "FAILED",
+          "CANCELLED"
+        ],
+        "type": "string"
+      },
+      "v2FunctionSingletonConfiguration": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/v2FunctionSingletonMode"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionSingletonMode": {
+        "default": "UNSPECIFIED",
+        "enum": [
+          "UNSPECIFIED",
+          "SKIP",
+          "CANCEL"
+        ],
+        "type": "string"
+      },
+      "v2FunctionThrottleConfiguration": {
+        "properties": {
+          "burst": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "limit": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "period": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionTrace": {
+        "properties": {
+          "rootSpan": {
+            "$ref": "#/components/schemas/v2TraceSpan"
+          },
+          "runId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionTrigger": {
+        "properties": {
+          "condition": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/v2FunctionTriggerType"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2FunctionTriggerType": {
+        "default": "UNSPECIFIED",
+        "enum": [
+          "UNSPECIFIED",
+          "EVENT",
+          "CRON"
+        ],
+        "type": "string"
+      },
+      "v2GetEventRunsResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2FunctionRun"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2GetFunctionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Function"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2GetFunctionRunResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2FunctionRun"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2GetFunctionTraceResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2FunctionTrace"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2HealthData": {
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2HealthResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2HealthData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsDiagnostic": {
+        "properties": {
+          "code": {
+            "description": "Machine-readable code representing the type of diagnostic",
+            "type": "string"
+          },
+          "message": {
+            "description": "Human-readable message describing the diagnostic",
+            "type": "string"
+          },
+          "position": {
+            "$ref": "#/components/schemas/v2InsightsDiagnosticPosition"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/v2InsightsDiagnosticSeverity"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsDiagnosticPosition": {
+        "properties": {
+          "context": {
+            "description": "Snippet of the query string around the position to provide context for the diagnostic",
+            "type": "string"
+          },
+          "end": {
+            "description": "Ending character index in the query string where the diagnostic applies",
+            "format": "int32",
+            "type": "integer"
+          },
+          "start": {
+            "description": "Starting character index in the query string where the diagnostic applies",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsDiagnosticSeverity": {
+        "default": "SEVERITY_UNSPECIFIED",
+        "enum": [
+          "SEVERITY_UNSPECIFIED",
+          "ERROR",
+          "WARNING",
+          "INFO"
+        ],
+        "type": "string"
+      },
+      "v2InsightsEventSchema": {
+        "properties": {
+          "name": {
+            "description": "Event type name",
+            "example": "orders/payment.created",
+            "type": "string"
+          },
+          "schema": {
+            "description": "JSON Schema describing the shape of this event's data, represented as a nested JSON object",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsOutputColumn": {
+        "properties": {
+          "name": {
+            "description": "Name of the column in the insights query result",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/v2InsightsOutputColumnType"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsOutputColumnType": {
+        "default": "VALUE_TYPE_UNSPECIFIED",
+        "enum": [
+          "VALUE_TYPE_UNSPECIFIED",
+          "STRING",
+          "NUMBER",
+          "BOOLEAN",
+          "DATETIME",
+          "COMPLEX"
+        ],
+        "type": "string"
+      },
+      "v2InsightsRow": {
+        "properties": {
+          "values": {
+            "description": "Values for a single row of the insights query result, where each value corresponds to a column. The value is represented as a JSON object to allow for flexible typing (e.g., string, number, boolean, etc.)",
+            "items": {},
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsTable": {
+        "properties": {
+          "columns": {
+            "description": "Columns available in this table",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsTableColumn"
+            },
+            "type": "array"
+          },
+          "description": {
+            "description": "Human-readable description of the table and its contents",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the table, used when writing queries",
+            "example": "function_runs",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2InsightsTableColumn": {
+        "properties": {
+          "description": {
+            "description": "Human-readable description of the column and the data it contains",
+            "type": "string"
+          },
+          "name": {
+            "description": "Name of the column in the insights table",
+            "type": "string"
+          },
+          "type": {
+            "description": "Data type of the column (e.g., 'String', 'Int64', 'Array(String)', etc.)",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2InvokeFunctionData": {
+        "properties": {
+          "completedAt": {
+            "description": "Timestamp when the function execution completed (if finished)",
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "description": "Error message if the function execution failed",
+            "type": "string"
+          },
+          "queuedAt": {
+            "description": "Timestamp when the function execution was enqueued",
+            "format": "date-time",
+            "type": "string"
+          },
+          "result": {
+            "description": "JSON string containing the function result (only available for completed synchronous invocations)",
+            "example": "{\"success\": true, \"data\": \"Hello, World!\"}",
+            "type": "string"
+          },
+          "runId": {
+            "description": "Unique identifier for this function execution",
+            "example": "01hp1zx8m3ng9vp6qn0xk7j4cy",
+            "type": "string"
+          },
+          "startedAt": {
+            "description": "Timestamp when the function execution started (if started)",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2InvokeFunctionResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2InvokeFunctionData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2ListInsightsEventSchemasResponse": {
+        "properties": {
+          "data": {
+            "description": "Paginated list of event type schemas",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsEventSchema"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2ListInsightsTablesResponse": {
+        "properties": {
+          "data": {
+            "description": "List of available tables that can be queried via the Insights query endpoint",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsTable"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2ListWebhooksResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/v2Webhook"
+            },
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          },
+          "page": {
+            "$ref": "#/components/schemas/v2Page"
+          }
+        },
+        "type": "object"
+      },
+      "v2Page": {
+        "properties": {
+          "cursor": {
+            "type": "string"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "limit": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "v2PatchEnvsResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2Env"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsData": {
+        "properties": {
+          "columns": {
+            "description": "Column metadata for the insights query result",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsOutputColumn"
+            },
+            "type": "array"
+          },
+          "diagnostics": {
+            "description": "Any non-fatal diagnostics related to the insights query execution",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsDiagnostic"
+            },
+            "type": "array"
+          },
+          "rows": {
+            "description": "Rows of the insights query result, where each row contains a list of values corresponding to the columns",
+            "items": {
+              "$ref": "#/components/schemas/v2InsightsRow"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsPromptData": {
+        "properties": {
+          "sql": {
+            "description": "The generated Insights SQL query",
+            "example": "SELECT function_id, COUNT(*) AS total, countIf(status = 'Failed') AS failures, failures / total AS failure_rate FROM function_runs WHERE started_at \u003e= now() - INTERVAL 7 DAY GROUP BY function_id ORDER BY failure_rate DESC LIMIT 10",
+            "type": "string"
+          },
+          "summary": {
+            "description": "A natural language summary of the generated query, useful for explaining the query's intent to agents",
+            "example": "This query retrieves the top 10 functions with the highest failure rate over the past week, showing the total number of runs, number of failures, and calculated failure rate for each function.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsPromptRequest": {
+        "properties": {
+          "prompt": {
+            "description": "Natural language description of the query to generate",
+            "example": "Show me the top 10 functions by failure rate in the last 7 days",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsPromptResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2QueryInsightsPromptData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsRequest": {
+        "properties": {
+          "query": {
+            "description": "The insights query to execute, written in modified ClickHouse SQL",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2QueryInsightsResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2QueryInsightsData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2ResponseMetadata": {
+        "properties": {
+          "cachedUntil": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fetchedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2RunTrigger": {
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "cronSchedule": {
+            "type": "string"
+          },
+          "eventIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "eventName": {
+            "type": "string"
+          },
+          "isBatch": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "v2SigningKey": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2SyncAppData": {
+        "properties": {
+          "appId": {
+            "description": "App ID",
+            "type": "string"
+          },
+          "error": {
+            "$ref": "#/components/schemas/v2SyncAppError"
+          },
+          "id": {
+            "description": "ID",
+            "type": "string"
+          },
+          "status": {
+            "description": "Status",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2SyncAppError": {
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "v2SyncAppResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/v2SyncAppData"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/v2ResponseMetadata"
+          }
+        },
+        "type": "object"
+      },
+      "v2TraceSpan": {
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/v2TraceSpan"
+            },
+            "type": "array"
+          },
+          "durationMs": {
+            "format": "uint64",
+            "type": "string"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object"
+          },
+          "metadata": {
+            "items": {
+              "$ref": "#/components/schemas/v2TraceSpanMetadata"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "output": {
+            "type": "object"
+          },
+          "queuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/v2TraceSpanStatus"
+          },
+          "stepId": {
+            "type": "string"
+          },
+          "stepOp": {
+            "$ref": "#/components/schemas/v2TraceStepOp"
+          }
+        },
+        "type": "object"
+      },
+      "v2TraceSpanMetadata": {
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "v2TraceSpanStatus": {
+        "default": "UNKNOWN",
+        "enum": [
+          "UNKNOWN",
+          "RUNNING",
+          "COMPLETED",
+          "FAILED",
+          "WAITING",
+          "CANCELLED",
+          "SKIPPED"
+        ],
+        "type": "string"
+      },
+      "v2TraceStepOp": {
+        "default": "UNSPECIFIED",
+        "enum": [
+          "UNSPECIFIED",
+          "RUN",
+          "SLEEP",
+          "WAIT_FOR_EVENT",
+          "INVOKE",
+          "SEND_EVENT",
+          "AI_GATEWAY",
+          "WAIT_FOR_SIGNAL"
+        ],
+        "type": "string"
+      },
+      "v2Webhook": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "eventFilter": {
+            "$ref": "#/components/schemas/v2EventFilter"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "response": {
+            "type": "string"
+          },
+          "transform": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "description": "Bearer token authentication. Format: `Bearer {key}`",
+        "in": "header",
+        "name": "Authorization",
+        "type": "apiKey"
+      }
+    }
+  },
   "info": {
     "description": "The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.",
     "title": "Inngest REST API v2",
     "version": "2.0.0"
   },
-  "servers": [
-    {
-      "description": "Production server",
-      "url": "https://api.inngest.com/v2"
-    },
-    {
-      "description": "Development server",
-      "url": "http://localhost:8288/api/v2"
-    }
-  ],
+  "openapi": "3.0.3",
   "paths": {
     "/account": {
       "get": {
@@ -104,6 +1460,52 @@
         "summary": "Get account",
         "tags": [
           "Account"
+        ]
+      }
+    },
+    "/apps/{appId}/functions/{functionId}": {
+      "get": {
+        "description": "Fetches function configuration and status details for a function within an app",
+        "operationId": "V2_GetFunction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "appId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "functionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetFunctionResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get function",
+        "tags": [
+          "Functions",
+          "Beta"
         ]
       }
     },
@@ -360,9 +1762,9 @@
         ],
         "summary": "Sync app",
         "tags": [
-          "Apps"
-        ],
-        "x-beta": true
+          "Apps",
+          "Beta"
+        ]
       }
     },
     "/env/webhooks": {
@@ -947,6 +2349,69 @@
         "summary": "Update environment",
         "tags": [
           "Environments"
+        ]
+      }
+    },
+    "/events/{eventId}/runs": {
+      "get": {
+        "description": "Lists function runs triggered by a specific event",
+        "operationId": "V2_GetEventRuns",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "eventId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeOutput",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Pagination cursor from previous response",
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Number of runs to return per page (min: 1, max: 40)",
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": "20",
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/v2GetEventRunsResponse"
+                }
+              }
+            },
+            "description": "A successful response."
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get event runs",
+        "tags": [
+          "Runs",
+          "Beta"
         ]
       }
     },
@@ -1621,9 +3086,9 @@
         ],
         "summary": "Get function run",
         "tags": [
-          "Runs"
-        ],
-        "x-beta": true
+          "Runs",
+          "Beta"
+        ]
       }
     },
     "/runs/{runId}/trace": {
@@ -1666,844 +3131,22 @@
         ],
         "summary": "Get function trace",
         "tags": [
-          "Runs"
-        ],
-        "x-beta": true
+          "Runs",
+          "Beta"
+        ]
       }
     }
   },
-  "components": {
-    "schemas": {
-      "V2InvokeFunctionBody": {
-        "properties": {
-          "data": {
-            "description": "JSON object containing the input data for the function",
-            "example": {
-              "message": "Hello, World!"
-            },
-            "type": "object"
-          },
-          "idempotencyKey": {
-            "description": "Optional idempotency key to handle duplicate requests within a given idempotency period.",
-            "example": "user-action-123",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "V2PatchEnvBody": {
-        "properties": {
-          "isArchived": {
-            "description": "Updates the archived status of the environment. Set to true to archive the environment or false to unarchive it.",
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "V2SyncAppBody": {
-        "properties": {
-          "url": {
-            "description": "URL for the Inngest endpoint in the app",
-            "example": "https://example.com/api/inngest",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "protobufAny": {
-        "additionalProperties": {},
-        "properties": {
-          "@type": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "protobufNullValue": {
-        "default": "NULL_VALUE",
-        "description": "`NullValue` is a singleton enumeration to represent the null value for the\n`Value` type union.\n\nThe JSON representation for `NullValue` is JSON `null`.\n\n - NULL_VALUE: Null value.",
-        "enum": [
-          "NULL_VALUE"
-        ],
-        "type": "string"
-      },
-      "rpcStatus": {
-        "properties": {
-          "code": {
-            "format": "int32",
-            "type": "integer"
-          },
-          "details": {
-            "items": {
-              "$ref": "#/components/schemas/protobufAny"
-            },
-            "type": "array"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2Account": {
-        "properties": {
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2AppRef": {
-        "properties": {
-          "id": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2CreateAccountData": {
-        "properties": {
-          "apiKey": {
-            "type": "string"
-          },
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2CreateAccountRequest": {
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2CreateAccountResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2CreateAccountData"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2CreateEnvRequest": {
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2CreateEnvResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2Env"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2CreateWebhookRequest": {
-        "properties": {
-          "eventFilter": {
-            "$ref": "#/components/schemas/v2EventFilter"
-          },
-          "name": {
-            "description": "Descriptive name for the webhook",
-            "example": "Payment Processing Webhook",
-            "type": "string"
-          },
-          "response": {
-            "description": "Optional inline JS function which is called to respond to GET requests",
-            "example": "function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };",
-            "type": "string"
-          },
-          "transform": {
-            "description": "The inline JS transform function for incoming events",
-            "example": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2CreateWebhookResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2Webhook"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2Env": {
-        "properties": {
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "isArchived": {
-            "type": "boolean"
-          },
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "$ref": "#/components/schemas/v2EnvType"
-          }
-        },
-        "type": "object"
-      },
-      "v2EnvType": {
-        "default": "PRODUCTION",
-        "enum": [
-          "PRODUCTION",
-          "TEST",
-          "BRANCH"
-        ],
-        "type": "string"
-      },
-      "v2Error": {
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2ErrorResponse": {
-        "properties": {
-          "errors": {
-            "items": {
-              "$ref": "#/components/schemas/v2Error"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "v2EventFilter": {
-        "properties": {
-          "events": {
-            "description": "Allow or deny specific events, e.g. 'orders/payment.created', or 'orders/*' for all orders. Only events in this list will be either allowed or denied.",
-            "example": [
-              "orders/payment.created",
-              "orders/*"
-            ],
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "filter": {
-            "$ref": "#/components/schemas/v2FilterType"
-          }
-        },
-        "type": "object"
-      },
-      "v2EventKey": {
-        "properties": {
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "environment": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "key": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2FetchAccountEnvsResponse": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/v2Env"
-            },
-            "type": "array"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          },
-          "page": {
-            "$ref": "#/components/schemas/v2Page"
-          }
-        },
-        "type": "object"
-      },
-      "v2FetchAccountEventKeysResponse": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/v2EventKey"
-            },
-            "type": "array"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          },
-          "page": {
-            "$ref": "#/components/schemas/v2Page"
-          }
-        },
-        "type": "object"
-      },
-      "v2FetchAccountResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2Account"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2FetchAccountSigningKeysResponse": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/v2SigningKey"
-            },
-            "type": "array"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          },
-          "page": {
-            "$ref": "#/components/schemas/v2Page"
-          }
-        },
-        "type": "object"
-      },
-      "v2FetchAccountsResponse": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/v2Account"
-            },
-            "type": "array"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          },
-          "page": {
-            "$ref": "#/components/schemas/v2Page"
-          }
-        },
-        "type": "object"
-      },
-      "v2FilterType": {
-        "default": "ALLOW",
-        "enum": [
-          "ALLOW",
-          "DENY"
-        ],
-        "type": "string"
-      },
-      "v2FunctionRef": {
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2FunctionRun": {
-        "properties": {
-          "app": {
-            "$ref": "#/components/schemas/v2AppRef"
-          },
-          "durationMs": {
-            "format": "uint64",
-            "type": "string"
-          },
-          "endedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "function": {
-            "$ref": "#/components/schemas/v2FunctionRef"
-          },
-          "id": {
-            "type": "string"
-          },
-          "output": {
-            "type": "object"
-          },
-          "queuedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "startedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "status": {
-            "$ref": "#/components/schemas/v2FunctionRunStatus"
-          },
-          "trigger": {
-            "$ref": "#/components/schemas/v2RunTrigger"
-          }
-        },
-        "type": "object"
-      },
-      "v2FunctionRunStatus": {
-        "default": "UNSPECIFIED",
-        "enum": [
-          "UNSPECIFIED",
-          "QUEUED",
-          "RUNNING",
-          "COMPLETED",
-          "FAILED",
-          "CANCELLED"
-        ],
-        "type": "string"
-      },
-      "v2FunctionTrace": {
-        "properties": {
-          "rootSpan": {
-            "$ref": "#/components/schemas/v2TraceSpan"
-          },
-          "runId": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2GetFunctionRunResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2FunctionRun"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2GetFunctionTraceResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2FunctionTrace"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2HealthData": {
-        "properties": {
-          "status": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2HealthResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2HealthData"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2InvokeFunctionData": {
-        "properties": {
-          "completedAt": {
-            "description": "Timestamp when the function execution completed (if finished)",
-            "format": "date-time",
-            "type": "string"
-          },
-          "error": {
-            "description": "Error message if the function execution failed",
-            "type": "string"
-          },
-          "queuedAt": {
-            "description": "Timestamp when the function execution was enqueued",
-            "format": "date-time",
-            "type": "string"
-          },
-          "result": {
-            "description": "JSON string containing the function result (only available for completed synchronous invocations)",
-            "example": "{\"success\": true, \"data\": \"Hello, World!\"}",
-            "type": "string"
-          },
-          "runId": {
-            "description": "Unique identifier for this function execution",
-            "example": "01hp1zx8m3ng9vp6qn0xk7j4cy",
-            "type": "string"
-          },
-          "startedAt": {
-            "description": "Timestamp when the function execution started (if started)",
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2InvokeFunctionResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2InvokeFunctionData"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2ListWebhooksResponse": {
-        "properties": {
-          "data": {
-            "items": {
-              "$ref": "#/components/schemas/v2Webhook"
-            },
-            "type": "array"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          },
-          "page": {
-            "$ref": "#/components/schemas/v2Page"
-          }
-        },
-        "type": "object"
-      },
-      "v2Page": {
-        "properties": {
-          "cursor": {
-            "type": "string"
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "limit": {
-            "format": "int32",
-            "type": "integer"
-          }
-        },
-        "type": "object"
-      },
-      "v2PatchEnvsResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2Env"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2ResponseMetadata": {
-        "properties": {
-          "cachedUntil": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "fetchedAt": {
-            "format": "date-time",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2RunTrigger": {
-        "properties": {
-          "batchId": {
-            "type": "string"
-          },
-          "cronSchedule": {
-            "type": "string"
-          },
-          "eventIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "eventName": {
-            "type": "string"
-          },
-          "isBatch": {
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "v2SigningKey": {
-        "properties": {
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "environment": {
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "key": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2SyncAppData": {
-        "properties": {
-          "appId": {
-            "description": "App ID",
-            "type": "string"
-          },
-          "error": {
-            "$ref": "#/components/schemas/v2SyncAppError"
-          },
-          "id": {
-            "description": "ID",
-            "type": "string"
-          },
-          "status": {
-            "description": "Status",
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2SyncAppError": {
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      },
-      "v2SyncAppResponse": {
-        "properties": {
-          "data": {
-            "$ref": "#/components/schemas/v2SyncAppData"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/v2ResponseMetadata"
-          }
-        },
-        "type": "object"
-      },
-      "v2TraceSpan": {
-        "properties": {
-          "children": {
-            "items": {
-              "$ref": "#/components/schemas/v2TraceSpan"
-            },
-            "type": "array"
-          },
-          "durationMs": {
-            "format": "uint64",
-            "type": "string"
-          },
-          "endedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "id": {
-            "type": "string"
-          },
-          "input": {
-            "type": "object"
-          },
-          "metadata": {
-            "items": {
-              "$ref": "#/components/schemas/v2TraceSpanMetadata"
-            },
-            "type": "array"
-          },
-          "name": {
-            "type": "string"
-          },
-          "output": {
-            "type": "object"
-          },
-          "queuedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "startedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "status": {
-            "$ref": "#/components/schemas/v2TraceSpanStatus"
-          },
-          "stepId": {
-            "type": "string"
-          },
-          "stepOp": {
-            "$ref": "#/components/schemas/v2TraceStepOp"
-          }
-        },
-        "type": "object"
-      },
-      "v2TraceSpanMetadata": {
-        "properties": {
-          "kind": {
-            "type": "string"
-          },
-          "scope": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "values": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object"
-          }
-        },
-        "type": "object"
-      },
-      "v2TraceSpanStatus": {
-        "default": "UNKNOWN",
-        "enum": [
-          "UNKNOWN",
-          "RUNNING",
-          "COMPLETED",
-          "FAILED",
-          "WAITING",
-          "CANCELLED",
-          "SKIPPED"
-        ],
-        "type": "string"
-      },
-      "v2TraceStepOp": {
-        "default": "UNSPECIFIED",
-        "enum": [
-          "UNSPECIFIED",
-          "RUN",
-          "SLEEP",
-          "WAIT_FOR_EVENT",
-          "INVOKE",
-          "SEND_EVENT",
-          "AI_GATEWAY",
-          "WAIT_FOR_SIGNAL"
-        ],
-        "type": "string"
-      },
-      "v2Webhook": {
-        "properties": {
-          "createdAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "environment": {
-            "type": "string"
-          },
-          "eventFilter": {
-            "$ref": "#/components/schemas/v2EventFilter"
-          },
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "response": {
-            "type": "string"
-          },
-          "transform": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "format": "date-time",
-            "type": "string"
-          },
-          "url": {
-            "type": "string"
-          }
-        },
-        "type": "object"
-      }
+  "servers": [
+    {
+      "description": "Production server",
+      "url": "https://api.inngest.com/v2"
     },
-    "securitySchemes": {
-      "BearerAuth": {
-        "description": "Bearer token authentication. Format: `Bearer {key}`",
-        "in": "header",
-        "name": "Authorization",
-        "type": "apiKey"
-      }
+    {
+      "description": "Development server",
+      "url": "http://localhost:8288/api/v2"
     }
-  },
+  ],
   "tags": [
     {
       "description": "Manage your account",
@@ -2535,8 +3178,7 @@
     },
     {
       "description": "Partner account management",
-      "name": "Partner API",
-      "x-displayName": "Partner API"
+      "name": "Partner API"
     },
     {
       "name": "V2"

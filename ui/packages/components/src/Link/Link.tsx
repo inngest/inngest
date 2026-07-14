@@ -14,7 +14,11 @@ type CustomLinkProps = {
   rel?: string;
 };
 
-export type LinkProps = CustomLinkProps & LinkComponentProps;
+type RouterLinkProps = Omit<LinkComponentProps, 'to'> & {
+  to?: LinkComponentProps['to'] | string;
+};
+
+export type LinkProps = CustomLinkProps & RouterLinkProps;
 
 export function Link({
   href,
@@ -52,7 +56,7 @@ export function Link({
         size === 'medium' && 'text-base',
         className
       )}
-      {...props}
+      {...(props as LinkComponentProps)}
     >
       {iconBefore}
       {children}
