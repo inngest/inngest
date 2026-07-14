@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -118,4 +119,35 @@ type RerunFromStep struct {
 type FunctionTraceReader interface {
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error)
 	GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error)
+	GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error)
+}
+
+type ScoreExperimentInput struct {
+	ExperimentName string
+	Variant        string
+}
+
+// ScoreInput describes a single named score recorded against a run, or against
+// a specific step when StepID is set.
+type ScoreInput struct {
+	StepID     *string
+	Experiment *ScoreExperimentInput
+	Name       string
+	// Value is a finite float64 or a bool.
+	Value    any
+	Metadata []metadata.Update
+}
+
+// CreateScoresParams describes one or more scores recorded against a run.
+type CreateScoresParams struct {
+	RunID  ulid.ULID
+	Scores []ScoreInput
+}
+
+type ScoreProvider interface {
+	// CreateScores records one or more scores for a run or step. Score writes
+	// are best-effort; targets are not validated before writing, and scores for
+	// missing runs or steps may not surface in queries. Implementations return
+	// ErrScoresNotEnabled when the account cannot submit scores.
+	CreateScores(ctx context.Context, params CreateScoresParams) error
 }

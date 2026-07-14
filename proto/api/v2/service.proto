@@ -1014,6 +1014,25 @@ service V2 {
     };
   }
 
+  rpc CreateScore(CreateScoreRequest) returns (CreateScoreResponse) {
+    option (google.api.http) = {
+      post: "/runs/{run_id}/scores",
+      body: "scores"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create score"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Submits one or more named scores for a function run, or for specific steps when step IDs are provided. Scores are recorded as run metadata and aggregated for experiments."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc SyncApp(SyncAppRequest) returns (SyncAppResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/syncs",
@@ -2506,6 +2525,94 @@ message InvokeFunctionData {
   optional string error = 6 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Error message if the function execution failed"
+    }
+  ];
+}
+
+message CreateScoreRequest {
+  string run_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run ID (ULID) of the function run to score"
+      example: "\"01JLW1NNJ69KCD1KMJEXAMPLE0\""
+    }
+  ];
+  repeated CreateScoreInput scores = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Scores to record for the run. The REST request body is this array. Writes are applied in order and are not atomic; if a later score fails, earlier scores may already be recorded. Score writes are best-effort: run and step targets are not validated before writing, and scores for targets that do not exist may not surface in queries. Maximum 100 scores."
+    }
+  ];
+}
+
+message CreateScoreInput {
+  string name = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Score name; must be at most 128 UTF-8 bytes"
+      example: "\"accuracy\""
+    }
+  ];
+  google.protobuf.Value value = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Score value; must be a finite number or a boolean"
+      example: "0.95"
+    }
+  ];
+  optional string step_id = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional SDK step ID; attaches the score to a specific step instead of the run. Step targets are recorded best-effort and are not validated before writing."
+      example: "\"generate-summary\""
+    }
+  ];
+  optional ScoreExperiment experiment = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional experiment context. When provided, the score is recorded with the same experiment metadata emitted by the SDK's score.experiment API. Experiment scores must be run-scoped for experiment aggregate and detail APIs."
+    }
+  ];
+}
+
+message ScoreExperiment {
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Experiment ID"
+      example: "\"model-routing\""
+    }
+  ];
+  string variant = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Experiment variant"
+      example: "\"baseline\""
+    }
+  ];
+}
+
+message CreateScoreResponse {
+  repeated Score data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message Score {
+  string run_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run ID the score was recorded against"
+    }
+  ];
+  string name = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Score name"
+    }
+  ];
+  google.protobuf.Value value = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Score value"
+    }
+  ];
+  optional string step_id = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Step ID the score was recorded against, if step-scoped"
+    }
+  ];
+  optional ScoreExperiment experiment = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Experiment context the score was recorded against, if provided"
     }
   ];
 }

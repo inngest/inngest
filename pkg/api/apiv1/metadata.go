@@ -117,6 +117,29 @@ type AddRunMetadataRequest struct {
 	Metadata []metadata.Update `json:"metadata"`
 }
 
+type AddRunMetadataOpts struct {
+	State          statev2.RunService
+	TracerProvider tracing.TracerProvider
+	TraceReader    cqrs.TraceReader
+}
+
+func AddRunMetadata(ctx context.Context, opts AddRunMetadataOpts, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
+	tracerProvider := opts.TracerProvider
+	if tracerProvider == nil {
+		tracerProvider = tracing.NewNoopTracerProvider()
+	}
+	r := router{
+		API: &API{
+			opts: Opts{
+				State:          opts.State,
+				TracerProvider: tracerProvider,
+				TraceReader:    opts.TraceReader,
+			},
+		},
+	}
+	return r.AddRunMetadata(ctx, auth, runID, req)
+}
+
 func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
 	if err := metadata.ValidateUpdatesAllowed(req.Metadata); err != nil {
 		return publicerr.Wrap(err, 400, "Invalid metadata")
@@ -231,6 +254,15 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			return err
 		}
 	}
+	if parentSpanRef != nil && parentSpanRef.DynamicSpanID != "" {
+		if err := a.opts.TracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "router.AddRunMetadata.refreshTarget"},
+			Metadata:   stateMetadata,
+			TargetSpan: parentSpanRef,
+		}); err != nil {
+			return err
+		}
+	}
 
 	// Persist the cumulative metadata size delta back to the state store.
 	// Only persist when we successfully loaded from state; the fallback
@@ -254,6 +286,10 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 // deterministicSpanIDCutoff. It queries ClickHouse to locate the parent span
 // with a retry loop to absorb Kafka→ClickHouse propagation latency.
 func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
+	if a.opts.TraceReader == nil {
+		return publicerr.Errorf(http.StatusBadRequest, "trace reader not provided, aborting legacy metadata retrieval")
+	}
+
 	var parentSpan *cqrs.OtelSpan
 	var scope metadata.Scope
 	var err error
@@ -368,6 +404,15 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 			addTenantIDs,
 		)
 		if err != nil {
+			return err
+		}
+	}
+	if parentSpanRef != nil && parentSpanRef.DynamicSpanID != "" {
+		if err := a.opts.TracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
+			Debug:      &tracing.SpanDebugData{Location: "router.AddRunMetadata.refreshTarget"},
+			Metadata:   stateMetadata,
+			TargetSpan: parentSpanRef,
+		}); err != nil {
 			return err
 		}
 	}

@@ -725,6 +725,17 @@ func start(ctx context.Context, opts StartOpts) error {
 		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
+		Scores: apiv2.NewStateScoreProvider(apiv2.StateScoreProviderOptions{
+			State:          smv2,
+			TracerProvider: tp,
+			Auth: func(ctx context.Context) (uuid.UUID, uuid.UUID, error) {
+				return consts.DevServerAccountID, consts.DevServerEnvID, nil
+			},
+			Enabled: func(ctx context.Context, accountID uuid.UUID) bool {
+				return enableStepMetadata
+			},
+			MissingStateLoader: scoreMetadataLoader(dbcqrs),
+		}),
 	}
 
 	apiv2Base := apiv2base.NewBase()

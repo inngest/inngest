@@ -12,6 +12,10 @@ const (
 	KindInngestScore Kind = "inngest.score"
 )
 
+const (
+	MaxScoreNameByteLength = 128
+)
+
 // validateScoreName checks a user-supplied score name (a key in the
 // inngest.score values map) for characters that downstream consumers can't
 // safely round-trip. Mirrors the SDK validation and the monorepo
@@ -19,6 +23,10 @@ const (
 // quote (which would silently drop in cloud variant aggregation because
 // MetricKeyRegex excludes it for SQL-injection defense).
 func validateScoreName(name string) error {
+	if len(name) > MaxScoreNameByteLength {
+		return fmt.Errorf("invalid score name %q: %w of %d UTF-8 bytes", name, ErrScoreNameTooLong, MaxScoreNameByteLength)
+	}
+
 	for _, r := range name {
 		if r < 0x20 || r == 0x7f || r == '\'' {
 			return fmt.Errorf("invalid score name %q: %w", name, ErrScoreNameInvalid)
