@@ -62,7 +62,12 @@ func TestQueueItemProtoRoundTrip(t *testing.T) {
 				ReplayID:        &replayID,
 				PriorityFactor:  &priorityFactor,
 				CustomConcurrencyKeys: []state.CustomConcurrency{
-					{Key: "f:fn:key-a", Hash: "hash-a", Limit: 10},
+					{
+						Key:                       "f:fn:key-a",
+						Hash:                      "hash-a",
+						Limit:                     10,
+						UnhashedEvaluatedKeyValue: "identifier-customer",
+					},
 				},
 				Semaphores: []constraintapi.Semaphore{
 					{
@@ -95,18 +100,24 @@ func TestQueueItemProtoRoundTrip(t *testing.T) {
 				ScavengeCount: 1,
 			},
 			Throttle: &Throttle{
-				Key:               "throttle-key",
-				Limit:             10,
-				Burst:             20,
-				Period:            30,
-				KeyExpressionHash: "expr-hash",
+				Key:                 "throttle-key",
+				Limit:               10,
+				Burst:               20,
+				Period:              30,
+				UnhashedThrottleKey: "raw-throttle",
+				KeyExpressionHash:   "expr-hash",
 			},
 			Singleton: &Singleton{
 				Key:  "singleton-key",
 				Mode: enums.SingletonModeCancel,
 			},
 			CustomConcurrencyKeys: []state.CustomConcurrency{
-				{Key: "a:acct:key-b", Hash: "hash-b", Limit: 4},
+				{
+					Key:                       "a:acct:key-b",
+					Hash:                      "hash-b",
+					Limit:                     4,
+					UnhashedEvaluatedKeyValue: "item-customer",
+				},
 			},
 			PriorityFactor:      &priorityFactor,
 			ParallelMode:        enums.ParallelModeRace,
@@ -285,6 +296,44 @@ func TestQueueItemFromProtoInvalidIDs(t *testing.T) {
 	require.ErrorContains(t, err, "queue item lease_id")
 }
 
+// TestQueueItemProtoNestedErrorPropagation guards top-level queue item
+// conversion from swallowing errors produced by nested item metadata and
+// runtime lease conversion.
+func TestQueueItemProtoNestedErrorPropagation(t *testing.T) {
+	_, err := QueueItemToProto(QueueItem{
+		FunctionID:  uuid.New(),
+		WorkspaceID: uuid.New(),
+		Data: Item{
+			WorkspaceID: uuid.New(),
+			Identifier:  validIdentifier(),
+			Metadata:    map[string]any{"bad": make(chan struct{})},
+		},
+	})
+	require.ErrorContains(t, err, "marshal item metadata")
+
+	_, err = QueueItemFromProto(&pb.QueueItem{
+		FunctionId:  uuid.NewString(),
+		WorkspaceId: uuid.NewString(),
+		Data: &pb.Item{
+			WorkspaceId: uuid.NewString(),
+			Identifier:  validIdentifierProto(),
+			Metadata:    []byte(`{`),
+		},
+	})
+	require.ErrorContains(t, err, "unmarshal item metadata")
+
+	_, err = QueueItemFromProto(&pb.QueueItem{
+		FunctionId:  uuid.NewString(),
+		WorkspaceId: uuid.NewString(),
+		Data: &pb.Item{
+			WorkspaceId: uuid.NewString(),
+			Identifier:  validIdentifierProto(),
+		},
+		CapacityLease: &pb.CapacityLease{LeaseId: "bad"},
+	})
+	require.ErrorContains(t, err, "capacity lease lease_id")
+}
+
 // TestItemFromProtoInvalidIDs guards nested item identifiers against malformed
 // proxy payloads that would otherwise decode to zero values.
 func TestItemFromProtoInvalidIDs(t *testing.T) {
@@ -324,7 +373,12 @@ func TestIdentifierProtoRoundTrip(t *testing.T) {
 		ReplayID:        &replayID,
 		PriorityFactor:  &priorityFactor,
 		CustomConcurrencyKeys: []state.CustomConcurrency{
-			{Key: "f:fn:key", Hash: "hash", Limit: 2},
+			{
+				Key:                       "f:fn:key",
+				Hash:                      "hash",
+				Limit:                     2,
+				UnhashedEvaluatedKeyValue: "customer-1",
+			},
 		},
 		Semaphores: []constraintapi.Semaphore{
 			{ID: "app:test", EvaluatedKeyHash: "hash", Weight: 3, Release: constraintapi.SemaphoreReleaseManual},
@@ -564,6 +618,32 @@ func TestMalformedItemProtoInputs(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "capacity lease lease_id")
+}
+
+// TestJSONPayloadAndMetadataConversion guards raw JSON payload transport and
+// metadata decoding separately from the full queue item fixture.
+func TestJSONPayloadAndMetadataConversion(t *testing.T) {
+	payload := json.RawMessage(`{"n":1}`)
+	item, err := ItemFromProto(&pb.Item{
+		WorkspaceId: uuid.NewString(),
+		Kind:        "custom-cloud-kind",
+		Identifier:  validIdentifierProto(),
+		Payload:     payload,
+		Metadata:    []byte(`{"flag":true,"count":2}`),
+	})
+	require.NoError(t, err)
+	require.Equal(t, payload, item.Payload)
+	require.Equal(t, map[string]any{"flag": true, "count": float64(2)}, item.Metadata)
+
+	msg, err := ItemToProto(Item{
+		WorkspaceID: uuid.New(),
+		Identifier:  validIdentifier(),
+		Payload:     payload,
+		Metadata:    map[string]any{"flag": true},
+	})
+	require.NoError(t, err)
+	require.Equal(t, []byte(payload), msg.GetPayload())
+	require.JSONEq(t, `{"flag":true}`, string(msg.GetMetadata()))
 }
 
 // TestDurationPointerConversion guards optional duration semantics used by
