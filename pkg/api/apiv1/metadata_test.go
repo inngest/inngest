@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"net/http"
 	"testing"
 	"time"
 
@@ -358,4 +359,28 @@ func TestAddRunMetadataLegacyPathForOldRuns(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, tp.called)
+}
+
+func TestAddRunMetadataLegacyPathRequiresTraceReader(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := preDeterministicSpanIDRunID()
+	r := router{API: &API{opts: Opts{}}}
+
+	require.NotPanics(t, func() {
+		err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+			Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+				Kind:   "userland.scores",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: metadata.Values{"score": json.RawMessage(`{"value":1}`)},
+			}}},
+		})
+	})
+
+	var publicErr publicerr.Error
+	require.ErrorAs(t, err, &publicErr)
+	require.Equal(t, http.StatusBadRequest, publicErr.Status)
+	require.Equal(t, "trace reader not provided, aborting legacy metadata retrieval", publicErr.Message)
 }

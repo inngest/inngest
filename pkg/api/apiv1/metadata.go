@@ -286,6 +286,10 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 // deterministicSpanIDCutoff. It queries ClickHouse to locate the parent span
 // with a retry loop to absorb Kafka→ClickHouse propagation latency.
 func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth, runID ulid.ULID, req *AddRunMetadataRequest) error {
+	if a.opts.TraceReader == nil {
+		return publicerr.Errorf(http.StatusBadRequest, "trace reader not provided, aborting legacy metadata retrieval")
+	}
+
 	var parentSpan *cqrs.OtelSpan
 	var scope metadata.Scope
 	var err error
