@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.37.0] - 2026-07-14
+
+### 🚀 Features
+
+- *(queue)* Make pause requeue extension configurable (#4569)
+- *(constraintapi)* Return lease usage from lifecycle ops (#4596)
+- Bring AI Metadata extraction from extended traces to parity with JS SDK (#4572)
+- *(traces)* Remove run-details-v4 flag and legacy RunDetailsV3, always render V4 (#4584)
+- *(api)* Add v2 score endpoint (#4453)
+
+### 🐛 Bug Fixes
+
+- *(execution)* Improve copy for error responses that do not come from the SDK (#4566)
+- Hydrate determinstic spans for sleep queue items on retries (#4592)
+- Lease race causing wasted work (#4593)
+- *(constraintapi)* Fix Constraint API marshaling (#4602)
+- *(dashboard)* Update Scores and Sessions nav icons (#4605)
+- *(tracing)* Stop dev server finalization group spans from duplicating in the trace UI (#4600)
+- Display errored attempts without step as `Function Error` rather than Finalization (#4571)
+- *(tracing)* Drop duplicate finalization span on errored runs (#4598)
+- *(sessions)* Sessions docs url (#4609)
+
+### 🚜 Refactor
+
+- *(queue)* Subsume QueueManager APIs into other appropriate narrow interfaces (#4581)
+- *(ui)* Decompose traceRollup into focused helpers (#4597)
+- *(queue)* Break up queueProcessor (#4606)
+
+### ⚡ Performance
+
+- Reduce sleep queue item payload size (#4591)
+
+### 🧪 Testing
+
+- *(constraintapi)* Add Redis Lua compatibility regression (#4603)
+- Capture WaitForRunStatus status-transition history on timeout (#4447)
+- *(dnscache)* Test DNS cache against mock servers to reduce flakes (#4595)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(e2e)* Check that the dev server comes up (#4583)
+- *(tygo-collect)* Gofmt generated output (#4586)
+- Remove unused TotalSystemQueueDepth from QueueManager interface (#4574)
+- Cache our pnpm installation (#4588)
+
 ## [v1.36.0] - 2026-07-08
 
 ### 🚀 Features
@@ -16,6 +61,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - *(go)* Move one unit test job to Depot (#4568)
+- *(release)* V1.36.0 (#4573)
 
 ### 🛡️ Security
 
