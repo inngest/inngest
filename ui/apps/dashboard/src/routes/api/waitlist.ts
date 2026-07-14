@@ -1,16 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { auth } from '@clerk/tanstack-react-start/server';
 
-// Read lazily; validated inside the handler so a missing config only fails the
-// waitlist endpoint rather than crashing the whole app at module-load time.
 // NOTION_WAITLIST_API_KEY is the secret for the dedicated "sandbox waitlist"
 // Notion integration; NOTION_WAITLIST_DATABASE_ID holds the Notion *data
-// source* id (the id returned by the Notion connector), addressed below via
-// the data-source API.
-const apiKey = process.env.NOTION_WAITLIST_API_KEY;
-const dataSourceId = process.env.NOTION_WAITLIST_DATABASE_ID;
+// source* id (the id returned by the Notion connector). Both are read inside
+// the handler so hot-reloading new env values takes effect without a full
+// restart, and so the Authorization header is never built from `undefined`.
 
-const NOTION_PAGES_URL = 'https://api.notion.com/v1/pages';
+const NOTION_API_BASE = 'https://api.notion.com/v1';
 // Data sources (parent.data_source_id) require the 2025-09-03 API or later.
 const NOTION_VERSION = '2025-09-03';
 
@@ -34,28 +31,30 @@ type Identity = {
 };
 
 // `join` is fired when the modal opens (records intent immediately); `answers`
-// updates that row when the user clicks Send. `answers` falls back to creating
-// a row if the original `join` create failed (no pageId).
+// updates that signup with the user's responses when they click Send. The row
+// is always located server-side via the authenticated Clerk user id — the
+// client never supplies a Notion page id, which avoids an IDOR where a crafted
+// id could patch someone else's row.
 export type RequestBody = Partial<Identity> & {
   action: 'join' | 'answers';
-  pageId?: string;
   workflow?: string;
   canContact?: boolean;
 };
 
-const notionHeaders = {
-  Authorization: `Bearer ${apiKey}`,
-  'Notion-Version': NOTION_VERSION,
-  'Content-Type': 'application/json',
-};
-
-// Identity properties match the "Sandbox waitlist" Notion data source:
-// Name (title), User (rich_text), Organisation (rich_text), Page (url).
-function identityProperties(identity: Identity) {
+function notionHeaders(apiKey: string) {
   return {
-    Name: {
-      title: [{ text: { content: identity.user.name.slice(0, 60) } }],
-    },
+    Authorization: `Bearer ${apiKey}`,
+    'Notion-Version': NOTION_VERSION,
+    'Content-Type': 'application/json',
+  };
+}
+
+// Identity properties match the "Sandboxes [Waitlist]" Notion data source:
+// Name (title), User (rich_text), Organisation (rich_text), Page (url),
+// Clerk User ID (rich_text — the server-trusted owner used to locate the row).
+function identityProperties(identity: Identity, userId: string) {
+  return {
+    Name: { title: [{ text: { content: identity.user.name.slice(0, 60) } }] },
     User: {
       rich_text: [
         { text: { content: `${identity.user.name} <${identity.user.email}>` } },
@@ -65,6 +64,7 @@ function identityProperties(identity: Identity) {
       rich_text: [{ text: { content: identity.organization.name } }],
     },
     Page: { url: identity.page },
+    'Clerk User ID': { rich_text: [{ text: { content: userId } }] },
   };
 }
 
@@ -87,10 +87,44 @@ function json(body: unknown, status: number) {
   });
 }
 
+// Locate the current user's own signup row by the server-trusted Clerk user id.
+// Returns the most recent match, or null if none exists / the query fails.
+async function findOwnRowId(
+  apiKey: string,
+  dataSourceId: string,
+  userId: string,
+): Promise<string | null> {
+  const res = await fetch(
+    `${NOTION_API_BASE}/data_sources/${dataSourceId}/query`,
+    {
+      method: 'POST',
+      headers: notionHeaders(apiKey),
+      body: JSON.stringify({
+        filter: { property: 'Clerk User ID', rich_text: { equals: userId } },
+        sorts: [{ timestamp: 'created_time', direction: 'descending' }],
+        page_size: 1,
+      }),
+    },
+  );
+  if (!res.ok) {
+    console.error(
+      'error querying waitlist rows via Notion API',
+      await res.text().catch(() => null),
+    );
+    return null;
+  }
+  const data = (await res.json().catch(() => null)) as {
+    results?: { id: string }[];
+  } | null;
+  return data?.results?.[0]?.id ?? null;
+}
+
 export const Route = createFileRoute('/api/waitlist')({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const apiKey = process.env.NOTION_WAITLIST_API_KEY;
+        const dataSourceId = process.env.NOTION_WAITLIST_DATABASE_ID;
         if (!apiKey || !dataSourceId) {
           console.error(
             'waitlist endpoint is missing NOTION_WAITLIST_API_KEY or NOTION_WAITLIST_DATABASE_ID',
@@ -104,57 +138,66 @@ export const Route = createFileRoute('/api/waitlist')({
         }
 
         const body = (await request.json()) as RequestBody;
+        const headers = notionHeaders(apiKey);
+        const submitting = body.action === 'answers';
 
-        // Update an existing signup row with the user's answers.
-        if (body.action === 'answers' && body.pageId) {
-          const res = await fetch(`${NOTION_PAGES_URL}/${body.pageId}`, {
-            method: 'PATCH',
-            headers: notionHeaders,
-            body: JSON.stringify({
-              properties: {
-                ...answerProperties(
-                  body.workflow ?? '',
-                  body.canContact === true,
-                ),
-                Status: { select: { name: 'Submitted' } },
-              },
-            }),
-          });
-
-          if (!res.ok) {
-            console.error(
-              'error updating waitlist row via Notion API',
-              await res.text().catch(() => null),
-            );
-            return json({ error: 'Failed to submit answers' }, 500);
+        // Answers: patch this user's own row (located server-side). If they
+        // have no row yet (join create failed / never fired), fall through to
+        // create one below with the answers included.
+        if (submitting) {
+          const ownRowId = await findOwnRowId(apiKey, dataSourceId, userId);
+          if (ownRowId) {
+            const res = await fetch(`${NOTION_API_BASE}/pages/${ownRowId}`, {
+              method: 'PATCH',
+              headers,
+              body: JSON.stringify({
+                properties: {
+                  ...answerProperties(
+                    body.workflow ?? '',
+                    body.canContact === true,
+                  ),
+                  Status: { select: { name: 'Submitted' } },
+                },
+              }),
+            });
+            if (!res.ok) {
+              console.error(
+                'error updating waitlist row via Notion API',
+                await res.text().catch(() => null),
+              );
+              return json({ error: 'Failed to submit answers' }, 500);
+            }
+            return json({ error: null }, 200);
           }
-
-          return json({ error: null }, 200);
+        } else {
+          // Join: keep signups one-per-user — if a row already exists, the
+          // click is already recorded, so don't create a duplicate.
+          const ownRowId = await findOwnRowId(apiKey, dataSourceId, userId);
+          if (ownRowId) {
+            return json({ error: null }, 200);
+          }
         }
 
-        // Otherwise create a new row: either the initial `join`, or an `answers`
-        // submission whose `join` create never landed (fallback).
+        // Create a new row: the initial `join`, or an `answers` submission with
+        // no existing row (fallback).
         if (!isIdentity(body)) {
           return json({ error: 'Missing user or organization' }, 400);
         }
 
-        const submitting = body.action === 'answers';
-        const res = await fetch(NOTION_PAGES_URL, {
+        const res = await fetch(`${NOTION_API_BASE}/pages`, {
           method: 'POST',
-          headers: notionHeaders,
+          headers,
           body: JSON.stringify({
             parent: { type: 'data_source_id', data_source_id: dataSourceId },
             properties: {
-              ...identityProperties(body),
+              ...identityProperties(body, userId),
               ...(submitting
                 ? answerProperties(
                     body.workflow ?? '',
                     body.canContact === true,
                   )
                 : {}),
-              Status: {
-                select: { name: submitting ? 'Submitted' : 'Joined' },
-              },
+              Status: { select: { name: submitting ? 'Submitted' : 'Joined' } },
             },
           }),
         });
@@ -167,10 +210,7 @@ export const Route = createFileRoute('/api/waitlist')({
           return json({ error: 'Failed to join the waitlist' }, 500);
         }
 
-        const created = (await res.json().catch(() => null)) as {
-          id?: string;
-        } | null;
-        return json({ error: null, pageId: created?.id ?? null }, 200);
+        return json({ error: null }, 200);
       },
     },
   },

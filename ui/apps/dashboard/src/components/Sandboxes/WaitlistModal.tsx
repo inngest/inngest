@@ -21,10 +21,9 @@ export default function WaitlistModal({ isOpen, onClose }: Props) {
   const [workflow, setWorkflow] = useState('');
   const [canContact, setCanContact] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Notion page id for the row created when the modal opened; updated on Send.
-  const [pageId, setPageId] = useState<string | null>(null);
   // Guards the join request against React's double-effect (and re-opens) so we
-  // don't create duplicate rows for a single signup.
+  // don't fire duplicate joins for a single modal session. The server locates
+  // the user's row by their Clerk id, so no page id is tracked client-side.
   const joiningRef = useRef(false);
 
   const email = user?.primaryEmailAddress?.emailAddress;
@@ -41,7 +40,7 @@ export default function WaitlistModal({ isOpen, onClose }: Props) {
   // Record the signup the moment the modal opens (the button click == intent),
   // even if the user later cancels without answering the questions.
   useEffect(() => {
-    if (!isOpen || joiningRef.current || pageId) return;
+    if (!isOpen || joiningRef.current) return;
     const identity = payloadIdentity();
     if (!identity) return;
 
@@ -53,15 +52,8 @@ export default function WaitlistModal({ isOpen, onClose }: Props) {
           credentials: 'include',
           body: JSON.stringify({ action: 'join', ...identity }),
         });
-        const data = (await res.json().catch(() => null)) as {
-          pageId?: string;
-        } | null;
-        if (res.ok && data?.pageId) {
-          setPageId(data.pageId);
-        } else {
-          // Allow a retry via the Send fallback if the join create failed.
-          joiningRef.current = false;
-        }
+        // Allow a retry via the Send fallback if the join create failed.
+        if (!res.ok) joiningRef.current = false;
       } catch {
         joiningRef.current = false;
       }
@@ -80,7 +72,6 @@ export default function WaitlistModal({ isOpen, onClose }: Props) {
         credentials: 'include',
         body: JSON.stringify({
           action: 'answers',
-          pageId,
           workflow,
           canContact,
           // Included so the server can create the row if the join call failed.
