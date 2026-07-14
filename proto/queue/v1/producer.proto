@@ -33,6 +33,7 @@ message RequeueByJobIDRequest {
   string shard_name = 1;
   string job_id = 2;
   google.protobuf.Timestamp at = 3;
+  Scope scope = 4;
 }
 
 message RequeueByJobIDResponse {}

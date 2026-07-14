@@ -220,6 +220,7 @@ type RequeueByJobIDRequest struct {
 	ShardName     string                 `protobuf:"bytes,1,opt,name=shard_name,json=shardName,proto3" json:"shard_name,omitempty"`
 	JobId         string                 `protobuf:"bytes,2,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
 	At            *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=at,proto3" json:"at,omitempty"`
+	Scope         *Scope                 `protobuf:"bytes,4,opt,name=scope,proto3" json:"scope,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -271,6 +272,13 @@ func (x *RequeueByJobIDRequest) GetJobId() string {
 func (x *RequeueByJobIDRequest) GetAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.At
+	}
+	return nil
+}
+
+func (x *RequeueByJobIDRequest) GetScope() *Scope {
+	if x != nil {
+		return x.Scope
 	}
 	return nil
 }
@@ -394,12 +402,13 @@ const file_queue_v1_producer_proto_rawDesc = "" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12'\n" +
 	"\x04item\x18\x02 \x01(\v2\x13.queue.v1.QueueItemR\x04item\x12*\n" +
 	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"\x11\n" +
-	"\x0fRequeueResponse\"y\n" +
+	"\x0fRequeueResponse\"\xa0\x01\n" +
 	"\x15RequeueByJobIDRequest\x12\x1d\n" +
 	"\n" +
 	"shard_name\x18\x01 \x01(\tR\tshardName\x12\x15\n" +
 	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12*\n" +
-	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\"\x18\n" +
+	"\x02at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12%\n" +
+	"\x05scope\x18\x04 \x01(\v2\x0f.queue.v1.ScopeR\x05scope\"\x18\n" +
 	"\x16RequeueByJobIDResponse\"\x94\x02\n" +
 	"\x0eEnqueueOptions\x12,\n" +
 	"\x12passthrough_job_id\x18\x01 \x01(\bR\x10passthroughJobId\x123\n" +
@@ -436,7 +445,8 @@ var file_queue_v1_producer_proto_goTypes = []any{
 	(*Item)(nil),                   // 7: queue.v1.Item
 	(*timestamppb.Timestamp)(nil),  // 8: google.protobuf.Timestamp
 	(*QueueItem)(nil),              // 9: queue.v1.QueueItem
-	(*durationpb.Duration)(nil),    // 10: google.protobuf.Duration
+	(*Scope)(nil),                  // 10: queue.v1.Scope
+	(*durationpb.Duration)(nil),    // 11: google.protobuf.Duration
 }
 var file_queue_v1_producer_proto_depIdxs = []int32{
 	7,  // 0: queue.v1.EnqueueRequest.item:type_name -> queue.v1.Item
@@ -445,18 +455,19 @@ var file_queue_v1_producer_proto_depIdxs = []int32{
 	9,  // 3: queue.v1.RequeueRequest.item:type_name -> queue.v1.QueueItem
 	8,  // 4: queue.v1.RequeueRequest.at:type_name -> google.protobuf.Timestamp
 	8,  // 5: queue.v1.RequeueByJobIDRequest.at:type_name -> google.protobuf.Timestamp
-	10, // 6: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
-	0,  // 7: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
-	2,  // 8: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
-	4,  // 9: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
-	1,  // 10: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
-	3,  // 11: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
-	5,  // 12: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
-	10, // [10:13] is the sub-list for method output_type
-	7,  // [7:10] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	10, // 6: queue.v1.RequeueByJobIDRequest.scope:type_name -> queue.v1.Scope
+	11, // 7: queue.v1.EnqueueOptions.idempotency_period:type_name -> google.protobuf.Duration
+	0,  // 8: queue.v1.ProducerService.Enqueue:input_type -> queue.v1.EnqueueRequest
+	2,  // 9: queue.v1.ProducerService.Requeue:input_type -> queue.v1.RequeueRequest
+	4,  // 10: queue.v1.ProducerService.RequeueByJobID:input_type -> queue.v1.RequeueByJobIDRequest
+	1,  // 11: queue.v1.ProducerService.Enqueue:output_type -> queue.v1.EnqueueResponse
+	3,  // 12: queue.v1.ProducerService.Requeue:output_type -> queue.v1.RequeueResponse
+	5,  // 13: queue.v1.ProducerService.RequeueByJobID:output_type -> queue.v1.RequeueByJobIDResponse
+	11, // [11:14] is the sub-list for method output_type
+	8,  // [8:11] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_queue_v1_producer_proto_init() }

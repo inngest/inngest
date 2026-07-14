@@ -679,7 +679,7 @@ func (p *captureProducer) Requeue(context.Context, string, queue.QueueItem, time
 	return nil
 }
 
-func (p *captureProducer) RequeueByJobID(context.Context, string, string, time.Time) error {
+func (p *captureProducer) RequeueByJobID(context.Context, queue.Scope, string, string, time.Time) error {
 	return nil
 }
 

@@ -24,6 +24,13 @@ message QueueItem {
   optional CapacityLease capacity_lease = 16;
 }
 
+message Scope {
+  bool is_system = 1;
+  string account_id = 2;
+  string env_id = 3;
+  string function_id = 4;
+}
+
 message CapacityLease {
   string lease_id = 1;
   int64 issued_at_ms = 2;

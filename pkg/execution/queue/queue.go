@@ -69,7 +69,7 @@ type Producer interface {
 	Enqueue(context.Context, Item, time.Time, EnqueueOpts) error
 
 	Requeue(ctx context.Context, shardName string, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
-	RequeueByJobID(ctx context.Context, shardName string, jobID string, at time.Time) error
+	RequeueByJobID(ctx context.Context, scope Scope, shardName string, jobID string, at time.Time) error
 }
 
 type Consumer interface {
