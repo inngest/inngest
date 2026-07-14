@@ -28,6 +28,17 @@ func (m *mockProducer) RequeueByJobID(context.Context, string, string, time.Time
 	return nil
 }
 
+type mockConsumer struct {
+	called    atomic.Bool
+	shardName atomic.Value
+}
+
+func (m *mockConsumer) Dequeue(_ context.Context, shardName string, _ QueueItem, _ ...DequeueOptionFn) error {
+	m.called.Store(true)
+	m.shardName.Store(shardName)
+	return nil
+}
+
 func TestProcessorWithQueueProducerOverridesDefaultProducer(t *testing.T) {
 	ctx := context.Background()
 	shard := &mockShardForIterator{name: "shard-a"}
@@ -41,6 +52,22 @@ func TestProcessorWithQueueProducerOverridesDefaultProducer(t *testing.T) {
 	err = q.Enqueue(ctx, Item{}, time.Now(), EnqueueOpts{})
 	require.NoError(t, err)
 	require.True(t, producer.called.Load())
+}
+
+func TestProcessorWithQueueConsumerOverridesDefaultConsumer(t *testing.T) {
+	ctx := context.Background()
+	shard := &mockShardForIterator{name: "shard-a"}
+	registry, err := NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	consumer := &mockConsumer{}
+	q, err := New(ctx, "test", registry, WithQueueConsumer(consumer))
+	require.NoError(t, err)
+
+	err = q.Dequeue(ctx, "custom-shard", QueueItem{})
+	require.NoError(t, err)
+	require.True(t, consumer.called.Load())
+	require.Equal(t, "custom-shard", consumer.shardName.Load())
 }
 
 func TestProcessorAccountShardReadsResolveByDefault(t *testing.T) {
