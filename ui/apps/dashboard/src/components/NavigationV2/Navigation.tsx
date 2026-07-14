@@ -5,6 +5,7 @@ import {
   experimentsItem,
   manage,
   monitor,
+  sandboxesItem,
   scoresItem,
   sessionsItem,
   workflow,
@@ -23,7 +24,12 @@ export const getNavRoute = (activeEnv: EnvType, link: string) =>
   `/env/${activeEnv.slug}/${link}` as FileRouteTypes['to'];
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
-  const aiItems: NavItemConfig[] = [experimentsItem, scoresItem, sessionsItem];
+  const aiItems: NavItemConfig[] = [
+    experimentsItem,
+    scoresItem,
+    sessionsItem,
+    sandboxesItem,
+  ];
 
   const ai: NavGroupConfig = {
     heading: 'AI',
