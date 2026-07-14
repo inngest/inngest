@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AnyVariables, Client, TypedDocumentNode } from 'urql';
 import { useClient } from 'urql';
@@ -256,9 +256,35 @@ export function useExperimentDetail(
   const fromIso = range.from.toISOString();
   const toIso = range.to.toISOString();
 
+  // React Query re-invokes queryFn for background refetches of the same
+  // view (window refocus, stale-time expiry, retries), not just when the
+  // user navigates to a genuinely new view. Only the latter should emit a
+  // tracking event, so we dedupe by the same identity React Query uses to
+  // key the query.
+  const trackedViewKeyRef = useRef<string | null>(null);
+
   const queryFn = useCallback(async (): Promise<ExperimentDetail | null> => {
     const startedAt = performance.now();
     const durationMs = () => Math.round(performance.now() - startedAt);
+    const viewKey = JSON.stringify([
+      environment.id,
+      functionID,
+      experimentName,
+      fromIso,
+      toIso,
+      variantFilter,
+    ]);
+    const shouldTrack = trackedViewKeyRef.current !== viewKey;
+    const trackViewed = (
+      props: Omit<
+        Parameters<typeof trackExperimentDetailViewed>[0],
+        'experimentName' | 'functionSlug'
+      >,
+    ) => {
+      if (!shouldTrack) return;
+      trackedViewKeyRef.current = viewKey;
+      trackExperimentDetailViewed({ experimentName, functionSlug, ...props });
+    };
 
     const result = await client
       .query(
@@ -282,9 +308,7 @@ export function useExperimentDetail(
       e.message.includes('null which the schema does not allow'),
     );
     if (isNoDataInRange) {
-      trackExperimentDetailViewed({
-        experimentName,
-        functionSlug,
+      trackViewed({
         durationMs: durationMs(),
         result: 'no_runs',
       });
@@ -292,9 +316,7 @@ export function useExperimentDetail(
     }
 
     if (result.error) {
-      trackExperimentDetailViewed({
-        experimentName,
-        functionSlug,
+      trackViewed({
         durationMs: durationMs(),
         result: 'error',
         errorType: result.error.networkError ? 'network' : 'graphql',
@@ -317,9 +339,7 @@ export function useExperimentDetail(
       })),
     };
 
-    trackExperimentDetailViewed({
-      experimentName,
-      functionSlug,
+    trackViewed({
       durationMs: durationMs(),
       result: detail.variants.length === 0 ? 'no_variant_data' : 'success',
       selectionStrategy: detail.selectionStrategy,
