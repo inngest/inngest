@@ -40,6 +40,18 @@ type EventLifecycleListener interface {
 		ScheduleRequest,
 	)
 
+	// OnFunctionSkipped is called when a matched function run is skipped before
+	// it is scheduled to start.
+	OnFunctionSkipped(context.Context, ScheduleRequest, sv2.Metadata, enums.SkipReason)
+
+	// OnFunctionSkippedIdempotency is called when a matched function is skipped
+	// because an existing or previous run already owns the idempotency key.
+	OnFunctionSkippedIdempotency(context.Context, ScheduleRequest, ulid.ULID)
+
+	// OnFunctionScheduleFailed is called when scheduling a matched function
+	// fails before a terminal scheduling decision can be made.
+	OnFunctionScheduleFailed(context.Context, ScheduleRequest, error)
+
 	// OnDebounced is called when a matched function is stored for debounce
 	// processing instead of being scheduled immediately.
 	OnDebounced(context.Context, ScheduleRequest, debounce.DebounceItem)
@@ -69,7 +81,7 @@ var _ EventLifecycleListener = (*NoopEventLifecycleListener)(nil)
 // implementation allowing other implementations to override specific functions.
 type NoopEventLifecycleListener struct{}
 
-func (NoopEventLifecycleListener) OnNoFunctionMatch(ctx context.Context)
+func (NoopEventLifecycleListener) OnNoFunctionMatch(ctx context.Context) {}
 
 func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context, req ScheduleRequest) {}
 
@@ -77,6 +89,15 @@ func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta 
 }
 
 func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context, req ScheduleRequest) {}
+
+func (NoopEventLifecycleListener) OnFunctionSkipped(ctx context.Context, req ScheduleRequest, meta sv2.Metadata, reason enums.SkipReason) {
+}
+
+func (NoopEventLifecycleListener) OnFunctionSkippedIdempotency(ctx context.Context, req ScheduleRequest, runID ulid.ULID) {
+}
+
+func (NoopEventLifecycleListener) OnFunctionScheduleFailed(ctx context.Context, req ScheduleRequest, err error) {
+}
 
 func (NoopEventLifecycleListener) OnDebounced(ctx context.Context, req ScheduleRequest, db debounce.DebounceItem) {
 }
