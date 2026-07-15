@@ -15,9 +15,11 @@ import (
 // EventLifecycleListener listens to event-level lifecycle decisions made while
 // scheduling or resuming function runs.
 type EventLifecycleListener interface {
+	OnNoFunctionMatch(context.Context)
+
 	// OnFunctionMatch is called when an incoming event has matched a function
 	// and scheduling is about to be attempted.
-	OnFunctionMatch(context.Context)
+	OnFunctionMatch(context.Context, ScheduleRequest)
 
 	// OnFunctionScheduled is called when a new function run is initialized from
 	// a matched event or batch.
@@ -67,7 +69,9 @@ var _ EventLifecycleListener = (*NoopEventLifecycleListener)(nil)
 // implementation allowing other implementations to override specific functions.
 type NoopEventLifecycleListener struct{}
 
-func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnNoFunctionMatch(ctx context.Context)
+
+func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context, req ScheduleRequest) {}
 
 func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta sv2.Metadata, qi queue.Item, evts []event.TrackedEvent) {
 }

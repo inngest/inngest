@@ -897,6 +897,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, nil, fmt.Errorf("no events provided in schedule request")
 	}
 
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnFunctionMatch(ctx, req)
+	})
+
 	l := e.log.With(
 		"account_id", req.AccountID,
 		"env_id", req.WorkspaceID,
