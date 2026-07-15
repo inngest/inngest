@@ -3,7 +3,6 @@ import type { DpaFieldKey } from "@/data/ticketOptions";
 import { isValidCommonPaperCountry } from "@/data/commonPaperCountries";
 import { formatDpaBody } from "@/data/ticketOptions";
 import { createPlainThread } from "@/data/plain";
-import { getAccountIdWithFallback } from "@/data/inngest";
 
 const API_BASE = "https://api.commonpaper.com/v1";
 
@@ -128,7 +127,6 @@ type CommonPaperAgreementResponse = {
 
 function buildDpaDraftPayload(
   request: DpaRequestInput,
-  accountId: string,
 ): Record<string, unknown> {
   const ownerEmail = requireEnv(
     "COMMONPAPER_OWNER_EMAIL",
@@ -196,9 +194,8 @@ function buildDpaDraftPayload(
 
 export async function createDpaDraft(
   request: DpaRequestInput,
-  accountId: string,
 ): Promise<CreateDpaDraftResult> {
-  const payload = buildDpaDraftPayload(request, accountId);
+  const payload = buildDpaDraftPayload(request);
 
   const agreement = await commonPaperFetch<CommonPaperAgreementResponse>(
     "/agreements",
@@ -220,8 +217,6 @@ export const createDpaRequest = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<CreateDpaRequestResult> => {
     try {
       const { user, dpa, attachmentIds } = data;
-      const authEmail = await requireAuthenticatedUserEmail();
-
       const ticketBody = formatDpaBody({
         companyName: dpa.companyLegalName,
         signatoryName: dpa.signatoryName,
@@ -233,7 +228,6 @@ export const createDpaRequest = createServerFn({ method: "POST" })
 
       const plainResult = await createPlainThread({
         user,
-        authEmail,
         ticket: {
           type: "dpa",
           title: dpa.companyLegalName,
@@ -252,8 +246,7 @@ export const createDpaRequest = createServerFn({ method: "POST" })
       }
 
       try {
-        const accountId = await getAccountIdWithFallback(user.id);
-        const draft = await createDpaDraft(dpa, accountId);
+        const draft = await createDpaDraft(dpa);
 
         return {
           success: true,
