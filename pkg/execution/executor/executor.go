@@ -897,6 +897,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, nil, fmt.Errorf("no events provided in schedule request")
 	}
 
+	attemptedRunID := *runID
+
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnFunctionMatch(ctx, req)
 	})
@@ -947,9 +949,28 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			}, util.WithBoundaries(2*time.Second))
 		})
 
-	if errors.Is(err, ErrFunctionRateLimited) {
+	switch {
+	case errors.Is(err, ErrFunctionRateLimited):
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnRateLimited(ctx, req)
+		})
+	case errors.Is(err, ErrFunctionSkippedIdempotency),
+		errors.Is(err, state.ErrIdentifierExists),
+		errors.Is(err, queue.ErrQueueItemExists):
+		skip := execution.IdempotencySkip{
+			AttemptedRunID: attemptedRunID,
+		}
+		if errors.Is(err, ErrFunctionSkippedIdempotency) {
+			skip.ExistingRunID = runID
+		}
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnFunctionSkippedIdempotency(ctx, req, skip)
+		})
+	case errors.Is(err, ErrFunctionDebounced), errors.Is(err, ErrFunctionSkipped), err == nil:
+		// Handled by more specific lifecycle hooks inside schedule.
+	default:
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnFunctionScheduleFailed(ctx, req, err)
 		})
 	}
 
@@ -1717,10 +1738,7 @@ func (e *executor) schedule(
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
-		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnSingletonSkipped(ctx, req)
-		})
-		return nil, nil, ErrFunctionSkipped
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
 
 	default:
 		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
@@ -1793,11 +1811,9 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
-	if reason == enums.SkipReasonSingleton {
-		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnSingletonSkipped(ctx, req)
-		})
-	}
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnFunctionSkipped(ctx, req, metadata, reason)
+	})
 
 	for _, e := range e.lifecycles {
 		service.Go(

@@ -12,6 +12,17 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+// IdempotencySkip describes a matched function that was skipped because the
+// idempotency key was already owned by an existing or previous run.
+type IdempotencySkip struct {
+	// AttemptedRunID is the run ID generated for this scheduling attempt.
+	AttemptedRunID ulid.ULID
+
+	// ExistingRunID is set when the executor knows which run owns or previously
+	// owned the idempotency key.
+	ExistingRunID *ulid.ULID
+}
+
 // EventLifecycleListener listens to event-level lifecycle decisions made while
 // scheduling or resuming function runs.
 type EventLifecycleListener interface {
@@ -46,7 +57,7 @@ type EventLifecycleListener interface {
 
 	// OnFunctionSkippedIdempotency is called when a matched function is skipped
 	// because an existing or previous run already owns the idempotency key.
-	OnFunctionSkippedIdempotency(context.Context, ScheduleRequest, ulid.ULID)
+	OnFunctionSkippedIdempotency(context.Context, ScheduleRequest, IdempotencySkip)
 
 	// OnFunctionScheduleFailed is called when scheduling a matched function
 	// fails before a terminal scheduling decision can be made.
@@ -58,10 +69,6 @@ type EventLifecycleListener interface {
 
 	// OnBatched is called when an event is accepted into a batch.
 	OnBatched(context.Context, batch.BatchItem, ulid.ULID)
-
-	// OnSingletonSkipped is called when a matched function is skipped because
-	// another singleton run already exists.
-	OnSingletonSkipped(context.Context, ScheduleRequest)
 
 	// OnSingletonCancelled is called when a matched function cancels an existing
 	// singleton run before continuing.
@@ -93,7 +100,7 @@ func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context, req Schedul
 func (NoopEventLifecycleListener) OnFunctionSkipped(ctx context.Context, req ScheduleRequest, meta sv2.Metadata, reason enums.SkipReason) {
 }
 
-func (NoopEventLifecycleListener) OnFunctionSkippedIdempotency(ctx context.Context, req ScheduleRequest, runID ulid.ULID) {
+func (NoopEventLifecycleListener) OnFunctionSkippedIdempotency(ctx context.Context, req ScheduleRequest, skip IdempotencySkip) {
 }
 
 func (NoopEventLifecycleListener) OnFunctionScheduleFailed(ctx context.Context, req ScheduleRequest, err error) {
@@ -104,8 +111,6 @@ func (NoopEventLifecycleListener) OnDebounced(ctx context.Context, req ScheduleR
 
 func (NoopEventLifecycleListener) OnBatched(ctx context.Context, bi batch.BatchItem, batchID ulid.ULID) {
 }
-
-func (NoopEventLifecycleListener) OnSingletonSkipped(ctx context.Context, req ScheduleRequest) {}
 
 func (NoopEventLifecycleListener) OnSingletonCancelled(ctx context.Context, req ScheduleRequest, id sv2.ID) {
 }
