@@ -584,7 +584,9 @@ func (e *executor) runEventLifecycles(ctx context.Context, fn func(context.Conte
 	ctx = context.WithoutCancel(ctx)
 	for _, l := range e.evtLifecycles {
 		l := l
-		go fn(ctx, l)
+		service.Go(func() {
+			fn(ctx, l)
+		})
 	}
 }
 
