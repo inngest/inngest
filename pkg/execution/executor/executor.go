@@ -1709,6 +1709,9 @@ func (e *executor) schedule(
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnSingletonSkipped(ctx, req)
+		})
 		return nil, nil, ErrFunctionSkipped
 
 	default:
@@ -1782,6 +1785,12 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
+	if reason == enums.SkipReasonSingleton {
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnSingletonSkipped(ctx, req)
+		})
+	}
+
 	for _, e := range e.lifecycles {
 		service.Go(
 			func() {

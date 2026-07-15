@@ -44,7 +44,7 @@ type EventLifecycleListener interface {
 
 	// OnSingletonSkipped is called when a matched function is skipped because
 	// another singleton run already exists.
-	OnSingletonSkipped(context.Context)
+	OnSingletonSkipped(context.Context, ScheduleRequest)
 
 	// OnSingletonCancelled is called when a matched function cancels an existing
 	// singleton run before continuing.
@@ -76,7 +76,7 @@ func (NoopEventLifecycleListener) OnDebounced(ctx context.Context, req ScheduleR
 
 func (NoopEventLifecycleListener) OnBatched(ctx context.Context) {}
 
-func (NoopEventLifecycleListener) OnSingletonSkipped(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnSingletonSkipped(ctx context.Context, req ScheduleRequest) {}
 
 func (NoopEventLifecycleListener) OnSingletonCancelled(ctx context.Context) {}
 
