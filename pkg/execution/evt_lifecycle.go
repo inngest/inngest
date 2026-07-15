@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -52,7 +53,7 @@ type EventLifecycleListener interface {
 
 	// OnRunResumed is called when a paused run is resumed from an event, signal,
 	// invoke completion, or timeout.
-	OnRunResumed(context.Context)
+	OnRunResumed(context.Context, sv2.ID, ResumeRequest, enums.Opcode)
 
 	// OnRunCancelled is called when a run is cancelled.
 	OnRunCancelled(context.Context, sv2.ID, CancelRequest)
@@ -81,6 +82,7 @@ func (NoopEventLifecycleListener) OnSingletonSkipped(ctx context.Context, req Sc
 func (NoopEventLifecycleListener) OnSingletonCancelled(ctx context.Context, req ScheduleRequest, id sv2.ID) {
 }
 
-func (NoopEventLifecycleListener) OnRunResumed(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnRunResumed(ctx context.Context, id sv2.ID, rr ResumeRequest, opcode enums.Opcode) {
+}
 
 func (NoopEventLifecycleListener) OnRunCancelled(ctx context.Context, id sv2.ID, cr CancelRequest) {}

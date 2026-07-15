@@ -3369,8 +3369,9 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		_ = nextStepSpan.Send()
 	}
 
+	code := pause.GetOpcode()
 	// Only run lifecycles if we consumed the pause and enqueued next step.
-	switch pause.GetOpcode() {
+	switch code {
 	case enums.OpcodeInvokeFunction:
 		for _, e := range e.lifecycles {
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
@@ -3384,6 +3385,9 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
 	}
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnRunResumed(ctx, id, r, code)
+	})
 
 	// And delete the OG pause.
 	if err := e.pm.Delete(ctx, pauses.PauseIndex(pause), pause); err != nil {
@@ -3555,8 +3559,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 		}
 
+		code := pause.GetOpcode()
 		// Only run lifecycles if we consumed the pause and enqueued next step.
-		switch pause.GetOpcode() {
+		switch code {
 		case enums.OpcodeInvokeFunction:
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
@@ -3570,6 +3575,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
 		}
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnRunResumed(ctx, sv2id, r, code)
+		})
 
 		// The timeout job is running on the queue and will Dequeue() itself. No need to continue.
 		if r.IsTimeout {
