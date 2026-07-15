@@ -1724,7 +1724,7 @@ func TestCQRSInsertTraceRun_TerminalMonotonicityUnderAllOrderings(t *testing.T) 
 }
 
 func TestCQRSGetTraceRunsPagination(t *testing.T) {
-	// This test verifies that cursor-based pagination works correctly for the GetSpanRuns
+	// This test verifies that cursor-based pagination works correctly for the span-backed runs list.
 	ctx := context.Background()
 	appID := uuid.New()
 
@@ -1735,7 +1735,7 @@ func TestCQRSGetTraceRunsPagination(t *testing.T) {
 	workspaceID := uuid.New()
 	functionID := uuid.New()
 
-	// Create 3 spans with "executor.run" name (required for GetSpanRuns) with distinct start_time
+	// Create 3 spans with "executor.run" name (required for ListRuns) with distinct start_time.
 	baseTime := time.Now().UTC().Truncate(time.Second)
 	runIDs := make([]string, 3)
 	for i := 0; i < 3; i++ {
@@ -2515,6 +2515,205 @@ func TestCQRSGetSpanRunsFastPathPagination(t *testing.T) {
 	assert.Equal(t, wantOrder, got, "every run returned once, in descending start order")
 }
 
+func TestCQRSListRunsUsesModernSpanData(t *testing.T) {
+	ctx := t.Context()
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+	firstEventID := ulid.Make()
+	eventID := ulid.Make()
+	thirdEventID := ulid.Make()
+	runID := ulid.Make()
+	batchID := ulid.Make()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	deferred := true
+
+	attrs, err := json.Marshal(map[string]any{
+		meta.Attrs.BatchID.Key():      batchID.String(),
+		meta.Attrs.CronSchedule.Key(): "*/5 * * * *",
+	})
+	require.NoError(t, err)
+	eventIDs, err := json.Marshal([]string{firstEventID.String(), eventID.String(), thirdEventID.String()})
+	require.NoError(t, err)
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID.String(),
+		DynamicSpanID: "dyn-list-run",
+		Name:          meta.SpanNameRun,
+		Status:        enums.StepStatusQueued.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    attrs,
+		Output:        []byte(`{"data":{"source":"root"}}`),
+		EventIDs:      eventIDs,
+		IsDeferred:    &deferred,
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID.String(),
+		DynamicSpanID: "dyn-list-run",
+		Name:          meta.SpanNameDynamicExtension,
+		Status:        enums.StepStatusCompleted.String(),
+		StartTime:     baseTime.Add(time.Second),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+	outputAttrs, err := json.Marshal(map[string]any{meta.Attrs.IsFunctionOutput.Key(): true})
+	require.NoError(t, err)
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID.String(),
+		DynamicSpanID: "dyn-list-output",
+		Name:          meta.SpanNameExecution,
+		StartTime:     baseTime.Add(500 * time.Millisecond),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    outputAttrs,
+		Output:        []byte(`{"data":{"source":"function"}}`),
+	})
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID.String(),
+		DynamicSpanID: "dyn-list-step-output",
+		Name:          meta.SpanNameExecution,
+		StartTime:     baseTime.Add(750 * time.Millisecond),
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+		Attributes:    []byte(`{}`),
+		Output:        []byte(`{"data":{"source":"step"}}`),
+	})
+
+	runs, err := cm.ListRuns(ctx, cqrs.ListRunsOptions{
+		Filter: cqrs.RunListFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			AppID:       []uuid.UUID{appID},
+			FunctionID:  []uuid.UUID{functionID},
+			EventID:     []ulid.ULID{eventID},
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+			Status:      []enums.RunStatus{enums.RunStatusCompleted},
+			IsDeferred:  &deferred,
+		},
+		Order: []cqrs.RunListOrder{{
+			Field:     enums.TraceRunTimeStartedAt,
+			Direction: enums.TraceRunOrderDesc,
+		}},
+		Items:         10,
+		IncludeOutput: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, runID.String(), runs[0].RunID)
+	assert.Equal(t, enums.RunStatusCompleted, runs[0].Status)
+	assert.True(t, runs[0].IsDeferred)
+	assert.Equal(t, []string{firstEventID.String(), eventID.String(), thirdEventID.String()}, runs[0].TriggerIDs)
+	require.NotNil(t, runs[0].BatchID)
+	assert.Equal(t, batchID, *runs[0].BatchID)
+	require.NotNil(t, runs[0].CronSchedule)
+	assert.Equal(t, "*/5 * * * *", *runs[0].CronSchedule)
+	assert.JSONEq(t, `{"data":{"source":"function"}}`, string(runs[0].Output))
+	assert.NotEmpty(t, runs[0].Cursor)
+}
+
+func TestCQRSListRunsMapsScheduledStatusFilter(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	runID := ulid.Make()
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runID.String(),
+		DynamicSpanID: "dyn-scheduled-run",
+		Name:          meta.SpanNameRun,
+		Status:        enums.StepStatusQueued.String(),
+		StartTime:     baseTime,
+		AccountID:     accountID.String(),
+		AppID:         appID.String(),
+		FunctionID:    functionID.String(),
+		EnvID:         workspaceID.String(),
+	})
+
+	runs, err := cm.ListRuns(t.Context(), cqrs.ListRunsOptions{
+		Filter: cqrs.RunListFilter{
+			AccountID:   accountID,
+			WorkspaceID: workspaceID,
+			TimeField:   enums.TraceRunTimeStartedAt,
+			From:        baseTime.Add(-time.Hour),
+			Until:       baseTime.Add(time.Hour),
+			Status:      []enums.RunStatus{enums.RunStatusScheduled},
+		},
+		Order: []cqrs.RunListOrder{{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderDesc}},
+		Items: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, runID.String(), runs[0].RunID)
+	assert.Equal(t, enums.RunStatusScheduled, runs[0].Status)
+}
+
+func TestCQRSListRunsFiltersByFinalEndedAt(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+	baseTime := time.Now().UTC().Truncate(time.Second)
+	insideRunID := ulid.Make()
+	outsideRunID := ulid.Make()
+
+	insertLifecycle := func(runID ulid.ULID, dynamicID string, finalAt time.Time) {
+		traceID := "trace-" + runID.String()
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runID.String(), TraceID: traceID, DynamicSpanID: dynamicID, Name: meta.SpanNameRun,
+			Status: enums.StepStatusQueued.String(), StartTime: baseTime.Add(-time.Second),
+			AccountID: accountID.String(), AppID: appID.String(), FunctionID: functionID.String(), EnvID: workspaceID.String(),
+		})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runID.String(), TraceID: traceID, DynamicSpanID: dynamicID, Name: meta.SpanNameDynamicExtension,
+			Status: enums.StepStatusRunning.String(), StartTime: baseTime.Add(4 * time.Second),
+			AccountID: accountID.String(), AppID: appID.String(), FunctionID: functionID.String(), EnvID: workspaceID.String(),
+		})
+		insertTestSpan(t, cm, testSpanFields{
+			RunID: runID.String(), TraceID: traceID, DynamicSpanID: dynamicID, Name: meta.SpanNameDynamicExtension,
+			Status: enums.StepStatusCompleted.String(), StartTime: finalAt,
+			AccountID: accountID.String(), AppID: appID.String(), FunctionID: functionID.String(), EnvID: workspaceID.String(),
+		})
+	}
+	insertLifecycle(insideRunID, "dyn-ended-inside", baseTime.Add(5*time.Second))
+	insertLifecycle(outsideRunID, "dyn-ended-outside", baseTime.Add(15*time.Second))
+
+	runs, err := cm.ListRuns(t.Context(), cqrs.ListRunsOptions{
+		Filter: cqrs.RunListFilter{
+			AccountID: accountID, WorkspaceID: workspaceID,
+			TimeField: enums.TraceRunTimeEndedAt,
+			From:      baseTime,
+			Until:     baseTime.Add(10 * time.Second),
+		},
+		Order: []cqrs.RunListOrder{{Field: enums.TraceRunTimeEndedAt, Direction: enums.TraceRunOrderDesc}},
+		Items: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, insideRunID.String(), runs[0].RunID)
+}
+
 //
 // Span Tests
 //
@@ -2955,7 +3154,8 @@ func TestExtendedTraceReparenting(t *testing.T) {
 //
 
 type testSpanFields struct {
-	RunID          string    // required
+	RunID          string // required
+	TraceID        string
 	DynamicSpanID  string    // required for GROUP BY tests
 	ParentSpanID   string    // for child spans (references parent's DynamicSpanID)
 	DebugRunID     string    // for debug run tests
@@ -2970,6 +3170,7 @@ type testSpanFields struct {
 	Attributes     []byte    // JSON attributes (optional)
 	Output         []byte    // JSON output (optional)
 	EventIDs       []byte    // JSON array of event IDs (optional)
+	IsDeferred     *bool
 }
 
 // There aren't any functions exposed on cqrs.Manager that write to the new spans table
@@ -2978,7 +3179,10 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 	t.Helper()
 
 	spanID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-	traceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	traceID := spanFields.TraceID
+	if traceID == "" {
+		traceID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	}
 
 	// Apply defaults
 	if spanFields.Name == "" {
@@ -3021,6 +3225,10 @@ func insertTestSpan(t *testing.T, cm cqrs.Manager, spanFields testSpanFields) {
 		Attributes:     spanFields.Attributes,
 		Output:         spanFields.Output,
 		EventIds:       spanFields.EventIDs,
+		IsDeferred: sql.NullBool{
+			Bool:  spanFields.IsDeferred != nil && *spanFields.IsDeferred,
+			Valid: spanFields.IsDeferred != nil,
+		},
 	})
 	require.NoError(t, err)
 }

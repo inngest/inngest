@@ -357,32 +357,8 @@ type SpanMetadata struct {
 	UpdatedAt time.Time       `json:"updated_at"`
 }
 
-// TraceRun represents a function run backed by a trace
-type TraceRun struct {
-	AccountID    uuid.UUID       `json:"account_id"`
-	WorkspaceID  uuid.UUID       `json:"workspace_id"`
-	AppID        uuid.UUID       `json:"app_id"`
-	FunctionID   uuid.UUID       `json:"function_id"`
-	TraceID      string          `json:"trace_id"`
-	RunID        string          `json:"run_id"`
-	QueuedAt     time.Time       `json:"queued_at"`
-	StartedAt    time.Time       `json:"started_at,omitempty"`
-	EndedAt      time.Time       `json:"ended_at,omitempty"`
-	Duration     time.Duration   `json:"duration"`
-	SourceID     string          `json:"source_id,omitempty"`
-	TriggerIDs   []string        `json:"trigger_ids"`
-	Triggers     [][]byte        `json:"triggers"`
-	Output       []byte          `json:"output,omitempty"`
-	Status       enums.RunStatus `json:"status"`
-	IsDeferred   bool            `json:"is_deferred"`
-	IsBatch      bool            `json:"is_batch"`
-	IsDebounce   bool            `json:"is_debounce"`
-	HasAI        bool            `json:"has_ai"`
-	BatchID      *ulid.ULID      `json:"batch_id,omitempty"`
-	CronSchedule *string         `json:"cron_schedule,omitempty"`
-	// Cursor is a composite cursor used for pagination
-	Cursor string `json:"cursor"`
-}
+// TraceRun remains an alias for existing TraceReader, GraphQL, and devserver callers.
+type TraceRun = RunListItem
 
 type SpanOutput struct {
 	Input            []byte
@@ -490,23 +466,11 @@ func GetRunOptFromContext(ctx context.Context) GetRunOpt {
 	return opt
 }
 
-type GetTraceRunFilter struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       []uuid.UUID
-	FunctionID  []uuid.UUID
-	TimeField   enums.TraceRunTime
-	From        time.Time
-	Until       time.Time
-	Status      []enums.RunStatus
-	CEL         string
-	IsDeferred  *bool
-}
+// GetTraceRunFilter and GetTraceRunOrder remain aliases for the existing
+// TraceReader and GraphQL runs list APIs.
+type GetTraceRunFilter = RunListFilter
 
-type GetTraceRunOrder struct {
-	Field     enums.TraceRunTime
-	Direction enums.TraceRunOrder
-}
+type GetTraceRunOrder = RunListOrder
 
 type TraceRunIdentifier struct {
 	AccountID   uuid.UUID
@@ -554,59 +518,8 @@ func (si *SpanIdentifier) Decode(data string) error {
 	return json.Unmarshal(byt, si)
 }
 
-// TracePageCursor represents the composite cursor used to handle pagination
-type TracePageCursor struct {
-	ID      string                 `json:"id"`
-	Cursors map[string]TraceCursor `json:"c"`
-}
+// TracePageCursor and TraceCursor preserve the cursor types used by
+// GetTraceRuns and the GraphQL runs list.
+type TracePageCursor = RunPageCursor
 
-func (c *TracePageCursor) IsEmpty() bool {
-	return len(c.Cursors) == 0
-}
-
-// Find finds a cusor with the provided name
-func (c *TracePageCursor) Find(field string) *TraceCursor {
-	if c.IsEmpty() {
-		return nil
-	}
-
-	f := strings.ToLower(field)
-	if v, ok := c.Cursors[f]; ok {
-		return &v
-	}
-	return nil
-}
-
-func (c *TracePageCursor) Add(field string) {
-	f := strings.ToLower(field)
-	if _, ok := c.Cursors[f]; !ok {
-		c.Cursors[f] = TraceCursor{Field: f}
-	}
-}
-
-func (c *TracePageCursor) Encode() (string, error) {
-	byt, err := json.Marshal(c)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(byt), nil
-}
-
-func (c *TracePageCursor) Decode(val string) error {
-	if c.Cursors == nil {
-		c.Cursors = map[string]TraceCursor{}
-	}
-	byt, err := base64.StdEncoding.DecodeString(val)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(byt, c)
-}
-
-// TraceCursor represents a cursor that is used as part of the pagination cursor
-type TraceCursor struct {
-	// Field represents the field used for this cursor
-	Field string `json:"f"`
-	// Value represents the value used for this cursor
-	Value int64 `json:"v"`
-}
+type TraceCursor = RunCursor

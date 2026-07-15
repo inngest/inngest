@@ -28,6 +28,32 @@ func (h *helpers) RootEventIDsExpr() sqexp.Expression {
 	return sq.L("spans.event_ids").As("event_ids")
 }
 
+func (h *helpers) EventIDsContain(ids []string) sqexp.Expression {
+	values := make([]any, len(ids))
+	for i, id := range ids {
+		values[i] = id
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	return sq.L(
+		"EXISTS (SELECT 1 FROM json_each(NULLIF(spans.event_ids, '')) WHERE value IN ("+placeholders+"))",
+		values...,
+	)
+}
+
+func (h *helpers) RunOutputExpr() sqexp.Expression {
+	return sq.L(`COALESCE((
+		SELECT CAST(output_lookup.output AS TEXT)
+		FROM spans output_lookup
+		WHERE output_lookup.run_id = spans.run_id
+			AND output_lookup.output IS NOT NULL
+			AND output_lookup.debug_run_id IS NULL
+		ORDER BY
+			CASE WHEN COALESCE(CAST(output_lookup.attributes->>'$."_inngest.is.function.output"' AS TEXT), '') IN ('true', '1') THEN 0 ELSE 1 END,
+			output_lookup.end_time DESC
+		LIMIT 1
+	), '')`).As("output")
+}
+
 func (h *helpers) BuildEventJoin(q *sq.SelectDataset) *sq.SelectDataset {
 	// SQLite: json_each for unnesting.
 	// json_each('') errors with "malformed JSON", so we use NULLIF to convert empty strings

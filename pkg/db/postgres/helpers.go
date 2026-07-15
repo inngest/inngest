@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	sq "github.com/doug-martin/goqu/v9"
@@ -28,6 +29,32 @@ func (h *helpers) RootEventIDsExpr() sqexp.Expression {
 	return sq.L("spans.event_ids::text").As("event_ids")
 }
 
+func (h *helpers) EventIDsContain(ids []string) sqexp.Expression {
+	values := make([]any, len(ids))
+	for i, id := range ids {
+		values[i] = id
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	return sq.L(
+		"EXISTS (SELECT 1 FROM jsonb_array_elements_text(NULLIF(spans.event_ids#>>'{}', '')::jsonb) AS eid(event_id) WHERE eid.event_id IN ("+placeholders+"))",
+		values...,
+	)
+}
+
+func (h *helpers) RunOutputExpr() sqexp.Expression {
+	return sq.L(`COALESCE((
+		SELECT CAST(output_lookup.output AS TEXT)
+		FROM spans output_lookup
+		WHERE output_lookup.run_id = spans.run_id
+			AND output_lookup.output IS NOT NULL
+			AND output_lookup.debug_run_id IS NULL
+		ORDER BY
+			CASE WHEN COALESCE((output_lookup.attributes#>>'{}')::json->>'_inngest.is.function.output', '') IN ('true', '1') THEN 0 ELSE 1 END,
+			output_lookup.end_time DESC NULLS LAST
+		LIMIT 1
+	), '')`).As("output")
+}
+
 func (h *helpers) BuildEventJoin(q *sq.SelectDataset) *sq.SelectDataset {
 	// PostgreSQL: jsonb_array_elements_text for unnesting.
 	// event_ids is JSONB containing a JSON string (double-encoded), e.g. "[\"uuid\"]" or ""
@@ -39,13 +66,17 @@ func (h *helpers) BuildEventJoin(q *sq.SelectDataset) *sq.SelectDataset {
 }
 
 func (h *helpers) ParseEventIDs(raw *string) []string {
-	// PostgreSQL: double-encoded JSON (a JSON string containing a JSON array)
 	var ids []string
-	if raw != nil && *raw != "" {
-		var innerStr string
-		if err := json.Unmarshal([]byte(*raw), &innerStr); err == nil {
-			_ = json.Unmarshal([]byte(innerStr), &ids)
-		}
+	if raw == nil || *raw == "" {
+		return ids
+	}
+	if err := json.Unmarshal([]byte(*raw), &ids); err == nil {
+		return ids
+	}
+
+	var encoded string
+	if err := json.Unmarshal([]byte(*raw), &encoded); err == nil {
+		_ = json.Unmarshal([]byte(encoded), &ids)
 	}
 	return ids
 }
