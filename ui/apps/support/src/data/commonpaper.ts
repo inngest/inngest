@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { DpaFieldKey } from "@/data/ticketOptions";
 import { isValidCommonPaperCountry } from "@/data/commonPaperCountries";
 import { formatDpaBody } from "@/data/ticketOptions";
-import { createPlainThread } from "@/data/plain";
+import { createPlainNote, createPlainThread } from "@/data/plain";
 
 const API_BASE = "https://api.commonpaper.com/v1";
 
@@ -120,10 +120,34 @@ async function commonPaperFetch<T>(
 }
 
 type CommonPaperAgreementResponse = {
-  id: string;
+  id?: string;
   status?: string;
   agreement_url?: string;
+  data?: {
+    id?: string;
+    attributes?: {
+      status?: string;
+    };
+    links?: {
+      agreement_url?: string;
+    };
+  };
 };
+
+function parseAgreementResponse(
+  response: CommonPaperAgreementResponse,
+): CreateDpaDraftResult {
+  const id = response.data?.id ?? response.id;
+  if (!id) {
+    throw new Error("Common Paper response did not include an agreement id");
+  }
+
+  return {
+    id,
+    status: response.data?.attributes?.status ?? response.status,
+    agreementUrl: response.data?.links?.agreement_url ?? response.agreement_url,
+  };
+}
 
 function buildDpaDraftPayload(
   request: DpaRequestInput,
@@ -205,11 +229,7 @@ export async function createDpaDraft(
     },
   );
 
-  return {
-    id: agreement.id,
-    status: agreement.status,
-    agreementUrl: agreement.agreement_url,
-  };
+  return parseAgreementResponse(agreement);
 }
 
 export const createDpaRequest = createServerFn({ method: "POST" })
@@ -247,6 +267,30 @@ export const createDpaRequest = createServerFn({ method: "POST" })
 
       try {
         const draft = await createDpaDraft(dpa);
+
+        if (plainResult.threadId) {
+          const noteLines = [
+            "Common Paper DPA draft created.",
+            `Agreement ID: ${draft.id}`,
+          ];
+          if (draft.agreementUrl) {
+            noteLines.push(`Agreement URL: ${draft.agreementUrl}`);
+          }
+
+          const noteText = noteLines.join("\n");
+          const noteResult = await createPlainNote({
+            threadId: plainResult.threadId,
+            customerId: plainResult.customerId,
+            text: noteText,
+            markdown: noteText,
+          });
+          if (!noteResult.success) {
+            console.error(
+              "Failed to add Common Paper URL as Plain note:",
+              noteResult.error,
+            );
+          }
+        }
 
         return {
           success: true,

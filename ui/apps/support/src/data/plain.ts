@@ -722,8 +722,114 @@ export type CreateTicketInput = {
 export type CreateTicketResult = {
   success: boolean;
   threadId?: string;
+  customerId?: string;
   error?: string;
 };
+
+export type CreatePlainNoteInput = {
+  threadId: string;
+  text: string;
+  markdown?: string;
+  customerId?: string;
+};
+
+export type CreatePlainNoteResult = {
+  success: boolean;
+  error?: string;
+};
+
+export async function createPlainNote({
+  threadId,
+  text,
+  markdown,
+  customerId: customerIdInput,
+}: CreatePlainNoteInput): Promise<CreatePlainNoteResult> {
+  let customerId = customerIdInput;
+
+  if (!customerId) {
+    const threadRes = (await plainClient.rawRequest({
+      query: `
+        query GetThreadCustomer($threadId: ID!) {
+          thread(threadId: $threadId) {
+            customer {
+              id
+            }
+          }
+        }
+      `,
+      variables: { threadId },
+    })) as {
+      data?: {
+        thread: { customer: { id: string } } | null;
+      };
+      error?: PlainSDKError;
+    };
+
+    if (threadRes.error || !threadRes.data?.thread) {
+      console.error("Error fetching thread for note:", threadRes.error);
+      return {
+        success: false,
+        error: "Failed to fetch ticket details for note",
+      };
+    }
+
+    customerId = threadRes.data.thread.customer.id;
+  }
+
+  const noteText = text.trim();
+  const noteMarkdown = (markdown ?? text).trim();
+
+  const noteRes = (await plainClient.rawRequest({
+    query: `
+      mutation CreateNote($input: CreateNoteInput!) {
+        createNote(input: $input) {
+          note {
+            id
+          }
+          error {
+            message
+            type
+            code
+          }
+        }
+      }
+    `,
+    variables: {
+      input: {
+        threadId,
+        customerId,
+        text: noteText,
+        markdown: noteMarkdown,
+      },
+    },
+  })) as {
+    data?: {
+      createNote: {
+        note: { id: string } | null;
+        error: { message: string } | null;
+      };
+    };
+    error?: PlainSDKError;
+  };
+
+  if (noteRes.error) {
+    console.error("Error creating Plain note:", noteRes.error);
+    return {
+      success: false,
+      error: noteRes.error.message,
+    };
+  }
+
+  if (noteRes.data?.createNote.error) {
+    console.error("Error creating Plain note:", noteRes.data.createNote.error);
+    return {
+      success: false,
+      error: noteRes.data.createNote.error.message,
+    };
+  }
+
+  return { success: true };
+}
 
 export async function createPlainThread({
   user,
@@ -850,6 +956,7 @@ export async function createPlainThread({
   return {
     success: true,
     threadId: threadRes.data.id,
+    customerId,
   };
 }
 
