@@ -788,6 +788,9 @@ func (q *queue) RequeueByJobID(ctx context.Context, jobID string, at time.Time) 
 	// Find the queue item so that we can fetch the shard info.
 	i := osqueue.QueueItem{}
 	if err := q.RedisClient.unshardedRc.Do(ctx, q.RedisClient.unshardedRc.B().Hget().Key(q.RedisClient.kg.QueueItem()).Field(jobID).Build()).DecodeJSON(&i); err != nil {
+		if err == rueidis.Nil {
+			return osqueue.ErrQueueItemNotFound
+		}
 		return err
 	}
 
