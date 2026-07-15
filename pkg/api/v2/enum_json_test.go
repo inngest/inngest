@@ -67,6 +67,50 @@ func TestResponseEnumMarshalerShortensTraceEnumPrefixes(t *testing.T) {
 	require.Equal(t, "WAITING", root["children"].([]any)[0].(map[string]any)["status"])
 }
 
+func TestResponseEnumMarshalerUsesSandboxJSONContract(t *testing.T) {
+	outcome := apiv2.SandboxOutcome_SANDBOX_OUTCOME_TIMED_OUT
+	marshaler := newResponseEnumMarshaler()
+	data, err := marshaler.Marshal(&apiv2.GetSandboxResponse{
+		Data: &apiv2.Sandbox{
+			Id:           "22222222-2222-2222-2222-222222222222",
+			Name:         "test-sandbox",
+			DesiredState: apiv2.SandboxDesiredState_SANDBOX_DESIRED_STATE_TERMINATED,
+			Phase:        apiv2.SandboxPhase_SANDBOX_PHASE_TERMINAL,
+			Outcome:      &outcome,
+			CleanupState: apiv2.SandboxCleanupState_SANDBOX_CLEANUP_STATE_IN_PROGRESS,
+		},
+	})
+	require.NoError(t, err)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(data, &body))
+	sandbox := body["data"].(map[string]any)
+	require.Equal(t, "TERMINATED", sandbox["desiredState"])
+	require.Equal(t, "TERMINAL", sandbox["phase"])
+	require.Equal(t, "TIMED_OUT", sandbox["outcome"])
+	require.Equal(t, "IN_PROGRESS", sandbox["cleanupState"])
+	require.NotContains(t, sandbox, "desired_state")
+	require.NotContains(t, sandbox, "cleanup_state")
+}
+
+func TestResponseEnumMarshalerOmitsUnknownSandboxOutcome(t *testing.T) {
+	marshaler := newResponseEnumMarshaler()
+	data, err := marshaler.Marshal(&apiv2.GetSandboxResponse{
+		Data: &apiv2.Sandbox{
+			Id:           "22222222-2222-2222-2222-222222222222",
+			DesiredState: apiv2.SandboxDesiredState_SANDBOX_DESIRED_STATE_RUNNING,
+			Phase:        apiv2.SandboxPhase_SANDBOX_PHASE_PENDING,
+			CleanupState: apiv2.SandboxCleanupState_SANDBOX_CLEANUP_STATE_NOT_REQUIRED,
+		},
+	})
+	require.NoError(t, err)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(data, &body))
+	sandbox := body["data"].(map[string]any)
+	require.NotContains(t, sandbox, "outcome")
+}
+
 func TestResponseEnumMarshalerLeavesNonProtoValuesUnchanged(t *testing.T) {
 	marshaler := newResponseEnumMarshaler()
 

@@ -20,7 +20,7 @@ func NewEventKeysProvider(eventKeys []string) EventKeysProvider {
 
 func (keys eventKeysProvider) GetEventKeys(ctx context.Context) ([]*apiv2.EventKey, error) {
 	var eventKeys []*apiv2.EventKey
-	
+
 	for _, key := range keys {
 		eventKeys = append(eventKeys, &apiv2.EventKey{
 			Id:          "",
@@ -30,6 +30,6 @@ func (keys eventKeysProvider) GetEventKeys(ctx context.Context) ([]*apiv2.EventK
 			CreatedAt:   timestamppb.New(time.Now()),
 		})
 	}
-	
+
 	return eventKeys, nil
 }

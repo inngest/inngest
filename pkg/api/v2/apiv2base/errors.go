@@ -30,6 +30,7 @@ const (
 	// 409 Conflict errors
 	ErrorResourceAlreadyExists = "resource_already_exists"
 	ErrorIdempotencyConflict   = "idempotency_conflict"
+	ErrorStateConflict         = "state_conflict"
 
 	// 429 Too Many Requests errors
 	ErrorRateLimited = "rate_limited"
@@ -53,6 +54,9 @@ const (
 
 	// 501 Not Implemented errors
 	ErrorNotImplemented = "not_implemented"
+
+	// 503 Service Unavailable errors
+	ErrorCapacityUnavailable = "capacity_unavailable"
 )
 
 // ErrorItem represents a single error in the API response

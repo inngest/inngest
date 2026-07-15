@@ -205,9 +205,12 @@ func TestErrorConstants(t *testing.T) {
 		"invalid_api_key":              ErrorInvalidAPIKey,
 		"access_denied":                ErrorAccessDenied,
 		"resource_already_exists":      ErrorResourceAlreadyExists,
+		"idempotency_conflict":         ErrorIdempotencyConflict,
+		"state_conflict":               ErrorStateConflict,
 		"app_sync_failed":              ErrorAppSyncFailed,
 		"validation_error":             ErrorValidationError,
 		"not_implemented":              ErrorNotImplemented,
+		"capacity_unavailable":         ErrorCapacityUnavailable,
 	}
 
 	for expected, actual := range expectedConstants {

@@ -582,5 +582,75 @@
         "// TODO": "Add example data for get /runs/{runId}/trace 200"
       }
     }
+  },
+  "/sandboxes": {
+    "post": {
+      "202": {
+        "// TODO": "Add example data for post /sandboxes 202"
+      },
+      "400": {
+        "// TODO": "Add example data for post /sandboxes 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /sandboxes 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /sandboxes 403"
+      },
+      "409": {
+        "// TODO": "Add example data for post /sandboxes 409"
+      },
+      "500": {
+        "// TODO": "Add example data for post /sandboxes 500"
+      },
+      "503": {
+        "// TODO": "Add example data for post /sandboxes 503"
+      }
+    }
+  },
+  "/sandboxes/{sandboxId}": {
+    "delete": {
+      "202": {
+        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 202"
+      },
+      "400": {
+        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 400"
+      },
+      "401": {
+        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 401"
+      },
+      "403": {
+        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 403"
+      },
+      "404": {
+        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 404"
+      },
+      "409": {
+        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 409"
+      },
+      "500": {
+        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 500"
+      }
+    },
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /sandboxes/{sandboxId} 200"
+      },
+      "400": {
+        "// TODO": "Add example data for get /sandboxes/{sandboxId} 400"
+      },
+      "401": {
+        "// TODO": "Add example data for get /sandboxes/{sandboxId} 401"
+      },
+      "403": {
+        "// TODO": "Add example data for get /sandboxes/{sandboxId} 403"
+      },
+      "404": {
+        "// TODO": "Add example data for get /sandboxes/{sandboxId} 404"
+      },
+      "500": {
+        "// TODO": "Add example data for get /sandboxes/{sandboxId} 500"
+      }
+    }
   }
 }

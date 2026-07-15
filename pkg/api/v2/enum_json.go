@@ -18,6 +18,10 @@ var responseEnumPrefixes = []string{
 	"FUNCTION_SINGLETON_MODE_",
 	"TRACE_SPAN_STATUS_",
 	"TRACE_STEP_OP_",
+	"SANDBOX_DESIRED_STATE_",
+	"SANDBOX_PHASE_",
+	"SANDBOX_OUTCOME_",
+	"SANDBOX_CLEANUP_STATE_",
 }
 
 type responseEnumMarshaler struct {
