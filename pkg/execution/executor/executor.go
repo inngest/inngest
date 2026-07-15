@@ -251,13 +251,18 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	}
 }
 
-func WithEventLifecycleListners(l ...execution.EventLifecycleListener) ExecutorOpt {
+func WithEventLifecycleListeners(l ...execution.EventLifecycleListener) ExecutorOpt {
 	return func(e execution.Executor) error {
 		for _, item := range l {
 			e.AddEventLifecycleListener(item)
 		}
 		return nil
 	}
+}
+
+// WithEventLifecycleListners is kept for compatibility with the original misspelling.
+func WithEventLifecycleListners(l ...execution.EventLifecycleListener) ExecutorOpt {
+	return WithEventLifecycleListeners(l...)
 }
 
 func WithStepLimits(limit func(id sv2.ID) int) ExecutorOpt {
@@ -573,6 +578,14 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 
 func (e *executor) AddEventLifecycleListener(l execution.EventLifecycleListener) {
 	e.evtLifecycles = append(e.evtLifecycles, l)
+}
+
+func (e *executor) runEventLifecycles(ctx context.Context, fn func(context.Context, execution.EventLifecycleListener)) {
+	ctx = context.WithoutCancel(ctx)
+	for _, l := range e.evtLifecycles {
+		l := l
+		go fn(ctx, l)
+	}
 }
 
 func (e *executor) RunFunctionFinishedLifecycle(
@@ -1063,9 +1076,9 @@ func (e *executor) schedule(
 		}
 		span.End()
 
-		for _, evtlf := range e.evtLifecycles {
-			go evtlf.OnDebounced(ctx, req, item)
-		}
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnDebounced(ctx, req, item)
+		})
 
 		return nil, nil, ErrFunctionDebounced
 	}
@@ -1593,6 +1606,9 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnFunctionScheduled(ctx, metadata, item, req.Events)
+		})
 		return &metadata.ID.RunID, &metadata, nil
 	}
 
@@ -1697,9 +1713,9 @@ func (e *executor) schedule(
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
-	for _, e := range e.evtLifecycles {
-		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
-	}
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnFunctionScheduled(ctx, metadata, item, req.Events)
+	})
 
 	return &metadata.ID.RunID, &metadata, nil
 }
