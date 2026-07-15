@@ -1697,6 +1697,9 @@ func (e *executor) schedule(
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
+	for _, e := range e.evtLifecycles {
+		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
+	}
 
 	return &metadata.ID.RunID, &metadata, nil
 }

@@ -3,12 +3,17 @@ package execution
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/debounce"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 )
 
 type EventLifecycleListener interface {
 	OnFunctionMatch(context.Context)
-	OnFunctionScheduled(context.Context)
+	OnFunctionScheduled(context.Context, statev2.Metadata,
+		queue.Item,
+		[]event.TrackedEvent)
 	OnRateLimited(context.Context)
 	OnDebounced(context.Context, ScheduleRequest, debounce.DebounceItem)
 	OnBatched(context.Context)
@@ -26,7 +31,8 @@ type NoopEventLifecycleListener struct{}
 
 func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context) {}
 
-func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta statev2.Metadata, qi queue.Item, evts []event.TrackedEvent) {
+}
 
 func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context) {}
 
