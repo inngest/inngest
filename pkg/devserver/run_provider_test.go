@@ -229,6 +229,68 @@ func TestRunProviderGetEventRunsUsesSharedRunList(t *testing.T) {
 	assert.Equal(t, "next-cursor", result.Runs[0].Cursor)
 }
 
+func TestRunProviderGetRunsResolvesPublicFilters(t *testing.T) {
+	appID := uuid.New()
+	functionID := uuid.New()
+	runID := ulid.Make()
+	eventID := ulid.Make()
+	startedAt := time.Now().UTC()
+
+	data := &stubRunProviderDataReader{
+		listedRuns: []*cqrs.TraceRun{{
+			RunID:        runID.String(),
+			Cursor:       "next-cursor",
+			AppID:        appID,
+			AppName:      "inngest-ai",
+			FunctionID:   functionID,
+			FunctionSlug: "hello-world",
+			FunctionName: "Hello",
+			StartedAt:    startedAt,
+			Status:       enums.RunStatusCompleted,
+			TriggerIDs:   []string{eventID.String()},
+		}},
+	}
+	provider := &runProvider{data: data}
+	deferred := false
+
+	result, err := provider.GetRuns(t.Context(), apiv2.GetRunsOpts{
+		Limit:       20,
+		AppIDs:      []string{"inngest-ai"},
+		FunctionIDs: []string{"hello-world"},
+		IsDeferred:  &deferred,
+		Order:       apiv2.OrderDirectionAsc,
+		TimeField:   apiv2.RunTimeFieldStartedAt,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Runs, 1)
+	require.NotNil(t, data.listOpts)
+	assert.Equal(t, []string{"inngest-ai"}, data.listOpts.Filter.AppName)
+	assert.Equal(t, []string{"hello-world"}, data.listOpts.Filter.FunctionSlug)
+	assert.Equal(t, &deferred, data.listOpts.Filter.IsDeferred)
+	assert.Equal(t, uint(21), data.listOpts.Items)
+	assert.Equal(t, enums.TraceRunTimeStartedAt, data.listOpts.Filter.TimeField)
+	assert.Equal(t, enums.TraceRunOrderAsc, data.listOpts.Order[0].Direction)
+	assert.Equal(t, "inngest-ai", result.Runs[0].AppID)
+	assert.Equal(t, "hello-world", result.Runs[0].FunctionID)
+	assert.Equal(t, "Hello", result.Runs[0].FunctionName)
+	assert.Equal(t, eventID, result.Runs[0].EventID)
+	assert.Equal(t, "next-cursor", result.Runs[0].Cursor)
+}
+
+func TestRunProviderGetRunsSkipsUnknownPublicFilter(t *testing.T) {
+	data := &stubRunProviderDataReader{}
+	provider := &runProvider{data: data}
+
+	result, err := provider.GetRuns(t.Context(), apiv2.GetRunsOpts{
+		Limit:  20,
+		AppIDs: []string{"unknown-app"},
+	})
+	require.NoError(t, err)
+	require.Empty(t, result.Runs)
+	require.NotNil(t, data.listOpts)
+	assert.Equal(t, []string{"unknown-app"}, data.listOpts.Filter.AppName)
+}
+
 type stubRunProviderDataReader struct {
 	run        *cqrs.FunctionRun
 	runErr     error
