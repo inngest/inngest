@@ -12,7 +12,7 @@ import { analytics } from '@/utils/segment';
  */
 
 type SandboxEventName =
-  | 'Sandboxes Viewed'
+  | 'Sandbox Viewed'
   | 'Sandbox Waitlist Joined'
   | 'Sandbox Waitlist Submitted';
 
@@ -36,7 +36,7 @@ function trackSandboxesEvent(
 }
 
 export function trackSandboxesViewed() {
-  trackSandboxesEvent('Sandboxes Viewed');
+  trackSandboxesEvent('Sandbox Viewed');
 }
 
 export function trackSandboxWaitlistJoined() {
