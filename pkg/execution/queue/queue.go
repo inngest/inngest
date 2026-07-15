@@ -242,6 +242,9 @@ type JobQueueReader interface {
 	// by summing the size of all backlogs in that partition.
 	PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error)
 
+	// PartitionSize returns the point-in-time ready queue size of a partition.
+	PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error)
+
 	// RunJobs reads items in the queue for a specific run.
 	RunJobs(ctx context.Context, queueShardName string, scope Scope, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 
