@@ -251,6 +251,15 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	}
 }
 
+func WithEventLifecycleListners(l ...event.LifecycleListener) ExecutorOpt {
+	return func(e execution.Executor) error {
+		for _, item := range l {
+			e.AddEventLifecycleListener(item)
+		}
+		return nil
+	}
+}
+
 func WithStepLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).steplimit = limit
@@ -511,7 +520,8 @@ type executor struct {
 	driverv1 map[string]driver.DriverV1
 	driverv2 map[string]driver.DriverV2
 
-	lifecycles []execution.LifecycleListener
+	lifecycles    []execution.LifecycleListener
+	evtLifecycles []event.LifecycleListener
 
 	// rtpub represents teh realtime publisher used to broadcast notifications
 	// on run execution.
@@ -559,6 +569,10 @@ func (e *executor) InvokeFailHandler(ctx context.Context, opts execution.InvokeF
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
+}
+
+func (e *executor) AddEventLifecycleListener(l event.LifecycleListener) {
+	e.evtLifecycles = append(e.evtLifecycles, l)
 }
 
 func (e *executor) RunFunctionFinishedLifecycle(
