@@ -80,7 +80,7 @@ export const dpaFields: Array<{
   { key: "signatoryName", label: "Full name of signatory" },
   { key: "signatoryTitle", label: "Title of signatory" },
   { key: "signatoryEmail", label: "Email of signatory", type: "email" },
-  { key: "companyAddress", label: "Address of company" },
+  { key: "companyAddress", label: "Full Address of company" },
   { key: "country", label: "Country", type: "country" },
 ];
 

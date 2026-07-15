@@ -153,11 +153,11 @@ function buildDpaDraftPayload(
     signer_email: signerEmail,
     draft: true,
     agreement: {
-      idempotency_key: `inngest_account_${accountId}`,
       recipient_organization: request.companyLegalName,
       recipient_name: request.signatoryName,
       recipient_title: request.signatoryTitle,
       recipient_email: request.signatoryEmail,
+      recipient_notice_email_address: request.signatoryEmail,
       recipient_street_address: companyAddress.street,
       recipient_city: companyAddress.city,
       recipient_state: companyAddress.state,
