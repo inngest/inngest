@@ -1044,7 +1044,7 @@ func (e *executor) schedule(
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.Debounce", req.AccountID, req.WorkspaceID, req.Function.ID)
-		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
+		item := debounce.DebounceItem{
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
 			AppID:            req.AppID,
@@ -1054,13 +1054,19 @@ func (e *executor) schedule(
 			EventID:          req.Events[0].GetInternalID(),
 			Event:            req.Events[0].GetEvent(),
 			FunctionPausedAt: req.FunctionPausedAt,
-		}, req.Function)
+		}
+		err := e.debouncer.Debounce(ctx, item, req.Function)
 		if err != nil {
 			span.RecordError(err)
 			span.End()
 			return nil, nil, err
 		}
 		span.End()
+
+		for _, evtlf := range e.evtLifecycles {
+			go evtlf.OnDebounced(ctx, req, item)
+		}
+
 		return nil, nil, ErrFunctionDebounced
 	}
 
