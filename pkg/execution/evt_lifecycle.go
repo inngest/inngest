@@ -55,7 +55,7 @@ type EventLifecycleListener interface {
 	OnRunResumed(context.Context)
 
 	// OnRunCancelled is called when a run is cancelled.
-	OnRunCancelled(context.Context)
+	OnRunCancelled(context.Context, sv2.ID, CancelRequest)
 }
 
 var _ EventLifecycleListener = (*NoopEventLifecycleListener)(nil)
@@ -83,4 +83,4 @@ func (NoopEventLifecycleListener) OnSingletonCancelled(ctx context.Context, req 
 
 func (NoopEventLifecycleListener) OnRunResumed(ctx context.Context) {}
 
-func (NoopEventLifecycleListener) OnRunCancelled(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnRunCancelled(ctx context.Context, id sv2.ID, cr CancelRequest) {}

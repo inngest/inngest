@@ -3170,6 +3170,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 			for _, e := range e.lifecycles {
 				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
 			}
+			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+				l.OnRunCancelled(ctx, id, r)
+			})
 		}
 		return nil
 	}
@@ -3196,6 +3199,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 				// Emit cancellation lifecycles so history and traces can mark this run cancelled even though event payloads are gone.
 				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
 			}
+			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+				l.OnRunCancelled(ctx, id, r)
+			})
 		}
 		return nil
 	}
@@ -3229,6 +3235,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 	}
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnRunCancelled(ctx, id, r)
+	})
 
 	return nil
 }
