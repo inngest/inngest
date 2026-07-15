@@ -22,6 +22,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type SemaphoreReleaseMode int32
+
+const (
+	SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_UNSPECIFIED SemaphoreReleaseMode = 0
+	SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_AUTO        SemaphoreReleaseMode = 1
+	SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_MANUAL      SemaphoreReleaseMode = 2
+)
+
+// Enum value maps for SemaphoreReleaseMode.
+var (
+	SemaphoreReleaseMode_name = map[int32]string{
+		0: "SEMAPHORE_RELEASE_MODE_UNSPECIFIED",
+		1: "SEMAPHORE_RELEASE_MODE_AUTO",
+		2: "SEMAPHORE_RELEASE_MODE_MANUAL",
+	}
+	SemaphoreReleaseMode_value = map[string]int32{
+		"SEMAPHORE_RELEASE_MODE_UNSPECIFIED": 0,
+		"SEMAPHORE_RELEASE_MODE_AUTO":        1,
+		"SEMAPHORE_RELEASE_MODE_MANUAL":      2,
+	}
+)
+
+func (x SemaphoreReleaseMode) Enum() *SemaphoreReleaseMode {
+	p := new(SemaphoreReleaseMode)
+	*p = x
+	return p
+}
+
+func (x SemaphoreReleaseMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SemaphoreReleaseMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_queue_v1_types_proto_enumTypes[0].Descriptor()
+}
+
+func (SemaphoreReleaseMode) Type() protoreflect.EnumType {
+	return &file_queue_v1_types_proto_enumTypes[0]
+}
+
+func (x SemaphoreReleaseMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SemaphoreReleaseMode.Descriptor instead.
+func (SemaphoreReleaseMode) EnumDescriptor() ([]byte, []int) {
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{0}
+}
+
 type QueueItem struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -647,7 +696,7 @@ type Semaphore struct {
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	EvaluatedKeyHash string                 `protobuf:"bytes,2,opt,name=evaluated_key_hash,json=evaluatedKeyHash,proto3" json:"evaluated_key_hash,omitempty"`
 	Weight           int64                  `protobuf:"varint,3,opt,name=weight,proto3" json:"weight,omitempty"`
-	Release          string                 `protobuf:"bytes,4,opt,name=release,proto3" json:"release,omitempty"`
+	Release          SemaphoreReleaseMode   `protobuf:"varint,4,opt,name=release,proto3,enum=queue.v1.SemaphoreReleaseMode" json:"release,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -703,11 +752,11 @@ func (x *Semaphore) GetWeight() int64 {
 	return 0
 }
 
-func (x *Semaphore) GetRelease() string {
+func (x *Semaphore) GetRelease() SemaphoreReleaseMode {
 	if x != nil {
 		return x.Release
 	}
-	return ""
+	return SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_UNSPECIFIED
 }
 
 type RunInfo struct {
@@ -1047,12 +1096,12 @@ const file_queue_v1_types_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
 	"\x04hash\x18\x02 \x01(\tR\x04hash\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x03R\x05limit\x12?\n" +
-	"\x1cunhashed_evaluated_key_value\x18\x04 \x01(\tR\x19unhashedEvaluatedKeyValue\"{\n" +
+	"\x1cunhashed_evaluated_key_value\x18\x04 \x01(\tR\x19unhashedEvaluatedKeyValue\"\x9b\x01\n" +
 	"\tSemaphore\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12,\n" +
 	"\x12evaluated_key_hash\x18\x02 \x01(\tR\x10evaluatedKeyHash\x12\x16\n" +
-	"\x06weight\x18\x03 \x01(\x03R\x06weight\x12\x18\n" +
-	"\arelease\x18\x04 \x01(\tR\arelease\"\x9e\x03\n" +
+	"\x06weight\x18\x03 \x01(\x03R\x06weight\x128\n" +
+	"\arelease\x18\x04 \x01(\x0e2\x1e.queue.v1.SemaphoreReleaseModeR\arelease\"\x9e\x03\n" +
 	"\aRunInfo\x123\n" +
 	"\alatency\x18\x01 \x01(\v2\x19.google.protobuf.DurationR\alatency\x12>\n" +
 	"\rsojourn_delay\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\fsojournDelay\x12\x1a\n" +
@@ -1072,7 +1121,11 @@ const file_queue_v1_types_proto_rawDesc = "" +
 	"\x15unhashed_throttle_key\x18\x06 \x01(\tR\x13unhashedThrottleKey\"1\n" +
 	"\tSingleton\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
-	"\x04mode\x18\x02 \x01(\tR\x04modeB5Z3github.com/inngest/inngest/proto/gen/queue/v1;queueb\x06proto3"
+	"\x04mode\x18\x02 \x01(\tR\x04mode*\x82\x01\n" +
+	"\x14SemaphoreReleaseMode\x12&\n" +
+	"\"SEMAPHORE_RELEASE_MODE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bSEMAPHORE_RELEASE_MODE_AUTO\x10\x01\x12!\n" +
+	"\x1dSEMAPHORE_RELEASE_MODE_MANUAL\x10\x02B5Z3github.com/inngest/inngest/proto/gen/queue/v1;queueb\x06proto3"
 
 var (
 	file_queue_v1_types_proto_rawDescOnce sync.Once
@@ -1086,39 +1139,42 @@ func file_queue_v1_types_proto_rawDescGZIP() []byte {
 	return file_queue_v1_types_proto_rawDescData
 }
 
+var file_queue_v1_types_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_queue_v1_types_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_queue_v1_types_proto_goTypes = []any{
-	(*QueueItem)(nil),           // 0: queue.v1.QueueItem
-	(*CapacityLease)(nil),       // 1: queue.v1.CapacityLease
-	(*Item)(nil),                // 2: queue.v1.Item
-	(*Identifier)(nil),          // 3: queue.v1.Identifier
-	(*CustomConcurrency)(nil),   // 4: queue.v1.CustomConcurrency
-	(*Semaphore)(nil),           // 5: queue.v1.Semaphore
-	(*RunInfo)(nil),             // 6: queue.v1.RunInfo
-	(*Throttle)(nil),            // 7: queue.v1.Throttle
-	(*Singleton)(nil),           // 8: queue.v1.Singleton
-	(*durationpb.Duration)(nil), // 9: google.protobuf.Duration
+	(SemaphoreReleaseMode)(0),   // 0: queue.v1.SemaphoreReleaseMode
+	(*QueueItem)(nil),           // 1: queue.v1.QueueItem
+	(*CapacityLease)(nil),       // 2: queue.v1.CapacityLease
+	(*Item)(nil),                // 3: queue.v1.Item
+	(*Identifier)(nil),          // 4: queue.v1.Identifier
+	(*CustomConcurrency)(nil),   // 5: queue.v1.CustomConcurrency
+	(*Semaphore)(nil),           // 6: queue.v1.Semaphore
+	(*RunInfo)(nil),             // 7: queue.v1.RunInfo
+	(*Throttle)(nil),            // 8: queue.v1.Throttle
+	(*Singleton)(nil),           // 9: queue.v1.Singleton
+	(*durationpb.Duration)(nil), // 10: google.protobuf.Duration
 }
 var file_queue_v1_types_proto_depIdxs = []int32{
-	2,  // 0: queue.v1.QueueItem.data:type_name -> queue.v1.Item
-	9,  // 1: queue.v1.QueueItem.idempotency_period:type_name -> google.protobuf.Duration
-	1,  // 2: queue.v1.QueueItem.capacity_lease:type_name -> queue.v1.CapacityLease
-	3,  // 3: queue.v1.Item.identifier:type_name -> queue.v1.Identifier
-	6,  // 4: queue.v1.Item.run_info:type_name -> queue.v1.RunInfo
-	7,  // 5: queue.v1.Item.throttle:type_name -> queue.v1.Throttle
-	8,  // 6: queue.v1.Item.singleton:type_name -> queue.v1.Singleton
-	4,  // 7: queue.v1.Item.custom_concurrency_keys:type_name -> queue.v1.CustomConcurrency
-	5,  // 8: queue.v1.Item.semaphores:type_name -> queue.v1.Semaphore
-	4,  // 9: queue.v1.Identifier.custom_concurrency_keys:type_name -> queue.v1.CustomConcurrency
-	5,  // 10: queue.v1.Identifier.semaphores:type_name -> queue.v1.Semaphore
-	9,  // 11: queue.v1.RunInfo.latency:type_name -> google.protobuf.Duration
-	9,  // 12: queue.v1.RunInfo.sojourn_delay:type_name -> google.protobuf.Duration
-	1,  // 13: queue.v1.RunInfo.capacity_lease:type_name -> queue.v1.CapacityLease
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	3,  // 0: queue.v1.QueueItem.data:type_name -> queue.v1.Item
+	10, // 1: queue.v1.QueueItem.idempotency_period:type_name -> google.protobuf.Duration
+	2,  // 2: queue.v1.QueueItem.capacity_lease:type_name -> queue.v1.CapacityLease
+	4,  // 3: queue.v1.Item.identifier:type_name -> queue.v1.Identifier
+	7,  // 4: queue.v1.Item.run_info:type_name -> queue.v1.RunInfo
+	8,  // 5: queue.v1.Item.throttle:type_name -> queue.v1.Throttle
+	9,  // 6: queue.v1.Item.singleton:type_name -> queue.v1.Singleton
+	5,  // 7: queue.v1.Item.custom_concurrency_keys:type_name -> queue.v1.CustomConcurrency
+	6,  // 8: queue.v1.Item.semaphores:type_name -> queue.v1.Semaphore
+	5,  // 9: queue.v1.Identifier.custom_concurrency_keys:type_name -> queue.v1.CustomConcurrency
+	6,  // 10: queue.v1.Identifier.semaphores:type_name -> queue.v1.Semaphore
+	0,  // 11: queue.v1.Semaphore.release:type_name -> queue.v1.SemaphoreReleaseMode
+	10, // 12: queue.v1.RunInfo.latency:type_name -> google.protobuf.Duration
+	10, // 13: queue.v1.RunInfo.sojourn_delay:type_name -> google.protobuf.Duration
+	2,  // 14: queue.v1.RunInfo.capacity_lease:type_name -> queue.v1.CapacityLease
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_queue_v1_types_proto_init() }
@@ -1135,13 +1191,14 @@ func file_queue_v1_types_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queue_v1_types_proto_rawDesc), len(file_queue_v1_types_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_queue_v1_types_proto_goTypes,
 		DependencyIndexes: file_queue_v1_types_proto_depIdxs,
+		EnumInfos:         file_queue_v1_types_proto_enumTypes,
 		MessageInfos:      file_queue_v1_types_proto_msgTypes,
 	}.Build()
 	File_queue_v1_types_proto = out.File

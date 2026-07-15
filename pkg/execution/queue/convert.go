@@ -3,7 +3,6 @@ package queue
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -433,7 +432,7 @@ func SemaphoreSliceToProto(semaphores []constraintapi.Semaphore) []*pb.Semaphore
 			Id:               semaphore.ID,
 			EvaluatedKeyHash: semaphore.EvaluatedKeyHash,
 			Weight:           semaphore.Weight,
-			Release:          strconv.Itoa(int(semaphore.Release)),
+			Release:          semaphoreReleaseToProto(semaphore.Release),
 		}
 	}
 	return result
@@ -639,13 +638,26 @@ func singletonModeFromProto(value string) (enums.SingletonMode, error) {
 	return enums.SingletonModeString(value)
 }
 
-func semaphoreReleaseFromProto(value string) (constraintapi.SemaphoreReleaseMode, error) {
-	if value == "" {
+func semaphoreReleaseToProto(mode constraintapi.SemaphoreReleaseMode) pb.SemaphoreReleaseMode {
+	switch mode {
+	case constraintapi.SemaphoreReleaseAuto:
+		return pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_AUTO
+	case constraintapi.SemaphoreReleaseManual:
+		return pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_MANUAL
+	default:
+		return pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_UNSPECIFIED
+	}
+}
+
+func semaphoreReleaseFromProto(value pb.SemaphoreReleaseMode) (constraintapi.SemaphoreReleaseMode, error) {
+	switch value {
+	case pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_UNSPECIFIED:
 		return constraintapi.SemaphoreReleaseAuto, nil
+	case pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_AUTO:
+		return constraintapi.SemaphoreReleaseAuto, nil
+	case pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_MANUAL:
+		return constraintapi.SemaphoreReleaseManual, nil
+	default:
+		return constraintapi.SemaphoreReleaseAuto, fmt.Errorf("semaphore release: unknown mode %s", value)
 	}
-	release, err := strconv.Atoi(value)
-	if err != nil {
-		return constraintapi.SemaphoreReleaseAuto, fmt.Errorf("semaphore release: %w", err)
-	}
-	return constraintapi.SemaphoreReleaseMode(release), nil
 }

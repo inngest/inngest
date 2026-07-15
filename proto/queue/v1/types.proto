@@ -75,11 +75,17 @@ message CustomConcurrency {
   string unhashed_evaluated_key_value = 4;
 }
 
+enum SemaphoreReleaseMode {
+  SEMAPHORE_RELEASE_MODE_UNSPECIFIED = 0;
+  SEMAPHORE_RELEASE_MODE_AUTO = 1;
+  SEMAPHORE_RELEASE_MODE_MANUAL = 2;
+}
+
 message Semaphore {
   string id = 1;
   string evaluated_key_hash = 2;
   int64 weight = 3;
-  string release = 4;
+  SemaphoreReleaseMode release = 4;
 }
 
 message RunInfo {

@@ -450,7 +450,7 @@ func TestIdentifierFromProtoInvalidIDs(t *testing.T) {
 		},
 		{
 			name:    "semaphore release",
-			mutate:  func(msg *pb.Identifier) { msg.Semaphores = []*pb.Semaphore{{Release: "bad"}} },
+			mutate:  func(msg *pb.Identifier) { msg.Semaphores = []*pb.Semaphore{{Release: pb.SemaphoreReleaseMode(17)}} },
 			wantErr: "semaphore release",
 		},
 	}
@@ -563,8 +563,58 @@ func TestLeafProtoRoundTrips(t *testing.T) {
 	roundTrippedSemaphores, err = SemaphoreSliceFromProto([]*pb.Semaphore{{Id: "app:test"}})
 	require.NoError(t, err)
 	require.Equal(t, constraintapi.SemaphoreReleaseAuto, roundTrippedSemaphores[0].Release)
-	_, err = SemaphoreSliceFromProto([]*pb.Semaphore{{Release: "bad"}})
+	_, err = SemaphoreSliceFromProto([]*pb.Semaphore{{Release: pb.SemaphoreReleaseMode(17)}})
 	require.ErrorContains(t, err, "semaphore release")
+}
+
+func TestSemaphoreReleaseModeConversion(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    constraintapi.SemaphoreReleaseMode
+		expected pb.SemaphoreReleaseMode
+	}{
+		{
+			name:     "auto",
+			input:    constraintapi.SemaphoreReleaseAuto,
+			expected: pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_AUTO,
+		},
+		{
+			name:     "manual",
+			input:    constraintapi.SemaphoreReleaseManual,
+			expected: pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_MANUAL,
+		},
+		{
+			name:     "invalid",
+			input:    constraintapi.SemaphoreReleaseMode(17),
+			expected: pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_UNSPECIFIED,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := semaphoreReleaseToProto(tt.input)
+			require.Equal(t, tt.expected, result)
+
+			backConverted, err := semaphoreReleaseFromProto(result)
+			require.NoError(t, err)
+			if tt.expected == pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_UNSPECIFIED {
+				require.Equal(t, constraintapi.SemaphoreReleaseAuto, backConverted)
+			} else {
+				require.Equal(t, tt.input, backConverted)
+			}
+		})
+	}
+
+	t.Run("unspecified from proto", func(t *testing.T) {
+		result, err := semaphoreReleaseFromProto(pb.SemaphoreReleaseMode_SEMAPHORE_RELEASE_MODE_UNSPECIFIED)
+		require.NoError(t, err)
+		require.Equal(t, constraintapi.SemaphoreReleaseAuto, result)
+	})
+
+	t.Run("unknown from proto", func(t *testing.T) {
+		_, err := semaphoreReleaseFromProto(pb.SemaphoreReleaseMode(17))
+		require.ErrorContains(t, err, "semaphore release")
+	})
 }
 
 // TestNilProtoInputs guards nil request fields so adapter code can safely
