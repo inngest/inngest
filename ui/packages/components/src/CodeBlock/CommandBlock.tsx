@@ -162,14 +162,25 @@ CommandBlock.Header = ({
   return <div className={cn('border-subtle border-b', className)}>{children}</div>;
 };
 
-function CommandBlockCopyButton({ content }: { content?: string }) {
+function CommandBlockCopyButton({
+  content,
+  onCopy,
+}: {
+  content?: string;
+  // Fired after a successful copy so callers can hook in side effects (e.g.
+  // analytics) without this shared component depending on any app.
+  onCopy?: () => void;
+}) {
   const { handleCopyClick, isCopying } = useCopyToClipboard();
   return (
     <CopyButton
       size="small"
       code={content}
       isCopying={isCopying}
-      handleCopyClick={handleCopyClick}
+      handleCopyClick={(code) => {
+        handleCopyClick(code);
+        onCopy?.();
+      }}
       appearance="outlined"
     />
   );
