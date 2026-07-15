@@ -103,6 +103,24 @@ func (r *jobQueueReader) PartitionBacklogSize(ctx context.Context, scope Scope, 
 	return totalCount, nil
 }
 
+// PartitionSize implements JobQueueReader.
+func (r *jobQueueReader) PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error) {
+	var totalCount int64
+
+	err := r.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
+		partitionSize, err := shard.PartitionSize(ctx, scope, partitionID, until)
+		if err != nil {
+			return fmt.Errorf("could not load partition size: %w", err)
+		}
+		atomic.AddInt64(&totalCount, partitionSize)
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("could not load partition size: %w", err)
+	}
+	return totalCount, nil
+}
+
 // PartitionByID implements JobQueueReader.
 func (r *jobQueueReader) PartitionByID(ctx context.Context, shard QueueShard, scope Scope, partitionID string) (*PartitionInspectionResult, error) {
 	return shard.PartitionByID(ctx, scope, partitionID)
