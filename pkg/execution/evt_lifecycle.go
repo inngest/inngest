@@ -5,9 +5,11 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/oklog/ulid/v2"
 )
 
 // EventLifecycleListener listens to event-level lifecycle decisions made while
@@ -41,7 +43,7 @@ type EventLifecycleListener interface {
 	OnDebounced(context.Context, ScheduleRequest, debounce.DebounceItem)
 
 	// OnBatched is called when an event is accepted into a batch.
-	OnBatched(context.Context)
+	OnBatched(context.Context, batch.BatchItem, ulid.ULID)
 
 	// OnSingletonSkipped is called when a matched function is skipped because
 	// another singleton run already exists.
@@ -75,7 +77,8 @@ func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context, req Schedul
 func (NoopEventLifecycleListener) OnDebounced(ctx context.Context, req ScheduleRequest, db debounce.DebounceItem) {
 }
 
-func (NoopEventLifecycleListener) OnBatched(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnBatched(ctx context.Context, bi batch.BatchItem, batchID ulid.ULID) {
+}
 
 func (NoopEventLifecycleListener) OnSingletonSkipped(ctx context.Context, req ScheduleRequest) {}
 

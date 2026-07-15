@@ -5500,6 +5500,15 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		return err
 	}
 
+	batchID, err := parseBatchID(result.BatchID)
+	if err != nil {
+		return err
+	}
+
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnBatched(ctx, bi, batchID)
+	})
+
 	if opts == nil {
 		opts = &execution.BatchExecOpts{}
 	}
@@ -5516,7 +5525,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 
 		if err := e.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
 			ScheduleBatchPayload: batch.ScheduleBatchPayload{
-				BatchID:         ulid.MustParse(result.BatchID),
+				BatchID:         batchID,
 				AccountID:       bi.AccountID,
 				WorkspaceID:     bi.WorkspaceID,
 				AppID:           bi.AppID,
@@ -5538,7 +5547,6 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		})
 	case enums.BatchFull, enums.BatchMaxSize:
 		// start execution immediately
-		batchID := ulid.MustParse(result.BatchID)
 		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    result.BatchPointerKey,
@@ -5558,6 +5566,17 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 	}
 
 	return nil
+}
+
+func parseBatchID(raw string) (ulid.ULID, error) {
+	if raw == "" {
+		return ulid.ULID{}, fmt.Errorf("batch append returned empty batch ID")
+	}
+	batchID, err := ulid.Parse(raw)
+	if err != nil {
+		return ulid.ULID{}, fmt.Errorf("invalid batch ID %q: %w", raw, err)
+	}
+	return batchID, nil
 }
 
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run
