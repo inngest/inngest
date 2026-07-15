@@ -105,10 +105,6 @@ func ScopeFromProto(msg *pb.Scope) (Scope, error) {
 	}
 
 	scope := Scope{IsSystem: msg.GetIsSystem()}
-	if scope.IsSystem {
-		return scope, nil
-	}
-
 	accountID, err := parseUUID(msg.GetAccountId(), "scope account_id")
 	if err != nil {
 		return Scope{}, err
