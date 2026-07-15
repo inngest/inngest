@@ -6,7 +6,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 )
 
 // EventLifecycleListener listens to event-level lifecycle decisions made while
@@ -23,7 +23,7 @@ type EventLifecycleListener interface {
 	// may start if and when there's capacity due to concurrency.
 	OnFunctionScheduled(
 		context.Context,
-		statev2.Metadata,
+		sv2.Metadata,
 		queue.Item,
 		[]event.TrackedEvent,
 	)
@@ -48,7 +48,7 @@ type EventLifecycleListener interface {
 
 	// OnSingletonCancelled is called when a matched function cancels an existing
 	// singleton run before continuing.
-	OnSingletonCancelled(context.Context)
+	OnSingletonCancelled(context.Context, ScheduleRequest, sv2.ID)
 
 	// OnRunResumed is called when a paused run is resumed from an event, signal,
 	// invoke completion, or timeout.
@@ -66,7 +66,7 @@ type NoopEventLifecycleListener struct{}
 
 func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context) {}
 
-func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta statev2.Metadata, qi queue.Item, evts []event.TrackedEvent) {
+func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta sv2.Metadata, qi queue.Item, evts []event.TrackedEvent) {
 }
 
 func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context, req ScheduleRequest) {}
@@ -78,7 +78,8 @@ func (NoopEventLifecycleListener) OnBatched(ctx context.Context) {}
 
 func (NoopEventLifecycleListener) OnSingletonSkipped(ctx context.Context, req ScheduleRequest) {}
 
-func (NoopEventLifecycleListener) OnSingletonCancelled(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnSingletonCancelled(ctx context.Context, req ScheduleRequest, id sv2.ID) {
+}
 
 func (NoopEventLifecycleListener) OnRunResumed(ctx context.Context) {}
 

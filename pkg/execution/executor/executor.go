@@ -1321,6 +1321,10 @@ func (e *executor) schedule(
 					if err != nil {
 						l.ReportError(err, "error canceling singleton run")
 					}
+					e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+						l.OnSingletonCancelled(ctx, req, runID)
+					})
+
 				default:
 					// Mark as singleton skip - will be handled after span creation
 					skipReason = enums.SkipReasonSingleton
