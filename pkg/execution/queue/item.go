@@ -528,74 +528,65 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.ParallelCoalesceKey = temp.ParallelCoalesceKey
 	i.Semaphores = temp.Semaphores
 
-	// Save this for custom unmarshalling of other jobs.  This is overwritten
-	// for known queue kinds.
-	if len(temp.Payload) > 0 {
-		i.Payload = temp.Payload
+	payload, err := decodePayloadForKind(temp.Kind, temp.Payload)
+	if err != nil {
+		return err
+	}
+	i.Payload = payload
+	return nil
+}
+
+func decodePayloadForKind(kind string, payload json.RawMessage) (any, error) {
+	if len(payload) == 0 {
+		return nil, nil
 	}
 
-	switch temp.Kind {
+	switch kind {
 	case KindStart, KindEdge, KindSleep, KindEdgeError:
 		// Edge and Sleep are the same;  the only difference is that the executor
 		// runner should always save nil to the state store using the outgoing edge's
 		// ID when processing a sleep so that the state + stack are updated properly.
-		if len(temp.Payload) == 0 {
-			return nil
-		}
 		p := &PayloadEdge{}
-		if err := json.Unmarshal(temp.Payload, p); err != nil {
-			return err
+		if err := json.Unmarshal(payload, p); err != nil {
+			return nil, err
 		}
-		i.Payload = *p
+		return *p, nil
 	case KindPause:
-		if len(temp.Payload) == 0 {
-			return nil
-		}
 		p := &PayloadPauseTimeout{}
-		if err := json.Unmarshal(temp.Payload, p); err != nil {
-			return err
+		if err := json.Unmarshal(payload, p); err != nil {
+			return nil, err
 		}
-		i.Payload = *p
+		return *p, nil
 	case KindPauseBlockFlush:
-		if len(temp.Payload) == 0 {
-			return nil
-		}
 		p := &PayloadPauseBlockFlush{}
-		if err := json.Unmarshal(temp.Payload, p); err != nil {
-			return err
+		if err := json.Unmarshal(payload, p); err != nil {
+			return nil, err
 		}
-		i.Payload = *p
+		return *p, nil
 	case KindJobPromote:
-		if len(temp.Payload) == 0 {
-			return nil
-		}
 		p := &PayloadJobPromote{}
-		if err := json.Unmarshal(temp.Payload, p); err != nil {
-			return err
+		if err := json.Unmarshal(payload, p); err != nil {
+			return nil, err
 		}
-		i.Payload = *p
+		return *p, nil
 	case KindFunctionPause:
-		if len(temp.Payload) == 0 {
-			return nil
-		}
 		p := &PayloadPauseFunction{}
-		if err := json.Unmarshal(temp.Payload, p); err != nil {
-			return err
+		if err := json.Unmarshal(payload, p); err != nil {
+			return nil, err
 		}
-		i.Payload = *p
+		return *p, nil
 	case KindFunctionUnpause:
-		if len(temp.Payload) == 0 {
-			return nil
-		}
 		p := &PayloadUnpauseFunction{}
-		if err := json.Unmarshal(temp.Payload, p); err != nil {
-			return err
+		if err := json.Unmarshal(payload, p); err != nil {
+			return nil, err
 		}
-		i.Payload = *p
+		return *p, nil
 	case KindLatencyTrack:
 		// No payload for latency tracking items.
+		return nil, nil
+	default:
+		return payload, nil
 	}
-	return nil
 }
 
 // GetEdge returns the edge from the enqueued item, if the payload is of type PayloadEdge.

@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	pb "github.com/inngest/inngest/proto/gen/queue/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -80,7 +81,9 @@ func TestQueueItemProtoRoundTrip(t *testing.T) {
 			},
 			Attempt:     2,
 			MaxAttempts: &maxAttempts,
-			Payload:     json.RawMessage(`{"edge":"step"}`),
+			Payload: PayloadEdge{
+				Edge: inngest.Edge{Incoming: "step-a", Outgoing: "step-b"},
+			},
 			Metadata: map[string]any{
 				"trace": "abc",
 				"count": float64(3),
@@ -175,7 +178,7 @@ func TestQueueItemProtoRoundTrip(t *testing.T) {
 func TestItemProtoRoundTrip_NilOptionalFields(t *testing.T) {
 	original := Item{
 		WorkspaceID: uuid.New(),
-		Kind:        KindEdge,
+		Kind:        "custom-cloud-kind",
 		Identifier: state.Identifier{
 			RunID:       ulid.Make(),
 			WorkflowID:  uuid.New(),
@@ -207,6 +210,66 @@ func TestItemProtoRoundTrip_NilOptionalFields(t *testing.T) {
 	require.Equal(t, original.Identifier.RunID, roundTripped.Identifier.RunID)
 }
 
+func TestItemFromProtoRehydratesKnownPayloads(t *testing.T) {
+	pauseID := uuid.New()
+	pause := state.Pause{ID: uuid.New()}
+	tests := []struct {
+		name        string
+		kind        string
+		payload     any
+		payloadType any
+	}{
+		{
+			name: "edge",
+			kind: KindEdge,
+			payload: PayloadEdge{
+				Edge: inngest.Edge{Incoming: "step-a", Outgoing: "step-b"},
+			},
+			payloadType: PayloadEdge{},
+		},
+		{
+			name: "pause timeout",
+			kind: KindPause,
+			payload: PayloadPauseTimeout{
+				PauseID: pauseID,
+				Pause:   pause,
+			},
+			payloadType: PayloadPauseTimeout{},
+		},
+		{
+			name: "job promote",
+			kind: KindJobPromote,
+			payload: PayloadJobPromote{
+				PromoteJobID: "job-a",
+				ScheduledAt:  123,
+			},
+			payloadType: PayloadJobPromote{},
+		},
+		{
+			name:        "unknown",
+			kind:        "custom-cloud-kind",
+			payload:     json.RawMessage(`{"n":1}`),
+			payloadType: json.RawMessage{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload, err := json.Marshal(tt.payload)
+			require.NoError(t, err)
+
+			item, err := ItemFromProto(&pb.Item{
+				WorkspaceId: uuid.NewString(),
+				Kind:        tt.kind,
+				Identifier:  validIdentifierProto(),
+				Payload:     payload,
+			})
+			require.NoError(t, err)
+			require.IsType(t, tt.payloadType, item.Payload)
+		})
+	}
+}
+
 // TestEnqueueRequestTimeContract guards the enqueue boundary: scheduled time is
 // carried by EnqueueRequest.at, not by Item.At, and enqueue time is assigned by
 // the queue rather than producer-provided Item.EnqueuedAt.
@@ -220,9 +283,11 @@ func TestEnqueueRequestTimeContract(t *testing.T) {
 		WorkspaceID: uuid.New(),
 		Kind:        KindEdge,
 		Identifier:  validIdentifier(),
-		Payload:     json.RawMessage(`{"edge":"step"}`),
-		At:          itemAt,
-		EnqueuedAt:  itemEnqueuedAt,
+		Payload: PayloadEdge{
+			Edge: inngest.Edge{Incoming: "step-a", Outgoing: "step-b"},
+		},
+		At:         itemAt,
+		EnqueuedAt: itemEnqueuedAt,
 	})
 	require.NoError(t, err)
 
@@ -855,7 +920,11 @@ func assertItemEqual(t *testing.T, expected, actual Item) {
 	require.Equal(t, expected.Kind, actual.Kind)
 	require.Equal(t, expected.Attempt, actual.Attempt)
 	require.Equal(t, expected.MaxAttempts, actual.MaxAttempts)
-	require.JSONEq(t, string(expected.Payload.(json.RawMessage)), string(actual.Payload.(json.RawMessage)))
+	expectedPayload, err := json.Marshal(expected.Payload)
+	require.NoError(t, err)
+	actualPayload, err := json.Marshal(actual.Payload)
+	require.NoError(t, err)
+	require.JSONEq(t, string(expectedPayload), string(actualPayload))
 	require.Equal(t, expected.Metadata, actual.Metadata)
 	require.Equal(t, expected.QueueName, actual.QueueName)
 	require.Equal(t, expected.Throttle, actual.Throttle)

@@ -161,6 +161,10 @@ func ItemFromProto(msg *pb.Item) (Item, error) {
 	if err != nil {
 		return Item{}, err
 	}
+	payload, err := payloadFromProto(msg.GetKind(), msg.GetPayload())
+	if err != nil {
+		return Item{}, err
+	}
 
 	return Item{
 		JobID:                 msg.JobId,
@@ -170,7 +174,7 @@ func ItemFromProto(msg *pb.Item) (Item, error) {
 		Identifier:            identifier,
 		Attempt:               int(msg.GetAttempt()),
 		MaxAttempts:           int64PtrToIntPtr(msg.MaxAttempts),
-		Payload:               payloadFromProto(msg.GetPayload()),
+		Payload:               payload,
 		Metadata:              metadata,
 		QueueName:             msg.QueueName,
 		RunInfo:               runInfo,
@@ -489,11 +493,15 @@ func jsonBytes(v any) ([]byte, error) {
 	return json.Marshal(v)
 }
 
-func payloadFromProto(payload []byte) any {
+func payloadFromProto(kind string, payload []byte) (any, error) {
 	if len(payload) == 0 {
-		return nil
+		return nil, nil
 	}
-	return json.RawMessage(payload)
+	decoded, err := decodePayloadForKind(kind, json.RawMessage(payload))
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal item payload: %w", err)
+	}
+	return decoded, nil
 }
 
 func metadataFromProto(metadata []byte) (map[string]any, error) {
