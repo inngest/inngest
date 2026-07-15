@@ -26,7 +26,7 @@ export default inngest.createFunction(
   { id: 'grade-response' },
   { event: 'ai/response.generated' },
   async ({ event, step }) => {
-    const result = step.run('agent-result', () => {/* ... */});
+    const result = await step.run('agent-result', () => {/* ... */});
 
     // Numeric and boolean scores both chart on the Scores tab
     await step.score('quality', { name: 'response_quality', value: result.qualityScore });
