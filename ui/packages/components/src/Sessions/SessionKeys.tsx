@@ -40,6 +40,10 @@ type SessionKeysProps = {
   onRefresh: () => void;
   onSelectSessionKey: (sessionKey: string) => void;
   getSessionKeyHref: (sessionKey: string) => string;
+  onEmptyStateViewed?: () => void;
+  onEmptyStateDocsLinkClick?: () => void;
+  onEmptyStatePromptCopy?: () => void;
+  onEmptyStateExampleCopy?: () => void;
 };
 
 export function SessionKeys({
@@ -52,11 +56,22 @@ export function SessionKeys({
   onRefresh,
   onSelectSessionKey,
   getSessionKeyHref,
+  onEmptyStateViewed,
+  onEmptyStateDocsLinkClick,
+  onEmptyStatePromptCopy,
+  onEmptyStateExampleCopy,
 }: SessionKeysProps) {
   const trimmedSearch = search.trim();
 
   if (!error && !trimmedSearch && sessionKeys.length === 0) {
-    return <SessionsEmptyState />;
+    return (
+      <SessionsEmptyState
+        onViewed={onEmptyStateViewed}
+        onDocsLinkClick={onEmptyStateDocsLinkClick}
+        onPromptCopy={onEmptyStatePromptCopy}
+        onExampleCopy={onEmptyStateExampleCopy}
+      />
+    );
   }
 
   return (

@@ -14,7 +14,11 @@ type ExperimentEventName =
   | 'Experiment Scoring Weight Updated'
   | 'Experiment Variant Filter Changed'
   | 'Experiment Time Range Changed'
-  | 'Experiment Docs Link Opened';
+  | 'Experiment Docs Link Opened'
+  | 'Experiment Empty State Viewed'
+  | 'Experiment Empty State Prompt Copied'
+  | 'Experiment Empty State Example Copied'
+  | 'Experiment Empty State Docs Link Opened';
 
 type ExperimentEventProperties = Record<
   string,
@@ -187,4 +191,20 @@ export function trackExperimentTimeRangeChanged({
 
 export function trackExperimentDocsLinkOpened() {
   trackExperimentsEvent('Experiment Docs Link Opened');
+}
+
+export function trackExperimentEmptyStateViewed() {
+  trackExperimentsEvent('Experiment Empty State Viewed');
+}
+
+export function trackExperimentEmptyStatePromptCopied() {
+  trackExperimentsEvent('Experiment Empty State Prompt Copied');
+}
+
+export function trackExperimentEmptyStateExampleCopied() {
+  trackExperimentsEvent('Experiment Empty State Example Copied');
+}
+
+export function trackExperimentEmptyStateDocsLinkOpened() {
+  trackExperimentsEvent('Experiment Empty State Docs Link Opened');
 }

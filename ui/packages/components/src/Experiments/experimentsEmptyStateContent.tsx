@@ -126,15 +126,4 @@ export const VARIANT_TABS: TabsProps[] = [
   { title: 'fixed ( )', content: FIXED, language: 'typescript', readOnly: true },
 ];
 
-export const STEPS = {
-  one: {
-    title: 'Declare your variants inside an inngest function and choose how runs are selected',
-    description:
-      'Wrap the paths you’re comparing in group.experiment( ). Each variant calls a step so the work stays durable. Every strategy returns exactly one variant per run.',
-  },
-  two: {
-    title: 'Track the outcome',
-    description:
-      'Compare latency, errors and traces. You can also emit your own score from inside the selected variant.',
-  },
-};
+export const PROMPT = `Read the docs about Inngest experiments @https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments and show me how to declare variants with group.experiment() using weighted, bucket, custom, or fixed selection, then help me find a function where I could safely trial a change and compare outcomes across variants.`;

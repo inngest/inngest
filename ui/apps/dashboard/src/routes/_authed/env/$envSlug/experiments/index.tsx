@@ -15,6 +15,10 @@ import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
 import {
   trackExperimentDocsLinkOpened,
+  trackExperimentEmptyStateDocsLinkOpened,
+  trackExperimentEmptyStateExampleCopied,
+  trackExperimentEmptyStatePromptCopied,
+  trackExperimentEmptyStateViewed,
   trackExperimentsListViewed,
 } from '@/components/Experiments/tracking';
 import { pathCreator } from '@/utils/urls';
@@ -87,7 +91,12 @@ function ExperimentsComponent() {
           breadcrumb={[{ text: 'All experiments' }]}
           infoIcon={<ExperimentsInfo />}
         />
-        <ExperimentsEmptyState />
+        <ExperimentsEmptyState
+          onViewed={trackExperimentEmptyStateViewed}
+          onDocsLinkClick={trackExperimentEmptyStateDocsLinkOpened}
+          onPromptCopy={trackExperimentEmptyStatePromptCopied}
+          onExampleCopy={trackExperimentEmptyStateExampleCopied}
+        />
         <FeedbackFloatingButton />
       </>
     );
