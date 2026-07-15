@@ -27,6 +27,7 @@ import { graphql } from '@/gql';
 import { GetAccountEntitlementsDocument, ScoreKind } from '@/gql/graphql';
 import { Legend } from './Legend';
 import { ScoreCard } from './ScoreCard';
+import { ScoresEmptyState } from './ScoresEmptyState';
 import type { ScoreSeries } from './types';
 
 const DEFAULT_DURATION = { hours: 24 };
@@ -250,6 +251,19 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
   const isLoading = namesFetching || seriesFetching;
 
   const filterError = lookupError ?? namesError;
+
+  // Show the onboarding empty state only for a true first-run view: no scores
+  // exist AND the user hasn't narrowed the view. When they're actively
+  // filtering (function or custom time range) and get zero, the inline "No
+  // scores…" message below covers it instead.
+  const isDefaultView =
+    (selectedFns?.length ?? 0) === 0 && !start && !end && !duration;
+  const showEmptyState =
+    isDefaultView && availableScores.length === 0 && !isLoading && !namesError;
+
+  if (showEmptyState) {
+    return <ScoresEmptyState />;
+  }
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden">
