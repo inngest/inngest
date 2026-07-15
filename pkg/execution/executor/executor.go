@@ -5528,7 +5528,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 	}
 
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-		l.OnBatched(ctx, bi, batchID)
+		l.OnBatched(ctx, bi, batchID, result)
 	})
 
 	if opts == nil {

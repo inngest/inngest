@@ -67,8 +67,10 @@ type EventLifecycleListener interface {
 	// processing instead of being scheduled immediately.
 	OnDebounced(context.Context, ScheduleRequest, debounce.DebounceItem)
 
-	// OnBatched is called when an event is accepted into a batch.
-	OnBatched(context.Context, batch.BatchItem, ulid.ULID)
+	// OnBatched is called when an event is accepted into a batch. The append
+	// result describes whether the item created, appended to, deduplicated
+	// within, or filled the batch.
+	OnBatched(context.Context, batch.BatchItem, ulid.ULID, *batch.BatchAppendResult)
 
 	// OnSingletonCancelled is called when a matched function cancels an existing
 	// singleton run before continuing.
@@ -109,7 +111,7 @@ func (NoopEventLifecycleListener) OnFunctionScheduleFailed(ctx context.Context, 
 func (NoopEventLifecycleListener) OnDebounced(ctx context.Context, req ScheduleRequest, db debounce.DebounceItem) {
 }
 
-func (NoopEventLifecycleListener) OnBatched(ctx context.Context, bi batch.BatchItem, batchID ulid.ULID) {
+func (NoopEventLifecycleListener) OnBatched(ctx context.Context, bi batch.BatchItem, batchID ulid.ULID, result *batch.BatchAppendResult) {
 }
 
 func (NoopEventLifecycleListener) OnSingletonCancelled(ctx context.Context, req ScheduleRequest, id sv2.ID) {
