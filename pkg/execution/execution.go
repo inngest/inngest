@@ -124,7 +124,7 @@ type Executor interface {
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
-	AddEventLifecycleListener(l event.LifecycleListener)
+	AddEventLifecycleListener(l EventLifecycleListener)
 
 	CloseLifecycleListeners(ctx context.Context)
 

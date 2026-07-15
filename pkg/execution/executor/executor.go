@@ -251,7 +251,7 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	}
 }
 
-func WithEventLifecycleListners(l ...event.LifecycleListener) ExecutorOpt {
+func WithEventLifecycleListners(l ...execution.EventLifecycleListener) ExecutorOpt {
 	return func(e execution.Executor) error {
 		for _, item := range l {
 			e.AddEventLifecycleListener(item)
@@ -521,7 +521,7 @@ type executor struct {
 	driverv2 map[string]driver.DriverV2
 
 	lifecycles    []execution.LifecycleListener
-	evtLifecycles []event.LifecycleListener
+	evtLifecycles []execution.EventLifecycleListener
 
 	// rtpub represents teh realtime publisher used to broadcast notifications
 	// on run execution.
@@ -571,7 +571,7 @@ func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
 }
 
-func (e *executor) AddEventLifecycleListener(l event.LifecycleListener) {
+func (e *executor) AddEventLifecycleListener(l execution.EventLifecycleListener) {
 	e.evtLifecycles = append(e.evtLifecycles, l)
 }
 
