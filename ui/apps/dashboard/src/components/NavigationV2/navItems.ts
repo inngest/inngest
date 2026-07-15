@@ -8,6 +8,7 @@ import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { OverviewIcon } from '@inngest/components/icons/sections/Overview';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
+import { SandboxesIcon } from '@inngest/components/icons/sections/Sandboxes';
 import { ScoresIcon } from '@inngest/components/icons/sections/Scores';
 import { SessionsIcon } from '@inngest/components/icons/sections/Sessions';
 import { WebhooksIcon } from '@inngest/components/icons/sections/Webhooks';
@@ -63,6 +64,12 @@ export const sessionsItem: NavItemConfig = {
   label: 'Sessions',
   route: 'sessions',
   Icon: SessionsIcon,
+};
+
+export const sandboxesItem: NavItemConfig = {
+  label: 'Sandboxes',
+  route: 'sandboxes',
+  Icon: SandboxesIcon,
 };
 
 export const manage: NavGroupConfig = {

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportIndexRouteImport } from './routes/support/index'
+import { Route as ApiWaitlistRouteImport } from './routes/api/waitlist'
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support-tickets'
 import { Route as ApiSentryRouteImport } from './routes/api/sentry'
 import { Route as ApiInngestRouteImport } from './routes/api/inngest'
@@ -60,6 +61,7 @@ import { Route as AuthedIntegrationsVercelCallbackIndexRouteImport } from './rou
 import { Route as AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/unattached-syncs/index'
 import { Route as AuthedEnvEnvSlugSessionsIndexRouteImport } from './routes/_authed/env/$envSlug/sessions/index'
 import { Route as AuthedEnvEnvSlugScoresIndexRouteImport } from './routes/_authed/env/$envSlug/scores/index'
+import { Route as AuthedEnvEnvSlugSandboxesIndexRouteImport } from './routes/_authed/env/$envSlug/sandboxes/index'
 import { Route as AuthedEnvEnvSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/runs/index'
 import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_authed/env/$envSlug/metrics/index'
 import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index'
@@ -121,6 +123,11 @@ const IndexRoute = IndexRouteImport.update({
 const SupportIndexRoute = SupportIndexRouteImport.update({
   id: '/support/',
   path: '/support/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWaitlistRoute = ApiWaitlistRouteImport.update({
+  id: '/api/waitlist',
+  path: '/api/waitlist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSupportTicketsRoute = ApiSupportTicketsRouteImport.update({
@@ -384,6 +391,12 @@ const AuthedEnvEnvSlugScoresIndexRoute =
   AuthedEnvEnvSlugScoresIndexRouteImport.update({
     id: '/scores/',
     path: '/scores/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
+const AuthedEnvEnvSlugSandboxesIndexRoute =
+  AuthedEnvEnvSlugSandboxesIndexRouteImport.update({
+    id: '/sandboxes/',
+    path: '/sandboxes/',
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any)
 const AuthedEnvEnvSlugRunsIndexRoute =
@@ -692,6 +705,7 @@ export interface FileRoutesByFullPath {
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
+  '/api/waitlist': typeof ApiWaitlistRoute
   '/support/': typeof SupportIndexRoute
   '/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren
   '/organization-list/$': typeof authOrganizationListSplatRoute
@@ -735,6 +749,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
   '/env/$envSlug/metrics/': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/env/$envSlug/runs/': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/env/$envSlug/sandboxes/': typeof AuthedEnvEnvSlugSandboxesIndexRoute
   '/env/$envSlug/scores/': typeof AuthedEnvEnvSlugScoresIndexRoute
   '/env/$envSlug/sessions/': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
@@ -791,6 +806,7 @@ export interface FileRoutesByTo {
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
+  '/api/waitlist': typeof ApiWaitlistRoute
   '/support': typeof SupportIndexRoute
   '/organization-list/$': typeof authOrganizationListSplatRoute
   '/sign-in/$': typeof authSignInSplatRoute
@@ -822,6 +838,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageIndexRoute
   '/env/$envSlug/metrics': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/env/$envSlug/runs': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/env/$envSlug/sandboxes': typeof AuthedEnvEnvSlugSandboxesIndexRoute
   '/env/$envSlug/scores': typeof AuthedEnvEnvSlugScoresIndexRoute
   '/env/$envSlug/sessions': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/env/$envSlug/unattached-syncs': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
@@ -881,6 +898,7 @@ export interface FileRoutesById {
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
+  '/api/waitlist': typeof ApiWaitlistRoute
   '/support/': typeof SupportIndexRoute
   '/_authed/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren
   '/(auth)/organization-list/$': typeof authOrganizationListSplatRoute
@@ -924,6 +942,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
   '/_authed/env/$envSlug/metrics/': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/_authed/env/$envSlug/runs/': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/_authed/env/$envSlug/sandboxes/': typeof AuthedEnvEnvSlugSandboxesIndexRoute
   '/_authed/env/$envSlug/scores/': typeof AuthedEnvEnvSlugScoresIndexRoute
   '/_authed/env/$envSlug/sessions/': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/_authed/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
@@ -983,6 +1002,7 @@ export interface FileRouteTypes {
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
+    | '/api/waitlist'
     | '/support/'
     | '/env/$envSlug'
     | '/organization-list/$'
@@ -1026,6 +1046,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage/'
     | '/env/$envSlug/metrics/'
     | '/env/$envSlug/runs/'
+    | '/env/$envSlug/sandboxes/'
     | '/env/$envSlug/scores/'
     | '/env/$envSlug/sessions/'
     | '/env/$envSlug/unattached-syncs/'
@@ -1082,6 +1103,7 @@ export interface FileRouteTypes {
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
+    | '/api/waitlist'
     | '/support'
     | '/organization-list/$'
     | '/sign-in/$'
@@ -1113,6 +1135,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage'
     | '/env/$envSlug/metrics'
     | '/env/$envSlug/runs'
+    | '/env/$envSlug/sandboxes'
     | '/env/$envSlug/scores'
     | '/env/$envSlug/sessions'
     | '/env/$envSlug/unattached-syncs'
@@ -1171,6 +1194,7 @@ export interface FileRouteTypes {
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
+    | '/api/waitlist'
     | '/support/'
     | '/_authed/env/$envSlug'
     | '/(auth)/organization-list/$'
@@ -1214,6 +1238,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/manage/'
     | '/_authed/env/$envSlug/metrics/'
     | '/_authed/env/$envSlug/runs/'
+    | '/_authed/env/$envSlug/sandboxes/'
     | '/_authed/env/$envSlug/scores/'
     | '/_authed/env/$envSlug/sessions/'
     | '/_authed/env/$envSlug/unattached-syncs/'
@@ -1270,6 +1295,7 @@ export interface RootRouteChildren {
   ApiInngestRoute: typeof ApiInngestRoute
   ApiSentryRoute: typeof ApiSentryRoute
   ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute
+  ApiWaitlistRoute: typeof ApiWaitlistRoute
   SupportIndexRoute: typeof SupportIndexRoute
   authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute
   authSignInSplatRoute: typeof authSignInSplatRoute
@@ -1299,6 +1325,13 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/support/'
       preLoaderRoute: typeof SupportIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/waitlist': {
+      id: '/api/waitlist'
+      path: '/api/waitlist'
+      fullPath: '/api/waitlist'
+      preLoaderRoute: typeof ApiWaitlistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/support-tickets': {
@@ -1635,6 +1668,13 @@ declare module '@tanstack/react-router' {
       path: '/scores'
       fullPath: '/env/$envSlug/scores/'
       preLoaderRoute: typeof AuthedEnvEnvSlugScoresIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
+    '/_authed/env/$envSlug/sandboxes/': {
+      id: '/_authed/env/$envSlug/sandboxes/'
+      path: '/sandboxes'
+      fullPath: '/env/$envSlug/sandboxes/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugSandboxesIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/env/$envSlug/runs/': {
@@ -2293,6 +2333,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugInsightsIndexRoute: typeof AuthedEnvEnvSlugInsightsIndexRoute
   AuthedEnvEnvSlugMetricsIndexRoute: typeof AuthedEnvEnvSlugMetricsIndexRoute
   AuthedEnvEnvSlugRunsIndexRoute: typeof AuthedEnvEnvSlugRunsIndexRoute
+  AuthedEnvEnvSlugSandboxesIndexRoute: typeof AuthedEnvEnvSlugSandboxesIndexRoute
   AuthedEnvEnvSlugScoresIndexRoute: typeof AuthedEnvEnvSlugScoresIndexRoute
   AuthedEnvEnvSlugSessionsIndexRoute: typeof AuthedEnvEnvSlugSessionsIndexRoute
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute: typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
@@ -2324,6 +2365,7 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugInsightsIndexRoute: AuthedEnvEnvSlugInsightsIndexRoute,
   AuthedEnvEnvSlugMetricsIndexRoute: AuthedEnvEnvSlugMetricsIndexRoute,
   AuthedEnvEnvSlugRunsIndexRoute: AuthedEnvEnvSlugRunsIndexRoute,
+  AuthedEnvEnvSlugSandboxesIndexRoute: AuthedEnvEnvSlugSandboxesIndexRoute,
   AuthedEnvEnvSlugScoresIndexRoute: AuthedEnvEnvSlugScoresIndexRoute,
   AuthedEnvEnvSlugSessionsIndexRoute: AuthedEnvEnvSlugSessionsIndexRoute,
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute:
@@ -2388,6 +2430,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInngestRoute: ApiInngestRoute,
   ApiSentryRoute: ApiSentryRoute,
   ApiSupportTicketsRoute: ApiSupportTicketsRoute,
+  ApiWaitlistRoute: ApiWaitlistRoute,
   SupportIndexRoute: SupportIndexRoute,
   authOrganizationListSplatRoute: authOrganizationListSplatRoute,
   authSignInSplatRoute: authSignInSplatRoute,
