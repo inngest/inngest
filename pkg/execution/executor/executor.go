@@ -943,6 +943,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			}, util.WithBoundaries(2*time.Second))
 		})
 
+	if errors.Is(err, ErrFunctionRateLimited) {
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnRateLimited(ctx, req)
+		})
+	}
+
 	return runID, md, err
 }
 

@@ -30,7 +30,10 @@ type EventLifecycleListener interface {
 
 	// OnRateLimited is called when a matched function is not scheduled because
 	// the function's rate limit was hit.
-	OnRateLimited(context.Context)
+	OnRateLimited(
+		context.Context,
+		ScheduleRequest,
+	)
 
 	// OnDebounced is called when a matched function is stored for debounce
 	// processing instead of being scheduled immediately.
@@ -66,7 +69,7 @@ func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context) {}
 func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta statev2.Metadata, qi queue.Item, evts []event.TrackedEvent) {
 }
 
-func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context, req ScheduleRequest) {}
 
 func (NoopEventLifecycleListener) OnDebounced(ctx context.Context, req ScheduleRequest, db debounce.DebounceItem) {
 }
