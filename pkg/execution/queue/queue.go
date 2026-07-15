@@ -69,6 +69,10 @@ type Producer interface {
 	Enqueue(context.Context, Item, time.Time, EnqueueOpts) error
 
 	Requeue(ctx context.Context, shardName string, i QueueItem, at time.Time, opts ...RequeueOptionFn) error
+
+	// RequeueByJobID reschedules an outstanding, unleased job by ID on the
+	// named shard. scope must identify the job's tenant/function namespace and
+	// must include account, environment, and function IDs.
 	RequeueByJobID(ctx context.Context, scope Scope, shardName string, jobID string, at time.Time) error
 }
 
