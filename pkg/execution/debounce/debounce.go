@@ -1008,8 +1008,10 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.
 		actualTTL := time.Second * time.Duration(newTTL)
-		err = queueShard.RequeueByJobID(
+		err = d.queue.RequeueByJobID(
 			ctx,
+			scopeForDebounceItem(di),
+			queueShard.Name(),
 			debounceID.String(),
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)
@@ -1225,8 +1227,10 @@ func (d debouncer) RunDebounce(ctx context.Context, opts RunDebounceOpts) (*RunD
 	}
 
 	// Requeue the debounce to run in 1 second
-	err = queueShard.RequeueByJobID(
+	err = d.queue.RequeueByJobID(
 		ctx,
+		scope,
+		queueShard.Name(),
 		debounceID.String(),
 		time.Now().Add(time.Second),
 	)

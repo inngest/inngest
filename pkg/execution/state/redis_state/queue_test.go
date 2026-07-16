@@ -1915,7 +1915,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.NoError(t, err)
 
 			err = shard.RequeueByJobID(ctx, "no bruv", time.Now().Add(5*time.Second))
-			require.NotNil(t, err)
+			require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
 		})
 
 		t.Run("It fails if the job is leased", func(t *testing.T) {

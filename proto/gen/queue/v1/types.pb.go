@@ -235,6 +235,74 @@ func (x *QueueItem) GetCapacityLease() *CapacityLease {
 	return nil
 }
 
+type Scope struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IsSystem      bool                   `protobuf:"varint,1,opt,name=is_system,json=isSystem,proto3" json:"is_system,omitempty"`
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	EnvId         string                 `protobuf:"bytes,3,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Scope) Reset() {
+	*x = Scope{}
+	mi := &file_queue_v1_types_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Scope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Scope) ProtoMessage() {}
+
+func (x *Scope) ProtoReflect() protoreflect.Message {
+	mi := &file_queue_v1_types_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Scope.ProtoReflect.Descriptor instead.
+func (*Scope) Descriptor() ([]byte, []int) {
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Scope) GetIsSystem() bool {
+	if x != nil {
+		return x.IsSystem
+	}
+	return false
+}
+
+func (x *Scope) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *Scope) GetEnvId() string {
+	if x != nil {
+		return x.EnvId
+	}
+	return ""
+}
+
+func (x *Scope) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
 type CapacityLease struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LeaseId       string                 `protobuf:"bytes,1,opt,name=lease_id,json=leaseId,proto3" json:"lease_id,omitempty"`
@@ -245,7 +313,7 @@ type CapacityLease struct {
 
 func (x *CapacityLease) Reset() {
 	*x = CapacityLease{}
-	mi := &file_queue_v1_types_proto_msgTypes[1]
+	mi := &file_queue_v1_types_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -257,7 +325,7 @@ func (x *CapacityLease) String() string {
 func (*CapacityLease) ProtoMessage() {}
 
 func (x *CapacityLease) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_types_proto_msgTypes[1]
+	mi := &file_queue_v1_types_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -270,7 +338,7 @@ func (x *CapacityLease) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapacityLease.ProtoReflect.Descriptor instead.
 func (*CapacityLease) Descriptor() ([]byte, []int) {
-	return file_queue_v1_types_proto_rawDescGZIP(), []int{1}
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CapacityLease) GetLeaseId() string {
@@ -313,7 +381,7 @@ type Item struct {
 
 func (x *Item) Reset() {
 	*x = Item{}
-	mi := &file_queue_v1_types_proto_msgTypes[2]
+	mi := &file_queue_v1_types_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -325,7 +393,7 @@ func (x *Item) String() string {
 func (*Item) ProtoMessage() {}
 
 func (x *Item) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_types_proto_msgTypes[2]
+	mi := &file_queue_v1_types_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -338,7 +406,7 @@ func (x *Item) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Item.ProtoReflect.Descriptor instead.
 func (*Item) Descriptor() ([]byte, []int) {
-	return file_queue_v1_types_proto_rawDescGZIP(), []int{2}
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Item) GetJobId() string {
@@ -490,7 +558,7 @@ type Identifier struct {
 
 func (x *Identifier) Reset() {
 	*x = Identifier{}
-	mi := &file_queue_v1_types_proto_msgTypes[3]
+	mi := &file_queue_v1_types_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -502,7 +570,7 @@ func (x *Identifier) String() string {
 func (*Identifier) ProtoMessage() {}
 
 func (x *Identifier) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_types_proto_msgTypes[3]
+	mi := &file_queue_v1_types_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -515,7 +583,7 @@ func (x *Identifier) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Identifier.ProtoReflect.Descriptor instead.
 func (*Identifier) Descriptor() ([]byte, []int) {
-	return file_queue_v1_types_proto_rawDescGZIP(), []int{3}
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Identifier) GetRunId() string {
@@ -635,7 +703,7 @@ type CustomConcurrency struct {
 
 func (x *CustomConcurrency) Reset() {
 	*x = CustomConcurrency{}
-	mi := &file_queue_v1_types_proto_msgTypes[4]
+	mi := &file_queue_v1_types_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +715,7 @@ func (x *CustomConcurrency) String() string {
 func (*CustomConcurrency) ProtoMessage() {}
 
 func (x *CustomConcurrency) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_types_proto_msgTypes[4]
+	mi := &file_queue_v1_types_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -660,7 +728,7 @@ func (x *CustomConcurrency) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CustomConcurrency.ProtoReflect.Descriptor instead.
 func (*CustomConcurrency) Descriptor() ([]byte, []int) {
-	return file_queue_v1_types_proto_rawDescGZIP(), []int{4}
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CustomConcurrency) GetKey() string {
@@ -703,7 +771,7 @@ type Semaphore struct {
 
 func (x *Semaphore) Reset() {
 	*x = Semaphore{}
-	mi := &file_queue_v1_types_proto_msgTypes[5]
+	mi := &file_queue_v1_types_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -715,7 +783,7 @@ func (x *Semaphore) String() string {
 func (*Semaphore) ProtoMessage() {}
 
 func (x *Semaphore) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_types_proto_msgTypes[5]
+	mi := &file_queue_v1_types_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -728,7 +796,7 @@ func (x *Semaphore) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Semaphore.ProtoReflect.Descriptor instead.
 func (*Semaphore) Descriptor() ([]byte, []int) {
-	return file_queue_v1_types_proto_rawDescGZIP(), []int{5}
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Semaphore) GetId() string {
@@ -775,7 +843,7 @@ type RunInfo struct {
 
 func (x *RunInfo) Reset() {
 	*x = RunInfo{}
-	mi := &file_queue_v1_types_proto_msgTypes[6]
+	mi := &file_queue_v1_types_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -787,7 +855,7 @@ func (x *RunInfo) String() string {
 func (*RunInfo) ProtoMessage() {}
 
 func (x *RunInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_types_proto_msgTypes[6]
+	mi := &file_queue_v1_types_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -800,7 +868,7 @@ func (x *RunInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunInfo.ProtoReflect.Descriptor instead.
 func (*RunInfo) Descriptor() ([]byte, []int) {
-	return file_queue_v1_types_proto_rawDescGZIP(), []int{6}
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *RunInfo) GetLatency() *durationpb.Duration {
@@ -873,7 +941,7 @@ type Throttle struct {
 
 func (x *Throttle) Reset() {
 	*x = Throttle{}
-	mi := &file_queue_v1_types_proto_msgTypes[7]
+	mi := &file_queue_v1_types_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -885,7 +953,7 @@ func (x *Throttle) String() string {
 func (*Throttle) ProtoMessage() {}
 
 func (x *Throttle) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_types_proto_msgTypes[7]
+	mi := &file_queue_v1_types_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -898,7 +966,7 @@ func (x *Throttle) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Throttle.ProtoReflect.Descriptor instead.
 func (*Throttle) Descriptor() ([]byte, []int) {
-	return file_queue_v1_types_proto_rawDescGZIP(), []int{7}
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Throttle) GetKey() string {
@@ -953,7 +1021,7 @@ type Singleton struct {
 
 func (x *Singleton) Reset() {
 	*x = Singleton{}
-	mi := &file_queue_v1_types_proto_msgTypes[8]
+	mi := &file_queue_v1_types_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -965,7 +1033,7 @@ func (x *Singleton) String() string {
 func (*Singleton) ProtoMessage() {}
 
 func (x *Singleton) ProtoReflect() protoreflect.Message {
-	mi := &file_queue_v1_types_proto_msgTypes[8]
+	mi := &file_queue_v1_types_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -978,7 +1046,7 @@ func (x *Singleton) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Singleton.ProtoReflect.Descriptor instead.
 func (*Singleton) Descriptor() ([]byte, []int) {
-	return file_queue_v1_types_proto_rawDescGZIP(), []int{8}
+	return file_queue_v1_types_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Singleton) GetKey() string {
@@ -1026,7 +1094,14 @@ const file_queue_v1_types_proto_rawDesc = "" +
 	"\t_lease_idB\r\n" +
 	"\v_queue_nameB\x15\n" +
 	"\x13_idempotency_periodB\x11\n" +
-	"\x0f_capacity_lease\"L\n" +
+	"\x0f_capacity_lease\"{\n" +
+	"\x05Scope\x12\x1b\n" +
+	"\tis_system\x18\x01 \x01(\bR\bisSystem\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x15\n" +
+	"\x06env_id\x18\x03 \x01(\tR\x05envId\x12\x1f\n" +
+	"\vfunction_id\x18\x04 \x01(\tR\n" +
+	"functionId\"L\n" +
 	"\rCapacityLease\x12\x19\n" +
 	"\blease_id\x18\x01 \x01(\tR\aleaseId\x12 \n" +
 	"\fissued_at_ms\x18\x02 \x01(\x03R\n" +
@@ -1140,36 +1215,37 @@ func file_queue_v1_types_proto_rawDescGZIP() []byte {
 }
 
 var file_queue_v1_types_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_queue_v1_types_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_queue_v1_types_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_queue_v1_types_proto_goTypes = []any{
 	(SemaphoreReleaseMode)(0),   // 0: queue.v1.SemaphoreReleaseMode
 	(*QueueItem)(nil),           // 1: queue.v1.QueueItem
-	(*CapacityLease)(nil),       // 2: queue.v1.CapacityLease
-	(*Item)(nil),                // 3: queue.v1.Item
-	(*Identifier)(nil),          // 4: queue.v1.Identifier
-	(*CustomConcurrency)(nil),   // 5: queue.v1.CustomConcurrency
-	(*Semaphore)(nil),           // 6: queue.v1.Semaphore
-	(*RunInfo)(nil),             // 7: queue.v1.RunInfo
-	(*Throttle)(nil),            // 8: queue.v1.Throttle
-	(*Singleton)(nil),           // 9: queue.v1.Singleton
-	(*durationpb.Duration)(nil), // 10: google.protobuf.Duration
+	(*Scope)(nil),               // 2: queue.v1.Scope
+	(*CapacityLease)(nil),       // 3: queue.v1.CapacityLease
+	(*Item)(nil),                // 4: queue.v1.Item
+	(*Identifier)(nil),          // 5: queue.v1.Identifier
+	(*CustomConcurrency)(nil),   // 6: queue.v1.CustomConcurrency
+	(*Semaphore)(nil),           // 7: queue.v1.Semaphore
+	(*RunInfo)(nil),             // 8: queue.v1.RunInfo
+	(*Throttle)(nil),            // 9: queue.v1.Throttle
+	(*Singleton)(nil),           // 10: queue.v1.Singleton
+	(*durationpb.Duration)(nil), // 11: google.protobuf.Duration
 }
 var file_queue_v1_types_proto_depIdxs = []int32{
-	3,  // 0: queue.v1.QueueItem.data:type_name -> queue.v1.Item
-	10, // 1: queue.v1.QueueItem.idempotency_period:type_name -> google.protobuf.Duration
-	2,  // 2: queue.v1.QueueItem.capacity_lease:type_name -> queue.v1.CapacityLease
-	4,  // 3: queue.v1.Item.identifier:type_name -> queue.v1.Identifier
-	7,  // 4: queue.v1.Item.run_info:type_name -> queue.v1.RunInfo
-	8,  // 5: queue.v1.Item.throttle:type_name -> queue.v1.Throttle
-	9,  // 6: queue.v1.Item.singleton:type_name -> queue.v1.Singleton
-	5,  // 7: queue.v1.Item.custom_concurrency_keys:type_name -> queue.v1.CustomConcurrency
-	6,  // 8: queue.v1.Item.semaphores:type_name -> queue.v1.Semaphore
-	5,  // 9: queue.v1.Identifier.custom_concurrency_keys:type_name -> queue.v1.CustomConcurrency
-	6,  // 10: queue.v1.Identifier.semaphores:type_name -> queue.v1.Semaphore
+	4,  // 0: queue.v1.QueueItem.data:type_name -> queue.v1.Item
+	11, // 1: queue.v1.QueueItem.idempotency_period:type_name -> google.protobuf.Duration
+	3,  // 2: queue.v1.QueueItem.capacity_lease:type_name -> queue.v1.CapacityLease
+	5,  // 3: queue.v1.Item.identifier:type_name -> queue.v1.Identifier
+	8,  // 4: queue.v1.Item.run_info:type_name -> queue.v1.RunInfo
+	9,  // 5: queue.v1.Item.throttle:type_name -> queue.v1.Throttle
+	10, // 6: queue.v1.Item.singleton:type_name -> queue.v1.Singleton
+	6,  // 7: queue.v1.Item.custom_concurrency_keys:type_name -> queue.v1.CustomConcurrency
+	7,  // 8: queue.v1.Item.semaphores:type_name -> queue.v1.Semaphore
+	6,  // 9: queue.v1.Identifier.custom_concurrency_keys:type_name -> queue.v1.CustomConcurrency
+	7,  // 10: queue.v1.Identifier.semaphores:type_name -> queue.v1.Semaphore
 	0,  // 11: queue.v1.Semaphore.release:type_name -> queue.v1.SemaphoreReleaseMode
-	10, // 12: queue.v1.RunInfo.latency:type_name -> google.protobuf.Duration
-	10, // 13: queue.v1.RunInfo.sojourn_delay:type_name -> google.protobuf.Duration
-	2,  // 14: queue.v1.RunInfo.capacity_lease:type_name -> queue.v1.CapacityLease
+	11, // 12: queue.v1.RunInfo.latency:type_name -> google.protobuf.Duration
+	11, // 13: queue.v1.RunInfo.sojourn_delay:type_name -> google.protobuf.Duration
+	3,  // 14: queue.v1.RunInfo.capacity_lease:type_name -> queue.v1.CapacityLease
 	15, // [15:15] is the sub-list for method output_type
 	15, // [15:15] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
@@ -1183,16 +1259,16 @@ func file_queue_v1_types_proto_init() {
 		return
 	}
 	file_queue_v1_types_proto_msgTypes[0].OneofWrappers = []any{}
-	file_queue_v1_types_proto_msgTypes[2].OneofWrappers = []any{}
 	file_queue_v1_types_proto_msgTypes[3].OneofWrappers = []any{}
-	file_queue_v1_types_proto_msgTypes[6].OneofWrappers = []any{}
+	file_queue_v1_types_proto_msgTypes[4].OneofWrappers = []any{}
+	file_queue_v1_types_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_queue_v1_types_proto_rawDesc), len(file_queue_v1_types_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

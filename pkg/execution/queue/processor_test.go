@@ -24,7 +24,7 @@ func (m *mockProducer) Requeue(context.Context, string, QueueItem, time.Time, ..
 	return nil
 }
 
-func (m *mockProducer) RequeueByJobID(context.Context, string, string, time.Time) error {
+func (m *mockProducer) RequeueByJobID(context.Context, Scope, string, string, time.Time) error {
 	return nil
 }
 

@@ -6,7 +6,7 @@ type queueConsumer struct {
 	shards QueueShardRegistry
 }
 
-func newQueueConsumer(shards QueueShardRegistry) Consumer {
+func NewConsumer(shards QueueShardRegistry) Consumer {
 	return &queueConsumer{shards: shards}
 }
 

@@ -173,6 +173,254 @@ func TestQueueItemProtoRoundTrip(t *testing.T) {
 	assertItemEqual(t, original.Data, roundTripped.Data)
 }
 
+func TestScopeProtoConversion(t *testing.T) {
+	accountID := uuid.New()
+	envID := uuid.New()
+	functionID := uuid.New()
+
+	tests := []struct {
+		name string
+		msg  *pb.Scope
+		want Scope
+	}{
+		{
+			name: "user scope",
+			msg: &pb.Scope{
+				AccountId:  accountID.String(),
+				EnvId:      envID.String(),
+				FunctionId: functionID.String(),
+			},
+			want: Scope{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+			},
+		},
+		{
+			name: "system scope preserves ids",
+			msg: &pb.Scope{
+				IsSystem:   true,
+				AccountId:  accountID.String(),
+				EnvId:      envID.String(),
+				FunctionId: functionID.String(),
+			},
+			want: Scope{
+				IsSystem:   true,
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+			},
+		},
+		{
+			name: "system scope false with ids",
+			msg: &pb.Scope{
+				IsSystem:   false,
+				AccountId:  accountID.String(),
+				EnvId:      envID.String(),
+				FunctionId: functionID.String(),
+			},
+			want: Scope{
+				IsSystem:   false,
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+			},
+		},
+		{
+			name: "system scope without ids",
+			msg: &pb.Scope{
+				IsSystem: true,
+			},
+			want: Scope{IsSystem: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scope, err := ScopeFromProto(tt.msg)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, scope)
+
+			roundTripped := ScopeToProto(scope)
+			require.Equal(t, tt.want.IsSystem, roundTripped.GetIsSystem())
+			require.Equal(t, tt.want.AccountID.String(), roundTripped.GetAccountId())
+			require.Equal(t, tt.want.EnvID.String(), roundTripped.GetEnvId())
+			require.Equal(t, tt.want.FunctionID.String(), roundTripped.GetFunctionId())
+		})
+	}
+}
+
+func TestScopeToProto(t *testing.T) {
+	accountID := uuid.New()
+	envID := uuid.New()
+	functionID := uuid.New()
+
+	tests := []struct {
+		name string
+		give Scope
+		want *pb.Scope
+	}{
+		{
+			name: "valid ids",
+			give: Scope{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+			},
+			want: &pb.Scope{
+				AccountId:  accountID.String(),
+				EnvId:      envID.String(),
+				FunctionId: functionID.String(),
+			},
+		},
+		{
+			name: "unset ids",
+			give: Scope{},
+			want: &pb.Scope{
+				AccountId:  uuid.Nil.String(),
+				EnvId:      uuid.Nil.String(),
+				FunctionId: uuid.Nil.String(),
+			},
+		},
+		{
+			name: "nil ids",
+			give: Scope{
+				AccountID:  uuid.Nil,
+				EnvID:      uuid.Nil,
+				FunctionID: uuid.Nil,
+			},
+			want: &pb.Scope{
+				AccountId:  uuid.Nil.String(),
+				EnvId:      uuid.Nil.String(),
+				FunctionId: uuid.Nil.String(),
+			},
+		},
+		{
+			name: "system with unset ids",
+			give: Scope{IsSystem: true},
+			want: &pb.Scope{
+				IsSystem:   true,
+				AccountId:  uuid.Nil.String(),
+				EnvId:      uuid.Nil.String(),
+				FunctionId: uuid.Nil.String(),
+			},
+		},
+		{
+			name: "system with nil ids",
+			give: Scope{
+				IsSystem:   true,
+				AccountID:  uuid.Nil,
+				EnvID:      uuid.Nil,
+				FunctionID: uuid.Nil,
+			},
+			want: &pb.Scope{
+				IsSystem:   true,
+				AccountId:  uuid.Nil.String(),
+				EnvId:      uuid.Nil.String(),
+				FunctionId: uuid.Nil.String(),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, ScopeToProto(tt.give))
+		})
+	}
+}
+
+func TestScopeFromProto(t *testing.T) {
+	accountID := uuid.New()
+	envID := uuid.New()
+	functionID := uuid.New()
+
+	tests := []struct {
+		name    string
+		msg     *pb.Scope
+		want    Scope
+		wantErr string
+	}{
+		{
+			name: "valid user scope",
+			msg: &pb.Scope{
+				AccountId:  accountID.String(),
+				EnvId:      envID.String(),
+				FunctionId: functionID.String(),
+			},
+			want: Scope{
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+			},
+		},
+		{
+			name: "valid system scope without ids",
+			msg: &pb.Scope{
+				IsSystem: true,
+			},
+			want: Scope{
+				IsSystem: true,
+			},
+		},
+		{
+			name: "valid system scope with ids",
+			msg: &pb.Scope{
+				IsSystem:   true,
+				AccountId:  accountID.String(),
+				EnvId:      envID.String(),
+				FunctionId: functionID.String(),
+			},
+			want: Scope{
+				IsSystem:   true,
+				AccountID:  accountID,
+				EnvID:      envID,
+				FunctionID: functionID,
+			},
+		},
+		{
+			name: "invalid account id",
+			msg: &pb.Scope{
+				AccountId: "bad",
+			},
+			wantErr: "scope account_id",
+		},
+		{
+			name: "invalid env id",
+			msg: &pb.Scope{
+				EnvId: "bad",
+			},
+			wantErr: "scope env_id",
+		},
+		{
+			name: "invalid function id",
+			msg: &pb.Scope{
+				FunctionId: "bad",
+			},
+			wantErr: "scope function_id",
+		},
+		{
+			name: "invalid system scope account id",
+			msg: &pb.Scope{
+				IsSystem:  true,
+				AccountId: "bad",
+			},
+			wantErr: "scope account_id",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ScopeFromProto(tt.msg)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // TestItemProtoRoundTrip_NilOptionalFields guards nil optional fields so the
 // proxy does not materialize absent queue data as non-nil zero values.
 func TestItemProtoRoundTrip_NilOptionalFields(t *testing.T) {
