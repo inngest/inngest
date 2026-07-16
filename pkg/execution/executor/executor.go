@@ -1101,7 +1101,7 @@ func (e *executor) schedule(
 			Event:            req.Events[0].GetEvent(),
 			FunctionPausedAt: req.FunctionPausedAt,
 		}
-		err := e.debouncer.Debounce(ctx, item, req.Function)
+		debounceID, err := e.debouncer.Debounce(ctx, item, req.Function)
 		if err != nil {
 			span.RecordError(err)
 			span.End()
@@ -1110,7 +1110,7 @@ func (e *executor) schedule(
 		span.End()
 
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnDebounced(ctx, req, item)
+			l.OnDebounced(ctx, req, item, debounceID)
 		})
 
 		return nil, nil, ErrFunctionDebounced

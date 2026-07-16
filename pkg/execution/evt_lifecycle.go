@@ -65,7 +65,7 @@ type EventLifecycleListener interface {
 
 	// OnDebounced is called when a matched function is stored for debounce
 	// processing instead of being scheduled immediately.
-	OnDebounced(context.Context, ScheduleRequest, debounce.DebounceItem)
+	OnDebounced(context.Context, ScheduleRequest, debounce.DebounceItem, *ulid.ULID)
 
 	// OnBatched is called when an event is accepted into a batch. The append
 	// result describes whether the item created, appended to, deduplicated
@@ -108,7 +108,7 @@ func (NoopEventLifecycleListener) OnFunctionSkippedIdempotency(ctx context.Conte
 func (NoopEventLifecycleListener) OnFunctionScheduleFailed(ctx context.Context, req ScheduleRequest, err error) {
 }
 
-func (NoopEventLifecycleListener) OnDebounced(ctx context.Context, req ScheduleRequest, db debounce.DebounceItem) {
+func (NoopEventLifecycleListener) OnDebounced(ctx context.Context, req ScheduleRequest, db debounce.DebounceItem, debounceID *ulid.ULID) {
 }
 
 func (NoopEventLifecycleListener) OnBatched(ctx context.Context, bi batch.BatchItem, batchID ulid.ULID, result *batch.BatchAppendResult) {
