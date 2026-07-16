@@ -174,7 +174,7 @@ export function ExperimentDetailPage({
     (nextRange: RangeChangeProps) => {
       onTimeRangeChange(nextRange);
     },
-    [onTimeRangeChange, experimentName, functionSlug, daysAgoMax],
+    [onTimeRangeChange],
   );
 
   const availableVariants = useMemo(
@@ -186,20 +186,12 @@ export function ExperimentDetailPage({
     (variants: string[]) => {
       onSelectedVariantsChange(variants);
     },
-    [onSelectedVariantsChange, experimentName, functionSlug, availableVariants],
+    [onSelectedVariantsChange],
   );
 
-  const handleShowInactiveChange = useCallback(
-    (next: boolean) => {
-      setShowInactive(next);
-    },
-    [
-      experimentName,
-      functionSlug,
-      selectedVariants.length,
-      availableVariants.length,
-    ],
-  );
+  const handleShowInactiveChange = useCallback((next: boolean) => {
+    setShowInactive(next);
+  }, []);
 
   const selectedAvailableVariants = useMemo(() => {
     if (selectedVariants.length === 0) return [];
