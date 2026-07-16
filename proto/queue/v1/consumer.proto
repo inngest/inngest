@@ -1,0 +1,17 @@
+syntax = "proto3";
+package queue.v1;
+
+import "queue/v1/types.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/queue/v1;queue";
+
+service ConsumerService {
+  rpc Dequeue(DequeueRequest) returns (DequeueResponse) {}
+}
+
+message DequeueRequest {
+  string shard_name = 1;
+  QueueItem item = 2;
+}
+
+message DequeueResponse {}

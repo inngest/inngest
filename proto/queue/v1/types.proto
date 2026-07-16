@@ -1,0 +1,114 @@
+syntax = "proto3";
+package queue.v1;
+
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/queue/v1;queue";
+
+message QueueItem {
+  string id = 1;
+  int64 earliest_peek_time = 2;
+  int64 at_ms = 3;
+  int64 wall_time_ms = 4;
+  string function_id = 5;
+  string workspace_id = 6;
+  optional string lease_id = 7;
+  int64 generation_id = 8;
+  Item data = 9;
+  optional string queue_name = 10;
+  optional google.protobuf.Duration idempotency_period = 11;
+  string refilled_from = 12;
+  int64 refilled_at = 13;
+  int64 enqueued_at = 14;
+  int64 scavenge_count = 15;
+  optional CapacityLease capacity_lease = 16;
+}
+
+message CapacityLease {
+  string lease_id = 1;
+  int64 issued_at_ms = 2;
+}
+
+message Item {
+  optional string job_id = 1;
+  string group_id = 2;
+  string workspace_id = 3;
+  string kind = 4;
+  Identifier identifier = 5;
+  int64 attempt = 6;
+  optional int64 max_attempts = 7;
+  bytes payload = 8;
+  bytes metadata = 9;
+  optional string queue_name = 10;
+  optional RunInfo run_info = 11;
+  optional Throttle throttle = 12;
+  optional Singleton singleton = 13;
+  repeated CustomConcurrency custom_concurrency_keys = 14;
+  optional int64 priority_factor = 15;
+  string parallel_mode = 16;
+  optional string parallel_coalesce_key = 17;
+  repeated Semaphore semaphores = 18;
+}
+
+message Identifier {
+  string run_id = 1;
+  string workflow_id = 2;
+  int64 workflow_version = 3;
+  string event_id = 4;
+  optional string batch_id = 5;
+  repeated string event_ids = 6;
+  string key = 7;
+  string account_id = 8;
+  string workspace_id = 9;
+  string app_id = 10;
+  optional string original_run_id = 11;
+  optional string replay_id = 12;
+  optional int64 priority_factor = 13;
+  repeated CustomConcurrency custom_concurrency_keys = 14;
+  repeated Semaphore semaphores = 15;
+}
+
+message CustomConcurrency {
+  string key = 1;
+  string hash = 2;
+  int64 limit = 3;
+  string unhashed_evaluated_key_value = 4;
+}
+
+enum SemaphoreReleaseMode {
+  SEMAPHORE_RELEASE_MODE_UNSPECIFIED = 0;
+  SEMAPHORE_RELEASE_MODE_AUTO = 1;
+  SEMAPHORE_RELEASE_MODE_MANUAL = 2;
+}
+
+message Semaphore {
+  string id = 1;
+  string evaluated_key_hash = 2;
+  int64 weight = 3;
+  SemaphoreReleaseMode release = 4;
+}
+
+message RunInfo {
+  google.protobuf.Duration latency = 1;
+  google.protobuf.Duration sojourn_delay = 2;
+  uint64 priority = 3;
+  string queue_shard_name = 4;
+  uint64 continue_count = 5;
+  string refilled_from_backlog = 6;
+  optional CapacityLease capacity_lease = 7;
+  int64 scavenge_count = 8;
+}
+
+message Throttle {
+  string key = 1;
+  int64 limit = 2;
+  int64 burst = 3;
+  int64 period = 4;
+  string key_expression_hash = 5;
+  string unhashed_throttle_key = 6;
+}
+
+message Singleton {
+  string key = 1;
+  string mode = 2;
+}
