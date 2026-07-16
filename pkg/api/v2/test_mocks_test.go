@@ -75,10 +75,10 @@ type mockEventProvider struct {
 	mock.Mock
 }
 
-func (m *mockEventProvider) ReplayEvent(ctx context.Context, eventID ulid.ULID) (ulid.ULID, error) {
-	args := m.Called(ctx, eventID)
-	eventID, _ = args.Get(0).(ulid.ULID)
-	return eventID, args.Error(1)
+func (m *mockEventProvider) ReplayEvent(ctx context.Context, eventID ulid.ULID, opts ReplayEventOpts) (*ReplayEventResult, error) {
+	args := m.Called(ctx, eventID, opts)
+	result, _ := args.Get(0).(*ReplayEventResult)
+	return result, args.Error(1)
 }
 
 type mockFunctionTraceReader struct {

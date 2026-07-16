@@ -1005,7 +1005,7 @@ service V2 {
       summary: "Replay event"
       tags: "Runs"
       tags: "Beta"
-      description: "Replays a stored event by internal event ID, creating a new event that can trigger matching functions"
+      description: "Replays a stored event by internal event ID. By default, this creates a new event that can trigger matching functions. Use mode if_no_runs to only replay events that have not already scheduled runs."
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -2037,6 +2037,12 @@ message ReplayEventRequest {
       example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
     }
   ];
+  string mode = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay mode. Defaults to force. Use if_no_runs to skip replay when the original event has already scheduled runs."
+      example: "\"if_no_runs\""
+    }
+  ];
 }
 
 message ReplayEventResponse {
@@ -2047,8 +2053,20 @@ message ReplayEventResponse {
 message ReplayEventData {
   string event_id = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "New internal event ID created by the replay"
+      description: "New internal event ID created by the replay. Empty when replayed is false."
       example: "\"01hp1zx8m3ng9vp6qn0xk7j4d0\""
+    }
+  ];
+  optional bool replayed = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether a new event was published for replay"
+      example: "true"
+    }
+  ];
+  string skipped_reason = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Reason the replay was skipped when replayed is false"
+      example: "\"event_has_runs\""
     }
   ];
 }

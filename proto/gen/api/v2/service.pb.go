@@ -2610,6 +2610,7 @@ func (x *RerunData) GetRunId() string {
 type ReplayEventRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	Mode          string                 `protobuf:"bytes,2,opt,name=mode,proto3" json:"mode,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2647,6 +2648,13 @@ func (*ReplayEventRequest) Descriptor() ([]byte, []int) {
 func (x *ReplayEventRequest) GetEventId() string {
 	if x != nil {
 		return x.EventId
+	}
+	return ""
+}
+
+func (x *ReplayEventRequest) GetMode() string {
+	if x != nil {
+		return x.Mode
 	}
 	return ""
 }
@@ -2706,6 +2714,8 @@ func (x *ReplayEventResponse) GetMetadata() *ResponseMetadata {
 type ReplayEventData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	Replayed      *bool                  `protobuf:"varint,2,opt,name=replayed,proto3,oneof" json:"replayed,omitempty"`
+	SkippedReason string                 `protobuf:"bytes,3,opt,name=skipped_reason,json=skippedReason,proto3" json:"skipped_reason,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2743,6 +2753,20 @@ func (*ReplayEventData) Descriptor() ([]byte, []int) {
 func (x *ReplayEventData) GetEventId() string {
 	if x != nil {
 		return x.EventId
+	}
+	return ""
+}
+
+func (x *ReplayEventData) GetReplayed() bool {
+	if x != nil && x.Replayed != nil {
+		return *x.Replayed
+	}
+	return false
+}
+
+func (x *ReplayEventData) GetSkippedReason() string {
+	if x != nil {
+		return x.SkippedReason
 	}
 	return ""
 }
@@ -8379,14 +8403,18 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x11.api.v2.RerunDataR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"f\n" +
 	"\tRerunData\x12Y\n" +
-	"\x06run_id\x18\x01 \x01(\tBB\x92A?2\x1fNew run ID created by the rerunJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId\"o\n" +
+	"\x06run_id\x18\x01 \x01(\tBB\x92A?2\x1fNew run ID created by the rerunJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId\"\x8c\x02\n" +
 	"\x12ReplayEventRequest\x12Y\n" +
-	"\bevent_id\x18\x01 \x01(\tB>\x92A;2\x1bInternal event ID to replayJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\aeventId\"x\n" +
+	"\bevent_id\x18\x01 \x01(\tB>\x92A;2\x1bInternal event ID to replayJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\aeventId\x12\x9a\x01\n" +
+	"\x04mode\x18\x02 \x01(\tB\x85\x01\x92A\x81\x012qReplay mode. Defaults to force. Use if_no_runs to skip replay when the original event has already scheduled runs.J\f\"if_no_runs\"R\x04mode\"x\n" +
 	"\x13ReplayEventResponse\x12+\n" +
 	"\x04data\x18\x01 \x01(\v2\x17.api.v2.ReplayEventDataR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"|\n" +
-	"\x0fReplayEventData\x12i\n" +
-	"\bevent_id\x18\x01 \x01(\tBN\x92AK2+New internal event ID created by the replayJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4d0\"R\aeventId\"\xf2\x01\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xf7\x02\n" +
+	"\x0fReplayEventData\x12\x88\x01\n" +
+	"\bevent_id\x18\x01 \x01(\tBm\x92Aj2JNew internal event ID created by the replay. Empty when replayed is false.J\x1c\"01hp1zx8m3ng9vp6qn0xk7j4d0\"R\aeventId\x12X\n" +
+	"\breplayed\x18\x02 \x01(\bB7\x92A42,Whether a new event was published for replayJ\x04trueH\x00R\breplayed\x88\x01\x01\x12r\n" +
+	"\x0eskipped_reason\x18\x03 \x01(\tBK\x92AH24Reason the replay was skipped when replayed is falseJ\x10\"event_has_runs\"R\rskippedReasonB\v\n" +
+	"\t_replayed\"\xf2\x01\n" +
 	"\x11TraceSpanMetadata\x12\x14\n" +
 	"\x05scope\x18\x01 \x01(\tR\x05scope\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12=\n" +
@@ -8956,7 +8984,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032ց\x01\n" +
+	"\x04INFO\x10\x032\xb8\x82\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -9222,10 +9250,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x12Rerun function run\x1a@Creates a new run using the original run's triggering event datab\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/runs/{run_id}/rerun\x12\x84\x02\n" +
-	"\vReplayEvent\x12\x1a.api.v2.ReplayEventRequest\x1a\x1b.api.v2.ReplayEventResponse\"\xbb\x01\x92A\x93\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/runs/{run_id}/rerun\x12\xe6\x02\n" +
+	"\vReplayEvent\x12\x1a.api.v2.ReplayEventRequest\x1a\x1b.api.v2.ReplayEventResponse\"\x9d\x02\x92A\xf5\x01\n" +
 	"\x04Runs\n" +
-	"\x04Beta\x12\fReplay event\x1aeReplays a stored event by internal event ID, creating a new event that can trigger matching functionsb\x10\n" +
+	"\x04Beta\x12\fReplay event\x1a\xc6\x01Replays a stored event by internal event ID. By default, this creates a new event that can trigger matching functions. Use mode if_no_runs to only replay events that have not already scheduled runs.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/events/{event_id}/replay\x12\xc8\x01\n" +
@@ -9896,6 +9924,7 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[28].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[30].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[31].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[36].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[38].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[40].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[44].OneofWrappers = []any{}

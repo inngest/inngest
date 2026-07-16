@@ -1202,7 +1202,9 @@ func TestService_ReplayEvent(t *testing.T) {
 
 	t.Run("replays an event", func(t *testing.T) {
 		events := &mockEventProvider{}
-		events.On("ReplayEvent", mock.Anything, eventID).Return(newEventID, nil).Once()
+		events.On("ReplayEvent", mock.Anything, eventID, ReplayEventOpts{Mode: ReplayEventModeForce}).
+			Return(&ReplayEventResult{EventID: newEventID, Replayed: true}, nil).
+			Once()
 		t.Cleanup(func() {
 			events.AssertExpectations(t)
 		})
@@ -1214,7 +1216,50 @@ func TestService_ReplayEvent(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Equal(t, newEventID.String(), resp.Data.EventId)
+		require.True(t, resp.Data.GetReplayed())
+		require.Empty(t, resp.Data.SkippedReason)
 		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("supports if no runs mode", func(t *testing.T) {
+		events := &mockEventProvider{}
+		events.On("ReplayEvent", mock.Anything, eventID, ReplayEventOpts{Mode: ReplayEventModeIfNoRuns}).
+			Return(&ReplayEventResult{EventID: newEventID, Replayed: true}, nil).
+			Once()
+		t.Cleanup(func() {
+			events.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Events: events})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{
+			EventId: eventID.String(),
+			Mode:    string(ReplayEventModeIfNoRuns),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, newEventID.String(), resp.Data.EventId)
+		require.True(t, resp.Data.GetReplayed())
+	})
+
+	t.Run("returns skipped response", func(t *testing.T) {
+		events := &mockEventProvider{}
+		events.On("ReplayEvent", mock.Anything, eventID, ReplayEventOpts{Mode: ReplayEventModeIfNoRuns}).
+			Return(&ReplayEventResult{Replayed: false, SkippedReason: ReplayEventSkipReasonEventHasRuns}, nil).
+			Once()
+		t.Cleanup(func() {
+			events.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Events: events})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{
+			EventId: eventID.String(),
+			Mode:    string(ReplayEventModeIfNoRuns),
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, resp.Data.EventId)
+		require.False(t, resp.Data.GetReplayed())
+		require.Equal(t, ReplayEventSkipReasonEventHasRuns, resp.Data.SkippedReason)
 	})
 
 	t.Run("requires event id", func(t *testing.T) {
@@ -1235,9 +1280,22 @@ func TestService_ReplayEvent(t *testing.T) {
 		require.ErrorContains(t, err, "Event ID must be a valid ULID")
 	})
 
+	t.Run("validates replay mode", func(t *testing.T) {
+		service := NewService(ServiceOptions{Events: &mockEventProvider{}})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{
+			EventId: eventID.String(),
+			Mode:    "sometimes",
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Replay mode must be one of: force, if_no_runs")
+	})
+
 	t.Run("maps missing event", func(t *testing.T) {
 		events := &mockEventProvider{}
-		events.On("ReplayEvent", mock.Anything, eventID).Return(ulid.ULID{}, ErrEventNotFound).Once()
+		events.On("ReplayEvent", mock.Anything, eventID, ReplayEventOpts{Mode: ReplayEventModeForce}).
+			Return((*ReplayEventResult)(nil), ErrEventNotFound).
+			Once()
 		t.Cleanup(func() {
 			events.AssertExpectations(t)
 		})
@@ -1253,7 +1311,9 @@ func TestService_ReplayEvent(t *testing.T) {
 
 	t.Run("maps expired event payload", func(t *testing.T) {
 		events := &mockEventProvider{}
-		events.On("ReplayEvent", mock.Anything, eventID).Return(ulid.ULID{}, ErrEventDataExpired).Once()
+		events.On("ReplayEvent", mock.Anything, eventID, ReplayEventOpts{Mode: ReplayEventModeForce}).
+			Return((*ReplayEventResult)(nil), ErrEventDataExpired).
+			Once()
 		t.Cleanup(func() {
 			events.AssertExpectations(t)
 		})

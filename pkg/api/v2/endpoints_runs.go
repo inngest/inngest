@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -175,7 +176,12 @@ func (s *Service) ReplayEvent(ctx context.Context, req *apiv2.ReplayEventRequest
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Event ID must be a valid ULID")
 	}
 
-	newEventID, err := s.events.ReplayEvent(ctx, eventID)
+	mode, err := replayEventMode(req.GetMode())
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
+
+	result, err := s.events.ReplayEvent(ctx, eventID, ReplayEventOpts{Mode: mode})
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrEventNotFound):
@@ -186,12 +192,37 @@ func (s *Service) ReplayEvent(ctx context.Context, req *apiv2.ReplayEventRequest
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to replay event")
 	}
 
+	eventIDValue := ""
+	if result != nil && result.EventID != ulid.Zero {
+		eventIDValue = result.EventID.String()
+	}
+
 	return &apiv2.ReplayEventResponse{
 		Data: &apiv2.ReplayEventData{
-			EventId: newEventID.String(),
+			EventId:       eventIDValue,
+			Replayed:      proto.Bool(result != nil && result.Replayed),
+			SkippedReason: replayEventSkippedReason(result),
 		},
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 	}, nil
+}
+
+func replayEventMode(mode string) (ReplayEventMode, error) {
+	switch ReplayEventMode(mode) {
+	case "", ReplayEventModeForce:
+		return ReplayEventModeForce, nil
+	case ReplayEventModeIfNoRuns:
+		return ReplayEventModeIfNoRuns, nil
+	default:
+		return "", fmt.Errorf("Replay mode must be one of: force, if_no_runs")
+	}
+}
+
+func replayEventSkippedReason(result *ReplayEventResult) string {
+	if result == nil || result.Replayed {
+		return ""
+	}
+	return result.SkippedReason
 }
 
 func runsPageOpts(cursor string, requestedLimit int32) (ulid.ULID, int, error) {

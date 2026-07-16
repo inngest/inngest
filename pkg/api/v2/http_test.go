@@ -221,10 +221,11 @@ func TestHTTPGateway_Rerun(t *testing.T) {
 func TestHTTPGateway_ReplayEvent(t *testing.T) {
 	ctx := context.Background()
 	eventID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
-	newEventID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4d0")
 
 	events := &mockEventProvider{}
-	events.On("ReplayEvent", mock.Anything, eventID).Return(newEventID, nil).Once()
+	events.On("ReplayEvent", mock.Anything, eventID, ReplayEventOpts{Mode: ReplayEventModeIfNoRuns}).
+		Return(&ReplayEventResult{Replayed: false, SkippedReason: ReplayEventSkipReasonEventHasRuns}, nil).
+		Once()
 
 	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Events: events}, HTTPHandlerOptions{})
 	require.NoError(t, err)
@@ -232,7 +233,7 @@ func TestHTTPGateway_ReplayEvent(t *testing.T) {
 		events.AssertExpectations(t)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v2/events/"+eventID.String()+"/replay", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/events/"+eventID.String()+"/replay", strings.NewReader(`{"mode":"if_no_runs"}`))
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
@@ -244,7 +245,9 @@ func TestHTTPGateway_ReplayEvent(t *testing.T) {
 	var response map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
 	data := response["data"].(map[string]any)
-	require.Equal(t, newEventID.String(), data["eventId"])
+	require.Empty(t, data["eventId"])
+	require.Equal(t, false, data["replayed"])
+	require.Equal(t, ReplayEventSkipReasonEventHasRuns, data["skippedReason"])
 }
 
 func TestHTTPGateway_RerunFromStepNotImplemented(t *testing.T) {
