@@ -260,11 +260,6 @@ func WithEventLifecycleListeners(l ...execution.EventLifecycleListener) Executor
 	}
 }
 
-// WithEventLifecycleListners is kept for compatibility with the original misspelling.
-func WithEventLifecycleListners(l ...execution.EventLifecycleListener) ExecutorOpt {
-	return WithEventLifecycleListeners(l...)
-}
-
 func WithStepLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).steplimit = limit
