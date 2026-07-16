@@ -11,7 +11,7 @@ import type {
   ExperimentScoringConfig,
   ExperimentScoringMetric,
 } from '@inngest/components/Experiments';
-import { trackExperimentDetailViewed } from './tracking';
+import { trackDetailViewed } from '@/utils/analyticsEvents';
 
 export type ExperimentTimeRange = { from: Date; to: Date };
 
@@ -277,13 +277,18 @@ export function useExperimentDetail(
     const shouldTrack = trackedViewKeyRef.current !== viewKey;
     const trackViewed = (
       props: Omit<
-        Parameters<typeof trackExperimentDetailViewed>[0],
-        'experimentName' | 'functionSlug'
+        Parameters<typeof trackDetailViewed>[0],
+        'feature' | 'experimentName' | 'functionSlug'
       >,
     ) => {
       if (!shouldTrack) return;
       trackedViewKeyRef.current = viewKey;
-      trackExperimentDetailViewed({ experimentName, functionSlug, ...props });
+      trackDetailViewed({
+        feature: 'experiments',
+        experimentName,
+        functionSlug,
+        ...props,
+      });
     };
 
     const result = await client

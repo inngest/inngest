@@ -14,13 +14,13 @@ import { Link } from '@inngest/components/Link';
 import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
 import {
-  trackExperimentDocsLinkOpened,
-  trackExperimentEmptyStateDocsLinkOpened,
-  trackExperimentEmptyStateExampleCopied,
-  trackExperimentEmptyStatePromptCopied,
-  trackExperimentEmptyStateViewed,
-  trackExperimentsListViewed,
-} from '@/components/Experiments/tracking';
+  trackDocsLinkOpened,
+  trackEmptyStateDocsLinkOpened,
+  trackEmptyStateExampleCopied,
+  trackEmptyStatePromptCopied,
+  trackEmptyStateViewed,
+  trackListViewed,
+} from '@/utils/analyticsEvents';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/experiments/')({
@@ -35,7 +35,7 @@ function ExperimentsInfo() {
         <Link
           href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments"
           target="_blank"
-          onClick={() => trackExperimentDocsLinkOpened()}
+          onClick={() => trackDocsLinkOpened({ feature: 'experiments' })}
         >
           Learn about experiments
         </Link>
@@ -62,7 +62,8 @@ function ExperimentsComponent() {
     if (isPending || error || !Array.isArray(data)) return;
 
     hasTrackedListViewed.current = true;
-    trackExperimentsListViewed({
+    trackListViewed({
+      feature: 'experiments',
       experimentCount: data.length,
       functionCount: new Set(data.map((item) => item.functionId)).size,
     });
@@ -92,10 +93,16 @@ function ExperimentsComponent() {
           infoIcon={<ExperimentsInfo />}
         />
         <ExperimentsEmptyState
-          onViewed={trackExperimentEmptyStateViewed}
-          onDocsLinkClick={trackExperimentEmptyStateDocsLinkOpened}
-          onPromptCopy={trackExperimentEmptyStatePromptCopied}
-          onExampleCopy={trackExperimentEmptyStateExampleCopied}
+          onViewed={() => trackEmptyStateViewed({ feature: 'experiments' })}
+          onDocsLinkClick={() =>
+            trackEmptyStateDocsLinkOpened({ feature: 'experiments' })
+          }
+          onPromptCopy={() =>
+            trackEmptyStatePromptCopied({ feature: 'experiments' })
+          }
+          onExampleCopy={() =>
+            trackEmptyStateExampleCopied({ feature: 'experiments' })
+          }
         />
         <FeedbackFloatingButton />
       </>

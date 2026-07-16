@@ -5,13 +5,13 @@ import { ClientOnly, createFileRoute } from '@tanstack/react-router';
 
 import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { SessionsInfo } from '@/components/Sessions/SessionsInfo';
-import {
-  trackSessionEmptyStateDocsLinkOpened,
-  trackSessionEmptyStateExampleCopied,
-  trackSessionEmptyStatePromptCopied,
-  trackSessionEmptyStateViewed,
-} from '@/components/Sessions/tracking';
 import { useSessionKeys } from '@/components/Sessions/useSessionKeys';
+import {
+  trackEmptyStateDocsLinkOpened,
+  trackEmptyStateExampleCopied,
+  trackEmptyStatePromptCopied,
+  trackEmptyStateViewed,
+} from '@/utils/analyticsEvents';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/sessions/')({
@@ -45,10 +45,18 @@ function SessionsPage() {
           getSessionKeyHref={(sessionKey) =>
             pathCreator.sessions({ envSlug, sessionKey })
           }
-          onEmptyStateViewed={trackSessionEmptyStateViewed}
-          onEmptyStateDocsLinkClick={trackSessionEmptyStateDocsLinkOpened}
-          onEmptyStatePromptCopy={trackSessionEmptyStatePromptCopied}
-          onEmptyStateExampleCopy={trackSessionEmptyStateExampleCopied}
+          onEmptyStateViewed={() =>
+            trackEmptyStateViewed({ feature: 'sessions' })
+          }
+          onEmptyStateDocsLinkClick={() =>
+            trackEmptyStateDocsLinkOpened({ feature: 'sessions' })
+          }
+          onEmptyStatePromptCopy={() =>
+            trackEmptyStatePromptCopied({ feature: 'sessions' })
+          }
+          onEmptyStateExampleCopy={() =>
+            trackEmptyStateExampleCopied({ feature: 'sessions' })
+          }
         />
       </ClientOnly>
       <FeedbackFloatingButton />

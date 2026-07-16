@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 
 import {
+  trackEmptyStateViewed,
+  trackWaitlistJoined,
+} from '@/utils/analyticsEvents';
+
+import {
   FEATURES,
   INTRO_LEAD,
   INTRO_REST,
   USE_CASES,
 } from './sandboxesContent';
-import { trackSandboxesViewed, trackSandboxWaitlistJoined } from './tracking';
 import WaitlistModal from './WaitlistModal';
 
 export default function SandboxesEmptyState() {
@@ -18,11 +22,11 @@ export default function SandboxesEmptyState() {
   useEffect(() => {
     if (hasTrackedViewed.current) return;
     hasTrackedViewed.current = true;
-    trackSandboxesViewed();
+    trackEmptyStateViewed({ feature: 'sandboxes' });
   }, []);
 
   function openModal() {
-    trackSandboxWaitlistJoined();
+    trackWaitlistJoined({ feature: 'sandboxes' });
     setModalOpen(true);
   }
 

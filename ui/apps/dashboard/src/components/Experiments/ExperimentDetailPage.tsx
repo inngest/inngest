@@ -45,11 +45,7 @@ import {
   type ExperimentTimeRange as ExperimentUrlTimeRange,
 } from '@/lib/experiments/urlState';
 import { pathCreator } from '@/utils/urls';
-import {
-  trackExperimentOpenedInInsights,
-  trackExperimentTimeRangeChanged,
-  trackExperimentVariantFilterChanged,
-} from '@/components/Experiments/tracking';
+import { trackOpenedInInsights } from '@/utils/analyticsEvents';
 
 type Props = {
   experimentName: string;
@@ -176,16 +172,6 @@ export function ExperimentDetailPage({
 
   const handleRangeChange = useCallback(
     (nextRange: RangeChangeProps) => {
-      const { from, to } = rangeToTimeRange(nextRange);
-      const rangeDays = Math.round(
-        (to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000),
-      );
-      trackExperimentTimeRangeChanged({
-        experimentName,
-        functionSlug,
-        rangeDays,
-        hitMaxRange: rangeDays >= daysAgoMax,
-      });
       onTimeRangeChange(nextRange);
     },
     [onTimeRangeChange, experimentName, functionSlug, daysAgoMax],
@@ -198,16 +184,6 @@ export function ExperimentDetailPage({
 
   const handleSelectedVariantsChange = useCallback(
     (variants: string[]) => {
-      const available = new Set(availableVariants);
-      const matchingCount = variants.filter((v) => available.has(v)).length;
-      trackExperimentVariantFilterChanged({
-        experimentName,
-        functionSlug,
-        filterType: 'variant_selection',
-        selectedVariantCount: variants.length,
-        availableVariantCount: availableVariants.length,
-        resultedInEmpty: variants.length > 0 && matchingCount === 0,
-      });
       onSelectedVariantsChange(variants);
     },
     [onSelectedVariantsChange, experimentName, functionSlug, availableVariants],
@@ -215,14 +191,6 @@ export function ExperimentDetailPage({
 
   const handleShowInactiveChange = useCallback(
     (next: boolean) => {
-      trackExperimentVariantFilterChanged({
-        experimentName,
-        functionSlug,
-        filterType: 'show_inactive',
-        selectedVariantCount: selectedVariants.length,
-        availableVariantCount: availableVariants.length,
-        resultedInEmpty: false,
-      });
       setShowInactive(next);
     },
     [
@@ -304,7 +272,8 @@ export function ExperimentDetailPage({
   const onOpenInsights = useCallback(() => {
     const sql = insightsQuery.data;
     if (!sql) return;
-    trackExperimentOpenedInInsights({
+    trackOpenedInInsights({
+      feature: 'experiments',
       experimentName,
       functionSlug,
       variantCount: detail.data?.variants.length ?? 0,
