@@ -8,13 +8,24 @@
  */
 import { DEMO_ACCOUNT_ID } from '../clerk/identity';
 import {
+  eventEnvelope,
+  decodeOutputID,
+  encodeOutputID,
+  runError,
+  runOutput,
+  stepOutput,
+  stepsFor,
+} from './content';
+import {
   allFunctions,
   APPS,
   type AppDef,
   deployFor,
   ENVIRONMENTS,
   envBySlug,
+  findRunSeed,
   type FnDef,
+  functionDailyUsage,
   now,
   runIso,
   runsFor,
@@ -23,6 +34,8 @@ import {
 } from './data';
 import { Rng } from './prng';
 import { seededULID, seededUUID } from './scalars';
+
+const asBytes = (obj: unknown) => JSON.stringify(obj);
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -132,45 +145,56 @@ function metricsResponse(seed: string, base: number, amp: number) {
 
 function buildTrace(seed: RunSeed, envSlug: string) {
   const rng = new Rng('span:' + seed.id);
-  const stepNames = ['load-context', 'call-api', 'persist-result', 'notify'];
-  const stepCount = rng.int(2, 4);
+  const stepNames = stepsFor(seed);
+  const failed = seed.status === 'FAILED';
+  const running = seed.status === 'RUNNING';
   const q = seed.queuedAt;
   const start = seed.startedAt ?? q + 200;
   const end = seed.endedAt ?? start + 8000;
   const span = seededUUID('span:' + seed.id);
   const total = end - start;
-  const children = Array.from({ length: stepCount }, (_, i) => {
-    const cs = start + (total / stepCount) * i;
-    const ce = start + (total / stepCount) * (i + 1);
+  const n = stepNames.length;
+  const children = stepNames.map((stepName, i) => {
+    const cs = start + (total / n) * i;
+    const ce = start + (total / n) * (i + 1);
+    const isLast = i === n - 1;
+    // A failed run fails on its last step; a running run's last step is live.
+    const status =
+      failed && isLast ? 'FAILED' : running && isLast ? 'RUNNING' : 'COMPLETED';
+    const isWait = stepName.startsWith('wait') || stepName === 'sleep';
+    const stepOp = isWait
+      ? 'SLEEP'
+      : stepName === 'sync-crm' || stepName === 'provision'
+      ? 'INVOKE'
+      : 'RUN';
     return {
       spanID: seededUUID(`span:${seed.id}:${i}`),
-      name: stepNames[i % stepNames.length],
-      status: 'COMPLETED',
+      name: stepName,
+      status,
       isRoot: false,
       isUserland: false,
-      stepOp: rng.pick(['RUN', 'RUN', 'INVOKE', 'SLEEP', 'WAIT_FOR_EVENT']),
+      stepOp,
       stepType: 'step.run',
-      attempts: 1,
+      stepID: stepName,
+      attempts: failed && isLast ? rng.int(2, 4) : 1,
       queuedAt: runIso(cs - 30),
       scheduledAt: runIso(cs - 15),
       startedAt: runIso(cs),
-      endedAt: runIso(ce),
-      duration: Math.round(ce - cs),
+      endedAt: running && isLast ? null : runIso(ce),
+      duration: running && isLast ? null : Math.round(ce - cs),
       childrenSpans: [],
       metadata: [],
       traceID: seededUUID('trace:' + seed.id),
       runID: seed.id,
+      // Decodable so runTraceSpanOutputByID can return matching step output.
+      outputID: encodeOutputID(seed.id, `step:${i}:${stepName}`),
+      parentSpanID: span,
     };
   });
   return {
     spanID: span,
     name: seed.fn.name,
-    status:
-      seed.status === 'FAILED'
-        ? 'FAILED'
-        : seed.status === 'RUNNING'
-        ? 'RUNNING'
-        : 'COMPLETED',
+    status: failed ? 'FAILED' : running ? 'RUNNING' : 'COMPLETED',
     isRoot: true,
     isUserland: false,
     stepType: 'run',
@@ -190,8 +214,165 @@ function buildTrace(seed: RunSeed, envSlug: string) {
       `fn:${seed.app.externalID}:${seed.fn.slug}:${envSlug}`,
     ),
     workspaceID: seededUUID('env:' + envSlug),
-    outputID: seededUUID('out:' + seed.id),
+    outputID: encodeOutputID(seed.id, 'root'),
     parentSpanID: null,
+  };
+}
+
+// --- scoped metrics ---------------------------------------------------------
+
+type ScopedFilter = {
+  name?: string;
+  scope?: string;
+  groupBy?: string;
+  functionIDs?: string[];
+  appIDs?: string[];
+  from?: string;
+  until?: string;
+};
+
+/** A metrics series bounded to an explicit [from,to] window. */
+function scopedSeries(
+  seed: string,
+  from: number,
+  to: number,
+  base: number,
+  amp: number,
+) {
+  const points = 24;
+  const step = Math.max(1, (to - from) / (points - 1));
+  const rng = new Rng('scoped:' + seed);
+  return Array.from({ length: points }, (_, i) => {
+    const trend = base * (1 + (i / points) * 0.2);
+    const daily = amp * Math.sin((i / points) * Math.PI * 4);
+    const noise = rng.float(-amp * 0.15, amp * 0.15);
+    return {
+      bucket: runIso(from + i * step),
+      value: Math.max(0, Math.round(trend + daily + noise)),
+    };
+  });
+}
+
+// Status breakdown shares (healthy account).
+const STATUS_SHARES: [string, number][] = [
+  ['Completed', 0.94],
+  ['Failed', 0.04],
+  ['Cancelled', 0.02],
+];
+
+function buildScopedMetrics(envSlug: string, filter?: ScopedFilter) {
+  const name = filter?.name ?? 'function_run_scheduled_total';
+  const scope = filter?.scope ?? 'ENV';
+  const groupBy = filter?.groupBy;
+  const from = filter?.from
+    ? new Date(filter.from).getTime()
+    : now() - 24 * HOUR;
+  const to = filter?.until ? new Date(filter.until).getTime() : now();
+  const base = name.includes('step')
+    ? 1800
+    : name.includes('started')
+    ? 880
+    : name.includes('ended')
+    ? 850
+    : 900;
+  const envelope = (metrics: unknown[]) => ({
+    from: runIso(from),
+    to: runIso(to),
+    granularity: '1h',
+    scope,
+    metrics,
+  });
+
+  if (groupBy === 'status' && scope === 'FN') {
+    // Per function × status (drives Failed-functions breakdown).
+    const metrics = allFunctions().flatMap(({ app, fn }) => {
+      const fid = seededUUID(`fn:${app.externalID}:${fn.slug}:${envSlug}`);
+      const u = functionDailyUsage(app, fn);
+      const perStatus: [string, number][] = [
+        ['Completed', u.totals.completed],
+        ['Failed', u.totals.failed],
+        ['Cancelled', u.totals.cancelled],
+      ];
+      return perStatus.map(([status, tot]) => ({
+        id: fid,
+        tagName: 'status',
+        tagValue: status,
+        data: scopedSeries(
+          `${fn.slug}:${status}`,
+          from,
+          to,
+          Math.max(1, tot / 24),
+          Math.max(1, tot / 80),
+        ),
+      }));
+    });
+    return envelope(metrics);
+  }
+
+  if (groupBy === 'status') {
+    return envelope(
+      STATUS_SHARES.map(([status, frac]) => ({
+        id: seededUUID(`status:${status}:${envSlug}`),
+        tagName: 'status',
+        tagValue: status,
+        data: scopedSeries(status, from, to, base * frac, base * frac * 0.3),
+      })),
+    );
+  }
+
+  // Ungrouped: one series (optionally per function when scope=FN).
+  if (scope === 'FN') {
+    return envelope(
+      allFunctions().map(({ app, fn }) => ({
+        id: seededUUID(`fn:${app.externalID}:${fn.slug}:${envSlug}`),
+        tagName: null,
+        tagValue: null,
+        data: scopedSeries(
+          fn.slug + name,
+          from,
+          to,
+          functionDailyUsage(app, fn).totals.started / 24,
+          base * 0.1,
+        ),
+      })),
+    );
+  }
+  return envelope([
+    {
+      id: seededUUID(`scoped:${name}:${envSlug}`),
+      tagName: null,
+      tagValue: null,
+      data: scopedSeries(name, from, to, base, base * 0.25),
+    },
+  ]);
+}
+
+// --- workflow usage ---------------------------------------------------------
+
+function buildUsage(app: AppDef, fn: FnDef, event: string | null) {
+  const u = functionDailyUsage(app, fn);
+  const pick =
+    event === 'completed'
+      ? u.completed
+      : event === 'cancelled'
+      ? u.cancelled
+      : event === 'errored' || event === 'failed'
+      ? u.failed
+      : u.started;
+  const total =
+    event === 'completed'
+      ? u.totals.completed
+      : event === 'cancelled'
+      ? u.totals.cancelled
+      : event === 'errored' || event === 'failed'
+      ? u.totals.failed
+      : u.totals.started;
+  return {
+    asOf: runIso(now()),
+    period: 'hour',
+    total,
+    range: { start: u.from, end: u.to },
+    data: pick,
   };
 }
 
@@ -246,6 +427,36 @@ export function buildResolvers() {
     Account: {
       // No auto-mocked "Hello World" banners in the demo.
       activeBanners: () => [],
+      // Healthy entitlements: seats well under limit (clears the seat-overage
+      // widget), generous run/step limits with modest usage. Unspecified
+      // nested fields fall back to auto-mocks.
+      entitlements: () => ({
+        userCount: { usage: 6, limit: 25 },
+        runCount: { usage: 184_000, limit: 5_000_000, overageAllowed: true },
+        stepCount: { usage: 921_500, limit: 25_000_000, overageAllowed: true },
+        concurrency: { limit: 100 },
+        history: { limit: 7 },
+        eventSize: { limit: 3_145_728 },
+        metricsExportFreshness: { limit: 900 },
+        metricsExportGranularity: { limit: 3600 },
+        connectWorkerConnections: { limit: 100 },
+        hipaa: { enabled: false },
+        metricsExport: { enabled: true },
+        slackChannel: { enabled: true },
+      }),
+      entitlementUsage: () => ({
+        accountConcurrencyLimitHits: 0,
+        runCount: {
+          current: 184_000,
+          limit: 5_000_000,
+          overageAllowed: true,
+        },
+        stepCount: {
+          current: 921_500,
+          limit: 25_000_000,
+          overageAllowed: true,
+        },
+      }),
     },
 
     Workspace: {
@@ -266,6 +477,14 @@ export function buildResolvers() {
         const found = allFunctions().find((f) => f.fn.slug === slug);
         return found ? buildWorkflow(found.app, found.fn, wsSlug(ws)) : null;
       },
+      workflow: (ws: { slug?: string }, { id }: { id: string }) => {
+        const envSlug = wsSlug(ws);
+        const found = allFunctions().find(
+          ({ app, fn }) =>
+            seededUUID(`fn:${app.externalID}:${fn.slug}:${envSlug}`) === id,
+        );
+        return found ? buildWorkflow(found.app, found.fn, envSlug) : null;
+      },
       runs: (ws: { slug?: string }) => {
         const envSlug = wsSlug(ws);
         const seeds = runsFor(envSlug);
@@ -280,19 +499,89 @@ export function buildResolvers() {
       },
       run: (ws: { slug?: string }, { runID }: { runID: string }) => {
         const envSlug = wsSlug(ws);
-        const seeds = runsFor(envSlug, 60);
-        const seed = seeds.find((s) => s.id === runID) ?? seeds[0];
+        const seed = findRunSeed(envSlug, runID) ?? runsFor(envSlug, 1)[0];
         return buildRun({ ...seed, id: runID }, envSlug);
       },
-      scopedMetrics: () => ({
-        metrics: [
-          {
-            tagName: null,
-            tagValue: null,
-            data: metricsResponse('scoped', 800, 220).data,
+      runTrigger: (ws: { slug?: string }, { runID }: { runID: string }) => {
+        const envSlug = wsSlug(ws);
+        const seed = findRunSeed(envSlug, runID) ?? runsFor(envSlug, 1)[0];
+        const isCron = seed.fn.trigger.type === 'CRON';
+        return {
+          IDs: [seededULID('trig:' + runID, seed.queuedAt)],
+          payloads: [asBytes(eventEnvelope(seed))],
+          timestamp: runIso(seed.queuedAt),
+          eventName: isCron ? null : seed.fn.trigger.value,
+          isBatch: false,
+          batchID: null,
+          cron: isCron ? seed.fn.trigger.value : null,
+        };
+      },
+      runTraceSpanOutputByID: (
+        ws: { slug?: string },
+        { outputID }: { outputID: string },
+      ) => {
+        const envSlug = wsSlug(ws);
+        const { runID, kind } = decodeOutputID(outputID);
+        const seed = findRunSeed(envSlug, runID);
+        if (!seed) return { data: null, input: null, error: null };
+
+        const stepNames = stepsFor(seed);
+        const isRoot = kind === 'root';
+        const stepIdx = kind.startsWith('step:')
+          ? Number(kind.split(':')[1])
+          : -1;
+        const isLastStep = stepIdx === stepNames.length - 1;
+        const failedHere = seed.status === 'FAILED' && (isRoot || isLastStep);
+
+        if (failedHere) {
+          return {
+            data: null,
+            input: asBytes(eventEnvelope(seed).data),
+            error: runError(seed),
+          };
+        }
+        if (isRoot) {
+          return {
+            data: asBytes(runOutput(seed)),
+            input: asBytes(eventEnvelope(seed).data),
+            error: null,
+          };
+        }
+        const stepName = stepNames[stepIdx] ?? 'step';
+        return {
+          data: asBytes(stepOutput(seed, stepName)),
+          input: null,
+          error: null,
+        };
+      },
+      scopedMetrics: (
+        ws: { slug?: string },
+        { filter }: { filter?: ScopedFilter },
+      ) => buildScopedMetrics(wsSlug(ws), filter),
+      scopedFunctionStatus: (ws: { slug?: string }) => {
+        // Aggregate healthy totals across all functions in the env.
+        const totals = allFunctions().reduce(
+          (acc, { app, fn }) => {
+            const u = functionDailyUsage(app, fn);
+            acc.completed += u.totals.completed;
+            acc.failed += u.totals.failed;
+            acc.cancelled += u.totals.cancelled;
+            return acc;
           },
-        ],
-      }),
+          { completed: 0, failed: 0, cancelled: 0 },
+        );
+        const rng = new Rng('status:' + wsSlug(ws));
+        return {
+          from: runIso(now() - 24 * HOUR),
+          to: runIso(now()),
+          completed: totals.completed,
+          failed: totals.failed,
+          cancelled: totals.cancelled,
+          running: rng.int(3, 24),
+          queued: rng.int(1, 12),
+          skipped: rng.int(0, 4),
+        };
+      },
       functionCount: () => allFunctions().length,
     },
 
@@ -316,6 +605,10 @@ export function buildResolvers() {
       ],
       metrics: (wf: { _fn: FnDef }) =>
         metricsResponse('fn:' + wf._fn.slug, 120, 40),
+      usage: (
+        wf: { _app: AppDef; _fn: FnDef },
+        { event }: { event?: string | null },
+      ) => buildUsage(wf._app, wf._fn, event ?? null),
     },
 
     FunctionRunV2: {

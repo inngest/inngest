@@ -290,4 +290,71 @@ export function runsFor(envSlug: string, count = 40): RunSeed[] {
   return out;
 }
 
+/** Find a run seed by id within an env (searches a wide window). */
+export function findRunSeed(
+  envSlug: string,
+  runID: string,
+): RunSeed | undefined {
+  return runsFor(envSlug, 120).find((s) => s.id === runID);
+}
+
+/**
+ * Deterministic 24h per-function volume, split into completed / cancelled /
+ * failed counts with a healthy (~2-5%) failure rate. Drives the functions-list
+ * failure-rate + volume columns and the function-detail usage charts.
+ */
+export function functionDailyUsage(app: AppDef, fn: FnDef) {
+  const rng = new Rng(`usage:${app.externalID}:${fn.slug}`);
+  const points = 24;
+  const start = now() - (points - 1) * HOUR;
+  // Per-hour started counts as a smooth curve; paused fns are quiet.
+  const base = fn.paused ? 0 : rng.int(40, 220);
+  const amp = Math.round(base * 0.35);
+  const started = Array.from({ length: points }, (_, i) => {
+    const trend = base * (1 + (i / points) * 0.15);
+    const daily = amp * Math.sin((i / points) * Math.PI * 4);
+    const noise = rng.float(-amp * 0.15, amp * 0.15);
+    return {
+      slot: iso(start + i * HOUR),
+      count: Math.max(0, Math.round(trend + daily + noise)),
+    };
+  });
+  const totalStarted = started.reduce((n, s) => n + s.count, 0);
+  const failureRate = fn.paused ? 0 : rng.float(0.01, 0.05);
+  const cancelRate = fn.paused ? 0 : rng.float(0.002, 0.01);
+  const failed = started.map((s) => ({
+    slot: s.slot,
+    count: Math.round(s.count * failureRate),
+  }));
+  const cancelled = started.map((s) => ({
+    slot: s.slot,
+    count: Math.round(s.count * cancelRate),
+  }));
+  const totalFailed = failed.reduce((n, s) => n + s.count, 0);
+  const totalCancelled = cancelled.reduce((n, s) => n + s.count, 0);
+  const totalCompleted = Math.max(
+    0,
+    totalStarted - totalFailed - totalCancelled,
+  );
+  const completed = started.map((s, i) => ({
+    slot: s.slot,
+    count: Math.max(0, s.count - failed[i].count - cancelled[i].count),
+  }));
+  return {
+    from: iso(start),
+    to: iso(now()),
+    started,
+    completed,
+    cancelled,
+    failed,
+    totals: {
+      started: totalStarted,
+      completed: totalCompleted,
+      cancelled: totalCancelled,
+      failed: totalFailed,
+    },
+  };
+}
+
 export const runIso = iso;
+export { HOUR as HOUR_MS };
