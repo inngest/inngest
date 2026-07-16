@@ -585,6 +585,12 @@ func (e *executor) runEventLifecycles(ctx context.Context, fn func(context.Conte
 	}
 }
 
+func (e *executor) RunFunctionMatchLifecycle(ctx context.Context, req execution.ScheduleRequest) {
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnFunctionMatch(ctx, req)
+	})
+}
+
 func (e *executor) RunFunctionFinishedLifecycle(
 	ctx context.Context,
 	md sv2.Metadata,
@@ -898,10 +904,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if runID != nil {
 		attemptedRunID = *runID
 	}
-
-	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-		l.OnFunctionMatch(ctx, req)
-	})
 
 	l := e.log.With(
 		"account_id", req.AccountID,
