@@ -93,16 +93,16 @@ func TestWaitForEventOpts_Expires(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), got, time.Second)
 	})
 
-	t.Run("accepts a timeout of exactly one year", func(t *testing.T) {
-		opts := WaitForEventOpts{Timeout: "365d"}
+	t.Run("accepts a timeout of exactly one leap year", func(t *testing.T) {
+		opts := WaitForEventOpts{Timeout: "366d"}
 		now := time.Now()
 		got, err := opts.Expires()
 		require.NoError(t, err)
 		assert.WithinDuration(t, now.Add(consts.MaxWaitForEventTimeout), got, time.Second)
 	})
 
-	t.Run("rejects a duration beyond one year", func(t *testing.T) {
-		opts := WaitForEventOpts{Timeout: "366d"}
+	t.Run("rejects a duration beyond one leap year", func(t *testing.T) {
+		opts := WaitForEventOpts{Timeout: "367d"}
 		_, err := opts.Expires()
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrTimeoutTooLong)
@@ -126,14 +126,14 @@ func TestGeneratorOpcode_SleepDuration(t *testing.T) {
 		}
 	}
 
-	t.Run("accepts a duration of exactly one year", func(t *testing.T) {
-		dur, err := sleepOp("365d").SleepDuration()
+	t.Run("accepts a duration of exactly one leap year", func(t *testing.T) {
+		dur, err := sleepOp("366d").SleepDuration()
 		require.NoError(t, err)
 		assert.Equal(t, consts.MaxSleepDuration, dur)
 	})
 
-	t.Run("rejects a duration beyond one year", func(t *testing.T) {
-		_, err := sleepOp("366d").SleepDuration()
+	t.Run("rejects a duration beyond one leap year", func(t *testing.T) {
+		_, err := sleepOp("367d").SleepDuration()
 		require.Error(t, err)
 		assert.ErrorIs(t, err, ErrTimeoutTooLong)
 	})
