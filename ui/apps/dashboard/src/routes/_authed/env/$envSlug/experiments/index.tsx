@@ -3,7 +3,6 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
 import { InlineCode } from '@inngest/components/Code';
 import {
-  ExperimentsEmptyState,
   ExperimentsTable,
   type ExperimentListItem,
 } from '@inngest/components/Experiments';
@@ -11,14 +10,12 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 
+import { ExperimentsEmptyState } from '@/components/Experiments/ExperimentsEmptyState';
 import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
 import {
   trackDocsLinkOpened,
   trackEmptyStateDocsLinkOpened,
-  trackEmptyStateExampleCopied,
-  trackEmptyStatePromptCopied,
-  trackEmptyStateViewed,
   trackListViewed,
 } from '@/utils/analyticsEvents';
 import { pathCreator } from '@/utils/urls';
@@ -93,15 +90,8 @@ function ExperimentsComponent() {
           infoIcon={<ExperimentsInfo />}
         />
         <ExperimentsEmptyState
-          onViewed={() => trackEmptyStateViewed({ feature: 'experiments' })}
           onDocsLinkClick={() =>
             trackEmptyStateDocsLinkOpened({ feature: 'experiments' })
-          }
-          onPromptCopy={() =>
-            trackEmptyStatePromptCopied({ feature: 'experiments' })
-          }
-          onExampleCopy={() =>
-            trackEmptyStateExampleCopied({ feature: 'experiments' })
           }
         />
         <FeedbackFloatingButton />

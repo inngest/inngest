@@ -1,14 +1,12 @@
 import { RiAlertLine, RiRouteLine, RiStackLine } from '@remixicon/react';
 
-import { InlineCode } from '../Code';
-import { FeatureEmptyState } from '../FeatureEmptyState';
+import { InlineCode } from '@inngest/components/Code';
+
+import { FeatureEmptyState } from '@/components/FeatureEmptyState/FeatureEmptyState';
 
 type SessionsEmptyStateProps = {
   docsUrl?: string;
-  onViewed?: () => void;
   onDocsLinkClick?: () => void;
-  onPromptCopy?: () => void;
-  onExampleCopy?: () => void;
 };
 
 const DEFAULT_DOCS_URL =
@@ -46,22 +44,20 @@ const VALUE_PROPS = [
 
 export function SessionsEmptyState({
   docsUrl = DEFAULT_DOCS_URL,
-  onViewed,
   onDocsLinkClick,
-  onPromptCopy,
-  onExampleCopy,
 }: SessionsEmptyStateProps) {
   return (
     <FeatureEmptyState
+      feature="sessions"
       title="Sessions"
       description="Group related runs into sessions. A session ties together every function run from the same conversation, job, or user flow, so you can find and inspect them all by one ID."
       docsUrl={docsUrl}
       onDocsLinkClick={onDocsLinkClick}
       valueProps={VALUE_PROPS}
       prompt={{
-        description: 'Copy this prompt to learn about this feature and implement sessions',
+        description:
+          'Copy this prompt to learn about this feature and implement sessions',
         content: PROMPT,
-        onCopy: onPromptCopy,
       }}
       example={{
         description: (
@@ -69,10 +65,15 @@ export function SessionsEmptyState({
             add <InlineCode>meta.sessions</InlineCode> to any event
           </>
         ),
-        tabs: [{ title: 'Code', content: EXAMPLE, readOnly: true, language: 'typescript' }],
-        onCopy: onExampleCopy,
+        tabs: [
+          {
+            title: 'Code',
+            content: EXAMPLE,
+            readOnly: true,
+            language: 'typescript',
+          },
+        ],
       }}
-      onViewed={onViewed}
     />
   );
 }

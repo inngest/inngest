@@ -1,7 +1,22 @@
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
 
-import CommandBlock, { type TabsProps } from '../CodeBlock/CommandBlock';
-import { Link } from '../Link';
+import CommandBlock, {
+  type TabsProps,
+} from '@inngest/components/CodeBlock/CommandBlock';
+import { Link } from '@inngest/components/Link';
+
+import {
+  trackEmptyStateExampleCopied,
+  trackEmptyStatePromptCopied,
+  trackEmptyStateViewed,
+  type AnalyticsFeature,
+} from '@/utils/analyticsEvents';
 
 export type FeatureEmptyStateValueProp = {
   icon: ComponentType<{ className?: string }>;
@@ -11,6 +26,7 @@ export type FeatureEmptyStateValueProp = {
 };
 
 export type FeatureEmptyStateProps = {
+  feature: AnalyticsFeature;
   title: string;
   description: ReactNode;
   docsUrl: string;
@@ -19,16 +35,12 @@ export type FeatureEmptyStateProps = {
   prompt: {
     description: ReactNode;
     content: string;
-    onCopy?: () => void;
   };
   example: {
     description?: ReactNode;
     tabs: TabsProps[];
     height?: number;
-    onCopy?: () => void;
   };
-  // Fired once, the first time the empty state is rendered.
-  onViewed?: () => void;
 };
 
 const PROMPT_HEIGHT = 124;
@@ -52,7 +64,12 @@ function ValuePropItem({
   );
 }
 
-function ExampleBlock({ description, tabs, height, onCopy }: FeatureEmptyStateProps['example']) {
+function ExampleBlock({
+  description,
+  tabs,
+  height,
+  feature,
+}: FeatureEmptyStateProps['example'] & { feature: AnalyticsFeature }) {
   const [activeTab, setActiveTab] = useState(tabs[0]?.title ?? '');
   const current = tabs.find((tab) => tab.title === activeTab) ?? tabs[0];
   const hasTabs = tabs.length > 1;
@@ -67,11 +84,18 @@ function ExampleBlock({ description, tabs, height, onCopy }: FeatureEmptyStatePr
         }
       >
         {hasTabs ? (
-          <CommandBlock.Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+          <CommandBlock.Tabs
+            tabs={tabs}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
         ) : (
           <p className="text-subtle text-sm">{description}</p>
         )}
-        <CommandBlock.CopyButton content={current?.content} onCopy={onCopy} />
+        <CommandBlock.CopyButton
+          content={current?.content}
+          onCopy={() => trackEmptyStateExampleCopied({ feature })}
+        />
       </CommandBlock.Header>
       <CommandBlock currentTabContent={current} height={height} />
     </CommandBlock.Wrapper>
@@ -79,6 +103,7 @@ function ExampleBlock({ description, tabs, height, onCopy }: FeatureEmptyStatePr
 }
 
 export function FeatureEmptyState({
+  feature,
   title,
   description,
   docsUrl,
@@ -86,7 +111,6 @@ export function FeatureEmptyState({
   valueProps,
   prompt,
   example,
-  onViewed,
 }: FeatureEmptyStateProps) {
   // Fire once on view. The ref guards against React 18 StrictMode's
   // double-invoke so we don't double-count.
@@ -94,8 +118,8 @@ export function FeatureEmptyState({
   useEffect(() => {
     if (viewedRef.current) return;
     viewedRef.current = true;
-    onViewed?.();
-  }, [onViewed]);
+    trackEmptyStateViewed({ feature });
+  }, [feature]);
 
   return (
     <div className="bg-canvasBase flex flex-1 flex-col items-center overflow-auto px-6 py-12">
@@ -122,7 +146,10 @@ export function FeatureEmptyState({
           <CommandBlock.Wrapper>
             <CommandBlock.Header className="flex items-center justify-between px-4 py-2.5">
               <p className="text-subtle text-sm">{prompt.description}</p>
-              <CommandBlock.CopyButton content={prompt.content} onCopy={prompt.onCopy} />
+              <CommandBlock.CopyButton
+                content={prompt.content}
+                onCopy={() => trackEmptyStatePromptCopied({ feature })}
+              />
             </CommandBlock.Header>
             <CommandBlock
               height={PROMPT_HEIGHT}
@@ -136,7 +163,7 @@ export function FeatureEmptyState({
             />
           </CommandBlock.Wrapper>
 
-          <ExampleBlock {...example} />
+          <ExampleBlock {...example} feature={feature} />
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { FeatureEmptyState } from '../FeatureEmptyState';
+import { FeatureEmptyState } from '@/components/FeatureEmptyState/FeatureEmptyState';
 import {
   DOCS_URL,
   INTRO_DESCRIPTION,
@@ -8,20 +8,15 @@ import {
 } from './experimentsEmptyStateContent';
 
 type ExperimentsEmptyStateProps = {
-  onViewed?: () => void;
   onDocsLinkClick?: () => void;
-  onPromptCopy?: () => void;
-  onExampleCopy?: () => void;
 };
 
 export function ExperimentsEmptyState({
-  onViewed,
   onDocsLinkClick,
-  onPromptCopy,
-  onExampleCopy,
 }: ExperimentsEmptyStateProps) {
   return (
     <FeatureEmptyState
+      feature="experiments"
       title="Experiments"
       description={INTRO_DESCRIPTION}
       docsUrl={DOCS_URL}
@@ -32,16 +27,14 @@ export function ExperimentsEmptyState({
         description,
       }))}
       prompt={{
-        description: 'Copy this prompt to learn about this feature and implement experiments',
+        description:
+          'Copy this prompt to learn about this feature and implement experiments',
         content: PROMPT,
-        onCopy: onPromptCopy,
       }}
       example={{
         tabs: VARIANT_TABS,
         height: 280,
-        onCopy: onExampleCopy,
       }}
-      onViewed={onViewed}
     />
   );
 }

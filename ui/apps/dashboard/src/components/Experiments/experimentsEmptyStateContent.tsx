@@ -1,7 +1,12 @@
 import type { ComponentType } from 'react';
-import { RiEqualizerLine, RiGroupLine, RiLineChartLine, RiScalesLine } from '@remixicon/react';
+import {
+  RiEqualizerLine,
+  RiGroupLine,
+  RiLineChartLine,
+  RiScalesLine,
+} from '@remixicon/react';
 
-import type { TabsProps } from '../CodeBlock/CommandBlock';
+import type { TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
 
 export const DOCS_URL =
   'https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments';
@@ -120,10 +125,30 @@ export default inngest.createFunction(
 );`;
 
 export const VARIANT_TABS: TabsProps[] = [
-  { title: 'weighted ( )', content: WEIGHTED, language: 'typescript', readOnly: true },
-  { title: 'bucket ( )', content: BUCKET, language: 'typescript', readOnly: true },
-  { title: 'custom ( )', content: CUSTOM, language: 'typescript', readOnly: true },
-  { title: 'fixed ( )', content: FIXED, language: 'typescript', readOnly: true },
+  {
+    title: 'weighted ( )',
+    content: WEIGHTED,
+    language: 'typescript',
+    readOnly: true,
+  },
+  {
+    title: 'bucket ( )',
+    content: BUCKET,
+    language: 'typescript',
+    readOnly: true,
+  },
+  {
+    title: 'custom ( )',
+    content: CUSTOM,
+    language: 'typescript',
+    readOnly: true,
+  },
+  {
+    title: 'fixed ( )',
+    content: FIXED,
+    language: 'typescript',
+    readOnly: true,
+  },
 ];
 
 export const PROMPT = `Read the docs about Inngest experiments @https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments and show me how to declare variants with group.experiment() using weighted, bucket, custom, or fixed selection, then help me find a function where I could safely trial a change and compare outcomes across variants.`;

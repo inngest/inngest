@@ -1,5 +1,4 @@
 import { InlineCode } from '@inngest/components/Code';
-import { FeatureEmptyState } from '@inngest/components/FeatureEmptyState';
 import {
   RiCheckboxCircleLine,
   RiFilterLine,
@@ -7,12 +6,8 @@ import {
   RiQuestionLine,
 } from '@remixicon/react';
 
-import {
-  trackEmptyStateDocsLinkOpened,
-  trackEmptyStateExampleCopied,
-  trackEmptyStatePromptCopied,
-  trackEmptyStateViewed,
-} from '@/utils/analyticsEvents';
+import { FeatureEmptyState } from '@/components/FeatureEmptyState/FeatureEmptyState';
+import { trackEmptyStateDocsLinkOpened } from '@/utils/analyticsEvents';
 
 const DOCS_URL =
   'https://www.inngest.com/docs/features/inngest-functions/steps-workflows/scoring?ref=app-empty-scores';
@@ -65,6 +60,7 @@ const valueProps = [
 export function ScoresEmptyState() {
   return (
     <FeatureEmptyState
+      feature="scores"
       title="Scores"
       description="Use scores to track and evaluate custom metrics from inside your functions. Record numeric or boolean scores on any run - eval pass/fail, confidence intervals, latency, tool use. Use Inngest to measure quality and performance trends over time."
       docsUrl={DOCS_URL}
@@ -76,7 +72,6 @@ export function ScoresEmptyState() {
         description:
           'Copy this prompt to learn about this feature and implement scores',
         content: prompt,
-        onCopy: () => trackEmptyStatePromptCopied({ feature: 'scores' }),
       }}
       example={{
         description: (
@@ -92,9 +87,7 @@ export function ScoresEmptyState() {
             language: 'typescript',
           },
         ],
-        onCopy: () => trackEmptyStateExampleCopied({ feature: 'scores' }),
       }}
-      onViewed={() => trackEmptyStateViewed({ feature: 'scores' })}
     />
   );
 }

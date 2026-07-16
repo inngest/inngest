@@ -4,13 +4,9 @@ import { SessionKeys } from '@inngest/components/Sessions/SessionKeys';
 import { ClientOnly, createFileRoute } from '@tanstack/react-router';
 
 import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
+import { SessionsEmptyState } from '@/components/Sessions/SessionsEmptyState';
 import { SessionsInfo } from '@/components/Sessions/SessionsInfo';
-import {
-  trackEmptyStateDocsLinkOpened,
-  trackEmptyStateExampleCopied,
-  trackEmptyStatePromptCopied,
-  trackEmptyStateViewed,
-} from '@/utils/analyticsEvents';
+import { trackEmptyStateDocsLinkOpened } from '@/utils/analyticsEvents';
 import { useSessionKeys } from '@/components/Sessions/useSessionKeys';
 import { pathCreator } from '@/utils/urls';
 
@@ -29,35 +25,34 @@ function SessionsPage() {
     navigate({ to: pathCreator.sessions({ envSlug, sessionKey }) });
   }
 
+  const sessionKeys = data ?? [];
+  const showEmptyState = !error && !search.trim() && sessionKeys.length === 0;
+
   return (
     <>
       <Header breadcrumb={[{ text: 'Sessions' }]} infoIcon={<SessionsInfo />} />
       <ClientOnly>
-        <SessionKeys
-          sessionKeys={data ?? []}
-          isLoading={isPending || isFetching}
-          search={search}
-          error={error}
-          onSearchChange={setSearch}
-          onSubmitSearch={navigateToSessionKey}
-          onRefresh={() => refetch()}
-          onSelectSessionKey={navigateToSessionKey}
-          getSessionKeyHref={(sessionKey) =>
-            pathCreator.sessions({ envSlug, sessionKey })
-          }
-          onEmptyStateViewed={() =>
-            trackEmptyStateViewed({ feature: 'sessions' })
-          }
-          onEmptyStateDocsLinkClick={() =>
-            trackEmptyStateDocsLinkOpened({ feature: 'sessions' })
-          }
-          onEmptyStatePromptCopy={() =>
-            trackEmptyStatePromptCopied({ feature: 'sessions' })
-          }
-          onEmptyStateExampleCopy={() =>
-            trackEmptyStateExampleCopied({ feature: 'sessions' })
-          }
-        />
+        {showEmptyState ? (
+          <SessionsEmptyState
+            onDocsLinkClick={() =>
+              trackEmptyStateDocsLinkOpened({ feature: 'sessions' })
+            }
+          />
+        ) : (
+          <SessionKeys
+            sessionKeys={sessionKeys}
+            isLoading={isPending || isFetching}
+            search={search}
+            error={error}
+            onSearchChange={setSearch}
+            onSubmitSearch={navigateToSessionKey}
+            onRefresh={() => refetch()}
+            onSelectSessionKey={navigateToSessionKey}
+            getSessionKeyHref={(sessionKey) =>
+              pathCreator.sessions({ envSlug, sessionKey })
+            }
+          />
+        )}
       </ClientOnly>
       <FeedbackFloatingButton />
     </>
