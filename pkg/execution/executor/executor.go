@@ -1642,7 +1642,7 @@ func (e *executor) schedule(
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnFunctionScheduled(ctx, metadata, item, req.Events)
+			l.OnFunctionScheduled(ctx, metadata, req.Events)
 		})
 		return &metadata.ID.RunID, &metadata, nil
 	}
@@ -1749,7 +1749,7 @@ func (e *executor) schedule(
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-		l.OnFunctionScheduled(ctx, metadata, item, req.Events)
+		l.OnFunctionScheduled(ctx, metadata, req.Events)
 	})
 
 	return &metadata.ID.RunID, &metadata, nil

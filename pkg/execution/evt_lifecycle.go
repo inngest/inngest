@@ -7,7 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/oklog/ulid/v2"
 )
@@ -40,7 +39,6 @@ type EventLifecycleListener interface {
 	OnFunctionScheduled(
 		context.Context,
 		sv2.Metadata,
-		queue.Item,
 		[]event.TrackedEvent,
 	)
 
@@ -94,7 +92,7 @@ func (NoopEventLifecycleListener) OnNoFunctionMatch(ctx context.Context, evt eve
 
 func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context, req ScheduleRequest) {}
 
-func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta sv2.Metadata, qi queue.Item, evts []event.TrackedEvent) {
+func (NoopEventLifecycleListener) OnFunctionScheduled(ctx context.Context, meta sv2.Metadata, evts []event.TrackedEvent) {
 }
 
 func (NoopEventLifecycleListener) OnRateLimited(ctx context.Context, req ScheduleRequest) {}
