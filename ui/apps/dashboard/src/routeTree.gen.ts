@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as GqlRouteImport } from './routes/gql'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportIndexRouteImport } from './routes/support/index'
@@ -111,6 +112,11 @@ import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRouteImport 
 import { Route as AuthedEnvEnvSlugAppsExternalIDSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/apps/$externalID/syncs/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/replays/$replayID/index'
 
+const GqlRoute = GqlRouteImport.update({
+  id: '/gql',
+  path: '/gql',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
   getParentRoute: () => rootRouteImport,
@@ -690,6 +696,7 @@ const AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/gql': typeof GqlRoute
   '/billing': typeof AuthedBillingRouteRouteWithChildren
   '/intent': typeof AuthedIntentRouteRouteWithChildren
   '/settings': typeof AuthedSettingsRouteRouteWithChildren
@@ -792,6 +799,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/gql': typeof GqlRoute
   '/intent': typeof AuthedIntentRouteRouteWithChildren
   '/settings': typeof AuthedSettingsRouteRouteWithChildren
   '/agent-deep-link': typeof authAgentDeepLinkRoute
@@ -883,6 +891,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authed': typeof AuthedRouteWithChildren
+  '/gql': typeof GqlRoute
   '/_authed/billing': typeof AuthedBillingRouteRouteWithChildren
   '/_authed/intent': typeof AuthedIntentRouteRouteWithChildren
   '/_authed/settings': typeof AuthedSettingsRouteRouteWithChildren
@@ -987,6 +996,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/gql'
     | '/billing'
     | '/intent'
     | '/settings'
@@ -1089,6 +1099,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/gql'
     | '/intent'
     | '/settings'
     | '/agent-deep-link'
@@ -1179,6 +1190,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authed'
+    | '/gql'
     | '/_authed/billing'
     | '/_authed/intent'
     | '/_authed/settings'
@@ -1283,6 +1295,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
+  GqlRoute: typeof GqlRoute
   authAgentDeepLinkRoute: typeof authAgentDeepLinkRoute
   authOrganizationSetupRoute: typeof authOrganizationSetupRoute
   authSignOutRoute: typeof authSignOutRoute
@@ -1306,6 +1319,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/gql': {
+      id: '/gql'
+      path: '/gql'
+      fullPath: '/gql'
+      preLoaderRoute: typeof GqlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authed': {
       id: '/_authed'
       path: ''
@@ -2418,6 +2438,7 @@ const AuthedRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
+  GqlRoute: GqlRoute,
   authAgentDeepLinkRoute: authAgentDeepLinkRoute,
   authOrganizationSetupRoute: authOrganizationSetupRoute,
   authSignOutRoute: authSignOutRoute,

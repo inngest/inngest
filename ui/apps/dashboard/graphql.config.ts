@@ -24,6 +24,16 @@ const graphqlConfig = {
   extensions: {
     codegen: {
       generates: {
+        // Committed SDL snapshot of the cloud App API schema. Emitted from the
+        // same introspection the client-preset uses, so it stays in lockstep
+        // with ./src/gql on every codegen run (dev watch + prod build). The
+        // demo build's fake GraphQL server (src/demo/mock) executes against it.
+        './src/gql/schema.graphql': {
+          plugins: ['schema-ast'],
+          config: {
+            includeDirectives: true,
+          },
+        },
         './src/gql/': {
           preset: 'client',
           config: {
