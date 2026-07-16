@@ -899,7 +899,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, nil, fmt.Errorf("no events provided in schedule request")
 	}
 
-	attemptedRunID := *runID
+	var attemptedRunID ulid.ULID
+	if runID != nil {
+		attemptedRunID = *runID
+	}
 
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 		l.OnFunctionMatch(ctx, req)
