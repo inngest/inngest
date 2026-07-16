@@ -58,7 +58,6 @@ type Querier interface {
 	GetFunctionRun(ctx context.Context, runID ulid.ULID) (*FunctionRunRow, error)
 	GetFunctionRuns(ctx context.Context) ([]*FunctionRunRow, error)
 	GetFunctionRunsFromEvents(ctx context.Context, eventIds []ulid.ULID) ([]*FunctionRunRow, error)
-	GetRuns(ctx context.Context, arg GetRunsParams) ([]*RunListItemRow, error)
 	GetFunctionRunsTimebound(ctx context.Context, arg GetFunctionRunsTimeboundParams) ([]*FunctionRunRow, error)
 	GetFunctionRunFinishesByRunIDs(ctx context.Context, runIds []ulid.ULID) ([]*FunctionFinish, error)
 

@@ -28,6 +28,18 @@ type DialectHelpers interface {
 	// RootEventIDsExpr selects root-only event IDs without aggregation.
 	RootEventIDsExpr() sqexp.Expression
 
+	// EventIDsContain filters a span JSON event_ids column by one or more IDs.
+	EventIDsContain(ids []string) sqexp.Expression
+
+	// RunOutputExpr selects the preferred function output for a run page row.
+	RunOutputExpr() sqexp.Expression
+
+	// RunFunctionSlugExpr selects the public function ID from joined run metadata.
+	RunFunctionSlugExpr() sqexp.LiteralExpression
+
+	// RunFunctionNameExpr selects the configured function name from joined run metadata.
+	RunFunctionNameExpr() sqexp.LiteralExpression
+
 	// BuildEventJoin adds the dialect-specific event join to a span query.
 	BuildEventJoin(q *sq.SelectDataset) *sq.SelectDataset
 

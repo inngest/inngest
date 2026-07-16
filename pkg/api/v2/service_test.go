@@ -926,9 +926,17 @@ func TestService_GetEventRuns(t *testing.T) {
 	nextRunID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cz")
 	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
 	endedAt := startedAt.Add(2 * time.Second)
+	pageCursor, err := (&cqrs.TracePageCursor{
+		ID: runID.String(),
+		Cursors: map[string]cqrs.TraceCursor{
+			"start_time": {Field: "start_time", Value: startedAt.UnixMicro()},
+		},
+	}).Encode()
+	require.NoError(t, err)
 
 	run := &RunListItem{
 		RunID:        runID,
+		Cursor:       pageCursor,
 		RunStartedAt: startedAt,
 		EventID:      eventID,
 		Status:       enums.RunStatusCompleted,
@@ -987,7 +995,7 @@ func TestService_GetEventRuns(t *testing.T) {
 		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, HasMore: true}, nil).Once()
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
-			Cursor:  runID,
+			Cursor:  pageCursor,
 			Limit:   1,
 		}).Return(&GetRunsResult{Runs: []*RunListItem{nextRun}}, nil).Once()
 		t.Cleanup(func() {
@@ -1006,7 +1014,7 @@ func TestService_GetEventRuns(t *testing.T) {
 		require.Equal(t, runID.String(), first.Data[0].Id)
 		require.True(t, first.Page.HasMore)
 		require.NotNil(t, first.Page.Cursor)
-		require.Equal(t, runID.String(), first.Page.GetCursor())
+		require.Equal(t, pageCursor, first.Page.GetCursor())
 
 		second, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: eventID.String(),
@@ -1068,6 +1076,17 @@ func TestService_GetEventRuns(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Limit cannot exceed 40")
+	})
+
+	t.Run("rejects legacy run ID cursor", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Cursor:  strPtr(runID.String()),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Cursor is invalid")
 	})
 }
 

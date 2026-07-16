@@ -241,17 +241,6 @@ type FunctionRunRow struct {
 	FunctionFinish FunctionFinish
 }
 
-type RunListItemRow struct {
-	FunctionRun    FunctionRun
-	FunctionFinish FunctionFinish
-	Output         []byte
-	FunctionSlug   string
-	FunctionName   string
-	FunctionConfig string
-	FunctionAppID  uuid.UUID
-	AppName        string
-}
-
 // SpanRow is the common shape returned by span queries that group by dynamic_span_id.
 type SpanRow struct {
 	RunID          string
