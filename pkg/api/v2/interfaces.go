@@ -70,6 +70,10 @@ type EventPublisher interface {
 	Publish(ctx context.Context, event event.TrackedEvent) error
 }
 
+type EventProvider interface {
+	ReplayEvent(ctx context.Context, eventID ulid.ULID) (ulid.ULID, error)
+}
+
 type GetRunOpts struct {
 	IncludeOutput bool
 }

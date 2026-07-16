@@ -1196,6 +1196,98 @@ func TestService_Rerun(t *testing.T) {
 	})
 }
 
+func TestService_ReplayEvent(t *testing.T) {
+	eventID := ulid.MustParse("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	newEventID := ulid.MustParse("01BX5ZZKBKACTAV9WEVGEMMVRZ")
+
+	t.Run("replays an event", func(t *testing.T) {
+		events := &mockEventProvider{}
+		events.On("ReplayEvent", mock.Anything, eventID).Return(newEventID, nil).Once()
+		t.Cleanup(func() {
+			events.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Events: events})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{
+			EventId: eventID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, newEventID.String(), resp.Data.EventId)
+		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("requires event id", func(t *testing.T) {
+		service := NewService(ServiceOptions{Events: &mockEventProvider{}})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Event ID is required")
+	})
+
+	t.Run("validates event id format", func(t *testing.T) {
+		service := NewService(ServiceOptions{Events: &mockEventProvider{}})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{
+			EventId: "not-a-ulid",
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Event ID must be a valid ULID")
+	})
+
+	t.Run("maps missing event", func(t *testing.T) {
+		events := &mockEventProvider{}
+		events.On("ReplayEvent", mock.Anything, eventID).Return(ulid.ULID{}, ErrEventNotFound).Once()
+		t.Cleanup(func() {
+			events.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Events: events})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{
+			EventId: eventID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Event not found")
+	})
+
+	t.Run("maps expired event payload", func(t *testing.T) {
+		events := &mockEventProvider{}
+		events.On("ReplayEvent", mock.Anything, eventID).Return(ulid.ULID{}, ErrEventDataExpired).Once()
+		t.Cleanup(func() {
+			events.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Events: events})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{
+			EventId: eventID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Event payload is no longer available")
+	})
+
+	t.Run("applies rate limit", func(t *testing.T) {
+		rateLimiter := &mockRateLimitProvider{}
+		rateLimiter.On("CheckRateLimit", mock.Anything, apiv2.V2_ReplayEvent_FullMethodName).
+			Return(RateLimitResult{Limited: true}).Once()
+		t.Cleanup(func() {
+			rateLimiter.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Events:            &mockEventProvider{},
+			RateLimitProvider: rateLimiter,
+		})
+		resp, err := service.ReplayEvent(context.Background(), &apiv2.ReplayEventRequest{
+			EventId: eventID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "API rate limit exceeded")
+	})
+}
+
 func TestToTraceSpanStatus(t *testing.T) {
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, toTraceSpanStatus(models.RunTraceSpanStatusCompleted))
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_FAILED, toTraceSpanStatus(models.RunTraceSpanStatusFailed))

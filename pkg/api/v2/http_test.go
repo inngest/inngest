@@ -218,6 +218,35 @@ func TestHTTPGateway_Rerun(t *testing.T) {
 	require.Equal(t, newRunID.String(), data["runId"])
 }
 
+func TestHTTPGateway_ReplayEvent(t *testing.T) {
+	ctx := context.Background()
+	eventID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	newEventID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4d0")
+
+	events := &mockEventProvider{}
+	events.On("ReplayEvent", mock.Anything, eventID).Return(newEventID, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Events: events}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		events.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/events/"+eventID.String()+"/replay", nil)
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	data := response["data"].(map[string]any)
+	require.Equal(t, newEventID.String(), data["eventId"])
+}
+
 func TestHTTPGateway_RerunFromStepNotImplemented(t *testing.T) {
 	ctx := context.Background()
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")

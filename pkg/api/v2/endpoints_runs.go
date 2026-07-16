@@ -156,6 +156,44 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
 	}, nil
 }
 
+func (s *Service) ReplayEvent(ctx context.Context, req *apiv2.ReplayEventRequest) (*apiv2.ReplayEventResponse, error) {
+	if req.EventId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Event ID is required")
+	}
+
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_ReplayEvent_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no event was replayed.")
+	}
+
+	if s.events == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Replay event is not yet implemented")
+	}
+
+	eventID, err := ulid.Parse(req.EventId)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Event ID must be a valid ULID")
+	}
+
+	newEventID, err := s.events.ReplayEvent(ctx, eventID)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrEventNotFound):
+			return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Event not found")
+		case errors.Is(err, ErrEventDataExpired):
+			return nil, s.base.NewError(http.StatusUnprocessableEntity, apiv2base.ErrorInvalidFieldFormat, "Event payload is no longer available")
+		}
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to replay event")
+	}
+
+	return &apiv2.ReplayEventResponse{
+		Data: &apiv2.ReplayEventData{
+			EventId: newEventID.String(),
+		},
+		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
+	}, nil
+}
+
 func runsPageOpts(cursor string, requestedLimit int32) (ulid.ULID, int, error) {
 	limit := int(requestedLimit)
 	if limit == 0 {
