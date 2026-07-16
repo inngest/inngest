@@ -158,7 +158,7 @@ export function ExperimentDetailPage({
     null,
     { enabled: rangeReady },
   );
-  const scoring = useScoringConfig(functionID, functionSlug, experimentName);
+  const scoring = useScoringConfig(functionID, experimentName);
   const insightsQuery = useExperimentInsightsQuery(
     functionID,
     experimentName,
@@ -274,8 +274,6 @@ export function ExperimentDetailPage({
     if (!sql) return;
     trackOpenedInInsights({
       feature: 'experiments',
-      experimentName,
-      functionSlug,
       variantCount: detail.data?.variants.length ?? 0,
       selectedVariantCount: selectedVariants.length,
     });
@@ -283,8 +281,6 @@ export function ExperimentDetailPage({
   }, [
     insightsQuery.data,
     environment.slug,
-    experimentName,
-    functionSlug,
     detail.data,
     selectedVariants.length,
   ]);

@@ -141,65 +141,24 @@ export function trackListViewed({
   });
 }
 
-type ExperimentDetailResult =
-  | 'success'
-  | 'no_runs'
-  | 'no_variant_data'
-  | 'error';
+type DetailViewedArgs = { feature: AnalyticsFeature };
 
-type DetailViewedArgs = {
-  feature: AnalyticsFeature;
-  experimentName: string;
-  functionSlug: string;
-  durationMs: number;
-  errorType?: 'network' | 'graphql';
-  result: ExperimentDetailResult;
-  runCount?: number;
-  selectionStrategy?: string;
-  variantCount?: number;
-};
-
-export function trackDetailViewed({
-  feature,
-  experimentName,
-  functionSlug,
-  durationMs,
-  errorType,
-  result,
-  runCount,
-  selectionStrategy,
-  variantCount,
-}: DetailViewedArgs) {
-  track('Detail Viewed', feature, {
-    experiment_name: experimentName,
-    function_slug: functionSlug,
-    duration_ms: durationMs,
-    error_type: errorType,
-    result,
-    run_count: runCount,
-    selection_strategy: selectionStrategy,
-    variant_count: variantCount,
-  });
+export function trackDetailViewed({ feature }: DetailViewedArgs) {
+  track('Detail Viewed', feature);
 }
 
 type OpenedInInsightsArgs = {
   feature: AnalyticsFeature;
-  experimentName: string;
-  functionSlug: string;
   selectedVariantCount: number;
   variantCount: number;
 };
 
 export function trackOpenedInInsights({
   feature,
-  experimentName,
-  functionSlug,
   selectedVariantCount,
   variantCount,
 }: OpenedInInsightsArgs) {
   track('Opened In Insights', feature, {
-    experiment_name: experimentName,
-    function_slug: functionSlug,
     selected_variant_count: selectedVariantCount,
     variant_count: variantCount,
   });
@@ -207,8 +166,6 @@ export function trackOpenedInInsights({
 
 type ScoringWeightUpdatedArgs = {
   feature: AnalyticsFeature;
-  experimentName: string;
-  functionSlug: string;
   changedFields: string[];
   enabled: boolean;
   metricKey: string;
@@ -218,8 +175,6 @@ type ScoringWeightUpdatedArgs = {
 
 export function trackScoringWeightUpdated({
   feature,
-  experimentName,
-  functionSlug,
   changedFields,
   enabled,
   metricKey,
@@ -227,8 +182,6 @@ export function trackScoringWeightUpdated({
   points,
 }: ScoringWeightUpdatedArgs) {
   track('Scoring Weight Updated', feature, {
-    experiment_name: experimentName,
-    function_slug: functionSlug,
     changed_fields: changedFields.join(','),
     enabled,
     metric_key: metricKey,

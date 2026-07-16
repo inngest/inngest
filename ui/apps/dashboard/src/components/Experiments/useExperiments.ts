@@ -264,8 +264,6 @@ export function useExperimentDetail(
   const trackedViewKeyRef = useRef<string | null>(null);
 
   const queryFn = useCallback(async (): Promise<ExperimentDetail | null> => {
-    const startedAt = performance.now();
-    const durationMs = () => Math.round(performance.now() - startedAt);
     const viewKey = JSON.stringify([
       environment.id,
       functionID,
@@ -275,20 +273,10 @@ export function useExperimentDetail(
       variantFilter,
     ]);
     const shouldTrack = trackedViewKeyRef.current !== viewKey;
-    const trackViewed = (
-      props: Omit<
-        Parameters<typeof trackDetailViewed>[0],
-        'feature' | 'experimentName' | 'functionSlug'
-      >,
-    ) => {
+    const trackViewed = () => {
       if (!shouldTrack) return;
       trackedViewKeyRef.current = viewKey;
-      trackDetailViewed({
-        feature: 'experiments',
-        experimentName,
-        functionSlug,
-        ...props,
-      });
+      trackDetailViewed({ feature: 'experiments' });
     };
 
     const result = await client
@@ -313,19 +301,12 @@ export function useExperimentDetail(
       e.message.includes('null which the schema does not allow'),
     );
     if (isNoDataInRange) {
-      trackViewed({
-        durationMs: durationMs(),
-        result: 'no_runs',
-      });
+      trackViewed();
       return null;
     }
 
     if (result.error) {
-      trackViewed({
-        durationMs: durationMs(),
-        result: 'error',
-        errorType: result.error.networkError ? 'network' : 'graphql',
-      });
+      trackViewed();
       throw result.error;
     }
     if (!result.data) throw new Error('No data returned');
@@ -344,13 +325,7 @@ export function useExperimentDetail(
       })),
     };
 
-    trackViewed({
-      durationMs: durationMs(),
-      result: detail.variants.length === 0 ? 'no_variant_data' : 'success',
-      selectionStrategy: detail.selectionStrategy,
-      variantCount: detail.variants.length,
-      runCount: detail.variants.reduce((sum, v) => sum + v.runCount, 0),
-    });
+    trackViewed();
 
     return detail;
   }, [

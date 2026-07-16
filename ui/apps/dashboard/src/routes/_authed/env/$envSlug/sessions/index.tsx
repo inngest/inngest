@@ -5,13 +5,13 @@ import { ClientOnly, createFileRoute } from '@tanstack/react-router';
 
 import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { SessionsInfo } from '@/components/Sessions/SessionsInfo';
-import { useSessionKeys } from '@/components/Sessions/useSessionKeys';
 import {
   trackEmptyStateDocsLinkOpened,
   trackEmptyStateExampleCopied,
   trackEmptyStatePromptCopied,
   trackEmptyStateViewed,
 } from '@/utils/analyticsEvents';
+import { useSessionKeys } from '@/components/Sessions/useSessionKeys';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/sessions/')({

@@ -29,11 +29,7 @@ const SCORING_METRIC_CHANGED_FIELDS = [
  * DEBOUNCE_MS of inactivity. The save is skipped when the local state matches
  * the last-known server state.
  */
-export function useScoringConfig(
-  functionID: string,
-  functionSlug: string,
-  experimentName: string,
-) {
+export function useScoringConfig(functionID: string, experimentName: string) {
   const scoring = useExperimentScoringConfig(functionID, experimentName);
   const updateScoring = useUpdateExperimentScoringConfig(
     functionID,
@@ -88,8 +84,6 @@ export function useScoringConfig(
 
           trackScoringWeightUpdated({
             feature: 'experiments',
-            experimentName,
-            functionSlug,
             metricKey: metric.key,
             metricKind: metric.kind,
             enabled: metric.enabled,
