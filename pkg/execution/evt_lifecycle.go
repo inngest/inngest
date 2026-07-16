@@ -26,7 +26,7 @@ type IdempotencySkip struct {
 // EventLifecycleListener listens to event-level lifecycle decisions made while
 // scheduling or resuming function runs.
 type EventLifecycleListener interface {
-	OnNoFunctionMatch(context.Context)
+	OnNoFunctionMatch(context.Context, event.TrackedEvent)
 
 	// OnFunctionMatch is called when an incoming event has matched a function
 	// and scheduling is about to be attempted.
@@ -90,7 +90,7 @@ var _ EventLifecycleListener = (*NoopEventLifecycleListener)(nil)
 // implementation allowing other implementations to override specific functions.
 type NoopEventLifecycleListener struct{}
 
-func (NoopEventLifecycleListener) OnNoFunctionMatch(ctx context.Context) {}
+func (NoopEventLifecycleListener) OnNoFunctionMatch(ctx context.Context, evt event.TrackedEvent) {}
 
 func (NoopEventLifecycleListener) OnFunctionMatch(ctx context.Context, req ScheduleRequest) {}
 
