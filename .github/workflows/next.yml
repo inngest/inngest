@@ -28,4 +28,4 @@ jobs:
           git config --local user.name gh-actions
           git config --local user.email gh-actions@github.com
 
-          git push origin main:next
+          git push --force-with-lease origin main:next
