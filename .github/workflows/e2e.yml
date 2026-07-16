@@ -27,7 +27,7 @@ jobs:
         # The v3 and v4 SDKs cannot share a process: they cache their
         # AsyncLocalStorage under the same global symbol with incompatible
         # shapes, so whichever runs second reads a corrupt store and crashes.
-        # Run the v3 (pages-router) tests and the v4 durable-endpoint tests in
+        # Run the v3 tests and the v4 tests in
         # separate jobs so each Next.js process only ever loads one SDK major.
         sdkVersion: [v3, v4]
         # Each SDK major has its own Go test package; map the version to its
