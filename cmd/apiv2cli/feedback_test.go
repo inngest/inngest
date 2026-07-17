@@ -88,7 +88,7 @@ func TestRunFeedbackPostsToCloud(t *testing.T) {
 	require.Equal(t, "Bearer test-key", gotAuth)
 	require.Equal(t, "please add more examples", gotBody["feedback"])
 	require.Equal(t, "cli", gotBody["source"])
-	require.Equal(t, "feedback", gotBody["operation"])
+	require.Equal(t, "submit-feedback", gotBody["operation"])
 	require.Equal(t, "dev@example.com", gotBody["email"])
 	require.Equal(t, "Dev", gotBody["name"])
 	require.Contains(t, out.String(), "Thanks")
@@ -138,9 +138,9 @@ func TestNormalizeFeedbackOperation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "get-function-run", actual)
 
-	actual, err = normalizeFeedbackOperation("feedback")
+	actual, err = normalizeFeedbackOperation("submit-feedback")
 	require.NoError(t, err)
-	require.Equal(t, "feedback", actual)
+	require.Equal(t, "submit-feedback", actual)
 
 	_, err = normalizeFeedbackOperation("not-real")
 	require.Error(t, err)

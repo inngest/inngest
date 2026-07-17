@@ -16,7 +16,7 @@ import (
 )
 
 const feedbackSourceCLI = "cli"
-const feedbackOperationCLI = "feedback"
+const feedbackOperationCLI = "submit-feedback"
 
 // FeedbackCommand returns a top-level `inngest feedback` command that submits
 // product feedback to Inngest Cloud (POST /v2/feedback). Defaults to cloud
@@ -245,10 +245,6 @@ func normalizeFeedbackOperation(value string) (string, error) {
 	if normalized == "" {
 		return "", nil
 	}
-	if normalized == feedbackOperationCLI {
-		return normalized, nil
-	}
-
 	for _, ep := range discoverEndpoints() {
 		if normalized == ep.name {
 			return ep.name, nil
