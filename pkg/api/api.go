@@ -347,6 +347,9 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	}
 	evt := event.NewInvocationEvent(newInvOpts)
 
+	// Merge the two session layers before the event is handled
+	evt.Event.Meta.ResolveSessions()
+
 	seed := event.SeededIDFromString(
 		r.Header.Get(headers.HeaderEventIDSeed),
 		0,
