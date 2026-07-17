@@ -422,7 +422,7 @@ func (e *executor) finalizeRemoveJobs(ctx context.Context, opts execution.Finali
 
 // doRemoveRunJobs performs a single pass of removing all queue items for the given run.
 // Returns the number of items successfully dequeued.
-func (e *executor) doRemoveRunJobs(ctx context.Context, l logger.Logger, shard queue.ShardOperations, opts execution.FinalizeOpts) int {
+func (e *executor) doRemoveRunJobs(ctx context.Context, l logger.Logger, shard queue.QueueShard, opts execution.FinalizeOpts) int {
 	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
 	// outstanding jobs from the queue, if possible.
 	//
