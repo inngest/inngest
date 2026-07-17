@@ -3091,14 +3091,14 @@ message SubmitFeedbackRequest {
   ];
   string source = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Origin surface of the feedback (e.g. cli, api, dashboard)"
+      description: "Optional origin surface of the feedback. Must be api or cli. Defaults to api."
       example: "\"cli\""
     }
   ];
-  optional string page = 3 [
+  optional string operation = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Page URL or context where the feedback was submitted"
-      example: "\"https://app.inngest.com/env/production/runs\""
+      description: "Optional API operation or CLI command this feedback relates to"
+      example: "\"get-function-run\""
     }
   ];
   optional string email = 4 [
@@ -3111,12 +3111,6 @@ message SubmitFeedbackRequest {
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "Optional submitter name"
       example: "\"Ada Lovelace\""
-    }
-  ];
-  optional string organization_name = 6 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Optional organization name"
-      example: "\"Acme Corp\""
     }
   ];
 }

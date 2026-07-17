@@ -16,6 +16,7 @@ import (
 )
 
 const feedbackSourceCLI = "cli"
+const feedbackOperationCLI = "feedback"
 
 // FeedbackCommand returns a top-level `inngest feedback` command that submits
 // product feedback to Inngest Cloud (POST /v2/feedback). Defaults to cloud
@@ -71,6 +72,10 @@ func FeedbackCommand() *cli.Command {
 				Name:  "name",
 				Usage: "Optional name included with the feedback",
 			},
+			&cli.StringFlag{
+				Name:  "operation",
+				Usage: "Optional API operation or CLI command this feedback relates to",
+			},
 			&cli.DurationFlag{
 				Category: "Target",
 				Name:     "timeout",
@@ -94,8 +99,16 @@ func runFeedback(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	body := map[string]any{
-		"feedback": message,
-		"source":   feedbackSourceCLI,
+		"feedback":  message,
+		"source":    feedbackSourceCLI,
+		"operation": feedbackOperationCLI,
+	}
+	if operation := strings.TrimSpace(cmd.String("operation")); operation != "" {
+		normalized, err := normalizeFeedbackOperation(operation)
+		if err != nil {
+			return err
+		}
+		body["operation"] = normalized
 	}
 	if email := strings.TrimSpace(cmd.String("email")); email != "" {
 		body["email"] = email
@@ -225,4 +238,21 @@ func isInteractiveReader(r io.Reader) bool {
 		return false
 	}
 	return (stat.Mode() & os.ModeCharDevice) != 0
+}
+
+func normalizeFeedbackOperation(value string) (string, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return "", nil
+	}
+	if normalized == feedbackOperationCLI {
+		return normalized, nil
+	}
+
+	for _, ep := range discoverEndpoints() {
+		if normalized == ep.name {
+			return ep.name, nil
+		}
+	}
+	return "", fmt.Errorf("unknown operation %q", value)
 }

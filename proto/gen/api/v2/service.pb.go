@@ -8060,15 +8060,14 @@ func (x *SessionRun) GetEndedAt() *timestamppb.Timestamp {
 }
 
 type SubmitFeedbackRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Feedback         string                 `protobuf:"bytes,1,opt,name=feedback,proto3" json:"feedback,omitempty"`
-	Source           string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
-	Page             *string                `protobuf:"bytes,3,opt,name=page,proto3,oneof" json:"page,omitempty"`
-	Email            *string                `protobuf:"bytes,4,opt,name=email,proto3,oneof" json:"email,omitempty"`
-	Name             *string                `protobuf:"bytes,5,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	OrganizationName *string                `protobuf:"bytes,6,opt,name=organization_name,json=organizationName,proto3,oneof" json:"organization_name,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Feedback      string                 `protobuf:"bytes,1,opt,name=feedback,proto3" json:"feedback,omitempty"`
+	Source        string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
+	Operation     *string                `protobuf:"bytes,3,opt,name=operation,proto3,oneof" json:"operation,omitempty"`
+	Email         *string                `protobuf:"bytes,4,opt,name=email,proto3,oneof" json:"email,omitempty"`
+	Name          *string                `protobuf:"bytes,5,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SubmitFeedbackRequest) Reset() {
@@ -8115,9 +8114,9 @@ func (x *SubmitFeedbackRequest) GetSource() string {
 	return ""
 }
 
-func (x *SubmitFeedbackRequest) GetPage() string {
-	if x != nil && x.Page != nil {
-		return *x.Page
+func (x *SubmitFeedbackRequest) GetOperation() string {
+	if x != nil && x.Operation != nil {
+		return *x.Operation
 	}
 	return ""
 }
@@ -8132,13 +8131,6 @@ func (x *SubmitFeedbackRequest) GetEmail() string {
 func (x *SubmitFeedbackRequest) GetName() string {
 	if x != nil && x.Name != nil {
 		return *x.Name
-	}
-	return ""
-}
-
-func (x *SubmitFeedbackRequest) GetOrganizationName() string {
-	if x != nil && x.OrganizationName != nil {
-		return *x.OrganizationName
 	}
 	return ""
 }
@@ -8923,18 +8915,17 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at\"\x8a\x05\n" +
+	"\t_ended_at\"\xa5\x04\n" +
 	"\x15SubmitFeedbackRequest\x12j\n" +
-	"\bfeedback\x18\x01 \x01(\tBN\x92AK2\x1aFeedback message to submitJ-\"The runs API could use a pagination example\"R\bfeedback\x12]\n" +
-	"\x06source\x18\x02 \x01(\tBE\x92AB29Origin surface of the feedback (e.g. cli, api, dashboard)J\x05\"cli\"R\x06source\x12\x81\x01\n" +
-	"\x04page\x18\x03 \x01(\tBh\x92Ae24Page URL or context where the feedback was submittedJ-\"https://app.inngest.com/env/production/runs\"H\x00R\x04page\x88\x01\x01\x12I\n" +
+	"\bfeedback\x18\x01 \x01(\tBN\x92AK2\x1aFeedback message to submitJ-\"The runs API could use a pagination example\"R\bfeedback\x12q\n" +
+	"\x06source\x18\x02 \x01(\tBY\x92AV2MOptional origin surface of the feedback. Must be api or cli. Defaults to api.J\x05\"cli\"R\x06source\x12z\n" +
+	"\toperation\x18\x03 \x01(\tBW\x92AT2>Optional API operation or CLI command this feedback relates toJ\x12\"get-function-run\"H\x00R\toperation\x88\x01\x01\x12I\n" +
 	"\x05email\x18\x04 \x01(\tB.\x92A+2\x16Optional contact emailJ\x11\"dev@example.com\"H\x01R\x05email\x88\x01\x01\x12E\n" +
-	"\x04name\x18\x05 \x01(\tB,\x92A)2\x17Optional submitter nameJ\x0e\"Ada Lovelace\"H\x02R\x04name\x88\x01\x01\x12^\n" +
-	"\x11organization_name\x18\x06 \x01(\tB,\x92A)2\x1aOptional organization nameJ\v\"Acme Corp\"H\x03R\x10organizationName\x88\x01\x01B\a\n" +
-	"\x05_pageB\b\n" +
+	"\x04name\x18\x05 \x01(\tB,\x92A)2\x17Optional submitter nameJ\x0e\"Ada Lovelace\"H\x02R\x04name\x88\x01\x01B\f\n" +
+	"\n" +
+	"_operationB\b\n" +
 	"\x06_emailB\a\n" +
-	"\x05_nameB\x14\n" +
-	"\x12_organization_name\"x\n" +
+	"\x05_name\"x\n" +
 	"\x16SubmitFeedbackResponse\x12(\n" +
 	"\x04data\x18\x01 \x01(\v2\x14.api.v2.FeedbackDataR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"R\n" +

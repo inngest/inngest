@@ -88,6 +88,7 @@ func TestRunFeedbackPostsToCloud(t *testing.T) {
 	require.Equal(t, "Bearer test-key", gotAuth)
 	require.Equal(t, "please add more examples", gotBody["feedback"])
 	require.Equal(t, "cli", gotBody["source"])
+	require.Equal(t, "feedback", gotBody["operation"])
 	require.Equal(t, "dev@example.com", gotBody["email"])
 	require.Equal(t, "Dev", gotBody["name"])
 	require.Contains(t, out.String(), "Thanks")
@@ -116,4 +117,31 @@ func TestResolveFeedbackBaseURLUsesDefaultPortForBareLocalHost(t *testing.T) {
 	}
 
 	require.NoError(t, cmd.Run(context.Background(), []string{"feedback", "--api-host", "localhost", "hello"}))
+}
+
+func TestRunFeedbackRejectsUnknownOperation(t *testing.T) {
+	cmd := FeedbackCommand()
+	cmd.Reader = io.NopCloser(strings.NewReader(""))
+
+	err := cmd.Run(context.Background(), []string{
+		"feedback",
+		"--api-key", "test-key",
+		"--operation", "not-real",
+		"please add more examples",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "unknown operation")
+}
+
+func TestNormalizeFeedbackOperation(t *testing.T) {
+	actual, err := normalizeFeedbackOperation("get-function-run")
+	require.NoError(t, err)
+	require.Equal(t, "get-function-run", actual)
+
+	actual, err = normalizeFeedbackOperation("feedback")
+	require.NoError(t, err)
+	require.Equal(t, "feedback", actual)
+
+	_, err = normalizeFeedbackOperation("not-real")
+	require.Error(t, err)
 }
