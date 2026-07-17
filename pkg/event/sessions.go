@@ -128,6 +128,9 @@ func parseManualSessions(raw json.RawMessage) (sessions Sessions, tombstones []s
 // lexicographic key order (matching run-level session truncation) for
 // deterministic output. PropagatedSessions is cleared so it never persists.
 //
+// Callers that want adoption metrics read len(Sessions)/len(PropagatedSessions)
+// before calling this (the propagated layer is nil afterwards).
+//
 // Called at API ingest before Event.Validate: each layer may independently be
 // up to MaxEventSessions, so the pre-merge union can exceed the cap —
 // validating the raw fields would falsely reject; validating the merged result
