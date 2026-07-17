@@ -99,6 +99,15 @@ func (s *racingQueueShard) ShardAssignmentConfig() queue.ShardAssignmentConfig {
 	return queue.ShardAssignmentConfig{}
 }
 
+type racingQueue struct {
+	queue.Queue
+	shard *racingQueueShard
+}
+
+func (q *racingQueue) Dequeue(ctx context.Context, shardName string, i queue.QueueItem, opts ...queue.DequeueOptionFn) error {
+	return q.shard.Dequeue(ctx, i, opts...)
+}
+
 func TestFinalizeRemoveJobs_CatchesPostSweepEnqueue(t *testing.T) {
 	// Setup: an initial item exists in the queue. After the first sweep removes
 	// it, a new item is injected (simulating a concurrent enqueue during the
@@ -118,6 +127,7 @@ func TestFinalizeRemoveJobs_CatchesPostSweepEnqueue(t *testing.T) {
 	e := &executor{
 		log:    logger.VoidLogger(),
 		shards: &racingShardRegistry{shard: queueShard},
+		queue:  &racingQueue{shard: queueShard},
 	}
 
 	runID := ulid.Make()
@@ -211,6 +221,7 @@ func TestFinalizeRemoveJobs_CatchesMultipleRaceWindows(t *testing.T) {
 	e := &executor{
 		log:    logger.VoidLogger(),
 		shards: &racingShardRegistry{shard: queueShard},
+		queue:  &racingQueue{shard: queueShard},
 	}
 
 	opts := execution.FinalizeOpts{
@@ -256,6 +267,7 @@ func TestFinalizeRemoveJobs_BoundsAtMaxSweeps(t *testing.T) {
 	e := &executor{
 		log:    logger.VoidLogger(),
 		shards: &racingShardRegistry{shard: queueShard},
+		queue:  &racingQueue{shard: queueShard},
 	}
 
 	opts := execution.FinalizeOpts{
@@ -297,6 +309,7 @@ func TestFinalizeRemoveJobs_NoItemsNoSweep(t *testing.T) {
 	e := &executor{
 		log:    logger.VoidLogger(),
 		shards: &racingShardRegistry{shard: queueShard},
+		queue:  &racingQueue{shard: queueShard},
 	}
 
 	opts := execution.FinalizeOpts{
