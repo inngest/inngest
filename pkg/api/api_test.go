@@ -61,3 +61,51 @@ func TestReceiveEvent_ResolvesPropagatedSessions(t *testing.T) {
 	require.Equal(t, event.Sessions{"conv_id": "manual", "org_id": "42"}, got.Meta.Sessions)
 	require.Nil(t, got.Meta.PropagatedSessions, "propagated layer must not persist past ingest")
 }
+
+// postInvoke drives Invoke directly with the chi "slug" route param
+// injected, capturing the invocation event the stub handler receives.
+func postInvoke(t *testing.T, body string) (*httptest.ResponseRecorder, *event.Event) {
+	t.Helper()
+
+	var got *event.Event
+	a := API{
+		handler: func(_ context.Context, e *event.Event, _ *event.SeededID) (string, error) {
+			got = e
+			return "01HZTESTEVENTID", nil
+		},
+		log: logger.StdlibLogger(t.Context()),
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/invoke/my-fn", bytes.NewReader([]byte(body)))
+	req.Header.Set("Content-Type", "application/json")
+
+	// Invoke reads the target function slug from the chi route param.
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("slug", "my-fn")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	w := httptest.NewRecorder()
+	a.Invoke(w, req)
+	return w, got
+}
+
+// TestInvoke_ResolvesPropagatedSessions proves the HTTP invoke path folds the
+// propagated session layer into meta.sessions (manual wins per key, disjoint
+// keys fill), applies null tombstones, and clears the propagated layer before
+// the invocation event reaches the handler — mirroring ReceiveEvent, which this
+// entrypoint bypasses.
+func TestInvoke_ResolvesPropagatedSessions(t *testing.T) {
+	w, got := postInvoke(t, `{
+		"data": {},
+		"meta": {
+			"sessions": {"conv_id": "manual", "cut_me": null},
+			"propagatedSessions": {"conv_id": "propagated", "org_id": "42", "cut_me": "inherited"}
+		}
+	}`)
+
+	require.Equal(t, 200, w.Code, w.Body.String())
+	require.NotNil(t, got)
+	require.Equal(t, event.Sessions{"conv_id": "manual", "org_id": "42"}, got.Meta.Sessions)
+	require.Nil(t, got.Meta.PropagatedSessions, "propagated layer must not persist past invoke")
+	require.Equal(t, event.InvokeFnName, got.Name, "invoke path rewrites the event name")
+}
