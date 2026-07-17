@@ -1734,6 +1734,24 @@ service V2 {
       }
     };
   }
+
+  rpc SubmitFeedback(SubmitFeedbackRequest) returns (SubmitFeedbackResponse) {
+    option (google.api.http) = {
+      post: "/feedback",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Submit product feedback"
+      tags: "Internal"
+      description: "Submits product feedback from authenticated CLI, API, or other Inngest surfaces. Cloud only."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
 }
 
 message HealthRequest {
@@ -3062,4 +3080,56 @@ message SessionRun {
   google.protobuf.Timestamp queued_at = 5;
   optional google.protobuf.Timestamp started_at = 6;
   optional google.protobuf.Timestamp ended_at = 7;
+}
+
+message SubmitFeedbackRequest {
+  string feedback = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Feedback message to submit"
+      example: "\"The runs API could use a pagination example\""
+    }
+  ];
+  string source = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Origin surface of the feedback (e.g. cli, api, dashboard)"
+      example: "\"cli\""
+    }
+  ];
+  optional string page = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Page URL or context where the feedback was submitted"
+      example: "\"https://app.inngest.com/env/production/runs\""
+    }
+  ];
+  optional string email = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional contact email"
+      example: "\"dev@example.com\""
+    }
+  ];
+  optional string name = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional submitter name"
+      example: "\"Ada Lovelace\""
+    }
+  ];
+  optional string organization_name = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional organization name"
+      example: "\"Acme Corp\""
+    }
+  ];
+}
+
+message SubmitFeedbackResponse {
+  FeedbackData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message FeedbackData {
+  bool accepted = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether the feedback was accepted"
+    }
+  ];
 }

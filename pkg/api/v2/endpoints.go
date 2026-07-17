@@ -33,6 +33,15 @@ func (s *Service) CreatePartnerAccount(ctx context.Context, req *apiv2.CreateAcc
 	)
 }
 
+// SubmitFeedback is cloud-only; the OSS/dev server cannot deliver feedback.
+func (s *Service) SubmitFeedback(ctx context.Context, req *apiv2.SubmitFeedbackRequest) (*apiv2.SubmitFeedbackResponse, error) {
+	return nil, s.base.NewError(
+		http.StatusNotImplemented,
+		apiv2base.ErrorNotImplemented,
+		"Feedback is only available when targeting Inngest Cloud (use --prod)",
+	)
+}
+
 func (s *Service) CreateEnv(ctx context.Context, req *apiv2.CreateEnvRequest) (*apiv2.CreateEnvResponse, error) {
 	// Validate required fields
 	if req.Name == "" {

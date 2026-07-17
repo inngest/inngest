@@ -98,6 +98,8 @@ const (
 	V2ListSessionsProcedure = "/api.v2.V2/ListSessions"
 	// V2ListSessionRunsProcedure is the fully-qualified name of the V2's ListSessionRuns RPC.
 	V2ListSessionRunsProcedure = "/api.v2.V2/ListSessionRuns"
+	// V2SubmitFeedbackProcedure is the fully-qualified name of the V2's SubmitFeedback RPC.
+	V2SubmitFeedbackProcedure = "/api.v2.V2/SubmitFeedback"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -136,6 +138,7 @@ type V2Client interface {
 	ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error)
 	ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error)
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
+	SubmitFeedback(context.Context, *connect.Request[v2.SubmitFeedbackRequest]) (*connect.Response[v2.SubmitFeedbackResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -335,6 +338,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("ListSessionRuns")),
 			connect.WithClientOptions(opts...),
 		),
+		submitFeedback: connect.NewClient[v2.SubmitFeedbackRequest, v2.SubmitFeedbackResponse](
+			httpClient,
+			baseURL+V2SubmitFeedbackProcedure,
+			connect.WithSchema(v2Methods.ByName("SubmitFeedback")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -371,6 +380,7 @@ type v2Client struct {
 	listSessionKeys          *connect.Client[v2.ListSessionKeysRequest, v2.ListSessionKeysResponse]
 	listSessions             *connect.Client[v2.ListSessionsRequest, v2.ListSessionsResponse]
 	listSessionRuns          *connect.Client[v2.ListSessionRunsRequest, v2.ListSessionRunsResponse]
+	submitFeedback           *connect.Client[v2.SubmitFeedbackRequest, v2.SubmitFeedbackResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -528,6 +538,11 @@ func (c *v2Client) ListSessionRuns(ctx context.Context, req *connect.Request[v2.
 	return c.listSessionRuns.CallUnary(ctx, req)
 }
 
+// SubmitFeedback calls api.v2.V2.SubmitFeedback.
+func (c *v2Client) SubmitFeedback(ctx context.Context, req *connect.Request[v2.SubmitFeedbackRequest]) (*connect.Response[v2.SubmitFeedbackResponse], error) {
+	return c.submitFeedback.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -564,6 +579,7 @@ type V2Handler interface {
 	ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error)
 	ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error)
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
+	SubmitFeedback(context.Context, *connect.Request[v2.SubmitFeedbackRequest]) (*connect.Response[v2.SubmitFeedbackResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -759,6 +775,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("ListSessionRuns")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2SubmitFeedbackHandler := connect.NewUnaryHandler(
+		V2SubmitFeedbackProcedure,
+		svc.SubmitFeedback,
+		connect.WithSchema(v2Methods.ByName("SubmitFeedback")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -823,6 +845,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListSessionsHandler.ServeHTTP(w, r)
 		case V2ListSessionRunsProcedure:
 			v2ListSessionRunsHandler.ServeHTTP(w, r)
+		case V2SubmitFeedbackProcedure:
+			v2SubmitFeedbackHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -954,4 +978,8 @@ func (UnimplementedV2Handler) ListSessions(context.Context, *connect.Request[v2.
 
 func (UnimplementedV2Handler) ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListSessionRuns is not implemented"))
+}
+
+func (UnimplementedV2Handler) SubmitFeedback(context.Context, *connect.Request[v2.SubmitFeedbackRequest]) (*connect.Response[v2.SubmitFeedbackResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.SubmitFeedback is not implemented"))
 }
