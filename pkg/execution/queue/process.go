@@ -482,7 +482,7 @@ func (q *queueProcessor) ProcessItem(
 
 			qi.AtMS = at.UnixMilli()
 			requeueItem := itemWithCurrentLease(qi)
-			if err := shard.Requeue(context.WithoutCancel(ctx), requeueItem, at); err != nil {
+			if err := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
 					return nil

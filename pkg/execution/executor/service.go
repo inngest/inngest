@@ -1208,7 +1208,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	// Grab the score, which already handles promotion by fudigng the time to
 	// be that of the actual run ID, prioritizing older runs.
 	nextTime := time.UnixMilli(qi.Score(time.Now()))
-	err = shard.Requeue(ctx, *qi, nextTime)
+	err = s.queue.Requeue(ctx, shard.Name(), *qi, nextTime)
 	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
 		return fmt.Errorf("could not requeue job with promoted time: %w", err)
 	}
