@@ -5154,8 +5154,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	})
 
 	// Merge the invocation payload's two session layers before the event is
-	// published.
+	// published, recording which layers were present for adoption metrics (read
+	// before the merge nils the propagated layer).
+	manualSessions, propagatedSessions := len(evt.Event.Meta.Sessions) > 0, len(evt.Event.Meta.PropagatedSessions) > 0
 	evt.Event.Meta.ResolveSessions()
+	metrics.IncrEventSessionsResolvedCounter(ctx, "invoke_executor", manualSessions, propagatedSessions, metrics.CounterOpt{PkgName: pkgName})
 
 	// Validate the sessions after the merge
 	if err := evt.Event.Meta.Sessions.Validate(); err != nil {
