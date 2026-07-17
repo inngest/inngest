@@ -12,7 +12,6 @@ import (
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
-	"github.com/moby/moby/api/types/strslice"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -576,7 +575,7 @@ func StartGarnet(t *testing.T, opts ...GarnetOption) (*GarnetContainer, error) {
 			}
 		}
 		req.ConfigModifier = func(c *container.Config) {
-			c.Cmd = strslice.StrSlice{
+			c.Cmd = []string{
 				"--config-import-path", "/etc/garnet/garnet.conf",
 				fmt.Sprintf("--port=%d", port),
 				"--cluster",
@@ -589,7 +588,7 @@ func StartGarnet(t *testing.T, opts ...GarnetOption) (*GarnetContainer, error) {
 		// Use default command line configuration
 		req.ConfigModifier = func(c *container.Config) {
 			// https://microsoft.github.io/garnet/docs/getting-started/configuration#garnetconf
-			c.Cmd = strslice.StrSlice{
+			c.Cmd = []string{
 				fmt.Sprintf("--port=%d", port),
 				"--cluster",
 				"--auth", "Password",

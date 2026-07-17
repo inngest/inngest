@@ -251,6 +251,15 @@ func WithLifecycleListeners(l ...execution.LifecycleListener) ExecutorOpt {
 	}
 }
 
+func WithEventLifecycleListeners(l ...execution.EventLifecycleListener) ExecutorOpt {
+	return func(e execution.Executor) error {
+		for _, item := range l {
+			e.AddEventLifecycleListener(item)
+		}
+		return nil
+	}
+}
+
 func WithStepLimits(limit func(id sv2.ID) int) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).steplimit = limit
@@ -511,7 +520,8 @@ type executor struct {
 	driverv1 map[string]driver.DriverV1
 	driverv2 map[string]driver.DriverV2
 
-	lifecycles []execution.LifecycleListener
+	lifecycles    []execution.LifecycleListener
+	evtLifecycles []execution.EventLifecycleListener
 
 	// rtpub represents teh realtime publisher used to broadcast notifications
 	// on run execution.
@@ -559,6 +569,26 @@ func (e *executor) InvokeFailHandler(ctx context.Context, opts execution.InvokeF
 
 func (e *executor) AddLifecycleListener(l execution.LifecycleListener) {
 	e.lifecycles = append(e.lifecycles, l)
+}
+
+func (e *executor) AddEventLifecycleListener(l execution.EventLifecycleListener) {
+	e.evtLifecycles = append(e.evtLifecycles, l)
+}
+
+func (e *executor) runEventLifecycles(ctx context.Context, fn func(context.Context, execution.EventLifecycleListener)) {
+	ctx = context.WithoutCancel(ctx)
+	for _, l := range e.evtLifecycles {
+		l := l
+		service.Go(func() {
+			fn(ctx, l)
+		})
+	}
+}
+
+func (e *executor) RunFunctionMatchLifecycle(ctx context.Context, req execution.ScheduleRequest) {
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnFunctionMatch(ctx, req)
+	})
 }
 
 func (e *executor) RunFunctionFinishedLifecycle(
@@ -870,6 +900,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, nil, fmt.Errorf("no events provided in schedule request")
 	}
 
+	var attemptedRunID ulid.ULID
+	if runID != nil {
+		attemptedRunID = *runID
+	}
+
 	l := e.log.With(
 		"account_id", req.AccountID,
 		"env_id", req.WorkspaceID,
@@ -915,6 +950,31 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				return md, err
 			}, util.WithBoundaries(2*time.Second))
 		})
+
+	switch {
+	case errors.Is(err, ErrFunctionRateLimited):
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnRateLimited(ctx, req)
+		})
+	case errors.Is(err, ErrFunctionSkippedIdempotency),
+		errors.Is(err, state.ErrIdentifierExists),
+		errors.Is(err, queue.ErrQueueItemExists):
+		skip := execution.IdempotencySkip{
+			AttemptedRunID: attemptedRunID,
+		}
+		if errors.Is(err, ErrFunctionSkippedIdempotency) {
+			skip.ExistingRunID = runID
+		}
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnFunctionSkippedIdempotency(ctx, req, skip)
+		})
+	case errors.Is(err, ErrFunctionDebounced), errors.Is(err, ErrFunctionSkipped), err == nil:
+		// Handled by more specific lifecycle hooks inside schedule.
+	default:
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnFunctionScheduleFailed(ctx, req, err)
+		})
+	}
 
 	return runID, md, err
 }
@@ -1030,7 +1090,7 @@ func (e *executor) schedule(
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.Debounce", req.AccountID, req.WorkspaceID, req.Function.ID)
-		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
+		item := debounce.DebounceItem{
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
 			AppID:            req.AppID,
@@ -1040,13 +1100,19 @@ func (e *executor) schedule(
 			EventID:          req.Events[0].GetInternalID(),
 			Event:            req.Events[0].GetEvent(),
 			FunctionPausedAt: req.FunctionPausedAt,
-		}, req.Function)
+		}
+		debounceID, err := e.debouncer.Debounce(ctx, item, req.Function)
 		if err != nil {
 			span.RecordError(err)
 			span.End()
 			return nil, nil, err
 		}
 		span.End()
+
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnDebounced(ctx, req, item, debounceID)
+		})
+
 		return nil, nil, ErrFunctionDebounced
 	}
 
@@ -1282,6 +1348,10 @@ func (e *executor) schedule(
 					if err != nil {
 						l.ReportError(err, "error canceling singleton run")
 					}
+					e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+						l.OnSingletonCancelled(ctx, req, runID)
+					})
+
 				default:
 					// Mark as singleton skip - will be handled after span creation
 					skipReason = enums.SkipReasonSingleton
@@ -1573,6 +1643,9 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnFunctionScheduled(ctx, metadata, req.Events)
+		})
 		return &metadata.ID.RunID, &metadata, nil
 	}
 
@@ -1667,7 +1740,7 @@ func (e *executor) schedule(
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
-		return nil, nil, ErrFunctionSkipped
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
 
 	default:
 		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
@@ -1677,6 +1750,9 @@ func (e *executor) schedule(
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnFunctionScheduled(ctx, metadata, req.Events)
+	})
 
 	return &metadata.ID.RunID, &metadata, nil
 }
@@ -1737,6 +1813,10 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnFunctionSkipped(ctx, req, metadata, reason)
+	})
+
 	for _, e := range e.lifecycles {
 		service.Go(
 			func() {
@@ -3112,6 +3192,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 			for _, e := range e.lifecycles {
 				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
 			}
+			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+				l.OnRunCancelled(ctx, id, r)
+			})
 		}
 		return nil
 	}
@@ -3138,6 +3221,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 				// Emit cancellation lifecycles so history and traces can mark this run cancelled even though event payloads are gone.
 				go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, []json.RawMessage{})
 			}
+			e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+				l.OnRunCancelled(ctx, id, r)
+			})
 		}
 		return nil
 	}
@@ -3171,6 +3257,9 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
 	}
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnRunCancelled(ctx, id, r)
+	})
 
 	return nil
 }
@@ -3302,8 +3391,9 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		_ = nextStepSpan.Send()
 	}
 
+	code := pause.GetOpcode()
 	// Only run lifecycles if we consumed the pause and enqueued next step.
-	switch pause.GetOpcode() {
+	switch code {
 	case enums.OpcodeInvokeFunction:
 		for _, e := range e.lifecycles {
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
@@ -3317,6 +3407,9 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
 	}
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnRunResumed(ctx, id, r, code)
+	})
 
 	// And delete the OG pause.
 	if err := e.pm.Delete(ctx, pauses.PauseIndex(pause), pause); err != nil {
@@ -3488,8 +3581,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 		}
 
+		code := pause.GetOpcode()
 		// Only run lifecycles if we consumed the pause and enqueued next step.
-		switch pause.GetOpcode() {
+		switch code {
 		case enums.OpcodeInvokeFunction:
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
@@ -3503,6 +3597,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
 		}
+		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+			l.OnRunResumed(ctx, sv2id, r, code)
+		})
 
 		// The timeout job is running on the queue and will Dequeue() itself. No need to continue.
 		if r.IsTimeout {
@@ -5425,6 +5522,15 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		return err
 	}
 
+	batchID, err := parseBatchID(result.BatchID)
+	if err != nil {
+		return err
+	}
+
+	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
+		l.OnBatched(ctx, bi, batchID, result)
+	})
+
 	if opts == nil {
 		opts = &execution.BatchExecOpts{}
 	}
@@ -5441,7 +5547,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 
 		if err := e.batcher.ScheduleExecution(ctx, batch.ScheduleBatchOpts{
 			ScheduleBatchPayload: batch.ScheduleBatchPayload{
-				BatchID:         ulid.MustParse(result.BatchID),
+				BatchID:         batchID,
 				AccountID:       bi.AccountID,
 				WorkspaceID:     bi.WorkspaceID,
 				AppID:           bi.AppID,
@@ -5463,7 +5569,6 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 		})
 	case enums.BatchFull, enums.BatchMaxSize:
 		// start execution immediately
-		batchID := ulid.MustParse(result.BatchID)
 		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
 			BatchID:         batchID,
 			BatchPointer:    result.BatchPointerKey,
@@ -5483,6 +5588,17 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 	}
 
 	return nil
+}
+
+func parseBatchID(raw string) (ulid.ULID, error) {
+	if raw == "" {
+		return ulid.ULID{}, fmt.Errorf("batch append returned empty batch ID")
+	}
+	batchID, err := ulid.Parse(raw)
+	if err != nil {
+		return ulid.ULID{}, fmt.Errorf("invalid batch ID %q: %w", raw, err)
+	}
+	return batchID, nil
 }
 
 // RetrieveAndScheduleBatch retrieves all items from a started batch and schedules a function run

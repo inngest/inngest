@@ -647,6 +647,10 @@ type InitOpts struct {
 	exec  execution.Executor
 }
 
+type functionMatchLifecycleRecorder interface {
+	RunFunctionMatchLifecycle(context.Context, execution.ScheduleRequest)
+}
+
 // Initialize creates a new funciton run identifier for the given workflow and
 // event, stores this in our state store, then enqueues a new function run
 // within the given queue for execution.
@@ -680,8 +684,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		}
 	}
 
-	// If this is a debounced function, run this through a debouncer.
-	_, md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
+	req := execution.ScheduleRequest{
 		WorkspaceID:    wsID,
 		AppID:          opts.appID,
 		Function:       fn,
@@ -690,7 +693,14 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		AccountID:      consts.DevServerAccountID,
 		DebugSessionID: debugSessionID,
 		DebugRunID:     debugRunID,
-	})
+	}
+
+	if recorder, ok := opts.exec.(functionMatchLifecycleRecorder); ok {
+		recorder.RunFunctionMatchLifecycle(ctx, req)
+	}
+
+	// If this is a debounced function, run this through a debouncer.
+	_, md, err := opts.exec.Schedule(ctx, req)
 
 	metrics.IncrExecutorScheduleCount(ctx, metrics.CounterOpt{
 		PkgName: pkgName,

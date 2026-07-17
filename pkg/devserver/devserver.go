@@ -532,6 +532,7 @@ func start(ctx context.Context, opts StartOpts) error {
 				run.NewTraceLifecycleListener(nil),
 			}, metrics.NewLifecycleListeners()...)...,
 		),
+		executor.WithEventLifecycleListeners(execution.NoopEventLifecycleListener{}),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
 				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)

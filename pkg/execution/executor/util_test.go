@@ -5,6 +5,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,6 +86,20 @@ func TestOpGroupsNoInput(t *testing.T) {
 	actual := opGroups(input)
 
 	require.EqualValues(t, expected, actual)
+}
+
+func TestParseBatchID(t *testing.T) {
+	expected := ulid.Make()
+
+	parsed, err := parseBatchID(expected.String())
+	require.NoError(t, err)
+	require.Equal(t, expected, parsed)
+
+	_, err = parseBatchID("")
+	require.ErrorContains(t, err, "batch append returned empty batch ID")
+
+	_, err = parseBatchID("not-a-ulid")
+	require.ErrorContains(t, err, "invalid batch ID")
 }
 
 func TestOpGroupsSingleInput(t *testing.T) {
