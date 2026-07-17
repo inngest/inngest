@@ -81,6 +81,15 @@ const (
 	// lets users delay functions for up to MaxDebouncePeriod when events are received.
 	MaxDebouncePeriod = time.Hour * 24 * 7
 
+	// MaxSleepDuration is the furthest into the future a step can sleep.
+	// 366 days, so that a one-year sleep spanning a leap day still fits.
+	MaxSleepDuration = time.Hour * 24 * 366
+
+	// MaxWaitForEventTimeout is the furthest into the future a wait-for-event
+	// timeout can expire.  366 days, so that a one-year timeout spanning a
+	// leap day still fits.
+	MaxWaitForEventTimeout = time.Hour * 24 * 366
+
 	// MaxCancellations represents the max automatic cancellation signals per function
 	MaxCancellations = 5
 

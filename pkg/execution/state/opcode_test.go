@@ -92,6 +92,65 @@ func TestWaitForEventOpts_Expires(t *testing.T) {
 		require.NoError(t, err)
 		assert.WithinDuration(t, time.Now(), got, time.Second)
 	})
+
+	t.Run("accepts a timeout of exactly one leap year", func(t *testing.T) {
+		opts := WaitForEventOpts{Timeout: "366d"}
+		now := time.Now()
+		got, err := opts.Expires()
+		require.NoError(t, err)
+		assert.WithinDuration(t, now.Add(consts.MaxWaitForEventTimeout), got, time.Second)
+	})
+
+	t.Run("rejects a duration beyond one leap year", func(t *testing.T) {
+		opts := WaitForEventOpts{Timeout: "367d"}
+		_, err := opts.Expires()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTimeoutTooLong)
+	})
+
+	t.Run("rejects an RFC 3339 timestamp beyond one year", func(t *testing.T) {
+		opts := WaitForEventOpts{
+			Timeout: time.Now().AddDate(2, 0, 0).Format(time.RFC3339),
+		}
+		_, err := opts.Expires()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTimeoutTooLong)
+	})
+}
+
+func TestGeneratorOpcode_SleepDuration(t *testing.T) {
+	sleepOp := func(duration string) GeneratorOpcode {
+		return GeneratorOpcode{
+			Op:   enums.OpcodeSleep,
+			Opts: map[string]any{"duration": duration},
+		}
+	}
+
+	t.Run("accepts a duration of exactly one leap year", func(t *testing.T) {
+		dur, err := sleepOp("366d").SleepDuration()
+		require.NoError(t, err)
+		assert.Equal(t, consts.MaxSleepDuration, dur)
+	})
+
+	t.Run("rejects a duration beyond one leap year", func(t *testing.T) {
+		_, err := sleepOp("367d").SleepDuration()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTimeoutTooLong)
+	})
+
+	t.Run("rejects a date beyond one year", func(t *testing.T) {
+		at := time.Now().AddDate(2, 0, 0).Format(time.RFC3339)
+		_, err := sleepOp(at).SleepDuration()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTimeoutTooLong)
+	})
+
+	t.Run("accepts a date within one year", func(t *testing.T) {
+		at := time.Now().Add(30 * 24 * time.Hour)
+		dur, err := sleepOp(at.Format(time.RFC3339)).SleepDuration()
+		require.NoError(t, err)
+		assert.WithinDuration(t, at, time.Now().Add(dur), time.Second)
+	})
 }
 
 func TestSignalOpts_Expires(t *testing.T) {

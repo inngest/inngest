@@ -51,6 +51,9 @@ var (
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
 	ErrFunctionPaused     = fmt.Errorf("function is paused")
 	ErrStateOverflowed    = fmt.Errorf("state is too large")
+	// ErrTimeoutTooLong is returned when a sleep or wait is scheduled further
+	// into the future than the maximum allowed duration (one year).
+	ErrTimeoutTooLong = fmt.Errorf("timeout exceeds the maximum duration")
 	// Error Connect Retry Errors
 	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
 )
@@ -60,6 +63,8 @@ const (
 	InngestErrFunctionOverflowed = "InngestErrFunctionOverflowed"
 	// InngestErrStateOverflowed is the public error code for ErrStateOverflowed
 	InngestErrStateOverflowed = "InngestErrStateOverflowed"
+	// InngestErrTimeoutTooLong is the public error code for ErrTimeoutTooLong
+	InngestErrTimeoutTooLong = "InngestErrTimeoutTooLong"
 )
 
 // Identifier represents the unique identifier for a workflow run.
