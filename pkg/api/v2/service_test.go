@@ -1482,6 +1482,95 @@ func TestService_Rerun(t *testing.T) {
 	})
 }
 
+func TestService_CancelRun(t *testing.T) {
+	runID := ulid.MustParse("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+
+	t.Run("cancels a run", func(t *testing.T) {
+		provider := &mockRunProvider{}
+		provider.On("Cancel", mock.Anything, runID).Return(nil).Once()
+		t.Cleanup(func() {
+			provider.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: provider})
+		resp, err := service.CancelRun(context.Background(), &apiv2.CancelRunRequest{
+			RunId: runID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, runID.String(), resp.Data.RunId)
+		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("validates run id", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			runID   string
+			message string
+		}{
+			{name: "missing", message: "Run ID is required"},
+			{name: "invalid", runID: "not-a-ulid", message: "Run ID must be a valid ULID"},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+				resp, err := service.CancelRun(context.Background(), &apiv2.CancelRunRequest{RunId: test.runID})
+
+				require.Nil(t, resp)
+				require.ErrorContains(t, err, test.message)
+			})
+		}
+	})
+
+	t.Run("maps provider errors", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			err     error
+			message string
+		}{
+			{name: "missing run", err: ErrRunNotFound, message: "Run not found"},
+			{name: "already cancelled", err: ErrRunAlreadyCancelled, message: "Run is already cancelled"},
+			{name: "ended run", err: ErrRunEnded, message: "Cannot cancel an ended run"},
+			{name: "internal error", err: errors.New("failed"), message: "Unable to cancel run"},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				provider := &mockRunProvider{}
+				provider.On("Cancel", mock.Anything, runID).Return(test.err).Once()
+				t.Cleanup(func() {
+					provider.AssertExpectations(t)
+				})
+
+				service := NewService(ServiceOptions{Runs: provider})
+				resp, err := service.CancelRun(context.Background(), &apiv2.CancelRunRequest{RunId: runID.String()})
+
+				require.Nil(t, resp)
+				require.ErrorContains(t, err, test.message)
+			})
+		}
+	})
+
+	t.Run("applies rate limit", func(t *testing.T) {
+		rateLimiter := &mockRateLimitProvider{}
+		rateLimiter.On("CheckRateLimit", mock.Anything, apiv2.V2_CancelRun_FullMethodName).
+			Return(RateLimitResult{Limited: true}).Once()
+		t.Cleanup(func() {
+			rateLimiter.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Runs:              &mockRunProvider{},
+			RateLimitProvider: rateLimiter,
+		})
+		resp, err := service.CancelRun(context.Background(), &apiv2.CancelRunRequest{RunId: runID.String()})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "API rate limit exceeded")
+	})
+}
+
 func TestToTraceSpanStatus(t *testing.T) {
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_COMPLETED, toTraceSpanStatus(models.RunTraceSpanStatusCompleted))
 	require.Equal(t, apiv2.TraceSpanStatus_TRACE_SPAN_STATUS_FAILED, toTraceSpanStatus(models.RunTraceSpanStatusFailed))
