@@ -461,7 +461,7 @@ func (e *executor) doRemoveRunJobs(ctx context.Context, l logger.Logger, shard q
 			continue
 		}
 
-		err := shard.Dequeue(ctx, *qi)
+		err := e.queue.Dequeue(ctx, shard.Name(), *qi)
 		if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
 			l.Error(
 				"error dequeueing run job",

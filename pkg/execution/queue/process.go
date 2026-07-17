@@ -500,7 +500,7 @@ func (q *queueProcessor) ProcessItem(
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := shard.Dequeue(context.WithoutCancel(ctx), itemWithCurrentLease(qi)); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil
@@ -515,7 +515,7 @@ func (q *queueProcessor) ProcessItem(
 		}
 	case <-jobCtx.Done():
 		stopItemLeaseRenewal()
-		if err := shard.Dequeue(context.WithoutCancel(ctx), itemWithCurrentLease(qi)); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
 				return nil

@@ -793,7 +793,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		}
 
 		// dequeue the item
-		if err := shard.Dequeue(ctx, *qi); err != nil {
+		if err := s.queue.Dequeue(ctx, shard.Name(), *qi); err != nil {
 			return err
 		}
 	}
