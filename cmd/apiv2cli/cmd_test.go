@@ -88,6 +88,8 @@ func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
 	require.NotNil(t, invoke)
 	require.Equal(t, "Invoke function", invoke.Usage)
 	require.Contains(t, invoke.Description, "Endpoint: POST /apps/{app_id}/functions/{function_id}/invoke")
+	require.Contains(t, invoke.Description, "inherited from `inngest api`")
+	require.NotContains(t, invoke.Description, "inherited from `inngest alpha api`")
 	require.Contains(t, invoke.Description, "--prod")
 	require.Contains(t, invoke.Description, "INNGEST_API_KEY")
 	require.Contains(t, invoke.Description, "INNGEST_ENV")
@@ -113,6 +115,49 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["data"].String(), "JSON object containing the input data for the function")
 	require.Contains(t, byName["function-id"].String(), "The ID of the function to invoke")
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
+}
+
+func TestSubmitFeedbackCommandSetsCLISource(t *testing.T) {
+	var gotBody map[string]any
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"accepted":true},"metadata":{}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"--api-key", "test-key",
+		"submit-feedback",
+		"--feedback", "Please add more examples",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "Please add more examples", gotBody["feedback"])
+	require.Equal(t, "cli", gotBody["source"])
+	require.NotContains(t, gotBody, "operation")
+}
+
+func TestSubmitFeedbackCommandHidesManagedSourceFlag(t *testing.T) {
+	var submitFeedback endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "submit-feedback" {
+			submitFeedback = ep
+			break
+		}
+	}
+	require.NotEmpty(t, submitFeedback.name)
+
+	flags := endpointFlags(submitFeedback)
+	for _, flag := range flags {
+		require.NotContains(t, flag.Names(), "source")
+	}
 }
 
 func TestEndpointDescriptionReferencesValidFlags(t *testing.T) {

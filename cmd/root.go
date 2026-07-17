@@ -93,7 +93,6 @@ func execute() {
 		Flags: globalFlags,
 		Commands: []*cli.Command{
 			apiv2cli.Command(),
-			apiv2cli.FeedbackCommand(),
 			devserver.Command(),
 			version.Command(),
 			start.Command(),
