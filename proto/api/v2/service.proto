@@ -1743,7 +1743,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Submit product feedback"
       tags: "Internal"
-      description: "Submits product feedback from authenticated CLI, API, or other Inngest surfaces. Cloud only."
+      description: "Submits product feedback from authenticated API or CLI callers. Cloud only."
       security: {
         security_requirement: {
           key: "BearerAuth"
