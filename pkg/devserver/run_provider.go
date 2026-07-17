@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	state "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -24,7 +25,12 @@ import (
 
 type runProvider struct {
 	data      runProviderDataReader
-	scheduler apiv2.FunctionScheduler
+	scheduler runProviderExecutor
+}
+
+type runProviderExecutor interface {
+	apiv2.FunctionScheduler
+	Cancel(ctx context.Context, id state.ID, req execution.CancelRequest) error
 }
 
 // Run filters use an exclusive upper bound, so this represents no requested bound.
@@ -42,8 +48,34 @@ type runSpanReader interface {
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error)
 }
 
-func NewRunProvider(data runProviderDataReader, scheduler apiv2.FunctionScheduler) apiv2.RunProvider {
+func NewRunProvider(data runProviderDataReader, scheduler runProviderExecutor) apiv2.RunProvider {
 	return &runProvider{data: data, scheduler: scheduler}
+}
+
+func (p *runProvider) Cancel(ctx context.Context, runID ulid.ULID) error {
+	fnrun, err := p.data.GetFunctionRun(ctx, consts.DevServerAccountID, consts.DevServerEnvID, runID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return apiv2.ErrRunNotFound
+		}
+		return err
+	}
+
+	if fnrun.Status == enums.RunStatusCancelled {
+		return apiv2.ErrRunAlreadyCancelled
+	}
+	if enums.RunStatusEnded(fnrun.Status) {
+		return apiv2.ErrRunEnded
+	}
+
+	return p.scheduler.Cancel(ctx, state.ID{
+		RunID:      runID,
+		FunctionID: fnrun.FunctionID,
+		Tenant: state.Tenant{
+			EnvID:     consts.DevServerEnvID,
+			AccountID: consts.DevServerAccountID,
+		},
+	}, execution.CancelRequest{})
 }
 
 func (p *runProvider) GetRun(ctx context.Context, runID ulid.ULID, _ apiv2.GetRunOpts) (*cqrs.FunctionRun, error) {
