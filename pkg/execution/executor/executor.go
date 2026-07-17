@@ -5157,6 +5157,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	// published.
 	evt.Event.Meta.ResolveSessions()
 
+	// Validate the sessions after the merge
+	if err := evt.Event.Meta.Sessions.Validate(); err != nil {
+		return execError{err: fmt.Errorf("invalid step.invoke sessions: %w", err), final: true}
+	}
+
 	pause := state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         runCtx.Metadata().ID.Tenant.EnvID,

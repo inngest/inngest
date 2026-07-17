@@ -109,3 +109,19 @@ func TestInvoke_ResolvesPropagatedSessions(t *testing.T) {
 	require.Nil(t, got.Meta.PropagatedSessions, "propagated layer must not persist past invoke")
 	require.Equal(t, event.InvokeFnName, got.Name, "invoke path rewrites the event name")
 }
+
+// TestInvoke_ValidatesAfterResolve proves the HTTP invoke path validates the
+// merged sessions and rejects an oversized manual layer, mirroring the
+// ReceiveEvent behaviour this entrypoint bypasses.
+func TestInvoke_ValidatesAfterResolve(t *testing.T) {
+	// 6 manual keys > MaxEventSessions (5); all survive the merge.
+	w, got := postInvoke(t, `{
+		"data": {},
+		"meta": {
+			"sessions": {"a":"1","b":"1","c":"1","d":"1","e":"1","f":"1"}
+		}
+	}`)
+
+	require.Equal(t, 400, w.Code, w.Body.String())
+	require.Nil(t, got, "an invalid invocation event must never reach the handler")
+}

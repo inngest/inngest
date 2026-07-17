@@ -81,3 +81,49 @@ func TestHandleGeneratorInvokeFunction_ResolvesSessionsBeforePublish(t *testing.
 	require.Equal(t, event.Sessions{"conv_id": "manual", "org_id": "42"}, got.Meta.Sessions)
 	require.Nil(t, got.Meta.PropagatedSessions, "propagated layer must be cleared before publish")
 }
+
+// TestHandleGeneratorInvokeFunction_ValidatesSessionsAfterResolve proves the
+// executor validates sessions *after* the merge, closing a gap the pre-merge
+// InvokeFunctionOpts.Validate() (manual layer only) leaves open
+//
+// The error must be non-retryable (a bad payload never self-heals).
+func TestHandleGeneratorInvokeFunction_ValidatesSessionsAfterResolve(t *testing.T) {
+	var called bool
+	e := &executor{
+		log:            logger.From(context.Background()),
+		tracerProvider: tracing.NewNoopTracerProvider(),
+		pm:             &stubPauseManager{},
+		queue:          &stubQueue{},
+		handleInvokeEvent: func(_ context.Context, _ event.TrackedEvent) error {
+			called = true
+			return nil
+		},
+	}
+
+	rc := &mockRunContext{
+		md: sv2.Metadata{
+			ID:     sv2.ID{RunID: ulid.MustNew(ulid.Now(), nil), FunctionID: uuid.New()},
+			Config: *sv2.InitConfig(&sv2.Config{}),
+		},
+	}
+
+	// Legal manual layer (empty), but the propagated layer has an empty id. The
+	// pre-merge manual-only check passes; only the post-merge validate catches it.
+	gen := state.GeneratorOpcode{
+		Op: enums.OpcodeInvokeFunction,
+		ID: "step-invoke",
+		Opts: []byte(`{"function_id":"app-fn","payload":{
+			"name":"some/event","data":{"foo":"bar"},
+			"meta":{"propagatedSessions":{"org_id":""}}
+		}}`),
+	}
+	edge := queue.PayloadEdge{Edge: inngest.Edge{Incoming: "step"}}
+
+	err := e.handleGeneratorInvokeFunction(context.Background(), rc, gen, edge, OpcodeGroup{})
+	require.Error(t, err)
+	require.False(t, called, "an invalid invocation event must never be published")
+
+	var execErr execError
+	require.ErrorAs(t, err, &execErr)
+	require.False(t, execErr.Retryable(), "session validation failure is a final user error")
+}
