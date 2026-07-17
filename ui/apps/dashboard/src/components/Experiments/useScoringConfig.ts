@@ -2,16 +2,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ExperimentScoringMetric } from '@inngest/components/Experiments';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 
-import {
-  SCORING_METRIC_CHANGED_FIELDS,
-  trackExperimentScoringWeightUpdated,
-} from './tracking';
+import { trackScoringWeightUpdated } from '@/utils/analyticsEvents';
+
 import {
   useExperimentScoringConfig,
   useUpdateExperimentScoringConfig,
 } from './useExperiments';
 
 const DEBOUNCE_MS = 600;
+
+const SCORING_METRIC_CHANGED_FIELDS = [
+  ['enabled', 'enabled'],
+  ['points', 'points'],
+  ['invert', 'invert'],
+  ['minValue', 'min_value'],
+  ['maxValue', 'max_value'],
+  ['labelWorst', 'label_worst'],
+  ['labelBest', 'label_best'],
+  ['displayName', 'display_name'],
+] as const;
 
 /**
  * Manages local scoring-config state with debounced persistence.
@@ -20,11 +29,7 @@ const DEBOUNCE_MS = 600;
  * DEBOUNCE_MS of inactivity. The save is skipped when the local state matches
  * the last-known server state.
  */
-export function useScoringConfig(
-  functionID: string,
-  functionSlug: string,
-  experimentName: string,
-) {
+export function useScoringConfig(functionID: string, experimentName: string) {
   const scoring = useExperimentScoringConfig(functionID, experimentName);
   const updateScoring = useUpdateExperimentScoringConfig(
     functionID,
@@ -77,9 +82,8 @@ export function useScoringConfig(
           ).map(([, snakeField]) => snakeField);
           if (changedFields.length === 0) continue;
 
-          trackExperimentScoringWeightUpdated({
-            experimentName,
-            functionSlug,
+          trackScoringWeightUpdated({
+            feature: 'experiments',
             metricKey: metric.key,
             metricKind: metric.kind,
             enabled: metric.enabled,

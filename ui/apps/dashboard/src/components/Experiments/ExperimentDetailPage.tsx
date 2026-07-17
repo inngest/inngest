@@ -45,11 +45,7 @@ import {
   type ExperimentTimeRange as ExperimentUrlTimeRange,
 } from '@/lib/experiments/urlState';
 import { pathCreator } from '@/utils/urls';
-import {
-  trackExperimentOpenedInInsights,
-  trackExperimentTimeRangeChanged,
-  trackExperimentVariantFilterChanged,
-} from '@/components/Experiments/tracking';
+import { trackOpenedInInsights } from '@/utils/analyticsEvents';
 
 type Props = {
   experimentName: string;
@@ -162,7 +158,7 @@ export function ExperimentDetailPage({
     null,
     { enabled: rangeReady },
   );
-  const scoring = useScoringConfig(functionID, functionSlug, experimentName);
+  const scoring = useScoringConfig(functionID, experimentName);
   const insightsQuery = useExperimentInsightsQuery(
     functionID,
     experimentName,
@@ -176,19 +172,9 @@ export function ExperimentDetailPage({
 
   const handleRangeChange = useCallback(
     (nextRange: RangeChangeProps) => {
-      const { from, to } = rangeToTimeRange(nextRange);
-      const rangeDays = Math.round(
-        (to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000),
-      );
-      trackExperimentTimeRangeChanged({
-        experimentName,
-        functionSlug,
-        rangeDays,
-        hitMaxRange: rangeDays >= daysAgoMax,
-      });
       onTimeRangeChange(nextRange);
     },
-    [onTimeRangeChange, experimentName, functionSlug, daysAgoMax],
+    [onTimeRangeChange],
   );
 
   const availableVariants = useMemo(
@@ -198,40 +184,14 @@ export function ExperimentDetailPage({
 
   const handleSelectedVariantsChange = useCallback(
     (variants: string[]) => {
-      const available = new Set(availableVariants);
-      const matchingCount = variants.filter((v) => available.has(v)).length;
-      trackExperimentVariantFilterChanged({
-        experimentName,
-        functionSlug,
-        filterType: 'variant_selection',
-        selectedVariantCount: variants.length,
-        availableVariantCount: availableVariants.length,
-        resultedInEmpty: variants.length > 0 && matchingCount === 0,
-      });
       onSelectedVariantsChange(variants);
     },
-    [onSelectedVariantsChange, experimentName, functionSlug, availableVariants],
+    [onSelectedVariantsChange],
   );
 
-  const handleShowInactiveChange = useCallback(
-    (next: boolean) => {
-      trackExperimentVariantFilterChanged({
-        experimentName,
-        functionSlug,
-        filterType: 'show_inactive',
-        selectedVariantCount: selectedVariants.length,
-        availableVariantCount: availableVariants.length,
-        resultedInEmpty: false,
-      });
-      setShowInactive(next);
-    },
-    [
-      experimentName,
-      functionSlug,
-      selectedVariants.length,
-      availableVariants.length,
-    ],
-  );
+  const handleShowInactiveChange = useCallback((next: boolean) => {
+    setShowInactive(next);
+  }, []);
 
   const selectedAvailableVariants = useMemo(() => {
     if (selectedVariants.length === 0) return [];
@@ -304,9 +264,8 @@ export function ExperimentDetailPage({
   const onOpenInsights = useCallback(() => {
     const sql = insightsQuery.data;
     if (!sql) return;
-    trackExperimentOpenedInInsights({
-      experimentName,
-      functionSlug,
+    trackOpenedInInsights({
+      feature: 'experiments',
       variantCount: detail.data?.variants.length ?? 0,
       selectedVariantCount: selectedVariants.length,
     });
@@ -314,8 +273,6 @@ export function ExperimentDetailPage({
   }, [
     insightsQuery.data,
     environment.slug,
-    experimentName,
-    functionSlug,
     detail.data,
     selectedVariants.length,
   ]);

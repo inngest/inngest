@@ -7,7 +7,7 @@ import { Modal } from '@inngest/components/Modal';
 import { RiCheckLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
-import { trackSandboxWaitlistSubmitted } from './tracking';
+import { trackWaitlistFormSubmitted } from '@/utils/analyticsEvents';
 
 type Props = {
   isOpen: boolean;
@@ -80,9 +80,10 @@ export default function WaitlistModal({ isOpen, onClose }: Props) {
       });
 
       if (res.ok) {
-        trackSandboxWaitlistSubmitted({
+        trackWaitlistFormSubmitted({
+          feature: 'sandboxes',
           canContact,
-          hasWorkflowDetails: workflow.trim().length > 0,
+          message: workflow.trim(),
         });
         toast.success("Thanks! We'll be in touch.");
         handleClose();

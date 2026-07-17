@@ -3,7 +3,6 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 
 import { InlineCode } from '@inngest/components/Code';
 import {
-  ExperimentsEmptyState,
   ExperimentsTable,
   type ExperimentListItem,
 } from '@inngest/components/Experiments';
@@ -11,12 +10,14 @@ import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 
+import { ExperimentsEmptyState } from '@/components/Experiments/ExperimentsEmptyState';
 import FeedbackFloatingButton from '@/components/Feedback/FeedbackFloatingButton';
 import { useExperimentsList } from '@/components/Experiments/useExperiments';
 import {
-  trackExperimentDocsLinkOpened,
-  trackExperimentsListViewed,
-} from '@/components/Experiments/tracking';
+  trackDocsLinkOpened,
+  trackEmptyStateDocsLinkOpened,
+  trackListViewed,
+} from '@/utils/analyticsEvents';
 import { pathCreator } from '@/utils/urls';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/experiments/')({
@@ -31,7 +32,7 @@ function ExperimentsInfo() {
         <Link
           href="https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments"
           target="_blank"
-          onClick={() => trackExperimentDocsLinkOpened()}
+          onClick={() => trackDocsLinkOpened({ feature: 'experiments' })}
         >
           Learn about experiments
         </Link>
@@ -58,7 +59,8 @@ function ExperimentsComponent() {
     if (isPending || error || !Array.isArray(data)) return;
 
     hasTrackedListViewed.current = true;
-    trackExperimentsListViewed({
+    trackListViewed({
+      feature: 'experiments',
       experimentCount: data.length,
       functionCount: new Set(data.map((item) => item.functionId)).size,
     });
@@ -87,7 +89,11 @@ function ExperimentsComponent() {
           breadcrumb={[{ text: 'All experiments' }]}
           infoIcon={<ExperimentsInfo />}
         />
-        <ExperimentsEmptyState />
+        <ExperimentsEmptyState
+          onDocsLinkClick={() =>
+            trackEmptyStateDocsLinkOpened({ feature: 'experiments' })
+          }
+        />
         <FeedbackFloatingButton />
       </>
     );

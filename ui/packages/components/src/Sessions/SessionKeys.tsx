@@ -8,8 +8,6 @@ import { type SessionKey } from '@inngest/components/types/session';
 import { RiExternalLinkLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
-import { SessionsEmptyState } from './SessionsEmptyState';
-
 const columnHelper = createColumnHelper<SessionKey>();
 const DOCS_URL = 'https://www.inngest.com/docs/features/events-triggers/sessions';
 
@@ -54,10 +52,6 @@ export function SessionKeys({
   getSessionKeyHref,
 }: SessionKeysProps) {
   const trimmedSearch = search.trim();
-
-  if (!error && !trimmedSearch && sessionKeys.length === 0) {
-    return <SessionsEmptyState />;
-  }
 
   return (
     <div className="bg-canvasBase text-basis flex flex-1 flex-col overflow-hidden focus-visible:outline-none">
