@@ -311,6 +311,7 @@ func TestBuildAuthzPathMap(t *testing.T) {
 func TestRequiresAuthzMatchesMethodAndParameterizedPath(t *testing.T) {
 	assert.True(t, RequiresAuthz(http.MethodPost, "/sandboxes"))
 	assert.True(t, RequiresAuthz(http.MethodGet, "/sandboxes/22222222-2222-2222-2222-222222222222"))
+	assert.True(t, RequiresAuthz(http.MethodPost, "/sandboxes/22222222-2222-2222-2222-222222222222/exec"))
 	assert.True(t, RequiresAuthz(http.MethodDelete, "/sandboxes/22222222-2222-2222-2222-222222222222"))
 	assert.False(t, RequiresAuthz(http.MethodPut, "/sandboxes/22222222-2222-2222-2222-222222222222"))
 	assert.False(t, RequiresAuthz(http.MethodGet, "/health"))

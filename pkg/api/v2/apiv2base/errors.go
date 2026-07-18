@@ -31,6 +31,7 @@ const (
 	ErrorResourceAlreadyExists = "resource_already_exists"
 	ErrorIdempotencyConflict   = "idempotency_conflict"
 	ErrorStateConflict         = "state_conflict"
+	ErrorOperationAmbiguous    = "operation_ambiguous"
 
 	// 429 Too Many Requests errors
 	ErrorRateLimited = "rate_limited"

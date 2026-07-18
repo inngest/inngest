@@ -1423,6 +1423,51 @@ func local_request_V2_GetSandbox_0(ctx context.Context, marshaler runtime.Marsha
 	return msg, metadata, err
 }
 
+func request_V2_ExecSandbox_0(ctx context.Context, marshaler runtime.Marshaler, client V2Client, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ExecSandboxRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
+	val, ok := pathParams["sandbox_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "sandbox_id")
+	}
+	protoReq.SandboxId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "sandbox_id", err)
+	}
+	msg, err := client.ExecSandbox(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_V2_ExecSandbox_0(ctx context.Context, marshaler runtime.Marshaler, server V2Server, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq ExecSandboxRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	val, ok := pathParams["sandbox_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "sandbox_id")
+	}
+	protoReq.SandboxId, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "sandbox_id", err)
+	}
+	msg, err := server.ExecSandbox(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 var filter_V2_DeleteSandbox_0 = &utilities.DoubleArray{Encoding: map[string]int{"sandbox_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
 func request_V2_DeleteSandbox_0(ctx context.Context, marshaler runtime.Marshaler, client V2Client, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
@@ -2162,6 +2207,26 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		}
 		forward_V2_GetSandbox_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_V2_ExecSandbox_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ExecSandbox", runtime.WithHTTPPathPattern("/sandboxes/{sandbox_id}/exec"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_V2_ExecSandbox_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_V2_ExecSandbox_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodDelete, pattern_V2_DeleteSandbox_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -2800,6 +2865,23 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		}
 		forward_V2_GetSandbox_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_V2_ExecSandbox_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ExecSandbox", runtime.WithHTTPPathPattern("/sandboxes/{sandbox_id}/exec"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_V2_ExecSandbox_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_V2_ExecSandbox_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodDelete, pattern_V2_DeleteSandbox_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -2855,6 +2937,7 @@ var (
 	pattern_V2_ListSessionRuns_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 3, 0, 4, 1, 5, 2, 2, 3}, []string{"sessions", "session_key", "session_id", "runs"}, ""))
 	pattern_V2_CreateSandbox_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"sandboxes"}, ""))
 	pattern_V2_GetSandbox_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"sandboxes", "sandbox_id"}, ""))
+	pattern_V2_ExecSandbox_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"sandboxes", "sandbox_id", "exec"}, ""))
 	pattern_V2_DeleteSandbox_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"sandboxes", "sandbox_id"}, ""))
 )
 
@@ -2893,5 +2976,6 @@ var (
 	forward_V2_ListSessionRuns_0          = runtime.ForwardResponseMessage
 	forward_V2_CreateSandbox_0            = runtime.ForwardResponseMessage
 	forward_V2_GetSandbox_0               = runtime.ForwardResponseMessage
+	forward_V2_ExecSandbox_0              = runtime.ForwardResponseMessage
 	forward_V2_DeleteSandbox_0            = runtime.ForwardResponseMessage
 )

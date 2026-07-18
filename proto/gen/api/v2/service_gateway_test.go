@@ -43,6 +43,7 @@ type sandboxRouteServer struct {
 	UnimplementedV2Server
 	createRequest *CreateSandboxRequest
 	getRequest    *GetSandboxRequest
+	execRequest   *ExecSandboxRequest
 	deleteRequest *DeleteSandboxRequest
 }
 
@@ -54,6 +55,11 @@ func (s *sandboxRouteServer) CreateSandbox(_ context.Context, req *CreateSandbox
 func (s *sandboxRouteServer) GetSandbox(_ context.Context, req *GetSandboxRequest) (*GetSandboxResponse, error) {
 	s.getRequest = req
 	return &GetSandboxResponse{Data: &Sandbox{Id: req.SandboxId}}, nil
+}
+
+func (s *sandboxRouteServer) ExecSandbox(_ context.Context, req *ExecSandboxRequest) (*ExecSandboxResponse, error) {
+	s.execRequest = req
+	return &ExecSandboxResponse{Data: &ExecSandboxData{}}, nil
 }
 
 func (s *sandboxRouteServer) DeleteSandbox(_ context.Context, req *DeleteSandboxRequest) (*DeleteSandboxResponse, error) {
@@ -104,6 +110,16 @@ func TestSandboxRoutesBindBodyPathAndQuery(t *testing.T) {
 	require.Equal(t, http.StatusOK, res.Code)
 	require.True(t, proto.Equal(&GetSandboxRequest{SandboxId: sandboxID}, server.getRequest))
 
+	req = httptest.NewRequest(http.MethodPost, "/sandboxes/"+sandboxID+"/exec", strings.NewReader(`{"argv":["printf","%s","hello world"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	res = httptest.NewRecorder()
+	mux.ServeHTTP(res, req)
+	require.Equal(t, http.StatusOK, res.Code)
+	require.True(t, proto.Equal(&ExecSandboxRequest{
+		SandboxId: sandboxID,
+		Argv:      []string{"printf", "%s", "hello world"},
+	}, server.execRequest))
+
 	req = httptest.NewRequest(http.MethodDelete, "/sandboxes/"+sandboxID+"?graceful=true", nil)
 	res = httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
@@ -128,6 +144,7 @@ func TestSandboxOpenAPIAndAuthzMetadata(t *testing.T) {
 	}{
 		{method: "CreateSandbox", status: "202"},
 		{method: "GetSandbox", status: "200"},
+		{method: "ExecSandbox", status: "200"},
 		{method: "DeleteSandbox", status: "202"},
 	}
 	for _, test := range tests {
@@ -143,6 +160,10 @@ func TestSandboxOpenAPIAndAuthzMetadata(t *testing.T) {
 			require.Contains(t, operation.Responses, test.status)
 		})
 	}
+
+	execMethod := service.Methods().ByName("ExecSandbox")
+	execOperation := proto.GetExtension(execMethod.Options(), openapiv2.E_Openapiv2Operation).(*openapiv2.Operation)
+	require.Contains(t, execOperation.Responses["409"].Description, "non-replayable command is ambiguous")
 }
 
 func TestSandboxMessagesExposeOnlyPublicFields(t *testing.T) {
@@ -167,15 +188,30 @@ func TestSandboxMessagesExposeOnlyPublicFields(t *testing.T) {
 		"secret_references",
 	}, fieldNames(request))
 	require.Equal(t, []string{"sandbox_id"}, fieldNames((&GetSandboxRequest{}).ProtoReflect().Descriptor()))
+	require.Equal(t, []string{"sandbox_id", "argv"}, fieldNames((&ExecSandboxRequest{}).ProtoReflect().Descriptor()))
 	require.Equal(t, []string{"sandbox_id", "graceful"}, fieldNames((&DeleteSandboxRequest{}).ProtoReflect().Descriptor()))
 
 	sandbox := (&Sandbox{}).ProtoReflect().Descriptor()
 	require.Equal(t, []string{"id", "name", "desired_state", "phase", "outcome", "cleanup_state"}, fieldNames(sandbox))
 	require.True(t, sandbox.Fields().ByName("outcome").HasOptionalKeyword())
 
+	execData := (&ExecSandboxData{}).ProtoReflect().Descriptor()
+	require.Equal(t, []string{
+		"stdout",
+		"stderr",
+		"exit_code",
+		"duration_ms",
+		"stdout_truncated",
+		"stderr_truncated",
+	}, fieldNames(execData))
+	for i := 0; i < execData.Fields().Len(); i++ {
+		require.True(t, execData.Fields().Get(i).HasOptionalKeyword())
+	}
+
 	for _, response := range []protoreflect.MessageDescriptor{
 		(&CreateSandboxResponse{}).ProtoReflect().Descriptor(),
 		(&GetSandboxResponse{}).ProtoReflect().Descriptor(),
+		(&ExecSandboxResponse{}).ProtoReflect().Descriptor(),
 		(&DeleteSandboxResponse{}).ProtoReflect().Descriptor(),
 	} {
 		require.Equal(t, []string{"data", "metadata"}, fieldNames(response))
@@ -183,5 +219,6 @@ func TestSandboxMessagesExposeOnlyPublicFields(t *testing.T) {
 
 	require.Equal(t, "/api.v2.V2/CreateSandbox", V2_CreateSandbox_FullMethodName)
 	require.Equal(t, "/api.v2.V2/GetSandbox", V2_GetSandbox_FullMethodName)
+	require.Equal(t, "/api.v2.V2/ExecSandbox", V2_ExecSandbox_FullMethodName)
 	require.Equal(t, "/api.v2.V2/DeleteSandbox", V2_DeleteSandbox_FullMethodName)
 }

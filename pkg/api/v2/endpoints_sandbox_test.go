@@ -38,6 +38,14 @@ func TestSandboxesNotImplementedInOSS(t *testing.T) {
 			},
 		},
 		{
+			name: "ExecSandbox",
+			call: func() error {
+				response, err := service.ExecSandbox(context.Background(), &apiv2.ExecSandboxRequest{})
+				require.Nil(t, response)
+				return err
+			},
+		},
+		{
 			name: "DeleteSandbox",
 			call: func() error {
 				response, err := service.DeleteSandbox(context.Background(), &apiv2.DeleteSandboxRequest{})
@@ -80,6 +88,7 @@ func TestHTTPGateway_SandboxesNotImplementedInOSS(t *testing.T) {
 	}{
 		{name: "create", method: http.MethodPost, path: "/api/v2/sandboxes", body: validCreateBody},
 		{name: "get", method: http.MethodGet, path: "/api/v2/sandboxes/" + sandboxID},
+		{name: "exec", method: http.MethodPost, path: "/api/v2/sandboxes/" + sandboxID + "/exec", body: `{"argv":["printf","%s","hello world"]}`},
 		{name: "delete", method: http.MethodDelete, path: "/api/v2/sandboxes/" + sandboxID + "?graceful=true"},
 		{name: "malformed UUID reaches OSS method", method: http.MethodGet, path: "/api/v2/sandboxes/not-a-uuid"},
 	}
@@ -104,7 +113,7 @@ func TestHTTPGateway_SandboxGeneratedTransportErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("malformed JSON", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/api/v2/sandboxes", strings.NewReader(`{"name":`))
+		request := httptest.NewRequest(http.MethodPost, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222/exec", strings.NewReader(`{"argv":`))
 		request.Header.Set("Content-Type", "application/json")
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
@@ -165,9 +174,11 @@ func TestHTTPGateway_SandboxRoutesRequireAuthz(t *testing.T) {
 	requests := []*http.Request{
 		httptest.NewRequest(http.MethodPost, "/api/v2/sandboxes", strings.NewReader(`{}`)),
 		httptest.NewRequest(http.MethodGet, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222", nil),
+		httptest.NewRequest(http.MethodPost, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222/exec", strings.NewReader(`{"argv":["true"]}`)),
 		httptest.NewRequest(http.MethodDelete, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222", nil),
 	}
 	requests[0].Header.Set("Content-Type", "application/json")
+	requests[2].Header.Set("Content-Type", "application/json")
 	for _, request := range requests {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)

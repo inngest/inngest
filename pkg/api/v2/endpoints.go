@@ -324,6 +324,10 @@ func (s *Service) GetSandbox(ctx context.Context, req *apiv2.GetSandboxRequest) 
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sandboxes are not implemented in OSS")
 }
 
+func (s *Service) ExecSandbox(ctx context.Context, req *apiv2.ExecSandboxRequest) (*apiv2.ExecSandboxResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sandboxes are not implemented in OSS")
+}
+
 func (s *Service) DeleteSandbox(ctx context.Context, req *apiv2.DeleteSandboxRequest) (*apiv2.DeleteSandboxResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sandboxes are not implemented in OSS")
 }

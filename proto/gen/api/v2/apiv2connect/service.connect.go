@@ -102,6 +102,8 @@ const (
 	V2CreateSandboxProcedure = "/api.v2.V2/CreateSandbox"
 	// V2GetSandboxProcedure is the fully-qualified name of the V2's GetSandbox RPC.
 	V2GetSandboxProcedure = "/api.v2.V2/GetSandbox"
+	// V2ExecSandboxProcedure is the fully-qualified name of the V2's ExecSandbox RPC.
+	V2ExecSandboxProcedure = "/api.v2.V2/ExecSandbox"
 	// V2DeleteSandboxProcedure is the fully-qualified name of the V2's DeleteSandbox RPC.
 	V2DeleteSandboxProcedure = "/api.v2.V2/DeleteSandbox"
 )
@@ -144,6 +146,7 @@ type V2Client interface {
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
+	ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error)
 	DeleteSandbox(context.Context, *connect.Request[v2.DeleteSandboxRequest]) (*connect.Response[v2.DeleteSandboxResponse], error)
 }
 
@@ -356,6 +359,12 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("GetSandbox")),
 			connect.WithClientOptions(opts...),
 		),
+		execSandbox: connect.NewClient[v2.ExecSandboxRequest, v2.ExecSandboxResponse](
+			httpClient,
+			baseURL+V2ExecSandboxProcedure,
+			connect.WithSchema(v2Methods.ByName("ExecSandbox")),
+			connect.WithClientOptions(opts...),
+		),
 		deleteSandbox: connect.NewClient[v2.DeleteSandboxRequest, v2.DeleteSandboxResponse](
 			httpClient,
 			baseURL+V2DeleteSandboxProcedure,
@@ -400,6 +409,7 @@ type v2Client struct {
 	listSessionRuns          *connect.Client[v2.ListSessionRunsRequest, v2.ListSessionRunsResponse]
 	createSandbox            *connect.Client[v2.CreateSandboxRequest, v2.CreateSandboxResponse]
 	getSandbox               *connect.Client[v2.GetSandboxRequest, v2.GetSandboxResponse]
+	execSandbox              *connect.Client[v2.ExecSandboxRequest, v2.ExecSandboxResponse]
 	deleteSandbox            *connect.Client[v2.DeleteSandboxRequest, v2.DeleteSandboxResponse]
 }
 
@@ -568,6 +578,11 @@ func (c *v2Client) GetSandbox(ctx context.Context, req *connect.Request[v2.GetSa
 	return c.getSandbox.CallUnary(ctx, req)
 }
 
+// ExecSandbox calls api.v2.V2.ExecSandbox.
+func (c *v2Client) ExecSandbox(ctx context.Context, req *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error) {
+	return c.execSandbox.CallUnary(ctx, req)
+}
+
 // DeleteSandbox calls api.v2.V2.DeleteSandbox.
 func (c *v2Client) DeleteSandbox(ctx context.Context, req *connect.Request[v2.DeleteSandboxRequest]) (*connect.Response[v2.DeleteSandboxResponse], error) {
 	return c.deleteSandbox.CallUnary(ctx, req)
@@ -611,6 +626,7 @@ type V2Handler interface {
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
 	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
 	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
+	ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error)
 	DeleteSandbox(context.Context, *connect.Request[v2.DeleteSandboxRequest]) (*connect.Response[v2.DeleteSandboxResponse], error)
 }
 
@@ -819,6 +835,12 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("GetSandbox")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2ExecSandboxHandler := connect.NewUnaryHandler(
+		V2ExecSandboxProcedure,
+		svc.ExecSandbox,
+		connect.WithSchema(v2Methods.ByName("ExecSandbox")),
+		connect.WithHandlerOptions(opts...),
+	)
 	v2DeleteSandboxHandler := connect.NewUnaryHandler(
 		V2DeleteSandboxProcedure,
 		svc.DeleteSandbox,
@@ -893,6 +915,8 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2CreateSandboxHandler.ServeHTTP(w, r)
 		case V2GetSandboxProcedure:
 			v2GetSandboxHandler.ServeHTTP(w, r)
+		case V2ExecSandboxProcedure:
+			v2ExecSandboxHandler.ServeHTTP(w, r)
 		case V2DeleteSandboxProcedure:
 			v2DeleteSandboxHandler.ServeHTTP(w, r)
 		default:
@@ -1034,6 +1058,10 @@ func (UnimplementedV2Handler) CreateSandbox(context.Context, *connect.Request[v2
 
 func (UnimplementedV2Handler) GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetSandbox is not implemented"))
+}
+
+func (UnimplementedV2Handler) ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ExecSandbox is not implemented"))
 }
 
 func (UnimplementedV2Handler) DeleteSandbox(context.Context, *connect.Request[v2.DeleteSandboxRequest]) (*connect.Response[v2.DeleteSandboxResponse], error) {

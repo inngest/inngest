@@ -50,6 +50,14 @@ func TestNewSingleError(t *testing.T) {
 			wantGRPCCode: codes.AlreadyExists,
 			wantJSON:     `{"errors":[{"code":"resource_already_exists","message":"Resource already exists"}]}`,
 		},
+		{
+			name:         "409 ambiguous operation error",
+			httpCode:     http.StatusConflict,
+			errorCode:    ErrorOperationAmbiguous,
+			message:      "Operation result is ambiguous",
+			wantGRPCCode: codes.AlreadyExists,
+			wantJSON:     `{"errors":[{"code":"operation_ambiguous","message":"Operation result is ambiguous"}]}`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -207,6 +215,7 @@ func TestErrorConstants(t *testing.T) {
 		"resource_already_exists":      ErrorResourceAlreadyExists,
 		"idempotency_conflict":         ErrorIdempotencyConflict,
 		"state_conflict":               ErrorStateConflict,
+		"operation_ambiguous":          ErrorOperationAmbiguous,
 		"app_sync_failed":              ErrorAppSyncFailed,
 		"validation_error":             ErrorValidationError,
 		"not_implemented":              ErrorNotImplemented,

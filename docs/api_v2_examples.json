@@ -652,5 +652,49 @@
         "// TODO": "Add example data for get /sandboxes/{sandboxId} 500"
       }
     }
+  },
+  "/sandboxes/{sandboxId}/exec": {
+    "post": {
+      "200": {
+        "data": {
+          "durationMs": 12,
+          "exitCode": 0,
+          "stderr": "",
+          "stderrTruncated": false,
+          "stdout": "hello world",
+          "stdoutTruncated": false
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetchedAt": "2026-07-18T12:00:00Z"
+        }
+      },
+      "400": {
+        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 400"
+      },
+      "401": {
+        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 401"
+      },
+      "403": {
+        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 403"
+      },
+      "404": {
+        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 404"
+      },
+      "409": {
+        "errors": [
+          {
+            "code": "operation_ambiguous",
+            "message": "The non-replayable command may have executed, but its result could not be confirmed"
+          }
+        ]
+      },
+      "500": {
+        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 500"
+      },
+      "503": {
+        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 503"
+      }
+    }
   }
 }

@@ -1673,6 +1673,97 @@ service V2 {
     };
   }
 
+  rpc ExecSandbox(ExecSandboxRequest) returns (ExecSandboxResponse) {
+    option (google.api.http) = {
+      post: "/sandboxes/{sandbox_id}/exec"
+      body: "*"
+    };
+    option (authz) = {require_authz: true};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Execute command in sandbox"
+      tags: "Sandboxes"
+      description: "Executes a structured argv command in a running sandbox and returns its captured output. The command is executed directly without implicit shell interpretation."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Command completed"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ExecSandboxResponse"}
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid sandbox ID or argv"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ErrorResponse"}
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ErrorResponse"}
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - insufficient permissions"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ErrorResponse"}
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "Not Found - sandbox not found"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ErrorResponse"}
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "Conflict - sandbox state does not allow command execution, or the result of a non-replayable command is ambiguous"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ErrorResponse"}
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ErrorResponse"}
+          }
+        }
+      }
+      responses: {
+        key: "503"
+        value: {
+          description: "Service Unavailable - sandbox execution unavailable"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ErrorResponse"}
+          }
+        }
+      }
+    };
+  }
+
   rpc DeleteSandbox(DeleteSandboxRequest) returns (DeleteSandboxResponse) {
     option (google.api.http) = {delete: "/sandboxes/{sandbox_id}"};
     option (authz) = {require_authz: true};
@@ -2891,6 +2982,30 @@ message GetSandboxRequest {
 message GetSandboxResponse {
   Sandbox data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message ExecSandboxRequest {
+  string sandbox_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "Sandbox UUID"
+    format: "uuid"
+  }];
+  repeated string argv = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "Executable and arguments to run directly, without shell interpretation"
+  }];
+}
+
+message ExecSandboxResponse {
+  ExecSandboxData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message ExecSandboxData {
+  optional string stdout = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Captured standard output"}];
+  optional string stderr = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Captured standard error"}];
+  optional int32 exit_code = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Process exit code"}];
+  optional uint32 duration_ms = 4 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Command execution duration in milliseconds"}];
+  optional bool stdout_truncated = 5 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Whether standard output was truncated"}];
+  optional bool stderr_truncated = 6 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Whether standard error was truncated"}];
 }
 
 message DeleteSandboxRequest {
