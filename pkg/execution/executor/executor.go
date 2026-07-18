@@ -55,6 +55,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
+	"github.com/inngest/inngest/pkg/util/sandbox"
 	"github.com/inngest/inngest/pkg/util/strtimeout"
 	"github.com/inngest/inngestgo"
 	"github.com/jonboulle/clockwork"
@@ -475,6 +476,15 @@ func WithConditionalTracer(tracer itrace.ConditionalTracer) ExecutorOpt {
 	}
 }
 
+// WithSandboxProvider enables the experimental server-side Sandbox opcode.
+// Provider credentials never enter SDK opcode data.
+func WithSandboxProvider(provider sandbox.Provider, stores ...sandbox.DispatchStore) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).sandboxDispatcher = sandbox.NewDispatcher(provider, stores...)
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -537,6 +547,7 @@ type executor struct {
 	clock             clockwork.Clock
 
 	conditionalTracer itrace.ConditionalTracer
+	sandboxDispatcher *sandbox.Dispatcher
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -3729,6 +3740,8 @@ func (e *executor) handleGeneratorOp(ctx context.Context, runCtx execution.RunCo
 		return e.handleGeneratorAIGateway(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeGateway:
 		return e.handleGeneratorGateway(ctx, runCtx, gen, edge, group)
+	case enums.OpcodeSandbox:
+		return e.handleGeneratorSandbox(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeWaitForSignal:
 		return e.handleGeneratorWaitForSignal(ctx, runCtx, gen, edge, group)
 	case enums.OpcodeRunComplete:
@@ -4011,45 +4024,12 @@ func (e *executor) handleGeneratorStep(ctx context.Context, runCtx execution.Run
 	))
 
 	e.emitStepSpan(ctx, runCtx, &gen, extraMetadata, nil)
-
-	// Persist the cumulative metadata size delta alongside the step output.
-	// SwapMetadataSizeDelta atomically reads the delta and advances the
-	// loaded baseline so that concurrent handlers in handleGeneratorGroup
-	// each claim only their own contribution, preventing double-counting.
-	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
-		ctx = state.WithMetadataSizeDelta(ctx, delta)
-	}
-
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, []byte(output))
-	if errors.Is(err, state.ErrDuplicateResponse) || errors.Is(err, state.ErrIdempotentResponse) {
-		// A prior attempt can persist output then fail before enqueueing discovery.
-		// Keep going so pending steps still enqueue; duplicate work is bounded.
-		e.log.Warn("step output already persisted; keeping existing output", "error", err, "run_id", runCtx.Metadata().ID.RunID, "step_id", gen.ID)
-		err = nil
-	}
-	if err != nil {
-		return err
-	}
-
-	// Once step output has been saved, we can release the held capacity.
-	// This allows us to continue work in the queue on other items even before
-	// the next step is enqueued and accounting is handled.
-	if err := runCtx.ReleaseCapacityLease(); err != nil {
-		logger.StdlibLogger(ctx).ReportError(err, "could not release capacity lease early")
-	}
-
-	// Update the group ID in context;  we've already saved this step's success and we're now
-	// running the step again, needing a new history group
-	groupID := uuid.New().String()
-
-	// Re-enqueue the exact same edge to run now.
-	return e.maybeEnqueueDiscoveryStep(
-		state.WithGroupID(ctx, groupID),
+	return e.saveStepAndEnqueueDiscovery(
+		ctx,
 		runCtx,
 		gen,
 		edge,
-		groupID,
-		hasPendingSteps,
+		[]byte(output),
 		runCtx.LifecycleItem().ParallelCoalesceKey,
 	)
 
@@ -4600,23 +4580,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		}
 	}
 
-	// Persist the cumulative metadata size delta alongside the step output.
-	// SwapMetadataSizeDelta atomically reads the delta and advances the
-	// loaded baseline so that concurrent handlers in handleGeneratorGroup
-	// each claim only their own contribution, preventing double-counting.
-	if delta := runCtx.Metadata().Metrics.SwapMetadataSizeDelta(); delta > 0 {
-		ctx = state.WithMetadataSizeDelta(ctx, delta)
-	}
-
-	// Save the output as the step result.
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, runCtx.Metadata().ID, gen.ID, output)
-	if err != nil {
-		return err
-	}
-
-	groupID := uuid.New().String()
-	ctx = state.WithGroupID(ctx, groupID)
-	return e.maybeEnqueueDiscoveryStep(ctx, runCtx, gen, edge, groupID, hasPendingSteps, &group.ParallelCoalesceKey)
+	return e.saveStepAndEnqueueDiscovery(ctx, runCtx, gen, edge, output, &group.ParallelCoalesceKey)
 }
 
 func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx execution.RunContext, gen state.GeneratorOpcode, edge queue.PayloadEdge, group OpcodeGroup) error {

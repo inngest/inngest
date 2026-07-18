@@ -138,6 +138,9 @@ func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	case enums.OpcodeWaitForSignal:
 		op := models.StepOpWaitForSignal
 		return &op
+	case enums.OpcodeSandbox:
+		op := models.StepOpSandbox
+		return &op
 	}
 
 	return nil
@@ -576,6 +579,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		gqlSpan.StepType = strings.ToUpper(FinalizationSpanName)
 	} else if span.Attributes.StepRunType != nil {
 		gqlSpan.StepType = *span.Attributes.StepRunType
+	} else if gqlSpan.StepOp != nil && *gqlSpan.StepOp == models.StepOpSandbox &&
+		span.Attributes.StepType != nil {
+		gqlSpan.StepType = span.Attributes.StepType.String()
 	} else if gqlSpan.StepOp != nil {
 		gqlSpan.StepType = gqlSpan.StepOp.String()
 	}

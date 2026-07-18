@@ -1530,7 +1530,7 @@ service V2 {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create sandbox"
       tags: "Sandboxes"
-      description: "Creates or updates a sandbox and begins asynchronous placement."
+      description: "Creates or updates a sandbox and waits for it to reach RUNNING."
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -1538,9 +1538,9 @@ service V2 {
         }
       }
       responses: {
-        key: "202"
+        key: "200"
         value: {
-          description: "Sandbox accepted"
+          description: "Sandbox created or updated and running"
           schema: {
             json_schema: {ref: "#/definitions/v2CreateSandboxResponse"}
           }
@@ -1604,7 +1604,7 @@ service V2 {
   }
 
   rpc GetSandbox(GetSandboxRequest) returns (GetSandboxResponse) {
-    option (google.api.http) = {get: "/sandboxes/{sandbox_id}"};
+    option (google.api.http) = {get: "/vpcs/{vpc_id}/sandboxes/{name}"};
     option (authz) = {require_authz: true};
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get sandbox"
@@ -1628,7 +1628,7 @@ service V2 {
       responses: {
         key: "400"
         value: {
-          description: "Bad Request - invalid sandbox ID"
+          description: "Bad Request - invalid VPC ID or sandbox name"
           schema: {
             json_schema: {ref: "#/definitions/v2ErrorResponse"}
           }
@@ -1675,7 +1675,7 @@ service V2 {
 
   rpc ExecSandbox(ExecSandboxRequest) returns (ExecSandboxResponse) {
     option (google.api.http) = {
-      post: "/sandboxes/{sandbox_id}/exec"
+      post: "/vpcs/{vpc_id}/sandboxes/{name}/exec"
       body: "*"
     };
     option (authz) = {require_authz: true};
@@ -1701,7 +1701,7 @@ service V2 {
       responses: {
         key: "400"
         value: {
-          description: "Bad Request - invalid sandbox ID or argv"
+          description: "Bad Request - invalid VPC ID, sandbox name, or argv"
           schema: {
             json_schema: {ref: "#/definitions/v2ErrorResponse"}
           }
@@ -1753,6 +1753,15 @@ service V2 {
         }
       }
       responses: {
+        key: "502"
+        value: {
+          description: "Bad Gateway - sandbox output is not valid UTF-8"
+          schema: {
+            json_schema: {ref: "#/definitions/v2ErrorResponse"}
+          }
+        }
+      }
+      responses: {
         key: "503"
         value: {
           description: "Service Unavailable - sandbox execution unavailable"
@@ -1765,7 +1774,7 @@ service V2 {
   }
 
   rpc DeleteSandbox(DeleteSandboxRequest) returns (DeleteSandboxResponse) {
-    option (google.api.http) = {delete: "/sandboxes/{sandbox_id}"};
+    option (google.api.http) = {delete: "/vpcs/{vpc_id}/sandboxes/{name}"};
     option (authz) = {require_authz: true};
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete sandbox"
@@ -1789,7 +1798,7 @@ service V2 {
       responses: {
         key: "400"
         value: {
-          description: "Bad Request - invalid sandbox ID or query parameter"
+          description: "Bad Request - invalid VPC ID, sandbox name, or query parameter"
           schema: {
             json_schema: {ref: "#/definitions/v2ErrorResponse"}
           }
@@ -2902,7 +2911,12 @@ message Sandbox {
     description: "Sandbox UUID"
     format: "uuid"
   }];
+  string vpc_id = 7 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "VPC UUID"
+    format: "uuid"
+  }];
   string name = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Normalized sandbox name"}];
+  uint32 generation = 8 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Monotonically increasing sandbox generation"}];
   SandboxDesiredState desired_state = 3;
   SandboxPhase phase = 4;
   optional SandboxOutcome outcome = 5 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Terminal outcome, omitted until known"}];
@@ -2973,9 +2987,18 @@ message CreateSandboxResponse {
 }
 
 message GetSandboxRequest {
-  string sandbox_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-    description: "Sandbox UUID"
+  reserved 1;
+  reserved "sandbox_id";
+
+  string vpc_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "VPC UUID"
     format: "uuid"
+  }];
+  string name = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "Normalized DNS label used as the sandbox identity"
+    min_length: 1
+    max_length: 63
+    pattern: "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
   }];
 }
 
@@ -2985,9 +3008,18 @@ message GetSandboxResponse {
 }
 
 message ExecSandboxRequest {
-  string sandbox_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-    description: "Sandbox UUID"
+  reserved 1;
+  reserved "sandbox_id";
+
+  string vpc_id = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "VPC UUID"
     format: "uuid"
+  }];
+  string name = 4 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "Normalized DNS label used as the sandbox identity"
+    min_length: 1
+    max_length: 63
+    pattern: "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
   }];
   repeated string argv = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
     description: "Executable and arguments to run directly, without shell interpretation"
@@ -3000,8 +3032,8 @@ message ExecSandboxResponse {
 }
 
 message ExecSandboxData {
-  optional string stdout = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Captured standard output"}];
-  optional string stderr = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Captured standard error"}];
+  optional string stdout = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Captured standard output, preserved exactly as valid UTF-8 text"}];
+  optional string stderr = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Captured standard error, preserved exactly as valid UTF-8 text"}];
   optional int32 exit_code = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Process exit code"}];
   optional uint32 duration_ms = 4 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Command execution duration in milliseconds"}];
   optional bool stdout_truncated = 5 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Whether standard output was truncated"}];
@@ -3009,9 +3041,18 @@ message ExecSandboxData {
 }
 
 message DeleteSandboxRequest {
-  string sandbox_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-    description: "Sandbox UUID"
+  reserved 1;
+  reserved "sandbox_id";
+
+  string vpc_id = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "VPC UUID"
     format: "uuid"
+  }];
+  string name = 4 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+    description: "Normalized DNS label used as the sandbox identity"
+    min_length: 1
+    max_length: 63
+    pattern: "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
   }];
   bool graceful = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {description: "Allow graceful shutdown before forced cleanup"}];
 }

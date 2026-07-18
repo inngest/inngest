@@ -53,6 +53,9 @@ const (
 	// 500 Not Implemented errors
 	ErrorInternalError = "internal_error"
 
+	// 502 Bad Gateway errors
+	ErrorOutputEncodingInvalid = "output_encoding_invalid"
+
 	// 501 Not Implemented errors
 	ErrorNotImplemented = "not_implemented"
 
@@ -119,6 +122,8 @@ func httpToGRPCStatus(httpCode int) codes.Code {
 		return codes.ResourceExhausted
 	case http.StatusInternalServerError:
 		return codes.Internal
+	case http.StatusBadGateway:
+		return codes.DataLoss
 	case http.StatusNotImplemented:
 		return codes.Unimplemented
 	case http.StatusServiceUnavailable:

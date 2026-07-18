@@ -1393,13 +1393,21 @@ func request_V2_GetSandbox_0(ctx context.Context, marshaler runtime.Marshaler, c
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
 	}
-	val, ok := pathParams["sandbox_id"]
+	val, ok := pathParams["vpc_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "sandbox_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "vpc_id")
 	}
-	protoReq.SandboxId, err = runtime.String(val)
+	protoReq.VpcId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "sandbox_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "vpc_id", err)
+	}
+	val, ok = pathParams["name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
+	}
+	protoReq.Name, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
 	msg, err := client.GetSandbox(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -1411,13 +1419,21 @@ func local_request_V2_GetSandbox_0(ctx context.Context, marshaler runtime.Marsha
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	val, ok := pathParams["sandbox_id"]
+	val, ok := pathParams["vpc_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "sandbox_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "vpc_id")
 	}
-	protoReq.SandboxId, err = runtime.String(val)
+	protoReq.VpcId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "sandbox_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "vpc_id", err)
+	}
+	val, ok = pathParams["name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
+	}
+	protoReq.Name, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
 	msg, err := server.GetSandbox(ctx, &protoReq)
 	return msg, metadata, err
@@ -1435,13 +1451,21 @@ func request_V2_ExecSandbox_0(ctx context.Context, marshaler runtime.Marshaler, 
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
 	}
-	val, ok := pathParams["sandbox_id"]
+	val, ok := pathParams["vpc_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "sandbox_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "vpc_id")
 	}
-	protoReq.SandboxId, err = runtime.String(val)
+	protoReq.VpcId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "sandbox_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "vpc_id", err)
+	}
+	val, ok = pathParams["name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
+	}
+	protoReq.Name, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
 	msg, err := client.ExecSandbox(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -1456,19 +1480,27 @@ func local_request_V2_ExecSandbox_0(ctx context.Context, marshaler runtime.Marsh
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	val, ok := pathParams["sandbox_id"]
+	val, ok := pathParams["vpc_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "sandbox_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "vpc_id")
 	}
-	protoReq.SandboxId, err = runtime.String(val)
+	protoReq.VpcId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "sandbox_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "vpc_id", err)
+	}
+	val, ok = pathParams["name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
+	}
+	protoReq.Name, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
 	msg, err := server.ExecSandbox(ctx, &protoReq)
 	return msg, metadata, err
 }
 
-var filter_V2_DeleteSandbox_0 = &utilities.DoubleArray{Encoding: map[string]int{"sandbox_id": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+var filter_V2_DeleteSandbox_0 = &utilities.DoubleArray{Encoding: map[string]int{"vpc_id": 0, "name": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
 
 func request_V2_DeleteSandbox_0(ctx context.Context, marshaler runtime.Marshaler, client V2Client, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
@@ -1479,13 +1511,21 @@ func request_V2_DeleteSandbox_0(ctx context.Context, marshaler runtime.Marshaler
 	if req.Body != nil {
 		_, _ = io.Copy(io.Discard, req.Body)
 	}
-	val, ok := pathParams["sandbox_id"]
+	val, ok := pathParams["vpc_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "sandbox_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "vpc_id")
 	}
-	protoReq.SandboxId, err = runtime.String(val)
+	protoReq.VpcId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "sandbox_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "vpc_id", err)
+	}
+	val, ok = pathParams["name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
+	}
+	protoReq.Name, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
@@ -1503,13 +1543,21 @@ func local_request_V2_DeleteSandbox_0(ctx context.Context, marshaler runtime.Mar
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	val, ok := pathParams["sandbox_id"]
+	val, ok := pathParams["vpc_id"]
 	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "sandbox_id")
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "vpc_id")
 	}
-	protoReq.SandboxId, err = runtime.String(val)
+	protoReq.VpcId, err = runtime.String(val)
 	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "sandbox_id", err)
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "vpc_id", err)
+	}
+	val, ok = pathParams["name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "name")
+	}
+	protoReq.Name, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "name", err)
 	}
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
@@ -2193,7 +2241,7 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/GetSandbox", runtime.WithHTTPPathPattern("/sandboxes/{sandbox_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/GetSandbox", runtime.WithHTTPPathPattern("/vpcs/{vpc_id}/sandboxes/{name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2213,7 +2261,7 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ExecSandbox", runtime.WithHTTPPathPattern("/sandboxes/{sandbox_id}/exec"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/ExecSandbox", runtime.WithHTTPPathPattern("/vpcs/{vpc_id}/sandboxes/{name}/exec"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2233,7 +2281,7 @@ func RegisterV2HandlerServer(ctx context.Context, mux *runtime.ServeMux, server 
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/DeleteSandbox", runtime.WithHTTPPathPattern("/sandboxes/{sandbox_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/api.v2.V2/DeleteSandbox", runtime.WithHTTPPathPattern("/vpcs/{vpc_id}/sandboxes/{name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2852,7 +2900,7 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/GetSandbox", runtime.WithHTTPPathPattern("/sandboxes/{sandbox_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/GetSandbox", runtime.WithHTTPPathPattern("/vpcs/{vpc_id}/sandboxes/{name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2869,7 +2917,7 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ExecSandbox", runtime.WithHTTPPathPattern("/sandboxes/{sandbox_id}/exec"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/ExecSandbox", runtime.WithHTTPPathPattern("/vpcs/{vpc_id}/sandboxes/{name}/exec"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2886,7 +2934,7 @@ func RegisterV2HandlerClient(ctx context.Context, mux *runtime.ServeMux, client 
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/DeleteSandbox", runtime.WithHTTPPathPattern("/sandboxes/{sandbox_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/api.v2.V2/DeleteSandbox", runtime.WithHTTPPathPattern("/vpcs/{vpc_id}/sandboxes/{name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2936,9 +2984,9 @@ var (
 	pattern_V2_ListSessions_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"sessions", "session_key"}, ""))
 	pattern_V2_ListSessionRuns_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 3, 0, 4, 1, 5, 2, 2, 3}, []string{"sessions", "session_key", "session_id", "runs"}, ""))
 	pattern_V2_CreateSandbox_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0}, []string{"sandboxes"}, ""))
-	pattern_V2_GetSandbox_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"sandboxes", "sandbox_id"}, ""))
-	pattern_V2_ExecSandbox_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"sandboxes", "sandbox_id", "exec"}, ""))
-	pattern_V2_DeleteSandbox_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1}, []string{"sandboxes", "sandbox_id"}, ""))
+	pattern_V2_GetSandbox_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"vpcs", "vpc_id", "sandboxes", "name"}, ""))
+	pattern_V2_ExecSandbox_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"vpcs", "vpc_id", "sandboxes", "name", "exec"}, ""))
+	pattern_V2_DeleteSandbox_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 1, 0, 4, 1, 5, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"vpcs", "vpc_id", "sandboxes", "name"}, ""))
 )
 
 var (

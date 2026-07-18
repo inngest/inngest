@@ -14,6 +14,9 @@ import (
 func TestResponseEnumMarshalerShortensAPIEnumPrefixes(t *testing.T) {
 	output, err := structpb.NewStruct(map[string]any{
 		"literal": "FUNCTION_RUN_STATUS_FAILED",
+		"fields": map[string]any{
+			"x": map[string]any{"nullValue": "FUNCTION_RUN_STATUS_FAILED"},
+		},
 	})
 	require.NoError(t, err)
 
@@ -33,6 +36,7 @@ func TestResponseEnumMarshalerShortensAPIEnumPrefixes(t *testing.T) {
 	run := body["data"].(map[string]any)
 	require.Equal(t, "COMPLETED", run["status"])
 	require.Equal(t, "FUNCTION_RUN_STATUS_FAILED", run["output"].(map[string]any)["literal"])
+	require.Equal(t, "FUNCTION_RUN_STATUS_FAILED", run["output"].(map[string]any)["fields"].(map[string]any)["x"].(map[string]any)["nullValue"])
 }
 
 func TestResponseEnumMarshalerShortensTraceEnumPrefixes(t *testing.T) {
@@ -73,7 +77,9 @@ func TestResponseEnumMarshalerUsesSandboxJSONContract(t *testing.T) {
 	data, err := marshaler.Marshal(&apiv2.GetSandboxResponse{
 		Data: &apiv2.Sandbox{
 			Id:           "22222222-2222-2222-2222-222222222222",
+			VpcId:        "11111111-1111-1111-1111-111111111111",
 			Name:         "test-sandbox",
+			Generation:   3,
 			DesiredState: apiv2.SandboxDesiredState_SANDBOX_DESIRED_STATE_TERMINATED,
 			Phase:        apiv2.SandboxPhase_SANDBOX_PHASE_TERMINAL,
 			Outcome:      &outcome,
@@ -85,6 +91,8 @@ func TestResponseEnumMarshalerUsesSandboxJSONContract(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(data, &body))
 	sandbox := body["data"].(map[string]any)
+	require.Equal(t, "11111111-1111-1111-1111-111111111111", sandbox["vpcId"])
+	require.Equal(t, float64(3), sandbox["generation"])
 	require.Equal(t, "TERMINATED", sandbox["desiredState"])
 	require.Equal(t, "TERMINAL", sandbox["phase"])
 	require.Equal(t, "TIMED_OUT", sandbox["outcome"])
@@ -185,28 +193,29 @@ func TestResponseEnumMarshalerEncoderReturnsDelimiterWriteErrors(t *testing.T) {
 	require.Contains(t, err.Error(), "delimiter write failed")
 }
 
-func TestShortenResponseEnumNamesHandlesNestedArraysAndSkipsPayloads(t *testing.T) {
-	data, err := shortenResponseEnumNames([]byte(`{
-		"values": ["TRACE_STEP_OP_SEND_EVENT", "TRACE_SPAN_STATUS_FAILED"],
-		"input": "TRACE_SPAN_STATUS_COMPLETED",
-		"output": "FUNCTION_RUN_STATUS_FAILED",
-		"metadata": [{"status": "TRACE_SPAN_STATUS_WAITING"}]
-	}`))
+func TestResponseEnumMarshalerPreservesExecOutputExactly(t *testing.T) {
+	stdout := "FUNCTION_RUN_STATUS_FAILED\nTRACE_STEP_OP_SEND_EVENT\x00 café 👩🏽‍💻"
+	stderr := "SANDBOX_OUTCOME_TIMED_OUT\nreplacement: �"
+	data, err := newResponseEnumMarshaler().Marshal(&apiv2.ExecSandboxResponse{Data: &apiv2.ExecSandboxData{
+		Stdout: &stdout,
+		Stderr: &stderr,
+	}})
 	require.NoError(t, err)
 
-	var body map[string]any
+	var body struct {
+		Data struct {
+			Stdout string `json:"stdout"`
+			Stderr string `json:"stderr"`
+		} `json:"data"`
+	}
 	require.NoError(t, json.Unmarshal(data, &body))
-
-	values := body["values"].([]any)
-	require.Equal(t, "SEND_EVENT", values[0])
-	require.Equal(t, "FAILED", values[1])
-	require.Equal(t, "TRACE_SPAN_STATUS_COMPLETED", body["input"])
-	require.Equal(t, "FUNCTION_RUN_STATUS_FAILED", body["output"])
-	require.Equal(t, "WAITING", body["metadata"].([]any)[0].(map[string]any)["status"])
+	require.Equal(t, stdout, body.Data.Stdout)
+	require.Equal(t, stderr, body.Data.Stderr)
 }
 
 func TestShortenResponseEnumNamesReturnsDecodeErrors(t *testing.T) {
-	data, err := shortenResponseEnumNames([]byte(`{`))
+	descriptor := (&apiv2.ExecSandboxResponse{}).ProtoReflect().Descriptor()
+	data, err := shortenResponseEnumNames([]byte(`{`), descriptor)
 	require.Nil(t, data)
 	require.Error(t, err)
 }

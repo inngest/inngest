@@ -72,6 +72,31 @@ func TestRunTraceEnded(t *testing.T) {
 	}
 }
 
+func TestSandboxStepPresentation(t *testing.T) {
+	queuedAt := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	status := enums.StepStatusCompleted
+	op := enums.OpcodeSandbox
+	stepType := enums.StepTypeStepSandboxCreate
+
+	result, err := (&traceReader{}).convertRunSpanToGQL(context.Background(), &cqrs.OtelSpan{
+		RawOtelSpan: cqrs.RawOtelSpan{
+			Name: "create sandbox", SpanID: "sandbox-span",
+			StartTime: queuedAt, EndTime: queuedAt.Add(time.Second),
+		},
+		Attributes: &meta.ExtractedValues{
+			DynamicStatus: &status,
+			QueuedAt:      &queuedAt,
+			StepOp:        &op,
+			StepType:      &stepType,
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, result.StepOp)
+	require.Equal(t, models.StepOpSandbox, *result.StepOp)
+	require.Equal(t, "stepSandboxCreate", result.StepType)
+}
+
 func boolPtr(b bool) *bool    { return &b }
 func strPtr(s string) *string { return &s }
 

@@ -69,7 +69,8 @@ func TestHTTPGateway_SandboxesNotImplementedInOSS(t *testing.T) {
 	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{}, HTTPHandlerOptions{})
 	require.NoError(t, err)
 
-	const sandboxID = "22222222-2222-2222-2222-222222222222"
+	const vpcID = "11111111-1111-1111-1111-111111111111"
+	const sandboxName = "test-sandbox"
 	validCreateBody := `{
 		"vpcId":"11111111-1111-1111-1111-111111111111",
 		"name":"test-sandbox",
@@ -87,10 +88,10 @@ func TestHTTPGateway_SandboxesNotImplementedInOSS(t *testing.T) {
 		body   string
 	}{
 		{name: "create", method: http.MethodPost, path: "/api/v2/sandboxes", body: validCreateBody},
-		{name: "get", method: http.MethodGet, path: "/api/v2/sandboxes/" + sandboxID},
-		{name: "exec", method: http.MethodPost, path: "/api/v2/sandboxes/" + sandboxID + "/exec", body: `{"argv":["printf","%s","hello world"]}`},
-		{name: "delete", method: http.MethodDelete, path: "/api/v2/sandboxes/" + sandboxID + "?graceful=true"},
-		{name: "malformed UUID reaches OSS method", method: http.MethodGet, path: "/api/v2/sandboxes/not-a-uuid"},
+		{name: "get", method: http.MethodGet, path: "/api/v2/vpcs/" + vpcID + "/sandboxes/" + sandboxName},
+		{name: "exec", method: http.MethodPost, path: "/api/v2/vpcs/" + vpcID + "/sandboxes/" + sandboxName + "/exec", body: `{"argv":["printf","%s","hello world"]}`},
+		{name: "delete", method: http.MethodDelete, path: "/api/v2/vpcs/" + vpcID + "/sandboxes/" + sandboxName + "?graceful=true"},
+		{name: "malformed VPC UUID reaches OSS method", method: http.MethodGet, path: "/api/v2/vpcs/not-a-uuid/sandboxes/" + sandboxName},
 	}
 
 	for _, test := range tests {
@@ -113,7 +114,7 @@ func TestHTTPGateway_SandboxGeneratedTransportErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("malformed JSON", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPost, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222/exec", strings.NewReader(`{"argv":`))
+		request := httptest.NewRequest(http.MethodPost, "/api/v2/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox/exec", strings.NewReader(`{"argv":`))
 		request.Header.Set("Content-Type", "application/json")
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
@@ -125,7 +126,7 @@ func TestHTTPGateway_SandboxGeneratedTransportErrors(t *testing.T) {
 	})
 
 	t.Run("unsupported method", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodPut, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222", nil)
+		request := httptest.NewRequest(http.MethodPut, "/api/v2/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox", nil)
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
 
@@ -152,7 +153,7 @@ func TestHTTPGateway_SandboxGeneratedTransportErrors(t *testing.T) {
 	})
 
 	t.Run("malformed graceful query", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodDelete, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222?graceful=not-a-bool", nil)
+		request := httptest.NewRequest(http.MethodDelete, "/api/v2/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox?graceful=not-a-bool", nil)
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
 
@@ -173,9 +174,9 @@ func TestHTTPGateway_SandboxRoutesRequireAuthz(t *testing.T) {
 
 	requests := []*http.Request{
 		httptest.NewRequest(http.MethodPost, "/api/v2/sandboxes", strings.NewReader(`{}`)),
-		httptest.NewRequest(http.MethodGet, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222", nil),
-		httptest.NewRequest(http.MethodPost, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222/exec", strings.NewReader(`{"argv":["true"]}`)),
-		httptest.NewRequest(http.MethodDelete, "/api/v2/sandboxes/22222222-2222-2222-2222-222222222222", nil),
+		httptest.NewRequest(http.MethodGet, "/api/v2/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox", nil),
+		httptest.NewRequest(http.MethodPost, "/api/v2/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox/exec", strings.NewReader(`{"argv":["true"]}`)),
+		httptest.NewRequest(http.MethodDelete, "/api/v2/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox", nil),
 	}
 	requests[0].Header.Set("Content-Type", "application/json")
 	requests[2].Header.Set("Content-Type", "application/json")

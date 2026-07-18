@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _StepTypeName = "unknownrunsendEventsendSignalsleepwaitForEventinvokeaiInferaiWrapfetchwaitForSignalmetadatagroupExperimentrealtimePublish"
+const _StepTypeName = "unknownrunsendEventsendSignalsleepwaitForEventinvokeaiInferaiWrapfetchwaitForSignalmetadatagroupExperimentrealtimePublishstepSandboxCreatestepSandboxListstepSandboxGetstepSandboxExecstepSandboxDestroystepSandboxProcessStartstepSandboxProcessListstepSandboxProcessGetstepSandboxProcessSignalstepSandboxProcessWaitstepSandboxProcessOutput"
 
-var _StepTypeIndex = [...]uint8{0, 7, 10, 19, 29, 34, 46, 52, 59, 65, 70, 83, 91, 106, 121}
+var _StepTypeIndex = [...]uint16{0, 7, 10, 19, 29, 34, 46, 52, 59, 65, 70, 83, 91, 106, 121, 138, 153, 167, 182, 200, 223, 245, 266, 290, 312, 336}
 
-const _StepTypeLowerName = "unknownrunsendeventsendsignalsleepwaitforeventinvokeaiinferaiwrapfetchwaitforsignalmetadatagroupexperimentrealtimepublish"
+const _StepTypeLowerName = "unknownrunsendeventsendsignalsleepwaitforeventinvokeaiinferaiwrapfetchwaitforsignalmetadatagroupexperimentrealtimepublishstepsandboxcreatestepsandboxliststepsandboxgetstepsandboxexecstepsandboxdestroystepsandboxprocessstartstepsandboxprocessliststepsandboxprocessgetstepsandboxprocesssignalstepsandboxprocesswaitstepsandboxprocessoutput"
 
 func (i StepType) String() string {
 	if i < 0 || i >= StepType(len(_StepTypeIndex)-1) {
@@ -39,9 +39,20 @@ func _StepTypeNoOp() {
 	_ = x[StepTypeMetadata-(11)]
 	_ = x[StepTypeGroupExperiment-(12)]
 	_ = x[StepTypeRealtimePublish-(13)]
+	_ = x[StepTypeStepSandboxCreate-(14)]
+	_ = x[StepTypeStepSandboxList-(15)]
+	_ = x[StepTypeStepSandboxGet-(16)]
+	_ = x[StepTypeStepSandboxExec-(17)]
+	_ = x[StepTypeStepSandboxDestroy-(18)]
+	_ = x[StepTypeStepSandboxProcessStart-(19)]
+	_ = x[StepTypeStepSandboxProcessList-(20)]
+	_ = x[StepTypeStepSandboxProcessGet-(21)]
+	_ = x[StepTypeStepSandboxProcessSignal-(22)]
+	_ = x[StepTypeStepSandboxProcessWait-(23)]
+	_ = x[StepTypeStepSandboxProcessOutput-(24)]
 }
 
-var _StepTypeValues = []StepType{StepTypeUnknown, StepTypeRun, StepTypeSendEvent, StepTypeSendSignal, StepTypeSleep, StepTypeWaitForEvent, StepTypeInvoke, StepTypeAiInfer, StepTypeAiWrap, StepTypeFetch, StepTypeWaitForSignal, StepTypeMetadata, StepTypeGroupExperiment, StepTypeRealtimePublish}
+var _StepTypeValues = []StepType{StepTypeUnknown, StepTypeRun, StepTypeSendEvent, StepTypeSendSignal, StepTypeSleep, StepTypeWaitForEvent, StepTypeInvoke, StepTypeAiInfer, StepTypeAiWrap, StepTypeFetch, StepTypeWaitForSignal, StepTypeMetadata, StepTypeGroupExperiment, StepTypeRealtimePublish, StepTypeStepSandboxCreate, StepTypeStepSandboxList, StepTypeStepSandboxGet, StepTypeStepSandboxExec, StepTypeStepSandboxDestroy, StepTypeStepSandboxProcessStart, StepTypeStepSandboxProcessList, StepTypeStepSandboxProcessGet, StepTypeStepSandboxProcessSignal, StepTypeStepSandboxProcessWait, StepTypeStepSandboxProcessOutput}
 
 var _StepTypeNameToValueMap = map[string]StepType{
 	_StepTypeName[0:7]:          StepTypeUnknown,
@@ -72,6 +83,28 @@ var _StepTypeNameToValueMap = map[string]StepType{
 	_StepTypeLowerName[91:106]:  StepTypeGroupExperiment,
 	_StepTypeName[106:121]:      StepTypeRealtimePublish,
 	_StepTypeLowerName[106:121]: StepTypeRealtimePublish,
+	_StepTypeName[121:138]:      StepTypeStepSandboxCreate,
+	_StepTypeLowerName[121:138]: StepTypeStepSandboxCreate,
+	_StepTypeName[138:153]:      StepTypeStepSandboxList,
+	_StepTypeLowerName[138:153]: StepTypeStepSandboxList,
+	_StepTypeName[153:167]:      StepTypeStepSandboxGet,
+	_StepTypeLowerName[153:167]: StepTypeStepSandboxGet,
+	_StepTypeName[167:182]:      StepTypeStepSandboxExec,
+	_StepTypeLowerName[167:182]: StepTypeStepSandboxExec,
+	_StepTypeName[182:200]:      StepTypeStepSandboxDestroy,
+	_StepTypeLowerName[182:200]: StepTypeStepSandboxDestroy,
+	_StepTypeName[200:223]:      StepTypeStepSandboxProcessStart,
+	_StepTypeLowerName[200:223]: StepTypeStepSandboxProcessStart,
+	_StepTypeName[223:245]:      StepTypeStepSandboxProcessList,
+	_StepTypeLowerName[223:245]: StepTypeStepSandboxProcessList,
+	_StepTypeName[245:266]:      StepTypeStepSandboxProcessGet,
+	_StepTypeLowerName[245:266]: StepTypeStepSandboxProcessGet,
+	_StepTypeName[266:290]:      StepTypeStepSandboxProcessSignal,
+	_StepTypeLowerName[266:290]: StepTypeStepSandboxProcessSignal,
+	_StepTypeName[290:312]:      StepTypeStepSandboxProcessWait,
+	_StepTypeLowerName[290:312]: StepTypeStepSandboxProcessWait,
+	_StepTypeName[312:336]:      StepTypeStepSandboxProcessOutput,
+	_StepTypeLowerName[312:336]: StepTypeStepSandboxProcessOutput,
 }
 
 var _StepTypeNames = []string{
@@ -89,6 +122,17 @@ var _StepTypeNames = []string{
 	_StepTypeName[83:91],
 	_StepTypeName[91:106],
 	_StepTypeName[106:121],
+	_StepTypeName[121:138],
+	_StepTypeName[138:153],
+	_StepTypeName[153:167],
+	_StepTypeName[167:182],
+	_StepTypeName[182:200],
+	_StepTypeName[200:223],
+	_StepTypeName[223:245],
+	_StepTypeName[245:266],
+	_StepTypeName[266:290],
+	_StepTypeName[290:312],
+	_StepTypeName[312:336],
 }
 
 // StepTypeString retrieves an enum value from the enum constants string name.

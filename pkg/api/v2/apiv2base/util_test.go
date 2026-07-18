@@ -259,6 +259,7 @@ func TestGRPCToHTTPStatus(t *testing.T) {
 		{"ResourceExhausted", codes.ResourceExhausted, 429},
 		{"Unimplemented", codes.Unimplemented, 501},
 		{"Unavailable", codes.Unavailable, 503},
+		{"DataLoss", codes.DataLoss, 502},
 		{"Internal", codes.Internal, 500},
 		{"Unknown", codes.Unknown, 500},
 		{"OK", codes.OK, 500},             // Default fallback
@@ -310,10 +311,11 @@ func TestBuildAuthzPathMap(t *testing.T) {
 
 func TestRequiresAuthzMatchesMethodAndParameterizedPath(t *testing.T) {
 	assert.True(t, RequiresAuthz(http.MethodPost, "/sandboxes"))
-	assert.True(t, RequiresAuthz(http.MethodGet, "/sandboxes/22222222-2222-2222-2222-222222222222"))
-	assert.True(t, RequiresAuthz(http.MethodPost, "/sandboxes/22222222-2222-2222-2222-222222222222/exec"))
-	assert.True(t, RequiresAuthz(http.MethodDelete, "/sandboxes/22222222-2222-2222-2222-222222222222"))
-	assert.False(t, RequiresAuthz(http.MethodPut, "/sandboxes/22222222-2222-2222-2222-222222222222"))
+	assert.True(t, RequiresAuthz(http.MethodGet, "/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox"))
+	assert.True(t, RequiresAuthz(http.MethodPost, "/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox/exec"))
+	assert.True(t, RequiresAuthz(http.MethodDelete, "/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox"))
+	assert.False(t, RequiresAuthz(http.MethodGet, "/sandboxes/22222222-2222-2222-2222-222222222222"))
+	assert.False(t, RequiresAuthz(http.MethodPut, "/vpcs/11111111-1111-1111-1111-111111111111/sandboxes/test-sandbox"))
 	assert.False(t, RequiresAuthz(http.MethodGet, "/health"))
 }
 

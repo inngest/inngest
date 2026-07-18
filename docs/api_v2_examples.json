@@ -585,8 +585,20 @@
   },
   "/sandboxes": {
     "post": {
-      "202": {
-        "// TODO": "Add example data for post /sandboxes 202"
+      "200": {
+        "data": {
+          "cleanupState": "NOT_REQUIRED",
+          "desiredState": "RUNNING",
+          "generation": 3,
+          "id": "22222222-2222-2222-2222-222222222222",
+          "name": "test-sandbox",
+          "phase": "RUNNING",
+          "vpcId": "11111111-1111-1111-1111-111111111111"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetchedAt": "2026-07-18T12:00:00Z"
+        }
       },
       "400": {
         "// TODO": "Add example data for post /sandboxes 400"
@@ -608,52 +620,76 @@
       }
     }
   },
-  "/sandboxes/{sandboxId}": {
+  "/vpcs/{vpcId}/sandboxes/{name}": {
     "delete": {
       "202": {
-        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 202"
+        "data": {
+          "cleanupState": "PENDING",
+          "desiredState": "TERMINATED",
+          "generation": 3,
+          "id": "22222222-2222-2222-2222-222222222222",
+          "name": "test-sandbox",
+          "phase": "TERMINATING",
+          "vpcId": "11111111-1111-1111-1111-111111111111"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetchedAt": "2026-07-18T12:00:00Z"
+        }
       },
       "400": {
-        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 400"
+        "// TODO": "Add example data for delete /vpcs/{vpcId}/sandboxes/{name} 400"
       },
       "401": {
-        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 401"
+        "// TODO": "Add example data for delete /vpcs/{vpcId}/sandboxes/{name} 401"
       },
       "403": {
-        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 403"
+        "// TODO": "Add example data for delete /vpcs/{vpcId}/sandboxes/{name} 403"
       },
       "404": {
-        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 404"
+        "// TODO": "Add example data for delete /vpcs/{vpcId}/sandboxes/{name} 404"
       },
       "409": {
-        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 409"
+        "// TODO": "Add example data for delete /vpcs/{vpcId}/sandboxes/{name} 409"
       },
       "500": {
-        "// TODO": "Add example data for delete /sandboxes/{sandboxId} 500"
+        "// TODO": "Add example data for delete /vpcs/{vpcId}/sandboxes/{name} 500"
       }
     },
     "get": {
       "200": {
-        "// TODO": "Add example data for get /sandboxes/{sandboxId} 200"
+        "data": {
+          "cleanupState": "NOT_REQUIRED",
+          "desiredState": "RUNNING",
+          "generation": 3,
+          "id": "22222222-2222-2222-2222-222222222222",
+          "name": "test-sandbox",
+          "phase": "RUNNING",
+          "vpcId": "11111111-1111-1111-1111-111111111111"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetchedAt": "2026-07-18T12:00:00Z"
+        }
       },
       "400": {
-        "// TODO": "Add example data for get /sandboxes/{sandboxId} 400"
+        "// TODO": "Add example data for get /vpcs/{vpcId}/sandboxes/{name} 400"
       },
       "401": {
-        "// TODO": "Add example data for get /sandboxes/{sandboxId} 401"
+        "// TODO": "Add example data for get /vpcs/{vpcId}/sandboxes/{name} 401"
       },
       "403": {
-        "// TODO": "Add example data for get /sandboxes/{sandboxId} 403"
+        "// TODO": "Add example data for get /vpcs/{vpcId}/sandboxes/{name} 403"
       },
       "404": {
-        "// TODO": "Add example data for get /sandboxes/{sandboxId} 404"
+        "// TODO": "Add example data for get /vpcs/{vpcId}/sandboxes/{name} 404"
       },
       "500": {
-        "// TODO": "Add example data for get /sandboxes/{sandboxId} 500"
+        "// TODO": "Add example data for get /vpcs/{vpcId}/sandboxes/{name} 500"
       }
     }
   },
-  "/sandboxes/{sandboxId}/exec": {
+  "/vpcs/{vpcId}/sandboxes/{name}/exec": {
     "post": {
       "200": {
         "data": {
@@ -670,16 +706,16 @@
         }
       },
       "400": {
-        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 400"
+        "// TODO": "Add example data for post /vpcs/{vpcId}/sandboxes/{name}/exec 400"
       },
       "401": {
-        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 401"
+        "// TODO": "Add example data for post /vpcs/{vpcId}/sandboxes/{name}/exec 401"
       },
       "403": {
-        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 403"
+        "// TODO": "Add example data for post /vpcs/{vpcId}/sandboxes/{name}/exec 403"
       },
       "404": {
-        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 404"
+        "// TODO": "Add example data for post /vpcs/{vpcId}/sandboxes/{name}/exec 404"
       },
       "409": {
         "errors": [
@@ -690,10 +726,10 @@
         ]
       },
       "500": {
-        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 500"
+        "// TODO": "Add example data for post /vpcs/{vpcId}/sandboxes/{name}/exec 500"
       },
       "503": {
-        "// TODO": "Add example data for post /sandboxes/{sandboxId}/exec 503"
+        "// TODO": "Add example data for post /vpcs/{vpcId}/sandboxes/{name}/exec 503"
       }
     }
   }

@@ -103,6 +103,8 @@ func GRPCToHTTPStatus(code codes.Code) int {
 		return http.StatusNotImplemented
 	case codes.Unavailable:
 		return http.StatusServiceUnavailable
+	case codes.DataLoss:
+		return http.StatusBadGateway
 	case codes.Internal:
 		return http.StatusInternalServerError
 	default:

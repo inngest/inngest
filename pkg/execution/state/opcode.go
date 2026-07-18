@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngest/pkg/util/interval"
+	"github.com/inngest/inngest/pkg/util/sandbox"
 	"github.com/inngest/inngest/pkg/util/strtimeout"
 	"github.com/xhit/go-str2duration/v2"
 )
@@ -114,6 +115,13 @@ func (g GeneratorOpcode) Input() (string, error) {
 	case enums.OpcodeAIGateway:
 		req, _ := g.AIGatewayOpts()
 		return string(req.Body), nil
+	case enums.OpcodeSandbox:
+		operation, err := g.SandboxOpts()
+		if err != nil {
+			return "", err
+		}
+		input, err := operation.Input()
+		return string(input), err
 	}
 
 	return "", nil
@@ -218,6 +226,28 @@ func (g GeneratorOpcode) StepType() enums.StepType {
 		return enums.StepTypeRealtimePublish
 	case "group.experiment":
 		return enums.StepTypeGroupExperiment
+	case "step.sandbox.create":
+		return enums.StepTypeStepSandboxCreate
+	case "step.sandbox.list":
+		return enums.StepTypeStepSandboxList
+	case "step.sandbox.get":
+		return enums.StepTypeStepSandboxGet
+	case "step.sandbox.exec":
+		return enums.StepTypeStepSandboxExec
+	case "step.sandbox.destroy":
+		return enums.StepTypeStepSandboxDestroy
+	case "step.sandbox.process.start":
+		return enums.StepTypeStepSandboxProcessStart
+	case "step.sandbox.process.list":
+		return enums.StepTypeStepSandboxProcessList
+	case "step.sandbox.process.get":
+		return enums.StepTypeStepSandboxProcessGet
+	case "step.sandbox.process.signal":
+		return enums.StepTypeStepSandboxProcessSignal
+	case "step.sandbox.process.wait":
+		return enums.StepTypeStepSandboxProcessWait
+	case "step.sandbox.process.output":
+		return enums.StepTypeStepSandboxProcessOutput
 	}
 
 	switch g.Op {
@@ -249,6 +279,10 @@ func (g GeneratorOpcode) RunOpts() (*RunOpts, error) {
 		return nil, err
 	}
 	return opts, nil
+}
+
+func (g GeneratorOpcode) SandboxOpts() (sandbox.Operation, error) {
+	return sandbox.ParseOpcodeOpts(g.Opts)
 }
 
 func (g GeneratorOpcode) WaitForEventOpts() (*WaitForEventOpts, error) {

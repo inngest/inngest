@@ -36,6 +36,17 @@ func TestGeneratorOpcode_StepType(t *testing.T) {
 			{"step.fetch", enums.StepTypeFetch},
 			{"step.realtime.publish", enums.StepTypeRealtimePublish},
 			{"group.experiment", enums.StepTypeGroupExperiment},
+			{"step.sandbox.create", enums.StepTypeStepSandboxCreate},
+			{"step.sandbox.list", enums.StepTypeStepSandboxList},
+			{"step.sandbox.get", enums.StepTypeStepSandboxGet},
+			{"step.sandbox.exec", enums.StepTypeStepSandboxExec},
+			{"step.sandbox.destroy", enums.StepTypeStepSandboxDestroy},
+			{"step.sandbox.process.start", enums.StepTypeStepSandboxProcessStart},
+			{"step.sandbox.process.list", enums.StepTypeStepSandboxProcessList},
+			{"step.sandbox.process.get", enums.StepTypeStepSandboxProcessGet},
+			{"step.sandbox.process.signal", enums.StepTypeStepSandboxProcessSignal},
+			{"step.sandbox.process.wait", enums.StepTypeStepSandboxProcessWait},
+			{"step.sandbox.process.output", enums.StepTypeStepSandboxProcessOutput},
 		}
 		for _, tc := range cases {
 			t.Run(tc.runType, func(t *testing.T) {

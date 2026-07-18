@@ -49,12 +49,12 @@ type sandboxRouteServer struct {
 
 func (s *sandboxRouteServer) CreateSandbox(_ context.Context, req *CreateSandboxRequest) (*CreateSandboxResponse, error) {
 	s.createRequest = req
-	return &CreateSandboxResponse{Data: &Sandbox{Id: req.VpcId, Name: req.Name}}, nil
+	return &CreateSandboxResponse{Data: &Sandbox{VpcId: req.VpcId, Name: req.Name, Generation: 1}}, nil
 }
 
 func (s *sandboxRouteServer) GetSandbox(_ context.Context, req *GetSandboxRequest) (*GetSandboxResponse, error) {
 	s.getRequest = req
-	return &GetSandboxResponse{Data: &Sandbox{Id: req.SandboxId}}, nil
+	return &GetSandboxResponse{Data: &Sandbox{VpcId: req.VpcId, Name: req.Name}}, nil
 }
 
 func (s *sandboxRouteServer) ExecSandbox(_ context.Context, req *ExecSandboxRequest) (*ExecSandboxResponse, error) {
@@ -64,7 +64,7 @@ func (s *sandboxRouteServer) ExecSandbox(_ context.Context, req *ExecSandboxRequ
 
 func (s *sandboxRouteServer) DeleteSandbox(_ context.Context, req *DeleteSandboxRequest) (*DeleteSandboxResponse, error) {
 	s.deleteRequest = req
-	return &DeleteSandboxResponse{Data: &Sandbox{Id: req.SandboxId}}, nil
+	return &DeleteSandboxResponse{Data: &Sandbox{VpcId: req.VpcId, Name: req.Name}}, nil
 }
 
 func TestSandboxRoutesBindBodyPathAndQuery(t *testing.T) {
@@ -73,7 +73,7 @@ func TestSandboxRoutesBindBodyPathAndQuery(t *testing.T) {
 	require.NoError(t, RegisterV2HandlerServer(context.Background(), mux, server))
 
 	const vpcID = "11111111-1111-1111-1111-111111111111"
-	const sandboxID = "22222222-2222-2222-2222-222222222222"
+	const sandboxName = "test-sandbox"
 	createBody := `{
 		"vpcId":"11111111-1111-1111-1111-111111111111",
 		"name":"test-sandbox",
@@ -104,34 +104,35 @@ func TestSandboxRoutesBindBodyPathAndQuery(t *testing.T) {
 		}},
 	}, server.createRequest))
 
-	req = httptest.NewRequest(http.MethodGet, "/sandboxes/"+sandboxID, nil)
+	req = httptest.NewRequest(http.MethodGet, "/vpcs/"+vpcID+"/sandboxes/"+sandboxName, nil)
 	res = httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	require.Equal(t, http.StatusOK, res.Code)
-	require.True(t, proto.Equal(&GetSandboxRequest{SandboxId: sandboxID}, server.getRequest))
+	require.True(t, proto.Equal(&GetSandboxRequest{VpcId: vpcID, Name: sandboxName}, server.getRequest))
 
-	req = httptest.NewRequest(http.MethodPost, "/sandboxes/"+sandboxID+"/exec", strings.NewReader(`{"argv":["printf","%s","hello world"]}`))
+	req = httptest.NewRequest(http.MethodPost, "/vpcs/"+vpcID+"/sandboxes/"+sandboxName+"/exec", strings.NewReader(`{"argv":["printf","%s","hello world"]}`))
 	req.Header.Set("Content-Type", "application/json")
 	res = httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	require.Equal(t, http.StatusOK, res.Code)
 	require.True(t, proto.Equal(&ExecSandboxRequest{
-		SandboxId: sandboxID,
-		Argv:      []string{"printf", "%s", "hello world"},
+		VpcId: vpcID,
+		Name:  sandboxName,
+		Argv:  []string{"printf", "%s", "hello world"},
 	}, server.execRequest))
 
-	req = httptest.NewRequest(http.MethodDelete, "/sandboxes/"+sandboxID+"?graceful=true", nil)
+	req = httptest.NewRequest(http.MethodDelete, "/vpcs/"+vpcID+"/sandboxes/"+sandboxName+"?graceful=true", nil)
 	res = httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	require.Equal(t, http.StatusOK, res.Code)
-	require.True(t, proto.Equal(&DeleteSandboxRequest{SandboxId: sandboxID, Graceful: true}, server.deleteRequest))
+	require.True(t, proto.Equal(&DeleteSandboxRequest{VpcId: vpcID, Name: sandboxName, Graceful: true}, server.deleteRequest))
 
-	req = httptest.NewRequest(http.MethodDelete, "/sandboxes/"+sandboxID, strings.NewReader(`{"graceful":true}`))
+	req = httptest.NewRequest(http.MethodDelete, "/vpcs/"+vpcID+"/sandboxes/"+sandboxName, strings.NewReader(`{"graceful":true}`))
 	req.Header.Set("Content-Type", "application/json")
 	res = httptest.NewRecorder()
 	mux.ServeHTTP(res, req)
 	require.Equal(t, http.StatusOK, res.Code)
-	require.True(t, proto.Equal(&DeleteSandboxRequest{SandboxId: sandboxID}, server.deleteRequest), "DELETE body must not bind")
+	require.True(t, proto.Equal(&DeleteSandboxRequest{VpcId: vpcID, Name: sandboxName}, server.deleteRequest), "DELETE body must not bind")
 }
 
 func TestSandboxOpenAPIAndAuthzMetadata(t *testing.T) {
@@ -142,7 +143,7 @@ func TestSandboxOpenAPIAndAuthzMetadata(t *testing.T) {
 		method protoreflect.Name
 		status string
 	}{
-		{method: "CreateSandbox", status: "202"},
+		{method: "CreateSandbox", status: "200"},
 		{method: "GetSandbox", status: "200"},
 		{method: "ExecSandbox", status: "200"},
 		{method: "DeleteSandbox", status: "202"},
@@ -164,6 +165,11 @@ func TestSandboxOpenAPIAndAuthzMetadata(t *testing.T) {
 	execMethod := service.Methods().ByName("ExecSandbox")
 	execOperation := proto.GetExtension(execMethod.Options(), openapiv2.E_Openapiv2Operation).(*openapiv2.Operation)
 	require.Contains(t, execOperation.Responses["409"].Description, "non-replayable command is ambiguous")
+
+	createMethod := service.Methods().ByName("CreateSandbox")
+	createOperation := proto.GetExtension(createMethod.Options(), openapiv2.E_Openapiv2Operation).(*openapiv2.Operation)
+	require.Contains(t, createOperation.Description, "RUNNING")
+	require.NotContains(t, createOperation.Responses, "202")
 }
 
 func TestSandboxMessagesExposeOnlyPublicFields(t *testing.T) {
@@ -187,12 +193,20 @@ func TestSandboxMessagesExposeOnlyPublicFields(t *testing.T) {
 		"environment",
 		"secret_references",
 	}, fieldNames(request))
-	require.Equal(t, []string{"sandbox_id"}, fieldNames((&GetSandboxRequest{}).ProtoReflect().Descriptor()))
-	require.Equal(t, []string{"sandbox_id", "argv"}, fieldNames((&ExecSandboxRequest{}).ProtoReflect().Descriptor()))
-	require.Equal(t, []string{"sandbox_id", "graceful"}, fieldNames((&DeleteSandboxRequest{}).ProtoReflect().Descriptor()))
+	require.Equal(t, []string{"vpc_id", "name"}, fieldNames((&GetSandboxRequest{}).ProtoReflect().Descriptor()))
+	require.Equal(t, []string{"vpc_id", "name", "argv"}, fieldNames((&ExecSandboxRequest{}).ProtoReflect().Descriptor()))
+	require.Equal(t, []string{"vpc_id", "name", "graceful"}, fieldNames((&DeleteSandboxRequest{}).ProtoReflect().Descriptor()))
+	for _, request := range []protoreflect.MessageDescriptor{
+		(&GetSandboxRequest{}).ProtoReflect().Descriptor(),
+		(&ExecSandboxRequest{}).ProtoReflect().Descriptor(),
+		(&DeleteSandboxRequest{}).ProtoReflect().Descriptor(),
+	} {
+		require.True(t, request.ReservedRanges().Has(1))
+		require.True(t, request.ReservedNames().Has("sandbox_id"))
+	}
 
 	sandbox := (&Sandbox{}).ProtoReflect().Descriptor()
-	require.Equal(t, []string{"id", "name", "desired_state", "phase", "outcome", "cleanup_state"}, fieldNames(sandbox))
+	require.Equal(t, []string{"id", "vpc_id", "name", "generation", "desired_state", "phase", "outcome", "cleanup_state"}, fieldNames(sandbox))
 	require.True(t, sandbox.Fields().ByName("outcome").HasOptionalKeyword())
 
 	execData := (&ExecSandboxData{}).ProtoReflect().Descriptor()

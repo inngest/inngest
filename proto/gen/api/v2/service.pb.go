@@ -8291,7 +8291,9 @@ func (x *SessionRun) GetEndedAt() *timestamppb.Timestamp {
 type Sandbox struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	VpcId         string                 `protobuf:"bytes,7,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Generation    uint32                 `protobuf:"varint,8,opt,name=generation,proto3" json:"generation,omitempty"`
 	DesiredState  SandboxDesiredState    `protobuf:"varint,3,opt,name=desired_state,json=desiredState,proto3,enum=api.v2.SandboxDesiredState" json:"desired_state,omitempty"`
 	Phase         SandboxPhase           `protobuf:"varint,4,opt,name=phase,proto3,enum=api.v2.SandboxPhase" json:"phase,omitempty"`
 	Outcome       *SandboxOutcome        `protobuf:"varint,5,opt,name=outcome,proto3,enum=api.v2.SandboxOutcome,oneof" json:"outcome,omitempty"`
@@ -8337,11 +8339,25 @@ func (x *Sandbox) GetId() string {
 	return ""
 }
 
+func (x *Sandbox) GetVpcId() string {
+	if x != nil {
+		return x.VpcId
+	}
+	return ""
+}
+
 func (x *Sandbox) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
+}
+
+func (x *Sandbox) GetGeneration() uint32 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
 }
 
 func (x *Sandbox) GetDesiredState() SandboxDesiredState {
@@ -8586,7 +8602,8 @@ func (x *CreateSandboxResponse) GetMetadata() *ResponseMetadata {
 
 type GetSandboxRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	VpcId         string                 `protobuf:"bytes,2,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8621,9 +8638,16 @@ func (*GetSandboxRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{125}
 }
 
-func (x *GetSandboxRequest) GetSandboxId() string {
+func (x *GetSandboxRequest) GetVpcId() string {
 	if x != nil {
-		return x.SandboxId
+		return x.VpcId
+	}
+	return ""
+}
+
+func (x *GetSandboxRequest) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
@@ -8682,7 +8706,8 @@ func (x *GetSandboxResponse) GetMetadata() *ResponseMetadata {
 
 type ExecSandboxRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	VpcId         string                 `protobuf:"bytes,3,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
 	Argv          []string               `protobuf:"bytes,2,rep,name=argv,proto3" json:"argv,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -8718,9 +8743,16 @@ func (*ExecSandboxRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{127}
 }
 
-func (x *ExecSandboxRequest) GetSandboxId() string {
+func (x *ExecSandboxRequest) GetVpcId() string {
 	if x != nil {
-		return x.SandboxId
+		return x.VpcId
+	}
+	return ""
+}
+
+func (x *ExecSandboxRequest) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
@@ -8870,7 +8902,8 @@ func (x *ExecSandboxData) GetStderrTruncated() bool {
 
 type DeleteSandboxRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SandboxId     string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	VpcId         string                 `protobuf:"bytes,3,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
 	Graceful      bool                   `protobuf:"varint,2,opt,name=graceful,proto3" json:"graceful,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -8906,9 +8939,16 @@ func (*DeleteSandboxRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{130}
 }
 
-func (x *DeleteSandboxRequest) GetSandboxId() string {
+func (x *DeleteSandboxRequest) GetVpcId() string {
 	if x != nil {
-		return x.SandboxId
+		return x.VpcId
+	}
+	return ""
+}
+
+func (x *DeleteSandboxRequest) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
@@ -9656,10 +9696,14 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at\"\x84\x03\n" +
+	"\t_ended_at\"\x83\x04\n" +
 	"\aSandbox\x12(\n" +
-	"\x02id\x18\x01 \x01(\tB\x18\x92A\x152\fSandbox UUID\xa2\x02\x04uuidR\x02id\x120\n" +
-	"\x04name\x18\x02 \x01(\tB\x1c\x92A\x192\x17Normalized sandbox nameR\x04name\x12@\n" +
+	"\x02id\x18\x01 \x01(\tB\x18\x92A\x152\fSandbox UUID\xa2\x02\x04uuidR\x02id\x12+\n" +
+	"\x06vpc_id\x18\a \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x120\n" +
+	"\x04name\x18\x02 \x01(\tB\x1c\x92A\x192\x17Normalized sandbox nameR\x04name\x12P\n" +
+	"\n" +
+	"generation\x18\b \x01(\rB0\x92A-2+Monotonically increasing sandbox generationR\n" +
+	"generation\x12@\n" +
 	"\rdesired_state\x18\x03 \x01(\x0e2\x1b.api.v2.SandboxDesiredStateR\fdesiredState\x12*\n" +
 	"\x05phase\x18\x04 \x01(\x0e2\x14.api.v2.SandboxPhaseR\x05phase\x12a\n" +
 	"\aoutcome\x18\x05 \x01(\x0e2\x16.api.v2.SandboxOutcomeB*\x92A'2%Terminal outcome, omitted until knownH\x00R\aoutcome\x88\x01\x01\x12@\n" +
@@ -9686,23 +9730,25 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"r\n" +
 	"\x15CreateSandboxResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"L\n" +
-	"\x11GetSandboxRequest\x127\n" +
-	"\n" +
-	"sandbox_id\x18\x01 \x01(\tB\x18\x92A\x152\fSandbox UUID\xa2\x02\x04uuidR\tsandboxId\"o\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xcc\x01\n" +
+	"\x11GetSandboxRequest\x12+\n" +
+	"\x06vpc_id\x18\x02 \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x12x\n" +
+	"\x04name\x18\x03 \x01(\tBd\x92Aa21Normalized DNS label used as the sandbox identityx?\x80\x01\x01\x8a\x01&^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$R\x04nameJ\x04\b\x01\x10\x02R\n" +
+	"sandbox_id\"o\n" +
 	"\x12GetSandboxResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xae\x01\n" +
-	"\x12ExecSandboxRequest\x127\n" +
-	"\n" +
-	"sandbox_id\x18\x01 \x01(\tB\x18\x92A\x152\fSandbox UUID\xa2\x02\x04uuidR\tsandboxId\x12_\n" +
-	"\x04argv\x18\x02 \x03(\tBK\x92AH2FExecutable and arguments to run directly, without shell interpretationR\x04argv\"x\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xae\x02\n" +
+	"\x12ExecSandboxRequest\x12+\n" +
+	"\x06vpc_id\x18\x03 \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x12x\n" +
+	"\x04name\x18\x04 \x01(\tBd\x92Aa21Normalized DNS label used as the sandbox identityx?\x80\x01\x01\x8a\x01&^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$R\x04name\x12_\n" +
+	"\x04argv\x18\x02 \x03(\tBK\x92AH2FExecutable and arguments to run directly, without shell interpretationR\x04argvJ\x04\b\x01\x10\x02R\n" +
+	"sandbox_id\"x\n" +
 	"\x13ExecSandboxResponse\x12+\n" +
 	"\x04data\x18\x01 \x01(\v2\x17.api.v2.ExecSandboxDataR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xae\x04\n" +
-	"\x0fExecSandboxData\x12:\n" +
-	"\x06stdout\x18\x01 \x01(\tB\x1d\x92A\x1a2\x18Captured standard outputH\x00R\x06stdout\x88\x01\x01\x129\n" +
-	"\x06stderr\x18\x02 \x01(\tB\x1c\x92A\x192\x17Captured standard errorH\x01R\x06stderr\x88\x01\x01\x128\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xfc\x04\n" +
+	"\x0fExecSandboxData\x12a\n" +
+	"\x06stdout\x18\x01 \x01(\tBD\x92AA2?Captured standard output, preserved exactly as valid UTF-8 textH\x00R\x06stdout\x88\x01\x01\x12`\n" +
+	"\x06stderr\x18\x02 \x01(\tBC\x92A@2>Captured standard error, preserved exactly as valid UTF-8 textH\x01R\x06stderr\x88\x01\x01\x128\n" +
 	"\texit_code\x18\x03 \x01(\x05B\x16\x92A\x132\x11Process exit codeH\x02R\bexitCode\x88\x01\x01\x12U\n" +
 	"\vduration_ms\x18\x04 \x01(\rB/\x92A,2*Command execution duration in millisecondsH\x03R\n" +
 	"durationMs\x88\x01\x01\x12Z\n" +
@@ -9714,11 +9760,12 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"_exit_codeB\x0e\n" +
 	"\f_duration_msB\x13\n" +
 	"\x11_stdout_truncatedB\x13\n" +
-	"\x11_stderr_truncated\"\x9f\x01\n" +
-	"\x14DeleteSandboxRequest\x127\n" +
-	"\n" +
-	"sandbox_id\x18\x01 \x01(\tB\x18\x92A\x152\fSandbox UUID\xa2\x02\x04uuidR\tsandboxId\x12N\n" +
-	"\bgraceful\x18\x02 \x01(\bB2\x92A/2-Allow graceful shutdown before forced cleanupR\bgraceful\"r\n" +
+	"\x11_stderr_truncated\"\x9f\x02\n" +
+	"\x14DeleteSandboxRequest\x12+\n" +
+	"\x06vpc_id\x18\x03 \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x12x\n" +
+	"\x04name\x18\x04 \x01(\tBd\x92Aa21Normalized DNS label used as the sandbox identityx?\x80\x01\x01\x8a\x01&^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$R\x04name\x12N\n" +
+	"\bgraceful\x18\x02 \x01(\bB2\x92A/2-Allow graceful shutdown before forced cleanupR\bgracefulJ\x04\b\x01\x10\x02R\n" +
+	"sandbox_id\"r\n" +
 	"\x15DeleteSandboxResponse\x12#\n" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata*\xdf\x01\n" +
@@ -9814,7 +9861,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1dSANDBOX_CLEANUP_STATE_PENDING\x10\x02\x12%\n" +
 	"!SANDBOX_CLEANUP_STATE_IN_PROGRESS\x10\x03\x12#\n" +
 	"\x1fSANDBOX_CLEANUP_STATE_CONFIRMED\x10\x04\x12#\n" +
-	"\x1fSANDBOX_CLEANUP_STATE_UNCERTAIN\x10\x052\xaa\x99\x01\n" +
+	"\x1fSANDBOX_CLEANUP_STATE_UNCERTAIN\x10\x052ך\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10300,11 +10347,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runs\x12\x97\x06\n" +
-	"\rCreateSandbox\x12\x1c.api.v2.CreateSandboxRequest\x1a\x1d.api.v2.CreateSandboxResponse\"\xc8\x05\x92A\xa9\x05\n" +
-	"\tSandboxes\x12\x0eCreate sandbox\x1a?Creates or updates a sandbox and begins asynchronous placement.JD\n" +
-	"\x03202\x12=\n" +
-	"\x10Sandbox accepted\x12)\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runs\x12\xad\x06\n" +
+	"\rCreateSandbox\x12\x1c.api.v2.CreateSandboxRequest\x1a\x1d.api.v2.CreateSandboxResponse\"\xde\x05\x92A\xbf\x05\n" +
+	"\tSandboxes\x12\x0eCreate sandbox\x1a?Creates or updates a sandbox and waits for it to reach RUNNING.JZ\n" +
+	"\x03200\x12S\n" +
+	"&Sandbox created or updated and running\x12)\n" +
 	"'\x1a%#/definitions/v2CreateSandboxResponseJL\n" +
 	"\x03400\x12E\n" +
 	" Bad Request - invalid input data\x12!\n" +
@@ -10327,15 +10374,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
-	"/sandboxes\x12\xfe\x04\n" +
+	"/sandboxes\x12\x92\x05\n" +
 	"\n" +
-	"GetSandbox\x12\x19.api.v2.GetSandboxRequest\x1a\x1a.api.v2.GetSandboxResponse\"\xb8\x04\x92A\x8f\x04\n" +
+	"GetSandbox\x12\x19.api.v2.GetSandboxRequest\x1a\x1a.api.v2.GetSandboxResponse\"\xcc\x04\x92A\x9b\x04\n" +
 	"\tSandboxes\x12\vGet sandbox\x1a'Returns the current state of a sandbox.J8\n" +
 	"\x03200\x121\n" +
 	"\aSandbox\x12&\n" +
-	"$\x1a\"#/definitions/v2GetSandboxResponseJL\n" +
-	"\x03400\x12E\n" +
-	" Bad Request - invalid sandbox ID\x12!\n" +
+	"$\x1a\"#/definitions/v2GetSandboxResponseJX\n" +
+	"\x03400\x12Q\n" +
+	",Bad Request - invalid VPC ID or sandbox name\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
 	"\x03401\x12K\n" +
 	"&Unauthorized - authentication required\x12!\n" +
@@ -10351,14 +10398,14 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/sandboxes/{sandbox_id}\x12\xa7\b\n" +
-	"\vExecSandbox\x12\x1a.api.v2.ExecSandboxRequest\x1a\x1b.api.v2.ExecSandboxResponse\"\xde\a\x92A\xad\a\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02!\x12\x1f/vpcs/{vpc_id}/sandboxes/{name}\x12\x97\t\n" +
+	"\vExecSandbox\x12\x1a.api.v2.ExecSandboxRequest\x1a\x1b.api.v2.ExecSandboxResponse\"\xce\b\x92A\x95\b\n" +
 	"\tSandboxes\x12\x1aExecute command in sandbox\x1a\xa0\x01Executes a structured argv command in a running sandbox and returns its captured output. The command is executed directly without implicit shell interpretation.JC\n" +
 	"\x03200\x12<\n" +
 	"\x11Command completed\x12'\n" +
-	"%\x1a##/definitions/v2ExecSandboxResponseJT\n" +
-	"\x03400\x12M\n" +
-	"(Bad Request - invalid sandbox ID or argv\x12!\n" +
+	"%\x1a##/definitions/v2ExecSandboxResponseJ_\n" +
+	"\x03400\x12X\n" +
+	"3Bad Request - invalid VPC ID, sandbox name, or argv\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
 	"\x03401\x12K\n" +
 	"&Unauthorized - authentication required\x12!\n" +
@@ -10374,20 +10421,23 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
 	"\x03500\x12:\n" +
 	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ[\n" +
+	"\x03502\x12T\n" +
+	"/Bad Gateway - sandbox output is not valid UTF-8\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ_\n" +
 	"\x03503\x12X\n" +
 	"3Service Unavailable - sandbox execution unavailable\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/sandboxes/{sandbox_id}/exec\x12\x93\x06\n" +
-	"\rDeleteSandbox\x12\x1c.api.v2.DeleteSandboxRequest\x1a\x1d.api.v2.DeleteSandboxResponse\"\xc4\x05\x92A\x9b\x05\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02):\x01*\"$/vpcs/{vpc_id}/sandboxes/{name}/exec\x12\xa6\x06\n" +
+	"\rDeleteSandbox\x12\x1c.api.v2.DeleteSandboxRequest\x1a\x1d.api.v2.DeleteSandboxResponse\"\xd7\x05\x92A\xa6\x05\n" +
 	"\tSandboxes\x12\x0eDelete sandbox\x1a6Requests sandbox termination and asynchronous cleanup.JP\n" +
 	"\x03202\x12I\n" +
 	"\x1cSandbox termination accepted\x12)\n" +
-	"'\x1a%#/definitions/v2DeleteSandboxResponseJ_\n" +
-	"\x03400\x12X\n" +
-	"3Bad Request - invalid sandbox ID or query parameter\x12!\n" +
+	"'\x1a%#/definitions/v2DeleteSandboxResponseJj\n" +
+	"\x03400\x12c\n" +
+	">Bad Request - invalid VPC ID, sandbox name, or query parameter\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
 	"\x03401\x12K\n" +
 	"&Unauthorized - authentication required\x12!\n" +
@@ -10406,7 +10456,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x19*\x17/sandboxes/{sandbox_id}B\x8b\x06\x92A\xd4\x05\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02!*\x1f/vpcs/{vpc_id}/sandboxes/{name}B\x8b\x06\x92A\xd4\x05\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +

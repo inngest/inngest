@@ -49,6 +49,7 @@ const STEP_OP_LABELS: Record<string, string> = {
   WAIT_FOR_EVENT: 'step.waitForEvent',
   AI_GATEWAY: 'step.ai',
   WAIT_FOR_SIGNAL: 'step.waitForSignal',
+  SANDBOX: 'step.sandbox',
 };
 
 type StepKindInfoProps = {

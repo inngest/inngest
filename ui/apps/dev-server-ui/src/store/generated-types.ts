@@ -981,6 +981,7 @@ export enum StepOp {
   AiGateway = 'AI_GATEWAY',
   Invoke = 'INVOKE',
   Run = 'RUN',
+  Sandbox = 'SANDBOX',
   Sleep = 'SLEEP',
   WaitForEvent = 'WAIT_FOR_EVENT',
   WaitForSignal = 'WAIT_FOR_SIGNAL',

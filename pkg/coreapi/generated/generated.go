@@ -4287,6 +4287,7 @@ enum StepOp {
   WAIT_FOR_EVENT # wait for an event
   AI_GATEWAY
   WAIT_FOR_SIGNAL
+  SANDBOX
 }
 
 union StepInfo =

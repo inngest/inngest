@@ -23,4 +23,15 @@ const (
 	StepTypeMetadata
 	StepTypeGroupExperiment
 	StepTypeRealtimePublish
+	StepTypeStepSandboxCreate
+	StepTypeStepSandboxList
+	StepTypeStepSandboxGet
+	StepTypeStepSandboxExec
+	StepTypeStepSandboxDestroy
+	StepTypeStepSandboxProcessStart
+	StepTypeStepSandboxProcessList
+	StepTypeStepSandboxProcessGet
+	StepTypeStepSandboxProcessSignal
+	StepTypeStepSandboxProcessWait
+	StepTypeStepSandboxProcessOutput
 )

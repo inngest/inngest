@@ -55,6 +55,50 @@ const StepTypeIcon: Record<string, StepType> = {
     icon: RiRedPacketLine,
     label: 'AI Wrap',
   },
+  stepSandboxCreate: {
+    icon: RiTerminalFill,
+    label: 'Sandbox Create',
+  },
+  stepSandboxList: {
+    icon: RiTerminalFill,
+    label: 'Sandbox List',
+  },
+  stepSandboxGet: {
+    icon: RiTerminalFill,
+    label: 'Sandbox Get',
+  },
+  stepSandboxExec: {
+    icon: RiTerminalFill,
+    label: 'Sandbox Exec',
+  },
+  stepSandboxDestroy: {
+    icon: RiTerminalFill,
+    label: 'Sandbox Destroy',
+  },
+  stepSandboxProcessStart: {
+    icon: RiTerminalFill,
+    label: 'Process Start',
+  },
+  stepSandboxProcessList: {
+    icon: RiTerminalFill,
+    label: 'Process List',
+  },
+  stepSandboxProcessGet: {
+    icon: RiTerminalFill,
+    label: 'Process Get',
+  },
+  stepSandboxProcessSignal: {
+    icon: RiTerminalFill,
+    label: 'Process Signal',
+  },
+  stepSandboxProcessWait: {
+    icon: RiTerminalFill,
+    label: 'Process Wait',
+  },
+  stepSandboxProcessOutput: {
+    icon: RiTerminalFill,
+    label: 'Process Output',
+  },
   FINALIZATION: {
     icon: RiCheckboxLine,
     label: 'Finalization',

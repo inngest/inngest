@@ -186,6 +186,7 @@ func TestHTTPToGRPCStatus(t *testing.T) {
 		{http.StatusUnprocessableEntity, codes.FailedPrecondition},
 		{http.StatusTooManyRequests, codes.ResourceExhausted},
 		{http.StatusInternalServerError, codes.Internal},
+		{http.StatusBadGateway, codes.DataLoss},
 		{http.StatusNotImplemented, codes.Unimplemented},
 		{http.StatusServiceUnavailable, codes.Unavailable},
 		{999, codes.Internal}, // Unknown status should default to Internal
@@ -218,6 +219,7 @@ func TestErrorConstants(t *testing.T) {
 		"operation_ambiguous":          ErrorOperationAmbiguous,
 		"app_sync_failed":              ErrorAppSyncFailed,
 		"validation_error":             ErrorValidationError,
+		"output_encoding_invalid":      ErrorOutputEncodingInvalid,
 		"not_implemented":              ErrorNotImplemented,
 		"capacity_unavailable":         ErrorCapacityUnavailable,
 	}

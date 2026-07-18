@@ -1000,6 +1000,7 @@ export enum StepOp {
   AiGateway = 'AI_GATEWAY',
   Invoke = 'INVOKE',
   Run = 'RUN',
+  Sandbox = 'SANDBOX',
   Sleep = 'SLEEP',
   WaitForEvent = 'WAIT_FOR_EVENT',
   WaitForSignal = 'WAIT_FOR_SIGNAL'
@@ -2034,4 +2035,3 @@ const injectedRtkApi = api.injectEndpoints({
 
 export { injectedRtkApi as api };
 export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetRunLinkageQuery, useLazyGetRunLinkageQuery, useGetRunTraceQuery, useLazyGetRunTraceQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery, useGetEventsV2Query, useLazyGetEventsV2Query, useGetEventV2Query, useLazyGetEventV2Query, useGetEventV2PayloadQuery, useLazyGetEventV2PayloadQuery, useGetEventV2RunsQuery, useLazyGetEventV2RunsQuery, useCreateDebugSessionMutation, useGetDebugRunQuery, useLazyGetDebugRunQuery, useGetDebugSessionQuery, useLazyGetDebugSessionQuery } = injectedRtkApi;
-
