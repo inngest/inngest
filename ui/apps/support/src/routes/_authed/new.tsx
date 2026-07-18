@@ -5,17 +5,27 @@ import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/tanstack-react-start";
 import { RiArrowLeftLine } from "@remixicon/react";
 import { Button } from "@inngest/components/Button";
+import { Input } from "@inngest/components/Forms/Input";
 import { Textarea } from "@inngest/components/Forms/Textarea";
 import { Alert } from "@inngest/components/Alert";
-import { Select } from "@inngest/components/Select/Select";
+import { Select, SelectWithSearch } from "@inngest/components/Select/Select";
 import type { Option } from "@inngest/components/Select/Select";
-import type { BugSeverity, TicketType } from "@/data/ticketOptions";
+import type {
+  BugSeverity,
+  DpaFieldKey,
+  TicketType,
+} from "@/data/ticketOptions";
+import { commonPaperCountries } from "@/data/commonPaperCountries";
 import {
   DEFAULT_BUG_SEVERITY_LEVEL,
+  dpaFields,
+  emptyDpaFields,
   formOptions,
   instructions,
+  isDpaFormComplete,
   severityOptions,
 } from "@/data/ticketOptions";
+import { createDpaRequest, toDpaRequest } from "@/data/commonpaper";
 import { createTicket, getCustomerTierByEmail } from "@/data/plain";
 import { getAccountPlanInfo } from "@/data/inngest";
 import { CommunityChannels } from "@/components/Support/CommunityChannels";
@@ -34,15 +44,19 @@ function NewTicketPage() {
   const navigate = useNavigate();
   const { user } = useUser();
   const createTicketFn = useServerFn(createTicket);
+  const createDpaRequestFn = useServerFn(createDpaRequest);
   const getCustomerTierFn = useServerFn(getCustomerTierByEmail);
   const getAccountPlanFn = useServerFn(getAccountPlanInfo);
 
   const [ticketType, setTicketType] = useState<TicketType>(null);
   const [body, setBody] = useState("");
+  const [dpaFormFields, setDpaFormFields] =
+    useState<Record<DpaFieldKey, string>>(emptyDpaFields);
   const [bugSeverity, setBugSeverity] = useState<BugSeverity>(
     DEFAULT_BUG_SEVERITY_LEVEL,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [countryQuery, setCountryQuery] = useState("");
   const [result, setResult] = useState<{ ok?: boolean; message?: string }>({});
 
   // Fetch customer tier information from Plain API (email derived server-side from auth)
@@ -121,10 +135,53 @@ function NewTicketPage() {
     },
   });
 
+  const isDpaTicket = ticketType === "dpa";
+  const isFormComplete = isDpaTicket
+    ? isDpaFormComplete(dpaFormFields)
+    : body.trim().length > 0;
+
+  const countryOptions: Array<Option> = useMemo(
+    () =>
+      commonPaperCountries.map((country) => ({
+        id: country.code,
+        name: country.name,
+      })),
+    [],
+  );
+
+  const filteredCountryOptions = useMemo(() => {
+    const query = countryQuery.trim().toLowerCase();
+    if (!query) return countryOptions;
+    return countryOptions.filter(
+      (option) =>
+        option.name.toLowerCase().includes(query) ||
+        option.id.toLowerCase().includes(query),
+    );
+  }, [countryOptions, countryQuery]);
+
+  const selectedCountryOption = useMemo(
+    () =>
+      countryOptions.find((option) => option.id === dpaFormFields.country) ||
+      null,
+    [countryOptions, dpaFormFields.country],
+  );
+
+  function handleTicketTypeChange(type: TicketType) {
+    setTicketType(type);
+    setBody("");
+    setDpaFormFields(emptyDpaFields);
+    setCountryQuery("");
+    setResult({});
+  }
+
+  function handleDpaFieldChange(key: DpaFieldKey, value: string) {
+    setDpaFormFields((current) => ({ ...current, [key]: value }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!ticketType || !body.trim()) {
+    if (!ticketType || !isFormComplete) {
       setResult({ ok: false, message: "Please fill in all required fields" });
       return;
     }
@@ -138,33 +195,51 @@ function NewTicketPage() {
     setResult({});
 
     try {
-      const response = await createTicketFn({
-        data: {
-          user: {
-            id: user.externalId || user.id,
-            email: user.primaryEmailAddress.emailAddress,
-            name: user.fullName || undefined,
-          },
-          ticket: {
-            type: ticketType,
-            body: body.trim(),
-            severity: ticketType === "bug" ? bugSeverity : undefined,
-            attachmentIds:
-              uploadedAttachmentIds.length > 0
-                ? uploadedAttachmentIds
-                : undefined,
-          },
-        },
-      });
+      const response = isDpaTicket
+        ? await createDpaRequestFn({
+            data: {
+              user: {
+                id: user.externalId || user.id,
+                name: user.fullName || undefined,
+              },
+              dpa: toDpaRequest(dpaFormFields),
+              attachmentIds:
+                uploadedAttachmentIds.length > 0
+                  ? uploadedAttachmentIds
+                  : undefined,
+            },
+          })
+        : await createTicketFn({
+            data: {
+              user: {
+                id: user.externalId || user.id,
+                email: user.primaryEmailAddress.emailAddress,
+                name: user.fullName || undefined,
+              },
+              ticket: {
+                type: ticketType,
+                body: body.trim(),
+                severity: ticketType === "bug" ? bugSeverity : undefined,
+                attachmentIds:
+                  uploadedAttachmentIds.length > 0
+                    ? uploadedAttachmentIds
+                    : undefined,
+              },
+            },
+          });
 
       if (response.success) {
         setResult({
           ok: true,
-          message: "Support ticket created successfully!",
+          message: isDpaTicket
+            ? "DPA request submitted successfully. Our team will follow up shortly."
+            : "Support ticket created successfully!",
         });
         // Reset form
         setTicketType(null);
         setBody("");
+        setDpaFormFields(emptyDpaFields);
+        setCountryQuery("");
         setBugSeverity(DEFAULT_BUG_SEVERITY_LEVEL);
         clearAttachments();
         // Navigate to home after a short delay
@@ -223,7 +298,7 @@ function NewTicketPage() {
               isLabelVisible={false}
               value={selectedTypeOption}
               onChange={(option: Option) =>
-                setTicketType(option.id as TicketType)
+                handleTicketTypeChange(option.id as TicketType)
               }
               className="w-full"
             >
@@ -240,19 +315,81 @@ function NewTicketPage() {
             </Select>
           </div>
 
-          {/* Message */}
-          <div className="flex flex-col gap-2">
-            <label className="text-basis text-sm font-medium">
-              {ticketType ? instructions[ticketType] : "Describe your issue"}
-            </label>
-            <Textarea
-              placeholder="Describe your issue..."
-              value={body}
-              onChange={setBody}
-              rows={6}
-              required
-            />
-          </div>
+          {/* Message / DPA fields */}
+          {isDpaTicket ? (
+            <div className="flex flex-col gap-4">
+              <p className="text-basis text-sm font-medium">
+                {instructions.dpa}
+              </p>
+              {dpaFields.map((field) =>
+                field.type === "country" ? (
+                  <div key={field.key} className="flex flex-col gap-1">
+                    <label className="text-basis text-sm font-medium">
+                      {field.label}
+                    </label>
+                    <SelectWithSearch
+                      label={field.label}
+                      isLabelVisible={false}
+                      value={selectedCountryOption}
+                      onChange={(option: Option) => {
+                        handleDpaFieldChange(field.key, option.id);
+                        setCountryQuery("");
+                      }}
+                      className="w-full"
+                    >
+                      <SelectWithSearch.Button>
+                        {selectedCountryOption?.name || "Select a country..."}
+                      </SelectWithSearch.Button>
+                      <SelectWithSearch.Options className="w-full">
+                        <SelectWithSearch.SearchInput
+                          displayValue={() => ""}
+                          placeholder="Search countries"
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                            setCountryQuery(e.target.value)
+                          }
+                        />
+                        <div className="max-h-60 overflow-y-auto">
+                          {filteredCountryOptions.map((option) => (
+                            <SelectWithSearch.Option
+                              key={option.id}
+                              option={option}
+                            >
+                              {option.name}
+                            </SelectWithSearch.Option>
+                          ))}
+                        </div>
+                      </SelectWithSearch.Options>
+                    </SelectWithSearch>
+                  </div>
+                ) : (
+                  <Input
+                    key={field.key}
+                    name={field.key}
+                    label={field.label}
+                    type={field.type ?? "text"}
+                    value={dpaFormFields[field.key]}
+                    onChange={(e) =>
+                      handleDpaFieldChange(field.key, e.target.value)
+                    }
+                    required
+                  />
+                ),
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <label className="text-basis text-sm font-medium">
+                {ticketType ? instructions[ticketType] : "Describe your issue"}
+              </label>
+              <Textarea
+                placeholder="Describe your issue..."
+                value={body}
+                onChange={setBody}
+                rows={6}
+                required
+              />
+            </div>
+          )}
 
           {/* Attachments */}
           <div className="flex flex-col gap-2">
@@ -305,9 +442,15 @@ function NewTicketPage() {
           <Button
             type="submit"
             kind="primary"
-            label={isSubmitting ? "Creating..." : "Create Support Ticket"}
+            label={
+              isSubmitting
+                ? "Creating..."
+                : isDpaTicket
+                ? "Submit DPA Request"
+                : "Create Support Ticket"
+            }
             disabled={
-              isSubmitting || isUploading || !ticketType || !body.trim()
+              isSubmitting || isUploading || !ticketType || !isFormComplete
             }
             className="w-full"
           />
