@@ -2,6 +2,7 @@ package checkpoint
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,6 +33,7 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 type Checkpointer interface {
@@ -76,7 +78,14 @@ func (a AllowAsyncDispatchValidation) Enabled(ctx context.Context, acctID uuid.U
 // cannot fire before the queue lease expires, so a fresh dispatch is
 // uncontested. The upper bound is the shortest plausible serverless timeout
 // (~10s) — longer windows let a fast-Requeue race slip past unfenced.
-const dispatchValidationSkipDuration = 10 * time.Second
+const (
+	dispatchValidationSkipDuration = 10 * time.Second
+
+	functionLookupRetryAttempts     = 5
+	functionLookupInitialBackoff    = 50 * time.Millisecond
+	functionLookupMaxBackoff        = 400 * time.Millisecond
+	functionLookupBackoffMultiplier = 2
+)
 
 type Opts struct {
 	// State allows loading and mutating state from various checkpointing APIs.
@@ -791,12 +800,38 @@ func (c checkpointer) finalize(ctx context.Context, md state.Metadata, result ap
 }
 
 func (c checkpointer) fn(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
-	// Load the function config.
-	cfn, err := c.FnReader.GetFunctionByInternalUUID(ctx, fnID)
+	// upserting in durable endpoints is done in a goroutine as this is
+	// in the fast path.  the first time a fn is written, there's a race
+	// between checkpointing and inserting into the db.  we dont want to blcok
+	// every time, so retry loading here on first insert.
+	cfn, err := util.WithRetry(
+		ctx,
+		"checkpoint.load-function",
+		func(ctx context.Context) (*cqrs.Function, error) {
+			return c.FnReader.GetFunctionByInternalUUID(ctx, fnID)
+		},
+		util.NewRetryConf(
+			util.WithRetryConfMaxAttempts(functionLookupRetryAttempts),
+			util.WithRetryConfInitialBackoff(functionLookupInitialBackoff),
+			util.WithRetryConfMaxBackoff(functionLookupMaxBackoff),
+			util.WithRetryConfBackoffFactor(functionLookupBackoffMultiplier),
+			util.WithRetryConfRetryableErrors(isRetryableFunctionLookupError),
+		),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error loading function: %w", err)
 	}
 	return cfn.InngestFunction()
+}
+
+func isRetryableFunctionLookupError(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if errors.Is(err, cqrs.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "not found")
 }
 
 func (c checkpointer) processMetadata(
