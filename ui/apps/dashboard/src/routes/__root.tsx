@@ -43,6 +43,11 @@ export const Route = createRootRouteWithContext<{
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
       },
+      // Keep the public no-auth demo out of search indexes. Build-gated, so the
+      // production dashboard is unaffected.
+      ...(import.meta.env.VITE_DEMO_MODE
+        ? [{ name: 'robots', content: 'noindex, nofollow' }]
+        : []),
       {
         title: 'Inngest Dashboard',
         description: 'The Inngest Cloud dashboard',

@@ -1,0 +1,2198 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+directive @auth on FIELD | FIELD_DEFINITION
+
+directive @cursored(cursor: String, perPage: Int) on FIELD | FIELD_DEFINITION
+
+"""
+The @defer directive may be specified on a fragment spread to imply de-prioritization, that causes the fragment to be omitted in the initial response, and delivered as a subsequent response afterward. A query with @defer directive will cause the request to potentially return multiple responses, where non-deferred data is delivered in the initial response and data deferred delivered in a subsequent response. @include and @skip take precedence over @defer.
+"""
+directive @defer(if: Boolean = true, label: String) on FRAGMENT_SPREAD | INLINE_FRAGMENT
+
+directive @paginated(page: Int, perPage: Int) on FIELD | FIELD_DEFINITION
+
+directive @timebound(from: Time, to: Time) on FIELD | FIELD_DEFINITION
+
+directive @unsetsFields(fields: [String]) on FIELD | FIELD_DEFINITION
+
+type APIKey {
+  createdAt: Time!
+  env: Workspace
+  id: UUID!
+  maskedKey: String!
+  name: String!
+  scopes: [APIKeyScope!]!
+}
+
+type APIKeyCreateResult {
+  apiKey: APIKey!
+  plaintextKey: String!
+}
+
+type APIKeyScope {
+  allow: [String!]!
+  deny: [String!]!
+  name: String!
+}
+
+input AWSMarketplaceSetupInput {
+  awsAccountID: String!
+  customerID: String!
+  productCode: String!
+}
+
+type AWSMarketplaceSetupResponse {
+  message: String!
+}
+
+type Account {
+  activeBanners: [Banner!]!
+  addons: Addons!
+  apiKeys(workspaceID: UUID): [APIKey!]!
+  appliedAddons: AppliedAddons!
+  billingEmail: String!
+  constraintAPIEnrolled(inEffect: Boolean): Boolean!
+  createdAt: Time!
+  datadogConnections: [DatadogConnectionStatus!]!
+  datadogOrganizations: [DatadogOrganization!]!
+  entitlementUsage: EntitlementUsage!
+  entitlements: Entitlements!
+  id: ID!
+  insightsQueries: [InsightsQueryStatement!]!
+  marketplace: Marketplace
+  name: NullString
+  paymentIntents: [PaymentIntent!]!
+  paymentMethods: [PaymentMethod!]
+  """
+  Collections / payment status for the account. Null when the account is in
+  good standing (no overdue invoices and no failed payment). Powers the in-app
+  overdue-invoice banner.
+  """
+  paymentStatus: AccountPaymentStatus
+  plan: BillingPlan
+  quickSearch(envSlug: String!, term: String!): QuickSearchResults!
+  search(opts: SearchInput!): SearchResults!
+  securityEmail: String
+  status: String!
+  subscription: BillingSubscription
+  updatedAt: Time!
+  users: [User!]!
+  vercelIntegration: VercelIntegration
+}
+
+type AccountPaymentStatus {
+  """
+  When the pending action takes effect (downgrade/suspension), if scheduled. Null otherwise.
+  """
+  actionDate: Time
+  """Total past-due amount across all overdue invoices, in cents."""
+  amountDueCents: Int!
+  """Pre-formatted amount for display, e.g. "$240.00"."""
+  amountDueLabel: String!
+  """ISO 4217 currency code, e.g. "usd"."""
+  currency: String!
+  """
+  Days the oldest overdue invoice is past due. 0 if a payment failed but nothing is overdue yet.
+  """
+  daysPastDue: Int!
+  """Whether the most recent payment attempt failed (card declined, etc.)."""
+  hasFailedPayment: Boolean!
+  """Per-invoice detail for the /billing page banner."""
+  overdueInvoices: [OverdueInvoice!]!
+  """What happens at actionDate. Null when nothing is scheduled."""
+  pendingAction: PaymentPendingAction
+  """
+  Most direct link to resolve payment (hosted invoice URL or billing portal). Must be https.
+  """
+  resolveURL: String!
+  """
+  Highest severity across all open/overdue invoices. Drives banner color.
+  """
+  severity: PaymentStatusSeverity!
+  """
+  Machine-readable collections stage, computed server-side from invoice age and
+  payment state. Drives banner copy and /billing detail messaging.
+  """
+  stage: PaymentCollectionStage!
+}
+
+type Addon {
+  available: Boolean!
+  baseValue: Int
+  maxValue: Int!
+  name: String!
+  price: Int
+  purchaseCount: Int!
+  quantityPer: Int!
+}
+
+type AddonMulti {
+  billingPeriod: BillingPeriod!
+  id: ID!
+  name: String!
+  price: Price!
+  quantityPer: Int!
+}
+
+type Addons {
+  accountID: UUID
+  advancedObservability: AdvancedObservabilityAddon!
+  concurrency: Addon!
+  connectWorkers: Addon!
+  hipaa: Addon!
+  planID: UUID
+  slackChannel: Addon!
+  userCount: Addon!
+}
+
+type AdvancedObservabilityAddon {
+  available: Boolean!
+  entitlements: AdvancedObservabilityEntitlements!
+  name: String!
+  price: Int
+  purchased: Boolean!
+}
+
+type AdvancedObservabilityEntitlements {
+  history: EntitlementInt!
+  metricsExportFreshness: EntitlementInt!
+  metricsExportGranularity: EntitlementInt!
+}
+
+type App {
+  appVersion: String
+  archivedAt: Time
+  createdAt: Time!
+  externalID: String!
+  functionCount: Int!
+  functions: [Workflow!]!
+  id: UUID!
+  isArchived: Boolean!
+  isParentArchived: Boolean!
+  latestSync(status: SyncStatus): Deploy
+  method: AppMethod!
+  name: String!
+  signingKeyRotationCheck: SigningKeyRotationCheck!
+  syncs(after: Time, first: Int! = 20): [Deploy!]!
+}
+
+type AppCheckFieldBoolean {
+  value: Boolean
+}
+
+type AppCheckFieldString {
+  value: String
+}
+
+type AppCheckResult {
+  apiOrigin: AppCheckFieldString
+  appID: AppCheckFieldString
+  authenticationSucceeded: AppCheckFieldBoolean
+  env: AppCheckFieldString
+  error: String
+  eventAPIOrigin: AppCheckFieldString
+  eventKeyStatus: SecretCheck!
+  extra: Map
+  framework: AppCheckFieldString
+  isReachable: Boolean!
+  isSDK: Boolean!
+  mode: SDKMode
+  respHeaders: Map
+  respStatusCode: Int
+  sdkLanguage: AppCheckFieldString
+  sdkVersion: AppCheckFieldString
+  serveOrigin: AppCheckFieldString
+  servePath: AppCheckFieldString
+  signingKeyFallbackStatus: SecretCheck!
+  signingKeyStatus: SecretCheck!
+}
+
+enum AppMethod {
+  API
+  CONNECT
+  SERVE
+}
+
+type AppliedAddonMulti {
+  addon: AddonMulti!
+  quantity: Int!
+}
+
+type AppliedAddons {
+  concurrency: AppliedAddonMulti
+  users: AppliedAddonMulti
+}
+
+input AppsFilter {
+  archived: Boolean
+  method: AppMethod
+}
+
+input ArchiveWorkflowInput {
+  archive: Boolean!
+  workflowID: ID!
+}
+
+type ArchivedEvent {
+  event: Bytes!
+  eventModel: Event!
+  eventVersion: EventType!
+  functionRuns: [FunctionRun!]!
+  id: ULID!
+  ingestSourceID: ID
+  name: String!
+  occurredAt: Time!
+  receivedAt: Time!
+  skippedFunctionRuns: [SkippedFunctionRun!]!
+  source: IngestKey
+  version: String!
+}
+
+type AvailableAddons {
+  concurrency: AddonMulti
+  users: AddonMulti
+}
+
+type Banner {
+  body: String!
+  cta: BannerCTA
+  dismissible: Boolean!
+  id: ID!
+  severity: BannerSeverity!
+  title: String
+}
+
+type BannerCTA {
+  label: String!
+  url: String!
+}
+
+enum BannerSeverity {
+  ERROR
+  INFO
+  SUCCESS
+  WARNING
+}
+
+scalar BillingPeriod
+
+type BillingPlan {
+  addons: Addons!
+  amount: Int!
+  availableAddons: AvailableAddons!
+  billingPeriod: BillingPeriod!
+  entitlements: Entitlements!
+  features: Map!
+  id: ID!
+  isFree: Boolean!
+  isLegacy: Boolean!
+  name: String!
+  slug: String!
+}
+
+type BillingSubscription {
+  nextInvoiceAmount: Int!
+  nextInvoiceDate: Time!
+}
+
+scalar Bytes
+
+type CDCConnection {
+  Host: String!
+  createdAt: Time!
+  description: String
+  engine: String!
+  id: ID!
+  name: String!
+  status: CDCStatus!
+  statusDetail: Map
+  updatedAt: Time!
+  watermark: Map
+}
+
+input CDCConnectionInput {
+  adminConn: String!
+  engine: String!
+  name: String!
+  replicaConn: String
+}
+
+type CDCSetupResponse {
+  error: String
+  steps: Map
+}
+
+enum CDCStatus {
+  ERROR
+  RUNNING
+  SETUP_COMPLETE
+  SETUP_INCOMPLETE
+  STOPPED
+}
+
+type Cancellation {
+  createdAt: Time!
+  environmentID: UUID!
+  expression: String
+  functionID: UUID!
+  id: ULID!
+  name: String
+  queuedAtMax: Time!
+  queuedAtMin: Time
+}
+
+type CancellationConfiguration {
+  condition: String
+  event: String!
+  timeout: String
+}
+
+type CancellationConnection {
+  edges: [CancellationEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type CancellationEdge {
+  cursor: String!
+  node: Cancellation!
+}
+
+input CancellationRunCountInput {
+  queuedAtMax: Time!
+  queuedAtMin: Time
+}
+
+type CodedError {
+  code: String!
+  data: JSON
+  message: String!
+}
+
+type ConcurrencyConfiguration {
+  key: String
+  limit: ConcurrencyLimitConfiguration!
+  scope: ConcurrencyScope!
+}
+
+type ConcurrencyLimitConfiguration {
+  isPlanLimit: Boolean
+  value: Int!
+}
+
+enum ConcurrencyScope {
+  ACCOUNT
+  ENVIRONMENT
+  FUNCTION
+}
+
+type ConfirmSubscriptionUpgradeResponse {
+  account: Account
+  message: String!
+  success: Boolean!
+}
+
+enum ConnectV1ConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  DISCONNECTING
+  DRAINING
+  READY
+}
+
+type ConnectV1WorkerConnection {
+  app: App
+  appID: UUID
+  appName: String
+  appVersion: String
+  buildId: String
+  connectedAt: Time!
+  cpuCores: Int!
+  deploy: Deploy @deprecated(reason: "buildId is deprecated. Use appVersion instead.")
+  disconnectReason: String
+  disconnectedAt: Time
+  functionCount: Int!
+  gatewayId: ULID!
+  id: ULID!
+  instanceId: String!
+  lastHeartbeatAt: Time
+  maxWorkerConcurrency: Int64!
+  memBytes: Int!
+  os: String!
+  sdkLang: String!
+  sdkPlatform: String!
+  sdkVersion: String!
+  status: ConnectV1ConnectionStatus!
+  workerIp: String!
+}
+
+type ConnectV1WorkerConnectionEdge {
+  cursor: String!
+  node: ConnectV1WorkerConnection!
+}
+
+type ConnectV1WorkerConnectionsConnection {
+  edges: [ConnectV1WorkerConnectionEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input ConnectV1WorkerConnectionsFilter {
+  appIDs: [UUID!]
+  from: Time
+  status: [ConnectV1ConnectionStatus!]
+  timeField: ConnectV1WorkerConnectionsOrderByField = CONNECTED_AT
+  until: Time
+}
+
+input ConnectV1WorkerConnectionsOrderBy {
+  direction: ConnectV1WorkerConnectionsOrderByDirection!
+  field: ConnectV1WorkerConnectionsOrderByField!
+}
+
+enum ConnectV1WorkerConnectionsOrderByDirection {
+  ASC
+  DESC
+}
+
+enum ConnectV1WorkerConnectionsOrderByField {
+  CONNECTED_AT
+  DISCONNECTED_AT
+  LAST_HEARTBEAT_AT
+}
+
+input ConnectV1WorkerMetricsFilter {
+  from: Time!
+  instanceIDs: [String!]
+  name: String!
+  until: Time
+}
+
+input CreateAPIKeyInput {
+  name: String!
+  workspaceID: UUID!
+}
+
+input CreateCancellationInput {
+  envID: UUID!
+  expression: String
+  functionSlug: String!
+  name: String
+  queuedAtMax: Time!
+  queuedAtMin: Time
+  testOnly: CreateCancellationInputTestOnly
+}
+
+input CreateCancellationInputTestOnly {
+  maxStepCount: Int
+  queryLimit: Int
+}
+
+input CreateFunctionReplayInput {
+  fromRange: ULID!
+  name: String!
+  statuses: [FunctionRunStatus!]
+  statusesV2: [ReplayRunStatus!]
+  toRange: ULID!
+  workflowID: UUID!
+  workspaceID: UUID!
+}
+
+type CreateStripeSubscriptionResponse {
+  clientSecret: String
+  message: String!
+  subscriptionId: String
+}
+
+type CreateUserPayload {
+  user: User
+}
+
+input CreateVercelAppInput {
+  originOverride: String
+  path: String = "/api/inngest"
+  projectID: String!
+  protectionBypassSecret: String
+  workspaceID: ID!
+}
+
+type CreateVercelAppResponse {
+  success: Boolean!
+}
+
+scalar DSN
+
+type DatadogConnectionStatus {
+  envID: UUID!
+  envName: String!
+  healthy: Boolean!
+  id: UUID!
+  lastErrorMessage: String
+  lastSentAt: Time
+  orgID: UUID!
+  orgName: String!
+}
+
+type DatadogOrganization {
+  createdAt: Time!
+  datadogDomain: String!
+  datadogOrgID: String
+  datadogOrgName: String
+  datadogSite: String!
+  id: UUID!
+  updatedAt: Time!
+}
+
+type DebounceConfiguration {
+  key: String
+  period: String!
+}
+
+input DeleteIngestKey {
+  id: ID!
+  workspaceID: ID!
+}
+
+type DeleteResponse {
+  ids: [ID!]!
+}
+
+type DeleteULIDResponse {
+  ids: [ULID!]!
+}
+
+type Deploy {
+  appName: String!
+  appVersion: String
+  authorID: UUID
+  checksum: String!
+  commitAuthor: String
+  commitHash: String
+  commitMessage: String
+  commitRef: String
+  createdAt: Time!
+  deployedFunctions: [Workflow!]!
+  dupeCount: Int!
+  error: String
+  framework: String
+  functionCount: Int
+  id: UUID!
+  idempotencyKey: String
+  lastSyncedAt: Time!
+  metadata: Map!
+  platform: String
+  prevFunctionCount: Int
+  removedFunctions: [Workflow!]!
+  repoURL: String
+  sdkLanguage: String!
+  sdkVersion: String!
+  status: String!
+  syncKind: String
+  trustProbeStatus: String
+  url: String
+  vercelDeploymentID: String
+  vercelDeploymentURL: String
+  vercelProjectID: String
+  vercelProjectURL: String
+  workspaceID: UUID!
+}
+
+scalar EdgeType
+
+type EntitlementBool {
+  enabled: Boolean!
+}
+
+type EntitlementConcurrency {
+  limit: Int!
+  usage: Int!
+}
+
+type EntitlementConnectAppsPerConnection {
+  limit: Int
+}
+
+type EntitlementConnectWorkerConnections {
+  limit: Int
+}
+
+type EntitlementEvents {
+  limit: Int
+  overageAllowed: Boolean!
+}
+
+type EntitlementExecutions {
+  limit: Int
+  overageAllowed: Boolean!
+  usage: Int!
+}
+
+type EntitlementInt {
+  limit: Int!
+}
+
+type EntitlementNullableInt {
+  limit: Int
+}
+
+type EntitlementRunCount {
+  limit: Int
+  overageAllowed: Boolean!
+  usage: Int!
+}
+
+type EntitlementStepCount {
+  limit: Int
+  overageAllowed: Boolean!
+  usage: Int!
+}
+
+type EntitlementUsage {
+  accountConcurrencyLimitHits: Int!
+  runCount: EntitlementUsageRunCount!
+  stepCount: EntitlementUsageStepCount!
+}
+
+type EntitlementUsageRunCount {
+  current: Int!
+  limit: Int
+  overageAllowed: Boolean!
+}
+
+type EntitlementUsageStepCount {
+  current: Int!
+  limit: Int
+  overageAllowed: Boolean!
+}
+
+type EntitlementUserCount {
+  limit: Int
+  usage: Int!
+}
+
+type Entitlements {
+  accountID: UUID
+  concurrency: EntitlementConcurrency!
+  connect: EntitlementBool!
+  connectAppsPerConnection: EntitlementConnectAppsPerConnection!
+  connectWorkerConnections: EntitlementConnectWorkerConnections!
+  eventBatchCount: EntitlementInt!
+  eventBatchTimeout: EntitlementInt!
+  eventSize: EntitlementInt!
+  events: EntitlementEvents!
+  executions: EntitlementExecutions!
+  functionBacklogSize: EntitlementNullableInt!
+  hipaa: EntitlementBool!
+  history: EntitlementInt!
+  metricsExport: EntitlementBool!
+  metricsExportFreshness: EntitlementInt!
+  metricsExportGranularity: EntitlementInt!
+  otelTraces: EntitlementBool!
+  planID: UUID
+  realtimeConnections: EntitlementInt!
+  realtimeMessages: EntitlementInt!
+  runCount: EntitlementRunCount!
+  runDuration: EntitlementInt!
+  slackChannel: EntitlementBool!
+  stepCount: EntitlementStepCount!
+  tracingCustomSpans: EntitlementInt!
+  userCount: EntitlementUserCount!
+}
+
+type EnvEdge {
+  cursor: String!
+  node: Workspace!
+}
+
+enum EnvironmentType {
+  BRANCH_CHILD
+  BRANCH_PARENT
+  PRODUCTION
+  TEST
+}
+
+type EnvsConnection {
+  edges: [EnvEdge!]!
+  pageInfo: PageInfo!
+}
+
+input EnvsFilter {
+  archived: Boolean
+  envTypes: [EnvironmentType!]
+}
+
+type Event {
+  description: String
+  firstSeen: Time
+  integrationName: String
+  name: String!
+  recent(count: Int): [ArchivedEvent!]!
+  schemaSource: SchemaSource
+  usage(opts: UsageInput): Usage!
+  versionCount: Int!
+  versions(versions: [String!]): [EventType]!
+  workflows: [Workflow!]!
+  workspaceID: UUID
+}
+
+input EventQuery {
+  name: String
+  prefix: String
+  schemaSource: SchemaSource
+  workspaceID: ID
+}
+
+enum EventSchemaFormat {
+  JSON_SCHEMA
+  TYPESCRIPT
+}
+
+type EventSearchConnection {
+  edges: [EventSearchItemEdge]
+  pageInfo: PageInfo!
+}
+
+input EventSearchFilter {
+  lowerTime: Time!
+  query: String!
+  upperTime: Time!
+}
+
+type EventSearchItem {
+  id: ULID!
+  name: String!
+  receivedAt: Time!
+}
+
+type EventSearchItemEdge {
+  cursor: String!
+  node: EventSearchItem!
+}
+
+type EventSource {
+  id: ID!
+  name: String
+  sourceKind: String!
+}
+
+type EventType {
+  createdAt: Time
+  cueType: String!
+  id: ID!
+  jsonSchema: Map!
+  name: String!
+  typescript: String!
+  updatedAt: Time
+  version: String!
+}
+
+type EventTypeV2 {
+  envID: UUID!
+  functions(after: String, first: Int! = 40): FunctionsConnection!
+  latestSchema(format: EventSchemaFormat! = JSON_SCHEMA): String
+  name: String!
+  usage(opts: UsageInput): Usage!
+}
+
+type EventTypesConnection {
+  edges: [EventTypesEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EventTypesEdge {
+  cursor: String!
+  node: EventTypeV2!
+}
+
+input EventTypesFilter {
+  archived: Boolean = false
+  nameSearch: String
+}
+
+type EventV2 {
+  envID: UUID!
+  id: ULID!
+  idempotencyKey: String
+  name: String!
+  occurredAt: Time!
+  raw: String!
+  receivedAt: Time!
+  runs: [FunctionRunV2!]!
+  source: EventSource
+  version: String
+}
+
+type EventsBatchConfiguration {
+  key: String
+  """The maximum number of events a batch can have."""
+  maxSize: Int!
+  """How long to wait before running the function with the batch."""
+  timeout: String!
+}
+
+type EventsConnection {
+  edges: [EventsEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EventsEdge {
+  cursor: String!
+  node: EventV2!
+}
+
+input EventsFilter {
+  eventNames: [String!]
+  from: Time!
+  includeInternalEvents: Boolean! = false
+  query: String
+  until: Time
+}
+
+type Experiment {
+  firstSeen: Time!
+  functionID: ID!
+  functionSlug: String!
+  lastSeen: Time!
+  name: String!
+  selectionStrategy: String!
+  totalRuns: Int!
+  variantCount: Int!
+  variants: [String!]!
+}
+
+type ExperimentDetail {
+  firstSeen: Time!
+  lastSeen: Time!
+  name: String!
+  selectionStrategy: String!
+  variantWeights: [VariantWeight!]!
+  variants: [ExperimentVariantMetrics!]!
+}
+
+type ExperimentScoringConfig {
+  experimentName: String!
+  metrics: [ExperimentScoringMetric!]!
+  updatedAt: Time!
+}
+
+type ExperimentScoringMetric {
+  displayName: String!
+  enabled: Boolean!
+  invert: Boolean!
+  key: String!
+  kind: ScoreKind!
+  labelBest: String!
+  labelWorst: String!
+  maxValue: Float!
+  minValue: Float!
+  points: Int!
+}
+
+input ExperimentScoringMetricInput {
+  displayName: String!
+  enabled: Boolean!
+  invert: Boolean!
+  key: String!
+  kind: ScoreKind
+  labelBest: String!
+  labelWorst: String!
+  maxValue: Float!
+  minValue: Float!
+  points: Int!
+}
+
+type ExperimentVariantMetrics {
+  metrics: [VariantMetric!]!
+  runCount: Int!
+  variantName: String!
+}
+
+type FilterList {
+  events: [String!]
+  ips: [IP!]
+  type: FilterType
+}
+
+input FilterListInput {
+  events: [String!]
+  ips: [IP!]
+  type: FilterType
+}
+
+scalar FilterType
+
+type Function {
+  id: UUID!
+  name: String!
+  slug: String!
+}
+
+type FunctionConfiguration {
+  cancellations: [CancellationConfiguration!]!
+  concurrency: [ConcurrencyConfiguration!]!
+  debounce: DebounceConfiguration
+  eventsBatch: EventsBatchConfiguration
+  priority: String
+  rateLimit: RateLimitConfiguration
+  retries: RetryConfiguration!
+  singleton: SingletonConfiguration
+  throttle: ThrottleConfiguration
+}
+
+type FunctionReplay {
+  createdAt: Time!
+  endedAt: Time!
+  id: UUID!
+  name: String
+  scheduledRunCount: Int!
+  totalRunCount: Int
+}
+
+type FunctionRun {
+  accountID: UUID!
+  batchID: ULID
+  canRerun: Boolean
+  endedAt: Time
+  event: ArchivedEvent
+  eventID: ULID
+  events: [ArchivedEvent!]
+  function: Workflow!
+  id: ULID!
+  output: Bytes
+  startedAt: Time!
+  status: FunctionRunStatus!
+  workflowID: UUID!
+  workflowVersion: WorkflowVersion
+  workflowVersionInt: Int!
+  workspaceID: UUID!
+}
+
+enum FunctionRunStatus {
+  """The function run has been cancelled."""
+  CANCELLED
+  """The function run has completed."""
+  COMPLETED
+  """The function run has failed."""
+  FAILED
+  """The function is paused."""
+  PAUSED
+  """The function run has been scheduled."""
+  QUEUED
+  """The function run is currently running."""
+  RUNNING
+  """The function run was skipped"""
+  SKIPPED
+  UNKNOWN
+}
+
+enum FunctionRunTimeField {
+  ENDED_AT
+  MIXED
+  STARTED_AT
+}
+
+type FunctionRunV2 {
+  accountID: UUID!
+  app: App!
+  appID: UUID!
+  batchCreatedAt: Time
+  cronSchedule: String
+  deferredFrom: [RunDeferredFrom!]!
+  defers: [RunDefer!]!
+  endedAt: Time
+  eventName: String
+  function: Workflow!
+  functionID: UUID!
+  hasAI: Boolean!
+  id: ULID!
+  isBatch: Boolean!
+  isDeferred: Boolean!
+  output: Bytes
+  queuedAt: Time!
+  siblingDefers: [RunDefer!]!
+  sourceID: String
+  startedAt: Time
+  status: FunctionRunStatus!
+  trace(preview: Boolean): RunTraceSpan
+  traceID: String!
+  triggerIDs: [ULID!]!
+  workspaceID: UUID!
+}
+
+type FunctionRunV2Edge {
+  cursor: String!
+  node: FunctionRunV2!
+}
+
+type FunctionTrigger {
+  condition: String
+  type: FunctionTriggerTypes!
+  value: String!
+}
+
+enum FunctionTriggerTypes {
+  CRON
+  EVENT
+}
+
+type FunctionsConnection {
+  edges: [FunctionsEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type FunctionsEdge {
+  cursor: String!
+  node: Function!
+}
+
+input FunctionsFilter {
+  archived: Boolean = false
+  eventName: String
+}
+
+scalar HTTPHeaders
+
+scalar IP
+
+type IngestKey {
+  createdAt: Time!
+  filter: FilterList!
+  id: ID!
+  metadata: Map
+  name: NullString!
+  presharedKey: String!
+  source: IngestSource!
+  url: String
+}
+
+input IngestKeyFilter {
+  name: String
+  source: String
+}
+
+scalar IngestSource
+
+type InsightsColumn {
+  columnType: InsightsColumnType!
+  name: String!
+}
+
+enum InsightsColumnType {
+  DATE
+  DYNAMIC
+  NUMBER
+  STRING
+  UNKNOWN
+}
+
+type InsightsDiagnostic {
+  code: InsightsDiagnosticCode!
+  message: String!
+  position: InsightsDiagnosticPosition
+  severity: InsightsDiagnosticSeverity!
+}
+
+scalar InsightsDiagnosticCode
+
+type InsightsDiagnosticPosition {
+  context: String!
+  end: Int!
+  start: Int!
+}
+
+scalar InsightsDiagnosticSeverity
+
+type InsightsQueryStatement {
+  createdAt: Time!
+  creator: String!
+  id: ULID!
+  lastEditor: String!
+  name: String!
+  shared: Boolean!
+  sql: String!
+  updatedAt: Time!
+}
+
+type InsightsResponse {
+  columns: [InsightsColumn!]!
+  diagnostics: [InsightsDiagnostic!]
+  rows: [InsightsRow!]!
+}
+
+type InsightsRow {
+  values: [String!]!
+}
+
+scalar Int64
+
+type InvokeStepInfo {
+  functionID: String!
+  returnEventID: ULID
+  runID: ULID
+  timedOut: Boolean
+  timeout: Time!
+  triggeringEventID: ULID!
+}
+
+scalar JSON
+
+scalar Map
+
+enum Marketplace {
+  AWS
+  DIGITAL_OCEAN
+  PARTNER
+  VERCEL
+}
+
+type MetricsData {
+  bucket: Time!
+  value: Float!
+}
+
+input MetricsOpts {
+  from: Time!
+  name: String!
+  to: Time
+}
+
+input MetricsRequest {
+  from: Time!
+  name: String!
+  to: Time!
+}
+
+type MetricsResponse {
+  data: [MetricsData!]!
+  from: Time!
+  granularity: String!
+  to: Time!
+}
+
+enum MetricsScope {
+  APP
+  ENV
+  FN
+}
+
+type Mutation {
+  archiveApp(id: UUID!): App!
+  archiveEnvironment(id: ID!): Workspace!
+  archiveEvent(name: String!, workspaceID: ID!): Event
+  archiveWorkflow(input: ArchiveWorkflowInput!): WorkflowResponse
+  cancelRun(envID: UUID!, runID: ULID!): FunctionRun!
+  cdcAutoSetup(envID: UUID!, input: CDCConnectionInput!): CDCSetupResponse!
+  cdcDelete(envID: UUID!, id: UUID!): DeleteResponse!
+  cdcManualSetup(envID: UUID!, input: CDCConnectionInput!): CDCSetupResponse!
+  cdcTestCredentials(envID: UUID!, input: CDCConnectionInput!): CDCSetupResponse!
+  cdcTestLogicalReplication(envID: UUID!, input: CDCConnectionInput!): CDCSetupResponse!
+  cdcTestSetup(envID: UUID!, input: CDCConnectionInput!): CDCSetupResponse!
+  completeAWSMarketplaceSetup(input: AWSMarketplaceSetupInput!): AWSMarketplaceSetupResponse
+  confirmSubscriptionUpgrade(subscriptionId: String!): ConfirmSubscriptionUpgradeResponse!
+  createAPIKey(input: CreateAPIKeyInput!): APIKeyCreateResult!
+  createCancellation(input: CreateCancellationInput!): Cancellation!
+  createFunctionReplay(input: CreateFunctionReplayInput!): Replay!
+  createIngestKey(input: NewIngestKey!): IngestKey!
+  createInsightsQuery(input: NewInsightsQuery!): InsightsQueryStatement!
+  createSigningKey(envID: UUID!): SigningKey!
+  createStripeSubscription(input: StripeSubscriptionInput!): CreateStripeSubscriptionResponse!
+  createUser: CreateUserPayload
+  createVercelApp(input: CreateVercelAppInput!): CreateVercelAppResponse
+  createWorkspace(input: NewWorkspaceInput!): [Workspace]!
+  datadogOAuthCompleted(authCode: String!, ddDomain: String!, ddSite: String!, orgID: String!, orgName: String!): DatadogOrganization!
+  datadogOAuthRedirectURL(ddDomain: String!, ddSite: String!): String!
+  deleteAPIKey(id: UUID!): Boolean!
+  deleteCancellation(cancellationID: ULID!, envID: UUID!): ULID!
+  deleteIngestKey(input: DeleteIngestKey!): DeleteResponse
+  deleteSigningKey(id: UUID!): SigningKey!
+  disableDatadogConnection(connectionID: UUID!): UUID!
+  disableEnvironmentAutoArchive(id: ID!): Workspace!
+  enableDatadogConnection(envID: UUID!, organizationID: UUID!): DatadogConnectionStatus!
+  enableEnvironmentAutoArchive(id: ID!): Workspace!
+  enrollToConstraintAPI: Boolean!
+  invokeFunction(data: Map, envID: UUID!, functionSlug: String!, meta: Map, user: Map): Boolean
+  pauseFunction(cancelRunning: Boolean, fnID: ID!): Workflow!
+  removeDatadogOrganization(organizationID: UUID!): UUID!
+  removeInsightsQuery(id: ULID!): DeleteULIDResponse
+  removeVercelApp(input: RemoveVercelAppInput!): RemoveVercelAppResponse
+  rerun(envID: UUID, fromStep: RerunFromStepInput, runID: ULID!): ULID!
+  resyncApp(appExternalID: String!, appURL: String, envID: UUID!): SyncResponse!
+  retryWorkflowRun(input: StartWorkflowInput!, workflowRunID: ULID!): StartWorkflowResponse
+  rotateSigningKey(envID: UUID!): SigningKey!
+  setAccountEntitlement(entitlementName: String!, overrideStrategy: String!, value: Int!): UUID!
+  setUpAccount: SetUpAccountPayload
+  shareInsightsQuery(id: ULID!): InsightsQueryStatement!
+  submitChurnSurvey(accountID: UUID!, clerkUserID: String!, email: String!, feedback: String, reason: String!, renderedOrder: [String!]): Boolean!
+  syncNewApp(appURL: String!, envID: UUID!): SyncResponse!
+  unarchiveApp(id: UUID!): App!
+  unarchiveEnvironment(id: ID!): Workspace!
+  unpauseFunction(fnID: ID!): Workflow!
+  updateAPIKey(input: UpdateAPIKeyInput!): APIKey!
+  updateAccount(input: UpdateAccount!): Account!
+  updateAccountAddonQuantity(addonName: String!, quantity: Int!): Addon!
+  updateExperimentScoringConfig(experimentName: String!, functionID: ID!, metrics: [ExperimentScoringMetricInput!]!, workspaceID: ID!): ExperimentScoringConfig!
+  updateIngestKey(id: ID!, input: UpdateIngestKey!): IngestKey!
+  updateInsightsQuery(id: ULID!, input: UpdateInsightsQuery!): InsightsQueryStatement!
+  updatePaymentMethod(token: String!): [PaymentMethod!]
+  updatePlan(slug: String, to: ID): Account!
+  updateVercelApp(input: UpdateVercelAppInput!): UpdateVercelAppResponse
+}
+
+input NewIngestKey {
+  filterList: FilterListInput
+  metadata: Map
+  name: String!
+  source: IngestSource!
+  workspaceID: ID!
+}
+
+input NewInsightsQuery {
+  name: String!
+  sql: String!
+}
+
+input NewUser {
+  email: String!
+  name: String
+}
+
+input NewWorkspaceInput {
+  name: String!
+}
+
+scalar NullString
+
+scalar NullTime
+
+type OverdueInvoice {
+  amountCents: Int!
+  """
+  e.g. "$120.00"
+  """
+  amountLabel: String!
+  """last payment attempt, null if none"""
+  attemptedAt: Time
+  currency: String!
+  daysPastDue: Int!
+  dueAt: Time!
+  """e.g. "card_declined", null if none"""
+  failureReason: String
+  """
+  Stripe invoice ID (e.g. "in_123"). Typed as String because IDs in this schema are UUIDs; invoice IDs are not.
+  """
+  id: String!
+  """hosted invoice / pay link (https), null if none"""
+  invoiceURL: String
+  """underlying invoice status (open, uncollectible, …)"""
+  status: String!
+}
+
+"""The pagination information in a connection."""
+type PageInfo {
+  """When paginating forward, the cursor to query the next page."""
+  endCursor: String
+  """Indicates if there are any pages subsequent to the current page."""
+  hasNextPage: Boolean!
+  """Indicates if there are any pages prior to the current page."""
+  hasPreviousPage: Boolean!
+  """When paginating backward, the cursor to query the previous page."""
+  startCursor: String
+}
+
+type PageResults {
+  cursor: String
+  page: Int!
+  perPage: Int!
+  totalItems: Int
+  totalPages: Int
+}
+
+type PaginatedEventTypes {
+  data: [EventType!]!
+  page: PageResults!
+}
+
+type PaginatedEvents {
+  data: [Event!]!
+  page: PageResults!
+}
+
+type PaginatedWorkflows {
+  data: [Workflow!]!
+  page: PageResults!
+}
+
+enum PaymentCollectionStage {
+  """already downgraded for non-payment"""
+  DOWNGRADED
+  """scheduled to downgrade on actionDate"""
+  DOWNGRADE_PENDING
+  """overdue beyond stricter threshold"""
+  FINAL_NOTICE
+  """overdue, within grace window"""
+  PAST_DUE
+  """card declined / retrying, not yet past grace"""
+  PAYMENT_FAILED
+  """account suspended for non-payment"""
+  SUSPENDED
+}
+
+type PaymentIntent {
+  amountLabel: String!
+  createdAt: Time!
+  description: String!
+  invoiceURL: String
+  status: String!
+}
+
+type PaymentMethod {
+  brand: String!
+  createdAt: Time!
+  default: Boolean!
+  expMonth: String!
+  expYear: String!
+  last4: String!
+}
+
+enum PaymentPendingAction {
+  DOWNGRADE
+  SUSPEND
+}
+
+enum PaymentStatusSeverity {
+  """past stricter threshold, downgrade/suspension imminent or active"""
+  CRITICAL
+  """failed payment / within grace window"""
+  WARNING
+}
+
+scalar Period
+
+type Price {
+  usCents: Int!
+}
+
+type Query {
+  account: Account!
+  billableStepTimeSeries(timeOptions: TimeSeriesOptions!): [TimeSeries!]!
+  defaultEnv: Workspace!
+  deploy(id: ID!): Deploy!
+  deploys(workspaceID: ID): [Deploy!]
+  envBySlug(slug: String!): Workspace
+  envs(after: String, filter: EnvsFilter, first: Int! = 40): EnvsConnection!
+  events(query: EventQuery): PaginatedEvents
+  executionTimeSeries(timeOptions: TimeSeriesOptions!): [TimeSeries!]!
+  experimentDetail(experimentName: String!, functionID: ID!, timeRange: TimeRangeInput, variantFilter: String, workspaceID: ID!): ExperimentDetail!
+  experimentInsightsQuery(experimentName: String!, functionID: ID!, timeRange: TimeRangeInput, workspaceID: ID!): String!
+  experimentScoringConfig(experimentName: String!, functionID: ID!, workspaceID: ID!): ExperimentScoringConfig!
+  experiments(timeRange: TimeRangeInput, workspaceID: ID!): [Experiment!]!
+  insights(query: String!, workspaceID: ID!): InsightsResponse!
+  insightsQuery(id: ULID!): InsightsQueryStatement!
+  metrics(opts: MetricsOpts!): MetricsResponse!
+  plans: [BillingPlan]!
+  runCountTimeSeries(timeOptions: TimeSeriesOptions!): [TimeSeries!]!
+  scoreNames(filter: ScoreFilter!, functionIDs: [ID!], workspaceID: ID!): [Score!]!
+  scoreTimeSeries(bucketSeconds: Int, filter: ScoreFilter!, functionIDs: [ID!], scoreNames: [String!], workspaceID: ID!): [ScoreSeries!]!
+  session: Session
+  sessionRuns(sessionId: String!, sessionKey: String!, timeRange: TimeRangeInput, workspaceID: ID!): [SessionRun!]!
+  sessions(sessionIdSearch: String, sessionKey: String!, timeRange: TimeRangeInput, workspaceID: ID!): [SessionGroup!]!
+  workspace(id: ID!): Workspace!
+  workspaces: [Workspace!]
+}
+
+type QuickSearchApp {
+  name: String!
+}
+
+type QuickSearchEnv {
+  name: String!
+  slug: String!
+}
+
+type QuickSearchEvent {
+  envSlug: String!
+  id: ULID!
+  name: String!
+}
+
+type QuickSearchEventType {
+  name: String!
+}
+
+type QuickSearchFunction {
+  name: String!
+  slug: String!
+}
+
+type QuickSearchResults {
+  apps: [QuickSearchApp!]!
+  event: QuickSearchEvent
+  eventTypes: [QuickSearchEventType!]!
+  functions: [QuickSearchFunction!]!
+  run: QuickSearchRun
+}
+
+type QuickSearchRun {
+  envSlug: String!
+  id: ULID!
+}
+
+type RateLimitConfiguration {
+  key: String
+  limit: Int!
+  period: String!
+}
+
+input RemoveVercelAppInput {
+  projectID: String!
+  workspaceID: ID!
+}
+
+type RemoveVercelAppResponse {
+  success: Boolean!
+}
+
+type Replay {
+  createdAt: Time!
+  endedAt: Time
+  """Filters applied to the replay, such as specific run statuses."""
+  filters: JSON
+  """Structured filters applied to the replay."""
+  filtersV2: ReplayFilters
+  """
+  The event or function ID that starts the replay range.
+  
+  This is not inclusive.
+  
+  A DateTime can also be used by generating an ULID from it.
+  """
+  fromRange: ULID!
+  """The number of functions that were processed during the replay."""
+  functionRunsProcessedCount: Int!
+  """The number of function runs created scheduled from the replay."""
+  functionRunsScheduledCount: Int!
+  id: ID!
+  name: String!
+  replayType: ReplayType!
+  """
+  The event or function ID that ends the replay range.
+  
+  This is inclusive.
+  
+  A DateTime can also be used by generating an ULID from it.
+  """
+  toRange: ULID!
+  """
+  The total number of function runs expected to be created from the replay.
+  """
+  totalRunCount: Int
+  workflowID: UUID
+  workspaceID: UUID
+}
+
+type ReplayFilters {
+  skipReasons: [SkipReason!]!
+  statuses: [FunctionRunStatus!]!
+}
+
+type ReplayRunCounts {
+  cancelledCount: Int!
+  completedCount: Int!
+  failedCount: Int!
+  skippedPausedCount: Int!
+}
+
+enum ReplayRunStatus {
+  ALL
+  CANCELLED
+  COMPLETED
+  FAILED
+  SKIPPED_PAUSED
+}
+
+enum ReplayType {
+  EVENT
+  FUNCTION
+}
+
+input RerunFromStepInput {
+  input: Bytes
+  stepID: String!
+}
+
+type RetryConfiguration {
+  isDefault: Boolean
+  value: Int!
+}
+
+scalar Role
+
+type RunDefer {
+  fnSlug: String!
+  function: Workflow
+  hashedDeferID: String!
+  run: FunctionRunV2
+  runID: ULID
+  status: RunDeferStatus!
+  userlandDeferID: String!
+}
+
+enum RunDeferStatus {
+  ABORTED
+  REJECTED
+  SCHEDULED
+}
+
+type RunDeferredFrom {
+  function: Workflow!
+  run: FunctionRunV2
+  runID: ULID!
+}
+
+type RunTraceSpan {
+  account: Account!
+  accountID: UUID!
+  appID: UUID!
+  attempts: Int
+  childrenSpans: [RunTraceSpan!]!
+  duration: Int
+  endedAt: Time
+  functionID: UUID!
+  groupID: String
+  isPreview: Boolean
+  isRoot: Boolean!
+  isUserland: Boolean!
+  metadata: [SpanMetadata!]!
+  name: String!
+  outputID: String
+  parentSpan: RunTraceSpan
+  parentSpanID: String
+  queuedAt: Time!
+  response: RunTraceSpanResponseInfo
+  run: FunctionRun!
+  runID: ULID!
+  scheduledAt: Time
+  skipExistingRunID: String
+  skipReason: String
+  spanID: String!
+  startedAt: Time
+  status: RunTraceSpanStatus!
+  stepID: String
+  stepInfo: StepInfo
+  stepOp: StepOp
+  stepType: String!
+  traceID: String!
+  userlandSpan: UserlandSpan
+  workspace: Workspace!
+  workspaceID: UUID!
+}
+
+type RunTraceSpanOutput {
+  data: Bytes
+  error: StepError
+  input: Bytes
+}
+
+type RunTraceSpanResponseInfo {
+  headers: HTTPHeaders!
+  statusCode: Int!
+}
+
+enum RunTraceSpanStatus {
+  CANCELLED
+  COMPLETED
+  FAILED
+  PAUSED
+  RUNNING
+  WAITING
+}
+
+type RunTraceTrigger {
+  IDs: [ULID!]!
+  batchID: ULID
+  cron: String
+  eventName: String
+  isBatch: Boolean!
+  payloads: [Bytes!]!
+  timestamp: Time!
+}
+
+type RunsConnection {
+  edges: [FunctionRunV2Edge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+input RunsFilter {
+  lowerTime: Time!
+  status: [FunctionRunStatus!]
+  timeField: FunctionRunTimeField = MIXED
+  upperTime: Time!
+}
+
+input RunsFilterV2 {
+  appIDs: [UUID!]
+  fnSlug: String
+  from: Time!
+  functionIDs: [UUID!]
+  isDeferred: Boolean
+  query: String
+  status: [FunctionRunStatus!]
+  timeField: RunsOrderByField = QUEUED_AT
+  until: Time
+}
+
+input RunsOrderBy {
+  direction: RunsOrderByDirection!
+  field: RunsOrderByField!
+}
+
+enum RunsOrderByDirection {
+  ASC
+  DESC
+}
+
+enum RunsOrderByField {
+  ENDED_AT
+  QUEUED_AT
+  STARTED_AT
+}
+
+scalar Runtime
+
+enum SDKMode {
+  CLOUD
+  DEV
+}
+
+scalar SchemaSource
+
+type ScopedFunctionStatusResponse {
+  cancelled: Int!
+  completed: Int!
+  failed: Int!
+  from: Time!
+  queued: Int!
+  running: Int!
+  skipped: Int!
+  to: Time!
+}
+
+type ScopedMetric {
+  data: [MetricsData!]!
+  id: UUID!
+  tagName: String
+  tagValue: String
+}
+
+input ScopedMetricsFilter {
+  appIDs: [UUID!]
+  from: Time!
+  functionIDs: [UUID!]
+  groupBy: String
+  name: String!
+  scope: MetricsScope!
+  until: Time
+}
+
+type ScopedMetricsResponse {
+  from: Time!
+  granularity: String!
+  metrics: [ScopedMetric!]!
+  scope: MetricsScope!
+  to: Time!
+}
+
+type Score {
+  kind: ScoreKind!
+  name: String!
+}
+
+type ScoreBucket {
+  avg: Float
+  bucketStart: Time!
+  falseCount: Int
+  max: Float
+  p50: Float
+  p90: Float
+  p99: Float
+  runCount: Int!
+  trueCount: Int
+}
+
+input ScoreFilter {
+  timeRange: TimeRangeInput!
+}
+
+enum ScoreKind {
+  BOOLEAN
+  NUMERIC
+}
+
+type ScoreSeries {
+  bucketSeconds: Int!
+  buckets: [ScoreBucket!]!
+  kind: ScoreKind!
+  scoreName: String!
+}
+
+input SearchInput {
+  term: String!
+}
+
+scalar SearchObject
+
+type SearchResult {
+  env: Workspace!
+  kind: SearchResultType!
+  value: SearchResultValue!
+}
+
+enum SearchResultType {
+  EVENT_OBJECT
+  FUNCTION_RUN
+}
+
+union SearchResultValue = ArchivedEvent | FunctionRun
+
+type SearchResults {
+  count: Int!
+  results: [SearchResult]!
+}
+
+enum SecretCheck {
+  CORRECT
+  INCORRECT
+  MISSING
+  UNKNOWN
+}
+
+type Session {
+  expires: Time
+  user: User!
+}
+
+type SessionFunction {
+  name: String!
+  slug: String!
+}
+
+type SessionGroup {
+  failedRunCount: Int!
+  failureRate: Float!
+  functions: [SessionFunction!]!
+  lastActiveAt: Time!
+  runCount: Int!
+  sessionId: String!
+  sessionKey: String!
+}
+
+type SessionKey {
+  createdAt: Time!
+  sessionKey: String!
+}
+
+type SessionRun {
+  endedAt: Time
+  eventName: String
+  functionSlug: String!
+  id: String!
+  queuedAt: Time!
+  startedAt: Time
+  status: String!
+}
+
+type SetUpAccountPayload {
+  account: Account
+}
+
+type SigningKey {
+  createdAt: Time!
+  decryptedValue: String!
+  id: UUID!
+  isActive: Boolean!
+  user: User
+}
+
+type SigningKeyRotationCheck {
+  sdkSupport: Boolean!
+  signingKeyFallbackState: SecretCheck!
+  signingKeyState: SecretCheck!
+}
+
+type SingletonConfiguration {
+  key: String
+  mode: SingletonMode!
+}
+
+enum SingletonMode {
+  CANCEL
+  SKIP
+}
+
+enum SkipReason {
+  FUNCTION_PAUSED
+  NONE
+}
+
+type SkippedFunctionRun {
+  accountID: UUID!
+  batchID: ULID
+  eventID: ULID
+  id: ULID!
+  skipReason: SkipReason!
+  skippedAt: Time!
+  workflowID: UUID!
+  workspaceID: UUID!
+}
+
+type SleepStepInfo {
+  sleepUntil: Time!
+}
+
+type SpanMetadata {
+  kind: SpanMetadataKind!
+  scope: SpanMetadataScope!
+  updatedAt: Time!
+  values: SpanMetadataValues!
+}
+
+scalar SpanMetadataKind
+
+scalar SpanMetadataScope
+
+scalar SpanMetadataValues
+
+input StartWorkflowInput {
+  workflowID: ID!
+  workflowVersion: Int
+  workspaceID: ID!
+}
+
+type StartWorkflowResponse {
+  id: ULID!
+}
+
+type StepError {
+  cause: String
+  message: String!
+  name: String
+  stack: String
+}
+
+union StepInfo = InvokeStepInfo | SleepStepInfo | WaitForEventStepInfo
+
+enum StepOp {
+  AI_GATEWAY
+  INVOKE
+  RUN
+  SLEEP
+  WAIT_FOR_EVENT
+}
+
+input StripeSubscriptionInput {
+  items: [StripeSubscriptionItemsInput!]!
+}
+
+input StripeSubscriptionItemsInput {
+  amount: Int!
+  planID: ID
+  planSlug: String
+  quantity: Int!
+}
+
+type SyncResponse {
+  app: App
+  error: CodedError
+  sync: Deploy
+}
+
+enum SyncStatus {
+  duplicate
+  error
+  pending
+  success
+}
+
+type ThrottleConfiguration {
+  burst: Int!
+  key: String
+  limit: Int!
+  period: String!
+}
+
+scalar Time
+
+input TimeRangeInput {
+  from: Time!
+  to: Time!
+}
+
+type TimeSeries {
+  data: [TimeSeriesPoint!]!
+  name: String!
+}
+
+input TimeSeriesOptions {
+  interval: String
+  month: Int!
+  year: Int!
+}
+
+type TimeSeriesPoint {
+  time: Time!
+  value: Float
+}
+
+scalar Timerange
+
+scalar ULID
+
+scalar UUID
+
+input UpdateAPIKeyInput {
+  id: UUID!
+  name: String!
+}
+
+input UpdateAccount {
+  billingEmail: String
+  name: String
+  securityEmail: String
+}
+
+input UpdateIngestKey {
+  filterList: FilterListInput
+  metadata: Map
+  name: String
+}
+
+input UpdateInsightsQuery {
+  name: String!
+  sql: String!
+}
+
+input UpdateVercelAppInput {
+  originOverride: String
+  path: String!
+  projectID: String!
+  protectionBypassSecret: String
+}
+
+type UpdateVercelAppResponse {
+  success: Boolean!
+  vercelApp: VercelApp
+}
+
+scalar Upload
+
+type Usage {
+  asOf: Time!
+  data: [UsageSlot!]!
+  period: Period!
+  range: Timerange!
+  total: Int!
+}
+
+input UsageInput {
+  from: Time
+  period: Period
+  range: Timerange
+  to: Time
+}
+
+type UsageSlot {
+  count: Int!
+  slot: Time!
+}
+
+type User {
+  account: Account
+  createdAt: Time!
+  email: String!
+  id: ID!
+  lastLoginAt: Time
+  name: NullString
+  passwordChangedAt: Time
+  roles: [Role]
+  updatedAt: Time!
+}
+
+type UserlandSpan {
+  resourceAttrs: Bytes
+  scopeName: String
+  scopeVersion: String
+  serviceName: String
+  spanAttrs: Bytes
+  spanKind: String
+  spanName: String
+}
+
+type VariantMetric {
+  avg: Float!
+  key: String!
+  max: Float!
+  med: Float!
+  min: Float!
+  q1: Float!
+  q3: Float!
+  stddev: Float!
+}
+
+type VariantWeight {
+  variantName: String!
+  weight: Float!
+}
+
+type VercelApp {
+  id: UUID!
+  originOverride: String
+  path: String
+  projectID: String!
+  protectionBypassSecret: String
+  workspaceID: UUID!
+}
+
+enum VercelDeploymentProtection {
+  ALL
+  ALL_EXCEPT_CUSTOM_DOMAINS
+  DISABLED
+  PREVIEW
+  PROD_DEPLOYMENT_URLS_AND_ALL_PREVIEWS
+  UNKNOWN
+}
+
+type VercelIntegration {
+  isMarketplace: Boolean!
+  projects: [VercelProject!]!
+}
+
+type VercelProject {
+  canChangeEnabled: Boolean!
+  deploymentProtection: VercelDeploymentProtection!
+  isEnabled: Boolean!
+  name: String!
+  originOverride: String
+  projectID: String!
+  protectionBypassSecret: String
+  servePath: String!
+}
+
+type WaitForEventStepInfo {
+  eventName: String!
+  expression: String
+  foundEventID: ULID
+  timedOut: Boolean
+  timeout: Time!
+}
+
+type Workflow {
+  app: App!
+  archivedAt: Time
+  cancellationRunCount(input: CancellationRunCountInput!): Int!
+  cancellations(after: String, first: Int! = 20): CancellationConnection!
+  configuration: FunctionConfiguration
+  current: WorkflowVersion
+  failureHandler: Workflow
+  id: ID!
+  isArchived: Boolean!
+  isParentArchived: Boolean!
+  isPaused: Boolean!
+  keyQueuesEnabled: Boolean!
+  latestVersion: WorkflowVersion
+  metrics(opts: MetricsRequest!): MetricsResponse!
+  name: String!
+  previous: [WorkflowVersion]!
+  """Lists the estimated number of runs to replay"""
+  replayCounts(from: Time!, to: Time!): ReplayRunCounts!
+  """
+  A list of all the function's replays.
+  
+  This doesn't include environment-level replays.
+  """
+  replays: [Replay!]!
+  slug: String!
+  triggers: [FunctionTrigger!]!
+  url: String!
+  usage(event: String, opts: UsageInput): Usage!
+}
+
+type WorkflowResponse {
+  workflow: Workflow!
+}
+
+type WorkflowVersion {
+  createdAt: Time!
+  deploy: Deploy
+  description: NullString
+  retries: Int!
+  throttleCount: Int!
+  throttlePeriod: String!
+  triggers: [FunctionTrigger!]!
+  updatedAt: Time!
+  url: String!
+  validFrom: Time
+  validTo: Time
+  version: Int!
+  workflowID: ID!
+  workflowType: String!
+}
+
+type WorkflowVersionResponse {
+  version: WorkflowVersion!
+  workflow: Workflow!
+}
+
+type Workspace {
+  appByExternalID(externalID: String!): App!
+  appCheck(url: String!): AppCheckResult!
+  apps(filter: AppsFilter): [App!]!
+  archivedEvent(id: ULID!): ArchivedEvent
+  cdcConnections: [CDCConnection!]!
+  connectWorkerMetrics(filter: ConnectV1WorkerMetricsFilter!): ScopedMetricsResponse!
+  createdAt: Time!
+  event(name: String!): Event
+  eventByNames(names: [String!]!): [EventType!]!
+  eventSearch(after: String, filter: EventSearchFilter!, first: Int! = 20): EventSearchConnection!
+  eventType(name: String!): EventTypeV2!
+  eventTypes: PaginatedEventTypes!
+  eventTypesV2(after: String, filter: EventTypesFilter!, first: Int! = 40): EventTypesConnection!
+  eventV2(id: ULID!): EventV2!
+  events(prefix: String): PaginatedEvents!
+  eventsV2(after: String, filter: EventsFilter!, first: Int! = 40): EventsConnection!
+  functionCount: Int!
+  id: ID!
+  ingestKey(id: ID!): IngestKey!
+  ingestKeys(filter: IngestKeyFilter): [IngestKey!]!
+  isArchived: Boolean!
+  isAutoArchiveEnabled: Boolean!
+  lastDeployedAt: Time
+  name: String!
+  parentID: ID
+  replay(id: ID!): Replay!
+  run(runID: String!): FunctionRunV2
+  runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
+  runTrigger(runID: String!): RunTraceTrigger!
+  runs(after: String, filter: RunsFilterV2!, first: Int! = 40, orderBy: [RunsOrderBy!]!, preview: Boolean): RunsConnection!
+  scopedFunctionStatus(filter: ScopedMetricsFilter!): ScopedFunctionStatusResponse!
+  scopedMetrics(filter: ScopedMetricsFilter!): ScopedMetricsResponse!
+  sessionKeys(search: String): [SessionKey!]!
+  signingKeys: [SigningKey!]!
+  slug: String!
+  test: Boolean!
+  type: EnvironmentType!
+  unattachedSyncs(after: Time, first: Int! = 20): [Deploy!]!
+  vercelApps: [VercelApp!]!
+  webhookSigningKey: String!
+  workerConnection(connectionId: ULID!): ConnectV1WorkerConnection
+  workerConnections(after: String, filter: ConnectV1WorkerConnectionsFilter!, first: Int! = 100, orderBy: [ConnectV1WorkerConnectionsOrderBy!]!): ConnectV1WorkerConnectionsConnection!
+  workflow(id: ID!): Workflow
+  workflowBySlug(slug: String!): Workflow
+  workflows(archived: Boolean = false, search: String): PaginatedWorkflows!
+}
