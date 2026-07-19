@@ -1,14 +1,14 @@
 package usage
 
 import (
-	"fmt"
+	"errors"
 	"time"
 )
 
 var (
-	ErrNoMetricsName      = fmt.Errorf("metrics' name must be specified")
-	ErrNoMetricsTimeRange = fmt.Errorf("metrics' time range (from/to - ISO8601 format) must be specified")
-	ErrInvalidMetricsTimeRange = fmt.Errorf("invalid time range for metrics")
+	ErrNoMetricsName           = errors.New("metrics' name must be specified")
+	ErrNoMetricsTimeRange      = errors.New("metrics' time range (from/to - ISO8601 format) must be specified")
+	ErrInvalidMetricsTimeRange = errors.New("invalid time range for metrics")
 )
 
 // MetricsRequest represents a client request for metrics based on time range
