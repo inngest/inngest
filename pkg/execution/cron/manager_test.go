@@ -151,13 +151,26 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, 0, opt.healthCheckLeadTimeSeconds)
 	})
 
-	t.Run("WithSplitCronPartitionByWorkspace sets callback", func(t *testing.T) {
+	t.Run("WithSplitGlobalCronPartition sets callback", func(t *testing.T) {
 		opt := managerOpt{}
-		WithSplitCronPartitionByWorkspace(func(context.Context, uuid.UUID) bool {
+		WithSplitGlobalCronPartition(func(context.Context, uuid.UUID) bool {
 			return true
 		})(&opt)
 
-		require.NotNil(t, opt.splitCronPartitionByWorkspace)
+		require.NotNil(t, opt.splitGlobalCronPartition)
+		require.True(t, opt.splitGlobalCronPartition(context.Background(), uuid.New()))
+	})
+
+	t.Run("WithQueueNameForCronItem sets callback", func(t *testing.T) {
+		opt := managerOpt{}
+		WithQueueNameForCronItem(func(context.Context, CronItem) string {
+			return "hello"
+		})(&opt)
+
+		require.NotNil(t, opt.queueNameForCronItem)
+		var ci CronItem
+		require.Equal(t, "hello", opt.queueNameForCronItem(context.Background(), ci))
+
 	})
 
 	t.Run("validate options", func(t *testing.T) {
@@ -691,31 +704,52 @@ func TestScheduleNextQueueName(t *testing.T) {
 	functionID := uuid.New()
 
 	tests := []struct {
-		name      string
-		gate      func(context.Context, uuid.UUID) bool
-		queueName string
+		name              string
+		gate              func(context.Context, uuid.UUID) bool
+		queueNameResolver func(context.Context, CronItem) string
+		expectedQueueName string
 	}{
 		{
-			name:      "flag gate unset",
-			queueName: queue.KindCron,
+			name:              "flag gate unset",
+			expectedQueueName: queue.KindCron,
 		}, {
-			name:      "flag gate nil",
-			gate:      nil,
-			queueName: queue.KindCron,
+			name:              "flag gate nil",
+			gate:              nil,
+			expectedQueueName: queue.KindCron,
 		},
 		{
-			name: "workspace scoped cron partition disabled",
+			name: "flag gate disabled",
 			gate: func(_ context.Context, acctID uuid.UUID) bool {
 				return false
 			},
-			queueName: queue.KindCron,
+			expectedQueueName: queue.KindCron,
 		},
 		{
-			name: "workspace scoped cron partition enabled",
+			name: "flag gate enabled without custom queue name",
 			gate: func(_ context.Context, acctID uuid.UUID) bool {
 				return true
 			},
-			queueName: queue.KindCron + ":" + workspaceID.String(),
+			expectedQueueName: queue.KindCron,
+		},
+		{
+			name: "flag gate enabled with empty custom queue name",
+			gate: func(_ context.Context, acctID uuid.UUID) bool {
+				return true
+			},
+			queueNameResolver: func(context.Context, CronItem) string {
+				return ""
+			},
+			expectedQueueName: queue.KindCron,
+		},
+		{
+			name: "flag gate enabled with custom queue name",
+			gate: func(_ context.Context, acctID uuid.UUID) bool {
+				return true
+			},
+			queueNameResolver: func(_ context.Context, item CronItem) string {
+				return "cron:lol:0"
+			},
+			expectedQueueName: "cron:lol:0",
 		},
 	}
 
@@ -726,7 +760,10 @@ func TestScheduleNextQueueName(t *testing.T) {
 				WithJitterRange(0, 0),
 			}
 			if tt.gate != nil {
-				opts = append(opts, WithSplitCronPartitionByWorkspace(tt.gate))
+				opts = append(opts, WithSplitGlobalCronPartition(tt.gate))
+			}
+			if tt.queueNameResolver != nil {
+				opts = append(opts, WithQueueNameForCronItem(tt.queueNameResolver))
 			}
 			mgr := NewManager(nil, producer, logger.StdlibLogger(ctx), opts...)
 
@@ -742,7 +779,7 @@ func TestScheduleNextQueueName(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.NotNil(t, producer.item.QueueName)
-			require.Equal(t, tt.queueName, *producer.item.QueueName)
+			require.Equal(t, tt.expectedQueueName, *producer.item.QueueName)
 			require.Equal(t, queue.KindCron, producer.item.Kind)
 		})
 	}
