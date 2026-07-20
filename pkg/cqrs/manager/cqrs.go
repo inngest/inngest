@@ -2644,7 +2644,7 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	if opt.Preview && !canReadEndedAtFromTraceRuns(opt) {
-		return w.GetSpanRuns(ctx, opt)
+		return w.GetRuns(ctx, opt)
 	}
 
 	return w.getTraceRunsFromTable(ctx, opt)
@@ -3387,13 +3387,23 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	return res, nil
 }
 
-// GetSpanRuns loads runs from spans.  querying by start time can use executor.run
+// GetRuns loads runs from spans.  querying by start time can use executor.run
 // spans (which have start embedded).  everything else needs an aggregation...
-func (w wrapper) GetSpanRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+func (w wrapper) GetRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	if err := validateSpanRunFilters(opt); err != nil {
+		return nil, err
+	}
 	if canPushDownRootPage(opt) {
 		return w.getSpanRunsPushdown(ctx, opt)
 	}
 	return w.getSpanRunsFullAggregate(ctx, opt)
+}
+
+func validateSpanRunFilters(opt cqrs.GetTraceRunOpt) error {
+	if len(opt.Filter.FunctionSlug) > 0 && len(opt.Filter.AppName) == 0 {
+		return fmt.Errorf("app name is required when filtering by function slug")
+	}
+	return nil
 }
 
 // Required for ended_at ordering and CEL filters, which depend on data outside
@@ -3429,7 +3439,13 @@ func (w wrapper) getSpanRunsFullAggregate(ctx context.Context, opt cqrs.GetTrace
 		sq.L(`(SELECT s3.is_deferred FROM spans s3
 			WHERE s3.run_id = spans.run_id AND s3.name = ?
 			ORDER BY s3.start_time ASC LIMIT 1)`, meta.SpanNameRun).As("is_deferred"),
+		sq.L(`(SELECT CAST(s4.attributes AS TEXT) FROM spans s4
+			WHERE s4.run_id = spans.run_id AND s4.name = ?
+			ORDER BY s4.start_time ASC LIMIT 1)`, meta.SpanNameRun).As("attributes"),
 		h.EventIDsExpr(), // DB-specific due to storage differences
+		"run_apps.name",
+		h.RunFunctionSlugExpr().As("function_slug"),
+		h.RunFunctionNameExpr().As("function_name"),
 	}
 
 	groupByCols := []interface{}{
@@ -3440,6 +3456,10 @@ func (w wrapper) getSpanRunsFullAggregate(ctx context.Context, opt cqrs.GetTrace
 		"spans.app_id",
 		"spans.function_id",
 		"spans.trace_id",
+		"run_apps.name",
+		"run_functions.slug",
+		"run_functions.name",
+		"run_functions.config",
 	}
 
 	// Build ORDER BY for aggregated columns
@@ -3466,7 +3486,7 @@ func (w wrapper) getSpanRunsFullAggregate(ctx context.Context, opt cqrs.GetTrace
 	// always add run_id at the end for stable sorting
 	orderExprs = append(orderExprs, sq.C("run_id").Asc())
 
-	q := sq.Dialect(h.GoquDialect()).From("spans")
+	q := spanRunsWithMetadata(sq.Dialect(h.GoquDialect()).From("spans"))
 	if useJoin {
 		// database specific join syntax needed because event_ids is an array of ids to the events table,
 		// so we need to unpack that and perform the join before the spans are grouped back together by run_id
@@ -3476,11 +3496,10 @@ func (w wrapper) getSpanRunsFullAggregate(ctx context.Context, opt cqrs.GetTrace
 	allFilters := append(builder.filter, celFilters...)
 	allFilters = append(allFilters, spanRunFinalStatusPredicates(opt)...)
 	q = q.Select(selectCols...).
-		Where(sq.L("spans.dynamic_span_id").In(
-			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").From("spans").Where(spanRunRootPredicates(opt)...),
-		)).
+		Where(sq.L("spans.dynamic_span_id").In(spanRunRootQuery(opt, h).Select("spans.dynamic_span_id").Where(spanRunRootPredicates(opt, h)...))).
 		Where(allFilters...).
 		GroupBy(groupByCols...).
+		Having(spanRunAggregatePredicates(opt, builder.cursor)...).
 		Order(orderExprs...)
 
 	if opt.Items > 0 {
@@ -3492,22 +3511,32 @@ func (w wrapper) getSpanRunsFullAggregate(ctx context.Context, opt cqrs.GetTrace
 		return nil, err
 	}
 
-	l.Debug("GetSpanRuns query", "sql", sqlQuery, "args", args)
+	l.Debug("GetRuns query", "sql", sqlQuery, "args", args)
 
 	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
-		l.Debug("GetSpanRuns query error", "error", err)
+		l.Debug("GetRuns query error", "error", err)
 		return nil, err
 	}
 	defer rows.Close()
 
-	return w.convertSpanRunRows(ctx, rows, builder.cursorLayout, h, opt.Items)
+	runs, err := w.convertSpanRunRows(ctx, rows, builder.cursorLayout, h, opt.Items)
+	if err != nil {
+		return nil, err
+	}
+	if err := w.loadSpanRunPageOutput(ctx, runs, opt.IncludeOutput); err != nil {
+		return nil, err
+	}
+	return runs, nil
 }
 
 func (w wrapper) getSpanRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
 	// Total counts should ignore pagination state.
 	opt.Cursor = ""
 	opt.Items = 0
+	if err := validateSpanRunFilters(opt); err != nil {
+		return 0, err
+	}
 
 	if canPushDownRootPage(opt) {
 		return w.countSpanRunRoots(ctx, opt)
@@ -3520,23 +3549,22 @@ func (w wrapper) countSpanRunRoots(ctx context.Context, opt cqrs.GetTraceRunOpt)
 	l := logger.StdlibLogger(ctx)
 	h := w.helpers()
 
-	preds := spanRunRootPredicates(opt)
+	preds := spanRunRootPredicates(opt, h)
 	preds = append(preds, spanRunFinalStatusPredicates(opt)...)
 
-	sqlQuery, args, err := sq.Dialect(h.GoquDialect()).
-		From("spans").
+	q := spanRunRootQuery(opt, h).
 		Select(sq.COUNT("*")).
-		Where(preds...).
-		ToSQL()
+		Where(preds...)
+	sqlQuery, args, err := q.ToSQL()
 	if err != nil {
 		return 0, err
 	}
 
-	l.Debug("GetSpanRunsCount root query", "sql", sqlQuery, "args", args)
+	l.Debug("GetRuns count root query", "sql", sqlQuery, "args", args)
 
 	var count int
 	if err := w.adapter.Conn().QueryRowContext(ctx, sqlQuery, args...).Scan(&count); err != nil {
-		l.Debug("GetSpanRunsCount root query error", "error", err)
+		l.Debug("GetRuns count root query error", "error", err)
 		return 0, err
 	}
 
@@ -3565,10 +3593,11 @@ func (w wrapper) getSpanRunsCountFullAggregate(ctx context.Context, opt cqrs.Get
 
 	grouped := q.Select(sq.L("1")).
 		Where(sq.L("spans.dynamic_span_id").In(
-			sq.Dialect(h.GoquDialect()).Select("dynamic_span_id").From("spans").Where(spanRunRootPredicates(opt)...),
+			spanRunRootQuery(opt, h).Select("spans.dynamic_span_id").Where(spanRunRootPredicates(opt, h)...),
 		)).
 		Where(groupedFilters...).
-		GroupBy(spanRunGroupByCols()...)
+		GroupBy(spanRunGroupByCols()...).
+		Having(spanRunAggregatePredicates(opt, nil)...)
 
 	sqlQuery, args, err := sq.Dialect(h.GoquDialect()).
 		From(grouped.As("span_runs")).
@@ -3578,11 +3607,11 @@ func (w wrapper) getSpanRunsCountFullAggregate(ctx context.Context, opt cqrs.Get
 		return 0, err
 	}
 
-	l.Debug("GetSpanRunsCount query", "sql", sqlQuery, "args", args)
+	l.Debug("GetRuns count query", "sql", sqlQuery, "args", args)
 
 	var count int
 	if err := w.adapter.Conn().QueryRowContext(ctx, sqlQuery, args...).Scan(&count); err != nil {
-		l.Debug("GetSpanRunsCount query error", "error", err)
+		l.Debug("GetRuns count query error", "error", err)
 		return 0, err
 	}
 
@@ -3596,25 +3625,30 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 
 	builder := newSpanRunsQueryBuilder(ctx, opt)
 
-	rootPreds := spanRunRootPredicates(opt)
+	rootPreds := spanRunRootPredicates(opt, h)
 	rootPreds = append(rootPreds, spanRunFinalStatusPredicates(opt)...)
 
 	rootQuery := sq.Dialect(h.GoquDialect()).
 		From("spans").
 		Select(
-			"run_id",
-			"dynamic_span_id",
-			"account_id",
-			"env_id",
-			"app_id",
-			"function_id",
-			"trace_id",
-			"start_time",
-			"end_time",
-			"status",
-			"is_deferred",
+			"spans.run_id",
+			"spans.dynamic_span_id",
+			"spans.account_id",
+			"spans.env_id",
+			"spans.app_id",
+			"spans.function_id",
+			"spans.trace_id",
+			"spans.start_time",
+			"spans.end_time",
+			"spans.status",
+			"spans.is_deferred",
+			sq.L("CAST(attributes AS TEXT)").As("attributes"),
 			h.RootEventIDsExpr(),
-		).
+			"run_apps.name",
+			h.RunFunctionSlugExpr().As("function_slug"),
+			h.RunFunctionNameExpr().As("function_name"),
+		)
+	rootQuery = spanRunsWithMetadata(rootQuery).
 		Where(rootPreds...).
 		Where(builder.cursorPred...).
 		Order(spanRunRootOrder(opt)...)
@@ -3627,11 +3661,11 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 		return nil, err
 	}
 
-	l.Debug("GetSpanRuns root-page query", "sql", sqlQuery, "args", args)
+	l.Debug("GetRuns root-page query", "sql", sqlQuery, "args", args)
 
 	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
-		l.Debug("GetSpanRuns root-page query error", "error", err)
+		l.Debug("GetRuns root-page query error", "error", err)
 		return nil, err
 	}
 
@@ -3671,8 +3705,89 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 			break
 		}
 	}
+	if err := w.loadSpanRunPageOutput(ctx, res, opt.IncludeOutput); err != nil {
+		return nil, err
+	}
 
 	return res, nil
+}
+
+func (w wrapper) loadSpanRunPageOutput(
+	ctx context.Context,
+	runs []*cqrs.TraceRun,
+	includeOutput bool,
+) error {
+	if len(runs) == 0 || !includeOutput {
+		return nil
+	}
+
+	runIDs := make([]string, len(runs))
+	byID := make(map[string]*cqrs.TraceRun, len(runs))
+	for i, run := range runs {
+		runIDs[i] = run.RunID
+		byID[run.RunID] = run
+	}
+
+	q := sq.Dialect(w.dialect()).
+		From("spans").
+		Select("spans.run_id", w.helpers().RunOutputExpr()).
+		Where(
+			sq.C("name").Eq(meta.SpanNameRun),
+			sq.C("debug_run_id").IsNull(),
+			sq.C("run_id").In(runIDs),
+		).
+		Order(sq.C("start_time").Asc())
+
+	sqlQuery, args, err := q.ToSQL()
+	if err != nil {
+		return err
+	}
+	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var runID string
+		var output *string
+		err = rows.Scan(&runID, &output)
+		if err != nil {
+			return err
+		}
+
+		run := byID[runID]
+		if run == nil {
+			continue
+		}
+		if output != nil && *output != "" {
+			run.Output = []byte(*output)
+		}
+	}
+	return rows.Err()
+}
+
+func decodeSpanAttributes(raw *string) map[string]any {
+	if raw == nil || *raw == "" {
+		return nil
+	}
+
+	var decoded any
+	if err := json.Unmarshal([]byte(*raw), &decoded); err != nil {
+		return nil
+	}
+	if encoded, ok := decoded.(string); ok {
+		if err := json.Unmarshal([]byte(encoded), &decoded); err != nil {
+			return nil
+		}
+	}
+	attrs, _ := decoded.(map[string]any)
+	return attrs
+}
+
+func stringAttribute(attrs map[string]any, key string) (string, bool) {
+	value, ok := attrs[key].(string)
+	return value, ok && value != ""
 }
 
 // loadSpanRunPageDetails fills in end_time and status for the selected roots.
@@ -3720,11 +3835,11 @@ func (w wrapper) loadSpanRunPageDetails(
 		return err
 	}
 
-	l.Debug("GetSpanRuns enrich query", "sql", sqlQuery, "args", args)
+	l.Debug("GetRuns enrich query", "sql", sqlQuery, "args", args)
 
 	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
-		l.Debug("GetSpanRuns enrich query error", "error", err)
+		l.Debug("GetRuns enrich query error", "error", err)
 		return err
 	}
 	defer rows.Close()
@@ -3788,7 +3903,7 @@ func spanRunCELFilters(
 	return celFilters, useJoin, nil
 }
 
-func spanRunRootPredicates(opt cqrs.GetTraceRunOpt) []sq.Expression {
+func spanRunRootPredicates(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers) []sq.Expression {
 	// the root subquery is bounded by Until (an executor.run always exists,
 	// before any EXTEND that adds finalization, etc.)
 	//
@@ -3796,36 +3911,56 @@ func spanRunRootPredicates(opt cqrs.GetTraceRunOpt) []sq.Expression {
 	// inner scan stops growing O(total executor.run history) as runs grow...
 	// at the cost of excluding runs whose root started before From but
 	// was EXTENDed inside the window.  that's fine, given start time shit.
+	//
+	// Convert times to UTC to match spans storage format in SQLite
+	// We currently store SQLite timestamps as Go's time.Time string: "2025-07-13 19:32:24.939517 +0000 UTC m=+..."
+	// SQLite compares these as strings, so filter times must also serialize with "+0000 UTC" suffix to correctly use
+	// lexicographic comparisons.
+	// The UTC conversion was not strictly necessary for Postgres because the timestamp columns are timestamptz, so
+	// type and timezone conversion were handled for us
 	preds := []sq.Expression{
-		sq.C("name").Eq(meta.SpanNameRun),
-		sq.C("debug_run_id").IsNull(),
+		sq.I("spans.name").Eq(meta.SpanNameRun),
+		sq.I("spans.debug_run_id").IsNull(),
 		sq.Or(
-			sq.C("status").IsNull(),
-			sq.C("status").Neq(enums.RunStatusSkipped.String()),
+			sq.I("spans.status").IsNull(),
+			sq.I("spans.status").Neq(enums.RunStatusSkipped.String()),
 		),
-		sq.C("start_time").Lt(opt.Filter.Until.UTC()),
+		sq.I("spans.start_time").Lt(opt.Filter.Until.UTC()),
 	}
 	if opt.Filter.AccountID != uuid.Nil {
-		preds = append(preds, sq.C("account_id").Eq(opt.Filter.AccountID))
+		preds = append(preds, sq.I("spans.account_id").Eq(opt.Filter.AccountID))
 	}
 	if opt.Filter.WorkspaceID != uuid.Nil {
-		preds = append(preds, sq.C("env_id").Eq(opt.Filter.WorkspaceID))
+		preds = append(preds, sq.I("spans.env_id").Eq(opt.Filter.WorkspaceID))
 	}
 	if len(opt.Filter.AppID) > 0 {
-		preds = append(preds, sq.C("app_id").In(opt.Filter.AppID))
+		preds = append(preds, sq.I("spans.app_id").In(opt.Filter.AppID))
 	}
 	if len(opt.Filter.FunctionID) > 0 {
-		preds = append(preds, sq.C("function_id").In(opt.Filter.FunctionID))
+		preds = append(preds, sq.I("spans.function_id").In(opt.Filter.FunctionID))
+	}
+	if len(opt.Filter.AppName) > 0 {
+		preds = append(preds, sq.I("run_apps.name").In(opt.Filter.AppName))
+	}
+	if len(opt.Filter.FunctionSlug) > 0 {
+		preds = append(preds, h.RunFunctionSlugExpr().In(opt.Filter.FunctionSlug))
+	}
+	if len(opt.Filter.EventID) > 0 {
+		eventIDs := make([]string, len(opt.Filter.EventID))
+		for i, id := range opt.Filter.EventID {
+			eventIDs[i] = id.String()
+		}
+		preds = append(preds, h.EventIDsContain(eventIDs))
 	}
 	if opt.Filter.IsDeferred != nil {
 		if *opt.Filter.IsDeferred {
-			preds = append(preds, sq.C("is_deferred").IsTrue())
+			preds = append(preds, sq.I("spans.is_deferred").IsTrue())
 		} else {
-			preds = append(preds, sq.C("is_deferred").IsNull())
+			preds = append(preds, sq.I("spans.is_deferred").IsNull())
 		}
 	}
 	if opt.Filter.TimeField != enums.TraceRunTimeEndedAt {
-		preds = append(preds, sq.C("start_time").Gte(opt.Filter.From.UTC()))
+		preds = append(preds, sq.I("spans.start_time").Gte(opt.Filter.From.UTC()))
 	}
 
 	return preds
@@ -3841,6 +3976,72 @@ func spanRunGroupByCols() []interface{} {
 		"spans.function_id",
 		"spans.trace_id",
 	}
+}
+
+func spanRunsWithMetadata(q *sq.SelectDataset) *sq.SelectDataset {
+	return q.
+		LeftJoin(
+			sq.T("apps").As("run_apps"),
+			sq.On(sq.I("run_apps.id").Eq(sq.I("spans.app_id"))),
+		).
+		LeftJoin(
+			sq.T("functions").As("run_functions"),
+			sq.On(sq.I("run_functions.id").Eq(sq.I("spans.function_id"))),
+		)
+}
+
+func spanRunRootQuery(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers) *sq.SelectDataset {
+	q := sq.Dialect(h.GoquDialect()).From("spans")
+	if len(opt.Filter.AppName) > 0 {
+		return spanRunsWithMetadata(q)
+	}
+	return q
+}
+
+func spanRunAggregatePredicates(opt cqrs.GetTraceRunOpt, cursor *cqrs.TracePageCursor) []sq.Expression {
+	fieldName := "start_time"
+	aggregate := sq.L("MIN(spans.start_time)")
+	preds := []sq.Expression{}
+	if opt.Filter.TimeField == enums.TraceRunTimeEndedAt {
+		fieldName = "end_time"
+		aggregate = sq.L("MAX(spans.end_time)")
+		//
+		// UTC preserves the SQLite timestamp ordering described in spanRunRootPredicates.
+		preds = append(preds,
+			aggregate.Gte(opt.Filter.From.UTC()),
+			aggregate.Lt(opt.Filter.Until.UTC()),
+		)
+	}
+	if cursor == nil {
+		return preds
+	}
+	fieldCursor := cursor.Find(fieldName)
+	if fieldCursor == nil {
+		return preds
+	}
+
+	cursorTime := time.UnixMicro(fieldCursor.Value).UTC()
+	direction := enums.TraceRunOrderDesc
+	for _, order := range opt.Order {
+		if (fieldName == "end_time" && order.Field == enums.TraceRunTimeEndedAt) ||
+			(fieldName == "start_time" && order.Field != enums.TraceRunTimeEndedAt) {
+			direction = order.Direction
+			break
+		}
+	}
+	var after sq.Expression
+	if direction == enums.TraceRunOrderAsc {
+		after = aggregate.Gt(cursorTime)
+	} else {
+		after = aggregate.Lt(cursorTime)
+	}
+	if cursor.ID != "" {
+		after = sq.Or(
+			after,
+			sq.And(aggregate.Eq(cursorTime), sq.C("run_id").Gt(cursor.ID)),
+		)
+	}
+	return append(preds, after)
 }
 
 // ended_at and CEL depend on data outside the root span.
@@ -3867,15 +4068,39 @@ func spanRunFinalStatusPredicates(opt cqrs.GetTraceRunOpt) []sq.Expression {
 	if len(opt.Filter.Status) == 0 {
 		return nil
 	}
-	statusStrings := make([]string, 0, len(opt.Filter.Status))
+	statusStrings := make([]string, 0, len(opt.Filter.Status)*2)
+	includeMissing := false
 	for _, s := range opt.Filter.Status {
-		statusStrings = append(statusStrings, s.String())
+		switch s {
+		case enums.RunStatusScheduled:
+			statusStrings = append(statusStrings, enums.StepStatusScheduled.String(), enums.StepStatusQueued.String())
+		case enums.RunStatusRunning:
+			statusStrings = append(statusStrings,
+				enums.StepStatusUnknown.String(),
+				enums.StepStatusRunning.String(),
+				enums.StepStatusWaiting.String(),
+				enums.StepStatusSleeping.String(),
+				enums.StepStatusInvoking.String(),
+			)
+			includeMissing = true
+		case enums.RunStatusCompleted:
+			statusStrings = append(statusStrings, enums.StepStatusCompleted.String())
+		case enums.RunStatusFailed, enums.RunStatusOverflowed:
+			statusStrings = append(statusStrings, enums.StepStatusFailed.String(), enums.StepStatusErrored.String())
+		case enums.RunStatusCancelled:
+			statusStrings = append(statusStrings, enums.StepStatusCancelled.String(), enums.StepStatusTimedOut.String())
+		case enums.RunStatusSkipped:
+			statusStrings = append(statusStrings, enums.StepStatusSkipped.String())
+		}
 	}
-	return []sq.Expression{
-		sq.L(`(SELECT s2.status FROM spans s2
+	statusExpr := sq.L(`(SELECT s2.status FROM spans s2
 			WHERE s2.run_id = spans.run_id AND s2.dynamic_span_id = spans.dynamic_span_id
-			ORDER BY s2.end_time DESC NULLS LAST, s2.span_id DESC LIMIT 1)`).In(statusStrings),
+			ORDER BY s2.end_time DESC NULLS LAST, s2.span_id DESC LIMIT 1)`)
+	predicate := sq.Expression(statusExpr.In(statusStrings))
+	if includeMissing {
+		predicate = sq.Or(statusExpr.IsNull(), predicate)
 	}
+	return []sq.Expression{predicate}
 }
 
 // queued_at and started_at both map to root start_time.
@@ -3907,7 +4132,11 @@ type spanRunRow struct {
 	EndTime       *string
 	Status        *string
 	IsDeferred    sql.NullBool
+	Attributes    *string
 	EventIDs      *string
+	AppName       *string
+	FunctionSlug  *string
+	FunctionName  *string
 }
 
 func scanSpanRunRow(rows *sql.Rows) (spanRunRow, error) {
@@ -3924,7 +4153,11 @@ func scanSpanRunRow(rows *sql.Rows) (spanRunRow, error) {
 		&row.EndTime,
 		&row.Status,
 		&row.IsDeferred,
+		&row.Attributes,
 		&row.EventIDs,
+		&row.AppName,
+		&row.FunctionSlug,
+		&row.FunctionName,
 	)
 	return row, err
 }
@@ -4020,6 +4253,25 @@ func convertSpanRunRow(
 		Cursor:      cursor,
 		TriggerIDs:  triggerIDs,
 	}
+	if row.AppName != nil {
+		traceRun.AppName = *row.AppName
+	}
+	if row.FunctionSlug != nil {
+		traceRun.FunctionSlug = *row.FunctionSlug
+	}
+	if row.FunctionName != nil {
+		traceRun.FunctionName = *row.FunctionName
+	}
+	attrs := decodeSpanAttributes(row.Attributes)
+	if batchID, ok := stringAttribute(attrs, meta.Attrs.BatchID.Key()); ok {
+		if parsed, err := ulid.Parse(batchID); err == nil {
+			traceRun.BatchID = &parsed
+			traceRun.IsBatch = true
+		}
+	}
+	if cron, ok := stringAttribute(attrs, meta.Attrs.CronSchedule.Key()); ok {
+		traceRun.CronSchedule = &cron
+	}
 
 	if endTime != nil {
 		traceRun.EndedAt = *endTime
@@ -4071,7 +4323,7 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 	filter := []sq.Expression{}
 	//
 	// debug runs are a special kind of run that should not be included in the main runs list
-	filter = append(filter, sq.C("debug_run_id").IsNull())
+	filter = append(filter, sq.I("spans.debug_run_id").IsNull())
 	if opt.Filter.AccountID != uuid.Nil {
 		filter = append(filter, sq.I("spans.account_id").Eq(opt.Filter.AccountID))
 	}
@@ -4079,39 +4331,18 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 		filter = append(filter, sq.I("spans.env_id").Eq(opt.Filter.WorkspaceID))
 	}
 	if len(opt.Filter.AppID) > 0 {
-		filter = append(filter, sq.C("app_id").In(opt.Filter.AppID))
+		filter = append(filter, sq.I("spans.app_id").In(opt.Filter.AppID))
 	}
 	if len(opt.Filter.FunctionID) > 0 {
-		filter = append(filter, sq.C("function_id").In(opt.Filter.FunctionID))
+		filter = append(filter, sq.I("spans.function_id").In(opt.Filter.FunctionID))
 	}
 	// Status filters use final run status; this only excludes skipped span rows.
 	// Skipped runs should only be visible in event-scoped queries, not the runs list.
 	// status is nullable in spans, so we must also accept NULL.
 	filter = append(filter, sq.Or(
-		sq.C("status").IsNull(),
-		sq.C("status").Neq(enums.RunStatusSkipped.String()),
+		sq.I("spans.status").IsNull(),
+		sq.I("spans.status").Neq(enums.RunStatusSkipped.String()),
 	))
-
-	// Map time fields - spans use start_time/end_time instead of
-	// queued_at/started_at/ended_at
-	var tsfield string
-	switch opt.Filter.TimeField {
-	case enums.TraceRunTimeQueuedAt, enums.TraceRunTimeStartedAt:
-		tsfield = "start_time"
-	case enums.TraceRunTimeEndedAt:
-		tsfield = "end_time"
-	default:
-		tsfield = "start_time"
-	}
-
-	// Convert times to UTC to match spans storage format in SQLite
-	// We currently store SQLite timestamps as Go's time.Time string: "2025-07-13 19:32:24.939517 +0000 UTC m=+..."
-	// SQLite compares these as strings, so filter times must also serialize with "+0000 UTC" suffix to correctly use
-	// lexicographic comparisons.
-	// The UTC conversion was not strictly necessary for Postgres because the timestamp columns are timestamptz, so
-	// type and timezone conversion were handled for us
-	filter = append(filter, sq.C(tsfield).Gte(opt.Filter.From.UTC()))
-	filter = append(filter, sq.C(tsfield).Lt(opt.Filter.Until.UTC()))
 
 	// cursor
 	resCursorLayout := &cqrs.TracePageCursor{
@@ -4221,7 +4452,6 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 
 		if len(cursorFilters) > 0 {
 			cursorPred = []sq.Expression{sq.Or(cursorFilters...)}
-			filter = append(filter, cursorPred...)
 		}
 	}
 

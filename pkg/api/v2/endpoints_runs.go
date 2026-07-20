@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
@@ -156,28 +155,26 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
 	}, nil
 }
 
-func runsPageOpts(cursor string, requestedLimit int32) (ulid.ULID, int, error) {
+func runsPageOpts(cursor string, requestedLimit int32) (string, int, error) {
 	limit := int(requestedLimit)
 	if limit == 0 {
 		limit = defaultEventRunsLimit
 	}
 	if limit < 1 {
-		return ulid.Zero, 0, fmt.Errorf("Limit must be at least 1")
+		return "", 0, fmt.Errorf("Limit must be at least 1")
 	}
 	if limit > maxEventRunsLimit {
-		return ulid.Zero, 0, fmt.Errorf("Limit cannot exceed %d", maxEventRunsLimit)
+		return "", 0, fmt.Errorf("Limit cannot exceed %d", maxEventRunsLimit)
 	}
 
-	parsedCursor := ulid.Zero
 	if cursor != "" {
-		decodedCursor, err := decodeEventRunsCursor(cursor)
-		if err != nil {
-			return ulid.Zero, 0, fmt.Errorf("Cursor is invalid")
+		pageCursor := cqrs.TracePageCursor{}
+		if err := pageCursor.Decode(cursor); err != nil || pageCursor.ID == "" || len(pageCursor.Cursors) == 0 {
+			return "", 0, fmt.Errorf("Cursor is invalid")
 		}
-		parsedCursor = decodedCursor
 	}
 
-	return parsedCursor, limit, nil
+	return cursor, limit, nil
 }
 
 func runsPage(runs []*RunListItem, limit int, hasMore bool) *apiv2.Page {
@@ -186,18 +183,10 @@ func runsPage(runs []*RunListItem, limit int, hasMore bool) *apiv2.Page {
 		Limit:   int32(limit),
 	}
 	if hasMore && len(runs) > 0 {
-		nextCursor := encodeEventRunsCursor(runs[len(runs)-1].RunID)
+		nextCursor := runs[len(runs)-1].Cursor
 		page.Cursor = &nextCursor
 	}
 	return page
-}
-
-func encodeEventRunsCursor(runID ulid.ULID) string {
-	return runID.String()
-}
-
-func decodeEventRunsCursor(cursor string) (ulid.ULID, error) {
-	return ulid.Parse(cursor)
 }
 
 func (s *Service) GetFunctionTrace(ctx context.Context, req *apiv2.GetFunctionTraceRequest) (*apiv2.GetFunctionTraceResponse, error) {
@@ -313,17 +302,7 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 }
 
 func functionRefID(fn inngest.DeployedFunction) string {
-	if fn.Function.Slug != "" && fn.Function.Slug != fn.Slug {
-		return fn.Function.Slug
-	}
-
-	if fn.AppName != "" {
-		return strings.TrimPrefix(fn.Slug, fn.AppName+"-")
-	}
-	if fn.Function.Slug != "" {
-		return fn.Function.Slug
-	}
-	return fn.Slug
+	return PublicFunctionID(fn.AppName, fn.Slug, fn.Function.Slug)
 }
 
 func appRefID(fn inngest.DeployedFunction) string {

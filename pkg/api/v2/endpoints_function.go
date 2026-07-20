@@ -314,21 +314,11 @@ func decodePathParam(value string) string {
 }
 
 func publicFunctionID(appID string, requestedFunctionID string, fn inngest.DeployedFunction) string {
-	if fn.Function.Slug != "" && fn.Function.Slug != fn.Slug {
-		return fn.Function.Slug
-	}
-	if requestedFunctionID != "" && requestedFunctionID != fn.Slug {
+	if requestedFunctionID != "" && requestedFunctionID != fn.Slug &&
+		(fn.Function.Slug == "" || fn.Function.Slug == fn.Slug) {
 		return requestedFunctionID
 	}
-
-	functionID := fn.Function.Slug
-	if functionID == "" {
-		functionID = fn.Slug
-	}
-	if trimmed := strings.TrimPrefix(functionID, appID+"-"); trimmed != functionID {
-		return trimmed
-	}
-	return functionID
+	return PublicFunctionID(appID, fn.Slug, fn.Function.Slug)
 }
 
 // isIdempotencyError checks whether the given error represents an idempotency
