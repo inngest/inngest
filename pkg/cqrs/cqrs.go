@@ -29,6 +29,7 @@ type Manager interface {
 	EventManager
 	HistoryReader
 	HistoryWriter
+	SessionManager
 
 	// Trace / dev only
 	TraceReadWriter

@@ -112,6 +112,36 @@ type EventsEdge {
   cursor: String!
 }
 
+type SessionKey {
+  sessionKey: String!
+  createdAt: Time!
+}
+
+type SessionFunction {
+  slug: String!
+  name: String!
+}
+
+type SessionGroup {
+  sessionKey: String!
+  sessionId: String!
+  runCount: Int!
+  failedRunCount: Int!
+  failureRate: Float!
+  lastActiveAt: Time!
+  functions: [SessionFunction!]!
+}
+
+type SessionRun {
+  id: String!
+  functionSlug: String!
+  eventName: String
+  status: String!
+  queuedAt: Time!
+  startedAt: Time
+  endedAt: Time
+}
+
 type EventV2 {
   envID: UUID!
 

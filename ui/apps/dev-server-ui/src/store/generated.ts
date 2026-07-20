@@ -595,6 +595,9 @@ export type Query = {
   runTraceSpanOutputByID: RunTraceSpanOutput;
   runTrigger: RunTraceTrigger;
   runs: RunsV2Connection;
+  sessionKeys: Array<SessionKey>;
+  sessionRuns: Array<SessionRun>;
+  sessions: Array<SessionGroup>;
   stream: Array<StreamItem>;
   workerConnection: Maybe<ConnectV1WorkerConnection>;
   workerConnections: ConnectV1WorkerConnectionsConnection;
@@ -679,6 +682,25 @@ export type QueryRunsArgs = {
   first?: Scalars['Int'];
   orderBy: Array<RunsV2OrderBy>;
   preview: InputMaybe<Scalars['Boolean']>;
+};
+
+
+export type QuerySessionKeysArgs = {
+  search: InputMaybe<Scalars['String']>;
+};
+
+
+export type QuerySessionRunsArgs = {
+  sessionId: Scalars['String'];
+  sessionKey: Scalars['String'];
+  timeRange: InputMaybe<TimeRangeInput>;
+};
+
+
+export type QuerySessionsArgs = {
+  sessionIdSearch: InputMaybe<Scalars['String']>;
+  sessionKey: Scalars['String'];
+  timeRange: InputMaybe<TimeRangeInput>;
 };
 
 
@@ -934,6 +956,40 @@ export enum RunsV2OrderByField {
   StartedAt = 'STARTED_AT'
 }
 
+export type SessionFunction = {
+  __typename?: 'SessionFunction';
+  name: Scalars['String'];
+  slug: Scalars['String'];
+};
+
+export type SessionGroup = {
+  __typename?: 'SessionGroup';
+  failedRunCount: Scalars['Int'];
+  failureRate: Scalars['Float'];
+  functions: Array<SessionFunction>;
+  lastActiveAt: Scalars['Time'];
+  runCount: Scalars['Int'];
+  sessionId: Scalars['String'];
+  sessionKey: Scalars['String'];
+};
+
+export type SessionKey = {
+  __typename?: 'SessionKey';
+  createdAt: Scalars['Time'];
+  sessionKey: Scalars['String'];
+};
+
+export type SessionRun = {
+  __typename?: 'SessionRun';
+  endedAt: Maybe<Scalars['Time']>;
+  eventName: Maybe<Scalars['String']>;
+  functionSlug: Scalars['String'];
+  id: Scalars['String'];
+  queuedAt: Scalars['Time'];
+  startedAt: Maybe<Scalars['Time']>;
+  status: Scalars['String'];
+};
+
 export type SingletonConfiguration = {
   __typename?: 'SingletonConfiguration';
   key: Maybe<Scalars['String']>;
@@ -1033,6 +1089,11 @@ export type ThrottleConfiguration = {
   key: Maybe<Scalars['String']>;
   limit: Scalars['Int'];
   period: Scalars['String'];
+};
+
+export type TimeRangeInput = {
+  from: Scalars['Time'];
+  until?: InputMaybe<Scalars['Time']>;
 };
 
 export type UpdateAppInput = {
