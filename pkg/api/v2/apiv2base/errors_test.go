@@ -50,6 +50,14 @@ func TestNewSingleError(t *testing.T) {
 			wantGRPCCode: codes.AlreadyExists,
 			wantJSON:     `{"errors":[{"code":"resource_already_exists","message":"Resource already exists"}]}`,
 		},
+		{
+			name:         "409 ambiguous operation error",
+			httpCode:     http.StatusConflict,
+			errorCode:    ErrorOperationAmbiguous,
+			message:      "Operation result is ambiguous",
+			wantGRPCCode: codes.AlreadyExists,
+			wantJSON:     `{"errors":[{"code":"operation_ambiguous","message":"Operation result is ambiguous"}]}`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -178,6 +186,7 @@ func TestHTTPToGRPCStatus(t *testing.T) {
 		{http.StatusUnprocessableEntity, codes.FailedPrecondition},
 		{http.StatusTooManyRequests, codes.ResourceExhausted},
 		{http.StatusInternalServerError, codes.Internal},
+		{http.StatusBadGateway, codes.DataLoss},
 		{http.StatusNotImplemented, codes.Unimplemented},
 		{http.StatusServiceUnavailable, codes.Unavailable},
 		{999, codes.Internal}, // Unknown status should default to Internal
@@ -205,9 +214,14 @@ func TestErrorConstants(t *testing.T) {
 		"invalid_api_key":              ErrorInvalidAPIKey,
 		"access_denied":                ErrorAccessDenied,
 		"resource_already_exists":      ErrorResourceAlreadyExists,
+		"idempotency_conflict":         ErrorIdempotencyConflict,
+		"state_conflict":               ErrorStateConflict,
+		"operation_ambiguous":          ErrorOperationAmbiguous,
 		"app_sync_failed":              ErrorAppSyncFailed,
 		"validation_error":             ErrorValidationError,
+		"output_encoding_invalid":      ErrorOutputEncodingInvalid,
 		"not_implemented":              ErrorNotImplemented,
+		"capacity_unavailable":         ErrorCapacityUnavailable,
 	}
 
 	for expected, actual := range expectedConstants {

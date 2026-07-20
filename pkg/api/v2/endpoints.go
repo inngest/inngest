@@ -315,3 +315,19 @@ func (s *Service) ListSessions(ctx context.Context, req *apiv2.ListSessionsReque
 func (s *Service) ListSessionRuns(ctx context.Context, req *apiv2.ListSessionRunsRequest) (*apiv2.ListSessionRunsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
 }
+
+func (s *Service) CreateSandbox(ctx context.Context, req *apiv2.CreateSandboxRequest) (*apiv2.CreateSandboxResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sandboxes are not implemented in OSS")
+}
+
+func (s *Service) GetSandbox(ctx context.Context, req *apiv2.GetSandboxRequest) (*apiv2.GetSandboxResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sandboxes are not implemented in OSS")
+}
+
+func (s *Service) ExecSandbox(ctx context.Context, req *apiv2.ExecSandboxRequest) (*apiv2.ExecSandboxResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sandboxes are not implemented in OSS")
+}
+
+func (s *Service) DeleteSandbox(ctx context.Context, req *apiv2.DeleteSandboxRequest) (*apiv2.DeleteSandboxResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sandboxes are not implemented in OSS")
+}

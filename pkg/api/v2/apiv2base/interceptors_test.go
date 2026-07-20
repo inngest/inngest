@@ -27,7 +27,7 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		ctx := context.Background()
 		req := &apiv2.HealthRequest{}
 		info := &grpc.UnaryServerInfo{FullMethod: "/api.v2.V2/Health"}
-		
+
 		called := false
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 			called = true
@@ -35,7 +35,7 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		resp, err := interceptor(ctx, req, info, handler)
-		
+
 		assert.True(t, called, "Handler should be called when no middleware provided")
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
@@ -52,11 +52,11 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		interceptor := NewAuthUnaryInterceptor(authnMiddleware, nil)
-		
+
 		ctx := context.Background()
 		req := &apiv2.HealthRequest{}
 		info := &grpc.UnaryServerInfo{FullMethod: "/api.v2.V2/Health"}
-		
+
 		handlerCalled := false
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 			handlerCalled = true
@@ -64,7 +64,7 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		resp, err := interceptor(ctx, req, info, handler)
-		
+
 		assert.True(t, authCalled, "Authentication middleware should be called")
 		assert.True(t, handlerCalled, "Handler should be called after successful auth")
 		assert.NoError(t, err)
@@ -80,11 +80,11 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		interceptor := NewAuthUnaryInterceptor(authnMiddleware, nil)
-		
+
 		ctx := context.Background()
 		req := &apiv2.HealthRequest{}
 		info := &grpc.UnaryServerInfo{FullMethod: "/api.v2.V2/Health"}
-		
+
 		handlerCalled := false
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 			handlerCalled = true
@@ -92,11 +92,11 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		resp, err := interceptor(ctx, req, info, handler)
-		
+
 		assert.False(t, handlerCalled, "Handler should not be called after auth failure")
 		assert.Error(t, err)
 		assert.Nil(t, resp)
-		
+
 		// Check that it's an authentication error
 		st, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -114,12 +114,12 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		interceptor := NewAuthUnaryInterceptor(nil, authzMiddleware)
-		
+
 		ctx := context.Background()
 		req := &apiv2.CreateAccountRequest{}
 		// Use a method that should require authorization
 		info := &grpc.UnaryServerInfo{FullMethod: "/api.v2.V2/CreatePartnerAccount"}
-		
+
 		handlerCalled := false
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 			handlerCalled = true
@@ -127,7 +127,7 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		resp, err := interceptor(ctx, req, info, handler)
-		
+
 		// Check if authorization was required for this method
 		if authzCalled {
 			assert.True(t, handlerCalled, "Handler should be called after successful authz")
@@ -148,11 +148,11 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		interceptor := NewAuthUnaryInterceptor(nil, authzMiddleware)
-		
+
 		ctx := context.Background()
 		req := &apiv2.CreateAccountRequest{}
 		info := &grpc.UnaryServerInfo{FullMethod: "/api.v2.V2/CreatePartnerAccount"}
-		
+
 		handlerCalled := false
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 			handlerCalled = true
@@ -160,7 +160,7 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		resp, err := interceptor(ctx, req, info, handler)
-		
+
 		// Check if this method requires authorization
 		if err != nil {
 			st, ok := status.FromError(err)
@@ -173,14 +173,14 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 
 	t.Run("applies both authentication and authorization", func(t *testing.T) {
 		authnCalled := false
-		
+
 		authnMiddleware := func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				authnCalled = true
 				next.ServeHTTP(w, r)
 			})
 		}
-		
+
 		authzMiddleware := func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				next.ServeHTTP(w, r)
@@ -188,11 +188,11 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		interceptor := NewAuthUnaryInterceptor(authnMiddleware, authzMiddleware)
-		
+
 		ctx := context.Background()
 		req := &apiv2.CreateAccountRequest{}
 		info := &grpc.UnaryServerInfo{FullMethod: "/api.v2.V2/CreatePartnerAccount"}
-		
+
 		handlerCalled := false
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 			handlerCalled = true
@@ -200,7 +200,7 @@ func TestNewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		resp, err := interceptor(ctx, req, info, handler)
-		
+
 		assert.True(t, authnCalled, "Authentication should always be called")
 		// Authorization might only be called for protected endpoints
 		if err == nil {
@@ -217,7 +217,7 @@ func TestNewAuthStreamInterceptor(t *testing.T) {
 
 		ctx := context.Background()
 		info := &grpc.StreamServerInfo{FullMethod: "/api.v2.V2/StreamMethod"}
-		
+
 		called := false
 		handler := func(srv interface{}, stream grpc.ServerStream) error {
 			called = true
@@ -226,9 +226,9 @@ func TestNewAuthStreamInterceptor(t *testing.T) {
 
 		// Create a mock server stream
 		stream := &mockServerStream{ctx: ctx}
-		
+
 		err := interceptor(nil, stream, info, handler)
-		
+
 		assert.True(t, called, "Handler should be called when no middleware provided")
 		assert.NoError(t, err)
 	})
@@ -243,10 +243,10 @@ func TestNewAuthStreamInterceptor(t *testing.T) {
 		}
 
 		interceptor := NewAuthStreamInterceptor(authnMiddleware, nil)
-		
+
 		ctx := context.Background()
 		info := &grpc.StreamServerInfo{FullMethod: "/api.v2.V2/StreamMethod"}
-		
+
 		handlerCalled := false
 		handler := func(srv interface{}, stream grpc.ServerStream) error {
 			handlerCalled = true
@@ -254,9 +254,9 @@ func TestNewAuthStreamInterceptor(t *testing.T) {
 		}
 
 		stream := &mockServerStream{ctx: ctx}
-		
+
 		err := interceptor(nil, stream, info, handler)
-		
+
 		assert.True(t, authCalled, "Authentication middleware should be called")
 		assert.True(t, handlerCalled, "Handler should be called after successful auth")
 		assert.NoError(t, err)
@@ -270,10 +270,10 @@ func TestNewAuthStreamInterceptor(t *testing.T) {
 		}
 
 		interceptor := NewAuthStreamInterceptor(authnMiddleware, nil)
-		
+
 		ctx := context.Background()
 		info := &grpc.StreamServerInfo{FullMethod: "/api.v2.V2/StreamMethod"}
-		
+
 		handlerCalled := false
 		handler := func(srv interface{}, stream grpc.ServerStream) error {
 			handlerCalled = true
@@ -281,12 +281,12 @@ func TestNewAuthStreamInterceptor(t *testing.T) {
 		}
 
 		stream := &mockServerStream{ctx: ctx}
-		
+
 		err := interceptor(nil, stream, info, handler)
-		
+
 		assert.False(t, handlerCalled, "Handler should not be called after auth failure")
 		assert.Error(t, err)
-		
+
 		st, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, st.Code())
@@ -303,10 +303,10 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 		}
 
 		interceptorFunc := HTTPMiddlewareToGRPCInterceptor(allowMiddleware)
-		
+
 		ctx := context.Background()
 		err := interceptorFunc(ctx, "/api.v2.V2/Health")
-		
+
 		assert.NoError(t, err)
 	})
 
@@ -319,10 +319,10 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 		}
 
 		interceptorFunc := HTTPMiddlewareToGRPCInterceptor(blockMiddleware)
-		
+
 		ctx := context.Background()
 		err := interceptorFunc(ctx, "/api.v2.V2/SomeProtectedMethod")
-		
+
 		assert.Error(t, err)
 		st, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -331,7 +331,7 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 
 	t.Run("forwards gRPC metadata as HTTP headers", func(t *testing.T) {
 		var receivedHeaders http.Header
-		
+
 		headerCheckMiddleware := func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				receivedHeaders = r.Header
@@ -340,16 +340,16 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 		}
 
 		interceptorFunc := HTTPMiddlewareToGRPCInterceptor(headerCheckMiddleware)
-		
+
 		// Create context with metadata
 		md := metadata.Pairs(
 			"authorization", "Bearer test-token",
 			"x-custom-header", "custom-value",
 		)
 		ctx := metadata.NewIncomingContext(context.Background(), md)
-		
+
 		err := interceptorFunc(ctx, "/api.v2.V2/Health")
-		
+
 		assert.NoError(t, err)
 		assert.Contains(t, receivedHeaders.Get("authorization"), "Bearer test-token")
 		assert.Equal(t, "custom-value", receivedHeaders.Get("x-custom-header"))
@@ -357,7 +357,7 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 
 	t.Run("determines HTTP method from gRPC method", func(t *testing.T) {
 		var receivedMethod string
-		
+
 		methodCheckMiddleware := func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				receivedMethod = r.Method
@@ -366,29 +366,29 @@ func TestHTTPMiddlewareToGRPCInterceptor(t *testing.T) {
 		}
 
 		interceptorFunc := HTTPMiddlewareToGRPCInterceptor(methodCheckMiddleware)
-		
+
 		ctx := context.Background()
-		
+
 		// Test with different gRPC methods that should map to different HTTP methods
 		testCases := []struct {
-			grpcMethod       string
+			grpcMethod         string
 			expectedHTTPMethod string
 		}{
-			{"/api.v2.V2/Health", "GET"},           // Assuming Health is GET
-			{"/api.v2.V2/CreateAccount", "POST"},   // Assuming Create* is POST
-			{"/api.v2.V2/UpdateAccount", "PUT"},    // Assuming Update* might be PUT
-			{"/api.v2.V2/UnknownMethod", "POST"},   // Default fallback
+			{"/api.v2.V2/Health", "GET"},         // Assuming Health is GET
+			{"/api.v2.V2/CreateAccount", "POST"}, // Assuming Create* is POST
+			{"/api.v2.V2/UpdateAccount", "PUT"},  // Assuming Update* might be PUT
+			{"/api.v2.V2/UnknownMethod", "POST"}, // Default fallback
 		}
 
 		for _, tc := range testCases {
 			t.Run(tc.grpcMethod, func(t *testing.T) {
 				err := interceptorFunc(ctx, tc.grpcMethod)
-				
+
 				assert.NoError(t, err)
 				// The actual HTTP method will depend on the protobuf annotations
 				// We just verify that some method was set
 				assert.NotEmpty(t, receivedMethod, "HTTP method should be determined")
-				
+
 				// Reset for next test
 				receivedMethod = ""
 			})
@@ -414,7 +414,7 @@ func TestApplyAuth(t *testing.T) {
 
 		ctx := context.Background()
 		err := applyAuth(ctx, "/api.v2.V2/Health", authnMiddleware, nil)
-		
+
 		assert.NoError(t, err)
 		assert.True(t, authCalled)
 	})
@@ -428,7 +428,7 @@ func TestApplyAuth(t *testing.T) {
 
 		ctx := context.Background()
 		err := applyAuth(ctx, "/api.v2.V2/Health", authnMiddleware, nil)
-		
+
 		assert.Error(t, err)
 		st, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -448,7 +448,7 @@ func TestGetHTTPMethodForGRPCMethod(t *testing.T) {
 			expectHTTP: "GET", // Health is typically GET
 		},
 		{
-			name:       "Create method", 
+			name:       "Create method",
 			grpcMethod: "/api.v2.V2/CreatePartnerAccount",
 			expectHTTP: "POST", // Create operations are typically POST
 		},
@@ -467,7 +467,7 @@ func TestGetHTTPMethodForGRPCMethod(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := getHTTPMethodForGRPCMethod(tc.grpcMethod)
-			
+
 			// We can't assert exact matches since it depends on proto annotations
 			// Just verify that some valid HTTP method is returned
 			validMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
@@ -487,7 +487,7 @@ func TestBase_NewAuthUnaryInterceptor(t *testing.T) {
 		ctx := context.Background()
 		req := &apiv2.HealthRequest{}
 		info := &grpc.UnaryServerInfo{FullMethod: "/api.v2.V2/Health"}
-		
+
 		called := false
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 			called = true
@@ -495,7 +495,7 @@ func TestBase_NewAuthUnaryInterceptor(t *testing.T) {
 		}
 
 		resp, err := interceptor(ctx, req, info, handler)
-		
+
 		assert.True(t, called)
 		assert.NoError(t, err)
 		assert.NotNil(t, resp)
@@ -511,7 +511,7 @@ func TestBase_NewAuthStreamInterceptor(t *testing.T) {
 
 		ctx := context.Background()
 		info := &grpc.StreamServerInfo{FullMethod: "/api.v2.V2/StreamMethod"}
-		
+
 		called := false
 		handler := func(srv interface{}, stream grpc.ServerStream) error {
 			called = true
@@ -519,9 +519,9 @@ func TestBase_NewAuthStreamInterceptor(t *testing.T) {
 		}
 
 		stream := &mockServerStream{ctx: ctx}
-		
+
 		err := interceptor(nil, stream, info, handler)
-		
+
 		assert.True(t, called)
 		assert.NoError(t, err)
 	})
@@ -532,7 +532,7 @@ func TestInterceptorIntegration(t *testing.T) {
 	t.Run("interceptors work with real gRPC server", func(t *testing.T) {
 		// Create a buffer connection for testing
 		lis := bufconn.Listen(bufSize)
-		
+
 		// Set up authentication middleware
 		authCalled := false
 		authnMiddleware := func(next http.Handler) http.Handler {
@@ -590,10 +590,10 @@ func TestInterceptorIntegration(t *testing.T) {
 		// Test with auth header - should succeed
 		md := metadata.Pairs("authorization", "Bearer test-token")
 		ctxWithAuth := metadata.NewOutgoingContext(context.Background(), md)
-		
+
 		authCalled = false // Reset
 		resp, err := client.Health(ctxWithAuth, &apiv2.HealthRequest{})
-		
+
 		assert.NoError(t, err, "Request with auth should succeed")
 		assert.NotNil(t, resp)
 		assert.True(t, authCalled, "Auth middleware should have been called")
@@ -626,17 +626,17 @@ func (s *testService) Health(ctx context.Context, req *apiv2.HealthRequest) (*ap
 // Benchmark tests
 func BenchmarkNewAuthUnaryInterceptor(b *testing.B) {
 	base := NewBase()
-	
+
 	authnMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			next.ServeHTTP(w, r)
 		})
 	}
-	
+
 	ctx := context.Background()
 	req := &apiv2.HealthRequest{}
 	info := &grpc.UnaryServerInfo{FullMethod: "/api.v2.V2/Health"}
-	
+
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return &apiv2.HealthResponse{}, nil
 	}
@@ -655,7 +655,7 @@ func BenchmarkHTTPMiddlewareToGRPCInterceptor(b *testing.B) {
 			next.ServeHTTP(w, r)
 		})
 	}
-	
+
 	interceptorFunc := HTTPMiddlewareToGRPCInterceptor(middleware)
 	ctx := context.Background()
 

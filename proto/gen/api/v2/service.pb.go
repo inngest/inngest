@@ -615,6 +615,235 @@ func (InsightsDiagnosticSeverity) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{10}
 }
 
+type SandboxDesiredState int32
+
+const (
+	SandboxDesiredState_SANDBOX_DESIRED_STATE_UNSPECIFIED SandboxDesiredState = 0
+	SandboxDesiredState_SANDBOX_DESIRED_STATE_RUNNING     SandboxDesiredState = 1
+	SandboxDesiredState_SANDBOX_DESIRED_STATE_TERMINATED  SandboxDesiredState = 2
+)
+
+// Enum value maps for SandboxDesiredState.
+var (
+	SandboxDesiredState_name = map[int32]string{
+		0: "SANDBOX_DESIRED_STATE_UNSPECIFIED",
+		1: "SANDBOX_DESIRED_STATE_RUNNING",
+		2: "SANDBOX_DESIRED_STATE_TERMINATED",
+	}
+	SandboxDesiredState_value = map[string]int32{
+		"SANDBOX_DESIRED_STATE_UNSPECIFIED": 0,
+		"SANDBOX_DESIRED_STATE_RUNNING":     1,
+		"SANDBOX_DESIRED_STATE_TERMINATED":  2,
+	}
+)
+
+func (x SandboxDesiredState) Enum() *SandboxDesiredState {
+	p := new(SandboxDesiredState)
+	*p = x
+	return p
+}
+
+func (x SandboxDesiredState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SandboxDesiredState) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[11].Descriptor()
+}
+
+func (SandboxDesiredState) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[11]
+}
+
+func (x SandboxDesiredState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SandboxDesiredState.Descriptor instead.
+func (SandboxDesiredState) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{11}
+}
+
+type SandboxPhase int32
+
+const (
+	SandboxPhase_SANDBOX_PHASE_UNSPECIFIED SandboxPhase = 0
+	SandboxPhase_SANDBOX_PHASE_PENDING     SandboxPhase = 1
+	SandboxPhase_SANDBOX_PHASE_STARTING    SandboxPhase = 2
+	SandboxPhase_SANDBOX_PHASE_RUNNING     SandboxPhase = 3
+	SandboxPhase_SANDBOX_PHASE_TERMINATING SandboxPhase = 4
+	SandboxPhase_SANDBOX_PHASE_TERMINAL    SandboxPhase = 5
+	SandboxPhase_SANDBOX_PHASE_LOST        SandboxPhase = 6
+)
+
+// Enum value maps for SandboxPhase.
+var (
+	SandboxPhase_name = map[int32]string{
+		0: "SANDBOX_PHASE_UNSPECIFIED",
+		1: "SANDBOX_PHASE_PENDING",
+		2: "SANDBOX_PHASE_STARTING",
+		3: "SANDBOX_PHASE_RUNNING",
+		4: "SANDBOX_PHASE_TERMINATING",
+		5: "SANDBOX_PHASE_TERMINAL",
+		6: "SANDBOX_PHASE_LOST",
+	}
+	SandboxPhase_value = map[string]int32{
+		"SANDBOX_PHASE_UNSPECIFIED": 0,
+		"SANDBOX_PHASE_PENDING":     1,
+		"SANDBOX_PHASE_STARTING":    2,
+		"SANDBOX_PHASE_RUNNING":     3,
+		"SANDBOX_PHASE_TERMINATING": 4,
+		"SANDBOX_PHASE_TERMINAL":    5,
+		"SANDBOX_PHASE_LOST":        6,
+	}
+)
+
+func (x SandboxPhase) Enum() *SandboxPhase {
+	p := new(SandboxPhase)
+	*p = x
+	return p
+}
+
+func (x SandboxPhase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SandboxPhase) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[12].Descriptor()
+}
+
+func (SandboxPhase) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[12]
+}
+
+func (x SandboxPhase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SandboxPhase.Descriptor instead.
+func (SandboxPhase) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{12}
+}
+
+type SandboxOutcome int32
+
+const (
+	SandboxOutcome_SANDBOX_OUTCOME_UNSPECIFIED           SandboxOutcome = 0
+	SandboxOutcome_SANDBOX_OUTCOME_EXITED                SandboxOutcome = 1
+	SandboxOutcome_SANDBOX_OUTCOME_DESTROYED             SandboxOutcome = 2
+	SandboxOutcome_SANDBOX_OUTCOME_TIMED_OUT             SandboxOutcome = 3
+	SandboxOutcome_SANDBOX_OUTCOME_LAUNCH_FAILED         SandboxOutcome = 4
+	SandboxOutcome_SANDBOX_OUTCOME_INFRASTRUCTURE_FAILED SandboxOutcome = 5
+	SandboxOutcome_SANDBOX_OUTCOME_LOST                  SandboxOutcome = 6
+)
+
+// Enum value maps for SandboxOutcome.
+var (
+	SandboxOutcome_name = map[int32]string{
+		0: "SANDBOX_OUTCOME_UNSPECIFIED",
+		1: "SANDBOX_OUTCOME_EXITED",
+		2: "SANDBOX_OUTCOME_DESTROYED",
+		3: "SANDBOX_OUTCOME_TIMED_OUT",
+		4: "SANDBOX_OUTCOME_LAUNCH_FAILED",
+		5: "SANDBOX_OUTCOME_INFRASTRUCTURE_FAILED",
+		6: "SANDBOX_OUTCOME_LOST",
+	}
+	SandboxOutcome_value = map[string]int32{
+		"SANDBOX_OUTCOME_UNSPECIFIED":           0,
+		"SANDBOX_OUTCOME_EXITED":                1,
+		"SANDBOX_OUTCOME_DESTROYED":             2,
+		"SANDBOX_OUTCOME_TIMED_OUT":             3,
+		"SANDBOX_OUTCOME_LAUNCH_FAILED":         4,
+		"SANDBOX_OUTCOME_INFRASTRUCTURE_FAILED": 5,
+		"SANDBOX_OUTCOME_LOST":                  6,
+	}
+)
+
+func (x SandboxOutcome) Enum() *SandboxOutcome {
+	p := new(SandboxOutcome)
+	*p = x
+	return p
+}
+
+func (x SandboxOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SandboxOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[13].Descriptor()
+}
+
+func (SandboxOutcome) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[13]
+}
+
+func (x SandboxOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SandboxOutcome.Descriptor instead.
+func (SandboxOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{13}
+}
+
+type SandboxCleanupState int32
+
+const (
+	SandboxCleanupState_SANDBOX_CLEANUP_STATE_UNSPECIFIED  SandboxCleanupState = 0
+	SandboxCleanupState_SANDBOX_CLEANUP_STATE_NOT_REQUIRED SandboxCleanupState = 1
+	SandboxCleanupState_SANDBOX_CLEANUP_STATE_PENDING      SandboxCleanupState = 2
+	SandboxCleanupState_SANDBOX_CLEANUP_STATE_IN_PROGRESS  SandboxCleanupState = 3
+	SandboxCleanupState_SANDBOX_CLEANUP_STATE_CONFIRMED    SandboxCleanupState = 4
+	SandboxCleanupState_SANDBOX_CLEANUP_STATE_UNCERTAIN    SandboxCleanupState = 5
+)
+
+// Enum value maps for SandboxCleanupState.
+var (
+	SandboxCleanupState_name = map[int32]string{
+		0: "SANDBOX_CLEANUP_STATE_UNSPECIFIED",
+		1: "SANDBOX_CLEANUP_STATE_NOT_REQUIRED",
+		2: "SANDBOX_CLEANUP_STATE_PENDING",
+		3: "SANDBOX_CLEANUP_STATE_IN_PROGRESS",
+		4: "SANDBOX_CLEANUP_STATE_CONFIRMED",
+		5: "SANDBOX_CLEANUP_STATE_UNCERTAIN",
+	}
+	SandboxCleanupState_value = map[string]int32{
+		"SANDBOX_CLEANUP_STATE_UNSPECIFIED":  0,
+		"SANDBOX_CLEANUP_STATE_NOT_REQUIRED": 1,
+		"SANDBOX_CLEANUP_STATE_PENDING":      2,
+		"SANDBOX_CLEANUP_STATE_IN_PROGRESS":  3,
+		"SANDBOX_CLEANUP_STATE_CONFIRMED":    4,
+		"SANDBOX_CLEANUP_STATE_UNCERTAIN":    5,
+	}
+)
+
+func (x SandboxCleanupState) Enum() *SandboxCleanupState {
+	p := new(SandboxCleanupState)
+	*p = x
+	return p
+}
+
+func (x SandboxCleanupState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SandboxCleanupState) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[14].Descriptor()
+}
+
+func (SandboxCleanupState) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[14]
+}
+
+func (x SandboxCleanupState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SandboxCleanupState.Descriptor instead.
+func (SandboxCleanupState) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{14}
+}
+
 type HealthRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -8059,11 +8288,735 @@ func (x *SessionRun) GetEndedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type Sandbox struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	VpcId         string                 `protobuf:"bytes,7,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Generation    uint32                 `protobuf:"varint,8,opt,name=generation,proto3" json:"generation,omitempty"`
+	DesiredState  SandboxDesiredState    `protobuf:"varint,3,opt,name=desired_state,json=desiredState,proto3,enum=api.v2.SandboxDesiredState" json:"desired_state,omitempty"`
+	Phase         SandboxPhase           `protobuf:"varint,4,opt,name=phase,proto3,enum=api.v2.SandboxPhase" json:"phase,omitempty"`
+	Outcome       *SandboxOutcome        `protobuf:"varint,5,opt,name=outcome,proto3,enum=api.v2.SandboxOutcome,oneof" json:"outcome,omitempty"`
+	CleanupState  SandboxCleanupState    `protobuf:"varint,6,opt,name=cleanup_state,json=cleanupState,proto3,enum=api.v2.SandboxCleanupState" json:"cleanup_state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Sandbox) Reset() {
+	*x = Sandbox{}
+	mi := &file_api_v2_service_proto_msgTypes[121]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Sandbox) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Sandbox) ProtoMessage() {}
+
+func (x *Sandbox) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[121]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Sandbox.ProtoReflect.Descriptor instead.
+func (*Sandbox) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{121}
+}
+
+func (x *Sandbox) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Sandbox) GetVpcId() string {
+	if x != nil {
+		return x.VpcId
+	}
+	return ""
+}
+
+func (x *Sandbox) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Sandbox) GetGeneration() uint32 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *Sandbox) GetDesiredState() SandboxDesiredState {
+	if x != nil {
+		return x.DesiredState
+	}
+	return SandboxDesiredState_SANDBOX_DESIRED_STATE_UNSPECIFIED
+}
+
+func (x *Sandbox) GetPhase() SandboxPhase {
+	if x != nil {
+		return x.Phase
+	}
+	return SandboxPhase_SANDBOX_PHASE_UNSPECIFIED
+}
+
+func (x *Sandbox) GetOutcome() SandboxOutcome {
+	if x != nil && x.Outcome != nil {
+		return *x.Outcome
+	}
+	return SandboxOutcome_SANDBOX_OUTCOME_UNSPECIFIED
+}
+
+func (x *Sandbox) GetCleanupState() SandboxCleanupState {
+	if x != nil {
+		return x.CleanupState
+	}
+	return SandboxCleanupState_SANDBOX_CLEANUP_STATE_UNSPECIFIED
+}
+
+type SandboxSecretReference struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	EnvironmentName string                 `protobuf:"bytes,2,opt,name=environment_name,json=environmentName,proto3" json:"environment_name,omitempty"`
+	VersionRef      string                 `protobuf:"bytes,3,opt,name=version_ref,json=versionRef,proto3" json:"version_ref,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SandboxSecretReference) Reset() {
+	*x = SandboxSecretReference{}
+	mi := &file_api_v2_service_proto_msgTypes[122]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SandboxSecretReference) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SandboxSecretReference) ProtoMessage() {}
+
+func (x *SandboxSecretReference) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[122]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SandboxSecretReference.ProtoReflect.Descriptor instead.
+func (*SandboxSecretReference) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{122}
+}
+
+func (x *SandboxSecretReference) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SandboxSecretReference) GetEnvironmentName() string {
+	if x != nil {
+		return x.EnvironmentName
+	}
+	return ""
+}
+
+func (x *SandboxSecretReference) GetVersionRef() string {
+	if x != nil {
+		return x.VersionRef
+	}
+	return ""
+}
+
+type CreateSandboxRequest struct {
+	state                 protoimpl.MessageState    `protogen:"open.v1"`
+	VpcId                 string                    `protobuf:"bytes,1,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	Name                  string                    `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	ProfileId             string                    `protobuf:"bytes,3,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	ImageId               string                    `protobuf:"bytes,4,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
+	RuntimeTimeoutSeconds int32                     `protobuf:"varint,5,opt,name=runtime_timeout_seconds,json=runtimeTimeoutSeconds,proto3" json:"runtime_timeout_seconds,omitempty"`
+	Command               []string                  `protobuf:"bytes,6,rep,name=command,proto3" json:"command,omitempty"`
+	Environment           map[string]string         `protobuf:"bytes,7,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	SecretReferences      []*SandboxSecretReference `protobuf:"bytes,8,rep,name=secret_references,json=secretReferences,proto3" json:"secret_references,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *CreateSandboxRequest) Reset() {
+	*x = CreateSandboxRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[123]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateSandboxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateSandboxRequest) ProtoMessage() {}
+
+func (x *CreateSandboxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[123]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateSandboxRequest.ProtoReflect.Descriptor instead.
+func (*CreateSandboxRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{123}
+}
+
+func (x *CreateSandboxRequest) GetVpcId() string {
+	if x != nil {
+		return x.VpcId
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetImageId() string {
+	if x != nil {
+		return x.ImageId
+	}
+	return ""
+}
+
+func (x *CreateSandboxRequest) GetRuntimeTimeoutSeconds() int32 {
+	if x != nil {
+		return x.RuntimeTimeoutSeconds
+	}
+	return 0
+}
+
+func (x *CreateSandboxRequest) GetCommand() []string {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *CreateSandboxRequest) GetEnvironment() map[string]string {
+	if x != nil {
+		return x.Environment
+	}
+	return nil
+}
+
+func (x *CreateSandboxRequest) GetSecretReferences() []*SandboxSecretReference {
+	if x != nil {
+		return x.SecretReferences
+	}
+	return nil
+}
+
+type CreateSandboxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *Sandbox               `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateSandboxResponse) Reset() {
+	*x = CreateSandboxResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[124]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateSandboxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateSandboxResponse) ProtoMessage() {}
+
+func (x *CreateSandboxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[124]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateSandboxResponse.ProtoReflect.Descriptor instead.
+func (*CreateSandboxResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{124}
+}
+
+func (x *CreateSandboxResponse) GetData() *Sandbox {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *CreateSandboxResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type GetSandboxRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	VpcId         string                 `protobuf:"bytes,2,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSandboxRequest) Reset() {
+	*x = GetSandboxRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[125]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSandboxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSandboxRequest) ProtoMessage() {}
+
+func (x *GetSandboxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[125]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSandboxRequest.ProtoReflect.Descriptor instead.
+func (*GetSandboxRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{125}
+}
+
+func (x *GetSandboxRequest) GetVpcId() string {
+	if x != nil {
+		return x.VpcId
+	}
+	return ""
+}
+
+func (x *GetSandboxRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type GetSandboxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *Sandbox               `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSandboxResponse) Reset() {
+	*x = GetSandboxResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[126]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSandboxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSandboxResponse) ProtoMessage() {}
+
+func (x *GetSandboxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[126]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSandboxResponse.ProtoReflect.Descriptor instead.
+func (*GetSandboxResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{126}
+}
+
+func (x *GetSandboxResponse) GetData() *Sandbox {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetSandboxResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type ExecSandboxRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	VpcId         string                 `protobuf:"bytes,3,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Argv          []string               `protobuf:"bytes,2,rep,name=argv,proto3" json:"argv,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecSandboxRequest) Reset() {
+	*x = ExecSandboxRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[127]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecSandboxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecSandboxRequest) ProtoMessage() {}
+
+func (x *ExecSandboxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[127]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecSandboxRequest.ProtoReflect.Descriptor instead.
+func (*ExecSandboxRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{127}
+}
+
+func (x *ExecSandboxRequest) GetVpcId() string {
+	if x != nil {
+		return x.VpcId
+	}
+	return ""
+}
+
+func (x *ExecSandboxRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ExecSandboxRequest) GetArgv() []string {
+	if x != nil {
+		return x.Argv
+	}
+	return nil
+}
+
+type ExecSandboxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *ExecSandboxData       `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExecSandboxResponse) Reset() {
+	*x = ExecSandboxResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[128]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecSandboxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecSandboxResponse) ProtoMessage() {}
+
+func (x *ExecSandboxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[128]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecSandboxResponse.ProtoReflect.Descriptor instead.
+func (*ExecSandboxResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{128}
+}
+
+func (x *ExecSandboxResponse) GetData() *ExecSandboxData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ExecSandboxResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type ExecSandboxData struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Stdout          *string                `protobuf:"bytes,1,opt,name=stdout,proto3,oneof" json:"stdout,omitempty"`
+	Stderr          *string                `protobuf:"bytes,2,opt,name=stderr,proto3,oneof" json:"stderr,omitempty"`
+	ExitCode        *int32                 `protobuf:"varint,3,opt,name=exit_code,json=exitCode,proto3,oneof" json:"exit_code,omitempty"`
+	DurationMs      *uint32                `protobuf:"varint,4,opt,name=duration_ms,json=durationMs,proto3,oneof" json:"duration_ms,omitempty"`
+	StdoutTruncated *bool                  `protobuf:"varint,5,opt,name=stdout_truncated,json=stdoutTruncated,proto3,oneof" json:"stdout_truncated,omitempty"`
+	StderrTruncated *bool                  `protobuf:"varint,6,opt,name=stderr_truncated,json=stderrTruncated,proto3,oneof" json:"stderr_truncated,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ExecSandboxData) Reset() {
+	*x = ExecSandboxData{}
+	mi := &file_api_v2_service_proto_msgTypes[129]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecSandboxData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecSandboxData) ProtoMessage() {}
+
+func (x *ExecSandboxData) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[129]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecSandboxData.ProtoReflect.Descriptor instead.
+func (*ExecSandboxData) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{129}
+}
+
+func (x *ExecSandboxData) GetStdout() string {
+	if x != nil && x.Stdout != nil {
+		return *x.Stdout
+	}
+	return ""
+}
+
+func (x *ExecSandboxData) GetStderr() string {
+	if x != nil && x.Stderr != nil {
+		return *x.Stderr
+	}
+	return ""
+}
+
+func (x *ExecSandboxData) GetExitCode() int32 {
+	if x != nil && x.ExitCode != nil {
+		return *x.ExitCode
+	}
+	return 0
+}
+
+func (x *ExecSandboxData) GetDurationMs() uint32 {
+	if x != nil && x.DurationMs != nil {
+		return *x.DurationMs
+	}
+	return 0
+}
+
+func (x *ExecSandboxData) GetStdoutTruncated() bool {
+	if x != nil && x.StdoutTruncated != nil {
+		return *x.StdoutTruncated
+	}
+	return false
+}
+
+func (x *ExecSandboxData) GetStderrTruncated() bool {
+	if x != nil && x.StderrTruncated != nil {
+		return *x.StderrTruncated
+	}
+	return false
+}
+
+type DeleteSandboxRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	VpcId         string                 `protobuf:"bytes,3,opt,name=vpc_id,json=vpcId,proto3" json:"vpc_id,omitempty"`
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	Graceful      bool                   `protobuf:"varint,2,opt,name=graceful,proto3" json:"graceful,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteSandboxRequest) Reset() {
+	*x = DeleteSandboxRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[130]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteSandboxRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteSandboxRequest) ProtoMessage() {}
+
+func (x *DeleteSandboxRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[130]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteSandboxRequest.ProtoReflect.Descriptor instead.
+func (*DeleteSandboxRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{130}
+}
+
+func (x *DeleteSandboxRequest) GetVpcId() string {
+	if x != nil {
+		return x.VpcId
+	}
+	return ""
+}
+
+func (x *DeleteSandboxRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DeleteSandboxRequest) GetGraceful() bool {
+	if x != nil {
+		return x.Graceful
+	}
+	return false
+}
+
+type DeleteSandboxResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *Sandbox               `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteSandboxResponse) Reset() {
+	*x = DeleteSandboxResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[131]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteSandboxResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteSandboxResponse) ProtoMessage() {}
+
+func (x *DeleteSandboxResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[131]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteSandboxResponse.ProtoReflect.Descriptor instead.
+func (*DeleteSandboxResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{131}
+}
+
+func (x *DeleteSandboxResponse) GetData() *Sandbox {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *DeleteSandboxResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a(third_party/google/api/annotations.proto\x1a\x14api/v2/options.proto\x1a:third_party/protoc-gen-openapiv2/options/annotations.proto\"\x0f\n" +
+	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x14api/v2/options.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(third_party/google/api/annotations.proto\x1a:third_party/protoc-gen-openapiv2/options/annotations.proto\"\x0f\n" +
 	"\rHealthRequest\"\x15\n" +
 	"\x13FetchAccountRequest\"n\n" +
 	"\x0eHealthResponse\x12&\n" +
@@ -8743,7 +9696,79 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at*\xdf\x01\n" +
+	"\t_ended_at\"\x83\x04\n" +
+	"\aSandbox\x12(\n" +
+	"\x02id\x18\x01 \x01(\tB\x18\x92A\x152\fSandbox UUID\xa2\x02\x04uuidR\x02id\x12+\n" +
+	"\x06vpc_id\x18\a \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x120\n" +
+	"\x04name\x18\x02 \x01(\tB\x1c\x92A\x192\x17Normalized sandbox nameR\x04name\x12P\n" +
+	"\n" +
+	"generation\x18\b \x01(\rB0\x92A-2+Monotonically increasing sandbox generationR\n" +
+	"generation\x12@\n" +
+	"\rdesired_state\x18\x03 \x01(\x0e2\x1b.api.v2.SandboxDesiredStateR\fdesiredState\x12*\n" +
+	"\x05phase\x18\x04 \x01(\x0e2\x14.api.v2.SandboxPhaseR\x05phase\x12a\n" +
+	"\aoutcome\x18\x05 \x01(\x0e2\x16.api.v2.SandboxOutcomeB*\x92A'2%Terminal outcome, omitted until knownH\x00R\aoutcome\x88\x01\x01\x12@\n" +
+	"\rcleanup_state\x18\x06 \x01(\x0e2\x1b.api.v2.SandboxCleanupStateR\fcleanupStateB\n" +
+	"\n" +
+	"\b_outcome\"\x9f\x02\n" +
+	"\x16SandboxSecretReference\x121\n" +
+	"\x02id\x18\x01 \x01(\tB!\x92A\x1e2\x15Secret reference UUID\xa2\x02\x04uuidR\x02id\x12\x85\x01\n" +
+	"\x10environment_name\x18\x02 \x01(\tBZ\x92AW2.Environment variable populated from the secretx\x80\x01\x80\x01\x01\x8a\x01\x1e^[A-Za-z_][A-Za-z0-9_]{0,127}$R\x0fenvironmentName\x12J\n" +
+	"\vversion_ref\x18\x03 \x01(\tB)\x92A&2\x1eExact secret version referencex\xff\x01\x80\x01\x01R\n" +
+	"versionRef\"\xc0\x06\n" +
+	"\x14CreateSandboxRequest\x12+\n" +
+	"\x06vpc_id\x18\x01 \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x12x\n" +
+	"\x04name\x18\x02 \x01(\tBd\x92Aa21Normalized DNS label used as the sandbox identityx?\x80\x01\x01\x8a\x01&^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$R\x04name\x12<\n" +
+	"\n" +
+	"profile_id\x18\x03 \x01(\tB\x1d\x92A\x1a2\x12Runtime profile IDx\x80\x01\x80\x01\x01R\tprofileId\x126\n" +
+	"\bimage_id\x18\x04 \x01(\tB\x1b\x92A\x182\x10Runtime image IDx\x80\x01\x80\x01\x01R\aimageId\x12q\n" +
+	"\x17runtime_timeout_seconds\x18\x05 \x01(\x05B9\x92A62\"Maximum sandbox runtime in secondsY\x00\x00\x00\x00\x00 \xac@i\x00\x00\x00\x00\x00\x00\xf0?R\x15runtimeTimeoutSeconds\x12Q\n" +
+	"\acommand\x18\x06 \x03(\tB7\x92A42.Initial command argv, with at most 256 entries\xa0\x01\x80\x02R\acommand\x12t\n" +
+	"\venvironment\x18\a \x03(\v2-.api.v2.CreateSandboxRequest.EnvironmentEntryB#\x92A 2\x1aLiteral environment values\xc0\x01\x80\x02R\venvironment\x12\x8e\x01\n" +
+	"\x11secret_references\x18\b \x03(\v2\x1e.api.v2.SandboxSecretReferenceBA\x92A>29Workspace secret references injected into the environment\xa0\x01@R\x10secretReferences\x1a>\n" +
+	"\x10EnvironmentEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"r\n" +
+	"\x15CreateSandboxResponse\x12#\n" +
+	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xcc\x01\n" +
+	"\x11GetSandboxRequest\x12+\n" +
+	"\x06vpc_id\x18\x02 \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x12x\n" +
+	"\x04name\x18\x03 \x01(\tBd\x92Aa21Normalized DNS label used as the sandbox identityx?\x80\x01\x01\x8a\x01&^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$R\x04nameJ\x04\b\x01\x10\x02R\n" +
+	"sandbox_id\"o\n" +
+	"\x12GetSandboxResponse\x12#\n" +
+	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xae\x02\n" +
+	"\x12ExecSandboxRequest\x12+\n" +
+	"\x06vpc_id\x18\x03 \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x12x\n" +
+	"\x04name\x18\x04 \x01(\tBd\x92Aa21Normalized DNS label used as the sandbox identityx?\x80\x01\x01\x8a\x01&^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$R\x04name\x12_\n" +
+	"\x04argv\x18\x02 \x03(\tBK\x92AH2FExecutable and arguments to run directly, without shell interpretationR\x04argvJ\x04\b\x01\x10\x02R\n" +
+	"sandbox_id\"x\n" +
+	"\x13ExecSandboxResponse\x12+\n" +
+	"\x04data\x18\x01 \x01(\v2\x17.api.v2.ExecSandboxDataR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xfc\x04\n" +
+	"\x0fExecSandboxData\x12a\n" +
+	"\x06stdout\x18\x01 \x01(\tBD\x92AA2?Captured standard output, preserved exactly as valid UTF-8 textH\x00R\x06stdout\x88\x01\x01\x12`\n" +
+	"\x06stderr\x18\x02 \x01(\tBC\x92A@2>Captured standard error, preserved exactly as valid UTF-8 textH\x01R\x06stderr\x88\x01\x01\x128\n" +
+	"\texit_code\x18\x03 \x01(\x05B\x16\x92A\x132\x11Process exit codeH\x02R\bexitCode\x88\x01\x01\x12U\n" +
+	"\vduration_ms\x18\x04 \x01(\rB/\x92A,2*Command execution duration in millisecondsH\x03R\n" +
+	"durationMs\x88\x01\x01\x12Z\n" +
+	"\x10stdout_truncated\x18\x05 \x01(\bB*\x92A'2%Whether standard output was truncatedH\x04R\x0fstdoutTruncated\x88\x01\x01\x12Y\n" +
+	"\x10stderr_truncated\x18\x06 \x01(\bB)\x92A&2$Whether standard error was truncatedH\x05R\x0fstderrTruncated\x88\x01\x01B\t\n" +
+	"\a_stdoutB\t\n" +
+	"\a_stderrB\f\n" +
+	"\n" +
+	"_exit_codeB\x0e\n" +
+	"\f_duration_msB\x13\n" +
+	"\x11_stdout_truncatedB\x13\n" +
+	"\x11_stderr_truncated\"\x9f\x02\n" +
+	"\x14DeleteSandboxRequest\x12+\n" +
+	"\x06vpc_id\x18\x03 \x01(\tB\x14\x92A\x112\bVPC UUID\xa2\x02\x04uuidR\x05vpcId\x12x\n" +
+	"\x04name\x18\x04 \x01(\tBd\x92Aa21Normalized DNS label used as the sandbox identityx?\x80\x01\x01\x8a\x01&^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$R\x04name\x12N\n" +
+	"\bgraceful\x18\x02 \x01(\bB2\x92A/2-Allow graceful shutdown before forced cleanupR\bgracefulJ\x04\b\x01\x10\x02R\n" +
+	"sandbox_id\"r\n" +
+	"\x15DeleteSandboxResponse\x12#\n" +
+	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata*\xdf\x01\n" +
 	"\x11FunctionRunStatus\x12#\n" +
 	"\x1fFUNCTION_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_RUN_STATUS_QUEUED\x10\x01\x12\x1f\n" +
@@ -8809,7 +9834,34 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\xcf\x7f\n" +
+	"\x04INFO\x10\x03*\x85\x01\n" +
+	"\x13SandboxDesiredState\x12%\n" +
+	"!SANDBOX_DESIRED_STATE_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dSANDBOX_DESIRED_STATE_RUNNING\x10\x01\x12$\n" +
+	" SANDBOX_DESIRED_STATE_TERMINATED\x10\x02*\xd2\x01\n" +
+	"\fSandboxPhase\x12\x1d\n" +
+	"\x19SANDBOX_PHASE_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15SANDBOX_PHASE_PENDING\x10\x01\x12\x1a\n" +
+	"\x16SANDBOX_PHASE_STARTING\x10\x02\x12\x19\n" +
+	"\x15SANDBOX_PHASE_RUNNING\x10\x03\x12\x1d\n" +
+	"\x19SANDBOX_PHASE_TERMINATING\x10\x04\x12\x1a\n" +
+	"\x16SANDBOX_PHASE_TERMINAL\x10\x05\x12\x16\n" +
+	"\x12SANDBOX_PHASE_LOST\x10\x06*\xf3\x01\n" +
+	"\x0eSandboxOutcome\x12\x1f\n" +
+	"\x1bSANDBOX_OUTCOME_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16SANDBOX_OUTCOME_EXITED\x10\x01\x12\x1d\n" +
+	"\x19SANDBOX_OUTCOME_DESTROYED\x10\x02\x12\x1d\n" +
+	"\x19SANDBOX_OUTCOME_TIMED_OUT\x10\x03\x12!\n" +
+	"\x1dSANDBOX_OUTCOME_LAUNCH_FAILED\x10\x04\x12)\n" +
+	"%SANDBOX_OUTCOME_INFRASTRUCTURE_FAILED\x10\x05\x12\x18\n" +
+	"\x14SANDBOX_OUTCOME_LOST\x10\x06*\xf8\x01\n" +
+	"\x13SandboxCleanupState\x12%\n" +
+	"!SANDBOX_CLEANUP_STATE_UNSPECIFIED\x10\x00\x12&\n" +
+	"\"SANDBOX_CLEANUP_STATE_NOT_REQUIRED\x10\x01\x12!\n" +
+	"\x1dSANDBOX_CLEANUP_STATE_PENDING\x10\x02\x12%\n" +
+	"!SANDBOX_CLEANUP_STATE_IN_PROGRESS\x10\x03\x12#\n" +
+	"\x1fSANDBOX_CLEANUP_STATE_CONFIRMED\x10\x04\x12#\n" +
+	"\x1fSANDBOX_CLEANUP_STATE_UNCERTAIN\x10\x052ך\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -9295,7 +10347,116 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\xe1\x05\x92A\xaa\x05\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runs\x12\xad\x06\n" +
+	"\rCreateSandbox\x12\x1c.api.v2.CreateSandboxRequest\x1a\x1d.api.v2.CreateSandboxResponse\"\xde\x05\x92A\xbf\x05\n" +
+	"\tSandboxes\x12\x0eCreate sandbox\x1a?Creates or updates a sandbox and waits for it to reach RUNNING.JZ\n" +
+	"\x03200\x12S\n" +
+	"&Sandbox created or updated and running\x12)\n" +
+	"'\x1a%#/definitions/v2CreateSandboxResponseJL\n" +
+	"\x03400\x12E\n" +
+	" Bad Request - invalid input data\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ\\\n" +
+	"\x03409\x12U\n" +
+	"0Conflict - idempotency or sandbox state conflict\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ^\n" +
+	"\x03503\x12W\n" +
+	"2Service Unavailable - sandbox capacity unavailable\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
+	"/sandboxes\x12\x92\x05\n" +
+	"\n" +
+	"GetSandbox\x12\x19.api.v2.GetSandboxRequest\x1a\x1a.api.v2.GetSandboxResponse\"\xcc\x04\x92A\x9b\x04\n" +
+	"\tSandboxes\x12\vGet sandbox\x1a'Returns the current state of a sandbox.J8\n" +
+	"\x03200\x121\n" +
+	"\aSandbox\x12&\n" +
+	"$\x1a\"#/definitions/v2GetSandboxResponseJX\n" +
+	"\x03400\x12Q\n" +
+	",Bad Request - invalid VPC ID or sandbox name\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJI\n" +
+	"\x03404\x12B\n" +
+	"\x1dNot Found - sandbox not found\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02!\x12\x1f/vpcs/{vpc_id}/sandboxes/{name}\x12\x97\t\n" +
+	"\vExecSandbox\x12\x1a.api.v2.ExecSandboxRequest\x1a\x1b.api.v2.ExecSandboxResponse\"\xce\b\x92A\x95\b\n" +
+	"\tSandboxes\x12\x1aExecute command in sandbox\x1a\xa0\x01Executes a structured argv command in a running sandbox and returns its captured output. The command is executed directly without implicit shell interpretation.JC\n" +
+	"\x03200\x12<\n" +
+	"\x11Command completed\x12'\n" +
+	"%\x1a##/definitions/v2ExecSandboxResponseJ_\n" +
+	"\x03400\x12X\n" +
+	"3Bad Request - invalid VPC ID, sandbox name, or argv\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJI\n" +
+	"\x03404\x12B\n" +
+	"\x1dNot Found - sandbox not found\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ\x9e\x01\n" +
+	"\x03409\x12\x96\x01\n" +
+	"qConflict - sandbox state does not allow command execution, or the result of a non-replayable command is ambiguous\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ[\n" +
+	"\x03502\x12T\n" +
+	"/Bad Gateway - sandbox output is not valid UTF-8\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ_\n" +
+	"\x03503\x12X\n" +
+	"3Service Unavailable - sandbox execution unavailable\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02):\x01*\"$/vpcs/{vpc_id}/sandboxes/{name}/exec\x12\xa6\x06\n" +
+	"\rDeleteSandbox\x12\x1c.api.v2.DeleteSandboxRequest\x1a\x1d.api.v2.DeleteSandboxResponse\"\xd7\x05\x92A\xa6\x05\n" +
+	"\tSandboxes\x12\x0eDelete sandbox\x1a6Requests sandbox termination and asynchronous cleanup.JP\n" +
+	"\x03202\x12I\n" +
+	"\x1cSandbox termination accepted\x12)\n" +
+	"'\x1a%#/definitions/v2DeleteSandboxResponseJj\n" +
+	"\x03400\x12c\n" +
+	">Bad Request - invalid VPC ID, sandbox name, or query parameter\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJR\n" +
+	"\x03401\x12K\n" +
+	"&Unauthorized - authentication required\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJP\n" +
+	"\x03403\x12I\n" +
+	"$Forbidden - insufficient permissions\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJI\n" +
+	"\x03404\x12B\n" +
+	"\x1dNot Found - sandbox not found\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJM\n" +
+	"\x03409\x12F\n" +
+	"!Conflict - sandbox state conflict\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJA\n" +
+	"\x03500\x12:\n" +
+	"\x15Internal Server Error\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02!*\x1f/vpcs/{vpc_id}/sandboxes/{name}B\x8b\x06\x92A\xd4\x05\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -9308,7 +10469,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\tFunctions\x12\x1bInvoke and manage functionsj\x1d\n" +
 	"\x04Runs\x12\x15Inspect function runsj9\n" +
 	"\vExperiments\x12*Inspect experiment variants and aggregatesj(\n" +
-	"\bSessions\x12\x1cInspect session-grouped runsj)\n" +
+	"\bSessions\x12\x1cInspect session-grouped runsj(\n" +
+	"\tSandboxes\x12\x1bCreate and manage sandboxesj)\n" +
 	"\vPartner API\x12\x1aPartner account managementZ1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
 
 var (
@@ -9323,8 +10485,8 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 122)
+var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 15)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 134)
 var file_api_v2_service_proto_goTypes = []any{
 	(FunctionRunStatus)(0),                        // 0: api.v2.FunctionRunStatus
 	(TraceSpanStatus)(0),                          // 1: api.v2.TraceSpanStatus
@@ -9337,379 +10499,417 @@ var file_api_v2_service_proto_goTypes = []any{
 	(FilterType)(0),                               // 8: api.v2.FilterType
 	(InsightsOutputColumnType)(0),                 // 9: api.v2.InsightsOutputColumnType
 	(InsightsDiagnosticSeverity)(0),               // 10: api.v2.InsightsDiagnosticSeverity
-	(*HealthRequest)(nil),                         // 11: api.v2.HealthRequest
-	(*FetchAccountRequest)(nil),                   // 12: api.v2.FetchAccountRequest
-	(*HealthResponse)(nil),                        // 13: api.v2.HealthResponse
-	(*HealthData)(nil),                            // 14: api.v2.HealthData
-	(*Error)(nil),                                 // 15: api.v2.Error
-	(*ErrorResponse)(nil),                         // 16: api.v2.ErrorResponse
-	(*ResponseMetadata)(nil),                      // 17: api.v2.ResponseMetadata
-	(*TimeRange)(nil),                             // 18: api.v2.TimeRange
-	(*FunctionRef)(nil),                           // 19: api.v2.FunctionRef
-	(*AppRef)(nil),                                // 20: api.v2.AppRef
-	(*FunctionApp)(nil),                           // 21: api.v2.FunctionApp
-	(*FunctionTrigger)(nil),                       // 22: api.v2.FunctionTrigger
-	(*FunctionFailureHandler)(nil),                // 23: api.v2.FunctionFailureHandler
-	(*FunctionCancellationConfiguration)(nil),     // 24: api.v2.FunctionCancellationConfiguration
-	(*FunctionRetryConfiguration)(nil),            // 25: api.v2.FunctionRetryConfiguration
-	(*FunctionEventsBatchConfiguration)(nil),      // 26: api.v2.FunctionEventsBatchConfiguration
-	(*FunctionConcurrencyLimitConfiguration)(nil), // 27: api.v2.FunctionConcurrencyLimitConfiguration
-	(*FunctionConcurrencyConfiguration)(nil),      // 28: api.v2.FunctionConcurrencyConfiguration
-	(*FunctionRateLimitConfiguration)(nil),        // 29: api.v2.FunctionRateLimitConfiguration
-	(*FunctionDebounceConfiguration)(nil),         // 30: api.v2.FunctionDebounceConfiguration
-	(*FunctionThrottleConfiguration)(nil),         // 31: api.v2.FunctionThrottleConfiguration
-	(*FunctionSingletonConfiguration)(nil),        // 32: api.v2.FunctionSingletonConfiguration
-	(*FunctionConfiguration)(nil),                 // 33: api.v2.FunctionConfiguration
-	(*Function)(nil),                              // 34: api.v2.Function
-	(*RunTrigger)(nil),                            // 35: api.v2.RunTrigger
-	(*FunctionRun)(nil),                           // 36: api.v2.FunctionRun
-	(*GetFunctionRunRequest)(nil),                 // 37: api.v2.GetFunctionRunRequest
-	(*GetFunctionRunResponse)(nil),                // 38: api.v2.GetFunctionRunResponse
-	(*GetEventRunsRequest)(nil),                   // 39: api.v2.GetEventRunsRequest
-	(*GetEventRunsResponse)(nil),                  // 40: api.v2.GetEventRunsResponse
-	(*RerunRequest)(nil),                          // 41: api.v2.RerunRequest
-	(*RerunFromStep)(nil),                         // 42: api.v2.RerunFromStep
-	(*RerunResponse)(nil),                         // 43: api.v2.RerunResponse
-	(*RerunData)(nil),                             // 44: api.v2.RerunData
-	(*TraceSpanMetadata)(nil),                     // 45: api.v2.TraceSpanMetadata
-	(*TraceSpan)(nil),                             // 46: api.v2.TraceSpan
-	(*FunctionTrace)(nil),                         // 47: api.v2.FunctionTrace
-	(*GetFunctionTraceRequest)(nil),               // 48: api.v2.GetFunctionTraceRequest
-	(*GetFunctionTraceResponse)(nil),              // 49: api.v2.GetFunctionTraceResponse
-	(*GetFunctionRequest)(nil),                    // 50: api.v2.GetFunctionRequest
-	(*GetFunctionResponse)(nil),                   // 51: api.v2.GetFunctionResponse
-	(*App)(nil),                                   // 52: api.v2.App
-	(*AppSync)(nil),                               // 53: api.v2.AppSync
-	(*GetAppRequest)(nil),                         // 54: api.v2.GetAppRequest
-	(*GetAppResponse)(nil),                        // 55: api.v2.GetAppResponse
-	(*GetFunctionsRequest)(nil),                   // 56: api.v2.GetFunctionsRequest
-	(*GetFunctionsResponse)(nil),                  // 57: api.v2.GetFunctionsResponse
-	(*CreateAccountRequest)(nil),                  // 58: api.v2.CreateAccountRequest
-	(*CreateAccountResponse)(nil),                 // 59: api.v2.CreateAccountResponse
-	(*CreateEnvRequest)(nil),                      // 60: api.v2.CreateEnvRequest
-	(*CreateEnvResponse)(nil),                     // 61: api.v2.CreateEnvResponse
-	(*Env)(nil),                                   // 62: api.v2.Env
-	(*CreateAccountData)(nil),                     // 63: api.v2.CreateAccountData
-	(*FetchAccountsRequest)(nil),                  // 64: api.v2.FetchAccountsRequest
-	(*FetchAccountsResponse)(nil),                 // 65: api.v2.FetchAccountsResponse
-	(*FetchAccountResponse)(nil),                  // 66: api.v2.FetchAccountResponse
-	(*Account)(nil),                               // 67: api.v2.Account
-	(*Page)(nil),                                  // 68: api.v2.Page
-	(*FetchAccountEventKeysRequest)(nil),          // 69: api.v2.FetchAccountEventKeysRequest
-	(*FetchAccountEventKeysResponse)(nil),         // 70: api.v2.FetchAccountEventKeysResponse
-	(*EventKey)(nil),                              // 71: api.v2.EventKey
-	(*FetchAccountEnvsRequest)(nil),               // 72: api.v2.FetchAccountEnvsRequest
-	(*FetchAccountEnvsResponse)(nil),              // 73: api.v2.FetchAccountEnvsResponse
-	(*FetchAccountSigningKeysRequest)(nil),        // 74: api.v2.FetchAccountSigningKeysRequest
-	(*FetchAccountSigningKeysResponse)(nil),       // 75: api.v2.FetchAccountSigningKeysResponse
-	(*SigningKey)(nil),                            // 76: api.v2.SigningKey
-	(*CreateWebhookRequest)(nil),                  // 77: api.v2.CreateWebhookRequest
-	(*CreateWebhookResponse)(nil),                 // 78: api.v2.CreateWebhookResponse
-	(*EventFilter)(nil),                           // 79: api.v2.EventFilter
-	(*ListWebhooksRequest)(nil),                   // 80: api.v2.ListWebhooksRequest
-	(*ListWebhooksResponse)(nil),                  // 81: api.v2.ListWebhooksResponse
-	(*Webhook)(nil),                               // 82: api.v2.Webhook
-	(*PatchEnvRequest)(nil),                       // 83: api.v2.PatchEnvRequest
-	(*PatchEnvsResponse)(nil),                     // 84: api.v2.PatchEnvsResponse
-	(*InvokeFunctionRequest)(nil),                 // 85: api.v2.InvokeFunctionRequest
-	(*InvokeFunctionResponse)(nil),                // 86: api.v2.InvokeFunctionResponse
-	(*InvokeFunctionData)(nil),                    // 87: api.v2.InvokeFunctionData
-	(*CreateScoreRequest)(nil),                    // 88: api.v2.CreateScoreRequest
-	(*CreateScoreInput)(nil),                      // 89: api.v2.CreateScoreInput
-	(*ScoreExperiment)(nil),                       // 90: api.v2.ScoreExperiment
-	(*CreateScoreResponse)(nil),                   // 91: api.v2.CreateScoreResponse
-	(*Score)(nil),                                 // 92: api.v2.Score
-	(*SyncAppRequest)(nil),                        // 93: api.v2.SyncAppRequest
-	(*SyncAppResponse)(nil),                       // 94: api.v2.SyncAppResponse
-	(*SyncAppData)(nil),                           // 95: api.v2.SyncAppData
-	(*SyncAppError)(nil),                          // 96: api.v2.SyncAppError
-	(*QueryInsightsRequest)(nil),                  // 97: api.v2.QueryInsightsRequest
-	(*QueryInsightsResponse)(nil),                 // 98: api.v2.QueryInsightsResponse
-	(*QueryInsightsData)(nil),                     // 99: api.v2.QueryInsightsData
-	(*InsightsOutputColumn)(nil),                  // 100: api.v2.InsightsOutputColumn
-	(*InsightsRow)(nil),                           // 101: api.v2.InsightsRow
-	(*InsightsDiagnostic)(nil),                    // 102: api.v2.InsightsDiagnostic
-	(*InsightsDiagnosticPosition)(nil),            // 103: api.v2.InsightsDiagnosticPosition
-	(*ListInsightsTablesRequest)(nil),             // 104: api.v2.ListInsightsTablesRequest
-	(*ListInsightsTablesResponse)(nil),            // 105: api.v2.ListInsightsTablesResponse
-	(*InsightsTable)(nil),                         // 106: api.v2.InsightsTable
-	(*InsightsTableColumn)(nil),                   // 107: api.v2.InsightsTableColumn
-	(*QueryInsightsPromptRequest)(nil),            // 108: api.v2.QueryInsightsPromptRequest
-	(*QueryInsightsPromptResponse)(nil),           // 109: api.v2.QueryInsightsPromptResponse
-	(*QueryInsightsPromptData)(nil),               // 110: api.v2.QueryInsightsPromptData
-	(*ListInsightsEventSchemasRequest)(nil),       // 111: api.v2.ListInsightsEventSchemasRequest
-	(*ListInsightsEventSchemasResponse)(nil),      // 112: api.v2.ListInsightsEventSchemasResponse
-	(*InsightsEventSchema)(nil),                   // 113: api.v2.InsightsEventSchema
-	(*ListExperimentsRequest)(nil),                // 114: api.v2.ListExperimentsRequest
-	(*ListExperimentsResponse)(nil),               // 115: api.v2.ListExperimentsResponse
-	(*Experiment)(nil),                            // 116: api.v2.Experiment
-	(*GetExperimentRequest)(nil),                  // 117: api.v2.GetExperimentRequest
-	(*GetExperimentResponse)(nil),                 // 118: api.v2.GetExperimentResponse
-	(*ExperimentDetail)(nil),                      // 119: api.v2.ExperimentDetail
-	(*ExperimentVariantMetrics)(nil),              // 120: api.v2.ExperimentVariantMetrics
-	(*ExperimentVariantMetric)(nil),               // 121: api.v2.ExperimentVariantMetric
-	(*ExperimentVariantWeight)(nil),               // 122: api.v2.ExperimentVariantWeight
-	(*ListSessionKeysRequest)(nil),                // 123: api.v2.ListSessionKeysRequest
-	(*ListSessionKeysResponse)(nil),               // 124: api.v2.ListSessionKeysResponse
-	(*SessionKey)(nil),                            // 125: api.v2.SessionKey
-	(*ListSessionsRequest)(nil),                   // 126: api.v2.ListSessionsRequest
-	(*ListSessionsResponse)(nil),                  // 127: api.v2.ListSessionsResponse
-	(*SessionGroup)(nil),                          // 128: api.v2.SessionGroup
-	(*ListSessionRunsRequest)(nil),                // 129: api.v2.ListSessionRunsRequest
-	(*ListSessionRunsResponse)(nil),               // 130: api.v2.ListSessionRunsResponse
-	(*SessionRun)(nil),                            // 131: api.v2.SessionRun
-	nil,                                           // 132: api.v2.TraceSpanMetadata.ValuesEntry
-	(*timestamppb.Timestamp)(nil),                 // 133: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                       // 134: google.protobuf.Struct
-	(*structpb.ListValue)(nil),                    // 135: google.protobuf.ListValue
-	(*structpb.Value)(nil),                        // 136: google.protobuf.Value
+	(SandboxDesiredState)(0),                      // 11: api.v2.SandboxDesiredState
+	(SandboxPhase)(0),                             // 12: api.v2.SandboxPhase
+	(SandboxOutcome)(0),                           // 13: api.v2.SandboxOutcome
+	(SandboxCleanupState)(0),                      // 14: api.v2.SandboxCleanupState
+	(*HealthRequest)(nil),                         // 15: api.v2.HealthRequest
+	(*FetchAccountRequest)(nil),                   // 16: api.v2.FetchAccountRequest
+	(*HealthResponse)(nil),                        // 17: api.v2.HealthResponse
+	(*HealthData)(nil),                            // 18: api.v2.HealthData
+	(*Error)(nil),                                 // 19: api.v2.Error
+	(*ErrorResponse)(nil),                         // 20: api.v2.ErrorResponse
+	(*ResponseMetadata)(nil),                      // 21: api.v2.ResponseMetadata
+	(*TimeRange)(nil),                             // 22: api.v2.TimeRange
+	(*FunctionRef)(nil),                           // 23: api.v2.FunctionRef
+	(*AppRef)(nil),                                // 24: api.v2.AppRef
+	(*FunctionApp)(nil),                           // 25: api.v2.FunctionApp
+	(*FunctionTrigger)(nil),                       // 26: api.v2.FunctionTrigger
+	(*FunctionFailureHandler)(nil),                // 27: api.v2.FunctionFailureHandler
+	(*FunctionCancellationConfiguration)(nil),     // 28: api.v2.FunctionCancellationConfiguration
+	(*FunctionRetryConfiguration)(nil),            // 29: api.v2.FunctionRetryConfiguration
+	(*FunctionEventsBatchConfiguration)(nil),      // 30: api.v2.FunctionEventsBatchConfiguration
+	(*FunctionConcurrencyLimitConfiguration)(nil), // 31: api.v2.FunctionConcurrencyLimitConfiguration
+	(*FunctionConcurrencyConfiguration)(nil),      // 32: api.v2.FunctionConcurrencyConfiguration
+	(*FunctionRateLimitConfiguration)(nil),        // 33: api.v2.FunctionRateLimitConfiguration
+	(*FunctionDebounceConfiguration)(nil),         // 34: api.v2.FunctionDebounceConfiguration
+	(*FunctionThrottleConfiguration)(nil),         // 35: api.v2.FunctionThrottleConfiguration
+	(*FunctionSingletonConfiguration)(nil),        // 36: api.v2.FunctionSingletonConfiguration
+	(*FunctionConfiguration)(nil),                 // 37: api.v2.FunctionConfiguration
+	(*Function)(nil),                              // 38: api.v2.Function
+	(*RunTrigger)(nil),                            // 39: api.v2.RunTrigger
+	(*FunctionRun)(nil),                           // 40: api.v2.FunctionRun
+	(*GetFunctionRunRequest)(nil),                 // 41: api.v2.GetFunctionRunRequest
+	(*GetFunctionRunResponse)(nil),                // 42: api.v2.GetFunctionRunResponse
+	(*GetEventRunsRequest)(nil),                   // 43: api.v2.GetEventRunsRequest
+	(*GetEventRunsResponse)(nil),                  // 44: api.v2.GetEventRunsResponse
+	(*RerunRequest)(nil),                          // 45: api.v2.RerunRequest
+	(*RerunFromStep)(nil),                         // 46: api.v2.RerunFromStep
+	(*RerunResponse)(nil),                         // 47: api.v2.RerunResponse
+	(*RerunData)(nil),                             // 48: api.v2.RerunData
+	(*TraceSpanMetadata)(nil),                     // 49: api.v2.TraceSpanMetadata
+	(*TraceSpan)(nil),                             // 50: api.v2.TraceSpan
+	(*FunctionTrace)(nil),                         // 51: api.v2.FunctionTrace
+	(*GetFunctionTraceRequest)(nil),               // 52: api.v2.GetFunctionTraceRequest
+	(*GetFunctionTraceResponse)(nil),              // 53: api.v2.GetFunctionTraceResponse
+	(*GetFunctionRequest)(nil),                    // 54: api.v2.GetFunctionRequest
+	(*GetFunctionResponse)(nil),                   // 55: api.v2.GetFunctionResponse
+	(*App)(nil),                                   // 56: api.v2.App
+	(*AppSync)(nil),                               // 57: api.v2.AppSync
+	(*GetAppRequest)(nil),                         // 58: api.v2.GetAppRequest
+	(*GetAppResponse)(nil),                        // 59: api.v2.GetAppResponse
+	(*GetFunctionsRequest)(nil),                   // 60: api.v2.GetFunctionsRequest
+	(*GetFunctionsResponse)(nil),                  // 61: api.v2.GetFunctionsResponse
+	(*CreateAccountRequest)(nil),                  // 62: api.v2.CreateAccountRequest
+	(*CreateAccountResponse)(nil),                 // 63: api.v2.CreateAccountResponse
+	(*CreateEnvRequest)(nil),                      // 64: api.v2.CreateEnvRequest
+	(*CreateEnvResponse)(nil),                     // 65: api.v2.CreateEnvResponse
+	(*Env)(nil),                                   // 66: api.v2.Env
+	(*CreateAccountData)(nil),                     // 67: api.v2.CreateAccountData
+	(*FetchAccountsRequest)(nil),                  // 68: api.v2.FetchAccountsRequest
+	(*FetchAccountsResponse)(nil),                 // 69: api.v2.FetchAccountsResponse
+	(*FetchAccountResponse)(nil),                  // 70: api.v2.FetchAccountResponse
+	(*Account)(nil),                               // 71: api.v2.Account
+	(*Page)(nil),                                  // 72: api.v2.Page
+	(*FetchAccountEventKeysRequest)(nil),          // 73: api.v2.FetchAccountEventKeysRequest
+	(*FetchAccountEventKeysResponse)(nil),         // 74: api.v2.FetchAccountEventKeysResponse
+	(*EventKey)(nil),                              // 75: api.v2.EventKey
+	(*FetchAccountEnvsRequest)(nil),               // 76: api.v2.FetchAccountEnvsRequest
+	(*FetchAccountEnvsResponse)(nil),              // 77: api.v2.FetchAccountEnvsResponse
+	(*FetchAccountSigningKeysRequest)(nil),        // 78: api.v2.FetchAccountSigningKeysRequest
+	(*FetchAccountSigningKeysResponse)(nil),       // 79: api.v2.FetchAccountSigningKeysResponse
+	(*SigningKey)(nil),                            // 80: api.v2.SigningKey
+	(*CreateWebhookRequest)(nil),                  // 81: api.v2.CreateWebhookRequest
+	(*CreateWebhookResponse)(nil),                 // 82: api.v2.CreateWebhookResponse
+	(*EventFilter)(nil),                           // 83: api.v2.EventFilter
+	(*ListWebhooksRequest)(nil),                   // 84: api.v2.ListWebhooksRequest
+	(*ListWebhooksResponse)(nil),                  // 85: api.v2.ListWebhooksResponse
+	(*Webhook)(nil),                               // 86: api.v2.Webhook
+	(*PatchEnvRequest)(nil),                       // 87: api.v2.PatchEnvRequest
+	(*PatchEnvsResponse)(nil),                     // 88: api.v2.PatchEnvsResponse
+	(*InvokeFunctionRequest)(nil),                 // 89: api.v2.InvokeFunctionRequest
+	(*InvokeFunctionResponse)(nil),                // 90: api.v2.InvokeFunctionResponse
+	(*InvokeFunctionData)(nil),                    // 91: api.v2.InvokeFunctionData
+	(*CreateScoreRequest)(nil),                    // 92: api.v2.CreateScoreRequest
+	(*CreateScoreInput)(nil),                      // 93: api.v2.CreateScoreInput
+	(*ScoreExperiment)(nil),                       // 94: api.v2.ScoreExperiment
+	(*CreateScoreResponse)(nil),                   // 95: api.v2.CreateScoreResponse
+	(*Score)(nil),                                 // 96: api.v2.Score
+	(*SyncAppRequest)(nil),                        // 97: api.v2.SyncAppRequest
+	(*SyncAppResponse)(nil),                       // 98: api.v2.SyncAppResponse
+	(*SyncAppData)(nil),                           // 99: api.v2.SyncAppData
+	(*SyncAppError)(nil),                          // 100: api.v2.SyncAppError
+	(*QueryInsightsRequest)(nil),                  // 101: api.v2.QueryInsightsRequest
+	(*QueryInsightsResponse)(nil),                 // 102: api.v2.QueryInsightsResponse
+	(*QueryInsightsData)(nil),                     // 103: api.v2.QueryInsightsData
+	(*InsightsOutputColumn)(nil),                  // 104: api.v2.InsightsOutputColumn
+	(*InsightsRow)(nil),                           // 105: api.v2.InsightsRow
+	(*InsightsDiagnostic)(nil),                    // 106: api.v2.InsightsDiagnostic
+	(*InsightsDiagnosticPosition)(nil),            // 107: api.v2.InsightsDiagnosticPosition
+	(*ListInsightsTablesRequest)(nil),             // 108: api.v2.ListInsightsTablesRequest
+	(*ListInsightsTablesResponse)(nil),            // 109: api.v2.ListInsightsTablesResponse
+	(*InsightsTable)(nil),                         // 110: api.v2.InsightsTable
+	(*InsightsTableColumn)(nil),                   // 111: api.v2.InsightsTableColumn
+	(*QueryInsightsPromptRequest)(nil),            // 112: api.v2.QueryInsightsPromptRequest
+	(*QueryInsightsPromptResponse)(nil),           // 113: api.v2.QueryInsightsPromptResponse
+	(*QueryInsightsPromptData)(nil),               // 114: api.v2.QueryInsightsPromptData
+	(*ListInsightsEventSchemasRequest)(nil),       // 115: api.v2.ListInsightsEventSchemasRequest
+	(*ListInsightsEventSchemasResponse)(nil),      // 116: api.v2.ListInsightsEventSchemasResponse
+	(*InsightsEventSchema)(nil),                   // 117: api.v2.InsightsEventSchema
+	(*ListExperimentsRequest)(nil),                // 118: api.v2.ListExperimentsRequest
+	(*ListExperimentsResponse)(nil),               // 119: api.v2.ListExperimentsResponse
+	(*Experiment)(nil),                            // 120: api.v2.Experiment
+	(*GetExperimentRequest)(nil),                  // 121: api.v2.GetExperimentRequest
+	(*GetExperimentResponse)(nil),                 // 122: api.v2.GetExperimentResponse
+	(*ExperimentDetail)(nil),                      // 123: api.v2.ExperimentDetail
+	(*ExperimentVariantMetrics)(nil),              // 124: api.v2.ExperimentVariantMetrics
+	(*ExperimentVariantMetric)(nil),               // 125: api.v2.ExperimentVariantMetric
+	(*ExperimentVariantWeight)(nil),               // 126: api.v2.ExperimentVariantWeight
+	(*ListSessionKeysRequest)(nil),                // 127: api.v2.ListSessionKeysRequest
+	(*ListSessionKeysResponse)(nil),               // 128: api.v2.ListSessionKeysResponse
+	(*SessionKey)(nil),                            // 129: api.v2.SessionKey
+	(*ListSessionsRequest)(nil),                   // 130: api.v2.ListSessionsRequest
+	(*ListSessionsResponse)(nil),                  // 131: api.v2.ListSessionsResponse
+	(*SessionGroup)(nil),                          // 132: api.v2.SessionGroup
+	(*ListSessionRunsRequest)(nil),                // 133: api.v2.ListSessionRunsRequest
+	(*ListSessionRunsResponse)(nil),               // 134: api.v2.ListSessionRunsResponse
+	(*SessionRun)(nil),                            // 135: api.v2.SessionRun
+	(*Sandbox)(nil),                               // 136: api.v2.Sandbox
+	(*SandboxSecretReference)(nil),                // 137: api.v2.SandboxSecretReference
+	(*CreateSandboxRequest)(nil),                  // 138: api.v2.CreateSandboxRequest
+	(*CreateSandboxResponse)(nil),                 // 139: api.v2.CreateSandboxResponse
+	(*GetSandboxRequest)(nil),                     // 140: api.v2.GetSandboxRequest
+	(*GetSandboxResponse)(nil),                    // 141: api.v2.GetSandboxResponse
+	(*ExecSandboxRequest)(nil),                    // 142: api.v2.ExecSandboxRequest
+	(*ExecSandboxResponse)(nil),                   // 143: api.v2.ExecSandboxResponse
+	(*ExecSandboxData)(nil),                       // 144: api.v2.ExecSandboxData
+	(*DeleteSandboxRequest)(nil),                  // 145: api.v2.DeleteSandboxRequest
+	(*DeleteSandboxResponse)(nil),                 // 146: api.v2.DeleteSandboxResponse
+	nil,                                           // 147: api.v2.TraceSpanMetadata.ValuesEntry
+	nil,                                           // 148: api.v2.CreateSandboxRequest.EnvironmentEntry
+	(*timestamppb.Timestamp)(nil),                 // 149: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                       // 150: google.protobuf.Struct
+	(*structpb.ListValue)(nil),                    // 151: google.protobuf.ListValue
+	(*structpb.Value)(nil),                        // 152: google.protobuf.Value
 }
 var file_api_v2_service_proto_depIdxs = []int32{
-	14,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
-	17,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
-	15,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	133, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	133, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
-	18,  // 5: api.v2.ResponseMetadata.time_range:type_name -> api.v2.TimeRange
-	133, // 6: api.v2.TimeRange.from:type_name -> google.protobuf.Timestamp
-	133, // 7: api.v2.TimeRange.until:type_name -> google.protobuf.Timestamp
-	20,  // 8: api.v2.FunctionRef.app:type_name -> api.v2.AppRef
+	18,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
+	21,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
+	19,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
+	149, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	149, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	22,  // 5: api.v2.ResponseMetadata.time_range:type_name -> api.v2.TimeRange
+	149, // 6: api.v2.TimeRange.from:type_name -> google.protobuf.Timestamp
+	149, // 7: api.v2.TimeRange.until:type_name -> google.protobuf.Timestamp
+	24,  // 8: api.v2.FunctionRef.app:type_name -> api.v2.AppRef
 	3,   // 9: api.v2.FunctionTrigger.type:type_name -> api.v2.FunctionTriggerType
 	4,   // 10: api.v2.FunctionConcurrencyConfiguration.scope:type_name -> api.v2.FunctionConcurrencyScope
-	27,  // 11: api.v2.FunctionConcurrencyConfiguration.limit:type_name -> api.v2.FunctionConcurrencyLimitConfiguration
+	31,  // 11: api.v2.FunctionConcurrencyConfiguration.limit:type_name -> api.v2.FunctionConcurrencyLimitConfiguration
 	5,   // 12: api.v2.FunctionSingletonConfiguration.mode:type_name -> api.v2.FunctionSingletonMode
-	24,  // 13: api.v2.FunctionConfiguration.cancellations:type_name -> api.v2.FunctionCancellationConfiguration
-	25,  // 14: api.v2.FunctionConfiguration.retries:type_name -> api.v2.FunctionRetryConfiguration
-	26,  // 15: api.v2.FunctionConfiguration.events_batch:type_name -> api.v2.FunctionEventsBatchConfiguration
-	28,  // 16: api.v2.FunctionConfiguration.concurrency:type_name -> api.v2.FunctionConcurrencyConfiguration
-	29,  // 17: api.v2.FunctionConfiguration.rate_limit:type_name -> api.v2.FunctionRateLimitConfiguration
-	30,  // 18: api.v2.FunctionConfiguration.debounce:type_name -> api.v2.FunctionDebounceConfiguration
-	31,  // 19: api.v2.FunctionConfiguration.throttle:type_name -> api.v2.FunctionThrottleConfiguration
-	32,  // 20: api.v2.FunctionConfiguration.singleton:type_name -> api.v2.FunctionSingletonConfiguration
-	21,  // 21: api.v2.Function.app:type_name -> api.v2.FunctionApp
-	22,  // 22: api.v2.Function.triggers:type_name -> api.v2.FunctionTrigger
-	23,  // 23: api.v2.Function.failure_handler:type_name -> api.v2.FunctionFailureHandler
-	33,  // 24: api.v2.Function.configuration:type_name -> api.v2.FunctionConfiguration
-	19,  // 25: api.v2.FunctionRun.function:type_name -> api.v2.FunctionRef
-	20,  // 26: api.v2.FunctionRun.app:type_name -> api.v2.AppRef
+	28,  // 13: api.v2.FunctionConfiguration.cancellations:type_name -> api.v2.FunctionCancellationConfiguration
+	29,  // 14: api.v2.FunctionConfiguration.retries:type_name -> api.v2.FunctionRetryConfiguration
+	30,  // 15: api.v2.FunctionConfiguration.events_batch:type_name -> api.v2.FunctionEventsBatchConfiguration
+	32,  // 16: api.v2.FunctionConfiguration.concurrency:type_name -> api.v2.FunctionConcurrencyConfiguration
+	33,  // 17: api.v2.FunctionConfiguration.rate_limit:type_name -> api.v2.FunctionRateLimitConfiguration
+	34,  // 18: api.v2.FunctionConfiguration.debounce:type_name -> api.v2.FunctionDebounceConfiguration
+	35,  // 19: api.v2.FunctionConfiguration.throttle:type_name -> api.v2.FunctionThrottleConfiguration
+	36,  // 20: api.v2.FunctionConfiguration.singleton:type_name -> api.v2.FunctionSingletonConfiguration
+	25,  // 21: api.v2.Function.app:type_name -> api.v2.FunctionApp
+	26,  // 22: api.v2.Function.triggers:type_name -> api.v2.FunctionTrigger
+	27,  // 23: api.v2.Function.failure_handler:type_name -> api.v2.FunctionFailureHandler
+	37,  // 24: api.v2.Function.configuration:type_name -> api.v2.FunctionConfiguration
+	23,  // 25: api.v2.FunctionRun.function:type_name -> api.v2.FunctionRef
+	24,  // 26: api.v2.FunctionRun.app:type_name -> api.v2.AppRef
 	0,   // 27: api.v2.FunctionRun.status:type_name -> api.v2.FunctionRunStatus
-	133, // 28: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
-	133, // 29: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
-	133, // 30: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
-	35,  // 31: api.v2.FunctionRun.trigger:type_name -> api.v2.RunTrigger
-	134, // 32: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
-	36,  // 33: api.v2.GetFunctionRunResponse.data:type_name -> api.v2.FunctionRun
-	17,  // 34: api.v2.GetFunctionRunResponse.metadata:type_name -> api.v2.ResponseMetadata
-	36,  // 35: api.v2.GetEventRunsResponse.data:type_name -> api.v2.FunctionRun
-	17,  // 36: api.v2.GetEventRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 37: api.v2.GetEventRunsResponse.page:type_name -> api.v2.Page
-	42,  // 38: api.v2.RerunRequest.from_step:type_name -> api.v2.RerunFromStep
-	135, // 39: api.v2.RerunFromStep.input:type_name -> google.protobuf.ListValue
-	44,  // 40: api.v2.RerunResponse.data:type_name -> api.v2.RerunData
-	17,  // 41: api.v2.RerunResponse.metadata:type_name -> api.v2.ResponseMetadata
-	132, // 42: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
-	133, // 43: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
+	149, // 28: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
+	149, // 29: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
+	149, // 30: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
+	39,  // 31: api.v2.FunctionRun.trigger:type_name -> api.v2.RunTrigger
+	150, // 32: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
+	40,  // 33: api.v2.GetFunctionRunResponse.data:type_name -> api.v2.FunctionRun
+	21,  // 34: api.v2.GetFunctionRunResponse.metadata:type_name -> api.v2.ResponseMetadata
+	40,  // 35: api.v2.GetEventRunsResponse.data:type_name -> api.v2.FunctionRun
+	21,  // 36: api.v2.GetEventRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 37: api.v2.GetEventRunsResponse.page:type_name -> api.v2.Page
+	46,  // 38: api.v2.RerunRequest.from_step:type_name -> api.v2.RerunFromStep
+	151, // 39: api.v2.RerunFromStep.input:type_name -> google.protobuf.ListValue
+	48,  // 40: api.v2.RerunResponse.data:type_name -> api.v2.RerunData
+	21,  // 41: api.v2.RerunResponse.metadata:type_name -> api.v2.ResponseMetadata
+	147, // 42: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
+	149, // 43: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
 	1,   // 44: api.v2.TraceSpan.status:type_name -> api.v2.TraceSpanStatus
 	2,   // 45: api.v2.TraceSpan.step_op:type_name -> api.v2.TraceStepOp
-	133, // 46: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
-	133, // 47: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
-	133, // 48: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
-	134, // 49: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
-	134, // 50: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
-	45,  // 51: api.v2.TraceSpan.metadata:type_name -> api.v2.TraceSpanMetadata
-	46,  // 52: api.v2.TraceSpan.children:type_name -> api.v2.TraceSpan
-	46,  // 53: api.v2.FunctionTrace.root_span:type_name -> api.v2.TraceSpan
-	47,  // 54: api.v2.GetFunctionTraceResponse.data:type_name -> api.v2.FunctionTrace
-	17,  // 55: api.v2.GetFunctionTraceResponse.metadata:type_name -> api.v2.ResponseMetadata
-	34,  // 56: api.v2.GetFunctionResponse.data:type_name -> api.v2.Function
-	17,  // 57: api.v2.GetFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
+	149, // 46: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
+	149, // 47: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
+	149, // 48: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
+	150, // 49: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
+	150, // 50: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
+	49,  // 51: api.v2.TraceSpan.metadata:type_name -> api.v2.TraceSpanMetadata
+	50,  // 52: api.v2.TraceSpan.children:type_name -> api.v2.TraceSpan
+	50,  // 53: api.v2.FunctionTrace.root_span:type_name -> api.v2.TraceSpan
+	51,  // 54: api.v2.GetFunctionTraceResponse.data:type_name -> api.v2.FunctionTrace
+	21,  // 55: api.v2.GetFunctionTraceResponse.metadata:type_name -> api.v2.ResponseMetadata
+	38,  // 56: api.v2.GetFunctionResponse.data:type_name -> api.v2.Function
+	21,  // 57: api.v2.GetFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
 	6,   // 58: api.v2.App.method:type_name -> api.v2.AppMethod
-	133, // 59: api.v2.App.created_at:type_name -> google.protobuf.Timestamp
-	133, // 60: api.v2.App.archived_at:type_name -> google.protobuf.Timestamp
-	53,  // 61: api.v2.App.latest_sync:type_name -> api.v2.AppSync
-	133, // 62: api.v2.AppSync.synced_at:type_name -> google.protobuf.Timestamp
-	52,  // 63: api.v2.GetAppResponse.data:type_name -> api.v2.App
-	17,  // 64: api.v2.GetAppResponse.metadata:type_name -> api.v2.ResponseMetadata
-	34,  // 65: api.v2.GetFunctionsResponse.data:type_name -> api.v2.Function
-	17,  // 66: api.v2.GetFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 67: api.v2.GetFunctionsResponse.page:type_name -> api.v2.Page
-	63,  // 68: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
-	17,  // 69: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	62,  // 70: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
-	17,  // 71: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
+	149, // 59: api.v2.App.created_at:type_name -> google.protobuf.Timestamp
+	149, // 60: api.v2.App.archived_at:type_name -> google.protobuf.Timestamp
+	57,  // 61: api.v2.App.latest_sync:type_name -> api.v2.AppSync
+	149, // 62: api.v2.AppSync.synced_at:type_name -> google.protobuf.Timestamp
+	56,  // 63: api.v2.GetAppResponse.data:type_name -> api.v2.App
+	21,  // 64: api.v2.GetAppResponse.metadata:type_name -> api.v2.ResponseMetadata
+	38,  // 65: api.v2.GetFunctionsResponse.data:type_name -> api.v2.Function
+	21,  // 66: api.v2.GetFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 67: api.v2.GetFunctionsResponse.page:type_name -> api.v2.Page
+	67,  // 68: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
+	21,  // 69: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	66,  // 70: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
+	21,  // 71: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
 	7,   // 72: api.v2.Env.type:type_name -> api.v2.EnvType
-	133, // 73: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	133, // 74: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	133, // 75: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	67,  // 76: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
-	17,  // 77: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 78: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
-	67,  // 79: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
-	17,  // 80: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	133, // 81: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	133, // 82: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
-	71,  // 83: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
-	17,  // 84: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 85: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	133, // 86: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
-	62,  // 87: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
-	17,  // 88: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 89: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
-	76,  // 90: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
-	17,  // 91: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 92: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	133, // 93: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
-	79,  // 94: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
-	82,  // 95: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
-	17,  // 96: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
+	149, // 73: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	149, // 74: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	149, // 75: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	71,  // 76: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
+	21,  // 77: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 78: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
+	71,  // 79: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
+	21,  // 80: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	149, // 81: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	149, // 82: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	75,  // 83: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
+	21,  // 84: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 85: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
+	149, // 86: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	66,  // 87: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
+	21,  // 88: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 89: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
+	80,  // 90: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
+	21,  // 91: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 92: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
+	149, // 93: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	83,  // 94: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
+	86,  // 95: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
+	21,  // 96: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
 	8,   // 97: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
-	82,  // 98: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
-	17,  // 99: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 100: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
-	79,  // 101: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	133, // 102: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	133, // 103: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
-	62,  // 104: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
-	17,  // 105: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	134, // 106: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
-	87,  // 107: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
-	17,  // 108: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	133, // 109: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	133, // 110: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	133, // 111: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
-	89,  // 112: api.v2.CreateScoreRequest.scores:type_name -> api.v2.CreateScoreInput
-	136, // 113: api.v2.CreateScoreInput.value:type_name -> google.protobuf.Value
-	90,  // 114: api.v2.CreateScoreInput.experiment:type_name -> api.v2.ScoreExperiment
-	92,  // 115: api.v2.CreateScoreResponse.data:type_name -> api.v2.Score
-	17,  // 116: api.v2.CreateScoreResponse.metadata:type_name -> api.v2.ResponseMetadata
-	136, // 117: api.v2.Score.value:type_name -> google.protobuf.Value
-	90,  // 118: api.v2.Score.experiment:type_name -> api.v2.ScoreExperiment
-	95,  // 119: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
-	17,  // 120: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
-	96,  // 121: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
-	99,  // 122: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
-	17,  // 123: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	100, // 124: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
-	101, // 125: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
-	102, // 126: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
+	86,  // 98: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
+	21,  // 99: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 100: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
+	83,  // 101: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
+	149, // 102: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	149, // 103: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	66,  // 104: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
+	21,  // 105: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	150, // 106: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	91,  // 107: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
+	21,  // 108: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
+	149, // 109: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	149, // 110: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	149, // 111: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	93,  // 112: api.v2.CreateScoreRequest.scores:type_name -> api.v2.CreateScoreInput
+	152, // 113: api.v2.CreateScoreInput.value:type_name -> google.protobuf.Value
+	94,  // 114: api.v2.CreateScoreInput.experiment:type_name -> api.v2.ScoreExperiment
+	96,  // 115: api.v2.CreateScoreResponse.data:type_name -> api.v2.Score
+	21,  // 116: api.v2.CreateScoreResponse.metadata:type_name -> api.v2.ResponseMetadata
+	152, // 117: api.v2.Score.value:type_name -> google.protobuf.Value
+	94,  // 118: api.v2.Score.experiment:type_name -> api.v2.ScoreExperiment
+	99,  // 119: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
+	21,  // 120: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
+	100, // 121: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
+	103, // 122: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
+	21,  // 123: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	104, // 124: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
+	105, // 125: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
+	106, // 126: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
 	9,   // 127: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
-	136, // 128: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
+	152, // 128: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
 	10,  // 129: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
-	103, // 130: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
-	106, // 131: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
-	17,  // 132: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
-	107, // 133: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
-	110, // 134: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
-	17,  // 135: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
-	113, // 136: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
-	17,  // 137: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 138: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
-	134, // 139: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
-	133, // 140: api.v2.ListExperimentsRequest.from:type_name -> google.protobuf.Timestamp
-	133, // 141: api.v2.ListExperimentsRequest.until:type_name -> google.protobuf.Timestamp
-	116, // 142: api.v2.ListExperimentsResponse.data:type_name -> api.v2.Experiment
-	17,  // 143: api.v2.ListExperimentsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 144: api.v2.ListExperimentsResponse.page:type_name -> api.v2.Page
-	19,  // 145: api.v2.Experiment.function:type_name -> api.v2.FunctionRef
-	133, // 146: api.v2.Experiment.first_seen:type_name -> google.protobuf.Timestamp
-	133, // 147: api.v2.Experiment.last_seen:type_name -> google.protobuf.Timestamp
-	133, // 148: api.v2.GetExperimentRequest.from:type_name -> google.protobuf.Timestamp
-	133, // 149: api.v2.GetExperimentRequest.until:type_name -> google.protobuf.Timestamp
-	119, // 150: api.v2.GetExperimentResponse.data:type_name -> api.v2.ExperimentDetail
-	17,  // 151: api.v2.GetExperimentResponse.metadata:type_name -> api.v2.ResponseMetadata
-	120, // 152: api.v2.ExperimentDetail.variants:type_name -> api.v2.ExperimentVariantMetrics
-	122, // 153: api.v2.ExperimentDetail.variant_weights:type_name -> api.v2.ExperimentVariantWeight
-	133, // 154: api.v2.ExperimentDetail.first_seen:type_name -> google.protobuf.Timestamp
-	133, // 155: api.v2.ExperimentDetail.last_seen:type_name -> google.protobuf.Timestamp
-	121, // 156: api.v2.ExperimentVariantMetrics.metrics:type_name -> api.v2.ExperimentVariantMetric
-	125, // 157: api.v2.ListSessionKeysResponse.data:type_name -> api.v2.SessionKey
-	17,  // 158: api.v2.ListSessionKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 159: api.v2.ListSessionKeysResponse.page:type_name -> api.v2.Page
-	133, // 160: api.v2.SessionKey.created_at:type_name -> google.protobuf.Timestamp
-	133, // 161: api.v2.ListSessionsRequest.from:type_name -> google.protobuf.Timestamp
-	133, // 162: api.v2.ListSessionsRequest.until:type_name -> google.protobuf.Timestamp
-	128, // 163: api.v2.ListSessionsResponse.data:type_name -> api.v2.SessionGroup
-	17,  // 164: api.v2.ListSessionsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 165: api.v2.ListSessionsResponse.page:type_name -> api.v2.Page
-	133, // 166: api.v2.SessionGroup.last_active_at:type_name -> google.protobuf.Timestamp
-	19,  // 167: api.v2.SessionGroup.functions:type_name -> api.v2.FunctionRef
-	133, // 168: api.v2.ListSessionRunsRequest.from:type_name -> google.protobuf.Timestamp
-	133, // 169: api.v2.ListSessionRunsRequest.until:type_name -> google.protobuf.Timestamp
-	131, // 170: api.v2.ListSessionRunsResponse.data:type_name -> api.v2.SessionRun
-	17,  // 171: api.v2.ListSessionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	68,  // 172: api.v2.ListSessionRunsResponse.page:type_name -> api.v2.Page
-	19,  // 173: api.v2.SessionRun.function:type_name -> api.v2.FunctionRef
+	107, // 130: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
+	110, // 131: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
+	21,  // 132: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
+	111, // 133: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
+	114, // 134: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
+	21,  // 135: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
+	117, // 136: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
+	21,  // 137: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 138: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
+	150, // 139: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
+	149, // 140: api.v2.ListExperimentsRequest.from:type_name -> google.protobuf.Timestamp
+	149, // 141: api.v2.ListExperimentsRequest.until:type_name -> google.protobuf.Timestamp
+	120, // 142: api.v2.ListExperimentsResponse.data:type_name -> api.v2.Experiment
+	21,  // 143: api.v2.ListExperimentsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 144: api.v2.ListExperimentsResponse.page:type_name -> api.v2.Page
+	23,  // 145: api.v2.Experiment.function:type_name -> api.v2.FunctionRef
+	149, // 146: api.v2.Experiment.first_seen:type_name -> google.protobuf.Timestamp
+	149, // 147: api.v2.Experiment.last_seen:type_name -> google.protobuf.Timestamp
+	149, // 148: api.v2.GetExperimentRequest.from:type_name -> google.protobuf.Timestamp
+	149, // 149: api.v2.GetExperimentRequest.until:type_name -> google.protobuf.Timestamp
+	123, // 150: api.v2.GetExperimentResponse.data:type_name -> api.v2.ExperimentDetail
+	21,  // 151: api.v2.GetExperimentResponse.metadata:type_name -> api.v2.ResponseMetadata
+	124, // 152: api.v2.ExperimentDetail.variants:type_name -> api.v2.ExperimentVariantMetrics
+	126, // 153: api.v2.ExperimentDetail.variant_weights:type_name -> api.v2.ExperimentVariantWeight
+	149, // 154: api.v2.ExperimentDetail.first_seen:type_name -> google.protobuf.Timestamp
+	149, // 155: api.v2.ExperimentDetail.last_seen:type_name -> google.protobuf.Timestamp
+	125, // 156: api.v2.ExperimentVariantMetrics.metrics:type_name -> api.v2.ExperimentVariantMetric
+	129, // 157: api.v2.ListSessionKeysResponse.data:type_name -> api.v2.SessionKey
+	21,  // 158: api.v2.ListSessionKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 159: api.v2.ListSessionKeysResponse.page:type_name -> api.v2.Page
+	149, // 160: api.v2.SessionKey.created_at:type_name -> google.protobuf.Timestamp
+	149, // 161: api.v2.ListSessionsRequest.from:type_name -> google.protobuf.Timestamp
+	149, // 162: api.v2.ListSessionsRequest.until:type_name -> google.protobuf.Timestamp
+	132, // 163: api.v2.ListSessionsResponse.data:type_name -> api.v2.SessionGroup
+	21,  // 164: api.v2.ListSessionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 165: api.v2.ListSessionsResponse.page:type_name -> api.v2.Page
+	149, // 166: api.v2.SessionGroup.last_active_at:type_name -> google.protobuf.Timestamp
+	23,  // 167: api.v2.SessionGroup.functions:type_name -> api.v2.FunctionRef
+	149, // 168: api.v2.ListSessionRunsRequest.from:type_name -> google.protobuf.Timestamp
+	149, // 169: api.v2.ListSessionRunsRequest.until:type_name -> google.protobuf.Timestamp
+	135, // 170: api.v2.ListSessionRunsResponse.data:type_name -> api.v2.SessionRun
+	21,  // 171: api.v2.ListSessionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	72,  // 172: api.v2.ListSessionRunsResponse.page:type_name -> api.v2.Page
+	23,  // 173: api.v2.SessionRun.function:type_name -> api.v2.FunctionRef
 	0,   // 174: api.v2.SessionRun.status:type_name -> api.v2.FunctionRunStatus
-	133, // 175: api.v2.SessionRun.queued_at:type_name -> google.protobuf.Timestamp
-	133, // 176: api.v2.SessionRun.started_at:type_name -> google.protobuf.Timestamp
-	133, // 177: api.v2.SessionRun.ended_at:type_name -> google.protobuf.Timestamp
-	11,  // 178: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	11,  // 179: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	58,  // 180: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	60,  // 181: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	64,  // 182: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	12,  // 183: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	72,  // 184: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	69,  // 185: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	74,  // 186: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	77,  // 187: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	80,  // 188: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	83,  // 189: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	37,  // 190: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
-	39,  // 191: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
-	41,  // 192: api.v2.V2.Rerun:input_type -> api.v2.RerunRequest
-	54,  // 193: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
-	88,  // 194: api.v2.V2.CreateScore:input_type -> api.v2.CreateScoreRequest
-	93,  // 195: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	48,  // 196: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
-	50,  // 197: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
-	56,  // 198: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
-	85,  // 199: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	104, // 200: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
-	111, // 201: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
-	108, // 202: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
-	97,  // 203: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
-	114, // 204: api.v2.V2.ListExperiments:input_type -> api.v2.ListExperimentsRequest
-	117, // 205: api.v2.V2.GetExperiment:input_type -> api.v2.GetExperimentRequest
-	123, // 206: api.v2.V2.ListSessionKeys:input_type -> api.v2.ListSessionKeysRequest
-	126, // 207: api.v2.V2.ListSessions:input_type -> api.v2.ListSessionsRequest
-	129, // 208: api.v2.V2.ListSessionRuns:input_type -> api.v2.ListSessionRunsRequest
-	13,  // 209: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	16,  // 210: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	59,  // 211: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	61,  // 212: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	65,  // 213: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	66,  // 214: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	73,  // 215: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	70,  // 216: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	75,  // 217: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	78,  // 218: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	81,  // 219: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	84,  // 220: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	38,  // 221: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
-	40,  // 222: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
-	43,  // 223: api.v2.V2.Rerun:output_type -> api.v2.RerunResponse
-	55,  // 224: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
-	91,  // 225: api.v2.V2.CreateScore:output_type -> api.v2.CreateScoreResponse
-	94,  // 226: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	49,  // 227: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
-	51,  // 228: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
-	57,  // 229: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
-	86,  // 230: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	105, // 231: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
-	112, // 232: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
-	109, // 233: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
-	98,  // 234: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
-	115, // 235: api.v2.V2.ListExperiments:output_type -> api.v2.ListExperimentsResponse
-	118, // 236: api.v2.V2.GetExperiment:output_type -> api.v2.GetExperimentResponse
-	124, // 237: api.v2.V2.ListSessionKeys:output_type -> api.v2.ListSessionKeysResponse
-	127, // 238: api.v2.V2.ListSessions:output_type -> api.v2.ListSessionsResponse
-	130, // 239: api.v2.V2.ListSessionRuns:output_type -> api.v2.ListSessionRunsResponse
-	209, // [209:240] is the sub-list for method output_type
-	178, // [178:209] is the sub-list for method input_type
-	178, // [178:178] is the sub-list for extension type_name
-	178, // [178:178] is the sub-list for extension extendee
-	0,   // [0:178] is the sub-list for field type_name
+	149, // 175: api.v2.SessionRun.queued_at:type_name -> google.protobuf.Timestamp
+	149, // 176: api.v2.SessionRun.started_at:type_name -> google.protobuf.Timestamp
+	149, // 177: api.v2.SessionRun.ended_at:type_name -> google.protobuf.Timestamp
+	11,  // 178: api.v2.Sandbox.desired_state:type_name -> api.v2.SandboxDesiredState
+	12,  // 179: api.v2.Sandbox.phase:type_name -> api.v2.SandboxPhase
+	13,  // 180: api.v2.Sandbox.outcome:type_name -> api.v2.SandboxOutcome
+	14,  // 181: api.v2.Sandbox.cleanup_state:type_name -> api.v2.SandboxCleanupState
+	148, // 182: api.v2.CreateSandboxRequest.environment:type_name -> api.v2.CreateSandboxRequest.EnvironmentEntry
+	137, // 183: api.v2.CreateSandboxRequest.secret_references:type_name -> api.v2.SandboxSecretReference
+	136, // 184: api.v2.CreateSandboxResponse.data:type_name -> api.v2.Sandbox
+	21,  // 185: api.v2.CreateSandboxResponse.metadata:type_name -> api.v2.ResponseMetadata
+	136, // 186: api.v2.GetSandboxResponse.data:type_name -> api.v2.Sandbox
+	21,  // 187: api.v2.GetSandboxResponse.metadata:type_name -> api.v2.ResponseMetadata
+	144, // 188: api.v2.ExecSandboxResponse.data:type_name -> api.v2.ExecSandboxData
+	21,  // 189: api.v2.ExecSandboxResponse.metadata:type_name -> api.v2.ResponseMetadata
+	136, // 190: api.v2.DeleteSandboxResponse.data:type_name -> api.v2.Sandbox
+	21,  // 191: api.v2.DeleteSandboxResponse.metadata:type_name -> api.v2.ResponseMetadata
+	15,  // 192: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	15,  // 193: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	62,  // 194: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	64,  // 195: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	68,  // 196: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	16,  // 197: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	76,  // 198: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	73,  // 199: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	78,  // 200: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	81,  // 201: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	84,  // 202: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	87,  // 203: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	41,  // 204: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
+	43,  // 205: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
+	45,  // 206: api.v2.V2.Rerun:input_type -> api.v2.RerunRequest
+	58,  // 207: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
+	92,  // 208: api.v2.V2.CreateScore:input_type -> api.v2.CreateScoreRequest
+	97,  // 209: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	52,  // 210: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
+	54,  // 211: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
+	60,  // 212: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
+	89,  // 213: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	108, // 214: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
+	115, // 215: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
+	112, // 216: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
+	101, // 217: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
+	118, // 218: api.v2.V2.ListExperiments:input_type -> api.v2.ListExperimentsRequest
+	121, // 219: api.v2.V2.GetExperiment:input_type -> api.v2.GetExperimentRequest
+	127, // 220: api.v2.V2.ListSessionKeys:input_type -> api.v2.ListSessionKeysRequest
+	130, // 221: api.v2.V2.ListSessions:input_type -> api.v2.ListSessionsRequest
+	133, // 222: api.v2.V2.ListSessionRuns:input_type -> api.v2.ListSessionRunsRequest
+	138, // 223: api.v2.V2.CreateSandbox:input_type -> api.v2.CreateSandboxRequest
+	140, // 224: api.v2.V2.GetSandbox:input_type -> api.v2.GetSandboxRequest
+	142, // 225: api.v2.V2.ExecSandbox:input_type -> api.v2.ExecSandboxRequest
+	145, // 226: api.v2.V2.DeleteSandbox:input_type -> api.v2.DeleteSandboxRequest
+	17,  // 227: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	20,  // 228: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	63,  // 229: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	65,  // 230: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	69,  // 231: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	70,  // 232: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	77,  // 233: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	74,  // 234: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	79,  // 235: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	82,  // 236: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	85,  // 237: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	88,  // 238: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	42,  // 239: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
+	44,  // 240: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
+	47,  // 241: api.v2.V2.Rerun:output_type -> api.v2.RerunResponse
+	59,  // 242: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
+	95,  // 243: api.v2.V2.CreateScore:output_type -> api.v2.CreateScoreResponse
+	98,  // 244: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	53,  // 245: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
+	55,  // 246: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
+	61,  // 247: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
+	90,  // 248: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	109, // 249: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
+	116, // 250: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
+	113, // 251: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
+	102, // 252: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
+	119, // 253: api.v2.V2.ListExperiments:output_type -> api.v2.ListExperimentsResponse
+	122, // 254: api.v2.V2.GetExperiment:output_type -> api.v2.GetExperimentResponse
+	128, // 255: api.v2.V2.ListSessionKeys:output_type -> api.v2.ListSessionKeysResponse
+	131, // 256: api.v2.V2.ListSessions:output_type -> api.v2.ListSessionsResponse
+	134, // 257: api.v2.V2.ListSessionRuns:output_type -> api.v2.ListSessionRunsResponse
+	139, // 258: api.v2.V2.CreateSandbox:output_type -> api.v2.CreateSandboxResponse
+	141, // 259: api.v2.V2.GetSandbox:output_type -> api.v2.GetSandboxResponse
+	143, // 260: api.v2.V2.ExecSandbox:output_type -> api.v2.ExecSandboxResponse
+	146, // 261: api.v2.V2.DeleteSandbox:output_type -> api.v2.DeleteSandboxResponse
+	227, // [227:262] is the sub-list for method output_type
+	192, // [192:227] is the sub-list for method input_type
+	192, // [192:192] is the sub-list for extension type_name
+	192, // [192:192] is the sub-list for extension extendee
+	0,   // [0:192] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -9765,13 +10965,15 @@ func file_api_v2_service_proto_init() {
 	file_api_v2_service_proto_msgTypes[115].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[118].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[120].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[121].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[129].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
-			NumEnums:      11,
-			NumMessages:   122,
+			NumEnums:      15,
+			NumMessages:   134,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

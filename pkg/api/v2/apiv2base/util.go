@@ -3,6 +3,7 @@ package apiv2base
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -102,6 +103,8 @@ func GRPCToHTTPStatus(code codes.Code) int {
 		return http.StatusNotImplemented
 	case codes.Unavailable:
 		return http.StatusServiceUnavailable
+	case codes.DataLoss:
+		return http.StatusBadGateway
 	case codes.Internal:
 		return http.StatusInternalServerError
 	default:
@@ -134,4 +137,51 @@ func BuildAuthzPathMap() map[string]bool {
 	}
 
 	return authzPaths
+}
+
+// RequiresAuthz reports whether an HTTP method and path match an RPC protected
+// by the V2 authz annotation.
+func RequiresAuthz(httpMethod, httpPath string) bool {
+	serviceDesc := apiv2.File_api_v2_service_proto.Services().ByName("V2")
+	if serviceDesc == nil {
+		return false
+	}
+
+	methods := serviceDesc.Methods()
+	for i := 0; i < methods.Len(); i++ {
+		method := methods.Get(i)
+		if !hasAuthzAnnotation(method) || getHTTPMethod(method) != httpMethod {
+			continue
+		}
+		if matchesHTTPPath(getHTTPPath(method), httpPath) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesHTTPPath matches the path parameter forms used by google.api.http.
+func matchesHTTPPath(templatePath, requestPath string) bool {
+	templateSegments := strings.Split(strings.Trim(templatePath, "/"), "/")
+	requestSegments := strings.Split(strings.Trim(requestPath, "/"), "/")
+
+	for templateIndex, requestIndex := 0, 0; ; templateIndex, requestIndex = templateIndex+1, requestIndex+1 {
+		if templateIndex == len(templateSegments) || requestIndex == len(requestSegments) {
+			return templateIndex == len(templateSegments) && requestIndex == len(requestSegments)
+		}
+
+		templateSegment := templateSegments[templateIndex]
+		if strings.HasPrefix(templateSegment, "{") && strings.HasSuffix(templateSegment, "}") {
+			if strings.HasSuffix(templateSegment, "=**}") {
+				return requestIndex < len(requestSegments)
+			}
+			if requestSegments[requestIndex] == "" {
+				return false
+			}
+			continue
+		}
+		if templateSegment != requestSegments[requestIndex] {
+			return false
+		}
+	}
 }

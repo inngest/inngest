@@ -345,18 +345,6 @@ func getProtoMessageForPath(path, method string) proto.Message {
 	return nil
 }
 
-// matchesHTTPPath checks if the given paths match, handling path parameters
-func matchesHTTPPath(templatePath, requestPath string) bool {
-	// For exact matches (no path parameters)
-	if templatePath == requestPath {
-		return true
-	}
-
-	// TODO: Add path parameter matching logic here if needed
-	// For now, just do exact matching
-	return false
-}
-
 // createMessageFromDescriptor creates a new instance of a message type from its descriptor
 // This uses dynamicpb to create message instances without hardcoding types
 func createMessageFromDescriptor(desc protoreflect.MessageDescriptor) proto.Message {

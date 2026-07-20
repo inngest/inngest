@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Base provides core API v2 functionality for error handling, validation, 
+// Base provides core API v2 functionality for error handling, validation,
 // authentication, and HTTP utilities
 type Base struct{}
 
@@ -53,6 +53,10 @@ func (b *Base) GRPCToHTTPStatus(code codes.Code) int {
 
 func (b *Base) BuildAuthzPathMap() map[string]bool {
 	return BuildAuthzPathMap()
+}
+
+func (b *Base) RequiresAuthz(method, path string) bool {
+	return RequiresAuthz(method, path)
 }
 
 func (b *Base) GetInngestEnvHeader(ctx context.Context) string {

@@ -98,6 +98,14 @@ const (
 	V2ListSessionsProcedure = "/api.v2.V2/ListSessions"
 	// V2ListSessionRunsProcedure is the fully-qualified name of the V2's ListSessionRuns RPC.
 	V2ListSessionRunsProcedure = "/api.v2.V2/ListSessionRuns"
+	// V2CreateSandboxProcedure is the fully-qualified name of the V2's CreateSandbox RPC.
+	V2CreateSandboxProcedure = "/api.v2.V2/CreateSandbox"
+	// V2GetSandboxProcedure is the fully-qualified name of the V2's GetSandbox RPC.
+	V2GetSandboxProcedure = "/api.v2.V2/GetSandbox"
+	// V2ExecSandboxProcedure is the fully-qualified name of the V2's ExecSandbox RPC.
+	V2ExecSandboxProcedure = "/api.v2.V2/ExecSandbox"
+	// V2DeleteSandboxProcedure is the fully-qualified name of the V2's DeleteSandbox RPC.
+	V2DeleteSandboxProcedure = "/api.v2.V2/DeleteSandbox"
 )
 
 // V2Client is a client for the api.v2.V2 service.
@@ -136,6 +144,10 @@ type V2Client interface {
 	ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error)
 	ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error)
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
+	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
+	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
+	ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error)
+	DeleteSandbox(context.Context, *connect.Request[v2.DeleteSandboxRequest]) (*connect.Response[v2.DeleteSandboxResponse], error)
 }
 
 // NewV2Client constructs a client for the api.v2.V2 service. By default, it uses the Connect
@@ -335,6 +347,30 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			connect.WithSchema(v2Methods.ByName("ListSessionRuns")),
 			connect.WithClientOptions(opts...),
 		),
+		createSandbox: connect.NewClient[v2.CreateSandboxRequest, v2.CreateSandboxResponse](
+			httpClient,
+			baseURL+V2CreateSandboxProcedure,
+			connect.WithSchema(v2Methods.ByName("CreateSandbox")),
+			connect.WithClientOptions(opts...),
+		),
+		getSandbox: connect.NewClient[v2.GetSandboxRequest, v2.GetSandboxResponse](
+			httpClient,
+			baseURL+V2GetSandboxProcedure,
+			connect.WithSchema(v2Methods.ByName("GetSandbox")),
+			connect.WithClientOptions(opts...),
+		),
+		execSandbox: connect.NewClient[v2.ExecSandboxRequest, v2.ExecSandboxResponse](
+			httpClient,
+			baseURL+V2ExecSandboxProcedure,
+			connect.WithSchema(v2Methods.ByName("ExecSandbox")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteSandbox: connect.NewClient[v2.DeleteSandboxRequest, v2.DeleteSandboxResponse](
+			httpClient,
+			baseURL+V2DeleteSandboxProcedure,
+			connect.WithSchema(v2Methods.ByName("DeleteSandbox")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -371,6 +407,10 @@ type v2Client struct {
 	listSessionKeys          *connect.Client[v2.ListSessionKeysRequest, v2.ListSessionKeysResponse]
 	listSessions             *connect.Client[v2.ListSessionsRequest, v2.ListSessionsResponse]
 	listSessionRuns          *connect.Client[v2.ListSessionRunsRequest, v2.ListSessionRunsResponse]
+	createSandbox            *connect.Client[v2.CreateSandboxRequest, v2.CreateSandboxResponse]
+	getSandbox               *connect.Client[v2.GetSandboxRequest, v2.GetSandboxResponse]
+	execSandbox              *connect.Client[v2.ExecSandboxRequest, v2.ExecSandboxResponse]
+	deleteSandbox            *connect.Client[v2.DeleteSandboxRequest, v2.DeleteSandboxResponse]
 }
 
 // Health calls api.v2.V2.Health.
@@ -528,6 +568,26 @@ func (c *v2Client) ListSessionRuns(ctx context.Context, req *connect.Request[v2.
 	return c.listSessionRuns.CallUnary(ctx, req)
 }
 
+// CreateSandbox calls api.v2.V2.CreateSandbox.
+func (c *v2Client) CreateSandbox(ctx context.Context, req *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error) {
+	return c.createSandbox.CallUnary(ctx, req)
+}
+
+// GetSandbox calls api.v2.V2.GetSandbox.
+func (c *v2Client) GetSandbox(ctx context.Context, req *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error) {
+	return c.getSandbox.CallUnary(ctx, req)
+}
+
+// ExecSandbox calls api.v2.V2.ExecSandbox.
+func (c *v2Client) ExecSandbox(ctx context.Context, req *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error) {
+	return c.execSandbox.CallUnary(ctx, req)
+}
+
+// DeleteSandbox calls api.v2.V2.DeleteSandbox.
+func (c *v2Client) DeleteSandbox(ctx context.Context, req *connect.Request[v2.DeleteSandboxRequest]) (*connect.Response[v2.DeleteSandboxResponse], error) {
+	return c.deleteSandbox.CallUnary(ctx, req)
+}
+
 // V2Handler is an implementation of the api.v2.V2 service.
 type V2Handler interface {
 	Health(context.Context, *connect.Request[v2.HealthRequest]) (*connect.Response[v2.HealthResponse], error)
@@ -564,6 +624,10 @@ type V2Handler interface {
 	ListSessionKeys(context.Context, *connect.Request[v2.ListSessionKeysRequest]) (*connect.Response[v2.ListSessionKeysResponse], error)
 	ListSessions(context.Context, *connect.Request[v2.ListSessionsRequest]) (*connect.Response[v2.ListSessionsResponse], error)
 	ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error)
+	CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error)
+	GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error)
+	ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error)
+	DeleteSandbox(context.Context, *connect.Request[v2.DeleteSandboxRequest]) (*connect.Response[v2.DeleteSandboxResponse], error)
 }
 
 // NewV2Handler builds an HTTP handler from the service implementation. It returns the path on which
@@ -759,6 +823,30 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		connect.WithSchema(v2Methods.ByName("ListSessionRuns")),
 		connect.WithHandlerOptions(opts...),
 	)
+	v2CreateSandboxHandler := connect.NewUnaryHandler(
+		V2CreateSandboxProcedure,
+		svc.CreateSandbox,
+		connect.WithSchema(v2Methods.ByName("CreateSandbox")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2GetSandboxHandler := connect.NewUnaryHandler(
+		V2GetSandboxProcedure,
+		svc.GetSandbox,
+		connect.WithSchema(v2Methods.ByName("GetSandbox")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ExecSandboxHandler := connect.NewUnaryHandler(
+		V2ExecSandboxProcedure,
+		svc.ExecSandbox,
+		connect.WithSchema(v2Methods.ByName("ExecSandbox")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2DeleteSandboxHandler := connect.NewUnaryHandler(
+		V2DeleteSandboxProcedure,
+		svc.DeleteSandbox,
+		connect.WithSchema(v2Methods.ByName("DeleteSandbox")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/api.v2.V2/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case V2HealthProcedure:
@@ -823,6 +911,14 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2ListSessionsHandler.ServeHTTP(w, r)
 		case V2ListSessionRunsProcedure:
 			v2ListSessionRunsHandler.ServeHTTP(w, r)
+		case V2CreateSandboxProcedure:
+			v2CreateSandboxHandler.ServeHTTP(w, r)
+		case V2GetSandboxProcedure:
+			v2GetSandboxHandler.ServeHTTP(w, r)
+		case V2ExecSandboxProcedure:
+			v2ExecSandboxHandler.ServeHTTP(w, r)
+		case V2DeleteSandboxProcedure:
+			v2DeleteSandboxHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -954,4 +1050,20 @@ func (UnimplementedV2Handler) ListSessions(context.Context, *connect.Request[v2.
 
 func (UnimplementedV2Handler) ListSessionRuns(context.Context, *connect.Request[v2.ListSessionRunsRequest]) (*connect.Response[v2.ListSessionRunsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListSessionRuns is not implemented"))
+}
+
+func (UnimplementedV2Handler) CreateSandbox(context.Context, *connect.Request[v2.CreateSandboxRequest]) (*connect.Response[v2.CreateSandboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.CreateSandbox is not implemented"))
+}
+
+func (UnimplementedV2Handler) GetSandbox(context.Context, *connect.Request[v2.GetSandboxRequest]) (*connect.Response[v2.GetSandboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetSandbox is not implemented"))
+}
+
+func (UnimplementedV2Handler) ExecSandbox(context.Context, *connect.Request[v2.ExecSandboxRequest]) (*connect.Response[v2.ExecSandboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ExecSandbox is not implemented"))
+}
+
+func (UnimplementedV2Handler) DeleteSandbox(context.Context, *connect.Request[v2.DeleteSandboxRequest]) (*connect.Response[v2.DeleteSandboxResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.DeleteSandbox is not implemented"))
 }

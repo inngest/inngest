@@ -146,9 +146,6 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 		return nil, fmt.Errorf("failed to register v2 gateway handler: %w", err)
 	}
 
-	// Build map of paths that require authorization
-	authzPaths := base.BuildAuthzPathMap()
-
 	r := chi.NewRouter()
 
 	// Add authentication middleware first
@@ -171,7 +168,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 		}
 
 		// Apply authorization middleware if this path requires it
-		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && httpOpts.AuthzMiddleware != nil {
+		if requiresAuthz := base.RequiresAuthz(req.Method, req.URL.Path); requiresAuthz && httpOpts.AuthzMiddleware != nil {
 			authzHandler := httpOpts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Add JSON validation after authorization for protected paths
 				validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
