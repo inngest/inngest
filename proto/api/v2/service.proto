@@ -3115,18 +3115,18 @@ message ListRunsRequest {
   ];
   optional google.protobuf.Timestamp from = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Start of the run time range"
+      description: "Inclusive start of the run time range"
     }
   ];
   optional google.protobuf.Timestamp until = 5 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "End of the run time range"
+      description: "Exclusive end of the run time range"
     }
   ];
   string time_field = 6 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt."
-      default: "queuedAt"
+      description: "Run timestamp field used for filtering and ordering. Accepts QUEUED_AT, STARTED_AT, or ENDED_AT."
+      default: "QUEUED_AT"
     }
   ];
   repeated string status = 7 [
@@ -3174,18 +3174,18 @@ message ListFunctionRunsRequest {
   ];
   optional google.protobuf.Timestamp from = 6 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Start of the run time range"
+      description: "Inclusive start of the run time range"
     }
   ];
   optional google.protobuf.Timestamp until = 7 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "End of the run time range"
+      description: "Exclusive end of the run time range"
     }
   ];
   string time_field = 8 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt."
-      default: "queuedAt"
+      description: "Run timestamp field used for filtering and ordering. Accepts QUEUED_AT, STARTED_AT, or ENDED_AT."
+      default: "QUEUED_AT"
     }
   ];
   repeated string status = 9 [

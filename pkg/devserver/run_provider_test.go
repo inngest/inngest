@@ -291,6 +291,29 @@ func TestRunProviderGetRunsSkipsUnknownPublicFilter(t *testing.T) {
 	assert.Equal(t, []string{"unknown-app"}, data.listOpts.Filter.AppName)
 }
 
+func TestCQRSRunTimeField(t *testing.T) {
+	tests := []struct {
+		name     string
+		field    apiv2.RunTimeField
+		expected enums.TraceRunTime
+	}{
+		{name: "queued", field: apiv2.RunTimeFieldQueuedAt, expected: enums.TraceRunTimeQueuedAt},
+		{name: "started", field: apiv2.RunTimeFieldStartedAt, expected: enums.TraceRunTimeStartedAt},
+		{name: "ended", field: apiv2.RunTimeFieldEndedAt, expected: enums.TraceRunTimeEndedAt},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual, err := cqrsRunTimeField(tt.field)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, actual)
+		})
+	}
+
+	_, err := cqrsRunTimeField(apiv2.RunTimeField(99))
+	require.ErrorContains(t, err, "unsupported run time field")
+}
+
 type stubRunProviderDataReader struct {
 	run        *cqrs.FunctionRun
 	runErr     error

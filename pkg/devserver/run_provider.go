@@ -50,6 +50,11 @@ func (p *runProvider) GetRun(ctx context.Context, runID ulid.ULID, _ apiv2.GetRu
 }
 
 func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*apiv2.GetRunsResult, error) {
+	timeField, err := cqrsRunTimeField(opts.TimeField)
+	if err != nil {
+		return nil, err
+	}
+
 	from := time.Time{}
 	if opts.From != nil {
 		from = *opts.From
@@ -70,14 +75,14 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 			AppName:      opts.AppIDs,
 			FunctionSlug: opts.FunctionIDs,
 			EventID:      eventIDs,
-			TimeField:    cqrsRunTimeField(opts.TimeField),
+			TimeField:    timeField,
 			From:         from,
 			Until:        until,
 			Status:       opts.Status,
 			IsDeferred:   opts.IsDeferred,
 		},
 		Order: []cqrs.GetTraceRunOrder{{
-			Field:     cqrsRunTimeField(opts.TimeField),
+			Field:     timeField,
 			Direction: cqrsRunOrder(opts.Order),
 		}},
 		Cursor:        opts.Cursor,
@@ -104,14 +109,16 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 	}, nil
 }
 
-func cqrsRunTimeField(field apiv2.RunTimeField) enums.TraceRunTime {
+func cqrsRunTimeField(field apiv2.RunTimeField) (enums.TraceRunTime, error) {
 	switch field {
+	case apiv2.RunTimeFieldQueuedAt:
+		return enums.TraceRunTimeQueuedAt, nil
 	case apiv2.RunTimeFieldStartedAt:
-		return enums.TraceRunTimeStartedAt
+		return enums.TraceRunTimeStartedAt, nil
 	case apiv2.RunTimeFieldEndedAt:
-		return enums.TraceRunTimeEndedAt
+		return enums.TraceRunTimeEndedAt, nil
 	default:
-		return enums.TraceRunTimeQueuedAt
+		return enums.TraceRunTimeQueuedAt, fmt.Errorf("unsupported run time field: %d", field)
 	}
 }
 
