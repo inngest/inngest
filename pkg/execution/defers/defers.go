@@ -85,6 +85,7 @@ func SaveFromOp(
 			HashedID:       op.ID,
 			ScheduleStatus: enums.DeferStatusAfterRun,
 			Input:          opts.Input,
+			Meta:           opts.Meta,
 		})
 		switch {
 		case errors.Is(saveErr, statev2.ErrDeferLimitExceeded):
