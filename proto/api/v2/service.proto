@@ -996,6 +996,25 @@ service V2 {
     };
   }
 
+  rpc ReplayEvent(ReplayEventRequest) returns (ReplayEventResponse) {
+    option (google.api.http) = {
+      post: "/events/{event_id}/replay"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Replay event"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Replays a stored event by internal event ID. By default, this creates a new event that can trigger matching functions. Use mode if_no_runs to only replay events that have not already scheduled runs."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc GetApp(GetAppRequest) returns (GetAppResponse) {
     option (google.api.http) = {
       get: "/apps/{app_id}"
@@ -2007,6 +2026,47 @@ message RerunData {
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
       description: "New run ID created by the rerun"
       example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
+    }
+  ];
+}
+
+message ReplayEventRequest {
+  string event_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Internal event ID to replay"
+      example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
+    }
+  ];
+  string mode = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Replay mode. Defaults to force. Use if_no_runs to skip replay when the original event has already scheduled runs."
+      example: "\"if_no_runs\""
+    }
+  ];
+}
+
+message ReplayEventResponse {
+  ReplayEventData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message ReplayEventData {
+  string event_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "New internal event ID created by the replay. Empty when replayed is false."
+      example: "\"01hp1zx8m3ng9vp6qn0xk7j4d0\""
+    }
+  ];
+  optional bool replayed = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether a new event was published for replay"
+      example: "true"
+    }
+  ];
+  string skipped_reason = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Reason the replay was skipped when replayed is false"
+      example: "\"event_has_runs\""
     }
   ];
 }

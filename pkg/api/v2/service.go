@@ -28,6 +28,7 @@ type Service struct {
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
+	events         EventProvider
 	scores         ScoreProvider
 	rateLimiter    RateLimitProvider
 	base           *apiv2base.Base
@@ -44,6 +45,7 @@ type ServiceOptions struct {
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
+	Events              EventProvider
 	Scores              ScoreProvider
 	RateLimitProvider   RateLimitProvider
 }
@@ -63,6 +65,7 @@ func NewService(opts ServiceOptions) *Service {
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
+		events:         opts.Events,
 		scores:         opts.Scores,
 		rateLimiter:    rateLimiter,
 		base:           apiv2base.NewBase(),

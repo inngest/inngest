@@ -34,6 +34,7 @@ const (
 	V2_GetFunctionRun_FullMethodName           = "/api.v2.V2/GetFunctionRun"
 	V2_GetEventRuns_FullMethodName             = "/api.v2.V2/GetEventRuns"
 	V2_Rerun_FullMethodName                    = "/api.v2.V2/Rerun"
+	V2_ReplayEvent_FullMethodName              = "/api.v2.V2/ReplayEvent"
 	V2_GetApp_FullMethodName                   = "/api.v2.V2/GetApp"
 	V2_CreateScore_FullMethodName              = "/api.v2.V2/CreateScore"
 	V2_SyncApp_FullMethodName                  = "/api.v2.V2/SyncApp"
@@ -74,6 +75,7 @@ type V2Client interface {
 	GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest, opts ...grpc.CallOption) (*GetFunctionRunResponse, error)
 	GetEventRuns(ctx context.Context, in *GetEventRunsRequest, opts ...grpc.CallOption) (*GetEventRunsResponse, error)
 	Rerun(ctx context.Context, in *RerunRequest, opts ...grpc.CallOption) (*RerunResponse, error)
+	ReplayEvent(ctx context.Context, in *ReplayEventRequest, opts ...grpc.CallOption) (*ReplayEventResponse, error)
 	GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.CallOption) (*GetAppResponse, error)
 	CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
@@ -244,6 +246,16 @@ func (c *v2Client) Rerun(ctx context.Context, in *RerunRequest, opts ...grpc.Cal
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RerunResponse)
 	err := c.cc.Invoke(ctx, V2_Rerun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ReplayEvent(ctx context.Context, in *ReplayEventRequest, opts ...grpc.CallOption) (*ReplayEventResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReplayEventResponse)
+	err := c.cc.Invoke(ctx, V2_ReplayEvent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -432,6 +444,7 @@ type V2Server interface {
 	GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error)
 	GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error)
 	Rerun(context.Context, *RerunRequest) (*RerunResponse, error)
+	ReplayEvent(context.Context, *ReplayEventRequest) (*ReplayEventResponse, error)
 	GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error)
 	CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
@@ -502,6 +515,9 @@ func (UnimplementedV2Server) GetEventRuns(context.Context, *GetEventRunsRequest)
 }
 func (UnimplementedV2Server) Rerun(context.Context, *RerunRequest) (*RerunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Rerun not implemented")
+}
+func (UnimplementedV2Server) ReplayEvent(context.Context, *ReplayEventRequest) (*ReplayEventResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReplayEvent not implemented")
 }
 func (UnimplementedV2Server) GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetApp not implemented")
@@ -838,6 +854,24 @@ func _V2_Rerun_Handler(srv interface{}, ctx context.Context, dec func(interface{
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).Rerun(ctx, req.(*RerunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ReplayEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplayEventRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ReplayEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ReplayEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ReplayEvent(ctx, req.(*ReplayEventRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1196,6 +1230,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Rerun",
 			Handler:    _V2_Rerun_Handler,
+		},
+		{
+			MethodName: "ReplayEvent",
+			Handler:    _V2_ReplayEvent_Handler,
 		},
 		{
 			MethodName: "GetApp",

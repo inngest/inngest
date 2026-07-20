@@ -70,6 +70,29 @@ type EventPublisher interface {
 	Publish(ctx context.Context, event event.TrackedEvent) error
 }
 
+type EventProvider interface {
+	ReplayEvent(ctx context.Context, eventID ulid.ULID, opts ReplayEventOpts) (*ReplayEventResult, error)
+}
+
+type ReplayEventMode string
+
+const (
+	ReplayEventModeForce    ReplayEventMode = "force"
+	ReplayEventModeIfNoRuns ReplayEventMode = "if_no_runs"
+)
+
+const ReplayEventSkipReasonEventHasRuns = "event_has_runs"
+
+type ReplayEventOpts struct {
+	Mode ReplayEventMode
+}
+
+type ReplayEventResult struct {
+	EventID       ulid.ULID
+	Replayed      bool
+	SkippedReason string
+}
+
 type GetRunOpts struct {
 	IncludeOutput bool
 }
