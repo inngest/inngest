@@ -75,7 +75,9 @@ func execute() {
 				}
 			}
 
-			tel.SendCmdExecutedEvent(ctx, cmd)
+			if cmd.Args().Len() == 0 || cmd.Args().Get(0) != "api" {
+				tel.SendCmdExecutedEvent(ctx, cmd)
+			}
 
 			// Best-effort background refresh of the cached "latest version"
 			// record. Dedup'd by the cache TTL, so cheap on every invocation.

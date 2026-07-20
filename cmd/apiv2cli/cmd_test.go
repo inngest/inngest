@@ -94,6 +94,47 @@ func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
 	require.Contains(t, invoke.Description, "/v2")
 }
 
+func TestCommandTelemetryContextIncludesEndpointAndFlagNamesOnly(t *testing.T) {
+	var getEventRuns endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "get-event-runs" {
+			getEventRuns = ep
+			break
+		}
+	}
+	require.NotEmpty(t, getEventRuns.name)
+
+	var endpointCommand *cli.Command
+	for _, command := range endpointCommands() {
+		if command.Name == getEventRuns.name {
+			endpointCommand = command
+			break
+		}
+	}
+	require.NotNil(t, endpointCommand)
+
+	app := Command()
+	endpointCommand.Action = func(_ context.Context, cmd *cli.Command) error {
+		require.Equal(t, map[string]any{
+			"endpoint": "get-event-runs",
+			"flags":    []string{"include-output", "limit", "prod"},
+		}, commandTelemetryContext(cmd, getEventRuns))
+		return nil
+	}
+	app.Commands = []*cli.Command{endpointCommand}
+
+	err := app.Run(context.Background(), []string{
+		"api",
+		"--prod",
+		"get-event-runs",
+		"01KTCTWSZJEKAFEDA4F9GYHFQW",
+		"--include-output",
+		"--limit", "5",
+	})
+
+	require.NoError(t, err)
+}
+
 func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	var invoke endpoint
 	for _, ep := range discoverEndpoints() {
