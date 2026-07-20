@@ -378,11 +378,29 @@ func (e *executor) buildDeferEvents(
 		}
 		data[consts.InngestEventDataPrefix] = deferredMeta
 
+		// Resolve the defer's session layers onto the deferred event.
+		var evtMeta event.EventMeta
+		if len(d.Meta) > 0 {
+			if err := json.Unmarshal(d.Meta, &evtMeta); err != nil {
+				logger.StdlibLogger(ctx).Error(
+					"deferred meta is not valid JSON",
+					"error", err,
+					"run_id", opts.Metadata.ID.RunID,
+				)
+				metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
+				continue
+			}
+		}
+		manualSessions, propagatedSessions := len(evtMeta.Sessions) > 0, len(evtMeta.PropagatedSessions) > 0
+		evtMeta.ResolveSessions()
+		metrics.IncrEventSessionsResolvedCounter(ctx, "defer", manualSessions, propagatedSessions, metrics.CounterOpt{PkgName: pkgName})
+
 		events = append(events, event.Event{
 			ID:        eventID.String(),
 			Name:      consts.FnDeferScheduleName,
 			Timestamp: now.UnixMilli(),
 			Data:      data,
+			Meta:      evtMeta,
 		})
 		metrics.IncrDefersFinalizedCounter(ctx, "after_run", metrics.CounterOpt{PkgName: pkgName})
 	}
