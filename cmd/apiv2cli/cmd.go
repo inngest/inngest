@@ -220,6 +220,9 @@ func endpointFlags(ep endpoint) []cli.Flag {
 	fields := ep.input.Fields()
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
+		if isCLIManagedField(ep, field) {
+			continue
+		}
 		name := string(field.Name())
 		flagName := kebab(name)
 		category := "Query"
@@ -329,7 +332,7 @@ func endpointDescription(ep endpoint) string {
 	lines = append(lines,
 		fmt.Sprintf("Endpoint: %s %s", ep.method, ep.path),
 		"",
-		"Target, auth, and output flags are inherited from `inngest alpha api`:",
+		"Target, auth, and output flags are inherited from `inngest api`:",
 		"  --prod                  Target Inngest Cloud Production",
 		"  --api-host, --api-port  Target a custom API server; host may include /api/v2 or /v2",
 		"  --api-key               API key, or INNGEST_API_KEY",
@@ -688,6 +691,10 @@ func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
 	fields := ep.input.Fields()
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
+		if isCLIManagedField(ep, field) {
+			body[field.JSONName()] = "cli"
+			continue
+		}
 		name := string(field.Name())
 		if slices.Contains(ep.pathParams, name) {
 			continue
@@ -710,6 +717,10 @@ func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
 	}
 
 	return body, nil
+}
+
+func isCLIManagedField(ep endpoint, field protoreflect.FieldDescriptor) bool {
+	return ep.name == "submit-feedback" && field.JSONName() == "source"
 }
 
 func rawBody(cmd *cli.Command) (map[string]any, error) {

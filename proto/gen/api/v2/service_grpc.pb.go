@@ -50,6 +50,7 @@ const (
 	V2_ListSessionKeys_FullMethodName          = "/api.v2.V2/ListSessionKeys"
 	V2_ListSessions_FullMethodName             = "/api.v2.V2/ListSessions"
 	V2_ListSessionRuns_FullMethodName          = "/api.v2.V2/ListSessionRuns"
+	V2_SubmitFeedback_FullMethodName           = "/api.v2.V2/SubmitFeedback"
 )
 
 // V2Client is the client API for V2 service.
@@ -90,6 +91,7 @@ type V2Client interface {
 	ListSessionKeys(ctx context.Context, in *ListSessionKeysRequest, opts ...grpc.CallOption) (*ListSessionKeysResponse, error)
 	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
 	ListSessionRuns(ctx context.Context, in *ListSessionRunsRequest, opts ...grpc.CallOption) (*ListSessionRunsResponse, error)
+	SubmitFeedback(ctx context.Context, in *SubmitFeedbackRequest, opts ...grpc.CallOption) (*SubmitFeedbackResponse, error)
 }
 
 type v2Client struct {
@@ -410,6 +412,16 @@ func (c *v2Client) ListSessionRuns(ctx context.Context, in *ListSessionRunsReque
 	return out, nil
 }
 
+func (c *v2Client) SubmitFeedback(ctx context.Context, in *SubmitFeedbackRequest, opts ...grpc.CallOption) (*SubmitFeedbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SubmitFeedbackResponse)
+	err := c.cc.Invoke(ctx, V2_SubmitFeedback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
@@ -448,6 +460,7 @@ type V2Server interface {
 	ListSessionKeys(context.Context, *ListSessionKeysRequest) (*ListSessionKeysResponse, error)
 	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
 	ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error)
+	SubmitFeedback(context.Context, *SubmitFeedbackRequest) (*SubmitFeedbackResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -550,6 +563,9 @@ func (UnimplementedV2Server) ListSessions(context.Context, *ListSessionsRequest)
 }
 func (UnimplementedV2Server) ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSessionRuns not implemented")
+}
+func (UnimplementedV2Server) SubmitFeedback(context.Context, *SubmitFeedbackRequest) (*SubmitFeedbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SubmitFeedback not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -1130,6 +1146,24 @@ func _V2_ListSessionRuns_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_SubmitFeedback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitFeedbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).SubmitFeedback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_SubmitFeedback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).SubmitFeedback(ctx, req.(*SubmitFeedbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1260,6 +1294,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListSessionRuns",
 			Handler:    _V2_ListSessionRuns_Handler,
+		},
+		{
+			MethodName: "SubmitFeedback",
+			Handler:    _V2_SubmitFeedback_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
