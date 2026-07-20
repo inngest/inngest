@@ -877,7 +877,14 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 
 	for stepID, marshalled := range rmap {
 		var data any
-		err = json.Unmarshal([]byte(marshalled), &data)
+		// Decode with UseNumber so JSON integers larger than 2^53 (e.g.
+		// snowflake IDs) survive the round-trip back to the SDK. Without
+		// UseNumber, json.Unmarshal decodes JSON numbers into the `any`
+		// bucket as float64, which silently truncates the bottom digits
+		// of large integers (see https://github.com/inngest/inngest/issues/4058).
+		dec := json.NewDecoder(strings.NewReader(marshalled))
+		dec.UseNumber()
+		err = dec.Decode(&data)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal step \"%s\" with data \"%s\"; %w", stepID, marshalled, err)
 		}

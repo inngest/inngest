@@ -1029,3 +1029,84 @@ func BenchmarkNew(b *testing.B) {
 	}
 
 }
+
+// TestLoadPreservesLargeIntegerStepOutput pins the fix for
+// https://github.com/inngest/inngest/issues/4058: when a step returns an
+// integer larger than 2^53 (e.g. a snowflake ID), reloading the state must
+// not silently truncate the trailing digits via float64.
+//
+// Before the fix, Load unmarshalled the action's raw JSON into `var data any`,
+// which decodes JSON numbers as float64 — losing precision past ~15-16 digits.
+// The fix decodes with json.Number so the integer survives round-trip.
+func TestLoadPreservesLargeIntegerStepOutput(t *testing.T) {
+	ctx := context.Background()
+
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
+	pauseStore := NewPauseStore(unshardedClient)
+
+	sm, err := New(
+		ctx,
+		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
+	)
+	require.NoError(t, err)
+
+	mgr := sm.(*mgr)
+
+	acctID, wsID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	id := state.Identifier{
+		AccountID:   acctID,
+		WorkspaceID: wsID,
+		AppID:       appID,
+		WorkflowID:  fnID,
+		RunID:       runID,
+	}
+
+	_, err = mgr.New(ctx, state.Input{
+		Identifier:     id,
+		EventBatchData: []map[string]any{{"test": "event"}},
+	})
+	require.NoError(t, err)
+
+	// Snowflake-style ID: > 2^53 (~9.0e15) where float64 loses integer precision.
+	// Float64 round-trip of this value is 616581622363398100 (last two digits drop to zero).
+	const snowflakeID uint64 = 616581622363398142
+
+	// SaveResponse stores the raw marshalled JSON in Redis hash. Stripping the
+	// SDK envelope so the action value is a bare JSON number — that's the shape
+	// step.Run produces for a scalar return type.
+	raw := strconv.FormatUint(snowflakeID, 10)
+	_, err = mgr.shardedMgr.SaveResponse(ctx, id, "snowflake-step", raw)
+	require.NoError(t, err)
+
+	loaded, err := mgr.shardedMgr.Load(ctx, acctID, runID)
+	require.NoError(t, err)
+
+	actionData, ok := loaded.Actions()["snowflake-step"]
+	require.True(t, ok, "expected snowflake-step in Load() actions")
+
+	// Re-marshalling Data is what eventually happens when state is shipped
+	// back to the SDK as part of the next invocation payload. That's the
+	// surface where precision loss would become observable to user code.
+	out, mErr := json.Marshal(actionData)
+	require.NoError(t, mErr)
+	assert.Equal(t, raw, string(out),
+		"large integer step output must round-trip losslessly; "+
+			"got %q, want %q", string(out), raw)
+
+	require.NoError(t, mgr.Delete(ctx, id))
+}

@@ -311,10 +311,14 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
+	// Numeric fixtures use json.Number so the load-side round-trip (which now
+	// decodes with json.Decoder.UseNumber to preserve large-integer precision,
+	// see #4058) deep-equals the input. The JSON wire form is identical to
+	// float64(200) because json.Number marshals as its raw digit string.
 	r := state.DriverResponse{
 		Step: w.Steps[0],
 		Output: map[string]interface{}{
-			"status": float64(200),
+			"status": json.Number("200"),
 			"body": map[string]any{
 				"ok": true,
 			},
@@ -356,10 +360,10 @@ func checkSaveResponse_output(t *testing.T, m state.Manager) {
 			ID: anotherStepID,
 		},
 		Output: map[string]interface{}{
-			"status": float64(200),
+			"status": json.Number("200"),
 			"body": map[string]any{
 				"another": "yea",
-				"lol":     float64(1),
+				"lol":     json.Number("1"),
 			},
 		},
 	}
@@ -403,7 +407,7 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 	s := setup(t, m)
 
 	output := map[string]interface{}{
-		"status": float64(200),
+		"status": json.Number("200"),
 		"body": map[string]any{
 			"ok": true,
 		},
