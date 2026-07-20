@@ -58,9 +58,24 @@ func execute() {
 		)),
 		Version: inngestversion.Print(),
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			// Set LOG_HANDLER environment variable based on --json flag
-			// This ensures the logger respects the JSON output setting
-			if cmd.Bool("json") {
+			// Resolve LOG_HANDLER with three-way precedence so an explicit
+			// `--json=false` actually takes effect (issue #4379). Done
+			// here in `Before` rather than alongside `app.Run` so the
+			// flag has already been parsed and `cmd.IsSet` can
+			// distinguish "explicitly set" from "absent":
+			//
+			//   1. `--json` explicitly set → honor user choice
+			//      (true → JSON, false → dev/pretty)
+			//   2. `--json` absent + non-TTY → auto-detect JSON
+			//      (preserves prior non-TTY default)
+			//   3. `--json` absent + TTY → leave unset, defaults to dev
+			if cmd.IsSet("json") {
+				if cmd.Bool("json") {
+					os.Setenv("LOG_HANDLER", "json")
+				} else {
+					os.Setenv("LOG_HANDLER", "dev")
+				}
+			} else if !isatty.IsTerminal(os.Stdout.Fd()) {
 				os.Setenv("LOG_HANDLER", "json")
 			}
 
@@ -102,10 +117,10 @@ func execute() {
 		},
 	}
 
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		// Always use JSON when not in a terminal
-		os.Setenv("LOG_HANDLER", "json")
-	}
+	// Non-TTY → JSON auto-detection moved into the `Before` hook above so
+	// it can be overridden by `--json=false` (issue #4379). Was previously
+	// here, unconditionally set before flag parsing, which made the flag a
+	// no-op in any non-TTY context (CI, piped output, Docker logs).
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		fmt.Println(err)
