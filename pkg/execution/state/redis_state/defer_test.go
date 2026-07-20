@@ -95,6 +95,29 @@ func TestSaveDefer(t *testing.T) {
 		require.Equal(t, d, defers[d.HashedID])
 	})
 
+	t.Run("meta round-trips through save and load", func(t *testing.T) {
+		v2svc, id := newDeferTestRunService(t)
+
+		d := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"user_id":"u_123"}`),
+			Meta:           json.RawMessage(`{"propagatedSessions":{"tenant":"acme"}}`),
+		}
+		require.NoError(t, v2svc.SaveDefer(ctx, id, d))
+
+		// Meta must survive the full-view load...
+		defers, err := v2svc.LoadDefers(ctx, id)
+		require.NoError(t, err)
+		require.JSONEq(t, string(d.Meta), string(defers[d.HashedID].Meta))
+
+		// ...and the Input-less metadata view, which is what finalize reads.
+		metas, err := v2svc.LoadDefersMeta(ctx, id)
+		require.NoError(t, err)
+		require.JSONEq(t, string(d.Meta), string(metas[d.HashedID].Meta))
+	})
+
 	t.Run("idempotent", func(t *testing.T) {
 		v2svc, id := newDeferTestRunService(t)
 

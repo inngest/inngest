@@ -950,6 +950,69 @@ func (i *execTestInfra) runParentDefer(t *testing.T, hashedIDs ...string) (ulid.
 	return parentRun.ID.RunID, deferEvents
 }
 
+// TestDeferPropagatesSessions drives the full defer session-propagation path:
+// a DeferAdd op carrying meta.propagatedSessions rides through SaveFromOp and
+// the persisted Defer to Finalize, where buildDeferEvents resolves the
+// propagated layer onto the emitted deferred.schedule event. Propagated folds
+// into the manual layer, so the inherited session surfaces on Meta.Sessions
+// and the propagated layer is consumed.
+func TestDeferPropagatesSessions(t *testing.T) {
+	r := require.New(t)
+	infra := newExecTestInfra(t, "step-defer")
+
+	const hashedID = "hash-session"
+
+	ops := []*state.GeneratorOpcode{
+		{
+			Op: enums.OpcodeDeferAdd,
+			ID: hashedID,
+			Opts: map[string]any{
+				"fn_slug": infra.fn.Slug,
+				"input":   map[string]any{},
+				// The SDK stamps the inherited session layer here at defer
+				// call-time.
+				"meta": map[string]any{
+					"propagatedSessions": map[string]any{"tenant": "acme"},
+				},
+			},
+		},
+		{
+			Op:   enums.OpcodeRunComplete,
+			ID:   "run-complete",
+			Data: json.RawMessage(`{"data": {}}`),
+		},
+	}
+
+	driver := &mockDriverV1{
+		t:        t,
+		response: &state.DriverResponse{StatusCode: 206, Generator: ops},
+	}
+	exec := infra.newExecutor(t, executor.WithDriverV1(driver))
+
+	var finalizationEvents []event.Event
+	exec.SetFinalizer(func(_ context.Context, _ statev2.ID, events []event.Event) error {
+		finalizationEvents = append(finalizationEvents, events...)
+		return nil
+	})
+
+	parentRun := infra.scheduleRun(t, exec)
+	_, err := exec.Execute(infra.ctx, state.Identifier{
+		WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID,
+	}, queue.Item{
+		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID},
+		Kind:        queue.KindStart,
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: hashedID}},
+		WorkspaceID: infra.wsID,
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: hashedID})
+	r.NoError(err)
+
+	evt := findDeferEvent(t, finalizationEvents, parentRun.ID.RunID, hashedID)
+	r.Equal("acme", evt.Meta.Sessions["tenant"],
+		"propagated session should fold into the resolved manual layer")
+	r.Empty(evt.Meta.PropagatedSessions,
+		"propagated layer should be consumed by ResolveSessions")
+}
+
 // findDeferEvent picks the deferred.schedule event whose ParentDeferSpan
 // matches (parentRunID, hashedID). buildDeferEvents emits in
 // non-deterministic order, so we can't rely on slice position.
