@@ -189,6 +189,54 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	require.Equal(t, "COMPLETED", run["status"])
 }
 
+func TestHTTPGateway_RunListRoutes(t *testing.T) {
+	t.Run("binds list filters", func(t *testing.T) {
+		isDeferred := true
+		runs := &mockRunProvider{}
+		runs.On("GetRuns", mock.Anything, GetRunsOpts{
+			Limit:       3,
+			TimeField:   RunTimeFieldStartedAt,
+			Status:      []enums.RunStatus{enums.RunStatusCompleted, enums.RunStatusFailed},
+			AppIDs:      []string{"my-app"},
+			FunctionIDs: []string{"test-fn"},
+			IsDeferred:  &isDeferred,
+			Order:       OrderDirectionAsc,
+		}).Return(&GetRunsResult{}, nil).Once()
+
+		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
+		require.NoError(t, err)
+		t.Cleanup(func() { runs.AssertExpectations(t) })
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=test-fn&isDeferred=true&order=ASC", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	})
+
+	t.Run("binds function path", func(t *testing.T) {
+		runs := &mockRunProvider{}
+		runs.On("GetRuns", mock.Anything, GetRunsOpts{
+			Limit:       defaultRunsLimit,
+			TimeField:   RunTimeFieldQueuedAt,
+			Status:      []enums.RunStatus{},
+			AppIDs:      []string{"my-app"},
+			FunctionIDs: []string{"test-fn"},
+			Order:       OrderDirectionDesc,
+		}).Return(&GetRunsResult{}, nil).Once()
+
+		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
+		require.NoError(t, err)
+		t.Cleanup(func() { runs.AssertExpectations(t) })
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	})
+}
+
 func TestHTTPGateway_Rerun(t *testing.T) {
 	ctx := context.Background()
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")

@@ -61,6 +61,10 @@ const (
 	V2PatchEnvProcedure = "/api.v2.V2/PatchEnv"
 	// V2GetFunctionRunProcedure is the fully-qualified name of the V2's GetFunctionRun RPC.
 	V2GetFunctionRunProcedure = "/api.v2.V2/GetFunctionRun"
+	// V2ListRunsProcedure is the fully-qualified name of the V2's ListRuns RPC.
+	V2ListRunsProcedure = "/api.v2.V2/ListRuns"
+	// V2ListFunctionRunsProcedure is the fully-qualified name of the V2's ListFunctionRuns RPC.
+	V2ListFunctionRunsProcedure = "/api.v2.V2/ListFunctionRuns"
 	// V2GetEventRunsProcedure is the fully-qualified name of the V2's GetEventRuns RPC.
 	V2GetEventRunsProcedure = "/api.v2.V2/GetEventRuns"
 	// V2RerunProcedure is the fully-qualified name of the V2's Rerun RPC.
@@ -118,6 +122,8 @@ type V2Client interface {
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
 	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
+	ListRuns(context.Context, *connect.Request[v2.ListRunsRequest]) (*connect.Response[v2.ListRunsResponse], error)
+	ListFunctionRuns(context.Context, *connect.Request[v2.ListFunctionRunsRequest]) (*connect.Response[v2.ListFunctionRunsResponse], error)
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
 	Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
@@ -225,6 +231,18 @@ func NewV2Client(httpClient connect.HTTPClient, baseURL string, opts ...connect.
 			httpClient,
 			baseURL+V2GetFunctionRunProcedure,
 			connect.WithSchema(v2Methods.ByName("GetFunctionRun")),
+			connect.WithClientOptions(opts...),
+		),
+		listRuns: connect.NewClient[v2.ListRunsRequest, v2.ListRunsResponse](
+			httpClient,
+			baseURL+V2ListRunsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListRuns")),
+			connect.WithClientOptions(opts...),
+		),
+		listFunctionRuns: connect.NewClient[v2.ListFunctionRunsRequest, v2.ListFunctionRunsResponse](
+			httpClient,
+			baseURL+V2ListFunctionRunsProcedure,
+			connect.WithSchema(v2Methods.ByName("ListFunctionRuns")),
 			connect.WithClientOptions(opts...),
 		),
 		getEventRuns: connect.NewClient[v2.GetEventRunsRequest, v2.GetEventRunsResponse](
@@ -353,6 +371,8 @@ type v2Client struct {
 	listWebhooks             *connect.Client[v2.ListWebhooksRequest, v2.ListWebhooksResponse]
 	patchEnv                 *connect.Client[v2.PatchEnvRequest, v2.PatchEnvsResponse]
 	getFunctionRun           *connect.Client[v2.GetFunctionRunRequest, v2.GetFunctionRunResponse]
+	listRuns                 *connect.Client[v2.ListRunsRequest, v2.ListRunsResponse]
+	listFunctionRuns         *connect.Client[v2.ListFunctionRunsRequest, v2.ListFunctionRunsResponse]
 	getEventRuns             *connect.Client[v2.GetEventRunsRequest, v2.GetEventRunsResponse]
 	rerun                    *connect.Client[v2.RerunRequest, v2.RerunResponse]
 	getApp                   *connect.Client[v2.GetAppRequest, v2.GetAppResponse]
@@ -436,6 +456,16 @@ func (c *v2Client) PatchEnv(ctx context.Context, req *connect.Request[v2.PatchEn
 // GetFunctionRun calls api.v2.V2.GetFunctionRun.
 func (c *v2Client) GetFunctionRun(ctx context.Context, req *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error) {
 	return c.getFunctionRun.CallUnary(ctx, req)
+}
+
+// ListRuns calls api.v2.V2.ListRuns.
+func (c *v2Client) ListRuns(ctx context.Context, req *connect.Request[v2.ListRunsRequest]) (*connect.Response[v2.ListRunsResponse], error) {
+	return c.listRuns.CallUnary(ctx, req)
+}
+
+// ListFunctionRuns calls api.v2.V2.ListFunctionRuns.
+func (c *v2Client) ListFunctionRuns(ctx context.Context, req *connect.Request[v2.ListFunctionRunsRequest]) (*connect.Response[v2.ListFunctionRunsResponse], error) {
+	return c.listFunctionRuns.CallUnary(ctx, req)
 }
 
 // GetEventRuns calls api.v2.V2.GetEventRuns.
@@ -546,6 +576,8 @@ type V2Handler interface {
 	ListWebhooks(context.Context, *connect.Request[v2.ListWebhooksRequest]) (*connect.Response[v2.ListWebhooksResponse], error)
 	PatchEnv(context.Context, *connect.Request[v2.PatchEnvRequest]) (*connect.Response[v2.PatchEnvsResponse], error)
 	GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error)
+	ListRuns(context.Context, *connect.Request[v2.ListRunsRequest]) (*connect.Response[v2.ListRunsResponse], error)
+	ListFunctionRuns(context.Context, *connect.Request[v2.ListFunctionRunsRequest]) (*connect.Response[v2.ListFunctionRunsResponse], error)
 	GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error)
 	Rerun(context.Context, *connect.Request[v2.RerunRequest]) (*connect.Response[v2.RerunResponse], error)
 	GetApp(context.Context, *connect.Request[v2.GetAppRequest]) (*connect.Response[v2.GetAppResponse], error)
@@ -649,6 +681,18 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 		V2GetFunctionRunProcedure,
 		svc.GetFunctionRun,
 		connect.WithSchema(v2Methods.ByName("GetFunctionRun")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListRunsHandler := connect.NewUnaryHandler(
+		V2ListRunsProcedure,
+		svc.ListRuns,
+		connect.WithSchema(v2Methods.ByName("ListRuns")),
+		connect.WithHandlerOptions(opts...),
+	)
+	v2ListFunctionRunsHandler := connect.NewUnaryHandler(
+		V2ListFunctionRunsProcedure,
+		svc.ListFunctionRuns,
+		connect.WithSchema(v2Methods.ByName("ListFunctionRuns")),
 		connect.WithHandlerOptions(opts...),
 	)
 	v2GetEventRunsHandler := connect.NewUnaryHandler(
@@ -787,6 +831,10 @@ func NewV2Handler(svc V2Handler, opts ...connect.HandlerOption) (string, http.Ha
 			v2PatchEnvHandler.ServeHTTP(w, r)
 		case V2GetFunctionRunProcedure:
 			v2GetFunctionRunHandler.ServeHTTP(w, r)
+		case V2ListRunsProcedure:
+			v2ListRunsHandler.ServeHTTP(w, r)
+		case V2ListFunctionRunsProcedure:
+			v2ListFunctionRunsHandler.ServeHTTP(w, r)
 		case V2GetEventRunsProcedure:
 			v2GetEventRunsHandler.ServeHTTP(w, r)
 		case V2RerunProcedure:
@@ -882,6 +930,14 @@ func (UnimplementedV2Handler) PatchEnv(context.Context, *connect.Request[v2.Patc
 
 func (UnimplementedV2Handler) GetFunctionRun(context.Context, *connect.Request[v2.GetFunctionRunRequest]) (*connect.Response[v2.GetFunctionRunResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.GetFunctionRun is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListRuns(context.Context, *connect.Request[v2.ListRunsRequest]) (*connect.Response[v2.ListRunsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListRuns is not implemented"))
+}
+
+func (UnimplementedV2Handler) ListFunctionRuns(context.Context, *connect.Request[v2.ListFunctionRunsRequest]) (*connect.Response[v2.ListFunctionRunsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("api.v2.V2.ListFunctionRuns is not implemented"))
 }
 
 func (UnimplementedV2Handler) GetEventRuns(context.Context, *connect.Request[v2.GetEventRunsRequest]) (*connect.Response[v2.GetEventRunsResponse], error) {

@@ -32,6 +32,8 @@ const (
 	V2_ListWebhooks_FullMethodName             = "/api.v2.V2/ListWebhooks"
 	V2_PatchEnv_FullMethodName                 = "/api.v2.V2/PatchEnv"
 	V2_GetFunctionRun_FullMethodName           = "/api.v2.V2/GetFunctionRun"
+	V2_ListRuns_FullMethodName                 = "/api.v2.V2/ListRuns"
+	V2_ListFunctionRuns_FullMethodName         = "/api.v2.V2/ListFunctionRuns"
 	V2_GetEventRuns_FullMethodName             = "/api.v2.V2/GetEventRuns"
 	V2_Rerun_FullMethodName                    = "/api.v2.V2/Rerun"
 	V2_GetApp_FullMethodName                   = "/api.v2.V2/GetApp"
@@ -72,6 +74,8 @@ type V2Client interface {
 	ListWebhooks(ctx context.Context, in *ListWebhooksRequest, opts ...grpc.CallOption) (*ListWebhooksResponse, error)
 	PatchEnv(ctx context.Context, in *PatchEnvRequest, opts ...grpc.CallOption) (*PatchEnvsResponse, error)
 	GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest, opts ...grpc.CallOption) (*GetFunctionRunResponse, error)
+	ListRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*ListRunsResponse, error)
+	ListFunctionRuns(ctx context.Context, in *ListFunctionRunsRequest, opts ...grpc.CallOption) (*ListFunctionRunsResponse, error)
 	GetEventRuns(ctx context.Context, in *GetEventRunsRequest, opts ...grpc.CallOption) (*GetEventRunsResponse, error)
 	Rerun(ctx context.Context, in *RerunRequest, opts ...grpc.CallOption) (*RerunResponse, error)
 	GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.CallOption) (*GetAppResponse, error)
@@ -224,6 +228,26 @@ func (c *v2Client) GetFunctionRun(ctx context.Context, in *GetFunctionRunRequest
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFunctionRunResponse)
 	err := c.cc.Invoke(ctx, V2_GetFunctionRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*ListRunsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListRunsResponse)
+	err := c.cc.Invoke(ctx, V2_ListRuns_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListFunctionRuns(ctx context.Context, in *ListFunctionRunsRequest, opts ...grpc.CallOption) (*ListFunctionRunsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListFunctionRunsResponse)
+	err := c.cc.Invoke(ctx, V2_ListFunctionRuns_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -430,6 +454,8 @@ type V2Server interface {
 	ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error)
 	PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error)
 	GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error)
+	ListRuns(context.Context, *ListRunsRequest) (*ListRunsResponse, error)
+	ListFunctionRuns(context.Context, *ListFunctionRunsRequest) (*ListFunctionRunsResponse, error)
 	GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error)
 	Rerun(context.Context, *RerunRequest) (*RerunResponse, error)
 	GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error)
@@ -496,6 +522,12 @@ func (UnimplementedV2Server) PatchEnv(context.Context, *PatchEnvRequest) (*Patch
 }
 func (UnimplementedV2Server) GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFunctionRun not implemented")
+}
+func (UnimplementedV2Server) ListRuns(context.Context, *ListRunsRequest) (*ListRunsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRuns not implemented")
+}
+func (UnimplementedV2Server) ListFunctionRuns(context.Context, *ListFunctionRunsRequest) (*ListFunctionRunsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListFunctionRuns not implemented")
 }
 func (UnimplementedV2Server) GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetEventRuns not implemented")
@@ -802,6 +834,42 @@ func _V2_GetFunctionRun_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(V2Server).GetFunctionRun(ctx, req.(*GetFunctionRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListRuns_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRunsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListRuns(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListRuns_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListRuns(ctx, req.(*ListRunsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListFunctionRuns_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFunctionRunsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListFunctionRuns(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListFunctionRuns_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListFunctionRuns(ctx, req.(*ListFunctionRunsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1188,6 +1256,14 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetFunctionRun",
 			Handler:    _V2_GetFunctionRun_Handler,
+		},
+		{
+			MethodName: "ListRuns",
+			Handler:    _V2_ListRuns_Handler,
+		},
+		{
+			MethodName: "ListFunctionRuns",
+			Handler:    _V2_ListFunctionRuns_Handler,
 		},
 		{
 			MethodName: "GetEventRuns",
