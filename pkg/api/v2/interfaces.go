@@ -79,7 +79,30 @@ type GetRunsOpts struct {
 	Cursor        string
 	Limit         int
 	IncludeOutput bool
+	From          *time.Time
+	Until         *time.Time
+	TimeField     RunTimeField
+	Status        []enums.RunStatus
+	AppIDs        []string
+	FunctionIDs   []string
+	IsDeferred    *bool
+	Order         OrderDirection
 }
+
+type RunTimeField int
+
+const (
+	RunTimeFieldQueuedAt RunTimeField = iota
+	RunTimeFieldStartedAt
+	RunTimeFieldEndedAt
+)
+
+type OrderDirection int
+
+const (
+	OrderDirectionDesc OrderDirection = iota
+	OrderDirectionAsc
+)
 
 type RunListItem struct {
 	RunID        ulid.ULID

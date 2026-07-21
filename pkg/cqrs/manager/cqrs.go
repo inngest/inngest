@@ -3925,7 +3925,7 @@ func spanRunRootPredicates(opt cqrs.GetTraceRunOpt, h driverhelp.DialectHelpers)
 			sq.I("spans.status").IsNull(),
 			sq.I("spans.status").Neq(enums.RunStatusSkipped.String()),
 		),
-		sq.I("spans.start_time").Lt(opt.Filter.Until.UTC()),
+		sq.I("spans.start_time").Lte(opt.Filter.Until.UTC()),
 	}
 	if opt.Filter.AccountID != uuid.Nil {
 		preds = append(preds, sq.I("spans.account_id").Eq(opt.Filter.AccountID))
@@ -4009,7 +4009,7 @@ func spanRunAggregatePredicates(opt cqrs.GetTraceRunOpt, cursor *cqrs.TracePageC
 		// UTC preserves the SQLite timestamp ordering described in spanRunRootPredicates.
 		preds = append(preds,
 			aggregate.Gte(opt.Filter.From.UTC()),
-			aggregate.Lt(opt.Filter.Until.UTC()),
+			aggregate.Lte(opt.Filter.Until.UTC()),
 		)
 	}
 	if cursor == nil {

@@ -959,6 +959,42 @@ service V2 {
     };
   }
 
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {
+    option (google.api.http) = {
+      get: "/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List function runs"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Lists function runs in the authenticated environment"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListFunctionRuns(ListFunctionRunsRequest) returns (ListFunctionRunsResponse) {
+    option (google.api.http) = {
+      get: "/apps/{app_id}/functions/{function_id}/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List function runs"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Lists runs for a function in the authenticated environment"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc GetEventRuns(GetEventRunsRequest) returns (GetEventRunsResponse) {
     option (google.api.http) = {
       get: "/events/{event_id}/runs"
@@ -3062,4 +3098,122 @@ message SessionRun {
   google.protobuf.Timestamp queued_at = 5;
   optional google.protobuf.Timestamp started_at = 6;
   optional google.protobuf.Timestamp ended_at = 7;
+}
+
+message ListRunsRequest {
+  optional bool include_output = 1;
+  optional string cursor = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of runs to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+  optional google.protobuf.Timestamp from = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive start of the run time range"
+    }
+  ];
+  optional google.protobuf.Timestamp until = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive end of the run time range"
+    }
+  ];
+  string time_field = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt. Snake case aliases such as QUEUED_AT, STARTED_AT, and ENDED_AT are also accepted."
+      default: "queuedAt"
+    }
+  ];
+  repeated string status = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Statuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, or CANCELLED"
+    }
+  ];
+  repeated string app_id = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "App IDs to include"
+    }
+  ];
+  repeated string function_id = 9 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Function IDs to include"
+    }
+  ];
+  optional bool is_deferred = 10 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether to include only deferred or non-deferred runs"
+    }
+  ];
+  string order = 11 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Sort direction. Accepts ASC or DESC."
+      default: "DESC"
+    }
+  ];
+}
+
+message ListFunctionRunsRequest {
+  string app_id = 1;
+  string function_id = 2;
+  optional bool include_output = 3;
+  optional string cursor = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of runs to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+  optional google.protobuf.Timestamp from = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive start of the run time range"
+    }
+  ];
+  optional google.protobuf.Timestamp until = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Inclusive end of the run time range"
+    }
+  ];
+  string time_field = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt. Snake case aliases such as QUEUED_AT, STARTED_AT, and ENDED_AT are also accepted."
+      default: "queuedAt"
+    }
+  ];
+  repeated string status = 9 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Statuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, or CANCELLED"
+    }
+  ];
+  optional bool is_deferred = 10 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether to include only deferred or non-deferred runs"
+    }
+  ];
+  string order = 11 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Sort direction. Accepts ASC or DESC."
+      default: "DESC"
+    }
+  ];
+}
+
+message ListRunsResponse {
+  repeated FunctionRun data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
+}
+
+message ListFunctionRunsResponse {
+  repeated FunctionRun data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
 }

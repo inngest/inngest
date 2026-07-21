@@ -50,22 +50,40 @@ func (p *runProvider) GetRun(ctx context.Context, runID ulid.ULID, _ apiv2.GetRu
 }
 
 func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*apiv2.GetRunsResult, error) {
+	timeField, err := cqrsRunTimeField(opts.TimeField)
+	if err != nil {
+		return nil, err
+	}
+
+	from := time.Time{}
+	if opts.From != nil {
+		from = *opts.From
+	}
+	until := maxRunListTime
+	if opts.Until != nil {
+		until = *opts.Until
+	}
 	eventIDs := []ulid.ULID{}
 	if opts.EventID != ulid.Zero {
 		eventIDs = append(eventIDs, opts.EventID)
 	}
+
 	rows, err := p.data.GetRuns(ctx, cqrs.GetTraceRunOpt{
 		Filter: cqrs.GetTraceRunFilter{
-			AccountID:   consts.DevServerAccountID,
-			WorkspaceID: consts.DevServerEnvID,
-			EventID:     eventIDs,
-			TimeField:   enums.TraceRunTimeQueuedAt,
-			From:        time.Time{},
-			Until:       maxRunListTime,
+			AccountID:    consts.DevServerAccountID,
+			WorkspaceID:  consts.DevServerEnvID,
+			AppName:      opts.AppIDs,
+			FunctionSlug: opts.FunctionIDs,
+			EventID:      eventIDs,
+			TimeField:    timeField,
+			From:         from,
+			Until:        until,
+			Status:       opts.Status,
+			IsDeferred:   opts.IsDeferred,
 		},
 		Order: []cqrs.GetTraceRunOrder{{
-			Field:     enums.TraceRunTimeQueuedAt,
-			Direction: enums.TraceRunOrderDesc,
+			Field:     timeField,
+			Direction: cqrsRunOrder(opts.Order),
 		}},
 		Cursor:        opts.Cursor,
 		Items:         uint(opts.Limit + 1),
@@ -89,6 +107,26 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		Runs:    runs,
 		HasMore: hasMore,
 	}, nil
+}
+
+func cqrsRunTimeField(field apiv2.RunTimeField) (enums.TraceRunTime, error) {
+	switch field {
+	case apiv2.RunTimeFieldQueuedAt:
+		return enums.TraceRunTimeQueuedAt, nil
+	case apiv2.RunTimeFieldStartedAt:
+		return enums.TraceRunTimeStartedAt, nil
+	case apiv2.RunTimeFieldEndedAt:
+		return enums.TraceRunTimeEndedAt, nil
+	default:
+		return enums.TraceRunTimeQueuedAt, fmt.Errorf("unsupported run time field: %d", field)
+	}
+}
+
+func cqrsRunOrder(order apiv2.OrderDirection) enums.TraceRunOrder {
+	if order == apiv2.OrderDirectionAsc {
+		return enums.TraceRunOrderAsc
+	}
+	return enums.TraceRunOrderDesc
 }
 
 func (p *runProvider) Rerun(ctx context.Context, runID ulid.ULID, opts apiv2.RerunOpts) (ulid.ULID, error) {
