@@ -620,7 +620,7 @@ func finalizeSpanAttributes(f execution.FinalizeOpts) *meta.SerializableAttrs {
 	case execution.FinalizeResponseRunComplete:
 		return runCompleteAttrs(f.Response.RunComplete)
 	case execution.FinalizeResponseDriver:
-		return tracing.DriverResponseAttrs(&f.Response.DriverResponse, nil)
+		return finalizeDriverResponseAttrs(&f.Response.DriverResponse)
 	}
 
 	panic("unknown finalize response type")
@@ -655,6 +655,49 @@ func runCompleteAttrs(gen state.GeneratorOpcode) *meta.SerializableAttrs {
 	meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, inngestgo.Ptr(util.DataWrap(gen.Data)))
 
 	rawAttrs = rawAttrs.Merge(tracing.GeneratorAttrs(&gen))
+
+	return rawAttrs
+}
+
+// finalizeDriverResponseAttrs builds span attributes for the run span when a
+// driver response marks the end of a function run. It attaches step.output so
+// the run span carries the function's return value.
+func finalizeDriverResponseAttrs(resp *state.DriverResponse) *meta.SerializableAttrs {
+	rawAttrs := meta.NewAttrSet()
+
+	if resp.Retryable() {
+		meta.AddAttr(rawAttrs, meta.Attrs.Retryable, inngestgo.Ptr(true))
+	}
+
+	fnOutput, err := resp.GetTraceFunctionOutput()
+	if err != nil {
+		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
+	} else if fnOutput != "" {
+		isFunctionOutput := true
+		meta.AddAttr(rawAttrs, meta.Attrs.IsFunctionOutput, &isFunctionOutput)
+		meta.AddAttr(rawAttrs, meta.Attrs.StepOutput, &fnOutput)
+	}
+
+	size := resp.OutputSize
+	if size == 0 && fnOutput != "" {
+		size = len(fnOutput)
+	}
+
+	redactedHeaders := headers.Compact(headers.Redact(resp.Header))
+
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseHeaders, &redactedHeaders)
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &size)
+
+	steps := make(meta.ResponseOps, len(resp.Generator))
+	for n, s := range resp.Generator {
+		steps[n] = meta.ResponseOp{
+			Op:   s.Op,
+			ID:   s.ID,
+			Name: s.Name,
+		}
+	}
+	meta.AddAttr(rawAttrs, meta.Attrs.ResponseSteps, &steps)
 
 	return rawAttrs
 }
