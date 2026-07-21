@@ -61,11 +61,8 @@ func (p *runProvider) Cancel(ctx context.Context, runID ulid.ULID) error {
 		return err
 	}
 
-	if fnrun.Status == enums.RunStatusCancelled {
-		return apiv2.ErrRunAlreadyCancelled
-	}
-	if enums.RunStatusEnded(fnrun.Status) {
-		return apiv2.ErrRunEnded
+	if err := apiv2.RunCancellability(fnrun.Status); err != nil {
+		return err
 	}
 
 	return p.scheduler.Cancel(ctx, state.ID{

@@ -173,6 +173,19 @@ func TestRunProviderCancel(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("returns not found for a missing run", func(t *testing.T) {
+		scheduler := &stubRunProviderScheduler{}
+		provider := &runProvider{
+			data:      &stubRunProviderDataReader{runErr: sql.ErrNoRows},
+			scheduler: scheduler,
+		}
+
+		err := provider.Cancel(context.Background(), runID)
+
+		require.ErrorIs(t, err, apiv2.ErrRunNotFound)
+		require.Nil(t, scheduler.cancelID)
+	})
 }
 
 func TestScoreMetadataLoaderReconstructsFinalizedRunMetadata(t *testing.T) {
