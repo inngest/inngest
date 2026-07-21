@@ -401,6 +401,22 @@ func (e *executor) buildDeferEvents(
 			metrics.CounterOpt{PkgName: pkgName},
 		)
 
+		// Validate the sessions after the merge.
+		//
+		// Failure to validate will drop the event, rather than truncate sessions or
+		// fail the parent run.
+		//
+		// Failures are unexpected as we also validate sessions SDK side.
+		if err := evtMeta.Sessions.Validate(); err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"deferred sessions failed validation after merge",
+				"error", err,
+				"run_id", opts.Metadata.ID.RunID,
+			)
+			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
+			continue
+		}
+
 		events = append(events, event.Event{
 			ID:        eventID.String(),
 			Name:      consts.FnDeferScheduleName,
