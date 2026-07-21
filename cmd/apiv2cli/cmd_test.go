@@ -37,12 +37,16 @@ func TestDiscoverEndpointsFromProto(t *testing.T) {
 	require.Equal(t, []string{"app_id", "function_id"}, byName["invoke-function"].pathParams)
 	require.Equal(t, http.MethodGet, byName["get-function-trace"].method)
 	require.Equal(t, "/runs/{run_id}/trace", byName["get-function-trace"].path)
+	require.NotContains(t, byName, "get-runs")
+	require.Equal(t, "/runs", byName["get-function-runs"].path)
+	require.Empty(t, byName["get-function-runs"].pathParams)
 }
 
 func TestEndpointCommandNameNormalizesReadVerbs(t *testing.T) {
 	require.Equal(t, "get-account", endpointCommandName("FetchAccount"))
 	require.Equal(t, "get-webhooks", endpointCommandName("ListWebhooks"))
 	require.Equal(t, "get-function-run", endpointCommandName("GetFunctionRun"))
+	require.Equal(t, "get-function-runs", endpointCommandName("ListRuns"))
 	require.Equal(t, "create-env", endpointCommandName("CreateEnv"))
 }
 

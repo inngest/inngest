@@ -9229,7 +9229,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x88\x83\x01\n" +
+	"\x04INFO\x10\x032\xf7\x83\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -9483,16 +9483,16 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x10Get function run\x1a;Fetches the canonical run summary for a single function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10\x12\x0e/runs/{run_id}\x12\xb7\x01\n" +
-	"\bListRuns\x12\x17.api.v2.ListRunsRequest\x1a\x18.api.v2.ListRunsResponse\"x\x92Ah\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10\x12\x0e/runs/{run_id}\x12\xd4\x01\n" +
+	"\bListRuns\x12\x17.api.v2.ListRunsRequest\x1a\x18.api.v2.ListRunsResponse\"\x94\x01\x92A\x83\x01\n" +
 	"\x04Runs\n" +
-	"\x04Beta\x12\x12List function runs\x1a4Lists function runs in the authenticated environmentb\x10\n" +
+	"\x04Beta\x12\tList runs\x1aXLists runs in the authenticated environment, optionally filtered by app and function IDsb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\a\x12\x05/runs\x12\xfc\x01\n" +
-	"\x10ListFunctionRuns\x12\x1f.api.v2.ListFunctionRunsRequest\x1a .api.v2.ListFunctionRunsResponse\"\xa4\x01\x92An\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\a\x12\x05/runs\x12\x84\x02\n" +
+	"\x10ListFunctionRuns\x12\x1f.api.v2.ListFunctionRunsRequest\x1a .api.v2.ListFunctionRunsResponse\"\xac\x01\x92Av\n" +
 	"\x04Runs\n" +
-	"\x04Beta\x12\x12List function runs\x1a:Lists runs for a function in the authenticated environmentb\x10\n" +
+	"\x04Beta\x12\x18List runs for a function\x1a<Lists runs for one function in the authenticated environmentb\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02-\x12+/apps/{app_id}/functions/{function_id}/runs\x12\xcf\x01\n" +
@@ -9697,10 +9697,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/insights/query\x12\x97\x02\n" +
-	"\x0fListExperiments\x12\x1e.api.v2.ListExperimentsRequest\x1a\x1f.api.v2.ListExperimentsResponse\"\xc2\x01\x92Au\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/insights/query\x12\xe1\x02\n" +
+	"\x0fListExperiments\x12\x1e.api.v2.ListExperimentsRequest\x1a\x1f.api.v2.ListExperimentsResponse\"\x8c\x02\x92A\xbe\x01\n" +
 	"\vExperiments\n" +
-	"\x04Beta\x12\x10List experiments\x1a<Lists observed experiments in the authenticated environment.b\x10\n" +
+	"\x04Beta\x12\x10List experiments\x1a\x84\x01Lists observed experiments in the authenticated environment. Use the nested app and function route to scope results to one function.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
 	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02DZ4\x122/apps/{app_id}/functions/{function_id}/experiments\x12\f/experiments\x12\xb5\x02\n" +

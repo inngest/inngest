@@ -964,10 +964,10 @@ service V2 {
       get: "/runs"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List function runs"
+      summary: "List runs"
       tags: "Runs"
       tags: "Beta"
-      description: "Lists function runs in the authenticated environment"
+      description: "Lists runs in the authenticated environment, optionally filtered by app and function IDs"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -982,10 +982,10 @@ service V2 {
       get: "/apps/{app_id}/functions/{function_id}/runs"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List function runs"
+      summary: "List runs for a function"
       tags: "Runs"
       tags: "Beta"
-      description: "Lists runs for a function in the authenticated environment"
+      description: "Lists runs for one function in the authenticated environment"
       security: {
         security_requirement: {
           key: "BearerAuth"
@@ -1689,7 +1689,7 @@ service V2 {
       summary: "List experiments"
       tags: "Experiments"
       tags: "Beta"
-      description: "Lists observed experiments in the authenticated environment."
+      description: "Lists observed experiments in the authenticated environment. Use the nested app and function route to scope results to one function."
       security: {
         security_requirement: {
           key: "BearerAuth"
