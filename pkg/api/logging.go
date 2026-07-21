@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"math/rand"
 	"net/http"
 	"time"
@@ -18,13 +19,36 @@ type LoggingMiddleware interface {
 	Middleware(next http.Handler) http.Handler
 }
 
-type loggingMiddleware struct{}
+type LoggingAttrsFunc func(context.Context) []any
 
-func NewLoggingMiddleware() loggingMiddleware {
-	return loggingMiddleware{}
+type LoggingMiddlewareOpt func(*loggingMiddleware)
+
+type loggingMiddleware struct {
+	attrs         LoggingAttrsFunc
+	samplePercent int
 }
 
-func (loggingMiddleware) Middleware(next http.Handler) http.Handler {
+func NewLoggingMiddleware(opts ...LoggingMiddlewareOpt) loggingMiddleware {
+	m := loggingMiddleware{samplePercent: requestLogSamplePercent}
+	for _, opt := range opts {
+		opt(&m)
+	}
+	return m
+}
+
+func WithLoggingAttrs(fn LoggingAttrsFunc) LoggingMiddlewareOpt {
+	return func(m *loggingMiddleware) {
+		m.attrs = fn
+	}
+}
+
+func WithLoggingSamplePercent(percent int) LoggingMiddlewareOpt {
+	return func(m *loggingMiddleware) {
+		m.samplePercent = percent
+	}
+}
+
+func (m loggingMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 		start := time.Now()
@@ -40,18 +64,22 @@ func (loggingMiddleware) Middleware(next http.Handler) http.Handler {
 		if status == http.StatusOK {
 			return
 		}
-		if rand.Intn(100) >= requestLogSamplePercent {
+		if m.samplePercent <= 0 || rand.Intn(100) >= m.samplePercent {
 			return
 		}
 
-		logger.StdlibLogger(r.Context()).Warn(
-			"http api request returned non-200 (sampled)",
+		args := []any{
 			"method", util.SanitizeLogField(r.Method),
 			"route", util.SanitizeLogField(chi.RouteContext(r.Context()).RoutePattern()),
 			"path", util.SanitizeLogField(r.URL.Path),
 			"status", status,
 			"duration_ms", time.Since(start).Milliseconds(),
 			"bytes_written", ww.BytesWritten(),
-		)
+		}
+		if m.attrs != nil {
+			args = append(args, m.attrs(r.Context())...)
+		}
+
+		logger.StdlibLogger(r.Context()).Warn("http api request returned non-200 (sampled)", args...)
 	})
 }
