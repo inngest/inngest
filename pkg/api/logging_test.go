@@ -85,7 +85,8 @@ func TestLoggingMiddlewareSanitizesRequestFields(t *testing.T) {
 		w.WriteHeader(http.StatusTeapot)
 	}))
 
-	req := httptest.NewRequest("GET\n", "/bad", nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/bad", nil).WithContext(ctx)
+	req.Method = "GET\n"
 	req.URL.Path = "/bad\npath"
 	routeCtx := chi.NewRouteContext()
 	routeCtx.RoutePatterns = []string{"/bad/{id}\n"}
