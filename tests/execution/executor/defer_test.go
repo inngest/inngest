@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -1015,6 +1016,84 @@ func TestDeferPropagatesSessions(t *testing.T) {
 	r.Equal("o_9", evt.Meta.Sessions["org"], "propagated-only key fills a free slot")
 	r.Len(evt.Meta.Sessions, 3)
 	r.Empty(evt.Meta.PropagatedSessions, "propagated layer consumed by ResolveSessions")
+}
+
+// TestDeferRejectsOversizedManualSessions asserts the post-merge validation.
+//
+// Invalid sessions should drop the event rather than scheduling with an
+// invalid session set or failing the parent run.
+func TestDeferRejectsOversizedManualSessions(t *testing.T) {
+	r := require.New(t)
+	infra := newExecTestInfra(t, "step-defer")
+
+	const hashedID = "hash-oversized"
+
+	// consts.MaxEventSessions + 1 manual keys: too many to be a valid event.
+	oversized := map[string]any{}
+	for k := 0; k <= consts.MaxEventSessions; k++ {
+		oversized[fmt.Sprintf("k%d", k)] = fmt.Sprintf("v%d", k)
+	}
+	r.Greater(len(oversized), consts.MaxEventSessions)
+
+	ops := []*state.GeneratorOpcode{
+		{
+			Op: enums.OpcodeDeferAdd,
+			ID: hashedID,
+			Opts: map[string]any{
+				"fn_slug": infra.fn.Slug,
+				"input":   map[string]any{},
+				"meta":    map[string]any{"sessions": oversized},
+			},
+		},
+		{
+			Op:   enums.OpcodeRunComplete,
+			ID:   "run-complete",
+			Data: json.RawMessage(`{"data": {}}`),
+		},
+	}
+
+	driver := &mockDriverV1{
+		t:        t,
+		response: &state.DriverResponse{StatusCode: 206, Generator: ops},
+	}
+	exec := infra.newExecutor(t, executor.WithDriverV1(driver))
+
+	var finalizationEvents []event.Event
+	exec.SetFinalizer(func(_ context.Context, _ statev2.ID, events []event.Event) error {
+		finalizationEvents = append(finalizationEvents, events...)
+		return nil
+	})
+
+	parentRun := infra.scheduleRun(t, exec)
+	_, err := exec.Execute(infra.ctx, state.Identifier{
+		WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID,
+	}, queue.Item{
+		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID},
+		Kind:        queue.KindStart,
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: hashedID}},
+		WorkspaceID: infra.wsID,
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: hashedID})
+	r.NoError(err, "parent run still finalizes cleanly")
+
+	r.False(hasDeferEvent(finalizationEvents, parentRun.ID.RunID, hashedID),
+		"deferred.schedule event should be dropped for an invalid session set")
+}
+
+// hasDeferEvent reports whether a deferred.schedule event was emitted for
+// (parentRunID, hashedID). Unlike findDeferEvent it does not fail the test on
+// absence, so it can assert an event was dropped.
+func hasDeferEvent(events []event.Event, parentRunID ulid.ULID, hashedID string) bool {
+	wantSpanID := tracing.DeferSpanRef(parentRunID, hashedID).DynamicSpanID
+	for _, e := range events {
+		md, err := e.DeferredScheduleMetadata()
+		if err != nil || md.ParentDeferSpan == nil {
+			continue
+		}
+		if md.ParentDeferSpan.DynamicSpanID == wantSpanID {
+			return true
+		}
+	}
+	return false
 }
 
 // findDeferEvent picks the deferred.schedule event whose ParentDeferSpan
