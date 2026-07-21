@@ -951,11 +951,13 @@ func (i *execTestInfra) runParentDefer(t *testing.T, hashedIDs ...string) (ulid.
 }
 
 // TestDeferPropagatesSessions drives the full defer session-propagation path:
-// a DeferAdd op carrying meta.propagatedSessions rides through SaveFromOp and
-// the persisted Defer to Finalize, where buildDeferEvents resolves the
-// propagated layer onto the emitted deferred.schedule event. Propagated folds
-// into the manual layer, so the inherited session surfaces on Meta.Sessions
-// and the propagated layer is consumed.
+// a DeferAdd op carrying both a manual meta.sessions layer and a
+// meta.propagatedSessions layer rides through SaveFromOp and the persisted
+// Defer to Finalize, where buildDeferEvents resolves the two layers onto the
+// emitted deferred.schedule event. ResolveSessions folds propagated into
+// manual: manual wins on a key collision (tenant), manual-only keys pass
+// through (user), and propagated-only keys fill free slots (org). The
+// propagated layer is consumed in the process.
 func TestDeferPropagatesSessions(t *testing.T) {
 	r := require.New(t)
 	infra := newExecTestInfra(t, "step-defer")
@@ -972,7 +974,8 @@ func TestDeferPropagatesSessions(t *testing.T) {
 				// The SDK stamps the inherited session layer here at defer
 				// call-time.
 				"meta": map[string]any{
-					"propagatedSessions": map[string]any{"tenant": "acme"},
+					"sessions":           map[string]any{"tenant": "manual-wins", "user": "u_1"},
+					"propagatedSessions": map[string]any{"tenant": "acme", "org": "o_9"},
 				},
 			},
 		},
@@ -1007,10 +1010,11 @@ func TestDeferPropagatesSessions(t *testing.T) {
 	r.NoError(err)
 
 	evt := findDeferEvent(t, finalizationEvents, parentRun.ID.RunID, hashedID)
-	r.Equal("acme", evt.Meta.Sessions["tenant"],
-		"propagated session should fold into the resolved manual layer")
-	r.Empty(evt.Meta.PropagatedSessions,
-		"propagated layer should be consumed by ResolveSessions")
+	r.Equal("manual-wins", evt.Meta.Sessions["tenant"], "manual layer wins on key collision")
+	r.Equal("u_1", evt.Meta.Sessions["user"], "manual-only key survives")
+	r.Equal("o_9", evt.Meta.Sessions["org"], "propagated-only key fills a free slot")
+	r.Len(evt.Meta.Sessions, 3)
+	r.Empty(evt.Meta.PropagatedSessions, "propagated layer consumed by ResolveSessions")
 }
 
 // findDeferEvent picks the deferred.schedule event whose ParentDeferSpan
