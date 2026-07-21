@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.38.1] - 2026-07-21
+
+### 🐛 Bug Fixes
+
+- *(api)* Clarify run list commands and docs (#4647)
+
 ## [v1.38.0] - 2026-07-21
 
 ### 🚀 Features
@@ -34,6 +40,7 @@ All notable changes to this project will be documented in this file.
 
 - Add event lifecycle hooks (#4624)
 - Align auto-labels with Linear (#4634)
+- *(release)* V1.38.0 (#4615)
 
 ## [v1.37.0] - 2026-07-14
 
