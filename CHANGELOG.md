@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.38.0] - 2026-07-21
+
+### 🚀 Features
+
+- *(dashboard)* Add Sandboxes waitlist (#4611)
+- *(queue)* Define grpc service interfaces for queue producer and consumer (#4610)
+- *(queue)* Route RequeueByJobID through producer (#4613)
+- Enforce one-year maximum duration for sleep and wait-for-event (#4628)
+- Normalize and instrument AI feature empty state pages (#4620)
+- *(cli)* Add API command usage metrics (#4642)
+- *(api)* Add v2 runs list endpoints (#4621)
+
+### 🐛 Bug Fixes
+
+- Fix the ordering and queue time of async opcodes (#4608)
+- *(queue)* Expose partition size on job queue reader (#4619)
+- *(insights ai)* Attribute Insights cost/latency/token scores to their experiment variant (bump inngest 4.13.0) (#4641)
+
+### 🚜 Refactor
+
+- *(queue)* Route processor dequeue and requeue through queue interfaces (#4639)
+- *(runs)* Consolidate oss runs queries (#4623)
+
+### 📚 Documentation
+
+- EXE-2021 Add CLI callout to API docs (#4618)
+- Add guidance on Postgres retention for self-hosting (#4357)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add event lifecycle hooks (#4624)
+- Align auto-labels with Linear (#4634)
+
 ## [v1.37.0] - 2026-07-14
 
 ### 🚀 Features
@@ -46,6 +79,7 @@ All notable changes to this project will be documented in this file.
 - *(tygo-collect)* Gofmt generated output (#4586)
 - Remove unused TotalSystemQueueDepth from QueueManager interface (#4574)
 - Cache our pnpm installation (#4588)
+- *(release)* V1.37.0 (#4587)
 
 ## [v1.36.0] - 2026-07-08
 
