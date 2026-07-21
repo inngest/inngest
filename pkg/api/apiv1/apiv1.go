@@ -52,6 +52,11 @@ type Opts struct {
 	TraceReader cqrs.TraceReader
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
 	MetricsMiddleware api.MetricsMiddleware
+	// LoggingMiddleware, if set, is applied immediately after the auth
+	// middleware so the request-scoped logger it reads already carries the
+	// authenticated account/user attributes. Callers (e.g. cloud) supply the
+	// implementation; the dev server leaves it nil.
+	LoggingMiddleware api.LoggingMiddleware
 
 	// ExtendedTraceCapCheck is consulted after /v1/traces/userland reads and
 	// parses a valid payload, but before it writes spans. Implementations return
@@ -168,6 +173,10 @@ func (a *router) setup() {
 
 			if a.opts.MetricsMiddleware != nil {
 				r.Use(a.opts.MetricsMiddleware.Middleware)
+			}
+
+			if a.opts.LoggingMiddleware != nil {
+				r.Use(a.opts.LoggingMiddleware.Middleware)
 			}
 
 			r.Use(headers.ContentTypeJsonResponse())
