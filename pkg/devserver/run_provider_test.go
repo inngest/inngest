@@ -11,11 +11,13 @@ import (
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -181,13 +183,66 @@ func TestScoreMetadataLoaderMapsMissingRowsToMetadataNotFound(t *testing.T) {
 	require.ErrorIs(t, err, sv2.ErrMetadataNotFound)
 }
 
+func TestRunProviderGetEventRunsUsesSharedRunList(t *testing.T) {
+	appID := uuid.New()
+	functionID := uuid.New()
+	runID := ulid.Make()
+	eventID := ulid.Make()
+	cursor := "opaque-cursor"
+	startedAt := time.Now().UTC()
+
+	data := &stubRunProviderDataReader{
+		listedRuns: []*cqrs.TraceRun{{
+			RunID:        runID.String(),
+			Cursor:       "next-cursor",
+			AppID:        appID,
+			AppName:      "inngest-ai",
+			FunctionID:   functionID,
+			FunctionSlug: "hello-world",
+			FunctionName: "Hello",
+			StartedAt:    startedAt,
+			Status:       enums.RunStatusCompleted,
+			TriggerIDs:   []string{eventID.String()},
+		}},
+	}
+	provider := &runProvider{data: data}
+
+	result, err := provider.GetRuns(t.Context(), apiv2.GetRunsOpts{
+		EventID: eventID,
+		Cursor:  cursor,
+		Limit:   20,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Runs, 1)
+	require.NotNil(t, data.listOpts)
+	assert.Equal(t, consts.DevServerAccountID, data.listOpts.Filter.AccountID)
+	assert.Equal(t, consts.DevServerEnvID, data.listOpts.Filter.WorkspaceID)
+	assert.Equal(t, []ulid.ULID{eventID}, data.listOpts.Filter.EventID)
+	assert.Equal(t, cursor, data.listOpts.Cursor)
+	assert.Equal(t, uint(21), data.listOpts.Items)
+	assert.Equal(t, enums.TraceRunTimeQueuedAt, data.listOpts.Filter.TimeField)
+	assert.Equal(t, enums.TraceRunOrderDesc, data.listOpts.Order[0].Direction)
+	assert.Equal(t, "inngest-ai", result.Runs[0].AppID)
+	assert.Equal(t, "hello-world", result.Runs[0].FunctionID)
+	assert.Equal(t, "Hello", result.Runs[0].FunctionName)
+	assert.Equal(t, eventID, result.Runs[0].EventID)
+	assert.Equal(t, "next-cursor", result.Runs[0].Cursor)
+}
+
 type stubRunProviderDataReader struct {
-	run    *cqrs.FunctionRun
-	runErr error
-	fn     *cqrs.Function
-	fnErr  error
-	evt    *cqrs.Event
-	evtErr error
+	run        *cqrs.FunctionRun
+	runErr     error
+	fn         *cqrs.Function
+	fnErr      error
+	evt        *cqrs.Event
+	evtErr     error
+	listedRuns []*cqrs.TraceRun
+	listOpts   *cqrs.GetTraceRunOpt
+}
+
+func (s *stubRunProviderDataReader) GetRuns(ctx context.Context, opts cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	s.listOpts = &opts
+	return s.listedRuns, nil
 }
 
 func (s *stubRunProviderDataReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {

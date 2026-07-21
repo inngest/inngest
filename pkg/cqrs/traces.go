@@ -382,6 +382,10 @@ type TraceRun struct {
 	CronSchedule *string         `json:"cron_schedule,omitempty"`
 	// Cursor is a composite cursor used for pagination
 	Cursor string `json:"cursor"`
+
+	AppName      string `json:"app_name,omitempty"`
+	FunctionSlug string `json:"function_slug,omitempty"`
+	FunctionName string `json:"function_name,omitempty"`
 }
 
 type SpanOutput struct {
@@ -452,10 +456,11 @@ type TraceReader interface {
 }
 
 type GetTraceRunOpt struct {
-	Filter GetTraceRunFilter
-	Order  []GetTraceRunOrder
-	Cursor string
-	Items  uint
+	Filter        GetTraceRunFilter
+	Order         []GetTraceRunOrder
+	Cursor        string
+	Items         uint
+	IncludeOutput bool
 	// Whether the run list should use the tracing preview stores
 	Preview bool
 }
@@ -491,16 +496,19 @@ func GetRunOptFromContext(ctx context.Context) GetRunOpt {
 }
 
 type GetTraceRunFilter struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	AppID       []uuid.UUID
-	FunctionID  []uuid.UUID
-	TimeField   enums.TraceRunTime
-	From        time.Time
-	Until       time.Time
-	Status      []enums.RunStatus
-	CEL         string
-	IsDeferred  *bool
+	AccountID    uuid.UUID
+	WorkspaceID  uuid.UUID
+	AppID        []uuid.UUID
+	FunctionID   []uuid.UUID
+	AppName      []string
+	FunctionSlug []string
+	EventID      []ulid.ULID
+	TimeField    enums.TraceRunTime
+	From         time.Time
+	Until        time.Time
+	Status       []enums.RunStatus
+	CEL          string
+	IsDeferred   *bool
 }
 
 type GetTraceRunOrder struct {

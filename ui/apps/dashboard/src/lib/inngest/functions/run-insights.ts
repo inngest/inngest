@@ -259,15 +259,25 @@ export const runInsightsAgent = inngest.createFunction(
       : 0;
 
     await step.run('emit-scores', async () => {
-      await inngest.score({
+      // .experiment() tags each score with its variant; runId writes them to the run span, one clean row per run.
+      await inngest.score.experiment({
         name: 'query_writer_latency_ms',
         value: latencyMs,
+        experiment: experimentRef,
+        runId,
       });
-      await inngest.score({
+      await inngest.score.experiment({
         name: 'query_writer_output_tokens',
         value: result.tokensOut,
+        experiment: experimentRef,
+        runId,
       });
-      await inngest.score({ name: 'query_writer_cost_usd', value: costUsd });
+      await inngest.score.experiment({
+        name: 'query_writer_cost_usd',
+        value: costUsd,
+        experiment: experimentRef,
+        runId,
+      });
       await inngest.score({
         name: 'insights_agent_submitted',
         value: draft.sql ? 1 : 0,

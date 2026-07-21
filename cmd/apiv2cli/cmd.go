@@ -22,6 +22,7 @@ import (
 	openapiv2 "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/api/tel"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -96,12 +97,29 @@ func endpointCommands() []*cli.Command {
 			Flags:       endpointFlags(ep),
 			Arguments:   endpointArguments(ep),
 			Action: func(ctx context.Context, cmd *cli.Command) error {
+				tel.SendCommandExecutedEvent(ctx, "inngest api", commandTelemetryContext(cmd, ep))
 				return callEndpoint(ctx, cmd, ep)
 			},
 		})
 	}
 
 	return cmds
+}
+
+func commandTelemetryContext(cmd *cli.Command, ep endpoint) map[string]any {
+	flags := []string{}
+	for _, flag := range append(commonFlags(), endpointFlags(ep)...) {
+		name := flag.Names()[0]
+		if cmd.IsSet(name) {
+			flags = append(flags, name)
+		}
+	}
+	slices.Sort(flags)
+
+	return map[string]any{
+		"endpoint": ep.name,
+		"flags":    flags,
+	}
 }
 
 func commonFlags() []cli.Flag {

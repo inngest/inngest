@@ -76,13 +76,14 @@ type GetRunOpts struct {
 
 type GetRunsOpts struct {
 	EventID       ulid.ULID
-	Cursor        ulid.ULID
+	Cursor        string
 	Limit         int
 	IncludeOutput bool
 }
 
 type RunListItem struct {
 	RunID        ulid.ULID
+	Cursor       string
 	RunStartedAt time.Time
 	EventID      ulid.ULID
 	BatchID      *ulid.ULID
