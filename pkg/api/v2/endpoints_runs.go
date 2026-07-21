@@ -214,12 +214,25 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
 	}
 
+	reqOpts := RerunOpts{}
 	if req.FromStep != nil {
-		// TODO: Re-enable once rerun from step reconstruction is fully implemented.
-		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Rerun from step is not yet implemented")
+		if req.FromStep.StepId == "" {
+			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Step ID is required")
+		}
+
+		fromStep := &RerunFromStep{StepID: req.FromStep.StepId}
+		if req.FromStep.Input != nil {
+			input, err := json.Marshal(req.FromStep.Input.AsSlice())
+			if err != nil {
+				return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Step input must be a valid JSON array")
+			}
+			fromStep.Input = input
+		}
+
+		reqOpts.FromStep = fromStep
 	}
 
-	newRunID, err := s.runs.Rerun(ctx, runID, RerunOpts{})
+	newRunID, err := s.runs.Rerun(ctx, runID, reqOpts)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrRunNotFound):

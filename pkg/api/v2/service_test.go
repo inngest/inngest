@@ -1336,11 +1336,17 @@ func TestService_Rerun(t *testing.T) {
 		require.NotNil(t, resp.Metadata.FetchedAt)
 	})
 
-	t.Run("rejects from step opts", func(t *testing.T) {
+	t.Run("reruns from step", func(t *testing.T) {
 		input, err := structpb.NewList([]any{map[string]any{"foo": "bar"}})
 		require.NoError(t, err)
 
 		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{
+			FromStep: &RerunFromStep{
+				StepID: "step-1",
+				Input:  json.RawMessage(`[{"foo":"bar"}]`),
+			},
+		}).Return(newRunID, nil).Once()
 		t.Cleanup(func() {
 			rerun.AssertExpectations(t)
 		})
@@ -1354,8 +1360,8 @@ func TestService_Rerun(t *testing.T) {
 			},
 		})
 
-		require.Nil(t, resp)
-		require.ErrorContains(t, err, "Rerun from step is not yet implemented")
+		require.NoError(t, err)
+		require.Equal(t, newRunID.String(), resp.Data.RunId)
 	})
 
 	t.Run("requires run id", func(t *testing.T) {
@@ -1384,7 +1390,7 @@ func TestService_Rerun(t *testing.T) {
 		})
 
 		require.Nil(t, resp)
-		require.ErrorContains(t, err, "Rerun from step is not yet implemented")
+		require.ErrorContains(t, err, "Step ID is required")
 	})
 
 	t.Run("maps missing run", func(t *testing.T) {
