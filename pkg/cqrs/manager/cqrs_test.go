@@ -2729,7 +2729,46 @@ func TestCQRSGetRunsMapsScheduledStatusFilter(t *testing.T) {
 	assert.Equal(t, enums.RunStatusScheduled, runs[0].Status)
 }
 
-func TestCQRSGetRunsFiltersByFinalEndedAt(t *testing.T) {
+func TestCQRSGetRunsIncludesStartedAtRangeBoundaries(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+	appID := uuid.New()
+	functionID := uuid.New()
+	from := time.Now().UTC().Truncate(time.Second)
+	until := from.Add(time.Minute)
+
+	for i, startedAt := range []time.Time{from, until} {
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:         ulid.Make().String(),
+			DynamicSpanID: fmt.Sprintf("dyn-boundary-%d", i),
+			Name:          meta.SpanNameRun,
+			Status:        enums.StepStatusQueued.String(),
+			StartTime:     startedAt,
+			AccountID:     accountID.String(),
+			AppID:         appID.String(),
+			FunctionID:    functionID.String(),
+			EnvID:         workspaceID.String(),
+		})
+	}
+
+	runs, err := cm.GetRuns(t.Context(), cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: workspaceID,
+			TimeField: enums.TraceRunTimeStartedAt,
+			From:      from,
+			Until:     until,
+		},
+		Order: []cqrs.GetTraceRunOrder{{Field: enums.TraceRunTimeStartedAt, Direction: enums.TraceRunOrderAsc}},
+		Items: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 2)
+}
+
+func TestCQRSGetRunsIncludesFinalEndedAtUntilBoundary(t *testing.T) {
 	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
@@ -2759,7 +2798,7 @@ func TestCQRSGetRunsFiltersByFinalEndedAt(t *testing.T) {
 			AccountID: accountID.String(), AppID: appID.String(), FunctionID: functionID.String(), EnvID: workspaceID.String(),
 		})
 	}
-	insertLifecycle(insideRunID, "dyn-ended-inside", baseTime.Add(5*time.Second))
+	insertLifecycle(insideRunID, "dyn-ended-inside", baseTime.Add(10*time.Second-100*time.Millisecond))
 	insertLifecycle(outsideRunID, "dyn-ended-outside", baseTime.Add(15*time.Second))
 
 	runs, err := cm.GetRuns(t.Context(), cqrs.GetTraceRunOpt{
