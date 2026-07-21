@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 // requestLogSamplePercent is the percentage of non-200 HTTP responses logged.
@@ -45,9 +46,9 @@ func (loggingMiddleware) Middleware(next http.Handler) http.Handler {
 
 		logger.StdlibLogger(r.Context()).Warn(
 			"http api request returned non-200 (sampled)",
-			"method", r.Method,
-			"route", chi.RouteContext(r.Context()).RoutePattern(),
-			"path", r.URL.Path,
+			"method", util.SanitizeLogField(r.Method),
+			"route", util.SanitizeLogField(chi.RouteContext(r.Context()).RoutePattern()),
+			"path", util.SanitizeLogField(r.URL.Path),
 			"status", status,
 			"duration_ms", time.Since(start).Milliseconds(),
 			"bytes_written", ww.BytesWritten(),
