@@ -1018,15 +1018,20 @@ func TestDeferPropagatesSessions(t *testing.T) {
 	r.Empty(evt.Meta.PropagatedSessions, "propagated layer consumed by ResolveSessions")
 }
 
-// TestDeferRejectsOversizedManualSessions asserts the post-merge validation.
+// TestDeferRejectsOversizedManualSessions asserts the post-merge validation
+// and its per-defer isolation.
 //
-// Invalid sessions should drop the event rather than scheduling with an
-// invalid session set or failing the parent run.
+// Invalid sessions should drop only that defer's event — rather than
+// scheduling with an invalid session set, failing the parent run, or taking
+// sibling defers down with it: buildDeferEvents `continue`s past each
+// rejected defer, so a valid sibling registered in the same run must still
+// schedule.
 func TestDeferRejectsOversizedManualSessions(t *testing.T) {
 	r := require.New(t)
 	infra := newExecTestInfra(t, "step-defer")
 
 	const hashedID = "hash-oversized"
+	const siblingID = "hash-valid-sibling"
 
 	// consts.MaxEventSessions + 1 manual keys: too many to be a valid event.
 	oversized := map[string]any{}
@@ -1043,6 +1048,15 @@ func TestDeferRejectsOversizedManualSessions(t *testing.T) {
 				"fn_slug": infra.fn.Slug,
 				"input":   map[string]any{},
 				"meta":    map[string]any{"sessions": oversized},
+			},
+		},
+		{
+			Op: enums.OpcodeDeferAdd,
+			ID: siblingID,
+			Opts: map[string]any{
+				"fn_slug": infra.fn.Slug,
+				"input":   map[string]any{},
+				"meta":    map[string]any{"sessions": map[string]any{"tenant": "t_1"}},
 			},
 		},
 		{
@@ -1077,6 +1091,18 @@ func TestDeferRejectsOversizedManualSessions(t *testing.T) {
 
 	r.False(hasDeferEvent(finalizationEvents, parentRun.ID.RunID, hashedID),
 		"deferred.schedule event should be dropped for an invalid session set")
+
+	evt := findDeferEvent(t, finalizationEvents, parentRun.ID.RunID, siblingID)
+	r.Equal("t_1", evt.Meta.Sessions["tenant"], "valid sibling keeps its own sessions")
+	r.Len(evt.Meta.Sessions, 1)
+
+	deferEvents := 0
+	for _, e := range finalizationEvents {
+		if e.Name == consts.FnDeferScheduleName {
+			deferEvents++
+		}
+	}
+	r.Equal(1, deferEvents, "only the valid sibling schedules")
 }
 
 // TestDeferSessionTombstones pins the tombstone single-hop invariant: RFC 7386
