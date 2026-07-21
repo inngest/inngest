@@ -23,6 +23,7 @@ var (
 	ErrStepOutputTooLarge = fmt.Errorf("step output size is greater than the limit")
 	ErrDeferInputTooLarge = fmt.Errorf("defer input size is greater than the limit")
 	ErrDeferInputInvalid  = fmt.Errorf("defer input is not a valid JSON object")
+	ErrDeferMetaTooLarge  = fmt.Errorf("defer meta size is greater than the limit")
 )
 
 type GeneratorOpcode struct {
@@ -445,6 +446,18 @@ func (d *DeferAddOpts) Validate() error {
 		// Redis (per defer × per run) and inflating them into the
 		// deferred.schedule event bus on Finalize.
 		return ErrDeferInputTooLarge
+	}
+	if len(d.Meta) > consts.MaxEventMetaSize {
+		// Meta is persisted as a raw, unparsed blob until the parent run
+		// finalizes (up to a year, x MaxDefersPerRun), so this byte cap is its
+		// only bound before then. A raw length check avoids parsing here,
+		// keeping the tombstone single-hop invariant intact; shape and size of
+		// the sessions themselves are validated post-merge at finalize. The
+		// sibling primitives don't need this cap: invoke materializes and
+		// validates its payload at op receipt and resolves in-request, and
+		// sendEvent meta rides inside the event, bounded by the event-size
+		// caps at API ingest.
+		return ErrDeferMetaTooLarge
 	}
 	return nil
 }

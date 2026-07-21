@@ -105,6 +105,19 @@ const (
 	// the parent run.
 	MaxDeferInputAggregateSize = 1024 * 1024 * 4 // 4MB
 
+	// MaxEventMetaSize is the maximum size, in bytes, of a raw event-meta blob
+	// carried opaquely on an op that persists it before validation.
+	//
+	// Currently, only DeferAdd validates. Other uses of EventMeta perform other
+	// validation before persistence.
+	//
+	// Sized from the sessions worst case: two full session layers
+	// (MaxEventSessions entries each at MaxEventSessionKeyLength +
+	// MaxEventSessionIDLength ≈ 3.2KB per layer) plus a null tombstone for every
+	// inheritable key (~0.7KB) is ~7KB, so 32KB leaves ~4.5x headroom for real
+	// tombstone use and modest future meta fields.
+	MaxEventMetaSize = 32 * 1024 // 32KB
+
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 
