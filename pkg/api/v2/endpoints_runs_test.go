@@ -65,6 +65,30 @@ func TestToFunctionRun(t *testing.T) {
 	require.Nil(t, result.Output)
 }
 
+func TestRunCancellability(t *testing.T) {
+	tests := []struct {
+		name   string
+		status enums.RunStatus
+		err    error
+	}{
+		{name: "cancelled", status: enums.RunStatusCancelled, err: ErrRunAlreadyCancelled},
+		{name: "completed", status: enums.RunStatusCompleted, err: ErrRunEnded},
+		{name: "running", status: enums.RunStatusRunning},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := RunCancellability(test.status)
+
+			if test.err == nil {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorIs(t, err, test.err)
+		})
+	}
+}
+
 func TestToFunctionRunOmitsOptionalFields(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 
