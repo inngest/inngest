@@ -196,4 +196,8 @@ var (
 	// ErrDeferInputTooLarge re-exports the v1 error so v2 callers can match
 	// without importing v1.
 	ErrDeferInputTooLarge = state.ErrDeferInputTooLarge
+
+	// ErrDeferMetaTooLarge re-exports the v1 error so v2 callers can match
+	// without importing v1.
+	ErrDeferMetaTooLarge = state.ErrDeferMetaTooLarge
 )
