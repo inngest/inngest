@@ -821,6 +821,14 @@ func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName s
 	case protoreflect.EnumKind:
 		return cmd.String(flagName), nil
 	case protoreflect.MessageKind, protoreflect.GroupKind:
+		if field.Message().FullName() == "google.protobuf.Timestamp" {
+			value, err := parseTimestamp(cmd.String(flagName))
+			if err != nil {
+				return nil, fmt.Errorf("--%s must be an RFC 3339 timestamp: %w", flagName, err)
+			}
+			return value, nil
+		}
+
 		var value any
 		if err := json.Unmarshal([]byte(cmd.String(flagName)), &value); err != nil {
 			return nil, fmt.Errorf("--%s must be valid JSON: %w", flagName, err)
@@ -831,6 +839,20 @@ func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName s
 	default:
 		return nil, fmt.Errorf("unsupported field type for --%s", flagName)
 	}
+}
+
+func parseTimestamp(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if strings.HasPrefix(trimmed, `"`) {
+		if err := json.Unmarshal([]byte(trimmed), &value); err != nil {
+			return "", err
+		}
+	}
+
+	if _, err := time.Parse(time.RFC3339Nano, value); err != nil {
+		return "", err
+	}
+	return value, nil
 }
 
 func authToken(cmd *cli.Command) (string, error) {
