@@ -932,6 +932,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		requestTime = req.Events[0].GetReceivedAt()
 	}
 
+	callbackReq := cloneScheduleRequest(req)
+
 	// Check constraints and acquire lease
 	md, err := WithConstraints(
 		ctx,
@@ -948,16 +950,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					md  *sv2.Metadata
 					err error
 				)
-				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks)
+				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks, &callbackReq)
 				return md, err
 			}, util.WithBoundaries(2*time.Second))
 		})
 
 	switch {
 	case errors.Is(err, ErrFunctionRateLimited):
-		reqSnapshot := cloneScheduleRequest(req)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnRateLimited(ctx, reqSnapshot)
+			l.OnRateLimited(ctx, callbackReq)
 		})
 	case errors.Is(err, ErrFunctionSkippedIdempotency),
 		errors.Is(err, state.ErrIdentifierExists),
@@ -968,16 +969,14 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if errors.Is(err, ErrFunctionSkippedIdempotency) {
 			skip.ExistingRunID = runID
 		}
-		reqSnapshot := cloneScheduleRequest(req)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnFunctionSkippedIdempotency(ctx, reqSnapshot, skip)
+			l.OnFunctionSkippedIdempotency(ctx, callbackReq, skip)
 		})
 	case errors.Is(err, ErrFunctionDebounced), errors.Is(err, ErrFunctionSkipped), err == nil:
 		// Handled by more specific lifecycle hooks inside schedule.
 	default:
-		reqSnapshot := cloneScheduleRequest(req)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnFunctionScheduleFailed(ctx, reqSnapshot, err)
+			l.OnFunctionScheduleFailed(ctx, callbackReq, err)
 		})
 	}
 
@@ -1016,12 +1015,16 @@ func (e *executor) schedule(
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
+	callbackReq *execution.ScheduleRequest,
 ) (*ulid.ULID, *sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, nil, fmt.Errorf("app ID is required to schedule a run")
 	}
 
 	req = cloneScheduleRequest(req)
+	if callbackReq != nil {
+		*callbackReq = cloneScheduleRequest(req)
+	}
 
 	ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
@@ -1236,6 +1239,9 @@ func (e *executor) schedule(
 	// Event lifecycles that run after scheduling should observe the fully
 	// enriched request context, not just the caller-provided fields.
 	reqSnapshot := cloneScheduleRequest(req)
+	if callbackReq != nil {
+		*callbackReq = reqSnapshot
+	}
 
 	metadata := sv2.Metadata{
 		ID: sv2.ID{
