@@ -655,6 +655,9 @@ func rerunFromStepEdge(req execution.ScheduleRequest, memoizedSteps []state.Memo
 		//
 		// Runnable steps should execute directly with any FromStep input override.
 		edge.IncomingGeneratorStep = req.FromStep.StepID
+		if result != nil && result.fromStepID != "" {
+			edge.IncomingGeneratorStep = result.fromStepID
+		}
 	}
 	if len(memoizedSteps) > 0 {
 		//

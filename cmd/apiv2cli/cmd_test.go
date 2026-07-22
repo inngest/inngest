@@ -160,7 +160,7 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
 }
 
-func TestRerunFromStepFlagDescribesJSONShape(t *testing.T) {
+func TestRerunFromStepFlagsDescribeSimpleShape(t *testing.T) {
 	var rerun endpoint
 	for _, ep := range discoverEndpoints() {
 		if ep.name == "rerun" {
@@ -176,9 +176,8 @@ func TestRerunFromStepFlagDescribesJSONShape(t *testing.T) {
 		byName[flag.Names()[0]] = flag
 	}
 
-	require.Contains(t, byName["from-step"].String(), `{"stepId":"5b8ee3806d3f5184753c00662758aaaf831cabf5","input":[{"foo":"bar"}]}`)
-	require.Contains(t, byName["from-step"].String(), "Use the stepId from get-function-trace, not the step name")
-	require.Contains(t, byName["from-step"].String(), "input field is optional and must be an array")
+	require.Contains(t, byName["from-step"].String(), "Step name to rerun from")
+	require.Contains(t, byName["input"].String(), "replacement step input as a JSON array")
 }
 
 func TestEndpointDescriptionReferencesValidFlags(t *testing.T) {
@@ -250,6 +249,53 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 		"idempotencyKey": "idem-1",
 	}, gotBody)
 	require.Contains(t, out.String(), `"runId": "01J00000000000000000000000"`)
+}
+
+func TestCommandBuildsRerunFromStepBody(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"runId":"01J00000000000000000000000"}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"rerun",
+		"01J00000000000000000000001",
+		"--from-step", "step 2",
+		"--input", `[{"foo":"bar"}]`,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{
+		"fromStep": map[string]any{
+			"stepId": "step 2",
+			"input":  []any{map[string]any{"foo": "bar"}},
+		},
+	}, gotBody)
+
+	cmd = Command()
+	cmd.Writer = &bytes.Buffer{}
+	err = cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"rerun",
+		"01J00000000000000000000001",
+		"--body", `{"fromStep":{"stepId":"step 3","input":[1]}}`,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{
+		"fromStep": map[string]any{
+			"stepId": "step 3",
+			"input":  []any{float64(1)},
+		},
+	}, gotBody)
 }
 
 func TestCommandUsesQueryParamsForGetEndpoint(t *testing.T) {
