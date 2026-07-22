@@ -5153,6 +5153,15 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 		SourceFnVersion: runCtx.Metadata().Config.FunctionVersion,
 	})
 
+	// Merge the invocation payload's two session layers before the event is
+	// published.
+	evt.Event.Meta.ResolveSessions()
+
+	// Validate the sessions after the merge
+	if err := evt.Event.Meta.Sessions.Validate(); err != nil {
+		return execError{err: fmt.Errorf("invalid step.invoke sessions: %w", err), final: true}
+	}
+
 	pause := state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         runCtx.Metadata().ID.Tenant.EnvID,
