@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -185,6 +186,12 @@ func (p *runProvider) Rerun(ctx context.Context, runID ulid.ULID, opts apiv2.Rer
 		PreventRateLimit: true,
 	})
 	if err != nil {
+		switch {
+		case errors.Is(err, executor.ErrRerunStepNotFound):
+			return ulid.ULID{}, apiv2.ErrRerunStepNotFound
+		case errors.Is(err, executor.ErrRerunStepAmbiguous):
+			return ulid.ULID{}, apiv2.ErrRerunStepAmbiguous
+		}
 		return ulid.ULID{}, err
 	}
 	if newRunID == nil {

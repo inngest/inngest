@@ -647,6 +647,9 @@ func rerunFromStepEdge(req execution.ScheduleRequest, memoizedSteps []state.Memo
 	if req.FromStep == nil || req.FromStep.StepID == "" {
 		return inngest.SourceEdge
 	}
+	if result == nil || result.fromStepID == "" {
+		panic("rerun from step reconstruction result is required")
+	}
 
 	edge := inngest.Edge{
 		Incoming: inngest.TriggerName,
@@ -654,10 +657,7 @@ func rerunFromStepEdge(req execution.ScheduleRequest, memoizedSteps []state.Memo
 	if shouldTargetRerunFromStep(result) {
 		//
 		// Runnable steps should execute directly with any FromStep input override.
-		edge.IncomingGeneratorStep = req.FromStep.StepID
-		if result != nil && result.fromStepID != "" {
-			edge.IncomingGeneratorStep = result.fromStepID
-		}
+		edge.IncomingGeneratorStep = result.fromStepID
 	}
 	if len(memoizedSteps) > 0 {
 		//

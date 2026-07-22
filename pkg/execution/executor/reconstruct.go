@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -13,6 +14,11 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+)
+
+var (
+	ErrRerunStepNotFound  = errors.New("rerun step not found")
+	ErrRerunStepAmbiguous = errors.New("rerun step name is ambiguous")
 )
 
 type reconstructResult struct {
@@ -115,11 +121,14 @@ func resolveRerunStepID(root *cqrs.OtelSpan, requested string) (string, error) {
 		}
 
 		stepID := *span.Attributes.StepID
+		//
+		// Keep accepting internal step IDs for backward compatibility when an ID
+		// happens to match another step's user-defined name.
 		if stepID == requested {
 			matchingIDs = map[string]struct{}{stepID: {}}
 			return
 		}
-		if span.GetStepName() == requested {
+		if span.Attributes.StepName != nil && *span.Attributes.StepName == requested {
 			matchingIDs[stepID] = struct{}{}
 		}
 	})
@@ -128,15 +137,15 @@ func resolveRerunStepID(root *cqrs.OtelSpan, requested string) (string, error) {
 		return requested, nil
 	}
 	if len(matchingIDs) == 0 {
-		return "", fmt.Errorf("step to run from not found in original run")
+		return "", ErrRerunStepNotFound
 	}
 	if len(matchingIDs) > 1 {
-		return "", fmt.Errorf("step name matches multiple steps in original run")
+		return "", ErrRerunStepAmbiguous
 	}
 	for stepID := range matchingIDs {
 		return stepID, nil
 	}
-	return "", fmt.Errorf("step to run from not found in original run")
+	return "", ErrRerunStepNotFound
 }
 
 type reconstructStepsResult []reconstructStep

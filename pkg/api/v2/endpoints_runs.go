@@ -239,6 +239,10 @@ func (s *Service) Rerun(ctx context.Context, req *apiv2.RerunRequest) (*apiv2.Re
 			return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Run not found")
 		case errors.Is(err, ErrCronRerunNotSupported):
 			return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Rerunning cron-triggered runs is not yet supported")
+		case errors.Is(err, ErrRerunStepNotFound):
+			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidRequest, "Step not found in original run")
+		case errors.Is(err, ErrRerunStepAmbiguous):
+			return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidRequest, "Step name matches multiple steps in original run")
 		}
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to rerun run")
 	}

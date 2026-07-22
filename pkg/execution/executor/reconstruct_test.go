@@ -255,7 +255,25 @@ func TestReconstructRejectsAmbiguousStepName(t *testing.T) {
 		},
 	}, &sv2.CreateState{})
 
-	require.ErrorContains(t, err, "step name matches multiple steps")
+	require.ErrorIs(t, err, ErrRerunStepAmbiguous)
+}
+
+func TestReconstructDoesNotUseSpanNameAsStepName(t *testing.T) {
+	runID := ulid.Make()
+	root := &cqrs.OtelSpan{
+		Children: []*cqrs.OtelSpan{
+			executorStepSpan("internal-step-id", time.UnixMilli(1), nil, nil),
+		},
+	}
+
+	_, err := reconstruct(context.Background(), fakeReconstructTraceReader{root: root}, execution.ScheduleRequest{
+		OriginalRunID: &runID,
+		FromStep: &execution.ScheduleRequestFromStep{
+			StepID: meta.SpanNameStep,
+		},
+	}, &sv2.CreateState{})
+
+	require.ErrorIs(t, err, ErrRerunStepNotFound)
 }
 
 func TestRerunFromStepEdgeTargetsRunnableStep(t *testing.T) {
@@ -287,6 +305,7 @@ func TestRerunFromStepEdgeDoesNotTargetPlannedStep(t *testing.T) {
 	}, []state.MemoizedStep{
 		{ID: "step-1"},
 	}, &reconstructResult{
+		fromStepID: "sleep-step",
 		fromStepOp: &stepOp,
 	})
 
@@ -298,13 +317,21 @@ func TestRerunFromStepEdgeDoesNotTargetPlannedStep(t *testing.T) {
 func TestRerunFromStepEdgeTargetsFirstStep(t *testing.T) {
 	edge := rerunFromStepEdge(execution.ScheduleRequest{
 		FromStep: &execution.ScheduleRequestFromStep{
-			StepID: "step-1",
+			StepID: "external-step-name",
 		},
-	}, nil, nil)
+	}, nil, &reconstructResult{fromStepID: "internal-step-id"})
 
 	require.Empty(t, edge.Outgoing)
 	require.Equal(t, "$trigger", edge.Incoming)
-	require.Equal(t, "step-1", edge.IncomingGeneratorStep)
+	require.Equal(t, "internal-step-id", edge.IncomingGeneratorStep)
+}
+
+func TestRerunFromStepEdgeRequiresReconstructionResult(t *testing.T) {
+	require.Panics(t, func() {
+		rerunFromStepEdge(execution.ScheduleRequest{
+			FromStep: &execution.ScheduleRequestFromStep{StepID: "step-1"},
+		}, nil, nil)
+	})
 }
 
 func TestRerunFromStepEdgeDefaultsToSource(t *testing.T) {
