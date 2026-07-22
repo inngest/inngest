@@ -564,6 +564,17 @@ type deferMeta struct {
 	// this field as a number via cjson. Conversion to the typed enum happens
 	// at the LoadDefers/SaveDefer boundary.
 	ScheduleStatus int
+
+	// Meta is an opaque JSON blob (SDK-stamped session layers) that must
+	// survive to the parent run's finalize.
+	//
+	// It is exempt from the cjson-safe rule above: a schedulable (AfterRun)
+	// defer's meta is only ever written verbatim by saveDefer.lua (HSET, no
+	// cjson), and buildDeferEvents reads only AfterRun defers. cjson round-trips
+	// the blob solely on terminal transitions (setDeferStatus.lua Aborted,
+	// saveDefer.lua aggregate-cap Rejected), whose Meta is never read. omitempty
+	// keeps the stored payload byte-identical for defers without sessions.
+	Meta json.RawMessage `json:",omitempty"`
 }
 
 // LoadDefersMeta returns each defer's metadata without loading Input. Use this
@@ -633,6 +644,7 @@ func (m shardedMgr) LoadDefersMeta(
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
 			ScheduleStatus: enums.DeferStatus(meta.ScheduleStatus),
+			Meta:           meta.Meta,
 		}
 	}
 	return metas, nil
@@ -677,6 +689,7 @@ func (m shardedMgr) LoadDefers(
 			FnSlug:         meta.FnSlug,
 			HashedID:       meta.HashedID,
 			ScheduleStatus: meta.ScheduleStatus,
+			Meta:           meta.Meta,
 		}
 		if raw, ok := inputs[hashedID]; ok && len(raw) > 0 {
 			d.Input = json.RawMessage(raw)
@@ -922,6 +935,7 @@ func (m shardedMgr) SaveDefer(ctx context.Context, accountId uuid.UUID, fnID uui
 		FnSlug:         d.FnSlug,
 		HashedID:       d.HashedID,
 		ScheduleStatus: int(d.ScheduleStatus),
+		Meta:           d.Meta,
 	})
 	if err != nil {
 		return err

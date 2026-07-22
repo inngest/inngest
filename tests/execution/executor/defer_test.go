@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -948,6 +949,307 @@ func (i *execTestInfra) runParentDefer(t *testing.T, hashedIDs ...string) (ulid.
 	}
 	r.Len(deferEvents, len(hashedIDs))
 	return parentRun.ID.RunID, deferEvents
+}
+
+// TestDeferPropagatesSessions drives the full defer session-propagation path:
+// a DeferAdd op carrying both a manual meta.sessions layer and a
+// meta.propagatedSessions layer rides through SaveFromOp and the persisted
+// Defer to Finalize, where buildDeferEvents resolves the two layers onto the
+// emitted deferred.schedule event. ResolveSessions folds propagated into
+// manual: manual wins on a key collision (tenant), manual-only keys pass
+// through (user), and propagated-only keys fill free slots (org). The
+// propagated layer is consumed in the process.
+func TestDeferPropagatesSessions(t *testing.T) {
+	r := require.New(t)
+	infra := newExecTestInfra(t, "step-defer")
+
+	const hashedID = "hash-session"
+
+	ops := []*state.GeneratorOpcode{
+		{
+			Op: enums.OpcodeDeferAdd,
+			ID: hashedID,
+			Opts: map[string]any{
+				"fn_slug": infra.fn.Slug,
+				"input":   map[string]any{},
+				// The SDK stamps the inherited session layer here at defer
+				// call-time.
+				"meta": map[string]any{
+					"sessions":           map[string]any{"tenant": "manual-wins", "user": "u_1"},
+					"propagatedSessions": map[string]any{"tenant": "acme", "org": "o_9"},
+				},
+			},
+		},
+		{
+			Op:   enums.OpcodeRunComplete,
+			ID:   "run-complete",
+			Data: json.RawMessage(`{"data": {}}`),
+		},
+	}
+
+	driver := &mockDriverV1{
+		t:        t,
+		response: &state.DriverResponse{StatusCode: 206, Generator: ops},
+	}
+	exec := infra.newExecutor(t, executor.WithDriverV1(driver))
+
+	var finalizationEvents []event.Event
+	exec.SetFinalizer(func(_ context.Context, _ statev2.ID, events []event.Event) error {
+		finalizationEvents = append(finalizationEvents, events...)
+		return nil
+	})
+
+	parentRun := infra.scheduleRun(t, exec)
+	_, err := exec.Execute(infra.ctx, state.Identifier{
+		WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID,
+	}, queue.Item{
+		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID},
+		Kind:        queue.KindStart,
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: hashedID}},
+		WorkspaceID: infra.wsID,
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: hashedID})
+	r.NoError(err)
+
+	evt := findDeferEvent(t, finalizationEvents, parentRun.ID.RunID, hashedID)
+	r.Equal("manual-wins", evt.Meta.Sessions["tenant"], "manual layer wins on key collision")
+	r.Equal("u_1", evt.Meta.Sessions["user"], "manual-only key survives")
+	r.Equal("o_9", evt.Meta.Sessions["org"], "propagated-only key fills a free slot")
+	r.Len(evt.Meta.Sessions, 3)
+	r.Empty(evt.Meta.PropagatedSessions, "propagated layer consumed by ResolveSessions")
+}
+
+// TestDeferRejectsOversizedManualSessions asserts the post-merge validation
+// and its per-defer isolation.
+//
+// Invalid sessions should drop only that defer's event — rather than
+// scheduling with an invalid session set, failing the parent run, or taking
+// sibling defers down with it: buildDeferEvents `continue`s past each
+// rejected defer, so a valid sibling registered in the same run must still
+// schedule.
+func TestDeferRejectsOversizedManualSessions(t *testing.T) {
+	r := require.New(t)
+	infra := newExecTestInfra(t, "step-defer")
+
+	const hashedID = "hash-oversized"
+	const siblingID = "hash-valid-sibling"
+
+	// consts.MaxEventSessions + 1 manual keys: too many to be a valid event.
+	oversized := map[string]any{}
+	for k := 0; k <= consts.MaxEventSessions; k++ {
+		oversized[fmt.Sprintf("k%d", k)] = fmt.Sprintf("v%d", k)
+	}
+	r.Greater(len(oversized), consts.MaxEventSessions)
+
+	ops := []*state.GeneratorOpcode{
+		{
+			Op: enums.OpcodeDeferAdd,
+			ID: hashedID,
+			Opts: map[string]any{
+				"fn_slug": infra.fn.Slug,
+				"input":   map[string]any{},
+				"meta":    map[string]any{"sessions": oversized},
+			},
+		},
+		{
+			Op: enums.OpcodeDeferAdd,
+			ID: siblingID,
+			Opts: map[string]any{
+				"fn_slug": infra.fn.Slug,
+				"input":   map[string]any{},
+				"meta":    map[string]any{"sessions": map[string]any{"tenant": "t_1"}},
+			},
+		},
+		{
+			Op:   enums.OpcodeRunComplete,
+			ID:   "run-complete",
+			Data: json.RawMessage(`{"data": {}}`),
+		},
+	}
+
+	driver := &mockDriverV1{
+		t:        t,
+		response: &state.DriverResponse{StatusCode: 206, Generator: ops},
+	}
+	exec := infra.newExecutor(t, executor.WithDriverV1(driver))
+
+	var finalizationEvents []event.Event
+	exec.SetFinalizer(func(_ context.Context, _ statev2.ID, events []event.Event) error {
+		finalizationEvents = append(finalizationEvents, events...)
+		return nil
+	})
+
+	parentRun := infra.scheduleRun(t, exec)
+	_, err := exec.Execute(infra.ctx, state.Identifier{
+		WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID,
+	}, queue.Item{
+		Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID},
+		Kind:        queue.KindStart,
+		Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: hashedID}},
+		WorkspaceID: infra.wsID,
+	}, inngest.Edge{Incoming: "$trigger", Outgoing: hashedID})
+	r.NoError(err, "parent run still finalizes cleanly")
+
+	r.False(hasDeferEvent(finalizationEvents, parentRun.ID.RunID, hashedID),
+		"deferred.schedule event should be dropped for an invalid session set")
+
+	evt := findDeferEvent(t, finalizationEvents, parentRun.ID.RunID, siblingID)
+	r.Equal("t_1", evt.Meta.Sessions["tenant"], "valid sibling keeps its own sessions")
+	r.Len(evt.Meta.Sessions, 1)
+
+	deferEvents := 0
+	for _, e := range finalizationEvents {
+		if e.Name == consts.FnDeferScheduleName {
+			deferEvents++
+		}
+	}
+	r.Equal(1, deferEvents, "only the valid sibling schedules")
+}
+
+// TestDeferSessionTombstones pins the tombstone single-hop invariant: RFC 7386
+// null tombstones stamped into a defer's meta must survive persistence
+// byte-preserved and take effect at finalize. The meta is an opaque blob from
+// SaveFromOp through redis_state to LoadDefers; it is unmarshaled exactly once
+// in buildDeferEvents, where EventMeta.UnmarshalJSON captures the nulls that a
+// plain map[string]string cannot represent. Any intermediate materialize or
+// re-marshal would silently drop the JSON nulls (Go serializes an absent key
+// and a null-valued key identically once decoded into a map), so this asserts
+// the tombstones actually cut propagated keys on the emitted event.
+func TestDeferSessionTombstones(t *testing.T) {
+	t.Run("per-key tombstone cuts the matching propagated key", func(t *testing.T) {
+		// Manual layer: `cut` is a null tombstone, `keep` is a real id. Parent
+		// propagated `cut` (must be cut) and `survive` (must pass through). The
+		// tombstone itself must never surface as a session key.
+		r := require.New(t)
+		infra := newExecTestInfra(t, "step-defer")
+
+		const hashedID = "hash-tombstone-perkey"
+
+		ops := []*state.GeneratorOpcode{
+			{
+				Op: enums.OpcodeDeferAdd,
+				ID: hashedID,
+				Opts: map[string]any{
+					"fn_slug": infra.fn.Slug,
+					"input":   map[string]any{},
+					"meta": map[string]any{
+						// nil marshals to JSON null: the per-key tombstone.
+						"sessions":           map[string]any{"cut": nil, "keep": "manual-id"},
+						"propagatedSessions": map[string]any{"cut": "inherited-cut", "survive": "prop-id"},
+					},
+				},
+			},
+			{
+				Op:   enums.OpcodeRunComplete,
+				ID:   "run-complete",
+				Data: json.RawMessage(`{"data": {}}`),
+			},
+		}
+
+		driver := &mockDriverV1{
+			t:        t,
+			response: &state.DriverResponse{StatusCode: 206, Generator: ops},
+		}
+		exec := infra.newExecutor(t, executor.WithDriverV1(driver))
+
+		var finalizationEvents []event.Event
+		exec.SetFinalizer(func(_ context.Context, _ statev2.ID, events []event.Event) error {
+			finalizationEvents = append(finalizationEvents, events...)
+			return nil
+		})
+
+		parentRun := infra.scheduleRun(t, exec)
+		_, err := exec.Execute(infra.ctx, state.Identifier{
+			WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID,
+		}, queue.Item{
+			Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID},
+			Kind:        queue.KindStart,
+			Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: hashedID}},
+			WorkspaceID: infra.wsID,
+		}, inngest.Edge{Incoming: "$trigger", Outgoing: hashedID})
+		r.NoError(err)
+
+		evt := findDeferEvent(t, finalizationEvents, parentRun.ID.RunID, hashedID)
+		r.NotContains(evt.Meta.Sessions, "cut", "tombstone cuts the matching propagated key")
+		r.Equal("manual-id", evt.Meta.Sessions["keep"], "manual-only key survives")
+		r.Equal("prop-id", evt.Meta.Sessions["survive"], "untombstoned propagated key survives")
+		r.Len(evt.Meta.Sessions, 2, "tombstone consumed: only keep + survive remain")
+		r.Empty(evt.Meta.PropagatedSessions, "propagated layer consumed by ResolveSessions")
+	})
+
+	t.Run("whole-field null clears all propagated sessions", func(t *testing.T) {
+		// Manual `sessions` is JSON null (RFC 7386 whole-document tombstone):
+		// clear every inherited session. Distinct from an absent field, which
+		// would keep the propagated layer.
+		r := require.New(t)
+		infra := newExecTestInfra(t, "step-defer")
+
+		const hashedID = "hash-tombstone-clearall"
+
+		ops := []*state.GeneratorOpcode{
+			{
+				Op: enums.OpcodeDeferAdd,
+				ID: hashedID,
+				Opts: map[string]any{
+					"fn_slug": infra.fn.Slug,
+					"input":   map[string]any{},
+					"meta": map[string]any{
+						// nil marshals to JSON null: the whole-field clear-all.
+						"sessions":           nil,
+						"propagatedSessions": map[string]any{"org": "o_9", "tenant": "acme"},
+					},
+				},
+			},
+			{
+				Op:   enums.OpcodeRunComplete,
+				ID:   "run-complete",
+				Data: json.RawMessage(`{"data": {}}`),
+			},
+		}
+
+		driver := &mockDriverV1{
+			t:        t,
+			response: &state.DriverResponse{StatusCode: 206, Generator: ops},
+		}
+		exec := infra.newExecutor(t, executor.WithDriverV1(driver))
+
+		var finalizationEvents []event.Event
+		exec.SetFinalizer(func(_ context.Context, _ statev2.ID, events []event.Event) error {
+			finalizationEvents = append(finalizationEvents, events...)
+			return nil
+		})
+
+		parentRun := infra.scheduleRun(t, exec)
+		_, err := exec.Execute(infra.ctx, state.Identifier{
+			WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID,
+		}, queue.Item{
+			Identifier:  state.Identifier{WorkflowID: infra.fnID, RunID: parentRun.ID.RunID, AccountID: infra.aID},
+			Kind:        queue.KindStart,
+			Payload:     queue.PayloadEdge{Edge: inngest.Edge{Incoming: "$trigger", Outgoing: hashedID}},
+			WorkspaceID: infra.wsID,
+		}, inngest.Edge{Incoming: "$trigger", Outgoing: hashedID})
+		r.NoError(err)
+
+		evt := findDeferEvent(t, finalizationEvents, parentRun.ID.RunID, hashedID)
+		r.Empty(evt.Meta.Sessions, "whole-field null clears all inherited sessions")
+		r.Empty(evt.Meta.PropagatedSessions, "propagated layer consumed by ResolveSessions")
+	})
+}
+
+// hasDeferEvent reports whether a deferred.schedule event was emitted for
+// (parentRunID, hashedID). Unlike findDeferEvent it does not fail the test on
+// absence, so it can assert an event was dropped.
+func hasDeferEvent(events []event.Event, parentRunID ulid.ULID, hashedID string) bool {
+	wantSpanID := tracing.DeferSpanRef(parentRunID, hashedID).DynamicSpanID
+	for _, e := range events {
+		md, err := e.DeferredScheduleMetadata()
+		if err != nil || md.ParentDeferSpan == nil {
+			continue
+		}
+		if md.ParentDeferSpan.DynamicSpanID == wantSpanID {
+			return true
+		}
+	}
+	return false
 }
 
 // findDeferEvent picks the deferred.schedule event whose ParentDeferSpan

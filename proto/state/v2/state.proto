@@ -169,12 +169,14 @@ message Defer {
   string      hashed_id       = 2;
   DeferStatus schedule_status = 3;
   bytes       input           = 4;
+  bytes       meta            = 5;
 }
 
 message DeferMeta {
   string      fn_slug         = 1;
   string      hashed_id       = 2;
   DeferStatus schedule_status = 3;
+  bytes       meta            = 4;
 }
 
 message SaveDeferRequest {

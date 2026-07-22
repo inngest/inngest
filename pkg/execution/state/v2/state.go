@@ -35,6 +35,12 @@ type DeferMeta struct {
 	FnSlug         string
 	HashedID       string
 	ScheduleStatus enums.DeferStatus
+
+	// Meta carries control metadata (e.g. propagated session layers) from
+	// defer call-time to the parent run's finalize, where buildDeferEvents
+	// stamps it onto the inngest/deferred.schedule event. Opaque JSON blob;
+	// kept separate from Input (the user payload). Keep in sync with Defer.
+	Meta json.RawMessage
 }
 
 type Defer struct {
@@ -58,6 +64,13 @@ type Defer struct {
 
 	// Data passed to the defer
 	Input json.RawMessage
+
+	// Meta carries control metadata (e.g. propagated session layers) from
+	// defer call-time to the parent run's finalize, where buildDeferEvents
+	// stamps it onto the inngest/deferred.schedule event. Opaque JSON blob;
+	// kept separate from Input (the user payload) so it is not size-capped
+	// or nulled on abort. Keep in sync with DeferMeta.
+	Meta json.RawMessage
 }
 
 func (d Defer) Validate() error {

@@ -424,6 +424,12 @@ func (g GeneratorOpcode) DeferAddOpts() (*DeferAddOpts, error) {
 type DeferAddOpts struct {
 	FnSlug string          `json:"fn_slug"`
 	Input  json.RawMessage `json:"input,omitempty"`
+
+	// Meta carries control metadata (SDK-stamped session layers) for the
+	// deferred run. Opaque here: persisted with the defer and resolved onto
+	// the inngest/deferred.schedule event at finalize. Distinct from Input,
+	// which is the user payload.
+	Meta json.RawMessage `json:"meta,omitempty"`
 }
 
 func (d *DeferAddOpts) Validate() error {
