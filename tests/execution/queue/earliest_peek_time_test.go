@@ -19,6 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func dispatchToOSQueueWorkers(workers chan osqueue.ProcessItem) osqueue.DispatchFunc {
+	return func(_ context.Context, item osqueue.ProcessItem) error {
+		workers <- item
+		return nil
+	}
+}
+
 func TestProcessorIteratorSetsEarliestPeekTimeBeforeConstraintLimit(t *testing.T) {
 	ctx := context.Background()
 
@@ -104,6 +111,7 @@ func TestProcessorIteratorSetsEarliestPeekTimeBeforeConstraintLimit(t *testing.T
 		Partition:  &partition,
 		Items:      []*osqueue.QueueItem{&qi1, &qi2},
 		Queue:      q,
+		Dispatch:   dispatchToOSQueueWorkers(q.Workers()),
 		StaticTime: peekTime,
 	}
 
@@ -340,6 +348,7 @@ func TestProcessorIteratorSetsEarliestPeekTimeForProcessedItemsBeforeConcurrency
 		Partition:  &partition,
 		Items:      items,
 		Queue:      q,
+		Dispatch:   dispatchToOSQueueWorkers(q.Workers()),
 		StaticTime: peekTime,
 	}
 
@@ -457,6 +466,7 @@ func TestProcessorIteratorDoesNotStampRemainingItemsWhenDisabled(t *testing.T) {
 		Partition:  &partition,
 		Items:      items,
 		Queue:      q,
+		Dispatch:   dispatchToOSQueueWorkers(q.Workers()),
 		StaticTime: clock.Now().Add(250 * time.Millisecond),
 	}
 
@@ -559,6 +569,7 @@ func TestQueueLatencySeparatesSystemAndUserLatencyAfterEarliestPeekStamp(t *test
 		Partition:  &partition,
 		Items:      []*osqueue.QueueItem{&qi1, &qi2},
 		Queue:      q,
+		Dispatch:   dispatchToOSQueueWorkers(q.Workers()),
 		StaticTime: peekTime,
 	}
 
@@ -586,6 +597,7 @@ func TestQueueLatencySeparatesSystemAndUserLatencyAfterEarliestPeekStamp(t *test
 		Partition:  &partition,
 		Items:      []*osqueue.QueueItem{&qi2},
 		Queue:      q,
+		Dispatch:   dispatchToOSQueueWorkers(q.Workers()),
 		StaticTime: processTime,
 	}
 	err = iter.Iterate(ctx)

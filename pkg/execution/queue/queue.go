@@ -47,6 +47,46 @@ type RunInfo struct {
 // Item's retry policy.
 type RunFunc func(context.Context, RunInfo, Item) (RunResult, error)
 
+type DispatchFunc func(ctx context.Context, item ProcessItem) error
+
+type QueueItemLeaser interface {
+	LeaseItem(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error)
+}
+
+type LeaseItemRequest struct {
+	Item                 *QueueItem
+	Partition            *QueuePartition
+	PartitionContinueCtr uint
+	StaticTime           time.Time
+}
+
+type LeaseItemStatus int
+
+const (
+	LeaseItemStatusNone LeaseItemStatus = iota
+	LeaseItemStatusDispatched
+	LeaseItemStatusAlreadyLeased
+	LeaseItemStatusNoWorkerCapacity
+	LeaseItemStatusThrottled
+	LeaseItemStatusConcurrencyLimited
+	LeaseItemStatusCustomConcurrencyLimited
+	LeaseItemStatusSemaphoreLimited
+	LeaseItemStatusNotFound
+	LeaseItemStatusLeaseContention
+	LeaseItemStatusLeaseError
+)
+
+type LeaseItemResult struct {
+	Status LeaseItemStatus
+	Err    error
+}
+
+// QueueScanner discovers and leases queue work. It should hand leased items to
+// the dispatch function and leave item execution to the common queue processor layer.
+type QueueScanner interface {
+	Run(ctx context.Context, dispatch DispatchFunc) error
+}
+
 type RunResult struct {
 	// ScheduledImmediateJob indicates whether this run function scheduled another job
 	// in the same partition for immediate consumption.

@@ -808,11 +808,15 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Dispatch: func(_ context.Context, item osqueue.ProcessItem) error {
+				q.Workers() <- item
+				return nil
+			},
+			StaticTime: clock.Now(),
+			Parallel:   false,
 		}
 
-		err = iter.Process(ctx, &qi)
+		err = iter.LeaseItem(ctx, &qi)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
@@ -855,11 +859,15 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Dispatch: func(_ context.Context, item osqueue.ProcessItem) error {
+				q.Workers() <- item
+				return nil
+			},
+			StaticTime: clock.Now(),
+			Parallel:   false,
 		}
 
-		err = iter.Process(ctx, &qi)
+		err = iter.LeaseItem(ctx, &qi)
 		require.NoError(t, err)
 
 		require.Equal(t, 1, len(cmLifecycles.AcquireCalls))
@@ -944,11 +952,15 @@ func TestQueueProcessorPreLeaseWithConstraintAPI(t *testing.T) {
 			Items:                []*osqueue.QueueItem{&qi},
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Dispatch: func(_ context.Context, item osqueue.ProcessItem) error {
+				q.Workers() <- item
+				return nil
+			},
+			StaticTime: clock.Now(),
+			Parallel:   false,
 		}
 
-		err = iter.Process(ctx, &qi)
+		err = iter.LeaseItem(ctx, &qi)
 		require.NoError(t, err)
 
 		// No further Constraint API calls should be made
@@ -1059,8 +1071,12 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			Items:                items,
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Dispatch: func(_ context.Context, item osqueue.ProcessItem) error {
+				q.Workers() <- item
+				return nil
+			},
+			StaticTime: clock.Now(),
+			Parallel:   false,
 		}
 
 		require.False(t, iter.IsRequeuable())
@@ -1127,7 +1143,10 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		// score in global set is at earliest item
 		require.Equal(t, start.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 
-		err = q.ProcessPartition(ctx, &p, 0, false)
+		err = q.ProcessPartition(ctx, &p, 0, false, func(_ context.Context, item osqueue.ProcessItem) error {
+			q.Workers() <- item
+			return nil
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, 0, zcard(t, rc, partitionConcurrencyKey(p, kg)))
@@ -1192,8 +1211,12 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 			Items:                items,
 			PartitionContinueCtr: 0,
 			Queue:                q,
-			StaticTime:           clock.Now(),
-			Parallel:             false,
+			Dispatch: func(_ context.Context, item osqueue.ProcessItem) error {
+				q.Workers() <- item
+				return nil
+			},
+			StaticTime: clock.Now(),
+			Parallel:   false,
 		}
 
 		require.False(t, iter.IsRequeuable())
@@ -1263,7 +1286,10 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		// score in global set is at earliest item
 		require.Equal(t, start.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 
-		err = q.ProcessPartition(ctx, &p, 0, false)
+		err = q.ProcessPartition(ctx, &p, 0, false, func(_ context.Context, item osqueue.ProcessItem) error {
+			q.Workers() <- item
+			return nil
+		})
 		require.NoError(t, err)
 
 		// first two items were successfully leased
@@ -1400,7 +1426,10 @@ func TestPartitionProcessRequeueAfterLimitedWithConstraintAPI(t *testing.T) {
 		// score in global set is at earliest item
 		require.Equal(t, start.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), p.ID)))
 
-		err = q.ProcessPartition(logger.WithStdlib(ctx, l), &p, 0, false)
+		err = q.ProcessPartition(logger.WithStdlib(ctx, l), &p, 0, false, func(_ context.Context, item osqueue.ProcessItem) error {
+			q.Workers() <- item
+			return nil
+		})
 		require.NoError(t, err)
 
 		// first two items were successfully leased
