@@ -418,13 +418,13 @@ func (v v2) LookupIdempotency(ctx context.Context, id state.ID, key string) (*st
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
 // for the run from the store.  Nothing referencing the run should exist in the state
 // store after.
-func (v v2) Delete(ctx context.Context, id state.ID) error {
+func (v v2) Delete(ctx context.Context, id state.ID, opts ...state.DeleteOption) error {
 	return v.mgr.Delete(ctx, statev1.Identifier{
 		RunID:       id.RunID,
 		WorkflowID:  id.FunctionID,
 		AccountID:   id.Tenant.AccountID,
 		WorkspaceID: id.Tenant.EnvID,
-	})
+	}, opts...)
 }
 
 // ClaimFinalization claims finish-effect emission for a run using Redis SET NX.

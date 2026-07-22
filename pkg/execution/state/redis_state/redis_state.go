@@ -1123,22 +1123,17 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 // lifecycle.  Now, state stores must account for deletion directly.  Note that if the
 // state store is queue-aware, it must delete queue items for the run also.  This may
 // not always be the case.
-func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
+func (m mgr) Delete(ctx context.Context, i state.Identifier, opts ...state.DeleteOption) error {
+	o := state.ApplyDeleteOpts(opts)
 	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
-	err := m.shardedMgr.delete(ctx, callCtx, i)
-	if err != nil {
+	if err := m.shardedMgr.delete(ctx, callCtx, i); err != nil {
 		return err
 	}
-
-	if m.pauseDeleter != nil {
-		err = m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
-		if err != nil {
-			return err
-		}
+	if o.IsMigration || m.pauseDeleter == nil {
+		return nil
 	}
-
-	return nil
+	return m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
 }
 
 func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) error {
