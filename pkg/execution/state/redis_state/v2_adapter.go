@@ -199,6 +199,129 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 	return state.State{Metadata: metadata, Events: s.Events, Steps: steps}, nil
 }
 
+func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
+	id := s.Metadata.ID
+	cfg := s.Metadata.Config
+	v1id := statev1.Identifier{
+		RunID:                 id.RunID,
+		WorkflowID:            id.FunctionID,
+		WorkflowVersion:       cfg.FunctionVersion,
+		EventID:               cfg.EventID(),
+		EventIDs:              cfg.EventIDs,
+		Key:                   cfg.Idempotency,
+		AccountID:             id.Tenant.AccountID,
+		WorkspaceID:           id.Tenant.EnvID,
+		AppID:                 id.Tenant.AppID,
+		OriginalRunID:         cfg.OriginalRunID,
+		ReplayID:              cfg.ReplayID,
+		PriorityFactor:        cfg.PriorityFactor,
+		CustomConcurrencyKeys: cfg.CustomConcurrencyKeys,
+		Semaphores:            cfg.Semaphores,
+		BatchID:               cfg.BatchID,
+	}
+
+	fnRunState := v.mgr.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, id.Tenant.AccountID, id.RunID)
+
+	eventsKey := fnRunState.kg.Events(ctx, isSharded, id.FunctionID, id.RunID)
+	actionsKey := fnRunState.kg.Actions(ctx, isSharded, id.FunctionID, id.RunID)
+	stackKey := fnRunState.kg.Stack(ctx, isSharded, id.RunID)
+	inputsKey := fnRunState.kg.ActionInputs(ctx, isSharded, v1id)
+	metadataKey := fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)
+
+	eventsBlob, err := json.Marshal(s.Events)
+	if err != nil {
+		return fmt.Errorf("redis_state: migrate marshal events: %w", err)
+	}
+
+	if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Set().Key(eventsKey).Value(rueidis.BinaryString(eventsBlob)).Build()
+	}).Error(); err != nil {
+		return fmt.Errorf("redis_state: migrate events: %w", err)
+	}
+
+	if len(s.Steps) > 0 {
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			partial := c.B().Hset().Key(actionsKey).FieldValue()
+			for stepID, data := range s.Steps {
+				partial = partial.FieldValue(stepID, rueidis.BinaryString(data))
+			}
+			return partial.Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate steps: %w", err)
+		}
+	}
+
+	if len(s.StepInputs) > 0 {
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			partial := c.B().Hset().Key(inputsKey).FieldValue()
+			for stepID, data := range s.StepInputs {
+				partial = partial.FieldValue(stepID, rueidis.BinaryString(data))
+			}
+			return partial.Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate step inputs: %w", err)
+		}
+	}
+
+	if len(s.Stack) > 0 {
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			return c.B().Del().Key(stackKey).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate reset stack: %w", err)
+		}
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			return c.B().Rpush().Key(stackKey).Element(s.Stack...).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate stack: %w", err)
+		}
+	}
+
+	var startedAtMS int64
+	if !cfg.StartedAt.IsZero() {
+		startedAtMS = cfg.StartedAt.UnixMilli()
+	}
+	md := runMetadata{
+		Identifier:                v1id,
+		Status:                    enums.RunStatusRunning,
+		StateSize:                 s.Metadata.Metrics.StateSize,
+		EventSize:                 s.Metadata.Metrics.EventSize,
+		StepCount:                 s.Metadata.Metrics.StepCount,
+		MetadataSize:              s.Metadata.Metrics.MetadataSize,
+		Version:                   currentVersion,
+		RequestVersion:            cfg.RequestVersion,
+		Context:                   cfg.Context,
+		DisableImmediateExecution: cfg.ForceStepPlan,
+		SpanID:                    cfg.SpanID,
+		StartedAt:                 startedAtMS,
+		HasAI:                     cfg.HasAI,
+	}
+
+	mdMap := md.Map()
+	mdFields := make(map[string]string, len(mdMap))
+	for k, val := range mdMap {
+		if k == "id" || k == "ctx" {
+			enc, err := json.Marshal(val)
+			if err != nil {
+				return fmt.Errorf("redis_state: migrate marshal metadata field %s: %w", k, err)
+			}
+			mdFields[k] = string(enc)
+		} else {
+			mdFields[k] = fmt.Sprintf("%v", val)
+		}
+	}
+	if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		partial := c.B().Hset().Key(metadataKey).FieldValue()
+		for k, strVal := range mdFields {
+			partial = partial.FieldValue(k, strVal)
+		}
+		return partial.Build()
+	}).Error(); err != nil {
+		return fmt.Errorf("redis_state: migrate metadata: %w", err)
+	}
+	return nil
+}
+
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
 // for the run from the store.  Nothing referencing the run should exist in the state
 // store after.
