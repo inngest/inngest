@@ -1690,17 +1690,21 @@ type runMetadata struct {
 
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
-		"id":       r.Identifier,
-		"status":   int(r.Status), // Always store this as an int
-		"debugger": r.Debugger,
-		"runType":  r.RunType,
-		"version":  r.Version,
-		"rv":       r.RequestVersion,
-		"ctx":      r.Context,
-		"die":      r.DisableImmediateExecution,
-		"sid":      r.SpanID,
-		"sat":      r.StartedAt,
-		"hasAI":    r.HasAI,
+		"id":            r.Identifier,
+		"status":        int(r.Status), // Always store this as an int
+		"debugger":      r.Debugger,
+		"runType":       r.RunType,
+		"version":       r.Version,
+		"rv":            r.RequestVersion,
+		"ctx":           r.Context,
+		"die":           r.DisableImmediateExecution,
+		"sid":           r.SpanID,
+		"sat":           r.StartedAt,
+		"hasAI":         r.HasAI,
+		"state_size":    r.StateSize,
+		"event_size":    r.EventSize,
+		"step_count":    r.StepCount,
+		"metadata_size": r.MetadataSize,
 	}
 }
 
