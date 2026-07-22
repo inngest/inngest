@@ -228,6 +228,9 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 	stackKey := fnRunState.kg.Stack(ctx, isSharded, id.RunID)
 	inputsKey := fnRunState.kg.ActionInputs(ctx, isSharded, v1id)
 	metadataKey := fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)
+	pendingKey := fnRunState.kg.Pending(ctx, isSharded, v1id)
+	defersMetaKey := fnRunState.kg.DefersMeta(ctx, isSharded, id.FunctionID, id.RunID)
+	defersInputKey := fnRunState.kg.DefersInput(ctx, isSharded, id.FunctionID, id.RunID)
 
 	eventsBlob, err := json.Marshal(s.Events)
 	if err != nil {
@@ -274,6 +277,62 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 			return c.B().Rpush().Key(stackKey).Element(s.Stack...).Build()
 		}).Error(); err != nil {
 			return fmt.Errorf("redis_state: migrate stack: %w", err)
+		}
+	}
+
+	if len(s.PendingSteps) > 0 {
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			return c.B().Del().Key(pendingKey).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate reset pending: %w", err)
+		}
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			return c.B().Sadd().Key(pendingKey).Member(s.PendingSteps...).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate pending: %w", err)
+		}
+	}
+
+	if len(s.Defers) > 0 {
+		var metaHashedIDs []string
+		var metaValues []string
+		var inputHashedIDs []string
+		var inputValues []string
+		for hashedID, d := range s.Defers {
+			metaJSON, err := json.Marshal(deferMeta{
+				FnSlug:         d.FnSlug,
+				HashedID:       d.HashedID,
+				ScheduleStatus: int(d.ScheduleStatus),
+			})
+			if err != nil {
+				return fmt.Errorf("redis_state: migrate marshal defer meta %s: %w", hashedID, err)
+			}
+			metaHashedIDs = append(metaHashedIDs, hashedID)
+			metaValues = append(metaValues, string(metaJSON))
+			if len(d.Input) > 0 {
+				inputHashedIDs = append(inputHashedIDs, hashedID)
+				inputValues = append(inputValues, string(d.Input))
+			}
+		}
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			partial := c.B().Hset().Key(defersMetaKey).FieldValue()
+			for i, h := range metaHashedIDs {
+				partial = partial.FieldValue(h, metaValues[i])
+			}
+			return partial.Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate defers meta: %w", err)
+		}
+		if len(inputHashedIDs) > 0 {
+			if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+				partial := c.B().Hset().Key(defersInputKey).FieldValue()
+				for i, h := range inputHashedIDs {
+					partial = partial.FieldValue(h, inputValues[i])
+				}
+				return partial.Build()
+			}).Error(); err != nil {
+				return fmt.Errorf("redis_state: migrate defers input: %w", err)
+			}
 		}
 	}
 
@@ -518,6 +577,11 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID, _ ...state.LoadMetada
 // LoadStack returns the current stack for a run.
 func (v v2) LoadStack(ctx context.Context, id state.ID) ([]string, error) {
 	return v.mgr.stack(ctx, id.Tenant.AccountID, id.RunID)
+}
+
+// LoadPending returns the set of pending step IDs for a run.
+func (v v2) LoadPending(ctx context.Context, id state.ID) ([]string, error) {
+	return v.mgr.loadPending(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
 // Update updates configuration on the state, eg. setting the execution

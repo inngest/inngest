@@ -183,6 +183,9 @@ type StateLoader interface {
 	// LoadStack returns the stack for a given run
 	LoadStack(ctx context.Context, id ID) ([]string, error)
 
+	// LoadPending returns the set of pending step IDs for a given run.
+	LoadPending(ctx context.Context, id ID) ([]string, error)
+
 	// LoadState returns all state for a run, including steps, events, and metadata.
 	LoadState(ctx context.Context, id ID) (State, error)
 
