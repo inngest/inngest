@@ -8593,10 +8593,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14GetEventRunsResponse\x12'\n" +
 	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"l\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xda\x02\n" +
 	"\fRerunRequest\x12\x15\n" +
-	"\x06run_id\x18\x01 \x01(\tR\x05runId\x127\n" +
-	"\tfrom_step\x18\x02 \x01(\v2\x15.api.v2.RerunFromStepH\x00R\bfromStep\x88\x01\x01B\f\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\xa4\x02\n" +
+	"\tfrom_step\x18\x02 \x01(\v2\x15.api.v2.RerunFromStepB\xea\x01\x92A\xe6\x012\xe3\x01Step rerun options as JSON, for example {\"stepId\":\"5b8ee3806d3f5184753c00662758aaaf831cabf5\",\"input\":[{\"foo\":\"bar\"}]}. Use the stepId from get-function-trace, not the step name. The input field is optional and must be an array.H\x00R\bfromStep\x88\x01\x01B\f\n" +
 	"\n" +
 	"_from_step\"\xd7\x01\n" +
 	"\rRerunFromStep\x12=\n" +

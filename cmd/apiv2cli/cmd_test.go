@@ -160,6 +160,27 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
 }
 
+func TestRerunFromStepFlagDescribesJSONShape(t *testing.T) {
+	var rerun endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "rerun" {
+			rerun = ep
+			break
+		}
+	}
+	require.NotEmpty(t, rerun.name)
+
+	flags := endpointFlags(rerun)
+	byName := map[string]cli.Flag{}
+	for _, flag := range flags {
+		byName[flag.Names()[0]] = flag
+	}
+
+	require.Contains(t, byName["from-step"].String(), `{"stepId":"5b8ee3806d3f5184753c00662758aaaf831cabf5","input":[{"foo":"bar"}]}`)
+	require.Contains(t, byName["from-step"].String(), "Use the stepId from get-function-trace, not the step name")
+	require.Contains(t, byName["from-step"].String(), "input field is optional and must be an array")
+}
+
 func TestEndpointDescriptionReferencesValidFlags(t *testing.T) {
 	var invoke endpoint
 	for _, ep := range discoverEndpoints() {
