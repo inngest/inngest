@@ -67,21 +67,12 @@ func (m *mockGatewayGRPCManager) Subscribe(ctx context.Context, requestID string
 	return channel
 }
 
-func (m *mockGatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage {
-	// Empty mock
-	return nil
-}
-
 func (m *mockGatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.subscriptions != nil {
 		delete(m.subscriptions, requestID)
 	}
-}
-
-func (m *mockGatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
-	// Empty mock
 }
 
 func (m *mockGatewayGRPCManager) getForwardCalls() []mockForwardCall {
@@ -1151,13 +1142,7 @@ func (m *mockFailingGatewayGRPCManager) Subscribe(ctx context.Context, requestID
 	return make(chan *connectpb.SDKResponse)
 }
 
-func (m *mockFailingGatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage {
-	return make(chan *connectpb.AckMessage)
-}
-
 func (m *mockFailingGatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {}
-
-func (m *mockFailingGatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {}
 
 // TestCleanupWorkerRequestOrLogError tests the cleanup function
 func TestCleanupWorkerRequestOrLogError(t *testing.T) {
