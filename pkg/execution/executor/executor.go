@@ -1022,7 +1022,6 @@ func (e *executor) schedule(
 	}
 
 	req = cloneScheduleRequest(req)
-	reqSnapshot := cloneScheduleRequest(req)
 
 	ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
 	defer span.End()
@@ -1128,6 +1127,7 @@ func (e *executor) schedule(
 		}
 		span.End()
 
+		reqSnapshot := cloneScheduleRequest(req)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
 			l.OnDebounced(ctx, reqSnapshot, item, debounceID)
 		})
@@ -1232,6 +1232,10 @@ func (e *executor) schedule(
 	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
+
+	// Event lifecycles that run after scheduling should observe the fully
+	// enriched request context, not just the caller-provided fields.
+	reqSnapshot := cloneScheduleRequest(req)
 
 	metadata := sv2.Metadata{
 		ID: sv2.ID{
