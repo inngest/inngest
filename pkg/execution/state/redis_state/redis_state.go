@@ -897,6 +897,22 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 	return state.NewStateInstance(id, meta, events, actions, stack), nil
 }
 
+func (m shardedMgr) loadPending(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) ([]string, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "loadPending"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+	id := state.Identifier{RunID: runID, WorkflowID: fnID, AccountID: accountId}
+
+	pending, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Smembers().Key(fnRunState.kg.Pending(ctx, isSharded, id)).Build()
+	}).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error loading pending: %w", err)
+	}
+	return pending, nil
+}
+
 func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) ([]string, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "stack"), redis_telemetry.ScopeFnRunState)
 
