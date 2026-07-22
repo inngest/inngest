@@ -64,6 +64,7 @@ func TestCommandHelpUsesTopLevelAPIAndBetaLabel(t *testing.T) {
 	require.Contains(t, out.String(), "inngest api [target/auth flags] <endpoint> [endpoint flags]")
 	require.Contains(t, out.String(), "Call Inngest REST API v2 endpoints (beta)")
 	require.Contains(t, out.String(), "Beta: this command is under active development and may change.")
+	require.Contains(t, out.String(), "Authentication: https://api-docs.inngest.com/authentication")
 	require.NotContains(t, out.String(), "inngest alpha api [target/auth flags]")
 }
 
@@ -96,6 +97,8 @@ func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
 	require.Contains(t, invoke.Description, "INNGEST_API_KEY")
 	require.Contains(t, invoke.Description, "INNGEST_ENV")
 	require.Contains(t, invoke.Description, "/v2")
+	require.Contains(t, invoke.Description, "Authentication: https://api-docs.inngest.com/authentication")
+	require.NotContains(t, invoke.Description, "inngest alpha api")
 }
 
 func TestCommandTelemetryContextIncludesEndpointAndFlagNamesOnly(t *testing.T) {

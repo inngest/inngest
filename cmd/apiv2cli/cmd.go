@@ -70,6 +70,7 @@ func Command() *cli.Command {
 			"Beta: this command is under active development and may change.",
 			"By default, the command targets the local dev server.",
 			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom API server.",
+			"Authentication: https://api-docs.inngest.com/authentication",
 		}, "\n"),
 		Flags:    commonFlags(),
 		Commands: endpointCommands(),
@@ -334,13 +335,15 @@ func endpointDescription(ep endpoint) string {
 	lines = append(lines,
 		fmt.Sprintf("Endpoint: %s %s", ep.method, ep.path),
 		"",
-		"Target, auth, and output flags are inherited from `inngest alpha api`:",
+		"Target, auth, and output flags are inherited from `inngest api`:",
 		"  --prod                  Target Inngest Cloud Production",
 		"  --api-host, --api-port  Target a custom API server; host may include /api/v2 or /v2",
 		"  --api-key               API key, or INNGEST_API_KEY",
 		"  --signing-key           Signing key, or INNGEST_SIGNING_KEY",
 		"  --env                   Environment name, or INNGEST_ENV",
 		"  --raw                   Print the response body without formatting",
+		"",
+		"Authentication: https://api-docs.inngest.com/authentication",
 	)
 
 	return strings.Join(lines, "\n")
