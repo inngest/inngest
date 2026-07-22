@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"runtime/debug"
 	"slices"
@@ -586,8 +587,9 @@ func (e *executor) runEventLifecycles(ctx context.Context, fn func(context.Conte
 }
 
 func (e *executor) RunFunctionMatchLifecycle(ctx context.Context, req execution.ScheduleRequest) {
+	reqSnapshot := cloneScheduleRequest(req)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-		l.OnFunctionMatch(ctx, req)
+		l.OnFunctionMatch(ctx, reqSnapshot)
 	})
 }
 
@@ -930,6 +932,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		requestTime = req.Events[0].GetReceivedAt()
 	}
 
+	callbackReq := cloneScheduleRequest(req)
+
 	// Check constraints and acquire lease
 	md, err := WithConstraints(
 		ctx,
@@ -946,7 +950,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					md  *sv2.Metadata
 					err error
 				)
-				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks)
+				runID, md, err = e.schedule(ctx, req, *runID, key, performChecks, &callbackReq)
 				return md, err
 			}, util.WithBoundaries(2*time.Second))
 		})
@@ -954,7 +958,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	switch {
 	case errors.Is(err, ErrFunctionRateLimited):
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnRateLimited(ctx, req)
+			l.OnRateLimited(ctx, callbackReq)
 		})
 	case errors.Is(err, ErrFunctionSkippedIdempotency),
 		errors.Is(err, state.ErrIdentifierExists),
@@ -966,17 +970,28 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			skip.ExistingRunID = runID
 		}
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnFunctionSkippedIdempotency(ctx, req, skip)
+			l.OnFunctionSkippedIdempotency(ctx, callbackReq, skip)
 		})
 	case errors.Is(err, ErrFunctionDebounced), errors.Is(err, ErrFunctionSkipped), err == nil:
 		// Handled by more specific lifecycle hooks inside schedule.
 	default:
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnFunctionScheduleFailed(ctx, req, err)
+			l.OnFunctionScheduleFailed(ctx, callbackReq, err)
 		})
 	}
 
 	return runID, md, err
+}
+
+func cloneScheduleRequest(req execution.ScheduleRequest) execution.ScheduleRequest {
+	req.Context = maps.Clone(req.Context)
+	req.Events = slices.Clone(req.Events)
+	return req
+}
+
+func cloneMetadata(md sv2.Metadata) sv2.Metadata {
+	md.Config.Context = maps.Clone(md.Config.Context)
+	return md
 }
 
 func (e *executor) now() time.Time {
@@ -1000,9 +1015,15 @@ func (e *executor) schedule(
 	// performChecks determines whether constraint checks must be performed
 	// This may be false when the Constraint API was used to enforce constraints.
 	performChecks bool,
+	callbackReq *execution.ScheduleRequest,
 ) (*ulid.ULID, *sv2.Metadata, error) {
 	if req.AppID == uuid.Nil {
 		return nil, nil, fmt.Errorf("app ID is required to schedule a run")
+	}
+
+	req = cloneScheduleRequest(req)
+	if callbackReq != nil {
+		*callbackReq = cloneScheduleRequest(req)
 	}
 
 	ctx, span := e.conditionalTracer.NewUserSpan(ctx, "executor.schedule", req.AccountID, req.WorkspaceID, req.Function.ID)
@@ -1109,8 +1130,9 @@ func (e *executor) schedule(
 		}
 		span.End()
 
+		reqSnapshot := cloneScheduleRequest(req)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnDebounced(ctx, req, item, debounceID)
+			l.OnDebounced(ctx, reqSnapshot, item, debounceID)
 		})
 
 		return nil, nil, ErrFunctionDebounced
@@ -1213,6 +1235,13 @@ func (e *executor) schedule(
 	carrier := itrace.NewTraceCarrier(itrace.WithTraceCarrierSpanID(&spanID))
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 	config.SetFunctionTrace(carrier)
+
+	// Event lifecycles that run after scheduling should observe the fully
+	// enriched request context, not just the caller-provided fields.
+	reqSnapshot := cloneScheduleRequest(req)
+	if callbackReq != nil {
+		*callbackReq = reqSnapshot
+	}
 
 	metadata := sv2.Metadata{
 		ID: sv2.ID{
@@ -1349,7 +1378,7 @@ func (e *executor) schedule(
 						l.ReportError(err, "error canceling singleton run")
 					}
 					e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-						l.OnSingletonCancelled(ctx, req, runID)
+						l.OnSingletonCancelled(ctx, reqSnapshot, runID)
 					})
 
 				default:
@@ -1552,7 +1581,7 @@ func (e *executor) schedule(
 	// If the function is being skipped, send spans and handle skip.
 	if skipReason != enums.SkipReasonNone {
 		sendSpans()
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipReason)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, skipReason)
 	}
 
 	if req.BatchID == nil {
@@ -1643,8 +1672,9 @@ func (e *executor) schedule(
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
+		metadataSnapshot := cloneMetadata(metadata)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-			l.OnFunctionScheduled(ctx, metadata, req.Events)
+			l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
 		})
 		return &metadata.ID.RunID, &metadata, nil
 	}
@@ -1740,7 +1770,7 @@ func (e *executor) schedule(
 		if deleteErr != nil {
 			l.ReportError(deleteErr, "error deleting function state, this has likely leaked state")
 		}
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+		return e.handleFunctionSkipped(ctx, reqSnapshot, metadata, evts, enums.SkipReasonSingleton)
 
 	default:
 		return nil, nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
@@ -1750,8 +1780,9 @@ func (e *executor) schedule(
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
+	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-		l.OnFunctionScheduled(ctx, metadata, req.Events)
+		l.OnFunctionScheduled(ctx, metadataSnapshot, reqSnapshot.Events)
 	})
 
 	return &metadata.ID.RunID, &metadata, nil
@@ -1813,8 +1844,10 @@ func (e *executor) updateInvokeSpanWithInvokedRunID(ctx context.Context, l logge
 }
 
 func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*ulid.ULID, *sv2.Metadata, error) {
+	reqSnapshot := cloneScheduleRequest(req)
+	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
-		l.OnFunctionSkipped(ctx, req, metadata, reason)
+		l.OnFunctionSkipped(ctx, reqSnapshot, metadataSnapshot, reason)
 	})
 
 	for _, e := range e.lifecycles {
