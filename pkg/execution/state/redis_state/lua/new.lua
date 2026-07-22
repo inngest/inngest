@@ -52,6 +52,5 @@ end
 
 -- Save events
 redis.call("SETNX", eventsKey, events)
-redis.call("HINCRBY", metadataKey, "event_size", #events)
 
 return 0
