@@ -64,6 +64,7 @@ func TestCommandHelpUsesTopLevelAPIAndBetaLabel(t *testing.T) {
 	require.Contains(t, out.String(), "inngest api [target/auth flags] <endpoint> [endpoint flags]")
 	require.Contains(t, out.String(), "Call Inngest REST API v2 endpoints (beta)")
 	require.Contains(t, out.String(), "Beta: this command is under active development and may change.")
+	require.Contains(t, out.String(), "Authentication: https://api-docs.inngest.com/authentication")
 	require.NotContains(t, out.String(), "inngest alpha api [target/auth flags]")
 }
 
@@ -96,6 +97,8 @@ func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
 	require.Contains(t, invoke.Description, "INNGEST_API_KEY")
 	require.Contains(t, invoke.Description, "INNGEST_ENV")
 	require.Contains(t, invoke.Description, "/v2")
+	require.Contains(t, invoke.Description, "Authentication: https://api-docs.inngest.com/authentication")
+	require.NotContains(t, invoke.Description, "inngest alpha api")
 }
 
 func TestCommandTelemetryContextIncludesEndpointAndFlagNamesOnly(t *testing.T) {
@@ -255,6 +258,62 @@ func TestCommandUsesQueryParamsForGetEndpoint(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "includeOutput=true", gotQuery)
+}
+
+func TestCommandAcceptsRFC3339TimestampQueryFlags(t *testing.T) {
+	var gotQuery url.Values
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[],"metadata":{},"page":{}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"get-function-runs",
+		"--status", "FAILED",
+		"--from", "2026-07-20T00:00:00-04:00",
+		"--until", "2026-07-20T23:59:59.999999999-04:00",
+		"--time-field", "queuedAt",
+		"--order", "DESC",
+		"--limit", "20",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"FAILED"}, gotQuery["status"])
+	require.Equal(t, "2026-07-20T00:00:00-04:00", gotQuery.Get("from"))
+	require.Equal(t, "2026-07-20T23:59:59.999999999-04:00", gotQuery.Get("until"))
+	require.Equal(t, "queuedAt", gotQuery.Get("timeField"))
+	require.Equal(t, "DESC", gotQuery.Get("order"))
+	require.Equal(t, "20", gotQuery.Get("limit"))
+}
+
+func TestParseTimestamp(t *testing.T) {
+	t.Run("plain RFC 3339", func(t *testing.T) {
+		value, err := parseTimestamp("2026-07-20T00:00:00-04:00")
+
+		require.NoError(t, err)
+		require.Equal(t, "2026-07-20T00:00:00-04:00", value)
+	})
+
+	t.Run("JSON string", func(t *testing.T) {
+		value, err := parseTimestamp(`"2026-07-20T00:00:00-04:00"`)
+
+		require.NoError(t, err)
+		require.Equal(t, "2026-07-20T00:00:00-04:00", value)
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		_, err := parseTimestamp("yesterday")
+
+		require.Error(t, err)
+	})
 }
 
 func TestCommandAcceptsPositionalPathParams(t *testing.T) {

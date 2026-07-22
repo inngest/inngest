@@ -70,6 +70,7 @@ func Command() *cli.Command {
 			"Beta: this command is under active development and may change.",
 			"By default, the command targets the local dev server.",
 			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom API server.",
+			"Authentication: https://api-docs.inngest.com/authentication",
 		}, "\n"),
 		Flags:    commonFlags(),
 		Commands: endpointCommands(),
@@ -334,13 +335,15 @@ func endpointDescription(ep endpoint) string {
 	lines = append(lines,
 		fmt.Sprintf("Endpoint: %s %s", ep.method, ep.path),
 		"",
-		"Target, auth, and output flags are inherited from `inngest alpha api`:",
+		"Target, auth, and output flags are inherited from `inngest api`:",
 		"  --prod                  Target Inngest Cloud Production",
 		"  --api-host, --api-port  Target a custom API server; host may include /api/v2 or /v2",
 		"  --api-key               API key, or INNGEST_API_KEY",
 		"  --signing-key           Signing key, or INNGEST_SIGNING_KEY",
 		"  --env                   Environment name, or INNGEST_ENV",
 		"  --raw                   Print the response body without formatting",
+		"",
+		"Authentication: https://api-docs.inngest.com/authentication",
 	)
 
 	return strings.Join(lines, "\n")
@@ -821,6 +824,14 @@ func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName s
 	case protoreflect.EnumKind:
 		return cmd.String(flagName), nil
 	case protoreflect.MessageKind, protoreflect.GroupKind:
+		if field.Message().FullName() == "google.protobuf.Timestamp" {
+			value, err := parseTimestamp(cmd.String(flagName))
+			if err != nil {
+				return nil, fmt.Errorf("--%s must be an RFC 3339 timestamp: %w", flagName, err)
+			}
+			return value, nil
+		}
+
 		var value any
 		if err := json.Unmarshal([]byte(cmd.String(flagName)), &value); err != nil {
 			return nil, fmt.Errorf("--%s must be valid JSON: %w", flagName, err)
@@ -831,6 +842,20 @@ func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName s
 	default:
 		return nil, fmt.Errorf("unsupported field type for --%s", flagName)
 	}
+}
+
+func parseTimestamp(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if strings.HasPrefix(trimmed, `"`) {
+		if err := json.Unmarshal([]byte(trimmed), &value); err != nil {
+			return "", err
+		}
+	}
+
+	if _, err := time.Parse(time.RFC3339Nano, value); err != nil {
+		return "", err
+	}
+	return value, nil
 }
 
 func authToken(cmd *cli.Command) (string, error) {
