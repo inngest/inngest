@@ -58,6 +58,26 @@ var (
 	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
 )
 
+// IsMigration signals JIT-migration source cleanup; backends must skip pause
+// cleanup since the run is still ongoing.
+type DeleteOpts struct {
+	IsMigration bool
+}
+
+type DeleteOption func(*DeleteOpts)
+
+func WithIsMigration() DeleteOption {
+	return func(o *DeleteOpts) { o.IsMigration = true }
+}
+
+func ApplyDeleteOpts(opts []DeleteOption) DeleteOpts {
+	var o DeleteOpts
+	for _, fn := range opts {
+		fn(&o)
+	}
+	return o
+}
+
 const (
 	// InngestErrFunctionOverflowed is the public error code for ErrFunctionOverflowed
 	InngestErrFunctionOverflowed = "InngestErrFunctionOverflowed"
@@ -402,7 +422,7 @@ type Mutater interface {
 	UpdateMetadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, md MetadataUpdate) error
 
 	// Delete removes state from the state store.
-	Delete(ctx context.Context, i Identifier) error
+	Delete(ctx context.Context, i Identifier, opts ...DeleteOption) error
 
 	// SetStatus sets a status specifically.
 	SetStatus(ctx context.Context, i Identifier, status enums.RunStatus) error

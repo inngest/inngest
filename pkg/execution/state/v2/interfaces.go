@@ -15,6 +15,13 @@ type IdempotencyEntry struct {
 	IsTombstone bool
 }
 
+type DeleteOption = state.DeleteOption
+
+var (
+	WithIsMigration = state.WithIsMigration
+	ApplyDeleteOpts = state.ApplyDeleteOpts
+)
+
 type CreateState struct {
 	Metadata Metadata
 	// Events contains a slice of JSON-encoded events.
@@ -29,10 +36,10 @@ type CreateState struct {
 
 // MigrateState carries a run-state snapshot for cross-cluster JIT migration.
 type MigrateState struct {
-	Metadata     Metadata
-	Events       []json.RawMessage
-	Steps        map[string]json.RawMessage
-	StepInputs   map[string]json.RawMessage
+	Metadata   Metadata
+	Events     []json.RawMessage
+	Steps      map[string]json.RawMessage
+	StepInputs map[string]json.RawMessage
 	// Stack is the ordered list of step IDs;
 	Stack        []string
 	PendingSteps []string
@@ -47,7 +54,7 @@ type RunService interface {
 	// Delete deletes state, metadata, and - when pauses are included - associated pauses
 	// for the run from the store.  Nothing referencing the run should exist in the state
 	// store after.
-	Delete(ctx context.Context, id ID) error
+	Delete(ctx context.Context, id ID, opts ...DeleteOption) error
 	// Exists checks whether a run exists given an ID
 	Exists(ctx context.Context, id ID) (bool, error)
 	// Update updates configuration on the state, eg. setting the execution
