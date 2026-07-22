@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
@@ -379,6 +380,39 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 		return fmt.Errorf("redis_state: migrate metadata: %w", err)
 	}
 	return nil
+}
+
+func (v v2) LookupIdempotency(ctx context.Context, id state.ID, key string) (*state.IdempotencyEntry, error) {
+	fnRunState := v.mgr.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, id.Tenant.AccountID, id.RunID)
+	v1id := statev1.Identifier{
+		Key:        key,
+		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+	redisKey := fnRunState.kg.Idempotency(ctx, isSharded, v1id)
+
+	val, err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Get().Key(redisKey).Build()
+	}).ToString()
+	if err == rueidis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("redis_state: lookup idempotency: %w", err)
+	}
+
+	entry := &state.IdempotencyEntry{}
+	if len(val) > 0 && val[0] == consts.FunctionIdempotencyTombstone {
+		entry.IsTombstone = true
+		val = val[1:]
+	}
+	runID, err := ulid.Parse(val)
+	if err != nil {
+		return nil, fmt.Errorf("redis_state: parse idempotency runID: %w", err)
+	}
+	entry.RunID = runID
+	return entry, nil
 }
 
 // Delete deletes state, metadata, and - when pauses are included - associated pauses

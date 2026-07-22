@@ -6,7 +6,14 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/oklog/ulid/v2"
 )
+
+// IdempotencyEntry is a single row from a backend's idempotency store.
+type IdempotencyEntry struct {
+	RunID       ulid.ULID
+	IsTombstone bool
+}
 
 type CreateState struct {
 	Metadata Metadata
@@ -53,6 +60,9 @@ type RunService interface {
 
 	// Migrate writes a run-state snapshot into this store for cross-cluster JIT migration.
 	Migrate(ctx context.Context, s MigrateState) error
+
+	// LookupIdempotency returns the entry for the given key, or (nil, nil) if the key is not present.
+	LookupIdempotency(ctx context.Context, id ID, key string) (*IdempotencyEntry, error)
 
 	// ConsumePause consumes a pause by its ID. It does not care about the pause's origin;
 	// it only uses the pause data to populate the state of a run.
