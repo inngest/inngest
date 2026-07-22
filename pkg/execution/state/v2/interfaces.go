@@ -20,6 +20,18 @@ type CreateState struct {
 	StepInputs []state.MemoizedStep
 }
 
+// MigrateState carries a run-state snapshot for cross-cluster JIT migration.
+type MigrateState struct {
+	Metadata     Metadata
+	Events       []json.RawMessage
+	Steps        map[string]json.RawMessage
+	StepInputs   map[string]json.RawMessage
+	// Stack is the ordered list of step IDs;
+	Stack        []string
+	PendingSteps []string
+	Defers       map[string]Defer
+}
+
 type RunService interface {
 	StateLoader
 
@@ -38,6 +50,9 @@ type RunService interface {
 	SaveStep(ctx context.Context, id ID, stepID string, data []byte) (hasPending bool, err error)
 	// SavePending saves pending step IDs for the given run ID.
 	SavePending(ctx context.Context, id ID, pending []string) error
+
+	// Migrate writes a run-state snapshot into this store for cross-cluster JIT migration.
+	Migrate(ctx context.Context, s MigrateState) error
 
 	// ConsumePause consumes a pause by its ID. It does not care about the pause's origin;
 	// it only uses the pause data to populate the state of a run.
