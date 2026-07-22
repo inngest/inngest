@@ -439,7 +439,7 @@ type deleteFailsOnceRunService struct {
 	deleteCalls int
 }
 
-func (d *deleteFailsOnceRunService) Delete(ctx context.Context, id statev2.ID) error {
+func (d *deleteFailsOnceRunService) Delete(ctx context.Context, id statev2.ID, opts ...statev2.DeleteOption) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -448,7 +448,7 @@ func (d *deleteFailsOnceRunService) Delete(ctx context.Context, id statev2.ID) e
 		return fmt.Errorf("synthetic delete failure")
 	}
 
-	return d.RunService.Delete(ctx, id)
+	return d.RunService.Delete(ctx, id, opts...)
 }
 
 func (d *deleteFailsOnceRunService) ClaimFinalization(ctx context.Context, md statev2.Metadata) (statev2.FinalizationClaim, error) {

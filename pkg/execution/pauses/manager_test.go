@@ -353,8 +353,16 @@ func (m *mockRunService) Create(ctx context.Context, s statev2.CreateState) (sta
 	return statev2.State{}, nil
 }
 
-func (m *mockRunService) Delete(ctx context.Context, id statev2.ID) error {
+func (m *mockRunService) Delete(ctx context.Context, id statev2.ID, opts ...statev2.DeleteOption) error {
 	return nil
+}
+
+func (m *mockRunService) Migrate(ctx context.Context, s statev2.MigrateState) error {
+	return nil
+}
+
+func (m *mockRunService) LookupIdempotency(ctx context.Context, id statev2.ID, key string) (*statev2.IdempotencyEntry, error) {
+	return nil, nil
 }
 
 func (m *mockRunService) Exists(ctx context.Context, id statev2.ID) (bool, error) {
@@ -394,6 +402,10 @@ func (m *mockRunService) LoadStepsWithIDs(ctx context.Context, id statev2.ID, st
 }
 
 func (m *mockRunService) LoadStack(ctx context.Context, id statev2.ID) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockRunService) LoadPending(ctx context.Context, id statev2.ID) ([]string, error) {
 	return nil, nil
 }
 
