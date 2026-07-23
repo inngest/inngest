@@ -40,29 +40,13 @@ export type LineChartData = {
   }>;
 };
 
-export const lineColors: readonly (readonly [string, string])[] = [
+export const lineColors = [
   [extendedColors.accent.subtle, '#ec9923'],
   [extendedColors.primary.moderate, '#2c9b63'],
   [extendedColors.secondary.moderate, '#2389f1'],
   [extendedColors.tertiary.moderate, '#f54a3f'],
   [extendedColors.quaternary.coolxIntense, '#6222df'],
 ];
-
-// Mixes `hex` toward `targetHex` by `ratio` (0 = pure target, 1 = pure hex)
-// — used to derive a flat, subtle tint of a series color (e.g. an area
-// fill, or a muted bar fill paired with the vivid color as its border)
-// deterministically, rather than trusting canvas alpha compositing or an
-// opaque design token to already be muted enough.
-export function mixHex(hex: string, targetHex: string, ratio: number): string {
-  const c1 = parseInt(hex.slice(1), 16);
-  const c2 = parseInt(targetHex.slice(1), 16);
-  const mix = (shift: number) => {
-    const a = (c1 >> shift) & 255;
-    const b = (c2 >> shift) & 255;
-    return Math.round(a * ratio + b * (1 - ratio));
-  };
-  return `#${[mix(16), mix(8), mix(0)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-}
 
 export const seriesOptions: LineSeriesOption = {
   type: 'line',
@@ -153,12 +137,8 @@ const tooltipFormatter = (params: any) => {
 export const getLineChartOptions = (
   data: Partial<ChartProps['option']>,
   legendData?: LegendComponentOption['data'],
-  // Callers that already track theme reactively (e.g. via next-themes'
-  // useTheme) pass it through instead of this falling back to a one-time,
-  // non-reactive isDark() read that would otherwise go stale on toggle.
-  darkOverride?: boolean,
 ): ChartProps['option'] => {
-  const dark = darkOverride ?? isDark();
+  const dark = isDark();
   return {
     tooltip: {
       trigger: 'axis',
