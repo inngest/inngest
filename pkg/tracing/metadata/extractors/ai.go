@@ -115,11 +115,11 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		aiMd.FinishReasons = []string{parsedOutput.StopReason}
 	}
 
-	if parsedInput.Temperature != 0 {
-		aiMd.Temperature = util.ToPtr(float32To64(parsedInput.Temperature))
+	if parsedInput.Temperature != nil {
+		aiMd.Temperature = util.ToPtr(float32To64(*parsedInput.Temperature))
 	}
-	if parsedInput.TopP != 0 {
-		aiMd.TopP = util.ToPtr(float32To64(parsedInput.TopP))
+	if parsedInput.TopP != nil {
+		aiMd.TopP = util.ToPtr(float32To64(*parsedInput.TopP))
 	}
 	maxTokens := parsedInput.MaxTokens
 	if maxTokens == 0 {

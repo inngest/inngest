@@ -18,24 +18,23 @@ type AIEnrichOpts struct {
 
 // Enrich fills derivable gaps in the metadata. It is idempotent and never
 // overwrites values the emitter supplied.
-func (md *AIMetadata) Enrich(opts AIEnrichOpts) {
-	if md.TotalTokens == nil && (md.InputTokens > 0 || md.OutputTokens > 0) {
-		totalTokens := md.InputTokens + md.OutputTokens
-		md.TotalTokens = &totalTokens
+func (ms *AIMetadata) Enrich(opts AIEnrichOpts) {
+	if ms.TotalTokens == nil && (ms.InputTokens > 0 || ms.OutputTokens > 0) {
+		totalTokens := ms.InputTokens + ms.OutputTokens
+		ms.TotalTokens = &totalTokens
 	}
 
-	if md.EstimatedCost == nil && (md.InputTokens > 0 || md.OutputTokens > 0) {
-		// prefer the response model (the model that actually served the
-		// request) for cost estimation, falling back to the requested model.
-		costModel := md.ResponseModel
+	if ms.EstimatedCost == nil && (ms.InputTokens > 0 || ms.OutputTokens > 0) {
+		// prefer the model that actually served the request for cost estimation
+		costModel := ms.ResponseModel
 		if costModel == "" {
-			costModel = md.RequestModel
+			costModel = ms.RequestModel
 		}
-		md.EstimatedCost = EstimateCost(costModel, md.InputTokens, md.OutputTokens)
+		ms.EstimatedCost = EstimateCost(costModel, ms.InputTokens, ms.OutputTokens)
 	}
 
-	if md.LatencyMs == nil && opts.FallbackLatencyMs > 0 {
-		md.LatencyMs = &opts.FallbackLatencyMs
+	if ms.LatencyMs == nil && opts.FallbackLatencyMs > 0 {
+		ms.LatencyMs = &opts.FallbackLatencyMs
 	}
 }
 

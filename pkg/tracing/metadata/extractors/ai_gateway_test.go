@@ -65,8 +65,6 @@ func TestExtractAIGatewayMetadata_OpenAIChatCompletion(t *testing.T) {
 func TestExtractAIGatewayMetadata_AnthropicFormatFallback(t *testing.T) {
 	t.Parallel()
 
-	// The host is an unrecognized proxy; the format alone determines the
-	// provider.
 	req := aigateway.Request{
 		URL:    "https://llm-proxy.internal.example.com/v1/messages",
 		Format: aigateway.FormatAnthropic,
@@ -135,6 +133,16 @@ func TestExtractAIGatewayMetadata_RequestParams(t *testing.T) {
 			name:     "seed zero is preserved",
 			body:     `{"model": "gpt-4o", "seed": 0}`,
 			wantSeed: util.ToPtr[int64](0),
+		},
+		{
+			name:     "temperature and top_p zero are preserved",
+			body:     `{"model": "gpt-4o", "temperature": 0, "top_p": 0}`,
+			wantTemp: util.ToPtr(0.0),
+			wantTopP: util.ToPtr(0.0),
+		},
+		{
+			name: "null params stay nil",
+			body: `{"model": "gpt-4o", "temperature": null, "top_p": null}`,
 		},
 		{
 			name: "absent params stay nil",
