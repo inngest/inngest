@@ -44,7 +44,8 @@ import { HeadlineStats } from '../InsightsMetrics/HeadlineStats';
 import { RangePlot } from '../InsightsMetrics/RangePlot';
 import { RankedTable } from '../InsightsMetrics/RankedTable';
 import { TrendChart } from '../InsightsMetrics/TrendChart';
-import { InsightsOverviewMetricsDocument, TREND_BUCKET_LIMIT } from '../InsightsMetrics/queries';
+import { TREND_BUCKET_LIMIT } from '../InsightsMetrics/queries';
+import { useInsightsMetric } from '../InsightsMetrics/useInsightsMetric';
 import {
   toListItems,
   toScalarValues,
@@ -139,20 +140,115 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
     [range],
   );
 
+  const functionIDs = selectedFns?.length ? selectedFns : null;
+
   const [{ data: accountData }] = useQuery({
     query: GetAccountEntitlementsDocument,
   });
   const daysAgoMax = accountData?.account.entitlements.history.limit ?? 7;
 
-  const [{ data, fetching, error }] = useQuery({
-    query: InsightsOverviewMetricsDocument,
-    variables: {
-      workspaceID,
-      functionIDs: selectedFns?.length ? selectedFns : null,
-      range: timeRange,
-      trendBucketLimit: TREND_BUCKET_LIMIT,
-    },
+  // One InsightsMetric request per widget (see InsightsMetrics/queries.ts) —
+  // topFunctionsByRuns/topFunctionsByCost omit functionIDs since they're
+  // env-wide rankings, so they don't refetch when the function filter
+  // changes.
+  const headline = useInsightsMetric('ai_headline', { workspaceID, functionIDs, range: timeRange });
+  const tokenTrend = useInsightsMetric('ai_token_trend', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: TREND_BUCKET_LIMIT,
   });
+  const modelDistribution = useInsightsMetric('ai_model_distribution', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+  });
+  const runsByModel = useInsightsMetric('ai_runs_by_model', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+  });
+  const runVolumeTrend = useInsightsMetric('ai_run_volume_trend', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: TREND_BUCKET_LIMIT,
+  });
+  const latencyByModel = useInsightsMetric('ai_latency_by_model', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+  });
+  const latencyTrend = useInsightsMetric('ai_latency_trend', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: TREND_BUCKET_LIMIT,
+  });
+  const topFunctionsByRuns = useInsightsMetric('ai_top_functions_by_runs', {
+    workspaceID,
+    range: timeRange,
+    limit: 5,
+  });
+  const topFunctionsByCost = useInsightsMetric('ai_top_functions_by_cost', {
+    workspaceID,
+    range: timeRange,
+    limit: 5,
+  });
+  const mostExpensiveRuns = useInsightsMetric('ai_most_expensive_runs', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: 5,
+  });
+  const mostExpensiveSteps = useInsightsMetric('ai_most_expensive_steps', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: 5,
+  });
+  const mostExpensiveSessions = useInsightsMetric('ai_most_expensive_sessions', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: 5,
+  });
+  const costPerRunTrend = useInsightsMetric('ai_avg_cost_per_run_trend', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: TREND_BUCKET_LIMIT,
+  });
+  const costPerSessionTrend = useInsightsMetric('ai_cost_per_session_trend', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: TREND_BUCKET_LIMIT,
+  });
+  const slowRuns = useInsightsMetric('ai_slow_runs', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: 5,
+  });
+
+  const error = [
+    headline,
+    tokenTrend,
+    modelDistribution,
+    runsByModel,
+    runVolumeTrend,
+    latencyByModel,
+    latencyTrend,
+    topFunctionsByRuns,
+    topFunctionsByCost,
+    mostExpensiveRuns,
+    mostExpensiveSteps,
+    mostExpensiveSessions,
+    costPerRunTrend,
+    costPerSessionTrend,
+    slowRuns,
+  ].some((m) => m.error);
 
   const [{ data: lookupData }] = useQuery({
     query: FunctionLookupDocument,
@@ -171,32 +267,17 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
     return m;
   }, [lookupData]);
 
-  const headline = data?.headline;
-  const tokenTrend = data?.tokenTrend;
-  const runVolumeTrend = data?.runVolumeTrend;
-  const latencyTrend = data?.latencyTrend;
   const latencyTrendPoints = useMemo(
-    () => msPointsToSeconds(toTrendPoints(latencyTrend), ['p50', 'p95', 'p99']),
-    [latencyTrend],
+    () => msPointsToSeconds(toTrendPoints(latencyTrend.data), ['p50', 'p95', 'p99']),
+    [latencyTrend.data],
   );
-  const modelDistribution = data?.modelDistribution;
-  const runsByModel = data?.runsByModel;
-  const latencyByModel = data?.latencyByModel;
-  const topFunctionsByRuns = data?.topFunctionsByRuns;
-  const topFunctionsByCost = data?.topFunctionsByCost;
-  const mostExpensiveRuns = data?.mostExpensiveRuns;
-  const mostExpensiveSteps = data?.mostExpensiveSteps;
-  const mostExpensiveSessions = data?.mostExpensiveSessions;
-  const costPerRunTrend = data?.costPerRunTrend;
-  const costPerSessionTrend = data?.costPerSessionTrend;
-  const slowRuns = data?.slowRuns;
 
   const isDefaultView = !start && !end && !duration && !selectedFns?.length;
-  const hasAnyCalls = toScalarValues(headline).some(
+  const hasAnyCalls = toScalarValues(headline.data).some(
     (v) => v.name === 'calls' && v.value > 0,
   );
   const showEmptyState =
-    isDefaultView && !fetching && !error && headline && !hasAnyCalls;
+    isDefaultView && !headline.fetching && !headline.error && headline.data && !hasAnyCalls;
 
   const defaultRange =
     parsedStart && parsedEnd
@@ -242,15 +323,15 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-6 [&::-webkit-scrollbar]:hidden">
         <Section plain>
           <HeadlineStats
-            values={toScalarValues(headline)}
-            isLoading={fetching && !headline}
+            values={toScalarValues(headline.data)}
+            isLoading={headline.fetching && !headline.data}
             tiles={[
               { valueName: 'runs', label: 'AI runs', format: formatCompactNumber },
               {
                 valueName: 'cost',
                 label: 'Cost',
                 format: formatCost,
-                tooltip: headlineCaveat(toScalarValues(headline)),
+                tooltip: headlineCaveat(toScalarValues(headline.data)),
               },
               {
                 valueName: 'p95_latency',
@@ -276,24 +357,24 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Section
             title="Runs over time"
-            query={runVolumeTrend?.query}
+            query={runVolumeTrend.data?.query}
             queryName="AI run volume over time"
           >
             <TrendChart
-              points={toTrendPoints(runVolumeTrend)}
-              isLoading={fetching && !runVolumeTrend}
+              points={toTrendPoints(runVolumeTrend.data)}
+              isLoading={runVolumeTrend.fetching && !runVolumeTrend.data}
               chartType="bar"
               series={[{ valueName: 'runs', label: 'Runs', color: CHART_COLORS[0] }]}
             />
           </Section>
           <Section
             title="Tokens over time"
-            query={tokenTrend?.query}
+            query={tokenTrend.data?.query}
             queryName="AI tokens over time"
           >
             <TrendChart
-              points={toTrendPoints(tokenTrend)}
-              isLoading={fetching && !tokenTrend}
+              points={toTrendPoints(tokenTrend.data)}
+              isLoading={tokenTrend.fetching && !tokenTrend.data}
               chartType="area"
               stacked
               legendIcon="rect"
@@ -315,14 +396,14 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Top functions by usage"
-            query={topFunctionsByRuns?.query}
+            query={topFunctionsByRuns.data?.query}
             queryName="AI top functions by usage"
             className="lg:col-span-2"
           >
             <div className="flex flex-col gap-4 lg:flex-row">
               <CategoricalChart
-                items={toListItems(topFunctionsByRuns)}
-                isLoading={fetching && !topFunctionsByRuns}
+                items={toListItems(topFunctionsByRuns.data)}
+                isLoading={topFunctionsByRuns.fetching && !topFunctionsByRuns.data}
                 valueName="runs"
                 valueLabel="Runs"
                 colors={CHART_COLORS}
@@ -332,8 +413,8 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                 className="min-w-0 lg:w-2/3"
               />
               <ChartLegend
-                items={toListItems(topFunctionsByRuns)}
-                isLoading={fetching && !topFunctionsByRuns}
+                items={toListItems(topFunctionsByRuns.data)}
+                isLoading={topFunctionsByRuns.fetching && !topFunctionsByRuns.data}
                 valueName="runs"
                 colors={CHART_COLORS}
                 format={formatRuns}
@@ -342,10 +423,10 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               />
             </div>
           </Section>
-          <Section title="Runs by model" query={runsByModel?.query} queryName="AI runs by model">
+          <Section title="Runs by model" query={runsByModel.data?.query} queryName="AI runs by model">
             <CategoricalChart
-              items={toListItems(runsByModel)}
-              isLoading={fetching && !runsByModel}
+              items={toListItems(runsByModel.data)}
+              isLoading={runsByModel.fetching && !runsByModel.data}
               valueName="runs"
               valueLabel="Runs"
               color={CHART_COLORS[0]}
@@ -356,12 +437,12 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Tokens by model"
-            query={modelDistribution?.query}
+            query={modelDistribution.data?.query}
             queryName="AI tokens by model"
           >
             <CategoricalChart
-              items={toListItems(modelDistribution)}
-              isLoading={fetching && !modelDistribution}
+              items={toListItems(modelDistribution.data)}
+              isLoading={modelDistribution.fetching && !modelDistribution.data}
               series={[
                 {
                   valueName: 'input_tokens',
@@ -385,10 +466,10 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
 
         <SectionGroupHeading>Cost</SectionGroupHeading>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Section title="Cost over time" query={tokenTrend?.query} queryName="AI cost over time">
+          <Section title="Cost over time" query={tokenTrend.data?.query} queryName="AI cost over time">
             <TrendChart
-              points={toTrendPoints(tokenTrend)}
-              isLoading={fetching && !tokenTrend}
+              points={toTrendPoints(tokenTrend.data)}
+              isLoading={tokenTrend.fetching && !tokenTrend.data}
               chartType="bar"
               format={formatCost}
               axisFormat={formatCostAxis}
@@ -396,10 +477,10 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               series={[{ valueName: 'cost', label: 'Cost', color: CHART_COLORS[0] }]}
             />
           </Section>
-          <Section title="Cost by model" query={modelDistribution?.query} queryName="AI cost by model">
+          <Section title="Cost by model" query={modelDistribution.data?.query} queryName="AI cost by model">
             <CategoricalChart
-              items={toListItems(modelDistribution)}
-              isLoading={fetching && !modelDistribution}
+              items={toListItems(modelDistribution.data)}
+              isLoading={modelDistribution.fetching && !modelDistribution.data}
               valueName="cost"
               colors={CHART_COLORS}
               format={formatCost}
@@ -409,12 +490,12 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Cost per run over time"
-            query={costPerRunTrend?.query}
+            query={costPerRunTrend.data?.query}
             queryName="AI cost per run over time"
           >
             <TrendChart
-              points={toTrendPoints(costPerRunTrend)}
-              isLoading={fetching && !costPerRunTrend}
+              points={toTrendPoints(costPerRunTrend.data)}
+              isLoading={costPerRunTrend.fetching && !costPerRunTrend.data}
               format={formatCost}
               axisFormat={formatCostAxis}
               allowDecimals
@@ -423,12 +504,12 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Cost per session over time"
-            query={costPerSessionTrend?.query}
+            query={costPerSessionTrend.data?.query}
             queryName="AI cost per session over time"
           >
             <TrendChart
-              points={toTrendPoints(costPerSessionTrend)}
-              isLoading={fetching && !costPerSessionTrend}
+              points={toTrendPoints(costPerSessionTrend.data)}
+              isLoading={costPerSessionTrend.fetching && !costPerSessionTrend.data}
               format={formatCost}
               axisFormat={formatCostAxis}
               allowDecimals
@@ -439,14 +520,14 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Cost by function"
-            query={topFunctionsByCost?.query}
+            query={topFunctionsByCost.data?.query}
             queryName="AI cost by function"
             className="lg:col-span-2"
           >
             <div className="flex flex-col gap-4 lg:flex-row">
               <CategoricalChart
-                items={toListItems(topFunctionsByCost)}
-                isLoading={fetching && !topFunctionsByCost}
+                items={toListItems(topFunctionsByCost.data)}
+                isLoading={topFunctionsByCost.fetching && !topFunctionsByCost.data}
                 valueName="cost"
                 colors={CHART_COLORS}
                 format={formatCost}
@@ -456,8 +537,8 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                 className="min-w-0 lg:w-2/3"
               />
               <ChartLegend
-                items={toListItems(topFunctionsByCost)}
-                isLoading={fetching && !topFunctionsByCost}
+                items={toListItems(topFunctionsByCost.data)}
+                isLoading={topFunctionsByCost.fetching && !topFunctionsByCost.data}
                 valueName="cost"
                 colors={CHART_COLORS}
                 format={formatCost}
@@ -468,12 +549,12 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Most expensive runs"
-            query={mostExpensiveRuns?.query}
+            query={mostExpensiveRuns.data?.query}
             queryName="AI most expensive runs"
           >
             <RankedTable
-              items={toListItems(mostExpensiveRuns)}
-              isLoading={fetching && !mostExpensiveRuns}
+              items={toListItems(mostExpensiveRuns.data)}
+              isLoading={mostExpensiveRuns.fetching && !mostExpensiveRuns.data}
               identifierLabel="Run"
               renderIdentifier={(id) => renderRunLink(id, envSlug)}
               functionColumn={{
@@ -488,12 +569,12 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Most expensive steps"
-            query={mostExpensiveSteps?.query}
+            query={mostExpensiveSteps.data?.query}
             queryName="AI most expensive steps"
           >
             <RankedTable
-              items={toListItems(mostExpensiveSteps)}
-              isLoading={fetching && !mostExpensiveSteps}
+              items={toListItems(mostExpensiveSteps.data)}
+              isLoading={mostExpensiveSteps.fetching && !mostExpensiveSteps.data}
               identifierLabel="Step"
               functionColumn={{
                 label: 'Function',
@@ -507,13 +588,13 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Most expensive sessions"
-            query={mostExpensiveSessions?.query}
+            query={mostExpensiveSessions.data?.query}
             queryName="AI most expensive sessions"
             className="lg:col-span-2"
           >
             <RankedTable
-              items={toListItems(mostExpensiveSessions)}
-              isLoading={fetching && !mostExpensiveSessions}
+              items={toListItems(mostExpensiveSessions.data)}
+              isLoading={mostExpensiveSessions.fetching && !mostExpensiveSessions.data}
               identifierLabel="Session"
               renderIdentifier={(id, item) => renderSessionLink(id, item.sessionKey ?? '', envSlug)}
               sessionKeyColumn={{
@@ -533,12 +614,12 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Section
             title="Latency over time"
-            query={latencyTrend?.query}
+            query={latencyTrend.data?.query}
             queryName="AI latency over time"
           >
             <TrendChart
               points={latencyTrendPoints}
-              isLoading={fetching && !latencyTrendPoints}
+              isLoading={latencyTrend.fetching && !latencyTrend.data}
               format={formatSeconds}
               axisFormat={formatSecondsAxis}
               allowDecimals
@@ -551,12 +632,12 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="AI Call Latency by model"
-            query={latencyByModel?.query}
+            query={latencyByModel.data?.query}
             queryName="AI Call Latency by model"
           >
             <RangePlot
-              items={toListItems(latencyByModel)}
-              isLoading={fetching && !latencyByModel}
+              items={toListItems(latencyByModel.data)}
+              isLoading={latencyByModel.fetching && !latencyByModel.data}
               format={formatSeconds}
               axisFormat={formatSecondsAxis}
               colors={CHART_COLORS}
@@ -566,12 +647,12 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           <Section
             title="Slowest runs"
             className="lg:col-span-2"
-            query={slowRuns?.query}
+            query={slowRuns.data?.query}
             queryName="AI slowest runs"
           >
             <RankedTable
-              items={toListItems(slowRuns)}
-              isLoading={fetching && !slowRuns}
+              items={toListItems(slowRuns.data)}
+              isLoading={slowRuns.fetching && !slowRuns.data}
               identifierLabel="Run"
               renderIdentifier={(id) => renderRunLink(id, envSlug)}
               functionColumn={{

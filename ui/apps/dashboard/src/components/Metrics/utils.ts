@@ -40,7 +40,7 @@ export type LineChartData = {
   }>;
 };
 
-export const lineColors = [
+export const lineColors: readonly (readonly [string, string])[] = [
   [extendedColors.accent.subtle, '#ec9923'],
   [extendedColors.primary.moderate, '#2c9b63'],
   [extendedColors.secondary.moderate, '#2389f1'],
