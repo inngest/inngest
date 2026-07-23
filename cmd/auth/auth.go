@@ -75,6 +75,7 @@ func login(ctx context.Context, cmd *cli.Command) error {
 	}
 	state.Credentials = []byte(resp.AccessToken)
 	state.Account = client.Account{ID: resp.AccountID, Name: resp.AccountName}
+	state.Env = resp.Env
 	if err := state.Persist(ctx); err != nil {
 		return fmt.Errorf("unable to save credentials: %w", err)
 	}
@@ -83,7 +84,11 @@ func login(ctx context.Context, cmd *cli.Command) error {
 		fmt.Println(inncli.BoldStyle.Render("Logged in."))
 		return nil
 	}
-	fmt.Println(inncli.BoldStyle.Render(fmt.Sprintf("Logged in as %s.", resp.AccountName)))
+	msg := fmt.Sprintf("Logged in as %s.", resp.AccountName)
+	if resp.Env != "" {
+		msg = fmt.Sprintf("Logged in as %s, using the %s environment.", resp.AccountName, resp.Env)
+	}
+	fmt.Println(inncli.BoldStyle.Render(msg))
 	return nil
 }
 
@@ -186,6 +191,7 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 	if err == nil {
 		state.Credentials = nil
 		state.Account = client.Account{}
+		state.Env = ""
 		if err := state.Persist(ctx); err != nil {
 			return fmt.Errorf("unable to clear credentials: %w", err)
 		}
@@ -203,6 +209,9 @@ func whoami(ctx context.Context, cmd *cli.Command) error {
 
 	fmt.Println(inncli.TextStyle.Render(fmt.Sprintf("Logged in as %s.", state.Account.Name)))
 	fmt.Println(inncli.FeintStyle.Render(fmt.Sprintf("Account ID: %s", state.Account.ID)))
+	if state.Env != "" {
+		fmt.Println(inncli.FeintStyle.Render(fmt.Sprintf("Environment: %s", state.Env)))
+	}
 	if os.Getenv(clistate.EnvApiKey) != "" {
 		fmt.Println(inncli.RenderWarning(fmt.Sprintf("%s is set and overrides the stored credentials.", clistate.EnvApiKey)))
 	}

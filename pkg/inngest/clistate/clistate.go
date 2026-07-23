@@ -82,7 +82,9 @@ type State struct {
 	ClientID    uuid.UUID              `json:"clientID"`
 	Credentials []byte                 `json:"credentials"`
 	Account     client.Account         `json:"account"`
-	Settings    map[string]interface{} `json:"settings"`
+	// Env is the name of the environment the stored credential is bound to.
+	Env      string                 `json:"env,omitempty"`
+	Settings map[string]interface{} `json:"settings"`
 }
 
 func (s State) Persist(ctx context.Context) error {
