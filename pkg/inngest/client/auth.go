@@ -56,7 +56,7 @@ func (c httpClient) StartDeviceLogin(ctx context.Context, clientID uuid.UUID) (*
 		return nil, fmt.Errorf("Please provide a valid client ID")
 	}
 
-	req, err := c.NewRequest(http.MethodPost, fmt.Sprintf("/v1/login/device/new?client_id=%s", clientID), nil)
+	req, err := c.NewRequest(http.MethodPost, fmt.Sprintf("/v2/login/device/new?client_id=%s", clientID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating login request: %s", err)
 	}
@@ -84,7 +84,7 @@ func (c httpClient) PollDeviceLogin(ctx context.Context, clientID, deviceCode uu
 	data := url.Values{}
 	data.Set("client_id", clientID.String())
 	data.Set("device_code", deviceCode.String())
-	req, err := c.NewRequest(http.MethodPost, "/v1/login/device/poll", strings.NewReader(data.Encode()))
+	req, err := c.NewRequest(http.MethodPost, "/v2/login/device/poll", strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("error creating login request: %s", err)
 	}
@@ -114,8 +114,10 @@ type StartDeviceLoginResponse struct {
 }
 
 type DeviceLoginResponse struct {
-	Error       string `json:"error"`
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	Expires     int    `json:"expires"`
+	Error       string    `json:"error"`
+	AccessToken string    `json:"access_token"`
+	TokenType   string    `json:"token_type"`
+	Expires     int       `json:"expires"`
+	AccountID   uuid.UUID `json:"account_id"`
+	AccountName string    `json:"account_name"`
 }

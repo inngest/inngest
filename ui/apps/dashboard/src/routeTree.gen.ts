@@ -30,6 +30,7 @@ import { Route as AuthedIntentRouteRouteImport } from './routes/_authed/intent/r
 import { Route as AuthedBillingRouteRouteImport } from './routes/_authed/billing/route'
 import { Route as SupportImpersonationIndexRouteImport } from './routes/support/impersonation/index'
 import { Route as AuthedEnvIndexRouteImport } from './routes/_authed/env/index'
+import { Route as AuthedDeviceIndexRouteImport } from './routes/_authed/device/index'
 import { Route as AuthedCreateEnvironmentIndexRouteImport } from './routes/_authed/create-environment/index'
 import { Route as AuthedBillingIndexRouteImport } from './routes/_authed/billing/index'
 import { Route as ApiRealtimeTokenRouteImport } from './routes/api/realtime/token'
@@ -214,6 +215,11 @@ const SupportImpersonationIndexRoute =
 const AuthedEnvIndexRoute = AuthedEnvIndexRouteImport.update({
   id: '/env/',
   path: '/env/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedDeviceIndexRoute = AuthedDeviceIndexRouteImport.update({
+  id: '/device/',
+  path: '/device/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedCreateEnvironmentIndexRoute =
@@ -714,6 +720,7 @@ export interface FileRoutesByFullPath {
   '/api/realtime/token': typeof ApiRealtimeTokenRoute
   '/billing/': typeof AuthedBillingIndexRoute
   '/create-environment/': typeof AuthedCreateEnvironmentIndexRoute
+  '/device/': typeof AuthedDeviceIndexRoute
   '/env/': typeof AuthedEnvIndexRoute
   '/support/impersonation/': typeof SupportImpersonationIndexRoute
   '/env/$envSlug/apps': typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren
@@ -814,6 +821,7 @@ export interface FileRoutesByTo {
   '/api/realtime/token': typeof ApiRealtimeTokenRoute
   '/billing': typeof AuthedBillingIndexRoute
   '/create-environment': typeof AuthedCreateEnvironmentIndexRoute
+  '/device': typeof AuthedDeviceIndexRoute
   '/env': typeof AuthedEnvIndexRoute
   '/support/impersonation': typeof SupportImpersonationIndexRoute
   '/env/$envSlug/onboarding': typeof AuthedEnvEnvSlugOnboardingRouteRouteWithChildren
@@ -907,6 +915,7 @@ export interface FileRoutesById {
   '/api/realtime/token': typeof ApiRealtimeTokenRoute
   '/_authed/billing/': typeof AuthedBillingIndexRoute
   '/_authed/create-environment/': typeof AuthedCreateEnvironmentIndexRoute
+  '/_authed/device/': typeof AuthedDeviceIndexRoute
   '/_authed/env/': typeof AuthedEnvIndexRoute
   '/support/impersonation/': typeof SupportImpersonationIndexRoute
   '/_authed/env/$envSlug/apps': typeof AuthedEnvEnvSlugAppsRouteRouteWithChildren
@@ -1011,6 +1020,7 @@ export interface FileRouteTypes {
     | '/api/realtime/token'
     | '/billing/'
     | '/create-environment/'
+    | '/device/'
     | '/env/'
     | '/support/impersonation/'
     | '/env/$envSlug/apps'
@@ -1111,6 +1121,7 @@ export interface FileRouteTypes {
     | '/api/realtime/token'
     | '/billing'
     | '/create-environment'
+    | '/device'
     | '/env'
     | '/support/impersonation'
     | '/env/$envSlug/onboarding'
@@ -1203,6 +1214,7 @@ export interface FileRouteTypes {
     | '/api/realtime/token'
     | '/_authed/billing/'
     | '/_authed/create-environment/'
+    | '/_authed/device/'
     | '/_authed/env/'
     | '/support/impersonation/'
     | '/_authed/env/$envSlug/apps'
@@ -1451,6 +1463,13 @@ declare module '@tanstack/react-router' {
       path: '/env'
       fullPath: '/env/'
       preLoaderRoute: typeof AuthedEnvIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/device/': {
+      id: '/_authed/device/'
+      path: '/device'
+      fullPath: '/device/'
+      preLoaderRoute: typeof AuthedDeviceIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/create-environment/': {
@@ -2392,6 +2411,7 @@ interface AuthedRouteChildren {
   AuthedSettingsRouteRoute: typeof AuthedSettingsRouteRouteWithChildren
   AuthedEnvEnvSlugRouteRoute: typeof AuthedEnvEnvSlugRouteRouteWithChildren
   AuthedCreateEnvironmentIndexRoute: typeof AuthedCreateEnvironmentIndexRoute
+  AuthedDeviceIndexRoute: typeof AuthedDeviceIndexRoute
   AuthedEnvIndexRoute: typeof AuthedEnvIndexRoute
   AuthedIntegrationsVercelIndexRoute: typeof AuthedIntegrationsVercelIndexRoute
   AuthedIntegrationsVercelCallbackIndexRoute: typeof AuthedIntegrationsVercelCallbackIndexRoute
@@ -2404,6 +2424,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsRouteRoute: AuthedSettingsRouteRouteWithChildren,
   AuthedEnvEnvSlugRouteRoute: AuthedEnvEnvSlugRouteRouteWithChildren,
   AuthedCreateEnvironmentIndexRoute: AuthedCreateEnvironmentIndexRoute,
+  AuthedDeviceIndexRoute: AuthedDeviceIndexRoute,
   AuthedEnvIndexRoute: AuthedEnvIndexRoute,
   AuthedIntegrationsVercelIndexRoute: AuthedIntegrationsVercelIndexRoute,
   AuthedIntegrationsVercelCallbackIndexRoute:
