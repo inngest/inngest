@@ -40,7 +40,7 @@ type MigrateState struct {
 	Events     []json.RawMessage
 	Steps      map[string]json.RawMessage
 	StepInputs map[string]json.RawMessage
-	// Stack is the ordered list of step IDs;
+	// Stack is the ordered list of step IDs.
 	Stack        []string
 	PendingSteps []string
 	Defers       map[string]Defer

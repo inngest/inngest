@@ -907,7 +907,7 @@ func TestV2AdapterMigrate(t *testing.T) {
 		pureSteps[k] = v
 	}
 
-	require.NoError(t, dstSvc.Migrate(ctx, statev2.MigrateState{
+	migrateState := statev2.MigrateState{
 		Metadata:     md,
 		Events:       events,
 		Steps:        pureSteps,
@@ -915,7 +915,8 @@ func TestV2AdapterMigrate(t *testing.T) {
 		Stack:        md.Stack,
 		PendingSteps: pending,
 		Defers:       defers,
-	}))
+	}
+	require.NoError(t, dstSvc.Migrate(ctx, migrateState))
 
 	// Idempotency keys are intentionally not migrated (they expire naturally
 	// on the source cluster), so filter them out before comparing.
@@ -953,6 +954,10 @@ func TestV2AdapterMigrate(t *testing.T) {
 	dstDefers, err := dstSvc.LoadDefers(ctx, id)
 	require.NoError(t, err)
 	assert.Equal(t, srcDefers, dstDefers, "defers must match")
+
+	before := dstMR.Dump()
+	require.NoError(t, dstSvc.Migrate(ctx, migrateState))
+	assert.Equal(t, before, dstMR.Dump(), "re-running Migrate with the same snapshot must not change destination state")
 }
 
 func TestV2AdapterLookupIdempotency(t *testing.T) {
