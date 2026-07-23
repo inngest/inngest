@@ -203,7 +203,7 @@ func IsProd() bool {
 func RequireState(ctx context.Context) *State {
 	state, err := GetState(ctx)
 	if err == ErrNoState {
-		fmt.Println("\nRun `inngestctl login` and log in before running this command.")
+		fmt.Println("\nRun `inngest auth login` and log in before running this command.")
 		os.Exit(1)
 	}
 
