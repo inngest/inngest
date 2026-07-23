@@ -37,6 +37,7 @@ const graphqlConfig = {
             strictScalars: true,
             useTypeImports: true,
             scalars: {
+              AccountSettingName: 'string',
               BillingPeriod: 'unknown',
               Bytes: 'string',
               DSN: 'unknown',
