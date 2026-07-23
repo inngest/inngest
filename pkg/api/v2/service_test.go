@@ -1336,11 +1336,17 @@ func TestService_Rerun(t *testing.T) {
 		require.NotNil(t, resp.Metadata.FetchedAt)
 	})
 
-	t.Run("rejects from step opts", func(t *testing.T) {
+	t.Run("reruns from step", func(t *testing.T) {
 		input, err := structpb.NewList([]any{map[string]any{"foo": "bar"}})
 		require.NoError(t, err)
 
 		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{
+			FromStep: &RerunFromStep{
+				StepID: "step-1",
+				Input:  json.RawMessage(`[{"foo":"bar"}]`),
+			},
+		}).Return(newRunID, nil).Once()
 		t.Cleanup(func() {
 			rerun.AssertExpectations(t)
 		})
@@ -1354,8 +1360,8 @@ func TestService_Rerun(t *testing.T) {
 			},
 		})
 
-		require.Nil(t, resp)
-		require.ErrorContains(t, err, "Rerun from step is not yet implemented")
+		require.NoError(t, err)
+		require.Equal(t, newRunID.String(), resp.Data.RunId)
 	})
 
 	t.Run("requires run id", func(t *testing.T) {
@@ -1384,7 +1390,7 @@ func TestService_Rerun(t *testing.T) {
 		})
 
 		require.Nil(t, resp)
-		require.ErrorContains(t, err, "Rerun from step is not yet implemented")
+		require.ErrorContains(t, err, "Step ID is required")
 	})
 
 	t.Run("maps missing run", func(t *testing.T) {
@@ -1417,6 +1423,42 @@ func TestService_Rerun(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Rerunning cron-triggered runs is not yet supported")
+	})
+
+	t.Run("maps missing rerun step", func(t *testing.T) {
+		opts := RerunOpts{FromStep: &RerunFromStep{StepID: "missing"}}
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, opts).Return(ulid.ULID{}, ErrRerunStepNotFound).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId:    runID.String(),
+			FromStep: &apiv2.RerunFromStep{StepId: "missing"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Step not found in original run")
+	})
+
+	t.Run("maps ambiguous rerun step", func(t *testing.T) {
+		opts := RerunOpts{FromStep: &RerunFromStep{StepID: "duplicate"}}
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, opts).Return(ulid.ULID{}, ErrRerunStepAmbiguous).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId:    runID.String(),
+			FromStep: &apiv2.RerunFromStep{StepId: "duplicate"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Step name matches multiple steps in original run")
 	})
 
 	t.Run("applies rate limit", func(t *testing.T) {

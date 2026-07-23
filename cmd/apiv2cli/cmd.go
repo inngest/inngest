@@ -235,7 +235,22 @@ func endpointFlags(ep endpoint) []cli.Flag {
 			category = "Body"
 		}
 
+		if ep.name == "rerun" && flagName == "from-step" {
+			flags = append(flags, &cli.StringFlag{
+				Category: category,
+				Name:     flagName,
+				Usage:    "Step name to rerun from.",
+			})
+			continue
+		}
 		flags = append(flags, flagForField(category, flagName, field))
+	}
+	if ep.name == "rerun" {
+		flags = append(flags, &cli.StringFlag{
+			Category: "Body",
+			Name:     "input",
+			Usage:    "Optional replacement step input as a JSON array.",
+		})
 	}
 
 	return flags
@@ -696,6 +711,11 @@ func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if ep.name == "rerun" {
+		if err := addRerunFromStepBody(cmd, body); err != nil {
+			return nil, err
+		}
+	}
 
 	fields := ep.input.Fields()
 	for i := 0; i < fields.Len(); i++ {
@@ -706,6 +726,9 @@ func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
 		}
 
 		flagName := kebab(name)
+		if ep.name == "rerun" && flagName == "from-step" {
+			continue
+		}
 		if !cmd.IsSet(flagName) {
 			continue
 		}
@@ -722,6 +745,30 @@ func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
 	}
 
 	return body, nil
+}
+
+func addRerunFromStepBody(cmd *cli.Command, body map[string]any) error {
+	if !cmd.IsSet("from-step") {
+		if cmd.IsSet("input") {
+			return errors.New("--input requires --from-step")
+		}
+		return nil
+	}
+
+	fromStep := map[string]any{"stepId": cmd.String("from-step")}
+
+	if cmd.IsSet("input") {
+		var input []any
+		if err := json.Unmarshal([]byte(cmd.String("input")), &input); err != nil {
+			return fmt.Errorf("--input must be a valid JSON array: %w", err)
+		}
+		if input == nil {
+			return errors.New("--input must be a valid JSON array")
+		}
+		fromStep["input"] = input
+	}
+	body["fromStep"] = fromStep
+	return nil
 }
 
 func rawBody(cmd *cli.Command) (map[string]any, error) {

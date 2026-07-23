@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -15,7 +16,13 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 )
 
+var (
+	ErrRerunStepNotFound  = errors.New("rerun step not found")
+	ErrRerunStepAmbiguous = errors.New("rerun step name is ambiguous")
+)
+
 type reconstructResult struct {
+	fromStepID string
 	fromStepOp *enums.Opcode
 }
 
@@ -28,22 +35,24 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 		return nil, fmt.Errorf("original run trace not found")
 	}
 
-	//
-	// executor.step spans identify completed step order and output IDs.
-	stepsToCopy, foundStepToRunFrom := reconstructSteps(root, req.FromStep.StepID)
-
-	if !foundStepToRunFrom {
-		return nil, fmt.Errorf("step to run from not found in original run")
+	fromStepID, err := resolveRerunStepID(root, req.FromStep.StepID)
+	if err != nil {
+		return nil, err
 	}
 
+	//
+	// executor.step spans identify completed step order and output IDs.
+	stepsToCopy, _ := reconstructSteps(root, fromStepID)
+
 	result := &reconstructResult{
+		fromStepID: fromStepID,
 		fromStepOp: stepsToCopy.fromStepOp(),
 	}
 
 	steps := []state.MemoizedStep{}
 
 	for _, step := range stepsToCopy {
-		if step.id == req.FromStep.StepID {
+		if step.id == fromStepID {
 			break
 		}
 
@@ -91,13 +100,52 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 		// Rerun from step can alter input for FromStep, so keep it out of completed step output.
 		newState.StepInputs = []state.MemoizedStep{
 			{
-				ID:   req.FromStep.StepID,
+				ID:   fromStepID,
 				Data: req.FromStep.Input,
 			},
 		}
 	}
 
 	return result, nil
+}
+
+func resolveRerunStepID(root *cqrs.OtelSpan, requested string) (string, error) {
+	matchingIDs := map[string]struct{}{}
+
+	walkOtelSpans(root, func(span *cqrs.OtelSpan) {
+		if span == nil || span.Attributes == nil || span.Name != meta.SpanNameStep {
+			return
+		}
+		if span.Attributes.StepID == nil || *span.Attributes.StepID == "" {
+			return
+		}
+
+		stepID := *span.Attributes.StepID
+		//
+		// Keep accepting internal step IDs for backward compatibility when an ID
+		// happens to match another step's user-defined name.
+		if stepID == requested {
+			matchingIDs = map[string]struct{}{stepID: {}}
+			return
+		}
+		if span.Attributes.StepName != nil && *span.Attributes.StepName == requested {
+			matchingIDs[stepID] = struct{}{}
+		}
+	})
+
+	if _, ok := matchingIDs[requested]; ok {
+		return requested, nil
+	}
+	if len(matchingIDs) == 0 {
+		return "", ErrRerunStepNotFound
+	}
+	if len(matchingIDs) > 1 {
+		return "", ErrRerunStepAmbiguous
+	}
+	for stepID := range matchingIDs {
+		return stepID, nil
+	}
+	return "", ErrRerunStepNotFound
 }
 
 type reconstructStepsResult []reconstructStep

@@ -1,6 +1,7 @@
 package apiv2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -266,9 +267,10 @@ func TestHTTPGateway_Rerun(t *testing.T) {
 	require.Equal(t, newRunID.String(), data["runId"])
 }
 
-func TestHTTPGateway_RerunFromStepNotImplemented(t *testing.T) {
+func TestHTTPGateway_RerunFromStep(t *testing.T) {
 	ctx := context.Background()
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	newRunID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4d0")
 	body, err := json.Marshal(map[string]any{
 		"fromStep": map[string]any{
 			"stepId": "step-1",
@@ -280,6 +282,12 @@ func TestHTTPGateway_RerunFromStepNotImplemented(t *testing.T) {
 	require.NoError(t, err)
 
 	rerun := &mockRunProvider{}
+	rerun.On("Rerun", mock.Anything, runID, RerunOpts{
+		FromStep: &RerunFromStep{
+			StepID: "step-1",
+			Input:  json.RawMessage(`[{"foo":"bar"}]`),
+		},
+	}).Return(newRunID, nil).Once()
 	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Runs: rerun}, HTTPHandlerOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -293,13 +301,55 @@ func TestHTTPGateway_RerunFromStepNotImplemented(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	require.Equal(t, http.StatusNotImplemented, rec.Code)
+	require.Equal(t, http.StatusOK, rec.Code)
 
-	var response errorResponse
+	var response map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	require.Len(t, response.Errors, 1)
-	require.Equal(t, apiv2base.ErrorNotImplemented, response.Errors[0].Code)
-	require.Equal(t, "Rerun from step is not yet implemented", response.Errors[0].Message)
+	data := response["data"].(map[string]any)
+	require.Equal(t, newRunID.String(), data["runId"])
+}
+
+func TestHTTPGateway_RerunFromStepErrors(t *testing.T) {
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	tests := []struct {
+		name    string
+		stepID  string
+		err     error
+		message string
+	}{
+		{name: "missing step", stepID: "missing", err: ErrRerunStepNotFound, message: "Step not found in original run"},
+		{name: "ambiguous step", stepID: "duplicate", err: ErrRerunStepAmbiguous, message: "Step name matches multiple steps in original run"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rerun := &mockRunProvider{}
+			rerun.On("Rerun", mock.Anything, runID, RerunOpts{
+				FromStep: &RerunFromStep{StepID: tt.stepID},
+			}).Return(ulid.ULID{}, tt.err).Once()
+			t.Cleanup(func() {
+				rerun.AssertExpectations(t)
+			})
+
+			handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{Runs: rerun}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+			body, err := json.Marshal(map[string]any{
+				"fromStep": map[string]any{"stepId": tt.stepID},
+			})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v2/runs/"+runID.String()+"/rerun", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			var response errorResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			require.Equal(t, apiv2base.ErrorInvalidRequest, response.Errors[0].Code)
+			require.Equal(t, tt.message, response.Errors[0].Message)
+		})
+	}
 }
 
 func TestHTTPGateway_GetApp(t *testing.T) {

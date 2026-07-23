@@ -8593,14 +8593,14 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14GetEventRunsResponse\x12'\n" +
 	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
-	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"l\n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xd8\x01\n" +
 	"\fRerunRequest\x12\x15\n" +
-	"\x06run_id\x18\x01 \x01(\tR\x05runId\x127\n" +
-	"\tfrom_step\x18\x02 \x01(\v2\x15.api.v2.RerunFromStepH\x00R\bfromStep\x88\x01\x01B\f\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\xa2\x01\n" +
+	"\tfrom_step\x18\x02 \x01(\v2\x15.api.v2.RerunFromStepBi\x92Af2dStep rerun options. stepId is the user-defined step name. The optional input field must be an array.H\x00R\bfromStep\x88\x01\x01B\f\n" +
 	"\n" +
-	"_from_step\"\xd7\x01\n" +
-	"\rRerunFromStep\x12=\n" +
-	"\astep_id\x18\x01 \x01(\tB$\x92A!2\x15Step ID to rerun fromJ\b\"step-1\"R\x06stepId\x12}\n" +
+	"_from_step\"\xe6\x01\n" +
+	"\rRerunFromStep\x12L\n" +
+	"\astep_id\x18\x01 \x01(\tB3\x92A02$User-defined step name to rerun fromJ\b\"step-1\"R\x06stepId\x12}\n" +
 	"\x05input\x18\x02 \x01(\v2\x1a.google.protobuf.ListValueBF\x92AC2/Optional replacement step input as a JSON arrayJ\x10[{\"foo\": \"bar\"}]H\x00R\x05input\x88\x01\x01B\b\n" +
 	"\x06_input\"l\n" +
 	"\rRerunResponse\x12%\n" +

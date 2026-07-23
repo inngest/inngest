@@ -2015,13 +2015,17 @@ message GetEventRunsResponse {
 
 message RerunRequest {
   string run_id = 1;
-  optional RerunFromStep from_step = 2;
+  optional RerunFromStep from_step = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Step rerun options. stepId is the user-defined step name. The optional input field must be an array."
+    }
+  ];
 }
 
 message RerunFromStep {
   string step_id = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Step ID to rerun from"
+      description: "User-defined step name to rerun from"
       example: "\"step-1\""
     }
   ];
