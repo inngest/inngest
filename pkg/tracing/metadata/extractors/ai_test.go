@@ -338,6 +338,117 @@ func TestExtractAIOutputMetadata_InvalidJSON(t *testing.T) {
 	assert.Nil(t, md, "Invalid JSON should return nil")
 }
 
+func TestBackfillEstimatedCostInValues(t *testing.T) {
+	t.Parallel()
+
+	valuesOf := func(v map[string]any) metadata.Values {
+		values := metadata.Values{}
+		for k, val := range v {
+			b, err := json.Marshal(val)
+			require.NoError(t, err)
+			values[k] = b
+		}
+		return values
+	}
+
+	costOf := func(t *testing.T, values metadata.Values) *float64 {
+		raw, ok := values["estimated_cost"]
+		if !ok {
+			return nil
+		}
+		var cost *float64
+		require.NoError(t, json.Unmarshal(raw, &cost))
+		return cost
+	}
+
+	cases := []struct {
+		name      string
+		values    map[string]any
+		wantCost  bool
+		wantExact *float64
+	}{
+		{
+			name: "backfills from response model when cost absent",
+			values: map[string]any{
+				"input_tokens":   int64(1_000_000),
+				"output_tokens":  int64(1_000_000),
+				"request_model":  "gpt-4o-request-snapshot",
+				"response_model": "gpt-4o",
+			},
+			wantCost:  true,
+			wantExact: util.ToPtr(12.5),
+		},
+		{
+			name: "falls back to request model when response model absent",
+			values: map[string]any{
+				"input_tokens":  int64(1_000_000),
+				"output_tokens": int64(1_000_000),
+				"request_model": "gpt-4o",
+			},
+			wantCost:  true,
+			wantExact: util.ToPtr(12.5),
+		},
+		{
+			name: "leaves an existing non-null cost untouched",
+			values: map[string]any{
+				"input_tokens":   int64(1_000_000),
+				"output_tokens":  int64(1_000_000),
+				"request_model":  "gpt-4o",
+				"estimated_cost": 42.0,
+			},
+			wantCost:  true,
+			wantExact: util.ToPtr(42.0),
+		},
+		{
+			name: "overwrites an explicit null cost",
+			values: map[string]any{
+				"input_tokens":   int64(1_000_000),
+				"output_tokens":  int64(1_000_000),
+				"request_model":  "gpt-4o",
+				"estimated_cost": nil,
+			},
+			wantCost:  true,
+			wantExact: util.ToPtr(12.5),
+		},
+		{
+			name: "no model means no cost",
+			values: map[string]any{
+				"input_tokens":  int64(500),
+				"output_tokens": int64(500),
+			},
+			wantCost: false,
+		},
+		{
+			name: "unpriced model means no cost",
+			values: map[string]any{
+				"input_tokens":  int64(500),
+				"output_tokens": int64(500),
+				"request_model": "some-unlisted-finetune",
+			},
+			wantCost: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			values := valuesOf(tc.values)
+			BackfillEstimatedCostInValues(values)
+
+			cost := costOf(t, values)
+			if !tc.wantCost {
+				assert.Nil(t, cost)
+				return
+			}
+			require.NotNil(t, cost)
+			if tc.wantExact != nil {
+				assert.Equal(t, *tc.wantExact, *cost)
+			}
+		})
+	}
+}
+
 func TestExtractAIOutputMetadata_TypicalStepOutput(t *testing.T) {
 	t.Parallel()
 
