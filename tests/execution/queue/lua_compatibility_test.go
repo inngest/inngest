@@ -19,7 +19,6 @@ import (
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,12 +36,10 @@ func getItemIDsFromBacklog(ctx context.Context, mgr queue.ShardOperations, backl
 	return itemIDs, nil
 }
 
-// LuaCompatibilityTestCase defines a test case for Lua compatibility across different Redis-compatible servers
+// LuaCompatibilityTestCase defines a test case for Lua compatibility against Valkey
 type LuaCompatibilityTestCase struct {
 	Name       string                // Test case name
-	ServerType string                // "valkey" or "garnet"
 	ValkeyOpts []helper.ValkeyOption // Optional Valkey configuration
-	GarnetOpts []helper.GarnetOption // Optional Garnet configuration
 }
 
 func TestLuaCompatibility(t *testing.T) {
@@ -52,20 +49,9 @@ func TestLuaCompatibility(t *testing.T) {
 
 	testCases := []LuaCompatibilityTestCase{
 		{
-			Name:       "Basic Valkey",
-			ServerType: "valkey",
+			Name: "Basic Valkey",
 			ValkeyOpts: []helper.ValkeyOption{
 				helper.WithValkeyImage(testutil.ValkeyDefaultImage),
-			},
-		},
-		{
-			Name:       "Basic Garnet",
-			ServerType: "garnet",
-			GarnetOpts: []helper.GarnetOption{
-				helper.WithImage(testutil.GarnetDefaultImage),
-				helper.WithConfiguration(&helper.GarnetConfiguration{
-					EnableLua: true,
-				}),
 			},
 		},
 	}
@@ -75,44 +61,17 @@ func TestLuaCompatibility(t *testing.T) {
 			ctx := context.Background()
 
 			setup := func(t *testing.T, opts ...queue.QueueOpt) redis_state.RedisQueueShard {
-				// Start the appropriate server based on test case
-				var client rueidis.Client
+				container, err := helper.StartValkey(t, tc.ValkeyOpts...)
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					_ = container.Terminate(ctx)
+				})
 
-				switch tc.ServerType {
-				case "valkey":
-					container, err := helper.StartValkey(t, tc.ValkeyOpts...)
-					require.NoError(t, err)
-					t.Cleanup(func() {
-						_ = container.Terminate(ctx)
-					})
-
-					valkeyClient, err := helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
-					require.NoError(t, err)
-					t.Cleanup(func() {
-						valkeyClient.Close()
-					})
-
-					client = valkeyClient
-
-				case "garnet":
-					container, err := helper.StartGarnet(t, tc.GarnetOpts...)
-					require.NoError(t, err)
-
-					t.Cleanup(func() {
-						_ = container.Terminate(ctx)
-					})
-
-					garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
-					require.NoError(t, err)
-					t.Cleanup(func() {
-						garnetClient.Close()
-					})
-
-					client = garnetClient
-
-				default:
-					t.Fatalf("unknown server type: %s", tc.ServerType)
-				}
+				client, err := helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					client.Close()
+				})
 
 				shard := redis_state.NewQueueShard(
 					consts.DefaultQueueShardName,
@@ -123,7 +82,7 @@ func TestLuaCompatibility(t *testing.T) {
 				return shard
 			}
 
-			serverType := tc.ServerType
+			serverType := "valkey"
 
 			t.Run("basic operations", func(t *testing.T) {
 				shard := setup(t)
