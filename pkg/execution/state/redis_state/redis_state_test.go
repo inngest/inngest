@@ -785,8 +785,11 @@ func TestDeleteCleansUpAllKeys(t *testing.T) {
 		Identifier:     id,
 		EventBatchData: []map[string]any{{"test": "event"}},
 		Steps:          []state.MemoizedStep{{ID: "step1", Data: "data"}},
+		StepInputs:     []state.MemoizedStep{{ID: "step1", Data: "input"}},
 	})
 	require.NoError(t, err)
+
+	require.NoError(t, mgr.SavePending(ctx, id, []string{"pending-step"}))
 
 	// Add some pauses to make sure they get deleted
 	pause1 := state.Pause{
