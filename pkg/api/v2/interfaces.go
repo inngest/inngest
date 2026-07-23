@@ -52,6 +52,18 @@ type AppSync struct {
 type AppProvider interface {
 	// GetApp returns an app given its external ID OR internal UUID.
 	GetApp(ctx context.Context, identifier string) (App, error)
+	// GetApps returns a stable page of apps.
+	GetApps(ctx context.Context, opts GetAppsOpts) (*GetAppsResult, error)
+}
+
+type GetAppsOpts struct {
+	Cursor uuid.UUID
+	Limit  int
+}
+
+type GetAppsResult struct {
+	Apps    []App
+	HasMore bool
 }
 
 type FunctionScheduler interface {

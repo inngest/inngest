@@ -3,14 +3,61 @@ package apiv2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+const (
+	defaultAppsLimit = 20
+	maxAppsLimit     = 100
+)
+
+func (s *Service) GetApps(ctx context.Context, req *apiv2.GetAppsRequest) (*apiv2.GetAppsResponse, error) {
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_GetApps_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no apps were fetched.")
+	}
+
+	if s.apps == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Get apps is not yet implemented")
+	}
+
+	cursor, limit, err := appsPageOpts(req.GetCursor(), req.GetLimit())
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
+	}
+
+	result, err := s.apps.GetApps(ctx, GetAppsOpts{
+		Cursor: cursor,
+		Limit:  limit,
+	})
+	if err != nil {
+		logger.From(ctx).Error("unable to fetch apps", "error", err)
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch apps")
+	}
+	if result == nil {
+		result = &GetAppsResult{}
+	}
+
+	data := make([]*apiv2.App, 0, len(result.Apps))
+	for _, app := range result.Apps {
+		data = append(data, toApp(app))
+	}
+
+	return &apiv2.GetAppsResponse{
+		Data:     data,
+		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
+		Page:     appsPage(result.Apps, limit, result.HasMore),
+	}, nil
+}
 
 func (s *Service) GetApp(ctx context.Context, req *apiv2.GetAppRequest) (*apiv2.GetAppResponse, error) {
 	if req.AppId == "" {
@@ -38,6 +85,42 @@ func (s *Service) GetApp(ctx context.Context, req *apiv2.GetAppRequest) (*apiv2.
 		Data:     toApp(app),
 		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
 	}, nil
+}
+
+func appsPageOpts(cursor string, requestedLimit int32) (uuid.UUID, int, error) {
+	limit := int(requestedLimit)
+	if limit == 0 {
+		limit = defaultAppsLimit
+	}
+	if limit < 1 {
+		return uuid.Nil, 0, fmt.Errorf("Limit must be at least 1")
+	}
+	if limit > maxAppsLimit {
+		return uuid.Nil, 0, fmt.Errorf("Limit cannot exceed %d", maxAppsLimit)
+	}
+
+	parsedCursor := uuid.Nil
+	if cursor != "" {
+		decodedCursor, err := uuid.Parse(cursor)
+		if err != nil {
+			return uuid.Nil, 0, fmt.Errorf("Cursor is invalid")
+		}
+		parsedCursor = decodedCursor
+	}
+
+	return parsedCursor, limit, nil
+}
+
+func appsPage(apps []App, limit int, hasMore bool) *apiv2.Page {
+	page := &apiv2.Page{
+		HasMore: hasMore,
+		Limit:   int32(limit),
+	}
+	if hasMore && len(apps) > 0 {
+		nextCursor := apps[len(apps)-1].InternalID.String()
+		page.Cursor = &nextCursor
+	}
+	return page
 }
 
 func toApp(app App) *apiv2.App {
