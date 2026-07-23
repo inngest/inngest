@@ -17,7 +17,7 @@ type ParsedInferenceRequest struct {
 	URL                 string   `json:"url"`
 	Model               string   `json:"model"`
 	Seed                *int     `json:"seed,omitempty"`
-	Temprature          float32  `json:"temperature,omitempty"`
+	Temperature         float32  `json:"temperature,omitempty"`
 	TopP                float32  `json:"top_p,omitempty"`
 	MaxTokens           int      `json:"max_tokens,omitempty"`
 	MaxCompletionTokens int      `json:"max_completion_tokens,omitempty"`
@@ -34,7 +34,7 @@ type ParsedInferenceRequest struct {
 
 // ParsedInferenceResponse represents the parsed output for a given inference request.
 type ParsedInferenceResponse struct {
-	ID         string            `json:"id"`
+	ID string `json:"id"`
 	// Model is the model that actually served the request, as reported by the
 	// provider. This may differ from the requested model (e.g. a dated snapshot).
 	Model      string            `json:"model,omitempty"`
@@ -130,7 +130,7 @@ func ParseInput(req Request) (ParsedInferenceRequest, error) {
 			URL:                 req.URL,
 			Model:               rf.Model,
 			Seed:                rf.Seed,
-			Temprature:          rf.Temperature,
+			Temperature:         rf.Temperature,
 			TopP:                rf.TopP,
 			MaxTokens:           rf.MaxTokens,
 			MaxCompletionTokens: rf.MaxCompletionTokens,

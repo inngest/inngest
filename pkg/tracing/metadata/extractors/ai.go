@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -103,10 +104,32 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 	aiMd := &AIMetadata{
 		RequestModel:  parsedInput.Model,
 		ResponseModel: parsedOutput.Model,
-		Provider:      req.Format,
+		ResponseID:    parsedOutput.ID,
+		Provider:      aiProviderFromRequest(u.Host, req.Format),
 
 		InputTokens:  int64(parsedOutput.TokensIn),
 		OutputTokens: int64(parsedOutput.TokensOut),
+	}
+
+	if parsedOutput.StopReason != "" {
+		aiMd.FinishReasons = []string{parsedOutput.StopReason}
+	}
+
+	if parsedInput.Temperature != 0 {
+		aiMd.Temperature = util.ToPtr(float32To64(parsedInput.Temperature))
+	}
+	if parsedInput.TopP != 0 {
+		aiMd.TopP = util.ToPtr(float32To64(parsedInput.TopP))
+	}
+	maxTokens := parsedInput.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = parsedInput.MaxCompletionTokens
+	}
+	if maxTokens != 0 {
+		aiMd.MaxTokens = util.ToPtr(int64(maxTokens))
+	}
+	if parsedInput.Seed != nil {
+		aiMd.Seed = util.ToPtr(int64(*parsedInput.Seed))
 	}
 
 	aiMd.Enrich(AIEnrichOpts{FallbackLatencyMs: serverProcessingMs})
@@ -125,6 +148,39 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 			ResponseStatus:      util.ToPtr(int64(respStatus)),
 		},
 	}, nil
+}
+
+// aiProviderFromRequest resolves a provider identifier from the request
+// format. The OpenAI chat format is shared by many compatible providers
+// (Groq, DeepSeek, local endpoints), so only api.openai.com itself maps to
+// "openai"; other hosts keep the format verbatim, with the endpoint visible
+// in the adjacent HTTP metadata.
+func aiProviderFromRequest(host, format string) string {
+	switch format {
+	case aigateway.FormatAnthropic:
+		return "anthropic"
+	case aigateway.FormatGemini:
+		return "gcp.gemini"
+	case aigateway.FormatBedrock:
+		return "aws.bedrock"
+	}
+
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	if strings.EqualFold(host, "api.openai.com") {
+		return "openai"
+	}
+
+	return format
+}
+
+// float32To64 widens via the shortest decimal representation so float32
+// request params survive without binary noise (0.7 stays 0.7 rather than
+// becoming 0.699999988079071).
+func float32To64(f float32) float64 {
+	v, _ := strconv.ParseFloat(strconv.FormatFloat(float64(f), 'g', -1, 32), 64)
+	return v
 }
 
 type vercelAIUsage struct {
