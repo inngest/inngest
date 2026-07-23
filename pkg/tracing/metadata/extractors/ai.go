@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -100,34 +101,38 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		}
 	}
 
-	inputTokens := int64(parsedOutput.TokensIn)
-	outputTokens := int64(parsedOutput.TokensOut)
-	totalTokens := inputTokens + outputTokens
-
-	var latencyMs *int64
-	if serverProcessingMs > 0 {
-		latencyMs = &serverProcessingMs
-	}
-
-	// prefer the response model (the model that actually served the request)
-	// for cost estimation, falling back to the requested model.
-	costModel := parsedOutput.Model
-	if costModel == "" {
-		costModel = parsedInput.Model
-	}
-
 	aiMd := &AIMetadata{
 		RequestModel:  parsedInput.Model,
 		ResponseModel: parsedOutput.Model,
-		Provider:      req.Format,
-		OperationName: "",
+		ResponseID:    parsedOutput.ID,
+		Provider:      aiProviderFromRequest(u.Host, req.Format),
 
-		InputTokens:   inputTokens,
-		OutputTokens:  outputTokens,
-		TotalTokens:   &totalTokens,
-		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
-		LatencyMs:     latencyMs,
+		InputTokens:  int64(parsedOutput.TokensIn),
+		OutputTokens: int64(parsedOutput.TokensOut),
 	}
+
+	if parsedOutput.StopReason != "" {
+		aiMd.FinishReasons = []string{parsedOutput.StopReason}
+	}
+
+	if parsedInput.Temperature != nil {
+		aiMd.Temperature = util.ToPtr(float32To64(*parsedInput.Temperature))
+	}
+	if parsedInput.TopP != nil {
+		aiMd.TopP = util.ToPtr(float32To64(*parsedInput.TopP))
+	}
+	maxTokens := parsedInput.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = parsedInput.MaxCompletionTokens
+	}
+	if maxTokens != 0 {
+		aiMd.MaxTokens = util.ToPtr(int64(maxTokens))
+	}
+	if parsedInput.Seed != nil {
+		aiMd.Seed = util.ToPtr(int64(*parsedInput.Seed))
+	}
+
+	aiMd.Enrich(AIEnrichOpts{FallbackLatencyMs: serverProcessingMs})
 
 	return []metadata.Structured{
 		aiMd,
@@ -143,6 +148,39 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 			ResponseStatus:      util.ToPtr(int64(respStatus)),
 		},
 	}, nil
+}
+
+// aiProviderFromRequest resolves a provider identifier from the request
+// format. The OpenAI chat format is shared by many compatible providers
+// (Groq, DeepSeek, local endpoints), so only api.openai.com itself maps to
+// "openai"; other hosts keep the format verbatim, with the endpoint visible
+// in the adjacent HTTP metadata.
+func aiProviderFromRequest(host, format string) string {
+	switch format {
+	case aigateway.FormatAnthropic:
+		return "anthropic"
+	case aigateway.FormatGemini:
+		return "gcp.gemini"
+	case aigateway.FormatBedrock:
+		return "aws.bedrock"
+	}
+
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	if strings.EqualFold(host, "api.openai.com") {
+		return "openai"
+	}
+
+	return format
+}
+
+// float32To64 widens via the shortest decimal representation so float32
+// request params survive without binary noise (0.7 stays 0.7 rather than
+// becoming 0.699999988079071).
+func float32To64(f float32) float64 {
+	v, _ := strconv.ParseFloat(strconv.FormatFloat(float64(f), 'g', -1, 32), 64)
+	return v
 }
 
 type vercelAIUsage struct {
@@ -244,18 +282,6 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		// TODO: Add other provider headers (Anthropic, etc.) as needed
 	}
 
-	// fallback to step duration if no provider header
-	if latencyMs == nil && stepDurationMs > 0 {
-		latencyMs = &stepDurationMs
-	}
-
-	// prefer the response model (the model that actually served the request)
-	// for cost estimation, falling back to the requested model.
-	costModel := responseModel
-	if costModel == "" {
-		costModel = requestModel
-	}
-
 	aiMd := &AIMetadata{
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
@@ -264,8 +290,9 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		ResponseModel: responseModel,
 		Provider:      "vercel-ai",
 		LatencyMs:     latencyMs,
-		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
 	}
+
+	aiMd.Enrich(AIEnrichOpts{FallbackLatencyMs: stepDurationMs})
 
 	return []metadata.Structured{aiMd}, nil
 }

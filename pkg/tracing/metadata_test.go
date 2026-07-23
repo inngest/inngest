@@ -12,6 +12,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -90,6 +91,67 @@ func TestCreateMetadataSpan_EmptyValues(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, ref)
+}
+
+// captureTracerProvider records CreateSpan options for attribute assertions.
+type captureTracerProvider struct {
+	TracerProvider
+	spans []*CreateSpanOptions
+}
+
+func (p *captureTracerProvider) CreateSpan(ctx context.Context, name string, opts *CreateSpanOptions) (*meta.SpanReference, error) {
+	p.spans = append(p.spans, opts)
+	return &meta.SpanReference{}, nil
+}
+
+func TestCreateMetadataSpanFromValues_EnrichesAIValues(t *testing.T) {
+	tp := &captureTracerProvider{}
+
+	values := metadata.Values{
+		"input_tokens":  json.RawMessage(`100`),
+		"output_tokens": json.RawMessage(`50`),
+		"request_model": json.RawMessage(`"gpt-4o"`),
+	}
+
+	ref, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", nil,
+		extractors.KindInngestAI, enums.MetadataOpcodeMerge, values, enums.MetadataScopeStep,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, ref)
+
+	require.Len(t, tp.spans, 1)
+	got, ok := tp.spans[0].Attributes.Get(meta.Attrs.Metadata.Key()).(*metadata.Values)
+	require.True(t, ok, "expected metadata values attribute on the span")
+	require.Equal(t, json.RawMessage(`100`), (*got)["input_tokens"])
+	require.Equal(t, json.RawMessage(`150`), (*got)["total_tokens"])
+	require.Equal(t, json.RawMessage(`0.00075`), (*got)["estimated_cost"])
+	_, hasLatency := (*got)["latency_ms"]
+	require.False(t, hasLatency, "no latency should be derived")
+}
+
+func TestCreateMetadataSpanFromValues_DeleteOpNotEnriched(t *testing.T) {
+	tp := &captureTracerProvider{}
+
+	values := metadata.Values{
+		"input_tokens":  json.RawMessage(`100`),
+		"output_tokens": json.RawMessage(`50`),
+		"request_model": json.RawMessage(`"gpt-4o"`),
+	}
+
+	ref, err := CreateMetadataSpanFromValues(
+		context.Background(), tp, &meta.SpanReference{},
+		"test.location", "test", nil,
+		extractors.KindInngestAI, enums.MetadataOpcodeDelete, values, enums.MetadataScopeStep,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, ref)
+
+	require.Len(t, tp.spans, 1)
+	got, ok := tp.spans[0].Attributes.Get(meta.Attrs.Metadata.Key()).(*metadata.Values)
+	require.True(t, ok, "expected metadata values attribute on the span")
+	require.Equal(t, values, *got, "delete op values must not be enriched")
 }
 
 func TestCreateMetadataSpanFromValues_CumulativeLimitExceeded(t *testing.T) {

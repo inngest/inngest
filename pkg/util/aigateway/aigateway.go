@@ -17,8 +17,8 @@ type ParsedInferenceRequest struct {
 	URL                 string   `json:"url"`
 	Model               string   `json:"model"`
 	Seed                *int     `json:"seed,omitempty"`
-	Temprature          float32  `json:"temperature,omitempty"`
-	TopP                float32  `json:"top_p,omitempty"`
+	Temperature         *float32 `json:"temperature,omitempty"`
+	TopP                *float32 `json:"top_p,omitempty"`
 	MaxTokens           int      `json:"max_tokens,omitempty"`
 	MaxCompletionTokens int      `json:"max_completion_tokens,omitempty"`
 	StopSequences       []string `json:"stop,omitempty"`
@@ -34,7 +34,7 @@ type ParsedInferenceRequest struct {
 
 // ParsedInferenceResponse represents the parsed output for a given inference request.
 type ParsedInferenceResponse struct {
-	ID         string            `json:"id"`
+	ID string `json:"id"`
 	// Model is the model that actually served the request, as reported by the
 	// provider. This may differ from the requested model (e.g. a dated snapshot).
 	Model      string            `json:"model,omitempty"`
@@ -93,6 +93,14 @@ func ParseInput(req Request) (ParsedInferenceRequest, error) {
 			return ParsedInferenceRequest{}, err
 		}
 
+		// rf uses non-pointer floats, so params where an explicit zero is
+		// meaningful (e.g. temperature 0) must be re-parsed as pointers.
+		var floatParams struct {
+			Temperature *float32 `json:"temperature"`
+			TopP        *float32 `json:"top_p"`
+		}
+		_ = json.Unmarshal(req.Body, &floatParams)
+
 		// Parse the tool choice.
 		var toolChoice string
 		switch t := rf.ToolChoice.(type) {
@@ -130,8 +138,8 @@ func ParseInput(req Request) (ParsedInferenceRequest, error) {
 			URL:                 req.URL,
 			Model:               rf.Model,
 			Seed:                rf.Seed,
-			Temprature:          rf.Temperature,
-			TopP:                rf.TopP,
+			Temperature:         floatParams.Temperature,
+			TopP:                floatParams.TopP,
 			MaxTokens:           rf.MaxTokens,
 			MaxCompletionTokens: rf.MaxCompletionTokens,
 			StopSequences:       rf.Stop,

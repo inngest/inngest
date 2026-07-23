@@ -29,25 +29,11 @@ func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) (md AIMetada
 		return md, false
 	}
 
-	// calculate latency from span duration
+	var spanDurMs int64
 	if span.EndTimeUnixNano > span.StartTimeUnixNano {
-		latencyMs := int64((span.EndTimeUnixNano - span.StartTimeUnixNano) / 1_000_000)
-		md.LatencyMs = &latencyMs
+		spanDurMs = int64((span.EndTimeUnixNano - span.StartTimeUnixNano) / 1_000_000)
 	}
-
-	// calculate total tokens if a provider value wasn't supplied
-	if md.TotalTokens == nil && (md.InputTokens > 0 || md.OutputTokens > 0) {
-		totalTokens := md.InputTokens + md.OutputTokens
-		md.TotalTokens = &totalTokens
-	}
-
-	// prefer the response model (the model that actually served the request)
-	// for cost estimation, falling back to the requested model.
-	costModel := md.ResponseModel
-	if costModel == "" {
-		costModel = md.RequestModel
-	}
-	md.EstimatedCost = EstimateCost(costModel, md.InputTokens, md.OutputTokens)
+	md.Enrich(AIEnrichOpts{FallbackLatencyMs: spanDurMs})
 
 	return md, true
 }
