@@ -358,6 +358,48 @@ func TestHTTPGateway_GetApp(t *testing.T) {
 	require.NotContains(t, latestSync, "error")
 }
 
+func TestHTTPGateway_GetApps(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	apps := &mockAppProvider{}
+	apps.On("GetApps", mock.Anything, GetAppsOpts{
+		Limit: 1,
+	}).Return(&GetAppsResult{
+		Apps: []App{{
+			ID:         "my-app",
+			InternalID: appID,
+			Name:       "My app",
+		}},
+		HasMore: true,
+	}, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Apps: apps}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		apps.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/apps?limit=1", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	data := body["data"].([]any)
+	item := data[0].(map[string]any)
+	require.Equal(t, "my-app", item["id"])
+	require.Equal(t, "My app", item["name"])
+
+	page := body["page"].(map[string]any)
+	require.True(t, page["hasMore"].(bool))
+	require.Equal(t, appID.String(), page["cursor"])
+	require.Equal(t, float64(1), page["limit"])
+}
+
 func TestHTTPGateway_GetFunction(t *testing.T) {
 	ctx := context.Background()
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")

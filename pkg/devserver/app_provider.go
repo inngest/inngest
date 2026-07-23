@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
@@ -48,6 +49,36 @@ func (p *cqrsAppProvider) GetApp(ctx context.Context, identifier string) (apiv2.
 		return apiv2.App{}, fmt.Errorf("%w: %s", apiv2.ErrAppNotFound, identifier)
 	}
 	return p.toApp(ctx, app)
+}
+
+func (p *cqrsAppProvider) GetApps(ctx context.Context, opts apiv2.GetAppsOpts) (*apiv2.GetAppsResult, error) {
+	apps, err := p.reader.GetApps(ctx, consts.DevServerEnvID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(apps, func(i, j int) bool {
+		return apps[i].ID.String() < apps[j].ID.String()
+	})
+
+	result := &apiv2.GetAppsResult{
+		Apps: make([]apiv2.App, 0, opts.Limit),
+	}
+	for _, app := range apps {
+		if app.ID.String() <= opts.Cursor.String() && opts.Cursor != uuid.Nil {
+			continue
+		}
+		if len(result.Apps) == opts.Limit {
+			result.HasMore = true
+			break
+		}
+		item, err := p.toApp(ctx, app)
+		if err != nil {
+			return nil, err
+		}
+		result.Apps = append(result.Apps, item)
+	}
+	return result, nil
 }
 
 func (p *cqrsAppProvider) toApp(ctx context.Context, app *cqrs.App) (apiv2.App, error) {
