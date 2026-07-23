@@ -55,6 +55,7 @@ import type { ScoreKind } from '@inngest/components/Experiments';
 
 // Alphabetical — this list is the only place a valid feature name is defined.
 export type AnalyticsFeature =
+  | 'ai-overview'
   | 'experiments'
   | 'sandboxes'
   | 'scores'
