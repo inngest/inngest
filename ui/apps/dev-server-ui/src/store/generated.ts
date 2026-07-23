@@ -1166,7 +1166,9 @@ export type RerunFromStepMutation = { __typename?: 'Mutation', rerun: any };
 
 export type GetRunsQueryVariables = Exact<{
   appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  functionIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
   startTime: Scalars['Time'];
+  endTime?: InputMaybe<Scalars['Time']>;
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
   functionRunCursor?: InputMaybe<Scalars['String']>;
@@ -1179,9 +1181,13 @@ export type GetRunsQueryVariables = Exact<{
 export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', cronSchedule: string | null, eventName: string | null, id: any, isBatch: boolean, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, hasAI: boolean, isDeferred: boolean, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string }, deferredFrom: Array<{ __typename?: 'RunDeferredFrom', runID: any, function: { __typename?: 'Function', name: string, slug: string } }> } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
 
 export type CountRunsQueryVariables = Exact<{
+  appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  functionIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
   startTime: Scalars['Time'];
+  endTime?: InputMaybe<Scalars['Time']>;
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
+  celQuery?: InputMaybe<Scalars['String']>;
   preview?: InputMaybe<Scalars['Boolean']>;
   isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
@@ -1612,9 +1618,9 @@ export const RerunFromStepDocument = `
 }
     `;
 export const GetRunsDocument = `
-    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null, $preview: Boolean = false, $isDeferred: Boolean = null) {
+    query GetRuns($appIDs: [UUID!], $functionIDs: [UUID!], $startTime: Time!, $endTime: Time = null, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null, $preview: Boolean = false, $isDeferred: Boolean = null) {
   runs(
-    filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField, query: $celQuery, isDeferred: $isDeferred}
+    filter: {appIDs: $appIDs, functionIDs: $functionIDs, from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $celQuery, isDeferred: $isDeferred}
     orderBy: [{field: $timeField, direction: DESC}]
     after: $functionRunCursor
     preview: $preview
@@ -1658,9 +1664,9 @@ export const GetRunsDocument = `
 }
     `;
 export const CountRunsDocument = `
-    query CountRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $preview: Boolean = false, $isDeferred: Boolean = null) {
+    query CountRuns($appIDs: [UUID!], $functionIDs: [UUID!], $startTime: Time!, $endTime: Time = null, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $celQuery: String = null, $preview: Boolean = false, $isDeferred: Boolean = null) {
   runs(
-    filter: {from: $startTime, status: $status, timeField: $timeField, isDeferred: $isDeferred}
+    filter: {appIDs: $appIDs, functionIDs: $functionIDs, from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $celQuery, isDeferred: $isDeferred}
     orderBy: [{field: $timeField, direction: DESC}]
     preview: $preview
   ) {

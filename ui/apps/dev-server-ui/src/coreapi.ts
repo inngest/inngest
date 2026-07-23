@@ -275,7 +275,9 @@ export const RERUN_FROM_STEP = gql`
 export const GET_RUNS = gql`
   query GetRuns(
     $appIDs: [UUID!]
+    $functionIDs: [UUID!]
     $startTime: Time!
+    $endTime: Time = null
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
     $functionRunCursor: String = null
@@ -286,7 +288,9 @@ export const GET_RUNS = gql`
     runs(
       filter: {
         appIDs: $appIDs
+        functionIDs: $functionIDs
         from: $startTime
+        until: $endTime
         status: $status
         timeField: $timeField
         query: $celQuery
@@ -337,17 +341,25 @@ export const GET_RUNS = gql`
 
 export const COUNT_RUNS = gql`
   query CountRuns(
+    $appIDs: [UUID!]
+    $functionIDs: [UUID!]
     $startTime: Time!
+    $endTime: Time = null
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
+    $celQuery: String = null
     $preview: Boolean = false
     $isDeferred: Boolean = null
   ) {
     runs(
       filter: {
+        appIDs: $appIDs
+        functionIDs: $functionIDs
         from: $startTime
+        until: $endTime
         status: $status
         timeField: $timeField
+        query: $celQuery
         isDeferred: $isDeferred
       }
       orderBy: [{ field: $timeField, direction: DESC }]
