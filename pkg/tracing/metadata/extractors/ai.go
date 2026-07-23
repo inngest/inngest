@@ -100,34 +100,16 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		}
 	}
 
-	inputTokens := int64(parsedOutput.TokensIn)
-	outputTokens := int64(parsedOutput.TokensOut)
-	totalTokens := inputTokens + outputTokens
-
-	var latencyMs *int64
-	if serverProcessingMs > 0 {
-		latencyMs = &serverProcessingMs
-	}
-
-	// prefer the response model (the model that actually served the request)
-	// for cost estimation, falling back to the requested model.
-	costModel := parsedOutput.Model
-	if costModel == "" {
-		costModel = parsedInput.Model
-	}
-
 	aiMd := &AIMetadata{
 		RequestModel:  parsedInput.Model,
 		ResponseModel: parsedOutput.Model,
 		Provider:      req.Format,
-		OperationName: "",
 
-		InputTokens:   inputTokens,
-		OutputTokens:  outputTokens,
-		TotalTokens:   &totalTokens,
-		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
-		LatencyMs:     latencyMs,
+		InputTokens:  int64(parsedOutput.TokensIn),
+		OutputTokens: int64(parsedOutput.TokensOut),
 	}
+
+	aiMd.Enrich(AIEnrichOpts{FallbackLatencyMs: serverProcessingMs})
 
 	return []metadata.Structured{
 		aiMd,
@@ -244,18 +226,6 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		// TODO: Add other provider headers (Anthropic, etc.) as needed
 	}
 
-	// fallback to step duration if no provider header
-	if latencyMs == nil && stepDurationMs > 0 {
-		latencyMs = &stepDurationMs
-	}
-
-	// prefer the response model (the model that actually served the request)
-	// for cost estimation, falling back to the requested model.
-	costModel := responseModel
-	if costModel == "" {
-		costModel = requestModel
-	}
-
 	aiMd := &AIMetadata{
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
@@ -264,8 +234,9 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		ResponseModel: responseModel,
 		Provider:      "vercel-ai",
 		LatencyMs:     latencyMs,
-		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
 	}
+
+	aiMd.Enrich(AIEnrichOpts{FallbackLatencyMs: stepDurationMs})
 
 	return []metadata.Structured{aiMd}, nil
 }

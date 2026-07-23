@@ -901,6 +901,82 @@ func TestSyncStepMetadata(t *testing.T) {
 		require.Len(mocks.tracer.createdSpans, 1, "expected only the step span")
 		require.Equal(meta.SpanNameStep, mocks.tracer.createdSpans[0].name)
 	})
+
+	t.Run("enriches inngest.ai metadata values", func(t *testing.T) {
+		// SDK-sent inngest.ai values get derivable gaps (total_tokens,
+		// estimated_cost) filled before the metadata span is created.
+		ctx := context.Background()
+		require := require.New(t)
+
+		now := time.Now()
+		ops := []state.GeneratorOpcode{
+			{
+				ID:     "step-ai",
+				Op:     enums.OpcodeStepRun,
+				Data:   json.RawMessage(`{"result": "ai output"}`),
+				Name:   "AI Step",
+				Timing: interval.New(now, now.Add(100*time.Millisecond)),
+				Metadata: []metadata.ScopedUpdate{
+					{
+						Scope: enums.MetadataScopeStep,
+						Update: metadata.Update{
+							RawUpdate: metadata.RawUpdate{
+								Kind: "inngest.ai",
+								Op:   enums.MetadataOpcodeMerge,
+								Values: metadata.Values{
+									"input_tokens":  json.RawMessage(`100`),
+									"output_tokens": json.RawMessage(`50`),
+									"request_model": json.RawMessage(`"gpt-4o"`),
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+		testData.checkpointer = New(Opts{
+			State:           mocks.state,
+			TracerProvider:  mocks.tracer,
+			Queue:           mocks.queue,
+			MetricsProvider: mocks.metrics,
+			Executor:        mocks.executor,
+			FnReader:        mocks.fnReader,
+			AllowStepMetadata: executor.AllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		})
+
+		expectedData := map[string]any{"data": json.RawMessage(`{"result": "ai output"}`)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-ai", expectedOutputBytes).Return(false, nil)
+
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
+
+		mocks.metrics.On("OnStepFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.StepStatusCompleted)
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.NoError(err)
+
+		var values *metadata.Values
+		for _, s := range mocks.tracer.createdSpans {
+			if s.name == meta.SpanNameMetadata {
+				var ok bool
+				values, ok = s.attributes.Get(meta.Attrs.Metadata.Key()).(*metadata.Values)
+				require.True(ok, "Expected metadata values attribute on the metadata span")
+			}
+		}
+		require.NotNil(values, "Expected a metadata span")
+
+		require.Equal(json.RawMessage(`100`), (*values)["input_tokens"])
+		require.Equal(json.RawMessage(`50`), (*values)["output_tokens"])
+		require.Equal(json.RawMessage(`150`), (*values)["total_tokens"])
+		require.Equal(json.RawMessage(`0.00075`), (*values)["estimated_cost"])
+	})
 }
 
 // TestCheckpointSyncSteps_RunComplete asserts that an OpcodeRunComplete op:
