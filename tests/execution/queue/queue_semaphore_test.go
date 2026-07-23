@@ -22,6 +22,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func dispatchToQueueWorkers(workers chan queue.ProcessItem) queue.DispatchFunc {
+	return func(_ context.Context, item queue.ProcessItem) error {
+		workers <- item
+		return nil
+	}
+}
+
 func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 	ctx := context.Background()
 
@@ -115,6 +122,7 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 		Partition:  &partition,
 		Items:      []*queue.QueueItem{&qi1, &qi2},
 		Queue:      q,
+		Dispatch:   dispatchToQueueWorkers(q.Workers()),
 		StaticTime: clock.Now(),
 	}
 
@@ -342,6 +350,7 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
+					Dispatch:   dispatchToQueueWorkers(deps.qp.Workers()),
 					StaticTime: clock.Now(),
 				}
 
@@ -396,6 +405,7 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
+					Dispatch:   dispatchToQueueWorkers(deps.qp.Workers()),
 					StaticTime: clock.Now(),
 				}
 
@@ -437,6 +447,7 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
+					Dispatch:   dispatchToQueueWorkers(deps.qp.Workers()),
 					StaticTime: clock.Now(),
 				}
 
@@ -490,6 +501,7 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
+					Dispatch:   dispatchToQueueWorkers(deps.qp.Workers()),
 					StaticTime: clock.Now(),
 				}
 
@@ -552,6 +564,7 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi, &qi2},
 					Queue:      deps.qp,
+					Dispatch:   dispatchToQueueWorkers(deps.qp.Workers()),
 					StaticTime: clock.Now(),
 				}
 
@@ -610,6 +623,7 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi},
 					Queue:      deps.qp,
+					Dispatch:   dispatchToQueueWorkers(deps.qp.Workers()),
 					StaticTime: clock.Now(),
 				}
 
@@ -671,6 +685,7 @@ func TestQueueSemaphore(t *testing.T) {
 					Partition:  &partition,
 					Items:      []*queue.QueueItem{&qi, &qi2},
 					Queue:      deps.qp,
+					Dispatch:   dispatchToQueueWorkers(deps.qp.Workers()),
 					StaticTime: clock.Now(),
 				}
 

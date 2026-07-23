@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
 	"sync"
 	"sync/atomic"
@@ -77,7 +78,7 @@ func (m *mockQueueProcessor) ProcessItem(ctx context.Context, i ProcessItem, f R
 	return nil
 }
 
-func (m *mockQueueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+func (m *mockQueueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool, dispatch DispatchFunc) error {
 	return nil
 }
 
@@ -462,6 +463,98 @@ func (m *mockQueueProcessor) ItemLeaseConstraintCheck(ctx context.Context, shado
 	}, nil
 }
 
+type mockQueueItemLeaser struct {
+	fn func(context.Context, LeaseItemRequest, DispatchFunc) (LeaseItemResult, error)
+}
+
+func (m mockQueueItemLeaser) LeaseItem(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error) {
+	return m.fn(ctx, req, dispatch)
+}
+
+func processorIteratorConstraintLeaser(mockProc *mockQueueProcessor) QueueItemLeaser {
+	return mockQueueItemLeaser{
+		fn: func(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error) {
+			constraint := enums.QueueConstraintNotLimited
+			if mockProc.constraintResultFunc != nil {
+				constraint = mockProc.constraintResultFunc()
+			}
+
+			switch constraint {
+			case enums.QueueConstraintNotLimited:
+				if dispatch == nil {
+					return LeaseItemResult{Status: LeaseItemStatusLeaseError, Err: ErrProcessMissingDispatch}, ErrProcessMissingDispatch
+				}
+				err := dispatch(ctx, ProcessItem{
+					P:    *req.Partition,
+					I:    *req.Item,
+					PCtr: req.PartitionContinueCtr,
+				})
+				if err != nil {
+					return LeaseItemResult{Status: LeaseItemStatusDispatched}, err
+				}
+				return LeaseItemResult{Status: LeaseItemStatusDispatched}, nil
+			case enums.QueueConstraintThrottle:
+				return LeaseItemResult{Status: LeaseItemStatusThrottled}, nil
+			case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
+				return LeaseItemResult{Status: LeaseItemStatusCustomConcurrencyLimited}, nil
+			case enums.QueueConstraintSemaphore:
+				return LeaseItemResult{Status: LeaseItemStatusSemaphoreLimited}, nil
+			default:
+				return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited}, fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
+			}
+		},
+	}
+}
+
+func processorIteratorLeaseBehaviorLeaser(mockProc *mockQueueProcessor) QueueItemLeaser {
+	return mockQueueItemLeaser{
+		fn: func(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error) {
+			if !mockProc.sem.TryAcquire(1) {
+				return LeaseItemResult{Status: LeaseItemStatusNoWorkerCapacity}, ErrProcessNoCapacity
+			}
+
+			commitSemaphoreAcquire := false
+			defer func() {
+				if !commitSemaphoreAcquire {
+					mockProc.sem.Release(1)
+				}
+			}()
+
+			if req.Item.EarliestPeekTime == 0 && mockProc.opts.ItemEarliestPeekTimeConfig(ctx, mockProc.shard.Name(), *req.Item).Enabled {
+				earliestPeekTime, err := mockProc.shard.SetEarliestPeekTime(ctx, *req.Item, req.StaticTime)
+				if err == nil {
+					req.Item.EarliestPeekTime = earliestPeekTime.UnixMilli()
+				}
+			}
+
+			constraint := enums.QueueConstraintNotLimited
+			if mockProc.constraintResultFunc != nil {
+				constraint = mockProc.constraintResultFunc()
+			}
+			if constraint != enums.QueueConstraintNotLimited {
+				if req.Item.EarliestPeekTime == 0 && req.Partition.Last > 0 && req.Partition.Last > req.Item.AtMS {
+					req.Item.EarliestPeekTime = req.Item.AtMS
+				}
+				return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited}, fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
+			}
+
+			if dispatch == nil {
+				return LeaseItemResult{Status: LeaseItemStatusLeaseError, Err: ErrProcessMissingDispatch}, ErrProcessMissingDispatch
+			}
+			err := dispatch(ctx, ProcessItem{
+				P:    *req.Partition,
+				I:    *req.Item,
+				PCtr: req.PartitionContinueCtr,
+			})
+			if err != nil {
+				return LeaseItemResult{Status: LeaseItemStatusDispatched}, err
+			}
+			commitSemaphoreAcquire = true
+			return LeaseItemResult{Status: LeaseItemStatusDispatched}, nil
+		},
+	}
+}
+
 // TestProcessorIteratorCounterRaceCondition tests for race conditions when
 // ProcessorIterator processes items in parallel mode.
 //
@@ -545,8 +638,13 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		StaticTime:           time.Now(),
-		Parallel:             true, // Enable parallel processing
+		Leaser:               processorIteratorConstraintLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			workers <- item
+			return nil
+		},
+		StaticTime: time.Now(),
+		Parallel:   true, // Enable parallel processing
 	}
 
 	// Run iteration - this is where the race condition would occur
@@ -655,8 +753,13 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		StaticTime:           time.Now(),
-		Parallel:             true,
+		Leaser:               processorIteratorConstraintLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			workers <- item
+			return nil
+		},
+		StaticTime: time.Now(),
+		Parallel:   true,
 	}
 
 	// Run iteration
@@ -757,8 +860,13 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		StaticTime:           time.Now(),
-		Parallel:             true,
+		Leaser:               processorIteratorConstraintLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			workers <- item
+			return nil
+		},
+		StaticTime: time.Now(),
+		Parallel:   true,
 	}
 
 	err := iter.Iterate(ctx)
@@ -826,13 +934,18 @@ func TestProcessorIteratorUsesPartitionLastEarliestPeekFallbackWhenFlagDisabled(
 	}
 
 	iter := ProcessorIterator{
-		Partition:  partition,
-		Items:      []*QueueItem{item},
-		Queue:      mockProc,
+		Partition: partition,
+		Items:     []*QueueItem{item},
+		Queue:     mockProc,
+		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			mockProc.workers <- item
+			return nil
+		},
 		StaticTime: at.Add(2 * time.Second),
 	}
 
-	err := iter.Process(ctx, item)
+	err := iter.LeaseItem(ctx, item)
 	require.ErrorIs(t, err, ErrProcessNoUserConstraintCapacity)
 	require.ErrorIs(t, err, ErrProcessStopIterator)
 	require.Equal(t, item.AtMS, item.EarliestPeekTime)
@@ -894,13 +1007,18 @@ func TestProcessorIteratorSkipsEarliestPeekTimeWhenNoWorkerCapacity(t *testing.T
 	}
 
 	iter := ProcessorIterator{
-		Partition:  partition,
-		Items:      []*QueueItem{item},
-		Queue:      mockProc,
+		Partition: partition,
+		Items:     []*QueueItem{item},
+		Queue:     mockProc,
+		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			mockProc.workers <- item
+			return nil
+		},
 		StaticTime: peekTime,
 	}
 
-	err := iter.Process(ctx, item)
+	err := iter.LeaseItem(ctx, item)
 	require.ErrorIs(t, err, ErrProcessNoCapacity)
 	require.Zero(t, item.EarliestPeekTime)
 	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
@@ -958,13 +1076,18 @@ func TestProcessorIteratorContinuesWhenEarliestPeekTimeStampFails(t *testing.T) 
 	}
 
 	iter := ProcessorIterator{
-		Partition:  partition,
-		Items:      []*QueueItem{item},
-		Queue:      mockProc,
+		Partition: partition,
+		Items:     []*QueueItem{item},
+		Queue:     mockProc,
+		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			workers <- item
+			return nil
+		},
 		StaticTime: at.Add(2 * time.Second),
 	}
 
-	err := iter.Process(ctx, item)
+	err := iter.LeaseItem(ctx, item)
 	require.NoError(t, err)
 	require.Zero(t, item.EarliestPeekTime)
 	require.Equal(t, int32(1), atomic.LoadInt32(&shard.earliestPeekTimeCalls))

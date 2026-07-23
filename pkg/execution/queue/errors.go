@@ -109,6 +109,7 @@ var (
 
 var (
 	ErrProcessNoCapacity               = fmt.Errorf("no capacity")
+	ErrProcessMissingDispatch          = fmt.Errorf("missing dispatch function")
 	ErrProcessStopIterator             = fmt.Errorf("stop iterator")
 	ErrProcessNoUserConstraintCapacity = fmt.Errorf("no user constraint capacity: %w", ErrProcessStopIterator)
 )
