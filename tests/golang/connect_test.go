@@ -103,8 +103,9 @@ func TestEndToEnd(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			<-time.After(2 * time.Second)
-			require.EqualValues(t, 1, atomic.LoadInt32(&counter))
+			require.EventuallyWithT(t, func(collect *assert.CollectT) {
+				assert.EqualValues(collect, 1, atomic.LoadInt32(&counter))
+			}, 10*time.Second, 500*time.Millisecond)
 		})
 
 		// Check span tree
