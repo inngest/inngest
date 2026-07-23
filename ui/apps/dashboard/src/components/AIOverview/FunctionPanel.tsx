@@ -218,8 +218,6 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
 
       {error && <Error message="There was an error loading AI metrics for this function." />}
 
-      <div id="chart-tooltip" className="z-[1000]" />
-
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-6 [&::-webkit-scrollbar]:hidden">
         {showEmptyState && <AIOverviewEmptyState compact className="mb-4 mt-3" />}
         <Section title="Overview" plain>

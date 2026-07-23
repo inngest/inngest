@@ -318,8 +318,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
 
       {error && <Error message="There was an error loading the AI Overview." />}
 
-      <div id="chart-tooltip" className="z-[1000]" />
-
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-6 [&::-webkit-scrollbar]:hidden">
         <Section plain>
           <HeadlineStats

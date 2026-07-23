@@ -11,6 +11,11 @@ import type { InsightsMetricPoint, NamedValue } from '../InsightsMetrics/types';
 // different decimal-place counts.
 function toSigFigs(value: number, sigFigs: number): string {
   if (value === 0) return '0';
+  // Guards against Infinity/NaN reaching .toFixed() as a raw JS value (which
+  // stringifies to the literal "Infinity"/"NaN") — toNumber in
+  // InsightsMetrics/types.ts only screens out NaN, not Infinity, so a
+  // malformed backend value could otherwise surface here.
+  if (!Number.isFinite(value)) return '0';
   const magnitude = Math.floor(Math.log10(Math.abs(value)));
   const decimals = Math.max(0, sigFigs - magnitude - 1);
   return value.toFixed(decimals);
