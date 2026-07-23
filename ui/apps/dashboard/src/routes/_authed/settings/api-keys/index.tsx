@@ -19,22 +19,17 @@ import {
   APIKeysTable,
   type APIKeyRow,
 } from '@/components/APIKeys/APIKeysTable';
+import {
+  allowMemberKeysEnabled,
+  AllowMemberKeysQuery,
+  settingQueryContext,
+} from '@/components/APIKeys/allowMemberKeys';
 import { CreateAPIKeyModal } from '@/components/APIKeys/CreateAPIKeyModal';
 import { DeleteAPIKeyModal } from '@/components/APIKeys/DeleteAPIKeyModal';
 import { RenameAPIKeyModal } from '@/components/APIKeys/RenameAPIKeyModal';
 import { useAPIKeys } from '@/components/APIKeys/useAPIKeys';
 import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-
-const AllowMemberKeysQuery = graphql(`
-  query GetAllowMemberAPIKeysSetting {
-    account {
-      setting(name: "allow_member_api_keys") {
-        value
-      }
-    }
-  }
-`);
 
 const SetAllowMemberKeysMutation = graphql(`
   mutation SetAllowMemberAPIKeys($enabled: Boolean!) {
@@ -47,24 +42,6 @@ export const Route = createFileRoute('/_authed/settings/api-keys/')({
 });
 
 const ADMIN_TOOLTIP = 'Only organization admins can manage API keys.';
-
-// The setting value is a jsonb blob serialized as a JSON string, e.g.
-// '{"enabled": true}'. An absent row (null setting) means admins-only.
-function allowMemberKeysEnabled(value: unknown): boolean {
-  if (typeof value !== 'string') return false;
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      (parsed as { enabled?: unknown }).enabled === true
-    );
-  } catch {
-    return false;
-  }
-}
-
-const settingQueryContext = { additionalTypenames: ['AccountSetting'] };
 
 function APIKeysPage() {
   const res = useAPIKeys();
