@@ -106,6 +106,9 @@ function APIKeysPage() {
     maskedKey: k.maskedKey,
     createdAt: k.createdAt,
     env: k.env ? { id: k.env.id, name: k.env.name } : null,
+    createdBy: k.createdBy
+      ? { name: k.createdBy.name, email: k.createdBy.email }
+      : null,
   }));
 
   const createButton = (
@@ -155,7 +158,8 @@ function APIKeysPage() {
               Allow members to create API keys
             </span>
             <span className="text-subtle text-sm">
-              When off, only organization admins can create API keys.
+              Members can create API keys from this page or by logging in with
+              the Inngest CLI. Admins can always create API keys.
             </span>
             {settingError && (
               <Alert severity="error" className="mt-2 text-sm">
