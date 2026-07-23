@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
@@ -199,16 +200,231 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (state.State, error
 	return state.State{Metadata: metadata, Events: s.Events, Steps: steps}, nil
 }
 
+func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
+	id := s.Metadata.ID
+	cfg := s.Metadata.Config
+	v1id := statev1.Identifier{
+		RunID:                 id.RunID,
+		WorkflowID:            id.FunctionID,
+		WorkflowVersion:       cfg.FunctionVersion,
+		EventID:               cfg.EventID(),
+		EventIDs:              cfg.EventIDs,
+		Key:                   cfg.Idempotency,
+		AccountID:             id.Tenant.AccountID,
+		WorkspaceID:           id.Tenant.EnvID,
+		AppID:                 id.Tenant.AppID,
+		OriginalRunID:         cfg.OriginalRunID,
+		ReplayID:              cfg.ReplayID,
+		PriorityFactor:        cfg.PriorityFactor,
+		CustomConcurrencyKeys: cfg.CustomConcurrencyKeys,
+		Semaphores:            cfg.Semaphores,
+		BatchID:               cfg.BatchID,
+	}
+
+	fnRunState := v.mgr.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, id.Tenant.AccountID, id.RunID)
+
+	eventsKey := fnRunState.kg.Events(ctx, isSharded, id.FunctionID, id.RunID)
+	actionsKey := fnRunState.kg.Actions(ctx, isSharded, id.FunctionID, id.RunID)
+	stackKey := fnRunState.kg.Stack(ctx, isSharded, id.RunID)
+	inputsKey := fnRunState.kg.ActionInputs(ctx, isSharded, v1id)
+	metadataKey := fnRunState.kg.RunMetadata(ctx, isSharded, id.RunID)
+	pendingKey := fnRunState.kg.Pending(ctx, isSharded, v1id)
+	defersMetaKey := fnRunState.kg.DefersMeta(ctx, isSharded, id.FunctionID, id.RunID)
+	defersInputKey := fnRunState.kg.DefersInput(ctx, isSharded, id.FunctionID, id.RunID)
+
+	eventsBlob, err := json.Marshal(s.Events)
+	if err != nil {
+		return fmt.Errorf("redis_state: migrate marshal events: %w", err)
+	}
+
+	if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Set().Key(eventsKey).Value(rueidis.BinaryString(eventsBlob)).Build()
+	}).Error(); err != nil {
+		return fmt.Errorf("redis_state: migrate events: %w", err)
+	}
+
+	if len(s.Steps) > 0 {
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			partial := c.B().Hset().Key(actionsKey).FieldValue()
+			for stepID, data := range s.Steps {
+				partial = partial.FieldValue(stepID, rueidis.BinaryString(data))
+			}
+			return partial.Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate steps: %w", err)
+		}
+	}
+
+	if len(s.StepInputs) > 0 {
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			partial := c.B().Hset().Key(inputsKey).FieldValue()
+			for stepID, data := range s.StepInputs {
+				partial = partial.FieldValue(stepID, rueidis.BinaryString(data))
+			}
+			return partial.Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate step inputs: %w", err)
+		}
+	}
+
+	if len(s.Stack) > 0 {
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			return c.B().Del().Key(stackKey).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate reset stack: %w", err)
+		}
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			return c.B().Rpush().Key(stackKey).Element(s.Stack...).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate stack: %w", err)
+		}
+	}
+
+	if len(s.PendingSteps) > 0 {
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			return c.B().Del().Key(pendingKey).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate reset pending: %w", err)
+		}
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			return c.B().Sadd().Key(pendingKey).Member(s.PendingSteps...).Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate pending: %w", err)
+		}
+	}
+
+	if len(s.Defers) > 0 {
+		var metaHashedIDs []string
+		var metaValues []string
+		var inputHashedIDs []string
+		var inputValues []string
+		for hashedID, d := range s.Defers {
+			metaJSON, err := json.Marshal(deferMeta{
+				FnSlug:         d.FnSlug,
+				HashedID:       d.HashedID,
+				ScheduleStatus: int(d.ScheduleStatus),
+			})
+			if err != nil {
+				return fmt.Errorf("redis_state: migrate marshal defer meta %s: %w", hashedID, err)
+			}
+			metaHashedIDs = append(metaHashedIDs, hashedID)
+			metaValues = append(metaValues, string(metaJSON))
+			if len(d.Input) > 0 {
+				inputHashedIDs = append(inputHashedIDs, hashedID)
+				inputValues = append(inputValues, string(d.Input))
+			}
+		}
+		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+			partial := c.B().Hset().Key(defersMetaKey).FieldValue()
+			for i, h := range metaHashedIDs {
+				partial = partial.FieldValue(h, metaValues[i])
+			}
+			return partial.Build()
+		}).Error(); err != nil {
+			return fmt.Errorf("redis_state: migrate defers meta: %w", err)
+		}
+		if len(inputHashedIDs) > 0 {
+			if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+				partial := c.B().Hset().Key(defersInputKey).FieldValue()
+				for i, h := range inputHashedIDs {
+					partial = partial.FieldValue(h, inputValues[i])
+				}
+				return partial.Build()
+			}).Error(); err != nil {
+				return fmt.Errorf("redis_state: migrate defers input: %w", err)
+			}
+		}
+	}
+
+	var startedAtMS int64
+	if !cfg.StartedAt.IsZero() {
+		startedAtMS = cfg.StartedAt.UnixMilli()
+	}
+	md := runMetadata{
+		Identifier:                v1id,
+		Status:                    enums.RunStatusRunning,
+		StateSize:                 s.Metadata.Metrics.StateSize,
+		EventSize:                 s.Metadata.Metrics.EventSize,
+		StepCount:                 s.Metadata.Metrics.StepCount,
+		MetadataSize:              s.Metadata.Metrics.MetadataSize,
+		Version:                   currentVersion,
+		RequestVersion:            cfg.RequestVersion,
+		Context:                   cfg.Context,
+		DisableImmediateExecution: cfg.ForceStepPlan,
+		SpanID:                    cfg.SpanID,
+		StartedAt:                 startedAtMS,
+		HasAI:                     cfg.HasAI,
+	}
+
+	mdMap := md.Map()
+	mdFields := make(map[string]string, len(mdMap))
+	for k, val := range mdMap {
+		if k == "id" || k == "ctx" {
+			enc, err := json.Marshal(val)
+			if err != nil {
+				return fmt.Errorf("redis_state: migrate marshal metadata field %s: %w", k, err)
+			}
+			mdFields[k] = string(enc)
+		} else {
+			mdFields[k] = fmt.Sprintf("%v", val)
+		}
+	}
+	if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		partial := c.B().Hset().Key(metadataKey).FieldValue()
+		for k, strVal := range mdFields {
+			partial = partial.FieldValue(k, strVal)
+		}
+		return partial.Build()
+	}).Error(); err != nil {
+		return fmt.Errorf("redis_state: migrate metadata: %w", err)
+	}
+	return nil
+}
+
+func (v v2) LookupIdempotency(ctx context.Context, id state.ID, key string) (*state.IdempotencyEntry, error) {
+	fnRunState := v.mgr.s.FunctionRunState()
+	client, isSharded := fnRunState.Client(ctx, id.Tenant.AccountID, id.RunID)
+	v1id := statev1.Identifier{
+		Key:        key,
+		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+	redisKey := fnRunState.kg.Idempotency(ctx, isSharded, v1id)
+
+	val, err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().Get().Key(redisKey).Build()
+	}).ToString()
+	if err == rueidis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("redis_state: lookup idempotency: %w", err)
+	}
+
+	entry := &state.IdempotencyEntry{}
+	if len(val) > 0 && val[0] == consts.FunctionIdempotencyTombstone {
+		entry.IsTombstone = true
+		val = val[1:]
+	}
+	runID, err := ulid.Parse(val)
+	if err != nil {
+		return nil, fmt.Errorf("redis_state: parse idempotency runID: %w", err)
+	}
+	entry.RunID = runID
+	return entry, nil
+}
+
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
 // for the run from the store.  Nothing referencing the run should exist in the state
 // store after.
-func (v v2) Delete(ctx context.Context, id state.ID) error {
+func (v v2) Delete(ctx context.Context, id state.ID, opts ...state.DeleteOption) error {
 	return v.mgr.Delete(ctx, statev1.Identifier{
 		RunID:       id.RunID,
 		WorkflowID:  id.FunctionID,
 		AccountID:   id.Tenant.AccountID,
 		WorkspaceID: id.Tenant.EnvID,
-	})
+	}, opts...)
 }
 
 // ClaimFinalization claims finish-effect emission for a run using Redis SET NX.
@@ -395,6 +611,11 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID, _ ...state.LoadMetada
 // LoadStack returns the current stack for a run.
 func (v v2) LoadStack(ctx context.Context, id state.ID) ([]string, error) {
 	return v.mgr.stack(ctx, id.Tenant.AccountID, id.RunID)
+}
+
+// LoadPending returns the set of pending step IDs for a run.
+func (v v2) LoadPending(ctx context.Context, id state.ID) ([]string, error) {
+	return v.mgr.loadPending(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
 // Update updates configuration on the state, eg. setting the execution

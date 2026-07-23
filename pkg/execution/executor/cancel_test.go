@@ -97,7 +97,7 @@ func (m *missingMetadataRunService) LoadDefers(context.Context, sv2.ID) (map[str
 	return nil, nil
 }
 
-func (m *missingMetadataRunService) Delete(context.Context, sv2.ID) error {
+func (m *missingMetadataRunService) Delete(context.Context, sv2.ID, ...sv2.DeleteOption) error {
 	m.deleted.Store(true)
 	return nil
 }

@@ -660,6 +660,10 @@ func (m *mockStateLoader) LoadStack(ctx context.Context, id sv2.ID) ([]string, e
 	return nil, nil
 }
 
+func (m *mockStateLoader) LoadPending(ctx context.Context, id sv2.ID) ([]string, error) {
+	return nil, nil
+}
+
 func (m *mockStateLoader) LoadState(ctx context.Context, id sv2.ID) (sv2.State, error) {
 	return sv2.State{}, nil
 }
