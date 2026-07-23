@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/inngest/inngest/cmd/apiv2cli"
+	"github.com/inngest/inngest/cmd/auth"
 	"github.com/inngest/inngest/cmd/devserver"
 	"github.com/inngest/inngest/cmd/start"
 	"github.com/inngest/inngest/cmd/version"
@@ -95,6 +96,7 @@ func execute() {
 		Flags: globalFlags,
 		Commands: []*cli.Command{
 			apiv2cli.Command(),
+			auth.Command(),
 			devserver.Command(),
 			version.Command(),
 			start.Command(),
