@@ -14,6 +14,11 @@ const Query = graphql(`
           name
           slug
         }
+        createdBy {
+          id
+          name
+          email
+        }
       }
     }
   }
