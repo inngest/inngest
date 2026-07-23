@@ -175,6 +175,16 @@ func WithCancellationChecker(c cancellation.Checker) ExecutorOpt {
 	}
 }
 
+// WithCancellationCheckDeadline bounds how long checkCancellation waits
+// synchronously for the cancellation lookup before proceeding. A zero or
+// negative value keeps the default of 100ms.
+func WithCancellationCheckDeadline(d time.Duration) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).cancellationCheckDeadline = d
+		return nil
+	}
+}
+
 // WithStateManager sets which state manager to use when creating an executor.
 func WithStateManager(sm sv2.RunService) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -507,13 +517,14 @@ type executor struct {
 	useConstraintAPI              constraintapi.UseConstraintAPIFn
 	enableBatchingInstrumentation func(ctx context.Context, accountID, envID uuid.UUID) (enable bool)
 
-	fl                  state.FunctionLoader
-	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	finishHandler       execution.FinalizePublisher
-	invokeFailHandler   execution.InvokeFailHandler
-	handleInvokeEvent   execution.HandleInvokeEvent
-	cancellationChecker cancellation.Checker
-	httpClient          exechttp.RequestExecutor
+	fl                        state.FunctionLoader
+	evalFactory               func(ctx context.Context, expr string) (expressions.Evaluator, error)
+	finishHandler             execution.FinalizePublisher
+	invokeFailHandler         execution.InvokeFailHandler
+	handleInvokeEvent         execution.HandleInvokeEvent
+	cancellationChecker       cancellation.Checker
+	cancellationCheckDeadline time.Duration
+	httpClient                exechttp.RequestExecutor
 	// signingKeyLoader is used to load signing keys for an env.  This is required for the
 	// HTTPv2 driver.
 	signingKeyLoader func(ctx context.Context, envID uuid.UUID) ([]byte, error)
@@ -2539,6 +2550,9 @@ func (e *executor) checkCancellation(ctx context.Context, md sv2.Metadata, evts 
 
 	// Wait for result to be available within deadline and return, or continue processing asynchronously
 	deadline := 100 * time.Millisecond
+	if e.cancellationCheckDeadline > 0 {
+		deadline = e.cancellationCheckDeadline
+	}
 
 	// Create buffered channel to allow sending even without receiver
 	// but block receive until message is ready
