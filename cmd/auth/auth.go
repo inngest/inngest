@@ -202,7 +202,11 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 
 func whoami(ctx context.Context, cmd *cli.Command) error {
 	state, err := clistate.GetState(ctx)
-	if err != nil || len(state.Credentials) == 0 || state.Account.ID == uuid.Nil {
+	if err != nil {
+		fmt.Println(inncli.TextStyle.Render("Not logged in. Run `inngest auth login`."))
+		return cli.Exit("", 1)
+	}
+	if len(state.Credentials) == 0 || state.Account.ID == uuid.Nil {
 		fmt.Println(inncli.TextStyle.Render("Not logged in. Run `inngest auth login`."))
 		return cli.Exit("", 1)
 	}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
@@ -66,6 +66,14 @@ function APIKeysPage() {
     settingRes.data?.account.setting?.value,
   );
   const canCreate = isAdmin || memberKeysEnabled;
+
+  // Clear the optimistic value once the refetch confirms it, so it doesn't
+  // shadow later changes to the policy (e.g. another admin toggling it).
+  useEffect(() => {
+    if (pendingEnabled !== null && pendingEnabled === memberKeysEnabled) {
+      setPendingEnabled(null);
+    }
+  }, [pendingEnabled, memberKeysEnabled]);
 
   // Create modal state is owned here so it survives the empty->populated
   // transition that unmounts the EmptyState.
