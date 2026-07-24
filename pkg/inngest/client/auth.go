@@ -89,8 +89,7 @@ func (c httpClient) PollDeviceLogin(ctx context.Context, clientID, deviceCode uu
 	if err != nil {
 		return nil, fmt.Errorf("error creating login request: %s", err)
 	}
-	// Carry the context so cancellation (Ctrl-C, code expiry) aborts the
-	// server-side long-poll rather than waiting out the request.
+	// Cancellation (Ctrl-C, code expiry) must abort the server-side long-poll.
 	req = req.WithContext(ctx)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := c.Do(req)
@@ -109,8 +108,8 @@ func (c httpClient) PollDeviceLogin(ctx context.Context, clientID, deviceCode uu
 	return r, nil
 }
 
-// RevokeDeviceLogin revokes the API key the client is configured with
-// (server-side delete), so a logged-out CLI credential can no longer be used.
+// RevokeDeviceLogin revokes the API key the client is configured with, so a
+// logged-out credential can no longer be used.
 func (c httpClient) RevokeDeviceLogin(ctx context.Context) error {
 	req, err := c.NewRequest(http.MethodPost, "/v2/login/device/revoke", nil)
 	if err != nil {

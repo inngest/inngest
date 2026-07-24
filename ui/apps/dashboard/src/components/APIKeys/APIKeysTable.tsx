@@ -10,8 +10,8 @@ export type APIKeyRow = {
   maskedKey: string;
   createdAt: string;
   env: { id: string; name: string } | null;
-  // Null for keys minted before attribution existed, machine-provisioned
-  // keys, and keys whose creator's user was deleted.
+  // Null for pre-attribution keys, machine-provisioned keys, and keys whose
+  // creator was deleted.
   createdBy: { name: string | null; email: string } | null;
 };
 

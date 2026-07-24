@@ -60,7 +60,7 @@ func login(ctx context.Context, cmd *cli.Command) error {
 	fmt.Println(inncli.TextStyle.Render("To log in, open the following URL in your browser:"))
 	fmt.Println(inncli.BoldStyle.Render("  " + start.VerificationURL))
 	fmt.Println()
-	fmt.Println(inncli.TextStyle.Render("And confirm that it shows this code:"))
+	fmt.Println(inncli.TextStyle.Render("Then enter this code on the approval page:"))
 	fmt.Println(inncli.BoldStyle.Render("  " + start.UserCode))
 	fmt.Println()
 
@@ -106,9 +106,9 @@ func pollForToken(ctx context.Context, api client.Client, clientID uuid.UUID, st
 	for {
 		resp, err := api.PollDeviceLogin(ctx, clientID, start.DeviceCode)
 		if err != nil {
-			// Ctrl-C or the expiry deadline is fatal; any other error (network
-			// blip, rate limit, non-JSON gateway response) is transient — keep
-			// polling until the deadline rather than failing the whole login.
+			// Only Ctrl-C or the expiry deadline is fatal; anything else
+			// (network blip, 429, non-JSON gateway response) is transient, so
+			// keep polling until the deadline.
 			if ctx.Err() != nil {
 				return nil, ctxErr(ctx)
 			}
@@ -121,7 +121,7 @@ func pollForToken(ctx context.Context, api client.Client, clientID uuid.UUID, st
 		switch resp.Error {
 		case "":
 			if resp.AccessToken == "" {
-				// The server never sends this; guard against persisting an
+				// Never sent by the server; guard against persisting an
 				// empty credential.
 				return nil, errors.New("unable to log in: the server returned an empty credential")
 			}
@@ -140,8 +140,6 @@ func pollForToken(ctx context.Context, api client.Client, clientID uuid.UUID, st
 	}
 }
 
-// wait sleeps for d, or returns a login error if the context is cancelled or
-// the expiry deadline elapses first.
 func wait(ctx context.Context, d time.Duration) error {
 	select {
 	case <-ctx.Done():
@@ -162,8 +160,8 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 	state, err := clistate.GetState(ctx)
 	if err == nil {
 		if len(state.Credentials) > 0 {
-			// Revoke the API key server-side so it doesn't outlive the login.
-			// Best-effort: local credentials are cleared regardless.
+			// Best-effort server-side revoke; local credentials are cleared
+			// regardless.
 			revokeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 			defer cancel()
 			api := client.New(client.WithCredentials(state.Credentials))

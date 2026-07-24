@@ -1,7 +1,7 @@
 import { graphql } from '@/gql';
 
-// The API keys settings page and the device-login page both read this policy;
-// the document lives here so graphql-codegen sees a single operation.
+// Shared by the API keys settings page and the device-login page; one file so
+// graphql-codegen sees a single operation.
 export const AllowMemberKeysQuery = graphql(`
   query GetAllowMemberAPIKeysSetting {
     account {
