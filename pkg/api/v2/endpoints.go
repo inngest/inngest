@@ -273,6 +273,34 @@ func (s *Service) ListWebhooks(ctx context.Context, req *apiv2.ListWebhooksReque
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
 }
 
+func (s *Service) UpdateWebhook(ctx context.Context, req *apiv2.UpdateWebhookRequest) (*apiv2.UpdateWebhookResponse, error) {
+	// Extract environment from X-Inngest-Env header
+	envName := s.base.GetInngestEnvHeader(ctx)
+	if envName == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "X-Inngest-Env header is required")
+	}
+
+	// Validate required fields. This is a full replacement (PUT), so name and
+	// transform must always be provided; omitting an optional field clears it.
+	if req.Id == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Webhook ID is required")
+	}
+	if req.Name == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Webhook name is required")
+	}
+	if req.Transform == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Webhook transform is required")
+	}
+
+	// For now, return not implemented since this is OSS
+	// In a real implementation, this would:
+	// 1. Find the existing webhook by ID in the specified environment
+	// 2. Validate JavaScript syntax for the transform and response functions
+	// 3. Replace the webhook configuration with the provided full state,
+	//    clearing any omitted optional fields, and return the updated webhook
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Webhooks not implemented in OSS")
+}
+
 func (s *Service) PatchEnv(ctx context.Context, req *apiv2.PatchEnvRequest) (*apiv2.PatchEnvsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Environments not implemented in OSS")
 }
