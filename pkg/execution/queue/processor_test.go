@@ -115,6 +115,8 @@ func TestProcessorRunUsesShardQueueScanner(t *testing.T) {
 	require.True(t, scanner.called.Load())
 	require.NotNil(t, scanner.runtime.Leaser)
 	require.NotNil(t, scanner.runtime.Dispatch)
+	require.NotNil(t, scanner.runtime.WorkerSemaphore)
+	require.Same(t, q.Semaphore(), scanner.runtime.WorkerSemaphore)
 }
 
 func TestProcessorRunReturnsQueueScannerError(t *testing.T) {

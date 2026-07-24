@@ -248,8 +248,9 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 	}
 
 	rt := QueueScannerRuntime{
-		Leaser:   q,
-		Dispatch: dispatch,
+		Leaser:          q,
+		Dispatch:        dispatch,
+		WorkerSemaphore: q.Semaphore(),
 	}
 	if rt.Leaser == nil {
 		return ErrQueueScannerMissingLeaser
