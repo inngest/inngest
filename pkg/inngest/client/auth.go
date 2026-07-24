@@ -109,6 +109,27 @@ func (c httpClient) PollDeviceLogin(ctx context.Context, clientID, deviceCode uu
 	return r, nil
 }
 
+// RevokeDeviceLogin revokes the API key the client is configured with
+// (server-side delete), so a logged-out CLI credential can no longer be used.
+func (c httpClient) RevokeDeviceLogin(ctx context.Context) error {
+	req, err := c.NewRequest(http.MethodPost, "/v2/login/device/revoke", nil)
+	if err != nil {
+		return fmt.Errorf("error creating revoke request: %s", err)
+	}
+	req = req.WithContext(ctx)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.creds))
+	resp, err := c.Do(req)
+	if err != nil {
+		return fmt.Errorf("error performing revoke request: %s", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		byt, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unable to revoke the API key: %s", byt)
+	}
+	return nil
+}
+
 type StartDeviceLoginResponse struct {
 	DeviceCode      uuid.UUID `json:"device_code"`
 	ExpiresIn       int       `json:"expires_in"`
