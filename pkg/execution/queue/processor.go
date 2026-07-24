@@ -273,9 +273,9 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 }
 
 func (q *queueProcessor) capacity() int64 {
-	return int64(q.numWorkers) - q.Semaphore().Count()
+	return q.Semaphore().Available()
 }
 
 func (q *queueProcessor) partitionCapacity() int64 {
-	return int64(q.numPartitionWorkers) - q.partitionSem.Count()
+	return q.partitionSem.Available()
 }
