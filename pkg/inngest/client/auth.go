@@ -60,6 +60,7 @@ func (c httpClient) StartDeviceLogin(ctx context.Context, clientID uuid.UUID) (*
 	if err != nil {
 		return nil, fmt.Errorf("error creating login request: %s", err)
 	}
+	req = req.WithContext(ctx)
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -88,6 +89,9 @@ func (c httpClient) PollDeviceLogin(ctx context.Context, clientID, deviceCode uu
 	if err != nil {
 		return nil, fmt.Errorf("error creating login request: %s", err)
 	}
+	// Carry the context so cancellation (Ctrl-C, code expiry) aborts the
+	// server-side long-poll rather than waiting out the request.
+	req = req.WithContext(ctx)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := c.Do(req)
 	if err != nil {
@@ -116,7 +120,6 @@ type StartDeviceLoginResponse struct {
 type DeviceLoginResponse struct {
 	Error       string    `json:"error"`
 	AccessToken string    `json:"access_token"`
-	TokenType   string    `json:"token_type"`
 	AccountID   uuid.UUID `json:"account_id"`
 	AccountName string    `json:"account_name"`
 	// Env is the name of the environment the minted API key is bound to.
