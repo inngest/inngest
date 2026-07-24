@@ -22,6 +22,7 @@ type Client interface {
 
 	StartDeviceLogin(ctx context.Context, clientID uuid.UUID) (*StartDeviceLoginResponse, error)
 	PollDeviceLogin(ctx context.Context, clientID uuid.UUID, deviceCode uuid.UUID) (*DeviceLoginResponse, error)
+	RevokeDeviceLogin(ctx context.Context) error
 
 	Account(ctx context.Context) (*Account, error)
 }
