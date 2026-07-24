@@ -2,11 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.39.0] - 2026-07-24
+
+### 🚀 Features
+
+- *(api)* Rest v2 rerun from step (#4645)
+
+### 🐛 Bug Fixes
+
+- *(cli)* Improve cli timestamp arg handling (#4650)
+- Use snapshots to handle map race access (#4653)
+
+### 🚜 Refactor
+
+- *(queue)* Add shard scanner boundary (#4655)
+- *(queue)* Add scanner runtime (#4665)
+- *(queue)* Expose available worker count (#4666)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(logging)* Add logging middleware for API (#4646)
+- Make cancellation deadline configurable (#4659)
+
 ## [v1.38.1] - 2026-07-21
 
 ### 🐛 Bug Fixes
 
 - *(api)* Clarify run list commands and docs (#4647)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.38.1 (#4648)
 
 ## [v1.38.0] - 2026-07-21
 
