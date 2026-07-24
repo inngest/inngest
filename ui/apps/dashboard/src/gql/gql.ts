@@ -17,7 +17,8 @@ type Documents = {
     "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n": typeof types.CreateApiKeyDocument,
     "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": typeof types.DeleteApiKeyDocument,
     "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": typeof types.UpdateApiKeyDocument,
-    "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": typeof types.GetApiKeysDocument,
+    "\n  query GetAllowMemberAPIKeysSetting {\n    account {\n      setting(name: \"allow_member_api_keys\") {\n        value\n      }\n    }\n  }\n": typeof types.GetAllowMemberApiKeysSettingDocument,
+    "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n        createdBy {\n          id\n          name\n          email\n        }\n      }\n    }\n  }\n": typeof types.GetApiKeysDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": typeof types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": typeof types.UnachiveAppDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": typeof types.GetArchivedAppBannerDataDocument,
@@ -168,6 +169,7 @@ type Documents = {
     "\n  query GetIngestKey($environmentID: ID!, $keyID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKey(id: $keyID) {\n        id\n        name\n        createdAt\n        presharedKey\n        url\n        filter {\n          type\n          ips\n          events\n        }\n        metadata\n        source\n      }\n    }\n  }\n": typeof types.GetIngestKeyDocument,
     "\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n": typeof types.CreateWebhookDocument,
     "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n": typeof types.CompleteAwsMarketplaceSetupDocument,
+    "\n  mutation SetAllowMemberAPIKeys($enabled: Boolean!) {\n    setAllowMemberAPIKeys(enabled: $enabled)\n  }\n": typeof types.SetAllowMemberApiKeysDocument,
     "\n  query SecurityEmailSettings {\n    account {\n      securityEmail\n    }\n  }\n": typeof types.SecurityEmailSettingsDocument,
     "\n  mutation UpdateSecurityEmail($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      securityEmail\n    }\n  }\n": typeof types.UpdateSecurityEmailDocument,
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": typeof types.GetAccountSupportInfoDocument,
@@ -176,7 +178,8 @@ const documents: Documents = {
     "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n": types.CreateApiKeyDocument,
     "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": types.DeleteApiKeyDocument,
     "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": types.UpdateApiKeyDocument,
-    "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": types.GetApiKeysDocument,
+    "\n  query GetAllowMemberAPIKeysSetting {\n    account {\n      setting(name: \"allow_member_api_keys\") {\n        value\n      }\n    }\n  }\n": types.GetAllowMemberApiKeysSettingDocument,
+    "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n        createdBy {\n          id\n          name\n          email\n        }\n      }\n    }\n  }\n": types.GetApiKeysDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": types.UnachiveAppDocument,
     "\n  query GetArchivedAppBannerData($envID: ID!, $externalAppID: String!) {\n    environment: workspace(id: $envID) {\n      app: appByExternalID(externalID: $externalAppID) {\n        isArchived\n      }\n    }\n  }\n": types.GetArchivedAppBannerDataDocument,
@@ -327,6 +330,7 @@ const documents: Documents = {
     "\n  query GetIngestKey($environmentID: ID!, $keyID: ID!) {\n    environment: workspace(id: $environmentID) {\n      ingestKey(id: $keyID) {\n        id\n        name\n        createdAt\n        presharedKey\n        url\n        filter {\n          type\n          ips\n          events\n        }\n        metadata\n        source\n      }\n    }\n  }\n": types.GetIngestKeyDocument,
     "\n  mutation CreateWebhook($input: NewIngestKey!) {\n    key: createIngestKey(input: $input) {\n      id\n      url\n    }\n  }\n": types.CreateWebhookDocument,
     "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n": types.CompleteAwsMarketplaceSetupDocument,
+    "\n  mutation SetAllowMemberAPIKeys($enabled: Boolean!) {\n    setAllowMemberAPIKeys(enabled: $enabled)\n  }\n": types.SetAllowMemberApiKeysDocument,
     "\n  query SecurityEmailSettings {\n    account {\n      securityEmail\n    }\n  }\n": types.SecurityEmailSettingsDocument,
     "\n  mutation UpdateSecurityEmail($input: UpdateAccount!) {\n    account: updateAccount(input: $input) {\n      securityEmail\n    }\n  }\n": types.UpdateSecurityEmailDocument,
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": types.GetAccountSupportInfoDocument,
@@ -361,7 +365,11 @@ export function graphql(source: "\n  mutation UpdateAPIKey($input: UpdateAPIKeyI
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n"];
+export function graphql(source: "\n  query GetAllowMemberAPIKeysSetting {\n    account {\n      setting(name: \"allow_member_api_keys\") {\n        value\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAllowMemberAPIKeysSetting {\n    account {\n      setting(name: \"allow_member_api_keys\") {\n        value\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n        createdBy {\n          id\n          name\n          email\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n        createdBy {\n          id\n          name\n          email\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -962,6 +970,10 @@ export function graphql(source: "\n  mutation CreateWebhook($input: NewIngestKey
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n"): (typeof documents)["\n  mutation CompleteAWSMarketplaceSetup($input: AWSMarketplaceSetupInput!) {\n    completeAWSMarketplaceSetup(input: $input) {\n      message\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SetAllowMemberAPIKeys($enabled: Boolean!) {\n    setAllowMemberAPIKeys(enabled: $enabled)\n  }\n"): (typeof documents)["\n  mutation SetAllowMemberAPIKeys($enabled: Boolean!) {\n    setAllowMemberAPIKeys(enabled: $enabled)\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

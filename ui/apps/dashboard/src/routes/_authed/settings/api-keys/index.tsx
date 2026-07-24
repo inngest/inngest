@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
+import { Switch } from '@inngest/components/Switch';
 import {
   Tooltip,
   TooltipContent,
@@ -9,6 +11,7 @@ import {
 import { useOrganization } from '@clerk/tanstack-react-start';
 import { RiAddLine } from '@remixicon/react';
 import { createFileRoute } from '@tanstack/react-router';
+import { useMutation } from 'urql';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import { APIKeysEmptyState } from '@/components/APIKeys/EmptyState';
@@ -16,10 +19,23 @@ import {
   APIKeysTable,
   type APIKeyRow,
 } from '@/components/APIKeys/APIKeysTable';
+import {
+  allowMemberKeysEnabled,
+  AllowMemberKeysQuery,
+  settingQueryContext,
+} from '@/components/APIKeys/allowMemberKeys';
 import { CreateAPIKeyModal } from '@/components/APIKeys/CreateAPIKeyModal';
 import { DeleteAPIKeyModal } from '@/components/APIKeys/DeleteAPIKeyModal';
 import { RenameAPIKeyModal } from '@/components/APIKeys/RenameAPIKeyModal';
 import { useAPIKeys } from '@/components/APIKeys/useAPIKeys';
+import { graphql } from '@/gql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+
+const SetAllowMemberKeysMutation = graphql(`
+  mutation SetAllowMemberAPIKeys($enabled: Boolean!) {
+    setAllowMemberAPIKeys(enabled: $enabled)
+  }
+`);
 
 export const Route = createFileRoute('/_authed/settings/api-keys/')({
   component: APIKeysPage,
@@ -32,11 +48,54 @@ function APIKeysPage() {
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
+  const settingRes = useGraphQLQuery({
+    query: AllowMemberKeysQuery,
+    variables: {},
+    context: settingQueryContext,
+  });
+  const [, setAllowMemberKeys] = useMutation(SetAllowMemberKeysMutation);
+  // Optimistic toggle value; the query refetch confirms it after the
+  // mutation invalidates AccountSetting.
+  const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null);
+  const [settingSaving, setSettingSaving] = useState(false);
+  const [settingError, setSettingError] = useState<string | null>(null);
+
+  // Degrade gracefully if the setting can't be read: members just see the
+  // admins-only default instead of a broken page.
+  const memberKeysEnabled = allowMemberKeysEnabled(
+    settingRes.data?.account.setting?.value,
+  );
+  const canCreate = isAdmin || memberKeysEnabled;
+
+  // Clear the optimistic value once the refetch confirms it, so it doesn't
+  // shadow later changes to the policy (e.g. another admin toggling it).
+  useEffect(() => {
+    if (pendingEnabled !== null && pendingEnabled === memberKeysEnabled) {
+      setPendingEnabled(null);
+    }
+  }, [pendingEnabled, memberKeysEnabled]);
+
   // Create modal state is owned here so it survives the empty->populated
   // transition that unmounts the EmptyState.
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<APIKeyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<APIKeyRow | null>(null);
+
+  async function toggleAllowMemberKeys(enabled: boolean) {
+    setPendingEnabled(enabled);
+    setSettingSaving(true);
+    try {
+      const mutRes = await setAllowMemberKeys({ enabled }, settingQueryContext);
+      if (mutRes.error) {
+        setPendingEnabled(null);
+        setSettingError('Could not update the policy. Try again.');
+      } else {
+        setSettingError(null);
+      }
+    } finally {
+      setSettingSaving(false);
+    }
+  }
 
   if (res.error) {
     throw res.error;
@@ -55,6 +114,9 @@ function APIKeysPage() {
     maskedKey: k.maskedKey,
     createdAt: k.createdAt,
     env: k.env ? { id: k.env.id, name: k.env.name } : null,
+    createdBy: k.createdBy
+      ? { name: k.createdBy.name, email: k.createdBy.email }
+      : null,
   }));
 
   const createButton = (
@@ -64,7 +126,7 @@ function APIKeysPage() {
       iconSide="left"
       label="Create API key"
       onClick={() => setCreateOpen(true)}
-      disabled={!isAdmin}
+      disabled={!canCreate}
     />
   );
 
@@ -85,7 +147,7 @@ function APIKeysPage() {
             </Link>
           </p>
         </div>
-        {isAdmin ? (
+        {canCreate ? (
           createButton
         ) : (
           <Tooltip>
@@ -97,10 +159,34 @@ function APIKeysPage() {
         )}
       </div>
 
+      {isAdmin && (
+        <div className="border-subtle flex items-start justify-between gap-4 rounded-md border p-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-basis text-sm font-medium">
+              Allow members to create API keys
+            </span>
+            <span className="text-subtle text-sm">
+              Members can create API keys from this page or by logging in with
+              the Inngest CLI. Admins can always create API keys.
+            </span>
+            {settingError && (
+              <Alert severity="error" className="mt-2 text-sm">
+                {settingError}
+              </Alert>
+            )}
+          </div>
+          <Switch
+            checked={pendingEnabled ?? memberKeysEnabled}
+            onCheckedChange={toggleAllowMemberKeys}
+            disabled={settingSaving || settingRes.isLoading}
+          />
+        </div>
+      )}
+
       {keys.length === 0 ? (
         <APIKeysEmptyState
           onCreate={() => setCreateOpen(true)}
-          canCreate={isAdmin}
+          canCreate={canCreate}
           disabledTooltip={ADMIN_TOOLTIP}
         />
       ) : (
