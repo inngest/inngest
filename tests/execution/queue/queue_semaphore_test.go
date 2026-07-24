@@ -23,9 +23,9 @@ import (
 )
 
 func dispatchToQueueWorkers(workers chan queue.ProcessItem) queue.DispatchFunc {
-	return func(_ context.Context, item queue.ProcessItem) error {
+	return func(_ context.Context, item queue.ProcessItem) (queue.DispatchedItem, error) {
 		workers <- item
-		return nil
+		return queue.NewCompletedDispatchedItem(queue.DispatchedItemResult{}), nil
 	}
 }
 
@@ -218,12 +218,10 @@ func TestLeaseItemReturnsRetryAfterForConstraintLimit(t *testing.T) {
 	qi2, err := shard.EnqueueItem(ctx, makeItem(), clock.Now(), queue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	partition := queue.ItemPartition(ctx, qi1)
 	dispatch := dispatchToQueueWorkers(q.Workers())
 	req := func(item *queue.QueueItem) queue.LeaseItemRequest {
 		return queue.LeaseItemRequest{
 			Item:       item,
-			Partition:  &partition,
 			StaticTime: clock.Now(),
 		}
 	}

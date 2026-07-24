@@ -20,9 +20,9 @@ import (
 )
 
 func dispatchToOSQueueWorkers(workers chan osqueue.ProcessItem) osqueue.DispatchFunc {
-	return func(_ context.Context, item osqueue.ProcessItem) error {
+	return func(_ context.Context, item osqueue.ProcessItem) (osqueue.DispatchedItem, error) {
 		workers <- item
-		return nil
+		return osqueue.NewCompletedDispatchedItem(osqueue.DispatchedItemResult{}), nil
 	}
 }
 
@@ -578,7 +578,7 @@ func TestQueueLatencySeparatesSystemAndUserLatencyAfterEarliestPeekStamp(t *test
 	require.Equal(t, peekTime.UnixMilli(), qi2.EarliestPeekTime)
 
 	firstWork := <-q.Workers()
-	err = q.ProcessItem(ctx, firstWork, func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
+	_, err = q.ProcessItem(ctx, firstWork, func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 		return osqueue.RunResult{}, nil
 	})
 	require.NoError(t, err)
@@ -606,7 +606,7 @@ func TestQueueLatencySeparatesSystemAndUserLatencyAfterEarliestPeekStamp(t *test
 
 	infoCh := make(chan osqueue.RunInfo, 1)
 	secondWork := <-q.Workers()
-	err = q.ProcessItem(ctx, secondWork, func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
+	_, err = q.ProcessItem(ctx, secondWork, func(ctx context.Context, info osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
 		infoCh <- info
 		return osqueue.RunResult{}, nil
 	})
