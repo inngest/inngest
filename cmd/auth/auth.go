@@ -161,6 +161,18 @@ func ctxErr(ctx context.Context) error {
 func logout(ctx context.Context, cmd *cli.Command) error {
 	state, err := clistate.GetState(ctx)
 	if err == nil {
+		if len(state.Credentials) > 0 {
+			// Revoke the API key server-side so it doesn't outlive the login.
+			// Best-effort: local credentials are cleared regardless.
+			revokeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+			defer cancel()
+			api := client.New(client.WithCredentials(state.Credentials))
+			if err := api.RevokeDeviceLogin(revokeCtx); err != nil {
+				fmt.Println(inncli.RenderWarning(fmt.Sprintf(
+					"Couldn't revoke the API key on the server: %s\nDelete the \"CLI login\" key from the dashboard's API keys settings if it should no longer be used.", err,
+				)))
+			}
+		}
 		state.Credentials = nil
 		state.Account = client.Account{}
 		state.Env = ""
