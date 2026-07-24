@@ -1193,25 +1193,38 @@ func (w wrapper) InsertQueueSnapshotChunk(ctx context.Context, params cqrs.Inser
 // Apps
 //
 
-// GetApps returns apps that have not been deleted.
+// GetApps returns active apps unless the filter requests archived apps.
 func (w wrapper) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
-	data, err := w.q.GetApps(ctx)
+	params := dbpkg.GetAppsParams{}
+	if filter != nil {
+		params.Cursor = filter.Cursor
+		params.Limit = filter.Limit
+		params.Archived = filter.Archived
+		if filter.Method != nil {
+			params.Method = filter.Method.String()
+		}
+	}
+
+	data, err := w.q.GetApps(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("could not get apps: %w", err)
 	}
-	if filter == nil {
-		return domainToCQRSList(data, domainApp), nil
-	}
+	return domainToCQRSList(data, domainApp), nil
+}
 
-	filtered := []*cqrs.App{}
-	for _, app := range data {
-		if filter.Method != nil && filter.Method.String() != app.Method {
-			continue
-		}
-		filtered = append(filtered, domainToCQRS(app, domainApp))
+func (w wrapper) GetAppFunctionCounts(ctx context.Context, appIDs []uuid.UUID) (map[uuid.UUID]int, error) {
+	result := make(map[uuid.UUID]int, len(appIDs))
+	if len(appIDs) == 0 {
+		return result, nil
 	}
-
-	return filtered, nil
+	counts, err := w.q.GetAppFunctionCounts(ctx, appIDs)
+	if err != nil {
+		return nil, fmt.Errorf("could not get function counts: %w", err)
+	}
+	for _, count := range counts {
+		result[count.AppID] = count.FunctionCount
+	}
+	return result, nil
 }
 
 func (w wrapper) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {

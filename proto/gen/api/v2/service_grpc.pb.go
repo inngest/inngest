@@ -38,6 +38,7 @@ const (
 	V2_Rerun_FullMethodName                    = "/api.v2.V2/Rerun"
 	V2_CancelRun_FullMethodName                = "/api.v2.V2/CancelRun"
 	V2_GetApp_FullMethodName                   = "/api.v2.V2/GetApp"
+	V2_GetApps_FullMethodName                  = "/api.v2.V2/GetApps"
 	V2_CreateScore_FullMethodName              = "/api.v2.V2/CreateScore"
 	V2_SyncApp_FullMethodName                  = "/api.v2.V2/SyncApp"
 	V2_GetFunctionTrace_FullMethodName         = "/api.v2.V2/GetFunctionTrace"
@@ -81,6 +82,7 @@ type V2Client interface {
 	Rerun(ctx context.Context, in *RerunRequest, opts ...grpc.CallOption) (*RerunResponse, error)
 	CancelRun(ctx context.Context, in *CancelRunRequest, opts ...grpc.CallOption) (*CancelRunResponse, error)
 	GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.CallOption) (*GetAppResponse, error)
+	GetApps(ctx context.Context, in *GetAppsRequest, opts ...grpc.CallOption) (*GetAppsResponse, error)
 	CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
@@ -296,6 +298,16 @@ func (c *v2Client) GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.C
 	return out, nil
 }
 
+func (c *v2Client) GetApps(ctx context.Context, in *GetAppsRequest, opts ...grpc.CallOption) (*GetAppsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAppsResponse)
+	err := c.cc.Invoke(ctx, V2_GetApps_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *v2Client) CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateScoreResponse)
@@ -472,6 +484,7 @@ type V2Server interface {
 	Rerun(context.Context, *RerunRequest) (*RerunResponse, error)
 	CancelRun(context.Context, *CancelRunRequest) (*CancelRunResponse, error)
 	GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error)
+	GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error)
 	CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
@@ -553,6 +566,9 @@ func (UnimplementedV2Server) CancelRun(context.Context, *CancelRunRequest) (*Can
 }
 func (UnimplementedV2Server) GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetApp not implemented")
+}
+func (UnimplementedV2Server) GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetApps not implemented")
 }
 func (UnimplementedV2Server) CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateScore not implemented")
@@ -962,6 +978,24 @@ func _V2_GetApp_Handler(srv interface{}, ctx context.Context, dec func(interface
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_GetApps_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAppsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetApps(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetApps_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetApps(ctx, req.(*GetAppsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _V2_CreateScore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateScoreRequest)
 	if err := dec(in); err != nil {
@@ -1314,6 +1348,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetApp",
 			Handler:    _V2_GetApp_Handler,
+		},
+		{
+			MethodName: "GetApps",
+			Handler:    _V2_GetApps_Handler,
 		},
 		{
 			MethodName: "CreateScore",

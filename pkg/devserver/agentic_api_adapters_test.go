@@ -315,6 +315,22 @@ func TestNewAppProvider(t *testing.T) {
 		require.Equal(t, appID, app.InternalID)
 	})
 
+	t.Run("lists apps with database pagination options", func(t *testing.T) {
+		result, err := NewAppProvider(store).GetApps(ctx, apiv2.GetAppsOpts{
+			Cursor:   appID,
+			Limit:    1,
+			Archived: true,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, result.Apps, 1)
+		require.Equal(t, 1, result.Apps[0].FunctionCount)
+		require.NotNil(t, store.appFilter)
+		require.Equal(t, appID, store.appFilter.Cursor)
+		require.Equal(t, 2, store.appFilter.Limit)
+		require.True(t, store.appFilter.Archived)
+	})
+
 	t.Run("not found", func(t *testing.T) {
 		_, err := NewAppProvider(store).GetApp(ctx, "missing")
 
@@ -390,6 +406,7 @@ type fakeFunctionStore struct {
 	app          *cqrs.App
 	err          error
 	functionOpts *cqrs.GetFunctionsByAppOpts
+	appFilter    *cqrs.FilterAppParam
 }
 
 func (f *fakeFunctionStore) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
@@ -485,7 +502,21 @@ func (f *fakeFunctionStore) GetActiveFunctionByAppAndSlug(ctx context.Context, a
 }
 
 func (f *fakeFunctionStore) GetApps(ctx context.Context, envID uuid.UUID, filter *cqrs.FilterAppParam) ([]*cqrs.App, error) {
-	return nil, nil
+	f.appFilter = filter
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.app == nil {
+		return nil, nil
+	}
+	return []*cqrs.App{f.app}, nil
+}
+
+func (f *fakeFunctionStore) GetAppFunctionCounts(ctx context.Context, appIDs []uuid.UUID) (map[uuid.UUID]int, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return map[uuid.UUID]int{f.app.ID: len(f.fns)}, nil
 }
 
 func (f *fakeFunctionStore) GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*cqrs.App, error) {

@@ -26,6 +26,12 @@ func (m *mockAppProvider) GetApp(ctx context.Context, identifier string) (App, e
 	return app, args.Error(1)
 }
 
+func (m *mockAppProvider) GetApps(ctx context.Context, opts GetAppsOpts) (*GetAppsResult, error) {
+	args := m.Called(ctx, opts)
+	result, _ := args.Get(0).(*GetAppsResult)
+	return result, args.Error(1)
+}
+
 type mockFunctionProvider struct {
 	mock.Mock
 }

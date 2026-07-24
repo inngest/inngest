@@ -235,6 +235,42 @@ func (q *Queries) GetAppByURL(ctx context.Context, url string) (*App, error) {
 	return &i, err
 }
 
+const getAppFunctionCounts = `-- name: GetAppFunctionCounts :many
+SELECT app_id, COUNT(*) AS function_count
+FROM functions
+WHERE archived_at IS NULL
+AND app_id = ANY(($1::uuid[])::text[])
+GROUP BY app_id
+`
+
+type GetAppFunctionCountsRow struct {
+	AppID         uuid.UUID
+	FunctionCount int64
+}
+
+func (q *Queries) GetAppFunctionCounts(ctx context.Context, appIds []uuid.UUID) ([]*GetAppFunctionCountsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAppFunctionCounts, pq.Array(appIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetAppFunctionCountsRow
+	for rows.Next() {
+		var i GetAppFunctionCountsRow
+		if err := rows.Scan(&i.AppID, &i.FunctionCount); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAppFunctions = `-- name: GetAppFunctions :many
 SELECT id, app_id, name, slug, config, created_at, archived_at FROM functions WHERE app_id = $1 AND archived_at IS NULL
 `
@@ -306,11 +342,31 @@ func (q *Queries) GetAppFunctionsBySlug(ctx context.Context, name string) ([]*Fu
 }
 
 const getApps = `-- name: GetApps :many
-SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version FROM apps WHERE archived_at IS NULL
+SELECT id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, created_at, archived_at, url, method, app_version FROM apps
+WHERE (
+    ($1::boolean AND archived_at IS NOT NULL)
+    OR (NOT $1::boolean AND archived_at IS NULL)
+)
+AND ($2::text = '' OR "method" = $2::text)
+AND ($3::uuid = '00000000-0000-0000-0000-000000000000'::uuid OR id > $3::uuid::text)
+ORDER BY id ASC
+LIMIT CASE WHEN $4::int > 0 THEN $4::int ELSE NULL END
 `
 
-func (q *Queries) GetApps(ctx context.Context) ([]*App, error) {
-	rows, err := q.db.QueryContext(ctx, getApps)
+type GetAppsParams struct {
+	Archived  bool
+	Method    string
+	Cursor    uuid.UUID
+	LimitRows int32
+}
+
+func (q *Queries) GetApps(ctx context.Context, arg GetAppsParams) ([]*App, error) {
+	rows, err := q.db.QueryContext(ctx, getApps,
+		arg.Archived,
+		arg.Method,
+		arg.Cursor,
+		arg.LimitRows,
+	)
 	if err != nil {
 		return nil, err
 	}
