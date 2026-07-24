@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Input } from '@inngest/components/Forms/Input';
-import { Select, type Option } from '@inngest/components/Select/Select';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { useAuth, useOrganization } from '@clerk/tanstack-react-start';
 import { RiTerminalBoxLine } from '@remixicon/react';
@@ -12,9 +11,11 @@ import {
   AllowMemberKeysQuery,
   settingQueryContext,
 } from '@/components/APIKeys/allowMemberKeys';
+import {
+  EnvironmentSelect,
+  useEnvironmentSelection,
+} from '@/components/APIKeys/EnvironmentSelect';
 import ApprovalDialog from '@/components/Intent/ApprovalDialog';
-import { useEnvironments } from '@/queries/environments';
-import { EnvironmentType } from '@/utils/environments';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 export const Route = createFileRoute('/_authed/device/')({
@@ -47,7 +48,6 @@ function DeviceLoginComponent() {
   const { profile } = useLoaderData({ from: '/_authed' });
   const [clientID] = useSearchParam('client_id');
   const [userCode, setUserCode] = useState('');
-  const [selectedEnv, setSelectedEnv] = useState<Option | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState<'pending' | 'approved' | 'cancelled'>(
@@ -65,34 +65,7 @@ function DeviceLoginComponent() {
     context: settingQueryContext,
   });
 
-  const [{ data: envs }] = useEnvironments();
-
-  // Pickable envs split by type so the picker can render Production / Test /
-  // Branches groups. Keys for branch envs live on the parent (mirrors the
-  // create-key modal), so we offer the parent and hide the children.
-  const envGroups = useMemo(() => {
-    const production: Option[] = [];
-    const test: Option[] = [];
-    const branches: Option[] = [];
-    for (const e of envs ?? []) {
-      if (e.isArchived || e.type === EnvironmentType.BranchChild) continue;
-      const opt = { id: e.id, name: e.name };
-      if (e.type === EnvironmentType.Production) production.push(opt);
-      else if (e.type === EnvironmentType.BranchParent) branches.push(opt);
-      else test.push(opt);
-    }
-    return { production, test, branches };
-  }, [envs]);
-
-  // Pre-select Production so the common case is type-code-and-approve. Only
-  // auto-select when there's exactly one production env; a user with several
-  // should make an explicit choice.
-  useEffect(() => {
-    if (selectedEnv) return;
-    if (envGroups.production.length === 1) {
-      setSelectedEnv(envGroups.production[0] ?? null);
-    }
-  }, [selectedEnv, envGroups.production]);
+  const { selectedEnv, setSelectedEnv, envGroups } = useEnvironmentSelection();
 
   if (!clientID || !UUID_REGEX.test(clientID)) {
     return (
@@ -210,43 +183,11 @@ function DeviceLoginComponent() {
               <label className="text-basis text-sm font-medium">
                 Environment
               </label>
-              <Select
-                label="Environment"
-                isLabelVisible={false}
+              <EnvironmentSelect
+                groups={envGroups}
                 value={selectedEnv}
-                onChange={(opt) => setSelectedEnv(opt)}
-              >
-                <Select.Button>
-                  <span
-                    className={selectedEnv ? 'text-basis' : 'text-disabled'}
-                  >
-                    {selectedEnv?.name ?? 'Select an environment'}
-                  </span>
-                </Select.Button>
-                <Select.Options>
-                  {(
-                    [
-                      ['Production', envGroups.production],
-                      ['Test', envGroups.test],
-                      ['Branches', envGroups.branches],
-                    ] as const
-                  ).map(([label, opts], idx) =>
-                    opts.length === 0 ? null : (
-                      <div key={label}>
-                        {idx > 0 && <hr className="border-subtle my-1" />}
-                        <div className="text-light px-4 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide">
-                          {label}
-                        </div>
-                        {opts.map((opt) => (
-                          <Select.Option key={opt.id} option={opt}>
-                            {opt.name}
-                          </Select.Option>
-                        ))}
-                      </div>
-                    ),
-                  )}
-                </Select.Options>
-              </Select>
+                onChange={setSelectedEnv}
+              />
             </div>
             <div className="flex flex-col gap-2 text-left">
               <label

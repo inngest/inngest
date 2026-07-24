@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
-import { Select, type Option } from '@inngest/components/Select/Select';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
-import { useEnvironments } from '@/queries/environments';
-import { EnvironmentType } from '@/utils/environments';
+import {
+  EnvironmentSelect,
+  useEnvironmentSelection,
+} from './EnvironmentSelect';
 import { apiKeyErrorMessage } from './errorMessage';
 import { RevealKeyCard } from './RevealKeyCard';
 import { validateAPIKeyName } from './validation';
@@ -38,7 +39,6 @@ type Props = {
 
 export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   const [name, setName] = useState('');
-  const [selectedEnv, setSelectedEnv] = useState<Option | null>(null);
   const [plaintextKey, setPlaintextKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,37 +48,9 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   // in state (which would leak the key into the next modal-open).
   const cancelledRef = useRef(false);
 
-  const [{ data: envs }] = useEnvironments();
+  const { selectedEnv, setSelectedEnv, envGroups } =
+    useEnvironmentSelection(isOpen);
   const [, create] = useMutation(Mutation);
-
-  // Pickable envs split by type so the picker can render Production / Test /
-  // Branches groups instead of one alphabetical blob. Keys for branch envs
-  // live on the parent (mirrors how signing and event keys work) — a
-  // parent-scoped key authenticates for every child beneath it, so we offer
-  // the parent and hide the programmatically-created children.
-  const envGroups = useMemo(() => {
-    const production: Option[] = [];
-    const test: Option[] = [];
-    const branches: Option[] = [];
-    for (const e of envs ?? []) {
-      if (e.isArchived || e.type === EnvironmentType.BranchChild) continue;
-      const opt = { id: e.id, name: e.name };
-      if (e.type === EnvironmentType.Production) production.push(opt);
-      else if (e.type === EnvironmentType.BranchParent) branches.push(opt);
-      else test.push(opt);
-    }
-    return { production, test, branches };
-  }, [envs]);
-
-  // Pre-select Production when the modal opens so the common case is one
-  // click. We only auto-select if there's exactly one production env — if a
-  // user has multiple they should make an explicit choice.
-  useEffect(() => {
-    if (!isOpen || selectedEnv) return;
-    if (envGroups.production.length === 1) {
-      setSelectedEnv(envGroups.production[0] ?? null);
-    }
-  }, [isOpen, selectedEnv, envGroups.production]);
 
   async function submit() {
     setError(null);
@@ -172,43 +144,11 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
               <label className="text-basis text-sm font-medium">
                 Environment
               </label>
-              <Select
-                label="Environment"
-                isLabelVisible={false}
+              <EnvironmentSelect
+                groups={envGroups}
                 value={selectedEnv}
-                onChange={(opt) => setSelectedEnv(opt)}
-              >
-                <Select.Button>
-                  <span
-                    className={selectedEnv ? 'text-basis' : 'text-disabled'}
-                  >
-                    {selectedEnv?.name ?? 'Select an environment'}
-                  </span>
-                </Select.Button>
-                <Select.Options>
-                  {(
-                    [
-                      ['Production', envGroups.production],
-                      ['Test', envGroups.test],
-                      ['Branches', envGroups.branches],
-                    ] as const
-                  ).map(([label, opts], idx) =>
-                    opts.length === 0 ? null : (
-                      <div key={label}>
-                        {idx > 0 && <hr className="border-subtle my-1" />}
-                        <div className="text-light px-4 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide">
-                          {label}
-                        </div>
-                        {opts.map((opt) => (
-                          <Select.Option key={opt.id} option={opt}>
-                            {opt.name}
-                          </Select.Option>
-                        ))}
-                      </div>
-                    ),
-                  )}
-                </Select.Options>
-              </Select>
+                onChange={setSelectedEnv}
+              />
             </div>
 
             {error && <Alert severity="error">{error}</Alert>}

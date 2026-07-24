@@ -104,7 +104,7 @@ func pollForToken(ctx context.Context, api client.Client, clientID uuid.UUID, st
 	}
 
 	for {
-		resp, err := poll(ctx, api, clientID, start.DeviceCode)
+		resp, err := api.PollDeviceLogin(ctx, clientID, start.DeviceCode)
 		if err != nil {
 			// Ctrl-C or the expiry deadline is fatal; any other error (network
 			// blip, rate limit, non-JSON gateway response) is transient — keep
@@ -121,12 +121,9 @@ func pollForToken(ctx context.Context, api client.Client, clientID uuid.UUID, st
 		switch resp.Error {
 		case "":
 			if resp.AccessToken == "" {
-				// Well-formed but missing a token: retry rather than persist an
+				// The server never sends this; guard against persisting an
 				// empty credential.
-				if err := wait(ctx, interval); err != nil {
-					return nil, err
-				}
-				continue
+				return nil, errors.New("unable to log in: the server returned an empty credential")
 			}
 			return resp, nil
 		case "authorization_pending", "server_error":
@@ -154,31 +151,6 @@ func wait(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// poll runs a single PollDeviceLogin call in a goroutine so that ctx
-// cancellation (Ctrl-C, code expiry) is honored while the server long-polls:
-// the client's requests do not carry the context.
-func poll(ctx context.Context, api client.Client, clientID, deviceCode uuid.UUID) (*client.DeviceLoginResponse, error) {
-	type result struct {
-		resp *client.DeviceLoginResponse
-		err  error
-	}
-	ch := make(chan result, 1)
-	go func() {
-		resp, err := api.PollDeviceLogin(ctx, clientID, deviceCode)
-		ch <- result{resp, err}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctxErr(ctx)
-	case r := <-ch:
-		if r.err != nil {
-			return nil, fmt.Errorf("unable to log in: %w", r.err)
-		}
-		return r.resp, nil
-	}
-}
-
 func ctxErr(ctx context.Context) error {
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return errors.New(expiredMsg)
@@ -202,11 +174,7 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 
 func whoami(ctx context.Context, cmd *cli.Command) error {
 	state, err := clistate.GetState(ctx)
-	if err != nil {
-		fmt.Println(inncli.TextStyle.Render("Not logged in. Run `inngest auth login`."))
-		return cli.Exit("", 1)
-	}
-	if len(state.Credentials) == 0 || state.Account.ID == uuid.Nil {
+	if err != nil || len(state.Credentials) == 0 || state.Account.ID == uuid.Nil {
 		fmt.Println(inncli.TextStyle.Render("Not logged in. Run `inngest auth login`."))
 		return cli.Exit("", 1)
 	}
