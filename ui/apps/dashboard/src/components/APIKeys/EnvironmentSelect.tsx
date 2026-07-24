@@ -12,17 +12,14 @@ type EnvGroups = {
 
 // Environment choice for minting an API key, shared by the create-key modal
 // and the device-login approval page so both offer the same environments.
-//
 // `active` gates the Production auto-select (e.g. only while a modal is open).
 export function useEnvironmentSelection(active = true) {
   const [selectedEnv, setSelectedEnv] = useState<Option | null>(null);
   const [{ data: envs }] = useEnvironments();
 
-  // Pickable envs split by type so the picker can render Production / Test /
-  // Branches groups instead of one alphabetical blob. Keys for branch envs
-  // live on the parent (mirrors how signing and event keys work) — a
-  // parent-scoped key authenticates for every child beneath it, so we offer
-  // the parent and hide the programmatically-created children.
+  // Branch-env keys live on the parent (a parent-scoped key authenticates
+  // every child, mirroring signing/event keys), so offer the parent and hide
+  // the programmatically-created children.
   const envGroups = useMemo<EnvGroups>(() => {
     const production: Option[] = [];
     const test: Option[] = [];
@@ -37,9 +34,8 @@ export function useEnvironmentSelection(active = true) {
     return { production, test, branches };
   }, [envs]);
 
-  // Pre-select Production so the common case is one click. Only auto-select
-  // when there's exactly one production env — a user with several should make
-  // an explicit choice.
+  // Auto-select Production only when there's exactly one; a user with
+  // several should make an explicit choice.
   useEffect(() => {
     if (!active || selectedEnv) return;
     if (envGroups.production.length === 1) {

@@ -60,15 +60,14 @@ function APIKeysPage() {
   const [settingSaving, setSettingSaving] = useState(false);
   const [settingError, setSettingError] = useState<string | null>(null);
 
-  // Degrade gracefully if the setting can't be read: members just see the
-  // admins-only default instead of a broken page.
+  // If the setting can't be read, members just see the admins-only default.
   const memberKeysEnabled = allowMemberKeysEnabled(
     settingRes.data?.account.setting?.value,
   );
   const canCreate = isAdmin || memberKeysEnabled;
 
-  // Clear the optimistic value once the refetch confirms it, so it doesn't
-  // shadow later changes to the policy (e.g. another admin toggling it).
+  // Clear the optimistic value once the refetch confirms it, so it can't
+  // shadow another admin's later toggle.
   useEffect(() => {
     if (pendingEnabled !== null && pendingEnabled === memberKeysEnabled) {
       setPendingEnabled(null);

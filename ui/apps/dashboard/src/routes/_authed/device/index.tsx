@@ -54,9 +54,8 @@ function DeviceLoginComponent() {
     'pending',
   );
 
-  // Approving mints the same API key as the dashboard's "Create API key", so
-  // the screen is gated by the same policy: org admins always, members only
-  // when the account allows it.
+  // Approving mints the same API key as "Create API key", so the same org
+  // policy gates the screen.
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
   const settingRes = useGraphQLQuery({
@@ -101,8 +100,8 @@ function DeviceLoginComponent() {
     );
   }
 
-  // Degrade gracefully if the setting can't be read: members see the
-  // admins-only default. The server enforces the same policy on confirm.
+  // If the setting can't be read, members see the admins-only default; the
+  // server enforces the policy on confirm anyway.
   const canMint =
     isAdmin || allowMemberKeysEnabled(settingRes.data?.account.setting?.value);
   if (!canMint) {
