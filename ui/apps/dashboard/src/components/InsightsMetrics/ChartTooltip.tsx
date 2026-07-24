@@ -62,8 +62,9 @@ export function ChartTooltip({
         </div>
       ))}
       {tooltipExtras?.map((extra) => {
-        const value = row?.[extra.valueName];
-        if (typeof value !== 'number') return null;
+        const raw = row?.[extra.valueName];
+        const value = typeof raw === 'number' ? raw : extra.defaultValue;
+        if (value === undefined) return null;
         return (
           <div key={extra.valueName} className="text-muted flex items-center justify-between gap-4 pt-1">
             <span>{extra.label}</span>

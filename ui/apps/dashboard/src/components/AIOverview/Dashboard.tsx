@@ -68,8 +68,8 @@ const formatRuns = (value: number) => `${formatCompactNumber(value)} runs`;
 // alongside it in the same row (see InsightsMetrics/queries.ts), so the
 // tooltip can show token counts without adding a visual series for them.
 const TOKEN_TOOLTIP_EXTRAS: TooltipExtra[] = [
-  { valueName: 'input_tokens', label: 'Input tokens', format: formatCompactNumber },
-  { valueName: 'output_tokens', label: 'Output tokens', format: formatCompactNumber },
+  { valueName: 'input_tokens', label: 'Input tokens', format: formatCompactNumber, defaultValue: 0 },
+  { valueName: 'output_tokens', label: 'Output tokens', format: formatCompactNumber, defaultValue: 0 },
 ];
 
 const FunctionLookupDocument = graphql(`
@@ -368,7 +368,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                   areaColor: SUBTLE_GREEN,
                 },
               ]}
-              tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost }]}
+              tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost, defaultValue: 0 }]}
               defaultValue={0}
             />
           </Section>
@@ -438,7 +438,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               stacked
               format={formatCompactNumber}
               showYAxisLine={false}
-              tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost }]}
+              tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost, defaultValue: 0 }]}
             />
           </Section>
         </div>

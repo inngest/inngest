@@ -29,6 +29,10 @@ export type TooltipExtra = {
   valueName: string;
   label: string;
   format?: (value: number) => string;
+  // Value to show when this bucket/category has no data for valueName —
+  // e.g. 0 for a count/sum measure, where "no data" and "zero" mean the
+  // same thing. Left out of the tooltip entirely by default.
+  defaultValue?: number;
 };
 
 export type InsightsMetricItem = {
