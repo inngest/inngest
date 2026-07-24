@@ -28,8 +28,11 @@ type BaseTableProps<T> = {
   isLoading?: boolean;
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: Row<T>) => void;
+  onRowMouseEnter?: (row: Row<T>) => void;
+  onRowMouseLeave?: () => void;
+  isRowHighlighted?: (row: Row<T>) => boolean;
   onCellClick?: (rowIndex: number, columnId: string, value: unknown) => void;
-  getRowHref?: (row: Row<T>) => string;
+  getRowHref?: (row: Row<T>) => string | undefined;
   blankState?: React.ReactNode;
   cellClassName?: string;
   enableColumnSizing?: boolean;
@@ -50,6 +53,9 @@ export function Table<T>({
   setSorting,
   renderSubComponent,
   onRowClick,
+  onRowMouseEnter,
+  onRowMouseLeave,
+  isRowHighlighted,
   onCellClick,
   getRowHref,
   blankState,
@@ -128,7 +134,7 @@ export function Table<T>({
                       key={header.id}
                       className={cn(
                         isIconOnlyColumn ? '' : tableColumnStyles,
-                        'text-muted text-nowrap text-left text-xs font-medium',
+                        'text-muted whitespace-nowrap text-left text-xs font-medium',
                         enableColumnSizing ? 'overflow-hidden text-ellipsis' : ''
                       )}
                       style={
@@ -199,8 +205,12 @@ export function Table<T>({
                     hasId(row.original) && expandedIDs.includes(row.original.id)
                       ? 'h-[42px]'
                       : 'border-light box-border h-[42px] border-b',
-                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
+                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : '',
+                    onRowMouseEnter ? 'hover:bg-canvasSubtle' : '',
+                    isRowHighlighted?.(row) ? 'bg-canvasSubtle' : '',
                   )}
+                  onMouseEnter={onRowMouseEnter ? () => onRowMouseEnter(row) : undefined}
+                  onMouseLeave={onRowMouseLeave}
                   onClick={(e) => {
                     const modalsContainer = document.getElementById('modals');
                     const hasModals = modalsContainer && modalsContainer.children.length > 0;

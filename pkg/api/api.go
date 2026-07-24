@@ -259,6 +259,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				evt.User = map[string]any{}
 			}
 
+			// Merge propagated sessions into the manual layer before validation
+			evt.Meta.ResolveSessions()
+
 			if err := evt.Validate(ctx); err != nil {
 				return err
 			}

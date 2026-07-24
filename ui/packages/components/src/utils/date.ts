@@ -172,6 +172,24 @@ export function toMaybeDate<T extends string | null | undefined>(value: T): Date
   return new Date(value);
 }
 
+export function maxDateString<T extends string | null | undefined>(
+  date1: T,
+  date2: T | null | undefined
+): T {
+  if (!date2) {
+    return date1;
+  }
+
+  const d1 = toMaybeDate(date1);
+  const d2 = toMaybeDate(date2);
+
+  if (!d1 || !d2) {
+    return date1;
+  }
+
+  return d1 > d2 ? date1 : date2;
+}
+
 export const parseDuration = (duration: string): Duration => {
   if (!DURATION_STRING_REGEX.test(duration)) {
     throw Error(

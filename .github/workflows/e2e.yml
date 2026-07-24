@@ -35,14 +35,25 @@ jobs:
         with:
           go-version-file: ./go.mod
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.13.0
 
+      # pnpm must be set up before setup-node so the "pnpm" cache can resolve
+      # the pnpm store path.
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10.18.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          # Key on both lockfiles this job installs: the UI build (the largest
+          # install, via make build-ui) and the tests/js E2E deps.
+          cache-dependency-path: |
+            ui/pnpm-lock.yaml
+            tests/js/pnpm-lock.yaml
 
       - name: Build UI
         run: make build-ui
@@ -56,15 +67,14 @@ jobs:
           cd ./tests/js
           pnpm install --frozen-lockfile
           pnpm dev &
-          sleep 5
+          "$GITHUB_WORKSPACE/scripts/wait-for-healthy.sh" "SDK app" "$SDK_URL"
           cd ../../
           echo "Running dev server"
           mkdir $GOCOVERDIR
           nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/devserver-logs-kq-${{ matrix.experimentalKeyQueues }}-api.txt &
           echo "Ran dev server"
-          sleep 5
-          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
-          go test ./tests -v
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
+          gotestsum --junitfile=junit.xml --format=standard-verbose -- ./tests
         env:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
@@ -88,10 +98,19 @@ jobs:
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
+          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }}
+          report_type: test_results
 
   # refs:
   #  - https://go.dev/doc/build-cover
@@ -154,16 +173,16 @@ jobs:
             nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
           fi
           echo "Ran dev server"
-          sleep 5
-          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
 
-          gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} ./tests/golang -- -v -count=1
+          gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} -junit-dir test-results ./tests/golang -- -v -count=1
         env:
           API_URL: http://127.0.0.1:8288
           INNGEST_EVENT_KEY: test
           INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
           INNGEST_DEV: http://127.0.0.1:8288
           TEST_MODE: true
+          DEBUG: "1"
           TEST_DATABASE: ${{ matrix.database }}
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
@@ -182,10 +201,19 @@ jobs:
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: go-e2e,split-${{ matrix.index }},kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./test-results/junit-${{ matrix.index }}-0.xml
+          flags: go-e2e,split-${{ matrix.index }},kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
+          report_type: test_results
 
   batch:
     name: "Batch / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}, db: ${{ matrix.database }}, split-batch-partition: ${{ matrix.splitBatchPartition }}"
@@ -206,6 +234,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: ./go.mod
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.13.0
 
       - name: Start postgres container
         if: matrix.database == 'postgres'
@@ -242,10 +273,9 @@ jobs:
             nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
           fi
           echo "Ran dev server"
-          sleep 5
-          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
 
-          go test ./tests/batch/... -v -count=1
+          gotestsum --junitfile=junit.xml --format=standard-verbose -- ./tests/batch/... -count=1
         env:
           API_URL: http://127.0.0.1:8288
           INNGEST_EVENT_KEY: test
@@ -270,10 +300,19 @@ jobs:
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: batch-e2e,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }},split-${{ matrix.splitBatchPartition }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
+          flags: batch-e2e,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }},split-${{ matrix.splitBatchPartition }}
+          report_type: test_results
 
   api:
     name: "API / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}, db: ${{ matrix.database }}"
@@ -293,6 +332,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: ./go.mod
+
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.13.0
 
       - name: Start postgres container
         if: matrix.database == 'postgres'
@@ -329,10 +371,9 @@ jobs:
             nohup ./inngest-bin dev --no-discovery --no-poll 2> /tmp/dev-output.txt &
           fi
           echo "Ran dev server"
-          sleep 5
-          curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
+          ./scripts/wait-for-healthy.sh "dev server" http://127.0.0.1:8288/health
 
-          go test ./tests/api/... -v -count=1
+          gotestsum --junitfile=junit.xml --format=standard-verbose -- ./tests/api/... -count=1
         env:
           API_URL: http://127.0.0.1:8288
           INNGEST_EVENT_KEY: test
@@ -356,10 +397,19 @@ jobs:
           retention-days: 7
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: api-e2e,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
+          flags: api-e2e,kq-${{ matrix.experimentalKeyQueues }},db-${{ matrix.database }}
+          report_type: test_results
 
   execution:
     name: "Execution / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
@@ -379,13 +429,25 @@ jobs:
         with:
           go-version-file: ./go.mod
 
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@v1.13.0
+
       - name: Run execution tests
-        run: go test ./tests/execution/... -v -count=1 -coverprofile=coverage.txt
+        run: gotestsum --junitfile=junit.xml --format=standard-verbose -- ./tests/execution/... -count=1 -coverprofile=coverage.txt
         env:
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: exec,kq-${{ matrix.experimentalKeyQueues }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./junit.xml
+          flags: exec,kq-${{ matrix.experimentalKeyQueues }}
+          report_type: test_results

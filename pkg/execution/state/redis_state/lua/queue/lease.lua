@@ -17,6 +17,8 @@ local queueID = ARGV[1]
 local partitionID = ARGV[2]
 local newLeaseID = ARGV[3]
 local currentTime = tonumber(ARGV[4]) -- in ms
+local setEarliestPeekTime = tonumber(ARGV[5])
+local itemEarliestPeekTime = tonumber(ARGV[6])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -41,8 +43,16 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 	return -2
 end
 
--- Track the earliest time this job was attempted in the queue.
-item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
+if setEarliestPeekTime == 1 and itemEarliestPeekTime ~= nil and itemEarliestPeekTime > 0 then
+	-- The processor may have stamped earliest peek time through the side-key
+	-- path before leasing. Persist that value on the item once leased so later
+	-- calls can compute latency from the queue item alone.
+	item = set_item_peek_time(keyQueueMap, queueID, item, itemEarliestPeekTime)
+else
+	-- Track the earliest time this job was attempted in the queue. This is the
+	-- legacy path used before earliest peek time moved to a side key.
+	item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
+end
 
 -- Update the item's lease key.
 item.leaseID = newLeaseID

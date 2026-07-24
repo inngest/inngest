@@ -3,7 +3,6 @@ package extractors
 import (
 	"testing"
 
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/assert"
 	v1 "go.opentelemetry.io/proto/otlp/common/v1"
 )
@@ -22,36 +21,30 @@ func intAttr(key string, value int64) *v1.KeyValue {
 	}
 }
 
-func strArrAttr(key string, values ...string) *v1.KeyValue {
-	vals := make([]*v1.AnyValue, len(values))
-	for i, v := range values {
-		vals[i] = &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: v}}
-	}
+func dblAttr(key string, value float64) *v1.KeyValue {
 	return &v1.KeyValue{
 		Key:   key,
-		Value: &v1.AnyValue{Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: vals}}},
+		Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: value}},
 	}
 }
 
-// TestCanonicalKeysHaveFieldSetters guards against drift between
-// canonicalKeyMapping and metadataFieldSetters: every canonical key referenced
-// by a mapping must have a setter, otherwise the attribute is silently dropped.
-func TestCanonicalKeysHaveFieldSetters(t *testing.T) {
-	t.Parallel()
-
-	for sourceKey, mapping := range keyFieldMap {
-		_, ok := metadataFieldSetters[mapping.field]
-		assert.Truef(t, ok,
-			"field %q (mapped from %q) has no entry in metadataFieldSetters",
-			mapping.field, sourceKey)
+func arrAttr(key string, values ...string) *v1.KeyValue {
+	vals := make([]*v1.AnyValue, len(values))
+	for i, s := range values {
+		vals[i] = &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: s}}
+	}
+	return &v1.KeyValue{
+		Key: key,
+		Value: &v1.AnyValue{
+			Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: vals}},
+		},
 	}
 }
 
-// TestRankingPrefersProviderNameOverDeprecatedSystem verifies that when both
+// TestProviderPrefersProviderNameOverDeprecatedSystem verifies that when both
 // the deprecated gen_ai.system and its replacement gen_ai.provider.name are
-// present, the deprecated key's keyRank demotes it so the replacement wins,
-// regardless of attribute order.
-func TestRankingPrefersProviderNameOverDeprecatedSystem(t *testing.T) {
+// present, the replacement wins, regardless of attribute order.
+func TestProviderPrefersProviderNameOverDeprecatedSystem(t *testing.T) {
 	t.Parallel()
 
 	orders := [][]*v1.KeyValue{
@@ -63,259 +56,102 @@ func TestRankingPrefersProviderNameOverDeprecatedSystem(t *testing.T) {
 		var md AIMetadata
 		foundAny := extractAIMetadataFromAttributes(attrs, &md)
 		assert.True(t, foundAny)
-		assert.Equal(t, "anthropic", md.System,
+		assert.Equal(t, "anthropic", md.Provider,
 			"gen_ai.provider.name should win over deprecated gen_ai.system")
 	}
 }
 
-// TestExtractAIMetadataFromAttributes_RealSpans feeds the full instrumentation
-// attribute set captured from real runs of test apps and asserts the
-// extractor pulls the correct values for the fields it parses.
-func TestExtractAIMetadataFromAttributes_RealSpans(t *testing.T) {
+// TestFinishReasons verifies the array path, the scalar-string fallback, and
+// that empty entries are dropped (leaving the field unset when none remain).
+func TestFinishReasons(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		name  string
-		attrs []*v1.KeyValue
-		want  AIMetadata
-	}{
-		{
-			// @traceloop/instrumentation-openai (gen_ai.* semconv).
-			name: "semconv (traceloop)",
-			attrs: []*v1.KeyValue{
-				strAttr("gen_ai.input.messages", `[{"role":"user","parts":[{"type":"text","content":"Write a one-sentence bedtime story about a unicorn."}]}]`),
-				strAttr("gen_ai.operation.name", "chat"),
-				strAttr("gen_ai.output.messages", `[{"role":"assistant","finish_reason":"stop","parts":[{"type":"text","content":"Under a moonlit sky, a gentle unicorn tiptoed through a sleepy meadow, sprinkling stardust on every leaf until the whole forest drifted into the softest, dreamiest quiet."}]}]`),
-				strAttr("gen_ai.provider.name", "openai"),
-				strAttr("gen_ai.request.model", "gpt-5.4-nano"),
-				strAttr("gen_ai.response.finish_reasons", ""),
-				strAttr("gen_ai.response.id", "resp_0a6244b051b4439d006a1dfd4611e0819a9ff1b38c811bc714"),
-				strAttr("gen_ai.response.model", "gpt-5.4-nano-2026-03-17"),
-				intAttr("gen_ai.usage.input_tokens", 17),
-				intAttr("gen_ai.usage.output_tokens", 44),
-				intAttr("gen_ai.usage.total_tokens", 61),
-			},
-			want: AIMetadata{
-				InputTokens:   17,
-				OutputTokens:  44,
-				TotalTokens:   util.ToPtr[int64](61),
-				Model:         "gpt-5.4-nano",
-				System:        "openai",
-				OperationName: "chat",
-			},
-		},
-		{
-			// @arizeai/openinference-instrumentation-openai (llm.*/openinference.*).
-			name: "openinference (arizeai)",
-			attrs: []*v1.KeyValue{
-				strAttr("input.mime_type", "application/json"),
-				strAttr("input.value", `{"model":"gpt-5.4-nano","input":"Write a one-sentence bedtime story about a unicorn."}`),
-				strAttr("llm.input_messages.0.message.content", "Write a one-sentence bedtime story about a unicorn."),
-				strAttr("llm.input_messages.0.message.role", "user"),
-				strAttr("llm.invocation_parameters", `{"model":"gpt-5.4-nano"}`),
-				strAttr("llm.model_name", "gpt-5.4-nano-2026-03-17"),
-				strAttr("llm.output_messages.0.message.contents.0.message_content.text", "On a moonlit night, a gentle unicorn tucked the stars into the corners of the sky and drifted off to sleep with a sigh of silver dreams."),
-				strAttr("llm.output_messages.0.message.contents.0.message_content.type", "output_text"),
-				strAttr("llm.output_messages.0.message.role", "assistant"),
-				strAttr("llm.provider", "openai"),
-				strAttr("llm.system", "openai"),
-				intAttr("llm.token_count.completion", 35),
-				intAttr("llm.token_count.completion_details.reasoning", 0),
-				intAttr("llm.token_count.prompt", 17),
-				intAttr("llm.token_count.prompt_details.cache_read", 0),
-				intAttr("llm.token_count.total", 52),
-				strAttr("openinference.span.kind", "LLM"),
-				strAttr("output.mime_type", "application/json"),
-				strAttr("output.value", `{"id":"resp_0f3cf5bafdfbe25c006a1dfb297544819aa73f0d05c13d5bd2","object":"response","created_at":1780349737,"status":"completed","model":"gpt-5.4-nano-2026-03-17","output":[{"type":"message","status":"completed","content":[{"type":"output_text","text":"On a moonlit night, a gentle unicorn tucked the stars into the corners of the sky and drifted off to sleep with a sigh of silver dreams."}],"role":"assistant"}],"usage":{"input_tokens":17,"output_tokens":35,"total_tokens":52},"output_text":"On a moonlit night, a gentle unicorn tucked the stars into the corners of the sky and drifted off to sleep with a sigh of silver dreams."}`),
-			},
-			want: AIMetadata{
-				InputTokens:  17,
-				OutputTokens: 35,
-				TotalTokens:  util.ToPtr[int64](52),
-				Model:        "gpt-5.4-nano-2026-03-17",
-				System:       "openai",
-				// No gen_ai.operation.name equivalent, so OperationName stays empty.
-				OperationName: "",
-			},
-		},
-		{
-			// @traceloop/instrumentation-openai, function-calling request.
-			name: "semconv tool call (traceloop)",
-			attrs: []*v1.KeyValue{
-				strAttr("gen_ai.input.messages", `[{"role":"user","parts":[{"type":"text","content":"What is the weather in Paris? Use the tool."}]}]`),
-				strAttr("gen_ai.operation.name", "chat"),
-				strAttr("gen_ai.output.messages", `[{"role":"assistant","finish_reason":"tool_call","parts":[{"type":"tool_call","id":"call_6MxqYADSZjLxOISAobIryAVW","name":"get_weather","arguments":{"city":"Paris"}}]}]`),
-				strAttr("gen_ai.provider.name", "openai"),
-				strAttr("gen_ai.request.model", "gpt-4.1-nano"),
-				strArrAttr("gen_ai.response.finish_reasons", "tool_call"),
-				strAttr("gen_ai.response.id", "chatcmpl-Dm5c6BetL4BkrR6mEAWxcGqloC8Dg"),
-				strAttr("gen_ai.response.model", "gpt-4.1-nano-2025-04-14"),
-				strAttr("gen_ai.tool.definitions", `[{"type":"function","function":{"name":"get_weather","description":"Get the current weather for a city","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}}]`),
-				intAttr("gen_ai.usage.input_tokens", 56),
-				intAttr("gen_ai.usage.output_tokens", 30),
-				intAttr("gen_ai.usage.total_tokens", 86),
-			},
-			want: AIMetadata{
-				InputTokens:   56,
-				OutputTokens:  30,
-				TotalTokens:   util.ToPtr[int64](86),
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-			},
-		},
-		{
-			// @traceloop/instrumentation-openai, streamed chat completion.
-			//
-			// Even with stream_options.include_usage, this emitter omits all
-			// gen_ai.usage.* tokens on streamed spans.
-			name: "semconv streaming, no usage (traceloop)",
-			attrs: []*v1.KeyValue{
-				strAttr("gen_ai.input.messages", `[{"role":"user","parts":[{"type":"text","content":"Count to five."}]}]`),
-				strAttr("gen_ai.operation.name", "chat"),
-				strAttr("gen_ai.output.messages", `[{"role":"assistant","finish_reason":"stop","parts":[{"type":"text","content":"One, two, three, four, five."}]}]`),
-				strAttr("gen_ai.provider.name", "openai"),
-				strAttr("gen_ai.request.model", "gpt-4.1-nano"),
-				strArrAttr("gen_ai.response.finish_reasons", "stop"),
-				strAttr("gen_ai.response.id", "chatcmpl-Dm5c7PQERrIFXe4rcDT0Z34aebODn"),
-				strAttr("gen_ai.response.model", "gpt-4.1-nano-2025-04-14"),
-			},
-			want: AIMetadata{
-				// No usage tokens on the streamed span.
-				InputTokens:   0,
-				OutputTokens:  0,
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-			},
-		},
-		{
-			// @arizeai/openinference-instrumentation-openai, function-calling
-			// request.
-			name: "openinference tool call (arizeai)",
-			attrs: []*v1.KeyValue{
-				strAttr("openinference.span.kind", "LLM"),
-				strAttr("llm.model_name", "gpt-4.1-nano-2025-04-14"),
-				strAttr("llm.system", "openai"),
-				strAttr("llm.provider", "openai"),
-				strAttr("llm.input_messages.0.message.role", "user"),
-				strAttr("llm.input_messages.0.message.content", "What is the weather in Paris? Use the tool."),
-				strAttr("llm.tools.0.tool.json_schema", `{"type":"function","function":{"name":"get_weather","description":"Get the current weather for a city","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}}`),
-				strAttr("llm.output_messages.0.message.role", "assistant"),
-				strAttr("llm.output_messages.0.message.tool_calls.0.tool_call.id", "call_H0gsiYIf5Yqe1WszKYFflRii"),
-				strAttr("llm.output_messages.0.message.tool_calls.0.tool_call.function.name", "get_weather"),
-				strAttr("llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments", `{"city":"Paris"}`),
-				strAttr("llm.finish_reason", "tool_calls"),
-				intAttr("llm.token_count.prompt", 56),
-				intAttr("llm.token_count.completion", 14),
-				intAttr("llm.token_count.total", 70),
-				intAttr("llm.token_count.prompt_details.cache_read", 0),
-				intAttr("llm.token_count.completion_details.reasoning", 0),
-			},
-			want: AIMetadata{
-				InputTokens:   56,
-				OutputTokens:  14,
-				TotalTokens:   util.ToPtr[int64](70),
-				Model:         "gpt-4.1-nano-2025-04-14",
-				System:        "openai",
-				OperationName: "",
-			},
-		},
-		{
-			// @arizeai/openinference-instrumentation-openai, streamed chat.
-			name: "openinference streaming, no usage (arizeai)",
-			attrs: []*v1.KeyValue{
-				strAttr("openinference.span.kind", "LLM"),
-				strAttr("llm.model_name", "gpt-4.1-nano"),
-				strAttr("llm.system", "openai"),
-				strAttr("llm.provider", "openai"),
-				strAttr("llm.input_messages.0.message.role", "user"),
-				strAttr("llm.input_messages.0.message.content", "Count to five."),
-				strAttr("llm.output_messages.0.message.role", "assistant"),
-				strAttr("llm.output_messages.0.message.content", "One, two, three, four, five."),
-				strAttr("llm.finish_reason", "stop"),
-				strAttr("input.mime_type", "application/json"),
-				strAttr("output.mime_type", "text/plain"),
-				strAttr("output.value", "One, two, three, four, five."),
-			},
-			want: AIMetadata{
-				InputTokens:   0,
-				OutputTokens:  0,
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "",
-			},
-		},
-		{
-			// @arizeai/openinference-instrumentation-openai, embeddings.
-			name: "openinference embeddings, provider only (arizeai)",
-			attrs: []*v1.KeyValue{
-				strAttr("openinference.span.kind", "EMBEDDING"),
-				strAttr("embedding.model_name", "text-embedding-3-small"),
-				strAttr("llm.system", "openai"),
-				strAttr("llm.provider", "openai"),
-				strAttr("embedding.embeddings.0.embedding.text", "The quick brown fox jumps over the lazy dog."),
-				strAttr("input.mime_type", "text/plain"),
-				strAttr("input.value", "The quick brown fox jumps over the lazy dog."),
-			},
-			want: AIMetadata{
-				System: "openai",
-			},
-		},
-		{
-			// Official @opentelemetry/instrumentation-openai (gen_ai.* + server.*).
-			name: "official otel semconv (chat)",
-			attrs: []*v1.KeyValue{
-				strAttr("gen_ai.operation.name", "chat"),
-				strAttr("gen_ai.request.model", "gpt-4.1-nano"),
-				strArrAttr("gen_ai.response.finish_reasons", "tool_calls"),
-				strAttr("gen_ai.response.id", "chatcmpl-Dm5nsU4lZuCVnOIxBJMAE2hhaQ98v"),
-				strAttr("gen_ai.response.model", "gpt-4.1-nano-2025-04-14"),
-				strAttr("gen_ai.system", "openai"),
-				intAttr("gen_ai.usage.input_tokens", 56),
-				intAttr("gen_ai.usage.output_tokens", 14),
-				strAttr("server.address", "api.openai.com"),
-				intAttr("server.port", 443),
-			},
-			want: AIMetadata{
-				InputTokens:   56,
-				OutputTokens:  14,
-				Model:         "gpt-4.1-nano",
-				System:        "openai",
-				OperationName: "chat",
-			},
-		},
-		{
-			// Official @opentelemetry/instrumentation-openai, embeddings.
-			name: "official otel embeddings",
-			attrs: []*v1.KeyValue{
-				strAttr("gen_ai.operation.name", "embeddings"),
-				strAttr("gen_ai.request.model", "text-embedding-3-small"),
-				strAttr("gen_ai.response.model", "text-embedding-3-small"),
-				strAttr("gen_ai.system", "openai"),
-				intAttr("gen_ai.usage.input_tokens", 10),
-				strAttr("server.address", "api.openai.com"),
-				intAttr("server.port", 443),
-			},
-			want: AIMetadata{
-				InputTokens:   10,
-				OutputTokens:  0,
-				Model:         "text-embedding-3-small",
-				System:        "openai",
-				OperationName: "embeddings",
-			},
-		},
-	}
+	t.Run("array drops empty entries", func(t *testing.T) {
+		var md AIMetadata
+		ok := extractAIMetadataFromAttributes(
+			[]*v1.KeyValue{arrAttr("gen_ai.response.finish_reasons", "stop", "", "length")}, &md)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"stop", "length"}, md.FinishReasons)
+	})
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+	t.Run("scalar string is wrapped", func(t *testing.T) {
+		var md AIMetadata
+		ok := extractAIMetadataFromAttributes(
+			[]*v1.KeyValue{strAttr("gen_ai.response.finish_reasons", "tool_calls")}, &md)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"tool_calls"}, md.FinishReasons)
+	})
 
-			var md AIMetadata
-			foundAny := extractAIMetadataFromAttributes(tc.attrs, &md)
+	t.Run("empty scalar leaves field unset", func(t *testing.T) {
+		var md AIMetadata
+		extractAIMetadataFromAttributes(
+			[]*v1.KeyValue{strAttr("gen_ai.response.finish_reasons", "")}, &md)
+		assert.Nil(t, md.FinishReasons)
+	})
+}
 
-			assert.True(t, foundAny)
-			assert.Equal(t, tc.want, md)
-		})
-	}
+// TestGranularUsageAndRequestParams verifies extraction of the granular usage
+// and request-parameter attributes into their pointer fields.
+func TestGranularUsageAndRequestParams(t *testing.T) {
+	t.Parallel()
+
+	var md AIMetadata
+	ok := extractAIMetadataFromAttributes([]*v1.KeyValue{
+		intAttr("gen_ai.usage.cache_read.input_tokens", 100),
+		intAttr("gen_ai.usage.cache_creation.input_tokens", 25),
+		intAttr("gen_ai.usage.reasoning.output_tokens", 40),
+		dblAttr("gen_ai.request.temperature", 0.7),
+		dblAttr("gen_ai.request.top_p", 0.9),
+		intAttr("gen_ai.request.max_tokens", 1024),
+		dblAttr("gen_ai.request.frequency_penalty", 0.5),
+		dblAttr("gen_ai.request.presence_penalty", -0.25),
+		intAttr("gen_ai.request.seed", 42),
+	}, &md)
+
+	assert.True(t, ok)
+	assert.Equal(t, int64(100), *md.CacheReadTokens)
+	assert.Equal(t, int64(25), *md.CacheCreationTokens)
+	assert.Equal(t, int64(40), *md.ReasoningTokens)
+	assert.Equal(t, 0.7, *md.Temperature)
+	assert.Equal(t, 0.9, *md.TopP)
+	assert.Equal(t, int64(1024), *md.MaxTokens)
+	assert.Equal(t, 0.5, *md.FrequencyPenalty)
+	assert.Equal(t, -0.25, *md.PresencePenalty)
+	assert.Equal(t, int64(42), *md.Seed)
+}
+
+// TestNumericCoercion verifies the int/double/string fallbacks, since OTLP
+// encoders are inconsistent about how they encode numeric attribute values.
+func TestNumericCoercion(t *testing.T) {
+	t.Parallel()
+
+	t.Run("int field accepts double and string", func(t *testing.T) {
+		var md AIMetadata
+		ok := extractAIMetadataFromAttributes([]*v1.KeyValue{
+			dblAttr("gen_ai.request.max_tokens", 2048),
+			strAttr("gen_ai.request.seed", "7"),
+		}, &md)
+		assert.True(t, ok)
+		assert.Equal(t, int64(2048), *md.MaxTokens)
+		assert.Equal(t, int64(7), *md.Seed)
+	})
+
+	t.Run("float field accepts int and string", func(t *testing.T) {
+		var md AIMetadata
+		ok := extractAIMetadataFromAttributes([]*v1.KeyValue{
+			intAttr("gen_ai.request.temperature", 1),
+			strAttr("gen_ai.request.top_p", "0.95"),
+		}, &md)
+		assert.True(t, ok)
+		assert.Equal(t, 1.0, *md.Temperature)
+		assert.Equal(t, 0.95, *md.TopP)
+	})
+
+	t.Run("unparseable string leaves field unset", func(t *testing.T) {
+		var md AIMetadata
+		extractAIMetadataFromAttributes([]*v1.KeyValue{
+			strAttr("gen_ai.request.max_tokens", "not-a-number"),
+		}, &md)
+		assert.Nil(t, md.MaxTokens)
+	})
 }

@@ -229,6 +229,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	gqlSpan := &models.RunTraceSpan{
 		AppID:          span.GetAppID(),
 		Attempts:       &attempts,
+		GroupID:        span.Attributes.GroupID,
 		EndedAt:        span.GetEndedAtTime(),
 		FunctionID:     span.GetFunctionID(),
 		IsRoot:         span.GetIsRoot(),
@@ -239,6 +240,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		RunID:          span.GetRunID(),
 		SpanID:         span.GetSpanID(),
 		StartedAt:      span.GetStartedAtTime(),
+		ScheduledAt:    span.GetScheduledAtTime(),
 		Status:         status,
 		TraceID:        span.GetTraceID(),
 		DebugRunID:     debugRunID,
@@ -481,6 +483,19 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			}
 
 			gqlSpan.ChildrenSpans = append(gqlSpan.ChildrenSpans, child)
+		}
+
+		// A discovery-derived finalization group aggregates the run's terminal
+		// attempts, but the loose executor.nonstep siblings (emitted once per
+		// attempt, parented to the run root) carry the same attempts and
+		// output. Clear StepID and OutputID so this group matches the cloud
+		// renderer's shape and clients render finalization from the nonstep
+		// spans instead of showing the same work twice; the per-attempt
+		// children keep their own output IDs.
+		if gqlSpan.Name == FinalizationSpanName &&
+			(span.Name == meta.SpanNameStepDiscovery || span.Name == meta.SpanNameStep) {
+			gqlSpan.StepID = nil
+			gqlSpan.OutputID = nil
 		}
 
 		// If we only have a single child, this span isn't a userland span,

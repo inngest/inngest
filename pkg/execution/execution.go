@@ -124,6 +124,7 @@ type Executor interface {
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
 	AddLifecycleListener(l LifecycleListener)
+	AddEventLifecycleListener(l EventLifecycleListener)
 
 	CloseLifecycleListeners(ctx context.Context)
 
@@ -156,6 +157,10 @@ type RunContext interface {
 	ExecutionSpan() *meta.SpanReference
 	// The span that represents this execution's parent.
 	ParentSpan() *meta.SpanReference
+	// The root span of this execution. IE the run span.
+	RootSpan() *meta.SpanReference
+
+	StartTime() time.Time
 
 	// Group correlation - for pause operations and history tracking
 	GroupID() string
@@ -239,6 +244,8 @@ type ScheduleRequest struct {
 	WorkspaceID uuid.UUID
 	// AppID is the app that this request belongs to.
 	AppID uuid.UUID
+	// AppName is the app ID defined in user code.
+	AppName string
 	// RunID allows specifying a run ID for the scheduled run.  This is entirely
 	// optional, and allows clients to choose a run ID when scheduling.  We need this
 	// for run IDs with API-based checkpointing.
@@ -314,6 +321,7 @@ func NewScheduleRequest(f inngest.DeployedFunction) ScheduleRequest {
 		AccountID:   f.AccountID,
 		WorkspaceID: f.EnvironmentID,
 		AppID:       f.AppID,
+		AppName:     f.AppName,
 	}
 	if !f.PausedAt.IsZero() {
 		req.FunctionPausedAt = &f.PausedAt

@@ -7,7 +7,9 @@ import {
   useMatch,
 } from '@tanstack/react-router';
 
-import Layout from '@/components/Layout/Layout';
+import LayoutV1 from '@/components/Layout/Layout';
+import LayoutV2 from '@/components/Layout/LayoutV2';
+import { useNavigationV2 } from '@/components/Layout/useNavigationV2';
 import { navCollapsed } from '@/lib/nav';
 import { getProfileDisplay } from '@/queries/server/profile';
 import NotFound from '@/components/Error/NotFound';
@@ -54,6 +56,7 @@ export const Route = createFileRoute('/_authed')({
 
 function Authed() {
   const { navCollapsed, profile } = Route.useLoaderData();
+  const Layout = useNavigationV2() ? LayoutV2 : LayoutV1;
   const activeEnv = useMatch({
     from: '/_authed/env/$envSlug',
     shouldThrow: false,

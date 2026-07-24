@@ -83,7 +83,7 @@ func TestExperimentMetadataExtractor_FullSpan(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, "checkout-flow", data["experiment_name"])
+	assert.Equal(t, "checkout-flow", data["name"])
 	assert.Equal(t, "variant-b", data["variant"])
 	assert.Equal(t, "weighted", data["selection_strategy"])
 
@@ -167,7 +167,7 @@ func TestExperimentMetadataExtractor_PartialAttributes(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, "ab-test", data["experiment_name"])
+	assert.Equal(t, "ab-test", data["name"])
 	assert.Equal(t, "", data["variant"])
 	assert.Equal(t, "", data["selection_strategy"])
 }
@@ -214,7 +214,7 @@ func TestExperimentMetadata_Serialize(t *testing.T) {
 
 	md := ExperimentMetadata{
 		ExperimentName:    "pricing-test",
-		Variant:   "high-price",
+		Variant:           "high-price",
 		SelectionStrategy: "random",
 		AvailableVariants: []string{"low-price", "high-price"},
 		VariantWeights:    map[string]float64{"low-price": 50, "high-price": 50},

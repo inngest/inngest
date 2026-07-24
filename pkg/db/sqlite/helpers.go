@@ -7,6 +7,7 @@ import (
 
 	sq "github.com/doug-martin/goqu/v9"
 	sqexp "github.com/doug-martin/goqu/v9/exp"
+	"github.com/inngest/inngest/pkg/dateutil"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
 	"github.com/inngest/inngest/pkg/run"
 )
@@ -21,6 +22,52 @@ func (h *helpers) CELConverter() run.ExprSQLConverter { return run.SpanEventSQLi
 
 func (h *helpers) EventIDsExpr() sqexp.Expression {
 	return sq.L("MAX(spans.event_ids)").As("event_ids")
+}
+
+func (h *helpers) RootEventIDsExpr() sqexp.Expression {
+	return sq.L("spans.event_ids").As("event_ids")
+}
+
+func (h *helpers) EventIDsContain(ids []string) sqexp.Expression {
+	values := make([]any, len(ids))
+	for i, id := range ids {
+		values[i] = id
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	return sq.L(
+		"EXISTS (SELECT 1 FROM json_each(NULLIF(spans.event_ids, '')) WHERE value IN ("+placeholders+"))",
+		values...,
+	)
+}
+
+func (h *helpers) RunOutputExpr() sqexp.Expression {
+	return sq.L(`COALESCE((
+		SELECT CAST(output_lookup.output AS TEXT)
+		FROM spans output_lookup
+		WHERE output_lookup.run_id = spans.run_id
+			AND output_lookup.output IS NOT NULL
+			AND output_lookup.debug_run_id IS NULL
+		ORDER BY
+			CASE WHEN COALESCE(CAST(output_lookup.attributes->>'$."_inngest.is.function.output"' AS TEXT), '') IN ('true', '1') THEN 0 ELSE 1 END,
+			output_lookup.end_time DESC
+		LIMIT 1
+	), '')`).As("output")
+}
+
+func (h *helpers) RunFunctionSlugExpr() sqexp.LiteralExpression {
+	return sq.L(`CASE
+		WHEN COALESCE(json_extract(run_functions.config, '$.slug'), '') <> ''
+			AND json_extract(run_functions.config, '$.slug') <> run_functions.slug
+			THEN json_extract(run_functions.config, '$.slug')
+		WHEN COALESCE(run_apps.name, '') <> ''
+			AND substr(COALESCE(NULLIF(json_extract(run_functions.config, '$.slug'), ''), run_functions.slug), 1, length(run_apps.name) + 1) = run_apps.name || '-'
+			THEN substr(COALESCE(NULLIF(json_extract(run_functions.config, '$.slug'), ''), run_functions.slug), length(run_apps.name) + 2)
+		ELSE COALESCE(NULLIF(json_extract(run_functions.config, '$.slug'), ''), run_functions.slug)
+	END`)
+}
+
+func (h *helpers) RunFunctionNameExpr() sqexp.LiteralExpression {
+	return sq.L("COALESCE(NULLIF(json_extract(run_functions.config, '$.name'), ''), run_functions.name)")
 }
 
 func (h *helpers) BuildEventJoin(q *sq.SelectDataset) *sq.SelectDataset {
@@ -45,5 +92,6 @@ func (h *helpers) ParseTime(s string) (time.Time, error) {
 	if idx := strings.Index(s, " m="); idx != -1 {
 		s = s[:idx]
 	}
-	return time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", s)
+	// Aggregates return stored Go time strings; direct DATETIME reads return RFC3339.
+	return dateutil.ParseString(s)
 }

@@ -2503,7 +2503,7 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 		Leaser:                 leaser,
 		BlockSize:              3,
 		CompactionGarbageRatio: 0.5,
-		CompactionSample:       1.0,
+		CompactionSample:       0.0, // Disable async maybeCompact; test calls compact() explicitly
 		CompactionLeaser:       leaser,
 		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
 		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
@@ -2596,4 +2596,102 @@ func TestCompactionSkipsPhantomBlocks(t *testing.T) {
 	blocks, err = store.BlocksSince(ctx, index, time.Time{})
 	require.NoError(t, err)
 	require.Len(t, blocks, 0, "block should be deleted when all pauses are deleted")
+}
+
+func TestPauseIteratorSkipsCompactionPhantoms(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bucket := memblob.OpenBucket(nil)
+	defer bucket.Close()
+
+	workspaceID := uuid.New()
+	eventName := "test.phantom"
+	now := time.Now()
+	pause1 := &state.Pause{ID: uuid.New(), WorkspaceID: workspaceID, CreatedAt: now}
+	pause2 := &state.Pause{ID: uuid.New(), WorkspaceID: workspaceID, CreatedAt: now.Add(time.Second)}
+	pause3 := &state.Pause{ID: uuid.New(), WorkspaceID: workspaceID, CreatedAt: now.Add(2 * time.Second)}
+
+	bufferer := &mockBufferer{
+		pauses: []*state.Pause{pause1, pause2, pause3},
+	}
+
+	leaser := redisBlockLeaser{
+		rc:       rc,
+		prefix:   "test",
+		duration: 5 * time.Second,
+	}
+
+	pauseClient := redis_state.NewPauseClient(rc, redis_state.StateDefaultKey)
+	store, err := NewBlockstore(BlockstoreOpts{
+		PauseClient:            pauseClient,
+		Bucket:                 bucket,
+		Bufferer:               bufferer,
+		Leaser:                 leaser,
+		BlockSize:              3,
+		CompactionGarbageRatio: 0.5,
+		CompactionSample:       -1,
+		CompactionLeaser:       leaser,
+		DeleteAfterFlush:       func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+		EnableBlockCompaction:  func(ctx context.Context, workspaceID uuid.UUID) bool { return true },
+	})
+	require.NoError(t, err)
+
+	index := Index{
+		WorkspaceID: workspaceID,
+		EventName:   eventName,
+	}
+	ctx := context.Background()
+
+	err = store.FlushIndexBlock(ctx, index)
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.Equal(t, 0, bufferer.pauseCount())
+	}, 5*time.Second, 200*time.Millisecond)
+
+	blocks, err := store.BlocksSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+	require.Len(t, blocks, 1)
+
+	err = store.Delete(ctx, index, *pause1)
+	require.NoError(t, err)
+	err = store.Delete(ctx, index, *pause2)
+	require.NoError(t, err)
+
+	err = store.(*blockstore).compact(ctx, index)
+	require.NoError(t, err)
+
+	block, err := store.ReadBlock(ctx, index, blocks[0])
+	require.NoError(t, err)
+	require.Len(t, block.Pauses, 2)
+
+	deleteCount, err := rc.Do(ctx, rc.B().Scard().Key(blockDeleteKey(index, blocks[0])).Build()).AsInt64()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), deleteCount)
+
+	mgr := NewManager(
+		bufferer,
+		store,
+		WithBlockStoreEnabled(func(ctx context.Context, workspaceID uuid.UUID) bool { return true }),
+	).(*manager)
+
+	iter, err := mgr.PausesSince(ctx, index, time.Time{})
+	require.NoError(t, err)
+
+	var got []uuid.UUID
+	for iter.Next(ctx) {
+		pause := iter.Val(ctx)
+		if pause != nil {
+			got = append(got, pause.ID)
+		}
+	}
+	require.Equal(t, context.Canceled, iter.Error())
+
+	require.Equal(t, []uuid.UUID{pause3.ID}, got)
 }

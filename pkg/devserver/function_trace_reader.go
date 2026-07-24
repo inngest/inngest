@@ -3,6 +3,7 @@ package devserver
 import (
 	"context"
 
+	"github.com/google/uuid"
 	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
@@ -22,4 +23,8 @@ func (r *cqrsFunctionTraceReader) GetSpansByRunID(ctx context.Context, runID uli
 
 func (r *cqrsFunctionTraceReader) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
 	return r.reader.GetSpanOutput(ctx, id)
+}
+
+func (r *cqrsFunctionTraceReader) GetStepSpanByStepID(ctx context.Context, runID ulid.ULID, stepID string, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
+	return r.reader.GetStepSpanByStepID(ctx, runID, stepID, accountID, workspaceID)
 }

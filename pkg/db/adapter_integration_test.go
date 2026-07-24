@@ -206,10 +206,6 @@ func TestInsertFunctionRoundTrip(t *testing.T) {
 	assert.Len(t, allFns, 1)
 }
 
-// ---------------------------------------------------------------------------
-// Event insert and read
-// ---------------------------------------------------------------------------
-
 func TestInsertEventRoundTrip(t *testing.T) {
 	adapter, cleanup := newTestAdapter(t)
 	defer cleanup()
@@ -307,7 +303,7 @@ func TestInsertSpanRoundTrip(t *testing.T) {
 	assert.Equal(t, spanID, fragments[0]["span_id"])
 
 	// Verify output is readable (not double-encoded)
-	outputs, err := q.GetSpanOutput(ctx, []string{spanID})
+	outputs, err := q.GetSpanOutput(ctx, runID, []string{spanID})
 	require.NoError(t, err)
 	require.Len(t, outputs, 1)
 

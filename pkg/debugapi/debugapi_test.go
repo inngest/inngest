@@ -9,6 +9,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
@@ -130,8 +131,8 @@ func TestGetQueueItemByRunIDResolvesShardFromScope(t *testing.T) {
 			accountShard.Name(): accountShard,
 		},
 		queue.WithPrimary(defaultShard),
-		queue.WithShardSelector(func(ctx context.Context, id uuid.UUID, queueName *string) (queue.QueueShard, error) {
-			if id == accountID {
+		queue.WithShardSelector(func(ctx context.Context, scope queue.Scope, queueName *string) (queue.QueueShard, error) {
+			if scope.AccountID == accountID {
 				return accountShard, nil
 			}
 			return defaultShard, nil
@@ -157,8 +158,8 @@ func TestGetQueueItemByRunIDResolvesShardFromScope(t *testing.T) {
 	require.NoError(t, err)
 
 	d := &debugAPI{
-		queue:  q,
-		shards: shardRegistry,
+		queueReader: q,
+		shards:      shardRegistry,
 	}
 
 	resp, err := d.GetQueueItem(ctx, &pb.QueueItemRequest{
@@ -304,8 +305,9 @@ func TestGetDebounceInfoHandler(t *testing.T) {
 		},
 	}
 
-	err := redisDebouncer.Debounce(ctx, di, fn)
+	debounceID, err := redisDebouncer.Debounce(ctx, di, fn)
 	require.NoError(t, err)
+	require.NotNil(t, debounceID)
 
 	// Test handler correctly converts debouncer response to protobuf
 	resp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
@@ -321,6 +323,294 @@ func TestGetDebounceInfoHandler(t *testing.T) {
 	require.Equal(t, accountID.String(), resp.AccountId)
 	require.Equal(t, workspaceID.String(), resp.WorkspaceId)
 	require.Equal(t, functionID.String(), resp.FunctionId)
+}
+
+func TestGetSemaphoreLevelHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	sm := constraintapi.NewRedisSemaphoreManager(rc)
+	d := &debugAPI{sm: sm}
+
+	accountID := uuid.New()
+	name := "debug:custom"
+	key := util.XXHash("customer-a")
+	_, err := sm.SetCapacity(ctx, accountID, name, "set-debug-custom", 10)
+	require.NoError(t, err)
+
+	sem := constraintapi.SemaphoreConstraint{ID: name, EvaluatedKeyHash: key}
+	err = rc.Do(ctx, rc.B().Set().Key(sem.UsageKey(accountID)).Value("4").Build()).Error()
+	require.NoError(t, err)
+
+	resp, err := d.GetSemaphoreLevel(ctx, &pb.SemaphoreLevelRequest{
+		AccountId: accountID.String(),
+		Name:      name,
+		Key:       key,
+	})
+	require.NoError(t, err)
+	require.Equal(t, name, resp.Level.Name)
+	require.Equal(t, key, resp.Level.Key)
+	require.Equal(t, int64(10), resp.Level.Capacity)
+	require.Equal(t, int64(4), resp.Level.Usage)
+	require.Equal(t, int64(6), resp.Level.Remaining)
+}
+
+func TestGetAppSemaphoreLevelHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	sm := constraintapi.NewRedisSemaphoreManager(rc)
+	d := &debugAPI{sm: sm}
+
+	accountID := uuid.New()
+	appID := uuid.New()
+	name := constraintapi.SemaphoreIDApp(appID)
+	_, err := sm.SetCapacity(ctx, accountID, name, "set-debug-app", 8)
+	require.NoError(t, err)
+
+	sem := constraintapi.SemaphoreConstraint{ID: name}
+	err = rc.Do(ctx, rc.B().Set().Key(sem.UsageKey(accountID)).Value("3").Build()).Error()
+	require.NoError(t, err)
+
+	resp, err := d.GetAppSemaphoreLevel(ctx, &pb.AppSemaphoreLevelRequest{
+		AccountId: accountID.String(),
+		AppId:     appID.String(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, name, resp.Level.Name)
+	require.Empty(t, resp.Level.Key)
+	require.Equal(t, int64(8), resp.Level.Capacity)
+	require.Equal(t, int64(3), resp.Level.Usage)
+	require.Equal(t, int64(5), resp.Level.Remaining)
+}
+
+func TestGetFunctionSemaphoreLevelHandlerKeyless(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	sm := constraintapi.NewRedisSemaphoreManager(rc)
+	d := &debugAPI{sm: sm}
+
+	accountID := uuid.New()
+	functionID := uuid.New()
+	name := constraintapi.SemaphoreIDFn(functionID)
+	_, err := sm.SetCapacity(ctx, accountID, name, "set-debug-fn", 2)
+	require.NoError(t, err)
+
+	sem := constraintapi.SemaphoreConstraint{ID: name}
+	err = rc.Do(ctx, rc.B().Set().Key(sem.UsageKey(accountID)).Value("1").Build()).Error()
+	require.NoError(t, err)
+
+	resp, err := d.GetFunctionSemaphoreLevel(ctx, &pb.FunctionSemaphoreLevelRequest{
+		AccountId:  accountID.String(),
+		FunctionId: functionID.String(),
+	})
+	require.NoError(t, err)
+	require.Equal(t, name, resp.Level.Name)
+	require.Empty(t, resp.Level.Key)
+	require.Equal(t, int64(2), resp.Level.Capacity)
+	require.Equal(t, int64(1), resp.Level.Usage)
+	require.Equal(t, int64(1), resp.Level.Remaining)
+}
+
+func TestGetFunctionSemaphoreLevelHandlerKeyed(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	sm := constraintapi.NewRedisSemaphoreManager(rc)
+	accountID := uuid.New()
+	functionID := uuid.New()
+	expr := "event.data.customer_id"
+	key := util.XXHash("customer-a")
+	name := constraintapi.SemaphoreIDFnKey(functionID, expr)
+
+	fn := inngest.Function{
+		ID: functionID,
+		Concurrency: &inngest.ConcurrencyLimits{
+			Fn: []inngest.FnConcurrency{
+				{Limit: 5, Key: &expr},
+			},
+		},
+	}
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+
+	d := &debugAPI{
+		sm: sm,
+		db: &mockCQRSManager{fn: &cqrs.Function{
+			ID:     functionID,
+			Config: config,
+		}},
+	}
+
+	_, err = sm.SetCapacity(ctx, accountID, name, "set-debug-fn-keyed", 5)
+	require.NoError(t, err)
+
+	sem := constraintapi.SemaphoreConstraint{ID: name, EvaluatedKeyHash: key}
+	err = rc.Do(ctx, rc.B().Set().Key(sem.UsageKey(accountID)).Value("2").Build()).Error()
+	require.NoError(t, err)
+
+	resp, err := d.GetFunctionSemaphoreLevel(ctx, &pb.FunctionSemaphoreLevelRequest{
+		AccountId:  accountID.String(),
+		FunctionId: functionID.String(),
+		Key:        key,
+	})
+	require.NoError(t, err)
+	require.Equal(t, name, resp.Level.Name)
+	require.Equal(t, key, resp.Level.Key)
+	require.Equal(t, int64(5), resp.Level.Capacity)
+	require.Equal(t, int64(2), resp.Level.Usage)
+	require.Equal(t, int64(3), resp.Level.Remaining)
+}
+
+func TestSetSemaphoreLevelHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	sm := constraintapi.NewRedisSemaphoreManager(rc)
+	d := &debugAPI{sm: sm}
+
+	accountID := uuid.New()
+	name := "debug:override"
+	key := util.XXHash("customer-a")
+	sem := constraintapi.SemaphoreConstraint{ID: name, EvaluatedKeyHash: key}
+	err := rc.Do(ctx, rc.B().Set().Key(sem.UsageKey(accountID)).Value("7").Build()).Error()
+	require.NoError(t, err)
+
+	resp, err := d.SetSemaphoreLevel(ctx, &pb.SetSemaphoreLevelRequest{
+		AccountId:      accountID.String(),
+		Name:           name,
+		Key:            key,
+		Capacity:       12,
+		IdempotencyKey: "override-1",
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Applied)
+	require.Equal(t, name, resp.Level.Name)
+	require.Equal(t, key, resp.Level.Key)
+	require.Equal(t, int64(12), resp.Level.Capacity)
+	require.Equal(t, int64(7), resp.Level.Usage)
+	require.Equal(t, int64(5), resp.Level.Remaining)
+
+	replay, err := d.SetSemaphoreLevel(ctx, &pb.SetSemaphoreLevelRequest{
+		AccountId:      accountID.String(),
+		Name:           name,
+		Key:            key,
+		Capacity:       20,
+		IdempotencyKey: "override-1",
+	})
+	require.NoError(t, err)
+	require.False(t, replay.Applied)
+	require.Equal(t, int64(12), replay.Level.Capacity)
+}
+
+func TestSetAppSemaphoreLevelHandler(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	sm := constraintapi.NewRedisSemaphoreManager(rc)
+	d := &debugAPI{sm: sm}
+
+	accountID := uuid.New()
+	appID := uuid.New()
+	name := constraintapi.SemaphoreIDApp(appID)
+
+	resp, err := d.SetAppSemaphoreLevel(ctx, &pb.SetAppSemaphoreLevelRequest{
+		AccountId:      accountID.String(),
+		AppId:          appID.String(),
+		Capacity:       4,
+		IdempotencyKey: "override-app",
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Applied)
+	require.Equal(t, name, resp.Level.Name)
+	require.Equal(t, int64(4), resp.Level.Capacity)
+	require.Equal(t, int64(0), resp.Level.Usage)
+	require.Equal(t, int64(4), resp.Level.Remaining)
+}
+
+func TestSetFunctionSemaphoreLevelHandlerKeyed(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	ctx := context.Background()
+
+	sm := constraintapi.NewRedisSemaphoreManager(rc)
+	accountID := uuid.New()
+	functionID := uuid.New()
+	expr := "event.data.customer_id"
+	key := util.XXHash("customer-b")
+	name := constraintapi.SemaphoreIDFnKey(functionID, expr)
+
+	fn := inngest.Function{
+		ID: functionID,
+		Concurrency: &inngest.ConcurrencyLimits{
+			Fn: []inngest.FnConcurrency{
+				{Limit: 5, Key: &expr},
+			},
+		},
+	}
+	config, err := json.Marshal(fn)
+	require.NoError(t, err)
+
+	d := &debugAPI{
+		sm: sm,
+		db: &mockCQRSManager{fn: &cqrs.Function{
+			ID:     functionID,
+			Config: config,
+		}},
+	}
+
+	sem := constraintapi.SemaphoreConstraint{ID: name, EvaluatedKeyHash: key}
+	err = rc.Do(ctx, rc.B().Set().Key(sem.UsageKey(accountID)).Value("2").Build()).Error()
+	require.NoError(t, err)
+
+	resp, err := d.SetFunctionSemaphoreLevel(ctx, &pb.SetFunctionSemaphoreLevelRequest{
+		AccountId:      accountID.String(),
+		FunctionId:     functionID.String(),
+		Key:            key,
+		Capacity:       9,
+		IdempotencyKey: "override-fn-keyed",
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Applied)
+	require.Equal(t, name, resp.Level.Name)
+	require.Equal(t, key, resp.Level.Key)
+	require.Equal(t, int64(9), resp.Level.Capacity)
+	require.Equal(t, int64(2), resp.Level.Usage)
+	require.Equal(t, int64(7), resp.Level.Remaining)
+}
+
+func TestSetSemaphoreLevelValidation(t *testing.T) {
+	rc, _ := setupTestRedis(t)
+	sm := constraintapi.NewRedisSemaphoreManager(rc)
+	d := &debugAPI{sm: sm}
+
+	_, err := d.SetSemaphoreLevel(context.Background(), &pb.SetSemaphoreLevelRequest{
+		AccountId:      uuid.New().String(),
+		Name:           "debug:override",
+		Capacity:       -1,
+		IdempotencyKey: "override-negative",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "capacity must be >= 0")
+
+	_, err = d.SetSemaphoreLevel(context.Background(), &pb.SetSemaphoreLevelRequest{
+		AccountId: uuid.New().String(),
+		Name:      "debug:override",
+		Capacity:  1,
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "idempotency_key is required")
+}
+
+func TestGetSemaphoreLevelNilManager(t *testing.T) {
+	d := &debugAPI{}
+
+	_, err := d.GetSemaphoreLevel(context.Background(), &pb.SemaphoreLevelRequest{
+		AccountId: uuid.New().String(),
+		Name:      "app:" + uuid.New().String(),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "semaphore manager not configured")
 }
 
 func TestGetBatchInfoNilManager(t *testing.T) {
@@ -673,8 +963,9 @@ func TestDeleteDebounceHandler(t *testing.T) {
 		},
 	}
 
-	err := redisDebouncer.Debounce(ctx, di, fn)
+	debounceID, err := redisDebouncer.Debounce(ctx, di, fn)
 	require.NoError(t, err)
+	require.NotNil(t, debounceID)
 
 	// Test handler correctly deletes the debounce
 	resp, err := d.DeleteDebounce(ctx, &pb.DeleteDebounceRequest{
@@ -738,8 +1029,9 @@ func TestRunDebounceHandler(t *testing.T) {
 		},
 	}
 
-	err := redisDebouncer.Debounce(ctx, di, fn)
+	debounceID, err := redisDebouncer.Debounce(ctx, di, fn)
 	require.NoError(t, err)
+	require.NotNil(t, debounceID)
 
 	// Test handler correctly schedules the debounce
 	resp, err := d.RunDebounce(ctx, &pb.RunDebounceRequest{
@@ -791,8 +1083,9 @@ func TestDeleteDebounceByIDHandler(t *testing.T) {
 		},
 	}
 
-	err := redisDebouncer.Debounce(ctx, di, fn)
+	debounceID, err := redisDebouncer.Debounce(ctx, di, fn)
 	require.NoError(t, err)
+	require.NotNil(t, debounceID)
 
 	infoResp, err := d.GetDebounceInfo(ctx, &pb.DebounceInfoRequest{
 		FunctionId:  functionID.String(),

@@ -37,7 +37,10 @@ func TestProcessPartitionRequeuesDeletedAccount(t *testing.T) {
 		ID:         fnID.String(),
 		FunctionID: &fnID,
 		AccountID:  accountID,
-	}, 0, false)
+	}, 0, false, func(_ context.Context, item ProcessItem) error {
+		q.workers <- item
+		return nil
+	})
 	require.NoError(t, err)
 
 	require.Equal(t, int32(1), atomic.LoadInt32(&checks))

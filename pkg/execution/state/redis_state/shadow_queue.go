@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/attribute"
@@ -187,7 +188,18 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *osqueue.QueueSha
 	}
 
 	partitionID := sp.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ShadowPartitionRequeue", partitionID.AccountID, partitionID.EnvID, partitionID.FunctionID)
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionID.AccountID,
+		EnvID:     partitionID.EnvID,
+		FnID:      partitionID.FunctionID,
+	})
+	if partitionID.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionID.SystemQueueName,
+			QueueShardName: q.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ShadowPartitionRequeue", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", sp.PartitionID))
 

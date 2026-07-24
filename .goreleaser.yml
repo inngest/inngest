@@ -77,6 +77,18 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
+notarize:
+  macos:
+    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        wait: false
+
 snapshot:
   version_template: "{{ incpatch .Tag }}-next"
 
@@ -87,9 +99,34 @@ changelog:
       - '^docs:'
       - '^test:'
 
+homebrew_casks:
+  - name: inngest
+
+    # https://github.com/inngest/homebrew-tap
+    repository:
+      owner: inngest
+      name: homebrew-tap
+      branch: "goreleaser/{{ .ProjectName }}-{{ .Tag }}"
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+      pull_request:
+        enabled: true
+        base:
+          owner: inngest
+          name: homebrew-tap
+          branch: main
+
+    # auto only uploads stable releases to homebrew-tap
+    # set to false temporarily if testing prereleases too
+    skip_upload: auto
+
+    homepage: "https://www.inngest.com/"
+    description: "Inngest CLI and development server"
+
 release:
   # Repo in which the release will be created.
   # Default is extracted from the origin remote URL or empty if its private hosted.
   github:
     owner: inngest
     name: inngest
+  prerelease: auto
+  make_latest: "{{ not .Prerelease }}"

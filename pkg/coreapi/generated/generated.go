@@ -336,7 +336,7 @@ type ComplexityRoot struct {
 		CreateDebugSession func(childComplexity int, input models.CreateDebugSessionInput) int
 		DeleteApp          func(childComplexity int, id string) int
 		DeleteAppByName    func(childComplexity int, name string) int
-		InvokeFunction     func(childComplexity int, data map[string]interface{}, functionSlug string, user map[string]interface{}, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) int
+		InvokeFunction     func(childComplexity int, data map[string]interface{}, functionSlug string, meta map[string]interface{}, user map[string]interface{}, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) int
 		Rerun              func(childComplexity int, runID ulid.ULID, fromStep *models.RerunFromStepInput, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) int
 		UpdateApp          func(childComplexity int, input models.UpdateAppInput) int
 	}
@@ -480,6 +480,7 @@ type ComplexityRoot struct {
 		Duration          func(childComplexity int) int
 		EndedAt           func(childComplexity int) int
 		FunctionID        func(childComplexity int) int
+		GroupID           func(childComplexity int) int
 		IsRoot            func(childComplexity int) int
 		IsUserland        func(childComplexity int) int
 		Metadata          func(childComplexity int) int
@@ -491,6 +492,7 @@ type ComplexityRoot struct {
 		Response          func(childComplexity int) int
 		Run               func(childComplexity int) int
 		RunID             func(childComplexity int) int
+		ScheduledAt       func(childComplexity int) int
 		SkipExistingRunID func(childComplexity int) int
 		SkipReason        func(childComplexity int) int
 		SpanID            func(childComplexity int) int
@@ -686,7 +688,7 @@ type MutationResolver interface {
 	UpdateApp(ctx context.Context, input models.UpdateAppInput) (*cqrs.App, error)
 	DeleteApp(ctx context.Context, id string) (string, error)
 	DeleteAppByName(ctx context.Context, name string) (bool, error)
-	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string, user map[string]interface{}, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) (*bool, error)
+	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string, meta map[string]interface{}, user map[string]interface{}, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) (*bool, error)
 	CancelRun(ctx context.Context, runID ulid.ULID) (*models.FunctionRun, error)
 	Rerun(ctx context.Context, runID ulid.ULID, fromStep *models.RerunFromStepInput, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) (ulid.ULID, error)
 	CreateDebugSession(ctx context.Context, input models.CreateDebugSessionInput) (*models.CreateDebugSessionResponse, error)
@@ -2097,7 +2099,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.InvokeFunction(childComplexity, args["data"].(map[string]interface{}), args["functionSlug"].(string), args["user"].(map[string]interface{}), args["debugSessionID"].(*ulid.ULID), args["debugRunID"].(*ulid.ULID)), true
+		return e.complexity.Mutation.InvokeFunction(childComplexity, args["data"].(map[string]interface{}), args["functionSlug"].(string), args["meta"].(map[string]interface{}), args["user"].(map[string]interface{}), args["debugSessionID"].(*ulid.ULID), args["debugRunID"].(*ulid.ULID)), true
 
 	case "Mutation.rerun":
 		if e.complexity.Mutation.Rerun == nil {
@@ -2843,6 +2845,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.FunctionID(childComplexity), true
 
+	case "RunTraceSpan.groupID":
+		if e.complexity.RunTraceSpan.GroupID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.GroupID(childComplexity), true
+
 	case "RunTraceSpan.isRoot":
 		if e.complexity.RunTraceSpan.IsRoot == nil {
 			break
@@ -2919,6 +2928,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpan.RunID(childComplexity), true
+
+	case "RunTraceSpan.scheduledAt":
+		if e.complexity.RunTraceSpan.ScheduledAt == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.ScheduledAt(childComplexity), true
 
 	case "RunTraceSpan.skipExistingRunID":
 		if e.complexity.RunTraceSpan.SkipExistingRunID == nil {
@@ -3541,6 +3557,7 @@ type Mutation {
   invokeFunction(
     data: Map
     functionSlug: String!
+    meta: Map
     user: Map
     debugSessionID: ULID
     debugRunID: ULID
@@ -4319,6 +4336,7 @@ type RunTraceSpan {
   # Internal
   spanID: String! # internal span ID, or a virtual span ID
   traceID: String! # the internal ID of the trace this span belongs to
+  groupID: String # the group ID of this span, used for grouping spans together in the UI, e.g. retries
   # Required
   name: String! # the name of the span
   status: RunTraceSpanStatus! # the status of the span
@@ -4329,6 +4347,7 @@ type RunTraceSpan {
   duration: Int # the duration of the span in milliseconds (calculated), if null, it's still running
   outputID: String
   queuedAt: Time!
+  scheduledAt: Time # the time this span was scheduled to run
   startedAt: Time # the start time of the span
   endedAt: Time # the end time of the span, only present if it's ended
   childrenSpans: [RunTraceSpan!]! # the children spans of this span - invoke
@@ -4648,32 +4667,41 @@ func (ec *executionContext) field_Mutation_invokeFunction_args(ctx context.Conte
 	}
 	args["functionSlug"] = arg1
 	var arg2 map[string]interface{}
-	if tmp, ok := rawArgs["user"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("user"))
+	if tmp, ok := rawArgs["meta"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("meta"))
 		arg2, err = ec.unmarshalOMap2map(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["user"] = arg2
-	var arg3 *ulid.ULID
-	if tmp, ok := rawArgs["debugSessionID"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugSessionID"))
-		arg3, err = ec.unmarshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, tmp)
+	args["meta"] = arg2
+	var arg3 map[string]interface{}
+	if tmp, ok := rawArgs["user"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("user"))
+		arg3, err = ec.unmarshalOMap2map(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["debugSessionID"] = arg3
+	args["user"] = arg3
 	var arg4 *ulid.ULID
-	if tmp, ok := rawArgs["debugRunID"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugRunID"))
+	if tmp, ok := rawArgs["debugSessionID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugSessionID"))
 		arg4, err = ec.unmarshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["debugRunID"] = arg4
+	args["debugSessionID"] = arg4
+	var arg5 *ulid.ULID
+	if tmp, ok := rawArgs["debugRunID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugRunID"))
+		arg5, err = ec.unmarshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["debugRunID"] = arg5
 	return args, nil
 }
 
@@ -7736,6 +7764,8 @@ func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Contex
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -7748,6 +7778,8 @@ func (ec *executionContext) fieldContext_DebugRun_debugTraces(ctx context.Contex
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -12647,6 +12679,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -12659,6 +12693,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -14095,7 +14131,7 @@ func (ec *executionContext) _Mutation_invokeFunction(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().InvokeFunction(rctx, fc.Args["data"].(map[string]interface{}), fc.Args["functionSlug"].(string), fc.Args["user"].(map[string]interface{}), fc.Args["debugSessionID"].(*ulid.ULID), fc.Args["debugRunID"].(*ulid.ULID))
+		return ec.resolvers.Mutation().InvokeFunction(rctx, fc.Args["data"].(map[string]interface{}), fc.Args["functionSlug"].(string), fc.Args["meta"].(map[string]interface{}), fc.Args["user"].(map[string]interface{}), fc.Args["debugSessionID"].(*ulid.ULID), fc.Args["debugRunID"].(*ulid.ULID))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -15627,6 +15663,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -15639,6 +15677,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -19072,6 +19112,47 @@ func (ec *executionContext) fieldContext_RunTraceSpan_traceID(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceSpan_groupID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_groupID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.GroupID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_groupID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_name(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_name(ctx, field)
 	if err != nil {
@@ -19327,6 +19408,47 @@ func (ec *executionContext) fieldContext_RunTraceSpan_queuedAt(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceSpan_scheduledAt(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ScheduledAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_scheduledAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_startedAt(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 	if err != nil {
@@ -19460,6 +19582,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -19472,6 +19596,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -19817,6 +19943,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_spanID(ctx, field)
 			case "traceID":
 				return ec.fieldContext_RunTraceSpan_traceID(ctx, field)
+			case "groupID":
+				return ec.fieldContext_RunTraceSpan_groupID(ctx, field)
 			case "name":
 				return ec.fieldContext_RunTraceSpan_name(ctx, field)
 			case "status":
@@ -19829,6 +19957,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_outputID(ctx, field)
 			case "queuedAt":
 				return ec.fieldContext_RunTraceSpan_queuedAt(ctx, field)
+			case "scheduledAt":
+				return ec.fieldContext_RunTraceSpan_scheduledAt(ctx, field)
 			case "startedAt":
 				return ec.fieldContext_RunTraceSpan_startedAt(ctx, field)
 			case "endedAt":
@@ -29156,6 +29286,10 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "groupID":
+
+			out.Values[i] = ec._RunTraceSpan_groupID(ctx, field, obj)
+
 		case "name":
 
 			out.Values[i] = ec._RunTraceSpan_name(ctx, field, obj)
@@ -29189,6 +29323,10 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "scheduledAt":
+
+			out.Values[i] = ec._RunTraceSpan_scheduledAt(ctx, field, obj)
+
 		case "startedAt":
 
 			out.Values[i] = ec._RunTraceSpan_startedAt(ctx, field, obj)

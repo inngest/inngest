@@ -10,6 +10,7 @@ export const invokeFunction = createServerFn({ method: 'POST' })
   .inputValidator(
     (data: {
       functionSlug: string;
+      meta: { sessions: Record<string, string> } | null;
       user: Record<string, unknown> | null;
       data: Record<string, unknown>;
     }) => data,
@@ -18,6 +19,7 @@ export const invokeFunction = createServerFn({ method: 'POST' })
     try {
       await invokeFn({
         functionSlug: data.functionSlug,
+        meta: data.meta,
         user: data.user,
         data: data.data,
       });

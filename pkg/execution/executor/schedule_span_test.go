@@ -49,7 +49,7 @@ func TestScheduleRunSpanIncludesFunctionMetadata(t *testing.T) {
 		},
 	}
 
-	_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false)
+	_, _, err := e.schedule(context.Background(), req, ulid.Make(), "test-key", false, nil)
 	require.ErrorIs(t, err, ErrFunctionSkipped)
 
 	var runSpan *createSpanCall

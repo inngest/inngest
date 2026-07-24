@@ -64,9 +64,10 @@ func WithExecutorOpts(opts ...ExecutorOpt) func(s *svc) {
 	}
 }
 
-func WithServiceQueue(q queue.Queue) func(s *svc) {
+func WithServiceQueueProcessor(qp queue.QueueProcessor) func(s *svc) {
 	return func(s *svc) {
-		s.queue = q
+		s.queueProcessor = qp
+		s.queue = qp.Queue()
 	}
 }
 
@@ -100,12 +101,6 @@ func WithServiceShardRegistry(shards queue.ShardRegistry) func(s *svc) {
 	}
 }
 
-func WithServiceEnableKeyQueues(kq func(ctx context.Context, acctID uuid.UUID) bool) func(*svc) {
-	return func(s *svc) {
-		s.allowKeyQueues = kq
-	}
-}
-
 func WithServicePublisher(p pubsub.Publisher) func(*svc) {
 	return func(s *svc) {
 		s.publisher = p
@@ -116,15 +111,18 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{
 		config: c,
 		log:    logger.StdlibLogger(context.Background()),
-		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		},
 	}
 	for _, o := range opts {
 		o(svc)
 	}
 	if svc.shards == nil {
 		panic("shard registry must be provided for executor service")
+	}
+	if svc.queueProcessor == nil {
+		panic("queue processor must be provided for executor service")
+	}
+	if svc.queue == nil {
+		panic("queue must be provided for executor service")
 	}
 
 	return svc
@@ -138,6 +136,8 @@ type svc struct {
 	state state.Manager
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
+	// queueProcessor owns queue worker lifecycle.
+	queueProcessor queue.QueueProcessor
 	// exec runs the specific actions.
 	exec      execution.Executor
 	debouncer debounce.Debouncer
@@ -151,8 +151,6 @@ type svc struct {
 	shards queue.ShardRegistry
 
 	publisher pubsub.Publisher
-
-	allowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 }
 
 func (s *svc) Name() string {
@@ -255,7 +253,7 @@ func (s *svc) isUnexpectedRunError(err error) bool {
 
 func (s *svc) Run(ctx context.Context) error {
 	s.log.Info("subscribing to function queue")
-	return s.queue.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
+	return s.queueProcessor.Run(logger.WithStdlib(ctx, s.log), func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
@@ -496,6 +494,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				AccountID:        di.AccountID,
 				WorkspaceID:      di.WorkspaceID,
 				AppID:            di.AppID,
+				AppName:          di.AppName,
 				Events:           []event.TrackedEvent{di},
 				PreventDebounce:  true,
 				PreventRateLimit: true, // Rate limit was already enforced for this
@@ -628,11 +627,6 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	}
 
 	// timeout was extended, requeue eager cancellation.
-	qm, ok := s.queue.(queue.QueueManager)
-	if !ok {
-		l.Error("queue does not conform to queue manager")
-		return nil
-	}
 	requeueAt := jobStarteddAt.Add(*timeout)
 	// Enqueue a new job in the future for when the timeout expires to reprocess the eager cancellation.
 	jobID := ""
@@ -643,9 +637,9 @@ func (s *svc) handleEagerCancelFinishTimeout(ctx context.Context, c cqrs.Cancell
 	}
 	jobID = fmt.Sprintf("%s:%s", "finish-timeout-extended", jobID)
 	item.JobID = &jobID
-	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
+	err = s.queue.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
-	if err != nil && err != queue.ErrQueueItemExists {
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 		return err
 	}
 	l.Info("re-enqueued eager cancellation of finish timeout", "requeueAt", requeueAt)
@@ -714,11 +708,6 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 		})
 	}
 	// timeout was extended, requeue eager cancellation.
-	qm, ok := s.queue.(queue.QueueManager)
-	if !ok {
-		l.Error("queue does not conform to queue manager")
-		return nil
-	}
 	requeueAt := jobEnqueuedAt.Add(*timeout)
 	// Enqueue a new job in the future for when the timeout expires to reprocess the eager cancellation.
 	jobID := ""
@@ -729,9 +718,9 @@ func (s *svc) handleEagerCancelStartTimeout(ctx context.Context, c cqrs.Cancella
 	}
 	jobID = fmt.Sprintf("%s:%s", "start-timeout-extended", jobID)
 	item.JobID = &jobID
-	err = qm.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
+	err = s.queue.Enqueue(ctx, item, requeueAt, queue.EnqueueOpts{})
 	// Ignore if the system job was already requeued.
-	if err != nil && err != queue.ErrQueueItemExists {
+	if err != nil && !errors.Is(err, queue.ErrQueueItemExists) {
 		return err
 	}
 	l.Info("re-enqueued eager cancellation of start timeout", "requeueAt", requeueAt)
@@ -749,7 +738,11 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	shard, err := s.shards.Resolve(ctx, c.AccountID, c.QueueName)
+	shard, err := s.shards.Resolve(ctx, queue.Scope{
+		AccountID:  c.AccountID,
+		EnvID:      c.WorkspaceID,
+		FunctionID: c.FunctionID,
+	}, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
@@ -800,7 +793,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		}
 
 		// dequeue the item
-		if err := shard.Dequeue(ctx, *qi); err != nil {
+		if err := s.queue.Dequeue(ctx, shard.Name(), *qi); err != nil {
 			return err
 		}
 	}
@@ -845,17 +838,17 @@ func (s *svc) handleEagerCancelBulkRun(ctx context.Context, c cqrs.Cancellation)
 		from = *c.StartedAfter
 	}
 
-	qm, ok := s.queue.(queue.QueueManager)
-	if !ok {
-		return fmt.Errorf("expected queue manager for cancellation")
+	scope := queue.Scope{
+		AccountID:  c.AccountID,
+		EnvID:      c.WorkspaceID,
+		FunctionID: c.FunctionID,
 	}
-
-	shard, err := s.shards.Resolve(ctx, c.AccountID, c.QueueName)
+	shard, err := s.shards.Resolve(ctx, scope, c.QueueName)
 	if err != nil {
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
 
-	items, err := qm.ItemsByPartition(ctx, shard, queue.Scope{
+	items, err := shard.ItemsByPartition(ctx, queue.Scope{
 		AccountID:  c.AccountID,
 		EnvID:      c.WorkspaceID,
 		FunctionID: c.FunctionID,
@@ -934,7 +927,7 @@ func (s *svc) handleCronHealthCheck(ctx context.Context, item queue.Item) error 
 		_ = json.Unmarshal([]byte(cqrsFn.Config), &fn)
 
 		accountID := consts.DevServerAccountID
-		envID := cqrsFn.EnvID
+		envID := consts.DevServerEnvID
 		appID := cqrsFn.AppID
 
 		for _, cronExpr := range fn.ScheduleExpressions() {
@@ -1032,7 +1025,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	fn, err := s.data.GetFunctionByInternalUUID(ctx, ci.FunctionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			l.Info("Breaking cron cycle, function does not exist")
+			l.Debug("Breaking cron cycle, function does not exist")
 			// function doesn't exist, no action needed
 			return nil
 		}
@@ -1040,7 +1033,7 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	}
 	// function is archived/deleted, so don't do anything
 	if fn.IsArchived() {
-		l.Info("Breaking cron cycle, function is archived")
+		l.Debug("Breaking cron cycle, function is archived")
 		return nil
 	}
 
@@ -1050,13 +1043,13 @@ func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("error converting function to config: %w", err)
 	}
 	if conf.FunctionVersion > ci.FunctionVersion {
-		l.Info("Breaking cron cycle, function version was upgraded")
+		l.Debug("Breaking cron cycle, function version was upgraded")
 		return nil
 	}
 
 	// ensure that the function has the same cron expression.
 	if !conf.HasCronExpression(ci.Expression) {
-		l.Info("Breaking cron cycle, cron trigger no longer exists")
+		l.Debug("Breaking cron cycle, cron trigger no longer exists")
 		return nil
 	}
 
@@ -1188,7 +1181,11 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 
 	// Retrieve current queue shard for sleep item. The account might have been migrated
 	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
-	shard, err := s.shards.Resolve(ctx, item.Identifier.AccountID, nil)
+	shard, err := s.shards.Resolve(ctx, queue.Scope{
+		AccountID:  item.Identifier.AccountID,
+		FunctionID: item.Identifier.WorkflowID,
+		EnvID:      item.Identifier.WorkspaceID,
+	}, nil)
 	if err != nil {
 		return fmt.Errorf("could not retrieve queue shard for job promotion:%w", err)
 	}
@@ -1211,7 +1208,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	// Grab the score, which already handles promotion by fudigng the time to
 	// be that of the actual run ID, prioritizing older runs.
 	nextTime := time.UnixMilli(qi.Score(time.Now()))
-	err = shard.Requeue(ctx, *qi, nextTime)
+	err = s.queue.Requeue(ctx, shard.Name(), *qi, nextTime)
 	if err != nil && !errors.Is(err, queue.ErrQueueItemNotFound) {
 		return fmt.Errorf("could not requeue job with promoted time: %w", err)
 	}

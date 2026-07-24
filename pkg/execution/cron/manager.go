@@ -3,6 +3,7 @@ package cron
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"time"
 
@@ -36,8 +37,19 @@ type managerOpt struct {
 	jitterMin time.Duration
 	jitterMax time.Duration
 
+	// productionWorkspaceJitter range is used for production workspace cron
+	// items. If unset, it defaults to the standard jitter range.
+	productionWorkspaceJitterMin time.Duration
+	productionWorkspaceJitterMax time.Duration
+	productionWorkspaceJitterSet bool
+
 	healthCheckLeadTimeSeconds int
 	healthCheckInterval        time.Duration
+
+	// splitCronPartitionByWorkspace, when non-nil and returning true for a
+	// given accountID, causes ScheduleNext to enqueue cron jobs to a
+	// workspace-scoped system partition rather than the shared cron partition.
+	splitCronPartitionByWorkspace func(ctx context.Context, accountID uuid.UUID) (enable bool)
 }
 
 func (opts *managerOpt) validate() {
@@ -63,6 +75,19 @@ func WithJitterRange(min time.Duration, max time.Duration) ManagerOpt {
 	}
 }
 
+func WithProductionWorkspaceJitterRange(min time.Duration, max time.Duration) ManagerOpt {
+	return func(c *managerOpt) {
+		if min > max {
+			logger.StdlibLogger(context.Background()).Warn("rejecting invalid production workspace jitter range in managerOpt", "min", min, "max", max)
+			return
+		}
+
+		c.productionWorkspaceJitterMin = min
+		c.productionWorkspaceJitterMax = max
+		c.productionWorkspaceJitterSet = true
+	}
+}
+
 func WithHealthCheckInterval(d time.Duration) ManagerOpt {
 	return func(c *managerOpt) {
 		if d < time.Minute {
@@ -80,6 +105,15 @@ func WithHealthCheckLeadTimeSeconds(leadTime int) ManagerOpt {
 			return
 		}
 		c.healthCheckLeadTimeSeconds = leadTime
+	}
+}
+
+// WithSplitCronPartitionByWorkspace registers a gate that controls whether
+// cron jobs are enqueued to a workspace-scoped system partition
+// (queue.KindCron:<workspaceID>) instead of the single shared cron partition.
+func WithSplitCronPartitionByWorkspace(fn func(ctx context.Context, accountID uuid.UUID) (enable bool)) ManagerOpt {
+	return func(c *managerOpt) {
+		c.splitCronPartitionByWorkspace = fn
 	}
 }
 
@@ -156,11 +190,11 @@ func (c *manager) Sync(ctx context.Context, ci CronItem) error {
 		Payload:     ci,
 		QueueName:   &kind,
 	}, at, queue.EnqueueOpts{})
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		l.Debug("cron-sync enqueued", "jobID", jobID, "at", at)
 		return nil
-	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
+	case errors.Is(err, queue.ErrQueueItemExists) || errors.Is(err, queue.ErrQueueItemSingletonExists):
 		l.Debug("cron-sync item already exists", "jobID", jobID, "at", at)
 		return nil
 	default:
@@ -199,11 +233,11 @@ func (c *manager) EnqueueHealthCheck(ctx context.Context, ci CronItem) error {
 		QueueName:   &kind,
 	}, now, queue.EnqueueOpts{})
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		l.Debug("adhoc cron-health-check enqueued", "jobID", jobID)
 		return nil
-	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
+	case errors.Is(err, queue.ErrQueueItemExists) || errors.Is(err, queue.ErrQueueItemSingletonExists):
 		l.Debug("adhoc cron-health-check already exists", "jobID", jobID)
 		return nil
 	default:
@@ -235,11 +269,11 @@ func (c *manager) EnqueueNextHealthCheck(ctx context.Context) error {
 		QueueName: &kind,
 	}, nextCheck, queue.EnqueueOpts{})
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		l.Debug("cron-health-check enqueued")
 		return nil
-	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
+	case errors.Is(err, queue.ErrQueueItemExists) || errors.Is(err, queue.ErrQueueItemSingletonExists):
 		l.Debug("cron-health-check already exists")
 		return nil
 	default:
@@ -298,25 +332,37 @@ func (c *manager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, err
 	// We want only one cron loop to exist for a {FnID, FnVersion, CronExpr} combination. This jobID helps achieve that idempotency.
 	jobID := queue.HashID(ctx, c.CronProcessJobID(next, ci.Expression, ci.FunctionID, ci.FunctionVersion))
 
-	// Add jitter to schedule execution slightly earlier
-	// This ensures execution starts around the desired time
-	jitter := generateJitter(c.opt.jitterMin, c.opt.jitterMax)
+	jitterMin := c.opt.jitterMin
+	jitterMax := c.opt.jitterMax
+	if ci.IsProductionWorkspace && c.opt.productionWorkspaceJitterSet {
+		jitterMin = c.opt.productionWorkspaceJitterMin
+		jitterMax = c.opt.productionWorkspaceJitterMax
+	}
+
+	// Add jitter to schedule execution slightly earlier.
+	// This ensures execution starts around the desired time.
+	jitter := generateJitter(jitterMin, jitterMax)
 	enqueueAt := next.Add(-jitter)
 
 	nextItem := CronItem{
-		ID:              ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
-		AccountID:       ci.AccountID,
-		WorkspaceID:     ci.WorkspaceID,
-		AppID:           ci.AppID,
-		FunctionID:      ci.FunctionID,
-		FunctionVersion: ci.FunctionVersion,
-		Expression:      ci.Expression,
-		JobID:           jobID,
-		Op:              enums.CronOpProcess,
+		ID:                    ulid.MustNew(uint64(next.UnixMilli()), rand.Reader),
+		AccountID:             ci.AccountID,
+		WorkspaceID:           ci.WorkspaceID,
+		AppID:                 ci.AppID,
+		FunctionID:            ci.FunctionID,
+		FunctionVersion:       ci.FunctionVersion,
+		IsProductionWorkspace: ci.IsProductionWorkspace,
+		Expression:            ci.Expression,
+		JobID:                 jobID,
+		Op:                    enums.CronOpProcess,
 	}
 
 	// enqueue new schedule
 	maxAttempts := consts.MaxRetries + 1
+	queueName := kind
+	if c.opt.splitCronPartitionByWorkspace != nil && c.opt.splitCronPartitionByWorkspace(ctx, ci.AccountID) {
+		queueName = fmt.Sprintf("%s:%s", queue.KindCron, ci.WorkspaceID)
+	}
 
 	err = c.q.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -330,17 +376,17 @@ func (c *manager) ScheduleNext(ctx context.Context, ci CronItem) (*CronItem, err
 			WorkflowVersion: ci.FunctionVersion,
 		},
 		Kind:        kind,
-		QueueName:   &kind,
+		QueueName:   &queueName,
 		MaxAttempts: &maxAttempts,
 		Payload:     nextItem,
 	}, enqueueAt, queue.EnqueueOpts{PassthroughJobId: true})
 
 	l = l.With("from", from, "next", next, "JobID", jobID, "enqueueAt", enqueueAt, "jitter", jitter)
 
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		l.Debug("cron ScheduleNext success")
-	case queue.ErrQueueItemExists, queue.ErrQueueItemSingletonExists:
+	case errors.Is(err, queue.ErrQueueItemExists) || errors.Is(err, queue.ErrQueueItemSingletonExists):
 		l.Debug("cron ScheduleNext already exists")
 	default:
 		l.ReportError(err, "error enqueueing cron for next schedule")

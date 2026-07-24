@@ -55,4 +55,10 @@ export default defineConfig({
     viteReact(),
     svgrPlugin(),
   ],
+  server: {
+    // Listen to all private hosts. We added this so the app listens to both
+    // localhost and 127.0.0.1. We need 127.0.0.1 for Vercel/DigitalOcean
+    // marketplace testing.
+    host: true,
+  },
 });

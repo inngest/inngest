@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AnyVariables, Client, TypedDocumentNode } from 'urql';
 import { useClient } from 'urql';
@@ -11,6 +11,7 @@ import type {
   ExperimentScoringConfig,
   ExperimentScoringMetric,
 } from '@inngest/components/Experiments';
+import { trackDetailViewed } from '@/utils/analyticsEvents';
 
 export type ExperimentTimeRange = { from: Date; to: Date };
 
@@ -65,7 +66,7 @@ export function useExperimentsList({
     const data = await runQuery(client, experimentsQuery, {
       workspaceID: environment.id,
     });
-    return data.experiments.map((exp) => ({
+    const items = data.experiments.map((exp) => ({
       experimentName: exp.name,
       functionId: exp.functionID,
       functionSlug: exp.functionSlug,
@@ -75,6 +76,8 @@ export function useExperimentsList({
       firstSeen: new Date(exp.firstSeen),
       lastSeen: new Date(exp.lastSeen),
     }));
+
+    return items;
   }, [client, environment.id]);
 
   return useQuery<ExperimentListItem[]>({
@@ -115,7 +118,11 @@ const experimentDetailQuery = graphql(`
         metrics {
           key
           avg
+          stddev
           min
+          q1
+          med
+          q3
           max
         }
       }
@@ -138,6 +145,7 @@ const experimentScoringConfigQuery = graphql(`
       updatedAt
       metrics {
         key
+        kind
         enabled
         points
         minValue
@@ -221,6 +229,7 @@ const updateExperimentScoringConfigMutation = graphql(`
       updatedAt
       metrics {
         key
+        kind
         enabled
         points
         minValue
@@ -236,6 +245,7 @@ const updateExperimentScoringConfigMutation = graphql(`
 
 export function useExperimentDetail(
   functionID: string,
+  functionSlug: string,
   experimentName: string,
   range: ExperimentTimeRange,
   variantFilter: string | null,
@@ -246,7 +256,29 @@ export function useExperimentDetail(
   const fromIso = range.from.toISOString();
   const toIso = range.to.toISOString();
 
+  // React Query re-invokes queryFn for background refetches of the same
+  // view (window refocus, stale-time expiry, retries), not just when the
+  // user navigates to a genuinely new view. Only the latter should emit a
+  // tracking event, so we dedupe by the same identity React Query uses to
+  // key the query.
+  const trackedViewKeyRef = useRef<string | null>(null);
+
   const queryFn = useCallback(async (): Promise<ExperimentDetail | null> => {
+    const viewKey = JSON.stringify([
+      environment.id,
+      functionID,
+      experimentName,
+      fromIso,
+      toIso,
+      variantFilter,
+    ]);
+    const shouldTrack = trackedViewKeyRef.current !== viewKey;
+    const trackViewed = () => {
+      if (!shouldTrack) return;
+      trackedViewKeyRef.current = viewKey;
+      trackDetailViewed({ feature: 'experiments' });
+    };
+
     const result = await client
       .query(
         experimentDetailQuery,
@@ -268,13 +300,19 @@ export function useExperimentDetail(
     const isNoDataInRange = result.error?.graphQLErrors.some((e) =>
       e.message.includes('null which the schema does not allow'),
     );
-    if (isNoDataInRange) return null;
+    if (isNoDataInRange) {
+      trackViewed();
+      return null;
+    }
 
-    if (result.error) throw result.error;
+    if (result.error) {
+      trackViewed();
+      throw result.error;
+    }
     if (!result.data) throw new Error('No data returned');
 
     const d = result.data.experimentDetail;
-    return {
+    const detail: ExperimentDetail = {
       name: d.name,
       firstSeen: new Date(d.firstSeen),
       lastSeen: new Date(d.lastSeen),
@@ -286,10 +324,15 @@ export function useExperimentDetail(
         metrics: v.metrics,
       })),
     };
+
+    trackViewed();
+
+    return detail;
   }, [
     client,
     environment.id,
     functionID,
+    functionSlug,
     experimentName,
     fromIso,
     toIso,

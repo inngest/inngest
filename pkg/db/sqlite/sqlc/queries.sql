@@ -109,6 +109,17 @@ SELECT * FROM functions WHERE app_id = ? AND archived_at IS NULL;
 -- name: GetAppFunctionsBySlug :many
 SELECT functions.* FROM functions JOIN apps ON apps.id = functions.app_id WHERE apps.name = ? AND functions.archived_at IS NULL;
 
+-- name: GetFunctionsByApp :many
+SELECT functions.* FROM functions
+JOIN apps ON apps.id = functions.app_id
+WHERE (@app_id = '00000000-0000-0000-0000-000000000000' OR functions.app_id = @app_id)
+  AND (@app_name = '' OR apps.name = @app_name)
+  AND (@cursor = '00000000-0000-0000-0000-000000000000' OR functions.id > @cursor)
+  AND functions.archived_at IS NULL
+  AND apps.archived_at IS NULL
+ORDER BY functions.id ASC
+LIMIT CASE WHEN @limit_rows > 0 THEN @limit_rows ELSE -1 END;
+
 -- name: GetFunctionByID :one
 SELECT * FROM functions WHERE id = ?;
 
@@ -279,7 +290,13 @@ DO UPDATE SET
     has_ai = CASE
                  WHEN trace_runs.has_ai = 1 THEN 1
                  ELSE excluded.has_ai
-             END;
+             END
+-- Terminal status codes (matches enums.runStatusCode in pkg/enums/run_status.go):
+--   50=Overflowed, 300=Completed, 400=Failed, 500=Cancelled, 600=Skipped.
+WHERE NOT (
+    trace_runs.status IN (50, 300, 400, 500, 600)
+    AND excluded.status NOT IN (50, 300, 400, 500, 600)
+);
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;
@@ -434,6 +451,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -456,6 +475,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -478,6 +499,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -494,7 +517,7 @@ SELECT
   COALESCE(CAST(input AS TEXT), '') AS input,
   COALESCE(CAST(output AS TEXT), '') AS output
 FROM spans
-WHERE span_id IN (sqlc.slice('ids'))
+WHERE run_id = sqlc.arg(run_id) AND span_id IN (sqlc.slice('ids'))
 LIMIT 2;
 
 -- name: GetRunSpanByRunID :one
@@ -507,6 +530,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -530,6 +555,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -562,6 +589,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -588,6 +617,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -616,6 +647,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -642,6 +675,8 @@ SELECT
   parent_span_id,
   json_group_array(json_object(
     'span_id', span_id,
+    'start_time', start_time,
+    'end_time', end_time,
     'name', name,
     'attributes', attributes,
     'links', links,
@@ -669,6 +704,8 @@ SELECT
   s.parent_span_id,
   json_group_array(json_object(
     'span_id', s.span_id,
+    'start_time', s.start_time,
+    'end_time', s.end_time,
     'name', s.name,
     'attributes', s.attributes,
     'links', s.links,

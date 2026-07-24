@@ -1,9 +1,6 @@
 /**
  * RunDetailsV4 - Run details page using the composable TimelineBar.
  * Feature: 001-composable-timeline-bar
- *
- * This component mirrors RunDetailsV3's interface but uses the V4 Timeline
- * component for the timeline visualization.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -29,7 +26,7 @@ import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
 import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
 import type { Trace } from './types';
-import { traceToTimelineData } from './utils/traceConversion';
+import { traceRollup, traceToTimelineData } from './utils/traceConversion';
 
 // Residual poll interval for userland traces
 const RESIDUAL_POLL_INTERVAL = 6000;
@@ -41,6 +38,8 @@ type Props = {
   pollInterval?: number;
   runID: string;
   orgName?: string;
+  // Hides run actions (rerun/cancel/invoke) for read-only views.
+  readOnly?: boolean;
 };
 
 const MIN_HEIGHT = 586;
@@ -77,19 +76,25 @@ function TimelineV4Wrapper({
 }) {
   const { selectStep } = useStepSelection({ runID });
 
+  const rolledUpTrace = useMemo(
+    // Roll up the trace to hide (new) request spans and group step attempts.
+    () => traceRollup(trace),
+    [trace, runID, orgName, functionSlug]
+  );
+
   // Build a map of spanID -> Trace for looking up traces when clicked
   const traceMap = useMemo(() => {
     const map = new Map<string, Trace>();
-    traceWalk(trace, (t) => {
+    traceWalk(rolledUpTrace, (t) => {
       map.set(t.spanID, t);
     });
     return map;
-  }, [trace]);
+  }, [rolledUpTrace]);
 
   // Convert V3 trace to V4 TimelineData
   const timelineData = useMemo(
-    () => traceToTimelineData(trace, { runID, orgName, functionSlug }),
-    [trace, runID, orgName, functionSlug]
+    () => traceToTimelineData(rolledUpTrace, { runID, orgName, functionSlug }),
+    [rolledUpTrace, runID, orgName, functionSlug]
   );
 
   // Handle step selection - look up the trace and emit to global selection
@@ -113,6 +118,7 @@ export const RunDetailsV4 = ({
   pollInterval: initialPollInterval,
   initialRunData,
   orgName,
+  readOnly,
 }: Props) => {
   const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
@@ -296,6 +302,7 @@ export const RunDetailsV4 = ({
               standalone={standalone}
               result={resultData}
               isDurableEndpoint={runData?.isDurableEndpoint}
+              readOnly={readOnly}
             />
             {showError && (
               <ErrorCard
@@ -366,6 +373,7 @@ export const RunDetailsV4 = ({
               result={resultData}
               trace={runData?.trace as unknown as Trace | undefined}
               isDurableEndpoint={runData?.isDurableEndpoint}
+              readOnly={readOnly}
               defers={linkageData?.defers}
               siblingDefers={linkageData?.siblingDefers ?? []}
               deferredFrom={linkageData?.deferredFrom}

@@ -3,9 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
-	"iter"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/VividCortex/ewma"
@@ -14,7 +12,6 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/karlseguin/ccache/v3"
 	"github.com/oklog/ulid/v2"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -48,8 +45,7 @@ func New(
 	}
 
 	qp := &queueProcessor{
-		name: name,
-
+		name:         name,
 		QueueOptions: o,
 
 		wg:             &sync.WaitGroup{},
@@ -67,6 +63,18 @@ func New(
 		quit:         make(chan error, o.numWorkers),
 
 		shards: shards,
+		Producer: NewProducer(
+			shards,
+			WithProducerClock(o.Clock),
+			WithProducerKindToQueueMapping(o.queueKindMapping),
+			WithProducerJobPromotion(o.enableJobPromotion),
+			WithProducerConditionalTracer(o.ConditionalTracer),
+		),
+		Consumer:        NewConsumer(shards),
+		JobQueueReader:  newJobQueueReader(shards, o.AccountShardIterationEnabled),
+		Migrator:        newQueueMigrator(shards, o.Clock),
+		Unpauser:        newQueueUnpauser(shards),
+		AttemptResetter: newAttemptResetter(shards),
 
 		peekSizeCache: ccache.New(ccache.Configure[int64]().MaxSize(50_000)),
 
@@ -85,7 +93,12 @@ func New(
 			return nil, fmt.Errorf("No shards found for configured shard group: %s", o.runMode.ShardGroup)
 		}
 	}
-
+	if o.queueProducer != nil {
+		qp.Producer = o.queueProducer
+	}
+	if o.queueConsumer != nil {
+		qp.Consumer = o.queueConsumer
+	}
 	qp.configureQueueRoles()
 
 	return qp, nil
@@ -93,6 +106,13 @@ func New(
 
 type queueProcessor struct {
 	*QueueOptions
+
+	Producer
+	Consumer
+	JobQueueReader
+	Migrator
+	Unpauser
+	AttemptResetter
 
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -188,182 +208,19 @@ func (q *queueProcessor) Workers() chan ProcessItem {
 	return q.workers
 }
 
-// BacklogSize implements QueueManager.
-func (q *queueProcessor) BacklogSize(ctx context.Context, shard QueueShard, backlogID string) (int64, error) {
-	return shard.BacklogSize(ctx, backlogID)
-}
-
-// BacklogByID implements QueueManager.
-func (q *queueProcessor) BacklogByID(ctx context.Context, shard QueueShard, backlogID string) (*QueueBacklog, error) {
-	return shard.BacklogByID(ctx, backlogID)
-}
-
-// BacklogsByPartition implements QueueManager.
-func (q *queueProcessor) BacklogsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
-	return shard.BacklogsByPartition(ctx, partitionID, from, until, opts...)
-}
-
-// Dequeue implements QueueManager.
-func (q *queueProcessor) Dequeue(ctx context.Context, shard QueueShard, i QueueItem, opts ...DequeueOptionFn) error {
-	return shard.Dequeue(ctx, i, opts...)
-}
-
-// ItemExists implements QueueManager.
-func (q *queueProcessor) ItemExists(ctx context.Context, shard QueueShard, scope Scope, jobID string) (bool, error) {
-	return shard.ItemExists(ctx, scope, jobID)
-}
-
-// ItemsByBacklog implements QueueManager.
-func (q *queueProcessor) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
-	return shard.ItemsByBacklog(ctx, backlogID, from, until, opts...)
-}
-
-// ItemsByPartition implements QueueManager.
-func (q *queueProcessor) ItemsByPartition(ctx context.Context, shard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
-	return shard.ItemsByPartition(ctx, scope, partitionID, from, until, opts...)
-}
-
-// ItemsByRunID implements QueueManager.
-func (q *queueProcessor) ItemsByRunID(ctx context.Context, shard QueueShard, scope Scope, runID ulid.ULID) ([]*QueueItem, error) {
-	return shard.ItemsByRunID(ctx, scope, runID)
-}
-
-// LoadQueueItem implements QueueManager.
-func (q *queueProcessor) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error) {
-	shard, err := q.shards.ByName(shardName)
-	if err != nil {
-		return nil, err
-	}
-
-	return shard.LoadQueueItem(ctx, itemID)
-}
-
-// PartitionBacklogSize implements QueueManager.
-func (q *queueProcessor) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
-	var totalCount int64
-
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
-		backlogSize, err := shard.PartitionBacklogSize(ctx, scope, partitionID)
-		if err != nil {
-			return fmt.Errorf("could not load partition backlog size: %w", err)
-		}
-		l := logger.StdlibLogger(ctx)
-		l.Trace("retrieved backlog size", "size", backlogSize)
-		atomic.AddInt64(&totalCount, int64(backlogSize))
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("could not load partition backlog size: %w", err)
-	}
-	return totalCount, nil
-}
-
-// PartitionByID implements QueueManager.
-func (q *queueProcessor) PartitionByID(ctx context.Context, shard QueueShard, scope Scope, partitionID string) (*PartitionInspectionResult, error) {
-	return shard.PartitionByID(ctx, scope, partitionID)
-}
-
-// RemoveQueueItem implements QueueManager.
-func (q *queueProcessor) RemoveQueueItem(ctx context.Context, shardName string, scope Scope, partitionID string, itemID string) error {
-	shard, err := q.shards.ByName(shardName)
-	if err != nil {
-		return err
-	}
-
-	return shard.RemoveQueueItem(ctx, scope, partitionID, itemID)
-}
-
-// Requeue implements QueueManager.
-func (q *queueProcessor) Requeue(ctx context.Context, shard QueueShard, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
-	return shard.Requeue(ctx, i, at, opts...)
-}
-
-// RequeueByJobID implements QueueManager.
-func (q *queueProcessor) RequeueByJobID(ctx context.Context, shard QueueShard, jobID string, at time.Time) error {
-	return shard.RequeueByJobID(ctx, jobID, at)
-}
-
-// TotalSystemQueueDepth implements QueueManager.
-func (q *queueProcessor) TotalSystemQueueDepth(ctx context.Context, shard QueueShard) (int64, error) {
-	return shard.TotalSystemQueueDepth(ctx)
-}
-
-// OutstandingJobCount implements Queue.
-func (q *queueProcessor) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
-	var totalCount int64
-
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
-		outstanding, err := shard.OutstandingJobCount(ctx, scope, runID)
-		if err != nil {
-			return fmt.Errorf("could not load outstanding job count: %w", err)
-		}
-		atomic.AddInt64(&totalCount, int64(outstanding))
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("could not load outstanding count: %w", err)
-	}
-	return int(totalCount), nil
-}
-
-// RunJobs implements Queue.
-func (q *queueProcessor) RunJobs(ctx context.Context, shardName string, scope Scope, runID ulid.ULID, limit int64, offset int64) ([]JobResponse, error) {
-	shard, err := q.shards.ByName(shardName)
-	if err != nil {
-		return nil, err
-	}
-
-	return shard.RunJobs(ctx, scope, runID, limit, offset)
-}
-
-// RunningCount implements Queue.
-func (q *queueProcessor) RunningCount(ctx context.Context, scope Scope) (int64, error) {
-	var totalCount int64
-
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
-		running, err := shard.RunningCount(ctx, scope)
-		if err != nil {
-			return fmt.Errorf("could not load running count: %w", err)
-		}
-		atomic.AddInt64(&totalCount, int64(running))
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("could not load running count: %w", err)
-	}
-	return totalCount, nil
-}
-
-// StatusCount implements Queue.
-func (q *queueProcessor) StatusCount(ctx context.Context, scope Scope, status string) (int64, error) {
-	var totalCount int64
-
-	err := q.shards.ForEach(ctx, func(ctx context.Context, shard QueueShard) error {
-		running, err := shard.StatusCount(ctx, scope, status)
-		if err != nil {
-			return fmt.Errorf("could not load status count: %w", err)
-		}
-		atomic.AddInt64(&totalCount, int64(running))
-		return nil
-	})
-	if err != nil {
-		return 0, fmt.Errorf("could not load status count: %w", err)
-	}
-	return totalCount, nil
-}
-
-// ResetAttemptsByJobID implements Queue.
-func (q *queueProcessor) ResetAttemptsByJobID(ctx context.Context, shardName string, scope Scope, jobID string) error {
-	shard, err := q.shards.ByName(shardName)
-	if err != nil {
-		return err
-	}
-
-	return shard.ResetAttemptsByJobID(ctx, scope, jobID)
+func (q *queueProcessor) Queue() Queue {
+	return q
 }
 
 func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
-	// claimShardLease will block until a shard lease is obtained to process the primary shard.
+	workerCtx, stopWorkers := context.WithCancel(ctx)
+	defer stopWorkers()
+
+	wrappedF := q.wrapRunFuncWithLatency(f)
+	for i := int32(0); i < q.numWorkers; i++ {
+		go q.worker(workerCtx, wrappedF)
+	}
+
 	l := logger.StdlibLogger(ctx)
 	if len(q.runMode.ShardGroup) != 0 {
 		l.Info("Executor started in ShardGroup mode, attempting to claim a shard lease", "shard_group", q.runMode.ShardGroup)
@@ -378,47 +235,25 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		go q.runRole(ctx, role)
 	}
 
-	wrappedF := q.wrapRunFuncWithLatency(f)
-
-	// start execution and shadow scan concurrently
-	eg, ctx := errgroup.WithContext(ctx)
-
-	eg.Go(func() error {
-		return q.executionScan(ctx, wrappedF)
-	})
-
-	if q.runMode.ShadowPartition {
-		eg.Go(func() error {
-			return q.shadowScan(ctx)
-		})
+	scanner := QueueScanner(partitionQueueScanner{q: q})
+	if shard := q.Shard(); shard != nil {
+		if shardScanner, ok := shard.(QueueScanner); ok {
+			scanner = shardScanner
+		}
 	}
 
-	if q.runMode.NormalizePartition {
-		eg.Go(func() error {
-			return q.backlogNormalizationScan(ctx)
-		})
+	dispatch := func(_ context.Context, item ProcessItem) error {
+		q.workers <- item
+		return nil
 	}
 
-	return eg.Wait()
-}
+	err := scanner.Run(ctx, dispatch)
 
-// SetFunctionMigrate implements Queue.
-func (q *queueProcessor) SetFunctionMigrate(ctx context.Context, sourceShard string, scope Scope, migrateLockUntil *time.Time) error {
-	shard, err := q.shards.ByName(sourceShard)
-	if err != nil {
-		return fmt.Errorf("could not find shard %q", sourceShard)
-	}
+	l.Info("queue waiting to quit", "err", err)
+	q.wg.Wait()
+	l.Info("in-progress jobs finished, exiting queue processor", "err", err)
 
-	return shard.SetFunctionMigrate(ctx, scope, migrateLockUntil)
-}
-
-// UnpauseFunction implements Queue.
-func (q *queueProcessor) UnpauseFunction(ctx context.Context, shardName string, scope Scope) error {
-	shard, err := q.shards.ByName(shardName)
-	if err != nil {
-		return err
-	}
-	return shard.UnpauseFunction(ctx, scope)
+	return err
 }
 
 func (q *queueProcessor) capacity() int64 {

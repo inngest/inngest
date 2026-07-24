@@ -5,7 +5,6 @@ import { useUser } from '@clerk/tanstack-react-start';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { CellDetailProvider } from '@/components/Insights/CellDetailContext';
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { SQLEditorProvider } from '@/components/Insights/InsightsSQLEditor/SQLEditorContext';
@@ -69,12 +68,19 @@ function saveTabsToStorage(tabs: Tab[], activeTabId: string) {
   } catch {}
 }
 
+export interface CreateTabFromQueryOptions {
+  // Auto-run the seeded query after the new tab mounts. Used by deep-link
+  // entry points (e.g. the Failed Functions "Open in Insights" button).
+  runOnMount?: boolean;
+}
+
 export interface TabManagerActions {
   breakQueryAssociation: (savedQueryId: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
   createTabFromQuery: (
     query: InsightsQueryStatement | QuerySnapshot | QueryTemplate,
+    options?: CreateTabFromQueryOptions,
   ) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
@@ -105,8 +111,6 @@ export function useInsightsTabManager(
   const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
   const hasHydratedRef = useRef(false);
   const [isHydrated, setIsHydrated] = useState(false);
-  const isInsightsAgentEnabled = useBooleanFlag('insights-agent');
-  const isSchemaWidgetEnabled = useBooleanFlag('insights-schema-widget');
 
   // Wait for saved queries to load before restoring tabs (prevents race condition)
   useEffect(() => {
@@ -205,18 +209,26 @@ export function useInsightsTabManager(
       },
       createTabFromQuery: (
         query: InsightsQueryStatement | QuerySnapshot | QueryTemplate,
+        options?: CreateTabFromQueryOptions,
       ) => {
+        const runOnMount = options?.runOnMount ? true : undefined;
+
         if (isQueryTemplate(query)) {
           createTabBase({
             ...makeEmptyUnsavedTab(),
             query: query.query,
             name: query.name,
+            runOnMount,
           });
           return;
         }
 
         if (isQuerySnapshot(query)) {
-          createTabBase({ ...makeEmptyUnsavedTab(), query: query.query });
+          createTabBase({
+            ...makeEmptyUnsavedTab(),
+            query: query.query,
+            runOnMount,
+          });
           return;
         }
 
@@ -233,6 +245,7 @@ export function useInsightsTabManager(
           name: query.name,
           query: query.sql,
           savedQueryId: query.id,
+          runOnMount,
         });
       },
       focusTab: setActiveTabId,
@@ -265,8 +278,6 @@ export function useInsightsTabManager(
         onToggleQueryHelperPanelVisibility={
           props.onToggleQueryHelperPanelVisibility
         }
-        isInsightsAgentEnabled={isInsightsAgentEnabled.value}
-        isSchemaWidgetEnabled={isSchemaWidgetEnabled.value}
       />
     ),
     [
@@ -277,8 +288,6 @@ export function useInsightsTabManager(
       props.historyWindow,
       props.isQueryHelperPanelVisible,
       props.onToggleQueryHelperPanelVisibility,
-      isInsightsAgentEnabled.value,
-      isSchemaWidgetEnabled.value,
     ],
   );
 
@@ -318,11 +327,15 @@ function SingleTabRenderer({
   return (
     <InsightsStateMachineContextProvider
       key={tab.id}
+      onAutoRunConsumed={() =>
+        actions.updateTab(tab.id, { runOnMount: undefined })
+      }
       onQueryChange={(query) => actions.updateTab(tab.id, { query })}
       onQueryNameChange={(name) => actions.updateTab(tab.id, { name })}
       query={tab.query}
       queryName={tab.name}
       renderChildren={isActive}
+      runOnMount={tab.runOnMount}
       tabId={tab.id}
     >
       <CellDetailProvider onOpenPanel={handleOpenCellDetailPanel}>
@@ -396,52 +409,6 @@ function SingleTabRenderer({
         )}
       </CellDetailProvider>
     </InsightsStateMachineContextProvider>
-  );
-}
-
-interface TabsRendererProps {
-  tabs: Tab[];
-  activeTabId: string;
-  actions: TabManagerActions;
-  activeHelper: HelperTitle | null;
-  setActiveHelper: (helper: HelperTitle | null) => void;
-  isHelperPanelOpen: boolean;
-  getAgentThreadIdForTab: (tabId: string) => string;
-  helperItems: HelperItem[];
-  historyWindow?: number;
-}
-
-// Component for rendering tabs WITHOUT AI helper integration (no chat provider)
-function TabsRenderer({
-  tabs,
-  activeTabId,
-  actions,
-  activeHelper,
-  setActiveHelper,
-  isHelperPanelOpen,
-  getAgentThreadIdForTab,
-  helperItems,
-  historyWindow,
-}: TabsRendererProps) {
-  return (
-    <InsightsAIHelperProvider openAIHelperWithPrompt={() => Promise.resolve()}>
-      <div className="h-full w-full">
-        {tabs.map((tab) => (
-          <SingleTabRenderer
-            key={tab.id}
-            tab={tab}
-            activeTabId={activeTabId}
-            actions={actions}
-            activeHelper={activeHelper}
-            setActiveHelper={setActiveHelper}
-            isHelperPanelOpen={isHelperPanelOpen}
-            getAgentThreadIdForTab={getAgentThreadIdForTab}
-            helperItems={helperItems}
-            historyWindow={historyWindow}
-          />
-        ))}
-      </div>
-    </InsightsAIHelperProvider>
   );
 }
 
@@ -529,12 +496,8 @@ interface InsightsTabManagerInternalProps {
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: Tab[];
-  isInsightsAgentEnabled: boolean;
-  isSchemaWidgetEnabled: boolean;
 }
 
-// TODO: Remove check on isInsightsAgentEnabled to determine whether to render InsightsHelperPanelControl.
-// That check currently exists because most customers would only see the support link icon, which would be strange.
 function InsightsTabManagerInternal({
   tabs,
   activeTabId,
@@ -543,8 +506,6 @@ function InsightsTabManagerInternal({
   historyWindow,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
-  isInsightsAgentEnabled,
-  isSchemaWidgetEnabled,
 }: InsightsTabManagerInternalProps) {
   const [activeHelper, setActiveHelper] = useState<HelperTitle | null>(null);
 
@@ -564,14 +525,12 @@ function InsightsTabManagerInternal({
   const helperItems = useMemo<HelperItem[]>(() => {
     const items: HelperItem[] = [];
 
-    if (isInsightsAgentEnabled) {
-      items.push({
-        title: INSIGHTS_AI,
-        label: 'INSIGHTS AI',
-        icon: <InsightsHelperPanelIcon title={INSIGHTS_AI} />,
-        action: () => handleSelectHelper(INSIGHTS_AI),
-      });
-    }
+    items.push({
+      title: INSIGHTS_AI,
+      label: 'INSIGHTS AI',
+      icon: <InsightsHelperPanelIcon title={INSIGHTS_AI} />,
+      action: () => handleSelectHelper(INSIGHTS_AI),
+    });
 
     if (SHOW_DOCS_CONTROL_PANEL_BUTTON) {
       items.push({
@@ -581,17 +540,15 @@ function InsightsTabManagerInternal({
       });
     }
 
-    if (isSchemaWidgetEnabled) {
-      items.push({
-        title: SCHEMA_EXPLORER,
-        label: 'SCHEMA EXPLORER',
-        icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
-        action: () => handleSelectHelper(SCHEMA_EXPLORER),
-      });
-    }
+    items.push({
+      title: SCHEMA_EXPLORER,
+      label: 'SCHEMA EXPLORER',
+      icon: <InsightsHelperPanelIcon title={SCHEMA_EXPLORER} />,
+      action: () => handleSelectHelper(SCHEMA_EXPLORER),
+    });
 
     return items;
-  }, [handleSelectHelper, isInsightsAgentEnabled, isSchemaWidgetEnabled]);
+  }, [handleSelectHelper]);
   const { user } = useUser();
 
   const tabsProps = {
@@ -614,20 +571,16 @@ function InsightsTabManagerInternal({
         tabs={tabs}
       />
       <div className="flex h-full w-full flex-1 overflow-hidden">
-        {isInsightsAgentEnabled ? (
-          <InsightsChatProvider
-            userId={user?.id || undefined}
-            channelKey={user?.id ? `insights:${user.id}` : undefined}
-          >
-            <ActiveThreadBridge
-              activeTabId={activeTabId}
-              getAgentThreadIdForTab={getAgentThreadIdForTab}
-            />
-            <TabsWithAIHelper {...tabsProps} />
-          </InsightsChatProvider>
-        ) : (
-          <TabsRenderer {...tabsProps} />
-        )}
+        <InsightsChatProvider
+          userId={user?.id || undefined}
+          channelKey={user?.id ? `insights:${user.id}` : undefined}
+        >
+          <ActiveThreadBridge
+            activeTabId={activeTabId}
+            getAgentThreadIdForTab={getAgentThreadIdForTab}
+          />
+          <TabsWithAIHelper {...tabsProps} />
+        </InsightsChatProvider>
       </div>
     </div>
   );

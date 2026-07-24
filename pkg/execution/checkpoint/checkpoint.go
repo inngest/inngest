@@ -1,7 +1,6 @@
 package checkpoint
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,7 +19,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/apiresult"
 	"github.com/inngest/inngest/pkg/execution/defers"
-	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
@@ -34,7 +32,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
-	"github.com/oklog/ulid/v2"
 )
 
 type Checkpointer interface {
@@ -54,7 +51,12 @@ type AsyncCheckpointer interface {
 	CheckpointAsyncSteps(context.Context, AsyncCheckpoint) error
 }
 
-const pkgName = "checkpoint"
+const (
+	pkgName = "checkpoint"
+
+	checkpointModeAsync    = "async"
+	checkpointModeEndpoint = "endpoint"
+)
 
 var ErrStaleDispatch = errors.New("stale dispatch")
 
@@ -75,10 +77,6 @@ func (a AllowAsyncDispatchValidation) Enabled(ctx context.Context, acctID uuid.U
 // uncontested. The upper bound is the shortest plausible serverless timeout
 // (~10s) — longer windows let a fast-Requeue race slip past unfenced.
 const dispatchValidationSkipDuration = 10 * time.Second
-
-type queueItemLoader interface {
-	LoadQueueItem(ctx context.Context, shardName string, itemID string) (*queue.QueueItem, error)
-}
 
 type Opts struct {
 	// State allows loading and mutating state from various checkpointing APIs.
@@ -267,7 +265,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncStep"},
-					Seed:       stepDynamicSeed(op, runCtx.AttemptCount()),
+					Seed:       tracing.FinalizedStepDynamicSeed(op.ID),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -305,7 +303,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.SyncErr"},
-					Seed:       stepDynamicSeed(op, runCtx.AttemptCount()),
+					Seed:       tracing.RetryStepDynamicSeed(op.ID, runCtx.AttemptCount()),
 					Parent:     tracing.RunSpanRefFromMetadata(input.Metadata),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -430,6 +428,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 				l.Error("error handling generator in checkpoint", "error", err, "opcode", op.Op)
 			}
 		}
+
+		recordCheckpointOpcode(ctx, checkpointModeEndpoint, op)
 	}
 
 	// Persist cumulative metadata size delta to Redis so subsequent checkpoint
@@ -561,7 +561,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Debug:      &tracing.SpanDebugData{Location: "checkpoint.AsyncStep"},
-					Seed:       stepDynamicSeed(op, 0),
+					Seed:       tracing.FinalizedStepDynamicSeed(op.ID),
 					Parent:     tracing.RunSpanRefFromMetadata(&md),
 					StartTime:  op.Timing.Start(),
 					EndTime:    op.Timing.End(),
@@ -590,7 +590,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 					// Set the same dynamic span ID as the eventual completion arm.
 					// We use DynamicSpanIDOverride instead of Seed to avoid setting the same
 					// span ID.
-					DynamicSpanIDOverride: tracing.DeterministicSpanConfig(stepDynamicSeed(op, 0)).SpanID.String(),
+					DynamicSpanIDOverride: tracing.DeterministicSpanConfig(tracing.FinalizedStepDynamicSeed(op.ID)).SpanID.String(),
 					Parent:                tracing.RunSpanRefFromMetadata(&md),
 					StartTime:             op.Timing.Start(),
 					Attributes:            stepPlannedAttrs(attrs, op, input.RunID),
@@ -633,6 +633,8 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			l.Error("unimplemented checkpoint op", "op", op.Op)
 			return fmt.Errorf("cannot checkpoint opcode: %s", op.Op)
 		}
+
+		recordCheckpointOpcode(ctx, checkpointModeAsync, op)
 	}
 
 	// Persist cumulative metadata size delta to Redis so subsequent checkpoint
@@ -674,6 +676,12 @@ func stepOutputSize(ops []state.GeneratorOpcode) int {
 	return total
 }
 
+func recordCheckpointOpcode(ctx context.Context, mode string, op state.GeneratorOpcode) {
+	metrics.IncrCheckpointSDKOpcodeCounter(ctx, op.Op.String(), mode, metrics.CounterOpt{
+		PkgName: pkgName,
+	})
+}
+
 func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncCheckpoint) (err error) {
 	start := time.Now()
 	result := "passed"
@@ -686,8 +694,8 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 			Tags:    map[string]any{"result": result},
 		})
 	}()
-	if input.RequestID == "" {
-		result = "no_request_id"
+	if input.GenerationID == 0 {
+		result = "no_generation_id"
 		return nil
 	}
 
@@ -701,29 +709,13 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		}
 	}
 
-	parsed, err := ulid.Parse(input.RequestID)
-	if err != nil {
-		return fmt.Errorf("%w: invalid request id %q: %v", ErrStaleDispatch, input.RequestID, err)
-	}
-
 	ref := queueref.Decode(input.QueueItemRef)
 	if ref.JobID() == "" || ref.ShardID() == "" {
 		result = "no_qi_ref"
 		return nil
 	}
 
-	loader, ok := c.Queue.(queueItemLoader)
-	if !ok {
-		// Fail open if the queue can't load items (e.g. mock or alt backend);
-		// the alternative is rejecting every fenced POST forever.
-		logger.StdlibLogger(ctx).Warn("checkpoint: queue does not support dispatch validation; skipping",
-			"run_id", input.RunID,
-		)
-		result = "no_loader"
-		return nil
-	}
-
-	item, err := loader.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
+	item, err := c.Queue.LoadQueueItem(ctx, ref.ShardID(), ref.JobID())
 	if errors.Is(err, queue.ErrQueueItemNotFound) {
 		return fmt.Errorf("%w: queue item not found", ErrStaleDispatch)
 	}
@@ -742,12 +734,11 @@ func (c checkpointer) validateAsyncDispatch(ctx context.Context, input AsyncChec
 		return nil
 	}
 
-	// Compare only the entropy: it's the deterministic part bound to
-	// (runID, generationID). The ULID timestamp is incidental (it just
-	// gives RequestIDs chronological sort order) and isn't part of the
-	// fence.
-	if !bytes.Equal(parsed.Entropy(), driver.DispatchRequestIDEntropy(input.RunID, item.GenerationID)) {
-		return fmt.Errorf("%w: request id %s does not match queue item generation %d", ErrStaleDispatch, input.RequestID, item.GenerationID)
+	if item.GenerationID != input.GenerationID {
+		return fmt.Errorf("%w: dispatch generation %d does not match queue item generation %d",
+			ErrStaleDispatch,
+			input.GenerationID,
+			item.GenerationID)
 	}
 
 	return nil
@@ -770,6 +761,9 @@ func (c checkpointer) runContext(md state.Metadata, fn *inngest.Function) execut
 		// endpoint is only for sync functions that have not yet re-entered,
 		// ie. first attempts at teps.
 		attemptCount: 0,
+
+		// This is only used if the checkpointed opcode is missing its timing field.
+		fallbackTime: time.Now(),
 
 		maxAttempts:     fn.MaxAttempts(),
 		priorityFactor:  nil,                         // Use default priority

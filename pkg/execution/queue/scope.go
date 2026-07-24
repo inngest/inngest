@@ -14,10 +14,20 @@ type Scope struct {
 	FunctionID uuid.UUID
 }
 
+// Validate checks whether the scope is valid for general queue operations.
+// System scopes are queue-name scoped and may omit tenant/function IDs; non-system
+// scopes must include account, environment, and function IDs.
 func (s Scope) Validate() error {
 	if s.IsSystem {
 		return nil
 	}
+	return s.ValidateIDs()
+}
+
+// ValidateIDs checks that account, environment, and function IDs are all set.
+// Use this for APIs that always require tenant/function context, even when the
+// scope is marked as system.
+func (s Scope) ValidateIDs() error {
 	if s.AccountID == uuid.Nil {
 		return fmt.Errorf("missing account ID")
 	}

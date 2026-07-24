@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -93,7 +94,7 @@ func WithSplitBatchPartitionByFunction(fn func(ctx context.Context, accountID uu
 // Note that this buffers in-memory using the defaults via [DefaultMaxBufferDuration] and
 // [DefaultMaxBufferSize].  to change these or disable buffering, use [WithBufferSettings]
 // or [WithoutBuffer].
-func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
+func NewRedisBatchManager(b *redis_state.BatchClient, q queue.Producer, opts ...RedisBatchManagerOpt) BatchManager {
 	manager := &redisBatchManager{
 		b:                 b,
 		q:                 q,
@@ -114,7 +115,7 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q queue.QueueManager, opts
 
 type redisBatchManager struct {
 	b *redis_state.BatchClient
-	q queue.QueueManager
+	q queue.Producer
 
 	// sizeLimit is the size limit that a batch can have
 	sizeLimit int
@@ -316,7 +317,7 @@ func (b *redisBatchManager) StartExecution(ctx context.Context, functionId uuid.
 // ScheduleExecution enqueues a job to run the batch job after the specified duration.
 func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
 	if b.q == nil {
-		// No queue manager configured, skip scheduling (useful for tests)
+		// No queue producer configured, skip scheduling (useful for tests)
 		return nil
 	}
 
@@ -345,7 +346,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 		Payload:     opts.ScheduleBatchPayload,
 		QueueName:   &queueName,
 	}, opts.At, queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID, "function_id", opts.FunctionID)
 		return nil
 	}

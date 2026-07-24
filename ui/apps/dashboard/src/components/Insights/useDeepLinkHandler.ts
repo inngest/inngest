@@ -5,7 +5,9 @@ import { ulid } from 'ulid';
 import { formatSQL } from '@/components/Insights/InsightsSQLEditor/utils';
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
-import type { QuerySnapshot } from '@/components/Insights/types';
+import type { QueryTemplate } from '@/components/Insights/types';
+
+const DEEP_LINK_DEFAULT_NAME = 'Untitled query';
 
 interface UseDeepLinkHandlerParams {
   actions: TabManagerActions;
@@ -67,23 +69,39 @@ export function useDeepLinkHandler({
       return;
     }
 
-    // If there's a sql param (and no query_id), open a new tab with that SQL
+    // If there's a sql param (and no query_id), open a new tab with that SQL.
+    // The tab name comes from the optional `name` param so callers (e.g. the
+    // Failed Functions "Open in Insights" button) can label the tab without
+    // depending on a built-in Insights template existing.
     if (sqlFromUrl) {
       hasProcessedInitialDeepLink.current = true;
 
-      const snapshot: QuerySnapshot = {
-        id: ulid(),
-        isSnapshot: true,
-        name: 'Experiment Query',
-        query: formatSQL(sqlFromUrl),
-      };
-      actions.createTabFromQuery(snapshot);
+      const nameFromUrl =
+        typeof search.name === 'string' && search.name.length > 0
+          ? search.name
+          : undefined;
 
-      // Clear the sql param from the URL to avoid re-opening on refresh
+      // Synthesize a QueryTemplate so the tab manager's template branch picks
+      // it up and honors the name (the snapshot branch ignores name and falls
+      // back to the "untitled" label). formatSQL now uses the ClickHouse
+      // dialect, so formatting the incoming SQL no longer mangles function
+      // calls like `toUnixTimestamp64Milli(...)`.
+      const template: QueryTemplate = {
+        id: `deeplink-${ulid()}`,
+        name: nameFromUrl ?? DEEP_LINK_DEFAULT_NAME,
+        query: formatSQL(sqlFromUrl),
+        explanation: '',
+        templateKind: 'time',
+      };
+      actions.createTabFromQuery(template, { runOnMount: true });
+
+      // Clear the deep-link params from the URL so refresh/bookmark doesn't
+      // respawn duplicate tabs.
       navigate({
         search: (prev: Record<string, unknown>) => {
           const next = { ...prev };
           delete next.sql;
+          delete next.name;
           return next;
         },
         replace: true,

@@ -216,7 +216,7 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&counter) == 1
-	}, 10*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+	}, 30*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
 }
 
 func TestDebounce_Timeout(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,6 +92,65 @@ func TestWaitForEventOpts_Expires(t *testing.T) {
 		require.NoError(t, err)
 		assert.WithinDuration(t, time.Now(), got, time.Second)
 	})
+
+	t.Run("accepts a timeout of exactly one leap year", func(t *testing.T) {
+		opts := WaitForEventOpts{Timeout: "366d"}
+		now := time.Now()
+		got, err := opts.Expires()
+		require.NoError(t, err)
+		assert.WithinDuration(t, now.Add(consts.MaxWaitForEventTimeout), got, time.Second)
+	})
+
+	t.Run("rejects a duration beyond one leap year", func(t *testing.T) {
+		opts := WaitForEventOpts{Timeout: "367d"}
+		_, err := opts.Expires()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTimeoutTooLong)
+	})
+
+	t.Run("rejects an RFC 3339 timestamp beyond one year", func(t *testing.T) {
+		opts := WaitForEventOpts{
+			Timeout: time.Now().AddDate(2, 0, 0).Format(time.RFC3339),
+		}
+		_, err := opts.Expires()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTimeoutTooLong)
+	})
+}
+
+func TestGeneratorOpcode_SleepDuration(t *testing.T) {
+	sleepOp := func(duration string) GeneratorOpcode {
+		return GeneratorOpcode{
+			Op:   enums.OpcodeSleep,
+			Opts: map[string]any{"duration": duration},
+		}
+	}
+
+	t.Run("accepts a duration of exactly one leap year", func(t *testing.T) {
+		dur, err := sleepOp("366d").SleepDuration()
+		require.NoError(t, err)
+		assert.Equal(t, consts.MaxSleepDuration, dur)
+	})
+
+	t.Run("rejects a duration beyond one leap year", func(t *testing.T) {
+		_, err := sleepOp("367d").SleepDuration()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTimeoutTooLong)
+	})
+
+	t.Run("rejects a date beyond one year", func(t *testing.T) {
+		at := time.Now().AddDate(2, 0, 0).Format(time.RFC3339)
+		_, err := sleepOp(at).SleepDuration()
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrTimeoutTooLong)
+	})
+
+	t.Run("accepts a date within one year", func(t *testing.T) {
+		at := time.Now().Add(30 * 24 * time.Hour)
+		dur, err := sleepOp(at.Format(time.RFC3339)).SleepDuration()
+		require.NoError(t, err)
+		assert.WithinDuration(t, at, time.Now().Add(dur), time.Second)
+	})
 }
 
 func TestSignalOpts_Expires(t *testing.T) {
@@ -144,6 +204,35 @@ func TestInvokeFunctionOpts_Expires(t *testing.T) {
 		got, err := opts.Expires()
 		require.NoError(t, err)
 		assert.WithinDuration(t, now.AddDate(1, 0, 0), got, time.Second)
+	})
+}
+
+func TestInvokeFunctionOpts_Validate(t *testing.T) {
+	t.Run("accepts nil payload", func(t *testing.T) {
+		opts := InvokeFunctionOpts{}
+		require.NoError(t, opts.Validate())
+	})
+
+	t.Run("accepts valid payload sessions", func(t *testing.T) {
+		opts := InvokeFunctionOpts{
+			Payload: &event.Event{
+				Meta: event.EventMeta{
+					Sessions: event.Sessions{"conversation_id": "conversation_1234"},
+				},
+			},
+		}
+		require.NoError(t, opts.Validate())
+	})
+
+	t.Run("rejects too many payload sessions", func(t *testing.T) {
+		opts := InvokeFunctionOpts{
+			Payload: &event.Event{
+				Meta: event.EventMeta{
+					Sessions: event.Sessions{"a": "1", "b": "2", "c": "3", "d": "4", "e": "5", "f": "6"},
+				},
+			},
+		}
+		require.EqualError(t, opts.Validate(), "event sessions can include at most 5 entries")
 	})
 }
 

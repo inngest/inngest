@@ -295,11 +295,29 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 			if at < 0 {
 				return time.Duration(0), nil
 			}
-			return at, nil
+			return boundedSleepDuration(at, opts.Duration)
 		}
 	}
 
-	return str2duration.ParseDuration(opts.Duration)
+	dur, err := str2duration.ParseDuration(opts.Duration)
+	if err != nil {
+		return 0, err
+	}
+	return boundedSleepDuration(dur, opts.Duration)
+}
+
+// boundedSleepDuration rejects sleeps scheduled further than
+// consts.MaxSleepDuration into the future.
+func boundedSleepDuration(dur time.Duration, raw string) (time.Duration, error) {
+	if dur > consts.MaxSleepDuration {
+		return 0, WrapInStandardError(
+			ErrTimeoutTooLong,
+			InngestErrTimeoutTooLong,
+			fmt.Sprintf("The sleep %q ends more than one year in the future; sleeps may last at most one year.", raw),
+			"",
+		)
+	}
+	return dur, nil
 }
 
 func (g GeneratorOpcode) SignalOpts() (*SignalOpts, error) {
@@ -349,13 +367,22 @@ func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
 		return nil, err
 	}
-	return opts, nil
+	return opts, opts.Validate()
 }
 
 type InvokeFunctionOpts struct {
 	FunctionID string       `json:"function_id"`
 	Payload    *event.Event `json:"payload,omitempty"`
 	Timeout    string       `json:"timeout"`
+}
+
+func (i *InvokeFunctionOpts) Validate() error {
+	if i.Payload == nil {
+		return nil
+	}
+	// Mirrors the session checks in Event.Validate() at API ingest; invocation
+	// events are constructed by the executor and never pass through the API.
+	return i.Payload.Meta.Sessions.Validate()
 }
 
 func (i *InvokeFunctionOpts) UnmarshalAny(a any) error {
@@ -563,7 +590,20 @@ func (w WaitForEventOpts) Expires() (time.Time, error) {
 		return time.Now(), nil
 	}
 
-	return strtimeout.ParseTimeout(w.Timeout, time.Now)
+	now := time.Now()
+	expires, err := strtimeout.ParseTimeout(w.Timeout, func() time.Time { return now })
+	if err != nil {
+		return expires, err
+	}
+	if expires.Sub(now) > consts.MaxWaitForEventTimeout {
+		return time.Time{}, WrapInStandardError(
+			ErrTimeoutTooLong,
+			InngestErrTimeoutTooLong,
+			fmt.Sprintf("The wait-for-event timeout %q expires more than one year in the future; timeouts may last at most one year.", w.Timeout),
+			"",
+		)
+	}
+	return expires, nil
 }
 
 // GatewayOpts returns the gateway options within the driver.

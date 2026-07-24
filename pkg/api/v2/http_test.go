@@ -1,6 +1,7 @@
 package apiv2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -97,6 +98,45 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_CreateScoreAcceptsArrayBody(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01KVDHCS8VTWZHBAHTMYJHBPKJ")
+	stepID := "b436f063682815df5b5fd9780200a9e4e8d4f0b3"
+	provider := &fakeScoreProvider{}
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Scores: provider}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+
+	body := `[{"name":"accuracy","value":0.95,"step_id":"` + stepID + `"}]`
+	req := httptest.NewRequest(http.MethodPost, "/v2/runs/"+runID.String()+"/scores", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.NotNil(t, provider.params)
+	require.Equal(t, runID, provider.params.RunID)
+	require.Len(t, provider.params.Scores, 1)
+	require.Equal(t, &stepID, provider.params.Scores[0].StepID)
+	require.Equal(t, "accuracy", provider.params.Scores[0].Name)
+	require.Equal(t, 0.95, provider.params.Scores[0].Value)
+
+	var response struct {
+		Data []struct {
+			RunID  string  `json:"runId"`
+			Name   string  `json:"name"`
+			Value  float64 `json:"value"`
+			StepID string  `json:"stepId"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	require.Len(t, response.Data, 1)
+	require.Equal(t, runID.String(), response.Data[0].RunID)
+	require.Equal(t, "accuracy", response.Data[0].Name)
+	require.Equal(t, 0.95, response.Data[0].Value)
+	require.Equal(t, stepID, response.Data[0].StepID)
+}
+
 func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	ctx := context.Background()
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
@@ -111,7 +151,7 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 		AppName: "my-app",
 		Function: inngest.Function{
 			Name: "Test function",
-			Slug: "test-fn",
+			Slug: "my-app-test-fn",
 		},
 	}
 	functionRun := &cqrs.FunctionRun{
@@ -123,12 +163,12 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	}
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
-	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(functionRun, nil).Once()
+	runs := &mockRunProvider{}
+	runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(functionRun, nil).Once()
 
 	handler, err := newTestHTTPHandler(ctx, ServiceOptions{
-		Functions:    functions,
-		FunctionRuns: runs,
+		Functions: functions,
+		Runs:      runs,
 	}, HTTPHandlerOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -148,6 +188,338 @@ func TestHTTPGateway_RunEnumsUseShortJSONNames(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	run := body["data"].(map[string]any)
 	require.Equal(t, "COMPLETED", run["status"])
+}
+
+func TestHTTPGateway_RunListRoutes(t *testing.T) {
+	t.Run("binds list filters", func(t *testing.T) {
+		isDeferred := true
+		runs := &mockRunProvider{}
+		runs.On("GetRuns", mock.Anything, GetRunsOpts{
+			Limit:       3,
+			TimeField:   RunTimeFieldStartedAt,
+			Status:      []enums.RunStatus{enums.RunStatusCompleted, enums.RunStatusFailed},
+			AppIDs:      []string{"my-app"},
+			FunctionIDs: []string{"test-fn"},
+			IsDeferred:  &isDeferred,
+			Order:       OrderDirectionAsc,
+		}).Return(&GetRunsResult{}, nil).Once()
+
+		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
+		require.NoError(t, err)
+		t.Cleanup(func() { runs.AssertExpectations(t) })
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=test-fn&isDeferred=true&order=ASC", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	})
+
+	t.Run("binds function path", func(t *testing.T) {
+		runs := &mockRunProvider{}
+		runs.On("GetRuns", mock.Anything, GetRunsOpts{
+			Limit:       defaultRunsLimit,
+			TimeField:   RunTimeFieldQueuedAt,
+			Status:      []enums.RunStatus{},
+			AppIDs:      []string{"my-app"},
+			FunctionIDs: []string{"test-fn"},
+			Order:       OrderDirectionDesc,
+		}).Return(&GetRunsResult{}, nil).Once()
+
+		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
+		require.NoError(t, err)
+		t.Cleanup(func() { runs.AssertExpectations(t) })
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	})
+}
+
+func TestHTTPGateway_Rerun(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	newRunID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4d0")
+
+	rerun := &mockRunProvider{}
+	rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(newRunID, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Runs: rerun}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		rerun.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/runs/"+runID.String()+"/rerun", nil)
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	data := response["data"].(map[string]any)
+	require.Equal(t, newRunID.String(), data["runId"])
+}
+
+func TestHTTPGateway_RerunFromStep(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	newRunID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4d0")
+	body, err := json.Marshal(map[string]any{
+		"fromStep": map[string]any{
+			"stepId": "step-1",
+			"input": []any{
+				map[string]any{"foo": "bar"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	rerun := &mockRunProvider{}
+	rerun.On("Rerun", mock.Anything, runID, RerunOpts{
+		FromStep: &RerunFromStep{
+			StepID: "step-1",
+			Input:  json.RawMessage(`[{"foo":"bar"}]`),
+		},
+	}).Return(newRunID, nil).Once()
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Runs: rerun}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		rerun.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/runs/"+runID.String()+"/rerun", strings.NewReader(string(body)))
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	data := response["data"].(map[string]any)
+	require.Equal(t, newRunID.String(), data["runId"])
+}
+
+func TestHTTPGateway_RerunFromStepErrors(t *testing.T) {
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	tests := []struct {
+		name    string
+		stepID  string
+		err     error
+		message string
+	}{
+		{name: "missing step", stepID: "missing", err: ErrRerunStepNotFound, message: "Step not found in original run"},
+		{name: "ambiguous step", stepID: "duplicate", err: ErrRerunStepAmbiguous, message: "Step name matches multiple steps in original run"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rerun := &mockRunProvider{}
+			rerun.On("Rerun", mock.Anything, runID, RerunOpts{
+				FromStep: &RerunFromStep{StepID: tt.stepID},
+			}).Return(ulid.ULID{}, tt.err).Once()
+			t.Cleanup(func() {
+				rerun.AssertExpectations(t)
+			})
+
+			handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{Runs: rerun}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+			body, err := json.Marshal(map[string]any{
+				"fromStep": map[string]any{"stepId": tt.stepID},
+			})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v2/runs/"+runID.String()+"/rerun", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			var response errorResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			require.Equal(t, apiv2base.ErrorInvalidRequest, response.Errors[0].Code)
+			require.Equal(t, tt.message, response.Errors[0].Message)
+		})
+	}
+}
+
+func TestHTTPGateway_GetApp(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	createdAt := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	syncedAt := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
+
+	apps := &mockAppProvider{}
+	apps.On("GetApp", mock.Anything, "my-app").Return(App{
+		ID:            "my-app",
+		InternalID:    appID,
+		Name:          "my-app",
+		Method:        enums.AppMethodServe,
+		CreatedAt:     createdAt,
+		FunctionCount: 2,
+		LatestSync: &AppSync{
+			SyncedAt:    syncedAt,
+			SdkLanguage: "typescript",
+			SdkVersion:  "3.22.0",
+			URL:         "https://example.com/api/inngest",
+		},
+	}, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Apps: apps}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		apps.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	data := body["data"].(map[string]any)
+	require.Equal(t, "my-app", data["id"])
+	require.Equal(t, "my-app", data["name"])
+	require.Equal(t, "SERVE", data["method"])
+	require.Equal(t, float64(2), data["functionCount"])
+	require.Equal(t, "2026-06-01T12:00:00Z", data["createdAt"])
+	latestSync := data["latestSync"].(map[string]any)
+	require.Equal(t, "2026-06-02T12:00:00Z", latestSync["syncedAt"])
+	require.Equal(t, "typescript", latestSync["sdkLanguage"])
+	require.Equal(t, "3.22.0", latestSync["sdkVersion"])
+	require.Equal(t, "https://example.com/api/inngest", latestSync["url"])
+	//
+	// zero-value and empty optional fields are omitted by the gateway marshaler
+	require.NotContains(t, data, "isArchived")
+	require.NotContains(t, latestSync, "framework")
+	require.NotContains(t, latestSync, "error")
+}
+
+func TestHTTPGateway_GetFunction(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	retries := 2
+	condition := "event.data.user_id != nil"
+
+	fn := inngest.DeployedFunction{
+		ID:      functionID,
+		Slug:    "my-app-test-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+			Steps: []inngest.Step{{
+				ID:      "step",
+				Retries: &retries,
+			}},
+			Triggers: inngest.MultipleTriggers{
+				{EventTrigger: &inngest.EventTrigger{Event: "user.created", Expression: &condition}},
+			},
+		},
+	}
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunctionByApp", mock.Anything, "my-app", "test-fn").Return(fn, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Functions: functions}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		functions.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	data := body["data"].(map[string]any)
+	require.Equal(t, "test-fn", data["id"])
+	require.Equal(t, "Test function", data["name"])
+	require.Equal(t, "test-fn", data["slug"])
+
+	app := data["app"].(map[string]any)
+	require.Equal(t, "my-app", app["id"])
+
+	triggers := data["triggers"].([]any)
+	trigger := triggers[0].(map[string]any)
+	require.Equal(t, "EVENT", trigger["type"])
+	require.Equal(t, "user.created", trigger["value"])
+	require.Equal(t, condition, trigger["if"])
+
+	configuration := data["configuration"].(map[string]any)
+	retryConfiguration := configuration["retries"].(map[string]any)
+	require.Equal(t, float64(retries), retryConfiguration["value"])
+}
+
+func TestHTTPGateway_GetFunctions(t *testing.T) {
+	ctx := context.Background()
+	firstID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	fn := inngest.DeployedFunction{
+		ID:      firstID,
+		Slug:    "my-app-test-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "Test function",
+			Slug: "test-fn",
+			Steps: []inngest.Step{{
+				ID: "step",
+			}},
+		},
+	}
+	functions := &mockFunctionProvider{}
+	functions.On("GetFunctions", mock.Anything, "my-app", GetFunctionsOpts{
+		Limit: 1,
+	}).Return(&GetFunctionsResult{
+		Functions: []inngest.DeployedFunction{fn},
+		HasMore:   true,
+	}, nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Functions: functions}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		functions.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions?limit=1", nil)
+	req.Header.Set("Accept", "*/*")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	data := body["data"].([]any)
+	item := data[0].(map[string]any)
+	require.Equal(t, "test-fn", item["id"])
+	require.Equal(t, "Test function", item["name"])
+
+	page := body["page"].(map[string]any)
+	require.True(t, page["hasMore"].(bool))
+	require.Equal(t, firstID.String(), page["cursor"])
+	require.Equal(t, float64(1), page["limit"])
 }
 
 func TestHTTPGateway_Middleware(t *testing.T) {
@@ -318,6 +690,15 @@ func TestHTTPGateway_Routing(t *testing.T) {
 
 	t.Run("invalid endpoints under /api/v2 return 404", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/invalid", nil)
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("invalid endpoints under /v2 return 404", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/v2/invalid", nil)
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)

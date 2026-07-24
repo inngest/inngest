@@ -5,6 +5,7 @@ import type { Environment } from '@/utils/environments';
 import SideBar from './SideBar';
 import { ActiveBanners } from '../ActiveBanners/ActiveBanners';
 import IncidentBanner from '../Incident/IncidentBanner';
+import { PaymentStatusBanner } from '../PaymentStatusBanner/PaymentStatusBanner';
 
 type LayoutProps = {
   collapsed: boolean | undefined;
@@ -30,6 +31,8 @@ export default function Layout({
         <IncidentBanner />
 
         <ActiveBanners />
+
+        <PaymentStatusBanner />
 
         {/* disabled by Dan 11/22/2025 for performance reasons */}
         <Suspense>{/* <BillingBanner /> */}</Suspense>

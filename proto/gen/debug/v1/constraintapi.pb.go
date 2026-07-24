@@ -74,6 +74,586 @@ func (x *CheckConstraintsResponse) GetResponse() *v1.CapacityCheckResponse {
 	return nil
 }
 
+type SemaphoreLevel struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Capacity      int64                  `protobuf:"varint,3,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	Usage         int64                  `protobuf:"varint,4,opt,name=usage,proto3" json:"usage,omitempty"`
+	Remaining     int64                  `protobuf:"varint,5,opt,name=remaining,proto3" json:"remaining,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SemaphoreLevel) Reset() {
+	*x = SemaphoreLevel{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreLevel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreLevel) ProtoMessage() {}
+
+func (x *SemaphoreLevel) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreLevel.ProtoReflect.Descriptor instead.
+func (*SemaphoreLevel) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SemaphoreLevel) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SemaphoreLevel) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SemaphoreLevel) GetCapacity() int64 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
+}
+
+func (x *SemaphoreLevel) GetUsage() int64 {
+	if x != nil {
+		return x.Usage
+	}
+	return 0
+}
+
+func (x *SemaphoreLevel) GetRemaining() int64 {
+	if x != nil {
+		return x.Remaining
+	}
+	return 0
+}
+
+type SemaphoreLevelRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Key           string                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SemaphoreLevelRequest) Reset() {
+	*x = SemaphoreLevelRequest{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreLevelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreLevelRequest) ProtoMessage() {}
+
+func (x *SemaphoreLevelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreLevelRequest.ProtoReflect.Descriptor instead.
+func (*SemaphoreLevelRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SemaphoreLevelRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SemaphoreLevelRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SemaphoreLevelRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+type AppSemaphoreLevelRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	AppId         string                 `protobuf:"bytes,2,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Key           string                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppSemaphoreLevelRequest) Reset() {
+	*x = AppSemaphoreLevelRequest{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppSemaphoreLevelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppSemaphoreLevelRequest) ProtoMessage() {}
+
+func (x *AppSemaphoreLevelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppSemaphoreLevelRequest.ProtoReflect.Descriptor instead.
+func (*AppSemaphoreLevelRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AppSemaphoreLevelRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *AppSemaphoreLevelRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *AppSemaphoreLevelRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+type FunctionSemaphoreLevelRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Key           string                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionSemaphoreLevelRequest) Reset() {
+	*x = FunctionSemaphoreLevelRequest{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionSemaphoreLevelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionSemaphoreLevelRequest) ProtoMessage() {}
+
+func (x *FunctionSemaphoreLevelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionSemaphoreLevelRequest.ProtoReflect.Descriptor instead.
+func (*FunctionSemaphoreLevelRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *FunctionSemaphoreLevelRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *FunctionSemaphoreLevelRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *FunctionSemaphoreLevelRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+type SemaphoreLevelResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Level         *SemaphoreLevel        `protobuf:"bytes,1,opt,name=level,proto3" json:"level,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SemaphoreLevelResponse) Reset() {
+	*x = SemaphoreLevelResponse{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SemaphoreLevelResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SemaphoreLevelResponse) ProtoMessage() {}
+
+func (x *SemaphoreLevelResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SemaphoreLevelResponse.ProtoReflect.Descriptor instead.
+func (*SemaphoreLevelResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SemaphoreLevelResponse) GetLevel() *SemaphoreLevel {
+	if x != nil {
+		return x.Level
+	}
+	return nil
+}
+
+type SetSemaphoreLevelRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Key            string                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	Capacity       int64                  `protobuf:"varint,4,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SetSemaphoreLevelRequest) Reset() {
+	*x = SetSemaphoreLevelRequest{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetSemaphoreLevelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetSemaphoreLevelRequest) ProtoMessage() {}
+
+func (x *SetSemaphoreLevelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetSemaphoreLevelRequest.ProtoReflect.Descriptor instead.
+func (*SetSemaphoreLevelRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SetSemaphoreLevelRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SetSemaphoreLevelRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SetSemaphoreLevelRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SetSemaphoreLevelRequest) GetCapacity() int64 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
+}
+
+func (x *SetSemaphoreLevelRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type SetAppSemaphoreLevelRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	AppId          string                 `protobuf:"bytes,2,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Key            string                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	Capacity       int64                  `protobuf:"varint,4,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SetAppSemaphoreLevelRequest) Reset() {
+	*x = SetAppSemaphoreLevelRequest{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetAppSemaphoreLevelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetAppSemaphoreLevelRequest) ProtoMessage() {}
+
+func (x *SetAppSemaphoreLevelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetAppSemaphoreLevelRequest.ProtoReflect.Descriptor instead.
+func (*SetAppSemaphoreLevelRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SetAppSemaphoreLevelRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SetAppSemaphoreLevelRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *SetAppSemaphoreLevelRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SetAppSemaphoreLevelRequest) GetCapacity() int64 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
+}
+
+func (x *SetAppSemaphoreLevelRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type SetFunctionSemaphoreLevelRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	FunctionId     string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	Key            string                 `protobuf:"bytes,3,opt,name=key,proto3" json:"key,omitempty"`
+	Capacity       int64                  `protobuf:"varint,4,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,5,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SetFunctionSemaphoreLevelRequest) Reset() {
+	*x = SetFunctionSemaphoreLevelRequest{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetFunctionSemaphoreLevelRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetFunctionSemaphoreLevelRequest) ProtoMessage() {}
+
+func (x *SetFunctionSemaphoreLevelRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetFunctionSemaphoreLevelRequest.ProtoReflect.Descriptor instead.
+func (*SetFunctionSemaphoreLevelRequest) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *SetFunctionSemaphoreLevelRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SetFunctionSemaphoreLevelRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *SetFunctionSemaphoreLevelRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SetFunctionSemaphoreLevelRequest) GetCapacity() int64 {
+	if x != nil {
+		return x.Capacity
+	}
+	return 0
+}
+
+func (x *SetFunctionSemaphoreLevelRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type SetSemaphoreLevelResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Applied       bool                   `protobuf:"varint,1,opt,name=applied,proto3" json:"applied,omitempty"`
+	Level         *SemaphoreLevel        `protobuf:"bytes,2,opt,name=level,proto3" json:"level,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetSemaphoreLevelResponse) Reset() {
+	*x = SetSemaphoreLevelResponse{}
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetSemaphoreLevelResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetSemaphoreLevelResponse) ProtoMessage() {}
+
+func (x *SetSemaphoreLevelResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_constraintapi_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetSemaphoreLevelResponse.ProtoReflect.Descriptor instead.
+func (*SetSemaphoreLevelResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_constraintapi_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SetSemaphoreLevelResponse) GetApplied() bool {
+	if x != nil {
+		return x.Applied
+	}
+	return false
+}
+
+func (x *SetSemaphoreLevelResponse) GetLevel() *SemaphoreLevel {
+	if x != nil {
+		return x.Level
+	}
+	return nil
+}
+
 var File_debug_v1_constraintapi_proto protoreflect.FileDescriptor
 
 const file_debug_v1_constraintapi_proto_rawDesc = "" +
@@ -81,7 +661,56 @@ const file_debug_v1_constraintapi_proto_rawDesc = "" +
 	"\x1cdebug/v1/constraintapi.proto\x12\bdebug.v1\x1a\x1econstraintapi/v1/service.proto\"\xa1\x01\n" +
 	"\x18CheckConstraintsResponse\x12@\n" +
 	"\arequest\x18\x01 \x01(\v2&.constraintapi.v1.CapacityCheckRequestR\arequest\x12C\n" +
-	"\bresponse\x18\x02 \x01(\v2'.constraintapi.v1.CapacityCheckResponseR\bresponseB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"\bresponse\x18\x02 \x01(\v2'.constraintapi.v1.CapacityCheckResponseR\bresponse\"\x86\x01\n" +
+	"\x0eSemaphoreLevel\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12\x1a\n" +
+	"\bcapacity\x18\x03 \x01(\x03R\bcapacity\x12\x14\n" +
+	"\x05usage\x18\x04 \x01(\x03R\x05usage\x12\x1c\n" +
+	"\tremaining\x18\x05 \x01(\x03R\tremaining\"\\\n" +
+	"\x15SemaphoreLevelRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key\"b\n" +
+	"\x18AppSemaphoreLevelRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x15\n" +
+	"\x06app_id\x18\x02 \x01(\tR\x05appId\x12\x10\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key\"q\n" +
+	"\x1dFunctionSemaphoreLevelRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1f\n" +
+	"\vfunction_id\x18\x02 \x01(\tR\n" +
+	"functionId\x12\x10\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key\"H\n" +
+	"\x16SemaphoreLevelResponse\x12.\n" +
+	"\x05level\x18\x01 \x01(\v2\x18.debug.v1.SemaphoreLevelR\x05level\"\xa4\x01\n" +
+	"\x18SetSemaphoreLevelRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x10\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key\x12\x1a\n" +
+	"\bcapacity\x18\x04 \x01(\x03R\bcapacity\x12'\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\"\xaa\x01\n" +
+	"\x1bSetAppSemaphoreLevelRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x15\n" +
+	"\x06app_id\x18\x02 \x01(\tR\x05appId\x12\x10\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key\x12\x1a\n" +
+	"\bcapacity\x18\x04 \x01(\x03R\bcapacity\x12'\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\"\xb9\x01\n" +
+	" SetFunctionSemaphoreLevelRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1f\n" +
+	"\vfunction_id\x18\x02 \x01(\tR\n" +
+	"functionId\x12\x10\n" +
+	"\x03key\x18\x03 \x01(\tR\x03key\x12\x1a\n" +
+	"\bcapacity\x18\x04 \x01(\x03R\bcapacity\x12'\n" +
+	"\x0fidempotency_key\x18\x05 \x01(\tR\x0eidempotencyKey\"e\n" +
+	"\x19SetSemaphoreLevelResponse\x12\x18\n" +
+	"\aapplied\x18\x01 \x01(\bR\aapplied\x12.\n" +
+	"\x05level\x18\x02 \x01(\v2\x18.debug.v1.SemaphoreLevelR\x05levelB5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var (
 	file_debug_v1_constraintapi_proto_rawDescOnce sync.Once
@@ -95,20 +724,31 @@ func file_debug_v1_constraintapi_proto_rawDescGZIP() []byte {
 	return file_debug_v1_constraintapi_proto_rawDescData
 }
 
-var file_debug_v1_constraintapi_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_debug_v1_constraintapi_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_debug_v1_constraintapi_proto_goTypes = []any{
-	(*CheckConstraintsResponse)(nil), // 0: debug.v1.CheckConstraintsResponse
-	(*v1.CapacityCheckRequest)(nil),  // 1: constraintapi.v1.CapacityCheckRequest
-	(*v1.CapacityCheckResponse)(nil), // 2: constraintapi.v1.CapacityCheckResponse
+	(*CheckConstraintsResponse)(nil),         // 0: debug.v1.CheckConstraintsResponse
+	(*SemaphoreLevel)(nil),                   // 1: debug.v1.SemaphoreLevel
+	(*SemaphoreLevelRequest)(nil),            // 2: debug.v1.SemaphoreLevelRequest
+	(*AppSemaphoreLevelRequest)(nil),         // 3: debug.v1.AppSemaphoreLevelRequest
+	(*FunctionSemaphoreLevelRequest)(nil),    // 4: debug.v1.FunctionSemaphoreLevelRequest
+	(*SemaphoreLevelResponse)(nil),           // 5: debug.v1.SemaphoreLevelResponse
+	(*SetSemaphoreLevelRequest)(nil),         // 6: debug.v1.SetSemaphoreLevelRequest
+	(*SetAppSemaphoreLevelRequest)(nil),      // 7: debug.v1.SetAppSemaphoreLevelRequest
+	(*SetFunctionSemaphoreLevelRequest)(nil), // 8: debug.v1.SetFunctionSemaphoreLevelRequest
+	(*SetSemaphoreLevelResponse)(nil),        // 9: debug.v1.SetSemaphoreLevelResponse
+	(*v1.CapacityCheckRequest)(nil),          // 10: constraintapi.v1.CapacityCheckRequest
+	(*v1.CapacityCheckResponse)(nil),         // 11: constraintapi.v1.CapacityCheckResponse
 }
 var file_debug_v1_constraintapi_proto_depIdxs = []int32{
-	1, // 0: debug.v1.CheckConstraintsResponse.request:type_name -> constraintapi.v1.CapacityCheckRequest
-	2, // 1: debug.v1.CheckConstraintsResponse.response:type_name -> constraintapi.v1.CapacityCheckResponse
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	10, // 0: debug.v1.CheckConstraintsResponse.request:type_name -> constraintapi.v1.CapacityCheckRequest
+	11, // 1: debug.v1.CheckConstraintsResponse.response:type_name -> constraintapi.v1.CapacityCheckResponse
+	1,  // 2: debug.v1.SemaphoreLevelResponse.level:type_name -> debug.v1.SemaphoreLevel
+	1,  // 3: debug.v1.SetSemaphoreLevelResponse.level:type_name -> debug.v1.SemaphoreLevel
+	4,  // [4:4] is the sub-list for method output_type
+	4,  // [4:4] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_debug_v1_constraintapi_proto_init() }
@@ -122,7 +762,7 @@ func file_debug_v1_constraintapi_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_debug_v1_constraintapi_proto_rawDesc), len(file_debug_v1_constraintapi_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

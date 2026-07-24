@@ -49,6 +49,13 @@ end
 local function toInteger(value)
 	return math.floor(value + 0.5) 
 end
+local function addConstraintUsage(target, index, limit, used)
+	local usage = {}
+	usage["i"] = index
+	usage["l"] = toInteger(limit or 0)
+	usage["u"] = toInteger(math.max(used or 0, 0))
+	table.insert(target, usage)
+end
 local function rateLimit(key, now_ns, period_ns, limit, burst, quantity)
 	limit = math.max(limit, 1)
 	local result = {}
@@ -189,20 +196,21 @@ local results = call("MGET", keyOperationIdempotency, keyRequestState)
 local opIdempotency = results[1]
 local existingRequestState = results[2]
 if opIdempotency ~= nil and opIdempotency ~= false then
-	return opIdempotency
+	return { 1, opIdempotency }
 end
 if existingRequestState ~= nil and existingRequestState ~= false and existingRequestState ~= "" then
 	local res = {}
 	res["s"] = 4
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 local availableCapacity = requested
 local limitingConstraints = {}
 local exhaustedConstraints = {}
 local exhaustedSet = {}
 local retryAt = 0
-local concurrencyCapacityCache = {}
+local concurrencyUsageCache = {}
+local constraintUsage = {}
 local skipGCRA = call("EXISTS", keyConstraintCheckIdempotency) == 1
 local cacheEnabled = cacheMaxTTL > 0
 local constraintCacheKeys = {}
@@ -246,7 +254,7 @@ if cacheEnabled then
 		res["d"] = debugLogs
 		res["fr"] = 0
 		res["ch"] = 1
-		return cjson.encode(res)
+		return { 0, cjson.encode(res) }
 	end
 end
 for index, value in ipairs(constraints) do
@@ -258,16 +266,19 @@ for index, value in ipairs(constraints) do
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, 0)
 		constraintCapacity = rlRes["remaining"] or 0
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000) 
+		addConstraintUsage(constraintUsage, index, value.r.l, rlRes["u"])
 	elseif value.k == 2 then
 		local inProgressLeases = getConcurrencyCount(value.c.ilk)
 		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
-		concurrencyCapacityCache[index] = constraintCapacity
+		addConstraintUsage(constraintUsage, index, value.c.l, inProgressLeases)
+		concurrencyUsageCache[index] = inProgressLeases
 	elseif value.k == 3 then
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, 0)
 		constraintCapacity = throttleRes["remaining"] or 0
 		constraintRetryAt = toInteger(throttleRes["retry_at"]) 
+		addConstraintUsage(constraintUsage, index, value.t.l, throttleRes["u"])
 	elseif value.k == 4 then
 		local usage = tonumber(call("GET", value.sem.k)) or 0
 		local capacity = tonumber(call("GET", value.sem.ck)) or 0
@@ -281,6 +292,7 @@ for index, value in ipairs(constraints) do
 		else
 			constraintCapacity = math.floor(remaining / weight)
 		end
+		addConstraintUsage(constraintUsage, index, capacity, usage)
 	end
 	if constraintCapacity <= 0 then
 		if not exhaustedSet[index] then
@@ -317,7 +329,8 @@ if availableCapacity <= 0 then
 	res["d"] = debugLogs
 	res["fr"] = fairnessReduction
 	res["ch"] = 0
-	return cjson.encode(res)
+	res["cu"] = constraintUsage
+	return { 0, cjson.encode(res) }
 end
 local granted = availableCapacity
 local grantedLeases = {}
@@ -325,6 +338,7 @@ local accountLeasesArgs = {}
 local keyPrefixLeaseDetails = scopedKeyPrefix .. ":ld:"
 local keyPrefixConstraintCheck = scopedKeyPrefix .. ":ik:cc:"
 retryAt = 0
+constraintUsage = {}
 for i, value in ipairs(constraints) do
 	local constraintRetryAt = 0
 	local constraintCapacity = 0
@@ -334,6 +348,7 @@ for i, value in ipairs(constraints) do
 		local rlRes = rateLimit(value.r.k, nowNS, value.r.p, value.r.l, value.r.b, granted)
 		constraintRetryAt = toInteger(rlRes["retry_at"] / 1000000)
 		constraintCapacity = rlRes["remaining"] or 0
+		addConstraintUsage(constraintUsage, i, value.r.l, rlRes["u"])
 	elseif value.k == 2 then
 		local updates = {}
 		for j = 1, granted, 1 do
@@ -342,13 +357,16 @@ for i, value in ipairs(constraints) do
 			updates[(j - 1) * 2 + 2] = initialLeaseID
 		end
 		call("ZADD", value.c.ilk, unpack(updates))
-		constraintCapacity = concurrencyCapacityCache[i] - granted
+		local inProgressLeases = (concurrencyUsageCache[i] or 0) + granted
+		constraintCapacity = value.c.l - inProgressLeases
 		constraintRetryAt = toInteger(nowMS + value.c.ra)
+		addConstraintUsage(constraintUsage, i, value.c.l, inProgressLeases)
 	elseif value.k == 3 then
 		local maxBurst = (value.t.l or 0) + (value.t.b or 0) - 1
 		local throttleRes = throttle(value.t.k, nowMS, value.t.p, value.t.l, maxBurst, granted)
 		constraintRetryAt = toInteger(throttleRes["retry_at"])
 		constraintCapacity = throttleRes["remaining"] or 0
+		addConstraintUsage(constraintUsage, i, value.t.l, throttleRes["u"])
 	elseif value.k == 4 then
 		local weight = value.sem.w
 		if not weight or weight <= 0 then
@@ -362,6 +380,7 @@ for i, value in ipairs(constraints) do
 		else
 			constraintCapacity = math.floor(remaining / weight)
 		end
+		addConstraintUsage(constraintUsage, i, capacity, newUsage)
 	end
 	if constraintCapacity <= 0 then
 		if not exhaustedSet[i] then
@@ -420,6 +439,7 @@ result["ra"] = retryAt
 result["d"] = debugLogs
 result["fr"] = fairnessReduction
 result["ch"] = 0
+result["cu"] = constraintUsage
 local encoded = cjson.encode(result)
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
-return encoded
+return { 0, encoded }

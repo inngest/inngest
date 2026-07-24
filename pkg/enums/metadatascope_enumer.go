@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _MetadataScopeName = "unknownrunstepstep_attemptextended_trace"
+const _MetadataScopeName = "unknownrunstepstep_attemptextended_tracerequest"
 
-var _MetadataScopeIndex = [...]uint8{0, 7, 10, 14, 26, 40}
+var _MetadataScopeIndex = [...]uint8{0, 7, 10, 14, 26, 40, 47}
 
-const _MetadataScopeLowerName = "unknownrunstepstep_attemptextended_trace"
+const _MetadataScopeLowerName = "unknownrunstepstep_attemptextended_tracerequest"
 
 func (i MetadataScope) String() string {
 	if i < 0 || i >= MetadataScope(len(_MetadataScopeIndex)-1) {
@@ -32,9 +32,10 @@ func _MetadataScopeNoOp() {
 	_ = x[MetadataScopeStep-(2)]
 	_ = x[MetadataScopeStepAttempt-(3)]
 	_ = x[MetadataScopeExtendedTrace-(4)]
+	_ = x[MetadataScopeRequest-(5)]
 }
 
-var _MetadataScopeValues = []MetadataScope{MetadataScopeUnknown, MetadataScopeRun, MetadataScopeStep, MetadataScopeStepAttempt, MetadataScopeExtendedTrace}
+var _MetadataScopeValues = []MetadataScope{MetadataScopeUnknown, MetadataScopeRun, MetadataScopeStep, MetadataScopeStepAttempt, MetadataScopeExtendedTrace, MetadataScopeRequest}
 
 var _MetadataScopeNameToValueMap = map[string]MetadataScope{
 	_MetadataScopeName[0:7]:        MetadataScopeUnknown,
@@ -47,6 +48,8 @@ var _MetadataScopeNameToValueMap = map[string]MetadataScope{
 	_MetadataScopeLowerName[14:26]: MetadataScopeStepAttempt,
 	_MetadataScopeName[26:40]:      MetadataScopeExtendedTrace,
 	_MetadataScopeLowerName[26:40]: MetadataScopeExtendedTrace,
+	_MetadataScopeName[40:47]:      MetadataScopeRequest,
+	_MetadataScopeLowerName[40:47]: MetadataScopeRequest,
 }
 
 var _MetadataScopeNames = []string{
@@ -55,6 +58,7 @@ var _MetadataScopeNames = []string{
 	_MetadataScopeName[10:14],
 	_MetadataScopeName[14:26],
 	_MetadataScopeName[26:40],
+	_MetadataScopeName[40:47],
 }
 
 // MetadataScopeString retrieves an enum value from the enum constants string name.

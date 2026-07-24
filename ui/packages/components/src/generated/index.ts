@@ -4,10 +4,9 @@ type error = string;
 
 // Span metadata kind types (derived from generated constants)
 export type SpanMetadataKindUserland = `userland.${string}`;
-// Score kinds embed the user-supplied score name in the suffix
-// (e.g. `inngest.score.accuracy`). The KindInngestScore constant is
-// the base prefix, not a complete kind.
-export type SpanMetadataKindInngestScore = `${typeof KindInngestScore}.${string}`;
+// The score kind is the constant `inngest.score`; user-supplied score
+// names are the keys of the values map, not a kind suffix.
+export type SpanMetadataKindInngestScore = typeof KindInngestScore;
 export type SpanMetadataKind =
   | typeof KindInngestAI
   | typeof KindInngestHTTP
@@ -44,12 +43,39 @@ export const KindInngestAI = 'inngest.ai';
 export interface AIMetadata {
   input_tokens: number /* int64 */;
   output_tokens: number /* int64 */;
-  model: string;
-  system: string;
+  request_model: string;
+  provider: string;
   operation_name: string;
+  /**
+   * Response identity. ResponseModel is the model that served the request (may
+   * differ from the RequestModel, e.g. a dated snapshot). FinishReasons is
+   * stored raw per emitter — note OpenAI's native "tool_calls" is emitted as
+   * the singular "tool_call" by some instrumentations.
+   */
+  response_model?: string;
+  response_id?: string;
+  finish_reasons?: string[];
   latency_ms?: number /* int64 */;
   total_tokens?: number /* int64 */;
   estimated_cost?: number /* float64 */;
+  /**
+   * Granular token usage. Cache semantics differ by provider: OpenAI reports
+   * cached tokens as a subset of InputTokens, whereas Anthropic reports them
+   * additively — values are stored raw and left unreconciled.
+   */
+  cache_read_tokens?: number /* int64 */;
+  cache_creation_tokens?: number /* int64 */;
+  reasoning_tokens?: number /* int64 */;
+  /**
+   * Request parameters. Pointers so an explicit zero (e.g. temperature 0 or
+   * seed 0) is distinguishable from an absent attribute.
+   */
+  temperature?: number /* float64 */;
+  top_p?: number /* float64 */;
+  max_tokens?: number /* int64 */;
+  frequency_penalty?: number /* float64 */;
+  presence_penalty?: number /* float64 */;
+  seed?: number /* int64 */;
 }
 /**
  * From experiment.go
@@ -59,7 +85,7 @@ export const KindInngestExperiment = 'inngest.experiment';
  * From experiment.go
  */
 export interface ExperimentMetadata {
-  experiment_name: string;
+  name: string;
   variant: string;
   selection_strategy: string;
   available_variants?: string[];

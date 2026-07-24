@@ -208,6 +208,208 @@ func (TraceStepOp) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_service_proto_rawDescGZIP(), []int{2}
 }
 
+type FunctionTriggerType int32
+
+const (
+	FunctionTriggerType_FUNCTION_TRIGGER_TYPE_UNSPECIFIED FunctionTriggerType = 0
+	FunctionTriggerType_FUNCTION_TRIGGER_TYPE_EVENT       FunctionTriggerType = 1
+	FunctionTriggerType_FUNCTION_TRIGGER_TYPE_CRON        FunctionTriggerType = 2
+)
+
+// Enum value maps for FunctionTriggerType.
+var (
+	FunctionTriggerType_name = map[int32]string{
+		0: "FUNCTION_TRIGGER_TYPE_UNSPECIFIED",
+		1: "FUNCTION_TRIGGER_TYPE_EVENT",
+		2: "FUNCTION_TRIGGER_TYPE_CRON",
+	}
+	FunctionTriggerType_value = map[string]int32{
+		"FUNCTION_TRIGGER_TYPE_UNSPECIFIED": 0,
+		"FUNCTION_TRIGGER_TYPE_EVENT":       1,
+		"FUNCTION_TRIGGER_TYPE_CRON":        2,
+	}
+)
+
+func (x FunctionTriggerType) Enum() *FunctionTriggerType {
+	p := new(FunctionTriggerType)
+	*p = x
+	return p
+}
+
+func (x FunctionTriggerType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FunctionTriggerType) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[3].Descriptor()
+}
+
+func (FunctionTriggerType) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[3]
+}
+
+func (x FunctionTriggerType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FunctionTriggerType.Descriptor instead.
+func (FunctionTriggerType) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{3}
+}
+
+type FunctionConcurrencyScope int32
+
+const (
+	FunctionConcurrencyScope_FUNCTION_CONCURRENCY_SCOPE_UNSPECIFIED FunctionConcurrencyScope = 0
+	FunctionConcurrencyScope_FUNCTION_CONCURRENCY_SCOPE_ACCOUNT     FunctionConcurrencyScope = 1
+	FunctionConcurrencyScope_FUNCTION_CONCURRENCY_SCOPE_ENVIRONMENT FunctionConcurrencyScope = 2
+	FunctionConcurrencyScope_FUNCTION_CONCURRENCY_SCOPE_FUNCTION    FunctionConcurrencyScope = 3
+)
+
+// Enum value maps for FunctionConcurrencyScope.
+var (
+	FunctionConcurrencyScope_name = map[int32]string{
+		0: "FUNCTION_CONCURRENCY_SCOPE_UNSPECIFIED",
+		1: "FUNCTION_CONCURRENCY_SCOPE_ACCOUNT",
+		2: "FUNCTION_CONCURRENCY_SCOPE_ENVIRONMENT",
+		3: "FUNCTION_CONCURRENCY_SCOPE_FUNCTION",
+	}
+	FunctionConcurrencyScope_value = map[string]int32{
+		"FUNCTION_CONCURRENCY_SCOPE_UNSPECIFIED": 0,
+		"FUNCTION_CONCURRENCY_SCOPE_ACCOUNT":     1,
+		"FUNCTION_CONCURRENCY_SCOPE_ENVIRONMENT": 2,
+		"FUNCTION_CONCURRENCY_SCOPE_FUNCTION":    3,
+	}
+)
+
+func (x FunctionConcurrencyScope) Enum() *FunctionConcurrencyScope {
+	p := new(FunctionConcurrencyScope)
+	*p = x
+	return p
+}
+
+func (x FunctionConcurrencyScope) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FunctionConcurrencyScope) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[4].Descriptor()
+}
+
+func (FunctionConcurrencyScope) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[4]
+}
+
+func (x FunctionConcurrencyScope) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FunctionConcurrencyScope.Descriptor instead.
+func (FunctionConcurrencyScope) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{4}
+}
+
+type FunctionSingletonMode int32
+
+const (
+	FunctionSingletonMode_FUNCTION_SINGLETON_MODE_UNSPECIFIED FunctionSingletonMode = 0
+	FunctionSingletonMode_FUNCTION_SINGLETON_MODE_SKIP        FunctionSingletonMode = 1
+	FunctionSingletonMode_FUNCTION_SINGLETON_MODE_CANCEL      FunctionSingletonMode = 2
+)
+
+// Enum value maps for FunctionSingletonMode.
+var (
+	FunctionSingletonMode_name = map[int32]string{
+		0: "FUNCTION_SINGLETON_MODE_UNSPECIFIED",
+		1: "FUNCTION_SINGLETON_MODE_SKIP",
+		2: "FUNCTION_SINGLETON_MODE_CANCEL",
+	}
+	FunctionSingletonMode_value = map[string]int32{
+		"FUNCTION_SINGLETON_MODE_UNSPECIFIED": 0,
+		"FUNCTION_SINGLETON_MODE_SKIP":        1,
+		"FUNCTION_SINGLETON_MODE_CANCEL":      2,
+	}
+)
+
+func (x FunctionSingletonMode) Enum() *FunctionSingletonMode {
+	p := new(FunctionSingletonMode)
+	*p = x
+	return p
+}
+
+func (x FunctionSingletonMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FunctionSingletonMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[5].Descriptor()
+}
+
+func (FunctionSingletonMode) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[5]
+}
+
+func (x FunctionSingletonMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FunctionSingletonMode.Descriptor instead.
+func (FunctionSingletonMode) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{5}
+}
+
+type AppMethod int32
+
+const (
+	AppMethod_APP_METHOD_UNSPECIFIED AppMethod = 0
+	AppMethod_APP_METHOD_SERVE       AppMethod = 1
+	AppMethod_APP_METHOD_CONNECT     AppMethod = 2
+	AppMethod_APP_METHOD_API         AppMethod = 3
+)
+
+// Enum value maps for AppMethod.
+var (
+	AppMethod_name = map[int32]string{
+		0: "APP_METHOD_UNSPECIFIED",
+		1: "APP_METHOD_SERVE",
+		2: "APP_METHOD_CONNECT",
+		3: "APP_METHOD_API",
+	}
+	AppMethod_value = map[string]int32{
+		"APP_METHOD_UNSPECIFIED": 0,
+		"APP_METHOD_SERVE":       1,
+		"APP_METHOD_CONNECT":     2,
+		"APP_METHOD_API":         3,
+	}
+)
+
+func (x AppMethod) Enum() *AppMethod {
+	p := new(AppMethod)
+	*p = x
+	return p
+}
+
+func (x AppMethod) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AppMethod) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_service_proto_enumTypes[6].Descriptor()
+}
+
+func (AppMethod) Type() protoreflect.EnumType {
+	return &file_api_v2_service_proto_enumTypes[6]
+}
+
+func (x AppMethod) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AppMethod.Descriptor instead.
+func (AppMethod) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{6}
+}
+
 type EnvType int32
 
 const (
@@ -241,11 +443,11 @@ func (x EnvType) String() string {
 }
 
 func (EnvType) Descriptor() protoreflect.EnumDescriptor {
-	return file_api_v2_service_proto_enumTypes[3].Descriptor()
+	return file_api_v2_service_proto_enumTypes[7].Descriptor()
 }
 
 func (EnvType) Type() protoreflect.EnumType {
-	return &file_api_v2_service_proto_enumTypes[3]
+	return &file_api_v2_service_proto_enumTypes[7]
 }
 
 func (x EnvType) Number() protoreflect.EnumNumber {
@@ -254,7 +456,7 @@ func (x EnvType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EnvType.Descriptor instead.
 func (EnvType) EnumDescriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{3}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{7}
 }
 
 type FilterType int32
@@ -287,11 +489,11 @@ func (x FilterType) String() string {
 }
 
 func (FilterType) Descriptor() protoreflect.EnumDescriptor {
-	return file_api_v2_service_proto_enumTypes[4].Descriptor()
+	return file_api_v2_service_proto_enumTypes[8].Descriptor()
 }
 
 func (FilterType) Type() protoreflect.EnumType {
-	return &file_api_v2_service_proto_enumTypes[4]
+	return &file_api_v2_service_proto_enumTypes[8]
 }
 
 func (x FilterType) Number() protoreflect.EnumNumber {
@@ -300,7 +502,7 @@ func (x FilterType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FilterType.Descriptor instead.
 func (FilterType) EnumDescriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{4}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{8}
 }
 
 type InsightsOutputColumnType int32
@@ -345,11 +547,11 @@ func (x InsightsOutputColumnType) String() string {
 }
 
 func (InsightsOutputColumnType) Descriptor() protoreflect.EnumDescriptor {
-	return file_api_v2_service_proto_enumTypes[5].Descriptor()
+	return file_api_v2_service_proto_enumTypes[9].Descriptor()
 }
 
 func (InsightsOutputColumnType) Type() protoreflect.EnumType {
-	return &file_api_v2_service_proto_enumTypes[5]
+	return &file_api_v2_service_proto_enumTypes[9]
 }
 
 func (x InsightsOutputColumnType) Number() protoreflect.EnumNumber {
@@ -358,7 +560,7 @@ func (x InsightsOutputColumnType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use InsightsOutputColumnType.Descriptor instead.
 func (InsightsOutputColumnType) EnumDescriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{5}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{9}
 }
 
 type InsightsDiagnosticSeverity int32
@@ -397,11 +599,11 @@ func (x InsightsDiagnosticSeverity) String() string {
 }
 
 func (InsightsDiagnosticSeverity) Descriptor() protoreflect.EnumDescriptor {
-	return file_api_v2_service_proto_enumTypes[6].Descriptor()
+	return file_api_v2_service_proto_enumTypes[10].Descriptor()
 }
 
 func (InsightsDiagnosticSeverity) Type() protoreflect.EnumType {
-	return &file_api_v2_service_proto_enumTypes[6]
+	return &file_api_v2_service_proto_enumTypes[10]
 }
 
 func (x InsightsDiagnosticSeverity) Number() protoreflect.EnumNumber {
@@ -410,7 +612,7 @@ func (x InsightsDiagnosticSeverity) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use InsightsDiagnosticSeverity.Descriptor instead.
 func (InsightsDiagnosticSeverity) EnumDescriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{6}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{10}
 }
 
 type HealthRequest struct {
@@ -681,6 +883,7 @@ type ResponseMetadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FetchedAt     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"`
 	CachedUntil   *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=cached_until,json=cachedUntil,proto3" json:"cached_until,omitempty"`
+	TimeRange     *TimeRange             `protobuf:"bytes,3,opt,name=time_range,json=timeRange,proto3" json:"time_range,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -729,17 +932,77 @@ func (x *ResponseMetadata) GetCachedUntil() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *ResponseMetadata) GetTimeRange() *TimeRange {
+	if x != nil {
+		return x.TimeRange
+	}
+	return nil
+}
+
+type TimeRange struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	From          *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=until,proto3" json:"until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimeRange) Reset() {
+	*x = TimeRange{}
+	mi := &file_api_v2_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimeRange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimeRange) ProtoMessage() {}
+
+func (x *TimeRange) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimeRange.ProtoReflect.Descriptor instead.
+func (*TimeRange) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *TimeRange) GetFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *TimeRange) GetUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Until
+	}
+	return nil
+}
+
 type FunctionRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	App           *AppRef                `protobuf:"bytes,3,opt,name=app,proto3" json:"app,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FunctionRef) Reset() {
 	*x = FunctionRef{}
-	mi := &file_api_v2_service_proto_msgTypes[7]
+	mi := &file_api_v2_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -751,7 +1014,7 @@ func (x *FunctionRef) String() string {
 func (*FunctionRef) ProtoMessage() {}
 
 func (x *FunctionRef) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[7]
+	mi := &file_api_v2_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -764,7 +1027,7 @@ func (x *FunctionRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionRef.ProtoReflect.Descriptor instead.
 func (*FunctionRef) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{7}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *FunctionRef) GetId() string {
@@ -781,6 +1044,13 @@ func (x *FunctionRef) GetName() string {
 	return ""
 }
 
+func (x *FunctionRef) GetApp() *AppRef {
+	if x != nil {
+		return x.App
+	}
+	return nil
+}
+
 type AppRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -790,7 +1060,7 @@ type AppRef struct {
 
 func (x *AppRef) Reset() {
 	*x = AppRef{}
-	mi := &file_api_v2_service_proto_msgTypes[8]
+	mi := &file_api_v2_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -802,7 +1072,7 @@ func (x *AppRef) String() string {
 func (*AppRef) ProtoMessage() {}
 
 func (x *AppRef) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[8]
+	mi := &file_api_v2_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -815,7 +1085,7 @@ func (x *AppRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppRef.ProtoReflect.Descriptor instead.
 func (*AppRef) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{8}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AppRef) GetId() string {
@@ -823,6 +1093,894 @@ func (x *AppRef) GetId() string {
 		return x.Id
 	}
 	return ""
+}
+
+type FunctionApp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionApp) Reset() {
+	*x = FunctionApp{}
+	mi := &file_api_v2_service_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionApp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionApp) ProtoMessage() {}
+
+func (x *FunctionApp) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionApp.ProtoReflect.Descriptor instead.
+func (*FunctionApp) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *FunctionApp) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type FunctionTrigger struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          FunctionTriggerType    `protobuf:"varint,1,opt,name=type,proto3,enum=api.v2.FunctionTriggerType" json:"type,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	If            *string                `protobuf:"bytes,3,opt,name=if,proto3,oneof" json:"if,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionTrigger) Reset() {
+	*x = FunctionTrigger{}
+	mi := &file_api_v2_service_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionTrigger) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionTrigger) ProtoMessage() {}
+
+func (x *FunctionTrigger) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionTrigger.ProtoReflect.Descriptor instead.
+func (*FunctionTrigger) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *FunctionTrigger) GetType() FunctionTriggerType {
+	if x != nil {
+		return x.Type
+	}
+	return FunctionTriggerType_FUNCTION_TRIGGER_TYPE_UNSPECIFIED
+}
+
+func (x *FunctionTrigger) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *FunctionTrigger) GetIf() string {
+	if x != nil && x.If != nil {
+		return *x.If
+	}
+	return ""
+}
+
+type FunctionFailureHandler struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Slug          string                 `protobuf:"bytes,1,opt,name=slug,proto3" json:"slug,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionFailureHandler) Reset() {
+	*x = FunctionFailureHandler{}
+	mi := &file_api_v2_service_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionFailureHandler) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionFailureHandler) ProtoMessage() {}
+
+func (x *FunctionFailureHandler) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionFailureHandler.ProtoReflect.Descriptor instead.
+func (*FunctionFailureHandler) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *FunctionFailureHandler) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *FunctionFailureHandler) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type FunctionCancellationConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Event         string                 `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+	Timeout       *string                `protobuf:"bytes,2,opt,name=timeout,proto3,oneof" json:"timeout,omitempty"`
+	Condition     *string                `protobuf:"bytes,3,opt,name=condition,proto3,oneof" json:"condition,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionCancellationConfiguration) Reset() {
+	*x = FunctionCancellationConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionCancellationConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionCancellationConfiguration) ProtoMessage() {}
+
+func (x *FunctionCancellationConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionCancellationConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionCancellationConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *FunctionCancellationConfiguration) GetEvent() string {
+	if x != nil {
+		return x.Event
+	}
+	return ""
+}
+
+func (x *FunctionCancellationConfiguration) GetTimeout() string {
+	if x != nil && x.Timeout != nil {
+		return *x.Timeout
+	}
+	return ""
+}
+
+func (x *FunctionCancellationConfiguration) GetCondition() string {
+	if x != nil && x.Condition != nil {
+		return *x.Condition
+	}
+	return ""
+}
+
+type FunctionRetryConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         int32                  `protobuf:"varint,1,opt,name=value,proto3" json:"value,omitempty"`
+	IsDefault     *bool                  `protobuf:"varint,2,opt,name=is_default,json=isDefault,proto3,oneof" json:"is_default,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionRetryConfiguration) Reset() {
+	*x = FunctionRetryConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionRetryConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionRetryConfiguration) ProtoMessage() {}
+
+func (x *FunctionRetryConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionRetryConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionRetryConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *FunctionRetryConfiguration) GetValue() int32 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *FunctionRetryConfiguration) GetIsDefault() bool {
+	if x != nil && x.IsDefault != nil {
+		return *x.IsDefault
+	}
+	return false
+}
+
+type FunctionEventsBatchConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MaxSize       int32                  `protobuf:"varint,1,opt,name=max_size,json=maxSize,proto3" json:"max_size,omitempty"`
+	Timeout       string                 `protobuf:"bytes,2,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	Key           *string                `protobuf:"bytes,3,opt,name=key,proto3,oneof" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionEventsBatchConfiguration) Reset() {
+	*x = FunctionEventsBatchConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionEventsBatchConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionEventsBatchConfiguration) ProtoMessage() {}
+
+func (x *FunctionEventsBatchConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionEventsBatchConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionEventsBatchConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *FunctionEventsBatchConfiguration) GetMaxSize() int32 {
+	if x != nil {
+		return x.MaxSize
+	}
+	return 0
+}
+
+func (x *FunctionEventsBatchConfiguration) GetTimeout() string {
+	if x != nil {
+		return x.Timeout
+	}
+	return ""
+}
+
+func (x *FunctionEventsBatchConfiguration) GetKey() string {
+	if x != nil && x.Key != nil {
+		return *x.Key
+	}
+	return ""
+}
+
+type FunctionConcurrencyLimitConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         int32                  `protobuf:"varint,1,opt,name=value,proto3" json:"value,omitempty"`
+	IsPlanLimit   *bool                  `protobuf:"varint,2,opt,name=is_plan_limit,json=isPlanLimit,proto3,oneof" json:"is_plan_limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionConcurrencyLimitConfiguration) Reset() {
+	*x = FunctionConcurrencyLimitConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionConcurrencyLimitConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionConcurrencyLimitConfiguration) ProtoMessage() {}
+
+func (x *FunctionConcurrencyLimitConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionConcurrencyLimitConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionConcurrencyLimitConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *FunctionConcurrencyLimitConfiguration) GetValue() int32 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *FunctionConcurrencyLimitConfiguration) GetIsPlanLimit() bool {
+	if x != nil && x.IsPlanLimit != nil {
+		return *x.IsPlanLimit
+	}
+	return false
+}
+
+type FunctionConcurrencyConfiguration struct {
+	state         protoimpl.MessageState                 `protogen:"open.v1"`
+	Scope         FunctionConcurrencyScope               `protobuf:"varint,1,opt,name=scope,proto3,enum=api.v2.FunctionConcurrencyScope" json:"scope,omitempty"`
+	Limit         *FunctionConcurrencyLimitConfiguration `protobuf:"bytes,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	Key           *string                                `protobuf:"bytes,3,opt,name=key,proto3,oneof" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionConcurrencyConfiguration) Reset() {
+	*x = FunctionConcurrencyConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionConcurrencyConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionConcurrencyConfiguration) ProtoMessage() {}
+
+func (x *FunctionConcurrencyConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionConcurrencyConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionConcurrencyConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *FunctionConcurrencyConfiguration) GetScope() FunctionConcurrencyScope {
+	if x != nil {
+		return x.Scope
+	}
+	return FunctionConcurrencyScope_FUNCTION_CONCURRENCY_SCOPE_UNSPECIFIED
+}
+
+func (x *FunctionConcurrencyConfiguration) GetLimit() *FunctionConcurrencyLimitConfiguration {
+	if x != nil {
+		return x.Limit
+	}
+	return nil
+}
+
+func (x *FunctionConcurrencyConfiguration) GetKey() string {
+	if x != nil && x.Key != nil {
+		return *x.Key
+	}
+	return ""
+}
+
+type FunctionRateLimitConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	Period        string                 `protobuf:"bytes,2,opt,name=period,proto3" json:"period,omitempty"`
+	Key           *string                `protobuf:"bytes,3,opt,name=key,proto3,oneof" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionRateLimitConfiguration) Reset() {
+	*x = FunctionRateLimitConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionRateLimitConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionRateLimitConfiguration) ProtoMessage() {}
+
+func (x *FunctionRateLimitConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionRateLimitConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionRateLimitConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *FunctionRateLimitConfiguration) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *FunctionRateLimitConfiguration) GetPeriod() string {
+	if x != nil {
+		return x.Period
+	}
+	return ""
+}
+
+func (x *FunctionRateLimitConfiguration) GetKey() string {
+	if x != nil && x.Key != nil {
+		return *x.Key
+	}
+	return ""
+}
+
+type FunctionDebounceConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Period        string                 `protobuf:"bytes,1,opt,name=period,proto3" json:"period,omitempty"`
+	Key           *string                `protobuf:"bytes,2,opt,name=key,proto3,oneof" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionDebounceConfiguration) Reset() {
+	*x = FunctionDebounceConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionDebounceConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionDebounceConfiguration) ProtoMessage() {}
+
+func (x *FunctionDebounceConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionDebounceConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionDebounceConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *FunctionDebounceConfiguration) GetPeriod() string {
+	if x != nil {
+		return x.Period
+	}
+	return ""
+}
+
+func (x *FunctionDebounceConfiguration) GetKey() string {
+	if x != nil && x.Key != nil {
+		return *x.Key
+	}
+	return ""
+}
+
+type FunctionThrottleConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Burst         int32                  `protobuf:"varint,1,opt,name=burst,proto3" json:"burst,omitempty"`
+	Key           *string                `protobuf:"bytes,2,opt,name=key,proto3,oneof" json:"key,omitempty"`
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Period        string                 `protobuf:"bytes,4,opt,name=period,proto3" json:"period,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionThrottleConfiguration) Reset() {
+	*x = FunctionThrottleConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionThrottleConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionThrottleConfiguration) ProtoMessage() {}
+
+func (x *FunctionThrottleConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionThrottleConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionThrottleConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *FunctionThrottleConfiguration) GetBurst() int32 {
+	if x != nil {
+		return x.Burst
+	}
+	return 0
+}
+
+func (x *FunctionThrottleConfiguration) GetKey() string {
+	if x != nil && x.Key != nil {
+		return *x.Key
+	}
+	return ""
+}
+
+func (x *FunctionThrottleConfiguration) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *FunctionThrottleConfiguration) GetPeriod() string {
+	if x != nil {
+		return x.Period
+	}
+	return ""
+}
+
+type FunctionSingletonConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Mode          FunctionSingletonMode  `protobuf:"varint,1,opt,name=mode,proto3,enum=api.v2.FunctionSingletonMode" json:"mode,omitempty"`
+	Key           *string                `protobuf:"bytes,2,opt,name=key,proto3,oneof" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionSingletonConfiguration) Reset() {
+	*x = FunctionSingletonConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionSingletonConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionSingletonConfiguration) ProtoMessage() {}
+
+func (x *FunctionSingletonConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionSingletonConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionSingletonConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *FunctionSingletonConfiguration) GetMode() FunctionSingletonMode {
+	if x != nil {
+		return x.Mode
+	}
+	return FunctionSingletonMode_FUNCTION_SINGLETON_MODE_UNSPECIFIED
+}
+
+func (x *FunctionSingletonConfiguration) GetKey() string {
+	if x != nil && x.Key != nil {
+		return *x.Key
+	}
+	return ""
+}
+
+type FunctionConfiguration struct {
+	state         protoimpl.MessageState               `protogen:"open.v1"`
+	Cancellations []*FunctionCancellationConfiguration `protobuf:"bytes,1,rep,name=cancellations,proto3" json:"cancellations,omitempty"`
+	Retries       *FunctionRetryConfiguration          `protobuf:"bytes,2,opt,name=retries,proto3" json:"retries,omitempty"`
+	Priority      *string                              `protobuf:"bytes,3,opt,name=priority,proto3,oneof" json:"priority,omitempty"`
+	EventsBatch   *FunctionEventsBatchConfiguration    `protobuf:"bytes,4,opt,name=events_batch,json=eventsBatch,proto3,oneof" json:"events_batch,omitempty"`
+	Concurrency   []*FunctionConcurrencyConfiguration  `protobuf:"bytes,5,rep,name=concurrency,proto3" json:"concurrency,omitempty"`
+	RateLimit     *FunctionRateLimitConfiguration      `protobuf:"bytes,6,opt,name=rate_limit,json=rateLimit,proto3,oneof" json:"rate_limit,omitempty"`
+	Debounce      *FunctionDebounceConfiguration       `protobuf:"bytes,7,opt,name=debounce,proto3,oneof" json:"debounce,omitempty"`
+	Throttle      *FunctionThrottleConfiguration       `protobuf:"bytes,8,opt,name=throttle,proto3,oneof" json:"throttle,omitempty"`
+	Singleton     *FunctionSingletonConfiguration      `protobuf:"bytes,9,opt,name=singleton,proto3,oneof" json:"singleton,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FunctionConfiguration) Reset() {
+	*x = FunctionConfiguration{}
+	mi := &file_api_v2_service_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FunctionConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FunctionConfiguration) ProtoMessage() {}
+
+func (x *FunctionConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FunctionConfiguration.ProtoReflect.Descriptor instead.
+func (*FunctionConfiguration) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *FunctionConfiguration) GetCancellations() []*FunctionCancellationConfiguration {
+	if x != nil {
+		return x.Cancellations
+	}
+	return nil
+}
+
+func (x *FunctionConfiguration) GetRetries() *FunctionRetryConfiguration {
+	if x != nil {
+		return x.Retries
+	}
+	return nil
+}
+
+func (x *FunctionConfiguration) GetPriority() string {
+	if x != nil && x.Priority != nil {
+		return *x.Priority
+	}
+	return ""
+}
+
+func (x *FunctionConfiguration) GetEventsBatch() *FunctionEventsBatchConfiguration {
+	if x != nil {
+		return x.EventsBatch
+	}
+	return nil
+}
+
+func (x *FunctionConfiguration) GetConcurrency() []*FunctionConcurrencyConfiguration {
+	if x != nil {
+		return x.Concurrency
+	}
+	return nil
+}
+
+func (x *FunctionConfiguration) GetRateLimit() *FunctionRateLimitConfiguration {
+	if x != nil {
+		return x.RateLimit
+	}
+	return nil
+}
+
+func (x *FunctionConfiguration) GetDebounce() *FunctionDebounceConfiguration {
+	if x != nil {
+		return x.Debounce
+	}
+	return nil
+}
+
+func (x *FunctionConfiguration) GetThrottle() *FunctionThrottleConfiguration {
+	if x != nil {
+		return x.Throttle
+	}
+	return nil
+}
+
+func (x *FunctionConfiguration) GetSingleton() *FunctionSingletonConfiguration {
+	if x != nil {
+		return x.Singleton
+	}
+	return nil
+}
+
+type Function struct {
+	state          protoimpl.MessageState  `protogen:"open.v1"`
+	Id             string                  `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name           string                  `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Slug           string                  `protobuf:"bytes,3,opt,name=slug,proto3" json:"slug,omitempty"`
+	IsPaused       bool                    `protobuf:"varint,4,opt,name=is_paused,json=isPaused,proto3" json:"is_paused,omitempty"`
+	IsArchived     bool                    `protobuf:"varint,5,opt,name=is_archived,json=isArchived,proto3" json:"is_archived,omitempty"`
+	App            *FunctionApp            `protobuf:"bytes,6,opt,name=app,proto3" json:"app,omitempty"`
+	Triggers       []*FunctionTrigger      `protobuf:"bytes,7,rep,name=triggers,proto3" json:"triggers,omitempty"`
+	FailureHandler *FunctionFailureHandler `protobuf:"bytes,8,opt,name=failure_handler,json=failureHandler,proto3,oneof" json:"failure_handler,omitempty"`
+	Configuration  *FunctionConfiguration  `protobuf:"bytes,9,opt,name=configuration,proto3" json:"configuration,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *Function) Reset() {
+	*x = Function{}
+	mi := &file_api_v2_service_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Function) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Function) ProtoMessage() {}
+
+func (x *Function) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Function.ProtoReflect.Descriptor instead.
+func (*Function) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *Function) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Function) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Function) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
+func (x *Function) GetIsPaused() bool {
+	if x != nil {
+		return x.IsPaused
+	}
+	return false
+}
+
+func (x *Function) GetIsArchived() bool {
+	if x != nil {
+		return x.IsArchived
+	}
+	return false
+}
+
+func (x *Function) GetApp() *FunctionApp {
+	if x != nil {
+		return x.App
+	}
+	return nil
+}
+
+func (x *Function) GetTriggers() []*FunctionTrigger {
+	if x != nil {
+		return x.Triggers
+	}
+	return nil
+}
+
+func (x *Function) GetFailureHandler() *FunctionFailureHandler {
+	if x != nil {
+		return x.FailureHandler
+	}
+	return nil
+}
+
+func (x *Function) GetConfiguration() *FunctionConfiguration {
+	if x != nil {
+		return x.Configuration
+	}
+	return nil
 }
 
 type RunTrigger struct {
@@ -838,7 +1996,7 @@ type RunTrigger struct {
 
 func (x *RunTrigger) Reset() {
 	*x = RunTrigger{}
-	mi := &file_api_v2_service_proto_msgTypes[9]
+	mi := &file_api_v2_service_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -850,7 +2008,7 @@ func (x *RunTrigger) String() string {
 func (*RunTrigger) ProtoMessage() {}
 
 func (x *RunTrigger) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[9]
+	mi := &file_api_v2_service_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -863,7 +2021,7 @@ func (x *RunTrigger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunTrigger.ProtoReflect.Descriptor instead.
 func (*RunTrigger) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{9}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RunTrigger) GetEventIds() []string {
@@ -919,7 +2077,7 @@ type FunctionRun struct {
 
 func (x *FunctionRun) Reset() {
 	*x = FunctionRun{}
-	mi := &file_api_v2_service_proto_msgTypes[10]
+	mi := &file_api_v2_service_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -931,7 +2089,7 @@ func (x *FunctionRun) String() string {
 func (*FunctionRun) ProtoMessage() {}
 
 func (x *FunctionRun) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[10]
+	mi := &file_api_v2_service_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -944,7 +2102,7 @@ func (x *FunctionRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionRun.ProtoReflect.Descriptor instead.
 func (*FunctionRun) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{10}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *FunctionRun) GetId() string {
@@ -1027,7 +2185,7 @@ type GetFunctionRunRequest struct {
 
 func (x *GetFunctionRunRequest) Reset() {
 	*x = GetFunctionRunRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[11]
+	mi := &file_api_v2_service_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1039,7 +2197,7 @@ func (x *GetFunctionRunRequest) String() string {
 func (*GetFunctionRunRequest) ProtoMessage() {}
 
 func (x *GetFunctionRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[11]
+	mi := &file_api_v2_service_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1052,7 +2210,7 @@ func (x *GetFunctionRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFunctionRunRequest.ProtoReflect.Descriptor instead.
 func (*GetFunctionRunRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{11}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetFunctionRunRequest) GetRunId() string {
@@ -1079,7 +2237,7 @@ type GetFunctionRunResponse struct {
 
 func (x *GetFunctionRunResponse) Reset() {
 	*x = GetFunctionRunResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[12]
+	mi := &file_api_v2_service_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1091,7 +2249,7 @@ func (x *GetFunctionRunResponse) String() string {
 func (*GetFunctionRunResponse) ProtoMessage() {}
 
 func (x *GetFunctionRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[12]
+	mi := &file_api_v2_service_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1104,7 +2262,7 @@ func (x *GetFunctionRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFunctionRunResponse.ProtoReflect.Descriptor instead.
 func (*GetFunctionRunResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{12}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetFunctionRunResponse) GetData() *FunctionRun {
@@ -1121,6 +2279,334 @@ func (x *GetFunctionRunResponse) GetMetadata() *ResponseMetadata {
 	return nil
 }
 
+type GetEventRunsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EventId       string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	IncludeOutput *bool                  `protobuf:"varint,2,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	Cursor        *string                `protobuf:"bytes,3,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,4,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetEventRunsRequest) Reset() {
+	*x = GetEventRunsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetEventRunsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetEventRunsRequest) ProtoMessage() {}
+
+func (x *GetEventRunsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetEventRunsRequest.ProtoReflect.Descriptor instead.
+func (*GetEventRunsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *GetEventRunsRequest) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *GetEventRunsRequest) GetIncludeOutput() bool {
+	if x != nil && x.IncludeOutput != nil {
+		return *x.IncludeOutput
+	}
+	return false
+}
+
+func (x *GetEventRunsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *GetEventRunsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+type GetEventRunsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*FunctionRun         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetEventRunsResponse) Reset() {
+	*x = GetEventRunsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetEventRunsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetEventRunsResponse) ProtoMessage() {}
+
+func (x *GetEventRunsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetEventRunsResponse.ProtoReflect.Descriptor instead.
+func (*GetEventRunsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *GetEventRunsResponse) GetData() []*FunctionRun {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetEventRunsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *GetEventRunsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type RerunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	FromStep      *RerunFromStep         `protobuf:"bytes,2,opt,name=from_step,json=fromStep,proto3,oneof" json:"from_step,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RerunRequest) Reset() {
+	*x = RerunRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RerunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RerunRequest) ProtoMessage() {}
+
+func (x *RerunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RerunRequest.ProtoReflect.Descriptor instead.
+func (*RerunRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *RerunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *RerunRequest) GetFromStep() *RerunFromStep {
+	if x != nil {
+		return x.FromStep
+	}
+	return nil
+}
+
+type RerunFromStep struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StepId        string                 `protobuf:"bytes,1,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	Input         *structpb.ListValue    `protobuf:"bytes,2,opt,name=input,proto3,oneof" json:"input,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RerunFromStep) Reset() {
+	*x = RerunFromStep{}
+	mi := &file_api_v2_service_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RerunFromStep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RerunFromStep) ProtoMessage() {}
+
+func (x *RerunFromStep) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RerunFromStep.ProtoReflect.Descriptor instead.
+func (*RerunFromStep) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *RerunFromStep) GetStepId() string {
+	if x != nil {
+		return x.StepId
+	}
+	return ""
+}
+
+func (x *RerunFromStep) GetInput() *structpb.ListValue {
+	if x != nil {
+		return x.Input
+	}
+	return nil
+}
+
+type RerunResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *RerunData             `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RerunResponse) Reset() {
+	*x = RerunResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RerunResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RerunResponse) ProtoMessage() {}
+
+func (x *RerunResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RerunResponse.ProtoReflect.Descriptor instead.
+func (*RerunResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *RerunResponse) GetData() *RerunData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *RerunResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type RerunData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RerunData) Reset() {
+	*x = RerunData{}
+	mi := &file_api_v2_service_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RerunData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RerunData) ProtoMessage() {}
+
+func (x *RerunData) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RerunData.ProtoReflect.Descriptor instead.
+func (*RerunData) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *RerunData) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
 type TraceSpanMetadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scope         string                 `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -1133,7 +2619,7 @@ type TraceSpanMetadata struct {
 
 func (x *TraceSpanMetadata) Reset() {
 	*x = TraceSpanMetadata{}
-	mi := &file_api_v2_service_proto_msgTypes[13]
+	mi := &file_api_v2_service_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1145,7 +2631,7 @@ func (x *TraceSpanMetadata) String() string {
 func (*TraceSpanMetadata) ProtoMessage() {}
 
 func (x *TraceSpanMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[13]
+	mi := &file_api_v2_service_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1158,7 +2644,7 @@ func (x *TraceSpanMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TraceSpanMetadata.ProtoReflect.Descriptor instead.
 func (*TraceSpanMetadata) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{13}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *TraceSpanMetadata) GetScope() string {
@@ -1210,7 +2696,7 @@ type TraceSpan struct {
 
 func (x *TraceSpan) Reset() {
 	*x = TraceSpan{}
-	mi := &file_api_v2_service_proto_msgTypes[14]
+	mi := &file_api_v2_service_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1222,7 +2708,7 @@ func (x *TraceSpan) String() string {
 func (*TraceSpan) ProtoMessage() {}
 
 func (x *TraceSpan) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[14]
+	mi := &file_api_v2_service_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1235,7 +2721,7 @@ func (x *TraceSpan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TraceSpan.ProtoReflect.Descriptor instead.
 func (*TraceSpan) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{14}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *TraceSpan) GetId() string {
@@ -1339,7 +2825,7 @@ type FunctionTrace struct {
 
 func (x *FunctionTrace) Reset() {
 	*x = FunctionTrace{}
-	mi := &file_api_v2_service_proto_msgTypes[15]
+	mi := &file_api_v2_service_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1351,7 +2837,7 @@ func (x *FunctionTrace) String() string {
 func (*FunctionTrace) ProtoMessage() {}
 
 func (x *FunctionTrace) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[15]
+	mi := &file_api_v2_service_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1364,7 +2850,7 @@ func (x *FunctionTrace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FunctionTrace.ProtoReflect.Descriptor instead.
 func (*FunctionTrace) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{15}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *FunctionTrace) GetRunId() string {
@@ -1391,7 +2877,7 @@ type GetFunctionTraceRequest struct {
 
 func (x *GetFunctionTraceRequest) Reset() {
 	*x = GetFunctionTraceRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[16]
+	mi := &file_api_v2_service_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1403,7 +2889,7 @@ func (x *GetFunctionTraceRequest) String() string {
 func (*GetFunctionTraceRequest) ProtoMessage() {}
 
 func (x *GetFunctionTraceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[16]
+	mi := &file_api_v2_service_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1416,7 +2902,7 @@ func (x *GetFunctionTraceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFunctionTraceRequest.ProtoReflect.Descriptor instead.
 func (*GetFunctionTraceRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{16}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetFunctionTraceRequest) GetRunId() string {
@@ -1443,7 +2929,7 @@ type GetFunctionTraceResponse struct {
 
 func (x *GetFunctionTraceResponse) Reset() {
 	*x = GetFunctionTraceResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[17]
+	mi := &file_api_v2_service_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1455,7 +2941,7 @@ func (x *GetFunctionTraceResponse) String() string {
 func (*GetFunctionTraceResponse) ProtoMessage() {}
 
 func (x *GetFunctionTraceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[17]
+	mi := &file_api_v2_service_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1468,7 +2954,7 @@ func (x *GetFunctionTraceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFunctionTraceResponse.ProtoReflect.Descriptor instead.
 func (*GetFunctionTraceResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{17}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetFunctionTraceResponse) GetData() *FunctionTrace {
@@ -1485,6 +2971,534 @@ func (x *GetFunctionTraceResponse) GetMetadata() *ResponseMetadata {
 	return nil
 }
 
+type GetFunctionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFunctionRequest) Reset() {
+	*x = GetFunctionRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFunctionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFunctionRequest) ProtoMessage() {}
+
+func (x *GetFunctionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFunctionRequest.ProtoReflect.Descriptor instead.
+func (*GetFunctionRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *GetFunctionRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *GetFunctionRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+type GetFunctionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *Function              `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFunctionResponse) Reset() {
+	*x = GetFunctionResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFunctionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFunctionResponse) ProtoMessage() {}
+
+func (x *GetFunctionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFunctionResponse.ProtoReflect.Descriptor instead.
+func (*GetFunctionResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *GetFunctionResponse) GetData() *Function {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetFunctionResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type App struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Method        AppMethod              `protobuf:"varint,3,opt,name=method,proto3,enum=api.v2.AppMethod" json:"method,omitempty"`
+	AppVersion    *string                `protobuf:"bytes,4,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	IsArchived    bool                   `protobuf:"varint,10,opt,name=is_archived,json=isArchived,proto3" json:"is_archived,omitempty"`
+	ArchivedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=archived_at,json=archivedAt,proto3,oneof" json:"archived_at,omitempty"`
+	FunctionCount int32                  `protobuf:"varint,12,opt,name=function_count,json=functionCount,proto3" json:"function_count,omitempty"`
+	LatestSync    *AppSync               `protobuf:"bytes,14,opt,name=latest_sync,json=latestSync,proto3,oneof" json:"latest_sync,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *App) Reset() {
+	*x = App{}
+	mi := &file_api_v2_service_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *App) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*App) ProtoMessage() {}
+
+func (x *App) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use App.ProtoReflect.Descriptor instead.
+func (*App) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *App) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *App) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *App) GetMethod() AppMethod {
+	if x != nil {
+		return x.Method
+	}
+	return AppMethod_APP_METHOD_UNSPECIFIED
+}
+
+func (x *App) GetAppVersion() string {
+	if x != nil && x.AppVersion != nil {
+		return *x.AppVersion
+	}
+	return ""
+}
+
+func (x *App) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *App) GetIsArchived() bool {
+	if x != nil {
+		return x.IsArchived
+	}
+	return false
+}
+
+func (x *App) GetArchivedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ArchivedAt
+	}
+	return nil
+}
+
+func (x *App) GetFunctionCount() int32 {
+	if x != nil {
+		return x.FunctionCount
+	}
+	return 0
+}
+
+func (x *App) GetLatestSync() *AppSync {
+	if x != nil {
+		return x.LatestSync
+	}
+	return nil
+}
+
+type AppSync struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        *string                `protobuf:"bytes,1,opt,name=status,proto3,oneof" json:"status,omitempty"`
+	SyncedAt      *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=synced_at,json=syncedAt,proto3,oneof" json:"synced_at,omitempty"`
+	SdkLanguage   *string                `protobuf:"bytes,4,opt,name=sdk_language,json=sdkLanguage,proto3,oneof" json:"sdk_language,omitempty"`
+	SdkVersion    *string                `protobuf:"bytes,5,opt,name=sdk_version,json=sdkVersion,proto3,oneof" json:"sdk_version,omitempty"`
+	Framework     *string                `protobuf:"bytes,6,opt,name=framework,proto3,oneof" json:"framework,omitempty"`
+	Url           *string                `protobuf:"bytes,7,opt,name=url,proto3,oneof" json:"url,omitempty"`
+	Error         *string                `protobuf:"bytes,8,opt,name=error,proto3,oneof" json:"error,omitempty"`
+	AppVersion    *string                `protobuf:"bytes,9,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppSync) Reset() {
+	*x = AppSync{}
+	mi := &file_api_v2_service_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppSync) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppSync) ProtoMessage() {}
+
+func (x *AppSync) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppSync.ProtoReflect.Descriptor instead.
+func (*AppSync) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *AppSync) GetStatus() string {
+	if x != nil && x.Status != nil {
+		return *x.Status
+	}
+	return ""
+}
+
+func (x *AppSync) GetSyncedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SyncedAt
+	}
+	return nil
+}
+
+func (x *AppSync) GetSdkLanguage() string {
+	if x != nil && x.SdkLanguage != nil {
+		return *x.SdkLanguage
+	}
+	return ""
+}
+
+func (x *AppSync) GetSdkVersion() string {
+	if x != nil && x.SdkVersion != nil {
+		return *x.SdkVersion
+	}
+	return ""
+}
+
+func (x *AppSync) GetFramework() string {
+	if x != nil && x.Framework != nil {
+		return *x.Framework
+	}
+	return ""
+}
+
+func (x *AppSync) GetUrl() string {
+	if x != nil && x.Url != nil {
+		return *x.Url
+	}
+	return ""
+}
+
+func (x *AppSync) GetError() string {
+	if x != nil && x.Error != nil {
+		return *x.Error
+	}
+	return ""
+}
+
+func (x *AppSync) GetAppVersion() string {
+	if x != nil && x.AppVersion != nil {
+		return *x.AppVersion
+	}
+	return ""
+}
+
+type GetAppRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAppRequest) Reset() {
+	*x = GetAppRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAppRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAppRequest) ProtoMessage() {}
+
+func (x *GetAppRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAppRequest.ProtoReflect.Descriptor instead.
+func (*GetAppRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *GetAppRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+type GetAppResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *App                   `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAppResponse) Reset() {
+	*x = GetAppResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAppResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAppResponse) ProtoMessage() {}
+
+func (x *GetAppResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAppResponse.ProtoReflect.Descriptor instead.
+func (*GetAppResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *GetAppResponse) GetData() *App {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetAppResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type GetFunctionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFunctionsRequest) Reset() {
+	*x = GetFunctionsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFunctionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFunctionsRequest) ProtoMessage() {}
+
+func (x *GetFunctionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFunctionsRequest.ProtoReflect.Descriptor instead.
+func (*GetFunctionsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *GetFunctionsRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *GetFunctionsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *GetFunctionsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+type GetFunctionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*Function            `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFunctionsResponse) Reset() {
+	*x = GetFunctionsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFunctionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFunctionsResponse) ProtoMessage() {}
+
+func (x *GetFunctionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFunctionsResponse.ProtoReflect.Descriptor instead.
+func (*GetFunctionsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *GetFunctionsResponse) GetData() []*Function {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetFunctionsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *GetFunctionsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
 type CreateAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
@@ -1495,7 +3509,7 @@ type CreateAccountRequest struct {
 
 func (x *CreateAccountRequest) Reset() {
 	*x = CreateAccountRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[18]
+	mi := &file_api_v2_service_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1507,7 +3521,7 @@ func (x *CreateAccountRequest) String() string {
 func (*CreateAccountRequest) ProtoMessage() {}
 
 func (x *CreateAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[18]
+	mi := &file_api_v2_service_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1520,7 +3534,7 @@ func (x *CreateAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccountRequest.ProtoReflect.Descriptor instead.
 func (*CreateAccountRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{18}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *CreateAccountRequest) GetEmail() string {
@@ -1547,7 +3561,7 @@ type CreateAccountResponse struct {
 
 func (x *CreateAccountResponse) Reset() {
 	*x = CreateAccountResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[19]
+	mi := &file_api_v2_service_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1559,7 +3573,7 @@ func (x *CreateAccountResponse) String() string {
 func (*CreateAccountResponse) ProtoMessage() {}
 
 func (x *CreateAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[19]
+	mi := &file_api_v2_service_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1572,7 +3586,7 @@ func (x *CreateAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccountResponse.ProtoReflect.Descriptor instead.
 func (*CreateAccountResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{19}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *CreateAccountResponse) GetData() *CreateAccountData {
@@ -1599,7 +3613,7 @@ type CreateEnvRequest struct {
 
 func (x *CreateEnvRequest) Reset() {
 	*x = CreateEnvRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[20]
+	mi := &file_api_v2_service_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1611,7 +3625,7 @@ func (x *CreateEnvRequest) String() string {
 func (*CreateEnvRequest) ProtoMessage() {}
 
 func (x *CreateEnvRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[20]
+	mi := &file_api_v2_service_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1624,7 +3638,7 @@ func (x *CreateEnvRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEnvRequest.ProtoReflect.Descriptor instead.
 func (*CreateEnvRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{20}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *CreateEnvRequest) GetName() string {
@@ -1651,7 +3665,7 @@ type CreateEnvResponse struct {
 
 func (x *CreateEnvResponse) Reset() {
 	*x = CreateEnvResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[21]
+	mi := &file_api_v2_service_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1663,7 +3677,7 @@ func (x *CreateEnvResponse) String() string {
 func (*CreateEnvResponse) ProtoMessage() {}
 
 func (x *CreateEnvResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[21]
+	mi := &file_api_v2_service_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1676,7 +3690,7 @@ func (x *CreateEnvResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateEnvResponse.ProtoReflect.Descriptor instead.
 func (*CreateEnvResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{21}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *CreateEnvResponse) GetData() *Env {
@@ -1706,7 +3720,7 @@ type Env struct {
 
 func (x *Env) Reset() {
 	*x = Env{}
-	mi := &file_api_v2_service_proto_msgTypes[22]
+	mi := &file_api_v2_service_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1718,7 +3732,7 @@ func (x *Env) String() string {
 func (*Env) ProtoMessage() {}
 
 func (x *Env) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[22]
+	mi := &file_api_v2_service_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1731,7 +3745,7 @@ func (x *Env) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Env.ProtoReflect.Descriptor instead.
 func (*Env) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{22}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *Env) GetId() string {
@@ -1783,7 +3797,7 @@ type CreateAccountData struct {
 
 func (x *CreateAccountData) Reset() {
 	*x = CreateAccountData{}
-	mi := &file_api_v2_service_proto_msgTypes[23]
+	mi := &file_api_v2_service_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1795,7 +3809,7 @@ func (x *CreateAccountData) String() string {
 func (*CreateAccountData) ProtoMessage() {}
 
 func (x *CreateAccountData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[23]
+	mi := &file_api_v2_service_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1808,7 +3822,7 @@ func (x *CreateAccountData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccountData.ProtoReflect.Descriptor instead.
 func (*CreateAccountData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{23}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *CreateAccountData) GetId() string {
@@ -1863,7 +3877,7 @@ type FetchAccountsRequest struct {
 
 func (x *FetchAccountsRequest) Reset() {
 	*x = FetchAccountsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[24]
+	mi := &file_api_v2_service_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1875,7 +3889,7 @@ func (x *FetchAccountsRequest) String() string {
 func (*FetchAccountsRequest) ProtoMessage() {}
 
 func (x *FetchAccountsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[24]
+	mi := &file_api_v2_service_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1888,7 +3902,7 @@ func (x *FetchAccountsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountsRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{24}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *FetchAccountsRequest) GetCursor() string {
@@ -1916,7 +3930,7 @@ type FetchAccountsResponse struct {
 
 func (x *FetchAccountsResponse) Reset() {
 	*x = FetchAccountsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[25]
+	mi := &file_api_v2_service_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1928,7 +3942,7 @@ func (x *FetchAccountsResponse) String() string {
 func (*FetchAccountsResponse) ProtoMessage() {}
 
 func (x *FetchAccountsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[25]
+	mi := &file_api_v2_service_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1941,7 +3955,7 @@ func (x *FetchAccountsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountsResponse.ProtoReflect.Descriptor instead.
 func (*FetchAccountsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{25}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *FetchAccountsResponse) GetData() []*Account {
@@ -1975,7 +3989,7 @@ type FetchAccountResponse struct {
 
 func (x *FetchAccountResponse) Reset() {
 	*x = FetchAccountResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[26]
+	mi := &file_api_v2_service_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1987,7 +4001,7 @@ func (x *FetchAccountResponse) String() string {
 func (*FetchAccountResponse) ProtoMessage() {}
 
 func (x *FetchAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[26]
+	mi := &file_api_v2_service_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2000,7 +4014,7 @@ func (x *FetchAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountResponse.ProtoReflect.Descriptor instead.
 func (*FetchAccountResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{26}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *FetchAccountResponse) GetData() *Account {
@@ -2030,7 +4044,7 @@ type Account struct {
 
 func (x *Account) Reset() {
 	*x = Account{}
-	mi := &file_api_v2_service_proto_msgTypes[27]
+	mi := &file_api_v2_service_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2042,7 +4056,7 @@ func (x *Account) String() string {
 func (*Account) ProtoMessage() {}
 
 func (x *Account) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[27]
+	mi := &file_api_v2_service_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2055,7 +4069,7 @@ func (x *Account) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Account.ProtoReflect.Descriptor instead.
 func (*Account) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{27}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *Account) GetId() string {
@@ -2104,7 +4118,7 @@ type Page struct {
 
 func (x *Page) Reset() {
 	*x = Page{}
-	mi := &file_api_v2_service_proto_msgTypes[28]
+	mi := &file_api_v2_service_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2116,7 +4130,7 @@ func (x *Page) String() string {
 func (*Page) ProtoMessage() {}
 
 func (x *Page) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[28]
+	mi := &file_api_v2_service_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2129,7 +4143,7 @@ func (x *Page) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Page.ProtoReflect.Descriptor instead.
 func (*Page) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{28}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *Page) GetCursor() string {
@@ -2163,7 +4177,7 @@ type FetchAccountEventKeysRequest struct {
 
 func (x *FetchAccountEventKeysRequest) Reset() {
 	*x = FetchAccountEventKeysRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[29]
+	mi := &file_api_v2_service_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2175,7 +4189,7 @@ func (x *FetchAccountEventKeysRequest) String() string {
 func (*FetchAccountEventKeysRequest) ProtoMessage() {}
 
 func (x *FetchAccountEventKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[29]
+	mi := &file_api_v2_service_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2188,7 +4202,7 @@ func (x *FetchAccountEventKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountEventKeysRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountEventKeysRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{29}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *FetchAccountEventKeysRequest) GetCursor() string {
@@ -2216,7 +4230,7 @@ type FetchAccountEventKeysResponse struct {
 
 func (x *FetchAccountEventKeysResponse) Reset() {
 	*x = FetchAccountEventKeysResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[30]
+	mi := &file_api_v2_service_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2228,7 +4242,7 @@ func (x *FetchAccountEventKeysResponse) String() string {
 func (*FetchAccountEventKeysResponse) ProtoMessage() {}
 
 func (x *FetchAccountEventKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[30]
+	mi := &file_api_v2_service_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2241,7 +4255,7 @@ func (x *FetchAccountEventKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountEventKeysResponse.ProtoReflect.Descriptor instead.
 func (*FetchAccountEventKeysResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{30}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *FetchAccountEventKeysResponse) GetData() []*EventKey {
@@ -2278,7 +4292,7 @@ type EventKey struct {
 
 func (x *EventKey) Reset() {
 	*x = EventKey{}
-	mi := &file_api_v2_service_proto_msgTypes[31]
+	mi := &file_api_v2_service_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2290,7 +4304,7 @@ func (x *EventKey) String() string {
 func (*EventKey) ProtoMessage() {}
 
 func (x *EventKey) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[31]
+	mi := &file_api_v2_service_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2303,7 +4317,7 @@ func (x *EventKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventKey.ProtoReflect.Descriptor instead.
 func (*EventKey) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{31}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *EventKey) GetId() string {
@@ -2351,7 +4365,7 @@ type FetchAccountEnvsRequest struct {
 
 func (x *FetchAccountEnvsRequest) Reset() {
 	*x = FetchAccountEnvsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[32]
+	mi := &file_api_v2_service_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2363,7 +4377,7 @@ func (x *FetchAccountEnvsRequest) String() string {
 func (*FetchAccountEnvsRequest) ProtoMessage() {}
 
 func (x *FetchAccountEnvsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[32]
+	mi := &file_api_v2_service_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2376,7 +4390,7 @@ func (x *FetchAccountEnvsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountEnvsRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountEnvsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{32}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *FetchAccountEnvsRequest) GetCursor() string {
@@ -2404,7 +4418,7 @@ type FetchAccountEnvsResponse struct {
 
 func (x *FetchAccountEnvsResponse) Reset() {
 	*x = FetchAccountEnvsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[33]
+	mi := &file_api_v2_service_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2416,7 +4430,7 @@ func (x *FetchAccountEnvsResponse) String() string {
 func (*FetchAccountEnvsResponse) ProtoMessage() {}
 
 func (x *FetchAccountEnvsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[33]
+	mi := &file_api_v2_service_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2429,7 +4443,7 @@ func (x *FetchAccountEnvsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountEnvsResponse.ProtoReflect.Descriptor instead.
 func (*FetchAccountEnvsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{33}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *FetchAccountEnvsResponse) GetData() []*Env {
@@ -2463,7 +4477,7 @@ type FetchAccountSigningKeysRequest struct {
 
 func (x *FetchAccountSigningKeysRequest) Reset() {
 	*x = FetchAccountSigningKeysRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[34]
+	mi := &file_api_v2_service_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2475,7 +4489,7 @@ func (x *FetchAccountSigningKeysRequest) String() string {
 func (*FetchAccountSigningKeysRequest) ProtoMessage() {}
 
 func (x *FetchAccountSigningKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[34]
+	mi := &file_api_v2_service_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2488,7 +4502,7 @@ func (x *FetchAccountSigningKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountSigningKeysRequest.ProtoReflect.Descriptor instead.
 func (*FetchAccountSigningKeysRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{34}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *FetchAccountSigningKeysRequest) GetCursor() string {
@@ -2516,7 +4530,7 @@ type FetchAccountSigningKeysResponse struct {
 
 func (x *FetchAccountSigningKeysResponse) Reset() {
 	*x = FetchAccountSigningKeysResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[35]
+	mi := &file_api_v2_service_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2528,7 +4542,7 @@ func (x *FetchAccountSigningKeysResponse) String() string {
 func (*FetchAccountSigningKeysResponse) ProtoMessage() {}
 
 func (x *FetchAccountSigningKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[35]
+	mi := &file_api_v2_service_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2541,7 +4555,7 @@ func (x *FetchAccountSigningKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchAccountSigningKeysResponse.ProtoReflect.Descriptor instead.
 func (*FetchAccountSigningKeysResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{35}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *FetchAccountSigningKeysResponse) GetData() []*SigningKey {
@@ -2578,7 +4592,7 @@ type SigningKey struct {
 
 func (x *SigningKey) Reset() {
 	*x = SigningKey{}
-	mi := &file_api_v2_service_proto_msgTypes[36]
+	mi := &file_api_v2_service_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2590,7 +4604,7 @@ func (x *SigningKey) String() string {
 func (*SigningKey) ProtoMessage() {}
 
 func (x *SigningKey) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[36]
+	mi := &file_api_v2_service_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2603,7 +4617,7 @@ func (x *SigningKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningKey.ProtoReflect.Descriptor instead.
 func (*SigningKey) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{36}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *SigningKey) GetId() string {
@@ -2653,7 +4667,7 @@ type CreateWebhookRequest struct {
 
 func (x *CreateWebhookRequest) Reset() {
 	*x = CreateWebhookRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[37]
+	mi := &file_api_v2_service_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2665,7 +4679,7 @@ func (x *CreateWebhookRequest) String() string {
 func (*CreateWebhookRequest) ProtoMessage() {}
 
 func (x *CreateWebhookRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[37]
+	mi := &file_api_v2_service_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2678,7 +4692,7 @@ func (x *CreateWebhookRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWebhookRequest.ProtoReflect.Descriptor instead.
 func (*CreateWebhookRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{37}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *CreateWebhookRequest) GetName() string {
@@ -2719,7 +4733,7 @@ type CreateWebhookResponse struct {
 
 func (x *CreateWebhookResponse) Reset() {
 	*x = CreateWebhookResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[38]
+	mi := &file_api_v2_service_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2731,7 +4745,7 @@ func (x *CreateWebhookResponse) String() string {
 func (*CreateWebhookResponse) ProtoMessage() {}
 
 func (x *CreateWebhookResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[38]
+	mi := &file_api_v2_service_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2744,7 +4758,7 @@ func (x *CreateWebhookResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateWebhookResponse.ProtoReflect.Descriptor instead.
 func (*CreateWebhookResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{38}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *CreateWebhookResponse) GetData() *Webhook {
@@ -2771,7 +4785,7 @@ type EventFilter struct {
 
 func (x *EventFilter) Reset() {
 	*x = EventFilter{}
-	mi := &file_api_v2_service_proto_msgTypes[39]
+	mi := &file_api_v2_service_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2783,7 +4797,7 @@ func (x *EventFilter) String() string {
 func (*EventFilter) ProtoMessage() {}
 
 func (x *EventFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[39]
+	mi := &file_api_v2_service_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2796,7 +4810,7 @@ func (x *EventFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventFilter.ProtoReflect.Descriptor instead.
 func (*EventFilter) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{39}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *EventFilter) GetEvents() []string {
@@ -2823,7 +4837,7 @@ type ListWebhooksRequest struct {
 
 func (x *ListWebhooksRequest) Reset() {
 	*x = ListWebhooksRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[40]
+	mi := &file_api_v2_service_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2835,7 +4849,7 @@ func (x *ListWebhooksRequest) String() string {
 func (*ListWebhooksRequest) ProtoMessage() {}
 
 func (x *ListWebhooksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[40]
+	mi := &file_api_v2_service_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2848,7 +4862,7 @@ func (x *ListWebhooksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWebhooksRequest.ProtoReflect.Descriptor instead.
 func (*ListWebhooksRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{40}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *ListWebhooksRequest) GetCursor() string {
@@ -2876,7 +4890,7 @@ type ListWebhooksResponse struct {
 
 func (x *ListWebhooksResponse) Reset() {
 	*x = ListWebhooksResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[41]
+	mi := &file_api_v2_service_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2888,7 +4902,7 @@ func (x *ListWebhooksResponse) String() string {
 func (*ListWebhooksResponse) ProtoMessage() {}
 
 func (x *ListWebhooksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[41]
+	mi := &file_api_v2_service_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2901,7 +4915,7 @@ func (x *ListWebhooksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWebhooksResponse.ProtoReflect.Descriptor instead.
 func (*ListWebhooksResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{41}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *ListWebhooksResponse) GetData() []*Webhook {
@@ -2938,7 +4952,7 @@ type UpdateWebhookRequest struct {
 
 func (x *UpdateWebhookRequest) Reset() {
 	*x = UpdateWebhookRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[42]
+	mi := &file_api_v2_service_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2950,7 +4964,7 @@ func (x *UpdateWebhookRequest) String() string {
 func (*UpdateWebhookRequest) ProtoMessage() {}
 
 func (x *UpdateWebhookRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[42]
+	mi := &file_api_v2_service_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2963,7 +4977,7 @@ func (x *UpdateWebhookRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateWebhookRequest.ProtoReflect.Descriptor instead.
 func (*UpdateWebhookRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{42}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *UpdateWebhookRequest) GetId() string {
@@ -3011,7 +5025,7 @@ type UpdateWebhookResponse struct {
 
 func (x *UpdateWebhookResponse) Reset() {
 	*x = UpdateWebhookResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[43]
+	mi := &file_api_v2_service_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3023,7 +5037,7 @@ func (x *UpdateWebhookResponse) String() string {
 func (*UpdateWebhookResponse) ProtoMessage() {}
 
 func (x *UpdateWebhookResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[43]
+	mi := &file_api_v2_service_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3036,7 +5050,7 @@ func (x *UpdateWebhookResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateWebhookResponse.ProtoReflect.Descriptor instead.
 func (*UpdateWebhookResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{43}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *UpdateWebhookResponse) GetData() *Webhook {
@@ -3070,7 +5084,7 @@ type Webhook struct {
 
 func (x *Webhook) Reset() {
 	*x = Webhook{}
-	mi := &file_api_v2_service_proto_msgTypes[44]
+	mi := &file_api_v2_service_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3082,7 +5096,7 @@ func (x *Webhook) String() string {
 func (*Webhook) ProtoMessage() {}
 
 func (x *Webhook) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[44]
+	mi := &file_api_v2_service_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3095,7 +5109,7 @@ func (x *Webhook) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Webhook.ProtoReflect.Descriptor instead.
 func (*Webhook) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{44}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *Webhook) GetId() string {
@@ -3171,7 +5185,7 @@ type PatchEnvRequest struct {
 
 func (x *PatchEnvRequest) Reset() {
 	*x = PatchEnvRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[45]
+	mi := &file_api_v2_service_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3183,7 +5197,7 @@ func (x *PatchEnvRequest) String() string {
 func (*PatchEnvRequest) ProtoMessage() {}
 
 func (x *PatchEnvRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[45]
+	mi := &file_api_v2_service_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3196,7 +5210,7 @@ func (x *PatchEnvRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PatchEnvRequest.ProtoReflect.Descriptor instead.
 func (*PatchEnvRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{45}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *PatchEnvRequest) GetId() string {
@@ -3223,7 +5237,7 @@ type PatchEnvsResponse struct {
 
 func (x *PatchEnvsResponse) Reset() {
 	*x = PatchEnvsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[46]
+	mi := &file_api_v2_service_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3235,7 +5249,7 @@ func (x *PatchEnvsResponse) String() string {
 func (*PatchEnvsResponse) ProtoMessage() {}
 
 func (x *PatchEnvsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[46]
+	mi := &file_api_v2_service_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3248,7 +5262,7 @@ func (x *PatchEnvsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PatchEnvsResponse.ProtoReflect.Descriptor instead.
 func (*PatchEnvsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{46}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *PatchEnvsResponse) GetData() *Env {
@@ -3277,7 +5291,7 @@ type InvokeFunctionRequest struct {
 
 func (x *InvokeFunctionRequest) Reset() {
 	*x = InvokeFunctionRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[47]
+	mi := &file_api_v2_service_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3289,7 +5303,7 @@ func (x *InvokeFunctionRequest) String() string {
 func (*InvokeFunctionRequest) ProtoMessage() {}
 
 func (x *InvokeFunctionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[47]
+	mi := &file_api_v2_service_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3302,7 +5316,7 @@ func (x *InvokeFunctionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvokeFunctionRequest.ProtoReflect.Descriptor instead.
 func (*InvokeFunctionRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{47}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *InvokeFunctionRequest) GetFunctionId() string {
@@ -3343,7 +5357,7 @@ type InvokeFunctionResponse struct {
 
 func (x *InvokeFunctionResponse) Reset() {
 	*x = InvokeFunctionResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[48]
+	mi := &file_api_v2_service_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3355,7 +5369,7 @@ func (x *InvokeFunctionResponse) String() string {
 func (*InvokeFunctionResponse) ProtoMessage() {}
 
 func (x *InvokeFunctionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[48]
+	mi := &file_api_v2_service_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3368,7 +5382,7 @@ func (x *InvokeFunctionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvokeFunctionResponse.ProtoReflect.Descriptor instead.
 func (*InvokeFunctionResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{48}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *InvokeFunctionResponse) GetData() *InvokeFunctionData {
@@ -3399,7 +5413,7 @@ type InvokeFunctionData struct {
 
 func (x *InvokeFunctionData) Reset() {
 	*x = InvokeFunctionData{}
-	mi := &file_api_v2_service_proto_msgTypes[49]
+	mi := &file_api_v2_service_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3411,7 +5425,7 @@ func (x *InvokeFunctionData) String() string {
 func (*InvokeFunctionData) ProtoMessage() {}
 
 func (x *InvokeFunctionData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[49]
+	mi := &file_api_v2_service_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3424,7 +5438,7 @@ func (x *InvokeFunctionData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InvokeFunctionData.ProtoReflect.Descriptor instead.
 func (*InvokeFunctionData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{49}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *InvokeFunctionData) GetRunId() string {
@@ -3469,6 +5483,306 @@ func (x *InvokeFunctionData) GetError() string {
 	return ""
 }
 
+type CreateScoreRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	Scores        []*CreateScoreInput    `protobuf:"bytes,2,rep,name=scores,proto3" json:"scores,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateScoreRequest) Reset() {
+	*x = CreateScoreRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateScoreRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateScoreRequest) ProtoMessage() {}
+
+func (x *CreateScoreRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateScoreRequest.ProtoReflect.Descriptor instead.
+func (*CreateScoreRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *CreateScoreRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *CreateScoreRequest) GetScores() []*CreateScoreInput {
+	if x != nil {
+		return x.Scores
+	}
+	return nil
+}
+
+type CreateScoreInput struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         *structpb.Value        `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	StepId        *string                `protobuf:"bytes,3,opt,name=step_id,json=stepId,proto3,oneof" json:"step_id,omitempty"`
+	Experiment    *ScoreExperiment       `protobuf:"bytes,4,opt,name=experiment,proto3,oneof" json:"experiment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateScoreInput) Reset() {
+	*x = CreateScoreInput{}
+	mi := &file_api_v2_service_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateScoreInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateScoreInput) ProtoMessage() {}
+
+func (x *CreateScoreInput) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateScoreInput.ProtoReflect.Descriptor instead.
+func (*CreateScoreInput) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *CreateScoreInput) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateScoreInput) GetValue() *structpb.Value {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *CreateScoreInput) GetStepId() string {
+	if x != nil && x.StepId != nil {
+		return *x.StepId
+	}
+	return ""
+}
+
+func (x *CreateScoreInput) GetExperiment() *ScoreExperiment {
+	if x != nil {
+		return x.Experiment
+	}
+	return nil
+}
+
+type ScoreExperiment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Variant       string                 `protobuf:"bytes,2,opt,name=variant,proto3" json:"variant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScoreExperiment) Reset() {
+	*x = ScoreExperiment{}
+	mi := &file_api_v2_service_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScoreExperiment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScoreExperiment) ProtoMessage() {}
+
+func (x *ScoreExperiment) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScoreExperiment.ProtoReflect.Descriptor instead.
+func (*ScoreExperiment) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{81}
+}
+
+func (x *ScoreExperiment) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ScoreExperiment) GetVariant() string {
+	if x != nil {
+		return x.Variant
+	}
+	return ""
+}
+
+type CreateScoreResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*Score               `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateScoreResponse) Reset() {
+	*x = CreateScoreResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateScoreResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateScoreResponse) ProtoMessage() {}
+
+func (x *CreateScoreResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateScoreResponse.ProtoReflect.Descriptor instead.
+func (*CreateScoreResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *CreateScoreResponse) GetData() []*Score {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *CreateScoreResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type Score struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Value         *structpb.Value        `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
+	StepId        *string                `protobuf:"bytes,4,opt,name=step_id,json=stepId,proto3,oneof" json:"step_id,omitempty"`
+	Experiment    *ScoreExperiment       `protobuf:"bytes,5,opt,name=experiment,proto3,oneof" json:"experiment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Score) Reset() {
+	*x = Score{}
+	mi := &file_api_v2_service_proto_msgTypes[83]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Score) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Score) ProtoMessage() {}
+
+func (x *Score) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[83]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Score.ProtoReflect.Descriptor instead.
+func (*Score) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{83}
+}
+
+func (x *Score) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *Score) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Score) GetValue() *structpb.Value {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *Score) GetStepId() string {
+	if x != nil && x.StepId != nil {
+		return *x.StepId
+	}
+	return ""
+}
+
+func (x *Score) GetExperiment() *ScoreExperiment {
+	if x != nil {
+		return x.Experiment
+	}
+	return nil
+}
+
 type SyncAppRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
@@ -3479,7 +5793,7 @@ type SyncAppRequest struct {
 
 func (x *SyncAppRequest) Reset() {
 	*x = SyncAppRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[50]
+	mi := &file_api_v2_service_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3491,7 +5805,7 @@ func (x *SyncAppRequest) String() string {
 func (*SyncAppRequest) ProtoMessage() {}
 
 func (x *SyncAppRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[50]
+	mi := &file_api_v2_service_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3504,7 +5818,7 @@ func (x *SyncAppRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncAppRequest.ProtoReflect.Descriptor instead.
 func (*SyncAppRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{50}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *SyncAppRequest) GetAppId() string {
@@ -3531,7 +5845,7 @@ type SyncAppResponse struct {
 
 func (x *SyncAppResponse) Reset() {
 	*x = SyncAppResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[51]
+	mi := &file_api_v2_service_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3543,7 +5857,7 @@ func (x *SyncAppResponse) String() string {
 func (*SyncAppResponse) ProtoMessage() {}
 
 func (x *SyncAppResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[51]
+	mi := &file_api_v2_service_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3556,7 +5870,7 @@ func (x *SyncAppResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncAppResponse.ProtoReflect.Descriptor instead.
 func (*SyncAppResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{51}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *SyncAppResponse) GetData() *SyncAppData {
@@ -3585,7 +5899,7 @@ type SyncAppData struct {
 
 func (x *SyncAppData) Reset() {
 	*x = SyncAppData{}
-	mi := &file_api_v2_service_proto_msgTypes[52]
+	mi := &file_api_v2_service_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3597,7 +5911,7 @@ func (x *SyncAppData) String() string {
 func (*SyncAppData) ProtoMessage() {}
 
 func (x *SyncAppData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[52]
+	mi := &file_api_v2_service_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3610,7 +5924,7 @@ func (x *SyncAppData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncAppData.ProtoReflect.Descriptor instead.
 func (*SyncAppData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{52}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *SyncAppData) GetId() string {
@@ -3651,7 +5965,7 @@ type SyncAppError struct {
 
 func (x *SyncAppError) Reset() {
 	*x = SyncAppError{}
-	mi := &file_api_v2_service_proto_msgTypes[53]
+	mi := &file_api_v2_service_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3663,7 +5977,7 @@ func (x *SyncAppError) String() string {
 func (*SyncAppError) ProtoMessage() {}
 
 func (x *SyncAppError) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[53]
+	mi := &file_api_v2_service_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3676,7 +5990,7 @@ func (x *SyncAppError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncAppError.ProtoReflect.Descriptor instead.
 func (*SyncAppError) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{53}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *SyncAppError) GetCode() string {
@@ -3702,7 +6016,7 @@ type QueryInsightsRequest struct {
 
 func (x *QueryInsightsRequest) Reset() {
 	*x = QueryInsightsRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[54]
+	mi := &file_api_v2_service_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3714,7 +6028,7 @@ func (x *QueryInsightsRequest) String() string {
 func (*QueryInsightsRequest) ProtoMessage() {}
 
 func (x *QueryInsightsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[54]
+	mi := &file_api_v2_service_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3727,7 +6041,7 @@ func (x *QueryInsightsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsRequest.ProtoReflect.Descriptor instead.
 func (*QueryInsightsRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{54}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *QueryInsightsRequest) GetQuery() string {
@@ -3747,7 +6061,7 @@ type QueryInsightsResponse struct {
 
 func (x *QueryInsightsResponse) Reset() {
 	*x = QueryInsightsResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[55]
+	mi := &file_api_v2_service_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3759,7 +6073,7 @@ func (x *QueryInsightsResponse) String() string {
 func (*QueryInsightsResponse) ProtoMessage() {}
 
 func (x *QueryInsightsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[55]
+	mi := &file_api_v2_service_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3772,7 +6086,7 @@ func (x *QueryInsightsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsResponse.ProtoReflect.Descriptor instead.
 func (*QueryInsightsResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{55}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *QueryInsightsResponse) GetData() *QueryInsightsData {
@@ -3800,7 +6114,7 @@ type QueryInsightsData struct {
 
 func (x *QueryInsightsData) Reset() {
 	*x = QueryInsightsData{}
-	mi := &file_api_v2_service_proto_msgTypes[56]
+	mi := &file_api_v2_service_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3812,7 +6126,7 @@ func (x *QueryInsightsData) String() string {
 func (*QueryInsightsData) ProtoMessage() {}
 
 func (x *QueryInsightsData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[56]
+	mi := &file_api_v2_service_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3825,7 +6139,7 @@ func (x *QueryInsightsData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsData.ProtoReflect.Descriptor instead.
 func (*QueryInsightsData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{56}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *QueryInsightsData) GetColumns() []*InsightsOutputColumn {
@@ -3859,7 +6173,7 @@ type InsightsOutputColumn struct {
 
 func (x *InsightsOutputColumn) Reset() {
 	*x = InsightsOutputColumn{}
-	mi := &file_api_v2_service_proto_msgTypes[57]
+	mi := &file_api_v2_service_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3871,7 +6185,7 @@ func (x *InsightsOutputColumn) String() string {
 func (*InsightsOutputColumn) ProtoMessage() {}
 
 func (x *InsightsOutputColumn) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[57]
+	mi := &file_api_v2_service_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3884,7 +6198,7 @@ func (x *InsightsOutputColumn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsOutputColumn.ProtoReflect.Descriptor instead.
 func (*InsightsOutputColumn) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{57}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *InsightsOutputColumn) GetName() string {
@@ -3910,7 +6224,7 @@ type InsightsRow struct {
 
 func (x *InsightsRow) Reset() {
 	*x = InsightsRow{}
-	mi := &file_api_v2_service_proto_msgTypes[58]
+	mi := &file_api_v2_service_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3922,7 +6236,7 @@ func (x *InsightsRow) String() string {
 func (*InsightsRow) ProtoMessage() {}
 
 func (x *InsightsRow) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[58]
+	mi := &file_api_v2_service_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3935,7 +6249,7 @@ func (x *InsightsRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsRow.ProtoReflect.Descriptor instead.
 func (*InsightsRow) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{58}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *InsightsRow) GetValues() []*structpb.Value {
@@ -3957,7 +6271,7 @@ type InsightsDiagnostic struct {
 
 func (x *InsightsDiagnostic) Reset() {
 	*x = InsightsDiagnostic{}
-	mi := &file_api_v2_service_proto_msgTypes[59]
+	mi := &file_api_v2_service_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3969,7 +6283,7 @@ func (x *InsightsDiagnostic) String() string {
 func (*InsightsDiagnostic) ProtoMessage() {}
 
 func (x *InsightsDiagnostic) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[59]
+	mi := &file_api_v2_service_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3982,7 +6296,7 @@ func (x *InsightsDiagnostic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsDiagnostic.ProtoReflect.Descriptor instead.
 func (*InsightsDiagnostic) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{59}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *InsightsDiagnostic) GetSeverity() InsightsDiagnosticSeverity {
@@ -4024,7 +6338,7 @@ type InsightsDiagnosticPosition struct {
 
 func (x *InsightsDiagnosticPosition) Reset() {
 	*x = InsightsDiagnosticPosition{}
-	mi := &file_api_v2_service_proto_msgTypes[60]
+	mi := &file_api_v2_service_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4036,7 +6350,7 @@ func (x *InsightsDiagnosticPosition) String() string {
 func (*InsightsDiagnosticPosition) ProtoMessage() {}
 
 func (x *InsightsDiagnosticPosition) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[60]
+	mi := &file_api_v2_service_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4049,7 +6363,7 @@ func (x *InsightsDiagnosticPosition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsDiagnosticPosition.ProtoReflect.Descriptor instead.
 func (*InsightsDiagnosticPosition) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{60}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *InsightsDiagnosticPosition) GetStart() int32 {
@@ -4081,7 +6395,7 @@ type ListInsightsTablesRequest struct {
 
 func (x *ListInsightsTablesRequest) Reset() {
 	*x = ListInsightsTablesRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[61]
+	mi := &file_api_v2_service_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4093,7 +6407,7 @@ func (x *ListInsightsTablesRequest) String() string {
 func (*ListInsightsTablesRequest) ProtoMessage() {}
 
 func (x *ListInsightsTablesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[61]
+	mi := &file_api_v2_service_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4106,7 +6420,7 @@ func (x *ListInsightsTablesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInsightsTablesRequest.ProtoReflect.Descriptor instead.
 func (*ListInsightsTablesRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{61}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{95}
 }
 
 type ListInsightsTablesResponse struct {
@@ -4119,7 +6433,7 @@ type ListInsightsTablesResponse struct {
 
 func (x *ListInsightsTablesResponse) Reset() {
 	*x = ListInsightsTablesResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[62]
+	mi := &file_api_v2_service_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4131,7 +6445,7 @@ func (x *ListInsightsTablesResponse) String() string {
 func (*ListInsightsTablesResponse) ProtoMessage() {}
 
 func (x *ListInsightsTablesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[62]
+	mi := &file_api_v2_service_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4144,7 +6458,7 @@ func (x *ListInsightsTablesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInsightsTablesResponse.ProtoReflect.Descriptor instead.
 func (*ListInsightsTablesResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{62}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *ListInsightsTablesResponse) GetData() []*InsightsTable {
@@ -4172,7 +6486,7 @@ type InsightsTable struct {
 
 func (x *InsightsTable) Reset() {
 	*x = InsightsTable{}
-	mi := &file_api_v2_service_proto_msgTypes[63]
+	mi := &file_api_v2_service_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4184,7 +6498,7 @@ func (x *InsightsTable) String() string {
 func (*InsightsTable) ProtoMessage() {}
 
 func (x *InsightsTable) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[63]
+	mi := &file_api_v2_service_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4197,7 +6511,7 @@ func (x *InsightsTable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsTable.ProtoReflect.Descriptor instead.
 func (*InsightsTable) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{63}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *InsightsTable) GetName() string {
@@ -4232,7 +6546,7 @@ type InsightsTableColumn struct {
 
 func (x *InsightsTableColumn) Reset() {
 	*x = InsightsTableColumn{}
-	mi := &file_api_v2_service_proto_msgTypes[64]
+	mi := &file_api_v2_service_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4244,7 +6558,7 @@ func (x *InsightsTableColumn) String() string {
 func (*InsightsTableColumn) ProtoMessage() {}
 
 func (x *InsightsTableColumn) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[64]
+	mi := &file_api_v2_service_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4257,7 +6571,7 @@ func (x *InsightsTableColumn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsTableColumn.ProtoReflect.Descriptor instead.
 func (*InsightsTableColumn) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{64}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *InsightsTableColumn) GetName() string {
@@ -4290,7 +6604,7 @@ type QueryInsightsPromptRequest struct {
 
 func (x *QueryInsightsPromptRequest) Reset() {
 	*x = QueryInsightsPromptRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[65]
+	mi := &file_api_v2_service_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4302,7 +6616,7 @@ func (x *QueryInsightsPromptRequest) String() string {
 func (*QueryInsightsPromptRequest) ProtoMessage() {}
 
 func (x *QueryInsightsPromptRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[65]
+	mi := &file_api_v2_service_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4315,7 +6629,7 @@ func (x *QueryInsightsPromptRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsPromptRequest.ProtoReflect.Descriptor instead.
 func (*QueryInsightsPromptRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{65}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *QueryInsightsPromptRequest) GetPrompt() string {
@@ -4335,7 +6649,7 @@ type QueryInsightsPromptResponse struct {
 
 func (x *QueryInsightsPromptResponse) Reset() {
 	*x = QueryInsightsPromptResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[66]
+	mi := &file_api_v2_service_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4347,7 +6661,7 @@ func (x *QueryInsightsPromptResponse) String() string {
 func (*QueryInsightsPromptResponse) ProtoMessage() {}
 
 func (x *QueryInsightsPromptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[66]
+	mi := &file_api_v2_service_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4360,7 +6674,7 @@ func (x *QueryInsightsPromptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsPromptResponse.ProtoReflect.Descriptor instead.
 func (*QueryInsightsPromptResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{66}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *QueryInsightsPromptResponse) GetData() *QueryInsightsPromptData {
@@ -4387,7 +6701,7 @@ type QueryInsightsPromptData struct {
 
 func (x *QueryInsightsPromptData) Reset() {
 	*x = QueryInsightsPromptData{}
-	mi := &file_api_v2_service_proto_msgTypes[67]
+	mi := &file_api_v2_service_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4399,7 +6713,7 @@ func (x *QueryInsightsPromptData) String() string {
 func (*QueryInsightsPromptData) ProtoMessage() {}
 
 func (x *QueryInsightsPromptData) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[67]
+	mi := &file_api_v2_service_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4412,7 +6726,7 @@ func (x *QueryInsightsPromptData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryInsightsPromptData.ProtoReflect.Descriptor instead.
 func (*QueryInsightsPromptData) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{67}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *QueryInsightsPromptData) GetSql() string {
@@ -4439,7 +6753,7 @@ type ListInsightsEventSchemasRequest struct {
 
 func (x *ListInsightsEventSchemasRequest) Reset() {
 	*x = ListInsightsEventSchemasRequest{}
-	mi := &file_api_v2_service_proto_msgTypes[68]
+	mi := &file_api_v2_service_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4451,7 +6765,7 @@ func (x *ListInsightsEventSchemasRequest) String() string {
 func (*ListInsightsEventSchemasRequest) ProtoMessage() {}
 
 func (x *ListInsightsEventSchemasRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[68]
+	mi := &file_api_v2_service_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4464,7 +6778,7 @@ func (x *ListInsightsEventSchemasRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInsightsEventSchemasRequest.ProtoReflect.Descriptor instead.
 func (*ListInsightsEventSchemasRequest) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{68}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *ListInsightsEventSchemasRequest) GetCursor() string {
@@ -4492,7 +6806,7 @@ type ListInsightsEventSchemasResponse struct {
 
 func (x *ListInsightsEventSchemasResponse) Reset() {
 	*x = ListInsightsEventSchemasResponse{}
-	mi := &file_api_v2_service_proto_msgTypes[69]
+	mi := &file_api_v2_service_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4504,7 +6818,7 @@ func (x *ListInsightsEventSchemasResponse) String() string {
 func (*ListInsightsEventSchemasResponse) ProtoMessage() {}
 
 func (x *ListInsightsEventSchemasResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[69]
+	mi := &file_api_v2_service_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4517,7 +6831,7 @@ func (x *ListInsightsEventSchemasResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListInsightsEventSchemasResponse.ProtoReflect.Descriptor instead.
 func (*ListInsightsEventSchemasResponse) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{69}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *ListInsightsEventSchemasResponse) GetData() []*InsightsEventSchema {
@@ -4551,7 +6865,7 @@ type InsightsEventSchema struct {
 
 func (x *InsightsEventSchema) Reset() {
 	*x = InsightsEventSchema{}
-	mi := &file_api_v2_service_proto_msgTypes[70]
+	mi := &file_api_v2_service_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4563,7 +6877,7 @@ func (x *InsightsEventSchema) String() string {
 func (*InsightsEventSchema) ProtoMessage() {}
 
 func (x *InsightsEventSchema) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_service_proto_msgTypes[70]
+	mi := &file_api_v2_service_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4576,7 +6890,7 @@ func (x *InsightsEventSchema) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InsightsEventSchema.ProtoReflect.Descriptor instead.
 func (*InsightsEventSchema) Descriptor() ([]byte, []int) {
-	return file_api_v2_service_proto_rawDescGZIP(), []int{70}
+	return file_api_v2_service_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *InsightsEventSchema) GetName() string {
@@ -4589,6 +6903,1654 @@ func (x *InsightsEventSchema) GetName() string {
 func (x *InsightsEventSchema) GetSchema() *structpb.Struct {
 	if x != nil {
 		return x.Schema
+	}
+	return nil
+}
+
+type ListExperimentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cursor        *string                `protobuf:"bytes,1,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,2,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	AppId         string                 `protobuf:"bytes,3,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,4,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	From          *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=from,proto3,oneof" json:"from,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=until,proto3,oneof" json:"until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListExperimentsRequest) Reset() {
+	*x = ListExperimentsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[105]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListExperimentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListExperimentsRequest) ProtoMessage() {}
+
+func (x *ListExperimentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[105]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListExperimentsRequest.ProtoReflect.Descriptor instead.
+func (*ListExperimentsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{105}
+}
+
+func (x *ListExperimentsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListExperimentsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *ListExperimentsRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *ListExperimentsRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *ListExperimentsRequest) GetFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *ListExperimentsRequest) GetUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Until
+	}
+	return nil
+}
+
+type ListExperimentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*Experiment          `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListExperimentsResponse) Reset() {
+	*x = ListExperimentsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[106]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListExperimentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListExperimentsResponse) ProtoMessage() {}
+
+func (x *ListExperimentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[106]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListExperimentsResponse.ProtoReflect.Descriptor instead.
+func (*ListExperimentsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{106}
+}
+
+func (x *ListExperimentsResponse) GetData() []*Experiment {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListExperimentsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListExperimentsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type Experiment struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Function          *FunctionRef           `protobuf:"bytes,2,opt,name=function,proto3" json:"function,omitempty"`
+	SelectionStrategy string                 `protobuf:"bytes,3,opt,name=selection_strategy,json=selectionStrategy,proto3" json:"selection_strategy,omitempty"`
+	Variants          []string               `protobuf:"bytes,4,rep,name=variants,proto3" json:"variants,omitempty"`
+	VariantCount      int32                  `protobuf:"varint,5,opt,name=variant_count,json=variantCount,proto3" json:"variant_count,omitempty"`
+	TotalRuns         int32                  `protobuf:"varint,6,opt,name=total_runs,json=totalRuns,proto3" json:"total_runs,omitempty"`
+	FirstSeen         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=first_seen,json=firstSeen,proto3" json:"first_seen,omitempty"`
+	LastSeen          *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *Experiment) Reset() {
+	*x = Experiment{}
+	mi := &file_api_v2_service_proto_msgTypes[107]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Experiment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Experiment) ProtoMessage() {}
+
+func (x *Experiment) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[107]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Experiment.ProtoReflect.Descriptor instead.
+func (*Experiment) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{107}
+}
+
+func (x *Experiment) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Experiment) GetFunction() *FunctionRef {
+	if x != nil {
+		return x.Function
+	}
+	return nil
+}
+
+func (x *Experiment) GetSelectionStrategy() string {
+	if x != nil {
+		return x.SelectionStrategy
+	}
+	return ""
+}
+
+func (x *Experiment) GetVariants() []string {
+	if x != nil {
+		return x.Variants
+	}
+	return nil
+}
+
+func (x *Experiment) GetVariantCount() int32 {
+	if x != nil {
+		return x.VariantCount
+	}
+	return 0
+}
+
+func (x *Experiment) GetTotalRuns() int32 {
+	if x != nil {
+		return x.TotalRuns
+	}
+	return 0
+}
+
+func (x *Experiment) GetFirstSeen() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FirstSeen
+	}
+	return nil
+}
+
+func (x *Experiment) GetLastSeen() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSeen
+	}
+	return nil
+}
+
+type GetExperimentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FunctionId    string                 `protobuf:"bytes,1,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	ExperimentId  string                 `protobuf:"bytes,2,opt,name=experiment_id,json=experimentId,proto3" json:"experiment_id,omitempty"`
+	Variant       *string                `protobuf:"bytes,3,opt,name=variant,proto3,oneof" json:"variant,omitempty"`
+	AppId         string                 `protobuf:"bytes,4,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	From          *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=from,proto3,oneof" json:"from,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=until,proto3,oneof" json:"until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetExperimentRequest) Reset() {
+	*x = GetExperimentRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[108]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetExperimentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetExperimentRequest) ProtoMessage() {}
+
+func (x *GetExperimentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[108]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetExperimentRequest.ProtoReflect.Descriptor instead.
+func (*GetExperimentRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{108}
+}
+
+func (x *GetExperimentRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *GetExperimentRequest) GetExperimentId() string {
+	if x != nil {
+		return x.ExperimentId
+	}
+	return ""
+}
+
+func (x *GetExperimentRequest) GetVariant() string {
+	if x != nil && x.Variant != nil {
+		return *x.Variant
+	}
+	return ""
+}
+
+func (x *GetExperimentRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *GetExperimentRequest) GetFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *GetExperimentRequest) GetUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Until
+	}
+	return nil
+}
+
+type GetExperimentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *ExperimentDetail      `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetExperimentResponse) Reset() {
+	*x = GetExperimentResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[109]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetExperimentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetExperimentResponse) ProtoMessage() {}
+
+func (x *GetExperimentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[109]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetExperimentResponse.ProtoReflect.Descriptor instead.
+func (*GetExperimentResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{109}
+}
+
+func (x *GetExperimentResponse) GetData() *ExperimentDetail {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetExperimentResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type ExperimentDetail struct {
+	state             protoimpl.MessageState      `protogen:"open.v1"`
+	Id                string                      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Variants          []*ExperimentVariantMetrics `protobuf:"bytes,2,rep,name=variants,proto3" json:"variants,omitempty"`
+	VariantWeights    []*ExperimentVariantWeight  `protobuf:"bytes,3,rep,name=variant_weights,json=variantWeights,proto3" json:"variant_weights,omitempty"`
+	FirstSeen         *timestamppb.Timestamp      `protobuf:"bytes,4,opt,name=first_seen,json=firstSeen,proto3" json:"first_seen,omitempty"`
+	LastSeen          *timestamppb.Timestamp      `protobuf:"bytes,5,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
+	SelectionStrategy string                      `protobuf:"bytes,6,opt,name=selection_strategy,json=selectionStrategy,proto3" json:"selection_strategy,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ExperimentDetail) Reset() {
+	*x = ExperimentDetail{}
+	mi := &file_api_v2_service_proto_msgTypes[110]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExperimentDetail) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExperimentDetail) ProtoMessage() {}
+
+func (x *ExperimentDetail) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[110]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExperimentDetail.ProtoReflect.Descriptor instead.
+func (*ExperimentDetail) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{110}
+}
+
+func (x *ExperimentDetail) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ExperimentDetail) GetVariants() []*ExperimentVariantMetrics {
+	if x != nil {
+		return x.Variants
+	}
+	return nil
+}
+
+func (x *ExperimentDetail) GetVariantWeights() []*ExperimentVariantWeight {
+	if x != nil {
+		return x.VariantWeights
+	}
+	return nil
+}
+
+func (x *ExperimentDetail) GetFirstSeen() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FirstSeen
+	}
+	return nil
+}
+
+func (x *ExperimentDetail) GetLastSeen() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSeen
+	}
+	return nil
+}
+
+func (x *ExperimentDetail) GetSelectionStrategy() string {
+	if x != nil {
+		return x.SelectionStrategy
+	}
+	return ""
+}
+
+type ExperimentVariantMetrics struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	VariantName   string                     `protobuf:"bytes,1,opt,name=variant_name,json=variantName,proto3" json:"variant_name,omitempty"`
+	RunCount      int32                      `protobuf:"varint,2,opt,name=run_count,json=runCount,proto3" json:"run_count,omitempty"`
+	Metrics       []*ExperimentVariantMetric `protobuf:"bytes,3,rep,name=metrics,proto3" json:"metrics,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExperimentVariantMetrics) Reset() {
+	*x = ExperimentVariantMetrics{}
+	mi := &file_api_v2_service_proto_msgTypes[111]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExperimentVariantMetrics) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExperimentVariantMetrics) ProtoMessage() {}
+
+func (x *ExperimentVariantMetrics) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[111]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExperimentVariantMetrics.ProtoReflect.Descriptor instead.
+func (*ExperimentVariantMetrics) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{111}
+}
+
+func (x *ExperimentVariantMetrics) GetVariantName() string {
+	if x != nil {
+		return x.VariantName
+	}
+	return ""
+}
+
+func (x *ExperimentVariantMetrics) GetRunCount() int32 {
+	if x != nil {
+		return x.RunCount
+	}
+	return 0
+}
+
+func (x *ExperimentVariantMetrics) GetMetrics() []*ExperimentVariantMetric {
+	if x != nil {
+		return x.Metrics
+	}
+	return nil
+}
+
+type ExperimentVariantMetric struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Avg           float64                `protobuf:"fixed64,2,opt,name=avg,proto3" json:"avg,omitempty"`
+	Min           float64                `protobuf:"fixed64,3,opt,name=min,proto3" json:"min,omitempty"`
+	Max           float64                `protobuf:"fixed64,4,opt,name=max,proto3" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExperimentVariantMetric) Reset() {
+	*x = ExperimentVariantMetric{}
+	mi := &file_api_v2_service_proto_msgTypes[112]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExperimentVariantMetric) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExperimentVariantMetric) ProtoMessage() {}
+
+func (x *ExperimentVariantMetric) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[112]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExperimentVariantMetric.ProtoReflect.Descriptor instead.
+func (*ExperimentVariantMetric) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{112}
+}
+
+func (x *ExperimentVariantMetric) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *ExperimentVariantMetric) GetAvg() float64 {
+	if x != nil {
+		return x.Avg
+	}
+	return 0
+}
+
+func (x *ExperimentVariantMetric) GetMin() float64 {
+	if x != nil {
+		return x.Min
+	}
+	return 0
+}
+
+func (x *ExperimentVariantMetric) GetMax() float64 {
+	if x != nil {
+		return x.Max
+	}
+	return 0
+}
+
+type ExperimentVariantWeight struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	VariantName   string                 `protobuf:"bytes,1,opt,name=variant_name,json=variantName,proto3" json:"variant_name,omitempty"`
+	Weight        float64                `protobuf:"fixed64,2,opt,name=weight,proto3" json:"weight,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExperimentVariantWeight) Reset() {
+	*x = ExperimentVariantWeight{}
+	mi := &file_api_v2_service_proto_msgTypes[113]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExperimentVariantWeight) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExperimentVariantWeight) ProtoMessage() {}
+
+func (x *ExperimentVariantWeight) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[113]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExperimentVariantWeight.ProtoReflect.Descriptor instead.
+func (*ExperimentVariantWeight) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{113}
+}
+
+func (x *ExperimentVariantWeight) GetVariantName() string {
+	if x != nil {
+		return x.VariantName
+	}
+	return ""
+}
+
+func (x *ExperimentVariantWeight) GetWeight() float64 {
+	if x != nil {
+		return x.Weight
+	}
+	return 0
+}
+
+type ListSessionKeysRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Search        *string                `protobuf:"bytes,1,opt,name=search,proto3,oneof" json:"search,omitempty"`
+	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionKeysRequest) Reset() {
+	*x = ListSessionKeysRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[114]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionKeysRequest) ProtoMessage() {}
+
+func (x *ListSessionKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[114]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionKeysRequest.ProtoReflect.Descriptor instead.
+func (*ListSessionKeysRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{114}
+}
+
+func (x *ListSessionKeysRequest) GetSearch() string {
+	if x != nil && x.Search != nil {
+		return *x.Search
+	}
+	return ""
+}
+
+func (x *ListSessionKeysRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListSessionKeysRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+type ListSessionKeysResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*SessionKey          `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionKeysResponse) Reset() {
+	*x = ListSessionKeysResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[115]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionKeysResponse) ProtoMessage() {}
+
+func (x *ListSessionKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[115]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionKeysResponse.ProtoReflect.Descriptor instead.
+func (*ListSessionKeysResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{115}
+}
+
+func (x *ListSessionKeysResponse) GetData() []*SessionKey {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListSessionKeysResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListSessionKeysResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type SessionKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionKey) Reset() {
+	*x = SessionKey{}
+	mi := &file_api_v2_service_proto_msgTypes[116]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionKey) ProtoMessage() {}
+
+func (x *SessionKey) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[116]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionKey.ProtoReflect.Descriptor instead.
+func (*SessionKey) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{116}
+}
+
+func (x *SessionKey) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SessionKey) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type ListSessionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionKey    string                 `protobuf:"bytes,1,opt,name=session_key,json=sessionKey,proto3" json:"session_key,omitempty"`
+	Search        *string                `protobuf:"bytes,2,opt,name=search,proto3,oneof" json:"search,omitempty"`
+	Cursor        *string                `protobuf:"bytes,3,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,4,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	From          *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=from,proto3,oneof" json:"from,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=until,proto3,oneof" json:"until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsRequest) Reset() {
+	*x = ListSessionsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[117]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsRequest) ProtoMessage() {}
+
+func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[117]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
+func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{117}
+}
+
+func (x *ListSessionsRequest) GetSessionKey() string {
+	if x != nil {
+		return x.SessionKey
+	}
+	return ""
+}
+
+func (x *ListSessionsRequest) GetSearch() string {
+	if x != nil && x.Search != nil {
+		return *x.Search
+	}
+	return ""
+}
+
+func (x *ListSessionsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListSessionsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *ListSessionsRequest) GetFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *ListSessionsRequest) GetUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Until
+	}
+	return nil
+}
+
+type ListSessionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*SessionGroup        `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsResponse) Reset() {
+	*x = ListSessionsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[118]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsResponse) ProtoMessage() {}
+
+func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[118]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
+func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{118}
+}
+
+func (x *ListSessionsResponse) GetData() []*SessionGroup {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListSessionsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListSessionsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type SessionGroup struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	RunCount       int32                  `protobuf:"varint,2,opt,name=run_count,json=runCount,proto3" json:"run_count,omitempty"`
+	FailedRunCount int32                  `protobuf:"varint,3,opt,name=failed_run_count,json=failedRunCount,proto3" json:"failed_run_count,omitempty"`
+	FailureRate    float64                `protobuf:"fixed64,4,opt,name=failure_rate,json=failureRate,proto3" json:"failure_rate,omitempty"`
+	LastActiveAt   *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_active_at,json=lastActiveAt,proto3" json:"last_active_at,omitempty"`
+	Functions      []*FunctionRef         `protobuf:"bytes,6,rep,name=functions,proto3" json:"functions,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SessionGroup) Reset() {
+	*x = SessionGroup{}
+	mi := &file_api_v2_service_proto_msgTypes[119]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionGroup) ProtoMessage() {}
+
+func (x *SessionGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[119]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionGroup.ProtoReflect.Descriptor instead.
+func (*SessionGroup) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{119}
+}
+
+func (x *SessionGroup) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SessionGroup) GetRunCount() int32 {
+	if x != nil {
+		return x.RunCount
+	}
+	return 0
+}
+
+func (x *SessionGroup) GetFailedRunCount() int32 {
+	if x != nil {
+		return x.FailedRunCount
+	}
+	return 0
+}
+
+func (x *SessionGroup) GetFailureRate() float64 {
+	if x != nil {
+		return x.FailureRate
+	}
+	return 0
+}
+
+func (x *SessionGroup) GetLastActiveAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastActiveAt
+	}
+	return nil
+}
+
+func (x *SessionGroup) GetFunctions() []*FunctionRef {
+	if x != nil {
+		return x.Functions
+	}
+	return nil
+}
+
+type ListSessionRunsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionKey    string                 `protobuf:"bytes,1,opt,name=session_key,json=sessionKey,proto3" json:"session_key,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Cursor        *string                `protobuf:"bytes,3,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,4,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	From          *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=from,proto3,oneof" json:"from,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=until,proto3,oneof" json:"until,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionRunsRequest) Reset() {
+	*x = ListSessionRunsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[120]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionRunsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionRunsRequest) ProtoMessage() {}
+
+func (x *ListSessionRunsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[120]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionRunsRequest.ProtoReflect.Descriptor instead.
+func (*ListSessionRunsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{120}
+}
+
+func (x *ListSessionRunsRequest) GetSessionKey() string {
+	if x != nil {
+		return x.SessionKey
+	}
+	return ""
+}
+
+func (x *ListSessionRunsRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ListSessionRunsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListSessionRunsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *ListSessionRunsRequest) GetFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *ListSessionRunsRequest) GetUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Until
+	}
+	return nil
+}
+
+type ListSessionRunsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*SessionRun          `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionRunsResponse) Reset() {
+	*x = ListSessionRunsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[121]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionRunsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionRunsResponse) ProtoMessage() {}
+
+func (x *ListSessionRunsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[121]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionRunsResponse.ProtoReflect.Descriptor instead.
+func (*ListSessionRunsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{121}
+}
+
+func (x *ListSessionRunsResponse) GetData() []*SessionRun {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListSessionRunsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListSessionRunsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type SessionRun struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Function      *FunctionRef           `protobuf:"bytes,2,opt,name=function,proto3" json:"function,omitempty"`
+	EventName     *string                `protobuf:"bytes,3,opt,name=event_name,json=eventName,proto3,oneof" json:"event_name,omitempty"`
+	Status        FunctionRunStatus      `protobuf:"varint,4,opt,name=status,proto3,enum=api.v2.FunctionRunStatus" json:"status,omitempty"`
+	QueuedAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=queued_at,json=queuedAt,proto3" json:"queued_at,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3,oneof" json:"started_at,omitempty"`
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=ended_at,json=endedAt,proto3,oneof" json:"ended_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionRun) Reset() {
+	*x = SessionRun{}
+	mi := &file_api_v2_service_proto_msgTypes[122]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionRun) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionRun) ProtoMessage() {}
+
+func (x *SessionRun) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[122]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionRun.ProtoReflect.Descriptor instead.
+func (*SessionRun) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{122}
+}
+
+func (x *SessionRun) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SessionRun) GetFunction() *FunctionRef {
+	if x != nil {
+		return x.Function
+	}
+	return nil
+}
+
+func (x *SessionRun) GetEventName() string {
+	if x != nil && x.EventName != nil {
+		return *x.EventName
+	}
+	return ""
+}
+
+func (x *SessionRun) GetStatus() FunctionRunStatus {
+	if x != nil {
+		return x.Status
+	}
+	return FunctionRunStatus_FUNCTION_RUN_STATUS_UNSPECIFIED
+}
+
+func (x *SessionRun) GetQueuedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.QueuedAt
+	}
+	return nil
+}
+
+func (x *SessionRun) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *SessionRun) GetEndedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndedAt
+	}
+	return nil
+}
+
+type ListRunsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IncludeOutput *bool                  `protobuf:"varint,1,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	Cursor        *string                `protobuf:"bytes,2,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,3,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	From          *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=from,proto3,oneof" json:"from,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=until,proto3,oneof" json:"until,omitempty"`
+	TimeField     string                 `protobuf:"bytes,6,opt,name=time_field,json=timeField,proto3" json:"time_field,omitempty"`
+	Status        []string               `protobuf:"bytes,7,rep,name=status,proto3" json:"status,omitempty"`
+	AppId         []string               `protobuf:"bytes,8,rep,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	FunctionId    []string               `protobuf:"bytes,9,rep,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	IsDeferred    *bool                  `protobuf:"varint,10,opt,name=is_deferred,json=isDeferred,proto3,oneof" json:"is_deferred,omitempty"`
+	Order         string                 `protobuf:"bytes,11,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRunsRequest) Reset() {
+	*x = ListRunsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[123]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRunsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRunsRequest) ProtoMessage() {}
+
+func (x *ListRunsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[123]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRunsRequest.ProtoReflect.Descriptor instead.
+func (*ListRunsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{123}
+}
+
+func (x *ListRunsRequest) GetIncludeOutput() bool {
+	if x != nil && x.IncludeOutput != nil {
+		return *x.IncludeOutput
+	}
+	return false
+}
+
+func (x *ListRunsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListRunsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *ListRunsRequest) GetFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *ListRunsRequest) GetUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Until
+	}
+	return nil
+}
+
+func (x *ListRunsRequest) GetTimeField() string {
+	if x != nil {
+		return x.TimeField
+	}
+	return ""
+}
+
+func (x *ListRunsRequest) GetStatus() []string {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *ListRunsRequest) GetAppId() []string {
+	if x != nil {
+		return x.AppId
+	}
+	return nil
+}
+
+func (x *ListRunsRequest) GetFunctionId() []string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return nil
+}
+
+func (x *ListRunsRequest) GetIsDeferred() bool {
+	if x != nil && x.IsDeferred != nil {
+		return *x.IsDeferred
+	}
+	return false
+}
+
+func (x *ListRunsRequest) GetOrder() string {
+	if x != nil {
+		return x.Order
+	}
+	return ""
+}
+
+type ListFunctionRunsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	FunctionId    string                 `protobuf:"bytes,2,opt,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
+	IncludeOutput *bool                  `protobuf:"varint,3,opt,name=include_output,json=includeOutput,proto3,oneof" json:"include_output,omitempty"`
+	Cursor        *string                `protobuf:"bytes,4,opt,name=cursor,proto3,oneof" json:"cursor,omitempty"`
+	Limit         *int32                 `protobuf:"varint,5,opt,name=limit,proto3,oneof" json:"limit,omitempty"`
+	From          *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=from,proto3,oneof" json:"from,omitempty"`
+	Until         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=until,proto3,oneof" json:"until,omitempty"`
+	TimeField     string                 `protobuf:"bytes,8,opt,name=time_field,json=timeField,proto3" json:"time_field,omitempty"`
+	Status        []string               `protobuf:"bytes,9,rep,name=status,proto3" json:"status,omitempty"`
+	IsDeferred    *bool                  `protobuf:"varint,10,opt,name=is_deferred,json=isDeferred,proto3,oneof" json:"is_deferred,omitempty"`
+	Order         string                 `protobuf:"bytes,11,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFunctionRunsRequest) Reset() {
+	*x = ListFunctionRunsRequest{}
+	mi := &file_api_v2_service_proto_msgTypes[124]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFunctionRunsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFunctionRunsRequest) ProtoMessage() {}
+
+func (x *ListFunctionRunsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[124]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFunctionRunsRequest.ProtoReflect.Descriptor instead.
+func (*ListFunctionRunsRequest) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{124}
+}
+
+func (x *ListFunctionRunsRequest) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
+func (x *ListFunctionRunsRequest) GetFunctionId() string {
+	if x != nil {
+		return x.FunctionId
+	}
+	return ""
+}
+
+func (x *ListFunctionRunsRequest) GetIncludeOutput() bool {
+	if x != nil && x.IncludeOutput != nil {
+		return *x.IncludeOutput
+	}
+	return false
+}
+
+func (x *ListFunctionRunsRequest) GetCursor() string {
+	if x != nil && x.Cursor != nil {
+		return *x.Cursor
+	}
+	return ""
+}
+
+func (x *ListFunctionRunsRequest) GetLimit() int32 {
+	if x != nil && x.Limit != nil {
+		return *x.Limit
+	}
+	return 0
+}
+
+func (x *ListFunctionRunsRequest) GetFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *ListFunctionRunsRequest) GetUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Until
+	}
+	return nil
+}
+
+func (x *ListFunctionRunsRequest) GetTimeField() string {
+	if x != nil {
+		return x.TimeField
+	}
+	return ""
+}
+
+func (x *ListFunctionRunsRequest) GetStatus() []string {
+	if x != nil {
+		return x.Status
+	}
+	return nil
+}
+
+func (x *ListFunctionRunsRequest) GetIsDeferred() bool {
+	if x != nil && x.IsDeferred != nil {
+		return *x.IsDeferred
+	}
+	return false
+}
+
+func (x *ListFunctionRunsRequest) GetOrder() string {
+	if x != nil {
+		return x.Order
+	}
+	return ""
+}
+
+type ListRunsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*FunctionRun         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListRunsResponse) Reset() {
+	*x = ListRunsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[125]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListRunsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListRunsResponse) ProtoMessage() {}
+
+func (x *ListRunsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[125]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListRunsResponse.ProtoReflect.Descriptor instead.
+func (*ListRunsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{125}
+}
+
+func (x *ListRunsResponse) GetData() []*FunctionRun {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListRunsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListRunsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type ListFunctionRunsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []*FunctionRun         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`
+	Metadata      *ResponseMetadata      `protobuf:"bytes,2,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Page          *Page                  `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFunctionRunsResponse) Reset() {
+	*x = ListFunctionRunsResponse{}
+	mi := &file_api_v2_service_proto_msgTypes[126]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFunctionRunsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFunctionRunsResponse) ProtoMessage() {}
+
+func (x *ListFunctionRunsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_service_proto_msgTypes[126]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFunctionRunsResponse.ProtoReflect.Descriptor instead.
+func (*ListFunctionRunsResponse) Descriptor() ([]byte, []int) {
+	return file_api_v2_service_proto_rawDescGZIP(), []int{126}
+}
+
+func (x *ListFunctionRunsResponse) GetData() []*FunctionRun {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ListFunctionRunsResponse) GetMetadata() *ResponseMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *ListFunctionRunsResponse) GetPage() *Page {
+	if x != nil {
+		return x.Page
 	}
 	return nil
 }
@@ -4610,16 +8572,108 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"6\n" +
 	"\rErrorResponse\x12%\n" +
-	"\x06errors\x18\x01 \x03(\v2\r.api.v2.ErrorR\x06errors\"\x8c\x01\n" +
+	"\x06errors\x18\x01 \x03(\v2\r.api.v2.ErrorR\x06errors\"\xbe\x01\n" +
 	"\x10ResponseMetadata\x129\n" +
 	"\n" +
 	"fetched_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tfetchedAt\x12=\n" +
-	"\fcached_until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vcachedUntil\"1\n" +
+	"\fcached_until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vcachedUntil\x120\n" +
+	"\n" +
+	"time_range\x18\x03 \x01(\v2\x11.api.v2.TimeRangeR\ttimeRange\"m\n" +
+	"\tTimeRange\x12.\n" +
+	"\x04from\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x04from\x120\n" +
+	"\x05until\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\"S\n" +
 	"\vFunctionRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\x18\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\x03app\x18\x03 \x01(\v2\x0e.api.v2.AppRefR\x03app\"\x18\n" +
 	"\x06AppRef\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xe0\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"O\n" +
+	"\vFunctionApp\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02idJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\x04\x10\x05R\vexternal_idR\x04nameR\vlatest_sync\"t\n" +
+	"\x0fFunctionTrigger\x12/\n" +
+	"\x04type\x18\x01 \x01(\x0e2\x1b.api.v2.FunctionTriggerTypeR\x04type\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12\x13\n" +
+	"\x02if\x18\x03 \x01(\tH\x00R\x02if\x88\x01\x01B\x05\n" +
+	"\x03_if\"@\n" +
+	"\x16FunctionFailureHandler\x12\x12\n" +
+	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x95\x01\n" +
+	"!FunctionCancellationConfiguration\x12\x14\n" +
+	"\x05event\x18\x01 \x01(\tR\x05event\x12\x1d\n" +
+	"\atimeout\x18\x02 \x01(\tH\x00R\atimeout\x88\x01\x01\x12!\n" +
+	"\tcondition\x18\x03 \x01(\tH\x01R\tcondition\x88\x01\x01B\n" +
+	"\n" +
+	"\b_timeoutB\f\n" +
+	"\n" +
+	"_condition\"e\n" +
+	"\x1aFunctionRetryConfiguration\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\x05R\x05value\x12\"\n" +
+	"\n" +
+	"is_default\x18\x02 \x01(\bH\x00R\tisDefault\x88\x01\x01B\r\n" +
+	"\v_is_default\"v\n" +
+	" FunctionEventsBatchConfiguration\x12\x19\n" +
+	"\bmax_size\x18\x01 \x01(\x05R\amaxSize\x12\x18\n" +
+	"\atimeout\x18\x02 \x01(\tR\atimeout\x12\x15\n" +
+	"\x03key\x18\x03 \x01(\tH\x00R\x03key\x88\x01\x01B\x06\n" +
+	"\x04_key\"x\n" +
+	"%FunctionConcurrencyLimitConfiguration\x12\x14\n" +
+	"\x05value\x18\x01 \x01(\x05R\x05value\x12'\n" +
+	"\ris_plan_limit\x18\x02 \x01(\bH\x00R\visPlanLimit\x88\x01\x01B\x10\n" +
+	"\x0e_is_plan_limit\"\xbe\x01\n" +
+	" FunctionConcurrencyConfiguration\x126\n" +
+	"\x05scope\x18\x01 \x01(\x0e2 .api.v2.FunctionConcurrencyScopeR\x05scope\x12C\n" +
+	"\x05limit\x18\x02 \x01(\v2-.api.v2.FunctionConcurrencyLimitConfigurationR\x05limit\x12\x15\n" +
+	"\x03key\x18\x03 \x01(\tH\x00R\x03key\x88\x01\x01B\x06\n" +
+	"\x04_key\"m\n" +
+	"\x1eFunctionRateLimitConfiguration\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06period\x18\x02 \x01(\tR\x06period\x12\x15\n" +
+	"\x03key\x18\x03 \x01(\tH\x00R\x03key\x88\x01\x01B\x06\n" +
+	"\x04_key\"V\n" +
+	"\x1dFunctionDebounceConfiguration\x12\x16\n" +
+	"\x06period\x18\x01 \x01(\tR\x06period\x12\x15\n" +
+	"\x03key\x18\x02 \x01(\tH\x00R\x03key\x88\x01\x01B\x06\n" +
+	"\x04_key\"\x82\x01\n" +
+	"\x1dFunctionThrottleConfiguration\x12\x14\n" +
+	"\x05burst\x18\x01 \x01(\x05R\x05burst\x12\x15\n" +
+	"\x03key\x18\x02 \x01(\tH\x00R\x03key\x88\x01\x01\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06period\x18\x04 \x01(\tR\x06periodB\x06\n" +
+	"\x04_key\"r\n" +
+	"\x1eFunctionSingletonConfiguration\x121\n" +
+	"\x04mode\x18\x01 \x01(\x0e2\x1d.api.v2.FunctionSingletonModeR\x04mode\x12\x15\n" +
+	"\x03key\x18\x02 \x01(\tH\x00R\x03key\x88\x01\x01B\x06\n" +
+	"\x04_key\"\xe1\x05\n" +
+	"\x15FunctionConfiguration\x12O\n" +
+	"\rcancellations\x18\x01 \x03(\v2).api.v2.FunctionCancellationConfigurationR\rcancellations\x12<\n" +
+	"\aretries\x18\x02 \x01(\v2\".api.v2.FunctionRetryConfigurationR\aretries\x12\x1f\n" +
+	"\bpriority\x18\x03 \x01(\tH\x00R\bpriority\x88\x01\x01\x12P\n" +
+	"\fevents_batch\x18\x04 \x01(\v2(.api.v2.FunctionEventsBatchConfigurationH\x01R\veventsBatch\x88\x01\x01\x12J\n" +
+	"\vconcurrency\x18\x05 \x03(\v2(.api.v2.FunctionConcurrencyConfigurationR\vconcurrency\x12J\n" +
+	"\n" +
+	"rate_limit\x18\x06 \x01(\v2&.api.v2.FunctionRateLimitConfigurationH\x02R\trateLimit\x88\x01\x01\x12F\n" +
+	"\bdebounce\x18\a \x01(\v2%.api.v2.FunctionDebounceConfigurationH\x03R\bdebounce\x88\x01\x01\x12F\n" +
+	"\bthrottle\x18\b \x01(\v2%.api.v2.FunctionThrottleConfigurationH\x04R\bthrottle\x88\x01\x01\x12I\n" +
+	"\tsingleton\x18\t \x01(\v2&.api.v2.FunctionSingletonConfigurationH\x05R\tsingleton\x88\x01\x01B\v\n" +
+	"\t_priorityB\x0f\n" +
+	"\r_events_batchB\r\n" +
+	"\v_rate_limitB\v\n" +
+	"\t_debounceB\v\n" +
+	"\t_throttleB\f\n" +
+	"\n" +
+	"_singleton\"\x83\x03\n" +
+	"\bFunction\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04slug\x18\x03 \x01(\tR\x04slug\x12\x1b\n" +
+	"\tis_paused\x18\x04 \x01(\bR\bisPaused\x12\x1f\n" +
+	"\vis_archived\x18\x05 \x01(\bR\n" +
+	"isArchived\x12%\n" +
+	"\x03app\x18\x06 \x01(\v2\x13.api.v2.FunctionAppR\x03app\x123\n" +
+	"\btriggers\x18\a \x03(\v2\x17.api.v2.FunctionTriggerR\btriggers\x12L\n" +
+	"\x0ffailure_handler\x18\b \x01(\v2\x1e.api.v2.FunctionFailureHandlerH\x00R\x0efailureHandler\x88\x01\x01\x12C\n" +
+	"\rconfiguration\x18\t \x01(\v2\x1d.api.v2.FunctionConfigurationR\rconfigurationB\x12\n" +
+	"\x10_failure_handler\"\xe0\x01\n" +
 	"\n" +
 	"RunTrigger\x12\x1b\n" +
 	"\tevent_ids\x18\x01 \x03(\tR\beventIds\x12\"\n" +
@@ -4655,7 +8709,33 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0f_include_output\"w\n" +
 	"\x16GetFunctionRunResponse\x12'\n" +
 	"\x04data\x18\x01 \x01(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xf2\x01\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xa9\x02\n" +
+	"\x13GetEventRunsRequest\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12*\n" +
+	"\x0einclude_output\x18\x02 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
+	"\x06cursor\x18\x03 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12W\n" +
+	"\x05limit\x18\x04 \x01(\x05B<\x92A923Number of runs to return per page (min: 1, max: 40):\x0220H\x02R\x05limit\x88\x01\x01B\x11\n" +
+	"\x0f_include_outputB\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limit\"\x97\x01\n" +
+	"\x14GetEventRunsResponse\x12'\n" +
+	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xd8\x01\n" +
+	"\fRerunRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\xa2\x01\n" +
+	"\tfrom_step\x18\x02 \x01(\v2\x15.api.v2.RerunFromStepBi\x92Af2dStep rerun options. stepId is the user-defined step name. The optional input field must be an array.H\x00R\bfromStep\x88\x01\x01B\f\n" +
+	"\n" +
+	"_from_step\"\xe6\x01\n" +
+	"\rRerunFromStep\x12L\n" +
+	"\astep_id\x18\x01 \x01(\tB3\x92A02$User-defined step name to rerun fromJ\b\"step-1\"R\x06stepId\x12}\n" +
+	"\x05input\x18\x02 \x01(\v2\x1a.google.protobuf.ListValueBF\x92AC2/Optional replacement step input as a JSON arrayJ\x10[{\"foo\": \"bar\"}]H\x00R\x05input\x88\x01\x01B\b\n" +
+	"\x06_input\"l\n" +
+	"\rRerunResponse\x12%\n" +
+	"\x04data\x18\x01 \x01(\v2\x11.api.v2.RerunDataR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"f\n" +
+	"\tRerunData\x12Y\n" +
+	"\x06run_id\x18\x01 \x01(\tBB\x92A?2\x1fNew run ID created by the rerunJ\x1c\"01hp1zx8m3ng9vp6qn0xk7j4cy\"R\x05runId\"\xf2\x01\n" +
 	"\x11TraceSpanMetadata\x12\x14\n" +
 	"\x05scope\x18\x01 \x01(\tR\x05scope\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12=\n" +
@@ -4700,7 +8780,71 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x0f_include_output\"{\n" +
 	"\x18GetFunctionTraceResponse\x12)\n" +
 	"\x04data\x18\x01 \x01(\v2\x15.api.v2.FunctionTraceR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"N\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"L\n" +
+	"\x12GetFunctionRequest\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
+	"\vfunction_id\x18\x02 \x01(\tR\n" +
+	"functionId\"q\n" +
+	"\x13GetFunctionResponse\x12$\n" +
+	"\x04data\x18\x01 \x01(\v2\x10.api.v2.FunctionR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xec\x06\n" +
+	"\x03App\x126\n" +
+	"\x02id\x18\x01 \x01(\tB&\x92A#2\x17The user-defined app IDJ\b\"my-app\"R\x02id\x12+\n" +
+	"\x04name\x18\x02 \x01(\tB\x17\x92A\x142\bApp nameJ\b\"my-app\"R\x04name\x12U\n" +
+	"\x06method\x18\x03 \x01(\x0e2\x11.api.v2.AppMethodB*\x92A'2%How the app communicates with InngestR\x06method\x12K\n" +
+	"\vapp_version\x18\x04 \x01(\tB%\x92A\"2 User-defined app version, if setH\x00R\n" +
+	"appVersion\x88\x01\x01\x12g\n" +
+	"\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampB,\x92A)2'Timestamp when the app was first syncedR\tcreatedAt\x12A\n" +
+	"\vis_archived\x18\n" +
+	" \x01(\bB \x92A\x1d2\x1bWhether the app is archivedR\n" +
+	"isArchived\x12x\n" +
+	"\varchived_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB6\x92A321Timestamp when the app was archived (if archived)H\x01R\n" +
+	"archivedAt\x88\x01\x01\x12J\n" +
+	"\x0efunction_count\x18\f \x01(\x05B#\x92A 2\x1eNumber of functions in the appR\rfunctionCount\x12j\n" +
+	"\vlatest_sync\x18\x0e \x01(\v2\x0f.api.v2.AppSyncB3\x92A02.Latest sync metadata for the app, if availableH\x02R\n" +
+	"latestSync\x88\x01\x01B\x0e\n" +
+	"\f_app_versionB\x0e\n" +
+	"\f_archived_atB\x0e\n" +
+	"\f_latest_syncJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\r\x10\x0eR\fsdk_languageR\vsdk_versionR\tframeworkR\x03urlR\x05error\"\xb4\a\n" +
+	"\aAppSync\x12;\n" +
+	"\x06status\x18\x01 \x01(\tB\x1e\x92A\x1b2\x19Status of the latest syncH\x00R\x06status\x88\x01\x01\x12n\n" +
+	"\tsynced_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB0\x92A-2+Timestamp for the latest sync, if availableH\x01R\bsyncedAt\x88\x01\x01\x12b\n" +
+	"\fsdk_language\x18\x04 \x01(\tB:\x92A72'Language of the SDK that synced the appJ\f\"typescript\"H\x02R\vsdkLanguage\x88\x01\x01\x12[\n" +
+	"\vsdk_version\x18\x05 \x01(\tB5\x92A22&Version of the SDK that synced the appJ\b\"3.22.0\"H\x03R\n" +
+	"sdkVersion\x88\x01\x01\x12c\n" +
+	"\tframework\x18\x06 \x01(\tB@\x92A=21Framework used by the app, if reported by the SDKJ\b\"nextjs\"H\x04R\tframework\x88\x01\x01\x12x\n" +
+	"\x03url\x18\a \x01(\tBa\x92A^29URL of the Inngest endpoint in the app, if synced via URLJ!\"https://example.com/api/inngest\"H\x05R\x03url\x88\x01\x01\x12Z\n" +
+	"\x05error\x18\b \x01(\tB?\x92A<2:Most recent sync or connectivity error for the app, if anyH\x06R\x05error\x88\x01\x01\x12Z\n" +
+	"\vapp_version\x18\t \x01(\tB4\x92A12/App version reported by the latest sync, if setH\aR\n" +
+	"appVersion\x88\x01\x01B\t\n" +
+	"\a_statusB\f\n" +
+	"\n" +
+	"_synced_atB\x0f\n" +
+	"\r_sdk_languageB\x0e\n" +
+	"\f_sdk_versionB\f\n" +
+	"\n" +
+	"_frameworkB\x06\n" +
+	"\x04_urlB\b\n" +
+	"\x06_errorB\x0e\n" +
+	"\f_app_versionJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04J\x04\b\n" +
+	"\x10\vR\n" +
+	"started_atR\fcompleted_atR\x0efunction_count\"N\n" +
+	"\rGetAppRequest\x12=\n" +
+	"\x06app_id\x18\x01 \x01(\tB&\x92A#2\x17The user-defined app IDJ\b\"my-app\"R\x05appId\"g\n" +
+	"\x0eGetAppResponse\x12\x1f\n" +
+	"\x04data\x18\x01 \x01(\v2\v.api.v2.AppR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xec\x01\n" +
+	"\x13GetFunctionsRequest\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12J\n" +
+	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12]\n" +
+	"\x05limit\x18\x03 \x01(\x05BB\x92A?29Number of functions to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limit\"\x94\x01\n" +
+	"\x14GetFunctionsResponse\x12$\n" +
+	"\x04data\x18\x01 \x03(\v2\x10.api.v2.FunctionR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"N\n" +
 	"\x14CreateAccountRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01B\a\n" +
@@ -4869,7 +9013,40 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\v_started_atB\x0f\n" +
 	"\r_completed_atB\t\n" +
 	"\a_resultB\b\n" +
-	"\x06_error\"\xa1\x01\n" +
+	"\x06_error\"\x97\x04\n" +
+	"\x12CreateScoreRequest\x12d\n" +
+	"\x06run_id\x18\x01 \x01(\tBM\x92AJ2*Run ID (ULID) of the function run to scoreJ\x1c\"01JLW1NNJ69KCD1KMJEXAMPLE0\"R\x05runId\x12\x9a\x03\n" +
+	"\x06scores\x18\x02 \x03(\v2\x18.api.v2.CreateScoreInputB\xe7\x02\x92A\xe3\x022\xe0\x02Scores to record for the run. The REST request body is this array. Writes are applied in order and are not atomic; if a later score fails, earlier scores may already be recorded. Score writes are best-effort: run and step targets are not validated before writing, and scores for targets that do not exist may not surface in queries. Maximum 100 scores.R\x06scores\"\xe9\x05\n" +
+	"\x10CreateScoreInput\x12P\n" +
+	"\x04name\x18\x01 \x01(\tB<\x92A92+Score name; must be at most 128 UTF-8 bytesJ\n" +
+	"\"accuracy\"R\x04name\x12j\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueB<\x92A921Score value; must be a finite number or a booleanJ\x040.95R\x05value\x12\xd5\x01\n" +
+	"\astep_id\x18\x03 \x01(\tB\xb6\x01\x92A\xb2\x012\x9b\x01Optional SDK step ID; attaches the score to a specific step instead of the run. Step targets are recorded best-effort and are not validated before writing.J\x12\"generate-summary\"H\x00R\x06stepId\x88\x01\x01\x12\xa3\x02\n" +
+	"\n" +
+	"experiment\x18\x04 \x01(\v2\x17.api.v2.ScoreExperimentB\xe4\x01\x92A\xe0\x012\xdd\x01Optional experiment context. When provided, the score is recorded with the same experiment metadata emitted by the SDK's score.experiment API. Experiment scores must be run-scoped for experiment aggregate and detail APIs.H\x01R\n" +
+	"experiment\x88\x01\x01B\n" +
+	"\n" +
+	"\b_step_idB\r\n" +
+	"\v_experiment\"\x85\x01\n" +
+	"\x0fScoreExperiment\x123\n" +
+	"\x02id\x18\x01 \x01(\tB#\x92A 2\rExperiment IDJ\x0f\"model-routing\"R\x02id\x12=\n" +
+	"\avariant\x18\x02 \x01(\tB#\x92A 2\x12Experiment variantJ\n" +
+	"\"baseline\"R\avariant\"n\n" +
+	"\x13CreateScoreResponse\x12!\n" +
+	"\x04data\x18\x01 \x03(\v2\r.api.v2.ScoreR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xa9\x03\n" +
+	"\x05Score\x12A\n" +
+	"\x06run_id\x18\x01 \x01(\tB*\x92A'2%Run ID the score was recorded againstR\x05runId\x12#\n" +
+	"\x04name\x18\x02 \x01(\tB\x0f\x92A\f2\n" +
+	"Score nameR\x04name\x12>\n" +
+	"\x05value\x18\x03 \x01(\v2\x16.google.protobuf.ValueB\x10\x92A\r2\vScore valueR\x05value\x12Y\n" +
+	"\astep_id\x18\x04 \x01(\tB;\x92A826Step ID the score was recorded against, if step-scopedH\x00R\x06stepId\x88\x01\x01\x12\x81\x01\n" +
+	"\n" +
+	"experiment\x18\x05 \x01(\v2\x17.api.v2.ScoreExperimentBC\x92A@2>Experiment context the score was recorded against, if providedH\x01R\n" +
+	"experiment\x88\x01\x01B\n" +
+	"\n" +
+	"\b_step_idB\r\n" +
+	"\v_experiment\"\xa1\x01\n" +
 	"\x0eSyncAppRequest\x12,\n" +
 	"\x06app_id\x18\x01 \x01(\tB\x15\x92A\x122\x06App IDJ\b\"my-app\"R\x05appId\x12a\n" +
 	"\x03url\x18\x02 \x01(\tBO\x92AL2'URL for the Inngest endpoint in the appJ!\"https://example.com/api/inngest\"R\x03url\"p\n" +
@@ -4940,7 +9117,193 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xec\x01\n" +
 	"\x13InsightsEventSchema\x12B\n" +
 	"\x04name\x18\x01 \x01(\tB.\x92A+2\x0fEvent type nameJ\x18\"orders/payment.created\"R\x04name\x12\x90\x01\n" +
-	"\x06schema\x18\x02 \x01(\v2\x17.google.protobuf.StructB_\x92A\\2ZJSON Schema describing the shape of this event's data, represented as a nested JSON objectR\x06schema*\xdf\x01\n" +
+	"\x06schema\x18\x02 \x01(\v2\x17.google.protobuf.StructB_\x92A\\2ZJSON Schema describing the shape of this event's data, represented as a nested JSON objectR\x06schema\"\x91\x03\n" +
+	"\x16ListExperimentsRequest\x12J\n" +
+	"\x06cursor\x18\x01 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12_\n" +
+	"\x05limit\x18\x02 \x01(\x05BD\x92AA2;Number of experiments to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01\x12\x15\n" +
+	"\x06app_id\x18\x03 \x01(\tR\x05appId\x12\x1f\n" +
+	"\vfunction_id\x18\x04 \x01(\tR\n" +
+	"functionId\x123\n" +
+	"\x04from\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x02R\x04from\x88\x01\x01\x125\n" +
+	"\x05until\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x03R\x05until\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limitB\a\n" +
+	"\x05_fromB\b\n" +
+	"\x06_until\"\x99\x01\n" +
+	"\x17ListExperimentsResponse\x12&\n" +
+	"\x04data\x18\x01 \x03(\v2\x12.api.v2.ExperimentR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xd0\x02\n" +
+	"\n" +
+	"Experiment\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12/\n" +
+	"\bfunction\x18\x02 \x01(\v2\x13.api.v2.FunctionRefR\bfunction\x12-\n" +
+	"\x12selection_strategy\x18\x03 \x01(\tR\x11selectionStrategy\x12\x1a\n" +
+	"\bvariants\x18\x04 \x03(\tR\bvariants\x12#\n" +
+	"\rvariant_count\x18\x05 \x01(\x05R\fvariantCount\x12\x1d\n" +
+	"\n" +
+	"total_runs\x18\x06 \x01(\x05R\ttotalRuns\x129\n" +
+	"\n" +
+	"first_seen\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tfirstSeen\x127\n" +
+	"\tlast_seen\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\"\xdd\x02\n" +
+	"\x14GetExperimentRequest\x12\x1f\n" +
+	"\vfunction_id\x18\x01 \x01(\tR\n" +
+	"functionId\x12#\n" +
+	"\rexperiment_id\x18\x02 \x01(\tR\fexperimentId\x12]\n" +
+	"\avariant\x18\x03 \x01(\tB>\x92A;29Optional variant name to restrict the aggregate response.H\x00R\avariant\x88\x01\x01\x12\x15\n" +
+	"\x06app_id\x18\x04 \x01(\tR\x05appId\x123\n" +
+	"\x04from\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x01R\x04from\x88\x01\x01\x125\n" +
+	"\x05until\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x02R\x05until\x88\x01\x01B\n" +
+	"\n" +
+	"\b_variantB\a\n" +
+	"\x05_fromB\b\n" +
+	"\x06_until\"{\n" +
+	"\x15GetExperimentResponse\x12,\n" +
+	"\x04data\x18\x01 \x01(\v2\x18.api.v2.ExperimentDetailR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xcd\x02\n" +
+	"\x10ExperimentDetail\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12<\n" +
+	"\bvariants\x18\x02 \x03(\v2 .api.v2.ExperimentVariantMetricsR\bvariants\x12H\n" +
+	"\x0fvariant_weights\x18\x03 \x03(\v2\x1f.api.v2.ExperimentVariantWeightR\x0evariantWeights\x129\n" +
+	"\n" +
+	"first_seen\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tfirstSeen\x127\n" +
+	"\tlast_seen\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\blastSeen\x12-\n" +
+	"\x12selection_strategy\x18\x06 \x01(\tR\x11selectionStrategy\"\x95\x01\n" +
+	"\x18ExperimentVariantMetrics\x12!\n" +
+	"\fvariant_name\x18\x01 \x01(\tR\vvariantName\x12\x1b\n" +
+	"\trun_count\x18\x02 \x01(\x05R\brunCount\x129\n" +
+	"\ametrics\x18\x03 \x03(\v2\x1f.api.v2.ExperimentVariantMetricR\ametrics\"a\n" +
+	"\x17ExperimentVariantMetric\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x10\n" +
+	"\x03avg\x18\x02 \x01(\x01R\x03avg\x12\x10\n" +
+	"\x03min\x18\x03 \x01(\x01R\x03min\x12\x10\n" +
+	"\x03max\x18\x04 \x01(\x01R\x03max\"T\n" +
+	"\x17ExperimentVariantWeight\x12!\n" +
+	"\fvariant_name\x18\x01 \x01(\tR\vvariantName\x12\x16\n" +
+	"\x06weight\x18\x02 \x01(\x01R\x06weight\"\xff\x01\n" +
+	"\x16ListSessionKeysRequest\x12\x1b\n" +
+	"\x06search\x18\x01 \x01(\tH\x00R\x06search\x88\x01\x01\x12J\n" +
+	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12\\\n" +
+	"\x05limit\x18\x03 \x01(\x05BA\x92A>28Number of sessions to return per page (min: 1, max: 100):\x0220H\x02R\x05limit\x88\x01\x01B\t\n" +
+	"\a_searchB\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limit\"\x99\x01\n" +
+	"\x17ListSessionKeysResponse\x12&\n" +
+	"\x04data\x18\x01 \x03(\v2\x12.api.v2.SessionKeyR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"W\n" +
+	"\n" +
+	"SessionKey\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x129\n" +
+	"\n" +
+	"created_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x9c\x03\n" +
+	"\x13ListSessionsRequest\x12\x1f\n" +
+	"\vsession_key\x18\x01 \x01(\tR\n" +
+	"sessionKey\x12\x1b\n" +
+	"\x06search\x18\x02 \x01(\tH\x00R\x06search\x88\x01\x01\x12J\n" +
+	"\x06cursor\x18\x03 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12\\\n" +
+	"\x05limit\x18\x04 \x01(\x05BA\x92A>28Number of sessions to return per page (min: 1, max: 100):\x0220H\x02R\x05limit\x88\x01\x01\x123\n" +
+	"\x04from\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x03R\x04from\x88\x01\x01\x125\n" +
+	"\x05until\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x04R\x05until\x88\x01\x01B\t\n" +
+	"\a_searchB\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limitB\a\n" +
+	"\x05_fromB\b\n" +
+	"\x06_until\"\x98\x01\n" +
+	"\x14ListSessionsResponse\x12(\n" +
+	"\x04data\x18\x01 \x03(\v2\x14.api.v2.SessionGroupR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\xfd\x01\n" +
+	"\fSessionGroup\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\trun_count\x18\x02 \x01(\x05R\brunCount\x12(\n" +
+	"\x10failed_run_count\x18\x03 \x01(\x05R\x0efailedRunCount\x12!\n" +
+	"\ffailure_rate\x18\x04 \x01(\x01R\vfailureRate\x12@\n" +
+	"\x0elast_active_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\flastActiveAt\x121\n" +
+	"\tfunctions\x18\x06 \x03(\v2\x13.api.v2.FunctionRefR\tfunctions\"\x9a\x03\n" +
+	"\x16ListSessionRunsRequest\x12\x1f\n" +
+	"\vsession_key\x18\x01 \x01(\tR\n" +
+	"sessionKey\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12J\n" +
+	"\x06cursor\x18\x03 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x00R\x06cursor\x88\x01\x01\x12`\n" +
+	"\x05limit\x18\x04 \x01(\x05BE\x92AB2<Number of session runs to return per page (min: 1, max: 100):\x0220H\x01R\x05limit\x88\x01\x01\x123\n" +
+	"\x04from\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x02R\x04from\x88\x01\x01\x125\n" +
+	"\x05until\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x03R\x05until\x88\x01\x01B\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limitB\a\n" +
+	"\x05_fromB\b\n" +
+	"\x06_until\"\x99\x01\n" +
+	"\x17ListSessionRunsResponse\x12&\n" +
+	"\x04data\x18\x01 \x03(\v2\x12.api.v2.SessionRunR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x84\x03\n" +
+	"\n" +
+	"SessionRun\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12/\n" +
+	"\bfunction\x18\x02 \x01(\v2\x13.api.v2.FunctionRefR\bfunction\x12\"\n" +
+	"\n" +
+	"event_name\x18\x03 \x01(\tH\x00R\teventName\x88\x01\x01\x121\n" +
+	"\x06status\x18\x04 \x01(\x0e2\x19.api.v2.FunctionRunStatusR\x06status\x127\n" +
+	"\tqueued_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\bqueuedAt\x12>\n" +
+	"\n" +
+	"started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampH\x01R\tstartedAt\x88\x01\x01\x12:\n" +
+	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
+	"\v_event_nameB\r\n" +
+	"\v_started_atB\v\n" +
+	"\t_ended_at\"\xf5\b\n" +
+	"\x0fListRunsRequest\x12*\n" +
+	"\x0einclude_output\x18\x01 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
+	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
+	"\x05limit\x18\x03 \x01(\x05B=\x92A:24Number of runs to return per page (min: 1, max: 100):\x0220H\x02R\x05limit\x88\x01\x01\x12_\n" +
+	"\x04from\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB*\x92A'2%Inclusive start of the run time rangeH\x03R\x04from\x88\x01\x01\x12_\n" +
+	"\x05until\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB(\x92A%2#Inclusive end of the run time rangeH\x04R\x05until\x88\x01\x01\x12\xe0\x01\n" +
+	"\n" +
+	"time_field\x18\x06 \x01(\tB\xc0\x01\x92A\xbc\x012\xaf\x01Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt. Snake case aliases such as QUEUED_AT, STARTED_AT, and ENDED_AT are also accepted.:\bqueuedAtR\ttimeField\x12\x87\x01\n" +
+	"\x06status\x18\a \x03(\tBo\x92Al2jStatuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, or CANCELLEDR\x06status\x12.\n" +
+	"\x06app_id\x18\b \x03(\tB\x17\x92A\x142\x12App IDs to includeR\x05appId\x12=\n" +
+	"\vfunction_id\x18\t \x03(\tB\x1c\x92A\x192\x17Function IDs to includeR\n" +
+	"functionId\x12`\n" +
+	"\vis_deferred\x18\n" +
+	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
+	"isDeferred\x88\x01\x01\x12E\n" +
+	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05orderB\x11\n" +
+	"\x0f_include_outputB\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limitB\a\n" +
+	"\x05_fromB\b\n" +
+	"\x06_untilB\x0e\n" +
+	"\f_is_deferred\"\xc6\b\n" +
+	"\x17ListFunctionRunsRequest\x12\x15\n" +
+	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
+	"\vfunction_id\x18\x02 \x01(\tR\n" +
+	"functionId\x12*\n" +
+	"\x0einclude_output\x18\x03 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
+	"\x06cursor\x18\x04 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
+	"\x05limit\x18\x05 \x01(\x05B=\x92A:24Number of runs to return per page (min: 1, max: 100):\x0220H\x02R\x05limit\x88\x01\x01\x12_\n" +
+	"\x04from\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB*\x92A'2%Inclusive start of the run time rangeH\x03R\x04from\x88\x01\x01\x12_\n" +
+	"\x05until\x18\a \x01(\v2\x1a.google.protobuf.TimestampB(\x92A%2#Inclusive end of the run time rangeH\x04R\x05until\x88\x01\x01\x12\xe0\x01\n" +
+	"\n" +
+	"time_field\x18\b \x01(\tB\xc0\x01\x92A\xbc\x012\xaf\x01Run timestamp field used for filtering and ordering. Accepts queuedAt, startedAt, or endedAt. Snake case aliases such as QUEUED_AT, STARTED_AT, and ENDED_AT are also accepted.:\bqueuedAtR\ttimeField\x12\x87\x01\n" +
+	"\x06status\x18\t \x03(\tBo\x92Al2jStatuses to include, using response status values such as COMPLETED, FAILED, RUNNING, QUEUED, or CANCELLEDR\x06status\x12`\n" +
+	"\vis_deferred\x18\n" +
+	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
+	"isDeferred\x88\x01\x01\x12E\n" +
+	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05orderB\x11\n" +
+	"\x0f_include_outputB\t\n" +
+	"\a_cursorB\b\n" +
+	"\x06_limitB\a\n" +
+	"\x05_fromB\b\n" +
+	"\x06_untilB\x0e\n" +
+	"\f_is_deferred\"\x93\x01\n" +
+	"\x10ListRunsResponse\x12'\n" +
+	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page\"\x9b\x01\n" +
+	"\x18ListFunctionRunsResponse\x12'\n" +
+	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +
+	"\x04page\x18\x03 \x01(\v2\f.api.v2.PageR\x04page*\xdf\x01\n" +
 	"\x11FunctionRunStatus\x12#\n" +
 	"\x1fFUNCTION_RUN_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aFUNCTION_RUN_STATUS_QUEUED\x10\x01\x12\x1f\n" +
@@ -4964,7 +9327,25 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14TRACE_STEP_OP_INVOKE\x10\x04\x12\x1c\n" +
 	"\x18TRACE_STEP_OP_SEND_EVENT\x10\x05\x12\x1c\n" +
 	"\x18TRACE_STEP_OP_AI_GATEWAY\x10\x06\x12!\n" +
-	"\x1dTRACE_STEP_OP_WAIT_FOR_SIGNAL\x10\a*/\n" +
+	"\x1dTRACE_STEP_OP_WAIT_FOR_SIGNAL\x10\a*}\n" +
+	"\x13FunctionTriggerType\x12%\n" +
+	"!FUNCTION_TRIGGER_TYPE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bFUNCTION_TRIGGER_TYPE_EVENT\x10\x01\x12\x1e\n" +
+	"\x1aFUNCTION_TRIGGER_TYPE_CRON\x10\x02*\xc3\x01\n" +
+	"\x18FunctionConcurrencyScope\x12*\n" +
+	"&FUNCTION_CONCURRENCY_SCOPE_UNSPECIFIED\x10\x00\x12&\n" +
+	"\"FUNCTION_CONCURRENCY_SCOPE_ACCOUNT\x10\x01\x12*\n" +
+	"&FUNCTION_CONCURRENCY_SCOPE_ENVIRONMENT\x10\x02\x12'\n" +
+	"#FUNCTION_CONCURRENCY_SCOPE_FUNCTION\x10\x03*\x86\x01\n" +
+	"\x15FunctionSingletonMode\x12'\n" +
+	"#FUNCTION_SINGLETON_MODE_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cFUNCTION_SINGLETON_MODE_SKIP\x10\x01\x12\"\n" +
+	"\x1eFUNCTION_SINGLETON_MODE_CANCEL\x10\x02*i\n" +
+	"\tAppMethod\x12\x1a\n" +
+	"\x16APP_METHOD_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10APP_METHOD_SERVE\x10\x01\x12\x16\n" +
+	"\x12APP_METHOD_CONNECT\x10\x02\x12\x12\n" +
+	"\x0eAPP_METHOD_API\x10\x03*/\n" +
 	"\aEnvType\x12\x0e\n" +
 	"\n" +
 	"PRODUCTION\x10\x00\x12\b\n" +
@@ -4988,7 +9369,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x8dq\n" +
+	"\x04INFO\x10\x032\xa6\x8b\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -5267,7 +9648,43 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x10Get function run\x1a;Fetches the canonical run summary for a single function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10\x12\x0e/runs/{run_id}\x12\xca\x06\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10\x12\x0e/runs/{run_id}\x12\xd4\x01\n" +
+	"\bListRuns\x12\x17.api.v2.ListRunsRequest\x1a\x18.api.v2.ListRunsResponse\"\x94\x01\x92A\x83\x01\n" +
+	"\x04Runs\n" +
+	"\x04Beta\x12\tList runs\x1aXLists runs in the authenticated environment, optionally filtered by app and function IDsb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\a\x12\x05/runs\x12\x84\x02\n" +
+	"\x10ListFunctionRuns\x12\x1f.api.v2.ListFunctionRunsRequest\x1a .api.v2.ListFunctionRunsResponse\"\xac\x01\x92Av\n" +
+	"\x04Runs\n" +
+	"\x04Beta\x12\x18List runs for a function\x1a<Lists runs for one function in the authenticated environmentb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02-\x12+/apps/{app_id}/functions/{function_id}/runs\x12\xcf\x01\n" +
+	"\fGetEventRuns\x12\x1b.api.v2.GetEventRunsRequest\x1a\x1c.api.v2.GetEventRunsResponse\"\x83\x01\x92Aa\n" +
+	"\x04Runs\n" +
+	"\x04Beta\x12\x0eGet event runs\x1a1Lists function runs triggered by a specific eventb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19\x12\x17/events/{event_id}/runs\x12\xcd\x01\n" +
+	"\x05Rerun\x12\x14.api.v2.RerunRequest\x1a\x15.api.v2.RerunResponse\"\x96\x01\x92At\n" +
+	"\x04Runs\n" +
+	"\x04Beta\x12\x12Rerun function run\x1a@Creates a new run using the original run's triggering event datab\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/runs/{run_id}/rerun\x12\xc8\x01\n" +
+	"\x06GetApp\x12\x15.api.v2.GetAppRequest\x1a\x16.api.v2.GetAppResponse\"\x8e\x01\x92Au\n" +
+	"\x04Apps\n" +
+	"\x04Beta\x12\aGet app\x1aLFetches details for a single app, including sync metadata and function countb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10\x12\x0e/apps/{app_id}\x12\xcb\x02\n" +
+	"\vCreateScore\x12\x1a.api.v2.CreateScoreRequest\x1a\x1b.api.v2.CreateScoreResponse\"\x82\x02\x92A\xd9\x01\n" +
+	"\x04Runs\n" +
+	"\x04Beta\x12\fCreate score\x1a\xaa\x01Submits one or more named scores for a function run, or for specific steps when step IDs are provided. Scores are recorded as run metadata and aggregated for experiments.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f:\x06scores\"\x15/runs/{run_id}/scores\x12\xca\x06\n" +
 	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x8d\x06\x92A\xea\x05\n" +
 	"\x04Apps\n" +
 	"\x04Beta\x12\bSync app\x1a Sync an app at the provided URL.JE\n" +
@@ -5300,7 +9717,19 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x12Get function trace\x1a0Fetches the trace tree for a single function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x16\x12\x14/runs/{run_id}/trace\x12\xfc\v\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x16\x12\x14/runs/{run_id}/trace\x12\xfc\x01\n" +
+	"\vGetFunction\x12\x1a.api.v2.GetFunctionRequest\x1a\x1b.api.v2.GetFunctionResponse\"\xb3\x01\x92A\x81\x01\n" +
+	"\tFunctions\n" +
+	"\x04Beta\x12\fGet function\x1aNFetches function configuration and status details for a function within an appb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xdd\x01\n" +
+	"\fGetFunctions\x12\x1b.api.v2.GetFunctionsRequest\x1a\x1c.api.v2.GetFunctionsResponse\"\x91\x01\x92An\n" +
+	"\tFunctions\n" +
+	"\x04Beta\x12\rGet functions\x1a:Lists function configuration and status details for an appb\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/apps/{app_id}/functions\x12\xfc\v\n" +
 	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\xaa\v\x92A\xee\n" +
 	"\n" +
 	"\tFunctions\x12\x0fInvoke function\x1a\x81\x01Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request bodyJn\n" +
@@ -5339,10 +9768,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invoke\x12\xc8\x04\n" +
-	"\x12ListInsightsTables\x12!.api.v2.ListInsightsTablesRequest\x1a\".api.v2.ListInsightsTablesResponse\"\xea\x03\x92A\xce\x03\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invoke\x12\xd2\x04\n" +
+	"\x12ListInsightsTables\x12!.api.v2.ListInsightsTablesRequest\x1a\".api.v2.ListInsightsTablesResponse\"\xf4\x03\x92A\xd8\x03\n" +
 	"\bInsights\n" +
-	"\x04Beta\x12\x14List insights tables\x1aOLists the available tables that can be queried via the Insights query endpoint.JZ\n" +
+	"\x04Beta\n" +
+	"\bInternal\x12\x14List insights tables\x1aOLists the available tables that can be queried via the Insights query endpoint.JZ\n" +
 	"\x03200\x12S\n" +
 	"!List of available insights tables\x12.\n" +
 	",\x1a*#/definitions/v2ListInsightsTablesResponseJR\n" +
@@ -5357,10 +9787,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\xf4\x05\n" +
-	"\x18ListInsightsEventSchemas\x12'.api.v2.ListInsightsEventSchemasRequest\x1a(.api.v2.ListInsightsEventSchemasResponse\"\x84\x05\x92A\xe0\x04\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\xfe\x05\n" +
+	"\x18ListInsightsEventSchemas\x12'.api.v2.ListInsightsEventSchemasRequest\x1a(.api.v2.ListInsightsEventSchemasResponse\"\x8e\x05\x92A\xea\x04\n" +
 	"\bInsights\n" +
-	"\x04Beta\x12\x17List event type schemas\x1a\x80\x01Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON.Jc\n" +
+	"\x04Beta\n" +
+	"\bInternal\x12\x17List event type schemas\x1a\x80\x01Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON.Jc\n" +
 	"\x03200\x12\\\n" +
 	"$Paginated list of event type schemas\x124\n" +
 	"2\x1a0#/definitions/v2ListInsightsEventSchemasResponseJR\n" +
@@ -5378,10 +9809,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/insights/events/schemas\x12\x94\x06\n" +
-	"\x13QueryInsightsPrompt\x12\".api.v2.QueryInsightsPromptRequest\x1a#.api.v2.QueryInsightsPromptResponse\"\xb3\x05\x92A\x8e\x05\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/insights/events/schemas\x12\x9e\x06\n" +
+	"\x13QueryInsightsPrompt\x12\".api.v2.QueryInsightsPromptRequest\x1a#.api.v2.QueryInsightsPromptResponse\"\xbd\x05\x92A\x98\x05\n" +
 	"\bInsights\n" +
-	"\x04Beta\x12#Generate insights query from prompt\x1a@Translates a natural language prompt into an Insights SQL query.JV\n" +
+	"\x04Beta\n" +
+	"\bInternal\x12#Generate insights query from prompt\x1a@Translates a natural language prompt into an Insights SQL query.JV\n" +
 	"\x03200\x12O\n" +
 	"\x1cQuery generated successfully\x12/\n" +
 	"-\x1a+#/definitions/v2QueryInsightsPromptResponseJL\n" +
@@ -5402,10 +9834,11 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/insights/query/prompt\x12\x8e\x06\n" +
-	"\rQueryInsights\x12\x1c.api.v2.QueryInsightsRequest\x1a\x1d.api.v2.QueryInsightsResponse\"\xbf\x05\x92A\xa1\x05\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/insights/query/prompt\x12\x98\x06\n" +
+	"\rQueryInsights\x12\x1c.api.v2.QueryInsightsRequest\x1a\x1d.api.v2.QueryInsightsResponse\"\xc9\x05\x92A\xab\x05\n" +
 	"\bInsights\n" +
-	"\x04Beta\x12\x0eQuery insights\x1a,Query Insights using the provided SQL query.JO\n" +
+	"\x04Beta\n" +
+	"\bInternal\x12\x0eQuery insights\x1a,Query Insights using the provided SQL query.JO\n" +
 	"\x03200\x12H\n" +
 	"\x1bQuery executed successfully\x12)\n" +
 	"'\x1a%#/definitions/v2QueryInsightsResponseJL\n" +
@@ -5429,7 +9862,37 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/insights/queryB\xfc\x04\x92A\xc5\x04\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/insights/query\x12\xe1\x02\n" +
+	"\x0fListExperiments\x12\x1e.api.v2.ListExperimentsRequest\x1a\x1f.api.v2.ListExperimentsResponse\"\x8c\x02\x92A\xbe\x01\n" +
+	"\vExperiments\n" +
+	"\x04Beta\x12\x10List experiments\x1a\x84\x01Lists observed experiments in the authenticated environment. Use the nested app and function route to scope results to one function.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02DZ4\x122/apps/{app_id}/functions/{function_id}/experiments\x12\f/experiments\x12\xb5\x02\n" +
+	"\rGetExperiment\x12\x1c.api.v2.GetExperimentRequest\x1a\x1d.api.v2.GetExperimentResponse\"\xe6\x01\x92A\x95\x01\n" +
+	"\vExperiments\n" +
+	"\x04Beta\x12\x19Get experiment aggregates\x1aSFetches variant run counts and score aggregates for one experiment on one function.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02G\x12E/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}\x12\xdd\x01\n" +
+	"\x0fListSessionKeys\x12\x1e.api.v2.ListSessionKeysRequest\x1a\x1f.api.v2.ListSessionKeysResponse\"\x88\x01\x92At\n" +
+	"\bSessions\n" +
+	"\x04Beta\x12\x11List session keys\x1a=Lists session keys observed in the authenticated environment.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\v\x12\t/sessions\x12\xe8\x01\n" +
+	"\fListSessions\x12\x1b.api.v2.ListSessionsRequest\x1a\x1c.api.v2.ListSessionsResponse\"\x9c\x01\x92Az\n" +
+	"\bSessions\n" +
+	"\x04Beta\x12\rList sessions\x1aGLists session IDs for one session key in the authenticated environment.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19\x12\x17/sessions/{session_key}\x12\x8f\x02\n" +
+	"\x0fListSessionRuns\x12\x1e.api.v2.ListSessionRunsRequest\x1a\x1f.api.v2.ListSessionRunsResponse\"\xba\x01\x92A\x82\x01\n" +
+	"\bSessions\n" +
+	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
+	"\x0e\n" +
+	"\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\xe1\x05\x92A\xaa\x05\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -5440,7 +9903,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bWebhooks\x12\"Create and manage inbound webhooksj\x17\n" +
 	"\x04Apps\x12\x0fSync and managej(\n" +
 	"\tFunctions\x12\x1bInvoke and manage functionsj\x1d\n" +
-	"\x04Runs\x12\x15Inspect function runsj)\n" +
+	"\x04Runs\x12\x15Inspect function runsj9\n" +
+	"\vExperiments\x12*Inspect experiment variants and aggregatesj(\n" +
+	"\bSessions\x12\x1cInspect session-grouped runsj)\n" +
 	"\vPartner API\x12\x1aPartner account managementZ1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
 
 var (
@@ -5455,237 +9920,418 @@ func file_api_v2_service_proto_rawDescGZIP() []byte {
 	return file_api_v2_service_proto_rawDescData
 }
 
-var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 72)
+var file_api_v2_service_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
+var file_api_v2_service_proto_msgTypes = make([]protoimpl.MessageInfo, 128)
 var file_api_v2_service_proto_goTypes = []any{
-	(FunctionRunStatus)(0),                   // 0: api.v2.FunctionRunStatus
-	(TraceSpanStatus)(0),                     // 1: api.v2.TraceSpanStatus
-	(TraceStepOp)(0),                         // 2: api.v2.TraceStepOp
-	(EnvType)(0),                             // 3: api.v2.EnvType
-	(FilterType)(0),                          // 4: api.v2.FilterType
-	(InsightsOutputColumnType)(0),            // 5: api.v2.InsightsOutputColumnType
-	(InsightsDiagnosticSeverity)(0),          // 6: api.v2.InsightsDiagnosticSeverity
-	(*HealthRequest)(nil),                    // 7: api.v2.HealthRequest
-	(*FetchAccountRequest)(nil),              // 8: api.v2.FetchAccountRequest
-	(*HealthResponse)(nil),                   // 9: api.v2.HealthResponse
-	(*HealthData)(nil),                       // 10: api.v2.HealthData
-	(*Error)(nil),                            // 11: api.v2.Error
-	(*ErrorResponse)(nil),                    // 12: api.v2.ErrorResponse
-	(*ResponseMetadata)(nil),                 // 13: api.v2.ResponseMetadata
-	(*FunctionRef)(nil),                      // 14: api.v2.FunctionRef
-	(*AppRef)(nil),                           // 15: api.v2.AppRef
-	(*RunTrigger)(nil),                       // 16: api.v2.RunTrigger
-	(*FunctionRun)(nil),                      // 17: api.v2.FunctionRun
-	(*GetFunctionRunRequest)(nil),            // 18: api.v2.GetFunctionRunRequest
-	(*GetFunctionRunResponse)(nil),           // 19: api.v2.GetFunctionRunResponse
-	(*TraceSpanMetadata)(nil),                // 20: api.v2.TraceSpanMetadata
-	(*TraceSpan)(nil),                        // 21: api.v2.TraceSpan
-	(*FunctionTrace)(nil),                    // 22: api.v2.FunctionTrace
-	(*GetFunctionTraceRequest)(nil),          // 23: api.v2.GetFunctionTraceRequest
-	(*GetFunctionTraceResponse)(nil),         // 24: api.v2.GetFunctionTraceResponse
-	(*CreateAccountRequest)(nil),             // 25: api.v2.CreateAccountRequest
-	(*CreateAccountResponse)(nil),            // 26: api.v2.CreateAccountResponse
-	(*CreateEnvRequest)(nil),                 // 27: api.v2.CreateEnvRequest
-	(*CreateEnvResponse)(nil),                // 28: api.v2.CreateEnvResponse
-	(*Env)(nil),                              // 29: api.v2.Env
-	(*CreateAccountData)(nil),                // 30: api.v2.CreateAccountData
-	(*FetchAccountsRequest)(nil),             // 31: api.v2.FetchAccountsRequest
-	(*FetchAccountsResponse)(nil),            // 32: api.v2.FetchAccountsResponse
-	(*FetchAccountResponse)(nil),             // 33: api.v2.FetchAccountResponse
-	(*Account)(nil),                          // 34: api.v2.Account
-	(*Page)(nil),                             // 35: api.v2.Page
-	(*FetchAccountEventKeysRequest)(nil),     // 36: api.v2.FetchAccountEventKeysRequest
-	(*FetchAccountEventKeysResponse)(nil),    // 37: api.v2.FetchAccountEventKeysResponse
-	(*EventKey)(nil),                         // 38: api.v2.EventKey
-	(*FetchAccountEnvsRequest)(nil),          // 39: api.v2.FetchAccountEnvsRequest
-	(*FetchAccountEnvsResponse)(nil),         // 40: api.v2.FetchAccountEnvsResponse
-	(*FetchAccountSigningKeysRequest)(nil),   // 41: api.v2.FetchAccountSigningKeysRequest
-	(*FetchAccountSigningKeysResponse)(nil),  // 42: api.v2.FetchAccountSigningKeysResponse
-	(*SigningKey)(nil),                       // 43: api.v2.SigningKey
-	(*CreateWebhookRequest)(nil),             // 44: api.v2.CreateWebhookRequest
-	(*CreateWebhookResponse)(nil),            // 45: api.v2.CreateWebhookResponse
-	(*EventFilter)(nil),                      // 46: api.v2.EventFilter
-	(*ListWebhooksRequest)(nil),              // 47: api.v2.ListWebhooksRequest
-	(*ListWebhooksResponse)(nil),             // 48: api.v2.ListWebhooksResponse
-	(*UpdateWebhookRequest)(nil),             // 49: api.v2.UpdateWebhookRequest
-	(*UpdateWebhookResponse)(nil),            // 50: api.v2.UpdateWebhookResponse
-	(*Webhook)(nil),                          // 51: api.v2.Webhook
-	(*PatchEnvRequest)(nil),                  // 52: api.v2.PatchEnvRequest
-	(*PatchEnvsResponse)(nil),                // 53: api.v2.PatchEnvsResponse
-	(*InvokeFunctionRequest)(nil),            // 54: api.v2.InvokeFunctionRequest
-	(*InvokeFunctionResponse)(nil),           // 55: api.v2.InvokeFunctionResponse
-	(*InvokeFunctionData)(nil),               // 56: api.v2.InvokeFunctionData
-	(*SyncAppRequest)(nil),                   // 57: api.v2.SyncAppRequest
-	(*SyncAppResponse)(nil),                  // 58: api.v2.SyncAppResponse
-	(*SyncAppData)(nil),                      // 59: api.v2.SyncAppData
-	(*SyncAppError)(nil),                     // 60: api.v2.SyncAppError
-	(*QueryInsightsRequest)(nil),             // 61: api.v2.QueryInsightsRequest
-	(*QueryInsightsResponse)(nil),            // 62: api.v2.QueryInsightsResponse
-	(*QueryInsightsData)(nil),                // 63: api.v2.QueryInsightsData
-	(*InsightsOutputColumn)(nil),             // 64: api.v2.InsightsOutputColumn
-	(*InsightsRow)(nil),                      // 65: api.v2.InsightsRow
-	(*InsightsDiagnostic)(nil),               // 66: api.v2.InsightsDiagnostic
-	(*InsightsDiagnosticPosition)(nil),       // 67: api.v2.InsightsDiagnosticPosition
-	(*ListInsightsTablesRequest)(nil),        // 68: api.v2.ListInsightsTablesRequest
-	(*ListInsightsTablesResponse)(nil),       // 69: api.v2.ListInsightsTablesResponse
-	(*InsightsTable)(nil),                    // 70: api.v2.InsightsTable
-	(*InsightsTableColumn)(nil),              // 71: api.v2.InsightsTableColumn
-	(*QueryInsightsPromptRequest)(nil),       // 72: api.v2.QueryInsightsPromptRequest
-	(*QueryInsightsPromptResponse)(nil),      // 73: api.v2.QueryInsightsPromptResponse
-	(*QueryInsightsPromptData)(nil),          // 74: api.v2.QueryInsightsPromptData
-	(*ListInsightsEventSchemasRequest)(nil),  // 75: api.v2.ListInsightsEventSchemasRequest
-	(*ListInsightsEventSchemasResponse)(nil), // 76: api.v2.ListInsightsEventSchemasResponse
-	(*InsightsEventSchema)(nil),              // 77: api.v2.InsightsEventSchema
-	nil,                                      // 78: api.v2.TraceSpanMetadata.ValuesEntry
-	(*timestamppb.Timestamp)(nil),            // 79: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),                  // 80: google.protobuf.Struct
-	(*structpb.Value)(nil),                   // 81: google.protobuf.Value
+	(FunctionRunStatus)(0),                        // 0: api.v2.FunctionRunStatus
+	(TraceSpanStatus)(0),                          // 1: api.v2.TraceSpanStatus
+	(TraceStepOp)(0),                              // 2: api.v2.TraceStepOp
+	(FunctionTriggerType)(0),                      // 3: api.v2.FunctionTriggerType
+	(FunctionConcurrencyScope)(0),                 // 4: api.v2.FunctionConcurrencyScope
+	(FunctionSingletonMode)(0),                    // 5: api.v2.FunctionSingletonMode
+	(AppMethod)(0),                                // 6: api.v2.AppMethod
+	(EnvType)(0),                                  // 7: api.v2.EnvType
+	(FilterType)(0),                               // 8: api.v2.FilterType
+	(InsightsOutputColumnType)(0),                 // 9: api.v2.InsightsOutputColumnType
+	(InsightsDiagnosticSeverity)(0),               // 10: api.v2.InsightsDiagnosticSeverity
+	(*HealthRequest)(nil),                         // 11: api.v2.HealthRequest
+	(*FetchAccountRequest)(nil),                   // 12: api.v2.FetchAccountRequest
+	(*HealthResponse)(nil),                        // 13: api.v2.HealthResponse
+	(*HealthData)(nil),                            // 14: api.v2.HealthData
+	(*Error)(nil),                                 // 15: api.v2.Error
+	(*ErrorResponse)(nil),                         // 16: api.v2.ErrorResponse
+	(*ResponseMetadata)(nil),                      // 17: api.v2.ResponseMetadata
+	(*TimeRange)(nil),                             // 18: api.v2.TimeRange
+	(*FunctionRef)(nil),                           // 19: api.v2.FunctionRef
+	(*AppRef)(nil),                                // 20: api.v2.AppRef
+	(*FunctionApp)(nil),                           // 21: api.v2.FunctionApp
+	(*FunctionTrigger)(nil),                       // 22: api.v2.FunctionTrigger
+	(*FunctionFailureHandler)(nil),                // 23: api.v2.FunctionFailureHandler
+	(*FunctionCancellationConfiguration)(nil),     // 24: api.v2.FunctionCancellationConfiguration
+	(*FunctionRetryConfiguration)(nil),            // 25: api.v2.FunctionRetryConfiguration
+	(*FunctionEventsBatchConfiguration)(nil),      // 26: api.v2.FunctionEventsBatchConfiguration
+	(*FunctionConcurrencyLimitConfiguration)(nil), // 27: api.v2.FunctionConcurrencyLimitConfiguration
+	(*FunctionConcurrencyConfiguration)(nil),      // 28: api.v2.FunctionConcurrencyConfiguration
+	(*FunctionRateLimitConfiguration)(nil),        // 29: api.v2.FunctionRateLimitConfiguration
+	(*FunctionDebounceConfiguration)(nil),         // 30: api.v2.FunctionDebounceConfiguration
+	(*FunctionThrottleConfiguration)(nil),         // 31: api.v2.FunctionThrottleConfiguration
+	(*FunctionSingletonConfiguration)(nil),        // 32: api.v2.FunctionSingletonConfiguration
+	(*FunctionConfiguration)(nil),                 // 33: api.v2.FunctionConfiguration
+	(*Function)(nil),                              // 34: api.v2.Function
+	(*RunTrigger)(nil),                            // 35: api.v2.RunTrigger
+	(*FunctionRun)(nil),                           // 36: api.v2.FunctionRun
+	(*GetFunctionRunRequest)(nil),                 // 37: api.v2.GetFunctionRunRequest
+	(*GetFunctionRunResponse)(nil),                // 38: api.v2.GetFunctionRunResponse
+	(*GetEventRunsRequest)(nil),                   // 39: api.v2.GetEventRunsRequest
+	(*GetEventRunsResponse)(nil),                  // 40: api.v2.GetEventRunsResponse
+	(*RerunRequest)(nil),                          // 41: api.v2.RerunRequest
+	(*RerunFromStep)(nil),                         // 42: api.v2.RerunFromStep
+	(*RerunResponse)(nil),                         // 43: api.v2.RerunResponse
+	(*RerunData)(nil),                             // 44: api.v2.RerunData
+	(*TraceSpanMetadata)(nil),                     // 45: api.v2.TraceSpanMetadata
+	(*TraceSpan)(nil),                             // 46: api.v2.TraceSpan
+	(*FunctionTrace)(nil),                         // 47: api.v2.FunctionTrace
+	(*GetFunctionTraceRequest)(nil),               // 48: api.v2.GetFunctionTraceRequest
+	(*GetFunctionTraceResponse)(nil),              // 49: api.v2.GetFunctionTraceResponse
+	(*GetFunctionRequest)(nil),                    // 50: api.v2.GetFunctionRequest
+	(*GetFunctionResponse)(nil),                   // 51: api.v2.GetFunctionResponse
+	(*App)(nil),                                   // 52: api.v2.App
+	(*AppSync)(nil),                               // 53: api.v2.AppSync
+	(*GetAppRequest)(nil),                         // 54: api.v2.GetAppRequest
+	(*GetAppResponse)(nil),                        // 55: api.v2.GetAppResponse
+	(*GetFunctionsRequest)(nil),                   // 56: api.v2.GetFunctionsRequest
+	(*GetFunctionsResponse)(nil),                  // 57: api.v2.GetFunctionsResponse
+	(*CreateAccountRequest)(nil),                  // 58: api.v2.CreateAccountRequest
+	(*CreateAccountResponse)(nil),                 // 59: api.v2.CreateAccountResponse
+	(*CreateEnvRequest)(nil),                      // 60: api.v2.CreateEnvRequest
+	(*CreateEnvResponse)(nil),                     // 61: api.v2.CreateEnvResponse
+	(*Env)(nil),                                   // 62: api.v2.Env
+	(*CreateAccountData)(nil),                     // 63: api.v2.CreateAccountData
+	(*FetchAccountsRequest)(nil),                  // 64: api.v2.FetchAccountsRequest
+	(*FetchAccountsResponse)(nil),                 // 65: api.v2.FetchAccountsResponse
+	(*FetchAccountResponse)(nil),                  // 66: api.v2.FetchAccountResponse
+	(*Account)(nil),                               // 67: api.v2.Account
+	(*Page)(nil),                                  // 68: api.v2.Page
+	(*FetchAccountEventKeysRequest)(nil),          // 69: api.v2.FetchAccountEventKeysRequest
+	(*FetchAccountEventKeysResponse)(nil),         // 70: api.v2.FetchAccountEventKeysResponse
+	(*EventKey)(nil),                              // 71: api.v2.EventKey
+	(*FetchAccountEnvsRequest)(nil),               // 72: api.v2.FetchAccountEnvsRequest
+	(*FetchAccountEnvsResponse)(nil),              // 73: api.v2.FetchAccountEnvsResponse
+	(*FetchAccountSigningKeysRequest)(nil),        // 74: api.v2.FetchAccountSigningKeysRequest
+	(*FetchAccountSigningKeysResponse)(nil),       // 75: api.v2.FetchAccountSigningKeysResponse
+	(*SigningKey)(nil),                            // 76: api.v2.SigningKey
+	(*CreateWebhookRequest)(nil),                  // 77: api.v2.CreateWebhookRequest
+	(*CreateWebhookResponse)(nil),                 // 78: api.v2.CreateWebhookResponse
+	(*EventFilter)(nil),                           // 79: api.v2.EventFilter
+	(*ListWebhooksRequest)(nil),                   // 80: api.v2.ListWebhooksRequest
+	(*ListWebhooksResponse)(nil),                  // 81: api.v2.ListWebhooksResponse
+	(*UpdateWebhookRequest)(nil),                  // 82: api.v2.UpdateWebhookRequest
+	(*UpdateWebhookResponse)(nil),                 // 83: api.v2.UpdateWebhookResponse
+	(*Webhook)(nil),                               // 84: api.v2.Webhook
+	(*PatchEnvRequest)(nil),                       // 85: api.v2.PatchEnvRequest
+	(*PatchEnvsResponse)(nil),                     // 86: api.v2.PatchEnvsResponse
+	(*InvokeFunctionRequest)(nil),                 // 87: api.v2.InvokeFunctionRequest
+	(*InvokeFunctionResponse)(nil),                // 88: api.v2.InvokeFunctionResponse
+	(*InvokeFunctionData)(nil),                    // 89: api.v2.InvokeFunctionData
+	(*CreateScoreRequest)(nil),                    // 90: api.v2.CreateScoreRequest
+	(*CreateScoreInput)(nil),                      // 91: api.v2.CreateScoreInput
+	(*ScoreExperiment)(nil),                       // 92: api.v2.ScoreExperiment
+	(*CreateScoreResponse)(nil),                   // 93: api.v2.CreateScoreResponse
+	(*Score)(nil),                                 // 94: api.v2.Score
+	(*SyncAppRequest)(nil),                        // 95: api.v2.SyncAppRequest
+	(*SyncAppResponse)(nil),                       // 96: api.v2.SyncAppResponse
+	(*SyncAppData)(nil),                           // 97: api.v2.SyncAppData
+	(*SyncAppError)(nil),                          // 98: api.v2.SyncAppError
+	(*QueryInsightsRequest)(nil),                  // 99: api.v2.QueryInsightsRequest
+	(*QueryInsightsResponse)(nil),                 // 100: api.v2.QueryInsightsResponse
+	(*QueryInsightsData)(nil),                     // 101: api.v2.QueryInsightsData
+	(*InsightsOutputColumn)(nil),                  // 102: api.v2.InsightsOutputColumn
+	(*InsightsRow)(nil),                           // 103: api.v2.InsightsRow
+	(*InsightsDiagnostic)(nil),                    // 104: api.v2.InsightsDiagnostic
+	(*InsightsDiagnosticPosition)(nil),            // 105: api.v2.InsightsDiagnosticPosition
+	(*ListInsightsTablesRequest)(nil),             // 106: api.v2.ListInsightsTablesRequest
+	(*ListInsightsTablesResponse)(nil),            // 107: api.v2.ListInsightsTablesResponse
+	(*InsightsTable)(nil),                         // 108: api.v2.InsightsTable
+	(*InsightsTableColumn)(nil),                   // 109: api.v2.InsightsTableColumn
+	(*QueryInsightsPromptRequest)(nil),            // 110: api.v2.QueryInsightsPromptRequest
+	(*QueryInsightsPromptResponse)(nil),           // 111: api.v2.QueryInsightsPromptResponse
+	(*QueryInsightsPromptData)(nil),               // 112: api.v2.QueryInsightsPromptData
+	(*ListInsightsEventSchemasRequest)(nil),       // 113: api.v2.ListInsightsEventSchemasRequest
+	(*ListInsightsEventSchemasResponse)(nil),      // 114: api.v2.ListInsightsEventSchemasResponse
+	(*InsightsEventSchema)(nil),                   // 115: api.v2.InsightsEventSchema
+	(*ListExperimentsRequest)(nil),                // 116: api.v2.ListExperimentsRequest
+	(*ListExperimentsResponse)(nil),               // 117: api.v2.ListExperimentsResponse
+	(*Experiment)(nil),                            // 118: api.v2.Experiment
+	(*GetExperimentRequest)(nil),                  // 119: api.v2.GetExperimentRequest
+	(*GetExperimentResponse)(nil),                 // 120: api.v2.GetExperimentResponse
+	(*ExperimentDetail)(nil),                      // 121: api.v2.ExperimentDetail
+	(*ExperimentVariantMetrics)(nil),              // 122: api.v2.ExperimentVariantMetrics
+	(*ExperimentVariantMetric)(nil),               // 123: api.v2.ExperimentVariantMetric
+	(*ExperimentVariantWeight)(nil),               // 124: api.v2.ExperimentVariantWeight
+	(*ListSessionKeysRequest)(nil),                // 125: api.v2.ListSessionKeysRequest
+	(*ListSessionKeysResponse)(nil),               // 126: api.v2.ListSessionKeysResponse
+	(*SessionKey)(nil),                            // 127: api.v2.SessionKey
+	(*ListSessionsRequest)(nil),                   // 128: api.v2.ListSessionsRequest
+	(*ListSessionsResponse)(nil),                  // 129: api.v2.ListSessionsResponse
+	(*SessionGroup)(nil),                          // 130: api.v2.SessionGroup
+	(*ListSessionRunsRequest)(nil),                // 131: api.v2.ListSessionRunsRequest
+	(*ListSessionRunsResponse)(nil),               // 132: api.v2.ListSessionRunsResponse
+	(*SessionRun)(nil),                            // 133: api.v2.SessionRun
+	(*ListRunsRequest)(nil),                       // 134: api.v2.ListRunsRequest
+	(*ListFunctionRunsRequest)(nil),               // 135: api.v2.ListFunctionRunsRequest
+	(*ListRunsResponse)(nil),                      // 136: api.v2.ListRunsResponse
+	(*ListFunctionRunsResponse)(nil),              // 137: api.v2.ListFunctionRunsResponse
+	nil,                                           // 138: api.v2.TraceSpanMetadata.ValuesEntry
+	(*timestamppb.Timestamp)(nil),                 // 139: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),                       // 140: google.protobuf.Struct
+	(*structpb.ListValue)(nil),                    // 141: google.protobuf.ListValue
+	(*structpb.Value)(nil),                        // 142: google.protobuf.Value
 }
 var file_api_v2_service_proto_depIdxs = []int32{
-	10,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
-	13,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
-	11,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
-	79,  // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
-	79,  // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
-	14,  // 5: api.v2.FunctionRun.function:type_name -> api.v2.FunctionRef
-	15,  // 6: api.v2.FunctionRun.app:type_name -> api.v2.AppRef
-	0,   // 7: api.v2.FunctionRun.status:type_name -> api.v2.FunctionRunStatus
-	79,  // 8: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
-	79,  // 9: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
-	79,  // 10: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
-	16,  // 11: api.v2.FunctionRun.trigger:type_name -> api.v2.RunTrigger
-	80,  // 12: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
-	17,  // 13: api.v2.GetFunctionRunResponse.data:type_name -> api.v2.FunctionRun
-	13,  // 14: api.v2.GetFunctionRunResponse.metadata:type_name -> api.v2.ResponseMetadata
-	78,  // 15: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
-	79,  // 16: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
-	1,   // 17: api.v2.TraceSpan.status:type_name -> api.v2.TraceSpanStatus
-	2,   // 18: api.v2.TraceSpan.step_op:type_name -> api.v2.TraceStepOp
-	79,  // 19: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
-	79,  // 20: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
-	79,  // 21: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
-	80,  // 22: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
-	80,  // 23: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
-	20,  // 24: api.v2.TraceSpan.metadata:type_name -> api.v2.TraceSpanMetadata
-	21,  // 25: api.v2.TraceSpan.children:type_name -> api.v2.TraceSpan
-	21,  // 26: api.v2.FunctionTrace.root_span:type_name -> api.v2.TraceSpan
-	22,  // 27: api.v2.GetFunctionTraceResponse.data:type_name -> api.v2.FunctionTrace
-	13,  // 28: api.v2.GetFunctionTraceResponse.metadata:type_name -> api.v2.ResponseMetadata
-	30,  // 29: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
-	13,  // 30: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	29,  // 31: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
-	13,  // 32: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
-	3,   // 33: api.v2.Env.type:type_name -> api.v2.EnvType
-	79,  // 34: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
-	79,  // 35: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
-	79,  // 36: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
-	34,  // 37: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
-	13,  // 38: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 39: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
-	34,  // 40: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
-	13,  // 41: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
-	79,  // 42: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
-	79,  // 43: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
-	38,  // 44: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
-	13,  // 45: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 46: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
-	79,  // 47: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
-	29,  // 48: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
-	13,  // 49: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 50: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
-	43,  // 51: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
-	13,  // 52: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 53: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
-	79,  // 54: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
-	46,  // 55: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
-	51,  // 56: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
-	13,  // 57: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
-	4,   // 58: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
-	51,  // 59: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
-	13,  // 60: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 61: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
-	46,  // 62: api.v2.UpdateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
-	51,  // 63: api.v2.UpdateWebhookResponse.data:type_name -> api.v2.Webhook
-	13,  // 64: api.v2.UpdateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
-	46,  // 65: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
-	79,  // 66: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
-	79,  // 67: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
-	29,  // 68: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
-	13,  // 69: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	80,  // 70: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
-	56,  // 71: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
-	13,  // 72: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
-	79,  // 73: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
-	79,  // 74: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
-	79,  // 75: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
-	59,  // 76: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
-	13,  // 77: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
-	60,  // 78: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
-	63,  // 79: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
-	13,  // 80: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
-	64,  // 81: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
-	65,  // 82: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
-	66,  // 83: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
-	5,   // 84: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
-	81,  // 85: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
-	6,   // 86: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
-	67,  // 87: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
-	70,  // 88: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
-	13,  // 89: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
-	71,  // 90: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
-	74,  // 91: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
-	13,  // 92: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
-	77,  // 93: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
-	13,  // 94: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
-	35,  // 95: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
-	80,  // 96: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
-	7,   // 97: api.v2.V2.Health:input_type -> api.v2.HealthRequest
-	7,   // 98: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
-	25,  // 99: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
-	27,  // 100: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
-	31,  // 101: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
-	8,   // 102: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
-	39,  // 103: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
-	36,  // 104: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
-	41,  // 105: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
-	44,  // 106: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
-	47,  // 107: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
-	49,  // 108: api.v2.V2.UpdateWebhook:input_type -> api.v2.UpdateWebhookRequest
-	52,  // 109: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
-	18,  // 110: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
-	57,  // 111: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
-	23,  // 112: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
-	54,  // 113: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
-	68,  // 114: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
-	75,  // 115: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
-	72,  // 116: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
-	61,  // 117: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
-	9,   // 118: api.v2.V2.Health:output_type -> api.v2.HealthResponse
-	12,  // 119: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
-	26,  // 120: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
-	28,  // 121: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
-	32,  // 122: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
-	33,  // 123: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
-	40,  // 124: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
-	37,  // 125: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
-	42,  // 126: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
-	45,  // 127: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
-	48,  // 128: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
-	50,  // 129: api.v2.V2.UpdateWebhook:output_type -> api.v2.UpdateWebhookResponse
-	53,  // 130: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
-	19,  // 131: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
-	58,  // 132: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
-	24,  // 133: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
-	55,  // 134: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
-	69,  // 135: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
-	76,  // 136: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
-	73,  // 137: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
-	62,  // 138: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
-	118, // [118:139] is the sub-list for method output_type
-	97,  // [97:118] is the sub-list for method input_type
-	97,  // [97:97] is the sub-list for extension type_name
-	97,  // [97:97] is the sub-list for extension extendee
-	0,   // [0:97] is the sub-list for field type_name
+	14,  // 0: api.v2.HealthResponse.data:type_name -> api.v2.HealthData
+	17,  // 1: api.v2.HealthResponse.metadata:type_name -> api.v2.ResponseMetadata
+	15,  // 2: api.v2.ErrorResponse.errors:type_name -> api.v2.Error
+	139, // 3: api.v2.ResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	139, // 4: api.v2.ResponseMetadata.cached_until:type_name -> google.protobuf.Timestamp
+	18,  // 5: api.v2.ResponseMetadata.time_range:type_name -> api.v2.TimeRange
+	139, // 6: api.v2.TimeRange.from:type_name -> google.protobuf.Timestamp
+	139, // 7: api.v2.TimeRange.until:type_name -> google.protobuf.Timestamp
+	20,  // 8: api.v2.FunctionRef.app:type_name -> api.v2.AppRef
+	3,   // 9: api.v2.FunctionTrigger.type:type_name -> api.v2.FunctionTriggerType
+	4,   // 10: api.v2.FunctionConcurrencyConfiguration.scope:type_name -> api.v2.FunctionConcurrencyScope
+	27,  // 11: api.v2.FunctionConcurrencyConfiguration.limit:type_name -> api.v2.FunctionConcurrencyLimitConfiguration
+	5,   // 12: api.v2.FunctionSingletonConfiguration.mode:type_name -> api.v2.FunctionSingletonMode
+	24,  // 13: api.v2.FunctionConfiguration.cancellations:type_name -> api.v2.FunctionCancellationConfiguration
+	25,  // 14: api.v2.FunctionConfiguration.retries:type_name -> api.v2.FunctionRetryConfiguration
+	26,  // 15: api.v2.FunctionConfiguration.events_batch:type_name -> api.v2.FunctionEventsBatchConfiguration
+	28,  // 16: api.v2.FunctionConfiguration.concurrency:type_name -> api.v2.FunctionConcurrencyConfiguration
+	29,  // 17: api.v2.FunctionConfiguration.rate_limit:type_name -> api.v2.FunctionRateLimitConfiguration
+	30,  // 18: api.v2.FunctionConfiguration.debounce:type_name -> api.v2.FunctionDebounceConfiguration
+	31,  // 19: api.v2.FunctionConfiguration.throttle:type_name -> api.v2.FunctionThrottleConfiguration
+	32,  // 20: api.v2.FunctionConfiguration.singleton:type_name -> api.v2.FunctionSingletonConfiguration
+	21,  // 21: api.v2.Function.app:type_name -> api.v2.FunctionApp
+	22,  // 22: api.v2.Function.triggers:type_name -> api.v2.FunctionTrigger
+	23,  // 23: api.v2.Function.failure_handler:type_name -> api.v2.FunctionFailureHandler
+	33,  // 24: api.v2.Function.configuration:type_name -> api.v2.FunctionConfiguration
+	19,  // 25: api.v2.FunctionRun.function:type_name -> api.v2.FunctionRef
+	20,  // 26: api.v2.FunctionRun.app:type_name -> api.v2.AppRef
+	0,   // 27: api.v2.FunctionRun.status:type_name -> api.v2.FunctionRunStatus
+	139, // 28: api.v2.FunctionRun.queued_at:type_name -> google.protobuf.Timestamp
+	139, // 29: api.v2.FunctionRun.started_at:type_name -> google.protobuf.Timestamp
+	139, // 30: api.v2.FunctionRun.ended_at:type_name -> google.protobuf.Timestamp
+	35,  // 31: api.v2.FunctionRun.trigger:type_name -> api.v2.RunTrigger
+	140, // 32: api.v2.FunctionRun.output:type_name -> google.protobuf.Struct
+	36,  // 33: api.v2.GetFunctionRunResponse.data:type_name -> api.v2.FunctionRun
+	17,  // 34: api.v2.GetFunctionRunResponse.metadata:type_name -> api.v2.ResponseMetadata
+	36,  // 35: api.v2.GetEventRunsResponse.data:type_name -> api.v2.FunctionRun
+	17,  // 36: api.v2.GetEventRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 37: api.v2.GetEventRunsResponse.page:type_name -> api.v2.Page
+	42,  // 38: api.v2.RerunRequest.from_step:type_name -> api.v2.RerunFromStep
+	141, // 39: api.v2.RerunFromStep.input:type_name -> google.protobuf.ListValue
+	44,  // 40: api.v2.RerunResponse.data:type_name -> api.v2.RerunData
+	17,  // 41: api.v2.RerunResponse.metadata:type_name -> api.v2.ResponseMetadata
+	138, // 42: api.v2.TraceSpanMetadata.values:type_name -> api.v2.TraceSpanMetadata.ValuesEntry
+	139, // 43: api.v2.TraceSpanMetadata.updated_at:type_name -> google.protobuf.Timestamp
+	1,   // 44: api.v2.TraceSpan.status:type_name -> api.v2.TraceSpanStatus
+	2,   // 45: api.v2.TraceSpan.step_op:type_name -> api.v2.TraceStepOp
+	139, // 46: api.v2.TraceSpan.queued_at:type_name -> google.protobuf.Timestamp
+	139, // 47: api.v2.TraceSpan.started_at:type_name -> google.protobuf.Timestamp
+	139, // 48: api.v2.TraceSpan.ended_at:type_name -> google.protobuf.Timestamp
+	140, // 49: api.v2.TraceSpan.input:type_name -> google.protobuf.Struct
+	140, // 50: api.v2.TraceSpan.output:type_name -> google.protobuf.Struct
+	45,  // 51: api.v2.TraceSpan.metadata:type_name -> api.v2.TraceSpanMetadata
+	46,  // 52: api.v2.TraceSpan.children:type_name -> api.v2.TraceSpan
+	46,  // 53: api.v2.FunctionTrace.root_span:type_name -> api.v2.TraceSpan
+	47,  // 54: api.v2.GetFunctionTraceResponse.data:type_name -> api.v2.FunctionTrace
+	17,  // 55: api.v2.GetFunctionTraceResponse.metadata:type_name -> api.v2.ResponseMetadata
+	34,  // 56: api.v2.GetFunctionResponse.data:type_name -> api.v2.Function
+	17,  // 57: api.v2.GetFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
+	6,   // 58: api.v2.App.method:type_name -> api.v2.AppMethod
+	139, // 59: api.v2.App.created_at:type_name -> google.protobuf.Timestamp
+	139, // 60: api.v2.App.archived_at:type_name -> google.protobuf.Timestamp
+	53,  // 61: api.v2.App.latest_sync:type_name -> api.v2.AppSync
+	139, // 62: api.v2.AppSync.synced_at:type_name -> google.protobuf.Timestamp
+	52,  // 63: api.v2.GetAppResponse.data:type_name -> api.v2.App
+	17,  // 64: api.v2.GetAppResponse.metadata:type_name -> api.v2.ResponseMetadata
+	34,  // 65: api.v2.GetFunctionsResponse.data:type_name -> api.v2.Function
+	17,  // 66: api.v2.GetFunctionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 67: api.v2.GetFunctionsResponse.page:type_name -> api.v2.Page
+	63,  // 68: api.v2.CreateAccountResponse.data:type_name -> api.v2.CreateAccountData
+	17,  // 69: api.v2.CreateAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	62,  // 70: api.v2.CreateEnvResponse.data:type_name -> api.v2.Env
+	17,  // 71: api.v2.CreateEnvResponse.metadata:type_name -> api.v2.ResponseMetadata
+	7,   // 72: api.v2.Env.type:type_name -> api.v2.EnvType
+	139, // 73: api.v2.Env.createdAt:type_name -> google.protobuf.Timestamp
+	139, // 74: api.v2.CreateAccountData.createdAt:type_name -> google.protobuf.Timestamp
+	139, // 75: api.v2.CreateAccountData.updatedAt:type_name -> google.protobuf.Timestamp
+	67,  // 76: api.v2.FetchAccountsResponse.data:type_name -> api.v2.Account
+	17,  // 77: api.v2.FetchAccountsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 78: api.v2.FetchAccountsResponse.page:type_name -> api.v2.Page
+	67,  // 79: api.v2.FetchAccountResponse.data:type_name -> api.v2.Account
+	17,  // 80: api.v2.FetchAccountResponse.metadata:type_name -> api.v2.ResponseMetadata
+	139, // 81: api.v2.Account.createdAt:type_name -> google.protobuf.Timestamp
+	139, // 82: api.v2.Account.updatedAt:type_name -> google.protobuf.Timestamp
+	71,  // 83: api.v2.FetchAccountEventKeysResponse.data:type_name -> api.v2.EventKey
+	17,  // 84: api.v2.FetchAccountEventKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 85: api.v2.FetchAccountEventKeysResponse.page:type_name -> api.v2.Page
+	139, // 86: api.v2.EventKey.createdAt:type_name -> google.protobuf.Timestamp
+	62,  // 87: api.v2.FetchAccountEnvsResponse.data:type_name -> api.v2.Env
+	17,  // 88: api.v2.FetchAccountEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 89: api.v2.FetchAccountEnvsResponse.page:type_name -> api.v2.Page
+	76,  // 90: api.v2.FetchAccountSigningKeysResponse.data:type_name -> api.v2.SigningKey
+	17,  // 91: api.v2.FetchAccountSigningKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 92: api.v2.FetchAccountSigningKeysResponse.page:type_name -> api.v2.Page
+	139, // 93: api.v2.SigningKey.createdAt:type_name -> google.protobuf.Timestamp
+	79,  // 94: api.v2.CreateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
+	84,  // 95: api.v2.CreateWebhookResponse.data:type_name -> api.v2.Webhook
+	17,  // 96: api.v2.CreateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
+	8,   // 97: api.v2.EventFilter.filter:type_name -> api.v2.FilterType
+	84,  // 98: api.v2.ListWebhooksResponse.data:type_name -> api.v2.Webhook
+	17,  // 99: api.v2.ListWebhooksResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 100: api.v2.ListWebhooksResponse.page:type_name -> api.v2.Page
+	79,  // 101: api.v2.UpdateWebhookRequest.event_filter:type_name -> api.v2.EventFilter
+	84,  // 102: api.v2.UpdateWebhookResponse.data:type_name -> api.v2.Webhook
+	17,  // 103: api.v2.UpdateWebhookResponse.metadata:type_name -> api.v2.ResponseMetadata
+	79,  // 104: api.v2.Webhook.event_filter:type_name -> api.v2.EventFilter
+	139, // 105: api.v2.Webhook.createdAt:type_name -> google.protobuf.Timestamp
+	139, // 106: api.v2.Webhook.updatedAt:type_name -> google.protobuf.Timestamp
+	62,  // 107: api.v2.PatchEnvsResponse.data:type_name -> api.v2.Env
+	17,  // 108: api.v2.PatchEnvsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	140, // 109: api.v2.InvokeFunctionRequest.data:type_name -> google.protobuf.Struct
+	89,  // 110: api.v2.InvokeFunctionResponse.data:type_name -> api.v2.InvokeFunctionData
+	17,  // 111: api.v2.InvokeFunctionResponse.metadata:type_name -> api.v2.ResponseMetadata
+	139, // 112: api.v2.InvokeFunctionData.queued_at:type_name -> google.protobuf.Timestamp
+	139, // 113: api.v2.InvokeFunctionData.started_at:type_name -> google.protobuf.Timestamp
+	139, // 114: api.v2.InvokeFunctionData.completed_at:type_name -> google.protobuf.Timestamp
+	91,  // 115: api.v2.CreateScoreRequest.scores:type_name -> api.v2.CreateScoreInput
+	142, // 116: api.v2.CreateScoreInput.value:type_name -> google.protobuf.Value
+	92,  // 117: api.v2.CreateScoreInput.experiment:type_name -> api.v2.ScoreExperiment
+	94,  // 118: api.v2.CreateScoreResponse.data:type_name -> api.v2.Score
+	17,  // 119: api.v2.CreateScoreResponse.metadata:type_name -> api.v2.ResponseMetadata
+	142, // 120: api.v2.Score.value:type_name -> google.protobuf.Value
+	92,  // 121: api.v2.Score.experiment:type_name -> api.v2.ScoreExperiment
+	97,  // 122: api.v2.SyncAppResponse.data:type_name -> api.v2.SyncAppData
+	17,  // 123: api.v2.SyncAppResponse.metadata:type_name -> api.v2.ResponseMetadata
+	98,  // 124: api.v2.SyncAppData.error:type_name -> api.v2.SyncAppError
+	101, // 125: api.v2.QueryInsightsResponse.data:type_name -> api.v2.QueryInsightsData
+	17,  // 126: api.v2.QueryInsightsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	102, // 127: api.v2.QueryInsightsData.columns:type_name -> api.v2.InsightsOutputColumn
+	103, // 128: api.v2.QueryInsightsData.rows:type_name -> api.v2.InsightsRow
+	104, // 129: api.v2.QueryInsightsData.diagnostics:type_name -> api.v2.InsightsDiagnostic
+	9,   // 130: api.v2.InsightsOutputColumn.type:type_name -> api.v2.InsightsOutputColumnType
+	142, // 131: api.v2.InsightsRow.values:type_name -> google.protobuf.Value
+	10,  // 132: api.v2.InsightsDiagnostic.severity:type_name -> api.v2.InsightsDiagnosticSeverity
+	105, // 133: api.v2.InsightsDiagnostic.position:type_name -> api.v2.InsightsDiagnosticPosition
+	108, // 134: api.v2.ListInsightsTablesResponse.data:type_name -> api.v2.InsightsTable
+	17,  // 135: api.v2.ListInsightsTablesResponse.metadata:type_name -> api.v2.ResponseMetadata
+	109, // 136: api.v2.InsightsTable.columns:type_name -> api.v2.InsightsTableColumn
+	112, // 137: api.v2.QueryInsightsPromptResponse.data:type_name -> api.v2.QueryInsightsPromptData
+	17,  // 138: api.v2.QueryInsightsPromptResponse.metadata:type_name -> api.v2.ResponseMetadata
+	115, // 139: api.v2.ListInsightsEventSchemasResponse.data:type_name -> api.v2.InsightsEventSchema
+	17,  // 140: api.v2.ListInsightsEventSchemasResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 141: api.v2.ListInsightsEventSchemasResponse.page:type_name -> api.v2.Page
+	140, // 142: api.v2.InsightsEventSchema.schema:type_name -> google.protobuf.Struct
+	139, // 143: api.v2.ListExperimentsRequest.from:type_name -> google.protobuf.Timestamp
+	139, // 144: api.v2.ListExperimentsRequest.until:type_name -> google.protobuf.Timestamp
+	118, // 145: api.v2.ListExperimentsResponse.data:type_name -> api.v2.Experiment
+	17,  // 146: api.v2.ListExperimentsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 147: api.v2.ListExperimentsResponse.page:type_name -> api.v2.Page
+	19,  // 148: api.v2.Experiment.function:type_name -> api.v2.FunctionRef
+	139, // 149: api.v2.Experiment.first_seen:type_name -> google.protobuf.Timestamp
+	139, // 150: api.v2.Experiment.last_seen:type_name -> google.protobuf.Timestamp
+	139, // 151: api.v2.GetExperimentRequest.from:type_name -> google.protobuf.Timestamp
+	139, // 152: api.v2.GetExperimentRequest.until:type_name -> google.protobuf.Timestamp
+	121, // 153: api.v2.GetExperimentResponse.data:type_name -> api.v2.ExperimentDetail
+	17,  // 154: api.v2.GetExperimentResponse.metadata:type_name -> api.v2.ResponseMetadata
+	122, // 155: api.v2.ExperimentDetail.variants:type_name -> api.v2.ExperimentVariantMetrics
+	124, // 156: api.v2.ExperimentDetail.variant_weights:type_name -> api.v2.ExperimentVariantWeight
+	139, // 157: api.v2.ExperimentDetail.first_seen:type_name -> google.protobuf.Timestamp
+	139, // 158: api.v2.ExperimentDetail.last_seen:type_name -> google.protobuf.Timestamp
+	123, // 159: api.v2.ExperimentVariantMetrics.metrics:type_name -> api.v2.ExperimentVariantMetric
+	127, // 160: api.v2.ListSessionKeysResponse.data:type_name -> api.v2.SessionKey
+	17,  // 161: api.v2.ListSessionKeysResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 162: api.v2.ListSessionKeysResponse.page:type_name -> api.v2.Page
+	139, // 163: api.v2.SessionKey.created_at:type_name -> google.protobuf.Timestamp
+	139, // 164: api.v2.ListSessionsRequest.from:type_name -> google.protobuf.Timestamp
+	139, // 165: api.v2.ListSessionsRequest.until:type_name -> google.protobuf.Timestamp
+	130, // 166: api.v2.ListSessionsResponse.data:type_name -> api.v2.SessionGroup
+	17,  // 167: api.v2.ListSessionsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 168: api.v2.ListSessionsResponse.page:type_name -> api.v2.Page
+	139, // 169: api.v2.SessionGroup.last_active_at:type_name -> google.protobuf.Timestamp
+	19,  // 170: api.v2.SessionGroup.functions:type_name -> api.v2.FunctionRef
+	139, // 171: api.v2.ListSessionRunsRequest.from:type_name -> google.protobuf.Timestamp
+	139, // 172: api.v2.ListSessionRunsRequest.until:type_name -> google.protobuf.Timestamp
+	133, // 173: api.v2.ListSessionRunsResponse.data:type_name -> api.v2.SessionRun
+	17,  // 174: api.v2.ListSessionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 175: api.v2.ListSessionRunsResponse.page:type_name -> api.v2.Page
+	19,  // 176: api.v2.SessionRun.function:type_name -> api.v2.FunctionRef
+	0,   // 177: api.v2.SessionRun.status:type_name -> api.v2.FunctionRunStatus
+	139, // 178: api.v2.SessionRun.queued_at:type_name -> google.protobuf.Timestamp
+	139, // 179: api.v2.SessionRun.started_at:type_name -> google.protobuf.Timestamp
+	139, // 180: api.v2.SessionRun.ended_at:type_name -> google.protobuf.Timestamp
+	139, // 181: api.v2.ListRunsRequest.from:type_name -> google.protobuf.Timestamp
+	139, // 182: api.v2.ListRunsRequest.until:type_name -> google.protobuf.Timestamp
+	139, // 183: api.v2.ListFunctionRunsRequest.from:type_name -> google.protobuf.Timestamp
+	139, // 184: api.v2.ListFunctionRunsRequest.until:type_name -> google.protobuf.Timestamp
+	36,  // 185: api.v2.ListRunsResponse.data:type_name -> api.v2.FunctionRun
+	17,  // 186: api.v2.ListRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 187: api.v2.ListRunsResponse.page:type_name -> api.v2.Page
+	36,  // 188: api.v2.ListFunctionRunsResponse.data:type_name -> api.v2.FunctionRun
+	17,  // 189: api.v2.ListFunctionRunsResponse.metadata:type_name -> api.v2.ResponseMetadata
+	68,  // 190: api.v2.ListFunctionRunsResponse.page:type_name -> api.v2.Page
+	11,  // 191: api.v2.V2.Health:input_type -> api.v2.HealthRequest
+	11,  // 192: api.v2.V2._SchemaOnly:input_type -> api.v2.HealthRequest
+	58,  // 193: api.v2.V2.CreatePartnerAccount:input_type -> api.v2.CreateAccountRequest
+	60,  // 194: api.v2.V2.CreateEnv:input_type -> api.v2.CreateEnvRequest
+	64,  // 195: api.v2.V2.FetchPartnerAccounts:input_type -> api.v2.FetchAccountsRequest
+	12,  // 196: api.v2.V2.FetchAccount:input_type -> api.v2.FetchAccountRequest
+	72,  // 197: api.v2.V2.FetchAccountEnvs:input_type -> api.v2.FetchAccountEnvsRequest
+	69,  // 198: api.v2.V2.FetchAccountEventKeys:input_type -> api.v2.FetchAccountEventKeysRequest
+	74,  // 199: api.v2.V2.FetchAccountSigningKeys:input_type -> api.v2.FetchAccountSigningKeysRequest
+	77,  // 200: api.v2.V2.CreateWebhook:input_type -> api.v2.CreateWebhookRequest
+	80,  // 201: api.v2.V2.ListWebhooks:input_type -> api.v2.ListWebhooksRequest
+	82,  // 202: api.v2.V2.UpdateWebhook:input_type -> api.v2.UpdateWebhookRequest
+	85,  // 203: api.v2.V2.PatchEnv:input_type -> api.v2.PatchEnvRequest
+	37,  // 204: api.v2.V2.GetFunctionRun:input_type -> api.v2.GetFunctionRunRequest
+	134, // 205: api.v2.V2.ListRuns:input_type -> api.v2.ListRunsRequest
+	135, // 206: api.v2.V2.ListFunctionRuns:input_type -> api.v2.ListFunctionRunsRequest
+	39,  // 207: api.v2.V2.GetEventRuns:input_type -> api.v2.GetEventRunsRequest
+	41,  // 208: api.v2.V2.Rerun:input_type -> api.v2.RerunRequest
+	54,  // 209: api.v2.V2.GetApp:input_type -> api.v2.GetAppRequest
+	90,  // 210: api.v2.V2.CreateScore:input_type -> api.v2.CreateScoreRequest
+	95,  // 211: api.v2.V2.SyncApp:input_type -> api.v2.SyncAppRequest
+	48,  // 212: api.v2.V2.GetFunctionTrace:input_type -> api.v2.GetFunctionTraceRequest
+	50,  // 213: api.v2.V2.GetFunction:input_type -> api.v2.GetFunctionRequest
+	56,  // 214: api.v2.V2.GetFunctions:input_type -> api.v2.GetFunctionsRequest
+	87,  // 215: api.v2.V2.InvokeFunction:input_type -> api.v2.InvokeFunctionRequest
+	106, // 216: api.v2.V2.ListInsightsTables:input_type -> api.v2.ListInsightsTablesRequest
+	113, // 217: api.v2.V2.ListInsightsEventSchemas:input_type -> api.v2.ListInsightsEventSchemasRequest
+	110, // 218: api.v2.V2.QueryInsightsPrompt:input_type -> api.v2.QueryInsightsPromptRequest
+	99,  // 219: api.v2.V2.QueryInsights:input_type -> api.v2.QueryInsightsRequest
+	116, // 220: api.v2.V2.ListExperiments:input_type -> api.v2.ListExperimentsRequest
+	119, // 221: api.v2.V2.GetExperiment:input_type -> api.v2.GetExperimentRequest
+	125, // 222: api.v2.V2.ListSessionKeys:input_type -> api.v2.ListSessionKeysRequest
+	128, // 223: api.v2.V2.ListSessions:input_type -> api.v2.ListSessionsRequest
+	131, // 224: api.v2.V2.ListSessionRuns:input_type -> api.v2.ListSessionRunsRequest
+	13,  // 225: api.v2.V2.Health:output_type -> api.v2.HealthResponse
+	16,  // 226: api.v2.V2._SchemaOnly:output_type -> api.v2.ErrorResponse
+	59,  // 227: api.v2.V2.CreatePartnerAccount:output_type -> api.v2.CreateAccountResponse
+	61,  // 228: api.v2.V2.CreateEnv:output_type -> api.v2.CreateEnvResponse
+	65,  // 229: api.v2.V2.FetchPartnerAccounts:output_type -> api.v2.FetchAccountsResponse
+	66,  // 230: api.v2.V2.FetchAccount:output_type -> api.v2.FetchAccountResponse
+	73,  // 231: api.v2.V2.FetchAccountEnvs:output_type -> api.v2.FetchAccountEnvsResponse
+	70,  // 232: api.v2.V2.FetchAccountEventKeys:output_type -> api.v2.FetchAccountEventKeysResponse
+	75,  // 233: api.v2.V2.FetchAccountSigningKeys:output_type -> api.v2.FetchAccountSigningKeysResponse
+	78,  // 234: api.v2.V2.CreateWebhook:output_type -> api.v2.CreateWebhookResponse
+	81,  // 235: api.v2.V2.ListWebhooks:output_type -> api.v2.ListWebhooksResponse
+	83,  // 236: api.v2.V2.UpdateWebhook:output_type -> api.v2.UpdateWebhookResponse
+	86,  // 237: api.v2.V2.PatchEnv:output_type -> api.v2.PatchEnvsResponse
+	38,  // 238: api.v2.V2.GetFunctionRun:output_type -> api.v2.GetFunctionRunResponse
+	136, // 239: api.v2.V2.ListRuns:output_type -> api.v2.ListRunsResponse
+	137, // 240: api.v2.V2.ListFunctionRuns:output_type -> api.v2.ListFunctionRunsResponse
+	40,  // 241: api.v2.V2.GetEventRuns:output_type -> api.v2.GetEventRunsResponse
+	43,  // 242: api.v2.V2.Rerun:output_type -> api.v2.RerunResponse
+	55,  // 243: api.v2.V2.GetApp:output_type -> api.v2.GetAppResponse
+	93,  // 244: api.v2.V2.CreateScore:output_type -> api.v2.CreateScoreResponse
+	96,  // 245: api.v2.V2.SyncApp:output_type -> api.v2.SyncAppResponse
+	49,  // 246: api.v2.V2.GetFunctionTrace:output_type -> api.v2.GetFunctionTraceResponse
+	51,  // 247: api.v2.V2.GetFunction:output_type -> api.v2.GetFunctionResponse
+	57,  // 248: api.v2.V2.GetFunctions:output_type -> api.v2.GetFunctionsResponse
+	88,  // 249: api.v2.V2.InvokeFunction:output_type -> api.v2.InvokeFunctionResponse
+	107, // 250: api.v2.V2.ListInsightsTables:output_type -> api.v2.ListInsightsTablesResponse
+	114, // 251: api.v2.V2.ListInsightsEventSchemas:output_type -> api.v2.ListInsightsEventSchemasResponse
+	111, // 252: api.v2.V2.QueryInsightsPrompt:output_type -> api.v2.QueryInsightsPromptResponse
+	100, // 253: api.v2.V2.QueryInsights:output_type -> api.v2.QueryInsightsResponse
+	117, // 254: api.v2.V2.ListExperiments:output_type -> api.v2.ListExperimentsResponse
+	120, // 255: api.v2.V2.GetExperiment:output_type -> api.v2.GetExperimentResponse
+	126, // 256: api.v2.V2.ListSessionKeys:output_type -> api.v2.ListSessionKeysResponse
+	129, // 257: api.v2.V2.ListSessions:output_type -> api.v2.ListSessionsResponse
+	132, // 258: api.v2.V2.ListSessionRuns:output_type -> api.v2.ListSessionRunsResponse
+	225, // [225:259] is the sub-list for method output_type
+	191, // [191:225] is the sub-list for method input_type
+	191, // [191:191] is the sub-list for extension type_name
+	191, // [191:191] is the sub-list for extension extendee
+	0,   // [0:191] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_service_proto_init() }
@@ -5694,35 +10340,63 @@ func file_api_v2_service_proto_init() {
 		return
 	}
 	file_api_v2_options_proto_init()
-	file_api_v2_service_proto_msgTypes[9].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[10].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[11].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[13].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[14].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[15].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[16].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[17].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[18].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[19].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[20].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[21].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[22].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[23].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[24].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[25].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[26].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[28].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[29].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[32].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[34].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[30].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[31].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[35].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[37].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[40].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[41].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[42].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[44].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[45].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[47].OneofWrappers = []any{}
 	file_api_v2_service_proto_msgTypes[49].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[52].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[59].OneofWrappers = []any{}
-	file_api_v2_service_proto_msgTypes[68].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[53].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[57].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[58].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[61].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[63].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[66].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[69].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[71].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[73].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[74].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[76].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[78].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[80].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[83].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[86].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[93].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[102].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[105].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[108].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[114].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[117].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[120].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[122].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[123].OneofWrappers = []any{}
+	file_api_v2_service_proto_msgTypes[124].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_service_proto_rawDesc), len(file_api_v2_service_proto_rawDesc)),
-			NumEnums:      7,
-			NumMessages:   72,
+			NumEnums:      11,
+			NumMessages:   128,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

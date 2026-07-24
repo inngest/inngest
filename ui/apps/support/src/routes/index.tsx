@@ -81,7 +81,7 @@ function Home() {
 
   // Paginate tickets with 8 per page
   const { currentPageData, BoundPagination } = usePaginationUI({
-    data: tickets,
+    data: tickets as Array<TicketSummary>,
     id: "tickets",
     pageSize: 8,
   });

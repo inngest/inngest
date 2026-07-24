@@ -15,7 +15,6 @@ import {
 import { Pill } from '../Pill/Pill';
 import { RerunModal } from '../Rerun/RerunModal';
 import { ScoresAttrs } from '../RunDetails/ScoresAttrs';
-import { useShared } from '../SharedContext/SharedContext';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
@@ -179,7 +178,6 @@ export const StepInfo = ({
   debug?: boolean;
   isDurableEndpoint?: boolean;
 }) => {
-  const { cloud } = useShared();
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
@@ -215,8 +213,9 @@ export const StepInfo = ({
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
   const prettyShortError = usePrettyShortError(result?.error);
-  const showRerunFromStep =
-    !isDurableEndpoint && !debug && runID && trace.stepID && (!cloud || prettyInput);
+  const showRerunFromStep = !isDurableEndpoint && !debug && runID && trace.stepID;
+  const editableInput =
+    trace.stepOp === 'RUN' || trace.stepOp === 'AI_GATEWAY' || Boolean(result?.input);
 
   const responseHeaderMetadata = trace.metadata?.filter(
     (md) => md.kind === 'inngest.response_headers'
@@ -284,7 +283,7 @@ export const StepInfo = ({
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
-      <div className="min-h-11 flex w-full flex-row items-center justify-between border-none px-4">
+      <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
@@ -323,6 +322,7 @@ export const StepInfo = ({
               runID={runID}
               stepID={trace.stepID!}
               input={prettyInput || result?.input || ''}
+              editableInput={editableInput}
             />
           </>
         )}
@@ -373,7 +373,9 @@ export const StepInfo = ({
           {experimentMetadata && (
             <>
               <ElementWrapper label="Experiment name">
-                <TextElement>{experimentMetadata.values.experiment_name}</TextElement>
+                <TextElement>
+                  {experimentMetadata.values.experiment_name ?? experimentMetadata.values.name}
+                </TextElement>
               </ElementWrapper>
               <ElementWrapper label="Variant">
                 <TextElement>{experimentMetadata.values.variant}</TextElement>

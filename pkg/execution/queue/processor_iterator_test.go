@@ -2,6 +2,8 @@ package queue
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"iter"
 	"sync"
 	"sync/atomic"
@@ -52,6 +54,42 @@ func (m *mockQueueProcessor) ClearShadowContinuations() {
 	m.shadowMap = make(map[string]ShadowContinuation)
 }
 
+func (m *mockQueueProcessor) ScanShadowPartitions(ctx context.Context, until time.Time, qspc chan ShadowPartitionChanMsg) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time, constraints PartitionConstraintConfig) (*BacklogRefillResult, enums.QueueConstraint, error) {
+	return nil, enums.QueueConstraintNotLimited, nil
+}
+
+func (m *mockQueueProcessor) NormalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) NormalizeItem(ctx context.Context, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig, sourceBacklog *QueueBacklog, item QueueItem) (QueueItem, error) {
+	return item, nil
+}
+
+func (m *mockQueueProcessor) ProcessItem(ctx context.Context, i ProcessItem, f RunFunc) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool, dispatch DispatchFunc) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) Run(ctx context.Context, f RunFunc) error {
+	return nil
+}
+
+func (m *mockQueueProcessor) Queue() Queue {
+	return nil
+}
+
 // mockShardForIterator implements the minimal QueueShard interface methods used by ProcessorIterator
 type mockShardForIterator struct {
 	name                    string
@@ -59,6 +97,17 @@ type mockShardForIterator struct {
 	partitionRequeueCount   int32
 	partitionRequeueAt      time.Time
 	partitionRequeueForceAt bool
+	partitionBacklogSize    int64
+	partitionBacklogCalls   int32
+	outstandingJobCount     int
+	outstandingJobCalls     int32
+	runningCount            int64
+	runningCountCalls       int32
+	statusCount             int64
+	statusCountCalls        int32
+	earliestPeekTimes       sync.Map
+	earliestPeekTimeCalls   int32
+	earliestPeekTimeErr     error
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -91,6 +140,15 @@ func (m *mockShardForIterator) ItemLeaseConstraintCheck(
 func (m *mockShardForIterator) Lease(ctx context.Context, item QueueItem, duration time.Duration, now time.Time, options ...LeaseOptionFn) (*ulid.ULID, error) {
 	id := ulid.Make()
 	return &id, nil
+}
+
+func (m *mockShardForIterator) SetEarliestPeekTime(ctx context.Context, item QueueItem, at time.Time) (time.Time, error) {
+	atomic.AddInt32(&m.earliestPeekTimeCalls, 1)
+	if m.earliestPeekTimeErr != nil {
+		return time.Time{}, m.earliestPeekTimeErr
+	}
+	actual, _ := m.earliestPeekTimes.LoadOrStore(item.ID, at)
+	return actual.(time.Time), nil
 }
 
 func (m *mockShardForIterator) Requeue(ctx context.Context, i QueueItem, at time.Time, opts ...RequeueOptionFn) error {
@@ -203,8 +261,8 @@ func (m *mockShardForIterator) DebounceStartExecution(ctx context.Context, scope
 	return DebounceStartStarted, nil
 }
 
-func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, error) {
-	return nil, 0, nil
+func (m *mockShardForIterator) DebouncePrepareMigration(ctx context.Context, scope Scope, key string, fakeDebounceID ulid.ULID) (*ulid.ULID, int64, time.Duration, error) {
+	return nil, 0, 0, nil
 }
 
 func (m *mockShardForIterator) DebounceGetItem(ctx context.Context, scope Scope, debounceID ulid.ULID) ([]byte, error) {
@@ -221,6 +279,10 @@ func (m *mockShardForIterator) DebounceDeleteMigratingFlag(ctx context.Context, 
 
 func (m *mockShardForIterator) DebounceGetPointer(ctx context.Context, scope Scope, key string) (string, error) {
 	return "", nil
+}
+
+func (m *mockShardForIterator) DebounceSetPointer(ctx context.Context, scope Scope, key string, debounceID ulid.ULID, ttl time.Duration) error {
+	return nil
 }
 
 func (m *mockShardForIterator) DebounceDeletePointer(ctx context.Context, scope Scope, key string) error {
@@ -348,7 +410,8 @@ func (m *mockShardForIterator) ItemsByRunID(ctx context.Context, scope Scope, ru
 }
 
 func (m *mockShardForIterator) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
-	return 0, nil
+	atomic.AddInt32(&m.partitionBacklogCalls, 1)
+	return m.partitionBacklogSize, nil
 }
 
 func (m *mockShardForIterator) PartitionByID(ctx context.Context, scope Scope, partitionID string) (*PartitionInspectionResult, error) {
@@ -360,15 +423,18 @@ func (m *mockShardForIterator) UnpauseFunction(ctx context.Context, scope Scope)
 }
 
 func (m *mockShardForIterator) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
-	return 0, nil
+	atomic.AddInt32(&m.outstandingJobCalls, 1)
+	return m.outstandingJobCount, nil
 }
 
 func (m *mockShardForIterator) RunningCount(ctx context.Context, scope Scope) (int64, error) {
-	return 0, nil
+	atomic.AddInt32(&m.runningCountCalls, 1)
+	return m.runningCount, nil
 }
 
 func (m *mockShardForIterator) StatusCount(ctx context.Context, scope Scope, status string) (int64, error) {
-	return 0, nil
+	atomic.AddInt32(&m.statusCountCalls, 1)
+	return m.statusCount, nil
 }
 
 func (m *mockShardForIterator) RunJobs(ctx context.Context, scope Scope, runID ulid.ULID, limit, offset int64) ([]JobResponse, error) {
@@ -395,6 +461,98 @@ func (m *mockQueueProcessor) ItemLeaseConstraintCheck(ctx context.Context, shado
 	return ItemLeaseConstraintCheckResult{
 		LimitingConstraint: constraint,
 	}, nil
+}
+
+type mockQueueItemLeaser struct {
+	fn func(context.Context, LeaseItemRequest, DispatchFunc) (LeaseItemResult, error)
+}
+
+func (m mockQueueItemLeaser) LeaseItem(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error) {
+	return m.fn(ctx, req, dispatch)
+}
+
+func processorIteratorConstraintLeaser(mockProc *mockQueueProcessor) QueueItemLeaser {
+	return mockQueueItemLeaser{
+		fn: func(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error) {
+			constraint := enums.QueueConstraintNotLimited
+			if mockProc.constraintResultFunc != nil {
+				constraint = mockProc.constraintResultFunc()
+			}
+
+			switch constraint {
+			case enums.QueueConstraintNotLimited:
+				if dispatch == nil {
+					return LeaseItemResult{Status: LeaseItemStatusLeaseError, Err: ErrProcessMissingDispatch}, ErrProcessMissingDispatch
+				}
+				err := dispatch(ctx, ProcessItem{
+					P:    *req.Partition,
+					I:    *req.Item,
+					PCtr: req.PartitionContinueCtr,
+				})
+				if err != nil {
+					return LeaseItemResult{Status: LeaseItemStatusDispatched}, err
+				}
+				return LeaseItemResult{Status: LeaseItemStatusDispatched}, nil
+			case enums.QueueConstraintThrottle:
+				return LeaseItemResult{Status: LeaseItemStatusThrottled}, nil
+			case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
+				return LeaseItemResult{Status: LeaseItemStatusCustomConcurrencyLimited}, nil
+			case enums.QueueConstraintSemaphore:
+				return LeaseItemResult{Status: LeaseItemStatusSemaphoreLimited}, nil
+			default:
+				return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited}, fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
+			}
+		},
+	}
+}
+
+func processorIteratorLeaseBehaviorLeaser(mockProc *mockQueueProcessor) QueueItemLeaser {
+	return mockQueueItemLeaser{
+		fn: func(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error) {
+			if !mockProc.sem.TryAcquire(1) {
+				return LeaseItemResult{Status: LeaseItemStatusNoWorkerCapacity}, ErrProcessNoCapacity
+			}
+
+			commitSemaphoreAcquire := false
+			defer func() {
+				if !commitSemaphoreAcquire {
+					mockProc.sem.Release(1)
+				}
+			}()
+
+			if req.Item.EarliestPeekTime == 0 && mockProc.opts.ItemEarliestPeekTimeConfig(ctx, mockProc.shard.Name(), *req.Item).Enabled {
+				earliestPeekTime, err := mockProc.shard.SetEarliestPeekTime(ctx, *req.Item, req.StaticTime)
+				if err == nil {
+					req.Item.EarliestPeekTime = earliestPeekTime.UnixMilli()
+				}
+			}
+
+			constraint := enums.QueueConstraintNotLimited
+			if mockProc.constraintResultFunc != nil {
+				constraint = mockProc.constraintResultFunc()
+			}
+			if constraint != enums.QueueConstraintNotLimited {
+				if req.Item.EarliestPeekTime == 0 && req.Partition.Last > 0 && req.Partition.Last > req.Item.AtMS {
+					req.Item.EarliestPeekTime = req.Item.AtMS
+				}
+				return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited}, fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
+			}
+
+			if dispatch == nil {
+				return LeaseItemResult{Status: LeaseItemStatusLeaseError, Err: ErrProcessMissingDispatch}, ErrProcessMissingDispatch
+			}
+			err := dispatch(ctx, ProcessItem{
+				P:    *req.Partition,
+				I:    *req.Item,
+				PCtr: req.PartitionContinueCtr,
+			})
+			if err != nil {
+				return LeaseItemResult{Status: LeaseItemStatusDispatched}, err
+			}
+			commitSemaphoreAcquire = true
+			return LeaseItemResult{Status: LeaseItemStatusDispatched}, nil
+		},
+	}
 }
 
 // TestProcessorIteratorCounterRaceCondition tests for race conditions when
@@ -480,8 +638,13 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		StaticTime:           time.Now(),
-		Parallel:             true, // Enable parallel processing
+		Leaser:               processorIteratorConstraintLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			workers <- item
+			return nil
+		},
+		StaticTime: time.Now(),
+		Parallel:   true, // Enable parallel processing
 	}
 
 	// Run iteration - this is where the race condition would occur
@@ -590,8 +753,13 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		StaticTime:           time.Now(),
-		Parallel:             true,
+		Leaser:               processorIteratorConstraintLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			workers <- item
+			return nil
+		},
+		StaticTime: time.Now(),
+		Parallel:   true,
 	}
 
 	// Run iteration
@@ -692,8 +860,13 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 		Items:                items,
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
-		StaticTime:           time.Now(),
-		Parallel:             true,
+		Leaser:               processorIteratorConstraintLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			workers <- item
+			return nil
+		},
+		StaticTime: time.Now(),
+		Parallel:   true,
 	}
 
 	err := iter.Iterate(ctx)
@@ -712,4 +885,211 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 	// With atomic operations, this should now be deterministic
 	require.False(t, isCustomKeyLimitOnly,
 		"IsCustomKeyLimitOnly should be false when function concurrency limits are hit")
+}
+
+func TestProcessorIteratorUsesPartitionLastEarliestPeekFallbackWhenFlagDisabled(t *testing.T) {
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+	envID := uuid.New()
+	at := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+
+	shard := &mockShardForIterator{
+		name: "test-shard",
+	}
+	mockProc := &mockQueueProcessor{
+		shard:     shard,
+		clock:     clockwork.NewRealClock(),
+		sem:       util.NewTrackingSemaphore(1),
+		workers:   make(chan ProcessItem, 1),
+		shadowMap: make(map[string]ShadowContinuation),
+		opts:      NewQueueOptions(),
+		constraintResultFunc: func() enums.QueueConstraint {
+			return enums.QueueConstraintFunctionConcurrency
+		},
+	}
+
+	partition := &QueuePartition{
+		ID:         fnID.String(),
+		AccountID:  accountID,
+		EnvID:      &envID,
+		FunctionID: &fnID,
+		Last:       at.Add(time.Second).UnixMilli(),
+	}
+	item := &QueueItem{
+		ID:          ulid.Make().String(),
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		AtMS:        at.UnixMilli(),
+		Data: Item{
+			Kind: KindEdge,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       ulid.Make(),
+			},
+		},
+	}
+
+	iter := ProcessorIterator{
+		Partition: partition,
+		Items:     []*QueueItem{item},
+		Queue:     mockProc,
+		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			mockProc.workers <- item
+			return nil
+		},
+		StaticTime: at.Add(2 * time.Second),
+	}
+
+	err := iter.LeaseItem(ctx, item)
+	require.ErrorIs(t, err, ErrProcessNoUserConstraintCapacity)
+	require.ErrorIs(t, err, ErrProcessStopIterator)
+	require.Equal(t, item.AtMS, item.EarliestPeekTime)
+	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
+}
+
+func TestProcessorIteratorSkipsEarliestPeekTimeWhenNoWorkerCapacity(t *testing.T) {
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+	envID := uuid.New()
+	at := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+	peekTime := at.Add(2 * time.Second)
+
+	shard := &mockShardForIterator{
+		name: "test-shard",
+	}
+	opts := NewQueueOptions()
+	WithQueueItemEarliestPeekTimeEnabled(func(ctx context.Context, shardName string, acctID, gotEnvID, gotFnID uuid.UUID) QueueItemEarliestPeekTimeConfig {
+		return QueueItemEarliestPeekTimeConfig{
+			Enabled:        true,
+			BulkStampLimit: 0,
+		}
+	})(opts)
+
+	mockProc := &mockQueueProcessor{
+		shard:     shard,
+		clock:     clockwork.NewRealClock(),
+		sem:       util.NewTrackingSemaphore(1),
+		workers:   make(chan ProcessItem, 1),
+		shadowMap: make(map[string]ShadowContinuation),
+		opts:      opts,
+	}
+
+	require.NoError(t, mockProc.sem.Acquire(ctx, 1))
+
+	partition := &QueuePartition{
+		ID:         fnID.String(),
+		AccountID:  accountID,
+		EnvID:      &envID,
+		FunctionID: &fnID,
+		Last:       at.Add(time.Second).UnixMilli(),
+	}
+	item := &QueueItem{
+		ID:          ulid.Make().String(),
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		AtMS:        at.UnixMilli(),
+		Data: Item{
+			Kind: KindEdge,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       ulid.Make(),
+			},
+		},
+	}
+
+	iter := ProcessorIterator{
+		Partition: partition,
+		Items:     []*QueueItem{item},
+		Queue:     mockProc,
+		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			mockProc.workers <- item
+			return nil
+		},
+		StaticTime: peekTime,
+	}
+
+	err := iter.LeaseItem(ctx, item)
+	require.ErrorIs(t, err, ErrProcessNoCapacity)
+	require.Zero(t, item.EarliestPeekTime)
+	require.Equal(t, int32(0), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
+}
+
+func TestProcessorIteratorContinuesWhenEarliestPeekTimeStampFails(t *testing.T) {
+	ctx := context.Background()
+
+	accountID := uuid.New()
+	fnID := uuid.New()
+	envID := uuid.New()
+	at := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+
+	shard := &mockShardForIterator{
+		name:                "test-shard",
+		earliestPeekTimeErr: errors.New("redis unavailable"),
+	}
+	opts := NewQueueOptions()
+	WithQueueItemEarliestPeekTimeEnabled(func(ctx context.Context, shardName string, acctID, gotEnvID, gotFnID uuid.UUID) QueueItemEarliestPeekTimeConfig {
+		return QueueItemEarliestPeekTimeConfig{
+			Enabled: true,
+		}
+	})(opts)
+
+	workers := make(chan ProcessItem, 1)
+	mockProc := &mockQueueProcessor{
+		shard:     shard,
+		clock:     clockwork.NewRealClock(),
+		sem:       util.NewTrackingSemaphore(1),
+		workers:   workers,
+		shadowMap: make(map[string]ShadowContinuation),
+		opts:      opts,
+	}
+
+	partition := &QueuePartition{
+		ID:         fnID.String(),
+		AccountID:  accountID,
+		EnvID:      &envID,
+		FunctionID: &fnID,
+	}
+	item := &QueueItem{
+		ID:          ulid.Make().String(),
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		AtMS:        at.UnixMilli(),
+		Data: Item{
+			Kind: KindEdge,
+			Identifier: state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				WorkflowID:  fnID,
+				RunID:       ulid.Make(),
+			},
+		},
+	}
+
+	iter := ProcessorIterator{
+		Partition: partition,
+		Items:     []*QueueItem{item},
+		Queue:     mockProc,
+		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
+		Dispatch: func(_ context.Context, item ProcessItem) error {
+			workers <- item
+			return nil
+		},
+		StaticTime: at.Add(2 * time.Second),
+	}
+
+	err := iter.LeaseItem(ctx, item)
+	require.NoError(t, err)
+	require.Zero(t, item.EarliestPeekTime)
+	require.Equal(t, int32(1), atomic.LoadInt32(&shard.earliestPeekTimeCalls))
+	require.Len(t, workers, 1)
 }

@@ -21,29 +21,35 @@ type QueueShard interface {
 	ShardAssignmentConfig() ShardAssignmentConfig
 }
 
-func (q *queueProcessor) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
+func (q *queueProducer) defaultQueueNameForItemKind(kind string) *string {
+	var queueName *string
+	if name, ok := q.queueKindMapping[kind]; ok {
+		queueName = &name
+	}
+	return queueName
+}
+
+func (q *queueProducer) selectShard(ctx context.Context, shardName string, qi QueueItem) (QueueShard, error) {
 	l := logger.StdlibLogger(ctx)
 
 	// If the caller wants us to enqueue the job to a specific queue shard, use that.
 	if shardName != "" {
 		shard, err := q.shards.ByName(shardName)
 		if err != nil {
-			return q.Shard(), fmt.Errorf("tried to force invalid queue shard %q", shardName)
+			return nil, fmt.Errorf("tried to force invalid queue shard %q", shardName)
 		}
 		return shard, nil
 	}
 
-	// QueueName should be consistently specified on both levels. This safeguard ensures
-	// we'll check for both places, just in case.
-	qn := qi.Data.QueueName
-	if qn == nil {
-		qn = qi.QueueName
+	var queueItemKind *string
+	if q.defaultQueueNameForItemKind(qi.Data.Kind) != nil {
+		queueItemKind = &qi.Data.Kind
 	}
 
-	selected, err := q.shards.Resolve(ctx, qi.Data.Identifier.AccountID, qn)
+	selected, err := q.shards.Resolve(ctx, ScopeFromQueueItem(qi), queueItemKind)
 	if err != nil {
 		l.Error("error selecting shard", "error", err, "item", qi)
-		return q.Shard(), fmt.Errorf("could not select shard: %w", err)
+		return nil, fmt.Errorf("could not select shard: %w", err)
 	}
 	return selected, nil
 }

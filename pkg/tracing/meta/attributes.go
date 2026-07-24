@@ -13,13 +13,15 @@ import (
 
 var Attrs = struct {
 	// Timings
-	StartedAt attr[*time.Time]
-	QueuedAt  attr[*time.Time]
-	EndedAt   attr[*time.Time]
+	QueuedAt    attr[*time.Time]
+	ScheduledAt attr[*time.Time]
+	StartedAt   attr[*time.Time]
+	EndedAt     attr[*time.Time]
 
 	// Run attributes
 	AccountID           attr[*uuid.UUID]
 	AppID               attr[*uuid.UUID]
+	AppName             attr[*string]
 	BatchID             attr[*ulid.ULID]
 	BatchTimestamp      attr[*time.Time]
 	CronSchedule        attr[*string]
@@ -27,6 +29,7 @@ var Attrs = struct {
 	EnvID               attr[*uuid.UUID]
 	EventIDs            attr[*[]string]
 	EventsInput         attr[*string]
+	Sessions            attr[*EventSessions]
 	TriggeringEventName attr[*string]
 	FunctionID          attr[*uuid.UUID]
 	FunctionName        attr[*string]
@@ -138,6 +141,7 @@ var Attrs = struct {
 	// HTTP (serve) attributes
 	RequestID          attr[*string]
 	JobID              attr[*string]
+	GroupID            attr[*string]
 	RequestURL         attr[*string]
 	ResponseHeaders    attr[*headers.Compact]
 	ResponseStatusCode attr[*int]
@@ -175,6 +179,7 @@ var Attrs = struct {
 	AIResponseMetadata:                 JsonAttr[aigateway.ParsedInferenceResponse]("ai.response"),
 	AccountID:                          UUIDAttr("account.id"),
 	AppID:                              UUIDAttr("app.id"),
+	AppName:                            StringAttr("app.name"),
 	BatchID:                            ULIDAttr("batch.id"),
 	BatchTimestamp:                     TimeAttr("batch.ts"),
 	CronSchedule:                       StringAttr("cron.schedule"),
@@ -193,6 +198,7 @@ var Attrs = struct {
 	EnvID:                              UUIDAttr("env.id"),
 	EventIDs:                           StringSliceAttr("event.ids"),
 	EventsInput:                        StringAttr("events.input"),
+	Sessions:                           JsonAttr[EventSessions]("event.sessions"),
 	TriggeringEventName:                StringAttr("event.trigger.name"),
 	FunctionID:                         UUIDAttr("function.id"),
 	FunctionName:                       StringAttr("function.name"),
@@ -205,6 +211,7 @@ var Attrs = struct {
 	QueuedAt:                           TimeAttr("queued_at"),
 	RequestID:                          StringAttr("request.id"),
 	JobID:                              StringAttr("job.id"),
+	GroupID:                            StringAttr("job.group.id"),
 	RequestURL:                         StringAttr("request.url"),
 	ResponseHeaders:                    JsonAttr[headers.Compact]("response.headers"),
 	ResponseOutputSize:                 IntAttr("response.output_size"),
@@ -216,6 +223,7 @@ var Attrs = struct {
 	SkipReason:                         TextAttr[enums.SkipReason]("run.skip_reason"),
 	SkipExistingRunID:                  StringAttr("run.skip_existing_run_id"),
 	StartedAt:                          TimeAttr("started_at"),
+	ScheduledAt:                        TimeAttr("scheduled_at"),
 	StepAttempt:                        IntAttr("step.attempt"),
 	StepCodeLocation:                   StringAttr("step.code_location"),
 	StepGatewayResponseOutputSizeBytes: IntAttr("step.gateway.response.output_size_bytes"),
@@ -264,6 +272,19 @@ var Attrs = struct {
 	MetadataOp:    TextAttr[enums.MetadataOpcode]("metadata.op"),
 	MetadataScope: TextAttr[enums.MetadataScope]("metadata.scope"),
 }
+
+// EventSession is a single session membership pair on a run. The run-level
+// label is a list of pairs rather than a map so that a run triggered by
+// multiple events (eg. a batch) can belong to several sessions sharing the
+// same key.
+type EventSession struct {
+	Key string `json:"key"`
+	ID  string `json:"id"`
+}
+
+// EventSessions is the run-level form of event.EventMeta.Sessions, which cannot be
+// imported here because pkg/event depends on this package.
+type EventSessions []EventSession
 
 type ResponseOps []ResponseOp
 

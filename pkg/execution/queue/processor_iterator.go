@@ -3,16 +3,10 @@ package queue
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/attribute"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -26,6 +20,10 @@ type ProcessorIterator struct {
 
 	// Queue is the Queue that owns this processor.
 	Queue QueueProcessor
+	// Leaser attempts to lease queue items before dispatch.
+	Leaser QueueItemLeaser
+	// Dispatch sends a leased item to the execution layer.
+	Dispatch DispatchFunc
 
 	// error returned when processing
 	Err error
@@ -70,7 +68,7 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	p.IsSemaphoreLimitOnly.Store(true)
 
 	eg := errgroup.Group{}
-	for _, i := range p.Items {
+	for idx, i := range p.Items {
 		if i == nil {
 			// THIS SHOULD NEVER HAPPEN. Skip gracefully and log error
 			logger.StdlibLogger(ctx).Error("nil queue item in partition", "partition", p.Partition)
@@ -80,7 +78,7 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 		if p.Parallel {
 			item := *i
 			eg.Go(func() error {
-				err := p.Process(ctx, &item)
+				err := p.LeaseItem(ctx, &item)
 				if err != nil {
 					// NOTE: ignore if the queue item is not found
 					if errors.Is(err, ErrQueueItemNotFound) {
@@ -93,10 +91,22 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 		}
 
 		// non-parallel (sequential fifo) processing.
-		if err = p.Process(ctx, i); err != nil {
+		if err = p.LeaseItem(ctx, i); err != nil {
 			// NOTE: ignore if the queue item is not found
 			if errors.Is(err, ErrQueueItemNotFound) {
 				continue
+			}
+
+			// If item processing was terminated early due to user constraints,
+			// set the earliest peek time for the remaining items.
+			// This ensures accurate tracking of peeked items waiting for
+			// user constraint capacity to become available (user latency).
+			if errors.Is(err, ErrProcessNoUserConstraintCapacity) {
+				config := p.Queue.Options().ItemEarliestPeekTimeConfig(ctx, p.Queue.Shard().Name(), *i)
+				if config.Enabled {
+					// Stamp remaining items from next item on (idx+1)
+					p.stampRemainingEarliestPeekTimes(ctx, idx+1, config.BulkStampLimit)
+				}
 			}
 			// always break on the first error;  if processing returns an error we
 			// always assume that we stop iterating.
@@ -127,395 +137,85 @@ func (p *ProcessorIterator) Iterate(ctx context.Context) error {
 	return err
 }
 
-func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
-	l := logger.StdlibLogger(ctx).With("partition", p.Partition, "item", item)
-
-	partitionIdentifier := p.Partition.Identifier()
-	ctx, span := p.Queue.Options().ConditionalTracer.NewSpan(ctx, "queue.Process", p.Partition.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
-	defer span.End()
-	span.SetAttributes(attribute.String("partition_id", p.Partition.ID))
-	span.SetAttributes(attribute.String("item_kind", item.Data.Kind))
-	span.SetAttributes(attribute.String("run_id", item.Data.Identifier.RunID.String()))
-	span.SetAttributes(attribute.String("item_id", item.ID))
-	if item.Data.JobID != nil {
-		span.SetAttributes(attribute.String("job_id", *item.Data.JobID))
+// stampRemainingEarliestPeekTimes iterates over a slice of items starting from start and up to limit.
+func (p *ProcessorIterator) stampRemainingEarliestPeekTimes(ctx context.Context, start, limit int) {
+	if limit <= 0 || start >= len(p.Items) {
+		return
 	}
 
-	if item.IsLeased(p.Queue.Clock().Now()) {
-		span.SetAttributes(attribute.String("skip_reason", "already_leased"))
-		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "lease_contention", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "lease"},
-		})
-		return nil
+	peekTime := p.StaticTime
+	if peekTime.IsZero() {
+		peekTime = p.Queue.Clock().Now()
 	}
 
-	// Check if there's capacity from our local workers atomically prior to leasing our items.
-	if !p.Queue.Semaphore().TryAcquire(1) {
-		span.SetAttributes(attribute.String("skip_reason", "no_queue_worker_capacity"))
-		metrics.IncrQueuePartitionProcessNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
-		// Break the entire loop to prevent out of order work.
-		return ErrProcessNoCapacity
-	}
-
-	metrics.WorkerQueueCapacityCounter(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
-
-	// Release semaphore capacity, will be called when this function
-	// exits unless explicitly committed (see below).
-	//
-	// release() can be called early to make worker capacity available again
-	release := sync.OnceFunc(func() {
-		p.Queue.Semaphore().Release(1)
-		metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": p.Queue.Shard().Name()}})
-	})
-
-	// Default to resetting the semaphore if we don't explicitly keep it
-	// This should prevent forgetting the .Release() case
-	commitSemaphoreAcquire := false
-	defer func() {
-		if commitSemaphoreAcquire {
+	l := logger.StdlibLogger(ctx).With("partition", p.Partition)
+	attempts := 0
+	for _, item := range p.Items[start:] {
+		if attempts >= limit {
 			return
 		}
+		if item == nil || item.EarliestPeekTime != 0 {
+			continue
+		}
 
-		release()
-	}()
-
-	//
-	// Before we can do any work on the queue item, we need to check if all the constraints have capacity.
-	// This was previously done in Lease and has since been moved to the Constraint API.
-	//
-	// The Constraint API employs in-memory caching for a subset of constraints, ensuring low-latency
-	// responses on hit constraints and avoiding overloading the API.
-	//
-
-	backlog := ItemBacklog(ctx, *item)
-	partition := ItemShadowPartition(ctx, *item)
-	constraints := p.Queue.Options().PartitionConstraintConfigGetter(ctx, partition.Identifier())
-
-	// The following lease options simply specify some objects that are required during lease but were already generated
-	leaseOptions := []LeaseOptionFn{
-		LeaseBacklog(backlog),
-		LeaseShadowPartition(partition),
-		LeaseConstraints(constraints),
-	}
-
-	// Acquire capacity lease, in case the Constraint API is enabled and the current queue item should use capacity leases.
-	// We only ignore capacity leases for system queues and items missing account ID / env ID / function ID combinations.
-	// When the Constraint API is enabled, it will handle concurrency and throttle checks on the queue item.
-	// This is for an individual lease. If a constraint is at capacity, no leases will be returned and we will handle the missing capacity accordingly.
-	constraintRes, err := p.Queue.ItemLeaseConstraintCheck(
-		ctx,
-		&partition,
-		&backlog,
-		constraints,
-		item,
-		p.Queue.Clock().Now(),
-	)
-	if err != nil {
-		span.RecordError(err)
-		l.ReportError(err, "could not check constraints to lease item")
-		// Stop iterator but don't quit the queue
-		return ErrProcessStopIterator
-	}
-
-	// If we're limited by constraints, release semaphore early since we won't be leasing or processing
-	if constraintRes.LimitingConstraint != enums.QueueConstraintNotLimited {
-		release()
-
-		span.SetAttributes(attribute.String("limiting_constraint", constraintRes.LimitingConstraint.String()))
-	}
-
-	var leaseID *ulid.ULID
-	switch constraintRes.LimitingConstraint {
-	// If no constraints were hit (or we didn't invoke the Constraint API)
-	case enums.QueueConstraintNotLimited:
-
-		// Attempt to lease this item before passing this to a worker.  We have to do this
-		// synchronously as we need to lease prior to requeueing the partition pointer. If
-		// we don't do this here, the workers may not lease the items before calling Peek
-		// to re-enqeueu the pointer, which then increases contention - as we requeue a
-		// pointer too early.
-		//
-		// This is safe:  only one process runs scan(), and we guard the total number of
-		// available workers with the above semaphore.
-		leaseID, err = Duration(ctx, p.Queue.Shard().Name(), "lease", p.Queue.Clock().Now(), func(ctx context.Context) (*ulid.ULID, error) {
-			return p.Queue.Shard().Lease(
-				ctx,
-				*item,
-				QueueLeaseDuration,
-				p.StaticTime,
-				leaseOptions...,
-			)
-		})
-		// NOTE: If this loop ends in an error, we must _always_ release an item from the
-		// semaphore to free capacity.  This will happen automatically when the worker
-		// finishes processing a queue item on success.
+		attempts++
+		earliestPeekTime, err := p.Queue.Shard().SetEarliestPeekTime(ctx, *item, peekTime)
 		if err != nil {
-			// Continue on and handle the error below.
-			release()
+			l.Warn("could not set earliest peek time for remaining item", "item", item, "error", err)
+			continue
 		}
-	// Simulate errors returned by Lease
-	case enums.QueueConstraintThrottle:
-		err = ErrQueueItemThrottled
-	case enums.QueueConstraintAccountConcurrency:
-		err = NewKeyError(ErrAccountConcurrencyLimit, partition.AccountID.String())
-	case enums.QueueConstraintFunctionConcurrency:
-		err = NewKeyError(ErrPartitionConcurrencyLimit, partition.FunctionID.String())
-	case enums.QueueConstraintCustomConcurrencyKey1:
-		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(1))
-	case enums.QueueConstraintCustomConcurrencyKey2:
-		err = NewKeyError(ErrConcurrencyLimitCustomKey, backlog.CustomConcurrencyKeyID(2))
-	case enums.QueueConstraintSemaphore:
-		err = ErrSemaphoreLimit
-	default:
-		l.ReportError(errors.New("unhandled queue constraint type"), fmt.Sprintf("constraint type: %s", constraintRes.LimitingConstraint))
-		// Limited but the constraint is unknown?
+
+		item.EarliestPeekTime = earliestPeekTime.UnixMilli()
+	}
+}
+
+// Process leases a single queue item and dispatches it to the execution layer.
+//
+// Deprecated: use LeaseItem.
+func (p *ProcessorIterator) Process(ctx context.Context, item *QueueItem) error {
+	return p.LeaseItem(ctx, item)
+}
+
+func (p *ProcessorIterator) LeaseItem(ctx context.Context, item *QueueItem) error {
+	leaser := p.Leaser
+	if leaser == nil {
+		var ok bool
+		leaser, ok = p.Queue.(QueueItemLeaser)
+		if !ok {
+			return ErrProcessStopIterator
+		}
 	}
 
-	// Check the sojourn delay for this item in the queue. Tracking system latency vs
-	// sojourn latency from concurrency is important.
-	//
-	// Firstly, we check:  does the job store the first peek time?  If so, the
-	// delta between now and that time is the sojourn latency.  If not, this is either
-	// one of two cases:
-	//   - This is a new job in the queue, and we're peeking it for the first time.
-	//     Sojourn latency is 0.  Easy.
-	//   - We've peeked the queue since adding the job.  At this point, the only
-	//     conclusion is that the job wasn't peeked because of concurrency/capacity
-	//     issues, so the delta between now - job added is sojourn latency.
-	//
-	// NOTE: You might see that we use tracking semaphores and the worker itself has
-	// a maximum capacity.  We must ALWAYS peek the available capacity in our worker
-	// via the above Peek() call so that worker capacity doesn't prevent us from accessing
-	// all jobs in a peek.  This would break sojourn latency:  it only works if we know
-	// we're quitting early because of concurrency issues in a user's function, NOT because
-	// of capacity issues in our system.
-	//
-	// Anyway, here we set the first peek item to the item's start time if there was a
-	// peek since the job was added.
-	if p.Partition.Last > 0 && p.Partition.Last > item.AtMS {
-		// Fudge the earliest peek time because we know this wasn't peeked and so
-		// the peek time wasn't set;  but, as we were still processing jobs after
-		// the job was added this item was concurrency-limited.
-		item.EarliestPeekTime = item.AtMS
-	}
+	result, err := leaser.LeaseItem(ctx, LeaseItemRequest{
+		Item:                 item,
+		Partition:            p.Partition,
+		PartitionContinueCtr: p.PartitionContinueCtr,
+		StaticTime:           p.StaticTime,
+	}, p.Dispatch)
+	p.applyLeaseItemResult(result)
+	return err
+}
 
-	// We may return a keyError, which masks the actual error underneath.  If so,
-	// grab the cause.
-	cause := err
-	var key KeyError
-	if errors.As(err, &key) {
-		cause = key.cause
-	}
-
-	l = l.With(
-		"cause", cause,
-		"item_id", item.ID,
-		"account_id", item.Data.Identifier.AccountID.String(),
-		"env_id", item.WorkspaceID.String(),
-		"app_id", item.Data.Identifier.AppID.String(),
-		"fn_id", item.FunctionID.String(),
-		"queue_shard", p.Queue.Shard().Name(),
-	)
-
-	// used for error reporting
-	errTags := map[string]string{}
-	if cause != nil {
-		errTags["cause"] = cause.Error()
-	}
-	if leaseID != nil {
-		errTags["lease"] = leaseID.String()
-	}
-
-	switch cause {
-	case ErrQueueItemThrottled:
+func (p *ProcessorIterator) applyLeaseItemResult(result LeaseItemResult) {
+	switch result.Status {
+	case LeaseItemStatusDispatched, LeaseItemStatusNotFound, LeaseItemStatusLeaseContention:
+		p.CtrSuccess.Add(1)
+	case LeaseItemStatusThrottled:
 		p.IsCustomKeyLimitOnly.Store(false)
 		p.IsSemaphoreLimitOnly.Store(false)
-
 		p.CtrRateLimit.Add(1)
-		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "throttled", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
-		})
-
-		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
-			err := p.Queue.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
-			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
-				l.ReportError(err, "could not requeue item to backlog after hitting throttle limit",
-					logger.WithErrorReportTags(errTags),
-				)
-				return fmt.Errorf("could not requeue to backlog: %w", err)
-			}
-
-			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard": p.Queue.Shard().Name(),
-					// "partition_id": item.FunctionID.String(),
-					"status": "throttled",
-				},
-			})
-		}
-
-		return nil
-	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
+	case LeaseItemStatusConcurrencyLimited:
 		p.IsCustomKeyLimitOnly.Store(false)
 		p.IsSemaphoreLimitOnly.Store(false)
-
 		p.CtrConcurrency.Add(1)
-		// Since the queue is at capacity on a fn or account level, no
-		// more jobs in this loop should be worked on - so break.
-		//
-		// Even if we have capacity for the next job in the loop we do NOT
-		// want to claim the job, as this breaks ordering guarantees.  The
-		// only safe thing to do when we hit a function or account level
-		// concurrency key.
-		var status string
-		switch cause {
-		case ErrSystemConcurrencyLimit:
-			status = "system_concurrency_limit"
-		case ErrPartitionConcurrencyLimit:
-			status = "partition_concurrency_limit"
-			if p.Partition.FunctionID != nil {
-				p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
-			}
-		case ErrAccountConcurrencyLimit:
-			status = "account_concurrency_limit"
-			// For backwards compatibility, we report on the function level as well
-			if p.Partition.FunctionID != nil {
-				p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
-			}
-
-			p.Queue.Options().lifecycles.OnAccountConcurrencyLimitReached(
-				context.WithoutCancel(ctx),
-				p.Partition.AccountID,
-				p.Partition.EnvID,
-			)
-		}
-
-		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": status, "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
-		})
-
-		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
-			err := p.Queue.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
-			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
-				l.ReportError(err, "could not requeue item to backlog after hitting concurrency limit",
-					logger.WithErrorReportTags(errTags),
-				)
-				return fmt.Errorf("could not requeue to backlog: %w", err)
-			}
-
-			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard": p.Queue.Shard().Name(),
-					// "partition_id": item.FunctionID.String(),
-					"status": status,
-				},
-			})
-		}
-
-		return fmt.Errorf("concurrency hit: %w", ErrProcessStopIterator)
-	case ErrConcurrencyLimitCustomKey:
+	case LeaseItemStatusCustomConcurrencyLimited:
 		p.IsSemaphoreLimitOnly.Store(false)
 		p.CtrConcurrency.Add(1)
-
-		// For backwards compatibility, we report on the function level as well
-		if p.Partition.FunctionID != nil {
-			p.Queue.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *p.Partition.FunctionID)
-		}
-
-		// TODO: Report on key that was hit (this must have been empty previously)
-		// p.queue.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), p.partition.EvaluatedConcurrencyKey)
-
-		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
-		})
-
-		if p.Queue.Options().ItemEnableKeyQueues(ctx, *item) {
-			err := p.Queue.Shard().Requeue(ctx, *item, time.UnixMilli(item.AtMS))
-			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
-				l.ReportError(err, "could not requeue item to backlog after hitting custom concurrency limit",
-					logger.WithErrorReportTags(errTags),
-				)
-				return fmt.Errorf("could not requeue to backlog: %w", err)
-			}
-
-			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard": p.Queue.Shard().Name(),
-					// "partition_id": item.FunctionID.String(),
-					"status": "custom_key_concurrency_limit",
-				},
-			})
-		}
-		return nil
-	case ErrSemaphoreLimit:
-		// Semaphore capacity exhausted for this specific item (e.g., start job with fn concurrency).
-		// Skip this item and continue scanning — other items without semaphores (step 2, etc.)
-		// can still be processed.
+	case LeaseItemStatusSemaphoreLimited:
 		p.CtrConcurrency.Add(1)
-		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
-		})
-		return nil
-	case ErrQueueItemNotFound:
-		// This is an okay error.  Move to the next job item.
-		p.CtrSuccess.Add(1) // count as a success for stats purposes.
-		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
-		})
-		return nil
-	case ErrQueueItemAlreadyLeased:
-		// This is an okay error.  Move to the next job item.
-		p.CtrSuccess.Add(1) // count as a success for stats purposes.
-		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
-		})
-		return nil
+	case LeaseItemStatusLeaseError:
+		p.Err = result.Err
 	}
-
-	// Handle other errors.
-	if err != nil || leaseID == nil {
-		span.RecordError(err)
-		p.Err = fmt.Errorf("error leasing in process: %w", err)
-		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"status": "error", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
-		})
-		return p.Err
-	}
-
-	// Assign the lease ID and pass this to be handled by the available worker.
-	// There should always be capacity on this queue as we track capacity via
-	// a semaphore. GenerationID was loaded from the queue hash on Peek and is
-	// preserved across Lease (the Lua script does not touch it).
-	item.LeaseID = leaseID
-
-	// increase success counter.
-	p.CtrSuccess.Add(1)
-	metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
-		PkgName: pkgName,
-		Tags:    map[string]any{"status": "success", "queue_shard": p.Queue.Shard().Name(), "constraint_source": "constraintapi"},
-	})
-	p.Queue.Workers() <- ProcessItem{
-		P:    *p.Partition,
-		I:    *item,
-		PCtr: p.PartitionContinueCtr,
-
-		CapacityLease:       constraintRes.CapacityLease,
-		ConditionalTraceCtx: context.WithoutCancel(ctx),
-	}
-	commitSemaphoreAcquire = true
-
-	return nil
 }
 
 func (p *ProcessorIterator) IsRequeuable() bool {

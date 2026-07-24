@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -30,6 +31,26 @@ type Options struct {
 	// purposes. By default database handlers are singletons, but when this flag
 	// is enabled, each call creates a new connection.
 	ForTest bool
+
+	// MaxIdleConns sets the number of idle connections retained in the pool.
+	//
+	// Zero leaves the database/sql default.
+	MaxIdleConns int
+
+	// MaxOpenConns bounds the total connections the pool may open.
+	//
+	// Zero leaves the database/sql default.
+	MaxOpenConns int
+
+	// ConnMaxIdleTime sets how long an idle connection is retained.
+	//
+	// Zero leaves the database/sql default.
+	ConnMaxIdleTime time.Duration
+
+	// ConnMaxLifetime sets the maximum lifetime of a connection.
+	//
+	// Zero leaves the database/sql default.
+	ConnMaxLifetime time.Duration
 }
 
 func Open(ctx context.Context, opts Options) (*sql.DB, error) {
@@ -61,6 +82,8 @@ func Open(ctx context.Context, opts Options) (*sql.DB, error) {
 		return nil, err
 	}
 
+	configurePool(conn, opts)
+
 	if err := conn.Ping(); err != nil {
 		return nil, err
 	}
@@ -71,6 +94,23 @@ func Open(ctx context.Context, opts Options) (*sql.DB, error) {
 	l.Info("ran database migrations")
 
 	return conn, nil
+}
+
+// configurePool applies any non-zero pool options, leaving database/sql
+// defaults otherwise.
+func configurePool(conn *sql.DB, opts Options) {
+	if opts.MaxIdleConns > 0 {
+		conn.SetMaxIdleConns(opts.MaxIdleConns)
+	}
+	if opts.MaxOpenConns > 0 {
+		conn.SetMaxOpenConns(opts.MaxOpenConns)
+	}
+	if opts.ConnMaxIdleTime > 0 {
+		conn.SetConnMaxIdleTime(opts.ConnMaxIdleTime)
+	}
+	if opts.ConnMaxLifetime > 0 {
+		conn.SetConnMaxLifetime(opts.ConnMaxLifetime)
+	}
 }
 
 func Migrate(ctx context.Context, conn *sql.DB) error {

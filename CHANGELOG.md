@@ -2,6 +2,414 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.38.1] - 2026-07-21
+
+### 🐛 Bug Fixes
+
+- *(api)* Clarify run list commands and docs (#4647)
+
+## [v1.38.0] - 2026-07-21
+
+### 🚀 Features
+
+- *(dashboard)* Add Sandboxes waitlist (#4611)
+- *(queue)* Define grpc service interfaces for queue producer and consumer (#4610)
+- *(queue)* Route RequeueByJobID through producer (#4613)
+- Enforce one-year maximum duration for sleep and wait-for-event (#4628)
+- Normalize and instrument AI feature empty state pages (#4620)
+- *(cli)* Add API command usage metrics (#4642)
+- *(api)* Add v2 runs list endpoints (#4621)
+
+### 🐛 Bug Fixes
+
+- Fix the ordering and queue time of async opcodes (#4608)
+- *(queue)* Expose partition size on job queue reader (#4619)
+- *(insights ai)* Attribute Insights cost/latency/token scores to their experiment variant (bump inngest 4.13.0) (#4641)
+
+### 🚜 Refactor
+
+- *(queue)* Route processor dequeue and requeue through queue interfaces (#4639)
+- *(runs)* Consolidate oss runs queries (#4623)
+
+### 📚 Documentation
+
+- EXE-2021 Add CLI callout to API docs (#4618)
+- Add guidance on Postgres retention for self-hosting (#4357)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add event lifecycle hooks (#4624)
+- Align auto-labels with Linear (#4634)
+- *(release)* V1.38.0 (#4615)
+
+## [v1.37.0] - 2026-07-14
+
+### 🚀 Features
+
+- *(queue)* Make pause requeue extension configurable (#4569)
+- *(constraintapi)* Return lease usage from lifecycle ops (#4596)
+- Bring AI Metadata extraction from extended traces to parity with JS SDK (#4572)
+- *(traces)* Remove run-details-v4 flag and legacy RunDetailsV3, always render V4 (#4584)
+- *(api)* Add v2 score endpoint (#4453)
+
+### 🐛 Bug Fixes
+
+- *(execution)* Improve copy for error responses that do not come from the SDK (#4566)
+- Hydrate determinstic spans for sleep queue items on retries (#4592)
+- Lease race causing wasted work (#4593)
+- *(constraintapi)* Fix Constraint API marshaling (#4602)
+- *(dashboard)* Update Scores and Sessions nav icons (#4605)
+- *(tracing)* Stop dev server finalization group spans from duplicating in the trace UI (#4600)
+- Display errored attempts without step as `Function Error` rather than Finalization (#4571)
+- *(tracing)* Drop duplicate finalization span on errored runs (#4598)
+- *(sessions)* Sessions docs url (#4609)
+
+### 🚜 Refactor
+
+- *(queue)* Subsume QueueManager APIs into other appropriate narrow interfaces (#4581)
+- *(ui)* Decompose traceRollup into focused helpers (#4597)
+- *(queue)* Break up queueProcessor (#4606)
+
+### ⚡ Performance
+
+- Reduce sleep queue item payload size (#4591)
+
+### 🧪 Testing
+
+- *(constraintapi)* Add Redis Lua compatibility regression (#4603)
+- Capture WaitForRunStatus status-transition history on timeout (#4447)
+- *(dnscache)* Test DNS cache against mock servers to reduce flakes (#4595)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(e2e)* Check that the dev server comes up (#4583)
+- *(tygo-collect)* Gofmt generated output (#4586)
+- Remove unused TotalSystemQueueDepth from QueueManager interface (#4574)
+- Cache our pnpm installation (#4588)
+- *(release)* V1.37.0 (#4587)
+
+## [v1.36.0] - 2026-07-08
+
+### 🚀 Features
+
+- Differentiate between request and response model for AI Metadata extraction with ai.step.* (#4518)
+
+### 🐛 Bug Fixes
+
+- *(release)* Open homebrew-tap PRs as ready for review (non-draft) (#4576)
+- Update AI Metadata field names (#4516)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(go)* Move one unit test job to Depot (#4568)
+- *(release)* V1.36.0 (#4573)
+
+### 🛡️ Security
+
+- Address Go vulnerabilities (#4570)
+
+## [v1.35.0] - 2026-07-07
+
+### 🚀 Features
+
+- *(experiments)* Visualize numeric metrics using box plots (#4517)
+- *(function-view)* Show key queues setting (#4546)
+- *(experiments)* Update charts/layout to match new design (#4551)
+- *(queue)* Jitter PartitionRequeue default case (#4561)
+- *(api)* Experiments api (#4504)
+
+### 🐛 Bug Fixes
+
+- Should not coalesce parallel steps for the V1 execution engine (#4538)
+- *(experiments)* Fix boxplot colors (#4542)
+
+### 🚜 Refactor
+
+- *(queue)* Clean up QueueManager interface (#4541)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(go)* Drop key-queues test matrix dimension (#4552)
+- Upload test results to CodeCov to analyze flake rates (#4545)
+- Use a depot runner for linting (#4554)
+- *(queue)* Add timeout to backlog size (#4556)
+- Track partition processing that yielded 0 peeks (#4562)
+- Cleanup unused queue injections (#4564)
+- *(release)* V1.35.0 (#4535)
+
+### ◀️ Revert
+
+- Always SavePending after parallel ops to coalesce discovery (#4021) (#4534)
+
+## [v1.34.0] - 2026-06-29
+
+### 🚀 Features
+
+- *(sessions)* Add search to `/sessions/:sessionsKey` route (#4499)
+- *(sessions)* Design feedback (#4524)
+
+### 🐛 Bug Fixes
+
+- Custom concurrency cache keys (#4501)
+- Wrong experiments docs URL (#4503)
+- *(queue)* Handle wrapped iterator errors (#4507)
+- *(support)* Fix React hydration — UI interactions unresponsive (#4510)
+- *(metadata)* Show last attempt metadata for retry groups (#4513)
+- Support only OTel GenAI in Extended Traces AI Metadata Extractor (#4509)
+- *(dashboard)* Scoring formula slider interaction (#4484)
+- The display of extended traces for steps with multiple attempts (#4523)
+- Rerun from step (#4182)
+- *(rerun-from-step)* Enable rerun from step everywhere (#4531)
+
+### 🚜 Refactor
+
+- *(queue)* Resolve shards by scope instead of acctID (#4475)
+- *(session)* Session ui empty state refactor (#4508)
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump SDK from 4.8.0 to 4.10.0 (#4496)
+- *(release)* Use homebrew_casks with goreleaser (#3462)
+- *(sessions)* Sessions UI feedback (#4500)
+- *(release)* For homebrew installed inngest-cli, use homebrew-tap for latest version (#4511)
+- Adding metrics for run duration (#4445)
+- *(release)* V1.34.0 (#4497)
+
+## [v1.33.0] - 2026-06-23
+
+### 🚀 Features
+
+- *(debugapi)* Add semaphore routes to the debug API (#4488)
+- *(sessions)* Allow sessions in invoke button (#4489)
+- Insights ai experiments updates (#4492)
+
+### 🚜 Refactor
+
+- *(queue)* Make Producer configurable in Queue (#4078)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.33.0 (#4490)
+
+## [v1.32.0] - 2026-06-22
+
+### 🚀 Features
+
+- *(tracing)* Allow system queue tracing (#4442)
+- *(score)* Make score kind constant (#4482)
+- *(sessions)* Sessions page optimization (#4480)
+
+### 🐛 Bug Fixes
+
+- *(support)* Fix local dev deps misalignment (#4472)
+- Update experiments docs links (#4481)
+- *(dashboard)* Drop vite back down until we can test thoroughly (#4486)
+
+### ⚙️ Miscellaneous Tasks
+
+- Dedup parallel fan-in discovery via coalesce key (#4452)
+- *(insights)* Add "Open in Insights" button on Failed Functions chart on the Metrics page (#4046)
+- *(metrics)* Add counter to checkpoint ops (#4478)
+- *(release)* V1.32.0 (#4469)
+
+## [v1.31.0] - 2026-06-18
+
+### 🚀 Features
+
+- Session server parse + emit (#4404)
+- Add sessions dashboard UI (#4403)
+
+### 🐛 Bug Fixes
+
+- *(traces)* Deduplicate nonstep/step spans in trace view (#4448)
+- *(extended traces)* Reparent orphaned extended trace spans using span attributes (#4443)
+- *(trace view)* Fix the ordering/timestamps of finalization spans (#4456)
+
+### 💼 Other
+
+- *(npm)* Address UI dependency alerts (#4260)
+
+### 🚜 Refactor
+
+- *(devServer)* New Information Architecture (#4395)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.31.0 (#4451)
+
+## [v1.30.0] - 2026-06-17
+
+### 🚀 Features
+
+- V2 api rerun (#4410)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.30.0 (#4450)
+
+## [v1.29.0] - 2026-06-17
+
+### 🚀 Features
+
+- *(queue)* Track earliest peek time before Constraint API (#4391)
+
+### 🐛 Bug Fixes
+
+- Queue item cleanup race in non-key-queues postgres cancel path (#4337)
+- *(dashboard)* Use distinct speedometer icon for sidebar Overview (#4429)
+- *(tests)* Widen timing tolerance from 10ms to 100ms in TestStartAll/TestSingleSvcError (#4115)
+- Alias conflicting grpc import (#4436)
+- *(tests)* Replace 50ms settle delay with deterministic clock.BlockUntil() in TestQueueItemProcessWithConstraintChecks (#4434)
+- *(queue)* Ignore already-leased partitions during scan (#4438)
+- Keep completed runs from being reported as reverted (#4247)
+- *(tests)* Increase WaitForRunStatus timeouts in all affected E2E tests (#4435)
+- Make WaitForRunStatus tolerate transient not found GQL errors (#4206)
+- *(executor)* Always SavePending after parallel ops to coalesce discovery (#4021)
+- Scope GetSpanOutput query by run_id to prevent cross-run data leak (#4441)
+- *(scoring)* Improve scoring dashboard ui (#4433)
+
+### 🧪 Testing
+
+- *(cqrs)* Cover all terminal trace run statuses (#4446)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(tests)* Fix flaky test status (#4439)
+- *(tests)* Flaky test fix (#4440)
+- Ttl upsert pkg (#4432)
+- *(release)* V1.29.0 (#4428)
+
+## [v1.28.0] - 2026-06-16
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.28.0 (#4373)
+
+## [v1.27.1] - 2026-06-16
+
+### 🚀 Features
+
+- Implements v2 api/cli get function (#4353)
+- *(queue)* Enable shard ForEach using feature flag (#4375)
+- Deterministic finalized step span IDs  (#4370)
+- *(experiments)* Change experiment_name -> name in metadata (#4355)
+- *(metadata)* Use deterministic step span IDs (#4386)
+- Rest v2 api get functions  (#4385)
+- V2 rest api get app (#4389)
+
+### 🐛 Bug Fixes
+
+- Return consistent function ids across v2 endpoints (#4377)
+- *(release)* Mark prerelease tags as non-latest (#4380)
+- State leak when new state is created but ErrQueueItemExists is hit (#4394)
+- Exact matching on ErrQueueItemExists causing unnecessary retries (#4400)
+- Properly identify the response AI model while parsing OTel attributes (EXE-1837) (#4398)
+- Don't double count Vercel SDK AI spans (EXE-1837) (#4399)
+- *(pauses)* Filter deleted block pauses during iteration (#4358)
+- *(queue)* Fix Semaphore Key Queues edge case (#4411)
+- *(queue)* Self-heal stale global partition pointers (#4244)
+- *(devserver)* Reapply postgres connection pool settings (#4392)
+- *(cron)* Set envid on health check resync path (#4419)
+
+### ⚡ Performance
+
+- Add state metadata option to skip fetching stack & step metadata (#4393)
+- Improvements for OSS filters (#4299)
+
+### 🧪 Testing
+
+- Synchronize compaction in TestCompactionSkipsPhantomBlocks (#4382)
+
+### ⚙️ Miscellaneous Tasks
+
+- Measure non-atomic state idempotency claim races (#4365)
+- Log warning on hitting the duplicate state metric (#4388)
+
+## [v1.27.0] - 2026-06-09
+
+### 🚀 Features
+
+- UI: Group top-level step spans using step/group IDs (#4305)
+- Extended traces metrics with hard caps (#4293)
+- Deterministic finalized step span IDs (#4274)
+
+### 🐛 Bug Fixes
+
+- Preserve debounce on migration failure (#4243)
+- *(debounce)* Preserve TTL from DebounceUpdate (#4349)
+- Preserve debounce migration guard on cleanup failure (#4354)
+- Fudge planned step span times slightly to prevent rollup race condition (#4364)
+- V2 api event/runs statuses (#4361)
+- Re-enable parallel processing for crons (#4369)
+
+### 🚜 Refactor
+
+- *(checkpointing)* RequestID -> GenerationID (#4342)
+- Refactor tel package to remove noise (#4352)
+
+### ⚡ Performance
+
+- *(cron)* Split cron partitions by workspace (#4356)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update v2 /runs to use latest trace span structures (#4346)
+- Expand batch buffer wait metric buckets (#3867)
+- *(release)* V1.27.0 (#4347)
+
+### ◀️ Revert
+
+- "feat: Deterministic finalized step span IDs" (#4360)
+
+## [v1.26.0] - 2026-06-05
+
+### 🚀 Features
+
+- Add support for parsing span attribute data from Langfuse (EXE-1914) (#4318)
+- A/B test insights query-writer model and score tokens/cost (#4331)
+- Promote api cli, add redirect message and beta tag (#4344)
+
+### 🐛 Bug Fixes
+
+- Mark insights api as internal to get docs gen working again (#4327)
+- Make v2 api path match mono/docs & improve host/port handling (#4302)
+- Status, duration, output in v2 api event/runs (#4343)
+
+### 🚜 Refactor
+
+- Use step.run for llm calls in insights experiment (#4338)
+- Use Item.Kind for shard selection instead of Item.QueueName (#4336)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(tracing)* Add more conditional traces around scheduling (#4323)
+- *(release)* V1.26.0 (#4328)
+
+## [v1.25.0] - 2026-06-03
+
+### 🚀 Features
+
+- EXE-1837: Add a few Open Inference attributes to Metadata (#4297)
+- EXE-1918: Parse total tokens from AI Metadata (#4307)
+- Add Group ID & Request ID attributes to most execution spans (#4304)
+- EXE-1918: Add Response Model, Response ID, and finish reasons to extracted AI Metadata (#4311)
+- Use queue item timestamps for traces (#4316)
+- Add event runs query for v2 api (#4282)
+- Add event runs v2 api contract and implementation (#4283)
+- EXE-1913: Add support for parsing span attribute data from Vercel's AI SDK (#4312)
+
+### 🐛 Bug Fixes
+
+- *(queue)* Log queue role acquire and loss (#4300)
+- *(realtime)* Websocket memory leak (#4309)
+- Add app name to run spans (#4314)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add function metadata to run spans (#4287)
+- Improve usability on deferred runs (#4320)
+- *(release)* V1.25.0 (#4301)
+
 ## [v1.24.0] - 2026-06-01
 
 ### 🚀 Features
@@ -18,6 +426,10 @@ All notable changes to this project will be documented in this file.
 ### 🚜 Refactor
 
 - *(queue)* Introduce queue roles (#4289)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.24.0 (#4288)
 
 ## [v1.23.0] - 2026-05-28
 

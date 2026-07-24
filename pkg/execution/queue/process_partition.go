@@ -10,8 +10,19 @@ import (
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/attribute"
 )
+
+func partitionRequeueExtensionWithJitter() time.Duration {
+	maxJitterMS := PartitionRequeueMaxJitter.Milliseconds()
+	if maxJitterMS <= 0 {
+		return PartitionRequeueExtension
+	}
+
+	jitter := time.Duration(rnd.Uint64n(uint64(maxJitterMS))+1) * time.Millisecond
+	return PartitionRequeueExtension + jitter
+}
 
 // ProcessPartition processes a given partition, peeking jobs from the partition to run.
 //
@@ -22,12 +33,23 @@ import (
 //
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
-func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool, dispatch DispatchFunc) error {
 	l := logger.StdlibLogger(ctx)
 	shard := q.Shard()
 
 	partitionIdentifier := p.Identifier()
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", p.AccountID, partitionIdentifier.EnvID, partitionIdentifier.FunctionID)
+	scope := itrace.Scope(itrace.UserScope{
+		AccountID: partitionIdentifier.AccountID,
+		EnvID:     partitionIdentifier.EnvID,
+		FnID:      partitionIdentifier.FunctionID,
+	})
+	if partitionIdentifier.SystemQueueName != nil {
+		scope = itrace.SystemScope{
+			QueueName:      partitionIdentifier.SystemQueueName,
+			QueueShardName: shard.Name(),
+		}
+	}
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.processPartition", scope)
 	defer span.End()
 	span.SetAttributes(attribute.String("queue_shard", shard.Name()))
 
@@ -255,6 +277,10 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 	if strings.HasPrefix(p.Queue(), KindScheduleBatch) {
 		isSystemFn = true
 	}
+	// All cron queue partitions get parallel processing.
+	if strings.HasPrefix(p.Queue(), KindCron) {
+		isSystemFn = true
+	}
 	_, parallelFn := q.disableFifoForFunctions[p.Queue()]
 	_, parallelAccount := q.disableFifoForAccounts[p.AccountID.String()]
 
@@ -265,6 +291,8 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		Items:                queue,
 		PartitionContinueCtr: continuationCount,
 		Queue:                q,
+		Leaser:               q,
+		Dispatch:             dispatch,
 		StaticTime:           q.Clock().Now(),
 		Parallel:             parallel,
 	}
@@ -292,7 +320,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 			l.Warn("error requeuieng partition for random peek", "error", err)
 		}
 
-		return q.ProcessPartition(ctx, p, continuationCount, true)
+		return q.ProcessPartition(ctx, p, continuationCount, true, dispatch)
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
@@ -329,16 +357,19 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return nil
 	}
 
+	noPeek := len(queue) == 0
+
 	// XXX: If we haven't been able to lease a single item, ensure we enqueue this
 	// for a minimum of 5 seconds.
 
-	// Requeue the partition, which reads the next unleased job or sets a time of
-	// 30 seconds.  This is why we have to lease items above, else this may return an item that is
-	// about to be leased and processed by the worker.
-	_, err = Duration(ctx, shard.Name(), "partition_requeue", q.Clock().Now(), func(ctx context.Context) (any, error) {
-		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(PartitionRequeueExtension), false)
+	// Requeue the partition, which reads the next unleased job or sets a fallback
+	// time with jitter. This is why we have to lease items above, else this may
+	// return an item that is about to be leased and processed by the worker.
+	requeueExtension := partitionRequeueExtensionWithJitter()
+	_, err = DurationWithTags(ctx, shard.Name(), "partition_requeue", q.Clock().Now(), func(ctx context.Context) (any, error) {
+		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Add(requeueExtension), false)
 		return nil, err
-	})
+	}, map[string]any{"no_peek": noPeek})
 	if err == ErrPartitionGarbageCollected {
 		q.removeContinue(ctx, p, false)
 		// Safe;  we're preventing this from wasting cycles in the future.
@@ -349,6 +380,7 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 		return err
 	}
 	span.SetAttributes(attribute.String("status", "requeue_default"))
-	span.SetAttributes(attribute.Int64("requeue_ms", PartitionRequeueExtension.Milliseconds()))
+	span.SetAttributes(attribute.Bool("no_peek", noPeek))
+	span.SetAttributes(attribute.Int64("requeue_ms", requeueExtension.Milliseconds()))
 	return nil
 }

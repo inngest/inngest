@@ -37,13 +37,48 @@ func TestDiscoverEndpointsFromProto(t *testing.T) {
 	require.Equal(t, []string{"app_id", "function_id"}, byName["invoke-function"].pathParams)
 	require.Equal(t, http.MethodGet, byName["get-function-trace"].method)
 	require.Equal(t, "/runs/{run_id}/trace", byName["get-function-trace"].path)
+	require.NotContains(t, byName, "get-runs")
+	require.Equal(t, "/runs", byName["get-function-runs"].path)
+	require.Empty(t, byName["get-function-runs"].pathParams)
 }
 
 func TestEndpointCommandNameNormalizesReadVerbs(t *testing.T) {
 	require.Equal(t, "get-account", endpointCommandName("FetchAccount"))
 	require.Equal(t, "get-webhooks", endpointCommandName("ListWebhooks"))
 	require.Equal(t, "get-function-run", endpointCommandName("GetFunctionRun"))
+	require.Equal(t, "get-function-runs", endpointCommandName("ListRuns"))
 	require.Equal(t, "create-env", endpointCommandName("CreateEnv"))
+}
+
+func TestCommandHelpUsesTopLevelAPIAndBetaLabel(t *testing.T) {
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--help",
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, out.String(), "inngest api [target/auth flags] <endpoint> [endpoint flags]")
+	require.Contains(t, out.String(), "Call Inngest REST API v2 endpoints (beta)")
+	require.Contains(t, out.String(), "Beta: this command is under active development and may change.")
+	require.Contains(t, out.String(), "Authentication: https://api-docs.inngest.com/authentication")
+	require.NotContains(t, out.String(), "inngest alpha api [target/auth flags]")
+}
+
+func TestMovedCommandTellsUsersToUseTopLevelAPI(t *testing.T) {
+	cmd := MovedCommand()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+	})
+
+	require.NoError(t, err)
+	require.Contains(t, out.String(), "The alpha api command has moved. Use `inngest api` instead.")
 }
 
 func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
@@ -61,6 +96,50 @@ func TestEndpointCommandsIncludeOperationAndInheritedFlagHelp(t *testing.T) {
 	require.Contains(t, invoke.Description, "--prod")
 	require.Contains(t, invoke.Description, "INNGEST_API_KEY")
 	require.Contains(t, invoke.Description, "INNGEST_ENV")
+	require.Contains(t, invoke.Description, "/v2")
+	require.Contains(t, invoke.Description, "Authentication: https://api-docs.inngest.com/authentication")
+	require.NotContains(t, invoke.Description, "inngest alpha api")
+}
+
+func TestCommandTelemetryContextIncludesEndpointAndFlagNamesOnly(t *testing.T) {
+	var getEventRuns endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "get-event-runs" {
+			getEventRuns = ep
+			break
+		}
+	}
+	require.NotEmpty(t, getEventRuns.name)
+
+	var endpointCommand *cli.Command
+	for _, command := range endpointCommands() {
+		if command.Name == getEventRuns.name {
+			endpointCommand = command
+			break
+		}
+	}
+	require.NotNil(t, endpointCommand)
+
+	app := Command()
+	endpointCommand.Action = func(_ context.Context, cmd *cli.Command) error {
+		require.Equal(t, map[string]any{
+			"endpoint": "get-event-runs",
+			"flags":    []string{"include-output", "limit", "prod"},
+		}, commandTelemetryContext(cmd, getEventRuns))
+		return nil
+	}
+	app.Commands = []*cli.Command{endpointCommand}
+
+	err := app.Run(context.Background(), []string{
+		"api",
+		"--prod",
+		"get-event-runs",
+		"01KTCTWSZJEKAFEDA4F9GYHFQW",
+		"--include-output",
+		"--limit", "5",
+	})
+
+	require.NoError(t, err)
 }
 
 func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
@@ -82,6 +161,26 @@ func TestEndpointFlagsUseProtoFieldDescriptions(t *testing.T) {
 	require.Contains(t, byName["data"].String(), "JSON object containing the input data for the function")
 	require.Contains(t, byName["function-id"].String(), "The ID of the function to invoke")
 	require.Contains(t, byName["idempotency-key"].String(), "Optional idempotency key")
+}
+
+func TestRerunFromStepFlagsDescribeSimpleShape(t *testing.T) {
+	var rerun endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "rerun" {
+			rerun = ep
+			break
+		}
+	}
+	require.NotEmpty(t, rerun.name)
+
+	flags := endpointFlags(rerun)
+	byName := map[string]cli.Flag{}
+	for _, flag := range flags {
+		byName[flag.Names()[0]] = flag
+	}
+
+	require.Contains(t, byName["from-step"].String(), "Step name to rerun from")
+	require.Contains(t, byName["input"].String(), "replacement step input as a JSON array")
 }
 
 func TestEndpointDescriptionReferencesValidFlags(t *testing.T) {
@@ -155,6 +254,53 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 	require.Contains(t, out.String(), `"runId": "01J00000000000000000000000"`)
 }
 
+func TestCommandBuildsRerunFromStepBody(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"runId":"01J00000000000000000000000"}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"rerun",
+		"01J00000000000000000000001",
+		"--from-step", "step 2",
+		"--input", `[{"foo":"bar"}]`,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{
+		"fromStep": map[string]any{
+			"stepId": "step 2",
+			"input":  []any{map[string]any{"foo": "bar"}},
+		},
+	}, gotBody)
+
+	cmd = Command()
+	cmd.Writer = &bytes.Buffer{}
+	err = cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"rerun",
+		"01J00000000000000000000001",
+		"--body", `{"fromStep":{"stepId":"step 3","input":[1]}}`,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{
+		"fromStep": map[string]any{
+			"stepId": "step 3",
+			"input":  []any{float64(1)},
+		},
+	}, gotBody)
+}
+
 func TestCommandUsesQueryParamsForGetEndpoint(t *testing.T) {
 	var gotQuery string
 
@@ -179,6 +325,62 @@ func TestCommandUsesQueryParamsForGetEndpoint(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "includeOutput=true", gotQuery)
+}
+
+func TestCommandAcceptsRFC3339TimestampQueryFlags(t *testing.T) {
+	var gotQuery url.Values
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[],"metadata":{},"page":{}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"get-function-runs",
+		"--status", "FAILED",
+		"--from", "2026-07-20T00:00:00-04:00",
+		"--until", "2026-07-20T23:59:59.999999999-04:00",
+		"--time-field", "queuedAt",
+		"--order", "DESC",
+		"--limit", "20",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"FAILED"}, gotQuery["status"])
+	require.Equal(t, "2026-07-20T00:00:00-04:00", gotQuery.Get("from"))
+	require.Equal(t, "2026-07-20T23:59:59.999999999-04:00", gotQuery.Get("until"))
+	require.Equal(t, "queuedAt", gotQuery.Get("timeField"))
+	require.Equal(t, "DESC", gotQuery.Get("order"))
+	require.Equal(t, "20", gotQuery.Get("limit"))
+}
+
+func TestParseTimestamp(t *testing.T) {
+	t.Run("plain RFC 3339", func(t *testing.T) {
+		value, err := parseTimestamp("2026-07-20T00:00:00-04:00")
+
+		require.NoError(t, err)
+		require.Equal(t, "2026-07-20T00:00:00-04:00", value)
+	})
+
+	t.Run("JSON string", func(t *testing.T) {
+		value, err := parseTimestamp(`"2026-07-20T00:00:00-04:00"`)
+
+		require.NoError(t, err)
+		require.Equal(t, "2026-07-20T00:00:00-04:00", value)
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		_, err := parseTimestamp("yesterday")
+
+		require.Error(t, err)
+	})
 }
 
 func TestCommandAcceptsPositionalPathParams(t *testing.T) {
@@ -381,6 +583,55 @@ func TestResolveBaseURLCustomTargetOverridesProd(t *testing.T) {
 	require.Equal(t, "http://localhost:1/api/v2", baseURL)
 }
 
+func TestResolveBaseURLAppliesAPIPortToURLHostWithoutPort(t *testing.T) {
+	var baseURL string
+	cmd := Command()
+	cmd.Commands = []*cli.Command{
+		{
+			Name: "capture",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				var err error
+				baseURL, err = resolveBaseURL(ctx, cmd)
+				return err
+			},
+		},
+	}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", "http://127.0.0.1",
+		"--api-port", "8090",
+		"capture",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "http://127.0.0.1:8090/api/v2", baseURL)
+}
+
+func TestResolveBaseURLDoesNotApplyDefaultPortToURLHost(t *testing.T) {
+	var baseURL string
+	cmd := Command()
+	cmd.Commands = []*cli.Command{
+		{
+			Name: "capture",
+			Action: func(ctx context.Context, cmd *cli.Command) error {
+				var err error
+				baseURL, err = resolveBaseURL(ctx, cmd)
+				return err
+			},
+		},
+	}
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", "https://inngest.example.com",
+		"capture",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "https://inngest.example.com/api/v2", baseURL)
+}
+
 func TestResolveBaseURLAPIPortOverridesProd(t *testing.T) {
 	var baseURL string
 	cmd := Command()
@@ -486,6 +737,11 @@ func TestNormalizeAPIURL(t *testing.T) {
 			expected: "https://inngest.example.com/v2",
 		},
 		{
+			name:     "existing api v2 path is preserved",
+			rawURL:   "https://inngest.example.com/api/v2",
+			expected: "https://inngest.example.com/api/v2",
+		},
+		{
 			name:     "existing api path is completed",
 			rawURL:   "https://inngest.example.com/api",
 			expected: "https://inngest.example.com/api/v2",
@@ -531,6 +787,18 @@ func TestNormalizeAPIHostTarget(t *testing.T) {
 			rawURL:   "http://127.0.0.1:9999",
 			port:     8288,
 			expected: "http://127.0.0.1:9999/api/v2",
+		},
+		{
+			name:     "url host without port uses api port",
+			rawURL:   "http://127.0.0.1",
+			port:     8090,
+			expected: "http://127.0.0.1:8090/api/v2",
+		},
+		{
+			name:     "url host with explicit path and missing port uses api port",
+			rawURL:   "http://127.0.0.1/v2",
+			port:     8090,
+			expected: "http://127.0.0.1:8090/v2",
 		},
 	}
 

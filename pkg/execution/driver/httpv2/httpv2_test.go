@@ -132,10 +132,11 @@ func TestSyncHeaders(t *testing.T) {
 	}
 
 	opts := driver.V2RequestOpts{
-		Fn:         fn,
-		RequestID:  "01ARZ3NDEKTSV4RRFFQ69G5FAV",
-		JobID:      "job-123",
-		SigningKey: []byte("test-signing-key"),
+		Fn:           fn,
+		RequestID:    "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+		GenerationID: 3,
+		JobID:        "job-123",
+		SigningKey:   []byte("test-signing-key"),
 		Metadata: sv2.Metadata{
 			ID: sv2.ID{
 				RunID: runID,
@@ -154,6 +155,7 @@ func TestSyncHeaders(t *testing.T) {
 	require.Contains(t, receivedHeaders.Get("X-Inngest-Signature"), "s=")
 	require.Equal(t, runID.String(), receivedHeaders.Get("X-Run-ID"))
 	require.Equal(t, opts.RequestID, receivedHeaders.Get(headers.HeaderKeyRequestID))
+	require.Equal(t, "3", receivedHeaders.Get(headers.HeaderKeyGenerationID))
 	require.Equal(t, opts.JobID, receivedHeaders.Get(headers.HeaderKeyJobID))
 	// ForceStepPlan not set, so header should be absent
 	require.Empty(t, receivedHeaders.Get(headers.HeaderKeyForceStepPlan))
@@ -243,6 +245,58 @@ func TestSyncNonSDKResponse(t *testing.T) {
 	require.NotNil(t, userErr)
 	require.NoError(t, internalErr)
 	require.Contains(t, userErr.Error(), "didn't receive SDK response")
+
+	// A non-SDK 2xx keeps the raw body untouched — no synthesized error.
+	require.Equal(t, []byte("not an SDK response"), userErr.Raw())
+}
+
+// A non-2xx response without SDK headers (proxy/gateway error, crash before
+// the SDK responded) must carry the synthesized fatal-upstream error as the
+// UserError's raw payload — the executor moves Raw() into
+// DriverResponse.Output, which is what the trace displays.
+func TestSyncNonSDKErrorResponse(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(502)
+		_, _ = w.Write([]byte("Bad Gateway"))
+	}))
+	defer ts.Close()
+
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
+	d := &httpv2{Client: client}
+
+	u, _ := url.Parse(ts.URL)
+	fn := inngest.Function{
+		Driver: inngest.FunctionDriver{
+			URI: u.String(),
+			Metadata: map[string]any{
+				"type": "sync",
+			},
+		},
+	}
+
+	opts := driver.V2RequestOpts{
+		Fn:         fn,
+		SigningKey: []byte("test-key"),
+		Metadata: sv2.Metadata{
+			ID: sv2.ID{
+				RunID: ulid.MustNew(ulid.Now(), rand.Reader),
+			},
+		},
+		URL: u.String(),
+	}
+
+	resp, userErr, internalErr := d.Do(context.Background(), nil, opts)
+	require.Nil(t, resp)
+	require.NotNil(t, userErr)
+	require.NoError(t, internalErr)
+	require.Contains(t, userErr.Error(), "didn't receive SDK response")
+
+	var se sv1.StandardError
+	require.NoError(t, json.Unmarshal(userErr.Raw(), &se))
+	require.Equal(t, sv1.FatalServerErrorName, se.Name)
+	require.Contains(t, se.Message, "HTTP 502")
+	require.Contains(t, se.Stack, "Bad Gateway")
 }
 
 func TestSyncRequestErrors(t *testing.T) {
@@ -582,30 +636,38 @@ type mockStateLoader struct {
 	err    error
 }
 
-func (m *mockStateLoader) LoadMetadata(ctx context.Context, id sv2.ID) (sv2.Metadata, error) {
+func (m *mockStateLoader) LoadMetadata(ctx context.Context, id sv2.ID, _ ...sv2.LoadMetadataOption) (sv2.Metadata, error) {
 	return sv2.Metadata{}, nil
 }
+
 func (m *mockStateLoader) LoadEvents(ctx context.Context, id sv2.ID) ([]json.RawMessage, error) {
 	return m.events, m.err
 }
+
 func (m *mockStateLoader) LoadSteps(ctx context.Context, id sv2.ID) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStepInputs(ctx context.Context, id sv2.ID) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStepsWithIDs(ctx context.Context, id sv2.ID, stepIDs []string) (map[string]json.RawMessage, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadStack(ctx context.Context, id sv2.ID) ([]string, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadState(ctx context.Context, id sv2.ID) (sv2.State, error) {
 	return sv2.State{}, nil
 }
+
 func (m *mockStateLoader) LoadDefers(ctx context.Context, id sv2.ID) (map[string]sv2.Defer, error) {
 	return nil, nil
 }
+
 func (m *mockStateLoader) LoadDefersMeta(ctx context.Context, id sv2.ID) (map[string]sv2.DeferMeta, error) {
 	return nil, nil
 }

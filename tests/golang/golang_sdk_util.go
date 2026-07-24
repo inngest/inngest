@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -206,5 +208,36 @@ func (r *RunID) Wait(t require.TestingT) string {
 	case <-time.After(20 * time.Second):
 		require.Fail(t, "timed out after 20s waiting for run ID")
 		return ""
+	}
+}
+
+// goroutineT is a require.TestingT that is safe to use from goroutines spawned
+// during a test.  require.* and helpers like WaitForRunStatus call FailNow,
+// which testing.T only permits from the test goroutine.  goroutineT records
+// failures and surfaces them on t via check once the goroutines have finished.
+type goroutineT struct {
+	mu   sync.Mutex
+	msgs []string
+}
+
+func (g *goroutineT) Errorf(format string, args ...any) {
+	g.mu.Lock()
+	g.msgs = append(g.msgs, fmt.Sprintf(format, args...))
+	g.mu.Unlock()
+}
+
+func (g *goroutineT) FailNow() {
+	// stop only this goroutine; the deferred wg.Done still runs.
+	runtime.Goexit()
+}
+
+// check reports recorded failures on t.  call it from the test goroutine after
+// the spawned goroutines finish (e.g. after wg.Wait).
+func (g *goroutineT) check(t *testing.T) {
+	t.Helper()
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for _, m := range g.msgs {
+		t.Error(m)
 	}
 }

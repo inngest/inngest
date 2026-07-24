@@ -22,6 +22,7 @@ import (
 	openapiv2 "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/api"
+	"github.com/inngest/inngest/pkg/api/tel"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/genproto/googleapis/api/annotations"
@@ -42,6 +43,11 @@ var pathParamPattern = regexp.MustCompile(`\{([^}=]+)(=[^}]*)?}`)
 var hiddenEndpointMethods = map[string]struct{}{
 	"CreatePartnerAccount": {},
 	"FetchPartnerAccounts": {},
+	"ListFunctionRuns":     {},
+}
+
+var endpointCommandNames = map[string]string{
+	"ListRuns": "get-function-runs",
 }
 
 type endpoint struct {
@@ -58,14 +64,29 @@ type endpoint struct {
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:      "api",
-		Usage:     "Call Inngest REST API v2 endpoints",
-		UsageText: "inngest alpha api [target/auth flags] <endpoint> [endpoint flags]",
+		Usage:     "Call Inngest REST API v2 endpoints (beta)",
+		UsageText: "inngest api [target/auth flags] <endpoint> [endpoint flags]",
 		Description: strings.Join([]string{
+			"Beta: this command is under active development and may change.",
 			"By default, the command targets the local dev server.",
 			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom API server.",
+			"Authentication: https://api-docs.inngest.com/authentication",
 		}, "\n"),
 		Flags:    commonFlags(),
 		Commands: endpointCommands(),
+	}
+}
+
+func MovedCommand() *cli.Command {
+	return &cli.Command{
+		Name:        "api",
+		Usage:       "Moved to inngest api",
+		UsageText:   "inngest alpha api",
+		Description: "The alpha api command has moved. Use `inngest api` instead.",
+		Action: func(ctx context.Context, cmd *cli.Command) error {
+			_, err := fmt.Fprintln(cmd.Root().Writer, "The alpha api command has moved. Use `inngest api` instead.")
+			return err
+		},
 	}
 }
 
@@ -82,12 +103,29 @@ func endpointCommands() []*cli.Command {
 			Flags:       endpointFlags(ep),
 			Arguments:   endpointArguments(ep),
 			Action: func(ctx context.Context, cmd *cli.Command) error {
+				tel.SendCommandExecutedEvent(ctx, "inngest api", commandTelemetryContext(cmd, ep))
 				return callEndpoint(ctx, cmd, ep)
 			},
 		})
 	}
 
 	return cmds
+}
+
+func commandTelemetryContext(cmd *cli.Command, ep endpoint) map[string]any {
+	flags := []string{}
+	for _, flag := range append(commonFlags(), endpointFlags(ep)...) {
+		name := flag.Names()[0]
+		if cmd.IsSet(name) {
+			flags = append(flags, name)
+		}
+	}
+	slices.Sort(flags)
+
+	return map[string]any{
+		"endpoint": ep.name,
+		"flags":    flags,
+	}
 }
 
 func commonFlags() []cli.Flag {
@@ -105,7 +143,7 @@ func commonFlags() []cli.Flag {
 		&cli.StringFlag{
 			Category: "Target",
 			Name:     "api-host",
-			Usage:    "Custom API host or origin",
+			Usage:    "Custom API host or origin; may include /api/v2 or /v2",
 		},
 		&cli.IntFlag{
 			Category:    "Target",
@@ -150,7 +188,7 @@ func endpointUsageText(ep endpoint) string {
 	for _, name := range ep.pathParams {
 		fmt.Fprintf(&positional, " [<%s>]", kebab(name))
 	}
-	return fmt.Sprintf("inngest alpha api [target/auth flags] %s%s [endpoint flags]", ep.name, positional.String())
+	return fmt.Sprintf("inngest api [target/auth flags] %s%s [endpoint flags]", ep.name, positional.String())
 }
 
 func endpointArguments(ep endpoint) []cli.Argument {
@@ -197,7 +235,22 @@ func endpointFlags(ep endpoint) []cli.Flag {
 			category = "Body"
 		}
 
+		if ep.name == "rerun" && flagName == "from-step" {
+			flags = append(flags, &cli.StringFlag{
+				Category: category,
+				Name:     flagName,
+				Usage:    "Step name to rerun from.",
+			})
+			continue
+		}
 		flags = append(flags, flagForField(category, flagName, field))
+	}
+	if ep.name == "rerun" {
+		flags = append(flags, &cli.StringFlag{
+			Category: "Body",
+			Name:     "input",
+			Usage:    "Optional replacement step input as a JSON array.",
+		})
 	}
 
 	return flags
@@ -297,13 +350,15 @@ func endpointDescription(ep endpoint) string {
 	lines = append(lines,
 		fmt.Sprintf("Endpoint: %s %s", ep.method, ep.path),
 		"",
-		"Target, auth, and output flags are inherited from `inngest alpha api`:",
+		"Target, auth, and output flags are inherited from `inngest api`:",
 		"  --prod                  Target Inngest Cloud Production",
-		"  --api-host, --api-port  Target a custom API server",
+		"  --api-host, --api-port  Target a custom API server; host may include /api/v2 or /v2",
 		"  --api-key               API key, or INNGEST_API_KEY",
 		"  --signing-key           Signing key, or INNGEST_SIGNING_KEY",
 		"  --env                   Environment name, or INNGEST_ENV",
 		"  --raw                   Print the response body without formatting",
+		"",
+		"Authentication: https://api-docs.inngest.com/authentication",
 	)
 
 	return strings.Join(lines, "\n")
@@ -324,6 +379,10 @@ func methodHelp(method protoreflect.MethodDescriptor) (string, string) {
 }
 
 func endpointCommandName(methodName string) string {
+	if name, ok := endpointCommandNames[methodName]; ok {
+		return name
+	}
+
 	name := kebab(methodName)
 	for _, prefix := range []string{"fetch-", "list-"} {
 		if strings.HasPrefix(name, prefix) {
@@ -494,7 +553,7 @@ func resolveBaseURL(ctx context.Context, cmd *cli.Command) (string, error) {
 
 	apiPort := localconfig.GetIntValue(cmd, "api-port", 0)
 	if apiHost := localconfig.GetValue(cmd, "api-host", ""); apiHost != "" {
-		if apiPort == 0 {
+		if apiPort == 0 && !looksLikeURL(apiHost) {
 			apiPort = api.DefaultAPIPort
 		}
 		return normalizeAPIHostTarget(apiHost, apiPort)
@@ -513,7 +572,7 @@ func resolveBaseURL(ctx context.Context, cmd *cli.Command) (string, error) {
 
 func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
 	if looksLikeURL(rawHost) {
-		return normalizeAPIURL(rawHost)
+		return normalizeAPIURLWithPort(rawHost, port)
 	}
 
 	host := rawHost
@@ -532,6 +591,21 @@ func normalizeAPIHostTarget(rawHost string, port int) (string, error) {
 	}
 
 	return normalizeAPIURL(fmt.Sprintf("%s://%s", scheme, rawHost))
+}
+
+func normalizeAPIURLWithPort(rawURL string, port int) (string, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", fmt.Errorf("api host must include scheme and host")
+	}
+	if port != 0 && parsed.Port() == "" {
+		parsed.Host = net.JoinHostPort(parsed.Hostname(), strconv.Itoa(port))
+	}
+
+	return normalizeAPIURL(parsed.String())
 }
 
 func normalizeAPIURL(rawURL string) (string, error) {
@@ -637,6 +711,11 @@ func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	if ep.name == "rerun" {
+		if err := addRerunFromStepBody(cmd, body); err != nil {
+			return nil, err
+		}
+	}
 
 	fields := ep.input.Fields()
 	for i := 0; i < fields.Len(); i++ {
@@ -647,6 +726,9 @@ func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
 		}
 
 		flagName := kebab(name)
+		if ep.name == "rerun" && flagName == "from-step" {
+			continue
+		}
 		if !cmd.IsSet(flagName) {
 			continue
 		}
@@ -663,6 +745,30 @@ func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
 	}
 
 	return body, nil
+}
+
+func addRerunFromStepBody(cmd *cli.Command, body map[string]any) error {
+	if !cmd.IsSet("from-step") {
+		if cmd.IsSet("input") {
+			return errors.New("--input requires --from-step")
+		}
+		return nil
+	}
+
+	fromStep := map[string]any{"stepId": cmd.String("from-step")}
+
+	if cmd.IsSet("input") {
+		var input []any
+		if err := json.Unmarshal([]byte(cmd.String("input")), &input); err != nil {
+			return fmt.Errorf("--input must be a valid JSON array: %w", err)
+		}
+		if input == nil {
+			return errors.New("--input must be a valid JSON array")
+		}
+		fromStep["input"] = input
+	}
+	body["fromStep"] = fromStep
+	return nil
 }
 
 func rawBody(cmd *cli.Command) (map[string]any, error) {
@@ -765,6 +871,14 @@ func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName s
 	case protoreflect.EnumKind:
 		return cmd.String(flagName), nil
 	case protoreflect.MessageKind, protoreflect.GroupKind:
+		if field.Message().FullName() == "google.protobuf.Timestamp" {
+			value, err := parseTimestamp(cmd.String(flagName))
+			if err != nil {
+				return nil, fmt.Errorf("--%s must be an RFC 3339 timestamp: %w", flagName, err)
+			}
+			return value, nil
+		}
+
 		var value any
 		if err := json.Unmarshal([]byte(cmd.String(flagName)), &value); err != nil {
 			return nil, fmt.Errorf("--%s must be valid JSON: %w", flagName, err)
@@ -775,6 +889,20 @@ func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName s
 	default:
 		return nil, fmt.Errorf("unsupported field type for --%s", flagName)
 	}
+}
+
+func parseTimestamp(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if strings.HasPrefix(trimmed, `"`) {
+		if err := json.Unmarshal([]byte(trimmed), &value); err != nil {
+			return "", err
+		}
+	}
+
+	if _, err := time.Parse(time.RFC3339Nano, value); err != nil {
+		return "", err
+	}
+	return value, nil
 }
 
 func authToken(cmd *cli.Command) (string, error) {

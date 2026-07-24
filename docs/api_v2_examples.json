@@ -28,6 +28,74 @@
       }
     }
   },
+  "/apps/{appId}": {
+    "get": {
+      "200": {
+        "data": {
+          "createdAt": "2024-01-10T09:15:00Z",
+          "functionCount": 2,
+          "id": "my-app",
+          "isArchived": false,
+          "latestSync": {
+            "sdkLanguage": "typescript",
+            "sdkVersion": "3.22.0",
+            "url": "https://example.com/api/inngest"
+          },
+          "method": "SERVE",
+          "name": "my-app"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetchedAt": "2024-01-20T14:22:33Z"
+        }
+      }
+    }
+  },
+  "/apps/{appId}/functions": {
+    "get": {
+      "200": {
+        "data": [
+          {
+            "app": {
+              "id": "production-app"
+            },
+            "configuration": {
+              "retries": {
+                "isDefault": true,
+                "value": 3
+              }
+            },
+            "id": "send-welcome-email",
+            "isArchived": false,
+            "isPaused": false,
+            "name": "Send welcome email",
+            "slug": "send-welcome-email",
+            "triggers": [
+              {
+                "type": "EVENT",
+                "value": "user.created"
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "fetchedAt": "2026-06-10T12:00:00Z"
+        },
+        "page": {
+          "cursor": null,
+          "hasMore": false,
+          "limit": 20
+        }
+      }
+    }
+  },
+  "/apps/{appId}/functions/{functionId}": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /apps/{appId}/functions/{functionId} 200"
+      }
+    }
+  },
   "/apps/{appId}/functions/{functionId}/invoke": {
     "post": {
       "201": {
@@ -281,6 +349,13 @@
       },
       "500": {
         "// TODO": "Add example data for patch /envs/{id} 500"
+      }
+    }
+  },
+  "/events/{eventId}/runs": {
+    "get": {
+      "200": {
+        "// TODO": "Add example data for get /events/{eventId}/runs 200"
       }
     }
   },

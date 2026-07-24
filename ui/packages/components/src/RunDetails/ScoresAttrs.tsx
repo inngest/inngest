@@ -1,11 +1,15 @@
 import { TimeElement } from '../DetailsCard/Element';
-
-const SCORE_KIND_PREFIX = 'inngest.score.';
+import { KindInngestScore } from '../generated';
 
 type ScoreMetadata = {
   kind: string;
   updatedAt: string;
-  values: Record<string, unknown>;
+  // Loose structural supertype of every SpanMetadata arm so both the V3 and V4
+  // Trace types can be passed in. `object` (not Record<string, unknown>) is
+  // required because generated interface value types (e.g. AIMetadata) lack an
+  // implicit index signature; this type only filters by kind and reads via
+  // Object.entries, so the looser bound is sufficient.
+  values: object;
 };
 
 type ScoreRow = {
@@ -21,25 +25,32 @@ type ScoreTrace = {
 
 export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
   // Run views need child spans because scores attach where they are emitted.
-  const metadata = trace?.metadata?.filter((md) => md.kind.startsWith(SCORE_KIND_PREFIX)) ?? [];
+  const metadata = trace?.metadata?.filter((md) => md.kind === KindInngestScore) ?? [];
   const childMetadata = trace?.childrenSpans?.flatMap((child) => collectScoreMetadata(child)) ?? [];
 
   return [...metadata, ...childMetadata];
 }
 
-function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
+// Trim floating-point noise and excess precision from non-integer scores;
+// integers and booleans render as-is.
+function formatScoreValue(value: number | boolean): string {
+  if (typeof value === 'number' && !Number.isInteger(value)) {
+    return String(Number(value.toPrecision(4)));
+  }
+  return String(value);
+}
+
+export function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   return metadata
-    .flatMap((md) => {
-      const name = md.kind.slice(SCORE_KIND_PREFIX.length);
-      if (!name) {
+    .flatMap((md) =>
+      Object.entries(md.values).flatMap(([name, raw]) => {
+        const value = (raw as { value?: unknown } | null)?.value;
+        if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
+          return [{ name, value, updatedAt: md.updatedAt }];
+        }
         return [];
-      }
-      const value = md.values.value;
-      if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
-        return [{ name, value, updatedAt: md.updatedAt }];
-      }
-      return [];
-    })
+      })
+    )
     .sort((a, b) => a.name.localeCompare(b.name) || a.updatedAt.localeCompare(b.updatedAt));
 }
 
@@ -56,7 +67,7 @@ export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
 
   return (
     <div className="relative h-full overflow-y-auto overflow-x-hidden">
-      <div className="text-muted bg-canvasSubtle sticky top-0 grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 px-4 py-2 text-sm font-medium leading-tight">
+      <div className="text-muted bg-canvasSubtle sticky top-0 grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 px-4 py-2 text-xs font-medium leading-tight">
         <div>Score</div>
         <div>Value</div>
         <div>Updated at</div>
@@ -67,7 +78,7 @@ export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
           className="border-muted grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 border-b px-4 py-3 text-sm last:border-b-0"
         >
           <div className="text-basis min-w-0 font-medium [overflow-wrap:anywhere]">{row.name}</div>
-          <div className="text-basis font-mono">{String(row.value)}</div>
+          <div className="text-basis font-mono">{formatScoreValue(row.value)}</div>
           <TimeElement date={new Date(row.updatedAt)} />
         </div>
       ))}

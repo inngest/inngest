@@ -14,6 +14,12 @@ export default defineConfig({
       ),
     },
   },
+  optimizeDeps: {
+    include: [
+      "use-sync-external-store/shim/index.js",
+      "use-sync-external-store/shim/with-selector.js",
+    ],
+  },
   ssr: {
     noExternal: ["@headlessui/tailwindcss"],
     external: ["next"],

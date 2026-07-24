@@ -14,7 +14,7 @@ func alpha() *cli.Command {
 		Hidden: true,
 		Usage:  "experimental CLI commands",
 		Commands: []*cli.Command{
-			apiv2cli.Command(),
+			apiv2cli.MovedCommand(),
 			conformance.Command(),
 			debug.Command(),
 			doctor.Command(),

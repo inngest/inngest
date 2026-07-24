@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -18,7 +19,7 @@ const (
 // Enqueue adds an item to the queue to be processed at the given time.
 // TODO: Lift this function and the queue interface to a higher level, so that it's disconnected from the
 // concrete Redis implementation.
-func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
+func (q *queueProducer) Enqueue(ctx context.Context, item Item, at time.Time, opts EnqueueOpts) error {
 	l := logger.StdlibLogger(ctx)
 
 	// propagate
@@ -32,10 +33,8 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 	}
 
 	if item.QueueName == nil {
-		// Check if we have a kind mapping.
-		if name, ok := q.queueKindMapping[item.Kind]; ok {
-			item.QueueName = &name
-		}
+		// Check if we have a kind => queuename mapping.
+		item.QueueName = q.defaultQueueNameForItemKind(item.Kind)
 	}
 
 	qi := QueueItem{
@@ -76,7 +75,9 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 		qi.AtMS -= factor
 	}
 
+	ctx, span := q.conditionalTracer.NewSpan(ctx, "queue.Enqueue.select_shard", TraceScopeFromQueueItem(qi, opts.ForceQueueShardName))
 	shard, err := q.selectShard(ctx, opts.ForceQueueShardName, qi)
+	span.End()
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func (q *queueProcessor) Enqueue(ctx context.Context, item Item, at time.Time, o
 			ScheduledAt:  qi.AtMS,
 		},
 	}, promoteAt, EnqueueOpts{})
-	if err != nil && err != ErrQueueItemExists {
+	if err != nil && !errors.Is(err, ErrQueueItemExists) {
 		// This is best effort, and shouldn't fail the OG enqueue.
 		l.ReportError(err, "error scheduling promotion job")
 	}

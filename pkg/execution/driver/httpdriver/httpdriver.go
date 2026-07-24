@@ -97,6 +97,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		WorkflowID:     s.ID.FunctionID,
 		RunID:          s.ID.RunID,
 		RequestID:      driver.RequestIDFromContext(ctx),
+		GenerationID:   queue.GenerationIDFromContext(ctx),
 		JobID:          driver.JobIDFromContext(ctx),
 		SigningKey:     e.localSigningKey,
 		URL:            *uri,
@@ -122,6 +123,8 @@ type Request struct {
 	RunID ulid.ULID
 	// RequestID is the unique per-outbound SDK request ID.
 	RequestID string
+	// GenerationID is the monotonic dispatch generation for this SDK request.
+	GenerationID int
 	// JobID is the stable queue item ID for this SDK request.
 	JobID string
 
@@ -266,6 +269,15 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		// - The function fails or errors (these are not *yet* opcodes, but should be).
 		err = fmt.Errorf("invalid status code: %d", resp.StatusCode)
 		dr.SetError(err)
+		// Synthesize a clear user-facing error only when the response did not
+		// come from an SDK (per its headers): a proxy/gateway 5xx, crash, or
+		// timeout before the SDK responded. SDK responses are left untouched —
+		// SDKs return real function/step errors as non-2xx with a serialized
+		// error body. Only Output is changed; dr.Err (set above) is left as-is
+		// so retry behavior is unchanged.
+		if !resp.IsSDK {
+			dr.Output = state.FatalUpstreamError(resp.StatusCode, resp.Body, resp.Header.Get("Content-Type"))
+		}
 	}
 	if resp.NoRetry {
 		// Ensure we return a NonRetriableError to indicate that
@@ -331,6 +343,9 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	req.Header.Add("X-Run-ID", r.RunID.String())
 	if r.RequestID != "" {
 		req.Header.Add(headerspkg.HeaderKeyRequestID, r.RequestID)
+	}
+	if r.GenerationID > 0 {
+		req.Header.Add(headerspkg.HeaderKeyGenerationID, strconv.Itoa(r.GenerationID))
 	}
 	if r.JobID != "" {
 		req.Header.Add(headerspkg.HeaderKeyJobID, r.JobID)

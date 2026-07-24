@@ -326,7 +326,7 @@ func (q *queueProcessor) NormalizeItem(
 
 	cleanupItem := func() {
 		// If event for item cannot be found, remove it from the backlog
-		err := shard.Dequeue(ctx, item)
+		err := q.Dequeue(ctx, shard.Name(), item)
 		if err != nil {
 			log.Warn("could not dequeue queue item with missing event", "err", err)
 		}

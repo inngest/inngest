@@ -4,7 +4,6 @@ import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicke
 
 import NotFound from '@/components/Error/NotFound';
 import { ExperimentDetailPage } from '@/components/Experiments/ExperimentDetailPage';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import {
   getExperimentUrlState,
   hasExperimentTimeRangeSearch,
@@ -25,7 +24,6 @@ function ExperimentDetailRoute() {
   const { functionSlug, experimentName } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const experimentsEnabled = useBooleanFlag('experimentation-steps');
   const urlState = useMemo(() => getExperimentUrlState(search), [search]);
   const hasTimeRangeSearch = hasExperimentTimeRangeSearch(search);
 
@@ -54,10 +52,6 @@ function ExperimentDetailRoute() {
     functionSlug: decodedFunctionSlug,
   });
   const fn = data?.workspace.workflow;
-
-  if (experimentsEnabled.isReady && !experimentsEnabled.value) {
-    return <NotFound />;
-  }
 
   if (!fetching && !fn) {
     return <NotFound />;

@@ -195,6 +195,13 @@ type CapacityAcquireResponse struct {
 	// FairnessReduction specifies the capacity that was reserved for fairness reasons.
 	FairnessReduction int
 
+	// Usage contains current usage for constraints evaluated by Acquire.
+	Usage []ConstraintUsage
+
+	// OperationIdempotencyHit is true when this response was replayed from the
+	// operation idempotency cache instead of applying a new state mutation.
+	OperationIdempotencyHit bool
+
 	RetryAfter time.Time
 
 	internalDebugState acquireScriptResponse
@@ -234,6 +241,18 @@ type CapacityExtendLeaseResponse struct {
 	// LeaseID is set to the next lease ID. If this is unset, the lease may have already expired.
 	LeaseID *ulid.ULID
 
+	AccountID  uuid.UUID
+	EnvID      uuid.UUID
+	AppID      uuid.UUID
+	FunctionID uuid.UUID
+
+	// Usage contains current usage for constraints associated with the lease.
+	Usage []ConstraintUsage
+
+	// OperationIdempotencyHit is true when this response was replayed from the
+	// operation idempotency cache instead of applying a new state mutation.
+	OperationIdempotencyHit bool
+
 	internalDebugState extendLeaseScriptResponse
 }
 
@@ -261,10 +280,19 @@ type CapacityReleaseRequest struct {
 type CapacityReleaseResponse struct {
 	AccountID  uuid.UUID
 	EnvID      uuid.UUID
+	AppID      uuid.UUID
 	FunctionID uuid.UUID
 
 	// CreationSource returns where this lease was created
 	CreationSource LeaseSource
+
+	// Usage contains current usage for constraints associated with the lease
+	// after the release mutation has been applied.
+	Usage []ConstraintUsage
+
+	// OperationIdempotencyHit is true when this response was replayed from the
+	// operation idempotency cache instead of applying a new state mutation.
+	OperationIdempotencyHit bool
 
 	internalDebugState releaseScriptResponse
 }

@@ -19,6 +19,15 @@ const (
 	DefaultErrorName        = "Error"
 	DefaultErrorMessage     = "Function execution error"
 	DefaultStepErrorMessage = "Step execution error"
+
+	// FatalServerErrorName is the error name shown for a transport-level non-2xx
+	// response that did not carry a structured Inngest error (see
+	// FatalUpstreamError).
+	FatalServerErrorName = "Server returned a fatal error"
+
+	// maxFatalUpstreamBodyBytes caps how much of an upstream response body we
+	// preserve in the synthesized error's stack, to avoid bloating span storage.
+	maxFatalUpstreamBodyBytes = 8192
 )
 
 type Retryable interface {
@@ -532,6 +541,53 @@ func (s StandardError) Serialize(key string) string {
 	}
 
 	return string(b)
+}
+
+// FatalUpstreamError constructs the serialized error output for a non-2xx
+// response that did not come from an SDK (per its headers) — e.g. a
+// proxy/gateway 5xx, or the app crashing or timing out before the SDK returned
+// a step response. In these cases the executor has a failed attempt but no
+// step output to attribute it to, which previously surfaced as an empty error
+// in the trace.
+//
+// The raw upstream body, if any, is preserved (truncated, content-type
+// labelled) in the error's stack so the user can see which layer failed.
+// Callers should set only DriverResponse.Output with this value and leave Err
+// untouched, so retry semantics are unchanged.
+func FatalUpstreamError(statusCode int, body []byte, contentType string) json.RawMessage {
+	// Keep the message to a single concise line — it renders in the truncated
+	// short-error row. The fuller explanation and the raw upstream body live in
+	// the stack, which renders in a full details block.
+	message := fmt.Sprintf("Your server returned HTTP %d before the SDK responded.", statusCode)
+
+	detail := "No step output was produced before the request failed — this can " +
+		"mean a proxy or load balancer in front of your app returned an error, " +
+		"or your app was unable to respond."
+
+	stack := detail
+	if len(body) > 0 {
+		b := body
+		truncated := ""
+		if len(b) > maxFatalUpstreamBodyBytes {
+			b = b[:maxFatalUpstreamBodyBytes]
+			truncated = "\n… (truncated)"
+		}
+		ct := contentType
+		if ct == "" {
+			ct = "unknown content-type"
+		}
+		stack = fmt.Sprintf("%s\n\nUpstream response (%s):\n%s%s", detail, ct, string(b), truncated)
+	}
+
+	se := StandardError{
+		Error:   message,
+		Name:    FatalServerErrorName,
+		Message: message,
+		Stack:   stack,
+	}
+	// Marshal of a string-only struct cannot fail.
+	out, _ := json.Marshal(se)
+	return out
 }
 
 func (r *DriverResponse) StandardError() StandardError {

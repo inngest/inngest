@@ -82,7 +82,10 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 		}
 
 		if s.ScopeName == consts.OtelScopeFunction {
-			b.root = s
+			// Function rows can share a span ID. Pick the highest status.
+			if b.root == nil || s.FunctionStatus().ToCode() >= b.root.FunctionStatus().ToCode() {
+				b.root = s
+			}
 		}
 
 		if s.ScopeName == consts.OtelScopeTrigger {
@@ -98,6 +101,11 @@ func NewRunTree(opts RunTreeOpts) (*runTree, error) {
 				b.groups[*groupID] = append(b.groups[*groupID], s)
 			}
 		}
+	}
+
+	// Child lookups must target the selected root.
+	if b.root != nil {
+		b.spans[b.root.SpanID] = b.root
 	}
 
 	// loop through again to construct parent/child relationship

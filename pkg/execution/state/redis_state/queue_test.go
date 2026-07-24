@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -610,7 +611,13 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It enqueues an item only once", func(t *testing.T) {
-		i := osqueue.QueueItem{ID: "once"}
+		runID := ulid.MustNew(ulid.Timestamp(start), rand.Reader)
+		i := osqueue.QueueItem{
+			ID: "once",
+			Data: osqueue.Item{
+				Identifier: state.Identifier{RunID: runID},
+			},
+		}
 
 		item, err := shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
 
@@ -620,17 +627,21 @@ func TestQueueEnqueueItemIdempotency(t *testing.T) {
 		found := getQueueItem(t, r, item.ID)
 		require.Equal(t, item, found)
 
-		// Ensure we can't enqueue again.
 		_, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
-		require.Equal(t, osqueue.ErrQueueItemExists, err)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+		var existsErr osqueue.QueueItemExistsError
+		require.True(t, errors.As(err, &existsErr))
+		require.NotNil(t, existsErr.RunID)
+		require.Equal(t, runID, *existsErr.RunID)
 
-		// Dequeue
 		err = shard.Dequeue(ctx, item)
 		require.NoError(t, err)
 
-		// Ensure we can't enqueue even after dequeue.
 		_, err = shard.EnqueueItem(ctx, i, start, osqueue.EnqueueOpts{})
-		require.Equal(t, osqueue.ErrQueueItemExists, err)
+		require.ErrorIs(t, err, osqueue.ErrQueueItemExists)
+		var tombstoneErr osqueue.QueueItemExistsError
+		require.True(t, errors.As(err, &tombstoneErr))
+		require.Nil(t, tombstoneErr.RunID)
 
 		// Wait for the idempotency TTL to expire
 		r.FastForward(dur)
@@ -1271,6 +1282,44 @@ func TestQueuePartitionPeek(t *testing.T) {
 		assert.Contains(t, apIds, idB.String())
 		assert.Contains(t, apIds, idC.String())
 	})
+
+	t.Run("Cleans up missing partitions in global queue", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		_, shard := newQueue(
+			t, rc,
+			osqueue.WithPartitionPriorityFinder(func(_ context.Context, _ osqueue.QueuePartition) uint {
+				return osqueue.PriorityDefault
+			}),
+		)
+		enqueue(shard, now)
+
+		// Create inconsistency: leave the stale global partition pointer but
+		// drop the backing partition metadata.
+		err = rc.Do(ctx, rc.B().Hdel().Key(shard.Client().kg.PartitionItem()).Field(idA.String()).Build()).Error()
+		require.NoError(t, err)
+
+		items, err := shard.PartitionPeek(ctx, true, time.Now().Add(time.Hour), osqueue.PartitionPeekMax)
+		require.NoError(t, err)
+		require.Len(t, items, 2)
+		require.EqualValues(t, []*osqueue.QueuePartition{
+			{ID: idB.String(), AccountID: accountId, FunctionID: &idB},
+			{ID: idC.String(), AccountID: accountId, FunctionID: &idC},
+		}, items)
+
+		globalPartitionIDs, err := r.ZMembers(shard.Client().kg.GlobalPartitionIndex())
+		require.NoError(t, err)
+		assert.Equal(t, 2, len(globalPartitionIDs))
+		assert.NotContains(t, globalPartitionIDs, idA.String())
+		assert.Contains(t, globalPartitionIDs, idB.String())
+		assert.Contains(t, globalPartitionIDs, idC.String())
+	})
 }
 
 func TestQueuePartitionRequeue(t *testing.T) {
@@ -1866,7 +1915,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 			require.NoError(t, err)
 
 			err = shard.RequeueByJobID(ctx, "no bruv", time.Now().Add(5*time.Second))
-			require.NotNil(t, err)
+			require.ErrorIs(t, err, osqueue.ErrQueueItemNotFound)
 		})
 
 		t.Run("It fails if the job is leased", func(t *testing.T) {
