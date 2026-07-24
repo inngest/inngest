@@ -17,6 +17,7 @@ import { ArchivedAppBanner } from '@/components/Apps/ArchivedAppBanner';
 import { ArchivedFuncBanner } from '@/components/Functions/ArchivedFuncBanner';
 import NewReplayModal from '@/components/Replay/NewReplayModal';
 import { ActionsMenu } from '@/components/Functions/ActionMenu';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 
 export const Route = createFileRoute('/_authed/env/$envSlug/functions/$slug')({
   component: FunctionComponent,
@@ -33,6 +34,13 @@ function FunctionComponent() {
   const [{ data, error, fetching }] = useFunction({ functionSlug });
   const [, invokeFunction] = useMutation(InvokeFunctionOnboardingDocument);
   const env = useEnvironment();
+
+  // TEMPORARY: defaults true until there's a LaunchDarkly rule for this flag.
+  // `isReady` is false whenever LD doesn't have the flag configured yet —
+  // exactly the case this override is for — so gating on `isReady` too would
+  // cancel the override out. Once a real LD rule exists, revert both the
+  // default above and the tab's condition below back to `isReady && value`.
+  const isAIOverviewEnabled = useBooleanFlag('ai-overview-dashboard', true);
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -141,6 +149,16 @@ function FunctionComponent() {
             href: `/env/${envSlug}/functions/${encodeURIComponent(slug)}`,
             exactRouteMatch: true,
           },
+          ...(isAIOverviewEnabled.value
+            ? [
+                {
+                  children: 'AI',
+                  href: `/env/${envSlug}/functions/${encodeURIComponent(
+                    slug,
+                  )}/ai`,
+                },
+              ]
+            : []),
           {
             children: 'Runs',
             href: `/env/${envSlug}/functions/${encodeURIComponent(slug)}/runs`,

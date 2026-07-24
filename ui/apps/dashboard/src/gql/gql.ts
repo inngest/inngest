@@ -14,6 +14,7 @@ import type { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-
  * Learn more about it here: https://the-guild.dev/graphql/codegen/plugins/presets/preset-client#reducing-bundle-size
  */
 type Documents = {
+    "\n  query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": typeof types.AiOverviewFunctionLookupDocument,
     "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n": typeof types.CreateApiKeyDocument,
     "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": typeof types.DeleteApiKeyDocument,
     "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": typeof types.UpdateApiKeyDocument,
@@ -89,6 +90,7 @@ type Documents = {
     "\n  mutation RemoveInsightsQuery($id: ULID!) {\n    removeInsightsQuery(id: $id) {\n      ids\n    }\n  }\n": typeof types.RemoveInsightsQueryDocument,
     "\n  mutation ShareInsightsQuery($id: ULID!) {\n    shareInsightsQuery(id: $id) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n": typeof types.ShareInsightsQueryDocument,
     "\n  mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {\n    updateInsightsQuery(id: $id, input: $input) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n": typeof types.UpdateInsightsQueryDocument,
+    "\n  query InsightsMetric(\n    $workspaceID: ID!\n    $functionIDs: [ID!]\n    $key: String!\n    $range: TimeRangeInput!\n    $limit: Int\n  ) {\n    insightsMetric(\n      workspaceID: $workspaceID\n      functionIDs: $functionIDs\n      key: $key\n      range: $range\n      limit: $limit\n    ) {\n      query\n      columns {\n        name\n      }\n      rows {\n        values\n      }\n    }\n  }\n": typeof types.InsightsMetricDocument,
     "\n  mutation CreateVercelApp($input: CreateVercelAppInput!) {\n    createVercelApp(input: $input) {\n      success\n    }\n  }\n": typeof types.CreateVercelAppDocument,
     "\n  mutation UpdateVercelApp($input: UpdateVercelAppInput!) {\n    updateVercelApp(input: $input) {\n      success\n    }\n  }\n": typeof types.UpdateVercelAppDocument,
     "\n  mutation RemoveVercelApp($input: RemoveVercelAppInput!) {\n    removeVercelApp(input: $input) {\n      success\n    }\n  }\n": typeof types.RemoveVercelAppDocument,
@@ -173,6 +175,7 @@ type Documents = {
     "\n  query GetAccountSupportInfo {\n    account {\n      id\n      plan {\n        id\n        name\n        amount\n        features\n      }\n    }\n  }\n": typeof types.GetAccountSupportInfoDocument,
 };
 const documents: Documents = {
+    "\n  query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n": types.AiOverviewFunctionLookupDocument,
     "\n  mutation CreateAPIKey($input: CreateAPIKeyInput!) {\n    createAPIKey(input: $input) {\n      plaintextKey\n      apiKey {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n        }\n      }\n    }\n  }\n": types.CreateApiKeyDocument,
     "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": types.DeleteApiKeyDocument,
     "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": types.UpdateApiKeyDocument,
@@ -248,6 +251,7 @@ const documents: Documents = {
     "\n  mutation RemoveInsightsQuery($id: ULID!) {\n    removeInsightsQuery(id: $id) {\n      ids\n    }\n  }\n": types.RemoveInsightsQueryDocument,
     "\n  mutation ShareInsightsQuery($id: ULID!) {\n    shareInsightsQuery(id: $id) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n": types.ShareInsightsQueryDocument,
     "\n  mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {\n    updateInsightsQuery(id: $id, input: $input) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n": types.UpdateInsightsQueryDocument,
+    "\n  query InsightsMetric(\n    $workspaceID: ID!\n    $functionIDs: [ID!]\n    $key: String!\n    $range: TimeRangeInput!\n    $limit: Int\n  ) {\n    insightsMetric(\n      workspaceID: $workspaceID\n      functionIDs: $functionIDs\n      key: $key\n      range: $range\n      limit: $limit\n    ) {\n      query\n      columns {\n        name\n      }\n      rows {\n        values\n      }\n    }\n  }\n": types.InsightsMetricDocument,
     "\n  mutation CreateVercelApp($input: CreateVercelAppInput!) {\n    createVercelApp(input: $input) {\n      success\n    }\n  }\n": types.CreateVercelAppDocument,
     "\n  mutation UpdateVercelApp($input: UpdateVercelAppInput!) {\n    updateVercelApp(input: $input) {\n      success\n    }\n  }\n": types.UpdateVercelAppDocument,
     "\n  mutation RemoveVercelApp($input: RemoveVercelAppInput!) {\n    removeVercelApp(input: $input) {\n      success\n    }\n  }\n": types.RemoveVercelAppDocument,
@@ -346,6 +350,10 @@ const documents: Documents = {
  */
 export function graphql(source: string): unknown;
 
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {\n    envBySlug(slug: $envSlug) {\n      workflows @paginated(perPage: $pageSize, page: $page) {\n        data {\n          id\n          name\n          slug\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
@@ -646,6 +654,10 @@ export function graphql(source: "\n  mutation ShareInsightsQuery($id: ULID!) {\n
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {\n    updateInsightsQuery(id: $id, input: $input) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n"): (typeof documents)["\n  mutation UpdateInsightsQuery($id: ULID!, $input: UpdateInsightsQuery!) {\n    updateInsightsQuery(id: $id, input: $input) {\n      id\n      createdAt\n      creator\n      lastEditor\n      name\n      shared\n      sql\n      updatedAt\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query InsightsMetric(\n    $workspaceID: ID!\n    $functionIDs: [ID!]\n    $key: String!\n    $range: TimeRangeInput!\n    $limit: Int\n  ) {\n    insightsMetric(\n      workspaceID: $workspaceID\n      functionIDs: $functionIDs\n      key: $key\n      range: $range\n      limit: $limit\n    ) {\n      query\n      columns {\n        name\n      }\n      rows {\n        values\n      }\n    }\n  }\n"): (typeof documents)["\n  query InsightsMetric(\n    $workspaceID: ID!\n    $functionIDs: [ID!]\n    $key: String!\n    $range: TimeRangeInput!\n    $limit: Int\n  ) {\n    insightsMetric(\n      workspaceID: $workspaceID\n      functionIDs: $functionIDs\n      key: $key\n      range: $range\n      limit: $limit\n    ) {\n      query\n      columns {\n        name\n      }\n      rows {\n        values\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

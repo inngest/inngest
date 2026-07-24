@@ -229,6 +229,21 @@ const config = {
             transform: 'translateX(100%)',
           },
         },
+        'shimmer-left': {
+          '100%': {
+            transform: 'translateX(-100%)',
+          },
+        },
+        'shimmer-down': {
+          '100%': {
+            transform: 'translateY(100%)',
+          },
+        },
+        'shimmer-up': {
+          '100%': {
+            transform: 'translateY(-100%)',
+          },
+        },
         'shimmer-text': {
           '0%': {
             backgroundPosition: '100% 0',
