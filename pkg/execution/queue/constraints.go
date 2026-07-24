@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -293,6 +294,15 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 		},
 	})
 	if err != nil {
+		if errors.Is(err, constraintapi.ErrAccountNotFound) {
+			metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonAccountMissing.String(), metrics.CounterOpt{
+				PkgName: pkgName,
+			})
+			return &BacklogRefillConstraintCheckResult{
+				ItemsToRefill: nil,
+			}, nil
+		}
+
 		logger.StdlibLogger(ctx).Error("acquiring capacity lease failed", "err", err, "method", "backlogRefillConstraintCheck", "functionID", *shadowPart.FunctionID)
 		metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonConstraintAPIError.String(), metrics.CounterOpt{
 			PkgName: pkgName,
@@ -488,6 +498,13 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		},
 	})
 	if err != nil {
+		if errors.Is(err, constraintapi.ErrAccountNotFound) {
+			metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonAccountMissing.String(), metrics.CounterOpt{
+				PkgName: pkgName,
+			})
+			return ItemLeaseConstraintCheckResult{}, nil
+		}
+
 		span.RecordError(err)
 		l.Error("acquiring capacity lease failed", "err", err, "method", "itemLeaseConstraintCheck", "constraints", constraints, "item", item, "function_id", *shadowPart.FunctionID)
 		metrics.IncrQueueItemConstraintCheckCounter(ctx, enums.QueueItemConstraintReasonConstraintAPIError.String(), metrics.CounterOpt{

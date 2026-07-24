@@ -92,22 +92,27 @@ func (m *mockQueueProcessor) Queue() Queue {
 
 // mockShardForIterator implements the minimal QueueShard interface methods used by ProcessorIterator
 type mockShardForIterator struct {
-	name                    string
-	partitionLeaseCount     int32
-	partitionRequeueCount   int32
-	partitionRequeueAt      time.Time
-	partitionRequeueForceAt bool
-	partitionBacklogSize    int64
-	partitionBacklogCalls   int32
-	outstandingJobCount     int
-	outstandingJobCalls     int32
-	runningCount            int64
-	runningCountCalls       int32
-	statusCount             int64
-	statusCountCalls        int32
-	earliestPeekTimes       sync.Map
-	earliestPeekTimeCalls   int32
-	earliestPeekTimeErr     error
+	name                        string
+	partitionLeaseCount         int32
+	partitionRequeueCount       int32
+	partitionRequeueAt          time.Time
+	partitionRequeueForceAt     bool
+	shadowPartitionLeaseCount   int32
+	shadowPartitionRequeueCount int32
+	shadowPartitionRequeueAt    *time.Time
+	shadowPartitionPeekCount    int32
+	backlogPeekCount            int32
+	partitionBacklogSize        int64
+	partitionBacklogCalls       int32
+	outstandingJobCount         int
+	outstandingJobCalls         int32
+	runningCount                int64
+	runningCountCalls           int32
+	statusCount                 int64
+	statusCountCalls            int32
+	earliestPeekTimes           sync.Map
+	earliestPeekTimeCalls       int32
+	earliestPeekTimeErr         error
 }
 
 func (m *mockShardForIterator) Name() string {
@@ -342,11 +347,15 @@ func (m *mockShardForIterator) PeekGlobalShadowPartitionAccounts(ctx context.Con
 }
 
 func (m *mockShardForIterator) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, requeueAt *time.Time) error {
+	atomic.AddInt32(&m.shadowPartitionRequeueCount, 1)
+	m.shadowPartitionRequeueAt = requeueAt
 	return nil
 }
 
 func (m *mockShardForIterator) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error) {
-	return nil, nil
+	atomic.AddInt32(&m.shadowPartitionLeaseCount, 1)
+	id := ulid.Make()
+	return &id, nil
 }
 
 func (m *mockShardForIterator) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
@@ -354,6 +363,7 @@ func (m *mockShardForIterator) ShadowPartitionExtendLease(ctx context.Context, s
 }
 
 func (m *mockShardForIterator) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error) {
+	atomic.AddInt32(&m.shadowPartitionPeekCount, 1)
 	return nil, 0, nil
 }
 
@@ -362,6 +372,7 @@ func (m *mockShardForIterator) BacklogPrepareNormalize(ctx context.Context, b *Q
 }
 
 func (m *mockShardForIterator) BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) (*BacklogPeekResult, error) {
+	atomic.AddInt32(&m.backlogPeekCount, 1)
 	return &BacklogPeekResult{}, nil
 }
 

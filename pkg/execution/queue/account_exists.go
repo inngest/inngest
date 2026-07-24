@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -53,6 +54,42 @@ func (q *queueProcessor) requeueDeletedAccountPartition(ctx context.Context, sha
 		"requeued partition for deleted account",
 		"account_id", p.AccountID.String(),
 		"partition_id", p.ID,
+		"queue_shard", shard.Name(),
+		"requeue_at", requeueAt,
+	)
+
+	return nil
+}
+
+func (q *queueProcessor) requeueDeletedAccountShadowPartition(ctx context.Context, shard QueueShard, p *QueueShadowPartition) error {
+	requeueAt := q.Clock().Now().Add(PartitionDeletedAccountRequeueExtension)
+	if err := shard.ShadowPartitionRequeue(ctx, p, &requeueAt); err != nil {
+		if errors.Is(err, ErrShadowPartitionNotFound) {
+			return nil
+		}
+
+		metrics.IncrQueueDeletedAccountPartitionCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard": shard.Name(),
+				"action":      deletedAccountPartitionActionQuarantineError,
+			},
+		})
+		return fmt.Errorf("error requeueing deleted account shadow partition: %w", err)
+	}
+
+	metrics.IncrQueueDeletedAccountPartitionCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name(),
+			"action":      deletedAccountPartitionActionQuarantined,
+		},
+	})
+
+	logger.StdlibLogger(ctx).Warn(
+		"requeued shadow partition for deleted account",
+		"account_id", p.AccountID.String(),
+		"partition_id", p.PartitionID,
 		"queue_shard", shard.Name(),
 		"requeue_at", requeueAt,
 	)
