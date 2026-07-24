@@ -28,7 +28,13 @@ func (q *queueProcessor) worker(ctx context.Context, f RunFunc) {
 
 			processCtx, cancel := context.WithCancel(processCtx)
 
-			err := q.ProcessItem(processCtx, i, f)
+			result, err := q.ProcessItem(processCtx, i, f)
+			if i.result != nil {
+				i.result.complete(DispatchedItemResult{
+					ScheduledImmediateJob: result.RunResult.ScheduledImmediateJob,
+					Err:                   err,
+				})
+			}
 			q.Semaphore().Release(1)
 			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.Shard().Name()}})
 			cancel()

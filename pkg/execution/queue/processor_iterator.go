@@ -186,11 +186,22 @@ func (p *ProcessorIterator) LeaseItem(ctx context.Context, item *QueueItem) erro
 		}
 	}
 
+	priority := uint(0)
+	if opts := p.Queue.Options(); opts != nil {
+		priority = opts.PartitionPriorityFinder(ctx, *p.Partition)
+	}
+
+	earliestPeekTimeFallbackMS := int64(0)
+	if item.EarliestPeekTime == 0 && p.Partition.Last > 0 && p.Partition.Last > item.AtMS {
+		earliestPeekTimeFallbackMS = item.AtMS
+	}
+
 	result, err := leaser.LeaseItem(ctx, LeaseItemRequest{
-		Item:                 item,
-		Partition:            p.Partition,
-		PartitionContinueCtr: p.PartitionContinueCtr,
-		StaticTime:           p.StaticTime,
+		Item:                       item,
+		Priority:                   priority,
+		ContinueCount:              p.PartitionContinueCtr,
+		EarliestPeekTimeFallbackMS: earliestPeekTimeFallbackMS,
+		StaticTime:                 p.StaticTime,
 	}, p.Dispatch)
 	p.applyLeaseItemResult(result)
 	return err

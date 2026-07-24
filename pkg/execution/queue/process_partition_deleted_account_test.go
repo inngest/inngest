@@ -37,9 +37,9 @@ func TestProcessPartitionRequeuesDeletedAccount(t *testing.T) {
 		ID:         fnID.String(),
 		FunctionID: &fnID,
 		AccountID:  accountID,
-	}, 0, false, func(_ context.Context, item ProcessItem) error {
+	}, 0, false, func(_ context.Context, item ProcessItem) (DispatchedItem, error) {
 		q.workers <- item
-		return nil
+		return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
 	})
 	require.NoError(t, err)
 

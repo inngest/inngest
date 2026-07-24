@@ -734,19 +734,57 @@ type ShadowContinuation struct {
 	Count      uint
 }
 
-// ProcessItem references the queue partition and queue item to be processed by a worker.
-// both items need to be passed to a worker as both items are needed to generate concurrency
-// keys to extend leases and dequeue.
+type DispatchedItem interface {
+	Done() <-chan DispatchedItemResult
+}
+
+type DispatchedItemResult struct {
+	ScheduledImmediateJob bool
+	Err                   error
+}
+
+type dispatchedItemHandle struct {
+	once sync.Once
+	done chan DispatchedItemResult
+}
+
+func newDispatchedItemHandle() *dispatchedItemHandle {
+	return &dispatchedItemHandle{
+		// Buffered so worker completion never blocks if no scanner is waiting.
+		done: make(chan DispatchedItemResult, 1),
+	}
+}
+
+// NewCompletedDispatchedItem returns a dispatched item that has already completed.
+// This is useful for scanner implementations or tests that synchronously process dispatch.
+func NewCompletedDispatchedItem(result DispatchedItemResult) DispatchedItem {
+	handle := newDispatchedItemHandle()
+	handle.complete(result)
+	return handle
+}
+
+func (h *dispatchedItemHandle) Done() <-chan DispatchedItemResult {
+	return h.done
+}
+
+func (h *dispatchedItemHandle) complete(result DispatchedItemResult) {
+	h.once.Do(func() {
+		h.done <- result
+		close(h.done)
+	})
+}
+
+// ProcessItem references the queue item and scanner-provided metadata to be processed by a worker.
 type ProcessItem struct {
-	P QueuePartition
 	I QueueItem
 
-	// PCtr represents the number of times the partition has been continued.
-	PCtr uint
+	Priority      uint
+	ContinueCount uint
 
 	CapacityLease *CapacityLease
 
 	ConditionalTraceCtx context.Context
+	result              *dispatchedItemHandle
 }
 
 type capacityLease struct {

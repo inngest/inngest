@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -16,12 +17,19 @@ import (
 
 func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, dispatch DispatchFunc) (LeaseItemResult, error) {
 	item := req.Item
-	partition := req.Partition
-	l := logger.StdlibLogger(ctx).With("partition", partition, "item", item)
+	accountID := item.Data.Identifier.AccountID
+	envID := item.Data.Identifier.WorkspaceID
+	fnID := item.Data.Identifier.WorkflowID
+	if fnID == uuid.Nil {
+		fnID = item.FunctionID
+	}
+	l := logger.StdlibLogger(ctx).With("item", item)
 
 	ctx, span := q.Options().ConditionalTracer.NewSpan(ctx, "queue.LeaseItem", TraceScopeFromQueueItem(*item, q.Shard().Name()))
 	defer span.End()
-	span.SetAttributes(attribute.String("partition_id", partition.ID))
+	span.SetAttributes(attribute.String("account_id", accountID.String()))
+	span.SetAttributes(attribute.String("env_id", envID.String()))
+	span.SetAttributes(attribute.String("fn_id", fnID.String()))
 	span.SetAttributes(attribute.String("item_kind", item.Data.Kind))
 	span.SetAttributes(attribute.String("run_id", item.Data.Identifier.RunID.String()))
 	span.SetAttributes(attribute.String("item_id", item.ID))
@@ -209,11 +217,11 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 	//
 	// Anyway, here we set the first peek item to the item's start time if there was a
 	// peek since the job was added.
-	if item.EarliestPeekTime == 0 && partition.Last > 0 && partition.Last > item.AtMS {
+	if item.EarliestPeekTime == 0 && req.EarliestPeekTimeFallbackMS > 0 {
 		// Fudge the earliest peek time because we know this wasn't peeked and so
 		// the peek time wasn't set;  but, as we were still processing jobs after
 		// the job was added this item was concurrency-limited.
-		item.EarliestPeekTime = item.AtMS
+		item.EarliestPeekTime = req.EarliestPeekTimeFallbackMS
 	}
 
 	// We may return a keyError, which masks the actual error underneath.  If so,
@@ -285,20 +293,20 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			status = "system_concurrency_limit"
 		case errors.Is(cause, ErrPartitionConcurrencyLimit):
 			status = "partition_concurrency_limit"
-			if partition.FunctionID != nil {
-				q.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *partition.FunctionID)
+			if fnID != uuid.Nil {
+				q.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), fnID)
 			}
 		case errors.Is(cause, ErrAccountConcurrencyLimit):
 			status = "account_concurrency_limit"
 			// For backwards compatibility, we report on the function level as well.
-			if partition.FunctionID != nil {
-				q.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *partition.FunctionID)
+			if fnID != uuid.Nil {
+				q.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), fnID)
 			}
 
 			q.Options().lifecycles.OnAccountConcurrencyLimitReached(
 				context.WithoutCancel(ctx),
-				partition.AccountID,
-				partition.EnvID,
+				accountID,
+				itemEnvIDPtr(envID),
 			)
 		}
 
@@ -329,8 +337,8 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited, RetryAfter: limitedRetryAfter}, fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
 	case errors.Is(cause, ErrConcurrencyLimitCustomKey):
 		// For backwards compatibility, we report on the function level as well.
-		if partition.FunctionID != nil {
-			q.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *partition.FunctionID)
+		if fnID != uuid.Nil {
+			q.Options().lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), fnID)
 		}
 
 		// TODO: Report on key that was hit (this must have been empty previously)
@@ -406,10 +414,10 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		PkgName: pkgName,
 		Tags:    map[string]any{"status": "success", "queue_shard": q.Shard().Name(), "constraint_source": "constraintapi"},
 	})
-	err = dispatch(ctx, ProcessItem{
-		P:    *partition,
-		I:    *item,
-		PCtr: req.PartitionContinueCtr,
+	_, err = dispatch(ctx, ProcessItem{
+		I:             *item,
+		Priority:      req.Priority,
+		ContinueCount: req.ContinueCount,
 
 		CapacityLease:       constraintRes.CapacityLease,
 		ConditionalTraceCtx: context.WithoutCancel(ctx),
@@ -422,4 +430,11 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 	commitSemaphoreAcquire = true
 
 	return result, nil
+}
+
+func itemEnvIDPtr(envID uuid.UUID) *uuid.UUID {
+	if envID == uuid.Nil {
+		return nil
+	}
+	return &envID
 }

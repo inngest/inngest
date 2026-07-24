@@ -74,8 +74,8 @@ func (m *mockQueueProcessor) NormalizeItem(ctx context.Context, sp *QueueShadowP
 	return item, nil
 }
 
-func (m *mockQueueProcessor) ProcessItem(ctx context.Context, i ProcessItem, f RunFunc) error {
-	return nil
+func (m *mockQueueProcessor) ProcessItem(ctx context.Context, i ProcessItem, f RunFunc) (ProcessItemResult, error) {
+	return ProcessItemResult{}, nil
 }
 
 func (m *mockQueueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool, dispatch DispatchFunc) error {
@@ -484,10 +484,10 @@ func processorIteratorConstraintLeaser(mockProc *mockQueueProcessor) QueueItemLe
 				if dispatch == nil {
 					return LeaseItemResult{Status: LeaseItemStatusLeaseError, Err: ErrProcessMissingDispatch}, ErrProcessMissingDispatch
 				}
-				err := dispatch(ctx, ProcessItem{
-					P:    *req.Partition,
-					I:    *req.Item,
-					PCtr: req.PartitionContinueCtr,
+				_, err := dispatch(ctx, ProcessItem{
+					I:             *req.Item,
+					Priority:      req.Priority,
+					ContinueCount: req.ContinueCount,
 				})
 				if err != nil {
 					return LeaseItemResult{Status: LeaseItemStatusDispatched}, err
@@ -532,8 +532,8 @@ func processorIteratorLeaseBehaviorLeaser(mockProc *mockQueueProcessor) QueueIte
 				constraint = mockProc.constraintResultFunc()
 			}
 			if constraint != enums.QueueConstraintNotLimited {
-				if req.Item.EarliestPeekTime == 0 && req.Partition.Last > 0 && req.Partition.Last > req.Item.AtMS {
-					req.Item.EarliestPeekTime = req.Item.AtMS
+				if req.Item.EarliestPeekTime == 0 && req.EarliestPeekTimeFallbackMS > 0 {
+					req.Item.EarliestPeekTime = req.EarliestPeekTimeFallbackMS
 				}
 				return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited}, fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
 			}
@@ -541,10 +541,10 @@ func processorIteratorLeaseBehaviorLeaser(mockProc *mockQueueProcessor) QueueIte
 			if dispatch == nil {
 				return LeaseItemResult{Status: LeaseItemStatusLeaseError, Err: ErrProcessMissingDispatch}, ErrProcessMissingDispatch
 			}
-			err := dispatch(ctx, ProcessItem{
-				P:    *req.Partition,
-				I:    *req.Item,
-				PCtr: req.PartitionContinueCtr,
+			_, err := dispatch(ctx, ProcessItem{
+				I:             *req.Item,
+				Priority:      req.Priority,
+				ContinueCount: req.ContinueCount,
 			})
 			if err != nil {
 				return LeaseItemResult{Status: LeaseItemStatusDispatched}, err
@@ -639,9 +639,9 @@ func TestProcessorIteratorCounterRaceCondition(t *testing.T) {
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
 		Leaser:               processorIteratorConstraintLeaser(mockProc),
-		Dispatch: func(_ context.Context, item ProcessItem) error {
+		Dispatch: func(_ context.Context, item ProcessItem) (DispatchedItem, error) {
 			workers <- item
-			return nil
+			return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
 		},
 		StaticTime: time.Now(),
 		Parallel:   true, // Enable parallel processing
@@ -754,9 +754,9 @@ func TestProcessorIteratorCounterRaceConditionMixed(t *testing.T) {
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
 		Leaser:               processorIteratorConstraintLeaser(mockProc),
-		Dispatch: func(_ context.Context, item ProcessItem) error {
+		Dispatch: func(_ context.Context, item ProcessItem) (DispatchedItem, error) {
 			workers <- item
-			return nil
+			return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
 		},
 		StaticTime: time.Now(),
 		Parallel:   true,
@@ -861,9 +861,9 @@ func TestProcessorIteratorIsCustomKeyLimitOnlyRace(t *testing.T) {
 		PartitionContinueCtr: 0,
 		Queue:                mockProc,
 		Leaser:               processorIteratorConstraintLeaser(mockProc),
-		Dispatch: func(_ context.Context, item ProcessItem) error {
+		Dispatch: func(_ context.Context, item ProcessItem) (DispatchedItem, error) {
 			workers <- item
-			return nil
+			return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
 		},
 		StaticTime: time.Now(),
 		Parallel:   true,
@@ -938,9 +938,9 @@ func TestProcessorIteratorUsesPartitionLastEarliestPeekFallbackWhenFlagDisabled(
 		Items:     []*QueueItem{item},
 		Queue:     mockProc,
 		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
-		Dispatch: func(_ context.Context, item ProcessItem) error {
+		Dispatch: func(_ context.Context, item ProcessItem) (DispatchedItem, error) {
 			mockProc.workers <- item
-			return nil
+			return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
 		},
 		StaticTime: at.Add(2 * time.Second),
 	}
@@ -1011,9 +1011,9 @@ func TestProcessorIteratorSkipsEarliestPeekTimeWhenNoWorkerCapacity(t *testing.T
 		Items:     []*QueueItem{item},
 		Queue:     mockProc,
 		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
-		Dispatch: func(_ context.Context, item ProcessItem) error {
+		Dispatch: func(_ context.Context, item ProcessItem) (DispatchedItem, error) {
 			mockProc.workers <- item
-			return nil
+			return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
 		},
 		StaticTime: peekTime,
 	}
@@ -1080,9 +1080,9 @@ func TestProcessorIteratorContinuesWhenEarliestPeekTimeStampFails(t *testing.T) 
 		Items:     []*QueueItem{item},
 		Queue:     mockProc,
 		Leaser:    processorIteratorLeaseBehaviorLeaser(mockProc),
-		Dispatch: func(_ context.Context, item ProcessItem) error {
+		Dispatch: func(_ context.Context, item ProcessItem) (DispatchedItem, error) {
 			workers <- item
-			return nil
+			return NewCompletedDispatchedItem(DispatchedItemResult{}), nil
 		},
 		StaticTime: at.Add(2 * time.Second),
 	}

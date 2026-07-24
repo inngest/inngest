@@ -242,9 +242,16 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		}
 	}
 
-	dispatch := func(_ context.Context, item ProcessItem) error {
-		q.workers <- item
-		return nil
+	dispatch := func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
+		handle := newDispatchedItemHandle()
+		item.result = handle
+
+		select {
+		case q.workers <- item:
+			return handle, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
 	rt := QueueScannerRuntime{
