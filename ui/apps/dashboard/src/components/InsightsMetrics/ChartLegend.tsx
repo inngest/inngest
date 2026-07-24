@@ -1,6 +1,5 @@
-import { lineColors } from '@/components/Metrics/utils';
 import { LegendSkeleton } from './ChartSkeleton';
-import { toCssColor } from './colors';
+import { DEFAULT_PALETTE } from './colors';
 import { valuesToMap, type InsightsMetricItem } from './types';
 
 type Props = {
@@ -9,7 +8,7 @@ type Props = {
   // Overrides the single shared swatch color with one distinct color per
   // row, in the same sorted order as CategoricalChart's `colors` prop —
   // pass the same palette to both so swatches match their bars.
-  colors?: readonly (readonly [string, string])[];
+  colors?: readonly string[];
   format?: (value: number) => string;
   // Renders the identifier — callers use this to resolve a function slug to
   // a display name/link, matching RankedTable's convention.
@@ -35,7 +34,7 @@ export function ChartLegend({
   isLoading = false,
   className,
 }: Props) {
-  const sharedSwatchColor = toCssColor(lineColors[2][0]);
+  const sharedSwatchColor = DEFAULT_PALETTE[2];
 
   const sorted = [...(items ?? [])].sort((a, b) => {
     const av = valuesToMap(a.values).get(valueName) ?? 0;
@@ -55,7 +54,7 @@ export function ChartLegend({
     <ul className={`flex flex-col gap-3 ${className ?? ''}`}>
       {sorted.map((item, idx) => {
         const value = valuesToMap(item.values).get(valueName);
-        const swatchColor = colors ? toCssColor(colors[idx % colors.length][0]) : sharedSwatchColor;
+        const swatchColor = colors ? colors[idx % colors.length] : sharedSwatchColor;
         return (
           <li key={item.identifier} className="flex items-center gap-2 text-sm">
             <span

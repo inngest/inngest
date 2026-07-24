@@ -81,35 +81,34 @@ function mapColumnType(
   }
 }
 
-// parseValueByType coerces one raw JSON cell value into the app's internal
-// cell representation. The backend already encodes NUMBER columns as JSON
-// numbers and NULL cells as JSON null (see InsightsRow.values: [JSON!]! and
-// toGQLInsightsRow in api/gql/resolver/query.go) — this mostly narrows that
-// JSON value to a Date for DATE columns and defensively coerces the
-// (expected) string case for everything else.
 function parseValueByType(
-  value: unknown,
+  value: string,
   columnType: InsightsColumnType,
 ): string | number | Date | null {
-  if (value === null || value === undefined) return null;
   switch (columnType) {
     case InsightsColumnType.Number:
-      return typeof value === 'number' ? value : parseFloat(String(value));
+      return parseFloat(value);
     case InsightsColumnType.Date:
-      return new Date(String(value));
+      return new Date(value);
     case InsightsColumnType.String:
     case InsightsColumnType.Unknown:
     default:
-      return typeof value === 'string' ? value : JSON.stringify(value);
+      return String(value);
   }
 }
 
 function transformValuesByColumns(
-  values: readonly unknown[],
+  values: string[],
   columns: Array<{ name: string; columnType: InsightsColumnType }>,
 ): Record<string, string | number | Date | null> {
   return columns.reduce((acc, column, index) => {
-    acc[column.name] = parseValueByType(values[index], column.columnType);
+    const value = values[index];
+    if (value === undefined) {
+      acc[column.name] = null;
+      return acc;
+    }
+
+    acc[column.name] = parseValueByType(value, column.columnType);
     return acc;
   }, {} as Record<string, string | number | Date | null>);
 }

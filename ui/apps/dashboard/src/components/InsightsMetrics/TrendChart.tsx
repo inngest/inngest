@@ -13,31 +13,30 @@ import {
 } from 'recharts';
 
 import { formatCompactNumber } from '@/components/InfraDashboard/utils';
-import { dateFormat, lineColors, timeDiff } from '@/components/Metrics/utils';
+import { dateFormat, timeDiff } from '@/components/Metrics/utils';
 import { ChartTooltip } from './ChartTooltip';
 import { TrendAreaChartSkeleton, TrendChartSkeleton } from './ChartSkeleton';
-import { BORDER_SUBTLE_COLOR, SURFACE_COLOR, toCssColor } from './colors';
+import { BORDER_SUBTLE_COLOR, DEFAULT_PALETTE, SURFACE_COLOR } from './colors';
 import { valuesToMap, type InsightsMetricPoint } from './types';
 
 export type TrendSeriesConfig = {
   // Which NamedValue.name to read per point.
   valueName: string;
   label: string;
-  // Overrides the index-based default from `lineColors` (a [light, dark]
-  // token/hex tuple, same shape as one `lineColors` entry) — for a series
+  // Overrides the index-based default from `DEFAULT_PALETTE` — for a series
   // whose identity has an established color independent of its position
   // (e.g. always green for "runs"), rather than whatever hue its index
   // would otherwise land on.
-  color?: readonly [string, string];
+  color?: string;
   // Bar border color override (CategoricalChart only) — e.g. a subtle fill
   // paired with its own moderate/vivid hue as the border, rather than the
   // chart surface color CategoricalChart uses by default to separate
   // stacked segments.
-  borderColor?: readonly [string, string];
+  borderColor?: string;
   // Area fill override ('area' chartType only) — a design-system subtle
   // token, rather than the default computed mix of `color` toward the
   // chart surface.
-  areaColor?: readonly [string, string];
+  areaColor?: string;
 };
 
 type Props = {
@@ -50,7 +49,7 @@ type Props = {
   // populated — e.g. one line per model. Which NamedValue.name to read per
   // dimension per bucket. Unlike `series`'s caller-supplied fixed config,
   // the category set here is open-ended and only known from the data: the
-  // top `lineColors.length` identifiers by total value across the whole
+  // top `DEFAULT_PALETTE.length` identifiers by total value across the whole
   // range each get their own line in a fixed rank order (color follows the
   // entity, not a cycled hue), and every other identifier folds into one
   // "Other" line rather than adding an unbounded number of series.
@@ -141,8 +140,12 @@ export function TrendChart({
       }
     }
     const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1]);
-    const topIdentifiers = ranked.slice(0, lineColors.length).map(([id]) => id);
-    return { topIdentifiers, topSet: new Set(topIdentifiers), hasOther: ranked.length > lineColors.length };
+    const topIdentifiers = ranked.slice(0, DEFAULT_PALETTE.length).map(([id]) => id);
+    return {
+      topIdentifiers,
+      topSet: new Set(topIdentifiers),
+      hasOther: ranked.length > DEFAULT_PALETTE.length,
+    };
   }, [points, valueName]);
 
   const effectiveSeries = useMemo<EffectiveSeries[]>(() => {
@@ -150,15 +153,14 @@ export function TrendChart({
       const names = hasOther ? [...topIdentifiers, OTHER_LABEL] : topIdentifiers;
       return names.map((name, i) => {
         const isOther = name === OTHER_LABEL;
-        const color = isOther ? BORDER_SUBTLE_COLOR : toCssColor(lineColors[i][0]);
+        const color = isOther ? BORDER_SUBTLE_COLOR : DEFAULT_PALETTE[i];
         return { key: name, label: name, color, areaColor: color, isOther };
       });
     }
     return (series ?? []).map((s, i) => {
-      const color = toCssColor((s.color ?? lineColors[i % lineColors.length])[0]);
-      const areaColor = s.areaColor
-        ? toCssColor(s.areaColor[0])
-        : `color-mix(in srgb, ${color} 40%, ${SURFACE_COLOR} 60%)`;
+      const color = s.color ?? DEFAULT_PALETTE[i % DEFAULT_PALETTE.length];
+      const areaColor =
+        s.areaColor ?? `color-mix(in srgb, ${color} 40%, ${SURFACE_COLOR} 60%)`;
       return { key: s.valueName, label: s.label, color, areaColor, isOther: false };
     });
   }, [valueName, hasOther, topIdentifiers, series]);

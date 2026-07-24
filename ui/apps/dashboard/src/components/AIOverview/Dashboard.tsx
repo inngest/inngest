@@ -21,11 +21,9 @@ import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useQuery } from 'urql';
 
 import { formatCompactNumber } from '@/components/InfraDashboard/utils';
-import { lineColors } from '@/components/Metrics/utils';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
-import { colors } from '@/utils/tailwind';
 import { pathCreator } from '@/utils/urls';
 import { AIOverviewEmptyState } from './EmptyState';
 import {
@@ -44,6 +42,7 @@ import { HeadlineStats } from '../InsightsMetrics/HeadlineStats';
 import { RangePlot } from '../InsightsMetrics/RangePlot';
 import { RankedTable } from '../InsightsMetrics/RankedTable';
 import { TrendChart } from '../InsightsMetrics/TrendChart';
+import { DEFAULT_PALETTE } from '../InsightsMetrics/colors';
 import { TREND_BUCKET_LIMIT } from '../InsightsMetrics/queries';
 import { useInsightsMetric } from '../InsightsMetrics/useInsightsMetric';
 import {
@@ -56,44 +55,35 @@ const DEFAULT_DURATION = { days: 7 };
 
 const formatRuns = (value: number) => `${formatCompactNumber(value)} runs`;
 
-// extendedColors casts in the design-system tiers this file reaches for
-// beyond DefaultColors — see @/utils/tailwind's `colors` export.
-const extendedColors = colors as typeof colors & {
-  primary: { subtle: string; '2xSubtle': string; '3xSubtle': string };
-  secondary: { subtle: string; '3xSubtle': string };
-  quaternary: { warmerxSubtle: string; coolxSubtle: string };
-};
-
 // Fixed-order pastel palette (green, blue, yellow, orange, purple), matched
 // against a reference mock — used both for per-category color (top
 // functions by usage) and as the single-hue override for individual charts
 // (e.g. green for runs). Reuses the design system's "subtle" tier tokens;
 // yellow has no dedicated categorical slot, so it references the honey
-// scale's step 300 directly via a CSS var (verified against the live app —
-// the warning/honey *semantic* tokens render as a burnt orange-rust in
-// light mode, not yellow).
-const CHART_COLORS: readonly (readonly [string, string])[] = [
-  [extendedColors.primary.subtle, '#66bd8b'], // green
-  [extendedColors.secondary.subtle, '#52b2fd'], // blue
-  ['var(--color-honey-300)', '#fcc43f'], // yellow
-  [extendedColors.quaternary.warmerxSubtle, '#ffae7f'], // orange
-  [extendedColors.quaternary.coolxSubtle, '#cec6fd'], // purple
+// scale's step 300 directly (verified against the live app — the
+// warning/honey *semantic* tokens render as a burnt orange-rust in light
+// mode, not yellow). Literal `rgb(var(--x))` strings (see
+// InsightsMetrics/colors.ts) rather than Tailwind's resolved theme object,
+// which embeds a `<alpha-value>` placeholder that isn't valid CSS as-is.
+const CHART_COLORS: readonly string[] = [
+  'rgb(var(--color-primary-subtle))', // green
+  'rgb(var(--color-secondary-subtle))', // blue
+  'rgb(var(--color-honey-300))', // yellow
+  'rgb(var(--color-quaternary-warmer-xSubtle))', // orange
+  'rgb(var(--color-quaternary-cool-xSubtle))', // purple
 ];
 
-// 3xSubtle blue/green tuple for the Tokens over time area fill — the design
-// system's most muted tier of the same secondary/primary hues lineColors'
-// "moderate" tier uses.
-const SUBTLE_BLUE: readonly [string, string] = [extendedColors.secondary['3xSubtle'], '#e3f0fd'];
-const SUBTLE_GREEN: readonly [string, string] = [extendedColors.primary['3xSubtle'], '#e2f3ea'];
+// 3xSubtle blue/green for the Tokens over time area fill — the design
+// system's most muted tier of the same secondary/primary hues
+// DEFAULT_PALETTE's "moderate" tier uses.
+const SUBTLE_BLUE = 'rgb(var(--color-secondary-3xSubtle))';
+const SUBTLE_GREEN = 'rgb(var(--color-primary-3xSubtle))';
 
 // Tokens by model's stacked bars — matched pixel-for-pixel against a
 // reference mock: blue reuses the same secondary 3xSubtle tier as Tokens
 // over time, but green needed one tier down (2xSubtle, not 3xSubtle) to
 // match — the two charts aren't a matched pair here.
-const TOKENS_BY_MODEL_GREEN: readonly [string, string] = [
-  extendedColors.primary['2xSubtle'],
-  '#c4efd4',
-];
+const TOKENS_BY_MODEL_GREEN = 'rgb(var(--color-primary-2xSubtle))';
 
 const FunctionLookupDocument = graphql(`
   query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {
@@ -380,13 +370,13 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                 {
                   valueName: 'input_tokens',
                   label: 'Input',
-                  color: lineColors[2],
+                  color: DEFAULT_PALETTE[2],
                   areaColor: SUBTLE_BLUE,
                 },
                 {
                   valueName: 'output_tokens',
                   label: 'Output',
-                  color: lineColors[1],
+                  color: DEFAULT_PALETTE[1],
                   areaColor: SUBTLE_GREEN,
                 },
               ]}
@@ -446,13 +436,13 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                   valueName: 'input_tokens',
                   label: 'Input',
                   color: SUBTLE_BLUE,
-                  borderColor: lineColors[2],
+                  borderColor: DEFAULT_PALETTE[2],
                 },
                 {
                   valueName: 'output_tokens',
                   label: 'Output',
                   color: TOKENS_BY_MODEL_GREEN,
-                  borderColor: lineColors[1],
+                  borderColor: DEFAULT_PALETTE[1],
                 },
               ]}
               stacked

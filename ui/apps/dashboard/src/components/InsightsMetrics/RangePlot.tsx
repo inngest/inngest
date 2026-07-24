@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, Customized, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-import { lineColors } from '@/components/Metrics/utils';
 import { truncateCenter } from '@/lib/experiments/chart';
 import { RankedChartSkeleton } from './ChartSkeleton';
-import { BORDER_SUBTLE_COLOR, toCssColor } from './colors';
+import { BORDER_SUBTLE_COLOR, DEFAULT_PALETTE } from './colors';
 import { valuesToMap, type InsightsMetricItem } from './types';
 
 // RangePlot is a copy of Experiments' BoxPlot (apps/dashboard/src/
@@ -302,7 +301,7 @@ type Props = {
   // One color per row (in row/sorted order), cycling if there are more rows
   // than colors — matches CategoricalChart's `colors` prop (e.g. the same
   // palette passed to a "Cost by model" chart).
-  colors?: readonly (readonly [string, string])[];
+  colors?: readonly string[];
   // Hides the vertical y-axis line (ticks/labels stay) — for callers where
   // it's redundant against the chart's own card border.
   showYAxisLine?: boolean;
@@ -341,7 +340,7 @@ export function RangePlot({
         values,
         min: present.length ? Math.min(...present) : 0,
         max: present.length ? Math.max(...present) : 0,
-        color: colors ? toCssColor(colors[idx % colors.length][0]) : toCssColor(lineColors[2][0]),
+        color: colors ? colors[idx % colors.length] : DEFAULT_PALETTE[2],
       };
     });
   }, [items, ticks, colors]);

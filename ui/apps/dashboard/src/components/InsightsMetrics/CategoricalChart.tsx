@@ -12,10 +12,9 @@ import {
 } from 'recharts';
 
 import { formatCompactNumber } from '@/components/InfraDashboard/utils';
-import { lineColors } from '@/components/Metrics/utils';
 import { truncateCenter } from '@/lib/experiments/chart';
 import { RankedChartSkeleton } from './ChartSkeleton';
-import { BORDER_SUBTLE_COLOR, SURFACE_COLOR, toCssColor } from './colors';
+import { BORDER_SUBTLE_COLOR, DEFAULT_PALETTE, SURFACE_COLOR } from './colors';
 import type { TrendSeriesConfig } from './TrendChart';
 import { valuesToMap, type InsightsMetricItem } from './types';
 
@@ -26,16 +25,15 @@ type Props = {
   // Mutually exclusive with `series`; exactly one must be given.
   valueName?: string;
   valueLabel?: string;
-  // Overrides the default single shared magnitude hue (a [light, dark]
-  // token/hex tuple, same shape as one lineColors entry) — single-measure
-  // form only; ignored when `colors` or `series` is given.
-  color?: readonly [string, string];
+  // Overrides the default single shared magnitude hue (DEFAULT_PALETTE[2])
+  // — single-measure form only; ignored when `colors` or `series` is given.
+  color?: string;
   // Overrides the single shared magnitude hue with one distinct color per
   // bar/category, in category (sorted) order — for callers where each
   // category is itself worth distinguishing by color (e.g. a fixed top-N
   // ranking), not just by its position on the axis. Single-measure form
   // only; ignored when `series` is given (which already colors by series).
-  colors?: readonly (readonly [string, string])[];
+  colors?: readonly string[];
   // Multi-measure form: `series.length` bars per category (e.g. input vs
   // output tokens by model), one categorical hue per series — this IS an
   // identity comparison, so every series gets a legend and a fixed-order hue.
@@ -217,15 +215,12 @@ export function CategoricalChart({
     [sorted, effectiveSeries],
   );
 
-  const singleColor = useMemo(
-    () => toCssColor((color ?? lineColors[2])[0]),
-    [color],
-  );
+  const singleColor = useMemo(() => color ?? DEFAULT_PALETTE[2], [color]);
 
   // perCategoryColors mirrors chartData order — each bar gets its own color
   // from `colors`, cycling if there are more bars than colors.
   const perCategoryColors = useMemo(
-    () => (colors ? chartData.map((_, idx) => toCssColor(colors[idx % colors.length][0])) : undefined),
+    () => (colors ? chartData.map((_, idx) => colors[idx % colors.length]) : undefined),
     [chartData, colors],
   );
 
@@ -234,14 +229,11 @@ export function CategoricalChart({
   // its own fill) when no explicit borderColor is set, so adjacent segments
   // stay visually separated without a loud outline.
   const seriesColors = useMemo(
-    () =>
-      effectiveSeries.map((s, i) =>
-        toCssColor((s.color ?? lineColors[i % lineColors.length] ?? lineColors[0])[0]),
-      ),
+    () => effectiveSeries.map((s, i) => s.color ?? DEFAULT_PALETTE[i % DEFAULT_PALETTE.length]),
     [effectiveSeries],
   );
   const segmentBorderColors = useMemo(
-    () => effectiveSeries.map((s) => (s.borderColor ? toCssColor(s.borderColor[0]) : SURFACE_COLOR)),
+    () => effectiveSeries.map((s) => s.borderColor ?? SURFACE_COLOR),
     [effectiveSeries],
   );
   // legendSwatchColors mirrors each multi-series entry's *border* color
