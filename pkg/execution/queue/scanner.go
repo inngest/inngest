@@ -3,8 +3,21 @@ package queue
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/util"
 	"golang.org/x/sync/errgroup"
 )
+
+type QueueScannerRuntime struct {
+	Leaser          QueueItemLeaser
+	Dispatch        DispatchFunc
+	WorkerSemaphore util.TrackingSemaphore
+}
+
+// QueueScanner discovers and leases queue work. It should hand leased items to
+// the dispatch function and leave item execution to the common queue processor layer.
+type QueueScanner interface {
+	Run(ctx context.Context, rt QueueScannerRuntime) error
+}
 
 type partitionQueueScanner struct {
 	q *queueProcessor

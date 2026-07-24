@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -82,18 +81,6 @@ type LeaseItemResult struct {
 	Status     LeaseItemStatus
 	Err        error
 	RetryAfter time.Time
-}
-
-type QueueScannerRuntime struct {
-	Leaser          QueueItemLeaser
-	Dispatch        DispatchFunc
-	WorkerSemaphore util.TrackingSemaphore
-}
-
-// QueueScanner discovers and leases queue work. It should hand leased items to
-// the dispatch function and leave item execution to the common queue processor layer.
-type QueueScanner interface {
-	Run(ctx context.Context, rt QueueScannerRuntime) error
 }
 
 type RunResult struct {
