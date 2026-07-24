@@ -37,7 +37,6 @@ const graphqlConfig = {
             strictScalars: true,
             useTypeImports: true,
             scalars: {
-              Any: 'null | boolean | number | string | Record<string, unknown> | unknown[]',
               BillingPeriod: 'unknown',
               Bytes: 'string',
               DSN: 'unknown',

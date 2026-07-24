@@ -18,7 +18,6 @@ export type Scalars = {
   Boolean: { input: boolean; output: boolean; }
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
-  Any: { input: null | boolean | number | string | Record<string, unknown> | unknown[]; output: null | boolean | number | string | Record<string, unknown> | unknown[]; }
   BillingPeriod: { input: unknown; output: unknown; }
   Bytes: { input: string; output: string; }
   DSN: { input: unknown; output: unknown; }
@@ -1296,7 +1295,7 @@ export type InsightsResponse = {
 
 export type InsightsRow = {
   __typename?: 'InsightsRow';
-  values: Array<Maybe<Scalars['Any']['output']>>;
+  values: Array<Scalars['String']['output']>;
 };
 
 export type InvokeStepInfo = {
@@ -3617,7 +3616,7 @@ export type InsightsResultsQueryVariables = Exact<{
 }>;
 
 
-export type InsightsResultsQuery = { __typename?: 'Query', insights: { __typename?: 'InsightsResponse', columns: Array<{ __typename?: 'InsightsColumn', name: string, columnType: InsightsColumnType }>, rows: Array<{ __typename?: 'InsightsRow', values: Array<null | boolean | number | string | Record<string, unknown> | unknown[] | null> }>, diagnostics: Array<{ __typename?: 'InsightsDiagnostic', severity: InsightsDiagnosticSeverity, code: InsightsDiagnosticCode, message: string, position: { __typename?: 'InsightsDiagnosticPosition', start: number, end: number, context: string } | null }> | null } };
+export type InsightsResultsQuery = { __typename?: 'Query', insights: { __typename?: 'InsightsResponse', columns: Array<{ __typename?: 'InsightsColumn', name: string, columnType: InsightsColumnType }>, rows: Array<{ __typename?: 'InsightsRow', values: Array<string> }>, diagnostics: Array<{ __typename?: 'InsightsDiagnostic', severity: InsightsDiagnosticSeverity, code: InsightsDiagnosticCode, message: string, position: { __typename?: 'InsightsDiagnosticPosition', start: number, end: number, context: string } | null }> | null } };
 
 export type GetEventTypeSchemasQueryVariables = Exact<{
   envID: Scalars['ID']['input'];
@@ -3672,7 +3671,7 @@ export type InsightsMetricQueryVariables = Exact<{
 }>;
 
 
-export type InsightsMetricQuery = { __typename?: 'Query', insightsMetric: { __typename?: 'InsightsResponse', query: string, columns: Array<{ __typename?: 'InsightsColumn', name: string }>, rows: Array<{ __typename?: 'InsightsRow', values: Array<null | boolean | number | string | Record<string, unknown> | unknown[] | null> }> } | null };
+export type InsightsMetricQuery = { __typename?: 'Query', insightsMetric: { __typename?: 'InsightsResponse', query: string, columns: Array<{ __typename?: 'InsightsColumn', name: string }>, rows: Array<{ __typename?: 'InsightsRow', values: Array<string> }> } | null };
 
 export type CreateVercelAppMutationVariables = Exact<{
   input: CreateVercelAppInput;
