@@ -1330,7 +1330,9 @@ export type RerunFromStepMutation = { __typename?: 'Mutation'; rerun: any };
 
 export type GetRunsQueryVariables = Exact<{
   appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  functionIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
   startTime: Scalars['Time'];
+  endTime?: InputMaybe<Scalars['Time']>;
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
   functionRunCursor?: InputMaybe<Scalars['String']>;
@@ -1377,9 +1379,13 @@ export type GetRunsQuery = {
 };
 
 export type CountRunsQueryVariables = Exact<{
+  appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  functionIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
   startTime: Scalars['Time'];
+  endTime?: InputMaybe<Scalars['Time']>;
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
+  celQuery?: InputMaybe<Scalars['String']>;
   preview?: InputMaybe<Scalars['Boolean']>;
   isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
