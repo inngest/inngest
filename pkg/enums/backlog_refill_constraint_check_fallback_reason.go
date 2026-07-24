@@ -9,4 +9,5 @@ const (
 	BacklogRefillConstraintCheckReasonIDNil
 	BacklogRefillConstraintCheckReasonAcquireOnRefillDisabled
 	BacklogRefillConstraintCheckReasonConstraintAPIError
+	BacklogRefillConstraintCheckReasonAccountMissing
 )
