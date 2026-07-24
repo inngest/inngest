@@ -298,7 +298,9 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 			metrics.IncrBacklogRefillConstraintCheckCounter(ctx, enums.BacklogRefillConstraintCheckReasonAccountMissing.String(), metrics.CounterOpt{
 				PkgName: pkgName,
 			})
-			return nil, nil
+			return &BacklogRefillConstraintCheckResult{
+				ItemsToRefill: nil,
+			}, nil
 		}
 
 		logger.StdlibLogger(ctx).Error("acquiring capacity lease failed", "err", err, "method", "backlogRefillConstraintCheck", "functionID", *shadowPart.FunctionID)
