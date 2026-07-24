@@ -124,6 +124,70 @@ func TestRunProviderRerunUsesRunIDWhenOriginalRunIDIsMissing(t *testing.T) {
 	require.Equal(t, runID, *scheduler.req.OriginalRunID)
 }
 
+func TestRunProviderCancel(t *testing.T) {
+	runID := ulid.MustParse("01HR3ZJ4Z4E0MZ6PRP7Z3A4T00")
+	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+
+	t.Run("cancels an active run", func(t *testing.T) {
+		scheduler := &stubRunProviderScheduler{}
+		provider := &runProvider{
+			data: &stubRunProviderDataReader{run: &cqrs.FunctionRun{
+				RunID:      runID,
+				FunctionID: functionID,
+				Status:     enums.RunStatusRunning,
+			}},
+			scheduler: scheduler,
+		}
+
+		err := provider.Cancel(context.Background(), runID)
+
+		require.NoError(t, err)
+		require.NotNil(t, scheduler.cancelID)
+		require.Equal(t, runID, scheduler.cancelID.RunID)
+		require.Equal(t, functionID, scheduler.cancelID.FunctionID)
+		require.Equal(t, consts.DevServerAccountID, scheduler.cancelID.Tenant.AccountID)
+		require.Equal(t, consts.DevServerEnvID, scheduler.cancelID.Tenant.EnvID)
+	})
+
+	t.Run("rejects non-cancellable runs", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			status enums.RunStatus
+			err    error
+		}{
+			{name: "cancelled", status: enums.RunStatusCancelled, err: apiv2.ErrRunAlreadyCancelled},
+			{name: "completed", status: enums.RunStatusCompleted, err: apiv2.ErrRunEnded},
+			{name: "failed", status: enums.RunStatusFailed, err: apiv2.ErrRunEnded},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				provider := &runProvider{
+					data:      &stubRunProviderDataReader{run: &cqrs.FunctionRun{Status: test.status}},
+					scheduler: &stubRunProviderScheduler{},
+				}
+
+				err := provider.Cancel(context.Background(), runID)
+
+				require.ErrorIs(t, err, test.err)
+			})
+		}
+	})
+
+	t.Run("returns not found for a missing run", func(t *testing.T) {
+		scheduler := &stubRunProviderScheduler{}
+		provider := &runProvider{
+			data:      &stubRunProviderDataReader{runErr: sql.ErrNoRows},
+			scheduler: scheduler,
+		}
+
+		err := provider.Cancel(context.Background(), runID)
+
+		require.ErrorIs(t, err, apiv2.ErrRunNotFound)
+		require.Nil(t, scheduler.cancelID)
+	})
+}
+
 func TestScoreMetadataLoaderReconstructsFinalizedRunMetadata(t *testing.T) {
 	runID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTQ")
 	eventID := ulid.MustParse("01KVBJWM98JHAJPC9K5EXVAQTR")
@@ -356,8 +420,11 @@ func (s *stubRunProviderDataReader) GetEventByInternalID(ctx context.Context, in
 }
 
 type stubRunProviderScheduler struct {
-	runID ulid.ULID
-	req   *execution.ScheduleRequest
+	runID     ulid.ULID
+	req       *execution.ScheduleRequest
+	cancelID  *sv2.ID
+	cancelReq *execution.CancelRequest
+	cancelErr error
 }
 
 func (s *stubRunProviderScheduler) Schedule(ctx context.Context, req execution.ScheduleRequest) (*ulid.ULID, *sv2.Metadata, error) {
@@ -365,6 +432,12 @@ func (s *stubRunProviderScheduler) Schedule(ctx context.Context, req execution.S
 	return &s.runID, nil, nil
 }
 
+func (s *stubRunProviderScheduler) Cancel(ctx context.Context, id sv2.ID, req execution.CancelRequest) error {
+	s.cancelID = &id
+	s.cancelReq = &req
+	return s.cancelErr
+}
+
 var _ runProviderDataReader = (*stubRunProviderDataReader)(nil)
-var _ apiv2.FunctionScheduler = (*stubRunProviderScheduler)(nil)
+var _ runProviderExecutor = (*stubRunProviderScheduler)(nil)
 var _ event.TrackedEvent = (*cqrs.Event)(nil)

@@ -129,6 +129,7 @@ type RunProvider interface {
 	GetRun(ctx context.Context, runID ulid.ULID, opts GetRunOpts) (*cqrs.FunctionRun, error)
 	GetRuns(ctx context.Context, opts GetRunsOpts) (*GetRunsResult, error)
 	Rerun(ctx context.Context, runID ulid.ULID, opts RerunOpts) (ulid.ULID, error)
+	Cancel(ctx context.Context, runID ulid.ULID) error
 }
 
 type RerunOpts struct {

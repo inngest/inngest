@@ -1032,6 +1032,25 @@ service V2 {
     };
   }
 
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse) {
+    option (google.api.http) = {
+      post: "/runs/{run_id}/cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel function run"
+      tags: "Runs"
+      tags: "Beta"
+      description: "Cancels an in-progress function run"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc GetApp(GetAppRequest) returns (GetAppResponse) {
     option (google.api.http) = {
       get: "/apps/{app_id}"
@@ -3220,4 +3239,22 @@ message ListFunctionRunsResponse {
   repeated FunctionRun data = 1;
   ResponseMetadata metadata = 2;
   Page page = 3;
+}
+
+message CancelRunRequest {
+  string run_id = 1;
+}
+
+message CancelRunResponse {
+  CancelRunData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message CancelRunData {
+  string run_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Cancelled run ID"
+      example: "\"01hp1zx8m3ng9vp6qn0xk7j4cy\""
+    }
+  ];
 }
