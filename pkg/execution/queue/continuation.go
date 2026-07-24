@@ -83,6 +83,29 @@ func (q *queueProcessor) removeContinue(ctx context.Context, p *QueuePartition, 
 	}
 }
 
+func (q *queueProcessor) watchDispatchedPartitionItem(ctx context.Context, dispatched DispatchedItem, p *QueuePartition, continuationCount uint) {
+	if !q.runMode.Continuations || dispatched == nil || p == nil {
+		return
+	}
+
+	partition := *p
+	go func() {
+		timeout := q.Clock().NewTimer(QueueContinuationResultTimeout)
+		defer timeout.Stop()
+
+		select {
+		case result := <-dispatched.Done():
+			if result.Err == nil && result.ScheduledImmediateJob {
+				q.addContinue(ctx, &partition, continuationCount+1)
+			}
+		case <-timeout.Chan():
+			return
+		case <-ctx.Done():
+			return
+		}
+	}()
+}
+
 func (q *queueProcessor) scanContinuations(ctx context.Context, dispatch DispatchFunc) error {
 	if !q.runMode.Continuations {
 		// continuations are not enabled.

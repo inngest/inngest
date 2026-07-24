@@ -41,14 +41,14 @@ func (m *mockConsumer) Dequeue(_ context.Context, shardName string, _ QueueItem,
 }
 
 type mockQueueScanner struct {
-	called   atomic.Bool
-	dispatch DispatchFunc
-	err      error
+	called  atomic.Bool
+	runtime QueueScannerRuntime
+	err     error
 }
 
-func (m *mockQueueScanner) Run(_ context.Context, dispatch DispatchFunc) error {
+func (m *mockQueueScanner) Run(_ context.Context, rt QueueScannerRuntime) error {
 	m.called.Store(true)
-	m.dispatch = dispatch
+	m.runtime = rt
 	return m.err
 }
 
@@ -57,8 +57,8 @@ type mockScannerShard struct {
 	scanner QueueScanner
 }
 
-func (m *mockScannerShard) Run(ctx context.Context, dispatch DispatchFunc) error {
-	return m.scanner.Run(ctx, dispatch)
+func (m *mockScannerShard) Run(ctx context.Context, rt QueueScannerRuntime) error {
+	return m.scanner.Run(ctx, rt)
 }
 
 func TestProcessorWithQueueProducerOverridesDefaultProducer(t *testing.T) {
@@ -113,7 +113,10 @@ func TestProcessorRunUsesShardQueueScanner(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, scanner.called.Load())
-	require.NotNil(t, scanner.dispatch)
+	require.NotNil(t, scanner.runtime.Leaser)
+	require.NotNil(t, scanner.runtime.Dispatch)
+	require.NotNil(t, scanner.runtime.WorkerSemaphore)
+	require.Same(t, q.Semaphore(), scanner.runtime.WorkerSemaphore)
 }
 
 func TestProcessorRunReturnsQueueScannerError(t *testing.T) {

@@ -242,12 +242,28 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		}
 	}
 
-	dispatch := func(_ context.Context, item ProcessItem) error {
-		q.workers <- item
-		return nil
+	dispatch := func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
+		handle := newDispatchedItemHandle()
+		item.result = handle
+
+		select {
+		case q.workers <- item:
+			return handle, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
-	err := scanner.Run(ctx, dispatch)
+	rt := QueueScannerRuntime{
+		Leaser:          q,
+		Dispatch:        dispatch,
+		WorkerSemaphore: q.Semaphore(),
+	}
+	if rt.Leaser == nil {
+		return ErrQueueScannerMissingLeaser
+	}
+
+	err := scanner.Run(ctx, rt)
 
 	l.Info("queue waiting to quit", "err", err)
 	q.wg.Wait()

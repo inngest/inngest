@@ -734,19 +734,17 @@ type ShadowContinuation struct {
 	Count      uint
 }
 
-// ProcessItem references the queue partition and queue item to be processed by a worker.
-// both items need to be passed to a worker as both items are needed to generate concurrency
-// keys to extend leases and dequeue.
+// ProcessItem references the queue item and scanner-provided metadata to be processed by a worker.
 type ProcessItem struct {
-	P QueuePartition
 	I QueueItem
 
-	// PCtr represents the number of times the partition has been continued.
-	PCtr uint
+	Priority      uint
+	ContinueCount uint
 
 	CapacityLease *CapacityLease
 
 	ConditionalTraceCtx context.Context
+	result              *dispatchedItemHandle
 }
 
 type capacityLease struct {

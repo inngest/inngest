@@ -23,9 +23,9 @@ import (
 )
 
 func dispatchToQueueWorkers(workers chan queue.ProcessItem) queue.DispatchFunc {
-	return func(_ context.Context, item queue.ProcessItem) error {
+	return func(_ context.Context, item queue.ProcessItem) (queue.DispatchedItem, error) {
 		workers <- item
-		return nil
+		return queue.NewCompletedDispatchedItem(queue.DispatchedItemResult{}), nil
 	}
 }
 
@@ -151,6 +151,90 @@ func TestQueueSemaphoreWithConstraintAPI(t *testing.T) {
 	// Verify semaphore only accounted for the first item
 	// This must not include the second item that got limited
 	require.Equal(t, int64(1), q.Semaphore().Count())
+}
+
+func TestLeaseItemReturnsRetryAfterForConstraintLimit(t *testing.T) {
+	ctx := context.Background()
+
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+	queueClient := redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey)
+
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
+		constraintapi.WithClock(clock),
+	)
+	require.NoError(t, err)
+
+	options := []queue.QueueOpt{
+		queue.WithClock(clock),
+		queue.WithCapacityManager(cm),
+		queue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		queue.WithPartitionConstraintConfigGetter(func(ctx context.Context, p queue.PartitionIdentifier) queue.PartitionConstraintConfig {
+			return queue.PartitionConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: queue.PartitionConcurrency{
+					AccountConcurrency:  1,
+					FunctionConcurrency: 1,
+				},
+			}
+		}),
+	}
+
+	shard := redis_state.NewQueueShard("test", queueClient, options...)
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	q, err := queue.New(ctx, "test", shardRegistry, options...)
+	require.NoError(t, err)
+
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	makeItem := func() queue.QueueItem {
+		return queue.QueueItem{
+			Data: queue.Item{
+				Kind: queue.KindStart,
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
+					RunID:       ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader),
+				},
+				WorkspaceID: envID,
+			},
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+		}
+	}
+
+	qi1, err := shard.EnqueueItem(ctx, makeItem(), clock.Now(), queue.EnqueueOpts{})
+	require.NoError(t, err)
+	qi2, err := shard.EnqueueItem(ctx, makeItem(), clock.Now(), queue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	dispatch := dispatchToQueueWorkers(q.Workers())
+	req := func(item *queue.QueueItem) queue.LeaseItemRequest {
+		return queue.LeaseItemRequest{
+			Item:       item,
+			StaticTime: clock.Now(),
+		}
+	}
+
+	result, err := q.LeaseItem(ctx, req(&qi1), dispatch)
+	require.NoError(t, err)
+	require.Equal(t, queue.LeaseItemStatusDispatched, result.Status)
+	require.Zero(t, result.RetryAfter)
+
+	result, err = q.LeaseItem(ctx, req(&qi2), dispatch)
+	require.ErrorIs(t, err, queue.ErrProcessNoUserConstraintCapacity)
+	require.Equal(t, queue.LeaseItemStatusConcurrencyLimited, result.Status)
+	require.WithinDuration(t, clock.Now().Add(constraintapi.ConcurrencyLimitRetryAfter), result.RetryAfter, time.Millisecond)
 }
 
 func TestQueueSemaphoreDisableFlagSkipsSemaphoreOnlyValidCapacityLeaseAcquire(t *testing.T) {

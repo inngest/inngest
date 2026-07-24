@@ -286,13 +286,25 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 
 	parallel := parallelFn || parallelAccount || isSystemFn
 
+	dispatchForIterator := dispatch
+	if q.runMode.Continuations {
+		dispatchForIterator = func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
+			dispatched, err := dispatch(ctx, item)
+			if err != nil {
+				return dispatched, err
+			}
+			q.watchDispatchedPartitionItem(ctx, dispatched, p, continuationCount)
+			return dispatched, nil
+		}
+	}
+
 	iter := ProcessorIterator{
 		Partition:            p,
 		Items:                queue,
 		PartitionContinueCtr: continuationCount,
 		Queue:                q,
 		Leaser:               q,
-		Dispatch:             dispatch,
+		Dispatch:             dispatchForIterator,
 		StaticTime:           q.Clock().Now(),
 		Parallel:             parallel,
 	}
