@@ -17,7 +17,7 @@ import { dateFormat, timeDiff } from '@/components/Metrics/utils';
 import { ChartTooltip } from './ChartTooltip';
 import { TrendAreaChartSkeleton, TrendChartSkeleton } from './ChartSkeleton';
 import { BORDER_SUBTLE_COLOR, DEFAULT_PALETTE, SURFACE_COLOR } from './colors';
-import { valuesToMap, type InsightsMetricPoint } from './types';
+import { valuesToMap, type InsightsMetricPoint, type TooltipExtra } from './types';
 
 export type TrendSeriesConfig = {
   // Which NamedValue.name to read per point.
@@ -83,6 +83,20 @@ type Props = {
   // Legend icon shape — 'circle' (default) matches every other trend chart;
   // 'rect' for callers that want a square swatch instead.
   legendIcon?: 'circle' | 'rect';
+  // Extra value(s) to show in the hover tooltip beyond what's plotted —
+  // e.g. token counts alongside a "Cost over time" chart's cost line. Reads
+  // straight off each point's `values` (every named value is carried
+  // through to chartData, not just the plotted series), so any column the
+  // query returns works here without adding a visual line/bar for it. Fixed
+  // `series` form only.
+  tooltipExtras?: TooltipExtra[];
+  // Value to use for a plotted series at a bucket that has no data for it —
+  // e.g. 0 for a count/sum measure (runs, tokens, cost), where "no data"
+  // and "zero" mean the same thing. Left as a gap (null, bridged by
+  // connectNulls) by default, which suits an average/percentile measure
+  // (cost per run, latency) where 0 would misrepresent "no data" as a real
+  // reading of zero. Fixed `series` form only.
+  defaultValue?: number;
   isLoading?: boolean;
   // Charts sharing the same group id sync their hover/tooltip position
   // (recharts' syncId) — hovering one chart highlights the same x position
@@ -123,6 +137,8 @@ export function TrendChart({
   axisFormat = format,
   allowDecimals = false,
   legendIcon = 'circle',
+  tooltipExtras,
+  defaultValue,
   isLoading = false,
   group,
   className,
@@ -184,13 +200,19 @@ export function TrendChart({
           });
         } else {
           const map = valuesToMap(p.values ?? []);
+          // Every named value the point carries, not just the plotted
+          // series — lets tooltipExtras read a column (e.g. token counts
+          // alongside a cost line) without a Line/Bar/Area of its own.
+          map.forEach((value, name) => {
+            row[name] = value;
+          });
           effectiveSeries.forEach((s) => {
-            row[s.key] = map.get(s.key) ?? null;
+            row[s.key] = map.get(s.key) ?? defaultValue ?? null;
           });
         }
         return row;
       }),
-    [points, effectiveSeries, valueName, topSet],
+    [points, effectiveSeries, valueName, topSet, defaultValue],
   );
 
   const colorByKey = useMemo(
@@ -253,7 +275,9 @@ export function TrendChart({
               />
               <Tooltip
                 cursor={{ stroke: BORDER_SUBTLE_COLOR }}
-                content={<ChartTooltip colorByKey={colorByKey} format={format} />}
+                content={
+                  <ChartTooltip colorByKey={colorByKey} format={format} tooltipExtras={tooltipExtras} />
+                }
                 // recharts' tooltip wrapper is `tabIndex={-1} role="dialog"`,
                 // programmatically focused whenever the tooltip shows —
                 // including on plain mouse hover, not just real keyboard

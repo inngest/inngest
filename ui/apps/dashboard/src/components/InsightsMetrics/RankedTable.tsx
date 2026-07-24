@@ -6,8 +6,11 @@ import { TableRowsSkeleton } from './ChartSkeleton';
 import { valuesToMap, type InsightsMetricItem } from './types';
 
 export type RankedTableColumn = {
-  // Which NamedValue.name to read.
-  valueName: string;
+  // Which NamedValue.name to read, or a function computing the cell's value
+  // from the whole row — for anything beyond a single named field (e.g.
+  // summing input_tokens + output_tokens into one "tokens used" column).
+  // Returns undefined to render '—', same as a missing named value would.
+  valueName: string | ((item: InsightsMetricItem) => number | undefined);
   label: string;
   format?: (value: number) => string;
 };
@@ -99,10 +102,15 @@ export function RankedTable({
       : [];
 
     const valueColumns: ColumnDef<Row, unknown>[] = columns.map((col) => ({
-      id: col.valueName,
+      // Labels are unique within one table's column set, so this is a
+      // stable id even when valueName is a function rather than a string.
+      id: typeof col.valueName === 'string' ? col.valueName : col.label,
       header: col.label,
       cell: ({ row }) => {
-        const value = valuesToMap(row.original.values).get(col.valueName);
+        const value =
+          typeof col.valueName === 'function'
+            ? col.valueName(row.original)
+            : valuesToMap(row.original.values).get(col.valueName);
         return value === undefined ? '—' : (col.format ?? defaultFormat)(value);
       },
     }));

@@ -25,6 +25,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
+import { CHART_COLORS, SUBTLE_BLUE, SUBTLE_GREEN, TOKENS_BY_MODEL_GREEN } from './colors';
 import { AIOverviewEmptyState } from './EmptyState';
 import {
   formatCost,
@@ -35,7 +36,12 @@ import {
   headlineCaveat,
   msPointsToSeconds,
 } from './utils';
-import { renderRunLink, renderSessionKeyLink, renderSessionLink } from './renderIdentifiers';
+import {
+  renderFunctionLink,
+  renderRunLink,
+  renderSessionKeyLink,
+  renderSessionLink,
+} from './renderIdentifiers';
 import { CategoricalChart } from '../InsightsMetrics/CategoricalChart';
 import { ChartLegend } from '../InsightsMetrics/ChartLegend';
 import { HeadlineStats } from '../InsightsMetrics/HeadlineStats';
@@ -46,44 +52,25 @@ import { DEFAULT_PALETTE } from '../InsightsMetrics/colors';
 import { TREND_BUCKET_LIMIT } from '../InsightsMetrics/queries';
 import { useInsightsMetric } from '../InsightsMetrics/useInsightsMetric';
 import {
+  sumValues,
   toListItems,
   toScalarValues,
   toTrendPoints,
+  type TooltipExtra,
 } from '../InsightsMetrics/types';
 
 const DEFAULT_DURATION = { days: 7 };
 
 const formatRuns = (value: number) => `${formatCompactNumber(value)} runs`;
 
-// Fixed-order pastel palette (green, blue, yellow, orange, purple), matched
-// against a reference mock — used both for per-category color (top
-// functions by usage) and as the single-hue override for individual charts
-// (e.g. green for runs). Reuses the design system's "subtle" tier tokens;
-// yellow has no dedicated categorical slot, so it references the honey
-// scale's step 300 directly (verified against the live app — the
-// warning/honey *semantic* tokens render as a burnt orange-rust in light
-// mode, not yellow). Literal `rgb(var(--x))` strings (see
-// InsightsMetrics/colors.ts) rather than Tailwind's resolved theme object,
-// which embeds a `<alpha-value>` placeholder that isn't valid CSS as-is.
-const CHART_COLORS: readonly string[] = [
-  'rgb(var(--color-primary-subtle))', // green
-  'rgb(var(--color-secondary-subtle))', // blue
-  'rgb(var(--color-honey-300))', // yellow
-  'rgb(var(--color-quaternary-warmer-xSubtle))', // orange
-  'rgb(var(--color-quaternary-cool-xSubtle))', // purple
+// Shared by "Cost over time" and "Cost by model" — both plot ai_token_trend/
+// ai_model_distribution's `cost` column, which carries input/output tokens
+// alongside it in the same row (see InsightsMetrics/queries.ts), so the
+// tooltip can show token counts without adding a visual series for them.
+const TOKEN_TOOLTIP_EXTRAS: TooltipExtra[] = [
+  { valueName: 'input_tokens', label: 'Input tokens', format: formatCompactNumber },
+  { valueName: 'output_tokens', label: 'Output tokens', format: formatCompactNumber },
 ];
-
-// 3xSubtle blue/green for the Tokens over time area fill — the design
-// system's most muted tier of the same secondary/primary hues
-// DEFAULT_PALETTE's "moderate" tier uses.
-const SUBTLE_BLUE = 'rgb(var(--color-secondary-3xSubtle))';
-const SUBTLE_GREEN = 'rgb(var(--color-primary-3xSubtle))';
-
-// Tokens by model's stacked bars — matched pixel-for-pixel against a
-// reference mock: blue reuses the same secondary 3xSubtle tier as Tokens
-// over time, but green needed one tier down (2xSubtle, not 3xSubtle) to
-// match — the two charts aren't a matched pair here.
-const TOKENS_BY_MODEL_GREEN = 'rgb(var(--color-primary-2xSubtle))';
 
 const FunctionLookupDocument = graphql(`
   query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {
@@ -258,8 +245,8 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
   }, [lookupData]);
 
   const latencyTrendPoints = useMemo(
-    () => msPointsToSeconds(toTrendPoints(latencyTrend.data), ['p50', 'p95', 'p99']),
-    [latencyTrend.data],
+    () => msPointsToSeconds(toTrendPoints(latencyTrend.data, timeRange, TREND_BUCKET_LIMIT), ['p50', 'p95', 'p99']),
+    [latencyTrend.data, timeRange],
   );
 
   const isDefaultView = !start && !end && !duration && !selectedFns?.length;
@@ -349,10 +336,11 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
             queryName="AI run volume over time"
           >
             <TrendChart
-              points={toTrendPoints(runVolumeTrend.data)}
+              points={toTrendPoints(runVolumeTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={runVolumeTrend.fetching && !runVolumeTrend.data}
               chartType="bar"
               series={[{ valueName: 'runs', label: 'Runs', color: CHART_COLORS[0] }]}
+              defaultValue={0}
             />
           </Section>
           <Section
@@ -361,7 +349,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
             queryName="AI tokens over time"
           >
             <TrendChart
-              points={toTrendPoints(tokenTrend.data)}
+              points={toTrendPoints(tokenTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={tokenTrend.fetching && !tokenTrend.data}
               chartType="area"
               stacked
@@ -380,6 +368,8 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                   areaColor: SUBTLE_GREEN,
                 },
               ]}
+              tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost }]}
+              defaultValue={0}
             />
           </Section>
           <Section
@@ -448,6 +438,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               stacked
               format={formatCompactNumber}
               showYAxisLine={false}
+              tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost }]}
             />
           </Section>
         </div>
@@ -456,13 +447,15 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Section title="Cost over time" query={tokenTrend.data?.query} queryName="AI cost over time">
             <TrendChart
-              points={toTrendPoints(tokenTrend.data)}
+              points={toTrendPoints(tokenTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={tokenTrend.fetching && !tokenTrend.data}
               chartType="bar"
               format={formatCost}
               axisFormat={formatCostAxis}
               allowDecimals
               series={[{ valueName: 'cost', label: 'Cost', color: CHART_COLORS[0] }]}
+              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
+              defaultValue={0}
             />
           </Section>
           <Section title="Cost by model" query={modelDistribution.data?.query} queryName="AI cost by model">
@@ -472,8 +465,10 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               valueName="cost"
               colors={CHART_COLORS}
               format={formatCost}
+              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
               showYAxisLine={false}
               showTooltipValueName={false}
+              showValueLabels
             />
           </Section>
           <Section
@@ -482,12 +477,13 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
             queryName="AI cost per run over time"
           >
             <TrendChart
-              points={toTrendPoints(costPerRunTrend.data)}
+              points={toTrendPoints(costPerRunTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={costPerRunTrend.fetching && !costPerRunTrend.data}
               format={formatCost}
               axisFormat={formatCostAxis}
               allowDecimals
               series={[{ valueName: 'avg_cost_per_run', label: 'Cost per run', color: CHART_COLORS[0] }]}
+              defaultValue={0}
             />
           </Section>
           <Section
@@ -496,7 +492,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
             queryName="AI cost per session over time"
           >
             <TrendChart
-              points={toTrendPoints(costPerSessionTrend.data)}
+              points={toTrendPoints(costPerSessionTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={costPerSessionTrend.fetching && !costPerSessionTrend.data}
               format={formatCost}
               axisFormat={formatCostAxis}
@@ -504,6 +500,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               series={[
                 { valueName: 'avg_cost_per_session', label: 'Cost per session', color: CHART_COLORS[0] },
               ]}
+              defaultValue={0}
             />
           </Section>
           <Section
@@ -522,6 +519,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                 formatIdentifier={(id) => functionsBySlug.get(id)?.name ?? id}
                 showYAxisLine={false}
                 showTooltipValueName={false}
+                tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
                 className="min-w-0 lg:w-2/3"
               />
               <ChartLegend
@@ -551,7 +549,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               }}
               columns={[
                 { valueName: 'cost', label: 'Cost', format: formatCost },
-                { valueName: 'tokens', label: 'Tokens used', format: formatCompactNumber },
+                { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
               ]}
             />
           </Section>
@@ -570,7 +568,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               }}
               columns={[
                 { valueName: 'cost', label: 'Total cost', format: formatCost },
-                { valueName: 'tokens', label: 'Tokens used', format: formatCompactNumber },
+                { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
               ]}
             />
           </Section>
@@ -592,7 +590,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               columns={[
                 { valueName: 'runs', label: 'Runs', format: formatCompactNumber },
                 { valueName: 'cost', label: 'Cost', format: formatCost },
-                { valueName: 'tokens', label: 'Tokens used', format: formatCompactNumber },
+                { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
               ]}
             />
           </Section>
@@ -657,23 +655,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
     </div>
   );
 };
-
-function renderFunctionLink(
-  identifier: string,
-  envSlug: string,
-  functionsBySlug: Map<string, { name: string; slug: string }>,
-) {
-  const fn = functionsBySlug.get(identifier);
-  if (!fn) return identifier;
-  return (
-    <a
-      className="text-link hover:underline"
-      href={pathCreator.function({ envSlug, functionSlug: fn.slug })}
-    >
-      {fn.name}
-    </a>
-  );
-}
 
 function SectionGroupHeading({ children }: { children: React.ReactNode }) {
   return <h2 className="text-basis mb-3 mt-6 text-base font-semibold">{children}</h2>;

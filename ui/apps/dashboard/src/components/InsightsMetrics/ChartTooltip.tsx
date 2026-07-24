@@ -1,10 +1,20 @@
 import { formatNumber } from '@/components/Metrics/utils';
+import type { TooltipExtra } from './types';
 
 export type ChartTooltipPayloadEntry = {
-  dataKey?: string;
+  // string for a real series (TrendChart sets `dataKey={s.key}` directly);
+  // a stacked area's invisible dot-marker overlay instead sets a *function*
+  // dataKey (it recomputes each layer's cumulative value for its hover dot)
+  // — recharts still reports that overlay as its own tooltip payload entry,
+  // so filtering to string dataKeys is what excludes it below.
+  dataKey?: string | ((row: unknown) => unknown);
   name?: string;
   value?: number | null;
   color?: string;
+  // recharts attaches the full chartData row here regardless of which
+  // dataKey the entry itself plots — this is how tooltipExtras reads a
+  // column (e.g. cost) that has no Line/Bar/Area of its own.
+  payload?: Record<string, string | number | null>;
 };
 
 // ChartTooltip renders TrendChart's shared axis tooltip: every series
@@ -19,18 +29,23 @@ export function ChartTooltip({
   label,
   colorByKey,
   format = formatNumber,
+  tooltipExtras,
 }: {
   active?: boolean;
   payload?: ChartTooltipPayloadEntry[];
   label?: string;
   colorByKey: Record<string, string>;
   format?: (value: number) => string;
+  tooltipExtras?: TooltipExtra[];
 }) {
   if (!active || !payload?.length) return null;
-  const sorted = [...payload]
-    .filter((p): p is ChartTooltipPayloadEntry & { value: number } => typeof p.value === 'number')
+  const sorted = payload
+    .filter((p): p is ChartTooltipPayloadEntry & { dataKey: string; value: number } =>
+      typeof p.dataKey === 'string' && p.dataKey in colorByKey && typeof p.value === 'number',
+    )
     .sort((a, b) => b.value - a.value);
   if (sorted.length === 0) return null;
+  const row = payload[0]?.payload;
   return (
     <div className="bg-canvasBase border-subtle shadow-tooltip rounded-md border px-3 pb-2 pt-1 text-sm shadow-md">
       <div className="text-muted pb-2">{label}</div>
@@ -46,6 +61,16 @@ export function ChartTooltip({
           <span className="shrink-0 tabular-nums">{format(p.value)}</span>
         </div>
       ))}
+      {tooltipExtras?.map((extra) => {
+        const value = row?.[extra.valueName];
+        if (typeof value !== 'number') return null;
+        return (
+          <div key={extra.valueName} className="text-muted flex items-center justify-between gap-4 pt-1">
+            <span>{extra.label}</span>
+            <span className="tabular-nums">{(extra.format ?? formatNumber)(value)}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

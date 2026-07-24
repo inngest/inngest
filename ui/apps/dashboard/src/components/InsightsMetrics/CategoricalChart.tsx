@@ -16,7 +16,7 @@ import { truncateCenter } from '@/lib/experiments/chart';
 import { RankedChartSkeleton } from './ChartSkeleton';
 import { BORDER_SUBTLE_COLOR, DEFAULT_PALETTE, SURFACE_COLOR } from './colors';
 import type { TrendSeriesConfig } from './TrendChart';
-import { valuesToMap, type InsightsMetricItem } from './types';
+import { valuesToMap, type InsightsMetricItem, type TooltipExtra } from './types';
 
 type Props = {
   items: InsightsMetricItem[] | undefined;
@@ -59,6 +59,12 @@ type Props = {
   // this off keeps the tooltip to just the formatted value. Multi-measure
   // charts still need this to tell series apart, so it defaults to true.
   showTooltipValueName?: boolean;
+  // Extra value(s) to show in the hover tooltip beyond what's plotted —
+  // e.g. token counts alongside a "Cost by model" chart's cost bars. Reads
+  // straight off each item's `values` (every named value is carried through
+  // to chartData, not just the plotted series), so any column the query
+  // returns works here without adding a visual bar/segment for it.
+  tooltipExtras?: TooltipExtra[];
   isLoading?: boolean;
   className?: string;
 };
@@ -101,7 +107,16 @@ function stackedSegmentShape(props: BarShapeProps, isLastSegment: boolean, strok
   );
 }
 
-type TooltipPayloadEntry = { dataKey?: string; name?: string; value?: number; color?: string };
+type TooltipPayloadEntry = {
+  dataKey?: string;
+  name?: string;
+  value?: number;
+  color?: string;
+  // recharts attaches the full chartData row here regardless of which
+  // dataKey the entry itself plots — this is how tooltipExtras reads a
+  // column (e.g. cost) that has no Bar of its own.
+  payload?: ChartRow;
+};
 
 function CategoricalTooltip({
   active,
@@ -112,6 +127,7 @@ function CategoricalTooltip({
   colorByKey,
   colorByIdentifier,
   showValueLabel,
+  tooltipExtras,
 }: {
   active?: boolean;
   payload?: TooltipPayloadEntry[];
@@ -132,8 +148,10 @@ function CategoricalTooltip({
   // `name` prop is falsy, so an absent/empty `valueLabel` alone can't
   // suppress this; the caller has to opt out explicitly instead.
   showValueLabel: boolean;
+  tooltipExtras?: TooltipExtra[];
 }) {
   if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload;
   return (
     <div className="bg-canvasBase border-subtle shadow-tooltip rounded-md border px-3 pb-2 pt-1 text-sm shadow-md">
       <div className="text-muted pb-2">{formatIdentifier(label ?? '')}</div>
@@ -152,6 +170,16 @@ function CategoricalTooltip({
               {typeof p.value === 'number' ? format(p.value) : p.value}
               {showValueLabel && p.name ? ` ${p.name}` : ''}
             </span>
+          </div>
+        );
+      })}
+      {tooltipExtras?.map((extra) => {
+        const value = row?.[extra.valueName];
+        if (typeof value !== 'number') return null;
+        return (
+          <div key={extra.valueName} className="text-muted flex items-center justify-between gap-4 pt-1">
+            <span>{extra.label}</span>
+            <span className="tabular-nums">{(extra.format ?? defaultFormat)(value)}</span>
           </div>
         );
       })}
@@ -182,6 +210,7 @@ export function CategoricalChart({
   showYAxisLine = true,
   showValueLabels = false,
   showTooltipValueName = true,
+  tooltipExtras,
   isLoading = false,
   className,
 }: Props) {
@@ -206,7 +235,10 @@ export function CategoricalChart({
     () =>
       sorted.map((item) => {
         const map = valuesToMap(item.values);
-        const row: ChartRow = { identifier: item.identifier };
+        // Every named value the item carries, not just the plotted
+        // series — lets tooltipExtras read a column (e.g. cost alongside
+        // Tokens by model's input/output bars) without a Bar of its own.
+        const row: ChartRow = { identifier: item.identifier, ...Object.fromEntries(map) };
         effectiveSeries.forEach((s) => {
           row[s.valueName] = map.get(s.valueName) ?? 0;
         });
@@ -364,6 +396,7 @@ export function CategoricalChart({
                   colorByKey={colorByKey}
                   colorByIdentifier={colorByIdentifier}
                   showValueLabel={showTooltipValueName}
+                  tooltipExtras={tooltipExtras}
                 />
               }
               // recharts' tooltip wrapper is `tabIndex={-1} role="dialog"`,

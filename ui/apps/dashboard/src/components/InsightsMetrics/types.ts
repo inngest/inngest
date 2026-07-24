@@ -20,6 +20,17 @@ export type NamedValue = {
   value: number;
 };
 
+// TooltipExtra is a chart-agnostic config for an extra tooltip row beyond
+// what's actually plotted — e.g. token counts alongside a "Cost by model"
+// chart's cost bars. Shared by CategoricalChart and TrendChart (declaring it
+// in either would create a circular import, since CategoricalChart already
+// imports TrendSeriesConfig from TrendChart).
+export type TooltipExtra = {
+  valueName: string;
+  label: string;
+  format?: (value: number) => string;
+};
+
 export type InsightsMetricItem = {
   identifier: string;
   // Present only for list entries whose underlying query also selects
@@ -43,6 +54,17 @@ export type InsightsMetricPoint = {
   values?: NamedValue[];
   dimensions?: InsightsMetricItem[];
 };
+
+// sumValues adds up several named values on one item (e.g. input_tokens +
+// output_tokens into one "tokens used" figure) — undefined if none of the
+// names are present, same as a single missing named value would be, so
+// RankedTable's '—' fallback still applies.
+export function sumValues(item: InsightsMetricItem, names: string[]): number | undefined {
+  const map = valuesToMap(item.values);
+  const present = names.filter((name) => map.has(name));
+  if (present.length === 0) return undefined;
+  return present.reduce((total, name) => total + (map.get(name) ?? 0), 0);
+}
 
 // valuesToMap turns a NamedValue[] into a lookup by name — every display
 // component reads its configured value names out of one of these rather
@@ -136,13 +158,63 @@ export function toListItems(table: MetricTable): InsightsMetricItem[] {
 
 // toTrendPoints reconstructs a flat bucketed time-series result: every row
 // becomes one Point keyed by the "bucket_start" column.
-export function toTrendPoints(table: MetricTable): InsightsMetricPoint[] {
+//
+// The backend doesn't zero-fill empty buckets (a plain `GROUP BY
+// bucket_start`, no `WITH FILL`/`generate_series` — see e.g.
+// buildTokenTrendSQL in pkg/applogic/dashboards/registry.go), so a bucket
+// with no matching rows is simply absent from the result. Passing `range`
+// and `limit` (the same values sent as the query's $range/$trendBucketLimit
+// variables) fills in an empty point for every such bucket, so the chart's
+// x-axis spans the full requested range even when the edge buckets have no
+// data. Omit them to get the raw, unfilled rows.
+export function toTrendPoints(
+  table: MetricTable,
+  range?: { from: string; to: string },
+  limit?: number,
+): InsightsMetricPoint[] {
   if (!table) return [];
   const bucketIdx = columnIndex(table.columns, BUCKET_COLUMN);
-  return table.rows.map((row) => ({
+  const points = table.rows.map((row) => ({
     timestamp: bucketIdx >= 0 ? String(row.values[bucketIdx] ?? '') : '',
     values: namedValuesFromRow(table.columns, row, new Set([BUCKET_COLUMN])),
   }));
+  return range && limit ? fillTrendBuckets(points, range, limit) : points;
+}
+
+// fillTrendBuckets synthesizes an empty point for every bucket the backend
+// would have returned had it zero-filled the range. Bucket boundaries mirror
+// the backend exactly: bucketDurationSeconds is floor((to-from)/limit) with
+// a 1-second floor, and bucket_start values are epoch-aligned (ClickHouse's
+// toStartOfInterval anchors to 1970-01-01, not to `from`) — see
+// bucketDurationSeconds in pkg/applogic/dashboards/registry.go. Matching
+// existing points by their own recomputed bucket (not by raw timestamp
+// string) so formatting differences (e.g. trailing milliseconds) can't
+// cause a real point to be treated as missing.
+function fillTrendBuckets(
+  points: InsightsMetricPoint[],
+  range: { from: string; to: string },
+  limit: number,
+): InsightsMetricPoint[] {
+  const fromSec = new Date(range.from).getTime() / 1000;
+  const toSec = new Date(range.to).getTime() / 1000;
+  if (!Number.isFinite(fromSec) || !Number.isFinite(toSec) || toSec <= fromSec || limit <= 0) {
+    return points;
+  }
+  const bucketSeconds = Math.max(1, Math.floor((toSec - fromSec) / limit));
+  const firstBucket = Math.floor(fromSec / bucketSeconds) * bucketSeconds;
+  const lastBucket = Math.floor(toSec / bucketSeconds) * bucketSeconds;
+
+  const byBucket = new Map<number, InsightsMetricPoint>();
+  for (const p of points) {
+    const sec = new Date(p.timestamp).getTime() / 1000;
+    if (Number.isFinite(sec)) byBucket.set(Math.floor(sec / bucketSeconds) * bucketSeconds, p);
+  }
+
+  const filled: InsightsMetricPoint[] = [];
+  for (let bucket = firstBucket; bucket <= lastBucket; bucket += bucketSeconds) {
+    filled.push(byBucket.get(bucket) ?? { timestamp: new Date(bucket * 1000).toISOString(), values: [] });
+  }
+  return filled;
 }
 
 // toDimensionedTrendPoints reconstructs a bucketed, per-dimension

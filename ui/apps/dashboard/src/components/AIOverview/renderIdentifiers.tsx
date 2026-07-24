@@ -43,3 +43,26 @@ export function renderSessionKeyLink(sessionKey: string, envSlug: string): React
     </a>
   );
 }
+
+// renderFunctionLink links a function_id identifier (already slug-translated
+// by the Insights transpiler — see AIOverviewDashboard's functionsBySlug
+// comment) to that function's page. `functionsBySlug` is optional: callers
+// scoped to a single already-known function (FunctionAIPanel) don't have a
+// lookup map built, so the identifier renders as plain text instead of a
+// link in that case.
+export function renderFunctionLink(
+  identifier: string,
+  envSlug: string,
+  functionsBySlug?: Map<string, { name: string; slug: string }>,
+): React.ReactNode {
+  const fn = functionsBySlug?.get(identifier);
+  if (!fn) return identifier;
+  return (
+    <a
+      className="text-link hover:underline"
+      href={pathCreator.function({ envSlug, functionSlug: fn.slug })}
+    >
+      {fn.name}
+    </a>
+  );
+}

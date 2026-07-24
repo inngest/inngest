@@ -25,14 +25,17 @@ import { pathCreator } from '@/utils/urls';
 import { AIOverviewEmptyState } from './EmptyState';
 import {
   formatCost,
+  formatCostAxis,
   formatMs,
   formatSeconds,
   formatSecondsAxis,
   headlineCaveat,
   msPointsToSeconds,
 } from './utils';
-import { renderRunLink } from './renderIdentifiers';
+import { CHART_COLORS, SUBTLE_BLUE, SUBTLE_GREEN, TOKENS_BY_MODEL_GREEN } from './colors';
+import { renderRunLink, renderSessionKeyLink, renderSessionLink } from './renderIdentifiers';
 import { CategoricalChart } from '../InsightsMetrics/CategoricalChart';
+import { DEFAULT_PALETTE } from '../InsightsMetrics/colors';
 import { HeadlineStats } from '../InsightsMetrics/HeadlineStats';
 import { RangePlot } from '../InsightsMetrics/RangePlot';
 import { RankedTable } from '../InsightsMetrics/RankedTable';
@@ -40,22 +43,30 @@ import { TrendChart } from '../InsightsMetrics/TrendChart';
 import { TREND_BUCKET_LIMIT } from '../InsightsMetrics/queries';
 import { useInsightsMetric } from '../InsightsMetrics/useInsightsMetric';
 import {
-  toDimensionedTrendPoints,
+  sumValues,
   toListItems,
   toScalarValues,
   toTrendPoints,
+  type TooltipExtra,
 } from '../InsightsMetrics/types';
 
 const DEFAULT_DURATION = { days: 7 };
 
-// FunctionAIPanel is the function-page AI tab — the same reusable display
-// components as AIOverviewDashboard, scoped to one function and without the
-// top-functions rankings (redundant when already scoped to a single
-// function). Run/step-level lists (most expensive runs/steps, slow runs)
-// stay, since a single function can still have many runs. Score averages
-// aren't merged in yet — the partial-data blank-slate behavior (scores
-// present, no gen_ai.* metadata) is still an open design question per the
-// spec.
+// Shared by "Cost over time" and "Cost by model" — both plot ai_token_trend/
+// ai_model_distribution's `cost` column, which carries input/output tokens
+// alongside it in the same row (see InsightsMetrics/queries.ts), so the
+// tooltip can show token counts without adding a visual series for them.
+const TOKEN_TOOLTIP_EXTRAS: TooltipExtra[] = [
+  { valueName: 'input_tokens', label: 'Input tokens', format: formatCompactNumber },
+  { valueName: 'output_tokens', label: 'Output tokens', format: formatCompactNumber },
+];
+
+// FunctionAIPanel is the function-page AI tab — the same set of charts as
+// AIOverviewDashboard (same titles, order, and colors) minus the
+// top-functions/cost-by-function rankings, which are meaningless once
+// already scoped to one function. Score averages aren't merged in yet — the
+// partial-data blank-slate behavior (scores present, no gen_ai.* metadata)
+// is still an open design question per the spec.
 export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
   const environment = useEnvironment();
   const workspaceID = environment.id;
@@ -107,12 +118,6 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
     range: timeRange,
     limit: TREND_BUCKET_LIMIT,
   });
-  const tokenTrendByModel = useInsightsMetric('ai_token_trend_by_model', {
-    workspaceID,
-    functionIDs,
-    range: timeRange,
-    limit: TREND_BUCKET_LIMIT,
-  });
   const runVolumeTrend = useInsightsMetric('ai_run_volume_trend', {
     workspaceID,
     functionIDs,
@@ -152,6 +157,18 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
     range: timeRange,
     limit: 5,
   });
+  const costPerSessionTrend = useInsightsMetric('ai_cost_per_session_trend', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: TREND_BUCKET_LIMIT,
+  });
+  const mostExpensiveSessions = useInsightsMetric('ai_most_expensive_sessions', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: 5,
+  });
   const slowRuns = useInsightsMetric('ai_slow_runs', {
     workspaceID,
     functionIDs,
@@ -163,7 +180,6 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
     headline,
     tokenTrend,
     avgCostPerRunTrend,
-    tokenTrendByModel,
     runVolumeTrend,
     latencyTrend,
     modelDistribution,
@@ -171,12 +187,14 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
     latencyByModel,
     mostExpensiveRuns,
     mostExpensiveSteps,
+    costPerSessionTrend,
+    mostExpensiveSessions,
     slowRuns,
   ].some((m) => m.error);
 
   const latencyTrendPoints = useMemo(
-    () => msPointsToSeconds(toTrendPoints(latencyTrend.data), ['p50', 'p95', 'p99']),
-    [latencyTrend.data],
+    () => msPointsToSeconds(toTrendPoints(latencyTrend.data, timeRange, TREND_BUCKET_LIMIT), ['p50', 'p95', 'p99']),
+    [latencyTrend.data, timeRange],
   );
 
   const isDefaultView = !start && !end && !duration;
@@ -226,17 +244,11 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             isLoading={headline.fetching && !headline.data}
             tiles={[
               { valueName: 'runs', label: 'AI runs', format: formatCompactNumber },
-              { valueName: 'calls', label: 'AI calls', format: formatCompactNumber },
               {
                 valueName: 'cost',
                 label: 'Cost',
                 format: formatCost,
                 tooltip: headlineCaveat(toScalarValues(headline.data)),
-              },
-              {
-                valueName: 'avg_cost_per_run',
-                label: 'Avg cost / run',
-                format: formatCost,
               },
               {
                 valueName: 'input_tokens',
@@ -261,26 +273,16 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
         <SectionGroupHeading>Usage</SectionGroupHeading>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Section
-            title="Run volume over time"
+            title="Runs over time"
             query={runVolumeTrend.data?.query}
             queryName="AI run volume over time"
           >
             <TrendChart
-              points={toTrendPoints(runVolumeTrend.data)}
+              points={toTrendPoints(runVolumeTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={runVolumeTrend.fetching && !runVolumeTrend.data}
-              group="aiFunctionPanel"
               chartType="bar"
-              series={[{ valueName: 'runs', label: 'Runs' }]}
-            />
-          </Section>
-          <Section title="Runs by model" query={runsByModel.data?.query} queryName="AI runs by model">
-            <CategoricalChart
-              items={toListItems(runsByModel.data)}
-              isLoading={runsByModel.fetching && !runsByModel.data}
-              valueName="runs"
-              valueLabel="Runs"
-              format={formatCompactNumber}
-              showValueLabels
+              series={[{ valueName: 'runs', label: 'Runs', color: CHART_COLORS[0] }]}
+              defaultValue={0}
             />
           </Section>
           <Section
@@ -289,68 +291,67 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             queryName="AI tokens over time"
           >
             <TrendChart
-              points={toTrendPoints(tokenTrend.data)}
+              points={toTrendPoints(tokenTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={tokenTrend.fetching && !tokenTrend.data}
-              group="aiFunctionPanel"
               chartType="area"
+              stacked
+              legendIcon="rect"
               series={[
-                { valueName: 'input_tokens', label: 'Input tokens' },
-                { valueName: 'output_tokens', label: 'Output tokens' },
+                {
+                  valueName: 'input_tokens',
+                  label: 'Input',
+                  color: DEFAULT_PALETTE[2],
+                  areaColor: SUBTLE_BLUE,
+                },
+                {
+                  valueName: 'output_tokens',
+                  label: 'Output',
+                  color: DEFAULT_PALETTE[1],
+                  areaColor: SUBTLE_GREEN,
+                },
               ]}
+              tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost }]}
+              defaultValue={0}
+            />
+          </Section>
+          <Section title="Runs by model" query={runsByModel.data?.query} queryName="AI runs by model">
+            <CategoricalChart
+              items={toListItems(runsByModel.data)}
+              isLoading={runsByModel.fetching && !runsByModel.data}
+              valueName="runs"
+              valueLabel="Runs"
+              color={CHART_COLORS[0]}
+              format={formatCompactNumber}
+              showYAxisLine={false}
+              showValueLabels
             />
           </Section>
           <Section
-            title="Tokens by model — input"
+            title="Tokens by model"
             query={modelDistribution.data?.query}
             queryName="AI tokens by model"
           >
             <CategoricalChart
               items={toListItems(modelDistribution.data)}
               isLoading={modelDistribution.fetching && !modelDistribution.data}
-              valueName="input_tokens"
-              valueLabel="Input tokens"
-              format={formatCompactNumber}
-            />
-          </Section>
-          <Section
-            title="Tokens by model — output"
-            query={modelDistribution.data?.query}
-            queryName="AI tokens by model"
-          >
-            <CategoricalChart
-              items={toListItems(modelDistribution.data)}
-              isLoading={modelDistribution.fetching && !modelDistribution.data}
-              valueName="output_tokens"
-              valueLabel="Output tokens"
-              format={formatCompactNumber}
-            />
-          </Section>
-          <Section
-            title="Tokens over time by model — input"
-            query={tokenTrendByModel.data?.query}
-            queryName="AI tokens over time by model"
-          >
-            <TrendChart
-              points={toDimensionedTrendPoints(tokenTrendByModel.data)}
-              isLoading={tokenTrendByModel.fetching && !tokenTrendByModel.data}
-              group="aiFunctionPanel"
-              chartType="bar"
+              series={[
+                {
+                  valueName: 'input_tokens',
+                  label: 'Input',
+                  color: SUBTLE_BLUE,
+                  borderColor: DEFAULT_PALETTE[2],
+                },
+                {
+                  valueName: 'output_tokens',
+                  label: 'Output',
+                  color: TOKENS_BY_MODEL_GREEN,
+                  borderColor: DEFAULT_PALETTE[1],
+                },
+              ]}
               stacked
-              valueName="input_tokens"
-            />
-          </Section>
-          <Section
-            title="Tokens over time by model — output"
-            query={tokenTrendByModel.data?.query}
-            queryName="AI tokens over time by model"
-          >
-            <TrendChart
-              points={toDimensionedTrendPoints(tokenTrendByModel.data)}
-              isLoading={tokenTrendByModel.fetching && !tokenTrendByModel.data}
-              group="aiFunctionPanel"
-              chartType="bar"
-              stacked
-              valueName="output_tokens"
+              format={formatCompactNumber}
+              showYAxisLine={false}
+              tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost }]}
             />
           </Section>
         </div>
@@ -359,22 +360,15 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Section title="Cost over time" query={tokenTrend.data?.query} queryName="AI cost over time">
             <TrendChart
-              points={toTrendPoints(tokenTrend.data)}
+              points={toTrendPoints(tokenTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={tokenTrend.fetching && !tokenTrend.data}
-              group="aiFunctionPanel"
-              series={[{ valueName: 'cost', label: 'Cost' }]}
-            />
-          </Section>
-          <Section
-            title="Avg cost per run over time"
-            query={avgCostPerRunTrend.data?.query}
-            queryName="AI avg cost per run over time"
-          >
-            <TrendChart
-              points={toTrendPoints(avgCostPerRunTrend.data)}
-              isLoading={avgCostPerRunTrend.fetching && !avgCostPerRunTrend.data}
-              group="aiFunctionPanel"
-              series={[{ valueName: 'avg_cost_per_run', label: 'Avg cost / run' }]}
+              chartType="bar"
+              format={formatCost}
+              axisFormat={formatCostAxis}
+              allowDecimals
+              series={[{ valueName: 'cost', label: 'Cost', color: CHART_COLORS[0] }]}
+              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
+              defaultValue={0}
             />
           </Section>
           <Section title="Cost by model" query={modelDistribution.data?.query} queryName="AI cost by model">
@@ -382,20 +376,44 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
               items={toListItems(modelDistribution.data)}
               isLoading={modelDistribution.fetching && !modelDistribution.data}
               valueName="cost"
+              colors={CHART_COLORS}
               format={formatCost}
+              showYAxisLine={false}
               showTooltipValueName={false}
+              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
+              showValueLabels
             />
           </Section>
           <Section
-            title="Cost over time by model"
-            query={tokenTrendByModel.data?.query}
-            queryName="AI cost over time by model"
+            title="Cost per run over time"
+            query={avgCostPerRunTrend.data?.query}
+            queryName="AI cost per run over time"
           >
             <TrendChart
-              points={toDimensionedTrendPoints(tokenTrendByModel.data)}
-              isLoading={tokenTrendByModel.fetching && !tokenTrendByModel.data}
-              group="aiFunctionPanel"
-              valueName="cost"
+              points={toTrendPoints(avgCostPerRunTrend.data, timeRange, TREND_BUCKET_LIMIT)}
+              isLoading={avgCostPerRunTrend.fetching && !avgCostPerRunTrend.data}
+              format={formatCost}
+              axisFormat={formatCostAxis}
+              allowDecimals
+              series={[{ valueName: 'avg_cost_per_run', label: 'Cost per run', color: CHART_COLORS[0] }]}
+              defaultValue={0}
+            />
+          </Section>
+          <Section
+            title="Cost per session over time"
+            query={costPerSessionTrend.data?.query}
+            queryName="AI cost per session over time"
+          >
+            <TrendChart
+              points={toTrendPoints(costPerSessionTrend.data, timeRange, TREND_BUCKET_LIMIT)}
+              isLoading={costPerSessionTrend.fetching && !costPerSessionTrend.data}
+              format={formatCost}
+              axisFormat={formatCostAxis}
+              allowDecimals
+              series={[
+                { valueName: 'avg_cost_per_session', label: 'Cost per session', color: CHART_COLORS[0] },
+              ]}
+              defaultValue={0}
             />
           </Section>
           <Section
@@ -410,7 +428,7 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
               renderIdentifier={(id) => renderRunLink(id, envSlug)}
               columns={[
                 { valueName: 'cost', label: 'Cost', format: formatCost },
-                { valueName: 'tokens', label: 'Tokens used', format: formatCompactNumber },
+                { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
               ]}
             />
           </Section>
@@ -425,7 +443,29 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
               identifierLabel="Step"
               columns={[
                 { valueName: 'cost', label: 'Total cost', format: formatCost },
-                { valueName: 'tokens', label: 'Tokens used', format: formatCompactNumber },
+                { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
+              ]}
+            />
+          </Section>
+          <Section
+            title="Most expensive sessions"
+            className="lg:col-span-2"
+            query={mostExpensiveSessions.data?.query}
+            queryName="AI most expensive sessions"
+          >
+            <RankedTable
+              items={toListItems(mostExpensiveSessions.data)}
+              isLoading={mostExpensiveSessions.fetching && !mostExpensiveSessions.data}
+              identifierLabel="Session"
+              renderIdentifier={(id, item) => renderSessionLink(id, item.sessionKey ?? '', envSlug)}
+              sessionKeyColumn={{
+                label: 'Session key',
+                render: (key) => renderSessionKeyLink(key, envSlug),
+              }}
+              columns={[
+                { valueName: 'runs', label: 'Runs', format: formatCompactNumber },
+                { valueName: 'cost', label: 'Cost', format: formatCost },
+                { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
               ]}
             />
           </Section>
@@ -441,7 +481,6 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             <TrendChart
               points={latencyTrendPoints}
               isLoading={latencyTrend.fetching && !latencyTrend.data}
-              group="aiFunctionPanel"
               format={formatSeconds}
               axisFormat={formatSecondsAxis}
               allowDecimals
@@ -462,6 +501,8 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
               isLoading={latencyByModel.fetching && !latencyByModel.data}
               format={formatSeconds}
               axisFormat={formatSecondsAxis}
+              colors={CHART_COLORS}
+              showYAxisLine={false}
             />
           </Section>
           <Section
