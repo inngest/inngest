@@ -77,14 +77,20 @@ const (
 )
 
 type LeaseItemResult struct {
-	Status LeaseItemStatus
-	Err    error
+	Status     LeaseItemStatus
+	Err        error
+	RetryAfter time.Time
+}
+
+type QueueScannerRuntime struct {
+	Leaser   QueueItemLeaser
+	Dispatch DispatchFunc
 }
 
 // QueueScanner discovers and leases queue work. It should hand leased items to
 // the dispatch function and leave item execution to the common queue processor layer.
 type QueueScanner interface {
-	Run(ctx context.Context, dispatch DispatchFunc) error
+	Run(ctx context.Context, rt QueueScannerRuntime) error
 }
 
 type RunResult struct {

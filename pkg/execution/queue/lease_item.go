@@ -242,6 +242,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 	if leaseID != nil {
 		errTags["lease"] = leaseID.String()
 	}
+	limitedRetryAfter := constraintRes.RetryAfter
 
 	switch {
 	case errors.Is(cause, ErrQueueItemThrottled):
@@ -256,7 +257,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 				l.ReportError(err, "could not requeue item to backlog after hitting throttle limit",
 					logger.WithErrorReportTags(errTags),
 				)
-				return LeaseItemResult{Status: LeaseItemStatusThrottled}, fmt.Errorf("could not requeue to backlog: %w", err)
+				return LeaseItemResult{Status: LeaseItemStatusThrottled, RetryAfter: limitedRetryAfter}, fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
@@ -269,7 +270,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			})
 		}
 
-		return LeaseItemResult{Status: LeaseItemStatusThrottled}, nil
+		return LeaseItemResult{Status: LeaseItemStatusThrottled, RetryAfter: limitedRetryAfter}, nil
 	case errors.Is(cause, ErrPartitionConcurrencyLimit), errors.Is(cause, ErrAccountConcurrencyLimit), errors.Is(cause, ErrSystemConcurrencyLimit):
 		// Since the queue is at capacity on a fn or account level, no
 		// more jobs in this loop should be worked on - so break.
@@ -312,7 +313,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 				l.ReportError(err, "could not requeue item to backlog after hitting concurrency limit",
 					logger.WithErrorReportTags(errTags),
 				)
-				return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited}, fmt.Errorf("could not requeue to backlog: %w", err)
+				return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited, RetryAfter: limitedRetryAfter}, fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
@@ -325,7 +326,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			})
 		}
 
-		return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited}, fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
+		return LeaseItemResult{Status: LeaseItemStatusConcurrencyLimited, RetryAfter: limitedRetryAfter}, fmt.Errorf("concurrency hit: %w", ErrProcessNoUserConstraintCapacity)
 	case errors.Is(cause, ErrConcurrencyLimitCustomKey):
 		// For backwards compatibility, we report on the function level as well.
 		if partition.FunctionID != nil {
@@ -346,7 +347,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 				l.ReportError(err, "could not requeue item to backlog after hitting custom concurrency limit",
 					logger.WithErrorReportTags(errTags),
 				)
-				return LeaseItemResult{Status: LeaseItemStatusCustomConcurrencyLimited}, fmt.Errorf("could not requeue to backlog: %w", err)
+				return LeaseItemResult{Status: LeaseItemStatusCustomConcurrencyLimited, RetryAfter: limitedRetryAfter}, fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
@@ -358,7 +359,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 				},
 			})
 		}
-		return LeaseItemResult{Status: LeaseItemStatusCustomConcurrencyLimited}, nil
+		return LeaseItemResult{Status: LeaseItemStatusCustomConcurrencyLimited, RetryAfter: limitedRetryAfter}, nil
 	case errors.Is(cause, ErrSemaphoreLimit):
 		// Semaphore capacity exhausted for this specific item (e.g., start job with fn concurrency).
 		// Skip this item and continue scanning; other items without semaphores (step 2, etc.)
@@ -367,7 +368,7 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": q.Shard().Name(), "constraint_source": "constraintapi"},
 		})
-		return LeaseItemResult{Status: LeaseItemStatusSemaphoreLimited}, nil
+		return LeaseItemResult{Status: LeaseItemStatusSemaphoreLimited, RetryAfter: limitedRetryAfter}, nil
 	case errors.Is(cause, ErrQueueItemNotFound):
 		// This is an okay error.  Move to the next job item.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{

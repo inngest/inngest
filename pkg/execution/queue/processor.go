@@ -247,7 +247,15 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		return nil
 	}
 
-	err := scanner.Run(ctx, dispatch)
+	rt := QueueScannerRuntime{
+		Leaser:   q,
+		Dispatch: dispatch,
+	}
+	if rt.Leaser == nil {
+		return ErrQueueScannerMissingLeaser
+	}
+
+	err := scanner.Run(ctx, rt)
 
 	l.Info("queue waiting to quit", "err", err)
 	q.wg.Wait()
