@@ -897,6 +897,22 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 	return state.NewStateInstance(id, meta, events, actions, stack), nil
 }
 
+func (m shardedMgr) loadPending(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, runID ulid.ULID) ([]string, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "loadPending"), redis_telemetry.ScopeFnRunState)
+
+	fnRunState := m.s.FunctionRunState()
+	r, isSharded := fnRunState.Client(ctx, accountId, runID)
+	id := state.Identifier{RunID: runID, WorkflowID: fnID, AccountID: accountId}
+
+	pending, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
+		return client.B().Smembers().Key(fnRunState.kg.Pending(ctx, isSharded, id)).Build()
+	}).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error loading pending: %w", err)
+	}
+	return pending, nil
+}
+
 func (m shardedMgr) stack(ctx context.Context, accountId uuid.UUID, runID ulid.ULID) ([]string, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "stack"), redis_telemetry.ScopeFnRunState)
 
@@ -1107,22 +1123,17 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 // lifecycle.  Now, state stores must account for deletion directly.  Note that if the
 // state store is queue-aware, it must delete queue items for the run also.  This may
 // not always be the case.
-func (m mgr) Delete(ctx context.Context, i state.Identifier) error {
+func (m mgr) Delete(ctx context.Context, i state.Identifier, opts ...state.DeleteOption) error {
+	o := state.ApplyDeleteOpts(opts)
 	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 20*time.Second)
 	defer cancel()
-	err := m.shardedMgr.delete(ctx, callCtx, i)
-	if err != nil {
+	if err := m.shardedMgr.delete(ctx, callCtx, i); err != nil {
 		return err
 	}
-
-	if m.pauseDeleter != nil {
-		err = m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
-		if err != nil {
-			return err
-		}
+	if o.IsMigration || m.pauseDeleter == nil {
+		return nil
 	}
-
-	return nil
+	return m.pauseDeleter.DeletePausesForRun(ctx, i.RunID, i.WorkspaceID)
 }
 
 func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state.Identifier) error {
@@ -1153,7 +1164,9 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		fnRunState.kg.Events(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.ActionInputs(ctx, isSharded, i),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
+		fnRunState.kg.Pending(ctx, isSharded, i),
 		fnRunState.kg.DefersMeta(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.DefersInput(ctx, isSharded, i.WorkflowID, i.RunID),
 	}
@@ -1690,17 +1703,21 @@ type runMetadata struct {
 
 func (r runMetadata) Map() map[string]any {
 	return map[string]any{
-		"id":       r.Identifier,
-		"status":   int(r.Status), // Always store this as an int
-		"debugger": r.Debugger,
-		"runType":  r.RunType,
-		"version":  r.Version,
-		"rv":       r.RequestVersion,
-		"ctx":      r.Context,
-		"die":      r.DisableImmediateExecution,
-		"sid":      r.SpanID,
-		"sat":      r.StartedAt,
-		"hasAI":    r.HasAI,
+		"id":            r.Identifier,
+		"status":        int(r.Status), // Always store this as an int
+		"debugger":      r.Debugger,
+		"runType":       r.RunType,
+		"version":       r.Version,
+		"rv":            r.RequestVersion,
+		"ctx":           r.Context,
+		"die":           r.DisableImmediateExecution,
+		"sid":           r.SpanID,
+		"sat":           r.StartedAt,
+		"hasAI":         r.HasAI,
+		"state_size":    r.StateSize,
+		"event_size":    r.EventSize,
+		"step_count":    r.StepCount,
+		"metadata_size": r.MetadataSize,
 	}
 }
 

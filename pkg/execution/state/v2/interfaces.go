@@ -6,6 +6,20 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/oklog/ulid/v2"
+)
+
+// IdempotencyEntry is a single row from a backend's idempotency store.
+type IdempotencyEntry struct {
+	RunID       ulid.ULID
+	IsTombstone bool
+}
+
+type DeleteOption = state.DeleteOption
+
+var (
+	WithIsMigration = state.WithIsMigration
+	ApplyDeleteOpts = state.ApplyDeleteOpts
 )
 
 type CreateState struct {
@@ -20,6 +34,18 @@ type CreateState struct {
 	StepInputs []state.MemoizedStep
 }
 
+// MigrateState carries a run-state snapshot for cross-cluster JIT migration.
+type MigrateState struct {
+	Metadata   Metadata
+	Events     []json.RawMessage
+	Steps      map[string]json.RawMessage
+	StepInputs map[string]json.RawMessage
+	// Stack is the ordered list of step IDs.
+	Stack        []string
+	PendingSteps []string
+	Defers       map[string]Defer
+}
+
 type RunService interface {
 	StateLoader
 
@@ -28,7 +54,7 @@ type RunService interface {
 	// Delete deletes state, metadata, and - when pauses are included - associated pauses
 	// for the run from the store.  Nothing referencing the run should exist in the state
 	// store after.
-	Delete(ctx context.Context, id ID) error
+	Delete(ctx context.Context, id ID, opts ...DeleteOption) error
 	// Exists checks whether a run exists given an ID
 	Exists(ctx context.Context, id ID) (bool, error)
 	// Update updates configuration on the state, eg. setting the execution
@@ -38,6 +64,12 @@ type RunService interface {
 	SaveStep(ctx context.Context, id ID, stepID string, data []byte) (hasPending bool, err error)
 	// SavePending saves pending step IDs for the given run ID.
 	SavePending(ctx context.Context, id ID, pending []string) error
+
+	// Migrate writes a run-state snapshot into this store for cross-cluster JIT migration.
+	Migrate(ctx context.Context, s MigrateState) error
+
+	// LookupIdempotency returns the entry for the given key, or (nil, nil) if the key is not present.
+	LookupIdempotency(ctx context.Context, id ID, key string) (*IdempotencyEntry, error)
 
 	// ConsumePause consumes a pause by its ID. It does not care about the pause's origin;
 	// it only uses the pause data to populate the state of a run.
@@ -167,6 +199,9 @@ type StateLoader interface {
 	LoadStepsWithIDs(ctx context.Context, id ID, stepIDs []string) (map[string]json.RawMessage, error)
 	// LoadStack returns the stack for a given run
 	LoadStack(ctx context.Context, id ID) ([]string, error)
+
+	// LoadPending returns the set of pending step IDs for a given run.
+	LoadPending(ctx context.Context, id ID) ([]string, error)
 
 	// LoadState returns all state for a run, including steps, events, and metadata.
 	LoadState(ctx context.Context, id ID) (State, error)
