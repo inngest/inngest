@@ -152,11 +152,14 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 
 	l := logger.StdlibLogger(ctx).With("run_id", input.Metadata.ID.RunID)
 
-	// Load the function config.
-	fn, err := c.fn(ctx, input.Metadata.ID.FunctionID)
-	if err != nil {
-		logger.StdlibLogger(ctx).Warn("error loading fn for background checkpoint steps", "error", err)
-		return err
+	fn := input.Function
+	if fn == nil {
+		var err error
+		fn, err = c.fn(ctx, input.Metadata.ID.FunctionID)
+		if err != nil {
+			logger.StdlibLogger(ctx).Warn("error loading fn for background checkpoint steps", "error", err)
+			return err
+		}
 	}
 
 	runCtx := c.runContext(*input.Metadata, fn)
