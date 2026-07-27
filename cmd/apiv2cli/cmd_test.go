@@ -8,11 +8,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
+	"github.com/inngest/inngest/pkg/inngest/clistate"
+	"github.com/mitchellh/go-homedir"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
@@ -723,6 +727,114 @@ func TestCommandPrefersAPIKeyOverSigningKeyEnv(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "Bearer sk-inn-api-test", gotAuth)
+}
+
+// loginAs writes a state file holding creds and points ~ at a temp dir, so the
+// stored-credential tests never read the developer's real login.  loginHost is
+// the API the credential was minted against; pass "" for Inngest Cloud.
+func loginAs(t *testing.T, creds string, loginHost string) {
+	t.Helper()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	// go-homedir caches the resolved home dir, so $HOME alone isn't enough.
+	homedir.DisableCache = true
+	homedir.Reset()
+	t.Cleanup(func() {
+		homedir.DisableCache = false
+		homedir.Reset()
+	})
+
+	// Clear anything in the developer's env that would win over the stored key.
+	t.Setenv("INNGEST_API_KEY", "")
+	t.Setenv("INNGEST_SIGNING_KEY", "")
+	t.Setenv(clistate.EnvApiKey, "")
+	t.Setenv("INNGEST_API", loginHost)
+
+	dir := filepath.Join(home, ".config", "inngest")
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	byt, err := json.Marshal(clistate.State{Credentials: []byte(creds)})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "state"), byt, 0600))
+}
+
+// stubAPI starts a stub v2 API and returns its URL along with a pointer to the
+// Authorization header it received.
+func stubAPI(t *testing.T) (string, *string) {
+	t.Helper()
+
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	return srv.URL, &gotAuth
+}
+
+func runHealth(t *testing.T, host string, args ...string) {
+	t.Helper()
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	require.NoError(t, cmd.Run(context.Background(), append([]string{"api", "health", "--api-host", host}, args...)))
+}
+
+func TestCommandUsesStoredCredential(t *testing.T) {
+	host, auth := stubAPI(t)
+	// The credential was minted by this host, so this is the one host we send it to.
+	loginAs(t, "stored-key", host)
+
+	runHealth(t, host)
+
+	require.Equal(t, "Bearer stored-key", *auth)
+}
+
+func TestCommandWithholdsStoredCredentialFromOtherHosts(t *testing.T) {
+	host, auth := stubAPI(t)
+	// Logged in to Inngest Cloud while the request targets something else.  Covers
+	// the default dev server target too: it is never the login host.
+	loginAs(t, "stored-key", "")
+
+	runHealth(t, host)
+
+	require.Empty(t, *auth)
+}
+
+func TestCommandPrefersFlagsOverStoredCredential(t *testing.T) {
+	for _, flag := range []string{"--api-key", "--signing-key"} {
+		t.Run(flag, func(t *testing.T) {
+			host, auth := stubAPI(t)
+			loginAs(t, "stored-key", host)
+
+			runHealth(t, host, flag, "explicit-key")
+
+			require.Equal(t, "Bearer explicit-key", *auth)
+		})
+	}
+}
+
+// Completes the --prod chain: TestResolveBaseURLProdUsesCloud covers --prod
+// resolving to cloudAPIURL, this covers the stored credential being sent there.
+func TestStoredCredentialSentToCloudTarget(t *testing.T) {
+	loginAs(t, "stored-key", "")
+
+	target, err := url.Parse(cloudAPIURL)
+	require.NoError(t, err)
+
+	require.Equal(t, "stored-key", storedCredential(context.Background(), target))
+}
+
+func TestCommandStoredCredentialHonorsAuthTokenOverride(t *testing.T) {
+	host, auth := stubAPI(t)
+	loginAs(t, "stored-key", host)
+	t.Setenv(clistate.EnvApiKey, "override-key")
+
+	runHealth(t, host)
+
+	require.Equal(t, "Bearer override-key", *auth)
 }
 
 func TestNormalizeAPIURL(t *testing.T) {
