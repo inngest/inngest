@@ -3,7 +3,6 @@ import {
   Bar,
   BarChart,
   Cell,
-  Legend,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -110,7 +109,7 @@ function stackedSegmentShape(props: BarShapeProps, isLastSegment: boolean, strok
   }`;
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} fill={fill} />
+      <rect x={x} y={y} width={width} height={height} fill={fill} shapeRendering="crispEdges" />
       <path d={outline} fill="none" stroke={stroke} strokeWidth={1} />
     </g>
   );
@@ -377,12 +376,12 @@ export function CategoricalChart({
 
   return (
     <div className={className}>
-      <div className={`relative w-full ${isMultiSeries ? 'h-[215px]' : 'h-[200px]'}`}>
+      <div className="relative h-[200px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             layout="vertical"
-            margin={{ top: 8, right: 12, bottom: isMultiSeries ? 24 : 8, left: 12 }}
+            margin={{ top: 8, right: 12, bottom: 0, left: 12 }}
             barCategoryGap={stacked && isMultiSeries ? STACKED_BAR_CATEGORY_GAP : undefined}
           >
             <XAxis
@@ -443,25 +442,6 @@ export function CategoricalChart({
               // browser's default focus outline shows on every hover.
               wrapperStyle={{ outline: 'none' }}
             />
-            {isMultiSeries && (
-              <Legend
-                verticalAlign="bottom"
-                align="left"
-                content={() => (
-                  <ul className="mt-2 flex flex-wrap gap-4">
-                    {effectiveSeries.map((s, i) => (
-                      <li key={s.valueName} className="flex items-center gap-1.5 text-xs">
-                        <span
-                          className="h-2.5 w-2.5 shrink-0"
-                          style={{ backgroundColor: legendSwatchColors[i] }}
-                        />
-                        <span className="text-basis">{s.label}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              />
-            )}
             {effectiveSeries.map((s, i) => {
               const isLastSegment = i === effectiveSeries.length - 1;
               return (
@@ -498,6 +478,23 @@ export function CategoricalChart({
           </BarChart>
         </ResponsiveContainer>
       </div>
+      {isMultiSeries && (
+        // A plain sibling block below the fixed-height plot, not recharts'
+        // own <Legend> (which would've had to carve its space out of the
+        // plot's own margin, shrinking the plot itself) — so the plot is
+        // the same size whether or not a legend follows it.
+        <ul className="mt-2 flex flex-wrap gap-4">
+          {effectiveSeries.map((s, i) => (
+            <li key={s.valueName} className="flex items-center gap-1.5 text-xs">
+              <span
+                className="h-2.5 w-2.5 shrink-0"
+                style={{ backgroundColor: legendSwatchColors[i] }}
+              />
+              <span className="text-basis">{s.label}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

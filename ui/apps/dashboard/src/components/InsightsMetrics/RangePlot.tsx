@@ -38,6 +38,14 @@ const DEFAULT_TICKS: RangePlotTick[] = [
 
 const TICK_LINE_HEIGHT = 24;
 const CONNECTING_LINE_WIDTH = 1.5;
+// Y-axis width heuristic: ~5.5px/char is a reasonable average glyph width
+// for this app's sans font at the tick's 10px font-size — avoids reserving
+// a full fixed column when every label is short (e.g. "gpt-4"), while still
+// growing for long ones, up to truncateCenter's own 30-char display cap.
+const Y_AXIS_CHAR_WIDTH = 5.5;
+const Y_AXIS_MIN_WIDTH = 40;
+const Y_AXIS_MAX_WIDTH = 140;
+const Y_AXIS_PADDING = 8;
 /** Snap within this many pixels of a tick value. */
 const SNAP_PX = 4;
 /**
@@ -364,6 +372,20 @@ export function RangePlot({
     });
   }, [items, ticks, colors]);
 
+  // Sized to the longest label actually rendered (after formatIdentifier and
+  // the same 30-char truncation renderYAxisTick applies), not a flat column
+  // wide enough for a worst-case label that may never appear.
+  const yAxisWidth = useMemo(() => {
+    const longest = rows.reduce(
+      (max, row) => Math.max(max, truncateCenter(formatIdentifier(row.identifier), 30).length),
+      0,
+    );
+    return Math.min(
+      Y_AXIS_MAX_WIDTH,
+      Math.max(Y_AXIS_MIN_WIDTH, Math.round(longest * Y_AXIS_CHAR_WIDTH) + Y_AXIS_PADDING),
+    );
+  }, [rows, formatIdentifier]);
+
   const tickShape = useMemo(() => makeTickShape(ticks), [ticks]);
   const spanDataKey = (entry: RowData): [number, number] => [entry.min, entry.max];
 
@@ -384,7 +406,7 @@ export function RangePlot({
             layout="vertical"
             syncId={group}
             barSize={TICK_LINE_HEIGHT}
-            margin={{ top: 8, right: 16, bottom: 8, left: 8 }}
+            margin={{ top: 8, right: 16, bottom: 0, left: 8 }}
             onMouseMove={(state) => {
               if (!state.isTooltipActive) {
                 setHoverX(null);
@@ -415,7 +437,7 @@ export function RangePlot({
               tick={renderYAxisTick}
               axisLine={showYAxisLine}
               tickLine={showYAxisLine}
-              width={140}
+              width={yAxisWidth}
               interval={0}
             />
             <Tooltip

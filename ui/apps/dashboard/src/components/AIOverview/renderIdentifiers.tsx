@@ -46,10 +46,8 @@ export function renderSessionKeyLink(sessionKey: string, envSlug: string): React
 
 // renderFunctionLink links a function_id identifier (already slug-translated
 // by the Insights transpiler — see AIOverviewDashboard's functionsBySlug
-// comment) to that function's page. `functionsBySlug` is optional: callers
-// scoped to a single already-known function (FunctionAIPanel) don't have a
-// lookup map built, so the identifier renders as plain text instead of a
-// link in that case.
+// comment) to that function's page. `functionsBySlug` is optional: renders
+// as plain text instead of a link when no lookup map is given.
 export function renderFunctionLink(
   identifier: string,
   envSlug: string,

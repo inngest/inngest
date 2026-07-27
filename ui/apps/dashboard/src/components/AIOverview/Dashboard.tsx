@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu/DropdownMenu';
 import { Error } from '@inngest/components/Error/Error';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
@@ -16,7 +22,7 @@ import {
   subtractDuration,
   toDate,
 } from '@inngest/components/utils/date';
-import { RiArrowRightUpLine } from '@remixicon/react';
+import { RiArrowRightUpLine, RiMoreFill } from '@remixicon/react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import type { SortingState } from '@tanstack/react-table';
 import { useQuery } from 'urql';
@@ -271,9 +277,9 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
         };
 
   return (
-    <div className="bg-canvasBase mx-auto flex h-full w-full flex-col">
-      {showEmptyState && <AIOverviewEmptyState compact className="mx-3 mt-3" />}
-      <div className="bg-canvasBase flex flex-row items-center gap-1.5 px-3 py-[9px]">
+    <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1500px] flex-col px-6">
+      {showEmptyState && <AIOverviewEmptyState compact className="mt-3" />}
+      <div className="bg-canvasBase flex flex-row items-center gap-1.5 py-[9px]">
         <SelectGroup>
           <span className="border-muted bg-modalBase text-muted box-content flex h-[24px] items-center rounded border px-1.5 text-[13px]">
             Time range
@@ -301,7 +307,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
 
       {error && <Error message="There was an error loading the AI Overview." />}
 
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-6 [&::-webkit-scrollbar]:hidden">
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pb-6 [&::-webkit-scrollbar]:hidden">
         <Section plain>
           <HeadlineStats
             values={withTotalTokens(toScalarValues(headline.data))}
@@ -733,21 +739,24 @@ function Section({
       <div className="mb-3 flex items-center justify-between gap-2">
         {title && <h2 className="text-basis text-sm font-medium">{title}</h2>}
         {query && (
-          <Button
-            className="ml-auto"
-            size="small"
-            kind="secondary"
-            appearance="outlined"
-            icon={<RiArrowRightUpLine />}
-            iconSide="left"
-            label="Open in Insights"
-            onClick={() =>
-              navigate({
-                to: pathCreator.insights({ envSlug: env.slug }),
-                search: { sql: query, name: queryName ?? title },
-              })
-            }
-          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild className="ml-auto">
+              <Button size="small" kind="secondary" appearance="ghost" icon={<RiMoreFill />} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() =>
+                  navigate({
+                    to: pathCreator.insights({ envSlug: env.slug }),
+                    search: { sql: query, name: queryName ?? title },
+                  })
+                }
+              >
+                <RiArrowRightUpLine className="h-4 w-4" />
+                Open in Insights
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
       {children}

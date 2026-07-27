@@ -4,8 +4,8 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Line,
+  Rectangle,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -256,7 +256,7 @@ export function TrendChart({
             <ComposedChart
               data={chartData}
               syncId={group}
-              margin={{ top: 8, right: 8, bottom: showLegend ? 24 : 8, left: 8 }}
+              margin={{ top: 8, right: 8, bottom: 0, left: 8 }}
             >
               {/* `stroke` as a direct prop, not a `stroke-[...]` className —
                   Tailwind's JIT scanner can't statically analyze a
@@ -295,25 +295,6 @@ export function TrendChart({
                 // browser's default focus outline shows on every hover.
                 wrapperStyle={{ outline: 'none' }}
               />
-              {showLegend && (
-                <Legend
-                  verticalAlign="bottom"
-                  align="left"
-                  content={() => (
-                    <ul className="mt-2 flex flex-wrap gap-4">
-                      {effectiveSeries.map((s) => (
-                        <li key={s.key} className="flex items-center gap-1.5 text-xs">
-                          <span
-                            className={`h-2.5 w-2.5 shrink-0 ${legendIcon === 'circle' ? 'rounded-full' : ''}`}
-                            style={{ backgroundColor: s.color }}
-                          />
-                          <span className="text-basis">{s.label}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                />
-              )}
               {effectiveSeries.map((s, i) => {
                 const isLastInStack = i === effectiveSeries.length - 1;
                 if (chartType === 'bar') {
@@ -332,6 +313,9 @@ export function TrendChart({
                       // can share one stacked bar.
                       radius={valueName && (!stacked || isLastInStack) ? [4, 4, 0, 0] : undefined}
                       isAnimationActive={false}
+                      shape={(props: unknown) => (
+                        <Rectangle {...(props as object)} shapeRendering="crispEdges" />
+                      )}
                     />
                   );
                 }
@@ -418,6 +402,23 @@ export function TrendChart({
             </ComposedChart>
           </ResponsiveContainer>
       </div>
+      {showLegend && (
+        // A plain sibling block below the fixed-height plot, not recharts'
+        // own <Legend> (which would've had to carve its space out of the
+        // plot's own margin, shrinking the plot itself) — so the plot is
+        // the same size whether or not a legend follows it.
+        <ul className="mt-2 flex flex-wrap gap-4">
+          {effectiveSeries.map((s) => (
+            <li key={s.key} className="flex items-center gap-1.5 text-xs">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 ${legendIcon === 'circle' ? 'rounded-full' : ''}`}
+                style={{ backgroundColor: s.color }}
+              />
+              <span className="text-basis">{s.label}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
