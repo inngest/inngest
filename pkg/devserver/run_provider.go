@@ -72,7 +72,9 @@ func (p *runProvider) Cancel(ctx context.Context, runID ulid.ULID) error {
 			EnvID:     consts.DevServerEnvID,
 			AccountID: consts.DevServerAccountID,
 		},
-	}, execution.CancelRequest{})
+	}, execution.CancelRequest{
+		ForceLifecycleHook: true,
+	})
 }
 
 func (p *runProvider) GetRun(ctx context.Context, runID ulid.ULID, _ apiv2.GetRunOpts) (*cqrs.FunctionRun, error) {

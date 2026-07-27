@@ -147,6 +147,8 @@ func TestRunProviderCancel(t *testing.T) {
 		require.Equal(t, functionID, scheduler.cancelID.FunctionID)
 		require.Equal(t, consts.DevServerAccountID, scheduler.cancelID.Tenant.AccountID)
 		require.Equal(t, consts.DevServerEnvID, scheduler.cancelID.Tenant.EnvID)
+		require.NotNil(t, scheduler.cancelReq)
+		require.True(t, scheduler.cancelReq.ForceLifecycleHook)
 	})
 
 	t.Run("rejects non-cancellable runs", func(t *testing.T) {
