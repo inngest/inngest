@@ -109,25 +109,18 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		latencyMs = &serverProcessingMs
 	}
 
-	// prefer the response model (the model that actually served the request)
-	// for cost estimation, falling back to the requested model.
-	costModel := parsedOutput.Model
-	if costModel == "" {
-		costModel = parsedInput.Model
-	}
-
 	aiMd := &AIMetadata{
 		RequestModel:  parsedInput.Model,
 		ResponseModel: parsedOutput.Model,
 		Provider:      req.Format,
 		OperationName: "",
 
-		InputTokens:   inputTokens,
-		OutputTokens:  outputTokens,
-		TotalTokens:   &totalTokens,
-		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
-		LatencyMs:     latencyMs,
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+		TotalTokens:  &totalTokens,
+		LatencyMs:    latencyMs,
 	}
+	backfillEstimatedCost(aiMd)
 
 	return []metadata.Structured{
 		aiMd,
@@ -249,13 +242,6 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		latencyMs = &stepDurationMs
 	}
 
-	// prefer the response model (the model that actually served the request)
-	// for cost estimation, falling back to the requested model.
-	costModel := responseModel
-	if costModel == "" {
-		costModel = requestModel
-	}
-
 	aiMd := &AIMetadata{
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
@@ -264,8 +250,8 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		ResponseModel: responseModel,
 		Provider:      "vercel-ai",
 		LatencyMs:     latencyMs,
-		EstimatedCost: EstimateCost(costModel, inputTokens, outputTokens),
 	}
+	backfillEstimatedCost(aiMd)
 
 	return []metadata.Structured{aiMd}, nil
 }
@@ -335,6 +321,67 @@ var modelPricing = map[string]ModelPricing{
 	"command-r":      {0.50, 1.50},
 	"command":        {1.00, 2.00},
 	"command-light":  {0.30, 0.60},
+}
+
+// estimatedCostForTokens prefers the response model (the model that actually
+// served the request) for cost estimation, falling back to the requested
+// model.
+func estimatedCostForTokens(responseModel, requestModel string, inputTokens, outputTokens int64) *float64 {
+	costModel := responseModel
+	if costModel == "" {
+		costModel = requestModel
+	}
+	return EstimateCost(costModel, inputTokens, outputTokens)
+}
+
+// backfillEstimatedCost sets md.EstimatedCost from model + token usage only
+// when it isn't already populated — so an extractor that already supplies
+// its own EstimatedCost (e.g. a provider-reported cost) is never
+// overwritten. Every AIMetadata construction site should call this instead
+// of computing cost inline, so the response-model-preferred-over-request-model
+// rule lives in one place.
+func backfillEstimatedCost(md *AIMetadata) {
+	if md.EstimatedCost != nil {
+		return
+	}
+	md.EstimatedCost = estimatedCostForTokens(md.ResponseModel, md.RequestModel, md.InputTokens, md.OutputTokens)
+}
+
+// BackfillEstimatedCostInValues fills an "estimated_cost" entry into raw
+// "inngest.ai" metadata values when one isn't already present. Unlike
+// backfillEstimatedCost, this operates on untyped metadata.Values — the shape
+// AI metadata takes when it's submitted directly by an SDK or API caller
+// (e.g. inngest.metadata.update or the AddRunMetadata API) rather than
+// produced by the extractor functions above, so it never passes through an
+// AIMetadata struct at all.
+func BackfillEstimatedCostInValues(values metadata.Values) {
+	if values == nil {
+		return
+	}
+
+	if raw, ok := values["estimated_cost"]; ok {
+		var existing *float64
+		if err := json.Unmarshal(raw, &existing); err == nil && existing != nil {
+			return
+		}
+	}
+
+	var inputTokens, outputTokens int64
+	_ = json.Unmarshal(values["input_tokens"], &inputTokens)
+	_ = json.Unmarshal(values["output_tokens"], &outputTokens)
+
+	var responseModel, requestModel string
+	_ = json.Unmarshal(values["response_model"], &responseModel)
+	_ = json.Unmarshal(values["request_model"], &requestModel)
+
+	cost := estimatedCostForTokens(responseModel, requestModel, inputTokens, outputTokens)
+	if cost == nil {
+		return
+	}
+
+	if b, err := json.Marshal(cost); err == nil {
+		values["estimated_cost"] = b
+	}
 }
 
 // EstimateCost calculates the estimated cost in USD for the given model and token counts
