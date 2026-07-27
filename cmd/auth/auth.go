@@ -157,20 +157,23 @@ func ctxErr(ctx context.Context) error {
 }
 
 func logout(ctx context.Context, cmd *cli.Command) error {
+	// Deliberately not GetState: an $INNGEST_AUTH_TOKEN override would make us
+	// delete a key the user supplied for this invocation, account-wide.
+	if creds, err := clistate.StoredCredentials(ctx); err == nil && len(creds) > 0 {
+		// Best-effort server-side revoke; local credentials are cleared
+		// regardless.
+		revokeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		api := client.New(client.WithCredentials(creds))
+		if err := api.RevokeDeviceLogin(revokeCtx); err != nil {
+			fmt.Println(inncli.RenderWarning(fmt.Sprintf(
+				"Couldn't revoke the API key on the server: %s\nDelete the \"CLI login\" key from the dashboard's API keys settings if it should no longer be used.", err,
+			)))
+		}
+	}
+
 	state, err := clistate.GetState(ctx)
 	if err == nil {
-		if len(state.Credentials) > 0 {
-			// Best-effort server-side revoke; local credentials are cleared
-			// regardless.
-			revokeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			defer cancel()
-			api := client.New(client.WithCredentials(state.Credentials))
-			if err := api.RevokeDeviceLogin(revokeCtx); err != nil {
-				fmt.Println(inncli.RenderWarning(fmt.Sprintf(
-					"Couldn't revoke the API key on the server: %s\nDelete the \"CLI login\" key from the dashboard's API keys settings if it should no longer be used.", err,
-				)))
-			}
-		}
 		state.Credentials = nil
 		state.Account = client.Account{}
 		state.Env = ""
@@ -179,6 +182,9 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 	fmt.Println(inncli.TextStyle.Render("Logged out."))
+	if os.Getenv(clistate.EnvApiKey) != "" {
+		fmt.Println(inncli.RenderWarning(fmt.Sprintf("%s is still set and will continue to authenticate you.", clistate.EnvApiKey)))
+	}
 	return nil
 }
 
