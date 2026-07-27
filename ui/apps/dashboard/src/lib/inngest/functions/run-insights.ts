@@ -57,8 +57,9 @@ async function chatCompletion(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: OPENROUTER_MODEL_IDS[model] ?? model,
       ...body,
+      // Last so the resolved model always wins over a stray `model` in `body`.
+      model: OPENROUTER_MODEL_IDS[model] ?? model,
     }),
   });
   if (!res.ok) {
