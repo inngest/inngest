@@ -592,6 +592,18 @@ func (e *executor) runEventLifecycles(ctx context.Context, fn func(context.Conte
 	for _, l := range e.evtLifecycles {
 		l := l
 		service.Go(func() {
+			// Event lifecycle listeners are observability side effects
+			// (metrics, exporters); a panicking implementation must never
+			// crash scheduling or the service.
+			defer func() {
+				if r := recover(); r != nil {
+					e.log.Error(
+						"panic in event lifecycle listener",
+						"error", r,
+						"stack", string(debug.Stack()),
+					)
+				}
+			}()
 			fn(ctx, l)
 		})
 	}
