@@ -23,6 +23,8 @@ import (
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
+	inngestclient "github.com/inngest/inngest/pkg/inngest/client"
+	"github.com/inngest/inngest/pkg/inngest/clistate"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -57,6 +59,7 @@ func Command() *cli.Command {
 			"Beta: this command is under active development and may change.",
 			"By default, the command targets the local dev server.",
 			"Set --prod to target Inngest Cloud Production, or --api-host/--api-port to target a custom API server.",
+			"When no key flag is set, the credential stored by `inngest auth login` is used for Inngest Cloud requests.",
 			"Authentication: https://api-docs.inngest.com/authentication",
 		}, "\n"),
 		Flags:    commonFlags(),
@@ -332,6 +335,8 @@ func endpointDescription(ep endpoint) string {
 		"  --env                   Environment name, or INNGEST_ENV",
 		"  --raw                   Print the response body without formatting",
 		"",
+		"With no key flag set, Inngest Cloud requests use the credential stored by `inngest auth login`.",
+		"",
 		"Authentication: https://api-docs.inngest.com/authentication",
 	)
 
@@ -440,7 +445,7 @@ func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Req
 	}
 	req.Header.Set("Accept", "application/json")
 
-	if token, err := authToken(cmd); err != nil {
+	if token, err := authToken(ctx, cmd, u); err != nil {
 		return nil, err
 	} else if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -820,11 +825,41 @@ func parseTimestamp(value string) (string, error) {
 	return value, nil
 }
 
-func authToken(cmd *cli.Command) (string, error) {
+func authToken(ctx context.Context, cmd *cli.Command, target *url.URL) (string, error) {
 	if apiKey := cmd.String("api-key"); apiKey != "" {
 		return apiKey, nil
 	}
-	return cmd.String("signing-key"), nil
+	if signingKey := cmd.String("signing-key"); signingKey != "" {
+		return signingKey, nil
+	}
+	return storedCredential(ctx, target), nil
+}
+
+// storedCredential returns the API key saved by `inngest auth login`, and only
+// when the request targets the host that minted it.  Without that check a cloud
+// key would be handed to whatever --api-host names — including the local dev
+// server, which needs no auth.
+func storedCredential(ctx context.Context, target *url.URL) string {
+	host := credentialHost()
+	if host == "" || !strings.EqualFold(target.Host, host) {
+		return ""
+	}
+
+	// GetState, not StoredCredentials: $INNGEST_AUTH_TOKEN is meant to override
+	// the stored key for callers that authenticate with it.
+	state, err := clistate.GetState(ctx)
+	if err != nil {
+		return ""
+	}
+	return string(state.Credentials)
+}
+
+func credentialHost() string {
+	parsed, err := url.Parse(inngestclient.APIBaseURL())
+	if err != nil {
+		return ""
+	}
+	return parsed.Host
 }
 
 func addQueryValue(values url.Values, key string, value any) {
