@@ -29,11 +29,17 @@ type Client interface {
 
 type ClientOpt func(Client) Client
 
-func New(opts ...ClientOpt) Client {
-	api := InngestCloudAPI
-	if os.Getenv("INNGEST_API") != "" {
-		api = os.Getenv("INNGEST_API")
+// APIBaseURL returns the API that `inngest auth login` authenticates against,
+// honoring the $INNGEST_API override used to target non-production stacks.
+func APIBaseURL() string {
+	if api := os.Getenv("INNGEST_API"); api != "" {
+		return api
 	}
+	return InngestCloudAPI
+}
+
+func New(opts ...ClientOpt) Client {
+	api := APIBaseURL()
 	// XXX: this enables us to use different queries for the self hosted API & the Cloud API
 	// until we meet full compatibility
 	isCloudAPI := true
