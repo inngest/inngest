@@ -154,7 +154,9 @@ func AccountIdentifier(ctx context.Context) (string, error) {
 	return *state.Account.Identifier.Domain, nil
 }
 
-func GetState(ctx context.Context) (*State, error) {
+// loadState reads the state file without applying the $INNGEST_AUTH_TOKEN
+// override or attaching a client.
+func loadState() (*State, error) {
 	path, err := homedir.Expand("~/.config/inngest")
 	if err != nil {
 		return nil, fmt.Errorf("error reading ~/.config/inngest")
@@ -169,6 +171,26 @@ func GetState(ctx context.Context) (*State, error) {
 	state := &State{}
 	if err := json.Unmarshal(byt, state); err != nil {
 		return nil, fmt.Errorf("invalid state file: %w", err)
+	}
+	return state, nil
+}
+
+// StoredCredentials returns the credential saved by `inngest auth login`,
+// ignoring any $INNGEST_AUTH_TOKEN override.  Callers that act on the key
+// itself — revoking it, say — must use this rather than GetState so they never
+// touch a key the CLI didn't mint.
+func StoredCredentials(ctx context.Context) ([]byte, error) {
+	state, err := loadState()
+	if err != nil {
+		return nil, err
+	}
+	return state.Credentials, nil
+}
+
+func GetState(ctx context.Context) (*State, error) {
+	state, err := loadState()
+	if err != nil {
+		return nil, err
 	}
 
 	// If we've been given an API key to use, use that instead of whatever we find
