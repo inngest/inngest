@@ -1,5 +1,5 @@
+import { formatPlainNumber } from './format';
 import type { RowData } from './BooleanChart';
-import { formatMetricValue } from './variantsTable/metricStats';
 
 type TooltipEntry = {
   name?: string | number;
@@ -12,14 +12,22 @@ type Props = {
   active?: boolean;
   payload?: TooltipEntry[];
   label?: string | number;
+  format?: (value: number) => string;
+  countLabel?: string;
 };
 
-export function BooleanChartTooltip({ active, payload, label }: Props) {
+export function BooleanChartTooltip({
+  active,
+  payload,
+  label,
+  format = formatPlainNumber,
+  countLabel = 'runs',
+}: Props) {
   if (!active || !payload?.length) return null;
   const first = payload[0];
   const data = first?.payload;
   if (!data) return null;
-  const title = label ?? data.variantName ?? '';
+  const title = label ?? data.label ?? '';
   const value = typeof first?.value === 'number' ? first.value : null;
 
   return (
@@ -27,13 +35,17 @@ export function BooleanChartTooltip({ active, payload, label }: Props) {
       {title && (
         <div className="border-subtle mb-1.5 flex items-baseline justify-between gap-4 border-b pb-1.5">
           <span className="text-basis text-sm font-medium">{title}</span>
-          <span className="text-muted tabular-nums">{data.runCount.toLocaleString()} runs</span>
+          {typeof data.count === 'number' && (
+            <span className="text-muted tabular-nums">
+              {data.count.toLocaleString()} {countLabel}
+            </span>
+          )}
         </div>
       )}
       {value !== null && (
         <div className="flex items-center justify-between gap-4">
           <span className="text-muted">{first?.name}</span>
-          <span className="text-basis tabular-nums font-semibold">{formatMetricValue(value)}</span>
+          <span className="text-basis tabular-nums font-semibold">{format(value)}</span>
         </div>
       )}
     </div>

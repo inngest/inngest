@@ -104,6 +104,7 @@ import { Route as AuthedEnvEnvSlugAppsExternalIDIndexRouteImport } from './route
 import { Route as AuthedSettingsIntegrationsVercelConfigureIdIndexRouteImport } from './routes/_authed/settings/integrations/vercel/configure/$id/index'
 import { Route as AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRouteImport } from './routes/_authed/env/$envSlug/sessions/$sessionKey/$sessionId/index'
 import { Route as AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport } from './routes/_authed/env/$envSlug/manage/$ingestKeys/$keyID/index'
+import { Route as AuthedEnvEnvSlugFunctionsSlugScoresIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/scores/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/runs/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/replays/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/cancellations/index'
@@ -652,6 +653,12 @@ const AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute =
     path: '/$keyID/',
     getParentRoute: () => AuthedEnvEnvSlugManageIngestKeysRouteRoute,
   } as any)
+const AuthedEnvEnvSlugFunctionsSlugScoresIndexRoute =
+  AuthedEnvEnvSlugFunctionsSlugScoresIndexRouteImport.update({
+    id: '/scores/',
+    path: '/scores/',
+    getParentRoute: () => AuthedEnvEnvSlugFunctionsSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute =
   AuthedEnvEnvSlugFunctionsSlugRunsIndexRouteImport.update({
     id: '/runs/',
@@ -793,6 +800,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/functions/$slug/cancellations/': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
+  '/env/$envSlug/functions/$slug/scores/': typeof AuthedEnvEnvSlugFunctionsSlugScoresIndexRoute
   '/env/$envSlug/manage/$ingestKeys/$keyID/': typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute
   '/env/$envSlug/sessions/$sessionKey/$sessionId/': typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute
   '/settings/integrations/vercel/configure/$id/': typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute
@@ -883,6 +891,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/functions/$slug/cancellations': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/env/$envSlug/functions/$slug/replays': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
+  '/env/$envSlug/functions/$slug/scores': typeof AuthedEnvEnvSlugFunctionsSlugScoresIndexRoute
   '/env/$envSlug/manage/$ingestKeys/$keyID': typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute
   '/env/$envSlug/sessions/$sessionKey/$sessionId': typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute
   '/settings/integrations/vercel/configure/$id': typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute
@@ -988,6 +997,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/functions/$slug/cancellations/': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/_authed/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/_authed/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
+  '/_authed/env/$envSlug/functions/$slug/scores/': typeof AuthedEnvEnvSlugFunctionsSlugScoresIndexRoute
   '/_authed/env/$envSlug/manage/$ingestKeys/$keyID/': typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute
   '/_authed/env/$envSlug/sessions/$sessionKey/$sessionId/': typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute
   '/_authed/settings/integrations/vercel/configure/$id/': typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute
@@ -1093,6 +1103,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/functions/$slug/cancellations/'
     | '/env/$envSlug/functions/$slug/replays/'
     | '/env/$envSlug/functions/$slug/runs/'
+    | '/env/$envSlug/functions/$slug/scores/'
     | '/env/$envSlug/manage/$ingestKeys/$keyID/'
     | '/env/$envSlug/sessions/$sessionKey/$sessionId/'
     | '/settings/integrations/vercel/configure/$id/'
@@ -1183,6 +1194,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/functions/$slug/cancellations'
     | '/env/$envSlug/functions/$slug/replays'
     | '/env/$envSlug/functions/$slug/runs'
+    | '/env/$envSlug/functions/$slug/scores'
     | '/env/$envSlug/manage/$ingestKeys/$keyID'
     | '/env/$envSlug/sessions/$sessionKey/$sessionId'
     | '/settings/integrations/vercel/configure/$id'
@@ -1287,6 +1299,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/functions/$slug/cancellations/'
     | '/_authed/env/$envSlug/functions/$slug/replays/'
     | '/_authed/env/$envSlug/functions/$slug/runs/'
+    | '/_authed/env/$envSlug/functions/$slug/scores/'
     | '/_authed/env/$envSlug/manage/$ingestKeys/$keyID/'
     | '/_authed/env/$envSlug/sessions/$sessionKey/$sessionId/'
     | '/_authed/settings/integrations/vercel/configure/$id/'
@@ -1984,6 +1997,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugManageIngestKeysRouteRoute
     }
+    '/_authed/env/$envSlug/functions/$slug/scores/': {
+      id: '/_authed/env/$envSlug/functions/$slug/scores/'
+      path: '/scores'
+      fullPath: '/env/$envSlug/functions/$slug/scores/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsSlugScoresIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugFunctionsSlugRouteRoute
+    }
     '/_authed/env/$envSlug/functions/$slug/runs/': {
       id: '/_authed/env/$envSlug/functions/$slug/runs/'
       path: '/runs'
@@ -2315,6 +2335,7 @@ interface AuthedEnvEnvSlugFunctionsSlugRouteRouteChildren {
   AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
+  AuthedEnvEnvSlugFunctionsSlugScoresIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugScoresIndexRoute
   AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute
 }
 
@@ -2328,6 +2349,8 @@ const AuthedEnvEnvSlugFunctionsSlugRouteRouteChildren: AuthedEnvEnvSlugFunctions
       AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute,
     AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute:
       AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute,
+    AuthedEnvEnvSlugFunctionsSlugScoresIndexRoute:
+      AuthedEnvEnvSlugFunctionsSlugScoresIndexRoute,
     AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute:
       AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute,
   }

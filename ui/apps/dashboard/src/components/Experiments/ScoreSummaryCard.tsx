@@ -13,12 +13,12 @@ import {
   YAxis,
 } from 'recharts';
 
+import { AxisTick } from '@/components/InsightsMetrics/AxisTick';
 import { computeChartSizing } from '@/lib/experiments/chart';
 import { buildMetricColorMap } from '@/lib/experiments/colors';
 import type { ScoredVariant } from '@/lib/experiments/score';
 import { ChartTooltip } from './ChartTooltip';
 import { ScoreCalculationExplainer } from './ScoreCalculationExplainer';
-import { VariantAxisTick } from './VariantAxisTick';
 
 type BackgroundLineProps = {
   x?: number;
@@ -166,7 +166,7 @@ export function ScoreSummaryCard({
                 type="category"
                 dataKey="variantName"
                 width={yAxisWidth}
-                tick={<VariantAxisTick />}
+                tick={<AxisTick />}
                 axisLine={false}
                 tickLine={false}
                 interval={0}

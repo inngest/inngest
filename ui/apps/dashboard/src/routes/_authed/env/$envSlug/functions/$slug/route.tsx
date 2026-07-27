@@ -157,6 +157,12 @@ function FunctionComponent() {
               slug,
             )}/cancellations`,
           },
+          {
+            children: 'Scores',
+            href: `/env/${envSlug}/functions/${encodeURIComponent(
+              slug,
+            )}/scores`,
+          },
         ]}
       />
       <Outlet />

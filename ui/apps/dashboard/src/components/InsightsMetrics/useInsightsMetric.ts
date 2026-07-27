@@ -37,10 +37,15 @@ export function useInsightsMetric(
     // callers don't need to import it. Changing this changes the query's
     // variables, so urql automatically re-fetches with the new order.
     orderBy?: { column: string; direction: 'asc' | 'desc' } | null;
+    // Skips firing the query — e.g. while a caller's own functionID lookup is
+    // still resolving, where an unpaused call would fire with an empty
+    // functionIDs list and get back env-wide (not "no data yet") rows.
+    pause?: boolean;
   },
 ): { data: MetricTable; fetching: boolean; error: unknown } {
   const [{ data, fetching, error }] = useQuery({
     query: InsightsMetricDocument,
+    pause: opts.pause,
     variables: {
       workspaceID: opts.workspaceID,
       functionIDs: opts.functionIDs ?? null,

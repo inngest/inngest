@@ -26,3 +26,15 @@ export const CHART_COLORS: readonly string[] = [
   'rgb(var(--color-quaternary-warmer-xSubtle))', // orange
   'rgb(var(--color-quaternary-cool-xSubtle))', // purple
 ];
+
+// Lighter counterparts of CHART_COLORS, index-paired — for a fill that sits
+// behind a CHART_COLORS stroke (e.g. a box plot's IQR box, a candle body),
+// the same pairing lib/experiments/colors.ts' METRIC_PALETTE/
+// METRIC_PALETTE_SUBTLE already establishes for that package's own palette.
+export const CHART_COLORS_SUBTLE: readonly string[] = [
+  'rgb(var(--color-primary-3xSubtle))', // green
+  'rgb(var(--color-secondary-3xSubtle))', // blue
+  'rgb(var(--color-honey-100))', // yellow
+  'rgb(var(--color-quaternary-warmer-3xSubtle))', // orange
+  'rgb(var(--color-quaternary-cool-3xSubtle))', // purple
+];

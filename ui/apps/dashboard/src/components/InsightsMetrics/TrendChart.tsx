@@ -121,6 +121,11 @@ type EffectiveSeries = {
   label: string;
   color: string;
   areaColor: string;
+  // Set only when a fixed `series` entry explicitly declares its own
+  // borderColor — opt-in, so every existing bar caller keeps its current
+  // solid `color` fill with no stroke; only a caller that wants the
+  // subtle-fill/strong-border look (e.g. a true/false histogram) gets it.
+  borderColor?: string;
   // Derived-mode "Other" bucket — a reserved neutral, never a categorical
   // hue, and (bar chartType) never gets the rounded outer-segment corner
   // treatment since it isn't the true top of the stack's ranked series.
@@ -185,7 +190,7 @@ export function TrendChart({
       const color = s.color ?? CHART_COLORS[i % CHART_COLORS.length];
       const areaColor =
         s.areaColor ?? `color-mix(in srgb, ${color} 40%, ${SURFACE_COLOR} 60%)`;
-      return { key: s.valueName, label: s.label, color, areaColor, isOther: false };
+      return { key: s.valueName, label: s.label, color, areaColor, borderColor: s.borderColor, isOther: false };
     });
   }, [valueName, hasOther, topIdentifiers, series]);
 
@@ -303,7 +308,9 @@ export function TrendChart({
                       key={s.key}
                       dataKey={s.key}
                       name={s.label}
-                      fill={s.color}
+                      fill={s.borderColor ? s.areaColor : s.color}
+                      stroke={s.borderColor}
+                      strokeWidth={s.borderColor ? 1 : undefined}
                       barSize={24}
                       stackId={stacked ? 'trend' : undefined}
                       // Rounded data-end anchored away from the baseline —
