@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 import { Error } from '@inngest/components/Error/Error';
@@ -16,6 +16,7 @@ import {
 } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine } from '@remixicon/react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
+import type { SortingState } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
 import { formatCompactNumber } from '@/components/InfraDashboard/utils';
@@ -31,18 +32,21 @@ import {
   formatSecondsAxis,
   headlineCaveat,
   msPointsToSeconds,
+  tokenBreakdown,
+  withTotalTokens,
 } from './utils';
-import { CHART_COLORS, SUBTLE_BLUE, SUBTLE_GREEN, TOKENS_BY_MODEL_GREEN } from './colors';
+import { CHART_COLORS } from '../InsightsMetrics/colors';
 import { renderRunLink, renderSessionKeyLink, renderSessionLink } from './renderIdentifiers';
 import { CategoricalChart } from '../InsightsMetrics/CategoricalChart';
-import { DEFAULT_PALETTE } from '../InsightsMetrics/colors';
 import { HeadlineStats } from '../InsightsMetrics/HeadlineStats';
 import { RangePlot } from '../InsightsMetrics/RangePlot';
 import { RankedTable } from '../InsightsMetrics/RankedTable';
+import { ViewToggle, type ViewMode } from '../InsightsMetrics/ViewToggle';
 import { TrendChart } from '../InsightsMetrics/TrendChart';
 import { TREND_BUCKET_LIMIT } from '../InsightsMetrics/queries';
-import { useInsightsMetric } from '../InsightsMetrics/useInsightsMetric';
+import { sortingToOrderBy, useInsightsMetric } from '../InsightsMetrics/useInsightsMetric';
 import {
+  hasTrendData,
   sumValues,
   toListItems,
   toScalarValues,
@@ -76,6 +80,11 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
   const [end] = useSearchParam('end');
   const [duration] = useSearchParam('duration');
   const batchUpdate = useBatchedSearchParams();
+  const [latencyByModelView, setLatencyByModelView] = useState<ViewMode>('chart');
+  // Changing this re-issues the ai_latency_by_model query with a new
+  // orderBy (see useInsightsMetric below) — sorting the table re-sorts the
+  // chart's rows too, since both views share one query.
+  const [latencyByModelSort, setLatencyByModelSort] = useState<SortingState>([]);
 
   const parsedDuration = duration ? parseDuration(duration) : '';
   const parsedStart = toDate(start);
@@ -144,18 +153,19 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
     workspaceID,
     functionIDs,
     range: timeRange,
+    orderBy: sortingToOrderBy(latencyByModelSort),
   });
   const mostExpensiveRuns = useInsightsMetric('ai_most_expensive_runs', {
     workspaceID,
     functionIDs,
     range: timeRange,
-    limit: 5,
+    limit: 10,
   });
   const mostExpensiveSteps = useInsightsMetric('ai_most_expensive_steps', {
     workspaceID,
     functionIDs,
     range: timeRange,
-    limit: 5,
+    limit: 10,
   });
   const costPerSessionTrend = useInsightsMetric('ai_cost_per_session_trend', {
     workspaceID,
@@ -167,13 +177,13 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
     workspaceID,
     functionIDs,
     range: timeRange,
-    limit: 5,
+    limit: 10,
   });
   const slowRuns = useInsightsMetric('ai_slow_runs', {
     workspaceID,
     functionIDs,
     range: timeRange,
-    limit: 5,
+    limit: 10,
   });
 
   const error = [
@@ -240,26 +250,21 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
         {showEmptyState && <AIOverviewEmptyState compact className="mb-4 mt-3" />}
         <Section title="Overview" plain>
           <HeadlineStats
-            values={toScalarValues(headline.data)}
+            values={withTotalTokens(toScalarValues(headline.data))}
             isLoading={headline.fetching && !headline.data}
             tiles={[
               { valueName: 'runs', label: 'AI runs', format: formatCompactNumber },
               {
                 valueName: 'cost',
-                label: 'Cost',
+                label: 'Estimated Cost',
                 format: formatCost,
                 tooltip: headlineCaveat(toScalarValues(headline.data)),
               },
               {
-                valueName: 'input_tokens',
-                label: 'input',
-                groupLabel: 'Total tokens',
+                valueName: 'total_tokens',
+                label: 'Total tokens',
                 format: formatCompactNumber,
-                secondary: {
-                  valueName: 'output_tokens',
-                  label: 'output',
-                  format: formatCompactNumber,
-                },
+                tooltip: tokenBreakdown(toScalarValues(headline.data)),
               },
               {
                 valueName: 'p95_latency',
@@ -280,8 +285,9 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             <TrendChart
               points={toTrendPoints(runVolumeTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={runVolumeTrend.fetching && !runVolumeTrend.data}
+              hasData={hasTrendData(runVolumeTrend.data)}
               chartType="bar"
-              series={[{ valueName: 'runs', label: 'Runs', color: CHART_COLORS[0] }]}
+              series={[{ valueName: 'runs', label: 'Runs', color: CHART_COLORS[1] }]}
               defaultValue={0}
             />
           </Section>
@@ -293,21 +299,20 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             <TrendChart
               points={toTrendPoints(tokenTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={tokenTrend.fetching && !tokenTrend.data}
-              chartType="area"
+              hasData={hasTrendData(tokenTrend.data)}
+              chartType="bar"
               stacked
               legendIcon="rect"
               series={[
                 {
                   valueName: 'input_tokens',
                   label: 'Input',
-                  color: DEFAULT_PALETTE[2],
-                  areaColor: SUBTLE_BLUE,
+                  color: CHART_COLORS[1],
                 },
                 {
                   valueName: 'output_tokens',
                   label: 'Output',
-                  color: DEFAULT_PALETTE[1],
-                  areaColor: SUBTLE_GREEN,
+                  color: CHART_COLORS[0],
                 },
               ]}
               tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost, defaultValue: 0 }]}
@@ -320,7 +325,7 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
               isLoading={runsByModel.fetching && !runsByModel.data}
               valueName="runs"
               valueLabel="Runs"
-              color={CHART_COLORS[0]}
+              color={CHART_COLORS[1]}
               format={formatCompactNumber}
               showYAxisLine={false}
               showValueLabels
@@ -338,19 +343,18 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
                 {
                   valueName: 'input_tokens',
                   label: 'Input',
-                  color: SUBTLE_BLUE,
-                  borderColor: DEFAULT_PALETTE[2],
+                  color: CHART_COLORS[1],
                 },
                 {
                   valueName: 'output_tokens',
                   label: 'Output',
-                  color: TOKENS_BY_MODEL_GREEN,
-                  borderColor: DEFAULT_PALETTE[1],
+                  color: CHART_COLORS[0],
                 },
               ]}
               stacked
               format={formatCompactNumber}
               showYAxisLine={false}
+              showValueLabels
               tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost, defaultValue: 0 }]}
             />
           </Section>
@@ -362,6 +366,7 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             <TrendChart
               points={toTrendPoints(tokenTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={tokenTrend.fetching && !tokenTrend.data}
+              hasData={hasTrendData(tokenTrend.data)}
               chartType="bar"
               format={formatCost}
               axisFormat={formatCostAxis}
@@ -392,6 +397,7 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             <TrendChart
               points={toTrendPoints(avgCostPerRunTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={avgCostPerRunTrend.fetching && !avgCostPerRunTrend.data}
+              hasData={hasTrendData(avgCostPerRunTrend.data)}
               format={formatCost}
               axisFormat={formatCostAxis}
               allowDecimals
@@ -407,6 +413,7 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             <TrendChart
               points={toTrendPoints(costPerSessionTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={costPerSessionTrend.fetching && !costPerSessionTrend.data}
+              hasData={hasTrendData(costPerSessionTrend.data)}
               format={formatCost}
               axisFormat={formatCostAxis}
               allowDecimals
@@ -422,6 +429,8 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             queryName="AI most expensive runs"
           >
             <RankedTable
+              headerStyle="subtle"
+              density="compact"
               items={toListItems(mostExpensiveRuns.data)}
               isLoading={mostExpensiveRuns.fetching && !mostExpensiveRuns.data}
               identifierLabel="Run"
@@ -438,6 +447,8 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             queryName="AI most expensive steps"
           >
             <RankedTable
+              headerStyle="subtle"
+              density="compact"
               items={toListItems(mostExpensiveSteps.data)}
               isLoading={mostExpensiveSteps.fetching && !mostExpensiveSteps.data}
               identifierLabel="Step"
@@ -454,6 +465,8 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             queryName="AI most expensive sessions"
           >
             <RankedTable
+              headerStyle="subtle"
+              density="compact"
               items={toListItems(mostExpensiveSessions.data)}
               isLoading={mostExpensiveSessions.fetching && !mostExpensiveSessions.data}
               identifierLabel="Session"
@@ -463,9 +476,9 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
                 render: (key) => renderSessionKeyLink(key, envSlug),
               }}
               columns={[
-                { valueName: 'runs', label: 'Runs', format: formatCompactNumber },
                 { valueName: 'cost', label: 'Cost', format: formatCost },
                 { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
+                { valueName: 'runs', label: 'Runs', format: formatCompactNumber },
               ]}
             />
           </Section>
@@ -481,6 +494,7 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             <TrendChart
               points={latencyTrendPoints}
               isLoading={latencyTrend.fetching && !latencyTrend.data}
+              hasData={hasTrendData(latencyTrend.data)}
               format={formatSeconds}
               axisFormat={formatSecondsAxis}
               allowDecimals
@@ -496,14 +510,35 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             query={latencyByModel.data?.query}
             queryName="AI Call Latency by model"
           >
-            <RangePlot
-              items={toListItems(latencyByModel.data)}
-              isLoading={latencyByModel.fetching && !latencyByModel.data}
-              format={formatSeconds}
-              axisFormat={formatSecondsAxis}
-              colors={CHART_COLORS}
-              showYAxisLine={false}
-            />
+            <ViewToggle mode={latencyByModelView} onChange={setLatencyByModelView} />
+            {latencyByModelView === 'chart' ? (
+              <RangePlot
+                items={toListItems(latencyByModel.data)}
+                isLoading={latencyByModel.fetching && !latencyByModel.data}
+                format={formatSeconds}
+                axisFormat={formatSecondsAxis}
+                colors={CHART_COLORS}
+                showYAxisLine={false}
+              />
+            ) : (
+              <RankedTable
+                headerStyle="subtle"
+                density="compact"
+                items={toListItems(latencyByModel.data)}
+                isLoading={latencyByModel.fetching && !latencyByModel.data}
+                identifierLabel="Model"
+                sortable
+                sorting={latencyByModelSort}
+                onSortingChange={setLatencyByModelSort}
+                columns={[
+                  { valueName: 'min', label: 'Min', format: (v) => formatSeconds(v / 1000) },
+                  { valueName: 'p50', label: 'p50', format: (v) => formatSeconds(v / 1000) },
+                  { valueName: 'p95', label: 'p95', format: (v) => formatSeconds(v / 1000) },
+                  { valueName: 'p99', label: 'p99', format: (v) => formatSeconds(v / 1000) },
+                  { valueName: 'max', label: 'Max', format: (v) => formatSeconds(v / 1000) },
+                ]}
+              />
+            )}
           </Section>
           <Section
             title="Slowest runs"
@@ -512,12 +547,15 @@ export const FunctionAIPanel = ({ functionID }: { functionID: string }) => {
             queryName="AI slowest runs"
           >
             <RankedTable
+              headerStyle="subtle"
+              density="compact"
               items={toListItems(slowRuns.data)}
               isLoading={slowRuns.fetching && !slowRuns.data}
               identifierLabel="Run"
               renderIdentifier={(id) => renderRunLink(id, envSlug)}
               columns={[
                 { valueName: 'latency_ms', label: 'Total AI latency', format: formatMs },
+                { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
               ]}
             />
           </Section>
@@ -556,12 +594,17 @@ function Section({
 
   return (
     <section
-      className={`mb-4 ${plain ? '' : 'border-subtle bg-canvasBase rounded-md border p-4'} ${className ?? ''}`}
+      // No margin here — every Section sits inside a `gap-4` grid/flex
+      // container (see the surrounding grids below), which already spaces
+      // rows/columns evenly at 16px; an own-margin here would double the
+      // vertical gap without affecting the horizontal one.
+      className={`${plain ? '' : 'border-subtle bg-canvasBase shadow-xs rounded-md border p-4'} ${className ?? ''}`}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="text-basis text-sm font-medium">{title}</h2>
         {query && (
           <Button
+            className="ml-auto"
             size="small"
             kind="secondary"
             appearance="outlined"

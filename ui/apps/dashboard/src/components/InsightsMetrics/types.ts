@@ -171,6 +171,16 @@ export function toListItems(table: MetricTable): InsightsMetricItem[] {
 // variables) fills in an empty point for every such bucket, so the chart's
 // x-axis spans the full requested range even when the edge buckets have no
 // data. Omit them to get the raw, unfilled rows.
+// hasTrendData reports whether the backend actually returned any rows for
+// this metric — as opposed to toTrendPoints' filled/synthesized points,
+// which are always present once `range`/`limit` are given (even for a
+// range with zero real data). Pass this to TrendChart's `hasData` so it can
+// still show its empty/loading skeleton instead of a chart full of
+// defaulted (e.g. all-zero) buckets.
+export function hasTrendData(table: MetricTable): boolean {
+  return !!table && table.rows.length > 0;
+}
+
 export function toTrendPoints(
   table: MetricTable,
   range?: { from: string; to: string },

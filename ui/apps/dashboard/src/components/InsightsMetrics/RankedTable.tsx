@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Table } from '@inngest/components/Table';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef, OnChangeFn, SortingState } from '@tanstack/react-table';
 
 import { TableRowsSkeleton } from './ChartSkeleton';
 import { valuesToMap, type InsightsMetricItem } from './types';
@@ -44,6 +44,24 @@ type Props = {
     render: (sessionKey: string) => React.ReactNode;
   };
   isLoading?: boolean;
+  // 'default' or 'subtle' (no filled header background) — see Table's own
+  // headerStyle doc. Passed straight through.
+  headerStyle?: 'default' | 'subtle';
+  // 'default' or 'compact' (shorter rows) — see Table's own density doc.
+  // Passed straight through.
+  density?: 'default' | 'compact';
+  // Lets the user click any column header to sort rows by it (identifier,
+  // function, session key, and every value column) — off by default, since
+  // Table's headers otherwise show a clickable/sort-icon affordance with no
+  // sorting actually wired up.
+  sortable?: boolean;
+  // Controlled sort state — when given (with `onSortingChange`), RankedTable
+  // renders `items` as-is (assumed already sorted the requested way, e.g. by
+  // a server request keyed off this same state) instead of sorting them
+  // itself. Omit both for a self-contained client-side sort of the given
+  // `items`, tracked in local state.
+  sorting?: SortingState;
+  onSortingChange?: (sorting: SortingState) => void;
   className?: string;
 };
 
@@ -62,17 +80,84 @@ export function RankedTable({
   functionColumn,
   sessionKeyColumn,
   isLoading = false,
+  headerStyle,
+  density,
+  sortable = false,
+  sorting: controlledSorting,
+  onSortingChange: controlledOnSortingChange,
   className,
 }: Props) {
+  // Controlled mode (both given): the caller owns sort state, e.g. to
+  // re-issue a server request for the new order — `items` is rendered as-is,
+  // assumed already sorted. Uncontrolled (neither given): RankedTable sorts
+  // the given `items` itself, client-side, tracked in local state.
+  const isControlled = controlledSorting !== undefined && controlledOnSortingChange !== undefined;
+  const [uncontrolledSorting, setUncontrolledSorting] = useState<SortingState>([]);
+  const sorting = isControlled ? controlledSorting : uncontrolledSorting;
+  // Table (via tanstack) calls this with either a new value or an updater
+  // function — resolve that here so both the controlled callback and the
+  // uncontrolled setState only ever see a plain next-value.
+  const setSorting: OnChangeFn<SortingState> = (updater) => {
+    const next = typeof updater === 'function' ? updater(sorting) : updater;
+    if (isControlled) {
+      controlledOnSortingChange(next);
+    } else {
+      setUncontrolledSorting(next);
+    }
+  };
+
   const rows = useMemo<Row[]>(
     () => (items ?? []).map((item) => ({ ...item, id: item.identifier })),
     [items],
   );
 
+  // getSortValue mirrors each column's own cell value — used to sort rows
+  // client-side (uncontrolled mode only), since Table's `manualSorting:
+  // true` means it only tracks which column/direction is active and expects
+  // the caller to reorder `data` to match, rather than sorting internally.
+  const getSortValue = useMemo(
+    () =>
+      (row: Row, columnId: string): string | number => {
+        if (columnId === 'identifier') return row.identifier;
+        if (columnId === 'functionId') return row.functionId ?? '';
+        if (columnId === 'sessionKey') return row.sessionKey ?? '';
+        const col = columns.find(
+          (c) => (typeof c.valueName === 'string' ? c.valueName : c.label) === columnId,
+        );
+        if (!col) return '';
+        const value = typeof col.valueName === 'function' ? col.valueName(row) : valuesToMap(row.values).get(col.valueName);
+        // Undefined sorts to the end regardless of direction — toggleable
+        // sort direction still only applies to rows that actually have a
+        // value for this column.
+        return value ?? -Infinity;
+      },
+    [columns],
+  );
+
+  const sortedRows = useMemo<Row[]>(() => {
+    if (isControlled) return rows;
+    const [sort] = sorting;
+    if (!sort) return rows;
+    return [...rows].sort((a, b) => {
+      const av = getSortValue(a, sort.id);
+      const bv = getSortValue(b, sort.id);
+      const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
+      return sort.desc ? -cmp : cmp;
+    });
+  }, [rows, sorting, getSortValue, isControlled]);
+
   const tableColumns = useMemo<ColumnDef<Row, unknown>[]>(() => {
+    // tanstack's own getCanSort() requires a truthy `accessorFn` on the
+    // column regardless of `enableSorting` (see RowSorting.js) — a plain
+    // `{ id, cell }` "display column" (every column here besides
+    // identifier, which gets one implicitly via accessorKey) can never be
+    // marked sortable without one. manualSorting means tanstack never
+    // actually calls this to compute a value itself, so reusing
+    // getSortValue here purely satisfies that requirement.
     const identifierColumn: ColumnDef<Row, unknown> = {
       accessorKey: 'identifier',
       header: identifierLabel,
+      enableSorting: sortable,
       cell: ({ row }) =>
         renderIdentifier
           ? renderIdentifier(row.original.identifier, row.original)
@@ -84,6 +169,8 @@ export function RankedTable({
           {
             id: 'functionId',
             header: functionColumn.label,
+            enableSorting: sortable,
+            accessorFn: (row) => getSortValue(row, 'functionId'),
             cell: ({ row }) =>
               row.original.functionId ? functionColumn.render(row.original.functionId) : '—',
           },
@@ -95,28 +182,35 @@ export function RankedTable({
           {
             id: 'sessionKey',
             header: sessionKeyColumn.label,
+            enableSorting: sortable,
+            accessorFn: (row) => getSortValue(row, 'sessionKey'),
             cell: ({ row }) =>
               row.original.sessionKey ? sessionKeyColumn.render(row.original.sessionKey) : '—',
           },
         ]
       : [];
 
-    const valueColumns: ColumnDef<Row, unknown>[] = columns.map((col) => ({
+    const valueColumns: ColumnDef<Row, unknown>[] = columns.map((col) => {
       // Labels are unique within one table's column set, so this is a
       // stable id even when valueName is a function rather than a string.
-      id: typeof col.valueName === 'string' ? col.valueName : col.label,
-      header: col.label,
-      cell: ({ row }) => {
-        const value =
-          typeof col.valueName === 'function'
-            ? col.valueName(row.original)
-            : valuesToMap(row.original.values).get(col.valueName);
-        return value === undefined ? '—' : (col.format ?? defaultFormat)(value);
-      },
-    }));
+      const id = typeof col.valueName === 'string' ? col.valueName : col.label;
+      return {
+        id,
+        header: col.label,
+        enableSorting: sortable,
+        accessorFn: (row) => getSortValue(row, id),
+        cell: ({ row }) => {
+          const value =
+            typeof col.valueName === 'function'
+              ? col.valueName(row.original)
+              : valuesToMap(row.original.values).get(col.valueName);
+          return value === undefined ? '—' : (col.format ?? defaultFormat)(value);
+        },
+      };
+    });
 
     return [identifierColumn, ...functionColumnDef, ...sessionKeyColumnDef, ...valueColumns];
-  }, [columns, identifierLabel, renderIdentifier, functionColumn, sessionKeyColumn]);
+  }, [columns, identifierLabel, renderIdentifier, functionColumn, sessionKeyColumn, sortable, getSortValue]);
 
   // Wide identifier column, narrower value/function columns — a rough match
   // for a real row's shape rather than an exact one.
@@ -128,9 +222,14 @@ export function RankedTable({
   return (
     <div className={className}>
       <Table
-        data={rows}
+        data={sortedRows}
         columns={tableColumns}
         isLoading={isLoading}
+        headerStyle={headerStyle}
+        density={density}
+        sorting={sortable ? sorting : undefined}
+        setSorting={sortable ? setSorting : undefined}
+        cellClassName="text-xs"
         blankState={<TableRowsSkeleton columnWidths={columnWidths} />}
       />
     </div>

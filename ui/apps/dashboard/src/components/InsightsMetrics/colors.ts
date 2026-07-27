@@ -11,14 +11,18 @@ export const SURFACE_COLOR = 'rgb(var(--color-background-canvas-base))';
 // chart in this feature.
 export const BORDER_SUBTLE_COLOR = 'rgb(var(--color-border-subtle))';
 
-// Default series/category palette — the same five tokens as Metrics/
-// utils.ts's `lineColors` (the ECharts dashboards' own default palette),
-// reproduced as ready-to-use CSS strings so every chart in this feature can
-// use them directly.
-export const DEFAULT_PALETTE: readonly string[] = [
-  'rgb(var(--color-accent-subtle))',
-  'rgb(var(--color-primary-moderate))',
-  'rgb(var(--color-secondary-moderate))',
-  'rgb(var(--color-tertiary-moderate))',
-  'rgb(var(--color-quaternary-cool-xIntense))',
+// Default series/category palette — a fixed-order pastel palette (green,
+// blue, yellow, orange, purple), matched against a reference mock. Used as
+// the default fill/stroke color by every chart in this package whenever a
+// caller doesn't pass its own `color`/`colors`/`series[].color`. Reuses the
+// design system's "subtle" tier tokens; yellow has no dedicated categorical
+// slot, so it references the honey scale's step 300 directly (verified
+// against the live app — the warning/honey *semantic* tokens render as a
+// burnt orange-rust in light mode, not yellow).
+export const CHART_COLORS: readonly string[] = [
+  'rgb(var(--color-primary-subtle))', // green
+  'rgb(var(--color-secondary-subtle))', // blue
+  'rgb(var(--color-honey-300))', // yellow
+  'rgb(var(--color-quaternary-warmer-xSubtle))', // orange
+  'rgb(var(--color-quaternary-cool-xSubtle))', // purple
 ];

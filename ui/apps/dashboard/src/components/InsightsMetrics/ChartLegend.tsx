@@ -1,5 +1,5 @@
 import { LegendSkeleton } from './ChartSkeleton';
-import { DEFAULT_PALETTE } from './colors';
+import { CHART_COLORS } from './colors';
 import { valuesToMap, type InsightsMetricItem } from './types';
 
 type Props = {
@@ -34,7 +34,7 @@ export function ChartLegend({
   isLoading = false,
   className,
 }: Props) {
-  const sharedSwatchColor = DEFAULT_PALETTE[2];
+  const sharedSwatchColor = CHART_COLORS[1];
 
   const sorted = [...(items ?? [])].sort((a, b) => {
     const av = valuesToMap(a.values).get(valueName) ?? 0;

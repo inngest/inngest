@@ -39,6 +39,16 @@ type BaseTableProps<T> = {
   enableColumnDynamicSizing?: boolean;
   selectedCell?: { rowIndex: number; columnId: string } | null;
   noHeader?: boolean;
+  // 'default' (a filled bg-tableHeader bar, the historical look) or
+  // 'subtle' (no fill, just a thin bottom border — header text is
+  // unchanged) — for tables sitting inside an already-bordered card, where
+  // a second filled header bar reads as visual noise rather than a useful
+  // separator.
+  headerStyle?: 'default' | 'subtle';
+  // 'default' (42px rows, 36px header) or 'compact' (32px rows, 28px
+  // header) — for tables with many short rows (e.g. a top-N ranking) where
+  // the default row height reads as excess whitespace.
+  density?: 'default' | 'compact';
 };
 
 type TableProps<T> = BaseTableProps<T> &
@@ -66,6 +76,8 @@ export function Table<T>({
   enableColumnSizing = false,
   enableColumnDynamicSizing = false,
   noHeader = false,
+  headerStyle = 'default',
+  density = 'default',
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -108,8 +120,13 @@ export function Table<T>({
   });
 
   const tableStyles = enableColumnSizing ? 'table-fixed' : 'w-full';
-  const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
+  const tableHeadStyles = cn(
+    'sticky top-0 z-[2]',
+    headerStyle === 'subtle' ? 'bg-canvasBase border-subtle border-b' : 'bg-tableHeader',
+  );
   const tableColumnStyles = 'px-4';
+  const headerRowHeight = density === 'compact' ? 'h-7' : 'h-9';
+  const bodyRowHeight = density === 'compact' ? 'h-8' : 'h-[42px]';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
 
@@ -126,7 +143,7 @@ export function Table<T>({
         {!noHeader && (
           <thead className={tableHeadStyles}>
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="h-9">
+              <tr key={headerGroup.id} className={headerRowHeight}>
                 {headerGroup.headers.map((header) => {
                   const isIconOnlyColumn = header.column.columnDef.header === undefined;
                   return (
@@ -134,7 +151,11 @@ export function Table<T>({
                       key={header.id}
                       className={cn(
                         isIconOnlyColumn ? '' : tableColumnStyles,
-                        'text-muted whitespace-nowrap text-left text-xs font-medium',
+                        'text-muted whitespace-nowrap text-left text-xs',
+                        // 'subtle' mode weights its header text heavier
+                        // (semibold, not medium) since there's no filled
+                        // header bar left to otherwise set the row apart.
+                        headerStyle === 'subtle' ? 'font-semibold' : 'font-medium',
                         enableColumnSizing ? 'overflow-hidden text-ellipsis' : ''
                       )}
                       style={
@@ -187,7 +208,7 @@ export function Table<T>({
           {isEmpty && (
             <tr>
               <td
-                className="text-muted h-[42px] text-center text-sm font-normal"
+                className={cn('text-muted text-center text-sm font-normal', bodyRowHeight)}
                 colSpan={table.getVisibleFlatColumns().length}
               >
                 {blankState}
@@ -203,8 +224,8 @@ export function Table<T>({
                   aria-label={getRowHref ? 'View details' : undefined}
                   className={cn(
                     hasId(row.original) && expandedIDs.includes(row.original.id)
-                      ? 'h-[42px]'
-                      : 'border-light box-border h-[42px] border-b',
+                      ? bodyRowHeight
+                      : cn('border-light box-border border-b', bodyRowHeight),
                     onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : '',
                     onRowMouseEnter ? 'hover:bg-canvasSubtle' : '',
                     isRowHighlighted?.(row) ? 'bg-canvasSubtle' : '',

@@ -16,22 +16,21 @@ import { formatCompactNumber } from '@/components/InfraDashboard/utils';
 import { dateFormat, timeDiff } from '@/components/Metrics/utils';
 import { ChartTooltip } from './ChartTooltip';
 import { TrendAreaChartSkeleton, TrendChartSkeleton } from './ChartSkeleton';
-import { BORDER_SUBTLE_COLOR, DEFAULT_PALETTE, SURFACE_COLOR } from './colors';
+import { BORDER_SUBTLE_COLOR, CHART_COLORS, SURFACE_COLOR } from './colors';
 import { valuesToMap, type InsightsMetricPoint, type TooltipExtra } from './types';
 
 export type TrendSeriesConfig = {
   // Which NamedValue.name to read per point.
   valueName: string;
   label: string;
-  // Overrides the index-based default from `DEFAULT_PALETTE` — for a series
+  // Overrides the index-based default from `CHART_COLORS` — for a series
   // whose identity has an established color independent of its position
   // (e.g. always green for "runs"), rather than whatever hue its index
   // would otherwise land on.
   color?: string;
-  // Bar border color override (CategoricalChart only) — e.g. a subtle fill
-  // paired with its own moderate/vivid hue as the border, rather than the
-  // chart surface color CategoricalChart uses by default to separate
-  // stacked segments.
+  // Bar border color override (CategoricalChart only) — stacked segments
+  // have no border by default (a transparent seam), so this only matters
+  // for a caller that wants one explicitly.
   borderColor?: string;
   // Area fill override ('area' chartType only) — a design-system subtle
   // token, rather than the default computed mix of `color` toward the
@@ -49,7 +48,7 @@ type Props = {
   // populated — e.g. one line per model. Which NamedValue.name to read per
   // dimension per bucket. Unlike `series`'s caller-supplied fixed config,
   // the category set here is open-ended and only known from the data: the
-  // top `DEFAULT_PALETTE.length` identifiers by total value across the whole
+  // top `CHART_COLORS.length` identifiers by total value across the whole
   // range each get their own line in a fixed rank order (color follows the
   // entity, not a cycled hue), and every other identifier folds into one
   // "Other" line rather than adding an unbounded number of series.
@@ -97,6 +96,14 @@ type Props = {
   // (cost per run, latency) where 0 would misrepresent "no data" as a real
   // reading of zero. Fixed `series` form only.
   defaultValue?: number;
+  // Whether there's any real data at all for this chart — pass this
+  // explicitly when `points` came from toTrendPoints' range/limit fill
+  // (which always returns one point per expected bucket, even ones the
+  // backend returned zero rows for), so `points.length` alone can no longer
+  // tell "no data in this range" apart from "sparse data with gaps filled".
+  // Omitting it falls back to `points.length > 0`, for callers that don't
+  // use that fill.
+  hasData?: boolean;
   isLoading?: boolean;
   // Charts sharing the same group id sync their hover/tooltip position
   // (recharts' syncId) — hovering one chart highlights the same x position
@@ -139,6 +146,7 @@ export function TrendChart({
   legendIcon = 'circle',
   tooltipExtras,
   defaultValue,
+  hasData,
   isLoading = false,
   group,
   className,
@@ -156,11 +164,11 @@ export function TrendChart({
       }
     }
     const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1]);
-    const topIdentifiers = ranked.slice(0, DEFAULT_PALETTE.length).map(([id]) => id);
+    const topIdentifiers = ranked.slice(0, CHART_COLORS.length).map(([id]) => id);
     return {
       topIdentifiers,
       topSet: new Set(topIdentifiers),
-      hasOther: ranked.length > DEFAULT_PALETTE.length,
+      hasOther: ranked.length > CHART_COLORS.length,
     };
   }, [points, valueName]);
 
@@ -169,12 +177,12 @@ export function TrendChart({
       const names = hasOther ? [...topIdentifiers, OTHER_LABEL] : topIdentifiers;
       return names.map((name, i) => {
         const isOther = name === OTHER_LABEL;
-        const color = isOther ? BORDER_SUBTLE_COLOR : DEFAULT_PALETTE[i];
+        const color = isOther ? BORDER_SUBTLE_COLOR : CHART_COLORS[i];
         return { key: name, label: name, color, areaColor: color, isOther };
       });
     }
     return (series ?? []).map((s, i) => {
-      const color = s.color ?? DEFAULT_PALETTE[i % DEFAULT_PALETTE.length];
+      const color = s.color ?? CHART_COLORS[i % CHART_COLORS.length];
       const areaColor =
         s.areaColor ?? `color-mix(in srgb, ${color} 40%, ${SURFACE_COLOR} 60%)`;
       return { key: s.valueName, label: s.label, color, areaColor, isOther: false };
@@ -232,7 +240,8 @@ export function TrendChart({
   const showLegend = valueName !== undefined || effectiveSeries.length > 1;
   const TrendSkeleton = chartType === 'area' ? TrendAreaChartSkeleton : TrendChartSkeleton;
 
-  if ((!points || points.length === 0) || isLoading) {
+  const noData = hasData !== undefined ? !hasData : !points || points.length === 0;
+  if (noData || isLoading) {
     return (
       <div className={className}>
         <TrendSkeleton animate={isLoading} className="h-full min-h-[240px]" />
@@ -336,6 +345,10 @@ export function TrendChart({
                       stroke={s.color}
                       strokeWidth={1}
                       fill={s.areaColor}
+                      // recharts defaults fillOpacity to 0.6 — without this,
+                      // an opaque areaColor still renders translucent
+                      // (blended with the gridlines/other areas behind it).
+                      fillOpacity={1}
                       // The active dot for stacked areas is rendered
                       // separately below, after every area fill — each
                       // area paints in declared order, so a lower (earlier)

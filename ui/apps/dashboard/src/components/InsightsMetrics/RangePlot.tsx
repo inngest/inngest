@@ -3,7 +3,7 @@ import { Bar, BarChart, Customized, ResponsiveContainer, Tooltip, XAxis, YAxis }
 
 import { truncateCenter } from '@/lib/experiments/chart';
 import { RankedChartSkeleton } from './ChartSkeleton';
-import { BORDER_SUBTLE_COLOR, DEFAULT_PALETTE } from './colors';
+import { BORDER_SUBTLE_COLOR, CHART_COLORS } from './colors';
 import { valuesToMap, type InsightsMetricItem } from './types';
 
 // RangePlot is a copy of Experiments' BoxPlot (apps/dashboard/src/
@@ -70,17 +70,30 @@ type BarShapeProps = {
   payload?: RowData;
 };
 
-// renderYAxisTick draws each category label as a single line of SVG text,
+// makeYAxisTick draws each category label as a single line of SVG text,
 // middle-truncated with an ellipsis — recharts' default category-axis tick
 // wraps long labels across multiple lines when constrained by `width`; a
 // plain <text> element never wraps, so labels stay on one line instead.
-function renderYAxisTick({ x, y, payload }: { x: number; y: number; payload: { value: string } }) {
-  return (
-    <text x={x} y={y} dy={4} textAnchor="end" fontSize={10} className="fill-basis">
-      <title>{payload.value}</title>
-      {truncateCenter(payload.value, 30)}
-    </text>
-  );
+// `formatIdentifier` maps the raw identifier to its display label (e.g. a
+// function slug to its human-readable name) before truncating.
+function makeYAxisTick(formatIdentifier: (identifier: string) => string) {
+  return function renderYAxisTick({
+    x,
+    y,
+    payload,
+  }: {
+    x: number;
+    y: number;
+    payload: { value: string };
+  }) {
+    const full = formatIdentifier(payload.value);
+    return (
+      <text x={x} y={y} dy={4} textAnchor="end" fontSize={10} className="fill-basis">
+        <title>{full}</title>
+        {truncateCenter(full, 30)}
+      </text>
+    );
+  };
 }
 
 // TickShape draws a vertical line at every configured tick's value, all
@@ -305,6 +318,10 @@ type Props = {
   // Hides the vertical y-axis line (ticks/labels stay) — for callers where
   // it's redundant against the chart's own card border.
   showYAxisLine?: boolean;
+  // Maps an item's raw identifier to its y-axis display label — e.g.
+  // resolving a function slug to its human-readable name. Defaults to the
+  // identifier as-is (already human-readable for callers like model names).
+  formatIdentifier?: (identifier: string) => string;
   isLoading?: boolean;
   group?: string;
   className?: string;
@@ -317,6 +334,7 @@ export function RangePlot({
   axisFormat = format,
   colors,
   showYAxisLine = true,
+  formatIdentifier = (identifier) => identifier,
   isLoading = false,
   group,
   className,
@@ -324,6 +342,7 @@ export function RangePlot({
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [activeRow, setActiveRow] = useState<RowData | null>(null);
   const [boldValueNames, setBoldValueNames] = useState<string[]>([]);
+  const renderYAxisTick = useMemo(() => makeYAxisTick(formatIdentifier), [formatIdentifier]);
 
   const rows = useMemo<RowData[]>(() => {
     if (!items) return [];
@@ -340,7 +359,7 @@ export function RangePlot({
         values,
         min: present.length ? Math.min(...present) : 0,
         max: present.length ? Math.max(...present) : 0,
-        color: colors ? colors[idx % colors.length] : DEFAULT_PALETTE[2],
+        color: colors ? colors[idx % colors.length] : CHART_COLORS[1],
       };
     });
   }, [items, ticks, colors]);

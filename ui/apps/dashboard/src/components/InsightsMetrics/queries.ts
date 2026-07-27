@@ -27,6 +27,7 @@ export const InsightsMetricDocument = graphql(`
     $key: String!
     $range: TimeRangeInput!
     $limit: Int
+    $orderBy: InsightsMetricOrderBy
   ) {
     insightsMetric(
       workspaceID: $workspaceID
@@ -34,6 +35,7 @@ export const InsightsMetricDocument = graphql(`
       key: $key
       range: $range
       limit: $limit
+      orderBy: $orderBy
     ) {
       query
       columns {

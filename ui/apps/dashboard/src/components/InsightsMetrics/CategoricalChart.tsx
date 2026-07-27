@@ -14,7 +14,7 @@ import {
 import { formatCompactNumber } from '@/components/InfraDashboard/utils';
 import { truncateCenter } from '@/lib/experiments/chart';
 import { RankedChartSkeleton } from './ChartSkeleton';
-import { BORDER_SUBTLE_COLOR, DEFAULT_PALETTE, SURFACE_COLOR } from './colors';
+import { BORDER_SUBTLE_COLOR, CHART_COLORS } from './colors';
 import type { TrendSeriesConfig } from './TrendChart';
 import { valuesToMap, type InsightsMetricItem, type TooltipExtra } from './types';
 
@@ -25,7 +25,7 @@ type Props = {
   // Mutually exclusive with `series`; exactly one must be given.
   valueName?: string;
   valueLabel?: string;
-  // Overrides the default single shared magnitude hue (DEFAULT_PALETTE[2])
+  // Overrides the default single shared magnitude hue (CHART_COLORS[1])
   // — single-measure form only; ignored when `colors` or `series` is given.
   color?: string;
   // Overrides the single shared magnitude hue with one distinct color per
@@ -49,9 +49,12 @@ type Props = {
   // Hides the vertical y-axis line (ticks/labels stay) — for callers where
   // it's redundant against the chart's own card border.
   showYAxisLine?: boolean;
-  // Shows each bar's formatted value as a persistent label to its right,
-  // instead of only on hover via the tooltip. Single-measure form only;
-  // ignored when `series` is given.
+  // Shows each bar's formatted value(s) as a persistent label to its right,
+  // instead of only on hover via the tooltip. Single-measure form: just that
+  // series' value. Multi-measure form: only when `stacked` (a grouped,
+  // non-stacked bar has no single row position to attach a combined label
+  // to) — every series' value in declared order, joined by " | " (e.g.
+  // "1.2K | 856" for input | output tokens).
   showValueLabels?: boolean;
   // Appends each series' name after its value in the hover tooltip — for
   // single-measure charts whose measure is already obvious from context
@@ -77,6 +80,12 @@ const defaultFormat = (value: number) => value.toLocaleString();
 // thickness so they line up with the fill bars exactly.
 const BAR_THICKNESS = 20;
 const STACKED_BAR_CATEGORY_GAP = '55%';
+
+// showValueLabels' per-series value columns: each value's own fixed-width
+// column, plus a "|" separator centered in the gap between columns.
+const VALUE_COLUMN_WIDTH = 36;
+const VALUE_COLUMN_GAP = 14;
+const VALUE_COLUMN_STEP = VALUE_COLUMN_WIDTH + VALUE_COLUMN_GAP;
 
 type ChartRow = { identifier: string; [valueName: string]: string | number };
 
@@ -248,7 +257,7 @@ export function CategoricalChart({
     [sorted, effectiveSeries],
   );
 
-  const singleColor = useMemo(() => color ?? DEFAULT_PALETTE[2], [color]);
+  const singleColor = useMemo(() => color ?? CHART_COLORS[1], [color]);
 
   // perCategoryColors mirrors chartData order — each bar gets its own color
   // from `colors`, cycling if there are more bars than colors.
@@ -258,15 +267,16 @@ export function CategoricalChart({
   );
 
   // seriesColors/segmentBorderColors parallel effectiveSeries. A stacked
-  // segment's border falls back to the chart's surface color (rather than
-  // its own fill) when no explicit borderColor is set, so adjacent segments
-  // stay visually separated without a loud outline.
+  // segment's border falls back to transparent (no seam at all) when no
+  // explicit borderColor is set, rather than the chart's surface color —
+  // opaque, non-subtle fills read better as one continuous stacked bar than
+  // as visually separated segments.
   const seriesColors = useMemo(
-    () => effectiveSeries.map((s, i) => s.color ?? DEFAULT_PALETTE[i % DEFAULT_PALETTE.length]),
+    () => effectiveSeries.map((s, i) => s.color ?? CHART_COLORS[i % CHART_COLORS.length]),
     [effectiveSeries],
   );
   const segmentBorderColors = useMemo(
-    () => effectiveSeries.map((s) => s.borderColor ?? SURFACE_COLOR),
+    () => effectiveSeries.map((s) => s.borderColor ?? 'transparent'),
     [effectiveSeries],
   );
   // legendSwatchColors mirrors each multi-series entry's *border* color
@@ -314,21 +324,46 @@ export function CategoricalChart({
     );
   };
 
-  // primaryValueName/valueByIdentifier back the value-label column
-  // (showValueLabels): a second category y-axis on the right, sharing the
-  // same row positions as the identifier axis on the left, so every value
-  // lines up with its bar regardless of that bar's own length.
-  const primaryValueName = effectiveSeries[0]?.valueName ?? '';
-  const valueByIdentifier = useMemo(
-    () => new Map(chartData.map((row) => [row.identifier, row[primaryValueName]])),
-    [chartData, primaryValueName],
+  // rowByIdentifier backs the value-label column (showValueLabels): a
+  // second category y-axis on the right, sharing the same row positions as
+  // the identifier axis on the left, so every value lines up with its bar
+  // regardless of that bar's own length.
+  const rowByIdentifier = useMemo(
+    () => new Map(chartData.map((row) => [row.identifier, row])),
+    [chartData],
   );
+  // Every series' value renders in its own fixed-width column (with a
+  // vertical divider line at a fixed position between them) rather than one
+  // joined string — so columns line up across rows regardless of how many
+  // digits any one row's value happens to have. Degrades to a single column
+  // with no divider for the single-measure form.
   const renderValueAxisTick = ({ x, y, payload }: { x: number; y: number; payload: { value: string } }) => {
-    const value = valueByIdentifier.get(payload.value);
+    const row = rowByIdentifier.get(payload.value);
     return (
-      <text x={x} y={y} dy={4} textAnchor="start" fontSize={10} className="fill-basis">
-        {typeof value === 'number' ? format(value) : ''}
-      </text>
+      <g>
+        {effectiveSeries.map((s, i) => {
+          const raw = row?.[s.valueName];
+          const text = typeof raw === 'number' ? format(raw) : '';
+          const columnX = x + i * VALUE_COLUMN_STEP;
+          return (
+            <g key={s.valueName}>
+              {i > 0 && (
+                <line
+                  x1={columnX - VALUE_COLUMN_GAP / 2}
+                  x2={columnX - VALUE_COLUMN_GAP / 2}
+                  y1={y - 5}
+                  y2={y + 5}
+                  stroke={BORDER_SUBTLE_COLOR}
+                  strokeWidth={1}
+                />
+              )}
+              <text x={columnX} y={y} dy={4} textAnchor="start" fontSize={10} className="fill-basis">
+                {text}
+              </text>
+            </g>
+          );
+        })}
+      </g>
     );
   };
 
@@ -366,7 +401,7 @@ export function CategoricalChart({
               width={140}
               interval={0}
             />
-            {!isMultiSeries && showValueLabels && (
+            {(!isMultiSeries || stacked) && showValueLabels && (
               <YAxis
                 yAxisId="values"
                 orientation="right"
@@ -375,7 +410,7 @@ export function CategoricalChart({
                 tick={renderValueAxisTick}
                 axisLine={false}
                 tickLine={false}
-                width={36}
+                width={effectiveSeries.length * VALUE_COLUMN_WIDTH + (effectiveSeries.length - 1) * VALUE_COLUMN_GAP}
                 tickMargin={0}
                 interval={0}
               />

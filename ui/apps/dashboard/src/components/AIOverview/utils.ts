@@ -1,7 +1,7 @@
 import { formatMilliseconds } from '@inngest/components/utils/date';
 
 import { formatCompactNumber } from '@/components/InfraDashboard/utils';
-import type { InsightsMetricPoint, NamedValue } from '../InsightsMetrics/types';
+import { valuesToMap, type InsightsMetricPoint, type NamedValue } from '../InsightsMetrics/types';
 
 // toSigFigs formats `value` to a fixed number of significant figures
 // (not a fixed number of decimal places) without falling back to
@@ -58,6 +58,29 @@ export function headlineCaveat(values: NamedValue[] | undefined): string | undef
     (byName.get('unpriced_output_tokens') ?? 0);
 
   return `${formatCompactNumber(unpricedCalls)} call${unpricedCalls === 1 ? '' : 's'} (${formatCompactNumber(unpricedTokens)} tokens) used a model without pricing data and are excluded from cost.`;
+}
+
+// withTotalTokens appends a synthetic `total_tokens` value (input_tokens +
+// output_tokens) to a headline's scalar values, so the "Total tokens" tile
+// can show one combined number instead of the raw input/output pair — the
+// breakdown moves into that tile's info popover instead (see
+// tokenBreakdown).
+export function withTotalTokens(values: NamedValue[]): NamedValue[] {
+  const map = valuesToMap(values);
+  const input = map.get('input_tokens');
+  const output = map.get('output_tokens');
+  if (input === undefined && output === undefined) return values;
+  return [...values, { name: 'total_tokens', value: (input ?? 0) + (output ?? 0) }];
+}
+
+// tokenBreakdown formats the input/output split behind the "Total tokens"
+// tile's info popover — e.g. "1.2K input, 856 output".
+export function tokenBreakdown(values: NamedValue[]): string | undefined {
+  const map = valuesToMap(values);
+  const input = map.get('input_tokens');
+  const output = map.get('output_tokens');
+  if (input === undefined && output === undefined) return undefined;
+  return `${formatCompactNumber(input ?? 0)} input, ${formatCompactNumber(output ?? 0)} output`;
 }
 
 export function formatMs(value: number): string {
