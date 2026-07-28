@@ -75,6 +75,7 @@ func login(ctx context.Context, cmd *cli.Command) error {
 	}
 	state.Credentials = []byte(resp.AccessToken)
 	state.Account = client.Account{ID: resp.AccountID, Name: resp.AccountName}
+	state.UserID = resp.UserID
 	state.Env = resp.Env
 	if err := state.Persist(ctx); err != nil {
 		return fmt.Errorf("unable to save credentials: %w", err)
@@ -175,7 +176,7 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 	state, err := clistate.GetState(ctx)
 	if err == nil {
 		state.Credentials = nil
-		state.Account = client.Account{}
+		state.Account.Name = ""
 		state.Env = ""
 		if err := state.Persist(ctx); err != nil {
 			return fmt.Errorf("unable to clear credentials: %w", err)
