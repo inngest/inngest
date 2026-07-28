@@ -309,6 +309,45 @@ func listRunsPageOpts(cursor string, requestedLimit int32) (string, int, error) 
 	return parseRunsPageOpts(cursor, requestedLimit, defaultRunsLimit, maxRunsLimit)
 }
 
+func (s *Service) CancelRun(ctx context.Context, req *apiv2.CancelRunRequest) (*apiv2.CancelRunResponse, error) {
+	if req.RunId == "" {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "Run ID is required")
+	}
+
+	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_CancelRun_FullMethodName); result.Limited {
+		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
+			"API rate limit exceeded. The request was rejected and no run was cancelled.")
+	}
+
+	if s.runs == nil {
+		return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Cancel run is not yet implemented")
+	}
+
+	runID, err := ulid.Parse(req.RunId)
+	if err != nil {
+		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, "Run ID must be a valid ULID")
+	}
+
+	if err := s.runs.Cancel(ctx, runID); err != nil {
+		switch {
+		case errors.Is(err, ErrRunNotFound):
+			return nil, s.base.NewError(http.StatusNotFound, apiv2base.ErrorNotFound, "Run not found")
+		case errors.Is(err, ErrRunAlreadyCancelled):
+			return nil, s.base.NewError(http.StatusConflict, apiv2base.ErrorRunAlreadyCancelled, "Run is already cancelled")
+		case errors.Is(err, ErrRunEnded):
+			return nil, s.base.NewError(http.StatusConflict, apiv2base.ErrorRunAlreadyEnded, "Cannot cancel an ended run")
+		}
+		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to cancel run")
+	}
+
+	return &apiv2.CancelRunResponse{
+		Data: &apiv2.CancelRunData{
+			RunId: runID.String(),
+		},
+		Metadata: &apiv2.ResponseMetadata{FetchedAt: timestamppb.Now()},
+	}, nil
+}
+
 func runsPageOpts(cursor string, requestedLimit int32) (string, int, error) {
 	return parseRunsPageOpts(cursor, requestedLimit, defaultEventRunsLimit, maxEventRunsLimit)
 }

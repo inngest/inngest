@@ -352,6 +352,34 @@ func TestHTTPGateway_RerunFromStepErrors(t *testing.T) {
 	}
 }
 
+func TestHTTPGateway_CancelRun(t *testing.T) {
+	ctx := context.Background()
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+
+	provider := &mockRunProvider{}
+	provider.On("Cancel", mock.Anything, runID).Return(nil).Once()
+
+	handler, err := newTestHTTPHandler(ctx, ServiceOptions{Runs: provider}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		provider.AssertExpectations(t)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/runs/"+runID.String()+"/cancel", nil)
+	req.Header.Set("Accept", "*/*")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	data := response["data"].(map[string]any)
+	require.Equal(t, runID.String(), data["runId"])
+}
+
 func TestHTTPGateway_GetApp(t *testing.T) {
 	ctx := context.Background()
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")

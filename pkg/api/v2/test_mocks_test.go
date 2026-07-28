@@ -70,6 +70,10 @@ func (m *mockRunProvider) Rerun(ctx context.Context, runID ulid.ULID, opts Rerun
 	return runID, args.Error(1)
 }
 
+func (m *mockRunProvider) Cancel(ctx context.Context, runID ulid.ULID) error {
+	return m.Called(ctx, runID).Error(0)
+}
+
 type mockFunctionTraceReader struct {
 	mock.Mock
 }
