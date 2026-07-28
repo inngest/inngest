@@ -32,7 +32,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { CHART_COLORS, CHART_COLORS_SUBTLE } from '../InsightsMetrics/colors';
+import { CHART_COLORS } from '../InsightsMetrics/colors';
 import { AIOverviewEmptyState } from './EmptyState';
 import {
   formatCost,
@@ -351,7 +351,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                 {
                   valueName: 'runs',
                   label: 'Runs',
-                  color: CHART_COLORS[1],
+                  color: CHART_COLORS[2],
                 },
               ]}
               defaultValue={0}
@@ -379,8 +379,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                   valueName: 'output_tokens',
                   label: 'Output',
                   color: CHART_COLORS[0],
-                  borderColor: CHART_COLORS[0],
-                  fillColor: CHART_COLORS_SUBTLE[0],
                 },
               ]}
               tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost, defaultValue: 0 }]}
@@ -440,7 +438,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                 {
                   valueName: 'input_tokens',
                   label: 'Input',
-                  color: CHART_COLORS[1],
+                  color: CHART_COLORS[2],
                 },
                 {
                   valueName: 'output_tokens',

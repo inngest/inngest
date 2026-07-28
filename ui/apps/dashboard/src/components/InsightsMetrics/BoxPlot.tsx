@@ -115,7 +115,8 @@ function BoxShape({
             x2={qx}
             y1={y}
             y2={y + height}
-            stroke={payload?.color}
+            stroke={ i=== 2 ? 'rgb(var(--color-background-canvas-base))' : payload?.color}
+            strokeDashoffset={i === 2 ? 1 : undefined}
             strokeWidth={LINE_WIDTH}
           />
         ))}

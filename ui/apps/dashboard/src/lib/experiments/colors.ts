@@ -1,4 +1,4 @@
-import { CHART_COLORS, CHART_COLORS_SUBTLE } from "@/components/InsightsMetrics/colors";
+import { CHART_COLORS } from "@/components/InsightsMetrics/colors";
 
 export function colorForMetric(index: number): string {
   return CHART_COLORS[index % CHART_COLORS.length];
@@ -6,10 +6,6 @@ export function colorForMetric(index: number): string {
 
 export function colorForVariant(index: number): string {
   return CHART_COLORS[index % CHART_COLORS.length];
-}
-
-export function subtleColorForVariant(index: number): string {
-  return CHART_COLORS_SUBTLE[index % CHART_COLORS_SUBTLE.length];
 }
 
 type MetricLike = { key: string };
