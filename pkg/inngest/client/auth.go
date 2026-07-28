@@ -142,6 +142,6 @@ type DeviceLoginResponse struct {
 	AccessToken string    `json:"access_token"`
 	AccountID   uuid.UUID `json:"account_id"`
 	AccountName string    `json:"account_name"`
-	// Env is the name of the environment the minted API key is bound to.
-	Env string `json:"env"`
+	UserID      uuid.UUID `json:"user_id"`
+	Env         string    `json:"env"`
 }
