@@ -31,7 +31,7 @@ export default function SideBar({ collapsed, setCollapsed }: SideBarProps) {
         <div>
           <div className="mx-4">
             <MenuItem
-              href="/mcp"
+              href="/mcp/setup"
               collapsed={collapsed}
               text="MCP"
               icon={<MCPIcon className="h-[18px] w-[18px]" />}
