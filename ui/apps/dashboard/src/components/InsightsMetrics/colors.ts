@@ -35,7 +35,8 @@ export const CHART_COLORS: readonly string[] = [
 export const CHART_COLORS_SUBTLE: readonly string[] = [
   'rgb(var(--color-chart-line-1-subtle))', // green
   'rgb(var(--color-chart-line-2-subtle))', // orange
-  'rgb(var(--color-chart-line-3-sbutle))', // blue
-  'rgb(var(--color-chart-line-4-subtle))', // red
+  'rgb(var(--color-chart-line-3-subtle))', // blue
+  'rgb(var(--color-chart-line-4-subtle))', // yellow
   'rgb(var(--color-chart-line-5-subtle))', // purple
+  'rgb(var(--color-chart-line-6-subtle))', // red
 ];

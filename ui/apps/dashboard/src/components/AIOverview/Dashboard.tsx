@@ -366,16 +366,14 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               points={toTrendPoints(tokenTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={tokenTrend.fetching && !tokenTrend.data}
               hasData={hasTrendData(tokenTrend.data)}
-              chartType="area"
+              chartType="bar"
               stacked
               legendIcon="rect"
               series={[
                 {
                   valueName: 'input_tokens',
                   label: 'Input',
-                  color: CHART_COLORS[1],
-                  borderColor: CHART_COLORS[1],
-                  fillColor: CHART_COLORS_SUBTLE[1],
+                  color: CHART_COLORS[2],
                 },
                 {
                   valueName: 'output_tokens',
@@ -424,7 +422,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               isLoading={runsByModel.fetching && !runsByModel.data}
               valueName="runs"
               valueLabel="Runs"
-              color={CHART_COLORS[1]}
+              color={CHART_COLORS[2]}
               format={formatCompactNumber}
               showYAxisLine={false}
               showValueLabels

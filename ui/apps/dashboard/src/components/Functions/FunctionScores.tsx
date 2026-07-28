@@ -16,7 +16,7 @@ import {
 import { useQuery } from 'urql';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
-import { CHART_COLORS, CHART_COLORS_SUBTLE } from '@/components/InsightsMetrics/colors';
+import { CHART_COLORS } from '@/components/InsightsMetrics/colors';
 import { TREND_BUCKET_LIMIT } from '@/components/InsightsMetrics/queries';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import {
@@ -164,7 +164,7 @@ export const FunctionScores = ({ functionSlug }: Props) => {
     const subtleColor = new Map<string, string>();
     orderedNames.forEach((name, i) => {
       color.set(name, CHART_COLORS[i % CHART_COLORS.length]);
-      subtleColor.set(name, CHART_COLORS_SUBTLE[i % CHART_COLORS_SUBTLE.length]);
+      subtleColor.set(name, CHART_COLORS[i % CHART_COLORS.length]);
     });
     return { color, subtleColor };
   }, [orderedNames.join(',')]);

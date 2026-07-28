@@ -2,6 +2,7 @@ import type { ExperimentVariantMetrics } from '@inngest/components/Experiments';
 
 import {
   colorForVariant,
+  subtleColorForVariant,
 } from '@/lib/experiments/colors';
 import type { RowData } from '@/components/InsightsMetrics/BoxPlot';
 
@@ -25,7 +26,7 @@ export function rowsForMetric(
             q3: m.q3,
             max: m.max,
             color: colorForVariant(colorIndex),
-            subtleColor: colorForVariant(colorIndex),
+            subtleColor: subtleColorForVariant(colorIndex),
             opacity: 1,
           }
         : null;

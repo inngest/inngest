@@ -330,6 +330,13 @@ input[type='number'] {
     --color-chart-line-4: var(--color-accent-xSubtle);
     --color-chart-line-5: var(--color-quaternary-cool-subtle);
     --color-chart-line-6: var(--color-tertiary-subtle);
+
+    --color-chart-line-1-subtle: var(--color-primary-2xSubtle);
+    --color-chart-line-2-subtle: var(--color-quaternary-warmer-3xSubtle);
+    --color-chart-line-3-subtle: var(--color-secondary-3xSubtle);
+    --color-chart-line-4-subtle: var(--color-accent-3xSubtle);
+    --color-chart-line-5-subtle: var(--color-quaternary-cool-2xSubtle);
+    --color-chart-line-6-subtle: var(--color-tertiary-2xSubtle);
   }
 
   .dark {
@@ -450,9 +457,13 @@ input[type='number'] {
     --color-quaternary-warm-3xIntense: var(--color-blush-100);
 
     --color-quaternary-warmer-3xSubtle: var(--color-citrus-900);
+    --color-quaternary-warmer-2xSubtle: var(--color-citrus-800);
     --color-quaternary-warmer-xSubtle: var(--color-citrus-700);
+    --color-quaternary-warmer-subtle: var(--color-citrus-600);
     --color-quaternary-warmer-moderate: var(--color-citrus-500);
+    --color-quaternary-warmer-intense: var(--color-citrus-400);
     --color-quaternary-warmer-xIntense: var(--color-citrus-300);
+    --color-quaternary-warmer-2xIntense: var(--color-citrus-200);
     --color-quaternary-warmer-3xIntense: var(--color-citrus-100);
 
     --color-accent-3xSubtle: var(--color-honey-900);
@@ -474,9 +485,10 @@ input[type='number'] {
 
     --color-chart-line-1-subtle: var(--color-primary-2xSubtle);
     --color-chart-line-2-subtle: var(--color-quaternary-warmer-2xSubtle);
-    --color-chart-line-3-subtle: var(--color-secondary-2xSubtle);
-    --color-chart-line-4-subtle: var(--color-quaternary-warm-xSubtle);
-    --color-chart-line-5-subtle: var(--color-quaternary-cool-xSubtle);
+    --color-chart-line-3-subtle: var(--color-secondary-3xSubtle);
+    --color-chart-line-4-subtle: var(--color-accent-xSubtle);
+    --color-chart-line-5-subtle: var(--color-quaternary-cool-3xSubtle);
+    --color-chart-line-6-subtle: var(--color-tertiary-2xSubtle);
   }
 }
 
