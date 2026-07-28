@@ -2,12 +2,13 @@
 // insightsMetric registry keys (see pkg/applogic/dashboards/scores.go in the
 // backend monorepo) into the shapes ScoreCard/FunctionScoreCard's Overview
 // and Timeseries tabs render. Both keys return one row per score `identifier`
-// with columns count/min/max/avg/p25/p50/p75/is_boolean — a true-quartile
-// box-plot aggregation, unlike ScoreBucket's avg/max/p50/p90/p99 (no
-// min/q1). `is_boolean` (every observation collapsing to exactly 0 or 1) is
-// the authoritative signal for whether a score name should render as a
-// boolean chart — ScoreNamesDocument's `kind` predates it and both should
-// agree, but this is computed straight from the same values being plotted.
+// with columns count/min/max/avg/p25/p50/p75/p95/p99/is_boolean/count_true/
+// count_runs — a true-quartile box-plot aggregation, unlike ScoreBucket's
+// avg/max/p50/p90/p99 (no min/q1). `is_boolean` (every observation
+// collapsing to exactly 0 or 1) is the authoritative signal for whether a
+// score name should render as a boolean chart — ScoreNamesDocument's `kind`
+// predates it and both should agree, but this is computed straight from the
+// same values being plotted.
 import { useMemo } from 'react';
 
 import type { RowData } from '@/components/InsightsMetrics/BoxPlot';
@@ -39,6 +40,8 @@ type BoxStats = {
   p25?: number;
   p50?: number;
   p75?: number;
+  p95?: number;
+  p99?: number;
   // countIf(score_value NOT IN (0, 1)) = 0 — every observation for this
   // identifier collapsed to exactly 0 or 1, so it's boolean-kind even though
   // it went through the same numeric aggregation as every other score.
@@ -46,6 +49,10 @@ type BoxStats = {
   // countIf(score_value = 1) — meaningful only alongside isBoolean, mirrors
   // pkg/applogic/scores.ScoreBucket.TrueCount.
   countTrue?: number;
+  // count(DISTINCT run_id) — a run can carry several scored steps, so this
+  // is the true "how many runs" figure, distinct from `count` (observation
+  // rows).
+  countRuns?: number;
 };
 
 function boxStatsFromItem(item: InsightsMetricItem): BoxStats {
@@ -58,10 +65,29 @@ function boxStatsFromItem(item: InsightsMetricItem): BoxStats {
     p25: map.get('p25'),
     p50: map.get('p50'),
     p75: map.get('p75'),
+    p95: map.get('p95'),
+    p99: map.get('p99'),
     isBoolean: map.get('is_boolean') === 1,
     countTrue: map.get('count_true'),
+    countRuns: map.get('count_runs'),
   };
 }
+
+// One score name's full display stats for the Overview tab's stat row —
+// broader than RowData (which only carries what BoxPlot itself draws:
+// min/q1/med/q3/max), since p95/p99 have no place on a standard box-and-
+// whisker but are still useful headline numbers.
+export type ScoreOverviewStats = {
+  count: number;
+  avg: number;
+  min: number;
+  max: number;
+  med: number;
+  q1: number;
+  q3: number;
+  p95?: number;
+  p99?: number;
+};
 
 function booleanStatsFromItem(item: InsightsMetricItem): BooleanStats | undefined {
   const stats = boxStatsFromItem(item);
@@ -133,8 +159,9 @@ export function useScoreOverallAggregation(opts: {
 }) {
   const { data, fetching, error } = useInsightsMetric(KEY_SCORE_OVERALL_AGGREGATION, opts);
 
-  const { byName, isBooleanByName, booleanByName, order } = useMemo(() => {
+  const { byName, statsByName, isBooleanByName, booleanByName, order } = useMemo(() => {
     const byName = new Map<string, RowData>();
+    const statsByName = new Map<string, ScoreOverviewStats>();
     const isBooleanByName = new Map<string, boolean>();
     const booleanByName = new Map<string, BooleanStats>();
     const order: string[] = [];
@@ -150,9 +177,14 @@ export function useScoreOverallAggregation(opts: {
       const boolStats = booleanStatsFromItem(item);
       if (boolStats) booleanByName.set(item.identifier, boolStats);
       if (!hasQuartiles(stats)) continue;
+      // count_runs (distinct run_id) is the true "how many runs" figure — a
+      // run can carry several scored steps, so it isn't always equal to
+      // `count` (observation rows). Falls back to `count` only if the
+      // backend response is missing it for some reason.
+      const runCount = stats.countRuns ?? stats.count;
       byName.set(item.identifier, {
         label: item.identifier,
-        count: stats.count,
+        count: runCount,
         avg: stats.avg,
         min: stats.min,
         q1: stats.p25,
@@ -163,14 +195,34 @@ export function useScoreOverallAggregation(opts: {
         subtleColor: '',
         opacity: 1,
       });
+      statsByName.set(item.identifier, {
+        count: runCount,
+        avg: stats.avg,
+        min: stats.min,
+        max: stats.max,
+        med: stats.p50,
+        q1: stats.p25,
+        q3: stats.p75,
+        p95: stats.p95,
+        p99: stats.p99,
+      });
     }
-    return { byName, isBooleanByName, booleanByName, order };
+    return { byName, statsByName, isBooleanByName, booleanByName, order };
   }, [data]);
 
   // The exact Insights-dialect SQL that produced this result — surfaced so
   // an "Open in Insights" action can deep-link to it, the same pattern
   // AIOverview's Section uses for its own widgets.
-  return { byName, isBooleanByName, booleanByName, order, query: data?.query, fetching, error };
+  return {
+    byName,
+    statsByName,
+    isBooleanByName,
+    booleanByName,
+    order,
+    query: data?.query,
+    fetching,
+    error,
+  };
 }
 
 export function useScoreAggregationTrend(opts: {

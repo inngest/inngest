@@ -16,7 +16,7 @@ import { formatCompactNumber } from '@/components/InfraDashboard/utils';
 import { dateFormat, timeDiff } from '@/components/Metrics/utils';
 import { ChartTooltip } from './ChartTooltip';
 import { TrendAreaChartSkeleton, TrendChartSkeleton } from './ChartSkeleton';
-import { BORDER_SUBTLE_COLOR, CHART_COLORS, SURFACE_COLOR } from './colors';
+import { BORDER_SUBTLE_COLOR, CHART_COLORS, CHART_COLORS_SUBTLE } from './colors';
 import { valuesToMap, type InsightsMetricPoint, type TooltipExtra } from './types';
 
 export type TrendSeriesConfig = {
@@ -32,10 +32,10 @@ export type TrendSeriesConfig = {
   // have no border by default (a transparent seam), so this only matters
   // for a caller that wants one explicitly.
   borderColor?: string;
-  // Area fill override ('area' chartType only) — a design-system subtle
-  // token, rather than the default computed mix of `color` toward the
-  // chart surface.
-  areaColor?: string;
+  // Fill color override — the 'area' chartType's fill, or (alongside
+  // borderColor) a 'bar' chartType's subtle fill under a solid border.
+  // Defaults to a computed mix of `color` toward the chart surface.
+  fillColor?: string;
 };
 
 type Props = {
@@ -116,11 +116,32 @@ const OTHER_LABEL = 'Other';
 
 type ChartRow = { timestamp: string; [key: string]: string | number | null };
 
+type BarShapeProps = { x: number; y: number; width: number; height: number; fill: string };
+
+// stackedColumnSegmentShape mirrors CategoricalChart's stackedSegmentShape
+// but for a vertical (column) stack: shared edges are horizontal (the seam
+// between the top of a lower segment and the bottom of the one above it), so
+// every segment draws its left/right/bottom edges, and only the topmost
+// (last-declared) segment also draws its top edge — the stack's true outer
+// edge, not shared with a neighbor above it.
+function stackedColumnSegmentShape(props: BarShapeProps, isLastSegment: boolean, stroke: string) {
+  const { x, y, width, height, fill } = props;
+  const outline = `M ${x} ${y} L ${x} ${y + height} L ${x + width} ${y + height} L ${x + width} ${y}${
+    isLastSegment ? ` L ${x} ${y}` : ''
+  }`;
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} fill={fill} shapeRendering="crispEdges" />
+      <path d={outline} fill="none" stroke={stroke} strokeWidth={1} />
+    </g>
+  );
+}
+
 type EffectiveSeries = {
   key: string;
   label: string;
   color: string;
-  areaColor: string;
+  fillColor: string;
   // Set only when a fixed `series` entry explicitly declares its own
   // borderColor — opt-in, so every existing bar caller keeps its current
   // solid `color` fill with no stroke; only a caller that wants the
@@ -183,14 +204,13 @@ export function TrendChart({
       return names.map((name, i) => {
         const isOther = name === OTHER_LABEL;
         const color = isOther ? BORDER_SUBTLE_COLOR : CHART_COLORS[i];
-        return { key: name, label: name, color, areaColor: color, isOther };
+        return { key: name, label: name, color, fillColor: color, isOther };
       });
     }
     return (series ?? []).map((s, i) => {
       const color = s.color ?? CHART_COLORS[i % CHART_COLORS.length];
-      const areaColor =
-        s.areaColor ?? `color-mix(in srgb, ${color} 40%, ${SURFACE_COLOR} 60%)`;
-      return { key: s.valueName, label: s.label, color, areaColor, borderColor: s.borderColor, isOther: false };
+      const fillColor = s.fillColor ?? CHART_COLORS_SUBTLE[i % CHART_COLORS_SUBTLE.length];
+      return { key: s.valueName, label: s.label, color, fillColor, borderColor: s.borderColor, isOther: false };
     });
   }, [valueName, hasOther, topIdentifiers, series]);
 
@@ -303,14 +323,15 @@ export function TrendChart({
               {effectiveSeries.map((s, i) => {
                 const isLastInStack = i === effectiveSeries.length - 1;
                 if (chartType === 'bar') {
+                  const border = s.borderColor;
                   return (
                     <Bar
                       key={s.key}
                       dataKey={s.key}
                       name={s.label}
-                      fill={s.borderColor ? s.areaColor : s.color}
-                      stroke={s.borderColor}
-                      strokeWidth={s.borderColor ? 1 : undefined}
+                      fill={border ? s.fillColor : s.color}
+                      stroke={stacked ? undefined : border}
+                      strokeWidth={stacked || !border ? undefined : 1}
                       barSize={24}
                       stackId={stacked ? 'trend' : undefined}
                       // Rounded data-end anchored away from the baseline —
@@ -320,9 +341,14 @@ export function TrendChart({
                       // can share one stacked bar.
                       radius={valueName && (!stacked || isLastInStack) ? [4, 4, 0, 0] : undefined}
                       isAnimationActive={false}
-                      shape={(props: unknown) => (
-                        <Rectangle {...(props as object)} shapeRendering="crispEdges" />
-                      )}
+                      shape={
+                        stacked && border
+                          ? (shapeProps: unknown) =>
+                              stackedColumnSegmentShape(shapeProps as BarShapeProps, isLastInStack, border)
+                          : (props: unknown) => (
+                              <Rectangle {...(props as object)} shapeRendering="crispEdges" />
+                            )
+                      }
                     />
                   );
                 }
@@ -335,9 +361,9 @@ export function TrendChart({
                       name={s.label}
                       stroke={s.color}
                       strokeWidth={1}
-                      fill={s.areaColor}
+                      fill={s.fillColor}
                       // recharts defaults fillOpacity to 0.6 — without this,
-                      // an opaque areaColor still renders translucent
+                      // an opaque fillColor still renders translucent
                       // (blended with the gridlines/other areas behind it).
                       fillOpacity={1}
                       // The active dot for stacked areas is rendered
@@ -366,12 +392,12 @@ export function TrendChart({
                     stroke={s.color}
                     strokeWidth={1}
                     dot={false}
-                    // Hover-point marker. Fill reuses `areaColor`, already
+                    // Hover-point marker. Fill reuses `fillColor`, already
                     // the "subtle" tier mix of this series' color (the same
                     // tint an area fill uses); the border matches the
                     // line's own stroke color, so the dot reads as "this
                     // line, lit up" rather than an unrelated hue.
-                    activeDot={{ r: 4, fill: s.areaColor, stroke: s.color, strokeWidth: 2 }}
+                    activeDot={{ r: 4, fill: s.fillColor, stroke: s.color, strokeWidth: 2 }}
                     connectNulls
                     isAnimationActive={false}
                   />
@@ -400,7 +426,7 @@ export function TrendChart({
                     }
                     stroke="none"
                     dot={false}
-                    activeDot={{ r: 4, fill: s.areaColor, stroke: s.color, strokeWidth: 2 }}
+                    activeDot={{ r: 4, fill: s.fillColor, stroke: s.color, strokeWidth: 2 }}
                     legendType="none"
                     connectNulls
                     isAnimationActive={false}

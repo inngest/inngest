@@ -20,11 +20,12 @@ export const BORDER_SUBTLE_COLOR = 'rgb(var(--color-border-subtle))';
 // against the live app — the warning/honey *semantic* tokens render as a
 // burnt orange-rust in light mode, not yellow).
 export const CHART_COLORS: readonly string[] = [
-  'rgb(var(--color-primary-subtle))', // green
-  'rgb(var(--color-secondary-subtle))', // blue
-  'rgb(var(--color-honey-300))', // yellow
-  'rgb(var(--color-quaternary-warmer-xSubtle))', // orange
-  'rgb(var(--color-quaternary-cool-xSubtle))', // purple
+  'rgb(var(--color-chart-line-1))', // green
+  'rgb(var(--color-chart-line-2))', // orange
+  'rgb(var(--color-chart-line-3))', // blue
+  'rgb(var(--color-chart-line-4))', // yellow
+  'rgb(var(--color-chart-line-5))', // purple
+  'rgb(var(--color-chart-line-6))', // red
 ];
 
 // Lighter counterparts of CHART_COLORS, index-paired — for a fill that sits
@@ -32,9 +33,9 @@ export const CHART_COLORS: readonly string[] = [
 // the same pairing lib/experiments/colors.ts' METRIC_PALETTE/
 // METRIC_PALETTE_SUBTLE already establishes for that package's own palette.
 export const CHART_COLORS_SUBTLE: readonly string[] = [
-  'rgb(var(--color-primary-3xSubtle))', // green
-  'rgb(var(--color-secondary-3xSubtle))', // blue
-  'rgb(var(--color-honey-100))', // yellow
-  'rgb(var(--color-quaternary-warmer-3xSubtle))', // orange
-  'rgb(var(--color-quaternary-cool-3xSubtle))', // purple
+  'rgb(var(--color-chart-line-1-subtle))', // green
+  'rgb(var(--color-chart-line-2-subtle))', // orange
+  'rgb(var(--color-chart-line-3-sbutle))', // blue
+  'rgb(var(--color-chart-line-4-subtle))', // red
+  'rgb(var(--color-chart-line-5-subtle))', // purple
 ];

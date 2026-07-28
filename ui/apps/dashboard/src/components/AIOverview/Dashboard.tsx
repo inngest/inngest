@@ -32,7 +32,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 import { GetAccountEntitlementsDocument } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
-import { CHART_COLORS } from '../InsightsMetrics/colors';
+import { CHART_COLORS, CHART_COLORS_SUBTLE } from '../InsightsMetrics/colors';
 import { AIOverviewEmptyState } from './EmptyState';
 import {
   formatCost,
@@ -347,7 +347,13 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               isLoading={runVolumeTrend.fetching && !runVolumeTrend.data}
               hasData={hasTrendData(runVolumeTrend.data)}
               chartType="bar"
-              series={[{ valueName: 'runs', label: 'Runs', color: CHART_COLORS[1] }]}
+              series={[
+                {
+                  valueName: 'runs',
+                  label: 'Runs',
+                  color: CHART_COLORS[1],
+                },
+              ]}
               defaultValue={0}
             />
           </Section>
@@ -360,7 +366,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               points={toTrendPoints(tokenTrend.data, timeRange, TREND_BUCKET_LIMIT)}
               isLoading={tokenTrend.fetching && !tokenTrend.data}
               hasData={hasTrendData(tokenTrend.data)}
-              chartType="bar"
+              chartType="area"
               stacked
               legendIcon="rect"
               series={[
@@ -368,11 +374,15 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
                   valueName: 'input_tokens',
                   label: 'Input',
                   color: CHART_COLORS[1],
+                  borderColor: CHART_COLORS[1],
+                  fillColor: CHART_COLORS_SUBTLE[1],
                 },
                 {
                   valueName: 'output_tokens',
                   label: 'Output',
                   color: CHART_COLORS[0],
+                  borderColor: CHART_COLORS[0],
+                  fillColor: CHART_COLORS_SUBTLE[0],
                 },
               ]}
               tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost, defaultValue: 0 }]}
@@ -460,7 +470,13 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               format={formatCost}
               axisFormat={formatCostAxis}
               allowDecimals
-              series={[{ valueName: 'cost', label: 'Cost', color: CHART_COLORS[0] }]}
+              series={[
+                {
+                  valueName: 'cost',
+                  label: 'Cost',
+                  color: CHART_COLORS[0],
+                },
+              ]}
               tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
               defaultValue={0}
             />

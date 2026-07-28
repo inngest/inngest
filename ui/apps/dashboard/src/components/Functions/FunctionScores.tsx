@@ -121,6 +121,7 @@ export const FunctionScores = ({ functionSlug }: Props) => {
 
   const {
     byName: overviewByName,
+    statsByName,
     isBooleanByName,
     booleanByName: booleanOverviewByName,
     order,
@@ -199,24 +200,24 @@ export const FunctionScores = ({ functionSlug }: Props) => {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="bg-canvasBase border-subtle flex flex-row items-center gap-1.5 border-b px-5 py-4">
-        <TimeFilter
-          daysAgoMax={daysAgoMax}
-          defaultValue={defaultRange}
-          onDaysChange={(r: RangeChangeProps) => {
-            batchUpdate({
-              duration:
-                r.type === 'relative' ? durationToString(r.duration) : null,
-              start: r.type === 'absolute' ? r.start.toISOString() : null,
-              end: r.type === 'absolute' ? r.end.toISOString() : null,
-            });
-          }}
-        />
-      </div>
       {filterError && (
         <Error message="There was an error fetching scores for this function." />
       )}
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto p-5 [&::-webkit-scrollbar]:hidden">
+        <div className="bg-canvasBase mb-4 flex flex-row items-center gap-1.5">
+          <TimeFilter
+            daysAgoMax={daysAgoMax}
+            defaultValue={defaultRange}
+            onDaysChange={(r: RangeChangeProps) => {
+              batchUpdate({
+                duration:
+                  r.type === 'relative' ? durationToString(r.duration) : null,
+                start: r.type === 'absolute' ? r.start.toISOString() : null,
+                end: r.type === 'absolute' ? r.end.toISOString() : null,
+              });
+            }}
+          />
+        </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {orderedNames.length === 0 && !isLoading && !namesError ? (
             <div className="text-muted col-span-full py-10 text-center text-sm">
@@ -233,6 +234,7 @@ export const FunctionScores = ({ functionSlug }: Props) => {
                 isLoading={seriesFetching || overviewFetching || trendFetching}
                 error={seriesError}
                 overview={overviewByName.get(name)}
+                stats={statsByName.get(name)}
                 trend={trendByName.get(name)}
                 // isBooleanByName comes straight from score_overall_aggregation's
                 // own is_boolean column; falls back to the ScoreNames kind while

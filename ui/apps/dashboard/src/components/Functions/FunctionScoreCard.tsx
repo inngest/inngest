@@ -17,18 +17,27 @@ import { BooleanChart } from '@/components/InsightsMetrics/BooleanChart';
 import { BoxPlot, type RowData } from '@/components/InsightsMetrics/BoxPlot';
 import { CandlestickPlot, type CandleData } from '@/components/InsightsMetrics/CandlestickPlot';
 import { CHART_COLORS, CHART_COLORS_SUBTLE } from '@/components/InsightsMetrics/colors';
+import { formatPlainNumber } from '@/components/InsightsMetrics/format';
 import { TrendChart } from '@/components/InsightsMetrics/TrendChart';
 import type { InsightsMetricPoint } from '@/components/InsightsMetrics/types';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import type { BooleanStats } from '@/components/Scores/scoreAggregation';
+import type { BooleanStats, ScoreOverviewStats } from '@/components/Scores/scoreAggregation';
 import type { ScoreSeries } from '@/components/Scores/types';
 import { pathCreator } from '@/utils/urls';
 
 // Green/orange from CHART_COLORS — the same palette the box/candlestick
 // charts above use — rather than the Metrics dashboard's own line palette,
 // so every chart on this card draws from one consistent set of colors.
+// TrendChart defaults a series' subtle fill to CHART_COLORS_SUBTLE at that
+// series' *position* in the array, not the index of the color it was
+// actually given — since "false" is CHART_COLORS[3] but sits at array
+// position 1, that default would land on CHART_COLORS_SUBTLE[1] (blue)
+// instead of the orange that matches its border. Passing fillColor
+// explicitly at the same index as the border/color keeps them paired.
 const TRUE_COLOR = CHART_COLORS[0];
+const TRUE_SUBTLE_COLOR = CHART_COLORS_SUBTLE[0];
 const FALSE_COLOR = CHART_COLORS[3];
+const FALSE_SUBTLE_COLOR = CHART_COLORS_SUBTLE[3];
 
 type Tab = 'overview' | 'timeseries';
 
@@ -49,6 +58,10 @@ type Props = {
   // range (score_overall_aggregation) — undefined while loading or when the
   // score has no numeric observations in range.
   overview?: RowData;
+  // The fuller stat set for the same range (adds p95/p99, which have no
+  // place on a standard box plot but are still useful headline numbers) —
+  // for the Overview tab's stat row.
+  stats?: ScoreOverviewStats;
   // Same stats bucketed over time (score_aggregation_trend), one candle per
   // bucket.
   trend?: CandleData[];
@@ -78,6 +91,7 @@ export const FunctionScoreCard = ({
   subtleColor,
   error,
   overview,
+  stats,
   trend,
   isBoolean,
   booleanOverview,
@@ -87,7 +101,7 @@ export const FunctionScoreCard = ({
 }: Props) => {
   const navigate = useNavigate();
   const environment = useEnvironment();
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('timeseries');
   // Whichever tab is showing decides which query "Open in Insights" opens —
   // Overview's box stats and Timeseries' candles come from two separate
   // insightsMetric calls (score_overall_aggregation/score_aggregation_trend).
@@ -198,12 +212,31 @@ export const FunctionScoreCard = ({
       ) : !isBoolean ? (
         <div className="min-h-0 flex-1">
           {tab === 'overview' ? (
-            <div className="flex h-full flex-col items-center justify-center">
-              <BoxPlot
-                rows={overviewRow ? [overviewRow] : []}
-                domain={boxDomain}
-                metricDisplayName={name}
+            <div className="flex h-full flex-col">
+              <StatRow
+                stats={[
+                  { label: 'Runs', value: stats?.count.toLocaleString() ?? '—' },
+                  { label: 'Avg', value: stats ? formatPlainNumber(stats.avg) : '—' },
+                  { label: 'Median', value: stats ? formatPlainNumber(stats.med) : '—' },
+                  {
+                    label: 'Q1/Q3',
+                    value: stats ? `${formatPlainNumber(stats.q1)} / ${formatPlainNumber(stats.q3)}` : '—',
+                  },
+                  { label: 'p95', value: stats?.p95 !== undefined ? formatPlainNumber(stats.p95) : '—' },
+                  { label: 'p99', value: stats?.p99 !== undefined ? formatPlainNumber(stats.p99) : '—' },
+                  {
+                    label: 'Min/Max',
+                    value: stats ? `${formatPlainNumber(stats.min)} / ${formatPlainNumber(stats.max)}` : '—',
+                  },
+                ]}
               />
+              <div className="flex flex-1 flex-col items-center justify-center">
+                <BoxPlot
+                  rows={overviewRow ? [overviewRow] : []}
+                  domain={boxDomain}
+                  metricDisplayName={name}
+                />
+              </div>
             </div>
           ) : (
             <CandlestickPlot
@@ -219,20 +252,43 @@ export const FunctionScoreCard = ({
       ) : (
         <div className="min-h-0 flex-1">
           {tab === 'overview' ? (
-            <div className="flex h-full flex-col items-center justify-center">
-              <BooleanChart
-                rows={booleanOverviewRow ? [booleanOverviewRow] : []}
-                domain={[0, 1]}
-                metricDisplayName={name}
+            <div className="flex h-full flex-col">
+              <StatRow
+                stats={[
+                  { label: 'Runs', value: booleanOverviewRow?.count?.toLocaleString() ?? '—' },
+                  {
+                    label: 'True rate',
+                    value: booleanOverviewRow ? `${(booleanOverviewRow.avg * 100).toFixed(1)}%` : '—',
+                  },
+                ]}
               />
+              <div className="flex flex-1 flex-col items-center justify-center">
+                <BooleanChart
+                  rows={booleanOverviewRow ? [booleanOverviewRow] : []}
+                  domain={[0, 1]}
+                  metricDisplayName={name}
+                />
+              </div>
             </div>
           ) : (
             <TrendChart
               className="h-full"
               points={booleanTrendPoints}
               series={[
-                { valueName: 'true', label: 'True', color: TRUE_COLOR, borderColor: TRUE_COLOR },
-                { valueName: 'false', label: 'False', color: FALSE_COLOR, borderColor: FALSE_COLOR },
+                {
+                  valueName: 'true',
+                  label: 'True',
+                  color: TRUE_COLOR,
+                  borderColor: TRUE_COLOR,
+                  fillColor: TRUE_SUBTLE_COLOR,
+                },
+                {
+                  valueName: 'false',
+                  label: 'False',
+                  color: FALSE_COLOR,
+                  borderColor: FALSE_COLOR,
+                  fillColor: FALSE_SUBTLE_COLOR,
+                },
               ]}
               chartType="bar"
               stacked
@@ -247,6 +303,21 @@ export const FunctionScoreCard = ({
   );
 };
 
+// StatRow is a compact, always-visible summary line above the Overview
+// chart — the box/lollipop chart's own tooltip already shows these numbers
+// on hover, but a card this small benefits from surfacing the headline
+// figures without requiring a hover.
+const StatRow = ({ stats }: { stats: { label: string; value: string }[] }) => (
+  <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1">
+    {stats.map((s) => (
+      <div key={s.label} className="flex items-baseline gap-1.5 text-xs">
+        <span className="text-muted">{s.label}</span>
+        <span className="text-basis font-semibold tabular-nums">{s.value}</span>
+      </div>
+    ))}
+  </div>
+);
+
 const ScoreTabs = ({
   selected,
   onSelect,
@@ -255,12 +326,12 @@ const ScoreTabs = ({
   onSelect: (tab: Tab) => void;
 }) => (
   <TabRow>
-    <TabButton label="Overview" isActive={selected === 'overview'} onClick={() => onSelect('overview')} />
     <TabButton
-      label="Timeseries"
+      label="Over Time"
       isActive={selected === 'timeseries'}
       onClick={() => onSelect('timeseries')}
     />
+    <TabButton label="Summary" isActive={selected === 'overview'} onClick={() => onSelect('overview')} />
   </TabRow>
 );
 

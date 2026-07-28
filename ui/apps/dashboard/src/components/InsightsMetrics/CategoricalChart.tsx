@@ -33,6 +33,17 @@ type Props = {
   // ranking), not just by its position on the axis. Single-measure form
   // only; ignored when `series` is given (which already colors by series).
   colors?: readonly string[];
+  // Single-measure form's border opt-in, mirroring `series[].borderColor` (see
+  // TrendChart's TrendSeriesConfig): when set, each bar draws a solid border
+  // in this color on top of `color`'s fill — pass a subtle fill color (e.g.
+  // from CHART_COLORS_SUBTLE) alongside this for the intended subtle-fill/
+  // solid-border look, rather than relying on any automatic derivation.
+  // Ignored when `series` is given.
+  borderColor?: string;
+  // Per-category counterpart to `borderColor`, mirroring `colors` — one
+  // border color per bar/category, layered over `colors`' per-category fill.
+  // Ignored when `series` is given.
+  borderColors?: readonly string[];
   // Multi-measure form: `series.length` bars per category (e.g. input vs
   // output tokens by model), one categorical hue per series — this IS an
   // identity comparison, so every series gets a legend and a fixed-order hue.
@@ -212,6 +223,8 @@ export function CategoricalChart({
   valueLabel,
   color,
   colors,
+  borderColor,
+  borderColors,
   series,
   stacked = false,
   format = defaultFormat,
@@ -256,13 +269,22 @@ export function CategoricalChart({
     [sorted, effectiveSeries],
   );
 
+  // singleColor is the fill — pass a subtle tone (e.g. CHART_COLORS_SUBTLE)
+  // via `color` directly when pairing it with `borderColor` below; there's no
+  // automatic fill derivation from the border color.
   const singleColor = useMemo(() => color ?? CHART_COLORS[1], [color]);
 
-  // perCategoryColors mirrors chartData order — each bar gets its own color
-  // from `colors`, cycling if there are more bars than colors.
+  // perCategoryColors mirrors chartData order — each bar gets its own fill
+  // color from `colors`, cycling if there are more bars than colors.
   const perCategoryColors = useMemo(
     () => (colors ? chartData.map((_, idx) => colors[idx % colors.length]) : undefined),
     [chartData, colors],
+  );
+  // perCategoryBorderColors: `borderColors`' per-category counterpart to
+  // `borderColor`, layered as a stroke over perCategoryColors' fill.
+  const perCategoryBorderColors = useMemo(
+    () => (borderColors ? chartData.map((_, idx) => borderColors[idx % borderColors.length]) : undefined),
+    [chartData, borderColors],
   );
 
   // seriesColors/segmentBorderColors parallel effectiveSeries. A stacked
@@ -299,13 +321,17 @@ export function CategoricalChart({
   // color by identifier — recharts' payload color reflects the Bar's base
   // fill, not a per-item Cell override, so a `colors` palette needs this to
   // show the actual bar color rather than the shared fallback fill.
-  const colorByIdentifier = useMemo(
-    () =>
-      !isMultiSeries && perCategoryColors
-        ? Object.fromEntries(chartData.map((row, idx) => [row.identifier, perCategoryColors[idx]]))
-        : undefined,
-    [isMultiSeries, perCategoryColors, chartData],
-  );
+  const colorByIdentifier = useMemo(() => {
+    if (isMultiSeries) return undefined;
+    const perCategory = perCategoryBorderColors ?? perCategoryColors;
+    if (perCategory) {
+      return Object.fromEntries(chartData.map((row, idx) => [row.identifier, perCategory[idx]]));
+    }
+    if (borderColor) {
+      return Object.fromEntries(chartData.map((row) => [row.identifier, borderColor]));
+    }
+    return undefined;
+  }, [isMultiSeries, perCategoryBorderColors, perCategoryColors, borderColor, chartData]);
 
   // renderYAxisTick draws each category label as a single line of SVG text,
   // middle-truncated with an ellipsis (matching VariantAxisTick in
@@ -452,8 +478,8 @@ export function CategoricalChart({
                   barSize={BAR_THICKNESS}
                   stackId={isMultiSeries && stacked ? 'stack' : undefined}
                   fill={isMultiSeries ? seriesColors[i] : singleColor}
-                  stroke={isMultiSeries && !stacked ? segmentBorderColors[i] : undefined}
-                  strokeWidth={isMultiSeries && !stacked ? 1 : undefined}
+                  stroke={isMultiSeries ? (!stacked ? segmentBorderColors[i] : undefined) : borderColor}
+                  strokeWidth={isMultiSeries ? (!stacked ? 1 : undefined) : borderColor ? 1 : undefined}
                   isAnimationActive={false}
                   legendType="none"
                   shape={
@@ -469,7 +495,12 @@ export function CategoricalChart({
                 >
                   {!isMultiSeries && perCategoryColors
                     ? chartData.map((row, idx) => (
-                        <Cell key={row.identifier} fill={perCategoryColors[idx] ?? singleColor} />
+                        <Cell
+                          key={row.identifier}
+                          fill={perCategoryColors[idx] ?? singleColor}
+                          stroke={perCategoryBorderColors?.[idx]}
+                          strokeWidth={perCategoryBorderColors ? 1 : undefined}
+                        />
                       ))
                     : null}
                 </Bar>
