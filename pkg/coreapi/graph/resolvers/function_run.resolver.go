@@ -41,7 +41,7 @@ func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.Func
 		}
 		return nil, fmt.Errorf("Run ID not found: %w", err)
 	}
-	pending, _ := r.Queue.OutstandingJobCount(
+	pending, _ := r.QueueReader.OutstandingJobCount(
 		ctx,
 		queue.Scope{
 			AccountID:  md.Identifier.AccountID,

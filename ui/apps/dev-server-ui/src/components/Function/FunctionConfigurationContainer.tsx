@@ -58,10 +58,11 @@ export function FunctionConfigurationContainer({
               appearance="solid"
               disabled={false}
               doesFunctionAcceptPayload={doesFunctionAcceptPayload}
-              btnAction={async ({ data, user }) => {
+              btnAction={async ({ data, meta, user }) => {
                 await invokeFunction({
                   data,
                   functionSlug: inngestFunction.slug,
+                  meta,
                   user,
                 });
                 toast.success('Function invoked');

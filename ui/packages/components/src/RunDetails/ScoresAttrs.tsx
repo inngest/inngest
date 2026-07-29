@@ -1,11 +1,15 @@
 import { TimeElement } from '../DetailsCard/Element';
-
-const SCORE_KIND_PREFIX = 'inngest.score.';
+import { KindInngestScore } from '../generated';
 
 type ScoreMetadata = {
   kind: string;
   updatedAt: string;
-  values: Record<string, unknown>;
+  // Loose structural supertype of every SpanMetadata arm so both the V3 and V4
+  // Trace types can be passed in. `object` (not Record<string, unknown>) is
+  // required because generated interface value types (e.g. AIMetadata) lack an
+  // implicit index signature; this type only filters by kind and reads via
+  // Object.entries, so the looser bound is sufficient.
+  values: object;
 };
 
 type ScoreRow = {
@@ -21,7 +25,7 @@ type ScoreTrace = {
 
 export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
   // Run views need child spans because scores attach where they are emitted.
-  const metadata = trace?.metadata?.filter((md) => md.kind.startsWith(SCORE_KIND_PREFIX)) ?? [];
+  const metadata = trace?.metadata?.filter((md) => md.kind === KindInngestScore) ?? [];
   const childMetadata = trace?.childrenSpans?.flatMap((child) => collectScoreMetadata(child)) ?? [];
 
   return [...metadata, ...childMetadata];
@@ -36,19 +40,17 @@ function formatScoreValue(value: number | boolean): string {
   return String(value);
 }
 
-function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
+export function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
   return metadata
-    .flatMap((md) => {
-      const name = md.kind.slice(SCORE_KIND_PREFIX.length);
-      if (!name) {
+    .flatMap((md) =>
+      Object.entries(md.values).flatMap(([name, raw]) => {
+        const value = (raw as { value?: unknown } | null)?.value;
+        if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
+          return [{ name, value, updatedAt: md.updatedAt }];
+        }
         return [];
-      }
-      const value = md.values.value;
-      if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
-        return [{ name, value, updatedAt: md.updatedAt }];
-      }
-      return [];
-    })
+      })
+    )
     .sort((a, b) => a.name.localeCompare(b.name) || a.updatedAt.localeCompare(b.updatedAt));
 }
 

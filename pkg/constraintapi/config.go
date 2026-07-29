@@ -11,9 +11,9 @@ type Semaphore struct {
 	//   fnkey:<xxhash(fnID+expr)> — function concurrency with key expression
 	ID string `json:"id"`
 
-	// UsageValue is the xxhash of the evaluated expression result.
+	// EvaluatedKeyHash is the xxhash of the evaluated expression result.
 	// Empty for keyless semaphores (app:, fn:).
-	UsageValue string `json:"uv,omitempty"`
+	EvaluatedKeyHash string `json:"uv,omitempty"`
 
 	// Weight is the number of units to acquire (default 1).
 	Weight int64 `json:"w"`

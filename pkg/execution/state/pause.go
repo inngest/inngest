@@ -253,6 +253,11 @@ type Pause struct {
 	// ends
 	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
 
+	// ParallelCoalesceKey, when non-empty, matches the key stored on the parallel
+	// step queue items in the same batch. Resume paths use it to produce the same
+	// discovery JobID as step.run completions, enabling ErrQueueItemExists dedup.
+	ParallelCoalesceKey string `json:"pck,omitempty"`
+
 	// CreatedAt is the timestamp when the pause was saved. This field may
 	// be empty for older pauses created before this field was added. It's used to
 	// determine which time-based storage blocks contain this pause, as block

@@ -90,13 +90,30 @@ local function debug(...)
 	end
 end
 
+---@param key string
+local function getConcurrencyCount(key)
+	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+
+local function addConcurrencyUsage(target, index, value)
+	local usage = {}
+	usage["i"] = index
+	usage["l"] = value.c.l or 0
+	usage["u"] = getConcurrencyCount(value.c.ilk)
+	table.insert(target, usage)
+end
+
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 
 	-- Return idempotency state to user (same as initial response)
-	return opIdempotency
+	return { 1, opIdempotency }
 end
 
 -- Check if lease already expired
@@ -104,7 +121,7 @@ if decode_ulid_time(currentLeaseID) < nowMS then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 
 -- Check if lease details still exist
@@ -113,7 +130,7 @@ if leaseDetails == false or leaseDetails == nil or not leaseDetails[1] or not le
 	local res = {}
 	res["s"] = 2
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 
 local hashedLeaseIdempotencyKey = leaseDetails[1]
@@ -129,7 +146,7 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	local res = {}
 	res["s"] = 3
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>?, m: { ss: integer?, sl: integer?, sm: integer? }? }
@@ -149,11 +166,15 @@ if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
 
-for _, value in ipairs(constraints) do
+---@type { i: integer, l: integer, u: integer }[]
+local constraintUsage = {}
+
+for index, value in ipairs(constraints) do
 	-- for concurrency constraints, update score to new expiry
 	if value.k == 2 then
 		call("ZREM", value.c.ilk, currentLeaseID)
 		call("ZADD", value.c.ilk, tostring(leaseExpiryMS), newLeaseID)
+		addConcurrencyUsage(constraintUsage, index, value)
 	end
 end
 
@@ -177,10 +198,15 @@ local res = {}
 res["s"] = 4
 res["d"] = debugLogs
 res["lid"] = newLeaseID
+res["e"] = requestDetails.e
+res["f"] = requestDetails.f
+res["ai"] = requestDetails.ai
+res["sc"] = constraints
+res["cu"] = constraintUsage
 
 local encoded = cjson.encode(res)
 
 -- Set operation idempotency TTL
 call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 
-return encoded
+return { 0, encoded }

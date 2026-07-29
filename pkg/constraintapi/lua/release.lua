@@ -21,10 +21,11 @@ local keyLeaseDetails = KEYS[4]
 local scopedKeyPrefix = ARGV[1]
 local accountID = ARGV[2]
 local currentLeaseID = ARGV[3]
-local operationIdempotencyTTL = tonumber(ARGV[4])--[[@as integer]]
-local enableDebugLogs = tonumber(ARGV[5]) == 1
-local forceReleaseSemaphores = tonumber(ARGV[6]) == 1
-local enableCacheInvalidation = ARGV[7] == "1"
+local nowMS = tonumber(ARGV[4]) --[[@as integer]]
+local operationIdempotencyTTL = tonumber(ARGV[5])--[[@as integer]]
+local enableDebugLogs = tonumber(ARGV[6]) == 1
+local forceReleaseSemaphores = tonumber(ARGV[7]) == 1
+local enableCacheInvalidation = ARGV[8] == "1"
 
 ---@type string[]
 local debugLogs = {}
@@ -43,13 +44,30 @@ local function toInteger(value)
 	return math.floor(value + 0.5) -- Round to nearest integer
 end
 
+---@param key string
+local function getConcurrencyCount(key)
+	local count = call("ZCOUNT", key, tostring(nowMS), "+inf")
+	if count == nil then
+		return 0
+	end
+	return count
+end
+
+local function addConcurrencyUsage(target, index, value)
+	local usage = {}
+	usage["i"] = index
+	usage["l"] = value.c.l or 0
+	usage["u"] = getConcurrencyCount(value.c.ilk)
+	table.insert(target, usage)
+end
+
 -- Handle operation idempotency
 local opIdempotency = call("GET", keyOperationIdempotency)
 if opIdempotency ~= nil and opIdempotency ~= false then
 	debug("hit operation idempotency")
 
 	-- Return idempotency state to user (same as initial response)
-	return opIdempotency
+	return { 1, opIdempotency }
 end
 
 -- Release is idempotent by lease ID. If another caller (e.g. the lease
@@ -61,7 +79,7 @@ if requestID == false or requestID == nil or requestID == "" then
 	local res = {}
 	res["s"] = 1
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 
 -- Request state must still exist
@@ -71,7 +89,7 @@ if requestStateStr == nil or requestStateStr == false or requestStateStr == "" t
 	local res = {}
 	res["s"] = 2
 	res["d"] = debugLogs
-	return cjson.encode(res)
+	return { 0, cjson.encode(res) }
 end
 
 ---@type { k: string, e: string, f: string, s: {}[], cv: integer?, r: integer?, g: integer?, a: integer?, l: integer?, lik: string[]?, lri: table<string, string>?, m: { ss: integer?, sl: integer?, sm: integer? }? }
@@ -91,11 +109,15 @@ if not constraints then
 	return redis.error_reply("ERR constraints array is nil")
 end
 
-for _, c in ipairs(constraints) do
+---@type { i: integer, l: integer, u: integer }[]
+local constraintUsage = {}
+
+for index, c in ipairs(constraints) do
 	-- for concurrency constraints
 	if c.k == 2 then
 		debug("removing in progress lease", c.c.ilk)
 		call("ZREM", c.c.ilk, currentLeaseID)
+		addConcurrencyUsage(constraintUsage, index, c)
 	elseif c.k == 4 then
 		-- semaphore: decrement for auto-release, or when force-released by the scavenger
 		if c.sem.rel == 0 or forceReleaseSemaphores then
@@ -143,7 +165,10 @@ res["d"] = debugLogs
 res["r"] = requestDetails.a
 res["e"] = requestDetails.e
 res["f"] = requestDetails.f
+res["ai"] = requestDetails.ai
 res["m"] = requestDetails.m
+res["sc"] = constraints
+res["cu"] = constraintUsage
 
 local encoded = cjson.encode(res)
 
@@ -159,7 +184,13 @@ if enableCacheInvalidation then
 			local sl = (scope == 2 and "a") or (scope == 1 and "e") or "f"
 			local cacheKey
 			if c.c.h ~= nil and c.c.h ~= "" then
-				cacheKey = accountID .. ":c:" .. sl .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+				if scope == 0 then
+					cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.f .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+				elseif scope == 1 then
+					cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.e .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+				else
+					cacheKey = accountID .. ":c:" .. sl .. ":" .. c.c.h .. ":" .. (c.c.eh or "")
+				end
 			elseif scope == 0 then
 				cacheKey = accountID .. ":c:" .. sl .. ":" .. requestDetails.f
 			elseif scope == 1 then
@@ -175,4 +206,4 @@ if enableCacheInvalidation then
 	end
 end
 
-return encoded
+return { 0, encoded }

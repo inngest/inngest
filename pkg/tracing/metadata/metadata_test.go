@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -86,77 +87,125 @@ func TestUpdateValidateAllowedNamedScoreValue(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		update  Update
-		wantErr error
+		name       string
+		update     Update
+		wantErr    error
+		wantErrMsg string
 	}{
 		{
-			name: "finite numeric value is valid",
+			name: "single finite numeric score is valid",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score.accuracy",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
-				Values: Values{"value": json.RawMessage(`0.95`)},
+				Values: Values{"accuracy": json.RawMessage(`{"value":0.95}`)},
 			}},
 		},
 		{
-			name: "arbitrary name in kind is accepted",
+			name: "boolean score value is valid",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score.click-through rate (variant A)",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
-				Values: Values{"value": json.RawMessage(`0.23`)},
+				Values: Values{"passed": json.RawMessage(`{"value":true}`)},
 			}},
 		},
 		{
-			name: "missing value key is rejected",
+			name: "multiple scores in one update are valid",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score.accuracy",
-				Op:     enums.MetadataOpcodeMerge,
-				Values: Values{"score": json.RawMessage(`1`)},
+				Kind: KindInngestScore,
+				Op:   enums.MetadataOpcodeMerge,
+				Values: Values{
+					"accuracy":  json.RawMessage(`{"value":0.95}`),
+					"relevance": json.RawMessage(`{"value":0.8}`),
+				},
 			}},
-			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "arbitrary score name is accepted",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"click-through rate (variant A)": json.RawMessage(`{"value":0.23}`)},
+			}},
+		},
+		{
+			name: "empty values map is valid",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{},
+			}},
+		},
+		{
+			name: "score name with single quote is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"name'with'quotes": json.RawMessage(`{"value":0.5}`)},
+			}},
+			wantErr:    ErrScoreNameInvalid,
+			wantErrMsg: "contains invalid characters",
+		},
+		{
+			name: "score name over byte limit is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{strings.Repeat("a", MaxScoreNameByteLength+1): json.RawMessage(`{"value":0.5}`)},
+			}},
+			wantErr:    ErrScoreNameTooLong,
+			wantErrMsg: "score name exceeds maximum length",
 		},
 		{
 			name: "extra keys alongside value are rejected",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score.accuracy",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
-				Values: Values{"value": json.RawMessage(`1`), "extra": json.RawMessage(`2`)},
+				Values: Values{"accuracy": json.RawMessage(`{"value":0.95,"extra":2}`)},
 			}},
 			wantErr: ErrScoreValueInvalid,
 		},
 		{
-			name: "empty values map is rejected",
+			name: "missing nested value key is rejected",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score.accuracy",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
-				Values: Values{},
+				Values: Values{"accuracy": json.RawMessage(`{"score":0.95}`)},
 			}},
 			wantErr: ErrScoreValueInvalid,
 		},
 		{
-			name: "null value is rejected",
+			name: "bare scalar instead of value object is rejected",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score.accuracy",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
-				Values: Values{"value": json.RawMessage(`null`)},
+				Values: Values{"accuracy": json.RawMessage(`0.95`)},
 			}},
 			wantErr: ErrScoreValueInvalid,
 		},
 		{
-			name: "string value is rejected",
+			name: "null score value is rejected",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score.accuracy",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
-				Values: Values{"value": json.RawMessage(`"high"`)},
+				Values: Values{"accuracy": json.RawMessage(`{"value":null}`)},
 			}},
 			wantErr: ErrScoreValueInvalid,
 		},
 		{
-			name: "object value is rejected",
+			name: "string score value is rejected",
 			update: Update{RawUpdate: RawUpdate{
-				Kind:   "inngest.score.accuracy",
+				Kind:   KindInngestScore,
 				Op:     enums.MetadataOpcodeMerge,
-				Values: Values{"value": json.RawMessage(`{"nested":1}`)},
+				Values: Values{"accuracy": json.RawMessage(`{"value":"high"}`)},
+			}},
+			wantErr: ErrScoreValueInvalid,
+		},
+		{
+			name: "object score value is rejected",
+			update: Update{RawUpdate: RawUpdate{
+				Kind:   KindInngestScore,
+				Op:     enums.MetadataOpcodeMerge,
+				Values: Values{"accuracy": json.RawMessage(`{"value":{"nested":1}}`)},
 			}},
 			wantErr: ErrScoreValueInvalid,
 		},
@@ -177,6 +226,9 @@ func TestUpdateValidateAllowedNamedScoreValue(t *testing.T) {
 			err := tt.update.ValidateAllowed()
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
+				if tt.wantErrMsg != "" {
+					require.ErrorContains(t, err, tt.wantErrMsg)
+				}
 				return
 			}
 

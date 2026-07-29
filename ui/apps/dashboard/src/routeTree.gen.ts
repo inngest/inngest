@@ -12,10 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SupportIndexRouteImport } from './routes/support/index'
+import { Route as ApiWaitlistRouteImport } from './routes/api/waitlist'
 import { Route as ApiSupportTicketsRouteImport } from './routes/api/support-tickets'
 import { Route as ApiSentryRouteImport } from './routes/api/sentry'
 import { Route as ApiInngestRouteImport } from './routes/api/inngest'
+import { Route as ApiFeedbackRouteImport } from './routes/api/feedback'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
+import { Route as ApiChatValidateRouteImport } from './routes/api/chat-validate'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup'
 import { Route as authSwitchOrganizationRouteImport } from './routes/(auth)/switch-organization'
@@ -56,6 +59,9 @@ import { Route as AuthedSettingsIntegrationsNeonIndexRouteImport } from './route
 import { Route as AuthedSettingsIntegrationsDatadogIndexRouteImport } from './routes/_authed/settings/integrations/datadog/index'
 import { Route as AuthedIntegrationsVercelCallbackIndexRouteImport } from './routes/_authed/integrations/vercel/callback/index'
 import { Route as AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/unattached-syncs/index'
+import { Route as AuthedEnvEnvSlugSessionsIndexRouteImport } from './routes/_authed/env/$envSlug/sessions/index'
+import { Route as AuthedEnvEnvSlugScoresIndexRouteImport } from './routes/_authed/env/$envSlug/scores/index'
+import { Route as AuthedEnvEnvSlugSandboxesIndexRouteImport } from './routes/_authed/env/$envSlug/sandboxes/index'
 import { Route as AuthedEnvEnvSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/runs/index'
 import { Route as AuthedEnvEnvSlugMetricsIndexRouteImport } from './routes/_authed/env/$envSlug/metrics/index'
 import { Route as AuthedEnvEnvSlugManageIndexRouteImport } from './routes/_authed/env/$envSlug/manage/index'
@@ -83,6 +89,7 @@ import { Route as AuthedSettingsIntegrationsDatadogStartIndexRouteImport } from 
 import { Route as AuthedSettingsIntegrationsDatadogFinishIndexRouteImport } from './routes/_authed/settings/integrations/datadog/finish/index'
 import { Route as AuthedSettingsIntegrationsDatadogConnectEnvIndexRouteImport } from './routes/_authed/settings/integrations/datadog/connect-env/index'
 import { Route as AuthedIntegrationsVercelCallbackSuccessIndexRouteImport } from './routes/_authed/integrations/vercel/callback/success/index'
+import { Route as AuthedEnvEnvSlugSessionsSessionKeyIndexRouteImport } from './routes/_authed/env/$envSlug/sessions/$sessionKey/index'
 import { Route as AuthedEnvEnvSlugRunsRunIDIndexRouteImport } from './routes/_authed/env/$envSlug/runs/$runID/index'
 import { Route as AuthedEnvEnvSlugOnboardingStepIndexRouteImport } from './routes/_authed/env/$envSlug/onboarding/$step/index'
 import { Route as AuthedEnvEnvSlugManageSigningKeyIndexRouteImport } from './routes/_authed/env/$envSlug/manage/signing-key/index'
@@ -94,6 +101,7 @@ import { Route as AuthedEnvEnvSlugDebuggerFunctionSlugIndexRouteImport } from '.
 import { Route as AuthedEnvEnvSlugAppsSyncNewIndexRouteImport } from './routes/_authed/env/$envSlug/apps/sync-new/index'
 import { Route as AuthedEnvEnvSlugAppsExternalIDIndexRouteImport } from './routes/_authed/env/$envSlug/apps/$externalID/index'
 import { Route as AuthedSettingsIntegrationsVercelConfigureIdIndexRouteImport } from './routes/_authed/settings/integrations/vercel/configure/$id/index'
+import { Route as AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRouteImport } from './routes/_authed/env/$envSlug/sessions/$sessionKey/$sessionId/index'
 import { Route as AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport } from './routes/_authed/env/$envSlug/manage/$ingestKeys/$keyID/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/runs/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/replays/index'
@@ -117,6 +125,11 @@ const SupportIndexRoute = SupportIndexRouteImport.update({
   path: '/support/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWaitlistRoute = ApiWaitlistRouteImport.update({
+  id: '/api/waitlist',
+  path: '/api/waitlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSupportTicketsRoute = ApiSupportTicketsRouteImport.update({
   id: '/api/support-tickets',
   path: '/api/support-tickets',
@@ -132,9 +145,19 @@ const ApiInngestRoute = ApiInngestRouteImport.update({
   path: '/api/inngest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFeedbackRoute = ApiFeedbackRouteImport.update({
+  id: '/api/feedback',
+  path: '/api/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCspReportRoute = ApiCspReportRouteImport.update({
   id: '/api/csp-report',
   path: '/api/csp-report',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatValidateRoute = ApiChatValidateRouteImport.update({
+  id: '/api/chat-validate',
+  path: '/api/chat-validate',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -358,6 +381,24 @@ const AuthedEnvEnvSlugUnattachedSyncsIndexRoute =
     path: '/',
     getParentRoute: () => AuthedEnvEnvSlugUnattachedSyncsRouteRoute,
   } as any)
+const AuthedEnvEnvSlugSessionsIndexRoute =
+  AuthedEnvEnvSlugSessionsIndexRouteImport.update({
+    id: '/sessions/',
+    path: '/sessions/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
+const AuthedEnvEnvSlugScoresIndexRoute =
+  AuthedEnvEnvSlugScoresIndexRouteImport.update({
+    id: '/scores/',
+    path: '/scores/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
+const AuthedEnvEnvSlugSandboxesIndexRoute =
+  AuthedEnvEnvSlugSandboxesIndexRouteImport.update({
+    id: '/sandboxes/',
+    path: '/sandboxes/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugRunsIndexRoute =
   AuthedEnvEnvSlugRunsIndexRouteImport.update({
     id: '/runs/',
@@ -520,6 +561,12 @@ const AuthedIntegrationsVercelCallbackSuccessIndexRoute =
     path: '/integrations/vercel/callback/success/',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedEnvEnvSlugSessionsSessionKeyIndexRoute =
+  AuthedEnvEnvSlugSessionsSessionKeyIndexRouteImport.update({
+    id: '/sessions/$sessionKey/',
+    path: '/sessions/$sessionKey/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugRunsRunIDIndexRoute =
   AuthedEnvEnvSlugRunsRunIDIndexRouteImport.update({
     id: '/runs/$runID/',
@@ -586,6 +633,12 @@ const AuthedSettingsIntegrationsVercelConfigureIdIndexRoute =
     path: '/integrations/vercel/configure/$id/',
     getParentRoute: () => AuthedSettingsRouteRoute,
   } as any)
+const AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute =
+  AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRouteImport.update({
+    id: '/sessions/$sessionKey/$sessionId/',
+    path: '/sessions/$sessionKey/$sessionId/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute =
   AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRouteImport.update({
     id: '/$keyID/',
@@ -646,10 +699,13 @@ export interface FileRoutesByFullPath {
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
+  '/api/waitlist': typeof ApiWaitlistRoute
   '/support/': typeof SupportIndexRoute
   '/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren
   '/organization-list/$': typeof authOrganizationListSplatRoute
@@ -693,6 +749,9 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
   '/env/$envSlug/metrics/': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/env/$envSlug/runs/': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/env/$envSlug/sandboxes/': typeof AuthedEnvEnvSlugSandboxesIndexRoute
+  '/env/$envSlug/scores/': typeof AuthedEnvEnvSlugScoresIndexRoute
+  '/env/$envSlug/sessions/': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/integrations/vercel/callback/': typeof AuthedIntegrationsVercelCallbackIndexRoute
   '/settings/integrations/datadog/': typeof AuthedSettingsIntegrationsDatadogIndexRoute
@@ -710,6 +769,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/manage/signing-key/': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
   '/env/$envSlug/onboarding/$step/': typeof AuthedEnvEnvSlugOnboardingStepIndexRoute
   '/env/$envSlug/runs/$runID/': typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  '/env/$envSlug/sessions/$sessionKey/': typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRoute
   '/integrations/vercel/callback/success/': typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute
   '/settings/integrations/datadog/connect-env/': typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute
   '/settings/integrations/datadog/finish/': typeof AuthedSettingsIntegrationsDatadogFinishIndexRoute
@@ -726,6 +786,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
   '/env/$envSlug/manage/$ingestKeys/$keyID/': typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute
+  '/env/$envSlug/sessions/$sessionKey/$sessionId/': typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute
   '/settings/integrations/vercel/configure/$id/': typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute
   '/env/$envSlug/functions/$slug/replays/$replayID/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute
 }
@@ -739,10 +800,13 @@ export interface FileRoutesByTo {
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
+  '/api/waitlist': typeof ApiWaitlistRoute
   '/support': typeof SupportIndexRoute
   '/organization-list/$': typeof authOrganizationListSplatRoute
   '/sign-in/$': typeof authSignInSplatRoute
@@ -774,6 +838,9 @@ export interface FileRoutesByTo {
   '/env/$envSlug/manage': typeof AuthedEnvEnvSlugManageIndexRoute
   '/env/$envSlug/metrics': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/env/$envSlug/runs': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/env/$envSlug/sandboxes': typeof AuthedEnvEnvSlugSandboxesIndexRoute
+  '/env/$envSlug/scores': typeof AuthedEnvEnvSlugScoresIndexRoute
+  '/env/$envSlug/sessions': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/env/$envSlug/unattached-syncs': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/integrations/vercel/callback': typeof AuthedIntegrationsVercelCallbackIndexRoute
   '/settings/integrations/datadog': typeof AuthedSettingsIntegrationsDatadogIndexRoute
@@ -791,6 +858,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/manage/signing-key': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
   '/env/$envSlug/onboarding/$step': typeof AuthedEnvEnvSlugOnboardingStepIndexRoute
   '/env/$envSlug/runs/$runID': typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  '/env/$envSlug/sessions/$sessionKey': typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRoute
   '/integrations/vercel/callback/success': typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute
   '/settings/integrations/datadog/connect-env': typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute
   '/settings/integrations/datadog/finish': typeof AuthedSettingsIntegrationsDatadogFinishIndexRoute
@@ -807,6 +875,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/functions/$slug/replays': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
   '/env/$envSlug/manage/$ingestKeys/$keyID': typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute
+  '/env/$envSlug/sessions/$sessionKey/$sessionId': typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute
   '/settings/integrations/vercel/configure/$id': typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute
   '/env/$envSlug/functions/$slug/replays/$replayID': typeof AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute
 }
@@ -823,10 +892,13 @@ export interface FileRoutesById {
   '/(auth)/switch-organization': typeof authSwitchOrganizationRoute
   '/(auth)/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
+  '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
   '/api/sentry': typeof ApiSentryRoute
   '/api/support-tickets': typeof ApiSupportTicketsRoute
+  '/api/waitlist': typeof ApiWaitlistRoute
   '/support/': typeof SupportIndexRoute
   '/_authed/env/$envSlug': typeof AuthedEnvEnvSlugRouteRouteWithChildren
   '/(auth)/organization-list/$': typeof authOrganizationListSplatRoute
@@ -870,6 +942,9 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/manage/': typeof AuthedEnvEnvSlugManageIndexRoute
   '/_authed/env/$envSlug/metrics/': typeof AuthedEnvEnvSlugMetricsIndexRoute
   '/_authed/env/$envSlug/runs/': typeof AuthedEnvEnvSlugRunsIndexRoute
+  '/_authed/env/$envSlug/sandboxes/': typeof AuthedEnvEnvSlugSandboxesIndexRoute
+  '/_authed/env/$envSlug/scores/': typeof AuthedEnvEnvSlugScoresIndexRoute
+  '/_authed/env/$envSlug/sessions/': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/_authed/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/_authed/integrations/vercel/callback/': typeof AuthedIntegrationsVercelCallbackIndexRoute
   '/_authed/settings/integrations/datadog/': typeof AuthedSettingsIntegrationsDatadogIndexRoute
@@ -887,6 +962,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/manage/signing-key/': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
   '/_authed/env/$envSlug/onboarding/$step/': typeof AuthedEnvEnvSlugOnboardingStepIndexRoute
   '/_authed/env/$envSlug/runs/$runID/': typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  '/_authed/env/$envSlug/sessions/$sessionKey/': typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRoute
   '/_authed/integrations/vercel/callback/success/': typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute
   '/_authed/settings/integrations/datadog/connect-env/': typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute
   '/_authed/settings/integrations/datadog/finish/': typeof AuthedSettingsIntegrationsDatadogFinishIndexRoute
@@ -903,6 +979,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/_authed/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
   '/_authed/env/$envSlug/manage/$ingestKeys/$keyID/': typeof AuthedEnvEnvSlugManageIngestKeysKeyIDIndexRoute
+  '/_authed/env/$envSlug/sessions/$sessionKey/$sessionId/': typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute
   '/_authed/settings/integrations/vercel/configure/$id/': typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRoute
   '/_authed/env/$envSlug/functions/$slug/replays/$replayID/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysReplayIDIndexRoute
 }
@@ -919,10 +996,13 @@ export interface FileRouteTypes {
     | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
+    | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
+    | '/api/waitlist'
     | '/support/'
     | '/env/$envSlug'
     | '/organization-list/$'
@@ -966,6 +1046,9 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage/'
     | '/env/$envSlug/metrics/'
     | '/env/$envSlug/runs/'
+    | '/env/$envSlug/sandboxes/'
+    | '/env/$envSlug/scores/'
+    | '/env/$envSlug/sessions/'
     | '/env/$envSlug/unattached-syncs/'
     | '/integrations/vercel/callback/'
     | '/settings/integrations/datadog/'
@@ -983,6 +1066,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage/signing-key/'
     | '/env/$envSlug/onboarding/$step/'
     | '/env/$envSlug/runs/$runID/'
+    | '/env/$envSlug/sessions/$sessionKey/'
     | '/integrations/vercel/callback/success/'
     | '/settings/integrations/datadog/connect-env/'
     | '/settings/integrations/datadog/finish/'
@@ -999,6 +1083,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/functions/$slug/replays/'
     | '/env/$envSlug/functions/$slug/runs/'
     | '/env/$envSlug/manage/$ingestKeys/$keyID/'
+    | '/env/$envSlug/sessions/$sessionKey/$sessionId/'
     | '/settings/integrations/vercel/configure/$id/'
     | '/env/$envSlug/functions/$slug/replays/$replayID/'
   fileRoutesByTo: FileRoutesByTo
@@ -1012,10 +1097,13 @@ export interface FileRouteTypes {
     | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
+    | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
+    | '/api/waitlist'
     | '/support'
     | '/organization-list/$'
     | '/sign-in/$'
@@ -1047,6 +1135,9 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage'
     | '/env/$envSlug/metrics'
     | '/env/$envSlug/runs'
+    | '/env/$envSlug/sandboxes'
+    | '/env/$envSlug/scores'
+    | '/env/$envSlug/sessions'
     | '/env/$envSlug/unattached-syncs'
     | '/integrations/vercel/callback'
     | '/settings/integrations/datadog'
@@ -1064,6 +1155,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage/signing-key'
     | '/env/$envSlug/onboarding/$step'
     | '/env/$envSlug/runs/$runID'
+    | '/env/$envSlug/sessions/$sessionKey'
     | '/integrations/vercel/callback/success'
     | '/settings/integrations/datadog/connect-env'
     | '/settings/integrations/datadog/finish'
@@ -1080,6 +1172,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/functions/$slug/replays'
     | '/env/$envSlug/functions/$slug/runs'
     | '/env/$envSlug/manage/$ingestKeys/$keyID'
+    | '/env/$envSlug/sessions/$sessionKey/$sessionId'
     | '/settings/integrations/vercel/configure/$id'
     | '/env/$envSlug/functions/$slug/replays/$replayID'
   id:
@@ -1095,10 +1188,13 @@ export interface FileRouteTypes {
     | '/(auth)/switch-organization'
     | '/(auth)/user-setup'
     | '/api/chat'
+    | '/api/chat-validate'
     | '/api/csp-report'
+    | '/api/feedback'
     | '/api/inngest'
     | '/api/sentry'
     | '/api/support-tickets'
+    | '/api/waitlist'
     | '/support/'
     | '/_authed/env/$envSlug'
     | '/(auth)/organization-list/$'
@@ -1142,6 +1238,9 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/manage/'
     | '/_authed/env/$envSlug/metrics/'
     | '/_authed/env/$envSlug/runs/'
+    | '/_authed/env/$envSlug/sandboxes/'
+    | '/_authed/env/$envSlug/scores/'
+    | '/_authed/env/$envSlug/sessions/'
     | '/_authed/env/$envSlug/unattached-syncs/'
     | '/_authed/integrations/vercel/callback/'
     | '/_authed/settings/integrations/datadog/'
@@ -1159,6 +1258,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/manage/signing-key/'
     | '/_authed/env/$envSlug/onboarding/$step/'
     | '/_authed/env/$envSlug/runs/$runID/'
+    | '/_authed/env/$envSlug/sessions/$sessionKey/'
     | '/_authed/integrations/vercel/callback/success/'
     | '/_authed/settings/integrations/datadog/connect-env/'
     | '/_authed/settings/integrations/datadog/finish/'
@@ -1175,6 +1275,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/functions/$slug/replays/'
     | '/_authed/env/$envSlug/functions/$slug/runs/'
     | '/_authed/env/$envSlug/manage/$ingestKeys/$keyID/'
+    | '/_authed/env/$envSlug/sessions/$sessionKey/$sessionId/'
     | '/_authed/settings/integrations/vercel/configure/$id/'
     | '/_authed/env/$envSlug/functions/$slug/replays/$replayID/'
   fileRoutesById: FileRoutesById
@@ -1188,10 +1289,13 @@ export interface RootRouteChildren {
   authSwitchOrganizationRoute: typeof authSwitchOrganizationRoute
   authUserSetupRoute: typeof authUserSetupRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiChatValidateRoute: typeof ApiChatValidateRoute
   ApiCspReportRoute: typeof ApiCspReportRoute
+  ApiFeedbackRoute: typeof ApiFeedbackRoute
   ApiInngestRoute: typeof ApiInngestRoute
   ApiSentryRoute: typeof ApiSentryRoute
   ApiSupportTicketsRoute: typeof ApiSupportTicketsRoute
+  ApiWaitlistRoute: typeof ApiWaitlistRoute
   SupportIndexRoute: typeof SupportIndexRoute
   authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute
   authSignInSplatRoute: typeof authSignInSplatRoute
@@ -1223,6 +1327,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SupportIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/waitlist': {
+      id: '/api/waitlist'
+      path: '/api/waitlist'
+      fullPath: '/api/waitlist'
+      preLoaderRoute: typeof ApiWaitlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/support-tickets': {
       id: '/api/support-tickets'
       path: '/api/support-tickets'
@@ -1244,11 +1355,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/feedback': {
+      id: '/api/feedback'
+      path: '/api/feedback'
+      fullPath: '/api/feedback'
+      preLoaderRoute: typeof ApiFeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/csp-report': {
       id: '/api/csp-report'
       path: '/api/csp-report'
       fullPath: '/api/csp-report'
       preLoaderRoute: typeof ApiCspReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat-validate': {
+      id: '/api/chat-validate'
+      path: '/api/chat-validate'
+      fullPath: '/api/chat-validate'
+      preLoaderRoute: typeof ApiChatValidateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -1531,6 +1656,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugUnattachedSyncsRouteRoute
     }
+    '/_authed/env/$envSlug/sessions/': {
+      id: '/_authed/env/$envSlug/sessions/'
+      path: '/sessions'
+      fullPath: '/env/$envSlug/sessions/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugSessionsIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
+    '/_authed/env/$envSlug/scores/': {
+      id: '/_authed/env/$envSlug/scores/'
+      path: '/scores'
+      fullPath: '/env/$envSlug/scores/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugScoresIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
+    '/_authed/env/$envSlug/sandboxes/': {
+      id: '/_authed/env/$envSlug/sandboxes/'
+      path: '/sandboxes'
+      fullPath: '/env/$envSlug/sandboxes/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugSandboxesIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
     '/_authed/env/$envSlug/runs/': {
       id: '/_authed/env/$envSlug/runs/'
       path: '/runs'
@@ -1720,6 +1866,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedIntegrationsVercelCallbackSuccessIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/env/$envSlug/sessions/$sessionKey/': {
+      id: '/_authed/env/$envSlug/sessions/$sessionKey/'
+      path: '/sessions/$sessionKey'
+      fullPath: '/env/$envSlug/sessions/$sessionKey/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
     '/_authed/env/$envSlug/runs/$runID/': {
       id: '/_authed/env/$envSlug/runs/$runID/'
       path: '/runs/$runID'
@@ -1796,6 +1949,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/integrations/vercel/configure/$id/'
       preLoaderRoute: typeof AuthedSettingsIntegrationsVercelConfigureIdIndexRouteImport
       parentRoute: typeof AuthedSettingsRouteRoute
+    }
+    '/_authed/env/$envSlug/sessions/$sessionKey/$sessionId/': {
+      id: '/_authed/env/$envSlug/sessions/$sessionKey/$sessionId/'
+      path: '/sessions/$sessionKey/$sessionId'
+      fullPath: '/env/$envSlug/sessions/$sessionKey/$sessionId/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
     '/_authed/env/$envSlug/manage/$ingestKeys/$keyID/': {
       id: '/_authed/env/$envSlug/manage/$ingestKeys/$keyID/'
@@ -2173,10 +2333,15 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugInsightsIndexRoute: typeof AuthedEnvEnvSlugInsightsIndexRoute
   AuthedEnvEnvSlugMetricsIndexRoute: typeof AuthedEnvEnvSlugMetricsIndexRoute
   AuthedEnvEnvSlugRunsIndexRoute: typeof AuthedEnvEnvSlugRunsIndexRoute
+  AuthedEnvEnvSlugSandboxesIndexRoute: typeof AuthedEnvEnvSlugSandboxesIndexRoute
+  AuthedEnvEnvSlugScoresIndexRoute: typeof AuthedEnvEnvSlugScoresIndexRoute
+  AuthedEnvEnvSlugSessionsIndexRoute: typeof AuthedEnvEnvSlugSessionsIndexRoute
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute: typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   AuthedEnvEnvSlugEventsEventIDIndexRoute: typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
   AuthedEnvEnvSlugRunsRunIDIndexRoute: typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  AuthedEnvEnvSlugSessionsSessionKeyIndexRoute: typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRoute
   AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute: typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
+  AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute: typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute
 }
 
 const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
@@ -2200,13 +2365,20 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugInsightsIndexRoute: AuthedEnvEnvSlugInsightsIndexRoute,
   AuthedEnvEnvSlugMetricsIndexRoute: AuthedEnvEnvSlugMetricsIndexRoute,
   AuthedEnvEnvSlugRunsIndexRoute: AuthedEnvEnvSlugRunsIndexRoute,
+  AuthedEnvEnvSlugSandboxesIndexRoute: AuthedEnvEnvSlugSandboxesIndexRoute,
+  AuthedEnvEnvSlugScoresIndexRoute: AuthedEnvEnvSlugScoresIndexRoute,
+  AuthedEnvEnvSlugSessionsIndexRoute: AuthedEnvEnvSlugSessionsIndexRoute,
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute:
     AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute,
   AuthedEnvEnvSlugEventsEventIDIndexRoute:
     AuthedEnvEnvSlugEventsEventIDIndexRoute,
   AuthedEnvEnvSlugRunsRunIDIndexRoute: AuthedEnvEnvSlugRunsRunIDIndexRoute,
+  AuthedEnvEnvSlugSessionsSessionKeyIndexRoute:
+    AuthedEnvEnvSlugSessionsSessionKeyIndexRoute,
   AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute:
     AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute,
+  AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute:
+    AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute,
 }
 
 const AuthedEnvEnvSlugRouteRouteWithChildren =
@@ -2252,10 +2424,13 @@ const rootRouteChildren: RootRouteChildren = {
   authSwitchOrganizationRoute: authSwitchOrganizationRoute,
   authUserSetupRoute: authUserSetupRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiChatValidateRoute: ApiChatValidateRoute,
   ApiCspReportRoute: ApiCspReportRoute,
+  ApiFeedbackRoute: ApiFeedbackRoute,
   ApiInngestRoute: ApiInngestRoute,
   ApiSentryRoute: ApiSentryRoute,
   ApiSupportTicketsRoute: ApiSupportTicketsRoute,
+  ApiWaitlistRoute: ApiWaitlistRoute,
   SupportIndexRoute: SupportIndexRoute,
   authOrganizationListSplatRoute: authOrganizationListSplatRoute,
   authSignInSplatRoute: authSignInSplatRoute,

@@ -9,4 +9,5 @@ const (
 	QueueItemConstraintReasonIdNil
 	QueueItemConstraintReasonFeatureFlagDisabled
 	QueueItemConstraintReasonConstraintAPIError
+	QueueItemConstraintReasonAccountMissing
 )

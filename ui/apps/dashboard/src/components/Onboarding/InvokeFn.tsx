@@ -80,13 +80,14 @@ export default function InvokeFn() {
     if (hasEventTrigger) {
       payload = parseCode(rawPayload);
     } else {
-      payload = { data: {}, user: null };
+      payload = { data: {}, meta: null, user: null };
     }
     try {
       const { success, error } = await invokeFunction({
         data: {
           functionSlug: selectedFunction.slug,
           user: payload.user,
+          meta: payload.meta,
           data: payload.data,
         },
       });

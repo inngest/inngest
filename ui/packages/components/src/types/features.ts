@@ -8,11 +8,6 @@ export type Features = {
   tracesPreview?: boolean;
 
   /**
-   * Whether to use the V4 run details UI (composable timeline bar).
-   */
-  runDetailsV4?: boolean;
-
-  /**
    * Whether the data source surfaces deferred-run linkage (`isDeferred`,
    * `deferredFrom`).
    */

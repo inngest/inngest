@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -22,22 +23,26 @@ func (q *queueProcessor) ProcessItem(
 	ctx context.Context,
 	i ProcessItem,
 	f RunFunc,
-) error {
+) (ProcessItemResult, error) {
 	shard := q.Shard()
-	accountID, envID, fnID, runID := i.I.Data.Identifier.AccountID, i.I.Data.Identifier.WorkspaceID, i.I.Data.Identifier.WorkflowID, i.I.Data.Identifier.RunID
+	accountID := i.I.Data.Identifier.AccountID
+	envID := i.I.Data.Identifier.WorkspaceID
+	fnID := i.I.Data.Identifier.WorkflowID
+	if fnID == uuid.Nil {
+		fnID = i.I.FunctionID
+	}
+	runID := i.I.Data.Identifier.RunID
 
 	l := logger.StdlibLogger(ctx).With(
 		"item_id", i.I.ID,
 		"account_id", accountID,
 		"env_id", envID,
 		"fn_id", fnID,
-		"partition_id", i.P.ID,
 		"run_id", i.I.Data.Identifier.RunID,
 	)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", accountID, envID, fnID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.ProcessItem", TraceScopeFromQueueItem(i.I, shard.Name()))
 	defer span.End()
-	span.SetAttributes(attribute.String("partition_id", i.P.ID))
 	span.SetAttributes(attribute.String("item_id", i.I.ID))
 	span.SetAttributes(attribute.String("item_kind", i.I.Data.Kind))
 	span.SetAttributes(attribute.String("run_id", runID.String()))
@@ -49,11 +54,11 @@ func (q *queueProcessor) ProcessItem(
 	}
 
 	qi := i.I
-	p := i.P
-	continuationCtr := i.PCtr
+	continuationCtr := i.ContinueCount
 
 	leaseID := qi.LeaseID
 	leaseMu := sync.RWMutex{}
+	processResult := ProcessItemResult{}
 
 	currentLeaseID := func() *ulid.ULID {
 		leaseMu.RLock()
@@ -119,7 +124,7 @@ func (q *queueProcessor) ProcessItem(
 
 				current := currentLeaseID()
 				if current == nil {
-					l.Error("cannot extend lease since lease ID is nil", "qi", qi, "partition", p)
+					l.Error("cannot extend lease since lease ID is nil", "qi", qi)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
@@ -136,7 +141,7 @@ func (q *queueProcessor) ProcessItem(
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
 					// invoked by finalize() (Cancellations, Parallelism)
 					if !errors.Is(ErrQueueItemNotFound, err) {
-						l.Error("error extending lease", "error", err, "qi", qi, "partition", p)
+						l.Error("error extending lease", "error", err, "qi", qi)
 					}
 
 					// always stop processing the queue item if lease cannot be extended
@@ -177,7 +182,7 @@ func (q *queueProcessor) ProcessItem(
 		leaseIssuedAt := capacityLeaseID.issuedAt()
 
 		res, err := q.CapacityManager.Release(context.Background(), &constraintapi.CapacityReleaseRequest{
-			AccountID:      p.AccountID,
+			AccountID:      accountID,
 			IdempotencyKey: qi.ID,
 			LeaseID:        *currentLeaseID,
 			Source: constraintapi.LeaseSource{
@@ -189,9 +194,9 @@ func (q *queueProcessor) ProcessItem(
 		})
 		if err != nil {
 			l.ReportError(err, "failed to release capacity", logger.WithErrorReportTags(map[string]string{
-				"account_id":      p.AccountID.String(),
+				"account_id":      accountID.String(),
 				"lease_id":        currentLeaseID.String(),
-				"function_id":     p.FunctionID.String(),
+				"function_id":     fnID.String(),
 				"lease_issued_at": leaseIssuedAt.String(),
 			}))
 			return
@@ -217,6 +222,13 @@ func (q *queueProcessor) ProcessItem(
 				case <-extendCapacityLeaseCtx.Done():
 					return
 				case <-extendCapacityLeaseTick.Chan():
+					if extendCapacityLeaseCtx.Err() != nil {
+						// The capacity lease was released early (or the job
+						// finished) after this tick was buffered. Don't extend
+						// a lease we no longer hold.
+						return
+					}
+
 					if ctx.Err() != nil {
 						// Don't extend lease when the ctx is done.
 						return
@@ -224,7 +236,7 @@ func (q *queueProcessor) ProcessItem(
 
 					currentCapacityLease := capacityLeaseID.get()
 					if currentCapacityLease == nil {
-						l.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi, "partition", p)
+						l.Error("cannot extend capacity lease since capacity lease ID is nil", "qi", qi)
 						// Don't extend lease since one doesn't exist
 						errCh <- AlwaysRetryError(fmt.Errorf("cannot extend capacity lease since lease ID is nil"))
 						return
@@ -246,15 +258,23 @@ func (q *queueProcessor) ProcessItem(
 						LeaseIssuedAt: capacityLeaseID.issuedAt(),
 					})
 					if err != nil {
+						if extendCapacityLeaseCtx.Err() != nil {
+							// The lease was released early while this extension
+							// was in flight; releaseCapacityLease cancels the
+							// context before releasing, so a failure observed
+							// after cancellation is expected and must not
+							// requeue the item.
+							return
+						}
+
 						l.ReportError(
 							err,
 							"error extending capacity lease",
 							logger.WithErrorReportLog(true),
 							logger.WithErrorReportTags(map[string]string{
-								"partitionID": p.ID,
-								"accountID":   accountID.String(),
-								"item":        qi.ID,
-								"leaseID":     currentCapacityLease.String(),
+								"accountID": accountID.String(),
+								"item":      qi.ID,
+								"leaseID":   currentCapacityLease.String(),
 							}),
 						)
 
@@ -264,8 +284,16 @@ func (q *queueProcessor) ProcessItem(
 					}
 
 					if res.LeaseID == nil {
+						if extendCapacityLeaseCtx.Err() != nil {
+							// The lease was released early while this extension
+							// was in flight (release wins over extend on the
+							// capacity manager); this is expected and must not
+							// requeue the item.
+							return
+						}
+
 						// Lease could not be extended
-						l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi, "partition", p)
+						l.Error("failed to extend capacity lease, no new lease ID received", "qi", qi)
 						errCh <- AlwaysRetryError(fmt.Errorf("failed to extend capacity lease, no new lease ID received"))
 						return
 					}
@@ -391,7 +419,7 @@ func (q *queueProcessor) ProcessItem(
 		runInfo := RunInfo{
 			Latency:             latency,
 			SojournDelay:        sojourn,
-			Priority:            q.PartitionPriorityFinder(ctx, p),
+			Priority:            i.Priority,
 			QueueShardName:      shard.Name(),
 			ContinueCount:       continuationCtr,
 			RefilledFromBacklog: qi.RefilledFrom,
@@ -401,6 +429,7 @@ func (q *queueProcessor) ProcessItem(
 
 		// Call the run func.
 		res, err := f(doCtx, runInfo, qi.Data)
+		processResult.RunResult = res
 
 		{
 			// Clean up leases and such
@@ -410,12 +439,6 @@ func (q *queueProcessor) ProcessItem(
 				extendCapacityLeaseTick.Stop()
 			}
 
-		}
-
-		if res.ScheduledImmediateJob {
-			// Add the partition to be continued again.  Note that if we've already
-			// continued beyond the limit this is a noop.
-			q.addContinue(ctx, &p, continuationCtr+1)
 		}
 
 		status := "completed"
@@ -458,47 +481,47 @@ func (q *queueProcessor) ProcessItem(
 
 			qi.AtMS = at.UnixMilli()
 			requeueItem := itemWithCurrentLease(qi)
-			if err := shard.Requeue(context.WithoutCancel(ctx), requeueItem, at); err != nil {
+			if err := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at); err != nil {
 				if err == ErrQueueItemNotFound {
 					// Safe. The executor may have dequeued.
-					return nil
+					return ProcessItemResult{}, nil
 				}
 
 				l.Error("error requeuing job", "error", err, "item", requeueItem)
-				return err
+				return ProcessItemResult{}, err
 			}
 			if _, ok := err.(QuitError); ok {
 				q.quit <- err
-				return err
+				return ProcessItemResult{}, err
 			}
-			return nil
+			return ProcessItemResult{}, nil
 		}
 
 		// Dequeue this entirely, as this permanently failed.
 		// XXX: Increase permanently failed counter here.
-		if err := shard.Dequeue(context.WithoutCancel(ctx), itemWithCurrentLease(qi)); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
-				return nil
+				return ProcessItemResult{}, nil
 			}
-			return err
+			return ProcessItemResult{}, err
 		}
 
 		if _, ok := err.(QuitError); ok {
 			l.Warn("received queue quit error", "error", err)
 			q.quit <- err
-			return err
+			return ProcessItemResult{}, err
 		}
 	case <-jobCtx.Done():
 		stopItemLeaseRenewal()
-		if err := shard.Dequeue(context.WithoutCancel(ctx), itemWithCurrentLease(qi)); err != nil {
+		if err := q.Dequeue(context.WithoutCancel(ctx), shard.Name(), itemWithCurrentLease(qi)); err != nil {
 			if err == ErrQueueItemNotFound {
 				// Safe. The executor may have dequeued.
-				return nil
+				return processResult, nil
 			}
-			return err
+			return ProcessItemResult{}, err
 		}
 	}
 
-	return nil
+	return processResult, nil
 }

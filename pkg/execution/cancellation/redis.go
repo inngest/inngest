@@ -3,6 +3,7 @@ package cancellation
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -93,7 +94,7 @@ func (r redisReadWriter) CreateCancellation(ctx context.Context, c cqrs.Cancella
 		Payload:     c,
 		QueueName:   &queueName,
 	}, time.Now(), queue.EnqueueOpts{})
-	if err == queue.ErrQueueItemExists {
+	if errors.Is(err, queue.ErrQueueItemExists) {
 		return nil
 	}
 	return err

@@ -20,9 +20,11 @@ const updateBillingInformationDocument = graphql(`
 export default function BillingInformation({
   billingEmail,
   accountName,
+  canManageBilling,
 }: {
   billingEmail: string;
   accountName: string | null | undefined;
+  canManageBilling: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [email, setEmail] = useState(billingEmail || '');
@@ -88,6 +90,7 @@ export default function BillingInformation({
               className="h-6 font-semibold"
               onClick={onEditButtonClick}
               label="Edit"
+              disabled={!canManageBilling}
             />
           )}
         </>

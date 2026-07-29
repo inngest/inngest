@@ -21,45 +21,30 @@ func intAttr(key string, value int64) *v1.KeyValue {
 	}
 }
 
-// TestCanonicalKeysHaveFieldSetters guards against drift between
-// canonicalKeyMapping and metadataFieldSetters: every canonical key referenced
-// by a scalar mapping must have a setter, otherwise the attribute is silently
-// dropped. Composite mappings (expand != nil) carry no field of their own — they
-// explode into synthetic children that are matched back through keyFieldMap, so
-// those children are covered by their own scalar entries in this same loop.
-func TestCanonicalKeysHaveFieldSetters(t *testing.T) {
-	t.Parallel()
-
-	for sourceKey, mapping := range keyFieldMap {
-		if mapping.expand != nil {
-			assert.Emptyf(t, mapping.field,
-				"composite mapping %q must not also set a scalar field", sourceKey)
-			continue
-		}
-
-		_, ok := metadataFieldSetters[mapping.field]
-		assert.Truef(t, ok,
-			"field %q (mapped from %q) has no entry in metadataFieldSetters",
-			mapping.field, sourceKey)
+func dblAttr(key string, value float64) *v1.KeyValue {
+	return &v1.KeyValue{
+		Key:   key,
+		Value: &v1.AnyValue{Value: &v1.AnyValue_DoubleValue{DoubleValue: value}},
 	}
 }
 
-func TestAttrMappings_FieldAndExpandAreExclusive(t *testing.T) {
-	t.Parallel()
-	for key, mapping := range keyFieldMap {
-		assert.Truef(
-			t,
-			(mapping.field != "") != (mapping.expand != nil),
-			"key %s cannot have both field and expand set", key,
-		)
+func arrAttr(key string, values ...string) *v1.KeyValue {
+	vals := make([]*v1.AnyValue, len(values))
+	for i, s := range values {
+		vals[i] = &v1.AnyValue{Value: &v1.AnyValue_StringValue{StringValue: s}}
+	}
+	return &v1.KeyValue{
+		Key: key,
+		Value: &v1.AnyValue{
+			Value: &v1.AnyValue_ArrayValue{ArrayValue: &v1.ArrayValue{Values: vals}},
+		},
 	}
 }
 
-// TestRankingPrefersProviderNameOverDeprecatedSystem verifies that when both
+// TestProviderPrefersProviderNameOverDeprecatedSystem verifies that when both
 // the deprecated gen_ai.system and its replacement gen_ai.provider.name are
-// present, the deprecated key's keyRank demotes it so the replacement wins,
-// regardless of attribute order.
-func TestRankingPrefersProviderNameOverDeprecatedSystem(t *testing.T) {
+// present, the replacement wins, regardless of attribute order.
+func TestProviderPrefersProviderNameOverDeprecatedSystem(t *testing.T) {
 	t.Parallel()
 
 	orders := [][]*v1.KeyValue{
@@ -71,48 +56,102 @@ func TestRankingPrefersProviderNameOverDeprecatedSystem(t *testing.T) {
 		var md AIMetadata
 		foundAny := extractAIMetadataFromAttributes(attrs, &md)
 		assert.True(t, foundAny)
-		assert.Equal(t, "anthropic", md.System,
+		assert.Equal(t, "anthropic", md.Provider,
 			"gen_ai.provider.name should win over deprecated gen_ai.system")
 	}
 }
 
-// TestLangfusePrecedenceAndUsageExpansion verifies two things no captured
-// fixture exercises (real Langfuse spans carry no gen_ai.*): on a span carrying
-// both namespaces, langfuse.* wins (it ranks first), and the usage_details JSON
-// blob expands into input/output/total while unmapped sub-keys are ignored.
-func TestLangfusePrecedenceAndUsageExpansion(t *testing.T) {
+// TestFinishReasons verifies the array path, the scalar-string fallback, and
+// that empty entries are dropped (leaving the field unset when none remain).
+func TestFinishReasons(t *testing.T) {
 	t.Parallel()
 
-	orders := [][]*v1.KeyValue{
-		{
-			strAttr("gen_ai.request.model", "gpt-4.1-nano"),
-			intAttr("gen_ai.usage.input_tokens", 100),
-			strAttr("langfuse.observation.model.name", "gpt-4.1-nano-2025-04-14"),
-			strAttr("langfuse.observation.usage_details",
-				`{"input":22,"output":6,"total":28,"input_cached_tokens":5}`),
-		},
-		// reversed, to prove order-independence
-		{
-			strAttr("langfuse.observation.usage_details",
-				`{"input":22,"output":6,"total":28,"input_cached_tokens":5}`),
-			strAttr("langfuse.observation.model.name", "gpt-4.1-nano-2025-04-14"),
-			intAttr("gen_ai.usage.input_tokens", 100),
-			strAttr("gen_ai.request.model", "gpt-4.1-nano"),
-		},
-	}
-
-	for _, attrs := range orders {
+	t.Run("array drops empty entries", func(t *testing.T) {
 		var md AIMetadata
-		foundAny := extractAIMetadataFromAttributes(attrs, &md)
-		assert.True(t, foundAny)
-		// langfuse ranks first, so its values win over the co-present gen_ai.*.
-		assert.Equal(t, "gpt-4.1-nano-2025-04-14", md.Model)
-		assert.Equal(t, int64(22), md.InputTokens)
-		assert.Equal(t, int64(6), md.OutputTokens)
-		// usage_details supplies the total; input_cached_tokens is unmapped and
-		// dropped, not summed.
-		if assert.NotNil(t, md.TotalTokens) {
-			assert.Equal(t, int64(28), *md.TotalTokens)
-		}
-	}
+		ok := extractAIMetadataFromAttributes(
+			[]*v1.KeyValue{arrAttr("gen_ai.response.finish_reasons", "stop", "", "length")}, &md)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"stop", "length"}, md.FinishReasons)
+	})
+
+	t.Run("scalar string is wrapped", func(t *testing.T) {
+		var md AIMetadata
+		ok := extractAIMetadataFromAttributes(
+			[]*v1.KeyValue{strAttr("gen_ai.response.finish_reasons", "tool_calls")}, &md)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"tool_calls"}, md.FinishReasons)
+	})
+
+	t.Run("empty scalar leaves field unset", func(t *testing.T) {
+		var md AIMetadata
+		extractAIMetadataFromAttributes(
+			[]*v1.KeyValue{strAttr("gen_ai.response.finish_reasons", "")}, &md)
+		assert.Nil(t, md.FinishReasons)
+	})
+}
+
+// TestGranularUsageAndRequestParams verifies extraction of the granular usage
+// and request-parameter attributes into their pointer fields.
+func TestGranularUsageAndRequestParams(t *testing.T) {
+	t.Parallel()
+
+	var md AIMetadata
+	ok := extractAIMetadataFromAttributes([]*v1.KeyValue{
+		intAttr("gen_ai.usage.cache_read.input_tokens", 100),
+		intAttr("gen_ai.usage.cache_creation.input_tokens", 25),
+		intAttr("gen_ai.usage.reasoning.output_tokens", 40),
+		dblAttr("gen_ai.request.temperature", 0.7),
+		dblAttr("gen_ai.request.top_p", 0.9),
+		intAttr("gen_ai.request.max_tokens", 1024),
+		dblAttr("gen_ai.request.frequency_penalty", 0.5),
+		dblAttr("gen_ai.request.presence_penalty", -0.25),
+		intAttr("gen_ai.request.seed", 42),
+	}, &md)
+
+	assert.True(t, ok)
+	assert.Equal(t, int64(100), *md.CacheReadTokens)
+	assert.Equal(t, int64(25), *md.CacheCreationTokens)
+	assert.Equal(t, int64(40), *md.ReasoningTokens)
+	assert.Equal(t, 0.7, *md.Temperature)
+	assert.Equal(t, 0.9, *md.TopP)
+	assert.Equal(t, int64(1024), *md.MaxTokens)
+	assert.Equal(t, 0.5, *md.FrequencyPenalty)
+	assert.Equal(t, -0.25, *md.PresencePenalty)
+	assert.Equal(t, int64(42), *md.Seed)
+}
+
+// TestNumericCoercion verifies the int/double/string fallbacks, since OTLP
+// encoders are inconsistent about how they encode numeric attribute values.
+func TestNumericCoercion(t *testing.T) {
+	t.Parallel()
+
+	t.Run("int field accepts double and string", func(t *testing.T) {
+		var md AIMetadata
+		ok := extractAIMetadataFromAttributes([]*v1.KeyValue{
+			dblAttr("gen_ai.request.max_tokens", 2048),
+			strAttr("gen_ai.request.seed", "7"),
+		}, &md)
+		assert.True(t, ok)
+		assert.Equal(t, int64(2048), *md.MaxTokens)
+		assert.Equal(t, int64(7), *md.Seed)
+	})
+
+	t.Run("float field accepts int and string", func(t *testing.T) {
+		var md AIMetadata
+		ok := extractAIMetadataFromAttributes([]*v1.KeyValue{
+			intAttr("gen_ai.request.temperature", 1),
+			strAttr("gen_ai.request.top_p", "0.95"),
+		}, &md)
+		assert.True(t, ok)
+		assert.Equal(t, 1.0, *md.Temperature)
+		assert.Equal(t, 0.95, *md.TopP)
+	})
+
+	t.Run("unparseable string leaves field unset", func(t *testing.T) {
+		var md AIMetadata
+		extractAIMetadataFromAttributes([]*v1.KeyValue{
+			strAttr("gen_ai.request.max_tokens", "not-a-number"),
+		}, &md)
+		assert.Nil(t, md.MaxTokens)
+	})
 }

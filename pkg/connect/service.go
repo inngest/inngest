@@ -453,6 +453,14 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		Handler: c.gatewayRoutes,
 	}
 
+	grpcAddr := fmt.Sprintf(":%d", c.grpcConfig.Gateway.Port)
+	grpcListener, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		c.logger.Error("could not listen for connect gateway grpc", "error", err, "addr", grpcAddr)
+		return fmt.Errorf("could not listen for connect gateway grpc: %w", err)
+	}
+	c.logger.Info("starting connect gateway grpc server", "addr", grpcAddr)
+
 	go func() {
 		<-ctx.Done()
 
@@ -486,14 +494,7 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	})
 
 	eg.Go(func() error {
-		addr := fmt.Sprintf(":%d", c.grpcConfig.Gateway.Port)
-
-		l, err := net.Listen("tcp", addr)
-		if err != nil {
-			return fmt.Errorf("could not listen for: %w", err)
-		}
-		logger.StdlibLogger(ctx).Info("starting connect gateway grpc server", "addr", addr)
-		return c.grpcServer.Serve(l)
+		return c.grpcServer.Serve(grpcListener)
 	})
 
 	if !c.isDraining.Load() {

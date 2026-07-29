@@ -152,6 +152,75 @@ func TestDriverResponseFormatError(t *testing.T) {
 	}
 }
 
+func TestFatalUpstreamError(t *testing.T) {
+	t.Run("empty body: message + detail, no upstream section", func(t *testing.T) {
+		out := FatalUpstreamError(502, nil, "")
+
+		var se StandardError
+		require.NoError(t, json.Unmarshal(out, &se))
+		require.Equal(t, FatalServerErrorName, se.Name)
+		require.Equal(t, "Your server returned HTTP 502 before the SDK responded.", se.Message)
+		require.Contains(t, se.Stack, "No step output was produced")
+		require.NotContains(t, se.Stack, "Upstream response", "no body -> no upstream section")
+	})
+
+	t.Run("plain-text body preserved verbatim with content-type", func(t *testing.T) {
+		out := FatalUpstreamError(502, []byte("Bad Gateway"), "text/plain")
+
+		var se StandardError
+		require.NoError(t, json.Unmarshal(out, &se))
+		require.Equal(t, "Your server returned HTTP 502 before the SDK responded.", se.Message)
+		require.Contains(t, se.Stack, "Upstream response (text/plain):")
+		require.Contains(t, se.Stack, "Bad Gateway")
+	})
+
+	t.Run("html body is preserved as text (not parsed)", func(t *testing.T) {
+		body := []byte("<html><body>502 Bad Gateway</body></html>")
+		out := FatalUpstreamError(502, body, "text/html")
+
+		var se StandardError
+		require.NoError(t, json.Unmarshal(out, &se))
+		require.Contains(t, se.Stack, "Upstream response (text/html):")
+		require.Contains(t, se.Stack, string(body))
+	})
+
+	t.Run("empty content-type is labelled", func(t *testing.T) {
+		out := FatalUpstreamError(500, []byte("oops"), "")
+
+		var se StandardError
+		require.NoError(t, json.Unmarshal(out, &se))
+		require.Contains(t, se.Stack, "Upstream response (unknown content-type):")
+	})
+
+	t.Run("oversized body is truncated", func(t *testing.T) {
+		big := make([]byte, maxFatalUpstreamBodyBytes+500)
+		for i := range big {
+			big[i] = 'a'
+		}
+		out := FatalUpstreamError(503, big, "text/plain")
+
+		var se StandardError
+		require.NoError(t, json.Unmarshal(out, &se))
+		require.Contains(t, se.Stack, "… (truncated)")
+		// We must not preserve more than the cap (plus our label/detail text).
+		require.Less(t, len(se.Stack), maxFatalUpstreamBodyBytes+1000)
+	})
+
+	t.Run("round-trips through StandardError() as displayed to the user", func(t *testing.T) {
+		out := FatalUpstreamError(502, []byte("Bad Gateway"), "text/plain")
+
+		// This mirrors what the driver does: set Output + keep the status Err.
+		dr := DriverResponse{
+			Output: json.RawMessage(out),
+			Err:    strptr("invalid status code: 502"),
+		}
+		se := dr.StandardError()
+		require.Equal(t, FatalServerErrorName, se.Name)
+		require.Equal(t, "Your server returned HTTP 502 before the SDK responded.", se.Message)
+		require.Contains(t, se.Stack, "Bad Gateway")
+	})
+}
+
 func TestGeneratorSleepDuration(t *testing.T) {
 	// Check that this works with a timestamp
 	at := time.Now().Truncate(time.Second).Add(time.Minute)

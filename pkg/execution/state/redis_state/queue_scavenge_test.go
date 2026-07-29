@@ -90,7 +90,7 @@ func TestQueueScavenge(t *testing.T) {
 		require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
 		// Dequeue item and check scavenger index was cleaned up
-		err = q.Dequeue(ctx, shard, item)
+		err = q.Dequeue(ctx, shard.Name(), item)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(kg.PartitionScavengerIndex(fnID.String())))
@@ -393,7 +393,7 @@ func TestQueueScavenge(t *testing.T) {
 
 			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
-			err = q.Requeue(ctx, shard, item1, clock.Now().Add(time.Minute))
+			err = q.Requeue(ctx, shard.Name(), item1, clock.Now().Add(time.Minute))
 			require.NoError(t, err)
 			require.NotNil(t, leaseID2)
 
@@ -469,7 +469,7 @@ func TestQueueScavenge(t *testing.T) {
 
 			require.False(t, r.Exists(kg.Concurrency("p", fnID.String())))
 
-			err = q.Dequeue(ctx, shard, item1)
+			err = q.Dequeue(ctx, shard.Name(), item1)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID2)
 

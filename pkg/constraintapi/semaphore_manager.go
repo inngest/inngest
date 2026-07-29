@@ -42,11 +42,15 @@ type SemaphoreManager interface {
 	AdjustCapacity(ctx context.Context, accountID uuid.UUID, name, idempotencyKey string, delta int64) (AdjustResult, error)
 
 	// GetCapacity returns current capacity and usage for a named semaphore.
-	GetCapacity(ctx context.Context, accountID uuid.UUID, name, usageValue string) (capacity int64, usage int64, err error)
+	//
+	// evaluatedKeyHash is empty for keyless semaphores.
+	GetCapacity(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash string) (capacity int64, usage int64, err error)
 
 	// ReleaseSemaphore decrements the usage counter for a manual-release semaphore.
 	// Called on run finalization for function concurrency. Must be idempotent.
-	ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, usageValue, idempotencyKey string, weight int64) error
+	//
+	// evaluatedKeyHash is empty for keyless semaphores.
+	ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64) error
 }
 
 type redisSemaphoreManager struct {
@@ -61,8 +65,10 @@ func semaphoreCapacityKey(accountID uuid.UUID, name string) string {
 	return fmt.Sprintf("{cs}:%s:sem:%s:cap", accountScope(accountID), name)
 }
 
-func semaphoreUsageKey(accountID uuid.UUID, name, usageValue string) string {
-	return fmt.Sprintf("{cs}:%s:sem:%s:usage:%s", accountScope(accountID), name, usageValue)
+// semaphoreUsageKey returns the counter key for a semaphore bucket. evaluatedKeyHash
+// is empty for keyless semaphores and populated for expression-keyed semaphores.
+func semaphoreUsageKey(accountID uuid.UUID, name, evaluatedKeyHash string) string {
+	return fmt.Sprintf("{cs}:%s:sem:%s:usage:%s", accountScope(accountID), name, evaluatedKeyHash)
 }
 
 func semaphoreIdempotencyKey(accountID uuid.UUID, op, idempotencyKey string) string {
@@ -129,11 +135,11 @@ func parseCapacityScriptResult(result rueidis.RedisResult) (AdjustResult, error)
 	}, nil
 }
 
-func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.UUID, name, usageValue string) (int64, int64, error) {
+func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash string) (int64, int64, error) {
 	start := time.Now()
 
 	capKey := semaphoreCapacityKey(accountID, name)
-	usageKey := semaphoreUsageKey(accountID, name, usageValue)
+	usageKey := semaphoreUsageKey(accountID, name, evaluatedKeyHash)
 
 	results := m.client.DoMulti(ctx,
 		m.client.B().Get().Key(capKey).Build(),
@@ -161,11 +167,11 @@ func (m *redisSemaphoreManager) GetCapacity(ctx context.Context, accountID uuid.
 	return capacity, usage, nil
 }
 
-func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, usageValue, idempotencyKey string, weight int64) error {
+func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID uuid.UUID, name, evaluatedKeyHash, idempotencyKey string, weight int64) error {
 	start := time.Now()
 
 	keys := []string{
-		semaphoreUsageKey(accountID, name, usageValue),
+		semaphoreUsageKey(accountID, name, evaluatedKeyHash),
 		semaphoreIdempotencyKey(accountID, "rel", idempotencyKey),
 	}
 	args := []string{

@@ -56,7 +56,7 @@ function TicketDetailPage() {
     queryKey: ["timeline", params.ticketId],
     queryFn: () =>
       getTimelineEntriesForTicket({ data: { ticketId: params.ticketId } }),
-    initialData: initialTimelineEntries,
+    initialData: initialTimelineEntries as Array<TimeLineEntryEdge>,
     staleTime: 30_000,
   });
 

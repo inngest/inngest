@@ -31,6 +31,7 @@ type Props = {
   runID: string;
   result?: TraceResult;
   isDurableEndpoint?: boolean;
+  readOnly?: boolean;
 };
 
 type Run = {
@@ -63,6 +64,7 @@ export const RunInfo = ({
   standalone,
   result,
   isDurableEndpoint,
+  readOnly,
 }: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
@@ -94,14 +96,16 @@ export const RunInfo = ({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Actions
-            runID={runID}
-            fnID={isLazyDone(run) ? run.fn.id : undefined}
-            allowCancel={allowCancel}
-            isDurableEndpoint={isDurableEndpoint}
-          />
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-2">
+            <Actions
+              runID={runID}
+              fnID={isLazyDone(run) ? run.fn.id : undefined}
+              allowCancel={allowCancel}
+              isDurableEndpoint={isDurableEndpoint}
+            />
+          </div>
+        )}
       </div>
 
       {expanded && (
@@ -158,7 +162,7 @@ export const RunInfo = ({
               const queuedAt = toMaybeDate(run.trace.queuedAt);
               if (queuedAt) {
                 durationText = formatDuration(
-                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - queuedAt.getTime()
+                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - queuedAt.getTime(),
                 );
               }
 

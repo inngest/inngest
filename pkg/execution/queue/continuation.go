@@ -83,7 +83,30 @@ func (q *queueProcessor) removeContinue(ctx context.Context, p *QueuePartition, 
 	}
 }
 
-func (q *queueProcessor) scanContinuations(ctx context.Context) error {
+func (q *queueProcessor) watchDispatchedPartitionItem(ctx context.Context, dispatched DispatchedItem, p *QueuePartition, continuationCount uint) {
+	if !q.runMode.Continuations || dispatched == nil || p == nil {
+		return
+	}
+
+	partition := *p
+	go func() {
+		timeout := q.Clock().NewTimer(QueueContinuationResultTimeout)
+		defer timeout.Stop()
+
+		select {
+		case result := <-dispatched.Done():
+			if result.Err == nil && result.ScheduledImmediateJob {
+				q.addContinue(ctx, &partition, continuationCount+1)
+			}
+		case <-timeout.Chan():
+			return
+		case <-ctx.Done():
+			return
+		}
+	}()
+}
+
+func (q *queueProcessor) scanContinuations(ctx context.Context, dispatch DispatchFunc) error {
 	if !q.runMode.Continuations {
 		// continuations are not enabled.
 		return nil
@@ -115,7 +138,7 @@ func (q *queueProcessor) scanContinuations(ctx context.Context) error {
 
 			logger.StdlibLogger(ctx).Trace("continue partition processing", "partition_id", p.ID, "count", cont.count)
 
-			err := q.ProcessPartition(ctx, p, cont.count, false)
+			err := q.ProcessPartition(ctx, p, cont.count, false, dispatch)
 
 			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,

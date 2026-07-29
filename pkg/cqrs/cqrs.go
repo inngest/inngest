@@ -29,6 +29,7 @@ type Manager interface {
 	EventManager
 	HistoryReader
 	HistoryWriter
+	GetRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
 
 	// Trace / dev only
 	TraceReadWriter

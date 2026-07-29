@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 )
 
 type MetadataSpanAttrOpts func(cfg *MetadataSpanConfig)
@@ -29,6 +30,16 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 // CreateMetadataSpanFromValues creates a metadata span from pre-serialized values,
 // avoiding redundant serialization when the caller has already called Serialize.
 func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, kind metadata.Kind, op metadata.Opcode, values metadata.Values, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
+	// Every metadata span, regardless of caller, passes through here — so
+	// this is the single chokepoint to backfill EstimatedCost for
+	// "inngest.ai" metadata that arrived without one (e.g. submitted
+	// directly via inngest.metadata.update or the AddRunMetadata API,
+	// bypassing the AIMetadata-producing extractors). A no-op when
+	// EstimatedCost is already set.
+	if kind == extractors.KindInngestAI {
+		extractors.BackfillEstimatedCostInValues(values)
+	}
+
 	spanSize := values.Size()
 
 	// Per-span size limit

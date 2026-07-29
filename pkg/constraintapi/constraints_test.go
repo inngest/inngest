@@ -2690,7 +2690,7 @@ func TestConstraintItem_CacheKey(t *testing.T) {
 					EvaluatedKeyHash:  "eval_env",
 				},
 			},
-			expected:    "550e8400-e29b-41d4-a716-446655440001:c:e:expr_env:eval_env",
+			expected:    "550e8400-e29b-41d4-a716-446655440001:c:e:550e8400-e29b-41d4-a716-446655440002:expr_env:eval_env",
 			description: "env concurrency with custom key should include both hashes",
 		},
 		{
@@ -2703,7 +2703,7 @@ func TestConstraintItem_CacheKey(t *testing.T) {
 					EvaluatedKeyHash:  "eval_fn",
 				},
 			},
-			expected:    "550e8400-e29b-41d4-a716-446655440001:c:f:expr_fn:eval_fn",
+			expected:    "550e8400-e29b-41d4-a716-446655440001:c:f:550e8400-e29b-41d4-a716-446655440003:expr_fn:eval_fn",
 			description: "function concurrency with custom key should include both hashes",
 		},
 
@@ -2766,7 +2766,7 @@ func TestConstraintItem_CacheKey(t *testing.T) {
 					EvaluatedKeyHash:  "throttle_env_eval",
 				},
 			},
-			expected:    "550e8400-e29b-41d4-a716-446655440001:t:e:throttle_env_expr:throttle_env_eval",
+			expected:    "550e8400-e29b-41d4-a716-446655440001:t:e:550e8400-e29b-41d4-a716-446655440002:throttle_env_expr:throttle_env_eval",
 			description: "env throttle with custom key should include both hashes",
 		},
 		{
@@ -2779,7 +2779,7 @@ func TestConstraintItem_CacheKey(t *testing.T) {
 					EvaluatedKeyHash:  "throttle_fn_eval",
 				},
 			},
-			expected:    "550e8400-e29b-41d4-a716-446655440001:t:f:throttle_fn_expr:throttle_fn_eval",
+			expected:    "550e8400-e29b-41d4-a716-446655440001:t:f:550e8400-e29b-41d4-a716-446655440003:throttle_fn_expr:throttle_fn_eval",
 			description: "function throttle with custom key should include both hashes",
 		},
 
@@ -2842,7 +2842,7 @@ func TestConstraintItem_CacheKey(t *testing.T) {
 					EvaluatedKeyHash:  "rl_env_eval",
 				},
 			},
-			expected:    "550e8400-e29b-41d4-a716-446655440001:r:e:rl_env_expr:rl_env_eval",
+			expected:    "550e8400-e29b-41d4-a716-446655440001:r:e:550e8400-e29b-41d4-a716-446655440002:rl_env_expr:rl_env_eval",
 			description: "env rate limit with custom key should include both hashes",
 		},
 		{
@@ -2855,7 +2855,7 @@ func TestConstraintItem_CacheKey(t *testing.T) {
 					EvaluatedKeyHash:  "rl_fn_eval",
 				},
 			},
-			expected:    "550e8400-e29b-41d4-a716-446655440001:r:f:rl_fn_expr:rl_fn_eval",
+			expected:    "550e8400-e29b-41d4-a716-446655440001:r:f:550e8400-e29b-41d4-a716-446655440003:rl_fn_expr:rl_fn_eval",
 			description: "function rate limit with custom key should include both hashes",
 		},
 

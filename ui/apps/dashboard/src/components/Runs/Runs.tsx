@@ -70,8 +70,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     true,
     true,
   );
-  const { value: v4Enabled } = booleanFlag('run-details-v4');
-
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] =
@@ -175,7 +173,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       features={{
         history: features.data?.history ?? 7,
         tracesPreview: tracePreviewEnabled,
-        runDetailsV4: v4Enabled,
         isDeferred: true,
       }}
       hasMore={hasNextPage}

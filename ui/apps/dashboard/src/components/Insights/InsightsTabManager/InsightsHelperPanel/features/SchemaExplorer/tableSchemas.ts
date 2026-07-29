@@ -188,6 +188,12 @@ const extendedTraceSpansTable = (table: string): SchemaEntry => ({
       },
       {
         kind: 'value',
+        name: 'trace_id',
+        path: `${table}.trace_id`,
+        type: 'String',
+      },
+      {
+        kind: 'value',
         name: 'span_id',
         path: `${table}.span_id`,
         type: 'String',
@@ -240,19 +246,86 @@ const extendedTraceSpansTable = (table: string): SchemaEntry => ({
         path: `${table}.service_name`,
         type: 'String',
       },
-      {
-        kind: 'value',
-        name: 'output',
-        path: `${table}.output`,
-        type: 'JSON',
-      },
-      {
-        kind: 'value',
-        name: 'error',
-        path: `${table}.error`,
-        type: 'JSON',
-      },
       attributesNode(table, 'attributes'),
+      metadataNode(table, 'inngest'),
+      metadataNode(table, 'metadata'),
+    ],
+  },
+});
+
+const metadataTable = (table: string): SchemaEntry => ({
+  key: table,
+  node: {
+    kind: 'table',
+    name: table,
+    path: table,
+    children: [
+      {
+        kind: 'value',
+        name: 'run_id',
+        path: `${table}.run_id`,
+        type: 'String',
+      },
+      {
+        kind: 'value',
+        name: 'run_queued_at',
+        path: `${table}.run_queued_at`,
+        type: 'DateTime',
+      },
+      {
+        kind: 'value',
+        name: 'updated_at',
+        path: `${table}.updated_at`,
+        type: 'DateTime',
+      },
+      {
+        kind: 'value',
+        name: 'app_id',
+        path: `${table}.app_id`,
+        type: 'String',
+      },
+      {
+        kind: 'value',
+        name: 'function_id',
+        path: `${table}.function_id`,
+        type: 'String',
+      },
+      {
+        kind: 'value',
+        name: 'step_id',
+        path: `${table}.step_id`,
+        type: 'String',
+      },
+      {
+        kind: 'value',
+        name: 'step_index',
+        path: `${table}.step_index`,
+        type: 'Integer',
+      },
+      {
+        kind: 'value',
+        name: 'step_attempt',
+        path: `${table}.step_attempt`,
+        type: 'Integer',
+      },
+      {
+        kind: 'value',
+        name: 'span_id',
+        path: `${table}.span_id`,
+        type: 'String',
+      },
+      {
+        kind: 'value',
+        name: 'level',
+        path: `${table}.level`,
+        type: 'String',
+      },
+      {
+        kind: 'value',
+        name: 'step_type',
+        path: `${table}.step_type`,
+        type: 'String',
+      },
       metadataNode(table, 'inngest'),
       metadataNode(table, 'metadata'),
     ],
@@ -284,6 +357,12 @@ export const tableEntries: SchemaEntry[] = [
           name: 'data',
           path: 'events.data',
           type: 'JSON',
+        },
+        {
+          kind: 'value',
+          name: 'v',
+          path: 'events.v',
+          type: 'String',
         },
         {
           kind: 'value',
@@ -345,6 +424,12 @@ export const tableEntries: SchemaEntry[] = [
         },
         {
           kind: 'value',
+          name: 'status',
+          path: 'runs.status',
+          type: 'String',
+        },
+        {
+          kind: 'value',
           name: 'queued_at',
           path: 'runs.queued_at',
           type: 'DateTime',
@@ -385,10 +470,39 @@ export const tableEntries: SchemaEntry[] = [
           path: 'runs.error',
           type: 'JSON',
         },
+        attributesNode('runs', 'attributes'),
+        metadataNode('runs', 'inngest'),
+        metadataNode('runs', 'metadata'),
+        {
+          kind: 'array',
+          name: 'sessions',
+          path: 'runs.sessions',
+          element: {
+            kind: 'object',
+            name: 'session',
+            path: 'runs.sessions',
+            type: 'object',
+            children: [
+              {
+                kind: 'value',
+                name: 'key',
+                path: 'runs.sessions.key',
+                type: 'String',
+              },
+              {
+                kind: 'value',
+                name: 'id',
+                path: 'runs.sessions.id',
+                type: 'String',
+              },
+            ],
+          },
+        },
       ],
     },
   },
   stepsTable('steps'),
   stepsTable('step_attempts'),
   extendedTraceSpansTable('extended_trace_spans'),
+  metadataTable('metadata'),
 ];

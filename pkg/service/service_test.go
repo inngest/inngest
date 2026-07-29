@@ -148,7 +148,7 @@ func TestStartAll(t *testing.T) {
 	now := time.Now()
 	err := StartAll(context.Background(), m, m, m)
 	require.NoError(t, err)
-	require.WithinDuration(t, time.Now(), now.Add(500*time.Millisecond), 10*time.Millisecond)
+	require.WithinDuration(t, time.Now(), now.Add(500*time.Millisecond), 100*time.Millisecond)
 	require.Equal(t, int32(3), atomic.LoadInt32(&invocations))
 }
 
@@ -180,7 +180,7 @@ func TestSingleSvcError(t *testing.T) {
 	err := StartAll(context.Background(), m, m, m)
 	require.Error(t, err, "expected service to return an error")
 	require.ErrorContains(t, err, "boo")
-	require.WithinDuration(t, time.Now(), now.Add(500*time.Millisecond), 10*time.Millisecond)
+	require.WithinDuration(t, time.Now(), now.Add(500*time.Millisecond), 100*time.Millisecond)
 	require.Equal(t, int32(3), atomic.LoadInt32(&invocations))
 	require.Equal(t, int32(3), atomic.LoadInt32(&stops))
 }

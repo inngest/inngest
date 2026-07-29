@@ -30,6 +30,7 @@ type ExtractedValues struct {
 	EnvID *uuid.UUID
 	EventIDs *[]string
 	EventsInput *string
+	Sessions *EventSessions
 	TriggeringEventName *string
 	FunctionID *uuid.UUID
 	FunctionName *string

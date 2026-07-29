@@ -291,7 +291,6 @@ func TestDeleteManager(t *testing.T) {
 		// Test deletion of KindDebounce items (should delete associated debounce)
 		// Create a debounce item first using Debounce()
 		eventID := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
-		debounceID := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
 
 		debounceItem := debounce.DebounceItem{
 			AccountID:   accountID,
@@ -324,8 +323,9 @@ func TestDeleteManager(t *testing.T) {
 		}
 
 		// Create the debounce using Debounce()
-		err := debouncer.Debounce(ctx, debounceItem, fn)
+		debounceID, err := debouncer.Debounce(ctx, debounceItem, fn)
 		require.NoError(t, err)
+		require.NotNil(t, debounceID)
 
 		// Create a KindDebounce queue item with DebouncePayload
 		queueItem := &queue.QueueItem{
@@ -346,7 +346,7 @@ func TestDeleteManager(t *testing.T) {
 					Key:         "test-debounce",
 				},
 				Payload: debounce.DebouncePayload{
-					DebounceID:      debounceID,
+					DebounceID:      *debounceID,
 					AccountID:       accountID,
 					WorkspaceID:     workspaceID,
 					AppID:           appID,
@@ -362,11 +362,14 @@ func TestDeleteManager(t *testing.T) {
 
 		// Delete the queue item (should also delete the debounce)
 		err = deleteManager.DeleteQueueItem(ctx, shard, queueItem)
-		require.Error(t, err)
-		require.ErrorIs(t, err, debounce.ErrDebounceNotFound)
+		require.NoError(t, err)
 
-		// Note: We can't easily verify debounce deletion without the exact debounce ID
-		// that was created, but the delete manager should handle it properly
+		_, err = debouncer.GetDebounceItem(ctx, queue.Scope{
+			AccountID:  accountID,
+			EnvID:      workspaceID,
+			FunctionID: functionID,
+		}, *debounceID)
+		require.ErrorIs(t, err, debounce.ErrDebounceNotFound)
 	})
 
 	t.Run("UnknownKind", func(t *testing.T) {

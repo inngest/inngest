@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { RiArrowLeftSLine, RiArrowRightSLine } from '@remixicon/react';
+import { IconPanelLeftClose } from '@inngest/components/icons/PanelLeftClose';
+import { IconPanelLeftOpen } from '@inngest/components/icons/PanelLeftOpen';
 
 import type { Environment } from '@/utils/environments';
+import AnnouncementStack from '../NavigationV2/Announcements/AnnouncementStack';
 import Navigation from '../NavigationV2/Navigation';
 import OnboardingWidget from '../NavigationV2/OnboardingWidget';
 import SeatOverageWidget from '../SeatOverage/SeatOverageWidget';
@@ -78,37 +80,60 @@ export default function SideBar({
   return (
     <nav
       className={`bg-canvasBase border-subtle group relative flex h-full flex-col justify-start py-3 transition-[width] duration-200 ease-out ${
-        collapsed ? 'w-[64px]' : 'w-[200px]'
-      } shrink-0 overflow-visible border-r-hairline`}
+        collapsed ? 'w-[60px]' : 'w-[220px]'
+      } shrink-0 overflow-visible border-r`}
       ref={navRef}
     >
-      {/* Vertical tab on the divider, hover-revealed. Sits half inside / half
-          outside the sidebar so it reads as part of the right edge itself. */}
-      <OptionalTooltip
-        tooltip={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="bg-canvasBase border-subtle text-muted hover:text-basis shadow-xs absolute right-0 top-1/2 z-[70] hidden h-8 w-5 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-md border-hairline transition-colors group-hover:flex"
-        >
-          {collapsed ? (
-            <RiArrowRightSLine className="h-4 w-4" />
-          ) : (
-            <RiArrowLeftSLine className="h-4 w-4" />
-          )}
-        </button>
-      </OptionalTooltip>
+      <div className="flex min-h-0 grow flex-col justify-between">
+        {/* Nav list scrolls on short screens; min-h-0 lets the flex child
+            actually overflow instead of pushing the bottom widgets off-screen. */}
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto">
+          <Navigation collapsed={collapsed} activeEnv={activeEnv} />
+        </div>
 
-      <div className="flex grow flex-col justify-between">
-        <Navigation collapsed={collapsed} activeEnv={activeEnv} />
-
-        <div className="pl-3 pr-2">
+        <div className="shrink-0 pl-3 pr-3">
           <SeatOverageWidget collapsed={collapsed} />
-          {isWidgetOpen && (
+          {/* The onboarding widget takes priority over marketing announcements. */}
+          {isWidgetOpen ? (
             <OnboardingWidget collapsed={collapsed} closeWidget={closeWidget} />
+          ) : (
+            // Marketing announcements are tall and non-essential — drop them on
+            // short viewports so the nav + collapse toggle stay reachable.
+            <div className="[@media(max-height:720px)]:hidden">
+              <AnnouncementStack collapsed={collapsed} />
+            </div>
           )}
+
+          {/* Discreet, icon-only collapse toggle pinned to the sidebar foot.
+              Hover-revealed via opacity so it stays out of the way; focus-within
+              keeps it keyboard reachable while it's transparent. */}
+          <div className="pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+            <OptionalTooltip
+              tooltip={
+                <span className="flex items-center gap-1.5">
+                  {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                  <kbd className="border-subtle flex h-4 items-center gap-0.5 rounded border px-1 font-mono text-[10px] font-medium leading-none">
+                    <span className="text-xs">⌘</span>B
+                  </kbd>
+                </span>
+              }
+            >
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                className={`text-muted hover:bg-canvasSubtle hover:text-basis my-0.5 flex h-8 w-8 items-center justify-center rounded ${
+                  collapsed ? 'mx-auto' : 'mr-auto'
+                }`}
+              >
+                {collapsed ? (
+                  <IconPanelLeftOpen className="h-4 w-4" />
+                ) : (
+                  <IconPanelLeftClose className="h-4 w-4" />
+                )}
+              </button>
+            </OptionalTooltip>
+          </div>
         </div>
       </div>
     </nav>

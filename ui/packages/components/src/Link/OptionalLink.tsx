@@ -5,12 +5,13 @@ export const OptionalLink = ({
   children,
   href,
   ...props
-}: Omit<LinkComponentProps, 'href'> & {
+}: Omit<LinkComponentProps, 'href' | 'to'> & {
   href?: string;
+  to?: LinkComponentProps['to'] | string;
   children: ReactNode;
 }) =>
   href || props.to ? (
-    <Link href={href} {...props}>
+    <Link href={href} {...(props as Omit<LinkComponentProps, 'href'>)}>
       {children}
     </Link>
   ) : (

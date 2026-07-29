@@ -6,7 +6,7 @@ import {
 } from '@inngest/components/Popover';
 import { RiSettings3Line } from '@remixicon/react';
 
-import { MetricAccordionItem } from '@/components/Experiments/ScoringFormulaSidebar';
+import { MetricConfigForm } from '@/components/Experiments/ScoringFormulaSidebar';
 
 import type { MetricStats } from './metricStats';
 
@@ -56,18 +56,19 @@ export function MetricSubLabel({
 
 export function MetricColumnHeader({
   metric,
-  pointsLeft,
   onUpdateMetric,
   range,
 }: {
   metric: ExperimentScoringMetric;
-  pointsLeft: number;
   onUpdateMetric: (
     key: string,
     patch: Partial<ExperimentScoringMetric>,
   ) => void;
   range?: { min: number; max: number };
 }) {
+  const onUpdate = (patch: Partial<ExperimentScoringMetric>) =>
+    onUpdateMetric(metric.key, patch);
+
   return (
     <div className="flex w-full items-center gap-1">
       <span className="text-muted min-w-0 flex-1 truncate text-xs font-medium">
@@ -82,14 +83,8 @@ export function MetricColumnHeader({
             <RiSettings3Line className="h-3.5 w-3.5" />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start">
-          <MetricAccordionItem
-            metric={metric}
-            pointsLeft={pointsLeft}
-            range={range}
-            isPopover
-            onUpdate={(patch) => onUpdateMetric(metric.key, patch)}
-          />
+        <PopoverContent align="start" className="w-[340px] p-4">
+          <MetricConfigForm metric={metric} range={range} onUpdate={onUpdate} />
         </PopoverContent>
       </Popover>
     </div>

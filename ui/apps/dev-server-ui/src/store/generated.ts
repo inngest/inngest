@@ -547,6 +547,7 @@ export type MutationInvokeFunctionArgs = {
   debugRunID: InputMaybe<Scalars['ULID']>;
   debugSessionID: InputMaybe<Scalars['ULID']>;
   functionSlug: Scalars['String'];
+  meta: InputMaybe<Scalars['Map']>;
   user: InputMaybe<Scalars['Map']>;
 };
 
@@ -1128,6 +1129,7 @@ export type DeleteAppMutation = { __typename?: 'Mutation', deleteApp: string };
 export type InvokeFunctionMutationVariables = Exact<{
   functionSlug: Scalars['String'];
   data: InputMaybe<Scalars['Map']>;
+  meta: InputMaybe<Scalars['Map']>;
   user: InputMaybe<Scalars['Map']>;
   debugSessionID?: InputMaybe<Scalars['ULID']>;
   debugRunID?: InputMaybe<Scalars['ULID']>;
@@ -1576,10 +1578,11 @@ export const DeleteAppDocument = `
 }
     `;
 export const InvokeFunctionDocument = `
-    mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map, $debugSessionID: ULID = null, $debugRunID: ULID = null) {
+    mutation InvokeFunction($functionSlug: String!, $data: Map, $meta: Map, $user: Map, $debugSessionID: ULID = null, $debugRunID: ULID = null) {
   invokeFunction(
     data: $data
     functionSlug: $functionSlug
+    meta: $meta
     user: $user
     debugSessionID: $debugSessionID
     debugRunID: $debugRunID

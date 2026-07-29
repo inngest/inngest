@@ -21,6 +21,10 @@ var (
 		time.Stamp,
 		time.StampMilli,
 		"2006-01-02",
+		// Go's time.Time String() layout, e.g. "2006-01-02 15:04:05.999999999 -0700 MST".
+		// SQLite aggregate expressions (MIN/MAX over a DATETIME column) return the
+		// raw stored value in this form rather than RFC3339.
+		"2006-01-02 15:04:05.999999999 -0700 MST",
 	}
 )
 

@@ -6,11 +6,18 @@
  */
 
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TooltipProvider } from '../Tooltip/Tooltip';
 import { StepInfo } from './StepInfo';
 import type { StepInfoWait, Trace } from './types';
+
+const useGetTraceResultMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    loading: false,
+    data: null,
+  }))
+);
 
 // jsdom doesn't provide ResizeObserver
 beforeAll(() => {
@@ -61,7 +68,9 @@ vi.mock('../AI/AITrace', () => ({
 }));
 
 vi.mock('../Rerun/RerunModal', () => ({
-  RerunModal: () => null,
+  RerunModal: ({ editableInput }: { editableInput?: boolean }) => (
+    <div data-input-editable={String(editableInput)} data-testid="mock-rerun-modal" />
+  ),
 }));
 
 vi.mock('./ErrorInfo', () => ({
@@ -96,7 +105,7 @@ vi.mock('../SharedContext/useBooleanFlag', () => ({
 }));
 
 vi.mock('../SharedContext/useGetTraceResult', () => ({
-  useGetTraceResult: () => ({ loading: false, data: null }),
+  useGetTraceResult: useGetTraceResultMock,
 }));
 
 vi.mock('../SharedContext/usePathCreator', () => ({
@@ -109,8 +118,16 @@ vi.mock('../SharedContext/usePathCreator', () => ({
   }),
 }));
 
+beforeEach(() => {
+  useGetTraceResultMock.mockReturnValue({
+    loading: false,
+    data: null,
+  });
+});
+
 afterEach(() => {
   cleanup();
+  useGetTraceResultMock.mockReset();
 });
 
 function makeTrace(overrides: Partial<Trace> = {}): Trace {
@@ -325,6 +342,47 @@ describe('Step operation type', () => {
     const trace = makeTrace({ stepOp: null });
     renderStepInfo(trace);
     expect(document.querySelector('[data-label="Step Type"]')).toBeNull();
+  });
+});
+
+describe('Rerun from step visibility', () => {
+  it.each(['RUN', 'AI_GATEWAY'])('renders for input-compatible stepOp "%s"', (stepOp) => {
+    const trace = makeTrace({ stepID: 'step-1', stepOp });
+    renderStepInfo(trace);
+    expect(screen.queryByText('Rerun from step')).toBeTruthy();
+    expect(screen.getByTestId('mock-rerun-modal').getAttribute('data-input-editable')).toBe('true');
+  });
+
+  it.each(['INVOKE', 'SLEEP', 'WAIT_FOR_EVENT', 'WAIT_FOR_SIGNAL'])(
+    'renders with input editing disabled for stepOp "%s" without existing input',
+    (stepOp) => {
+      const trace = makeTrace({ stepID: 'step-1', stepOp });
+      renderStepInfo(trace);
+      expect(screen.queryByText('Rerun from step')).toBeTruthy();
+      expect(screen.getByTestId('mock-rerun-modal').getAttribute('data-input-editable')).toBe(
+        'false'
+      );
+    }
+  );
+
+  it('enables input editing for unsupported stepOp when existing input is available', () => {
+    useGetTraceResultMock.mockReturnValue({
+      loading: false,
+      data: {
+        input: '{"value":true}',
+      },
+    });
+
+    const trace = makeTrace({ stepID: 'step-1', stepOp: 'SLEEP' });
+    renderStepInfo(trace);
+    expect(screen.queryByText('Rerun from step')).toBeTruthy();
+    expect(screen.getByTestId('mock-rerun-modal').getAttribute('data-input-editable')).toBe('true');
+  });
+
+  it('does not render without a step ID', () => {
+    const trace = makeTrace({ stepID: null, stepOp: 'RUN' });
+    renderStepInfo(trace);
+    expect(screen.queryByText('Rerun from step')).toBeNull();
   });
 });
 

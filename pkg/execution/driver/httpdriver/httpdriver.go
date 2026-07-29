@@ -269,6 +269,15 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		// - The function fails or errors (these are not *yet* opcodes, but should be).
 		err = fmt.Errorf("invalid status code: %d", resp.StatusCode)
 		dr.SetError(err)
+		// Synthesize a clear user-facing error only when the response did not
+		// come from an SDK (per its headers): a proxy/gateway 5xx, crash, or
+		// timeout before the SDK responded. SDK responses are left untouched —
+		// SDKs return real function/step errors as non-2xx with a serialized
+		// error body. Only Output is changed; dr.Err (set above) is left as-is
+		// so retry behavior is unchanged.
+		if !resp.IsSDK {
+			dr.Output = state.FatalUpstreamError(resp.StatusCode, resp.Body, resp.Header.Get("Content-Type"))
+		}
 	}
 	if resp.NoRetry {
 		// Ensure we return a NonRetriableError to indicate that

@@ -21,6 +21,7 @@ import { useDeepLinkHandler } from '@/components/Insights/useDeepLinkHandler';
 export type InsightsSearchParams = {
   query_id?: string;
   sql?: string;
+  name?: string;
 };
 
 export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
@@ -29,6 +30,7 @@ export const Route = createFileRoute('/_authed/env/$envSlug/insights/')({
     query_id:
       typeof search?.query_id === 'string' ? search.query_id : undefined,
     sql: typeof search?.sql === 'string' ? search.sql : undefined,
+    name: typeof search?.name === 'string' ? search.name : undefined,
   }),
 });
 

@@ -130,8 +130,13 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 			if existing.err != nil {
 				return nil, existing.err
 			}
+			batchID := ""
+			if existing.result != nil {
+				batchID = existing.result.BatchID
+			}
 			return &BatchAppendResult{
 				Status:          enums.BatchItemExists,
+				BatchID:         batchID,
 				BatchPointerKey: batchPointer,
 			}, nil
 		case <-ctx.Done():

@@ -121,10 +121,11 @@ function TriggerCell({ row }: { row: Row<Function> }) {
       appearance="outlined"
       disabled={false}
       doesFunctionAcceptPayload={doesFunctionAcceptPayload}
-      btnAction={async ({ data, user }) => {
+      btnAction={async ({ data, meta, user }) => {
         await invokeFunction({
           data,
           functionSlug: row.original.slug,
+          meta,
           user,
         });
         toast.success('Function invoked');

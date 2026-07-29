@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"net/http"
 	"testing"
 	"time"
 
@@ -36,9 +37,10 @@ func (r metadataTraceReader) GetLatestExecutionSpanByStepID(context.Context, uli
 }
 
 type metadataTracerProvider struct {
-	t      *testing.T
-	wantID statev2.ID
-	called bool
+	t       *testing.T
+	wantID  statev2.ID
+	called  bool
+	updated []*tracing.UpdateSpanOptions
 }
 
 type metadataStateLoader struct {
@@ -46,7 +48,7 @@ type metadataStateLoader struct {
 	loadMetadata func(context.Context, statev2.ID) (statev2.Metadata, error)
 }
 
-func (s metadataStateLoader) LoadMetadata(ctx context.Context, id statev2.ID) (statev2.Metadata, error) {
+func (s metadataStateLoader) LoadMetadata(ctx context.Context, id statev2.ID, _ ...statev2.LoadMetadataOption) (statev2.Metadata, error) {
 	if s.loadMetadata != nil {
 		return s.loadMetadata(ctx, id)
 	}
@@ -70,8 +72,9 @@ func (p *metadataTracerProvider) CreateDroppableSpan(context.Context, string, *t
 	return nil, errors.New("unexpected CreateDroppableSpan call")
 }
 
-func (p *metadataTracerProvider) UpdateSpan(context.Context, *tracing.UpdateSpanOptions) error {
-	return errors.New("unexpected UpdateSpan call")
+func (p *metadataTracerProvider) UpdateSpan(_ context.Context, opts *tracing.UpdateSpanOptions) error {
+	p.updated = append(p.updated, opts)
+	return nil
 }
 
 // newRunID returns a ULID with the current time (new path).
@@ -123,6 +126,8 @@ func TestAddRunMetadataNewPathUsesStateForTenantIDs(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, tp.called)
+	require.Len(t, tp.updated, 1)
+	require.NotNil(t, tp.updated[0].TargetSpan)
 }
 
 // TestAddRunMetadataNewPathFallbackToPartialIDWhenStateMissing verifies that
@@ -159,6 +164,8 @@ func TestAddRunMetadataNewPathFallbackToPartialIDWhenStateMissing(t *testing.T) 
 	})
 	require.NoError(t, err)
 	require.True(t, tp.called)
+	require.Len(t, tp.updated, 1)
+	require.NotNil(t, tp.updated[0].TargetSpan)
 }
 
 func TestAddRunMetadataReturnsTransientStateLoadError(t *testing.T) {
@@ -221,9 +228,9 @@ func TestAddRunMetadataAllowsScoreMetadata(t *testing.T) {
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Target: RunMetadataTarget{StepID: &stepID},
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore + ".passed",
+			Kind:   metadata.KindInngestScore,
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"value": json.RawMessage(`true`)},
+			Values: metadata.Values{"passed": json.RawMessage(`{"value": true}`)},
 		}}},
 	})
 	require.NoError(t, err)
@@ -245,9 +252,9 @@ func TestAddRunMetadataRejectsInvalidScoreMetadata(t *testing.T) {
 
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore + ".score",
+			Kind:   metadata.KindInngestScore,
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"value": json.RawMessage(`{"nested":1}`)},
+			Values: metadata.Values{"score": json.RawMessage(`{"value": {"nested":1}}`)},
 		}}},
 	})
 	require.ErrorIs(t, err, metadata.ErrScoreValueInvalid)
@@ -281,9 +288,9 @@ func TestAddRunMetadataAllowsRunScopedScoreMetadata(t *testing.T) {
 
 	err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
 		Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
-			Kind:   metadata.KindInngestScore + ".accuracy",
+			Kind:   metadata.KindInngestScore,
 			Op:     enums.MetadataOpcodeMerge,
-			Values: metadata.Values{"value": json.RawMessage(`1`)},
+			Values: metadata.Values{"accuracy": json.RawMessage(`{"value": 1}`)},
 		}}},
 	})
 	require.NoError(t, err)
@@ -352,4 +359,28 @@ func TestAddRunMetadataLegacyPathForOldRuns(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, tp.called)
+}
+
+func TestAddRunMetadataLegacyPathRequiresTraceReader(t *testing.T) {
+	ctx := t.Context()
+	auth, err := apiv1auth.NilAuthFinder(ctx)
+	require.NoError(t, err)
+
+	runID := preDeterministicSpanIDRunID()
+	r := router{API: &API{opts: Opts{}}}
+
+	require.NotPanics(t, func() {
+		err = r.AddRunMetadata(ctx, auth, runID, &AddRunMetadataRequest{
+			Metadata: []metadata.Update{{RawUpdate: metadata.RawUpdate{
+				Kind:   "userland.scores",
+				Op:     enums.MetadataOpcodeMerge,
+				Values: metadata.Values{"score": json.RawMessage(`{"value":1}`)},
+			}}},
+		})
+	})
+
+	var publicErr publicerr.Error
+	require.ErrorAs(t, err, &publicErr)
+	require.Equal(t, http.StatusBadRequest, publicErr.Status)
+	require.Equal(t, "trace reader not provided, aborting legacy metadata retrieval", publicErr.Message)
 }

@@ -45,7 +45,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 	partition := osqueue.ItemShadowPartition(ctx, i)
 	backlog := osqueue.ItemBacklog(ctx, i)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Dequeue", i.Data.Identifier.AccountID, i.Data.Identifier.WorkspaceID, i.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Dequeue", osqueue.TraceScopeFromQueueItem(i, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", partition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -81,6 +81,7 @@ func (q *queue) Dequeue(ctx context.Context, i osqueue.QueueItem, options ...osq
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 
 		kg.PartitionScavengerIndex(partition.PartitionID),
+		kg.QueueItemEarliestPeekTime(i.ID),
 	}
 
 	// Append indexes
@@ -170,11 +171,12 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 
 	// Reset enqueuedAt (used for latency calculation)
 	i.EnqueuedAt = now.UnixMilli()
+	i.EarliestPeekTime = 0
 
 	fnPartition := osqueue.ItemPartition(ctx, i)
 	shadowPartition := osqueue.ItemShadowPartition(ctx, i)
 
-	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Requeue", i.Data.Identifier.AccountID, i.Data.Identifier.WorkspaceID, i.FunctionID)
+	ctx, span := q.ConditionalTracer.NewSpan(ctx, "queue.Requeue", osqueue.TraceScopeFromQueueItem(i, q.Name()))
 	defer span.End()
 	span.SetAttributes(attribute.String("partition_id", shadowPartition.PartitionID))
 	span.SetAttributes(attribute.String("item_id", i.ID))
@@ -237,6 +239,7 @@ func (q *queue) Requeue(ctx context.Context, i osqueue.QueueItem, at time.Time, 
 		kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // empty for system partitions
 
 		kg.PartitionScavengerIndex(shadowPartition.PartitionID),
+		kg.QueueItemEarliestPeekTime(i.ID),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, q.RedisClient.kg) {

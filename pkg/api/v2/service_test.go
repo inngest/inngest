@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -262,6 +263,162 @@ func intPtr(value int) *int {
 	return &value
 }
 
+func int32Ptr(value int32) *int32 {
+	return &value
+}
+
+func TestService_GetApp(t *testing.T) {
+	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	createdAt := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	syncedAt := time.Date(2026, 6, 2, 12, 0, 0, 0, time.UTC)
+	archivedAt := time.Now().Add(-time.Hour)
+
+	app := App{
+		ID:            "my-app",
+		InternalID:    appID,
+		Name:          "my-app",
+		Method:        enums.AppMethodConnect,
+		AppVersion:    "1.2.3",
+		CreatedAt:     createdAt,
+		FunctionCount: 4,
+		LatestSync: &AppSync{
+			Status:      "failed",
+			SyncedAt:    syncedAt,
+			SdkLanguage: "typescript",
+			SdkVersion:  "3.22.0",
+			Framework:   "nextjs",
+			URL:         "https://example.com/api/inngest",
+			Error:       "could not reach app",
+			AppVersion:  "1.2.3",
+		},
+	}
+
+	t.Run("returns mapped app data", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(app, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.NoError(t, err)
+		require.Equal(t, "my-app", resp.Data.Id)
+		require.Equal(t, "my-app", resp.Data.Name)
+		require.Equal(t, apiv2.AppMethod_APP_METHOD_CONNECT, resp.Data.Method)
+		require.Equal(t, "1.2.3", resp.Data.GetAppVersion())
+		require.Equal(t, createdAt, resp.Data.CreatedAt.AsTime())
+		require.False(t, resp.Data.IsArchived)
+		require.Nil(t, resp.Data.ArchivedAt)
+		require.Equal(t, int32(4), resp.Data.FunctionCount)
+		require.NotNil(t, resp.Data.LatestSync)
+		require.Equal(t, "failed", resp.Data.LatestSync.GetStatus())
+		require.Equal(t, syncedAt, resp.Data.LatestSync.GetSyncedAt().AsTime())
+		require.Equal(t, "typescript", resp.Data.LatestSync.GetSdkLanguage())
+		require.Equal(t, "3.22.0", resp.Data.LatestSync.GetSdkVersion())
+		require.Equal(t, "nextjs", resp.Data.LatestSync.GetFramework())
+		require.Equal(t, "https://example.com/api/inngest", resp.Data.LatestSync.GetUrl())
+		require.Equal(t, "could not reach app", resp.Data.LatestSync.GetError())
+		require.Equal(t, "1.2.3", resp.Data.LatestSync.GetAppVersion())
+		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("omits empty optional fields", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(App{InternalID: appID, Name: "my-app"}, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.NoError(t, err)
+		require.Equal(t, "my-app", resp.Data.Id)
+		require.Nil(t, resp.Data.AppVersion)
+		require.Nil(t, resp.Data.LatestSync)
+		require.Nil(t, resp.Data.CreatedAt)
+	})
+
+	t.Run("returns archived app data", func(t *testing.T) {
+		archived := app
+		archived.ArchivedAt = archivedAt
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(archived, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.NoError(t, err)
+		require.True(t, resp.Data.IsArchived)
+		require.Equal(t, archivedAt.UTC().Truncate(time.Microsecond), resp.Data.ArchivedAt.AsTime().Truncate(time.Microsecond))
+	})
+
+	t.Run("falls back to internal uuid when external id is missing", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, appID.String()).Return(App{InternalID: appID}, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: appID.String()})
+
+		require.NoError(t, err)
+		require.Equal(t, appID.String(), resp.Data.Id)
+	})
+
+	t.Run("requires app id", func(t *testing.T) {
+		service := NewService(ServiceOptions{Apps: &mockAppProvider{}})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "App ID is required")
+	})
+
+	t.Run("returns not implemented without app provider", func(t *testing.T) {
+		service := NewService(ServiceOptions{})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Get app is not yet implemented")
+	})
+
+	t.Run("returns not found when app is missing", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "missing-app").Return(App{}, fmt.Errorf("%w: missing-app", ErrAppNotFound)).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "missing-app"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "App not found")
+		require.Equal(t, codes.NotFound, status.Code(err))
+	})
+
+	t.Run("returns internal error when app lookup fails", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(App{}, errors.New("database unavailable")).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Unable to fetch app")
+		require.Equal(t, codes.Internal, status.Code(err))
+	})
+}
+
 func TestService_GetFunction(t *testing.T) {
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
@@ -443,6 +600,126 @@ func TestService_GetFunction(t *testing.T) {
 	})
 }
 
+func TestService_GetFunctions(t *testing.T) {
+	firstID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	secondID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	appID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	first := inngest.DeployedFunction{
+		ID:      firstID,
+		Slug:    "my-app-first-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "First function",
+			Slug: "first-fn",
+			Steps: []inngest.Step{{
+				ID: "step",
+			}},
+		},
+	}
+	second := inngest.DeployedFunction{
+		ID:      secondID,
+		Slug:    "my-app-second-fn",
+		AppID:   appID,
+		AppName: "my-app",
+		Function: inngest.Function{
+			Name: "Second function",
+			Slug: "second-fn",
+			Steps: []inngest.Step{{
+				ID: "step",
+			}},
+		},
+	}
+
+	t.Run("returns mapped function data and page", func(t *testing.T) {
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunctions", mock.Anything, "my-app", GetFunctionsOpts{
+			Limit: defaultFunctionsLimit,
+		}).Return(&GetFunctionsResult{
+			Functions: []inngest.DeployedFunction{first, second},
+		}, nil).Once()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Functions: functions})
+		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{AppId: "my-app"})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 2)
+		require.Equal(t, "first-fn", resp.Data[0].Id)
+		require.Equal(t, "First function", resp.Data[0].Name)
+		require.Equal(t, "my-app", resp.Data[0].App.Id)
+		require.False(t, resp.Page.HasMore)
+		require.Equal(t, int32(defaultFunctionsLimit), resp.Page.Limit)
+		require.Nil(t, resp.Page.Cursor)
+	})
+
+	t.Run("uses cursor and limit", func(t *testing.T) {
+		functions := &mockFunctionProvider{}
+		functions.On("GetFunctions", mock.Anything, "my-app", GetFunctionsOpts{
+			Cursor: firstID,
+			Limit:  1,
+		}).Return(&GetFunctionsResult{
+			Functions: []inngest.DeployedFunction{second},
+			HasMore:   true,
+		}, nil).Once()
+		t.Cleanup(func() {
+			functions.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Functions: functions})
+		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{
+			AppId:  "my-app",
+			Cursor: strPtr(firstID.String()),
+			Limit:  int32Ptr(1),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.True(t, resp.Page.HasMore)
+		require.Equal(t, secondID.String(), resp.Page.GetCursor())
+	})
+
+	t.Run("requires valid cursor", func(t *testing.T) {
+		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
+		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{
+			AppId:  "my-app",
+			Cursor: strPtr("not-a-uuid"),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Cursor is invalid")
+	})
+
+	t.Run("validates limit", func(t *testing.T) {
+		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
+		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{
+			AppId: "my-app",
+			Limit: int32Ptr(maxFunctionsLimit + 1),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Limit cannot exceed")
+	})
+
+	t.Run("returns not implemented without function provider", func(t *testing.T) {
+		service := NewService(ServiceOptions{})
+		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{AppId: "my-app"})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Get functions is not yet implemented")
+	})
+
+	t.Run("requires app id", func(t *testing.T) {
+		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
+		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "App ID is required")
+	})
+}
+
 func TestService_GetFunctionRun(t *testing.T) {
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 	functionID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
@@ -469,12 +746,12 @@ func TestService_GetFunctionRun(t *testing.T) {
 	}
 	functions := &mockFunctionProvider{}
 	functions.On("GetFunction", mock.Anything, functionID.String()).Return(fn, nil).Once()
-	runs := &mockFunctionRunReader{}
-	runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(run, nil).Once()
+	runs := &mockRunProvider{}
+	runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(run, nil).Once()
 
 	service := NewService(ServiceOptions{
-		Functions:    functions,
-		FunctionRuns: runs,
+		Functions: functions,
+		Runs:      runs,
 	})
 	t.Cleanup(func() {
 		functions.AssertExpectations(t)
@@ -516,15 +793,15 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("returns not found when run is missing", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(nil, errors.New("missing")).Once()
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(nil, errors.New("missing")).Once()
 		t.Cleanup(func() {
 			runs.AssertExpectations(t)
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    &mockFunctionProvider{},
-			FunctionRuns: runs,
+			Functions: &mockFunctionProvider{},
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -536,8 +813,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("returns not found when function is missing", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{}).Return(run, nil).Once()
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{}).Return(run, nil).Once()
 		functions := &mockFunctionProvider{}
 		functions.On("GetFunction", mock.Anything, functionID.String()).Return(inngest.DeployedFunction{}, errors.New("missing")).Once()
 		t.Cleanup(func() {
@@ -546,8 +823,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    functions,
-			FunctionRuns: runs,
+			Functions: functions,
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -568,8 +845,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		outputID, err := outputIdentifier.Encode()
 		require.NoError(t, err)
 
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
 			RunID:        runID,
 			RunStartedAt: startedAt,
 			FunctionID:   functionID,
@@ -596,7 +873,7 @@ func TestService_GetFunctionRun(t *testing.T) {
 
 		service := NewService(ServiceOptions{
 			Functions:      functions,
-			FunctionRuns:   runs,
+			Runs:           runs,
 			FunctionTraces: traces,
 		})
 
@@ -611,8 +888,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 
 	t.Run("does not fall back to run output", func(t *testing.T) {
-		runs := &mockFunctionRunReader{}
-		runs.On("GetFunctionRun", mock.Anything, runID, GetFunctionRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
+		runs := &mockRunProvider{}
+		runs.On("GetRun", mock.Anything, runID, GetRunOpts{IncludeOutput: true}).Return(&cqrs.FunctionRun{
 			RunID:        runID,
 			RunStartedAt: startedAt,
 			FunctionID:   functionID,
@@ -629,8 +906,8 @@ func TestService_GetFunctionRun(t *testing.T) {
 		})
 
 		service := NewService(ServiceOptions{
-			Functions:    functions,
-			FunctionRuns: runs,
+			Functions: functions,
+			Runs:      runs,
 		})
 
 		resp, err := service.GetFunctionRun(context.Background(), &apiv2.GetFunctionRunRequest{
@@ -643,15 +920,248 @@ func TestService_GetFunctionRun(t *testing.T) {
 	})
 }
 
+func TestService_ListRuns(t *testing.T) {
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	eventID := ulid.MustParse("01hp1zyb8p2nb5kvm2a6x1h9ae")
+	startedAt := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	endedAt := startedAt.Add(5 * time.Second)
+	from := startedAt.Add(-time.Hour)
+	until := startedAt.Add(time.Hour)
+	isDeferred := false
+	limit := int32(1)
+	pageCursor, err := (&cqrs.TracePageCursor{
+		ID: runID.String(),
+		Cursors: map[string]cqrs.TraceCursor{
+			"start_time": {Field: "start_time", Value: startedAt.UnixMicro()},
+		},
+	}).Encode()
+	require.NoError(t, err)
+
+	run := &RunListItem{
+		RunID:        runID,
+		Cursor:       "opaque-cursor",
+		RunStartedAt: startedAt,
+		EventID:      eventID,
+		Status:       enums.RunStatusCompleted,
+		EndedAt:      &endedAt,
+		FunctionID:   "test-fn",
+		FunctionName: "Test function",
+		AppID:        "my-app",
+	}
+
+	t.Run("returns mapped runs with filters", func(t *testing.T) {
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, GetRunsOpts{
+			Cursor:        pageCursor,
+			Limit:         1,
+			IncludeOutput: true,
+			From:          &from,
+			Until:         &until,
+			TimeField:     RunTimeFieldStartedAt,
+			Status:        []enums.RunStatus{enums.RunStatusCompleted},
+			AppIDs:        []string{"my-app"},
+			FunctionIDs:   []string{"test-fn"},
+			IsDeferred:    &isDeferred,
+			Order:         OrderDirectionAsc,
+		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, HasMore: true}, nil).Once()
+		t.Cleanup(func() {
+			reader.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: reader})
+		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
+			Cursor:        strPtr(pageCursor),
+			Limit:         &limit,
+			IncludeOutput: boolPtr(true),
+			From:          timestamppb.New(from),
+			Until:         timestamppb.New(until),
+			TimeField:     "startedAt",
+			Status:        []string{"COMPLETED"},
+			AppId:         []string{"my-app"},
+			FunctionId:    []string{"test-fn"},
+			IsDeferred:    &isDeferred,
+			Order:         "asc",
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.Equal(t, runID.String(), resp.Data[0].Id)
+		require.Equal(t, "test-fn", resp.Data[0].Function.Id)
+		require.Equal(t, "my-app", resp.Data[0].App.Id)
+		require.Equal(t, apiv2.FunctionRunStatus_FUNCTION_RUN_STATUS_COMPLETED, resp.Data[0].Status)
+		require.NotNil(t, resp.Metadata.TimeRange)
+		require.Equal(t, from, resp.Metadata.TimeRange.From.AsTime())
+		require.Equal(t, until, resp.Metadata.TimeRange.Until.AsTime())
+		require.True(t, resp.Page.HasMore)
+		require.Equal(t, "opaque-cursor", resp.Page.GetCursor())
+		require.Equal(t, int32(1), resp.Page.Limit)
+	})
+
+	t.Run("validates time range", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
+			From:  timestamppb.New(until),
+			Until: timestamppb.New(from),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "from must be before until")
+	})
+
+	t.Run("validates status", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
+			Status: []string{"FUNCTION_RUN_STATUS_UNSPECIFIED"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Status is invalid")
+	})
+
+	t.Run("requires app filter with function filter", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
+			FunctionId: []string{"test-fn"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "appId is required when filtering by functionId")
+	})
+
+	t.Run("validates cursor", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.ListRuns(context.Background(), &apiv2.ListRunsRequest{
+			Cursor: strPtr("not-a-cursor"),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Cursor is invalid")
+	})
+}
+
+func TestService_ListFunctionRuns(t *testing.T) {
+	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
+	eventID := ulid.MustParse("01hp1zyb8p2nb5kvm2a6x1h9ae")
+	startedAt := time.Date(2026, 7, 14, 12, 0, 0, 0, time.UTC)
+	limit := int32(20)
+	run := &RunListItem{
+		RunID:        runID,
+		Cursor:       "next-cursor",
+		RunStartedAt: startedAt,
+		EventID:      eventID,
+		Status:       enums.RunStatusCompleted,
+		FunctionID:   "hello-world",
+		FunctionName: "Hello world",
+		AppID:        "inngest-ai",
+	}
+
+	reader := &mockRunProvider{}
+	reader.On("GetRuns", mock.Anything, GetRunsOpts{
+		Cursor:      "",
+		Limit:       20,
+		TimeField:   RunTimeFieldQueuedAt,
+		Status:      []enums.RunStatus{},
+		AppIDs:      []string{"inngest ai"},
+		FunctionIDs: []string{"hello/world"},
+		Order:       OrderDirectionDesc,
+	}).Return(&GetRunsResult{Runs: []*RunListItem{run}}, nil).Once()
+	t.Cleanup(func() {
+		reader.AssertExpectations(t)
+	})
+
+	service := NewService(ServiceOptions{Runs: reader})
+	resp, err := service.ListFunctionRuns(context.Background(), &apiv2.ListFunctionRunsRequest{
+		AppId:      "inngest%20ai",
+		FunctionId: "hello%2Fworld",
+		Limit:      &limit,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, resp.Data, 1)
+	require.Equal(t, runID.String(), resp.Data[0].Id)
+	require.Equal(t, "hello-world", resp.Data[0].Function.Id)
+	require.Equal(t, "inngest-ai", resp.Data[0].App.Id)
+}
+
+func TestRunStatusesFromAPI(t *testing.T) {
+	got, err := runStatusesFromAPI([]string{"COMPLETED", "failed", "RUNNING", " queued "})
+
+	require.NoError(t, err)
+	require.Equal(t, []enums.RunStatus{
+		enums.RunStatusCompleted,
+		enums.RunStatusFailed,
+		enums.RunStatusRunning,
+		enums.RunStatusScheduled,
+	}, got)
+
+	_, err = runStatusesFromAPI([]string{"FUNCTION_RUN_STATUS_COMPLETED"})
+	require.ErrorContains(t, err, "Status is invalid")
+}
+
+func TestRunTimeFieldFromAPI(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  RunTimeField
+	}{
+		{name: "default", value: "", want: RunTimeFieldQueuedAt},
+		{name: "camel queued", value: "queuedAt", want: RunTimeFieldQueuedAt},
+		{name: "snake started", value: "started_at", want: RunTimeFieldStartedAt},
+		{name: "camel ended", value: "endedAt", want: RunTimeFieldEndedAt},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := runTimeFieldFromAPI(tc.value)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+
+	_, err := runTimeFieldFromAPI("FUNCTION_RUN_TIME_FIELD_STARTED_AT")
+	require.ErrorContains(t, err, "timeField is invalid")
+}
+
+func TestOrderDirectionFromAPI(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  OrderDirection
+	}{
+		{name: "default", value: "", want: OrderDirectionDesc},
+		{name: "lower asc", value: "asc", want: OrderDirectionAsc},
+		{name: "upper desc", value: "DESC", want: OrderDirectionDesc},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := orderDirectionFromAPI(tc.value)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, got)
+		})
+	}
+
+	_, err := orderDirectionFromAPI("ORDER_DIRECTION_ASC")
+	require.ErrorContains(t, err, "order is invalid")
+}
+
 func TestService_GetEventRuns(t *testing.T) {
 	eventID := ulid.MustParse("01hp1zyb8p2nb5kvm2a6x1h9ae")
 	runID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cy")
 	nextRunID := ulid.MustParse("01hp1zx8m3ng9vp6qn0xk7j4cz")
 	startedAt := time.Date(2026, 4, 9, 12, 0, 0, 0, time.UTC)
 	endedAt := startedAt.Add(2 * time.Second)
+	pageCursor, err := (&cqrs.TracePageCursor{
+		ID: runID.String(),
+		Cursors: map[string]cqrs.TraceCursor{
+			"start_time": {Field: "start_time", Value: startedAt.UnixMicro()},
+		},
+	}).Encode()
+	require.NoError(t, err)
 
 	run := &RunListItem{
 		RunID:        runID,
+		Cursor:       pageCursor,
 		RunStartedAt: startedAt,
 		EventID:      eventID,
 		Status:       enums.RunStatusCompleted,
@@ -672,7 +1182,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	}
 
 	t.Run("returns mapped event runs", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID:       eventID,
 			Limit:         defaultEventRunsLimit,
@@ -682,7 +1192,7 @@ func TestService_GetEventRuns(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId:       eventID.String(),
 			IncludeOutput: boolPtr(true),
@@ -703,21 +1213,21 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("passes pagination to reader", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
 			Limit:   1,
 		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, HasMore: true}, nil).Once()
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
-			Cursor:  runID,
+			Cursor:  pageCursor,
 			Limit:   1,
 		}).Return(&GetRunsResult{Runs: []*RunListItem{nextRun}}, nil).Once()
 		t.Cleanup(func() {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		limit := int32(1)
 
 		first, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
@@ -729,7 +1239,7 @@ func TestService_GetEventRuns(t *testing.T) {
 		require.Equal(t, runID.String(), first.Data[0].Id)
 		require.True(t, first.Page.HasMore)
 		require.NotNil(t, first.Page.Cursor)
-		require.Equal(t, runID.String(), first.Page.GetCursor())
+		require.Equal(t, pageCursor, first.Page.GetCursor())
 
 		second, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: eventID.String(),
@@ -752,7 +1262,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("validates event id format", func(t *testing.T) {
-		service := NewService(ServiceOptions{RunList: &mockRunsReader{}})
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: "not-a-ulid",
 		})
@@ -762,7 +1272,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("returns internal error when reader fails", func(t *testing.T) {
-		reader := &mockRunsReader{}
+		reader := &mockRunProvider{}
 		reader.On("GetRuns", mock.Anything, GetRunsOpts{
 			EventID: eventID,
 			Limit:   defaultEventRunsLimit,
@@ -771,7 +1281,7 @@ func TestService_GetEventRuns(t *testing.T) {
 			reader.AssertExpectations(t)
 		})
 
-		service := NewService(ServiceOptions{RunList: reader})
+		service := NewService(ServiceOptions{Runs: reader})
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
 			EventId: eventID.String(),
 		})
@@ -781,7 +1291,7 @@ func TestService_GetEventRuns(t *testing.T) {
 	})
 
 	t.Run("validates pagination", func(t *testing.T) {
-		service := NewService(ServiceOptions{RunList: &mockRunsReader{}})
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
 		invalidLimit := int32(maxEventRunsLimit + 1)
 
 		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
@@ -791,6 +1301,273 @@ func TestService_GetEventRuns(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Limit cannot exceed 40")
+	})
+
+	t.Run("rejects legacy run ID cursor", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.GetEventRuns(context.Background(), &apiv2.GetEventRunsRequest{
+			EventId: eventID.String(),
+			Cursor:  strPtr(runID.String()),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Cursor is invalid")
+	})
+}
+
+func TestService_Rerun(t *testing.T) {
+	runID := ulid.MustParse("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+	newRunID := ulid.MustParse("01BX5ZZKBKACTAV9WEVGEMMVRZ")
+
+	t.Run("reruns a run", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(newRunID, nil).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, newRunID.String(), resp.Data.RunId)
+		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("reruns from step", func(t *testing.T) {
+		input, err := structpb.NewList([]any{map[string]any{"foo": "bar"}})
+		require.NoError(t, err)
+
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{
+			FromStep: &RerunFromStep{
+				StepID: "step-1",
+				Input:  json.RawMessage(`[{"foo":"bar"}]`),
+			},
+		}).Return(newRunID, nil).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+			FromStep: &apiv2.RerunFromStep{
+				StepId: "step-1",
+				Input:  input,
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, newRunID.String(), resp.Data.RunId)
+	})
+
+	t.Run("requires run id", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run ID is required")
+	})
+
+	t.Run("validates run id format", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: "not-a-ulid",
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run ID must be a valid ULID")
+	})
+
+	t.Run("rejects empty from step opts", func(t *testing.T) {
+		service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId:    runID.String(),
+			FromStep: &apiv2.RerunFromStep{},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Step ID is required")
+	})
+
+	t.Run("maps missing run", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(ulid.ULID{}, ErrRunNotFound).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Run not found")
+	})
+
+	t.Run("maps cron rerun unsupported", func(t *testing.T) {
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, RerunOpts{}).Return(ulid.ULID{}, ErrCronRerunNotSupported).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Rerunning cron-triggered runs is not yet supported")
+	})
+
+	t.Run("maps missing rerun step", func(t *testing.T) {
+		opts := RerunOpts{FromStep: &RerunFromStep{StepID: "missing"}}
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, opts).Return(ulid.ULID{}, ErrRerunStepNotFound).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId:    runID.String(),
+			FromStep: &apiv2.RerunFromStep{StepId: "missing"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Step not found in original run")
+	})
+
+	t.Run("maps ambiguous rerun step", func(t *testing.T) {
+		opts := RerunOpts{FromStep: &RerunFromStep{StepID: "duplicate"}}
+		rerun := &mockRunProvider{}
+		rerun.On("Rerun", mock.Anything, runID, opts).Return(ulid.ULID{}, ErrRerunStepAmbiguous).Once()
+		t.Cleanup(func() {
+			rerun.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: rerun})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId:    runID.String(),
+			FromStep: &apiv2.RerunFromStep{StepId: "duplicate"},
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Step name matches multiple steps in original run")
+	})
+
+	t.Run("applies rate limit", func(t *testing.T) {
+		rateLimiter := &mockRateLimitProvider{}
+		rateLimiter.On("CheckRateLimit", mock.Anything, apiv2.V2_Rerun_FullMethodName).
+			Return(RateLimitResult{Limited: true}).Once()
+		t.Cleanup(func() {
+			rateLimiter.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Runs:              &mockRunProvider{},
+			RateLimitProvider: rateLimiter,
+		})
+		resp, err := service.Rerun(context.Background(), &apiv2.RerunRequest{
+			RunId: runID.String(),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "API rate limit exceeded")
+	})
+}
+
+func TestService_CancelRun(t *testing.T) {
+	runID := ulid.MustParse("01ARZ3NDEKTSV4RRFFQ69G5FAV")
+
+	t.Run("cancels a run", func(t *testing.T) {
+		provider := &mockRunProvider{}
+		provider.On("Cancel", mock.Anything, runID).Return(nil).Once()
+		t.Cleanup(func() {
+			provider.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Runs: provider})
+		resp, err := service.CancelRun(context.Background(), &apiv2.CancelRunRequest{
+			RunId: runID.String(),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, runID.String(), resp.Data.RunId)
+		require.NotNil(t, resp.Metadata.FetchedAt)
+	})
+
+	t.Run("validates run id", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			runID   string
+			message string
+		}{
+			{name: "missing", message: "Run ID is required"},
+			{name: "invalid", runID: "not-a-ulid", message: "Run ID must be a valid ULID"},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				service := NewService(ServiceOptions{Runs: &mockRunProvider{}})
+				resp, err := service.CancelRun(context.Background(), &apiv2.CancelRunRequest{RunId: test.runID})
+
+				require.Nil(t, resp)
+				require.ErrorContains(t, err, test.message)
+			})
+		}
+	})
+
+	t.Run("maps provider errors", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			err     error
+			message string
+		}{
+			{name: "missing run", err: ErrRunNotFound, message: "Run not found"},
+			{name: "already cancelled", err: ErrRunAlreadyCancelled, message: "Run is already cancelled"},
+			{name: "ended run", err: ErrRunEnded, message: "Cannot cancel an ended run"},
+			{name: "internal error", err: errors.New("failed"), message: "Unable to cancel run"},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				provider := &mockRunProvider{}
+				provider.On("Cancel", mock.Anything, runID).Return(test.err).Once()
+				t.Cleanup(func() {
+					provider.AssertExpectations(t)
+				})
+
+				service := NewService(ServiceOptions{Runs: provider})
+				resp, err := service.CancelRun(context.Background(), &apiv2.CancelRunRequest{RunId: runID.String()})
+
+				require.Nil(t, resp)
+				require.ErrorContains(t, err, test.message)
+			})
+		}
+	})
+
+	t.Run("applies rate limit", func(t *testing.T) {
+		rateLimiter := &mockRateLimitProvider{}
+		rateLimiter.On("CheckRateLimit", mock.Anything, apiv2.V2_CancelRun_FullMethodName).
+			Return(RateLimitResult{Limited: true}).Once()
+		t.Cleanup(func() {
+			rateLimiter.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{
+			Runs:              &mockRunProvider{},
+			RateLimitProvider: rateLimiter,
+		})
+		resp, err := service.CancelRun(context.Background(), &apiv2.CancelRunRequest{RunId: runID.String()})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "API rate limit exceeded")
 	})
 }
 

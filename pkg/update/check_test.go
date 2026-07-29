@@ -99,12 +99,8 @@ func TestShouldFetch(t *testing.T) {
 	}
 }
 
-func TestCheckFetchesAndCaches(t *testing.T) {
+func TestFetchLatestCachesLatest(t *testing.T) {
 	withTempCache(t)
-	// Force the env-var gate off so the test doesn't depend on host env.
-	for _, k := range []string{"INNGEST_NO_UPDATE_NOTIFIER", "NO_UPDATE_NOTIFIER", "DO_NOT_TRACK", "CI"} {
-		t.Setenv(k, "")
-	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{
@@ -118,14 +114,9 @@ func TestCheckFetchesAndCaches(t *testing.T) {
 	releasesAddr = srv.URL
 	t.Cleanup(func() { releasesAddr = oldAddr })
 
-	// Bypass the TTY gate inside disabled() — the fetch logic itself does
-	// not require a TTY, only the shared opt-out helper does. We test that
-	// helper separately; here we exercise the network path by calling the
-	// internals directly.
-	if !shouldFetch() {
-		t.Fatal("shouldFetch returned false with empty cache")
-	}
-	latest, url, err := fetchLatest(context.Background())
+	// Check() also applies opt-out and TTY gates. This covers the fetch ->
+	// writeCache -> Latest path underneath those gates.
+	latest, url, err := fetchLatest(context.Background(), MethodBinary)
 	if err != nil {
 		t.Fatalf("fetchLatest: %v", err)
 	}
@@ -142,6 +133,64 @@ func TestCheckFetchesAndCaches(t *testing.T) {
 	}
 }
 
+func TestFetchGitHubLatest(t *testing.T) {
+	withTempCache(t)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"tag_name": "v0.36.0",
+			"html_url": "https://example.test/releases/v0.36.0",
+		})
+	}))
+	defer srv.Close()
+
+	oldAddr := releasesAddr
+	releasesAddr = srv.URL
+	t.Cleanup(func() { releasesAddr = oldAddr })
+
+	// All non-Homebrew install methods should continue using GitHub releases.
+	for _, method := range []Method{MethodNPM, MethodBash, MethodBinary} {
+		t.Run(string(method), func(t *testing.T) {
+			latest, url, err := fetchLatest(context.Background(), method)
+			if err != nil {
+				t.Fatalf("fetchLatest: %v", err)
+			}
+			if latest != "0.36.0" {
+				t.Errorf("Latest version = %q, want %q", latest, "0.36.0")
+			}
+			if url != "https://example.test/releases/v0.36.0" {
+				t.Errorf("Latest url = %q", url)
+			}
+		})
+	}
+}
+
+func TestFetchHomebrewLatest(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`cask "inngest" do
+  version "0.37.0"
+  sha256 "abc123"
+end
+`))
+	}))
+	defer srv.Close()
+
+	oldAddr := homebrewCaskAddr
+	homebrewCaskAddr = srv.URL
+	t.Cleanup(func() { homebrewCaskAddr = oldAddr })
+
+	latest, url, err := fetchLatest(context.Background(), MethodHomebrew)
+	if err != nil {
+		t.Fatalf("fetchLatest: %v", err)
+	}
+	if latest != "0.37.0" {
+		t.Errorf("Latest version = %q, want %q", latest, "0.37.0")
+	}
+	if url != "https://github.com/inngest/inngest/releases/tag/v0.37.0" {
+		t.Errorf("Latest url = %q", url)
+	}
+}
+
 func TestCheckSilentOnHTTPError(t *testing.T) {
 	withTempCache(t)
 
@@ -155,7 +204,7 @@ func TestCheckSilentOnHTTPError(t *testing.T) {
 	t.Cleanup(func() { releasesAddr = oldAddr })
 
 	// Even calling the fetch directly, an HTTP error must not write cache.
-	if _, _, err := fetchLatest(context.Background()); err == nil {
+	if _, _, err := fetchLatest(context.Background(), MethodBinary); err == nil {
 		t.Fatal("fetchLatest succeeded on 500, want error")
 	}
 	if v, _ := Latest(); v != "" {

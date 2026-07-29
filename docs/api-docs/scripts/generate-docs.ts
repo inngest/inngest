@@ -8,7 +8,9 @@ const appRoot = resolve(import.meta.dirname, '..');
 const repoRoot = resolve(appRoot, '../..');
 
 type Operation = {
+  description?: string;
   requestBody?: { content?: Record<string, unknown> };
+  summary?: string;
   tags?: string[];
   [extension: `x-${string}`]: unknown;
 };
@@ -21,6 +23,25 @@ type OpenAPIDocument = {
 };
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'];
+
+const OPERATION_DOC_OVERRIDES: Record<string, Pick<Operation, 'description' | 'summary'>> = {
+  'GET /apps/{appId}/functions/{functionId}/experiments': {
+    description: 'Lists observed experiments for one function in the authenticated environment.',
+    summary: 'List experiments for a function',
+  },
+};
+
+function applyOperationDocOverrides(doc: OpenAPIDocument): OpenAPIDocument {
+  for (const [path, pathItem] of Object.entries(doc.paths ?? {})) {
+    for (const method of HTTP_METHODS) {
+      const op = pathItem[method];
+      if (!op) continue;
+      const override = OPERATION_DOC_OVERRIDES[`${method.toUpperCase()} ${path}`];
+      if (override) Object.assign(op, override);
+    }
+  }
+  return doc;
+}
 
 /**
  * Operations tagged with any of these names are stripped from the spec before
@@ -176,7 +197,9 @@ async function main() {
   );
   const v2Doc = preserveSpacedTagDisplayNames(
     applySoftTags(
-      hideTaggedOperations(JSON.parse(readFileSync(v2SpecPath, 'utf8')) as OpenAPIDocument)
+      applyOperationDocOverrides(
+        hideTaggedOperations(JSON.parse(readFileSync(v2SpecPath, 'utf8')) as OpenAPIDocument)
+      )
     )
   );
 

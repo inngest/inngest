@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { Error } from '@inngest/components/Error/Error';
 import { RiArrowDownSFill, RiArrowRightSFill } from '@remixicon/react';
+import { gql, type TypedDocumentNode } from 'urql';
 
-import { graphql } from '@/gql';
-import { MetricsScope } from '@/gql/graphql';
+import {
+  MetricsScope,
+  type VolumeMetricsQuery,
+  type VolumeMetricsQueryVariables,
+} from '@/gql/graphql';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
@@ -16,6 +20,10 @@ import {
   ConnectWorkerTotalCapacity,
 } from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
+import {
+  sumScopedMetricData,
+  sumScopedMetricsByGroup,
+} from './metricAggregation';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
@@ -33,9 +41,26 @@ export type MetricsFilters = {
   isMarketplace: boolean;
 };
 
-// accountConcurrency is the unscoped account-level gauge, read directly as a single series.
-// This avoids the gauge stacking problem where per-function maxes are summed (SYS-722).
-const GetVolumeMetrics = graphql(`
+type AllFunctionConcurrencyMetrics = {
+  metrics: Array<{
+    id: string;
+    data: Array<{
+      value: number;
+      bucket: string;
+    }>;
+  }>;
+};
+
+type VolumeMetricsWithAllFunctionConcurrencyQuery = {
+  workspace: VolumeMetricsQuery['workspace'] & {
+    allFunctionConcurrency: AllFunctionConcurrencyMetrics;
+  };
+};
+
+const GetVolumeMetrics: TypedDocumentNode<
+  VolumeMetricsWithAllFunctionConcurrencyQuery,
+  VolumeMetricsQueryVariables
+> = gql`
   query VolumeMetrics(
     $workspaceId: ID!
     $from: Time!
@@ -44,17 +69,23 @@ const GetVolumeMetrics = graphql(`
     $until: Time
     $scope: MetricsScope!
   ) {
-    accountConcurrency: metrics(opts: { name: "steps_running", from: $from, to: $until }) {
-      data {
-        bucket
-        value
-      }
-      from
-      to
-      granularity
-    }
-
     workspace(id: $workspaceId) {
+      allFunctionConcurrency: scopedMetrics(
+        filter: {
+          name: "steps_running"
+          scope: FN
+          from: $from
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          data {
+            value
+            bucket
+          }
+        }
+      }
       runsThroughput: scopedMetrics(
         filter: {
           name: "function_run_ended_total"
@@ -259,7 +290,7 @@ const GetVolumeMetrics = graphql(`
       }
     }
   }
-`);
+`;
 
 export const MetricsVolume = ({
   from,
@@ -268,6 +299,7 @@ export const MetricsVolume = ({
   selectedFns = [],
   autoRefresh = false,
   entities,
+  functions,
   scope,
   concurrencyLimit,
   isMarketplace = false,
@@ -298,6 +330,22 @@ export const MetricsVolume = ({
 
   error && console.error('Error fetcthing metrics data for', variables, error);
 
+  const accountConcurrency = data
+    ? sumScopedMetricData(data.workspace.allFunctionConcurrency.metrics)
+    : undefined;
+
+  const appConcurrency = data
+    ? sumScopedMetricsByGroup(
+        data.workspace.allFunctionConcurrency.metrics,
+        ({ id }) => functions[id]?.appID,
+      )
+    : undefined;
+
+  const concurrencyMetrics =
+    scope === MetricsScope.App
+      ? appConcurrency
+      : data?.workspace.stepRunning.metrics;
+
   return (
     <div className="item-start flex h-full w-full flex-col items-start">
       <div
@@ -322,12 +370,12 @@ export const MetricsVolume = ({
             <Backlog workspace={data?.workspace} entities={entities} />
 
             <Concurrency
-              workspace={data?.workspace}
+              metrics={concurrencyMetrics}
               entities={entities}
               isMarketplace={isMarketplace}
             />
             <AccountConcurrency
-              accountConcurrency={data?.accountConcurrency}
+              accountConcurrency={accountConcurrency}
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />

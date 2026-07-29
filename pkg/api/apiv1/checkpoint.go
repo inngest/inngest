@@ -240,6 +240,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 			EnvID:     auth.WorkspaceID(),
 			Steps:     input.Steps,
 			Metadata:  md,
+			Function:  &fn,
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error checkpointing sync steps", "error", err)

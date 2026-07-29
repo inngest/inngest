@@ -295,3 +295,23 @@ func (s *Service) QueryInsightsPrompt(ctx context.Context, req *apiv2.QueryInsig
 func (s *Service) QueryInsights(ctx context.Context, req *apiv2.QueryInsightsRequest) (*apiv2.QueryInsightsResponse, error) {
 	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Insights not implemented in OSS")
 }
+
+func (s *Service) ListExperiments(ctx context.Context, req *apiv2.ListExperimentsRequest) (*apiv2.ListExperimentsResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Experiments not implemented in OSS")
+}
+
+func (s *Service) GetExperiment(ctx context.Context, req *apiv2.GetExperimentRequest) (*apiv2.GetExperimentResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Experiments not implemented in OSS")
+}
+
+func (s *Service) ListSessionKeys(ctx context.Context, req *apiv2.ListSessionKeysRequest) (*apiv2.ListSessionKeysResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
+}
+
+func (s *Service) ListSessions(ctx context.Context, req *apiv2.ListSessionsRequest) (*apiv2.ListSessionsResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
+}
+
+func (s *Service) ListSessionRuns(ctx context.Context, req *apiv2.ListSessionRunsRequest) (*apiv2.ListSessionRunsResponse, error) {
+	return nil, s.base.NewError(http.StatusNotImplemented, apiv2base.ErrorNotImplemented, "Sessions not implemented in OSS")
+}

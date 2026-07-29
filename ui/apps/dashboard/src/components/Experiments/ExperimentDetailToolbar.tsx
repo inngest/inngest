@@ -137,7 +137,7 @@ export function ExperimentDetailToolbar({
         key={getRangeKey(range)}
         defaultValue={range}
         daysAgoMax={daysAgoMax}
-        minDuration={{ hours: 24 }}
+        minDuration={{ hours: 1 }}
         onDaysChange={onRangeChange}
       />
 

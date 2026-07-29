@@ -40,7 +40,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
       alignTop
       isOpen={isOpen}
       onClose={onClose}
-      className="mt-cmdk-margin max-w-2xl"
+      className="mt-cmdk-margin w-full max-w-2xl"
     >
       <Command
         label="Search by functions, events, apps and IDs"

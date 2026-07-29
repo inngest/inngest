@@ -207,9 +207,13 @@ func (f *http2FancyWriter) Push(target string, opts *http.PushOptions) error {
 }
 
 func (f *httpFancyWriter) ReadFrom(r io.Reader) (int64, error) {
-	if f.basicWriter.tee != nil {
+	if f.basicWriter.tee != nil || f.basicWriter.discard {
+		// Route through basicWriter.Write so that the tee and discard semantics
+		// are honored (the fast ReaderFrom path below would bypass both, writing
+		// straight to the original ResponseWriter). basicWriter.Write already
+		// increments basicWriter.bytes, so we must NOT add n again here (that
+		// would double-count).
 		n, err := io.Copy(&f.basicWriter, r)
-		f.basicWriter.bytes += int(n)
 		return n, err
 	}
 	rf := f.basicWriter.ResponseWriter.(io.ReaderFrom)

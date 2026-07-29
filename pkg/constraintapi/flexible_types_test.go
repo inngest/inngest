@@ -331,6 +331,140 @@ func TestFlexibleStringArray_InStruct(t *testing.T) {
 	}
 }
 
+func TestFlexibleConstraintUsageArray_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []scriptConstraintUsage
+		wantErr  bool
+	}{
+		{
+			name:     "empty array",
+			input:    "[]",
+			expected: []scriptConstraintUsage{},
+		},
+		{
+			name:     "empty object from Lua",
+			input:    "{}",
+			expected: []scriptConstraintUsage{},
+		},
+		{
+			name:  "populated array",
+			input: `[{"i":2,"u":3,"l":5}]`,
+			expected: []scriptConstraintUsage{
+				{Index: 2, Used: 3, Limit: 5},
+			},
+		},
+		{
+			name:     "null value",
+			input:    "null",
+			expected: nil,
+		},
+		{
+			name:    "non-empty object",
+			input:   `{"i":2,"u":3,"l":5}`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var usage flexibleConstraintUsageArray
+			err := json.Unmarshal([]byte(tt.input), &usage)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, []scriptConstraintUsage(usage))
+		})
+	}
+}
+
+func TestFlexibleCheckConstraintUsageArray_UnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []checkScriptConstraintUsage
+		wantErr  bool
+	}{
+		{
+			name:     "empty array",
+			input:    "[]",
+			expected: []checkScriptConstraintUsage{},
+		},
+		{
+			name:     "empty object from Lua",
+			input:    "{}",
+			expected: []checkScriptConstraintUsage{},
+		},
+		{
+			name:  "populated array",
+			input: `[{"u":3,"l":5}]`,
+			expected: []checkScriptConstraintUsage{
+				{Usage: 3, Limit: 5},
+			},
+		},
+		{
+			name:     "null value",
+			input:    "null",
+			expected: nil,
+		},
+		{
+			name:    "non-empty object",
+			input:   `{"u":3,"l":5}`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var usage flexibleCheckConstraintUsageArray
+			err := json.Unmarshal([]byte(tt.input), &usage)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, []checkScriptConstraintUsage(usage))
+		})
+	}
+}
+
+func TestScriptResponsesAcceptEmptyConstraintUsageObject(t *testing.T) {
+	t.Run("acquire", func(t *testing.T) {
+		var resp acquireScriptResponse
+		err := json.Unmarshal([]byte(`{"s":2,"cu":{},"lc":{},"ec":{},"d":{}}`), &resp)
+		require.NoError(t, err)
+		require.Empty(t, resp.ConstraintUsage)
+	})
+
+	t.Run("release", func(t *testing.T) {
+		var resp releaseScriptResponse
+		err := json.Unmarshal([]byte(`{"s":3,"cu":{},"sc":[],"d":{}}`), &resp)
+		require.NoError(t, err)
+		require.Empty(t, resp.ConstraintUsage)
+	})
+
+	t.Run("extend", func(t *testing.T) {
+		var resp extendLeaseScriptResponse
+		err := json.Unmarshal([]byte(`{"s":4,"cu":{},"sc":[],"d":{}}`), &resp)
+		require.NoError(t, err)
+		require.Empty(t, resp.ConstraintUsage)
+	})
+
+	t.Run("check", func(t *testing.T) {
+		var resp checkScriptResponse
+		err := json.Unmarshal([]byte(`{"s":1,"cu":{},"lc":{},"ec":{},"d":{}}`), &resp)
+		require.NoError(t, err)
+		require.Empty(t, resp.ConstraintUsage)
+	})
+}
+
 func TestFlexibleTypes_RealWorldScenarios(t *testing.T) {
 	// Test scenarios that mimic actual Lua script responses
 	t.Run("acquire script response with empty arrays", func(t *testing.T) {
@@ -474,4 +608,3 @@ func TestFlexibleTypes_TypeConversions(t *testing.T) {
 		require.Equal(t, 60, sum)
 	})
 }
-

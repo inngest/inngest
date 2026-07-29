@@ -449,6 +449,7 @@ func TestPerEventIdempotenceKeys(t *testing.T) {
 	// Append first event
 	res, err := bm.Append(context.Background(), bi, fn)
 	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
 	require.Equal(t, enums.BatchNew, res.Status)
 
 	// Verify per-event idem key was created (not the legacy sorted set)
@@ -460,6 +461,7 @@ func TestPerEventIdempotenceKeys(t *testing.T) {
 	// Same event should be rejected as duplicate
 	res, err = bm.Append(context.Background(), bi, fn)
 	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
 	require.Equal(t, enums.BatchNew, res.Status) // size == 1, so returns "new"
 
 	// Second event should work fine
@@ -467,6 +469,7 @@ func TestPerEventIdempotenceKeys(t *testing.T) {
 	bi2.EventID = ulid.MustNew(ulid.Now(), rand.Reader)
 	res, err = bm.Append(context.Background(), bi2, fn)
 	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
 	require.Equal(t, enums.BatchAppend, res.Status)
 
 	// Per-event keys should expire independently
@@ -476,6 +479,7 @@ func TestPerEventIdempotenceKeys(t *testing.T) {
 	// After expiry, same event ID can be appended again (TTL window passed)
 	res, err = bm.Append(context.Background(), bi, fn)
 	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
 	require.Equal(t, enums.BatchAppend, res.Status)
 }
 

@@ -180,4 +180,4 @@ if operationIdempotencyTTL > 0 then
 	call("SET", keyOperationIdempotency, encoded, "EX", tostring(operationIdempotencyTTL))
 end
 
-return encoded
+return { 0, encoded }

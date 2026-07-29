@@ -32,6 +32,7 @@ export const Search = forwardRef<HTMLInputElement, SearchProps>(
           }}
         />
         <button
+          type="button"
           className={cn(
             'text-muted hover:text-basis absolute bottom-0 right-2 top-0 my-auto',
             value.length ? 'block' : 'hidden'

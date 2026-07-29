@@ -14,7 +14,8 @@ import (
 // This is only used as an indicator as to whether to scan.
 type trackingSemaphore struct {
 	*semaphore.Weighted
-	counter int64
+	capacity int64
+	counter  int64
 }
 
 type TrackingSemaphore interface {
@@ -22,10 +23,15 @@ type TrackingSemaphore interface {
 	Acquire(ctx context.Context, n int64) error
 	Release(n int64)
 	Count() int64
+	Available() int64
 }
 
 func NewTrackingSemaphore(num int) TrackingSemaphore {
-	return &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(num))}
+	capacity := int64(num)
+	return &trackingSemaphore{
+		Weighted: semaphore.NewWeighted(capacity),
+		capacity: capacity,
+	}
 }
 
 func (t *trackingSemaphore) TryAcquire(n int64) bool {
@@ -51,4 +57,8 @@ func (t *trackingSemaphore) Release(n int64) {
 
 func (t *trackingSemaphore) Count() int64 {
 	return atomic.LoadInt64(&t.counter)
+}
+
+func (t *trackingSemaphore) Available() int64 {
+	return t.capacity - t.Count()
 }

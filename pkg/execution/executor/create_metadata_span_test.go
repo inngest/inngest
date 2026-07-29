@@ -24,13 +24,15 @@ import (
 
 // mockRunContext is a minimal RunContext implementation for testing createMetadataSpan.
 type mockRunContext struct {
-	md sv2.Metadata
+	md            sv2.Metadata
+	lifecycleItem queue.Item
+	httpClient    exechttp.RequestExecutor
 }
 
 func (m *mockRunContext) Metadata() *sv2.Metadata                                              { return &m.md }
 func (m *mockRunContext) DriverResponse() *state.DriverResponse                                { return nil }
 func (m *mockRunContext) Events() []json.RawMessage                                            { return nil }
-func (m *mockRunContext) HTTPClient() exechttp.RequestExecutor                                 { return nil }
+func (m *mockRunContext) HTTPClient() exechttp.RequestExecutor                                 { return m.httpClient }
 func (m *mockRunContext) ExecutionSpan() *meta.SpanReference                                   { return &meta.SpanReference{} }
 func (m *mockRunContext) ParentSpan() *meta.SpanReference                                      { return &meta.SpanReference{} }
 func (m *mockRunContext) GroupID() string                                                      { return "" }
@@ -42,7 +44,7 @@ func (m *mockRunContext) OnlyHasLazyOps() bool                                  
 func (m *mockRunContext) PriorityFactor() *int64                                               { return nil }
 func (m *mockRunContext) ConcurrencyKeys() []state.CustomConcurrency                           { return nil }
 func (m *mockRunContext) ParallelMode() enums.ParallelMode                                     { return 0 }
-func (m *mockRunContext) LifecycleItem() queue.Item                                            { return queue.Item{} }
+func (m *mockRunContext) LifecycleItem() queue.Item                                            { return m.lifecycleItem }
 func (m *mockRunContext) SetStatusCode(code int)                                               {}
 func (m *mockRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError)     {}
 func (m *mockRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {}

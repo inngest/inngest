@@ -3,8 +3,13 @@ import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-r
 import { RootProvider } from 'fumadocs-ui/provider/tanstack';
 
 import '@/app.css';
+import { SegmentPageTracking } from '@/components/SegmentPageTracking';
+import { segmentLoaderSnippet } from '@/lib/analytics';
 
 export const Route = createRootRoute({
+  head: () => ({
+    scripts: [{ children: segmentLoaderSnippet }],
+  }),
   component: RootComponent,
 });
 
@@ -26,6 +31,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="flex min-h-screen flex-col">
         <RootProvider>{children}</RootProvider>
+        <SegmentPageTracking />
         <Scripts />
       </body>
     </html>

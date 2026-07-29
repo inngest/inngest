@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _QueueItemConstraintReasonName = "constraint_api_uninitializedid_nilfeature_flag_disabledconstraint_api_error"
+const _QueueItemConstraintReasonName = "constraint_api_uninitializedid_nilfeature_flag_disabledconstraint_api_erroraccount_missing"
 
-var _QueueItemConstraintReasonIndex = [...]uint8{0, 28, 34, 55, 75}
+var _QueueItemConstraintReasonIndex = [...]uint8{0, 28, 34, 55, 75, 90}
 
-const _QueueItemConstraintReasonLowerName = "constraint_api_uninitializedid_nilfeature_flag_disabledconstraint_api_error"
+const _QueueItemConstraintReasonLowerName = "constraint_api_uninitializedid_nilfeature_flag_disabledconstraint_api_erroraccount_missing"
 
 func (i QueueItemConstraintReason) String() string {
 	if i < 0 || i >= QueueItemConstraintReason(len(_QueueItemConstraintReasonIndex)-1) {
@@ -29,9 +29,10 @@ func _QueueItemConstraintReasonNoOp() {
 	_ = x[QueueItemConstraintReasonIdNil-(1)]
 	_ = x[QueueItemConstraintReasonFeatureFlagDisabled-(2)]
 	_ = x[QueueItemConstraintReasonConstraintAPIError-(3)]
+	_ = x[QueueItemConstraintReasonAccountMissing-(4)]
 }
 
-var _QueueItemConstraintReasonValues = []QueueItemConstraintReason{QueueItemConstraintReasonConstraintAPIUninitialized, QueueItemConstraintReasonIdNil, QueueItemConstraintReasonFeatureFlagDisabled, QueueItemConstraintReasonConstraintAPIError}
+var _QueueItemConstraintReasonValues = []QueueItemConstraintReason{QueueItemConstraintReasonConstraintAPIUninitialized, QueueItemConstraintReasonIdNil, QueueItemConstraintReasonFeatureFlagDisabled, QueueItemConstraintReasonConstraintAPIError, QueueItemConstraintReasonAccountMissing}
 
 var _QueueItemConstraintReasonNameToValueMap = map[string]QueueItemConstraintReason{
 	_QueueItemConstraintReasonName[0:28]:       QueueItemConstraintReasonConstraintAPIUninitialized,
@@ -42,6 +43,8 @@ var _QueueItemConstraintReasonNameToValueMap = map[string]QueueItemConstraintRea
 	_QueueItemConstraintReasonLowerName[34:55]: QueueItemConstraintReasonFeatureFlagDisabled,
 	_QueueItemConstraintReasonName[55:75]:      QueueItemConstraintReasonConstraintAPIError,
 	_QueueItemConstraintReasonLowerName[55:75]: QueueItemConstraintReasonConstraintAPIError,
+	_QueueItemConstraintReasonName[75:90]:      QueueItemConstraintReasonAccountMissing,
+	_QueueItemConstraintReasonLowerName[75:90]: QueueItemConstraintReasonAccountMissing,
 }
 
 var _QueueItemConstraintReasonNames = []string{
@@ -49,6 +52,7 @@ var _QueueItemConstraintReasonNames = []string{
 	_QueueItemConstraintReasonName[28:34],
 	_QueueItemConstraintReasonName[34:55],
 	_QueueItemConstraintReasonName[55:75],
+	_QueueItemConstraintReasonName[75:90],
 }
 
 // QueueItemConstraintReasonString retrieves an enum value from the enum constants string name.

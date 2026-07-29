@@ -51,15 +51,40 @@ var (
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
 	ErrFunctionPaused     = fmt.Errorf("function is paused")
 	ErrStateOverflowed    = fmt.Errorf("state is too large")
+	// ErrTimeoutTooLong is returned when a sleep or wait is scheduled further
+	// into the future than the maximum allowed duration (one year).
+	ErrTimeoutTooLong = fmt.Errorf("timeout exceeds the maximum duration")
 	// Error Connect Retry Errors
 	ErrConnectWorkerCapacity = fmt.Errorf("connect workers at capacity")
 )
+
+// IsMigration signals JIT-migration source cleanup; backends must skip pause
+// cleanup since the run is still ongoing.
+type DeleteOpts struct {
+	IsMigration bool
+}
+
+type DeleteOption func(*DeleteOpts)
+
+func WithIsMigration() DeleteOption {
+	return func(o *DeleteOpts) { o.IsMigration = true }
+}
+
+func ApplyDeleteOpts(opts []DeleteOption) DeleteOpts {
+	var o DeleteOpts
+	for _, fn := range opts {
+		fn(&o)
+	}
+	return o
+}
 
 const (
 	// InngestErrFunctionOverflowed is the public error code for ErrFunctionOverflowed
 	InngestErrFunctionOverflowed = "InngestErrFunctionOverflowed"
 	// InngestErrStateOverflowed is the public error code for ErrStateOverflowed
 	InngestErrStateOverflowed = "InngestErrStateOverflowed"
+	// InngestErrTimeoutTooLong is the public error code for ErrTimeoutTooLong
+	InngestErrTimeoutTooLong = "InngestErrTimeoutTooLong"
 )
 
 // Identifier represents the unique identifier for a workflow run.
@@ -397,7 +422,7 @@ type Mutater interface {
 	UpdateMetadata(ctx context.Context, accountId uuid.UUID, runID ulid.ULID, md MetadataUpdate) error
 
 	// Delete removes state from the state store.
-	Delete(ctx context.Context, i Identifier) error
+	Delete(ctx context.Context, i Identifier, opts ...DeleteOption) error
 
 	// SetStatus sets a status specifically.
 	SetStatus(ctx context.Context, i Identifier, status enums.RunStatus) error

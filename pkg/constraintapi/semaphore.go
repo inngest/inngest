@@ -45,9 +45,9 @@ type SemaphoreConstraint struct {
 	//   fnkey:<xxhash(fnID + expression)> — hash of function ID & unevaluated expression
 	ID string
 
-	// UsageValue is the xxhash of the *evaluated* expression, if the semaphore was created via
+	// EvaluatedKeyHash is the xxhash of the *evaluated* expression, if the semaphore was created via
 	// expressions.  This allows arbitrary expressions per fn for semaphores.
-	UsageValue string
+	EvaluatedKeyHash string
 
 	// Weight is the number of units to acquire from the semaphore (default 1).
 	Weight int64
@@ -57,7 +57,7 @@ type SemaphoreConstraint struct {
 }
 
 func (s *SemaphoreConstraint) UsageKey(accountID uuid.UUID) string {
-	return fmt.Sprintf("{cs}:%s:sem:%s:usage:%s", accountScope(accountID), s.ID, s.UsageValue)
+	return fmt.Sprintf("{cs}:%s:sem:%s:usage:%s", accountScope(accountID), s.ID, s.EvaluatedKeyHash)
 }
 
 func (s *SemaphoreConstraint) CapacityKey(accountID uuid.UUID) string {
@@ -65,8 +65,8 @@ func (s *SemaphoreConstraint) CapacityKey(accountID uuid.UUID) string {
 }
 
 func (s *SemaphoreConstraint) PrettyString() string {
-	if s.UsageValue != "" {
-		return fmt.Sprintf("id %s, usage_value %s, weight %d, release %d", s.ID, s.UsageValue, s.Weight, s.Release)
+	if s.EvaluatedKeyHash != "" {
+		return fmt.Sprintf("id %s, evaluated_key_hash %s, weight %d, release %d", s.ID, s.EvaluatedKeyHash, s.Weight, s.Release)
 	}
 	return fmt.Sprintf("id %s, weight %d, release %d", s.ID, s.Weight, s.Release)
 }

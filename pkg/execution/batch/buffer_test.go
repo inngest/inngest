@@ -240,6 +240,7 @@ func TestBufferedBatchManager(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
+		require.NotEmpty(t, result.BatchID)
 		require.Equal(t, enums.BatchAppend, result.Status) // Buffer handles scheduling internally
 
 		// Should have waited for timer (100ms)
@@ -293,6 +294,7 @@ func TestBufferedBatchManager(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			require.NoError(t, errors[i])
 			require.NotNil(t, results[i])
+			require.NotEmpty(t, results[i].BatchID)
 		}
 
 		// Verify all items are in Redis
@@ -342,6 +344,7 @@ func TestBufferedBatchManager(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.Equal(t, enums.BatchItemExists, result.Status)
+		require.NotEmpty(t, result.BatchID)
 	})
 
 	t.Run("context cancellation unblocks", func(t *testing.T) {
@@ -467,6 +470,7 @@ func TestBufferedBatchManager(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
+		require.NotEmpty(t, result.BatchID)
 		// Should be fast (no buffering delay)
 		require.Less(t, elapsed, 50*time.Millisecond)
 
@@ -586,6 +590,7 @@ func TestBufferedFlushDurationClamping(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
+		require.NotEmpty(t, result.BatchID)
 		require.Equal(t, enums.BatchAppend, result.Status) // Buffer handles scheduling internally
 
 		// Should have flushed at ~100ms (function timeout), not 5s (buffer max)
@@ -624,6 +629,7 @@ func TestBufferedFlushDurationClamping(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, result)
+		require.NotEmpty(t, result.BatchID)
 		require.Equal(t, enums.BatchAppend, result.Status) // Buffer handles scheduling internally
 
 		// Should have flushed at ~100ms (buffer max), not waiting for 60s
@@ -675,11 +681,13 @@ func TestBufferedIdempotence(t *testing.T) {
 		// First append - should succeed (buffer handles scheduling, returns Append status)
 		result1, err := buffered.Append(context.Background(), bi, fn)
 		require.NoError(t, err)
+		require.NotEmpty(t, result1.BatchID)
 		require.Equal(t, enums.BatchAppend, result1.Status)
 
 		// Second append with same eventID - should be detected as duplicate by Redis
 		result2, err := buffered.Append(context.Background(), bi, fn)
 		require.NoError(t, err)
+		require.NotEmpty(t, result2.BatchID)
 		require.Equal(t, enums.BatchItemExists, result2.Status)
 
 		// Verify only 1 item in Redis
@@ -764,6 +772,9 @@ func TestBufferedIdempotence(t *testing.T) {
 		require.NoError(t, errs[2])
 
 		// With buffering, scheduling is handled internally so all non-duplicate items return Append
+		require.NotEmpty(t, results[0].BatchID)
+		require.NotEmpty(t, results[1].BatchID)
+		require.NotEmpty(t, results[2].BatchID)
 		require.Equal(t, enums.BatchAppend, results[0].Status)
 		require.Equal(t, enums.BatchAppend, results[1].Status)
 		require.Equal(t, enums.BatchItemExists, results[2].Status)
@@ -835,6 +846,7 @@ func TestBufferedBatchFull(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			require.NoError(t, errs[i], "append %d failed", i)
 			require.NotNil(t, results[i], "result %d is nil", i)
+			require.NotEmpty(t, results[i].BatchID, "result %d should include batch ID", i)
 			require.Equal(t, enums.BatchAppend, results[i].Status, "result %d should be BatchAppend", i)
 		}
 
@@ -894,6 +906,7 @@ func TestBufferedBatchFull(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			require.NoError(t, errs[i], "append %d failed", i)
 			require.NotNil(t, results[i], "result %d is nil", i)
+			require.NotEmpty(t, results[i].BatchID, "result %d should include batch ID", i)
 		}
 
 		// All 5 events should be committed (3 in first batch, 2 in overflow)
@@ -947,8 +960,10 @@ func TestBufferedBatchManagerMultipleBufferKeys(t *testing.T) {
 				EventID:     ulid.MustNew(ulid.Now(), rand.Reader),
 				Event:       event.Event{Name: "test/event", Data: map[string]any{"tenant": tenantName}},
 			}
-			_, appendErr := buffered.Append(context.Background(), bi, fn)
+			result, appendErr := buffered.Append(context.Background(), bi, fn)
 			require.NoError(t, appendErr)
+			require.NotNil(t, result)
+			require.NotEmpty(t, result.BatchID)
 		}(tenant)
 	}
 
@@ -1027,6 +1042,7 @@ func TestBufferedByteSize(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			require.NoError(t, errs[i], "append %d failed", i)
 			require.NotNil(t, results[i], "result %d is nil", i)
+			require.NotEmpty(t, results[i].BatchID, "result %d should include batch ID", i)
 		}
 
 		// Should have flushed quickly via byte-size, not waited 5s for timer
@@ -1074,8 +1090,10 @@ func TestBufferedByteSize(t *testing.T) {
 			wg1.Add(1)
 			go func() {
 				defer wg1.Done()
-				_, appendErr := buffered.Append(context.Background(), makeLargeItem(), fn)
+				result, appendErr := buffered.Append(context.Background(), makeLargeItem(), fn)
 				require.NoError(t, appendErr)
+				require.NotNil(t, result)
+				require.NotEmpty(t, result.BatchID)
 			}()
 		}
 		wg1.Wait()
@@ -1087,8 +1105,10 @@ func TestBufferedByteSize(t *testing.T) {
 			wg2.Add(1)
 			go func() {
 				defer wg2.Done()
-				_, appendErr := buffered.Append(context.Background(), makeLargeItem(), fn)
+				result, appendErr := buffered.Append(context.Background(), makeLargeItem(), fn)
 				require.NoError(t, appendErr)
+				require.NotNil(t, result)
+				require.NotEmpty(t, result.BatchID)
 			}()
 		}
 		wg2.Wait()

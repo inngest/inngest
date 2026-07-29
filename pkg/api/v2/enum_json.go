@@ -11,6 +11,7 @@ import (
 )
 
 var responseEnumPrefixes = []string{
+	"APP_METHOD_",
 	"FUNCTION_RUN_STATUS_",
 	"FUNCTION_TRIGGER_TYPE_",
 	"FUNCTION_CONCURRENCY_SCOPE_",

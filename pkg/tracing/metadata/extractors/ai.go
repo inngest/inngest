@@ -24,12 +24,12 @@ const (
 type AIMetadata struct {
 	InputTokens   int64  `json:"input_tokens"`
 	OutputTokens  int64  `json:"output_tokens"`
-	Model         string `json:"model"`
-	System        string `json:"system"`
+	RequestModel  string `json:"request_model"`
+	Provider      string `json:"provider"`
 	OperationName string `json:"operation_name"`
 
 	// Response identity. ResponseModel is the model that served the request (may
-	// differ from the requested Model, e.g. a dated snapshot). FinishReasons is
+	// differ from the RequestModel, e.g. a dated snapshot). FinishReasons is
 	// stored raw per emitter — note OpenAI's native "tool_calls" is emitted as
 	// the singular "tool_call" by some instrumentations.
 	ResponseModel string   `json:"response_model,omitempty"`
@@ -39,6 +39,22 @@ type AIMetadata struct {
 	LatencyMs     *int64   `json:"latency_ms,omitempty"`
 	TotalTokens   *int64   `json:"total_tokens,omitempty"`
 	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
+
+	// Granular token usage. Cache semantics differ by provider: OpenAI reports
+	// cached tokens as a subset of InputTokens, whereas Anthropic reports them
+	// additively — values are stored raw and left unreconciled.
+	CacheReadTokens     *int64 `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens *int64 `json:"cache_creation_tokens,omitempty"`
+	ReasoningTokens     *int64 `json:"reasoning_tokens,omitempty"`
+
+	// Request parameters. Pointers so an explicit zero (e.g. temperature 0 or
+	// seed 0) is distinguishable from an absent attribute.
+	Temperature      *float64 `json:"temperature,omitempty"`
+	TopP             *float64 `json:"top_p,omitempty"`
+	MaxTokens        *int64   `json:"max_tokens,omitempty"`
+	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty"`
+	PresencePenalty  *float64 `json:"presence_penalty,omitempty"`
+	Seed             *int64   `json:"seed,omitempty"`
 }
 
 func (ms AIMetadata) Kind() metadata.Kind {
@@ -94,16 +110,17 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 	}
 
 	aiMd := &AIMetadata{
-		Model:         parsedInput.Model,
-		System:        req.Format,
+		RequestModel:  parsedInput.Model,
+		ResponseModel: parsedOutput.Model,
+		Provider:      req.Format,
 		OperationName: "",
 
-		InputTokens:   inputTokens,
-		OutputTokens:  outputTokens,
-		TotalTokens:   &totalTokens,
-		EstimatedCost: EstimateCost(parsedInput.Model, inputTokens, outputTokens),
-		LatencyMs:     latencyMs,
+		InputTokens:  inputTokens,
+		OutputTokens: outputTokens,
+		TotalTokens:  &totalTokens,
+		LatencyMs:    latencyMs,
 	}
+	backfillEstimatedCost(aiMd)
 
 	return []metadata.Structured{
 		aiMd,
@@ -195,13 +212,15 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		return nil, nil
 	}
 
-	// get model name, try response.modelId first, then request.body.model
-	var model string
+	var requestModel string
+	var responseModel string
 	if firstStep != nil {
 		if firstStep.Response != nil && firstStep.Response.ModelID != "" {
-			model = firstStep.Response.ModelID
-		} else if firstStep.Request != nil && firstStep.Request.Body.Model != "" {
-			model = firstStep.Request.Body.Model
+			responseModel = firstStep.Response.ModelID
+		}
+
+		if firstStep.Request != nil && firstStep.Request.Body.Model != "" {
+			requestModel = firstStep.Request.Body.Model
 		}
 	}
 
@@ -227,11 +246,12 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 		InputTokens:   inputTokens,
 		OutputTokens:  outputTokens,
 		TotalTokens:   &totalTokens,
-		Model:         model,
-		System:        "vercel-ai",
+		RequestModel:  requestModel,
+		ResponseModel: responseModel,
+		Provider:      "vercel-ai",
 		LatencyMs:     latencyMs,
-		EstimatedCost: EstimateCost(model, inputTokens, outputTokens),
 	}
+	backfillEstimatedCost(aiMd)
 
 	return []metadata.Structured{aiMd}, nil
 }
@@ -301,6 +321,67 @@ var modelPricing = map[string]ModelPricing{
 	"command-r":      {0.50, 1.50},
 	"command":        {1.00, 2.00},
 	"command-light":  {0.30, 0.60},
+}
+
+// estimatedCostForTokens prefers the response model (the model that actually
+// served the request) for cost estimation, falling back to the requested
+// model.
+func estimatedCostForTokens(responseModel, requestModel string, inputTokens, outputTokens int64) *float64 {
+	costModel := responseModel
+	if costModel == "" {
+		costModel = requestModel
+	}
+	return EstimateCost(costModel, inputTokens, outputTokens)
+}
+
+// backfillEstimatedCost sets md.EstimatedCost from model + token usage only
+// when it isn't already populated — so an extractor that already supplies
+// its own EstimatedCost (e.g. a provider-reported cost) is never
+// overwritten. Every AIMetadata construction site should call this instead
+// of computing cost inline, so the response-model-preferred-over-request-model
+// rule lives in one place.
+func backfillEstimatedCost(md *AIMetadata) {
+	if md.EstimatedCost != nil {
+		return
+	}
+	md.EstimatedCost = estimatedCostForTokens(md.ResponseModel, md.RequestModel, md.InputTokens, md.OutputTokens)
+}
+
+// BackfillEstimatedCostInValues fills an "estimated_cost" entry into raw
+// "inngest.ai" metadata values when one isn't already present. Unlike
+// backfillEstimatedCost, this operates on untyped metadata.Values — the shape
+// AI metadata takes when it's submitted directly by an SDK or API caller
+// (e.g. inngest.metadata.update or the AddRunMetadata API) rather than
+// produced by the extractor functions above, so it never passes through an
+// AIMetadata struct at all.
+func BackfillEstimatedCostInValues(values metadata.Values) {
+	if values == nil {
+		return
+	}
+
+	if raw, ok := values["estimated_cost"]; ok {
+		var existing *float64
+		if err := json.Unmarshal(raw, &existing); err == nil && existing != nil {
+			return
+		}
+	}
+
+	var inputTokens, outputTokens int64
+	_ = json.Unmarshal(values["input_tokens"], &inputTokens)
+	_ = json.Unmarshal(values["output_tokens"], &outputTokens)
+
+	var responseModel, requestModel string
+	_ = json.Unmarshal(values["response_model"], &responseModel)
+	_ = json.Unmarshal(values["request_model"], &requestModel)
+
+	cost := estimatedCostForTokens(responseModel, requestModel, inputTokens, outputTokens)
+	if cost == nil {
+		return
+	}
+
+	if b, err := json.Marshal(cost); err == nil {
+		values["estimated_cost"] = b
+	}
 }
 
 // EstimateCost calculates the estimated cost in USD for the given model and token counts

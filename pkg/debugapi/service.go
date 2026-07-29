@@ -32,25 +32,27 @@ func NewDebugAPI(o Opts) service.Service {
 		port:         port,
 		log:          o.Log,
 		db:           o.DB,
-		queue:        o.Queue,
+		queueReader:  o.QueueReader,
 		state:        o.State,
 		croner:       o.Cron,
 		shards:       o.ShardRegistry,
 		pm:           o.PauseManager,
 		cm:           o.CapacityManager,
+		sm:           o.SemaphoreManager,
 		batchManager: o.BatchManager,
 		debouncer:    o.Debouncer,
 	}
 }
 
 type Opts struct {
-	Log             logger.Logger
-	DB              cqrs.Manager
-	Queue           queue.QueueManager
-	State           state.Manager
-	Cron            cron.CronManager
-	PauseManager    pauses.Manager
-	CapacityManager constraintapi.CapacityManager
+	Log              logger.Logger
+	DB               cqrs.Manager
+	QueueReader      queue.JobQueueReader
+	State            state.Manager
+	Cron             cron.CronManager
+	PauseManager     pauses.Manager
+	CapacityManager  constraintapi.CapacityManager
+	SemaphoreManager constraintapi.SemaphoreManager
 
 	ShardRegistry queue.ShardRegistry
 
@@ -69,12 +71,13 @@ type debugAPI struct {
 	log    logger.Logger
 	shards queue.ShardRegistry
 
-	db     cqrs.Manager
-	queue  queue.QueueManager
-	state  state.Manager
-	croner cron.CronManager
-	pm     pauses.Manager
-	cm     constraintapi.CapacityManager
+	db          cqrs.Manager
+	queueReader queue.JobQueueReader
+	state       state.Manager
+	croner      cron.CronManager
+	pm          pauses.Manager
+	cm          constraintapi.CapacityManager
+	sm          constraintapi.SemaphoreManager
 
 	// Dependencies for batching and debounce insights
 	batchManager batch.BatchManager

@@ -142,10 +142,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 			break
 		}
 	}
-	// Since blockStore.Delete only marks the pause for deletion and doesn't immediately remove it
-	// from the block, we can't assert \!found here. In a real implementation,
-	// this would eventually be removed during compaction.
-	require.True(t, found)
+	require.False(t, found)
 }
 
 func TestConsumePause(t *testing.T) {
@@ -356,8 +353,16 @@ func (m *mockRunService) Create(ctx context.Context, s statev2.CreateState) (sta
 	return statev2.State{}, nil
 }
 
-func (m *mockRunService) Delete(ctx context.Context, id statev2.ID) error {
+func (m *mockRunService) Delete(ctx context.Context, id statev2.ID, opts ...statev2.DeleteOption) error {
 	return nil
+}
+
+func (m *mockRunService) Migrate(ctx context.Context, s statev2.MigrateState) error {
+	return nil
+}
+
+func (m *mockRunService) LookupIdempotency(ctx context.Context, id statev2.ID, key string) (*statev2.IdempotencyEntry, error) {
+	return nil, nil
 }
 
 func (m *mockRunService) Exists(ctx context.Context, id statev2.ID) (bool, error) {
@@ -376,7 +381,7 @@ func (m *mockRunService) SavePending(ctx context.Context, id statev2.ID, pending
 	return nil
 }
 
-func (m *mockRunService) LoadMetadata(ctx context.Context, id statev2.ID) (statev2.Metadata, error) {
+func (m *mockRunService) LoadMetadata(ctx context.Context, id statev2.ID, _ ...statev2.LoadMetadataOption) (statev2.Metadata, error) {
 	return statev2.Metadata{}, nil
 }
 
@@ -397,6 +402,10 @@ func (m *mockRunService) LoadStepsWithIDs(ctx context.Context, id statev2.ID, st
 }
 
 func (m *mockRunService) LoadStack(ctx context.Context, id statev2.ID) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockRunService) LoadPending(ctx context.Context, id statev2.ID) ([]string, error) {
 	return nil, nil
 }
 

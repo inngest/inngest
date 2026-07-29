@@ -9,22 +9,44 @@ import (
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
 )
 
-func (q *queueProcessor) Migrate(ctx context.Context, sourceShardName string, scope Scope, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error) {
+type queueMigrator struct {
+	shards QueueShardRegistry
+	clock  clockwork.Clock
+}
+
+func newQueueMigrator(shards QueueShardRegistry, clock clockwork.Clock) Migrator {
+	return &queueMigrator{
+		shards: shards,
+		clock:  clock,
+	}
+}
+
+func (m *queueMigrator) SetFunctionMigrate(ctx context.Context, sourceShard string, scope Scope, migrateLockUntil *time.Time) error {
+	shard, err := m.shards.ByName(sourceShard)
+	if err != nil {
+		return fmt.Errorf("could not find shard %q", sourceShard)
+	}
+
+	return shard.SetFunctionMigrate(ctx, scope, migrateLockUntil)
+}
+
+func (m *queueMigrator) Migrate(ctx context.Context, sourceShardName string, scope Scope, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error) {
 	l := logger.StdlibLogger(ctx)
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "MigrationPeek"), redis_telemetry.ScopeQueue)
 
-	shard, err := q.shards.ByName(sourceShardName)
+	shard, err := m.shards.ByName(sourceShardName)
 	if err != nil {
 		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
 	}
 
 	from := time.Time{}
 	// setting it to 5 years ahead should be enough to cover all queue items in the partition
-	until := q.Clock().Now().Add(24 * time.Hour * 365 * 5)
+	until := m.clock.Now().Add(24 * time.Hour * 365 * 5)
 	items, err := shard.ItemsByPartition(ctx, scope, scope.FunctionID.String(), from, until,
 		WithQueueItemIterBatchSize(limit),
 	)

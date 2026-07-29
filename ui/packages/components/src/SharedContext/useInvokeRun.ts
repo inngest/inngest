@@ -7,6 +7,7 @@ export interface InvokeRunPayload {
   functionSlug: string;
   data: Record<string, unknown>;
   user: Record<string, unknown> | null;
+  meta?: { sessions: Record<string, string> } | null;
   debugSessionID?: string;
   debugRunID?: string;
 }

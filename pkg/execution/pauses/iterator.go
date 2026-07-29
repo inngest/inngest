@@ -2,6 +2,7 @@ package pauses
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -316,6 +317,15 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 		return
 	}
 	start := time.Now()
+	success := false
+	defer func() {
+		d.l.Lock()
+		defer d.l.Unlock()
+		delete(d.inflightBlocks, id)
+		if success {
+			d.fetchedBlocks[id] = struct{}{}
+		}
+	}()
 
 	block, err := d.blockReader.ReadBlock(ctx, d.idx, id)
 	// TODO: Maybe we should retry if it's a retriable error
@@ -334,20 +344,44 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 	}
 
 	if block == nil {
+		success = true
 		return
 	}
 
-	// TODO:  Here we can optionally filter out deleted pauses from
-	// the delete buffer.
+	// Deleted IDs are authoritative for compacted blocks: a block may retain a
+	// deleted pause as a phantom boundary marker, but iteration must not return
+	// it as live work. Fail closed on lookup errors so callers retry instead of
+	// potentially resuming a deleted pause.
+	deletedIDs, _, err := d.blockReader.GetBlockDeletedIDs(ctx, d.idx, id)
+	if err != nil {
+		if d.err == nil {
+			d.l.Lock()
+			d.err = err
+			d.l.Unlock()
+		}
+
+		metrics.HistogramPauseBlockFetchLatency(ctx, time.Since(start), metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"success": false},
+		})
+		return
+	}
+	if len(deletedIDs) > 0 {
+		deleted := make(map[string]struct{}, len(deletedIDs))
+		for _, pauseID := range deletedIDs {
+			deleted[pauseID] = struct{}{}
+		}
+		block.Pauses = slices.DeleteFunc(block.Pauses, func(pause *state.Pause) bool {
+			_, ok := deleted[pause.ID.String()]
+			return ok
+		})
+	}
 
 	d.l.Lock()
 	defer d.l.Unlock()
-	// Remove this from in-flight stuff.
-	delete(d.inflightBlocks, id)
-	// Add to fetched blocks to keep track of already processed blocks.
-	d.fetchedBlocks[id] = struct{}{}
 	// And, of course, add our pauses so that we can iterate through them.
 	d.pauses = append(d.pauses, block.Pauses...)
+	success = true
 
 	metrics.HistogramPauseBlockFetchLatency(ctx, time.Since(start), metrics.HistogramOpt{
 		PkgName: pkgName,

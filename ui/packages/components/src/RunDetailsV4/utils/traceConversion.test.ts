@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Trace } from '../types';
-import { traceToTimelineData } from './traceConversion';
+import { traceRollup, traceToTimelineData } from './traceConversion';
 
 describe('traceConversion', () => {
   // Helper to create a minimal valid trace
@@ -18,6 +18,7 @@ describe('traceConversion', () => {
     name: 'test-step',
     outputID: null,
     queuedAt: '2024-01-01T00:00:00Z',
+    scheduledAt: '2024-01-01T00:00:00Z',
     spanID: 'span-1',
     stepID: 'step-1',
     startedAt: '2024-01-01T00:00:02Z',
@@ -481,6 +482,233 @@ describe('traceConversion', () => {
     });
   });
 
+  describe('traceRollup', () => {
+    it('passes single-attempt steps through unchanged, sorted by queuedAt', () => {
+      const step1 = createTrace({
+        spanID: 's1',
+        stepID: 'step-1',
+        attempts: 0,
+        queuedAt: '2024-01-01T00:00:05Z',
+        endedAt: '2024-01-01T00:00:06Z',
+      });
+      const step2 = createTrace({
+        spanID: 's2',
+        stepID: 'step-2',
+        attempts: 0,
+        queuedAt: '2024-01-01T00:00:01Z',
+        endedAt: '2024-01-01T00:00:02Z',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [step1, step2] });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans?.map((c) => c.spanID)).toEqual(['s2', 's1']);
+      expect(result.childrenSpans?.[1]).toEqual(step1); // clone of the input span
+      expect(result.childrenSpans?.[1]?.name).toBe('test-step'); // no "Attempt N" renaming
+    });
+
+    it('rolls up a multi-attempt step into a virtual span', () => {
+      const attempt0 = createTrace({
+        spanID: 'a0',
+        stepID: 'step-1',
+        attempts: 0,
+        name: 'my-step',
+        queuedAt: '2024-01-01T00:00:00Z',
+        startedAt: '2024-01-01T00:00:01Z',
+        endedAt: '2024-01-01T00:00:02Z',
+        status: 'FAILED',
+      });
+      const attempt1 = createTrace({
+        spanID: 'a1',
+        stepID: 'step-1',
+        attempts: 1,
+        name: 'my-step',
+        queuedAt: '2024-01-01T00:00:02Z',
+        startedAt: '2024-01-01T00:00:03Z',
+        endedAt: '2024-01-01T00:00:04Z',
+        status: 'COMPLETED',
+        outputID: 'out-1',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [attempt0, attempt1] });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans).toHaveLength(1);
+      const rollup = result.childrenSpans?.[0];
+      expect(rollup?.spanID).toBe('step-1-rollup');
+      expect(rollup?.name).toBe('my-step');
+      expect(rollup?.stepID).toBe('step-1');
+      expect(rollup?.attempts).toBe(1);
+      // Start fields come from the first attempt, end fields from the last
+      expect(rollup?.queuedAt).toBe('2024-01-01T00:00:00Z');
+      expect(rollup?.startedAt).toBe('2024-01-01T00:00:01Z');
+      expect(rollup?.endedAt).toBe('2024-01-01T00:00:04Z');
+      expect(rollup?.status).toBe('COMPLETED');
+      expect(rollup?.outputID).toBe('out-1');
+      // Attempts are renamed and nested in order
+      expect(rollup?.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
+      expect(rollup?.childrenSpans?.map((c) => c.spanID)).toEqual(['a0', 'a1']);
+    });
+
+    it('adopts grouped no-step spans as attempts of the step sharing their groupID', () => {
+      // e.g. a network failure: has an output but never resolved to a stepID
+      const failure = createTrace({
+        spanID: 'f0',
+        stepID: null,
+        groupID: 'g1',
+        attempts: 0,
+        outputID: 'out-f',
+        queuedAt: '2024-01-01T00:00:00Z',
+        endedAt: '2024-01-01T00:00:01Z',
+        status: 'FAILED',
+      });
+      const step = createTrace({
+        spanID: 's1',
+        stepID: 'step-1',
+        groupID: 'g1',
+        attempts: 1,
+        queuedAt: '2024-01-01T00:00:01Z',
+        endedAt: '2024-01-01T00:00:02Z',
+        outputID: 'out-1',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [failure, step] });
+
+      const result = traceRollup(root);
+
+      // One rollup span; the grouped failure is not treated as finalization
+      expect(result.childrenSpans).toHaveLength(1);
+      const rollup = result.childrenSpans?.[0];
+      expect(rollup?.spanID).toBe('step-1-rollup');
+      expect(rollup?.childrenSpans?.map((c) => c.spanID)).toEqual(['f0', 's1']);
+      expect(rollup?.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
+    });
+
+    it('turns a trailing unmatched group into a Finalization span with clamped timestamps', () => {
+      const step = createTrace({
+        spanID: 's1',
+        stepID: 'step-1',
+        attempts: 0,
+        queuedAt: '2024-01-01T00:00:00Z',
+        endedAt: '2024-01-01T00:00:10Z',
+      });
+      const fin = createTrace({
+        spanID: 'fin-0',
+        stepID: null,
+        groupID: 'g-final',
+        attempts: 0,
+        outputID: 'out-fin',
+        // Queued before the last step ended; should be clamped to the step's end
+        queuedAt: '2024-01-01T00:00:05Z',
+        startedAt: '2024-01-01T00:00:06Z',
+        endedAt: '2024-01-01T00:00:11Z',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [step, fin] });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans).toHaveLength(2);
+      const finalization = result.childrenSpans?.[1];
+      expect(finalization?.spanID).toBe('fin-0');
+      expect(finalization?.name).toBe('Finalization');
+      expect(finalization?.queuedAt).toBe('2024-01-01T00:00:10Z');
+      expect(finalization?.startedAt).toBe('2024-01-01T00:00:10Z');
+      expect(finalization?.endedAt).toBe('2024-01-01T00:00:11Z');
+    });
+
+    it('rolls up a multi-attempt unmatched group into a final-rollup virtual span', () => {
+      const step = createTrace({
+        spanID: 's1',
+        stepID: 'step-1',
+        attempts: 0,
+        queuedAt: '2024-01-01T00:00:00Z',
+        endedAt: '2024-01-01T00:00:10Z',
+      });
+      const fin0 = createTrace({
+        spanID: 'fin-0',
+        stepID: null,
+        groupID: 'g-final',
+        attempts: 0,
+        outputID: 'out-f0',
+        queuedAt: '2024-01-01T00:00:05Z',
+        startedAt: '2024-01-01T00:00:06Z',
+        endedAt: '2024-01-01T00:00:11Z',
+        status: 'FAILED',
+      });
+      const fin1 = createTrace({
+        spanID: 'fin-1',
+        stepID: null,
+        groupID: 'g-final',
+        attempts: 1,
+        outputID: 'out-f1',
+        queuedAt: '2024-01-01T00:00:11Z',
+        startedAt: '2024-01-01T00:00:12Z',
+        endedAt: '2024-01-01T00:00:13Z',
+        status: 'COMPLETED',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [step, fin0, fin1] });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans).toHaveLength(2);
+      const finalization = result.childrenSpans?.[1];
+      expect(finalization?.spanID).toBe('final-rollup');
+      // The group ends COMPLETED, so this is a genuine (retried) finalization
+      // — not a "Function error"
+      expect(finalization?.name).toBe('Finalization');
+      // Start clamped to the last step's end, end from the last attempt
+      expect(finalization?.queuedAt).toBe('2024-01-01T00:00:10Z');
+      expect(finalization?.endedAt).toBe('2024-01-01T00:00:13Z');
+      expect(finalization?.status).toBe('COMPLETED');
+      expect(finalization?.outputID).toBe('out-f1');
+      expect(finalization?.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
+    });
+
+    it('passes through output spans without stepID or groupID unchanged', () => {
+      const outputSpan = createTrace({
+        spanID: 'out-span',
+        stepID: null,
+        groupID: null,
+        attempts: null,
+        outputID: 'out-1',
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [outputSpan] });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans).toHaveLength(1);
+      expect(result.childrenSpans?.[0]).toEqual(outputSpan); // clone of the input span
+      expect(result.childrenSpans?.[0]?.name).toBe('test-step');
+    });
+
+    it('drops spans without a stepID/outputID and step spans with null attempts', () => {
+      const noStepNoOutput = createTrace({
+        spanID: 'x',
+        stepID: null,
+        outputID: null,
+        attempts: 0,
+      });
+      const nullAttempts = createTrace({
+        spanID: 'y',
+        stepID: 'step-y',
+        outputID: null,
+        attempts: null,
+      });
+      const root = createTrace({ isRoot: true, childrenSpans: [noStepNoOutput, nullAttempts] });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans).toEqual([]);
+    });
+
+    it('handles a root with no children', () => {
+      const root = createTrace({ isRoot: true, childrenSpans: undefined });
+
+      const result = traceRollup(root);
+
+      expect(result.childrenSpans).toEqual([]);
+    });
+  });
+
   describe('nested children conversion', () => {
     it('converts nested children recursively', () => {
       const trace = createTrace({
@@ -514,6 +742,654 @@ describe('traceConversion', () => {
 
       expect(result.bars[0]?.id).toBe('root-span-id');
       expect(result.bars[0]?.children?.[0]?.id).toBe('child-span-id');
+    });
+  });
+
+  // Realistic server shapes, captured from live runs. A step-execution
+  // request can fail before the SDK returns a step opcode/ID, producing
+  // "non-step" attempt spans with no stepID. These tests lock in the current
+  // rendering of those shapes.
+  describe('traceRollup — pre-stepID failed attempts', () => {
+    const childNames = (t: Trace): string[] => (t.childrenSpans ?? []).map((c) => c.name);
+
+    // Case A: attempts 0 and 1 fail with no step ID, attempt 2 succeeds. We DO
+    // learn the step ID, so the attempts roll up under the resolved step and it
+    // keeps its real name.
+    it('groups failed pre-stepID attempts under the resolved step when it succeeds', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-step',
+            outputID: 'o0',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-step',
+            outputID: 'o1',
+          }),
+          createTrace({
+            spanID: 'step-ok',
+            name: 'the-only-step',
+            stepID: 'c031',
+            attempts: 2,
+            groupID: 'g-step',
+            outputID: 'o2',
+          }),
+          createTrace({
+            spanID: 'final',
+            name: 'executor.nonstep',
+            status: 'COMPLETED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o-final',
+          }),
+        ],
+      });
+
+      const out = traceRollup(structuredClone(root));
+
+      const step = out.childrenSpans?.find((c) => c.stepID === 'c031');
+      expect(step?.name).toBe('the-only-step');
+      expect(step?.childrenSpans?.map((c) => c.status)).toEqual(['FAILED', 'FAILED', 'COMPLETED']);
+
+      // The terminal function output renders as "Finalization"; nothing is
+      // labeled "Function error".
+      expect(childNames(out)).toContain('Finalization');
+      expect(childNames(out)).not.toContain('Function error');
+    });
+
+    // A stepless function whose body throws a real SDK error on every attempt:
+    // the SDK responded each time (the outputs hold the user's actual error),
+    // so this is the run's terminal work. The span shape is identical to Case
+    // B's pre-SDK deaths minus the backend group span — the client cannot
+    // tell them apart — which is exactly why the label is the neutral
+    // "Function error": truthful whether the group holds the function's own
+    // error or attempts that died before the SDK responded.
+    it('labels an exhausted-retry function error as "Function error"', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        status: 'FAILED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-root',
+            outputID: 'o1',
+          }),
+          createTrace({
+            spanID: 'n2',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 2,
+            groupID: 'g-root',
+            outputID: 'o2',
+          }),
+        ],
+      });
+
+      const out = traceRollup(structuredClone(root));
+      const rollup = out.childrenSpans?.find((c) => c.spanID === 'final-rollup');
+
+      expect(out.childrenSpans).toHaveLength(1);
+      expect(rollup?.name).toBe('Function error');
+      expect(rollup?.childrenSpans?.map((c) => c.name)).toEqual([
+        'Attempt 0',
+        'Attempt 1',
+        'Attempt 2',
+      ]);
+    });
+
+    // Case B: the step 5xx's on every attempt, so its ID is never learned. The
+    // server emits a pre-grouped backend span (no groupID, holds the attempts)
+    // plus loose per-attempt spans. The grouped attempts have no step to
+    // attribute to -> "Function error", and the redundant backend passthrough
+    // is dropped (EXE-1992).
+    it('labels never-resolved failed attempts "Function error", not "Finalization"', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        status: 'FAILED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          // Backend group span: no groupID, holds the attempts. It duplicates
+          // the loose per-attempt spans below (the same terminal failure
+          // surfaced twice). Once those roll into a "Function error" group,
+          // this redundant "Finalization" passthrough is dropped (EXE-1992).
+          createTrace({
+            spanID: 'backend-group',
+            name: 'Finalization',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            groupID: null,
+            outputID: 'og',
+            attempts: 2,
+            childrenSpans: [
+              createTrace({
+                spanID: 'a0',
+                name: 'Attempt 0',
+                status: 'FAILED',
+                stepID: null,
+                stepOp: null,
+                attempts: 0,
+              }),
+              createTrace({
+                spanID: 'a1',
+                name: 'Attempt 1',
+                status: 'FAILED',
+                stepID: null,
+                stepOp: null,
+                attempts: 1,
+              }),
+              createTrace({
+                spanID: 'a2',
+                name: 'Attempt 2',
+                status: 'FAILED',
+                stepID: null,
+                stepOp: null,
+                attempts: 2,
+              }),
+            ],
+          }),
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-root',
+            outputID: 'o1',
+          }),
+          createTrace({
+            spanID: 'n2',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 2,
+            groupID: 'g-root',
+            outputID: 'o2',
+          }),
+        ],
+      });
+
+      const out = traceRollup(structuredClone(root));
+      const rollup = out.childrenSpans?.find((c) => c.spanID === 'final-rollup');
+
+      // The rolled-up loose attempts are now surfaced as a function error.
+      expect(rollup?.name).toBe('Function error');
+      expect(rollup?.childrenSpans).toHaveLength(3);
+
+      // EXE-1992: the duplicate groupID-less "Finalization" passthrough is
+      // dropped once the attempts roll into "Function error", leaving it as
+      // the only run child.
+      expect(out.childrenSpans).toHaveLength(1);
+      expect(childNames(out)).toEqual(['Function error']);
+    });
+
+    // The final discovery itself can retry: the request after the last step
+    // completes 500s once, then succeeds. Fixture mirrors a real dev-server
+    // trace: the server emits a pre-grouped "Finalization" span (with a stepID
+    // and no groupID) plus the loose per-attempt spans. Current behavior: the
+    // pre-grouped span passes through via the steps map and the loose attempts
+    // roll into a group ending COMPLETED — a genuine (retried) finalization,
+    // not an unresolved step.
+    it('labels a retried-but-successful finalization "Finalization", not "Function error"', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'flaky-finalization-probe',
+        status: 'COMPLETED',
+        stepID: 'fn-hash',
+        stepOp: null,
+        groupID: 'g-root',
+        queuedAt: '2024-01-01T00:00:00Z',
+        startedAt: '2024-01-01T00:00:00.050Z',
+        endedAt: '2024-01-01T00:00:38Z',
+        childrenSpans: [
+          // Server-grouped finalization span: carries a stepID (the function
+          // hash) and no groupID, so traceRollup passes it through untouched.
+          createTrace({
+            spanID: 'backend-final-group',
+            name: 'Finalization',
+            status: 'COMPLETED',
+            stepID: 'fn-hash',
+            stepOp: null,
+            groupID: null,
+            attempts: 1,
+            outputID: 'og',
+            queuedAt: '2024-01-01T00:00:00Z',
+            endedAt: '2024-01-01T00:00:38Z',
+          }),
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+            queuedAt: '2024-01-01T00:00:00Z',
+            endedAt: '2024-01-01T00:00:00.400Z',
+          }),
+          createTrace({
+            spanID: 'step-work',
+            name: 'work',
+            status: 'COMPLETED',
+            stepID: 'step-hash',
+            stepOp: 'RUN',
+            attempts: 0,
+            groupID: null,
+            outputID: 'ow',
+            queuedAt: '2024-01-01T00:00:00.349Z',
+            endedAt: '2024-01-01T00:00:00.350Z',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'COMPLETED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-root',
+            outputID: 'o1',
+            queuedAt: '2024-01-01T00:00:00.400Z',
+            endedAt: '2024-01-01T00:00:38Z',
+          }),
+        ],
+      });
+
+      const out = traceRollup(structuredClone(root));
+      const rollup = out.childrenSpans?.find((c) => c.spanID === 'final-rollup');
+
+      expect(rollup?.name).toBe('Finalization');
+      expect(rollup?.status).toBe('COMPLETED');
+      expect(rollup?.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
+
+      // The backend pre-grouped span still renders alongside the rollup
+      // (de-duped server-side; out of scope for the client rollup).
+      expect(childNames(out)).toEqual(['Finalization', 'work', 'Finalization']);
+    });
+
+    // Case C: a single pre-SDK failure (e.g. retries: 0). The lone FAILED
+    // nonstep is labeled "Function error" (status-based naming: the group is
+    // where the run failed), and the groupID-less passthrough must still be
+    // de-duped — otherwise a redundant "Finalization" span renders alongside
+    // it (EXE-1992 with a single attempt).
+    it('de-dupes the finalization passthrough for a single failed pre-stepID attempt', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        status: 'FAILED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          createTrace({
+            spanID: 'backend-group',
+            name: 'Finalization',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            groupID: null,
+            outputID: 'og',
+            attempts: 0,
+          }),
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+          }),
+        ],
+      });
+
+      const out = traceRollup(structuredClone(root));
+
+      // Exactly one terminal span; the duplicate passthrough is gone.
+      expect(out.childrenSpans).toHaveLength(1);
+      expect(childNames(out)).toEqual(['Function error']);
+    });
+
+    // Case D: a groupID-less finalization span with NO failed pre-SDK attempt
+    // group to duplicate must be KEPT. Guards the drop from degrading into a
+    // blunt "always remove" (which would still pass the failure cases above).
+    it('keeps a groupID-less finalization when no terminal failure is rendered', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        status: 'COMPLETED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          createTrace({
+            spanID: 'step-ok',
+            name: 'the-only-step',
+            status: 'COMPLETED',
+            stepID: 'c031',
+            attempts: 0,
+            groupID: 'g-step',
+            outputID: 'os',
+          }),
+          createTrace({
+            spanID: 'lone-final',
+            name: 'Finalization',
+            status: 'COMPLETED',
+            stepID: null,
+            stepOp: null,
+            groupID: null,
+            outputID: 'of',
+            attempts: 0,
+          }),
+        ],
+      });
+
+      const out = traceRollup(structuredClone(root));
+
+      expect(childNames(out)).toContain('Finalization');
+    });
+    // Post-#4600: the dev server now emits its pre-grouped "Finalization" span
+    // with stepID=null AND outputID=null (previously outputID carried a value).
+    // collectRollupGroups's `child.outputID && !child.stepID` check no longer
+    // matches, so the span falls through to the `!child.stepID` guard and is
+    // silently dropped — the loose per-attempt spans are canonical and roll up
+    // on their own. These two tests lock in that dev-server shape.
+    it('drops the stepID-less, outputID-less finalization group span (COMPLETED-after-retry)', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'flaky-finalization-probe',
+        status: 'COMPLETED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          // Cleared server group span: post-#4600, stepID AND outputID are
+          // both null, so it no longer matches the outputID/stepID filter in
+          // collectRollupGroups and is dropped outright (its nested attempts
+          // are never visited — only the loose spans below are canonical).
+          createTrace({
+            spanID: 'backend-final-group',
+            name: 'Finalization',
+            status: 'COMPLETED',
+            stepID: null,
+            stepOp: null,
+            groupID: null,
+            outputID: null,
+            attempts: 1,
+            queuedAt: '2024-01-01T00:00:00Z',
+            endedAt: '2024-01-01T00:00:38Z',
+            childrenSpans: [
+              createTrace({
+                spanID: 'backend-a0',
+                name: 'Attempt 0',
+                status: 'FAILED',
+                stepID: null,
+              }),
+              createTrace({
+                spanID: 'backend-a1',
+                name: 'Attempt 1',
+                status: 'COMPLETED',
+                stepID: null,
+              }),
+            ],
+          }),
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+            queuedAt: '2024-01-01T00:00:00Z',
+            endedAt: '2024-01-01T00:00:00.400Z',
+          }),
+          createTrace({
+            spanID: 'step-work',
+            name: 'work',
+            status: 'COMPLETED',
+            stepID: 'step-hash',
+            stepOp: 'RUN',
+            attempts: 0,
+            groupID: null,
+            outputID: 'ow',
+            queuedAt: '2024-01-01T00:00:00.349Z',
+            endedAt: '2024-01-01T00:00:00.350Z',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'COMPLETED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-root',
+            outputID: 'o1',
+            queuedAt: '2024-01-01T00:00:00.400Z',
+            endedAt: '2024-01-01T00:00:38Z',
+          }),
+        ],
+      });
+
+      const out = traceRollup(structuredClone(root));
+
+      // The loose spans roll up into a single genuine (retried) finalization.
+      const rollup = out.childrenSpans?.find((c) => c.spanID === 'final-rollup');
+      expect(rollup?.name).toBe('Finalization');
+      expect(rollup?.childrenSpans?.map((c) => c.name)).toEqual(['Attempt 0', 'Attempt 1']);
+
+      // The cleared group span is dropped: no 'backend-final-group' survivor,
+      // and no second "Finalization" alongside the rollup's.
+      // The rollup's queuedAt is clamped past the step's end, so it sorts
+      // after "work".
+      expect(childNames(out)).toEqual(['work', 'Finalization']);
+    });
+
+    it('drops the stepID-less, outputID-less finalization group span (all attempts FAILED pre-SDK)', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        status: 'FAILED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          // Cleared server group span, FAILED variant: still stepID=null AND
+          // outputID=null post-#4600, so it's dropped the same way regardless
+          // of status.
+          createTrace({
+            spanID: 'backend-final-group',
+            name: 'Finalization',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            groupID: null,
+            outputID: null,
+            attempts: 2,
+            childrenSpans: [
+              createTrace({
+                spanID: 'backend-a0',
+                name: 'Attempt 0',
+                status: 'FAILED',
+                stepID: null,
+              }),
+              createTrace({
+                spanID: 'backend-a1',
+                name: 'Attempt 1',
+                status: 'FAILED',
+                stepID: null,
+              }),
+              createTrace({
+                spanID: 'backend-a2',
+                name: 'Attempt 2',
+                status: 'FAILED',
+                stepID: null,
+              }),
+            ],
+          }),
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-root',
+            outputID: 'o1',
+          }),
+          createTrace({
+            spanID: 'n2',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 2,
+            groupID: 'g-root',
+            outputID: 'o2',
+          }),
+        ],
+      });
+
+      const out = traceRollup(structuredClone(root));
+
+      // The loose spans roll into a single "Function error" — the group is
+      // where the run failed.
+      expect(childNames(out)).toEqual(['Function error']);
+    });
+
+    // traceRollup must NOT mutate its input. The result is memoized against the
+    // trace object, so on a re-render the memo re-runs traceRollup(trace) on the
+    // same object; if that object had been mutated into the rolled-up shape, the
+    // "Function error" group would collapse to a single span and get relabeled
+    // "Finalization". Non-mutation keeps every call operating on pristine input.
+    it('does not mutate its input, so repeated calls are stable', () => {
+      const root = createTrace({
+        isRoot: true,
+        spanID: 'run',
+        name: 'Run',
+        status: 'FAILED',
+        stepID: null,
+        stepOp: null,
+        groupID: 'g-root',
+        childrenSpans: [
+          createTrace({
+            spanID: 'n0',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 0,
+            groupID: 'g-root',
+            outputID: 'o0',
+          }),
+          createTrace({
+            spanID: 'n1',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 1,
+            groupID: 'g-root',
+            outputID: 'o1',
+          }),
+          createTrace({
+            spanID: 'n2',
+            name: 'executor.nonstep',
+            status: 'FAILED',
+            stepID: null,
+            stepOp: null,
+            attempts: 2,
+            groupID: 'g-root',
+            outputID: 'o2',
+          }),
+        ],
+      });
+      const frozen = JSON.stringify(root);
+
+      const first = traceRollup(root);
+      // Input is untouched: the rollup operates on a clone.
+      expect(JSON.stringify(root)).toBe(frozen);
+      expect(childNames(first)).toContain('Function error');
+
+      // Re-running on the same (still-pristine) input yields the same labels —
+      // this is what the memoized render does across re-renders/polls.
+      const second = traceRollup(root);
+      expect(childNames(second)).toEqual(childNames(first));
     });
   });
 });

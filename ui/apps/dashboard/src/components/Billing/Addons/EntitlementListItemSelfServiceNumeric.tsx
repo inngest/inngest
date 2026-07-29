@@ -7,6 +7,7 @@ export default function EntitlementListItemSelfServiceNumeric({
   addon,
   onCancel,
   onSubmit,
+  canEdit = false,
 }: {
   entitlement: {
     currentValue: number;
@@ -19,6 +20,7 @@ export default function EntitlementListItemSelfServiceNumeric({
   };
   onCancel?: () => void;
   onSubmit?: (quantity: number, cost: number) => void;
+  canEdit: boolean;
 }) {
   if (!onSubmit || !onCancel) {
     throw new Error('onSubmit and onCancel are required');
@@ -59,7 +61,7 @@ export default function EntitlementListItemSelfServiceNumeric({
         />
         <Button
           appearance="outlined"
-          disabled={inputValue == startingInputValue || !inputValid}
+          disabled={inputValue == startingInputValue || !inputValid || !canEdit}
           onClick={() => {
             onSubmit(inputQuantity, cost);
           }}

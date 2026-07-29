@@ -481,7 +481,7 @@ func ThrottleConstraintFromProto(pbConstraint *pb.ThrottleConstraint) ThrottleCo
 func SemaphoreToProto(s Semaphore) *pb.Semaphore {
 	return &pb.Semaphore{
 		Id:         s.ID,
-		UsageValue: s.UsageValue,
+		UsageValue: s.EvaluatedKeyHash,
 		Weight:     s.Weight,
 		Release:    SemaphoreReleaseModeToProto(s.Release),
 	}
@@ -492,17 +492,17 @@ func SemaphoreFromProto(pbSem *pb.Semaphore) Semaphore {
 		return Semaphore{}
 	}
 	return Semaphore{
-		ID:         pbSem.Id,
-		UsageValue: pbSem.UsageValue,
-		Weight:     pbSem.Weight,
-		Release:    SemaphoreReleaseModeFromProto(pbSem.Release),
+		ID:               pbSem.Id,
+		EvaluatedKeyHash: pbSem.UsageValue,
+		Weight:           pbSem.Weight,
+		Release:          SemaphoreReleaseModeFromProto(pbSem.Release),
 	}
 }
 
 func SemaphoreConstraintToProto(constraint SemaphoreConstraint) *pb.SemaphoreConstraint {
 	return &pb.SemaphoreConstraint{
 		Id:         constraint.ID,
-		UsageValue: constraint.UsageValue,
+		UsageValue: constraint.EvaluatedKeyHash,
 		Weight:     constraint.Weight,
 		Release:    SemaphoreReleaseModeToProto(constraint.Release),
 	}
@@ -513,10 +513,10 @@ func SemaphoreConstraintFromProto(pbConstraint *pb.SemaphoreConstraint) Semaphor
 		return SemaphoreConstraint{}
 	}
 	return SemaphoreConstraint{
-		ID:         pbConstraint.Id,
-		UsageValue: pbConstraint.UsageValue,
-		Weight:     pbConstraint.Weight,
-		Release:    SemaphoreReleaseModeFromProto(pbConstraint.Release),
+		ID:               pbConstraint.Id,
+		EvaluatedKeyHash: pbConstraint.UsageValue,
+		Weight:           pbConstraint.Weight,
+		Release:          SemaphoreReleaseModeFromProto(pbConstraint.Release),
 	}
 }
 
@@ -595,6 +595,42 @@ func ConstraintUsageFromProto(pbUsage *pb.ConstraintUsage) ConstraintUsage {
 		Used:       int(pbUsage.Used),
 		Limit:      int(pbUsage.Limit),
 	}
+}
+
+func usageToProto(usage []ConstraintUsage) []*pb.ConstraintUsage {
+	if len(usage) == 0 {
+		return nil
+	}
+	out := make([]*pb.ConstraintUsage, len(usage))
+	for i, u := range usage {
+		out[i] = ConstraintUsageToProto(u)
+	}
+	return out
+}
+
+func usageFromProto(pbUsage []*pb.ConstraintUsage) []ConstraintUsage {
+	if len(pbUsage) == 0 {
+		return nil
+	}
+	out := make([]ConstraintUsage, len(pbUsage))
+	for i, u := range pbUsage {
+		out[i] = ConstraintUsageFromProto(u)
+	}
+	return out
+}
+
+func parseOptionalUUID(value string) (uuid.UUID, error) {
+	if value == "" {
+		return uuid.Nil, nil
+	}
+	return uuid.Parse(value)
+}
+
+func uuidToProtoString(value uuid.UUID) string {
+	if value == uuid.Nil {
+		return ""
+	}
+	return value.String()
 }
 
 func CapacityLeaseToProto(lease CapacityLease) *pb.CapacityLease {
@@ -910,11 +946,13 @@ func CapacityAcquireResponseToProto(resp *CapacityAcquireResponse) *pb.CapacityA
 	}
 
 	return &pb.CapacityAcquireResponse{
-		Leases:               leases,
-		LimitingConstraints:  limitingConstraints,
-		ExhaustedConstraints: exhaustedConstraints,
-		RetryAfter:           timestamppb.New(resp.RetryAfter),
-		FairnessReduction:    int32(resp.FairnessReduction),
+		Leases:                  leases,
+		LimitingConstraints:     limitingConstraints,
+		ExhaustedConstraints:    exhaustedConstraints,
+		RetryAfter:              timestamppb.New(resp.RetryAfter),
+		FairnessReduction:       int32(resp.FairnessReduction),
+		Usage:                   usageToProto(resp.Usage),
+		OperationIdempotencyHit: resp.OperationIdempotencyHit,
 	}
 }
 
@@ -948,11 +986,13 @@ func CapacityAcquireResponseFromProto(pbResp *pb.CapacityAcquireResponse) (*Capa
 	}
 
 	return &CapacityAcquireResponse{
-		Leases:               leases,
-		LimitingConstraints:  limitingConstraints,
-		ExhaustedConstraints: exhaustedConstraints,
-		RetryAfter:           retryAfter,
-		FairnessReduction:    int(pbResp.FairnessReduction),
+		Leases:                  leases,
+		LimitingConstraints:     limitingConstraints,
+		ExhaustedConstraints:    exhaustedConstraints,
+		RetryAfter:              retryAfter,
+		FairnessReduction:       int(pbResp.FairnessReduction),
+		Usage:                   usageFromProto(pbResp.Usage),
+		OperationIdempotencyHit: pbResp.OperationIdempotencyHit,
 	}, nil
 }
 
@@ -1025,7 +1065,13 @@ func CapacityExtendLeaseResponseToProto(resp *CapacityExtendLeaseResponse) *pb.C
 	}
 
 	return &pb.CapacityExtendLeaseResponse{
-		LeaseId: leaseID,
+		LeaseId:                 leaseID,
+		AccountId:               uuidToProtoString(resp.AccountID),
+		EnvId:                   uuidToProtoString(resp.EnvID),
+		AppId:                   uuidToProtoString(resp.AppID),
+		FunctionId:              uuidToProtoString(resp.FunctionID),
+		Usage:                   usageToProto(resp.Usage),
+		OperationIdempotencyHit: resp.OperationIdempotencyHit,
 	}
 }
 
@@ -1043,8 +1089,31 @@ func CapacityExtendLeaseResponseFromProto(pbResp *pb.CapacityExtendLeaseResponse
 		leaseID = &parsed
 	}
 
+	accountID, err := parseOptionalUUID(pbResp.AccountId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid account ID: %w", err)
+	}
+	envID, err := parseOptionalUUID(pbResp.EnvId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid env ID: %w", err)
+	}
+	appID, err := parseOptionalUUID(pbResp.AppId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid app ID: %w", err)
+	}
+	functionID, err := parseOptionalUUID(pbResp.FunctionId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid function ID: %w", err)
+	}
+
 	return &CapacityExtendLeaseResponse{
-		LeaseID: leaseID,
+		LeaseID:                 leaseID,
+		AccountID:               accountID,
+		EnvID:                   envID,
+		AppID:                   appID,
+		FunctionID:              functionID,
+		Usage:                   usageFromProto(pbResp.Usage),
+		OperationIdempotencyHit: pbResp.OperationIdempotencyHit,
 	}, nil
 }
 
@@ -1102,12 +1171,44 @@ func CapacityReleaseResponseToProto(resp *CapacityReleaseResponse) *pb.CapacityR
 	if resp == nil {
 		return nil
 	}
-	return &pb.CapacityReleaseResponse{}
+	return &pb.CapacityReleaseResponse{
+		AccountId:               uuidToProtoString(resp.AccountID),
+		EnvId:                   uuidToProtoString(resp.EnvID),
+		AppId:                   uuidToProtoString(resp.AppID),
+		FunctionId:              uuidToProtoString(resp.FunctionID),
+		Usage:                   usageToProto(resp.Usage),
+		OperationIdempotencyHit: resp.OperationIdempotencyHit,
+	}
 }
 
-func CapacityReleaseResponseFromProto(pbResp *pb.CapacityReleaseResponse) *CapacityReleaseResponse {
+func CapacityReleaseResponseFromProto(pbResp *pb.CapacityReleaseResponse) (*CapacityReleaseResponse, error) {
 	if pbResp == nil {
-		return nil
+		return nil, nil
 	}
-	return &CapacityReleaseResponse{}
+
+	accountID, err := parseOptionalUUID(pbResp.AccountId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid account ID: %w", err)
+	}
+	envID, err := parseOptionalUUID(pbResp.EnvId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid env ID: %w", err)
+	}
+	appID, err := parseOptionalUUID(pbResp.AppId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid app ID: %w", err)
+	}
+	functionID, err := parseOptionalUUID(pbResp.FunctionId)
+	if err != nil {
+		return nil, fmt.Errorf("invalid function ID: %w", err)
+	}
+
+	return &CapacityReleaseResponse{
+		AccountID:               accountID,
+		EnvID:                   envID,
+		AppID:                   appID,
+		FunctionID:              functionID,
+		Usage:                   usageFromProto(pbResp.Usage),
+		OperationIdempotencyHit: pbResp.OperationIdempotencyHit,
+	}, nil
 }

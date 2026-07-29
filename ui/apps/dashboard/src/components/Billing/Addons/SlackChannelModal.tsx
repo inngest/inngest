@@ -25,6 +25,7 @@ export default function SlackChannelComponent({
   addon,
   addonPurchased,
   onChange,
+  canEdit = false,
 }: {
   title: string;
   description: string | ReactNode;
@@ -39,6 +40,7 @@ export default function SlackChannelComponent({
   };
   addonPurchased?: boolean;
   onChange?: () => void;
+  canEdit: boolean;
 }) {
   const router = useRouter();
   const [, updateAccountAddonQuantity] = useMutation(
@@ -131,12 +133,14 @@ export default function SlackChannelComponent({
             appearance="outlined"
             label="Remove Slack channel"
             onClick={() => handleClick(true)}
+            disabled={!canEdit}
           />
         ) : (
           <Button
             appearance="outlined"
             label="Add Slack channel"
             onClick={() => handleClick(false)}
+            disabled={!canEdit}
           />
         )}
       </div>

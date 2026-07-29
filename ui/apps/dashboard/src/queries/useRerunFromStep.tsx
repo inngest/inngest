@@ -6,8 +6,8 @@ import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 
 const rerun = graphql(`
-  mutation Rerun($runID: ULID!, $fromStep: RerunFromStepInput) {
-    rerun(runID: $runID, fromStep: $fromStep)
+  mutation Rerun($envID: UUID!, $runID: ULID!, $fromStep: RerunFromStepInput) {
+    rerun(envID: $envID, runID: $runID, fromStep: $fromStep)
   }
 `);
 
@@ -18,6 +18,7 @@ export const useRerunFromStep = () => {
   const rerunFromStep = async ({ runID, fromStep }: RerunFromStepPayload) => {
     try {
       const result = await rerunMutation({
+        envID: env.id,
         runID,
         fromStep: {
           stepID: fromStep.stepID,

@@ -8,5 +8,14 @@ SPAN ChatOpenAI
   "finish_reasons": null,
   "input_tokens": 17,
   "output_tokens": 35,
-  "total_tokens": 52
+  "total_tokens": 52,
+  "cache_read_tokens": null,
+  "cache_creation_tokens": null,
+  "reasoning_tokens": null,
+  "temperature": null,
+  "top_p": null,
+  "max_tokens": null,
+  "frequency_penalty": null,
+  "presence_penalty": null,
+  "seed": null
 }

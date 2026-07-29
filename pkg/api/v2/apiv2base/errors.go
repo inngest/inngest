@@ -30,6 +30,8 @@ const (
 	// 409 Conflict errors
 	ErrorResourceAlreadyExists = "resource_already_exists"
 	ErrorIdempotencyConflict   = "idempotency_conflict"
+	ErrorRunAlreadyCancelled   = "run_already_cancelled"
+	ErrorRunAlreadyEnded       = "run_already_ended"
 
 	// 429 Too Many Requests errors
 	ErrorRateLimited = "rate_limited"

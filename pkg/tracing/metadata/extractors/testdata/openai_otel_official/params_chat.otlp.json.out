@@ -10,5 +10,14 @@ SPAN chat gpt-4.1-nano
   ],
   "input_tokens": 22,
   "output_tokens": 6,
-  "total_tokens": 28
+  "total_tokens": 28,
+  "cache_read_tokens": null,
+  "cache_creation_tokens": null,
+  "reasoning_tokens": null,
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "max_tokens": 64,
+  "frequency_penalty": 0.2,
+  "presence_penalty": 0.1,
+  "seed": null
 }

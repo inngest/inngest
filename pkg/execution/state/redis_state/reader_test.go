@@ -1481,7 +1481,7 @@ func TestItemExists(t *testing.T) {
 		require.True(t, exists)
 
 		// Dequeue the item
-		err = q.Dequeue(ctx, shard, enqueued)
+		err = q.Dequeue(ctx, shard.Name(), enqueued)
 		require.NoError(t, err)
 
 		// Should no longer exist

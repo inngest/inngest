@@ -68,7 +68,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 
 		ctx = trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
 	}
-	ctx, span := tracer.NewSpan(ctx, "RouteExecutorRequest", accountID, envID, fnID)
+	ctx, span := tracer.NewUserSpan(ctx, "RouteExecutorRequest", accountID, envID, fnID)
 	defer span.End()
 
 	routeTo, err := getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)

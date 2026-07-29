@@ -214,6 +214,7 @@ const GetFunctionDocument = graphql(`
             mode
           }
         }
+        keyQueuesEnabled
       }
     }
   }

@@ -30,6 +30,16 @@ type goldenAIMetadata struct {
 	InputTokens   int64    `json:"input_tokens"`
 	OutputTokens  int64    `json:"output_tokens"`
 	TotalTokens   *int64   `json:"total_tokens"`
+
+	CacheReadTokens     *int64   `json:"cache_read_tokens"`
+	CacheCreationTokens *int64   `json:"cache_creation_tokens"`
+	ReasoningTokens     *int64   `json:"reasoning_tokens"`
+	Temperature         *float64 `json:"temperature"`
+	TopP                *float64 `json:"top_p"`
+	MaxTokens           *int64   `json:"max_tokens"`
+	FrequencyPenalty    *float64 `json:"frequency_penalty"`
+	PresencePenalty     *float64 `json:"presence_penalty"`
+	Seed                *int64   `json:"seed"`
 }
 
 // TestAIMetadataExtractor_CapturedFixtures asserts AIMetadata extraction
@@ -38,10 +48,10 @@ type goldenAIMetadata struct {
 // order. Regenerate with `go test -update`; see testdata/README.md for how
 // fixtures were captured and per-instrumentation quirks.
 func TestAIMetadataExtractor_CapturedFixtures(t *testing.T) {
-	// goldenAIMetadata must mirror every asserted field of AIMetadata (9
+	// goldenAIMetadata must mirror every asserted field of AIMetadata (18
 	// rendered + the 2 deliberately-blanked LatencyMs/EstimatedCost). If this
 	// fails, a field was added: update goldenAIMetadata and regenerate.
-	require.Equal(t, 11, reflect.TypeFor[extractors.AIMetadata]().NumField(),
+	require.Equal(t, 20, reflect.TypeFor[extractors.AIMetadata]().NumField(),
 		"AIMetadata changed shape; update goldenAIMetadata and the goldens")
 
 	paths, err := fs.Glob(fixtures, "testdata/*/*.otlp.json")
@@ -77,8 +87,8 @@ func TestAIMetadataExtractor_CapturedFixtures(t *testing.T) {
 				enc := json.NewEncoder(&buf)
 				enc.SetIndent("", "  ")
 				require.NoError(t, enc.Encode(goldenAIMetadata{
-					Model:         md.Model,
-					System:        md.System,
+					Model:         md.RequestModel,
+					System:        md.Provider,
 					OperationName: md.OperationName,
 					ResponseModel: md.ResponseModel,
 					ResponseID:    md.ResponseID,
@@ -86,6 +96,16 @@ func TestAIMetadataExtractor_CapturedFixtures(t *testing.T) {
 					InputTokens:   md.InputTokens,
 					OutputTokens:  md.OutputTokens,
 					TotalTokens:   md.TotalTokens,
+
+					CacheReadTokens:     md.CacheReadTokens,
+					CacheCreationTokens: md.CacheCreationTokens,
+					ReasoningTokens:     md.ReasoningTokens,
+					Temperature:         md.Temperature,
+					TopP:                md.TopP,
+					MaxTokens:           md.MaxTokens,
+					FrequencyPenalty:    md.FrequencyPenalty,
+					PresencePenalty:     md.PresencePenalty,
+					Seed:                md.Seed,
 				}))
 			}
 

@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   type ReactNode,
 } from 'react';
@@ -36,22 +37,26 @@ const InsightsStateMachineContext =
 
 type InsightsStateMachineContextProviderProps = {
   children: ReactNode;
+  onAutoRunConsumed?: () => void;
   onQueryChange: (query: string) => void;
   onQueryNameChange: (name: string) => void;
   query: string;
   queryName: string;
   renderChildren: boolean;
+  runOnMount?: boolean;
   savedQueryId?: string;
   tabId: string;
 };
 
 export function InsightsStateMachineContextProvider({
   children,
+  onAutoRunConsumed,
   onQueryChange,
   onQueryNameChange,
   query,
   queryName,
   renderChildren,
+  runOnMount,
   savedQueryId,
   tabId,
 }: InsightsStateMachineContextProviderProps) {
@@ -125,6 +130,20 @@ export function InsightsStateMachineContextProvider({
     },
     [refetch],
   );
+
+  // Fire refetch() once per tab when a tab is created with a seeded query
+  // that should execute automatically (e.g. the Failed Functions "Open in
+  // Insights" deep link). Gated on `renderChildren` so inactive tabs don't
+  // run, and on a ref so toggling the tab in/out of focus can't refire it.
+  const hasAutoRunRef = useRef(false);
+  useEffect(() => {
+    if (hasAutoRunRef.current) return;
+    if (!runOnMount || !renderChildren) return;
+
+    hasAutoRunRef.current = true;
+    refetch();
+    onAutoRunConsumed?.();
+  }, [runOnMount, renderChildren, refetch, onAutoRunConsumed]);
 
   return (
     <InsightsStateMachineContext.Provider

@@ -36,7 +36,8 @@ func (f Function) IsArchived() bool {
 	return false
 }
 
-// FunctionReader finds functions for use across the API and dev server.
+// Legacy reader, use FunctionV2Reader going forward
+// TODO: move to v2 reader
 type FunctionReader interface {
 	// GetFunctionsByAppInternalID returns functions given the string ID of an app as defined
 	// by users in our SDKs.
@@ -63,11 +64,26 @@ type FunctionReader interface {
 	GetActiveFunctionByAppAndSlug(ctx context.Context, appName string, slug string) (*Function, error)
 }
 
+// FunctionV2Reader is the latest and greatest, use this one going forward:
+// see: docs/plans/005-remove-base-cqrs.org
+type FunctionV2Reader interface {
+	GetFunctionsByApp(ctx context.Context, opts GetFunctionsByAppOpts) ([]*Function, error)
+}
+
+type GetFunctionsByAppOpts struct {
+	WorkspaceID uuid.UUID
+	AppID       uuid.UUID
+	AppName     string
+	Cursor      uuid.UUID
+	Limit       int
+}
+
 // DevFunctionManager is a development-only function manager
 type DevFunctionManager interface {
 	// Embeds production & API related functionality.
 
 	FunctionReader
+	FunctionV2Reader
 
 	// Also embeds the development functionality.
 
@@ -81,7 +97,8 @@ type FunctionCreator interface {
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
 }
 
-// DevFunctionReader is a development-only function reader.
+// Legacy reader, use FunctionV2Reader going forward
+// TODO: move to v2 reader
 type DevFunctionReader interface {
 	GetFunctions(ctx context.Context) ([]*Function, error)
 }

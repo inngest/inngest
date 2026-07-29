@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -766,4 +767,321 @@ func TestV2AdapterWithDisabledRetries(t *testing.T) {
 
 func int64Ptr(v int64) *int64 {
 	return &v
+}
+
+// mustV2Service spins up a miniredis, wires a sharded manager against it, and
+// returns the v2 RunService plus the miniredis handle for key inspection.
+func mustV2Service(t *testing.T, ctx context.Context) (statev2.RunService, *miniredis.Miniredis) {
+	t.Helper()
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	t.Cleanup(mr.Close)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{mr.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+	pauseStore := NewPauseStore(unshardedClient)
+
+	mgr, err := New(ctx,
+		WithShardedClient(shardedClient),
+		WithPauseDeleter(pauseStore),
+	)
+	require.NoError(t, err)
+	return MustRunServiceV2(mgr), mr
+}
+
+func TestV2AdapterLoadMetadataPersistsSizeFields(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := mustV2Service(t, ctx)
+
+	event, err := json.Marshal(map[string]any{"name": "sizes.test", "data": map[string]any{"k": "v"}})
+	require.NoError(t, err)
+	stepData := map[string]any{"result": "ok"}
+
+	id := statev2.ID{
+		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		FunctionID: uuid.New(),
+		Tenant: statev2.Tenant{
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     uuid.New(),
+		},
+	}
+	_, err = svc.Create(ctx, statev2.CreateState{
+		Metadata: statev2.Metadata{
+			ID: id,
+			Config: *statev2.InitConfig(&statev2.Config{
+				SpanID:      "sizes-span",
+				Idempotency: "sizes-" + id.RunID.String(),
+			}),
+		},
+		Events: []json.RawMessage{event},
+		Steps: []state.MemoizedStep{
+			{ID: "step-1", Data: stepData},
+		},
+	})
+	require.NoError(t, err)
+
+	md, err := svc.LoadMetadata(ctx, id)
+	require.NoError(t, err)
+	assert.Positive(t, md.Metrics.EventSize, "EventSize must be persisted (>0) after Create")
+	assert.Positive(t, md.Metrics.StateSize, "StateSize must be persisted (>0) after Create")
+	assert.Equal(t, 1, md.Metrics.StepCount, "StepCount must reflect memoized steps")
+}
+
+func TestV2AdapterMigrate(t *testing.T) {
+	ctx := context.Background()
+	srcSvc, srcMR := mustV2Service(t, ctx)
+	dstSvc, dstMR := mustV2Service(t, ctx)
+
+	id := statev2.ID{
+		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		FunctionID: uuid.New(),
+		Tenant: statev2.Tenant{
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     uuid.New(),
+		},
+	}
+	event, err := json.Marshal(map[string]any{"name": "migrate.test"})
+	require.NoError(t, err)
+
+	// Seed source with a run + pre-memoized step + step_input + pending step + defer.
+	_, err = srcSvc.Create(ctx, statev2.CreateState{
+		Metadata: statev2.Metadata{
+			ID: id,
+			Config: *statev2.InitConfig(&statev2.Config{
+				SpanID:      "src-span",
+				Idempotency: "migrate-" + id.RunID.String(),
+			}),
+		},
+		Events: []json.RawMessage{event},
+		Steps: []state.MemoizedStep{
+			{ID: "step-a", Data: map[string]any{"v": 1}},
+		},
+		StepInputs: []state.MemoizedStep{
+			{ID: "step-input-1", Data: map[string]any{"in": "a"}},
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, srcSvc.SavePending(ctx, id, []string{"pending-1"}))
+	require.NoError(t, srcSvc.SaveDefer(ctx, id, statev2.Defer{
+		FnSlug: "migrate/deferred", HashedID: "hash-1",
+		Input: json.RawMessage(`{"payload":"one"}`),
+	}))
+
+	// Build a MigrateState from the source, filtering wrapped inputs out of Steps.
+	md, err := srcSvc.LoadMetadata(ctx, id)
+	require.NoError(t, err)
+	events, err := srcSvc.LoadEvents(ctx, id)
+	require.NoError(t, err)
+	steps, err := srcSvc.LoadSteps(ctx, id)
+	require.NoError(t, err)
+	inputs, err := srcSvc.LoadStepInputs(ctx, id)
+	require.NoError(t, err)
+	pending, err := srcSvc.LoadPending(ctx, id)
+	require.NoError(t, err)
+	defers, err := srcSvc.LoadDefers(ctx, id)
+	require.NoError(t, err)
+
+	pureSteps := make(map[string]json.RawMessage, len(steps))
+	for k, v := range steps {
+		var probe map[string]json.RawMessage
+		if err := json.Unmarshal(v, &probe); err == nil && len(probe) == 1 {
+			if _, isInputWrap := probe["input"]; isInputWrap {
+				continue
+			}
+		}
+		pureSteps[k] = v
+	}
+
+	migrateState := statev2.MigrateState{
+		Metadata:     md,
+		Events:       events,
+		Steps:        pureSteps,
+		StepInputs:   inputs,
+		Stack:        md.Stack,
+		PendingSteps: pending,
+		Defers:       defers,
+	}
+	require.NoError(t, dstSvc.Migrate(ctx, migrateState))
+
+	// Idempotency keys are intentionally not migrated (they expire naturally
+	// on the source cluster), so filter them out before comparing.
+	filterKeys := func(keys []string) []string {
+		out := make([]string, 0, len(keys))
+		for _, k := range keys {
+			if strings.Contains(k, ":key:") {
+				continue
+			}
+			out = append(out, k)
+		}
+		return out
+	}
+	assert.ElementsMatch(t, filterKeys(srcMR.Keys()), filterKeys(dstMR.Keys()), "redis keys must match after migrate")
+
+	// LoadState output must match between source and destination.
+	srcState, err := srcSvc.LoadState(ctx, id)
+	require.NoError(t, err)
+	dstState, err := dstSvc.LoadState(ctx, id)
+	require.NoError(t, err)
+	srcJSON, err := json.Marshal(srcState.Steps)
+	require.NoError(t, err)
+	dstJSON, err := json.Marshal(dstState.Steps)
+	require.NoError(t, err)
+	assert.JSONEq(t, string(srcJSON), string(dstJSON), "steps must match")
+
+	srcPending, err := srcSvc.LoadPending(ctx, id)
+	require.NoError(t, err)
+	dstPending, err := dstSvc.LoadPending(ctx, id)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, srcPending, dstPending, "pending must match")
+
+	srcDefers, err := srcSvc.LoadDefers(ctx, id)
+	require.NoError(t, err)
+	dstDefers, err := dstSvc.LoadDefers(ctx, id)
+	require.NoError(t, err)
+	assert.Equal(t, srcDefers, dstDefers, "defers must match")
+
+	before := dstMR.Dump()
+	require.NoError(t, dstSvc.Migrate(ctx, migrateState))
+	assert.Equal(t, before, dstMR.Dump(), "re-running Migrate with the same snapshot must not change destination state")
+}
+
+func TestV2AdapterLookupIdempotency(t *testing.T) {
+	ctx := context.Background()
+	svc, _ := mustV2Service(t, ctx)
+
+	id := statev2.ID{
+		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		FunctionID: uuid.New(),
+		Tenant: statev2.Tenant{
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     uuid.New(),
+		},
+	}
+	key := "lookup-" + id.RunID.String()
+
+	// Missing key returns (nil, nil).
+	entry, err := svc.LookupIdempotency(ctx, id, key)
+	require.NoError(t, err)
+	assert.Nil(t, entry)
+
+	// After Create, LookupIdempotency returns a non-tombstone entry.
+	_, err = svc.Create(ctx, statev2.CreateState{
+		Metadata: statev2.Metadata{
+			ID: id,
+			Config: *statev2.InitConfig(&statev2.Config{
+				SpanID:      "lookup-span",
+				Idempotency: key,
+			}),
+		},
+		Events: []json.RawMessage{[]byte(`{"name":"lookup.test"}`)},
+	})
+	require.NoError(t, err)
+
+	entry, err = svc.LookupIdempotency(ctx, id, key)
+	require.NoError(t, err)
+	require.NotNil(t, entry)
+	assert.Equal(t, id.RunID, entry.RunID)
+	assert.False(t, entry.IsTombstone)
+
+	// After Delete, LookupIdempotency returns a tombstone entry.
+	require.NoError(t, svc.Delete(ctx, id))
+
+	entry, err = svc.LookupIdempotency(ctx, id, key)
+	require.NoError(t, err)
+	require.NotNil(t, entry)
+	assert.Equal(t, id.RunID, entry.RunID)
+	assert.True(t, entry.IsTombstone)
+}
+
+// recordingPauseDeleter counts DeletePausesForRun calls for verifying
+// Delete's cascade behavior.
+type recordingPauseDeleter struct{ calls int }
+
+func (r *recordingPauseDeleter) DeletePausesForRun(_ context.Context, _ ulid.ULID, _ uuid.UUID) error {
+	r.calls++
+	return nil
+}
+
+func TestV2AdapterDeleteWithIsMigration(t *testing.T) {
+	ctx := context.Background()
+
+	mr, err := miniredis.Run()
+	require.NoError(t, err)
+	defer mr.Close()
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{mr.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unsharded := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	sharded := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unsharded,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+	rec := &recordingPauseDeleter{}
+	mgr, err := New(ctx,
+		WithShardedClient(sharded),
+		WithPauseDeleter(rec),
+	)
+	require.NoError(t, err)
+	svc := MustRunServiceV2(mgr)
+
+	seed := func(t *testing.T) statev2.ID {
+		t.Helper()
+		id := statev2.ID{
+			RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+			FunctionID: uuid.New(),
+			Tenant: statev2.Tenant{
+				AccountID: uuid.New(),
+				EnvID:     uuid.New(),
+				AppID:     uuid.New(),
+			},
+		}
+		_, err := svc.Create(ctx, statev2.CreateState{
+			Metadata: statev2.Metadata{
+				ID: id,
+				Config: *statev2.InitConfig(&statev2.Config{
+					SpanID:      "delete-span",
+					Idempotency: "delete-" + id.RunID.String(),
+				}),
+			},
+			Events: []json.RawMessage{[]byte(`{"name":"delete.test"}`)},
+		})
+		require.NoError(t, err)
+		return id
+	}
+
+	// Normal Delete cascades to pauseDeleter.
+	id1 := seed(t)
+	before := rec.calls
+	require.NoError(t, svc.Delete(ctx, id1))
+	assert.Equal(t, before+1, rec.calls, "normal Delete must call DeletePausesForRun")
+
+	// Delete with WithIsMigration skips the pauseDeleter.
+	id2 := seed(t)
+	before = rec.calls
+	require.NoError(t, svc.Delete(ctx, id2, state.WithIsMigration()))
+	assert.Equal(t, before, rec.calls, "Delete with WithIsMigration must skip pause cleanup")
 }

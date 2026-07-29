@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -23,6 +24,9 @@ type SyncCheckpoint struct {
 	// Optional metadata.  If not provided this will be loaded.
 	// This is never exposed via JSON, as this type us unmarshalled.
 	Metadata *state.Metadata `json:"-"`
+
+	// Optional function. When set, CheckpointSyncSteps skips loading it from the DB.
+	Function *inngest.Function `json:"-"`
 }
 
 func (s SyncCheckpoint) ID() state.ID {

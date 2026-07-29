@@ -20,3 +20,4 @@ jobs:
         with:
           # Keep this list aligned with cliff.toml.
           task_types: '["feat","fix","doc","docs","test","ci","refactor","perf","chore","revert","style","security","cloud","internal","noop"]'
+          custom_labels: '{"feat": "feature", "fix": "fix", "doc": "documentation", "docs": "documentation", "test": "test", "ci": "ci", "refactor": "refactor", "perf": "performance", "chore": "chore", "revert": "revert", "cloud": "Cloud"}'

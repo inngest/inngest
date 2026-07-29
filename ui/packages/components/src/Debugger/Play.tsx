@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
-import { useStepSelection } from '../RunDetailsV3/utils';
+import { useStepSelection } from '../RunDetailsShared/utils';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { useRerun } from '../SharedContext/useRerun';
 import { useRerunFromStep } from '../SharedContext/useRerunFromStep';

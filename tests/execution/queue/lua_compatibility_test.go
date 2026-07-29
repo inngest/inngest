@@ -19,7 +19,6 @@ import (
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,12 +36,10 @@ func getItemIDsFromBacklog(ctx context.Context, mgr queue.ShardOperations, backl
 	return itemIDs, nil
 }
 
-// LuaCompatibilityTestCase defines a test case for Lua compatibility across different Redis-compatible servers
+// LuaCompatibilityTestCase defines a test case for Lua compatibility against Valkey
 type LuaCompatibilityTestCase struct {
 	Name       string                // Test case name
-	ServerType string                // "valkey" or "garnet"
 	ValkeyOpts []helper.ValkeyOption // Optional Valkey configuration
-	GarnetOpts []helper.GarnetOption // Optional Garnet configuration
 }
 
 func TestLuaCompatibility(t *testing.T) {
@@ -52,20 +49,9 @@ func TestLuaCompatibility(t *testing.T) {
 
 	testCases := []LuaCompatibilityTestCase{
 		{
-			Name:       "Basic Valkey",
-			ServerType: "valkey",
+			Name: "Basic Valkey",
 			ValkeyOpts: []helper.ValkeyOption{
 				helper.WithValkeyImage(testutil.ValkeyDefaultImage),
-			},
-		},
-		{
-			Name:       "Basic Garnet",
-			ServerType: "garnet",
-			GarnetOpts: []helper.GarnetOption{
-				helper.WithImage(testutil.GarnetDefaultImage),
-				helper.WithConfiguration(&helper.GarnetConfiguration{
-					EnableLua: true,
-				}),
 			},
 		},
 	}
@@ -75,44 +61,17 @@ func TestLuaCompatibility(t *testing.T) {
 			ctx := context.Background()
 
 			setup := func(t *testing.T, opts ...queue.QueueOpt) redis_state.RedisQueueShard {
-				// Start the appropriate server based on test case
-				var client rueidis.Client
+				container, err := helper.StartValkey(t, tc.ValkeyOpts...)
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					_ = container.Terminate(ctx)
+				})
 
-				switch tc.ServerType {
-				case "valkey":
-					container, err := helper.StartValkey(t, tc.ValkeyOpts...)
-					require.NoError(t, err)
-					t.Cleanup(func() {
-						_ = container.Terminate(ctx)
-					})
-
-					valkeyClient, err := helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
-					require.NoError(t, err)
-					t.Cleanup(func() {
-						valkeyClient.Close()
-					})
-
-					client = valkeyClient
-
-				case "garnet":
-					container, err := helper.StartGarnet(t, tc.GarnetOpts...)
-					require.NoError(t, err)
-
-					t.Cleanup(func() {
-						_ = container.Terminate(ctx)
-					})
-
-					garnetClient, err := helper.NewRedisClient(container.Addr, container.Username, container.Password, false)
-					require.NoError(t, err)
-					t.Cleanup(func() {
-						garnetClient.Close()
-					})
-
-					client = garnetClient
-
-				default:
-					t.Fatalf("unknown server type: %s", tc.ServerType)
-				}
+				client, err := helper.NewValkeyClient(container.Addr, container.Username, container.Password, false)
+				require.NoError(t, err)
+				t.Cleanup(func() {
+					client.Close()
+				})
 
 				shard := redis_state.NewQueueShard(
 					consts.DefaultQueueShardName,
@@ -123,7 +82,7 @@ func TestLuaCompatibility(t *testing.T) {
 				return shard
 			}
 
-			serverType := tc.ServerType
+			serverType := "valkey"
 
 			t.Run("basic operations", func(t *testing.T) {
 				shard := setup(t)
@@ -191,7 +150,7 @@ func TestLuaCompatibility(t *testing.T) {
 
 				// - Requeue item
 				requeueTime := now.Add(5 * time.Second)
-				err = q.Requeue(ctx, shard, enqueuedItem, requeueTime)
+				err = q.Requeue(ctx, shard.Name(), enqueuedItem, requeueTime)
 				require.NoError(t, err)
 
 				// - Requeue partition
@@ -203,7 +162,7 @@ func TestLuaCompatibility(t *testing.T) {
 				require.NoError(t, err, "Failed to peek partition after requeue on %s", serverType)
 				require.NotEmpty(t, peekedAfterRequeue, "Should find items in partition after requeue on %s", serverType)
 
-				err = q.Dequeue(ctx, shard, enqueuedItem)
+				err = q.Dequeue(ctx, shard.Name(), enqueuedItem)
 				require.NoError(t, err)
 
 				peekedAfterDequeue, err := shard.Peek(ctx, qp, requeueTime.Add(5*time.Second), 10)
@@ -549,6 +508,80 @@ func TestLuaCompatibility(t *testing.T) {
 				require.Equal(t, constraintapi.RunProcessingModeDurableEndpoint, releaseResp.CreationSource.RunProcessingMode)
 			})
 
+			t.Run("constraint API accepts empty usage arrays", func(t *testing.T) {
+				shard := setup(t)
+
+				rc := shard.Client().Client()
+
+				cm, err := constraintapi.NewRedisCapacityManager(
+					constraintapi.WithClock(clockwork.NewRealClock()),
+					constraintapi.WithEnableDebugLogs(false),
+					constraintapi.WithClient(rc),
+					constraintapi.WithShardName("test"),
+				)
+				require.NoError(t, err)
+
+				t.Run("acquire", func(t *testing.T) {
+					accountID, envID, functionID := uuid.New(), uuid.New(), uuid.New()
+					config, constraints := constraintAPIEmptyUsageConfig()
+
+					firstReq := constraintAPIEmptyUsageAcquireRequest(accountID, envID, functionID, config, constraints, "empty-usage-acquire")
+					firstResp, err := cm.Acquire(ctx, firstReq)
+					require.NoError(t, err)
+					require.Len(t, firstResp.Leases, 1)
+					require.NotEmpty(t, firstResp.Usage)
+
+					// Reuse the same idempotency key with a different request
+					// fingerprint. Operation idempotency misses, while the real
+					// constraint-check idempotency marker from firstReq makes
+					// acquire.lua skip GCRA and return an empty Lua table for cu.
+					skippedConfig := config
+					skippedConfig.FunctionVersion++
+					skippedReq := constraintAPIEmptyUsageAcquireRequest(accountID, envID, functionID, skippedConfig, constraints, firstReq.IdempotencyKey)
+
+					resp, err := cm.Acquire(ctx, skippedReq)
+					require.NoError(t, err)
+					require.Len(t, resp.Leases, 1)
+					require.Empty(t, resp.Usage)
+				})
+
+				t.Run("extend", func(t *testing.T) {
+					accountID, envID, functionID := uuid.New(), uuid.New(), uuid.New()
+					config, constraints := constraintAPIEmptyUsageConfig()
+
+					acquireResp, err := cm.Acquire(ctx, constraintAPIEmptyUsageAcquireRequest(accountID, envID, functionID, config, constraints, "empty-usage-extend-acquire"))
+					require.NoError(t, err)
+					require.Len(t, acquireResp.Leases, 1)
+
+					extendResp, err := cm.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+						IdempotencyKey: "empty-usage-extend",
+						AccountID:      accountID,
+						LeaseID:        acquireResp.Leases[0].LeaseID,
+						Duration:       5 * time.Second,
+					})
+					require.NoError(t, err)
+					require.NotNil(t, extendResp.LeaseID)
+					require.Empty(t, extendResp.Usage)
+				})
+
+				t.Run("release", func(t *testing.T) {
+					accountID, envID, functionID := uuid.New(), uuid.New(), uuid.New()
+					config, constraints := constraintAPIEmptyUsageConfig()
+
+					acquireResp, err := cm.Acquire(ctx, constraintAPIEmptyUsageAcquireRequest(accountID, envID, functionID, config, constraints, "empty-usage-release-acquire"))
+					require.NoError(t, err)
+					require.Len(t, acquireResp.Leases, 1)
+
+					releaseResp, err := cm.Release(ctx, &constraintapi.CapacityReleaseRequest{
+						IdempotencyKey: "empty-usage-release",
+						AccountID:      accountID,
+						LeaseID:        acquireResp.Leases[0].LeaseID,
+					})
+					require.NoError(t, err)
+					require.Empty(t, releaseResp.Usage)
+				})
+			})
+
 			t.Run("acquire cache hit on exhausted constraint", func(t *testing.T) {
 				shard := setup(t)
 
@@ -761,5 +794,58 @@ func TestLuaCompatibility(t *testing.T) {
 				require.False(t, acquire3Resp.RetryAfter.IsZero(), "RetryAfter should be set when capacity is exhausted")
 			})
 		})
+	}
+}
+
+func constraintAPIEmptyUsageConfig() (constraintapi.ConstraintConfig, []constraintapi.ConstraintItem) {
+	config := constraintapi.ConstraintConfig{
+		FunctionVersion: 1,
+		RateLimit: []constraintapi.RateLimitConfig{
+			{
+				Scope:             enums.RateLimitScopeFn,
+				KeyExpressionHash: "expr",
+				Limit:             120,
+				Period:            60,
+			},
+		},
+	}
+	constraints := []constraintapi.ConstraintItem{
+		{
+			Kind: constraintapi.ConstraintKindRateLimit,
+			RateLimit: &constraintapi.RateLimitConstraint{
+				Scope:             enums.RateLimitScopeFn,
+				KeyExpressionHash: "expr",
+				EvaluatedKeyHash:  "value",
+			},
+		},
+	}
+	return config, constraints
+}
+
+func constraintAPIEmptyUsageAcquireRequest(
+	accountID uuid.UUID,
+	envID uuid.UUID,
+	functionID uuid.UUID,
+	config constraintapi.ConstraintConfig,
+	constraints []constraintapi.ConstraintItem,
+	idempotencyKey string,
+) *constraintapi.CapacityAcquireRequest {
+	return &constraintapi.CapacityAcquireRequest{
+		IdempotencyKey:       idempotencyKey,
+		AccountID:            accountID,
+		EnvID:                envID,
+		FunctionID:           functionID,
+		Configuration:        config,
+		Constraints:          constraints,
+		Amount:               1,
+		LeaseIdempotencyKeys: []string{"item-" + idempotencyKey},
+		CurrentTime:          time.Now(),
+		Duration:             5 * time.Second,
+		MaximumLifetime:      time.Hour,
+		Source: constraintapi.LeaseSource{
+			Service:           constraintapi.ServiceAPI,
+			Location:          constraintapi.CallerLocationItemLease,
+			RunProcessingMode: constraintapi.RunProcessingModeDurableEndpoint,
+		},
 	}
 }

@@ -31,7 +31,7 @@ func newTestShard(name, group string) *registryTestShard {
 
 // alwaysShard returns a selector that always resolves to the given shard.
 func alwaysShard(s QueueShard) shardSelector {
-	return func(context.Context, uuid.UUID, *string) (QueueShard, error) {
+	return func(context.Context, Scope, *string) (QueueShard, error) {
 		return s, nil
 	}
 }
@@ -171,7 +171,7 @@ func TestShardRegistry_Resolve_DelegatesToSelector(t *testing.T) {
 	a := newTestShard("a", "")
 	b := newTestShard("b", "")
 	called := false
-	sel := func(_ context.Context, _ uuid.UUID, _ *string) (QueueShard, error) {
+	sel := func(_ context.Context, _ Scope, _ *string) (QueueShard, error) {
 		called = true
 		return b, nil
 	}
@@ -180,7 +180,7 @@ func TestShardRegistry_Resolve_DelegatesToSelector(t *testing.T) {
 		WithShardSelector(sel),
 	)
 
-	got, err := r.Resolve(context.Background(), uuid.New(), nil)
+	got, err := r.Resolve(context.Background(), Scope{AccountID: uuid.New()}, nil)
 	require.NoError(t, err)
 	require.Equal(t, QueueShard(b), got)
 	require.True(t, called)
@@ -258,12 +258,12 @@ func TestNewSingleShardRegistry(t *testing.T) {
 		s := newTestShard("only", "g")
 		r := mustSingleShardRegistry(t, s)
 
-		got, err := r.Resolve(context.Background(), uuid.New(), nil)
+		got, err := r.Resolve(context.Background(), Scope{AccountID: uuid.New()}, nil)
 		require.NoError(t, err)
 		require.Equal(t, QueueShard(s), got)
 
 		qn := "ignored"
-		got, err = r.Resolve(context.Background(), uuid.Nil, &qn)
+		got, err = r.Resolve(context.Background(), Scope{}, &qn)
 		require.NoError(t, err)
 		require.Equal(t, QueueShard(s), got)
 	})

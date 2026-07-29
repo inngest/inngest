@@ -96,6 +96,8 @@ type DefaultLogFormatter struct {
 
 // NewLogEntry creates a new LogEntry for the request.
 func (l *DefaultLogFormatter) NewLogEntry(r *http.Request) LogEntry {
+	ctx := r.Context()
+
 	useColor := !l.NoColor
 	entry := &defaultLogEntry{
 		DefaultLogFormatter: l,
@@ -104,7 +106,7 @@ func (l *DefaultLogFormatter) NewLogEntry(r *http.Request) LogEntry {
 		useColor:            useColor,
 	}
 
-	reqID := GetReqID(r.Context())
+	reqID := GetReqID(ctx)
 	if reqID != "" {
 		cW(entry.buf, useColor, nYellow, "[%s] ", reqID)
 	}
@@ -118,7 +120,11 @@ func (l *DefaultLogFormatter) NewLogEntry(r *http.Request) LogEntry {
 	cW(entry.buf, useColor, nCyan, "%s://%s%s %s\" ", scheme, r.Host, r.RequestURI, r.Proto)
 
 	entry.buf.WriteString("from ")
-	entry.buf.WriteString(r.RemoteAddr)
+	clientIP := GetClientIP(ctx)
+	if clientIP == "" {
+		clientIP = r.RemoteAddr
+	}
+	entry.buf.WriteString(clientIP)
 	entry.buf.WriteString(" - ")
 
 	return entry
@@ -160,7 +166,7 @@ func (l *defaultLogEntry) Write(status, bytes int, header http.Header, elapsed t
 }
 
 func (l *defaultLogEntry) Panic(v interface{}, stack []byte) {
-	PrintPrettyStack(v)
+	printPrettyStack(v, l.useColor)
 }
 
 func init() {

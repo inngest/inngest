@@ -38,6 +38,7 @@ type TopInfoProps = {
   resultLoading?: boolean;
   trace?: Trace;
   isDurableEndpoint?: boolean;
+  readOnly?: boolean;
   defers?: RunDeferSummary[];
   siblingDefers?: RunDeferSummary[];
   deferredFrom?: RunDeferredFromSummary[];
@@ -99,6 +100,7 @@ export const TopInfo = ({
   resultLoading,
   trace,
   isDurableEndpoint,
+  readOnly,
   defers,
   siblingDefers,
   deferredFrom,
@@ -191,7 +193,7 @@ export const TopInfo = ({
           )}
         </div>
 
-        {!isDurableEndpoint && (
+        {!isDurableEndpoint && !readOnly && (
           <>
             <Button
               kind="primary"

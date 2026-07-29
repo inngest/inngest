@@ -15,10 +15,19 @@ export type ExperimentListItem = {
   lastSeen: Date;
 };
 
+export enum ScoreKind {
+  Boolean = 'BOOLEAN',
+  Numeric = 'NUMERIC',
+}
+
 export type VariantMetric = {
   key: string;
   avg: number;
+  stddev: number;
   min: number;
+  q1: number;
+  med: number;
+  q3: number;
   max: number;
 };
 
@@ -44,6 +53,7 @@ export type ExperimentDetail = {
 
 export type ExperimentScoringMetric = {
   key: string;
+  kind: ScoreKind;
   enabled: boolean;
   points: number;
   minValue: number;

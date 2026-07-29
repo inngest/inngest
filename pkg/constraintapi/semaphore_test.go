@@ -525,11 +525,11 @@ func TestSemaphoreScavengeManualRelease(t *testing.T) {
 	require.Equal(t, "0", val, "scavenger must force-release manual semaphore to prevent deadlock")
 }
 
-// TestSemaphoreUsageValueIsolation verifies that different UsageValues get independent
+// TestSemaphoreEvaluatedKeyHashIsolation verifies that different evaluated key hashes get independent
 // usage counters while sharing the same capacity.  This is the core of key-based fn
 // concurrency: e.g., 5 concurrent runs per customer, where each customer has its own
 // usage counter but all share the same capacity limit.
-func TestSemaphoreUsageValueIsolation(t *testing.T) {
+func TestSemaphoreEvaluatedKeyHashIsolation(t *testing.T) {
 	cm, r, _, clock := newSemaphoreTestEnv(t)
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
@@ -539,17 +539,17 @@ func TestSemaphoreUsageValueIsolation(t *testing.T) {
 	capKey := (&SemaphoreConstraint{ID: semID}).CapacityKey(accountID)
 	_ = r.Set(capKey, "2")
 
-	// Two different usage values (e.g., two different customers)
-	semA := SemaphoreConstraint{ID: semID, UsageValue: "customer-a", Weight: 1, Release: SemaphoreReleaseManual}
-	semB := SemaphoreConstraint{ID: semID, UsageValue: "customer-b", Weight: 1, Release: SemaphoreReleaseManual}
+	// Two different evaluated key hashes (e.g., two different customers)
+	semA := SemaphoreConstraint{ID: semID, EvaluatedKeyHash: "customer-a", Weight: 1, Release: SemaphoreReleaseManual}
+	semB := SemaphoreConstraint{ID: semID, EvaluatedKeyHash: "customer-b", Weight: 1, Release: SemaphoreReleaseManual}
 
 	configA := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{ID: semA.ID, UsageValue: semA.UsageValue, Weight: 1, Release: SemaphoreReleaseManual}},
+		Semaphores:      []Semaphore{{ID: semA.ID, EvaluatedKeyHash: semA.EvaluatedKeyHash, Weight: 1, Release: SemaphoreReleaseManual}},
 	}
 	configB := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{ID: semB.ID, UsageValue: semB.UsageValue, Weight: 1, Release: SemaphoreReleaseManual}},
+		Semaphores:      []Semaphore{{ID: semB.ID, EvaluatedKeyHash: semB.EvaluatedKeyHash, Weight: 1, Release: SemaphoreReleaseManual}},
 	}
 
 	constraintsA := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &semA}}
@@ -586,9 +586,9 @@ func TestSemaphoreUsageValueIsolation(t *testing.T) {
 	require.Len(t, resp.Leases, 1, "customer B second acquire should still succeed — independent counter")
 }
 
-// TestSemaphoreSameUsageValueShared verifies that two acquires with the same
-// UsageValue share a single counter (same customer, same semaphore).
-func TestSemaphoreSameUsageValueShared(t *testing.T) {
+// TestSemaphoreSameEvaluatedKeyHashShared verifies that two acquires with the same
+// evaluated key hash share a single counter (same customer, same semaphore).
+func TestSemaphoreSameEvaluatedKeyHashShared(t *testing.T) {
 	cm, r, _, clock := newSemaphoreTestEnv(t)
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 
@@ -598,10 +598,10 @@ func TestSemaphoreSameUsageValueShared(t *testing.T) {
 	capKey := (&SemaphoreConstraint{ID: semID}).CapacityKey(accountID)
 	_ = r.Set(capKey, "1")
 
-	sem := SemaphoreConstraint{ID: semID, UsageValue: "same-customer", Weight: 1, Release: SemaphoreReleaseManual}
+	sem := SemaphoreConstraint{ID: semID, EvaluatedKeyHash: "same-customer", Weight: 1, Release: SemaphoreReleaseManual}
 	config := ConstraintConfig{
 		FunctionVersion: 1,
-		Semaphores:      []Semaphore{{ID: sem.ID, UsageValue: sem.UsageValue, Weight: 1, Release: SemaphoreReleaseManual}},
+		Semaphores:      []Semaphore{{ID: sem.ID, EvaluatedKeyHash: sem.EvaluatedKeyHash, Weight: 1, Release: SemaphoreReleaseManual}},
 	}
 	constraints := []ConstraintItem{{Kind: ConstraintKindSemaphore, Semaphore: &sem}}
 
@@ -609,10 +609,10 @@ func TestSemaphoreSameUsageValueShared(t *testing.T) {
 	resp := acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "same-1")
 	require.Len(t, resp.Leases, 1)
 
-	// Second acquire with same usage value fails — they share the counter
+	// Second acquire with same evaluated key hash fails — they share the counter
 	clock.Advance(time.Second)
 	resp = acquireWithSemaphore(t, cm, clock, accountID, envID, fnID, config, constraints, "same-2")
-	require.Len(t, resp.Leases, 0, "same usage value should share counter and exhaust capacity")
+	require.Len(t, resp.Leases, 0, "same evaluated key hash should share counter and exhaust capacity")
 
 	usageKey := sem.UsageKey(accountID)
 	val, _ := r.Get(usageKey)

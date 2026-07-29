@@ -7,14 +7,16 @@
 
 local queueKey     = KEYS[1]
 local queueItemKey = KEYS[2]
+local keyEarliestPeekTime = KEYS[3]
 
 local itemID = ARGV[1]
 
 redis.call("ZREM", queueKey, itemID)
 redis.call("HDEL", queueItemKey, itemID)
+redis.call("DEL", keyEarliestPeekTime)
 
 -- Clean up any additional index keys (e.g. status indexes) passed by the caller.
-for i = 3, #KEYS do
+for i = 4, #KEYS do
     if KEYS[i] ~= "" then
         redis.call("ZREM", KEYS[i], itemID)
     end

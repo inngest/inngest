@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import type { Trace } from '../RunDetailsV3/types';
+import type { Trace } from '../RunDetailsShared/types';
 import { useShared } from './SharedContext';
 
 export type GetRunPayload = {

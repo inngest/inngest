@@ -296,6 +296,9 @@ func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string
 
 		// Custom key uses expression and evaluated hashes
 		if c.KeyExpressionHash != "" {
+			if entityID != uuid.Nil {
+				return fmt.Sprintf("%s:c:%s:%s:%s:%s", accountID, scopeLetter, entityID, c.KeyExpressionHash, c.EvaluatedKeyHash)
+			}
 			return fmt.Sprintf("%s:c:%s:%s:%s", accountID, scopeLetter, c.KeyExpressionHash, c.EvaluatedKeyHash)
 		}
 
@@ -328,6 +331,9 @@ func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string
 
 		// Custom key uses expression and evaluated hashes
 		if t.KeyExpressionHash != "" {
+			if entityID != uuid.Nil {
+				return fmt.Sprintf("%s:t:%s:%s:%s:%s", accountID, scopeLetter, entityID, t.KeyExpressionHash, t.EvaluatedKeyHash)
+			}
 			return fmt.Sprintf("%s:t:%s:%s:%s", accountID, scopeLetter, t.KeyExpressionHash, t.EvaluatedKeyHash)
 		}
 
@@ -360,6 +366,9 @@ func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string
 
 		// Custom key uses expression and evaluated hashes
 		if r.KeyExpressionHash != "" {
+			if entityID != uuid.Nil {
+				return fmt.Sprintf("%s:r:%s:%s:%s:%s", accountID, scopeLetter, entityID, r.KeyExpressionHash, r.EvaluatedKeyHash)
+			}
 			return fmt.Sprintf("%s:r:%s:%s:%s", accountID, scopeLetter, r.KeyExpressionHash, r.EvaluatedKeyHash)
 		}
 
@@ -375,7 +384,7 @@ func (ci ConstraintItem) CacheKey(accountID, envID, functionID uuid.UUID) string
 		if ci.Semaphore == nil {
 			return ""
 		}
-		return fmt.Sprintf("%s:s:%s:%s", accountID, ci.Semaphore.ID, ci.Semaphore.UsageValue)
+		return fmt.Sprintf("%s:s:%s:%s", accountID, ci.Semaphore.ID, ci.Semaphore.EvaluatedKeyHash)
 
 	default:
 		return ""

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -19,9 +20,10 @@ import (
 )
 
 const (
-	releasesURL  = "https://api.github.com/repos/inngest/inngest/releases/latest"
-	cacheTTL     = 24 * time.Hour
-	checkTimeout = 3 * time.Second
+	releasesURL     = "https://api.github.com/repos/inngest/inngest/releases/latest"
+	homebrewCaskURL = "https://raw.githubusercontent.com/inngest/homebrew-tap/main/Casks/inngest.rb"
+	cacheTTL        = 24 * time.Hour
+	checkTimeout    = 3 * time.Second
 )
 
 type cacheFile struct {
@@ -31,10 +33,12 @@ type cacheFile struct {
 }
 
 var (
-	cacheMu      sync.Mutex
-	httpClient   = &http.Client{Timeout: checkTimeout}
-	cachePathFn  = defaultCachePath
-	releasesAddr = releasesURL
+	cacheMu          sync.Mutex
+	httpClient       = &http.Client{Timeout: checkTimeout}
+	cachePathFn      = defaultCachePath
+	releasesAddr     = releasesURL
+	homebrewCaskAddr = homebrewCaskURL
+	caskVersionRE    = regexp.MustCompile(`(?m)^\s*version\s+"([^"]+)"`)
 )
 
 // Check refreshes the cached "latest version" record if the cache is stale.
@@ -47,10 +51,11 @@ func Check(ctx context.Context, currentVersion string) {
 	if disabled(currentVersion) {
 		return
 	}
+	installMethod := Detect()
 	if !shouldFetch() {
 		return
 	}
-	latest, url, err := fetchLatest(ctx)
+	latest, url, err := fetchLatest(ctx, installMethod)
 	if err != nil || latest == "" {
 		return
 	}
@@ -79,7 +84,14 @@ func shouldFetch() bool {
 	return time.Since(c.CheckedAt) > cacheTTL
 }
 
-func fetchLatest(ctx context.Context) (string, string, error) {
+func fetchLatest(ctx context.Context, method Method) (string, string, error) {
+	if method == MethodHomebrew {
+		return fetchHomebrewLatest(ctx)
+	}
+	return fetchGitHubLatest(ctx)
+}
+
+func fetchGitHubLatest(ctx context.Context) (string, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releasesAddr, nil)
 	if err != nil {
 		return "", "", err
@@ -102,6 +114,33 @@ func fetchLatest(ctx context.Context) (string, string, error) {
 		return "", "", err
 	}
 	return strings.TrimPrefix(body.TagName, "v"), body.HTMLURL, nil
+}
+
+func fetchHomebrewLatest(ctx context.Context) (string, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, homebrewCaskAddr, nil)
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("Accept", "text/plain")
+	req.Header.Set("User-Agent", "inngest-cli")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("homebrew cask: status %d", resp.StatusCode)
+	}
+	byt, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", "", err
+	}
+	match := caskVersionRE.FindSubmatch(byt)
+	if len(match) < 2 {
+		return "", "", errors.New("homebrew cask: version not found")
+	}
+	version := string(match[1])
+	return version, "https://github.com/inngest/inngest/releases/tag/v" + version, nil
 }
 
 func defaultCachePath() (string, error) {

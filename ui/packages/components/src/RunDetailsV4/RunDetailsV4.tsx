@@ -1,9 +1,6 @@
 /**
  * RunDetailsV4 - Run details page using the composable TimelineBar.
  * Feature: 001-composable-timeline-bar
- *
- * This component mirrors RunDetailsV3's interface but uses the V4 Timeline
- * component for the timeline visualization.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -41,6 +38,8 @@ type Props = {
   pollInterval?: number;
   runID: string;
   orgName?: string;
+  // Hides run actions (rerun/cancel/invoke) for read-only views.
+  readOnly?: boolean;
 };
 
 const MIN_HEIGHT = 586;
@@ -119,6 +118,7 @@ export const RunDetailsV4 = ({
   pollInterval: initialPollInterval,
   initialRunData,
   orgName,
+  readOnly,
 }: Props) => {
   const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
@@ -302,6 +302,7 @@ export const RunDetailsV4 = ({
               standalone={standalone}
               result={resultData}
               isDurableEndpoint={runData?.isDurableEndpoint}
+              readOnly={readOnly}
             />
             {showError && (
               <ErrorCard
@@ -372,6 +373,7 @@ export const RunDetailsV4 = ({
               result={resultData}
               trace={runData?.trace as unknown as Trace | undefined}
               isDurableEndpoint={runData?.isDurableEndpoint}
+              readOnly={readOnly}
               defers={linkageData?.defers}
               siblingDefers={linkageData?.siblingDefers ?? []}
               deferredFrom={linkageData?.deferredFrom}

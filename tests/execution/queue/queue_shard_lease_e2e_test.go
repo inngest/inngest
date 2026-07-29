@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/jonboulle/clockwork"
@@ -15,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func alwaysSelect(s queue.QueueShard) func(context.Context, uuid.UUID, *string) (queue.QueueShard, error) {
-	return func(context.Context, uuid.UUID, *string) (queue.QueueShard, error) {
+func alwaysSelect(s queue.QueueShard) func(context.Context, queue.Scope, *string) (queue.QueueShard, error) {
+	return func(context.Context, queue.Scope, *string) (queue.QueueShard, error) {
 		return s, nil
 	}
 }
