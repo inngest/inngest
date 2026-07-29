@@ -158,64 +158,205 @@
   "/env/webhooks": {
     "get": {
       "200": {
-        "// TODO": "Add example data for get /env/webhooks 200"
+        "data": [
+          {
+            "createdAt": "2024-01-15T10:30:00Z",
+            "environment": "production",
+            "eventFilter": {
+              "events": ["orders/payment.created", "orders/*"],
+              "filter": "ALLOW"
+            },
+            "id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+            "name": "Payment Processing Webhook",
+            "response": "function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };",
+            "transform": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }",
+            "updatedAt": "2024-01-20T14:22:33Z",
+            "url": "https://inn.gs/e/wZXmP3vN9kQ2rL8tY6bH4jD1"
+          },
+          {
+            "createdAt": "2024-01-18T14:22:33Z",
+            "environment": "production",
+            "id": "f8c3de3d-1fea-4d7c-a8b0-29f63c4c3454",
+            "name": "GitHub Events Webhook",
+            "transform": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'github/webhook.received', data: evt }; }",
+            "updatedAt": "2024-01-18T14:22:33Z",
+            "url": "https://inn.gs/e/kP9wR2mB7nT4vX6yH1cL8dQ3"
+          }
+        ],
+        "metadata": {
+          "cachedUntil": null,
+          "fetchedAt": "2024-01-20T14:22:33Z"
+        },
+        "page": {
+          "cursor": null,
+          "hasMore": false,
+          "limit": 20
+        }
       },
       "400": {
-        "// TODO": "Add example data for get /env/webhooks 400"
+        "errors": [
+          {
+            "code": "invalid_field_format",
+            "message": "Limit must be at least 1"
+          }
+        ]
       },
       "401": {
-        "// TODO": "Add example data for get /env/webhooks 401"
+        "errors": [
+          {
+            "code": "invalid_signing_key",
+            "message": "The signing key provided is invalid"
+          }
+        ]
       },
       "403": {
-        "// TODO": "Add example data for get /env/webhooks 403"
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to this environment"
+          }
+        ]
       },
       "500": {
-        "// TODO": "Add example data for get /env/webhooks 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     },
     "post": {
       "201": {
-        "// TODO": "Add example data for post /env/webhooks 201"
+        "data": {
+          "createdAt": "2024-01-20T14:22:33Z",
+          "environment": "production",
+          "eventFilter": {
+            "events": ["orders/payment.created", "orders/*"],
+            "filter": "ALLOW"
+          },
+          "id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+          "name": "Payment Processing Webhook",
+          "response": "function respond(body, headers) { return { status: 200, headers: {}, body: JSON.parse(body)?.challenge } };",
+          "transform": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }",
+          "updatedAt": "2024-01-20T14:22:33Z",
+          "url": "https://inn.gs/e/wZXmP3vN9kQ2rL8tY6bH4jD1"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetchedAt": "2024-01-20T14:22:33Z"
+        }
       },
       "400": {
-        "// TODO": "Add example data for post /env/webhooks 400"
+        "errors": [
+          {
+            "code": "missing_field",
+            "message": "Webhook name is required"
+          }
+        ]
       },
       "401": {
-        "// TODO": "Add example data for post /env/webhooks 401"
+        "errors": [
+          {
+            "code": "invalid_signing_key",
+            "message": "The signing key provided is invalid"
+          }
+        ]
       },
       "403": {
-        "// TODO": "Add example data for post /env/webhooks 403"
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to this environment"
+          }
+        ]
       },
       "409": {
-        "// TODO": "Add example data for post /env/webhooks 409"
+        "errors": [
+          {
+            "code": "resource_already_exists",
+            "message": "A webhook with this name already exists"
+          }
+        ]
       },
       "422": {
-        "// TODO": "Add example data for post /env/webhooks 422"
+        "errors": [
+          {
+            "code": "validation_error",
+            "message": "Transform function contains invalid JavaScript"
+          }
+        ]
       },
       "500": {
-        "// TODO": "Add example data for post /env/webhooks 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     }
   },
   "/env/webhooks/{id}": {
     "put": {
       "200": {
-        "// TODO": "Add example data for put /env/webhooks/{id} 200"
+        "data": {
+          "createdAt": "2024-01-15T10:30:00Z",
+          "environment": "production",
+          "eventFilter": {
+            "events": ["orders/payment.created"],
+            "filter": "ALLOW"
+          },
+          "id": "d290f1ee-6c54-4b01-90e6-d701748f0851",
+          "name": "Payment Processing Webhook - Updated",
+          "transform": "function transform(evt, headers = {}, queryParams = {}, raw = '') { return { name: 'webhook/request.received', data: evt }; }",
+          "updatedAt": "2024-01-22T09:05:12Z",
+          "url": "https://inn.gs/e/wZXmP3vN9kQ2rL8tY6bH4jD1"
+        },
+        "metadata": {
+          "cachedUntil": null,
+          "fetchedAt": "2024-01-22T09:05:12Z"
+        }
       },
       "400": {
-        "// TODO": "Add example data for put /env/webhooks/{id} 400"
+        "errors": [
+          {
+            "code": "missing_field",
+            "message": "Webhook transform is required"
+          }
+        ]
       },
       "401": {
-        "// TODO": "Add example data for put /env/webhooks/{id} 401"
+        "errors": [
+          {
+            "code": "invalid_signing_key",
+            "message": "The signing key provided is invalid"
+          }
+        ]
       },
       "403": {
-        "// TODO": "Add example data for put /env/webhooks/{id} 403"
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "You do not have access to this environment"
+          }
+        ]
       },
       "404": {
-        "// TODO": "Add example data for put /env/webhooks/{id} 404"
+        "errors": [
+          {
+            "code": "not_found",
+            "message": "Webhook not found"
+          }
+        ]
       },
       "500": {
-        "// TODO": "Add example data for put /env/webhooks/{id} 500"
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Something went wrong"
+          }
+        ]
       }
     }
   },
