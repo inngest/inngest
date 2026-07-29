@@ -51,6 +51,14 @@ func (h *historyLifecycles) OnSynced(ctx context.Context, conn *state.Connection
 }
 
 func (h *historyLifecycles) OnConnected(ctx context.Context, conn *state.Connection) {
+	if conn.Data.GetSystemAttributes() == nil {
+		logger.StdlibLogger(ctx).Warn(
+			"worker connected without system attributes",
+			"connection_id", conn.ConnectionId.String(),
+			"instance_id", conn.Data.GetInstanceId(),
+		)
+	}
+
 	err := h.upsertConnection(ctx, conn, connectpb.ConnectionStatus_CONNECTED, time.Now())
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not persist connection history", "error", err)
@@ -71,6 +79,7 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 	if closeReason != "" {
 		disconnectReason = ptr.String(closeReason)
 	}
+	system := conn.Data.GetSystemAttributes()
 
 	for groupHash, group := range conn.Groups {
 		// Persist history in history store
@@ -103,9 +112,9 @@ func (h *historyLifecycles) OnDisconnected(ctx context.Context, conn *state.Conn
 			AppVersion:    group.AppVersion,
 			FunctionCount: len(group.FunctionSlugs),
 
-			CpuCores: conn.Data.SystemAttributes.CpuCores,
-			MemBytes: conn.Data.SystemAttributes.MemBytes,
-			Os:       conn.Data.SystemAttributes.Os,
+			CpuCores: system.GetCpuCores(),
+			MemBytes: system.GetMemBytes(),
+			Os:       system.GetOs(),
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("could not persist connection history", "error", err)
@@ -120,6 +129,8 @@ func NewHistoryLifecycle(writer cqrs.ConnectionHistoryWriter) connect.ConnectGat
 }
 
 func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Connection, status connectpb.ConnectionStatus, lastHeartbeatAt time.Time) error {
+	system := conn.Data.GetSystemAttributes()
+
 	for groupHash, group := range conn.Groups {
 		// Persist history in history store
 		err := h.writer.InsertWorkerConnection(ctx, &cqrs.WorkerConnection{
@@ -152,9 +163,9 @@ func (h *historyLifecycles) upsertConnection(ctx context.Context, conn *state.Co
 			SDKVersion:  conn.Data.SdkVersion,
 			SDKPlatform: conn.Data.GetPlatform(),
 
-			CpuCores: conn.Data.SystemAttributes.CpuCores,
-			MemBytes: conn.Data.SystemAttributes.MemBytes,
-			Os:       conn.Data.SystemAttributes.Os,
+			CpuCores: system.GetCpuCores(),
+			MemBytes: system.GetMemBytes(),
+			Os:       system.GetOs(),
 		})
 		if err != nil {
 			return fmt.Errorf("could not persist connection history: %w", err)
