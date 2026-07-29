@@ -481,14 +481,37 @@ func (q *queueProcessor) ProcessItem(
 
 			qi.AtMS = at.UnixMilli()
 			requeueItem := itemWithCurrentLease(qi)
-			if err := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at); err != nil {
-				if err == ErrQueueItemNotFound {
-					// Safe. The executor may have dequeued.
+			if requeueErr := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at); requeueErr != nil {
+				if requeueErr == ErrQueueItemNotFound {
+					// The item is gone, so there is nothing to requeue and this retry is
+					// dropped.  That is benign when finalize() legitimately dequeued the
+					// item (cancellations, parallelism) and the run is already terminal.
+					//
+					// It is NOT benign if the run is still live: nothing remains to drive
+					// it to a terminal state, so it stays non-terminal and holds its
+					// function concurrency capacity until it is cancelled by hand.
+					//
+					// We cannot cheaply tell those cases apart here, so record the
+					// occurrence instead of returning silently.
+					l.Warn("dropped retry; queue item not found on requeue",
+						"cause", err,
+						"next_attempt", qi.Data.Attempt,
+						"max_attempts", qi.Data.GetMaxAttempts(),
+						"lease_id", requeueItem.LeaseID,
+						"requeue_at", at,
+					)
+					metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"status":      "requeue_item_missing",
+							"queue_shard": shard.Name(),
+						},
+					})
 					return ProcessItemResult{}, nil
 				}
 
-				l.Error("error requeuing job", "error", err, "item", requeueItem)
-				return ProcessItemResult{}, err
+				l.Error("error requeuing job", "error", requeueErr, "item", requeueItem)
+				return ProcessItemResult{}, requeueErr
 			}
 			if _, ok := err.(QuitError); ok {
 				q.quit <- err
