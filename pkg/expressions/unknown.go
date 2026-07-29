@@ -20,6 +20,10 @@ import (
 // cached for the lifetime of the expression rather than rebuilt on every evaluation.
 func unknownDecorator() interpreter.InterpretableDecorator {
 	return func(i interpreter.Interpretable) (interpreter.Interpretable, error) {
+		if wrapConditionalCondition(i) {
+			return i, nil
+		}
+
 		// Handle logical OR/AND nodes.  CEL represents || and && as special
 		// evalOr/evalAnd (or evalExhaustiveOr/evalExhaustiveAnd) structs that
 		// are NOT InterpretableCall.  They require boolean operands, but users
@@ -38,6 +42,44 @@ func unknownDecorator() interpreter.InterpretableDecorator {
 
 		return &runtimeUnknownCall{InterpretableCall: call}, nil
 	}
+}
+
+func wrapConditionalCondition(i interpreter.Interpretable) bool {
+	attr, ok := i.(interpreter.InterpretableAttribute)
+	if !ok {
+		return false
+	}
+
+	conditional := reflect.ValueOf(attr.Attr())
+	if conditional.Kind() != reflect.Pointer || !strings.Contains(conditional.Type().String(), "conditionalAttribute") {
+		return false
+	}
+
+	conditionField := conditional.Elem().FieldByName("expr")
+	if !conditionField.IsValid() {
+		return false
+	}
+
+	condition := *(*interpreter.Interpretable)(unsafe.Pointer(conditionField.UnsafeAddr()))
+	*(*interpreter.Interpretable)(unsafe.Pointer(conditionField.UnsafeAddr())) = &evalTruthyCondition{
+		inner: condition,
+	}
+	return true
+}
+
+type evalTruthyCondition struct {
+	inner interpreter.Interpretable
+}
+
+func (e *evalTruthyCondition) ID() int64 {
+	return e.inner.ID()
+}
+
+func (e *evalTruthyCondition) Eval(ctx interpreter.Activation) ref.Val {
+	if isTruthy(e.inner.Eval(ctx)) {
+		return types.True
+	}
+	return types.False
 }
 
 // runtimeUnknownCall wraps an InterpretableCall and applies the same unknown/null/coercion
