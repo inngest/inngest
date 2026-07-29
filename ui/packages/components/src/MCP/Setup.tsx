@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 type JSONSchema = {
   properties?: Record<string, JSONSchemaProperty>;
@@ -146,6 +146,11 @@ const useMCPTools = (
   const [tools, setTools] = useState<MCPTool[]>([]);
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const getAccessTokenRef = useRef(getAccessToken);
+
+  useEffect(() => {
+    getAccessTokenRef.current = getAccessToken;
+  }, [getAccessToken]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -156,7 +161,7 @@ const useMCPTools = (
       setLoading(true);
       setError(undefined);
       try {
-        const accessToken = await getAccessToken?.();
+        const accessToken = await getAccessTokenRef.current?.();
         requestHeaders = accessToken
           ? { ...headers, Authorization: `Bearer ${accessToken}` }
           : headers;
@@ -224,7 +229,7 @@ const useMCPTools = (
         });
       }
     };
-  }, [endpoint, getAccessToken, headers]);
+  }, [endpoint, headers]);
 
   return { error, loading, tools };
 };
