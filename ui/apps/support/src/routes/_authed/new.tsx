@@ -24,8 +24,9 @@ import {
   instructions,
   isDpaFormComplete,
   severityOptions,
+  toDpaRequest,
 } from "@/data/ticketOptions";
-import { createDpaRequest, toDpaRequest } from "@/data/commonpaper";
+import { createDpaRequest } from "@/data/commonpaper";
 import { createTicket, getCustomerTierByEmail } from "@/data/plain";
 import { getAccountPlanInfo } from "@/data/inngest";
 import { CommunityChannels } from "@/components/Support/CommunityChannels";
@@ -57,7 +58,11 @@ function NewTicketPage() {
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
-  const [result, setResult] = useState<{ ok?: boolean; message?: string }>({});
+  const [result, setResult] = useState<{
+    ok?: boolean;
+    warning?: boolean;
+    message?: string;
+  }>({});
 
   // Fetch customer tier information from Plain API (email derived server-side from auth)
   const userEmail = user?.primaryEmailAddress?.emailAddress;
@@ -229,11 +234,16 @@ function NewTicketPage() {
           });
 
       if (response.success) {
+        const warning =
+          isDpaTicket && "warning" in response ? response.warning : undefined;
         setResult({
           ok: true,
-          message: isDpaTicket
-            ? "DPA request submitted successfully. Our team will follow up shortly."
-            : "Support ticket created successfully!",
+          warning: Boolean(warning),
+          message:
+            warning ||
+            (isDpaTicket
+              ? "DPA request submitted successfully. Our team will follow up shortly."
+              : "Support ticket created successfully!"),
         });
         // Reset form
         setTicketType(null);
@@ -259,7 +269,9 @@ function NewTicketPage() {
       setResult({
         ok: false,
         message:
-          "Failed to create support ticket. Please email hello@inngest.com if the problem persists.",
+          error instanceof Error
+            ? error.message
+            : "Failed to create support ticket. Please email hello@inngest.com if the problem persists.",
       });
     } finally {
       setIsSubmitting(false);
@@ -457,7 +469,11 @@ function NewTicketPage() {
 
           {/* Result Message */}
           {result.message && (
-            <Alert severity={result.ok ? "info" : "error"}>
+            <Alert
+              severity={
+                result.ok ? (result.warning ? "warning" : "info") : "error"
+              }
+            >
               {result.message}
             </Alert>
           )}

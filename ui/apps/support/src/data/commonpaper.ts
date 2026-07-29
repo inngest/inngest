@@ -1,10 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { DpaFieldKey } from "@/data/ticketOptions";
+import type { DpaRequestInput } from "@/data/ticketOptions";
 import { isValidCommonPaperCountry } from "@/data/commonPaperCountries";
 import { formatDpaBody } from "@/data/ticketOptions";
 import { createPlainNote, createPlainThread } from "@/data/plain";
 
 const API_BASE = "https://api.commonpaper.com/v1";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type CompanyAddress = {
   street: string;
@@ -14,14 +16,7 @@ type CompanyAddress = {
   country: string;
 };
 
-export type DpaRequestInput = {
-  companyLegalName: string;
-  signatoryName: string;
-  signatoryTitle: string;
-  signatoryEmail: string;
-  companyAddress: string;
-  country: string;
-};
+export type { DpaRequestInput };
 
 export type CreateDpaDraftResult = {
   id: string;
@@ -44,6 +39,7 @@ export type CreateDpaRequestResult = {
   agreementId?: string;
   agreementUrl?: string;
   error?: string;
+  warning?: string;
 };
 
 function requireEnv(name: string, value: string | undefined): string {
@@ -53,14 +49,84 @@ function requireEnv(name: string, value: string | undefined): string {
   return value;
 }
 
-function toDpaRequest(fields: Record<DpaFieldKey, string>): DpaRequestInput {
+function requireNonEmptyString(value: unknown, label: string): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${label} is required`);
+  }
+  return value.trim();
+}
+
+function validateCreateDpaRequestInput(data: unknown): CreateDpaRequestInput {
+  if (!data || typeof data !== "object") {
+    throw new Error("Invalid DPA request");
+  }
+
+  const input = data as Partial<CreateDpaRequestInput>;
+  const user = input.user;
+  const dpa = input.dpa;
+
+  if (!user || typeof user !== "object") {
+    throw new Error("User is required");
+  }
+  if (!dpa || typeof dpa !== "object") {
+    throw new Error("DPA details are required");
+  }
+
+  const userId = requireNonEmptyString(user.id, "User id");
+  const companyLegalName = requireNonEmptyString(
+    dpa.companyLegalName,
+    "Company legal name",
+  );
+  const signatoryName = requireNonEmptyString(
+    dpa.signatoryName,
+    "Signatory name",
+  );
+  const signatoryTitle = requireNonEmptyString(
+    dpa.signatoryTitle,
+    "Signatory title",
+  );
+  const signatoryEmail = requireNonEmptyString(
+    dpa.signatoryEmail,
+    "Signatory email",
+  );
+  const companyAddress = requireNonEmptyString(
+    dpa.companyAddress,
+    "Company address",
+  );
+  const country = requireNonEmptyString(dpa.country, "Country");
+
+  if (!EMAIL_PATTERN.test(signatoryEmail)) {
+    throw new Error("Signatory email is invalid");
+  }
+
+  if (!isValidCommonPaperCountry(country)) {
+    throw new Error("Please select a valid country from the list");
+  }
+
+  const attachmentIds = Array.isArray(input.attachmentIds)
+    ? input.attachmentIds.filter(
+        (id): id is string => typeof id === "string" && id.length > 0,
+      )
+    : undefined;
+
   return {
-    companyLegalName: fields.companyName.trim(),
-    signatoryName: fields.signatoryName.trim(),
-    signatoryTitle: fields.signatoryTitle.trim(),
-    signatoryEmail: fields.signatoryEmail.trim(),
-    companyAddress: fields.companyAddress.trim(),
-    country: fields.country.trim(),
+    user: {
+      id: userId,
+      name:
+        typeof user.name === "string" && user.name.trim().length > 0
+          ? user.name.trim()
+          : undefined,
+    },
+    dpa: {
+      companyLegalName,
+      signatoryName,
+      signatoryTitle,
+      signatoryEmail,
+      companyAddress,
+      country,
+    },
+    attachmentIds:
+      attachmentIds && attachmentIds.length > 0 ? attachmentIds : undefined,
   };
 }
 
@@ -233,7 +299,7 @@ export async function createDpaDraft(
 }
 
 export const createDpaRequest = createServerFn({ method: "POST" })
-  .inputValidator((data: CreateDpaRequestInput) => data)
+  .inputValidator((data: unknown) => validateCreateDpaRequestInput(data))
   .handler(async ({ data }): Promise<CreateDpaRequestResult> => {
     try {
       const { user, dpa, attachmentIds } = data;
@@ -299,14 +365,16 @@ export const createDpaRequest = createServerFn({ method: "POST" })
           agreementUrl: draft.agreementUrl,
         };
       } catch (error) {
+        // Plain thread already exists — treat as success with a warning so the
+        // UI resets and the user does not retry and create a duplicate ticket.
         console.error("Error creating Common Paper DPA draft:", error);
         return {
-          success: false,
+          success: true,
           threadId: plainResult.threadId,
-          error:
+          warning:
             error instanceof Error
               ? `Support ticket created, but the DPA draft failed: ${error.message}`
-              : "Support ticket created, but the DPA draft failed.",
+              : "Support ticket created, but the DPA draft failed. Our team will follow up.",
         };
       }
     } catch (error) {
@@ -320,5 +388,3 @@ export const createDpaRequest = createServerFn({ method: "POST" })
       };
     }
   });
-
-export { toDpaRequest };

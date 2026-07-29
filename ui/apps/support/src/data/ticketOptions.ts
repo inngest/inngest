@@ -112,6 +112,28 @@ export function isDpaFormComplete(
   return dpaFields.every(({ key }) => fields[key].trim().length > 0);
 }
 
+export type DpaRequestInput = {
+  companyLegalName: string;
+  signatoryName: string;
+  signatoryTitle: string;
+  signatoryEmail: string;
+  companyAddress: string;
+  country: string;
+};
+
+export function toDpaRequest(
+  fields: Record<DpaFieldKey, string>,
+): DpaRequestInput {
+  return {
+    companyLegalName: fields.companyName.trim(),
+    signatoryName: fields.signatoryName.trim(),
+    signatoryTitle: fields.signatoryTitle.trim(),
+    signatoryEmail: fields.signatoryEmail.trim(),
+    companyAddress: fields.companyAddress.trim(),
+    country: fields.country.trim(),
+  };
+}
+
 type SeverityOption = {
   label: string;
   description: string;
