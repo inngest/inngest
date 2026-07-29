@@ -16,7 +16,7 @@ import { formatCompactNumber } from '@/components/InfraDashboard/utils';
 import { dateFormat, timeDiff } from '@/components/Metrics/utils';
 import { ChartTooltip } from './ChartTooltip';
 import { TrendAreaChartSkeleton, TrendChartSkeleton } from './ChartSkeleton';
-import { BORDER_SUBTLE_COLOR, CHART_COLORS, CHART_COLORS_SUBTLE } from './colors';
+import { BORDER_SUBTLE_COLOR, CHART_COLORS } from './colors';
 import { valuesToMap, type InsightsMetricPoint, type TooltipExtra } from './types';
 
 export type TrendSeriesConfig = {
@@ -33,8 +33,8 @@ export type TrendSeriesConfig = {
   // for a caller that wants one explicitly.
   borderColor?: string;
   // Fill color override — the 'area' chartType's fill, or (alongside
-  // borderColor) a 'bar' chartType's subtle fill under a solid border.
-  // Defaults to a computed mix of `color` toward the chart surface.
+  // borderColor) a 'bar' chartType's fill under a solid border. Defaults to
+  // `color`.
   fillColor?: string;
 };
 
@@ -97,12 +97,12 @@ type Props = {
   // reading of zero. Fixed `series` form only.
   defaultValue?: number;
   // Whether there's any real data at all for this chart — pass this
-  // explicitly when `points` came from toTrendPoints' range/limit fill
-  // (which always returns one point per expected bucket, even ones the
-  // backend returned zero rows for), so `points.length` alone can no longer
-  // tell "no data in this range" apart from "sparse data with gaps filled".
-  // Omitting it falls back to `points.length > 0`, for callers that don't
-  // use that fill.
+  // explicitly for a `points` source whose backend query zero-fills gaps
+  // (see toTrendPoints), which always returns one point per expected bucket
+  // once there's any real data in range, so `points.length` alone can no
+  // longer tell "no data in this range" apart from "sparse data with gaps
+  // filled". Omitting it falls back to `points.length > 0`, for callers
+  // whose query doesn't zero-fill.
   hasData?: boolean;
   isLoading?: boolean;
   // Charts sharing the same group id sync their hover/tooltip position
@@ -209,7 +209,7 @@ export function TrendChart({
     }
     return (series ?? []).map((s, i) => {
       const color = s.color ?? CHART_COLORS[i % CHART_COLORS.length];
-      const fillColor = s.fillColor ?? CHART_COLORS_SUBTLE[i % CHART_COLORS_SUBTLE.length];
+      const fillColor = s.fillColor ?? color;
       return { key: s.valueName, label: s.label, color, fillColor, borderColor: s.borderColor, isOther: false };
     });
   }, [valueName, hasOther, topIdentifiers, series]);
@@ -392,8 +392,7 @@ export function TrendChart({
                     stroke={s.color}
                     strokeWidth={1}
                     dot={false}
-                    // Hover-point marker. Fill reuses `fillColor`, already
-                    // the "subtle" tier mix of this series' color (the same
+                    // Hover-point marker. Fill reuses `fillColor` (the same
                     // tint an area fill uses); the border matches the
                     // line's own stroke color, so the dot reads as "this
                     // line, lit up" rather than an unrelated hue.

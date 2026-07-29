@@ -20,9 +20,10 @@ const Y_AXIS_WIDTH = 50;
 // (min/q1/med/q3/max), the same shape BoxPlot draws horizontally per
 // category, just one per bucket along a time axis instead of one per row.
 // The stat fields are optional so a bucket with no observations can still
-// occupy its rightful slot on the time axis (see fillTrendBuckets-style
-// gap-filling upstream) — CandleShape just draws nothing for it, rather
-// than the axis compressing to only the buckets that have data.
+// occupy its rightful slot on the time axis (the backend zero-fills gaps —
+// see InsightsMetrics/types.ts' toTrendPoints) — CandleShape just draws
+// nothing for it, rather than the axis compressing to only the buckets that
+// have data.
 export type CandleData = {
   timestamp: string;
   count?: number;

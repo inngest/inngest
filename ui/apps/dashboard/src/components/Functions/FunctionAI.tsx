@@ -1,13 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
+import { Alert } from '@inngest/components/Alert';
 import { Error } from '@inngest/components/Error/Error';
-import EntityFilter from '@inngest/components/Filter/EntityFilter';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
-import {
-  useBatchedSearchParams,
-  useSearchParam,
-  useStringArraySearchParam,
-} from '@inngest/components/hooks/useSearchParams';
+import { useBatchedSearchParams, useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { SelectGroup } from '@inngest/components/Select/Select';
 import {
   durationToString,
@@ -15,17 +11,30 @@ import {
   subtractDuration,
   toDate,
 } from '@inngest/components/utils/date';
-import { useRouterState } from '@tanstack/react-router';
 import type { SortingState } from '@tanstack/react-table';
-import { useQuery } from 'urql';
 
+import LoadingIcon from '@/components/Icons/LoadingIcon';
+import { useFunction } from '@/queries/functions';
+import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { CategoricalChart } from '@/components/InsightsMetrics/CategoricalChart';
+import { CHART_COLORS } from '@/components/InsightsMetrics/colors';
+import { HeadlineStats } from '@/components/InsightsMetrics/HeadlineStats';
+import { RangePlot } from '@/components/InsightsMetrics/RangePlot';
+import { RankedTable } from '@/components/InsightsMetrics/RankedTable';
+import { Section, SectionGroupHeading } from '@/components/InsightsMetrics/Section';
+import { TrendChart } from '@/components/InsightsMetrics/TrendChart';
+import { TREND_BUCKET_LIMIT } from '@/components/InsightsMetrics/queries';
+import {
+  sumValues,
+  toListItems,
+  toScalarValues,
+  toTrendPoints,
+  type TooltipExtra,
+} from '@/components/InsightsMetrics/types';
+import { sortingToOrderBy, useInsightsMetric } from '@/components/InsightsMetrics/useInsightsMetric';
+import { ViewToggle, type ViewMode } from '@/components/InsightsMetrics/ViewToggle';
 import { formatCompactNumber } from '@/components/InfraDashboard/utils';
 import { useEnvironment } from '@/components/Environments/environment-context';
-import { graphql } from '@/gql';
-import { GetAccountEntitlementsDocument } from '@/gql/graphql';
-import { CHART_COLORS } from '../InsightsMetrics/colors';
-import { Section, SectionGroupHeading } from '../InsightsMetrics/Section';
-import { AIOverviewEmptyState } from './EmptyState';
 import {
   formatCost,
   formatCostAxis,
@@ -35,80 +44,66 @@ import {
   headlineCaveat,
   tokenBreakdown,
   withTotalTokens,
-} from './utils';
+} from '@/components/AIOverview/utils';
 import {
   renderFunctionLink,
   renderRunLink,
   renderSessionKeyLink,
   renderSessionLink,
-} from './renderIdentifiers';
-import { CategoricalChart } from '../InsightsMetrics/CategoricalChart';
-import { ChartLegend } from '../InsightsMetrics/ChartLegend';
-import { HeadlineStats } from '../InsightsMetrics/HeadlineStats';
-import { RangePlot } from '../InsightsMetrics/RangePlot';
-import { RankedTable } from '../InsightsMetrics/RankedTable';
-import { ViewToggle, type ViewMode } from '../InsightsMetrics/ViewToggle';
-import { TrendChart } from '../InsightsMetrics/TrendChart';
-import { TREND_BUCKET_LIMIT } from '../InsightsMetrics/queries';
-import { sortingToOrderBy, useInsightsMetric } from '../InsightsMetrics/useInsightsMetric';
-import {
-  sumValues,
-  toListItems,
-  toScalarValues,
-  toTrendPoints,
-  type TooltipExtra,
-} from '../InsightsMetrics/types';
+} from '@/components/AIOverview/renderIdentifiers';
 
 const DEFAULT_DURATION = { days: 7 };
 
-const formatRuns = (value: number) => `${formatCompactNumber(value)} runs`;
-
 // Shared by "Cost over time" and "Cost by model" — both plot ai_token_trend/
 // ai_model_distribution's `cost` column, which carries input/output tokens
-// alongside it in the same row (see InsightsMetrics/queries.ts), so the
-// tooltip can show token counts without adding a visual series for them.
+// alongside it in the same row, so the tooltip can show token counts
+// without adding a visual series for them.
 const TOKEN_TOOLTIP_EXTRAS: TooltipExtra[] = [
   { valueName: 'input_tokens', label: 'Input tokens', format: formatCompactNumber, defaultValue: 0 },
   { valueName: 'output_tokens', label: 'Output tokens', format: formatCompactNumber, defaultValue: 0 },
 ];
 
-const FunctionLookupDocument = graphql(`
-  query AIOverviewFunctionLookup($envSlug: String!, $page: Int, $pageSize: Int) {
-    envBySlug(slug: $envSlug) {
-      workflows @paginated(perPage: $pageSize, page: $page) {
-        data {
-          id
-          name
-          slug
-        }
-      }
-    }
-  }
-`);
+type Props = {
+  functionSlug: string;
+};
 
-export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
+// FunctionAI is a single-function-scoped cut of AIOverviewDashboard: every
+// "by function" breakdown (top functions by usage/cost, latency by
+// function) is meaningless when already scoped to one function, so those
+// sections are dropped along with the function selector — everything else,
+// including the session-scoped sections, mirrors the env-wide dashboard.
+export const FunctionAI = ({ functionSlug }: Props) => {
   const environment = useEnvironment();
   const workspaceID = environment.id;
+
+  const [{ data, fetching: isFetchingFunction }] = useFunction({ functionSlug });
+  const function_ = data?.workspace.workflow;
+  const functionID = function_?.id;
+
+  // A single-entry map (rather than an env-wide function lookup query) is
+  // enough here — every renderFunctionLink call below resolves to this same
+  // function.
+  const functionsBySlug = useMemo(() => {
+    if (!function_) return new Map<string, { name: string; slug: string }>();
+    return new Map([[function_.slug, { name: function_.name, slug: function_.slug }]]);
+  }, [function_]);
+
+  const features = useAccountFeatures();
+  const daysAgoMax = features.data?.history ?? 7;
 
   const [start] = useSearchParam('start');
   const [end] = useSearchParam('end');
   const [duration] = useSearchParam('duration');
   const batchUpdate = useBatchedSearchParams();
-  const [selectedFns, setFns, removeFns] = useStringArraySearchParam('fns');
   const [latencyByModelView, setLatencyByModelView] = useState<ViewMode>('chart');
-  const [latencyByFunctionView, setLatencyByFunctionView] = useState<ViewMode>('chart');
-  // Changing these re-issues the ai_latency_by_model/ai_latency_by_function
-  // queries with a new orderBy (see useInsightsMetric below) — sorting the
-  // table re-sorts the chart's rows too, since both views share one query.
+  // Changing this re-issues the ai_latency_by_model query with a new orderBy
+  // (see useInsightsMetric below) — sorting the table re-sorts the chart's
+  // rows too, since both views share one query.
   const [latencyByModelSort, setLatencyByModelSort] = useState<SortingState>([]);
-  const [latencyByFunctionSort, setLatencyByFunctionSort] = useState<SortingState>([]);
 
   const parsedDuration = duration ? parseDuration(duration) : '';
   const parsedStart = toDate(start);
   const parsedEnd = toDate(end);
-
-  // `loadedAt` bumps on router.invalidate(), so RefreshButton refires queries.
-  const loadedAt = useRouterState({ select: (s) => s.loadedAt });
 
   const range = useMemo(() => {
     if (parsedStart && parsedEnd) {
@@ -117,105 +112,108 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
     const to = new Date();
     const dur = parsedDuration || DEFAULT_DURATION;
     return { from: subtractDuration(to, dur), to };
-  }, [start, end, duration, loadedAt]);
+  }, [start, end, duration]);
 
   const timeRange = useMemo(
     () => ({ from: range.from.toISOString(), to: range.to.toISOString() }),
     [range],
   );
 
-  const functionIDs = selectedFns?.length ? selectedFns : null;
+  const functionIDs = functionID ? [functionID] : null;
+  // Every metric below pauses on `!functionID` — an unpaused call would fire
+  // with an empty/null functionIDs list while the function lookup is still
+  // resolving and get back env-wide (not "no data yet") rows.
+  const pause = !functionID;
 
-  const [{ data: accountData }] = useQuery({
-    query: GetAccountEntitlementsDocument,
+  const headline = useInsightsMetric('ai_headline', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    pause,
   });
-  const daysAgoMax = accountData?.account.entitlements.history.limit ?? 7;
-
-  // One InsightsMetric request per widget (see InsightsMetrics/queries.ts) —
-  // topFunctionsByRuns/topFunctionsByCost omit functionIDs since they're
-  // env-wide rankings, so they don't refetch when the function filter
-  // changes.
-  const headline = useInsightsMetric('ai_headline', { workspaceID, functionIDs, range: timeRange });
   const tokenTrend = useInsightsMetric('ai_token_trend', {
     workspaceID,
     functionIDs,
     range: timeRange,
     limit: TREND_BUCKET_LIMIT,
+    pause,
   });
   const modelDistribution = useInsightsMetric('ai_model_distribution', {
     workspaceID,
     functionIDs,
     range: timeRange,
+    pause,
   });
   const runsByModel = useInsightsMetric('ai_runs_by_model', {
     workspaceID,
     functionIDs,
     range: timeRange,
+    pause,
   });
   const runVolumeTrend = useInsightsMetric('ai_run_volume_trend', {
     workspaceID,
     functionIDs,
     range: timeRange,
     limit: TREND_BUCKET_LIMIT,
+    pause,
   });
   const latencyByModel = useInsightsMetric('ai_latency_by_model', {
     workspaceID,
     functionIDs,
     range: timeRange,
     orderBy: sortingToOrderBy(latencyByModelSort),
-  });
-  const latencyByFunction = useInsightsMetric('ai_latency_by_function', {
-    workspaceID,
-    functionIDs,
-    range: timeRange,
-    orderBy: sortingToOrderBy(latencyByFunctionSort),
-  });
-  const topFunctionsByRuns = useInsightsMetric('ai_top_functions_by_runs', {
-    workspaceID,
-    range: timeRange,
-    limit: 5,
-  });
-  const topFunctionsByCost = useInsightsMetric('ai_top_functions_by_cost', {
-    workspaceID,
-    range: timeRange,
-    limit: 5,
+    pause,
   });
   const mostExpensiveRuns = useInsightsMetric('ai_most_expensive_runs', {
     workspaceID,
     functionIDs,
     range: timeRange,
     limit: 10,
+    pause,
   });
   const mostExpensiveSteps = useInsightsMetric('ai_most_expensive_steps', {
     workspaceID,
     functionIDs,
     range: timeRange,
     limit: 10,
-  });
-  const mostExpensiveSessions = useInsightsMetric('ai_most_expensive_sessions', {
-    workspaceID,
-    functionIDs,
-    range: timeRange,
-    limit: 10,
+    pause,
   });
   const costPerRunTrend = useInsightsMetric('ai_avg_cost_per_run_trend', {
     workspaceID,
     functionIDs,
     range: timeRange,
     limit: TREND_BUCKET_LIMIT,
+    pause,
   });
   const costPerSessionTrend = useInsightsMetric('ai_cost_per_session_trend', {
     workspaceID,
     functionIDs,
     range: timeRange,
     limit: TREND_BUCKET_LIMIT,
+    pause,
+  });
+  const mostExpensiveSessions = useInsightsMetric('ai_most_expensive_sessions', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: 10,
+    pause,
   });
   const slowRuns = useInsightsMetric('ai_slow_runs', {
     workspaceID,
     functionIDs,
     range: timeRange,
     limit: 10,
+    pause,
   });
+
+  // A non-bucketed aggregate, unaffected by the trend queries' backend
+  // FILL (which zero-fills every bucket in range unconditionally, so
+  // `points.length` alone can't tell "no data" apart from "zero-filled") —
+  // used as the shared `hasData` signal for every trend chart below.
+  const hasAnyCalls = toScalarValues(headline.data).some(
+    (v) => v.name === 'calls' && v.value > 0,
+  );
 
   const error = [
     headline,
@@ -224,40 +222,13 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
     runsByModel,
     runVolumeTrend,
     latencyByModel,
-    latencyByFunction,
-    topFunctionsByRuns,
-    topFunctionsByCost,
     mostExpensiveRuns,
     mostExpensiveSteps,
-    mostExpensiveSessions,
     costPerRunTrend,
     costPerSessionTrend,
+    mostExpensiveSessions,
     slowRuns,
   ].some((m) => m.error);
-
-  const [{ data: lookupData }] = useQuery({
-    query: FunctionLookupDocument,
-    variables: { envSlug, page: 1, pageSize: 1000 },
-  });
-  // Keyed by slug, not id: the backend's "identifier" column for these
-  // rankings is `function_id AS identifier`, and the Insights transpiler's
-  // output slug-translation (buildSlugOutputColumns in pkg/insights) turns
-  // that UUID into the function's slug before it reaches the frontend — so
-  // `identifier` here is already a slug, not the workflow's id.
-  const functionsBySlug = useMemo(() => {
-    const m = new Map<string, { name: string; slug: string }>();
-    for (const wf of lookupData?.envBySlug?.workflows.data ?? []) {
-      m.set(wf.slug, { name: wf.name, slug: wf.slug });
-    }
-    return m;
-  }, [lookupData]);
-
-  const isDefaultView = !start && !end && !duration && !selectedFns?.length;
-  const hasAnyCalls = toScalarValues(headline.data).some(
-    (v) => v.name === 'calls' && v.value > 0,
-  );
-  const showEmptyState =
-    isDefaultView && !headline.fetching && !headline.error && headline.data && !hasAnyCalls;
 
   const defaultRange =
     parsedStart && parsedEnd
@@ -267,9 +238,24 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           duration: parsedDuration || DEFAULT_DURATION,
         };
 
+  if (isFetchingFunction) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <LoadingIcon />
+      </div>
+    );
+  }
+
+  if (!function_) {
+    return (
+      <div className="mt-4 flex place-content-center">
+        <Alert severity="warning">Function not yet deployed to this environment</Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1500px] flex-col px-6">
-      {showEmptyState && <AIOverviewEmptyState compact className="mt-3" />}
       <div className="bg-canvasBase flex flex-row items-center gap-1.5 py-[9px]">
         <SelectGroup>
           <span className="border-muted bg-modalBase text-muted box-content flex h-[24px] items-center rounded border px-1.5 text-[13px]">
@@ -288,15 +274,9 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
             }}
           />
         </SelectGroup>
-        <EntityFilter
-          type="function"
-          onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
-          selectedEntities={selectedFns || []}
-          entities={lookupData?.envBySlug?.workflows.data || []}
-        />
       </div>
 
-      {error && <Error message="There was an error loading the AI Overview." />}
+      {error && <Error message="There was an error loading this function's AI metrics." />}
 
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pb-6 [&::-webkit-scrollbar]:hidden">
         <Section plain>
@@ -375,35 +355,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               tooltipExtras={[{ valueName: 'cost', label: 'Cost', format: formatCost, defaultValue: 0 }]}
               defaultValue={0}
             />
-          </Section>
-          <Section
-            title="Top functions by usage"
-            query={topFunctionsByRuns.data?.query}
-            queryName="AI top functions by usage"
-            className="lg:col-span-2"
-          >
-            <div className="flex flex-col gap-4 lg:flex-row">
-              <CategoricalChart
-                items={toListItems(topFunctionsByRuns.data)}
-                isLoading={topFunctionsByRuns.fetching && !topFunctionsByRuns.data}
-                valueName="runs"
-                valueLabel="Runs"
-                colors={CHART_COLORS}
-                format={formatRuns}
-                formatIdentifier={(id) => functionsBySlug.get(id)?.name ?? id}
-                showYAxisLine={false}
-                className="min-w-0 lg:w-2/3"
-              />
-              <ChartLegend
-                items={toListItems(topFunctionsByRuns.data)}
-                isLoading={topFunctionsByRuns.fetching && !topFunctionsByRuns.data}
-                valueName="runs"
-                colors={CHART_COLORS}
-                format={formatRuns}
-                renderIdentifier={(id) => renderFunctionLink(id, envSlug, functionsBySlug)}
-                className="w-full lg:w-1/3"
-              />
-            </div>
           </Section>
           <Section title="Runs by model" query={runsByModel.data?.query} queryName="AI runs by model">
             <CategoricalChart
@@ -516,24 +467,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
             />
           </Section>
           <Section
-            title="Cost by function"
-            query={topFunctionsByCost.data?.query}
-            queryName="AI cost by function"
-          >
-            <CategoricalChart
-              items={toListItems(topFunctionsByCost.data)}
-              isLoading={topFunctionsByCost.fetching && !topFunctionsByCost.data}
-              valueName="cost"
-              colors={CHART_COLORS}
-              format={formatCost}
-              formatIdentifier={(id) => functionsBySlug.get(id)?.name ?? id}
-              showYAxisLine={false}
-              showTooltipValueName={false}
-              showValueLabels
-              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
-            />
-          </Section>
-          <Section
             title="Most expensive runs"
             query={mostExpensiveRuns.data?.query}
             queryName="AI most expensive runs"
@@ -544,10 +477,10 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               items={toListItems(mostExpensiveRuns.data)}
               isLoading={mostExpensiveRuns.fetching && !mostExpensiveRuns.data}
               identifierLabel="Run"
-              renderIdentifier={(id) => renderRunLink(id, envSlug)}
+              renderIdentifier={(id) => renderRunLink(id, environment.slug)}
               functionColumn={{
                 label: 'Function',
-                render: (id) => renderFunctionLink(id, envSlug, functionsBySlug),
+                render: (id) => renderFunctionLink(id, environment.slug, functionsBySlug),
               }}
               columns={[
                 { valueName: 'cost', label: 'Cost', format: formatCost },
@@ -568,7 +501,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               identifierLabel="Step"
               functionColumn={{
                 label: 'Function',
-                render: (id) => renderFunctionLink(id, envSlug, functionsBySlug),
+                render: (id) => renderFunctionLink(id, environment.slug, functionsBySlug),
               }}
               columns={[
                 { valueName: 'cost', label: 'Total cost', format: formatCost },
@@ -587,10 +520,10 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               items={toListItems(mostExpensiveSessions.data)}
               isLoading={mostExpensiveSessions.fetching && !mostExpensiveSessions.data}
               identifierLabel="Session"
-              renderIdentifier={(id, item) => renderSessionLink(id, item.sessionKey ?? '', envSlug)}
+              renderIdentifier={(id, item) => renderSessionLink(id, item.sessionKey ?? '', environment.slug)}
               sessionKeyColumn={{
                 label: 'Session key',
-                render: (key) => renderSessionKeyLink(key, envSlug),
+                render: (key) => renderSessionKeyLink(key, environment.slug),
               }}
               columns={[
                 { valueName: 'cost', label: 'Cost', format: formatCost },
@@ -603,43 +536,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
 
         <SectionGroupHeading>Performance</SectionGroupHeading>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Section
-            title="AI Call Latency by function"
-            query={latencyByFunction.data?.query}
-            queryName="AI Call Latency by function"
-          >
-            <ViewToggle mode={latencyByFunctionView} onChange={setLatencyByFunctionView} />
-            {latencyByFunctionView === 'chart' ? (
-              <RangePlot
-                items={toListItems(latencyByFunction.data)}
-                isLoading={latencyByFunction.fetching && !latencyByFunction.data}
-                format={formatSeconds}
-                axisFormat={formatSecondsAxis}
-                colors={CHART_COLORS}
-                showYAxisLine={false}
-                formatIdentifier={(id) => functionsBySlug.get(id)?.name ?? id}
-              />
-            ) : (
-              <RankedTable
-                headerStyle="subtle"
-                density="compact"
-                items={toListItems(latencyByFunction.data)}
-                isLoading={latencyByFunction.fetching && !latencyByFunction.data}
-                identifierLabel="Function"
-                sortable
-                sorting={latencyByFunctionSort}
-                onSortingChange={setLatencyByFunctionSort}
-                renderIdentifier={(id) => renderFunctionLink(id, envSlug, functionsBySlug)}
-                columns={[
-                  { valueName: 'min', label: 'Min', format: (v) => formatSeconds(v / 1000) },
-                  { valueName: 'p50', label: 'p50', format: (v) => formatSeconds(v / 1000) },
-                  { valueName: 'p95', label: 'p95', format: (v) => formatSeconds(v / 1000) },
-                  { valueName: 'p99', label: 'p99', format: (v) => formatSeconds(v / 1000) },
-                  { valueName: 'max', label: 'Max', format: (v) => formatSeconds(v / 1000) },
-                ]}
-              />
-            )}
-          </Section>
           <Section
             title="AI Call Latency by model"
             query={latencyByModel.data?.query}
@@ -687,10 +583,10 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               items={toListItems(slowRuns.data)}
               isLoading={slowRuns.fetching && !slowRuns.data}
               identifierLabel="Run"
-              renderIdentifier={(id) => renderRunLink(id, envSlug)}
+              renderIdentifier={(id) => renderRunLink(id, environment.slug)}
               functionColumn={{
                 label: 'Function',
-                render: (id) => renderFunctionLink(id, envSlug, functionsBySlug),
+                render: (id) => renderFunctionLink(id, environment.slug, functionsBySlug),
               }}
               columns={[
                 { valueName: 'latency_ms', label: 'Total AI latency', format: formatMs },

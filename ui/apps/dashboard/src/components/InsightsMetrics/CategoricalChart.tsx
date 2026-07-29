@@ -35,10 +35,9 @@ type Props = {
   colors?: readonly string[];
   // Single-measure form's border opt-in, mirroring `series[].borderColor` (see
   // TrendChart's TrendSeriesConfig): when set, each bar draws a solid border
-  // in this color on top of `color`'s fill — pass a subtle fill color (e.g.
-  // from CHART_COLORS_SUBTLE) alongside this for the intended subtle-fill/
-  // solid-border look, rather than relying on any automatic derivation.
-  // Ignored when `series` is given.
+  // in this color on top of `color`'s fill — pass a distinct fill color via
+  // `color` alongside this for a fill/solid-border look, rather than relying
+  // on any automatic derivation. Ignored when `series` is given.
   borderColor?: string;
   // Per-category counterpart to `borderColor`, mirroring `colors` — one
   // border color per bar/category, layered over `colors`' per-category fill.
@@ -269,9 +268,9 @@ export function CategoricalChart({
     [sorted, effectiveSeries],
   );
 
-  // singleColor is the fill — pass a subtle tone (e.g. CHART_COLORS_SUBTLE)
-  // via `color` directly when pairing it with `borderColor` below; there's no
-  // automatic fill derivation from the border color.
+  // singleColor is the fill — pass a distinct tone via `color` directly when
+  // pairing it with `borderColor` below; there's no automatic fill
+  // derivation from the border color.
   const singleColor = useMemo(() => color ?? CHART_COLORS[1], [color]);
 
   // perCategoryColors mirrors chartData order — each bar gets its own fill

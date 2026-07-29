@@ -163,6 +163,10 @@ function FunctionComponent() {
               slug,
             )}/scores`,
           },
+          {
+            children: 'AI',
+            href: `/env/${envSlug}/functions/${encodeURIComponent(slug)}/ai`,
+          },
         ]}
       />
       <Outlet />

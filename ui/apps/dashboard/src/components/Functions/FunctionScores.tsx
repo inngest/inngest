@@ -156,9 +156,9 @@ export const FunctionScores = ({ functionSlug }: Props) => {
     return [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [order, availableScores]);
 
-  // CHART_COLORS/CHART_COLORS_SUBTLE, index-paired the same way BoxPlot's
-  // Overview/Timeseries charts use them elsewhere in InsightsMetrics — each
-  // score keeps its color regardless of which others are toggled off.
+  // CHART_COLORS, index-paired the same way BoxPlot's Overview/Timeseries
+  // charts use them elsewhere in InsightsMetrics — each score keeps its
+  // color regardless of which others are toggled off.
   const scoreColors = useMemo(() => {
     const color = new Map<string, string>();
     const subtleColor = new Map<string, string>();

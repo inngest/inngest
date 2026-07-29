@@ -97,42 +97,6 @@ function booleanStatsFromItem(item: InsightsMetricItem): BooleanStats | undefine
   return { count: stats.count, countTrue: stats.countTrue };
 }
 
-// fillTimeBuckets synthesizes an empty entry (via makeEmpty) for every
-// bucket the backend would have returned had it zero-filled the range —
-// the same bucket math as InsightsMetrics/types.ts' fillTrendBuckets,
-// applied per score name since that helper only handles the
-// non-dimensioned shape. Without this, a score with sparse data renders a
-// compressed timeline: candles/bars only at the buckets that happen to
-// have data, evenly spaced as if adjacent, rather than at their true time
-// position with gaps in between still occupying a slot.
-function fillTimeBuckets<T extends { timestamp: string }>(
-  items: T[],
-  range: { from: string; to: string },
-  limit: number,
-  makeEmpty: (timestamp: string) => T,
-): T[] {
-  const fromSec = new Date(range.from).getTime() / 1000;
-  const toSec = new Date(range.to).getTime() / 1000;
-  if (!Number.isFinite(fromSec) || !Number.isFinite(toSec) || toSec <= fromSec || limit <= 0) {
-    return items;
-  }
-  const bucketSeconds = Math.max(1, Math.floor((toSec - fromSec) / limit));
-  const firstBucket = Math.floor(fromSec / bucketSeconds) * bucketSeconds;
-  const lastBucket = Math.floor(toSec / bucketSeconds) * bucketSeconds;
-
-  const byBucket = new Map<number, T>();
-  for (const item of items) {
-    const sec = new Date(item.timestamp).getTime() / 1000;
-    if (Number.isFinite(sec)) byBucket.set(Math.floor(sec / bucketSeconds) * bucketSeconds, item);
-  }
-
-  const filled: T[] = [];
-  for (let bucket = firstBucket; bucket <= lastBucket; bucket += bucketSeconds) {
-    filled.push(byBucket.get(bucket) ?? makeEmpty(new Date(bucket * 1000).toISOString()));
-  }
-  return filled;
-}
-
 // hasQuartiles reports whether a score name's box stats are complete enough
 // to draw a box — the registry's boolean-exclusion filter means an
 // identifier legitimately gets zero rows when every observation in range is
@@ -262,25 +226,8 @@ export function useScoreAggregationTrend(opts: {
       }
     }
 
-    // Every score name's series is gap-filled independently against the
-    // same range/limit the query itself used — a score with fewer
-    // observations than another shouldn't render on a different (shorter,
-    // compressed) timeline than its sibling cards.
-    if (opts.limit) {
-      const { range, limit } = opts;
-      for (const [k, arr] of byName) {
-        byName.set(k, fillTimeBuckets(arr, range, limit, (timestamp) => ({ timestamp })));
-      }
-      for (const [k, arr] of booleanByName) {
-        booleanByName.set(
-          k,
-          fillTimeBuckets(arr, range, limit, (timestamp) => ({ timestamp, count: 0, countTrue: 0 })),
-        );
-      }
-    }
-
     return { byName, booleanByName };
-  }, [data, opts.range, opts.limit]);
+  }, [data]);
 
   return { byName, booleanByName, query: data?.query, fetching, error };
 }

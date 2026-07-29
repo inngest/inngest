@@ -108,6 +108,7 @@ import { Route as AuthedEnvEnvSlugFunctionsSlugScoresIndexRouteImport } from './
 import { Route as AuthedEnvEnvSlugFunctionsSlugRunsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/runs/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugReplaysIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/replays/index'
 import { Route as AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/cancellations/index'
+import { Route as AuthedEnvEnvSlugFunctionsSlugAiIndexRouteImport } from './routes/_authed/env/$envSlug/functions/$slug/ai/index'
 import { Route as AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRouteImport } from './routes/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/index'
 import { Route as AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRouteImport } from './routes/_authed/env/$envSlug/event-types/$eventTypeName/events/index'
 import { Route as AuthedEnvEnvSlugAppsExternalIDSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/apps/$externalID/syncs/index'
@@ -677,6 +678,12 @@ const AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute =
     path: '/cancellations/',
     getParentRoute: () => AuthedEnvEnvSlugFunctionsSlugRouteRoute,
   } as any)
+const AuthedEnvEnvSlugFunctionsSlugAiIndexRoute =
+  AuthedEnvEnvSlugFunctionsSlugAiIndexRouteImport.update({
+    id: '/ai/',
+    path: '/ai/',
+    getParentRoute: () => AuthedEnvEnvSlugFunctionsSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute =
   AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRouteImport.update({
     id: '/experiments/$functionSlug/$experimentName/',
@@ -797,6 +804,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/apps/$externalID/syncs/': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/env/$envSlug/event-types/$eventTypeName/events/': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
   '/env/$envSlug/experiments/$functionSlug/$experimentName/': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
+  '/env/$envSlug/functions/$slug/ai/': typeof AuthedEnvEnvSlugFunctionsSlugAiIndexRoute
   '/env/$envSlug/functions/$slug/cancellations/': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -888,6 +896,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/apps/$externalID/syncs': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/env/$envSlug/event-types/$eventTypeName/events': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
   '/env/$envSlug/experiments/$functionSlug/$experimentName': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
+  '/env/$envSlug/functions/$slug/ai': typeof AuthedEnvEnvSlugFunctionsSlugAiIndexRoute
   '/env/$envSlug/functions/$slug/cancellations': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/env/$envSlug/functions/$slug/replays': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/env/$envSlug/functions/$slug/runs': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -994,6 +1003,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/apps/$externalID/syncs/': typeof AuthedEnvEnvSlugAppsExternalIDSyncsIndexRoute
   '/_authed/env/$envSlug/event-types/$eventTypeName/events/': typeof AuthedEnvEnvSlugEventTypesEventTypeNameEventsIndexRoute
   '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/': typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
+  '/_authed/env/$envSlug/functions/$slug/ai/': typeof AuthedEnvEnvSlugFunctionsSlugAiIndexRoute
   '/_authed/env/$envSlug/functions/$slug/cancellations/': typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   '/_authed/env/$envSlug/functions/$slug/replays/': typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   '/_authed/env/$envSlug/functions/$slug/runs/': typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -1100,6 +1110,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/apps/$externalID/syncs/'
     | '/env/$envSlug/event-types/$eventTypeName/events/'
     | '/env/$envSlug/experiments/$functionSlug/$experimentName/'
+    | '/env/$envSlug/functions/$slug/ai/'
     | '/env/$envSlug/functions/$slug/cancellations/'
     | '/env/$envSlug/functions/$slug/replays/'
     | '/env/$envSlug/functions/$slug/runs/'
@@ -1191,6 +1202,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/apps/$externalID/syncs'
     | '/env/$envSlug/event-types/$eventTypeName/events'
     | '/env/$envSlug/experiments/$functionSlug/$experimentName'
+    | '/env/$envSlug/functions/$slug/ai'
     | '/env/$envSlug/functions/$slug/cancellations'
     | '/env/$envSlug/functions/$slug/replays'
     | '/env/$envSlug/functions/$slug/runs'
@@ -1296,6 +1308,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/apps/$externalID/syncs/'
     | '/_authed/env/$envSlug/event-types/$eventTypeName/events/'
     | '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/'
+    | '/_authed/env/$envSlug/functions/$slug/ai/'
     | '/_authed/env/$envSlug/functions/$slug/cancellations/'
     | '/_authed/env/$envSlug/functions/$slug/replays/'
     | '/_authed/env/$envSlug/functions/$slug/runs/'
@@ -2025,6 +2038,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugFunctionsSlugRouteRoute
     }
+    '/_authed/env/$envSlug/functions/$slug/ai/': {
+      id: '/_authed/env/$envSlug/functions/$slug/ai/'
+      path: '/ai'
+      fullPath: '/env/$envSlug/functions/$slug/ai/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugFunctionsSlugAiIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugFunctionsSlugRouteRoute
+    }
     '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/': {
       id: '/_authed/env/$envSlug/experiments/$functionSlug/$experimentName/'
       path: '/experiments/$functionSlug/$experimentName'
@@ -2332,6 +2352,7 @@ const AuthedEnvEnvSlugEventTypesEventTypeNameRouteRouteWithChildren =
 
 interface AuthedEnvEnvSlugFunctionsSlugRouteRouteChildren {
   AuthedEnvEnvSlugFunctionsSlugIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugIndexRoute
+  AuthedEnvEnvSlugFunctionsSlugAiIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugAiIndexRoute
   AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute
   AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute
   AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute: typeof AuthedEnvEnvSlugFunctionsSlugRunsIndexRoute
@@ -2343,6 +2364,8 @@ const AuthedEnvEnvSlugFunctionsSlugRouteRouteChildren: AuthedEnvEnvSlugFunctions
   {
     AuthedEnvEnvSlugFunctionsSlugIndexRoute:
       AuthedEnvEnvSlugFunctionsSlugIndexRoute,
+    AuthedEnvEnvSlugFunctionsSlugAiIndexRoute:
+      AuthedEnvEnvSlugFunctionsSlugAiIndexRoute,
     AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute:
       AuthedEnvEnvSlugFunctionsSlugCancellationsIndexRoute,
     AuthedEnvEnvSlugFunctionsSlugReplaysIndexRoute:

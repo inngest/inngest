@@ -27,8 +27,8 @@ export function CandlestickTooltip({
 }: Props) {
   if (!active || !payload?.length) return null;
   const data = payload[0]?.payload;
-  // A gap-filled empty bucket still occupies an x-axis slot (see
-  // fillTimeBuckets), but has no stats to show — nothing to hover into.
+  // A gap-filled empty bucket (backend zero-fill) still occupies an x-axis
+  // slot, but has no stats to show — nothing to hover into.
   if (!data || data.min === undefined || data.max === undefined) return null;
   const title = formatLabel && typeof label === 'string' ? formatLabel(label) : label;
 

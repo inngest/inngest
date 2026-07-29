@@ -16,7 +16,7 @@ import type { CombinedError } from 'urql';
 import { BooleanChart } from '@/components/InsightsMetrics/BooleanChart';
 import { BoxPlot, type RowData } from '@/components/InsightsMetrics/BoxPlot';
 import { CandlestickPlot, type CandleData } from '@/components/InsightsMetrics/CandlestickPlot';
-import { CHART_COLORS, CHART_COLORS_SUBTLE } from '@/components/InsightsMetrics/colors';
+import { CHART_COLORS } from '@/components/InsightsMetrics/colors';
 import { formatPlainNumber } from '@/components/InsightsMetrics/format';
 import { TrendChart } from '@/components/InsightsMetrics/TrendChart';
 import type { InsightsMetricPoint } from '@/components/InsightsMetrics/types';
@@ -28,16 +28,8 @@ import { pathCreator } from '@/utils/urls';
 // Green/orange from CHART_COLORS — the same palette the box/candlestick
 // charts above use — rather than the Metrics dashboard's own line palette,
 // so every chart on this card draws from one consistent set of colors.
-// TrendChart defaults a series' subtle fill to CHART_COLORS_SUBTLE at that
-// series' *position* in the array, not the index of the color it was
-// actually given — since "false" is CHART_COLORS[3] but sits at array
-// position 1, that default would land on CHART_COLORS_SUBTLE[1] (blue)
-// instead of the orange that matches its border. Passing fillColor
-// explicitly at the same index as the border/color keeps them paired.
 const TRUE_COLOR = CHART_COLORS[0];
-const TRUE_SUBTLE_COLOR = CHART_COLORS_SUBTLE[0];
 const FALSE_COLOR = CHART_COLORS[3];
-const FALSE_SUBTLE_COLOR = CHART_COLORS_SUBTLE[3];
 
 type Tab = 'overview' | 'timeseries';
 
@@ -45,10 +37,9 @@ type Props = {
   name: string;
   series: ScoreSeries | undefined;
   isLoading: boolean;
-  // Resolved per-score color (and its paired subtle fill), both from
-  // CHART_COLORS/CHART_COLORS_SUBTLE — the box/candlestick charts use these
-  // so every score card draws from one consistent palette. Fall back to the
-  // palette's blue when absent.
+  // Resolved per-score color (and its fill), both from CHART_COLORS — the
+  // box/candlestick charts use these so every score card draws from one
+  // consistent palette. Fall back to the palette's blue when absent.
   color?: string;
   subtleColor?: string;
   // The `Error` import above is the banner component and shadows the global
@@ -108,7 +99,7 @@ export const FunctionScoreCard = ({
   const activeQuery = tab === 'overview' ? overviewQuery : trendQuery;
 
   const resolvedColor = color ?? CHART_COLORS[1];
-  const resolvedSubtleColor = subtleColor ?? CHART_COLORS_SUBTLE[1];
+  const resolvedSubtleColor = subtleColor ?? CHART_COLORS[1];
 
   const overviewRow = useMemo<RowData | undefined>(
     () =>
@@ -280,14 +271,14 @@ export const FunctionScoreCard = ({
                   label: 'True',
                   color: TRUE_COLOR,
                   borderColor: TRUE_COLOR,
-                  fillColor: TRUE_SUBTLE_COLOR,
+                  fillColor: TRUE_COLOR,
                 },
                 {
                   valueName: 'false',
                   label: 'False',
                   color: FALSE_COLOR,
                   borderColor: FALSE_COLOR,
-                  fillColor: FALSE_SUBTLE_COLOR,
+                  fillColor: FALSE_COLOR,
                 },
               ]}
               chartType="bar"
