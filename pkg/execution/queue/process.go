@@ -140,7 +140,7 @@ func (q *queueProcessor) ProcessItem(
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
 					// invoked by finalize() (Cancellations, Parallelism)
-					if !errors.Is(ErrQueueItemNotFound, err) {
+					if !errors.Is(err, ErrQueueItemNotFound) {
 						l.Error("error extending lease", "error", err, "qi", qi)
 					}
 
