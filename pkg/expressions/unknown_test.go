@@ -500,6 +500,65 @@ func TestTruthyLogicalCoercion(t *testing.T) {
 	}
 }
 
+func TestTruthyConditionalCoercion(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		data     map[string]interface{}
+		expected string
+	}{
+		{
+			name:     "missing field selects the falsy branch",
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{}}},
+			expected: "falsy",
+		},
+		{
+			name:     "null field selects the falsy branch",
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"value": nil}}},
+			expected: "falsy",
+		},
+		{
+			name:     "false selects the falsy branch",
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"value": false}}},
+			expected: "falsy",
+		},
+		{
+			name:     "empty string selects the falsy branch",
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"value": ""}}},
+			expected: "falsy",
+		},
+		{
+			name:     "integer zero selects the falsy branch",
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"value": 0}}},
+			expected: "falsy",
+		},
+		{
+			name:     "double zero selects the falsy branch",
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"value": 0.0}}},
+			expected: "falsy",
+		},
+		{
+			name:     "true selects the truthy branch",
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"value": true}}},
+			expected: "truthy",
+		},
+		{
+			name:     "nonempty string selects the truthy branch",
+			data:     map[string]interface{}{"event": map[string]interface{}{"data": map[string]interface{}{"value": "candidate-123"}}},
+			expected: "truthy",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := Evaluate(ctx, `event.data.value ? "truthy" : "falsy"`, test.data)
+			require.NoError(t, err)
+			require.Equal(t, test.expected, result)
+		})
+	}
+}
+
 // TestMacrosWithUnknowns tests that macros (exists, all) handle unknowns correctly.
 // The key invariant: lambda variables produce "no such attribute" errors which must
 // pass through the decorator unchanged, not be treated as unknown call failures.
