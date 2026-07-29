@@ -158,12 +158,6 @@ function FunctionComponent() {
             )}/cancellations`,
           },
           {
-            children: 'Scores',
-            href: `/env/${envSlug}/functions/${encodeURIComponent(
-              slug,
-            )}/scores`,
-          },
-          {
             children: 'AI Overview',
             href: `/env/${envSlug}/functions/${encodeURIComponent(slug)}/ai`,
           },
