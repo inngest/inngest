@@ -416,6 +416,16 @@ type RunsV2OrderBy struct {
 	Direction RunsOrderByDirection `json:"direction"`
 }
 
+type SDKFeatureReadiness struct {
+	AiMetadataExtraction *SDKFeatureStatus `json:"aiMetadataExtraction,omitempty"`
+	ExtendedTraces       *SDKFeatureStatus `json:"extendedTraces,omitempty"`
+}
+
+type SDKFeatureStatus struct {
+	Ready  bool `json:"ready"`
+	Reason *int `json:"reason,omitempty"`
+}
+
 type SingletonConfiguration struct {
 	Mode SingletonMode `json:"mode"`
 	Key  *string       `json:"key,omitempty"`

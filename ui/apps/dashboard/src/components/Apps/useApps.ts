@@ -1,4 +1,7 @@
-import { methodTypes } from '@inngest/components/types/app';
+import {
+  methodTypes,
+  type SDKFeatureReadiness,
+} from '@inngest/components/types/app';
 import type { Function } from '@inngest/components/types/function';
 import {
   transformFramework,
@@ -13,7 +16,7 @@ import { type AppsQuery } from '@/gql/graphql';
 
 export type FlattenedApp = Omit<
   AppsQuery['environment']['apps'][number],
-  'latestSync' | 'functions'
+  'latestSync' | 'functions' | 'sdkFeatureReadiness'
 > & {
   __typename?: 'App';
   lastSyncedAt?: Date;
@@ -25,6 +28,7 @@ export type FlattenedApp = Omit<
   status?: string;
   url?: string | null;
   functions: Function[];
+  sdkFeatureReadiness: SDKFeatureReadiness;
 };
 
 const query = graphql(`
@@ -38,6 +42,14 @@ const query = graphql(`
         name
         method
         isParentArchived
+        sdkFeatureReadiness {
+          aiMetadataExtraction {
+            readinessReason
+          }
+          extendedTraces {
+            readinessReason
+          }
+        }
         latestSync {
           error
           framework
@@ -93,6 +105,27 @@ export function useApps({
         // We are flattening the latestSync data to match the structure used in the DevServer
         const apps = result.data.environment.apps
           .map(({ latestSync, functions, ...app }) => {
+            const sdkFeatureReadiness = {
+              aiMetadataExtraction: app.sdkFeatureReadiness.aiMetadataExtraction
+                ? {
+                    ready:
+                      app.sdkFeatureReadiness.aiMetadataExtraction
+                        .readinessReason === 1,
+                    reason:
+                      app.sdkFeatureReadiness.aiMetadataExtraction
+                        .readinessReason,
+                  }
+                : null,
+              extendedTraces: app.sdkFeatureReadiness.extendedTraces
+                ? {
+                    ready:
+                      app.sdkFeatureReadiness.extendedTraces.readinessReason ===
+                      1,
+                    reason:
+                      app.sdkFeatureReadiness.extendedTraces.readinessReason,
+                  }
+                : null,
+            };
             const latestSyncData: Omit<
               FlattenedApp,
               keyof typeof app | 'functions'
@@ -129,6 +162,7 @@ export function useApps({
             return {
               ...app,
               ...latestSyncData,
+              sdkFeatureReadiness,
               functions: functions.map((fn) => ({
                 ...fn,
                 triggers: fn.triggers,

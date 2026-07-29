@@ -1,4 +1,9 @@
 import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
+import {
+  featureReadinessTooltipClassName,
+  FeatureReadinessDetail,
+  FeatureReadinessTooltip,
+} from '@inngest/components/Apps/FeatureReadiness';
 import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill';
 import { TextClickToCopy } from '@inngest/components/Text';
@@ -10,6 +15,22 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { SyncStatusPill } from '@/components/Apps/SyncStatusPill';
 import { pathCreator } from '@/utils/urls';
 import { PlatformSection } from './PlatformSection';
+
+function aiMetadataDetail(reason?: number | null): React.ReactNode {
+  if (reason == null) {
+    return null;
+  }
+
+  return <FeatureReadinessDetail kind="aiMetadata" reason={reason} />;
+}
+
+function extendedTracesDetail(reason?: number | null): React.ReactNode {
+  if (reason == null) {
+    return null;
+  }
+
+  return <FeatureReadinessDetail kind="extendedTraces" reason={reason} />;
+}
 
 type Props = {
   //
@@ -52,6 +73,11 @@ export const AppInfoCard = ({
   workerCounter,
 }: Props | LoadingProps) => {
   const env = useEnvironment();
+  const aiMetadataReason =
+    app?.sdkFeatureReadiness?.aiMetadataExtraction?.reason;
+  const extendedTracesReason = app?.sdkFeatureReadiness?.extendedTraces?.reason;
+  const aiMetadata = aiMetadataDetail(aiMetadataReason);
+  const extendedTraces = extendedTracesDetail(extendedTracesReason);
   let lastSyncValue;
   if (sync) {
     if (app) {
@@ -156,6 +182,26 @@ export const AppInfoCard = ({
         />
         {app?.method === methodTypes.Connect && workerCounter && (
           <>{workerCounter}</>
+        )}
+        {aiMetadata && (
+          <AppDetailsCard.Item
+            detail={aiMetadata}
+            term="AI OTel"
+            loading={loading}
+            tooltipContent={<FeatureReadinessTooltip kind="aiMetadata" />}
+            tooltipContentClassName={featureReadinessTooltipClassName}
+            tooltipHasArrow={false}
+          />
+        )}
+        {extendedTraces && (
+          <AppDetailsCard.Item
+            detail={extendedTraces}
+            term="Extended traces"
+            loading={loading}
+            tooltipContent={<FeatureReadinessTooltip kind="extendedTraces" />}
+            tooltipContentClassName={featureReadinessTooltipClassName}
+            tooltipHasArrow={false}
+          />
         )}
 
         {sync && <PlatformSection sync={sync} />}

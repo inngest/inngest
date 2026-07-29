@@ -52,6 +52,7 @@ export type App = {
   id: Scalars['ID'];
   method: AppMethod;
   name: Scalars['String'];
+  sdkFeatureReadiness: SdkFeatureReadiness;
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
   url: Maybe<Scalars['String']>;
@@ -694,6 +695,18 @@ export type RetryConfiguration = {
   value: Scalars['Int'];
 };
 
+export type SdkFeatureReadiness = {
+  __typename?: 'SDKFeatureReadiness';
+  aiMetadataExtraction: Maybe<SdkFeatureStatus>;
+  extendedTraces: Maybe<SdkFeatureStatus>;
+};
+
+export type SdkFeatureStatus = {
+  __typename?: 'SDKFeatureStatus';
+  ready: Scalars['Boolean'];
+  reason: Maybe<Scalars['Int']>;
+};
+
 export type RunDefer = {
   __typename?: 'RunDefer';
   fnSlug: Scalars['String'];
@@ -1215,6 +1228,19 @@ export type GetAppsQuery = {
     functionCount: number;
     autodiscovered: boolean;
     method: AppMethod;
+    sdkFeatureReadiness: {
+      __typename?: 'SDKFeatureReadiness';
+      aiMetadataExtraction: {
+        __typename?: 'SDKFeatureStatus';
+        ready: boolean;
+        reason: number | null;
+      } | null;
+      extendedTraces: {
+        __typename?: 'SDKFeatureStatus';
+        ready: boolean;
+        reason: number | null;
+      } | null;
+    };
     functions: Array<{
       __typename?: 'Function';
       name: string;
@@ -1247,6 +1273,19 @@ export type GetAppQuery = {
     functionCount: number;
     autodiscovered: boolean;
     method: AppMethod;
+    sdkFeatureReadiness: {
+      __typename?: 'SDKFeatureReadiness';
+      aiMetadataExtraction: {
+        __typename?: 'SDKFeatureStatus';
+        ready: boolean;
+        reason: number | null;
+      } | null;
+      extendedTraces: {
+        __typename?: 'SDKFeatureStatus';
+        ready: boolean;
+        reason: number | null;
+      } | null;
+    };
     functions: Array<{
       __typename?: 'Function';
       name: string;

@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
+	"github.com/inngest/inngest/pkg/registration"
 )
 
 func (qr queryResolver) Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error) {
@@ -59,6 +61,51 @@ func (a appResolver) Error(ctx context.Context, obj *cqrs.App) (*string, error) 
 		return &obj.Error.String, nil
 	}
 	return nil, nil
+}
+
+func (a appResolver) SdkFeatureReadiness(ctx context.Context, obj *cqrs.App) (*models.SDKFeatureReadiness, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("no app defined")
+	}
+
+	return sdkFeatureReadinessFromMetadata(obj.Metadata)
+}
+
+func sdkFeatureReadinessFromMetadata(metadata map[string]string) (*models.SDKFeatureReadiness, error) {
+	readiness := &models.SDKFeatureReadiness{}
+
+	observations, err := registration.FeatureObservationsFromAppMetadata(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, observation := range observations {
+		if observation == nil {
+			continue
+		}
+
+		if aiMetadataExtraction := observation.GetAiMetadataExtraction(); aiMetadataExtraction != nil && readiness.AiMetadataExtraction == nil {
+			readiness.AiMetadataExtraction = sdkFeatureStatusFromReadinessReason(
+				int(aiMetadataExtraction.GetReadinessReason()),
+			)
+			continue
+		}
+
+		if extendedTraces := observation.GetExtendedTraces(); extendedTraces != nil && readiness.ExtendedTraces == nil {
+			readiness.ExtendedTraces = sdkFeatureStatusFromReadinessReason(
+				int(extendedTraces.GetReadinessReason()),
+			)
+		}
+	}
+
+	return readiness, nil
+}
+
+func sdkFeatureStatusFromReadinessReason(reason int) *models.SDKFeatureStatus {
+	return &models.SDKFeatureStatus{
+		Ready:  reason == 1,
+		Reason: &reason,
+	}
 }
 
 func (a appResolver) Functions(ctx context.Context, obj *cqrs.App) ([]*models.Function, error) {

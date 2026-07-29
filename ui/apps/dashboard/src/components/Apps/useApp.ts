@@ -25,6 +25,14 @@ const query = graphql(`
         appVersion
         name
         method
+        sdkFeatureReadiness {
+          aiMetadataExtraction {
+            readinessReason
+          }
+          extendedTraces {
+            readinessReason
+          }
+        }
         latestSync {
           commitAuthor
           commitHash
@@ -66,6 +74,23 @@ export const useApp = ({
 
   if (res.data) {
     const { app } = res.data.environment;
+    const sdkFeatureReadiness = {
+      aiMetadataExtraction: app.sdkFeatureReadiness.aiMetadataExtraction
+        ? {
+            ready:
+              app.sdkFeatureReadiness.aiMetadataExtraction.readinessReason ===
+              1,
+            reason:
+              app.sdkFeatureReadiness.aiMetadataExtraction.readinessReason,
+          }
+        : null,
+      extendedTraces: app.sdkFeatureReadiness.extendedTraces
+        ? {
+            ready: app.sdkFeatureReadiness.extendedTraces.readinessReason === 1,
+            reason: app.sdkFeatureReadiness.extendedTraces.readinessReason,
+          }
+        : null,
+    };
     let latestSync = null;
     if (app.latestSync) {
       latestSync = {
@@ -82,6 +107,7 @@ export const useApp = ({
       data: {
         ...app,
         latestSync,
+        sdkFeatureReadiness,
       },
     };
   }
