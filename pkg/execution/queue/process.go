@@ -490,18 +490,13 @@ func (q *queueProcessor) ProcessItem(
 					// dequeues the run's jobs, and the in-flight job then returns
 					// ErrFunctionCancelled, which ShouldRetry treats as retryable because
 					// it is a plain error.  The run is already terminal, so dropping the
-					// retry is correct.  Count it, but do not log it -- this fires on
+					// retry is correct and not worth logging -- it would emit a line for
 					// every cancellation that catches a job in flight.
 					//
 					// Any other cause is suspicious: if the run is still live, nothing
 					// remains to drive it to a terminal state, so it stays non-terminal
-					// and holds its function concurrency capacity until cancelled by
-					// hand.  We cannot cheaply confirm liveness here, so warn and let the
-					// metric split show how often each case occurs.
-					status := "requeue_item_missing"
-					if errors.Is(err, state.ErrFunctionCancelled) {
-						status = "requeue_item_missing_cancelled"
-					} else {
+					// and holds its function concurrency capacity until cancelled by hand.
+					if !errors.Is(err, state.ErrFunctionCancelled) {
 						l.Warn("dropped retry; queue item not found on requeue",
 							"cause", err,
 							"next_attempt", qi.Data.Attempt,
@@ -510,13 +505,6 @@ func (q *queueProcessor) ProcessItem(
 							"requeue_at", at,
 						)
 					}
-					metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
-						PkgName: pkgName,
-						Tags: map[string]any{
-							"status":      status,
-							"queue_shard": shard.Name(),
-						},
-					})
 					return ProcessItemResult{}, nil
 				}
 
