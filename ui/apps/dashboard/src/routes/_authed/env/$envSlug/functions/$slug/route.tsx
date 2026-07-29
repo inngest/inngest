@@ -164,7 +164,7 @@ function FunctionComponent() {
             )}/scores`,
           },
           {
-            children: 'AI',
+            children: 'AI Overview',
             href: `/env/${envSlug}/functions/${encodeURIComponent(slug)}/ai`,
           },
         ]}

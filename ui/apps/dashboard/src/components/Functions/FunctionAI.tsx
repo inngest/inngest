@@ -45,14 +45,14 @@ import {
   tokenBreakdown,
   withTotalTokens,
 } from '@/components/AIOverview/utils';
-import {
-  renderFunctionLink,
-  renderRunLink,
-  renderSessionKeyLink,
-  renderSessionLink,
-} from '@/components/AIOverview/renderIdentifiers';
+import { renderFunctionLink, renderRunLink } from '@/components/AIOverview/renderIdentifiers';
 
 const DEFAULT_DURATION = { days: 7 };
+
+// "Cost over time" gets twice the buckets of every other trend chart here —
+// it's the sole full-width chart in the Cost section, so it has the
+// horizontal room to render a finer-grained trend.
+const COST_TREND_BUCKET_LIMIT = TREND_BUCKET_LIMIT * 2;
 
 // Shared by "Cost over time" and "Cost by model" — both plot ai_token_trend/
 // ai_model_distribution's `cost` column, which carries input/output tokens
@@ -69,9 +69,11 @@ type Props = {
 
 // FunctionAI is a single-function-scoped cut of AIOverviewDashboard: every
 // "by function" breakdown (top functions by usage/cost, latency by
-// function) is meaningless when already scoped to one function, so those
-// sections are dropped along with the function selector — everything else,
-// including the session-scoped sections, mirrors the env-wide dashboard.
+// function) is meaningless when already scoped to one function, and the
+// session-scoped sections (cost per session over time, most expensive
+// sessions) are dropped here too — sessions can span several functions, so
+// they read better at the env-wide level. Both are cut along with the
+// function selector; everything else mirrors the env-wide dashboard.
 export const FunctionAI = ({ functionSlug }: Props) => {
   const environment = useEnvironment();
   const workspaceID = environment.id;
@@ -138,6 +140,16 @@ export const FunctionAI = ({ functionSlug }: Props) => {
     limit: TREND_BUCKET_LIMIT,
     pause,
   });
+  // Separate from tokenTrend (same registry key, double the buckets) so
+  // "Cost over time" can render at finer granularity than "Tokens over
+  // time" without doubling the latter's bucket count too.
+  const costTrend = useInsightsMetric('ai_token_trend', {
+    workspaceID,
+    functionIDs,
+    range: timeRange,
+    limit: COST_TREND_BUCKET_LIMIT,
+    pause,
+  });
   const modelDistribution = useInsightsMetric('ai_model_distribution', {
     workspaceID,
     functionIDs,
@@ -185,20 +197,6 @@ export const FunctionAI = ({ functionSlug }: Props) => {
     limit: TREND_BUCKET_LIMIT,
     pause,
   });
-  const costPerSessionTrend = useInsightsMetric('ai_cost_per_session_trend', {
-    workspaceID,
-    functionIDs,
-    range: timeRange,
-    limit: TREND_BUCKET_LIMIT,
-    pause,
-  });
-  const mostExpensiveSessions = useInsightsMetric('ai_most_expensive_sessions', {
-    workspaceID,
-    functionIDs,
-    range: timeRange,
-    limit: 10,
-    pause,
-  });
   const slowRuns = useInsightsMetric('ai_slow_runs', {
     workspaceID,
     functionIDs,
@@ -218,6 +216,7 @@ export const FunctionAI = ({ functionSlug }: Props) => {
   const error = [
     headline,
     tokenTrend,
+    costTrend,
     modelDistribution,
     runsByModel,
     runVolumeTrend,
@@ -225,8 +224,6 @@ export const FunctionAI = ({ functionSlug }: Props) => {
     mostExpensiveRuns,
     mostExpensiveSteps,
     costPerRunTrend,
-    costPerSessionTrend,
-    mostExpensiveSessions,
     slowRuns,
   ].some((m) => m.error);
 
@@ -256,29 +253,28 @@ export const FunctionAI = ({ functionSlug }: Props) => {
 
   return (
     <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1500px] flex-col px-6">
-      <div className="bg-canvasBase flex flex-row items-center gap-1.5 py-[9px]">
-        <SelectGroup>
-          <span className="border-muted bg-modalBase text-muted box-content flex h-[24px] items-center rounded border px-1.5 text-[13px]">
-            Time range
-          </span>
-          <TimeFilter
-            className="rounded-l-none border-l-0"
-            daysAgoMax={daysAgoMax}
-            defaultValue={defaultRange}
-            onDaysChange={(r: RangeChangeProps) => {
-              batchUpdate({
-                duration: r.type === 'relative' ? durationToString(r.duration) : null,
-                start: r.type === 'absolute' ? r.start.toISOString() : null,
-                end: r.type === 'absolute' ? r.end.toISOString() : null,
-              });
-            }}
-          />
-        </SelectGroup>
-      </div>
-
       {error && <Error message="There was an error loading this function's AI metrics." />}
 
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pb-6 [&::-webkit-scrollbar]:hidden">
+        <div className="bg-canvasBase flex flex-row items-center gap-1.5 pb-3 pt-6">
+          <SelectGroup>
+            <span className="border-muted bg-modalBase text-muted box-content flex h-[24px] items-center rounded border px-1.5 text-[13px]">
+              Time range
+            </span>
+            <TimeFilter
+              className="rounded-l-none border-l-0"
+              daysAgoMax={daysAgoMax}
+              defaultValue={defaultRange}
+              onDaysChange={(r: RangeChangeProps) => {
+                batchUpdate({
+                  duration: r.type === 'relative' ? durationToString(r.duration) : null,
+                  start: r.type === 'absolute' ? r.start.toISOString() : null,
+                  end: r.type === 'absolute' ? r.end.toISOString() : null,
+                });
+              }}
+            />
+          </SelectGroup>
+        </div>
         <Section plain>
           <HeadlineStats
             values={withTotalTokens(toScalarValues(headline.data))}
@@ -399,10 +395,15 @@ export const FunctionAI = ({ functionSlug }: Props) => {
 
         <SectionGroupHeading>Cost</SectionGroupHeading>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Section title="Cost over time" query={tokenTrend.data?.query} queryName="AI cost over time">
+          <Section
+            title="Cost over time"
+            className="lg:col-span-2"
+            query={costTrend.data?.query}
+            queryName="AI cost over time"
+          >
             <TrendChart
-              points={toTrendPoints(tokenTrend.data)}
-              isLoading={tokenTrend.fetching && !tokenTrend.data}
+              points={toTrendPoints(costTrend.data)}
+              isLoading={costTrend.fetching && !costTrend.data}
               hasData={hasAnyCalls}
               chartType="bar"
               format={formatCost}
@@ -417,19 +418,6 @@ export const FunctionAI = ({ functionSlug }: Props) => {
               ]}
               tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
               defaultValue={0}
-            />
-          </Section>
-          <Section title="Cost by model" query={modelDistribution.data?.query} queryName="AI cost by model">
-            <CategoricalChart
-              items={toListItems(modelDistribution.data)}
-              isLoading={modelDistribution.fetching && !modelDistribution.data}
-              valueName="cost"
-              colors={CHART_COLORS}
-              format={formatCost}
-              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
-              showYAxisLine={false}
-              showTooltipValueName={false}
-              showValueLabels
             />
           </Section>
           <Section
@@ -448,22 +436,17 @@ export const FunctionAI = ({ functionSlug }: Props) => {
               defaultValue={0}
             />
           </Section>
-          <Section
-            title="Cost per session over time"
-            query={costPerSessionTrend.data?.query}
-            queryName="AI cost per session over time"
-          >
-            <TrendChart
-              points={toTrendPoints(costPerSessionTrend.data)}
-              isLoading={costPerSessionTrend.fetching && !costPerSessionTrend.data}
-              hasData={hasAnyCalls}
+          <Section title="Cost by model" query={modelDistribution.data?.query} queryName="AI cost by model">
+            <CategoricalChart
+              items={toListItems(modelDistribution.data)}
+              isLoading={modelDistribution.fetching && !modelDistribution.data}
+              valueName="cost"
+              colors={CHART_COLORS}
               format={formatCost}
-              axisFormat={formatCostAxis}
-              allowDecimals
-              series={[
-                { valueName: 'avg_cost_per_session', label: 'Cost per session', color: CHART_COLORS[0] },
-              ]}
-              defaultValue={0}
+              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
+              showYAxisLine={false}
+              showTooltipValueName={false}
+              showValueLabels
             />
           </Section>
           <Section
@@ -509,29 +492,6 @@ export const FunctionAI = ({ functionSlug }: Props) => {
               ]}
             />
           </Section>
-          <Section
-            title="Most expensive sessions"
-            query={mostExpensiveSessions.data?.query}
-            queryName="AI most expensive sessions"
-          >
-            <RankedTable
-              headerStyle="subtle"
-              density="compact"
-              items={toListItems(mostExpensiveSessions.data)}
-              isLoading={mostExpensiveSessions.fetching && !mostExpensiveSessions.data}
-              identifierLabel="Session"
-              renderIdentifier={(id, item) => renderSessionLink(id, item.sessionKey ?? '', environment.slug)}
-              sessionKeyColumn={{
-                label: 'Session key',
-                render: (key) => renderSessionKeyLink(key, environment.slug),
-              }}
-              columns={[
-                { valueName: 'cost', label: 'Cost', format: formatCost },
-                { valueName: (item) => sumValues(item, ['input_tokens', 'output_tokens']), label: 'Tokens used', format: formatCompactNumber },
-                { valueName: 'runs', label: 'Runs', format: formatCompactNumber },
-              ]}
-            />
-          </Section>
         </div>
 
         <SectionGroupHeading>Performance</SectionGroupHeading>
@@ -573,7 +533,6 @@ export const FunctionAI = ({ functionSlug }: Props) => {
           </Section>
           <Section
             title="Slowest runs"
-            className="lg:col-span-2"
             query={slowRuns.data?.query}
             queryName="AI slowest runs"
           >

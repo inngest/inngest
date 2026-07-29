@@ -12,7 +12,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { pathCreator } from '@/utils/urls';
 
 export function SectionGroupHeading({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-basis mb-3 mt-6 text-base font-semibold">{children}</h2>;
+  return <h2 className="text-basis mb-3 mt-6 text-lg font-normal">{children}</h2>;
 }
 
 export function Section({

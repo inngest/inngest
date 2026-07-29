@@ -36,7 +36,7 @@ const DEFAULT_TICKS: RangePlotTick[] = [
   { valueName: 'max', label: 'Max' },
 ];
 
-const TICK_LINE_HEIGHT = 24;
+const TICK_LINE_HEIGHT = 20;
 const CONNECTING_LINE_WIDTH = 1.5;
 // Y-axis width heuristic: ~5.5px/char is a reasonable average glyph width
 // for this app's sans font at the tick's 10px font-size — avoids reserving
@@ -114,7 +114,7 @@ function makeTickShape(ticks: RangePlotTick[]) {
     const cy = y + height / 2;
 
     if (range === 0) {
-      return <circle cx={x} cy={cy} r={height / 2} fill={payload.color} />;
+      return <circle cx={x} cy={cy} r={height / 4} fill={payload.color} />;
     }
 
     const tickXs = ticks.map((t) => {

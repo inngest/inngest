@@ -406,7 +406,7 @@ export function CategoricalChart({
           <BarChart
             data={chartData}
             layout="vertical"
-            margin={{ top: 8, right: 12, bottom: 0, left: 12 }}
+            margin={{ top: 8, right: 12, bottom: -9.5, left: 12 }}
             barCategoryGap={stacked && isMultiSeries ? STACKED_BAR_CATEGORY_GAP : undefined}
           >
             <XAxis
@@ -507,24 +507,24 @@ export function CategoricalChart({
             })}
           </BarChart>
         </ResponsiveContainer>
+        {isMultiSeries && (
+          // Absolutely positioned into the plot's own bottom-left corner —
+          // a horizontal bar chart's categories rarely fill the fixed-height
+          // container down to its last pixel, so the legend can sit in that
+          // otherwise-empty margin instead of pushing the whole card taller.
+          <ul className="absolute bottom-0 flex flex-wrap gap-4">
+            {effectiveSeries.map((s, i) => (
+              <li key={s.valueName} className="flex items-center gap-1.5 text-xs">
+                <span
+                  className="h-2.5 w-2.5 shrink-0"
+                  style={{ backgroundColor: legendSwatchColors[i] }}
+                />
+                <span className="text-basis">{s.label}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      {isMultiSeries && (
-        // A plain sibling block below the fixed-height plot, not recharts'
-        // own <Legend> (which would've had to carve its space out of the
-        // plot's own margin, shrinking the plot itself) — so the plot is
-        // the same size whether or not a legend follows it.
-        <ul className="mt-2 flex flex-wrap gap-4">
-          {effectiveSeries.map((s, i) => (
-            <li key={s.valueName} className="flex items-center gap-1.5 text-xs">
-              <span
-                className="h-2.5 w-2.5 shrink-0"
-                style={{ backgroundColor: legendSwatchColors[i] }}
-              />
-              <span className="text-basis">{s.label}</span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

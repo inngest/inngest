@@ -204,12 +204,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
     range: timeRange,
     limit: TREND_BUCKET_LIMIT,
   });
-  const costPerSessionTrend = useInsightsMetric('ai_cost_per_session_trend', {
-    workspaceID,
-    functionIDs,
-    range: timeRange,
-    limit: TREND_BUCKET_LIMIT,
-  });
   const slowRuns = useInsightsMetric('ai_slow_runs', {
     workspaceID,
     functionIDs,
@@ -231,7 +225,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
     mostExpensiveSteps,
     mostExpensiveSessions,
     costPerRunTrend,
-    costPerSessionTrend,
     slowRuns,
   ].some((m) => m.error);
 
@@ -270,35 +263,34 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
   return (
     <div className="bg-canvasBase mx-auto flex h-full w-full max-w-[1500px] flex-col px-6">
       {showEmptyState && <AIOverviewEmptyState compact className="mt-3" />}
-      <div className="bg-canvasBase flex flex-row items-center gap-1.5 py-[9px]">
-        <SelectGroup>
-          <span className="border-muted bg-modalBase text-muted box-content flex h-[24px] items-center rounded border px-1.5 text-[13px]">
-            Time range
-          </span>
-          <TimeFilter
-            className="rounded-l-none border-l-0"
-            daysAgoMax={daysAgoMax}
-            defaultValue={defaultRange}
-            onDaysChange={(r: RangeChangeProps) => {
-              batchUpdate({
-                duration: r.type === 'relative' ? durationToString(r.duration) : null,
-                start: r.type === 'absolute' ? r.start.toISOString() : null,
-                end: r.type === 'absolute' ? r.end.toISOString() : null,
-              });
-            }}
-          />
-        </SelectGroup>
-        <EntityFilter
-          type="function"
-          onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
-          selectedEntities={selectedFns || []}
-          entities={lookupData?.envBySlug?.workflows.data || []}
-        />
-      </div>
-
       {error && <Error message="There was an error loading the AI Overview." />}
 
       <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pb-6 [&::-webkit-scrollbar]:hidden">
+        <div className="bg-canvasBase flex flex-row items-center gap-1.5 pb-3 pt-6">
+          <SelectGroup>
+            <span className="border-muted bg-modalBase text-muted box-content flex h-[24px] items-center rounded border px-1.5 text-[13px]">
+              Time range
+            </span>
+            <TimeFilter
+              className="rounded-l-none border-l-0"
+              daysAgoMax={daysAgoMax}
+              defaultValue={defaultRange}
+              onDaysChange={(r: RangeChangeProps) => {
+                batchUpdate({
+                  duration: r.type === 'relative' ? durationToString(r.duration) : null,
+                  start: r.type === 'absolute' ? r.start.toISOString() : null,
+                  end: r.type === 'absolute' ? r.end.toISOString() : null,
+                });
+              }}
+            />
+          </SelectGroup>
+          <EntityFilter
+            type="function"
+            onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
+            selectedEntities={selectedFns || []}
+            entities={lookupData?.envBySlug?.workflows.data || []}
+          />
+        </div>
         <Section plain>
           <HeadlineStats
             values={withTotalTokens(toScalarValues(headline.data))}
@@ -468,19 +460,6 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               defaultValue={0}
             />
           </Section>
-          <Section title="Cost by model" query={modelDistribution.data?.query} queryName="AI cost by model">
-            <CategoricalChart
-              items={toListItems(modelDistribution.data)}
-              isLoading={modelDistribution.fetching && !modelDistribution.data}
-              valueName="cost"
-              colors={CHART_COLORS}
-              format={formatCost}
-              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
-              showYAxisLine={false}
-              showTooltipValueName={false}
-              showValueLabels
-            />
-          </Section>
           <Section
             title="Cost per run over time"
             query={costPerRunTrend.data?.query}
@@ -497,22 +476,17 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
               defaultValue={0}
             />
           </Section>
-          <Section
-            title="Cost per session over time"
-            query={costPerSessionTrend.data?.query}
-            queryName="AI cost per session over time"
-          >
-            <TrendChart
-              points={toTrendPoints(costPerSessionTrend.data)}
-              isLoading={costPerSessionTrend.fetching && !costPerSessionTrend.data}
-              hasData={hasAnyCalls}
+          <Section title="Cost by model" query={modelDistribution.data?.query} queryName="AI cost by model">
+            <CategoricalChart
+              items={toListItems(modelDistribution.data)}
+              isLoading={modelDistribution.fetching && !modelDistribution.data}
+              valueName="cost"
+              colors={CHART_COLORS}
               format={formatCost}
-              axisFormat={formatCostAxis}
-              allowDecimals
-              series={[
-                { valueName: 'avg_cost_per_session', label: 'Cost per session', color: CHART_COLORS[0] },
-              ]}
-              defaultValue={0}
+              tooltipExtras={TOKEN_TOOLTIP_EXTRAS}
+              showYAxisLine={false}
+              showTooltipValueName={false}
+              showValueLabels
             />
           </Section>
           <Section
@@ -578,6 +552,7 @@ export const AIOverviewDashboard = ({ envSlug }: { envSlug: string }) => {
           </Section>
           <Section
             title="Most expensive sessions"
+            className="lg:col-span-2"
             query={mostExpensiveSessions.data?.query}
             queryName="AI most expensive sessions"
           >
