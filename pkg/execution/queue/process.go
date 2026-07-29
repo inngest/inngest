@@ -496,6 +496,18 @@ func (q *queueProcessor) ProcessItem(
 					// Any other cause is suspicious: if the run is still live, nothing
 					// remains to drive it to a terminal state, so it stays non-terminal
 					// and holds its function concurrency capacity until cancelled by hand.
+					// Counted for both causes, tagged so the suspicious share is
+					// visible as a ratio rather than needing the logs.
+					metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							"status":      "dropped_retry_item_not_found",
+							"queue_shard": shard.Name(),
+							"kind":        qi.Data.Kind,
+							"cancelled":   errors.Is(err, state.ErrFunctionCancelled),
+						},
+					})
+
 					if !errors.Is(err, state.ErrFunctionCancelled) {
 						l.Warn("dropped retry; queue item not found on requeue",
 							"cause", err,
