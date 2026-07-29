@@ -484,26 +484,36 @@ func (q *queueProcessor) ProcessItem(
 			if requeueErr := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at); requeueErr != nil {
 				if requeueErr == ErrQueueItemNotFound {
 					// The item is gone, so there is nothing to requeue and this retry is
-					// dropped.  That is benign when finalize() legitimately dequeued the
-					// item (cancellations, parallelism) and the run is already terminal.
+					// dropped.
 					//
-					// It is NOT benign if the run is still live: nothing remains to drive
-					// it to a terminal state, so it stays non-terminal and holds its
-					// function concurrency capacity until it is cancelled by hand.
+					// A cancelled run is the expected, high-volume case: Finalize()
+					// dequeues the run's jobs, and the in-flight job then returns
+					// ErrFunctionCancelled, which ShouldRetry treats as retryable because
+					// it is a plain error.  The run is already terminal, so dropping the
+					// retry is correct.  Count it, but do not log it -- this fires on
+					// every cancellation that catches a job in flight.
 					//
-					// We cannot cheaply tell those cases apart here, so record the
-					// occurrence instead of returning silently.
-					l.Warn("dropped retry; queue item not found on requeue",
-						"cause", err,
-						"next_attempt", qi.Data.Attempt,
-						"max_attempts", qi.Data.GetMaxAttempts(),
-						"lease_id", requeueItem.LeaseID,
-						"requeue_at", at,
-					)
+					// Any other cause is suspicious: if the run is still live, nothing
+					// remains to drive it to a terminal state, so it stays non-terminal
+					// and holds its function concurrency capacity until cancelled by
+					// hand.  We cannot cheaply confirm liveness here, so warn and let the
+					// metric split show how often each case occurs.
+					status := "requeue_item_missing"
+					if errors.Is(err, state.ErrFunctionCancelled) {
+						status = "requeue_item_missing_cancelled"
+					} else {
+						l.Warn("dropped retry; queue item not found on requeue",
+							"cause", err,
+							"next_attempt", qi.Data.Attempt,
+							"max_attempts", qi.Data.GetMaxAttempts(),
+							"lease_id", requeueItem.LeaseID,
+							"requeue_at", at,
+						)
+					}
 					metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
 						PkgName: pkgName,
 						Tags: map[string]any{
-							"status":      "requeue_item_missing",
+							"status":      status,
 							"queue_shard": shard.Name(),
 						},
 					})
