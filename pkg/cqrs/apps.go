@@ -33,7 +33,7 @@ type AppManager interface {
 }
 
 type AppReader interface {
-	// GetApps returns apps that have not been deleted.
+	// GetApps returns active apps unless the filter requests archived apps.
 	GetApps(ctx context.Context, envID uuid.UUID, filter *FilterAppParam) ([]*App, error)
 	// GetAppByChecksum returns an app by checksum.
 	GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*App, error)
@@ -99,5 +99,8 @@ type UpdateAppURLParams struct {
 }
 
 type FilterAppParam struct {
-	Method *enums.AppMethod
+	Method   *enums.AppMethod
+	Cursor   uuid.UUID
+	Limit    int
+	Archived bool
 }

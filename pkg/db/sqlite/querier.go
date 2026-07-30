@@ -80,12 +80,32 @@ func (sq *sqliteQuerier) GetAppByURL(ctx context.Context, url string) (*db.App, 
 	return appFromSQLite(r), nil
 }
 
-func (sq *sqliteQuerier) GetApps(ctx context.Context) ([]*db.App, error) {
-	rows, err := sq.q.GetApps(ctx)
+func (sq *sqliteQuerier) GetApps(ctx context.Context, arg db.GetAppsParams) ([]*db.App, error) {
+	rows, err := sq.q.GetApps(ctx, sqlc.GetAppsParams{
+		Cursor:    arg.Cursor,
+		LimitRows: int64(arg.Limit),
+		Archived:  arg.Archived,
+		Method:    arg.Method,
+	})
 	if err != nil {
 		return nil, err
 	}
 	return convertSlice(rows, appFromSQLite), nil
+}
+
+func (sq *sqliteQuerier) GetAppFunctionCounts(ctx context.Context, appIDs []uuid.UUID) ([]db.AppFunctionCount, error) {
+	rows, err := sq.q.GetAppFunctionCounts(ctx, appIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]db.AppFunctionCount, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, db.AppFunctionCount{
+			AppID:         row.AppID,
+			FunctionCount: int(row.FunctionCount),
+		})
+	}
+	return result, nil
 }
 
 func (sq *sqliteQuerier) UpsertApp(ctx context.Context, arg db.UpsertAppParams) (*db.App, error) {

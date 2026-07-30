@@ -51,7 +51,22 @@ RETURNING *;
 SELECT * FROM apps WHERE id = $1;
 
 -- name: GetApps :many
-SELECT * FROM apps WHERE archived_at IS NULL;
+SELECT * FROM apps
+WHERE (
+    (sqlc.arg('archived')::boolean AND archived_at IS NOT NULL)
+    OR (NOT sqlc.arg('archived')::boolean AND archived_at IS NULL)
+)
+AND (sqlc.arg('method')::text = '' OR "method" = sqlc.arg('method')::text)
+AND (sqlc.arg('cursor')::uuid = '00000000-0000-0000-0000-000000000000'::uuid OR id > sqlc.arg('cursor')::uuid::text)
+ORDER BY id ASC
+LIMIT CASE WHEN sqlc.arg('limit_rows')::int > 0 THEN sqlc.arg('limit_rows')::int ELSE NULL END;
+
+-- name: GetAppFunctionCounts :many
+SELECT app_id, COUNT(*) AS function_count
+FROM functions
+WHERE archived_at IS NULL
+AND app_id = ANY((sqlc.arg('app_ids')::uuid[])::text[])
+GROUP BY app_id;
 
 -- name: GetAppByChecksum :one
 SELECT * FROM apps WHERE checksum = $1 AND archived_at IS NULL LIMIT 1;

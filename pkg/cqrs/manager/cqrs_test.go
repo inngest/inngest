@@ -102,6 +102,75 @@ func TestCQRSGetApps(t *testing.T) {
 	})
 }
 
+func TestCQRSGetAppsPagination(t *testing.T) {
+	ctx := context.Background()
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	firstID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	secondID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	archivedID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	for _, app := range []cqrs.UpsertAppParams{
+		{ID: firstID, Name: "first", Checksum: "first", Url: "http://first", Method: enums.AppMethodServe.String()},
+		{ID: secondID, Name: "second", Checksum: "second", Url: "http://second", Method: enums.AppMethodConnect.String()},
+		{ID: archivedID, Name: "archived", Checksum: "archived", Url: "http://archived", Method: enums.AppMethodAPI.String()},
+	} {
+		_, err := cm.UpsertApp(ctx, app)
+		require.NoError(t, err)
+	}
+	require.NoError(t, cm.DeleteApp(ctx, archivedID))
+
+	for i := 0; i < 2; i++ {
+		_, err := cm.UpsertFunction(ctx, cqrs.UpsertFunctionParams{
+			ID:        uuid.New(),
+			AppID:     secondID,
+			Name:      fmt.Sprintf("function-%d", i),
+			Slug:      fmt.Sprintf("function-%d", i),
+			Config:    "{}",
+			CreatedAt: time.Now(),
+		})
+		require.NoError(t, err)
+	}
+
+	t.Run("returns an active page after the cursor with function counts", func(t *testing.T) {
+		result, err := cm.GetApps(ctx, uuid.New(), &cqrs.FilterAppParam{
+			Cursor: firstID,
+			Limit:  1,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		require.Equal(t, secondID, result[0].ID)
+
+		counts, err := cm.GetAppFunctionCounts(ctx, []uuid.UUID{secondID})
+		require.NoError(t, err)
+		require.Equal(t, 2, counts[secondID])
+	})
+
+	t.Run("returns archived apps only", func(t *testing.T) {
+		result, err := cm.GetApps(ctx, uuid.New(), &cqrs.FilterAppParam{
+			Limit:    10,
+			Archived: true,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		require.Equal(t, archivedID, result[0].ID)
+		require.False(t, result[0].DeletedAt.IsZero())
+	})
+
+	t.Run("preserves method filtering", func(t *testing.T) {
+		method := enums.AppMethodConnect
+		result, err := cm.GetApps(ctx, uuid.New(), &cqrs.FilterAppParam{
+			Method: &method,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		require.Equal(t, secondID, result[0].ID)
+	})
+}
+
 func TestCQRSGetAppByChecksum(t *testing.T) {
 	ctx := context.Background()
 	envID := uuid.New()

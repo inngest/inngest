@@ -358,6 +358,23 @@ func TestService_GetApp(t *testing.T) {
 		require.Equal(t, archivedAt.UTC().Truncate(time.Microsecond), resp.Data.ArchivedAt.AsTime().Truncate(time.Microsecond))
 	})
 
+	t.Run("omits future archive time", func(t *testing.T) {
+		scheduled := app
+		scheduled.ArchivedAt = time.Now().Add(time.Hour)
+		apps := &mockAppProvider{}
+		apps.On("GetApp", mock.Anything, "my-app").Return(scheduled, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		service := NewService(ServiceOptions{Apps: apps})
+		resp, err := service.GetApp(context.Background(), &apiv2.GetAppRequest{AppId: "my-app"})
+
+		require.NoError(t, err)
+		require.False(t, resp.Data.IsArchived)
+		require.Nil(t, resp.Data.ArchivedAt)
+	})
+
 	t.Run("falls back to internal uuid when external id is missing", func(t *testing.T) {
 		apps := &mockAppProvider{}
 		apps.On("GetApp", mock.Anything, appID.String()).Return(App{InternalID: appID}, nil).Once()
@@ -416,6 +433,121 @@ func TestService_GetApp(t *testing.T) {
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Unable to fetch app")
 		require.Equal(t, codes.Internal, status.Code(err))
+	})
+}
+
+func TestService_GetApps(t *testing.T) {
+	firstID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	secondID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	first := App{ID: "first", InternalID: firstID, Name: "First"}
+	second := App{ID: "second", InternalID: secondID, Name: "Second"}
+
+	t.Run("returns mapped app data and page", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApps", mock.Anything, GetAppsOpts{
+			Limit: defaultAppsLimit,
+		}).Return(&GetAppsResult{
+			Apps: []App{first, second},
+		}, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		resp, err := NewService(ServiceOptions{Apps: apps}).GetApps(context.Background(), &apiv2.GetAppsRequest{})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 2)
+		require.Equal(t, "first", resp.Data[0].Id)
+		require.Equal(t, "First", resp.Data[0].Name)
+		require.False(t, resp.Page.HasMore)
+		require.Equal(t, int32(defaultAppsLimit), resp.Page.Limit)
+		require.Nil(t, resp.Page.Cursor)
+	})
+
+	t.Run("uses cursor and limit", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApps", mock.Anything, GetAppsOpts{
+			Cursor: firstID,
+			Limit:  1,
+		}).Return(&GetAppsResult{
+			Apps:    []App{second},
+			HasMore: true,
+		}, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		resp, err := NewService(ServiceOptions{Apps: apps}).GetApps(context.Background(), &apiv2.GetAppsRequest{
+			Cursor: strPtr(firstID.String()),
+			Limit:  int32Ptr(1),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resp.Data, 1)
+		require.True(t, resp.Page.HasMore)
+		require.Equal(t, secondID.String(), resp.Page.GetCursor())
+	})
+
+	t.Run("requests archived apps", func(t *testing.T) {
+		apps := &mockAppProvider{}
+		apps.On("GetApps", mock.Anything, GetAppsOpts{
+			Limit:    defaultAppsLimit,
+			Archived: true,
+		}).Return(&GetAppsResult{}, nil).Once()
+		t.Cleanup(func() {
+			apps.AssertExpectations(t)
+		})
+
+		resp, err := NewService(ServiceOptions{Apps: apps}).GetApps(context.Background(), &apiv2.GetAppsRequest{
+			Archived: boolPtr(true),
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, resp.Data)
+	})
+
+	t.Run("requires valid cursor", func(t *testing.T) {
+		resp, err := NewService(ServiceOptions{Apps: &mockAppProvider{}}).GetApps(
+			context.Background(),
+			&apiv2.GetAppsRequest{Cursor: strPtr("not-a-uuid")},
+		)
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Cursor is invalid")
+	})
+
+	t.Run("validates limit", func(t *testing.T) {
+		resp, err := NewService(ServiceOptions{Apps: &mockAppProvider{}}).GetApps(
+			context.Background(),
+			&apiv2.GetAppsRequest{Limit: int32Ptr(maxAppsLimit + 1)},
+		)
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Limit cannot exceed")
+	})
+
+	t.Run("returns not implemented without app provider", func(t *testing.T) {
+		resp, err := NewService(ServiceOptions{}).GetApps(context.Background(), &apiv2.GetAppsRequest{})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, "Get apps is not yet implemented")
+	})
+
+	t.Run("applies rate limiting", func(t *testing.T) {
+		rateLimiter := &mockRateLimitProvider{}
+		rateLimiter.On("CheckRateLimit", mock.Anything, apiv2.V2_GetApps_FullMethodName).
+			Return(RateLimitResult{Limited: true}).Once()
+		t.Cleanup(func() {
+			rateLimiter.AssertExpectations(t)
+		})
+
+		resp, err := NewService(ServiceOptions{
+			Apps:              &mockAppProvider{},
+			RateLimitProvider: rateLimiter,
+		}).GetApps(context.Background(), &apiv2.GetAppsRequest{})
+
+		require.Nil(t, resp)
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	})
 }
 
