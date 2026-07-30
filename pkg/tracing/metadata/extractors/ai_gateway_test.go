@@ -119,12 +119,6 @@ func TestExtractAIGatewayMetadata_RequestParams(t *testing.T) {
 			wantSeed:      util.ToPtr[int64](42),
 		},
 		{
-			name:     "float32 params widen without binary noise",
-			body:     `{"model": "gpt-4o", "temperature": 0.7, "top_p": 0.9}`,
-			wantTemp: util.ToPtr(0.7),
-			wantTopP: util.ToPtr(0.9),
-		},
-		{
 			name:          "max tokens falls back to max completion tokens",
 			body:          `{"model": "gpt-4o", "max_completion_tokens": 2048}`,
 			wantMaxTokens: util.ToPtr[int64](2048),

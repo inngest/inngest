@@ -121,12 +121,8 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		aiMd.FinishReasons = []string{parsedOutput.StopReason}
 	}
 
-	if parsedInput.Temperature != nil {
-		aiMd.Temperature = util.ToPtr(float32To64(*parsedInput.Temperature))
-	}
-	if parsedInput.TopP != nil {
-		aiMd.TopP = util.ToPtr(float32To64(*parsedInput.TopP))
-	}
+	aiMd.Temperature = parsedInput.Temperature
+	aiMd.TopP = parsedInput.TopP
 	maxTokens := parsedInput.MaxTokens
 	if maxTokens == 0 {
 		maxTokens = parsedInput.MaxCompletionTokens
@@ -180,14 +176,6 @@ func aiProviderFromRequest(host, format string) string {
 	}
 
 	return format
-}
-
-// float32To64 widens via the shortest decimal representation so float32
-// request params survive without binary noise (0.7 stays 0.7 rather than
-// becoming 0.699999988079071).
-func float32To64(f float32) float64 {
-	v, _ := strconv.ParseFloat(strconv.FormatFloat(float64(f), 'g', -1, 32), 64)
-	return v
 }
 
 type vercelAIUsage struct {
