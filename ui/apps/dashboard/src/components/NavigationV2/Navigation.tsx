@@ -26,12 +26,7 @@ export const getNavRoute = (activeEnv: EnvType, link: string) =>
   `/env/${activeEnv.slug}/${link}` as FileRouteTypes['to'];
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
-  // TEMPORARY: defaults true until there's a LaunchDarkly rule for this flag.
-  // `isReady` is false whenever LD doesn't have the flag configured yet —
-  // exactly the case this override is for — so gating on `isReady` too would
-  // cancel the override out. Once a real LD rule exists, revert both the
-  // default above and this check back to `isReady && value`.
-  const isAIOverviewEnabled = useBooleanFlag('ai-overview-dashboard', true);
+  const isAIOverviewEnabled = useBooleanFlag('ai-overview-dashboard', false);
 
   const aiItems: NavItemConfig[] = [
     ...(isAIOverviewEnabled.value ? [aiOverviewItem] : []),
