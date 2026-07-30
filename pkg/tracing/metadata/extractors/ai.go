@@ -347,6 +347,44 @@ func backfillEstimatedCost(md *AIMetadata) {
 	md.EstimatedCost = estimatedCostForTokens(md.ResponseModel, md.RequestModel, md.InputTokens, md.OutputTokens)
 }
 
+// backfillTotalTokens sets md.TotalTokens by summing input and output tokens
+// only when the emitter didn't supply a total and there is usage to sum.
+func backfillTotalTokens(md *AIMetadata) {
+	if md.TotalTokens != nil || (md.InputTokens == 0 && md.OutputTokens == 0) {
+		return
+	}
+	totalTokens := md.InputTokens + md.OutputTokens
+	md.TotalTokens = &totalTokens
+}
+
+// BackfillTotalTokensInValues fills a "total_tokens" entry into raw
+// "inngest.ai" metadata values when one isn't already present, mirroring
+// BackfillEstimatedCostInValues for token totals.
+func BackfillTotalTokensInValues(values metadata.Values) {
+	if values == nil {
+		return
+	}
+
+	if raw, ok := values["total_tokens"]; ok {
+		var existing *int64
+		if err := json.Unmarshal(raw, &existing); err == nil && existing != nil {
+			return
+		}
+	}
+
+	var inputTokens, outputTokens int64
+	_ = json.Unmarshal(values["input_tokens"], &inputTokens)
+	_ = json.Unmarshal(values["output_tokens"], &outputTokens)
+	if inputTokens == 0 && outputTokens == 0 {
+		return
+	}
+
+	totalTokens := inputTokens + outputTokens
+	if b, err := json.Marshal(totalTokens); err == nil {
+		values["total_tokens"] = b
+	}
+}
+
 // BackfillEstimatedCostInValues fills an "estimated_cost" entry into raw
 // "inngest.ai" metadata values when one isn't already present. Unlike
 // backfillEstimatedCost, this operates on untyped metadata.Values — the shape

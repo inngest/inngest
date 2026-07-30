@@ -35,12 +35,7 @@ func (e *AIMetadataExtractor) extractAIMetadata(span *tracev1.Span) (md AIMetada
 		md.LatencyMs = &latencyMs
 	}
 
-	// calculate total tokens if a provider value wasn't supplied
-	if md.TotalTokens == nil && (md.InputTokens > 0 || md.OutputTokens > 0) {
-		totalTokens := md.InputTokens + md.OutputTokens
-		md.TotalTokens = &totalTokens
-	}
-
+	backfillTotalTokens(&md)
 	backfillEstimatedCost(&md)
 
 	return md, true
