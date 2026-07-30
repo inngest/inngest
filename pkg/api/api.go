@@ -66,7 +66,7 @@ func NewAPI(o Options) (chi.Router, error) {
 		AllowOriginFunc:  func(r *http.Request, origin string) bool { return true },
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"*"},
-		ExposedHeaders:   []string{"Link"},
+		ExposedHeaders:   []string{"Link", "Mcp-Session-Id"},
 		AllowCredentials: false,
 		MaxAge:           60 * 60, // 1 hour
 	})

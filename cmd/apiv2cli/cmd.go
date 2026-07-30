@@ -19,14 +19,11 @@ import (
 	"time"
 	"unicode"
 
-	openapiv2 "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/tel"
-	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/urfave/cli/v3"
-	"google.golang.org/genproto/googleapis/api/annotations"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -39,16 +36,6 @@ const (
 )
 
 var pathParamPattern = regexp.MustCompile(`\{([^}=]+)(=[^}]*)?}`)
-
-var hiddenEndpointMethods = map[string]struct{}{
-	"CreatePartnerAccount": {},
-	"FetchPartnerAccounts": {},
-	"ListFunctionRuns":     {},
-}
-
-var endpointCommandNames = map[string]string{
-	"ListRuns": "get-function-runs",
-}
 
 type endpoint struct {
 	name       string
@@ -275,13 +262,7 @@ func flagForField(category, name string, field protoreflect.FieldDescriptor) cli
 }
 
 func fieldUsage(field protoreflect.FieldDescriptor) string {
-	usage := string(field.JSONName())
-	opts := field.Options()
-	if proto.HasExtension(opts, openapiv2.E_Openapiv2Field) {
-		if schema, ok := proto.GetExtension(opts, openapiv2.E_Openapiv2Field).(*openapiv2.JSONSchema); ok && schema.GetDescription() != "" {
-			usage = schema.GetDescription()
-		}
-	}
+	usage := apiv2endpoint.FieldDescription(field)
 
 	if isRequiredField(field) {
 		usage += " (required)"
@@ -291,47 +272,40 @@ func fieldUsage(field protoreflect.FieldDescriptor) string {
 }
 
 func discoverEndpoints() []endpoint {
-	service := apiv2.File_api_v2_service_proto.Services().ByName("V2")
-	if service == nil {
-		return nil
-	}
-
-	endpoints := []endpoint{}
-	methods := service.Methods()
-	for i := 0; i < methods.Len(); i++ {
-		method := methods.Get(i)
-		methodName := string(method.Name())
-		if strings.HasPrefix(methodName, "_") {
-			continue
-		}
-		if _, hidden := hiddenEndpointMethods[methodName]; hidden {
-			continue
-		}
-
-		httpRule := httpRule(method)
-		if httpRule == nil {
-			continue
-		}
-
-		httpMethod, path := methodAndPath(httpRule)
-		if path == "" {
-			continue
-		}
-
-		summary, help := methodHelp(method)
+	shared := canonicalCommandEndpoints(apiv2endpoint.Discover())
+	endpoints := make([]endpoint, 0, len(shared))
+	for _, discovered := range shared {
 		endpoints = append(endpoints, endpoint{
-			name:       endpointCommandName(methodName),
-			method:     httpMethod,
-			path:       path,
-			summary:    summary,
-			help:       help,
-			body:       httpRule.Body,
-			input:      method.Input(),
-			pathParams: pathParams(path),
+			name:       discovered.CommandName,
+			method:     discovered.HTTPMethod,
+			path:       discovered.Path,
+			summary:    discovered.Summary,
+			help:       discovered.Description,
+			body:       discovered.Body,
+			input:      discovered.Input,
+			pathParams: discovered.PathParams,
 		})
 	}
 
 	return endpoints
+}
+
+func canonicalCommandEndpoints(endpoints []apiv2endpoint.Endpoint) []apiv2endpoint.Endpoint {
+	explicitOwners := map[string]string{}
+	for _, endpoint := range endpoints {
+		if endpoint.CommandNameExplicit {
+			explicitOwners[endpoint.CommandName] = endpoint.MethodName
+		}
+	}
+
+	result := make([]apiv2endpoint.Endpoint, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		if owner, ok := explicitOwners[endpoint.CommandName]; ok && owner != endpoint.MethodName {
+			continue
+		}
+		result = append(result, endpoint)
+	}
+	return result
 }
 
 func endpointUsage(ep endpoint) string {
@@ -364,57 +338,8 @@ func endpointDescription(ep endpoint) string {
 	return strings.Join(lines, "\n")
 }
 
-func methodHelp(method protoreflect.MethodDescriptor) (string, string) {
-	opts := method.Options()
-	if !proto.HasExtension(opts, openapiv2.E_Openapiv2Operation) {
-		return "", ""
-	}
-
-	op, ok := proto.GetExtension(opts, openapiv2.E_Openapiv2Operation).(*openapiv2.Operation)
-	if !ok {
-		return "", ""
-	}
-
-	return op.GetSummary(), op.GetDescription()
-}
-
 func endpointCommandName(methodName string) string {
-	if name, ok := endpointCommandNames[methodName]; ok {
-		return name
-	}
-
-	name := kebab(methodName)
-	for _, prefix := range []string{"fetch-", "list-"} {
-		if strings.HasPrefix(name, prefix) {
-			return "get-" + strings.TrimPrefix(name, prefix)
-		}
-	}
-	return name
-}
-
-func httpRule(method protoreflect.MethodDescriptor) *annotations.HttpRule {
-	opts := method.Options()
-	if !proto.HasExtension(opts, annotations.E_Http) {
-		return nil
-	}
-	return proto.GetExtension(opts, annotations.E_Http).(*annotations.HttpRule)
-}
-
-func methodAndPath(rule *annotations.HttpRule) (string, string) {
-	switch pattern := rule.Pattern.(type) {
-	case *annotations.HttpRule_Get:
-		return http.MethodGet, pattern.Get
-	case *annotations.HttpRule_Post:
-		return http.MethodPost, pattern.Post
-	case *annotations.HttpRule_Put:
-		return http.MethodPut, pattern.Put
-	case *annotations.HttpRule_Delete:
-		return http.MethodDelete, pattern.Delete
-	case *annotations.HttpRule_Patch:
-		return http.MethodPatch, pattern.Patch
-	default:
-		return http.MethodPost, ""
-	}
+	return apiv2endpoint.CommandName(methodName)
 }
 
 func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
@@ -832,18 +757,8 @@ func validateBody(cmd *cli.Command, ep endpoint, body map[string]any) error {
 	return nil
 }
 
-// isRequiredField reports whether the field carries a
-// `(google.api.field_behavior) = REQUIRED` annotation.
 func isRequiredField(field protoreflect.FieldDescriptor) bool {
-	opts := field.Options()
-	if !proto.HasExtension(opts, annotations.E_FieldBehavior) {
-		return false
-	}
-	behaviors, ok := proto.GetExtension(opts, annotations.E_FieldBehavior).([]annotations.FieldBehavior)
-	if !ok {
-		return false
-	}
-	return slices.Contains(behaviors, annotations.FieldBehavior_REQUIRED)
+	return apiv2endpoint.IsRequired(field)
 }
 
 func fieldValue(cmd *cli.Command, field protoreflect.FieldDescriptor, flagName string) (any, error) {
@@ -921,17 +836,6 @@ func addQueryValue(values url.Values, key string, value any) {
 	default:
 		values.Set(key, fmt.Sprint(v))
 	}
-}
-
-func pathParams(path string) []string {
-	matches := pathParamPattern.FindAllStringSubmatch(path, -1)
-	params := make([]string, 0, len(matches))
-	for _, match := range matches {
-		if len(match) > 1 {
-			params = append(params, match[1])
-		}
-	}
-	return params
 }
 
 func parseInt(value string, bitSize int) (int64, error) {

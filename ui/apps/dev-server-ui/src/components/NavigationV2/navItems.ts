@@ -30,5 +30,5 @@ export const workflow: NavGroupConfig = {
 
 export const setup: NavGroupConfig = {
   heading: 'Setup',
-  items: [{ label: 'MCP', href: '/mcp', Icon: MCPIcon }],
+  items: [{ label: 'MCP', href: '/mcp/setup', Icon: MCPIcon }],
 };
