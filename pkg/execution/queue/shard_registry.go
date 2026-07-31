@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/inngest/inngest/pkg/logger"
-	"golang.org/x/sync/errgroup"
 )
 
 // shardSelector returns a shard reference for the given queue item. It
@@ -37,10 +36,10 @@ type ShardRegistry interface {
 	// shard selector. Resolve errors if no selector has been configured.
 	Resolve(ctx context.Context, scope Scope, queueItemKind *string) (QueueShard, error)
 
-	// ForEach runs fn against every active shard concurrently, returning
-	// the first error encountered. The shard set is snapshotted at call
-	// time; mutations during iteration are not observed. The ctx passed
-	// to fn carries a logger tagged with shard_name.
+	// ForEach runs fn against every active shard concurrently. Shard errors
+	// are logged without cancelling work against other shards. The shard set
+	// is snapshotted at call time; mutations during iteration are not observed.
+	// The ctx passed to fn carries a logger tagged with shard_name.
 	ForEach(ctx context.Context, fn func(context.Context, QueueShard) error) error
 }
 
@@ -113,6 +112,11 @@ func NewShardRegistry(
 	if len(shards) == 0 {
 		return nil, fmt.Errorf("queue: NewShardRegistry requires at least one shard")
 	}
+	for name, shard := range shards {
+		if shard == nil {
+			return nil, fmt.Errorf("queue: shard %q must not be nil", name)
+		}
+	}
 	r := &shardRegistry{
 		shards: maps.Clone(shards),
 	}
@@ -181,17 +185,19 @@ func (r *shardRegistry) Resolve(ctx context.Context, scope Scope, queueItemKind 
 
 func (r *shardRegistry) ForEach(ctx context.Context, fn func(context.Context, QueueShard) error) error {
 	snapshot := r.snapshot()
-	eg, ctx := errgroup.WithContext(ctx)
+	var wg sync.WaitGroup
 	for name, s := range snapshot {
-		eg.Go(func() error {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			l := logger.StdlibLogger(ctx).With("shard_name", name)
 			if err := fn(logger.WithStdlib(ctx, l), s); err != nil {
-				return fmt.Errorf("shard %q: %w", name, err)
+				l.Error("error iterating queue shard", "error", err, "operation", "shard_iteration")
 			}
-			return nil
-		})
+		}()
 	}
-	return eg.Wait()
+	wg.Wait()
+	return ctx.Err()
 }
 
 // SetPrimary updates the leased primary shard. The shard must already be
