@@ -229,6 +229,11 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 
 	require.WithinDuration(t, time.Now().Add(consts.ConnectWorkerRequestLeaseDuration), ulid.Time(parsed.Time()), 500*time.Millisecond)
 
+	// The immediately previous lease ID is accepted as an idempotent retry in
+	// case its renewal ACK was lost. Use an unrelated lease ID to exercise the
+	// genuinely invalid lease path.
+	invalidLeaseID := ulid.Make().String()
+
 	sendWorkerExtendLeaseMessage(t, res, &connect.WorkerRequestExtendLeaseData{
 		RequestId:      payload.RequestId,
 		AccountId:      payload.AccountId,
@@ -239,7 +244,7 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 		SystemTraceCtx: payload.SystemTraceCtx,
 		UserTraceCtx:   payload.UserTraceCtx,
 		RunId:          payload.RunId,
-		LeaseId:        payload.LeaseId,
+		LeaseId:        invalidLeaseID,
 	})
 
 	// Expect lease extension ack
