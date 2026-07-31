@@ -11,7 +11,6 @@ import {
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { useEnvironment } from '../Environments/environment-context';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
-import { AccountConcurrency } from './AccountConcurrency';
 import { AUTO_REFRESH_INTERVAL } from './ActionMenu';
 import { Backlog } from './Backlog';
 import { Concurrency } from './Concurrency';
@@ -20,6 +19,7 @@ import {
   ConnectWorkerTotalCapacity,
 } from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
+import { EnvironmentConcurrency } from './EnvironmentConcurrency';
 import {
   sumScopedMetricData,
   sumScopedMetricsByGroup,
@@ -330,7 +330,9 @@ export const MetricsVolume = ({
 
   error && console.error('Error fetcthing metrics data for', variables, error);
 
-  const accountConcurrency = data
+  // The gauge is queried under workspace(id:), so this total covers the
+  // selected environment only — not the whole account.
+  const envConcurrency = data
     ? sumScopedMetricData(data.workspace.allFunctionConcurrency.metrics)
     : undefined;
 
@@ -374,8 +376,8 @@ export const MetricsVolume = ({
               entities={entities}
               isMarketplace={isMarketplace}
             />
-            <AccountConcurrency
-              accountConcurrency={accountConcurrency}
+            <EnvironmentConcurrency
+              envConcurrency={envConcurrency}
               limit={concurrencyLimit}
               isMarketplace={isMarketplace}
             />

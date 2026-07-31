@@ -10,29 +10,29 @@ import { pathCreator } from '@/utils/urls';
 import { borderColor } from '@/utils/tailwind';
 import { getLineChartOptions, lineColors, seriesOptions } from './utils';
 
-type AccountConcurrencyData = Array<Pick<MetricsData, 'bucket' | 'value'>>;
+type EnvironmentConcurrencyData = Array<Pick<MetricsData, 'bucket' | 'value'>>;
 
 type Props = {
-  accountConcurrency: AccountConcurrencyData | undefined;
+  envConcurrency: EnvironmentConcurrencyData | undefined;
   limit?: number;
   isMarketplace: boolean;
 };
 
-export function AccountConcurrency({
-  accountConcurrency,
+export function EnvironmentConcurrency({
+  envConcurrency,
   limit,
   isMarketplace = false,
 }: Props) {
   let option = {};
-  if (accountConcurrency) {
-    option = createChartOption({ limit, accountConcurrency });
+  if (envConcurrency) {
+    option = createChartOption({ limit, envConcurrency });
   }
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
-          Account Concurrency
+          Environment Concurrency
           <Info
             action={
               <Link
@@ -42,7 +42,7 @@ export function AccountConcurrency({
                 Learn more about concurrency.
               </Link>
             }
-            text="The number of concurrently running steps across all environments"
+            text="The number of concurrently running steps across all functions in this environment. The limit shown is your account concurrency limit, which is shared across every environment."
           />
         </div>
         {!isMarketplace && (
@@ -70,18 +70,18 @@ export function AccountConcurrency({
 
 function createChartOption({
   limit,
-  accountConcurrency,
+  envConcurrency,
 }: {
   limit: number | undefined;
-  accountConcurrency: AccountConcurrencyData;
+  envConcurrency: EnvironmentConcurrencyData;
 }): React.ComponentProps<typeof Chart>['option'] {
   const dark = isDark();
 
   const series: LineSeriesOption[] = [
     {
       ...seriesOptions,
-      name: 'Account Concurrency',
-      data: accountConcurrency.map(({ value }) => value),
+      name: 'Environment Concurrency',
+      data: envConcurrency.map(({ value }) => value),
       itemStyle: {
         color: resolveColor(lineColors[0][0], dark, lineColors[0]?.[1]),
       },
@@ -94,12 +94,14 @@ function createChartOption({
       ...seriesOptions,
       markLine: {
         animation: false,
-        data: [{ yAxis: limit, name: 'Concurrency Limit', symbol: 'none' }],
+        data: [
+          { yAxis: limit, name: 'Account Concurrency Limit', symbol: 'none' },
+        ],
         emphasis: {
           label: {
             color: 'inherit',
             formatter: ({ value }: any) => {
-              return ` Plan Limit: ${value}\n\n`;
+              return ` Account Limit: ${value}\n\n`;
             },
             position: 'insideStartTop' as const,
             show: true,
@@ -117,7 +119,7 @@ function createChartOption({
     });
   }
 
-  const xAxisData = accountConcurrency.map(({ bucket }) => bucket);
+  const xAxisData = envConcurrency.map(({ bucket }) => bucket);
 
   return getLineChartOptions(
     {
@@ -139,6 +141,6 @@ function createChartOption({
         },
       },
     },
-    [{ name: 'Account Concurrency' }],
+    [{ name: 'Environment Concurrency' }],
   );
 }
