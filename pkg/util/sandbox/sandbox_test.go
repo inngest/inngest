@@ -26,7 +26,10 @@ func canonicalOpcodeOpts(action Action) map[string]any {
 	processTarget := map[string]any{"sandboxId": testSandboxID, "processId": testProcessID}
 	switch action {
 	case ActionCreate:
-		operation["input"] = []any{map[string]any{"name": "eval_run-1", "vcpu": 2, "memoryMb": 2048}}
+		operation["input"] = []any{map[string]any{
+			"name": "eval_run-1", "vcpu": 2, "memoryMb": 2048,
+			"environment": map[string]string{"1.WITH-DOT": "ok", "SHARED": "sandbox"},
+		}}
 	case ActionList:
 		operation["input"] = []any{map[string]any{"limit": 50}}
 	case ActionGet:
@@ -88,6 +91,14 @@ func TestParseCanonicalOpcodeOpts(t *testing.T) {
 	_, err := ParseOpcodeOpts(invalidEnv)
 	require.ErrorContains(t, err, "environment keys")
 
+	invalidCreateEnv := canonicalOpcodeOpts(ActionCreate)
+	invalidCreateEnv["sandbox"].(map[string]any)["input"] = []any{map[string]any{
+		"name": "eval_run-1", "vcpu": 2, "memoryMb": 2048,
+		"environment": map[string]string{"A=B": "x"},
+	}}
+	_, err = ParseOpcodeOpts(invalidCreateEnv)
+	require.ErrorContains(t, err, "environment keys")
+
 	relative := canonicalOpcodeOpts(ActionExec)
 	relative["sandbox"].(map[string]any)["input"] = []any{map[string]any{
 		"command": []string{"bin/true"}, "timeoutMs": 1000,
@@ -123,6 +134,12 @@ func TestRESTProviderCanonicalLifecycle(t *testing.T) {
 		require.Equal(t, "workspace-"+r.Header.Get("X-Test-Workspace"), r.Header.Get("X-Inngest-Env"))
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/v2/sandboxes":
+			var body CreateInput
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+			require.Equal(t, map[string]string{
+				"1.WITH-DOT": "ok",
+				"SHARED":     "sandbox",
+			}, body.Environment)
 			writeData(w, http.StatusCreated, resource)
 		case r.Method == http.MethodGet && r.URL.Path == "/v2/sandboxes":
 			writeData(w, http.StatusOK, []any{resource}, map[string]any{"hasMore": false, "limit": 50})
