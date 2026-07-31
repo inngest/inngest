@@ -60,6 +60,7 @@ func deferAddOp(t *testing.T, hashedID string, opts state.DeferAddOpts) state.Ge
 func TestSaveFromOp_Rejected(t *testing.T) {
 	validInput := json.RawMessage(`{"x":1}`)
 	oversizedInput := json.RawMessage(`{"msg": "` + strings.Repeat("a", consts.MaxDeferInputSize+1) + `"}`)
+	oversizedMeta := json.RawMessage(`{"sessions": {"k": "` + strings.Repeat("a", consts.MaxEventMetaSize) + `"}}`)
 
 	cases := []struct {
 		name           string
@@ -72,6 +73,31 @@ func TestSaveFromOp_Rejected(t *testing.T) {
 		{
 			name:          "oversized input writes Rejected sentinel",
 			opts:          state.DeferAddOpts{FnSlug: "child-fn", Input: oversizedInput},
+			wantSaveCalls: 1,
+			wantStatus:    enums.DeferStatusRejected,
+		},
+		{
+			// Non-object Meta is caught at op receipt rather than at finalize,
+			// where a bad blob could only be dropped silently. The sentinel means
+			// that if the SDK sends the same defer again, it will dedupe rather than
+			// re-rejecting.
+			name: "non-object meta writes Rejected sentinel",
+			opts: state.DeferAddOpts{
+				FnSlug: "child-fn",
+				Input:  validInput,
+				// Wrap with an array, rather than a top-level object
+				Meta: json.RawMessage(`[{"sessions":{}}]`),
+			},
+			wantSaveCalls: 1,
+			wantStatus:    enums.DeferStatusRejected,
+		},
+		{
+			name: "oversized meta writes Rejected sentinel",
+			opts: state.DeferAddOpts{
+				FnSlug: "child-fn",
+				Input:  validInput,
+				Meta:   oversizedMeta,
+			},
 			wantSaveCalls: 1,
 			wantStatus:    enums.DeferStatusRejected,
 		},

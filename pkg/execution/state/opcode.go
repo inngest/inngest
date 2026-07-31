@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -24,6 +25,7 @@ var (
 	ErrDeferInputTooLarge = fmt.Errorf("defer input size is greater than the limit")
 	ErrDeferInputInvalid  = fmt.Errorf("defer input is not a valid JSON object")
 	ErrDeferMetaTooLarge  = fmt.Errorf("defer meta size is greater than the limit")
+	ErrDeferMetaInvalid   = fmt.Errorf("defer meta is not a valid JSON object")
 )
 
 type GeneratorOpcode struct {
@@ -446,6 +448,17 @@ func (d *DeferAddOpts) Validate() error {
 		// Redis (per defer × per run) and inflating them into the
 		// deferred.schedule event bus on Finalize.
 		return ErrDeferInputTooLarge
+	}
+	// Meta is optional. A literal `null` is accepted as a special case.
+	if meta := bytes.TrimSpace(d.Meta); len(meta) > 0 && !bytes.Equal(meta, []byte("null")) {
+		if !util.IsJSONObject(meta) {
+			// Object shape is checked here rather than left to finalize: a
+			// non-object Meta (`3`, `"x"`, `[1]`) would persist happily and only fail
+			// in buildDeferEvents, after the parent run has finished, where the
+			// deferred run can only be dropped. Rejecting at op receipt turns it
+			// into a rejectReason with the existing metric and rejected span.
+			return ErrDeferMetaInvalid
+		}
 	}
 	if len(d.Meta) > consts.MaxEventMetaSize {
 		// Meta is persisted as a raw, unparsed blob until the parent run

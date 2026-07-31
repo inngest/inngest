@@ -59,6 +59,8 @@ func SaveFromOp(
 			rejectReason = "per_defer_size"
 		} else if errors.Is(err, state.ErrDeferMetaTooLarge) {
 			rejectReason = "meta_size"
+		} else if errors.Is(err, state.ErrDeferMetaInvalid) {
+			rejectReason = "invalid_meta"
 		} else if errors.Is(err, state.ErrDeferInputInvalid) {
 			rejectReason = "invalid_input"
 		} else {
