@@ -9,10 +9,8 @@ import {
 import { FeatureEmptyState } from '@/components/FeatureEmptyState/FeatureEmptyState';
 import { trackEmptyStateDocsLinkOpened } from '@/utils/analyticsEvents';
 
-// TODO: point this at an actual step-by-step guide once one exists — this is
-// currently the Extended Traces reference doc, not a walkthrough.
 const DOCS_URL =
-  'https://www.inngest.com/docs/reference/typescript/v4/extended-traces?ref=app-empty-ai-overview';
+  'https://www.inngest.com/docs/examples/ai-metadata-quickstart?ref=app-empty-ai-overview';
 
 const example = `import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
