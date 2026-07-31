@@ -21,14 +21,15 @@ function toSigFigs(value: number, sigFigs: number): string {
   return value.toFixed(decimals);
 }
 
-// formatCost rounds to 2 decimal places (cents) under $1000, and falls back
-// to a compact K/M number above that, where exact cents stop being the
-// interesting part of the number.
+// formatCost is 3 significant figures under $1000 (not a fixed decimal
+// count) — a $0.0000234 call and a $234 one both read with the same
+// precision — and falls back to a compact K/M number above that, where
+// exact cents stop being the interesting part of the number.
 export function formatCost(value: number): string {
   if (value >= 1000) {
     return `$${formatCompactNumber(value)}`;
   }
-  return `$${value.toFixed(2)}`;
+  return `$${toSigFigs(value, 3)}`;
 }
 
 // formatCostAxis is formatCost's axis-tick counterpart — trailing zeros
