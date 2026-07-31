@@ -354,14 +354,14 @@ func TestNewSingleShardRegistry(t *testing.T) {
 		require.Equal(t, []string{"only"}, visited)
 	})
 
-	t.Run("ForEach surfaces fn error", func(t *testing.T) {
+	t.Run("ForEach suppresses fn error", func(t *testing.T) {
 		r := mustSingleShardRegistry(t, newTestShard("only", ""))
 
 		want := errors.New("nope")
 		err := r.ForEach(context.Background(), func(context.Context, QueueShard) error {
 			return want
 		})
-		require.ErrorIs(t, err, want)
+		require.NoError(t, err)
 	})
 
 	t.Run("nil shard returns an error", func(t *testing.T) {

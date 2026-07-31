@@ -17,6 +17,12 @@ type shardLeaseTestShard struct {
 	calls atomic.Int32
 }
 
+func (s *shardLeaseTestShard) ShardAssignmentConfig() ShardAssignmentConfig {
+	config := s.registryTestShard.ShardAssignmentConfig()
+	config.NumExecutors = 1
+	return config
+}
+
 func (s *shardLeaseTestShard) ShardLease(context.Context, string, time.Duration, int, ...*ulid.ULID) (*ulid.ULID, error) {
 	s.calls.Add(1)
 	return nil, s.err
