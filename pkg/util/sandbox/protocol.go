@@ -75,9 +75,10 @@ type ProcessTarget struct {
 }
 
 type CreateInput struct {
-	Name     string `json:"name"`
-	VCPU     uint32 `json:"vcpu"`
-	MemoryMB uint32 `json:"memoryMb"`
+	Name        string            `json:"name"`
+	VCPU        uint32            `json:"vcpu"`
+	MemoryMB    uint32            `json:"memoryMb"`
+	Environment map[string]string `json:"environment,omitempty"`
 }
 
 type ListInput struct {
@@ -761,7 +762,7 @@ func (i CreateInput) Validate() error {
 	if i.VCPU == 0 || i.MemoryMB == 0 {
 		return errors.New("vcpu and memoryMb must be positive uint32 values")
 	}
-	return nil
+	return validateEnvironment(i.Environment)
 }
 
 func (i ListInput) Validate() error {
@@ -792,18 +793,8 @@ func (i ProcessSpecInput) Validate() error {
 	if argvBytes > 32<<10 {
 		return errors.New("command exceeds 32768 bytes")
 	}
-	if len(i.Environment) > 256 {
-		return errors.New("environment exceeds 256 entries")
-	}
-	envBytes := 0
-	for key, value := range i.Environment {
-		if key == "" || strings.ContainsAny(key, "=\x00") || !portableString(key) || !portableString(value) {
-			return errors.New("environment keys must be nonempty without '=' or NUL and values must not contain NUL")
-		}
-		envBytes += len(key) + 1 + len(value)
-	}
-	if envBytes > 64<<10 {
-		return errors.New("environment exceeds 65536 bytes")
+	if err := validateEnvironment(i.Environment); err != nil {
+		return err
 	}
 	if !portableString(i.CWD) || len(i.CWD) > 4096 {
 		return errors.New("cwd must be valid UTF-8 without NUL and at most 4096 bytes")
@@ -815,6 +806,23 @@ func (i ProcessSpecInput) Validate() error {
 	}{Argv: i.Command, Env: i.Environment, CWD: i.CWD})
 	if err != nil || len(wire) > 96<<10 {
 		return errors.New("process spec exceeds 98304 encoded bytes")
+	}
+	return nil
+}
+
+func validateEnvironment(environment map[string]string) error {
+	if len(environment) > 256 {
+		return errors.New("environment exceeds 256 entries")
+	}
+	envBytes := 0
+	for key, value := range environment {
+		if key == "" || strings.ContainsAny(key, "=\x00") || !portableString(key) || !portableString(value) {
+			return errors.New("environment keys must be nonempty without '=' or NUL and values must not contain NUL")
+		}
+		envBytes += len(key) + 1 + len(value)
+	}
+	if envBytes > 64<<10 {
+		return errors.New("environment exceeds 65536 bytes")
 	}
 	return nil
 }
