@@ -100,8 +100,11 @@ func (q *queueProcessor) tryClaimShardLease(ctx context.Context, shards []QueueS
 			continue
 		}
 		if err != nil {
-			l.Warn("could not get a shard lease", "shard", shard.Name(), "err", err, "duration", time.Since(start))
-			return false, err
+			if ctx.Err() != nil {
+				return false, ctx.Err()
+			}
+			l.Error("could not get a shard lease", "shard", shard.Name(), "err", err, "duration", time.Since(start), "operation", "shard_initialization")
+			continue
 		}
 
 		// If lease has been gotten, set the primary shard and return it
