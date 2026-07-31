@@ -358,8 +358,8 @@ func TestExtendRequestLeaseLegacyValueCompatibility(t *testing.T) {
 	}
 	serializedLegacyLease, err := json.Marshal(legacyLease)
 	require.NoError(t, err)
-	require.NotContains(t, string(serializedLegacyLease), `"p"`)
-	require.NotContains(t, string(serializedLegacyLease), `"w"`)
+	require.NotContains(t, string(serializedLegacyLease), `"prevLeaseID"`)
+	require.NotContains(t, string(serializedLegacyLease), `"workerID"`)
 	require.NoError(t, r.Set(leaseKey, string(serializedLegacyLease)))
 	r.SetTTL(leaseKey, consts.MaxFunctionTimeout+duration)
 
@@ -396,6 +396,85 @@ func TestExtendRequestLeaseLegacyValueCompatibility(t *testing.T) {
 	)
 	require.ErrorIs(t, err, ErrRequestLeased)
 	require.Nil(t, rejectedLeaseID)
+}
+
+func TestLeaseRequestPreservesExtensionReplayMetadata(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	fakeClock := clockwork.NewFakeClock()
+	connManager := NewRedisConnectionStateManager(rc, RedisStateManagerOpt{
+		Clock: fakeClock,
+	})
+
+	envID := uuid.New()
+	requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	instanceID := "instance-1"
+	duration := consts.ConnectWorkerRequestLeaseDuration
+	leaseKey := connManager.keyRequestLease(envID, requestID)
+
+	initialLeaseID, err := connManager.LeaseRequest(
+		ctx,
+		envID,
+		requestID,
+		duration,
+		net.IPv4(1, 1, 1, 1),
+	)
+	require.NoError(t, err)
+	extendedLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		instanceID,
+		requestID,
+		*initialLeaseID,
+		duration,
+		true,
+	)
+	require.NoError(t, err)
+
+	ttlBeforeLeaseAttempt := r.TTL(leaseKey)
+
+	newExecutorIP := net.IPv4(2, 2, 2, 2)
+	rejectedLeaseID, err := connManager.LeaseRequest(
+		ctx,
+		envID,
+		requestID,
+		duration,
+		newExecutorIP,
+	)
+	require.ErrorIs(t, err, ErrRequestLeased)
+	require.Nil(t, rejectedLeaseID)
+	require.Equal(t, ttlBeforeLeaseAttempt, r.TTL(leaseKey))
+
+	serializedLease, err := r.Get(leaseKey)
+	require.NoError(t, err)
+
+	var storedLease Lease
+	require.NoError(t, json.Unmarshal([]byte(serializedLease), &storedLease))
+	require.Equal(t, *extendedLeaseID, storedLease.LeaseID)
+	require.Equal(t, *initialLeaseID, *storedLease.PreviousLeaseID)
+	require.Equal(t, instanceID, storedLease.WorkerInstanceID)
+	require.Equal(t, newExecutorIP, storedLease.ExecutorIP)
+
+	// The predecessor remains usable after the rejected lease attempt.
+	replayedLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		instanceID,
+		requestID,
+		*initialLeaseID,
+		duration,
+		true,
+	)
+	require.NoError(t, err)
+	require.Equal(t, *extendedLeaseID, *replayedLeaseID)
 }
 
 func TestExtendRequestLeaseReplayOwnershipClearedOnReassignment(t *testing.T) {

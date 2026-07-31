@@ -28,8 +28,8 @@ var (
 
 type Lease struct {
 	LeaseID          ulid.ULID  `json:"leaseID"`
-	PreviousLeaseID  *ulid.ULID `json:"p,omitempty"`
-	WorkerInstanceID string     `json:"w,omitempty"`
+	PreviousLeaseID  *ulid.ULID `json:"prevLeaseID,omitempty"`
+	WorkerInstanceID string     `json:"workerID,omitempty"`
 	ExecutorIP       net.IP     `json:"executorIP"`
 }
 

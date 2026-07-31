@@ -66,8 +66,8 @@ if requestItem.leaseID ~= leaseID and decode_ulid_time(requestItem.leaseID) > cu
 	-- one predecessor in the existing lease value so the same worker can replay
 	-- an old-SDK extension and recover the current lease ID without another key
 	-- or an unbounded history.
-	local retryOwnedByWorker = workerCapUnlimitedBool == false or requestItem.w == instanceID
-	if requestItem.p == leaseID and retryOwnedByWorker then
+	local retryOwnedByWorker = workerCapUnlimitedBool == false or requestItem.workerID == instanceID
+	if requestItem.prevLeaseID == leaseID and retryOwnedByWorker then
 		return {3, requestItem.leaseID}
 	end
 	return {-2, ""}
@@ -92,14 +92,14 @@ if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 end
 
 -- Update the request lease item with the new lease ID
-requestItem.p = requestItem.leaseID
+requestItem.prevLeaseID = requestItem.leaseID
 requestItem.leaseID = newLeaseID
 if workerCapUnlimitedBool == true then
 	-- Capacity-limited workers already have a bounded request-to-worker
 	-- mapping, so only unlimited workers need ownership duplicated here.
-	requestItem.w = instanceID
+	requestItem.workerID = instanceID
 else
-	requestItem.w = nil
+	requestItem.workerID = nil
 end
 redis.call("SET", keyRequestLease, cjson.encode(requestItem), "EX", expiry)
 
