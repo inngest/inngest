@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { runAgentLoop, type QueryDraft, type ToolDef } from './loop';
+import {
+  runAgentLoop,
+  type ChatCompletion,
+  type QueryDraft,
+  type ToolDef,
+} from './loop';
 
 function fakeStep(waitForEventResult: unknown = null) {
   return {
@@ -9,11 +14,13 @@ function fakeStep(waitForEventResult: unknown = null) {
   };
 }
 
-function fakeClient(responses: unknown[]) {
+// Replays canned completions in order, recording each request body.
+function fakeComplete(responses: unknown[]) {
   let i = 0;
-  return {
-    messages: { create: vi.fn(async () => responses[i++]) },
-  } as never;
+  return vi.fn(
+    (_body: unknown): Promise<ChatCompletion> =>
+      Promise.resolve(responses[i++] as ChatCompletion),
+  );
 }
 
 const echoTool: ToolDef = {
@@ -24,7 +31,6 @@ const echoTool: ToolDef = {
 function baseArgs(overrides: Record<string, unknown> = {}) {
   return {
     step: fakeStep() as never,
-    model: 'claude-sonnet-4-5',
     system: 'system prompt',
     messages: [{ role: 'user' as const, content: 'hi' }],
     tools: [echoTool],
@@ -39,22 +45,36 @@ function baseArgs(overrides: Record<string, unknown> = {}) {
 
 function textResponse(text: string) {
   return {
-    content: [{ type: 'text', text }],
-    usage: { input_tokens: 10, output_tokens: 5 },
+    choices: [{ message: { role: 'assistant', content: text } }],
+    usage: { prompt_tokens: 10, completion_tokens: 5 },
   };
 }
 
 function toolResponse(name: string, input: Record<string, unknown>, id = 't1') {
   return {
-    content: [{ type: 'tool_use', id, name, input }],
-    usage: { input_tokens: 10, output_tokens: 5 },
+    choices: [
+      {
+        message: {
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              id,
+              type: 'function',
+              function: { name, arguments: JSON.stringify(input) },
+            },
+          ],
+        },
+      },
+    ],
+    usage: { prompt_tokens: 10, completion_tokens: 5 },
   };
 }
 
 describe('runAgentLoop', () => {
   it('returns a text-only response as the summary without calling tools', async () => {
-    const client = fakeClient([textResponse('done summary')]);
-    const res = await runAgentLoop({ ...baseArgs(), client });
+    const complete = fakeComplete([textResponse('done summary')]);
+    const res = await runAgentLoop({ ...baseArgs(), complete });
 
     expect(res.summary).toBe('done summary');
     expect(res.iterations).toBe(1);
@@ -65,27 +85,28 @@ describe('runAgentLoop', () => {
   });
 
   it('executes tool calls then finishes on a text-only turn', async () => {
-    const client = fakeClient([
+    const complete = fakeComplete([
       toolResponse('echo', { msg: 'x' }),
       textResponse('final'),
     ]);
-    const res = await runAgentLoop({ ...baseArgs(), client });
+    const res = await runAgentLoop({ ...baseArgs(), complete });
 
     expect(res.toolCalls).toBe(1);
     expect(res.iterations).toBe(2);
     expect(res.summary).toBe('final');
 
     // The second LLM call must carry the assistant turn and the tool result.
-    const secondCall = (
-      client as { messages: { create: ReturnType<typeof vi.fn> } }
-    ).messages.create.mock.calls[1]?.[0] as {
-      messages: { role: string; content: unknown }[];
+    // Messages: [system, user, assistant(tool_calls), tool].
+    const secondCall = complete.mock.calls[1]?.[0] as {
+      messages: { role: string; content: unknown; tool_call_id?: string }[];
     };
-    expect(secondCall.messages).toHaveLength(3);
-    expect(secondCall.messages[1]?.role).toBe('assistant');
-    expect(secondCall.messages[2]?.content).toEqual([
-      { type: 'tool_result', tool_use_id: 't1', content: 'echoed:x' },
-    ]);
+    expect(secondCall.messages).toHaveLength(4);
+    expect(secondCall.messages[2]?.role).toBe('assistant');
+    expect(secondCall.messages[3]).toEqual({
+      role: 'tool',
+      tool_call_id: 't1',
+      content: 'echoed:x',
+    });
   });
 
   it('applies draftPatch and publishes outside the tool step (replay-safe)', async () => {
@@ -102,14 +123,14 @@ describe('runAgentLoop', () => {
         publish: { event: 'step.completed', data: { sql: 'SELECT 1' } },
       }),
     };
-    const client = fakeClient([
+    const complete = fakeComplete([
       toolResponse('submit', {}),
       textResponse('summary'),
     ]);
     const draft: QueryDraft = { selectedEvents: [] };
     const res = await runAgentLoop({
       ...baseArgs({ tools: [submit], draft }),
-      client,
+      complete,
       publish: async (_id, event, data) => {
         published.push({ event, data });
       },
@@ -127,15 +148,17 @@ describe('runAgentLoop', () => {
     const responses = Array.from({ length: 3 }, (_, i) =>
       toolResponse('echo', { msg: 'x' }, `t${i}`),
     );
-    const client = fakeClient(responses);
-    const res = await runAgentLoop({ ...baseArgs(), client, maxIterations: 3 });
+    const complete = fakeComplete(responses);
+    const res = await runAgentLoop({
+      ...baseArgs(),
+      complete,
+      maxIterations: 3,
+    });
 
     expect(res.iterations).toBe(3);
     expect(res.summary).toBe('');
 
-    const lastCall = (
-      client as { messages: { create: ReturnType<typeof vi.fn> } }
-    ).messages.create.mock.calls[2]?.[0] as {
+    const lastCall = complete.mock.calls[2]?.[0] as {
       messages: { content: unknown }[];
     };
     const lastMessage = lastCall.messages[lastCall.messages.length - 1];
@@ -143,16 +166,34 @@ describe('runAgentLoop', () => {
   });
 
   it('keeps text that accompanies a tool call on the final iteration', async () => {
-    const client = fakeClient([
+    const complete = fakeComplete([
       {
-        content: [
-          { type: 'text', text: 'Here is your query.' },
-          { type: 'tool_use', id: 't1', name: 'echo', input: { msg: 'x' } },
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: 'Here is your query.',
+              tool_calls: [
+                {
+                  id: 't1',
+                  type: 'function',
+                  function: {
+                    name: 'echo',
+                    arguments: JSON.stringify({ msg: 'x' }),
+                  },
+                },
+              ],
+            },
+          },
         ],
-        usage: { input_tokens: 10, output_tokens: 5 },
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
       },
     ]);
-    const res = await runAgentLoop({ ...baseArgs(), client, maxIterations: 1 });
+    const res = await runAgentLoop({
+      ...baseArgs(),
+      complete,
+      maxIterations: 1,
+    });
 
     expect(res.summary).toBe('Here is your query.');
   });
@@ -179,14 +220,14 @@ describe('runAgentLoop', () => {
         },
       });
       const published: { event: string; data: Record<string, unknown> }[] = [];
-      const client = fakeClient([
+      const complete = fakeComplete([
         toolResponse('validate_query', { sql: 'SELECT count() FROM runs' }),
         textResponse('done'),
       ]);
       const res = await runAgentLoop({
         ...baseArgs({ tools: [validateTool] }),
         step: step as never,
-        client,
+        complete,
         publish: async (_id, event, data) => {
           published.push({ event, data });
         },
@@ -207,14 +248,10 @@ describe('runAgentLoop', () => {
       expect(res.validationAttempts).toBe(1);
       expect(res.validationFailures).toEqual([]);
 
-      const secondCall = (
-        client as { messages: { create: ReturnType<typeof vi.fn> } }
-      ).messages.create.mock.calls[1]?.[0] as {
-        messages: { content: [{ content: string }] }[];
+      const secondCall = complete.mock.calls[1]?.[0] as {
+        messages: { content: string }[];
       };
-      expect(secondCall.messages[2]?.content[0]?.content).toContain(
-        'ran successfully',
-      );
+      expect(secondCall.messages[3]?.content).toContain('ran successfully');
     });
 
     it('records diagnostics as validation failures', async () => {
@@ -227,14 +264,14 @@ describe('runAgentLoop', () => {
           ],
         },
       });
-      const client = fakeClient([
+      const complete = fakeComplete([
         toolResponse('validate_query', { sql: 'SELECT nope FROM runs' }),
         textResponse('done'),
       ]);
       const res = await runAgentLoop({
         ...baseArgs({ tools: [validateTool] }),
         step: step as never,
-        client,
+        complete,
       });
 
       expect(res.validationAttempts).toBe(1);
@@ -250,7 +287,7 @@ describe('runAgentLoop', () => {
     it('treats a hallucinated validate_query call as an unknown tool when not offered', async () => {
       const step = fakeStep();
       const publish = vi.fn(async () => {});
-      const client = fakeClient([
+      const complete = fakeComplete([
         toolResponse('validate_query', { sql: 'SELECT 1' }),
         textResponse('done'),
       ]);
@@ -258,7 +295,7 @@ describe('runAgentLoop', () => {
       const res = await runAgentLoop({
         ...baseArgs({ tools: [echoTool] }),
         step: step as never,
-        client,
+        complete,
         publish,
       });
 
@@ -266,37 +303,31 @@ describe('runAgentLoop', () => {
       expect(step.waitForEvent).not.toHaveBeenCalled();
       expect(res.validationAttempts).toBe(0);
 
-      const secondCall = (
-        client as { messages: { create: ReturnType<typeof vi.fn> } }
-      ).messages.create.mock.calls[1]?.[0] as {
-        messages: { content: [{ content: string }] }[];
+      const secondCall = complete.mock.calls[1]?.[0] as {
+        messages: { content: string }[];
       };
-      expect(secondCall.messages[2]?.content[0]?.content).toContain(
+      expect(secondCall.messages[3]?.content).toContain(
         'Unknown tool: validate_query',
       );
     });
 
     it('degrades gracefully when no validation result arrives (timeout)', async () => {
       const step = fakeStep(null);
-      const client = fakeClient([
+      const complete = fakeComplete([
         toolResponse('validate_query', { sql: 'SELECT 1' }),
         textResponse('done'),
       ]);
       const res = await runAgentLoop({
         ...baseArgs({ tools: [validateTool] }),
         step: step as never,
-        client,
+        complete,
       });
 
       expect(res.validationFailures).toEqual([]);
-      const secondCall = (
-        client as { messages: { create: ReturnType<typeof vi.fn> } }
-      ).messages.create.mock.calls[1]?.[0] as {
-        messages: { content: [{ content: string }] }[];
+      const secondCall = complete.mock.calls[1]?.[0] as {
+        messages: { content: string }[];
       };
-      expect(secondCall.messages[2]?.content[0]?.content).toContain(
-        'unavailable',
-      );
+      expect(secondCall.messages[3]?.content).toContain('unavailable');
     });
   });
 });

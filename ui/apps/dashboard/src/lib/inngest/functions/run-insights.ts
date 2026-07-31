@@ -1,12 +1,13 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { anthropic, experiment } from 'inngest';
+import { experiment } from 'inngest';
 import { createScorer } from 'inngest/experimental';
 import { v4 as uuidv4 } from 'uuid';
 
 import { inngest } from '../client';
 import { insightsChannel } from '../realtime';
 import {
+  parseToolArguments,
   runAgentLoop,
+  type ChatCompletion,
   type InsightsClientState,
   type QueryDraft,
 } from './agent/loop';
@@ -33,12 +34,41 @@ type ChatEventData = {
   canValidate?: boolean;
 };
 
-// Anthropic API pricing per 1M tokens (hardcoded for now).
-const PRICING: Record<string, { inputPerMTok: number; outputPerMTok: number }> =
-  {
-    'claude-sonnet-4-5': { inputPerMTok: 3, outputPerMTok: 15 },
-    'claude-opus-4-8': { inputPerMTok: 5, outputPerMTok: 25 },
-  };
+// All LLM calls route through OpenRouter. Requires OPENROUTER_API_KEY.
+const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+// Internal model ids, kept stable for pricing and experiment attribution, mapped
+// to the OpenRouter slugs the API expects.
+const OPENROUTER_MODEL_IDS: Record<string, string> = {
+  'claude-opus-5': 'anthropic/claude-opus-5',
+  'glm-5.2': 'z-ai/glm-5.2',
+  'claude-haiku-4-5': 'anthropic/claude-haiku-4.5',
+};
+
+// Throws on a non-2xx response so the enclosing step.run retries.
+async function chatCompletion(
+  model: string,
+  body: Record<string, unknown>,
+): Promise<ChatCompletion> {
+  const res = await fetch(OPENROUTER_CHAT_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY ?? ''}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      ...body,
+      // Last so the resolved model always wins over a stray `model` in `body`.
+      model: OPENROUTER_MODEL_IDS[model] ?? model,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `OpenRouter request failed (${res.status}): ${await res.text()}`,
+    );
+  }
+  return (await res.json()) as ChatCompletion;
+}
 
 // Deferred LLM-as-judge, run after the parent run finalizes. Two modes:
 // - SQL produced → insights_judge_relevance: how well the query fits the chat
@@ -71,44 +101,45 @@ export const insightsJudgeScorer = createScorer(
       ? `User chat context:\n${chatContext}\n\nGenerated SQL:\n${sql}`
       : `User chat context:\n${chatContext}\n\nAssistant response (no SQL):\n${summary}`;
 
-    const result = await step.ai.infer('judge-relevance', {
-      model: anthropic({
-        model: 'claude-haiku-4-5',
-        defaultParameters: { max_tokens: 1024 },
-      }),
-      body: {
-        system,
-        messages: [{ role: 'user' as const, content }],
+    const result = (await step.run('judge-relevance', () =>
+      chatCompletion('claude-haiku-4-5', {
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content },
+        ],
         tools: [
           {
-            name: 'submit_score' as const,
-            description: 'Submit the relevance score for the generated SQL.',
-            input_schema: {
-              type: 'object' as const,
-              properties: {
-                relevance: {
-                  type: 'number',
-                  description:
-                    'How well the SQL fits the user request, 0 to 1.',
+            type: 'function',
+            function: {
+              name: 'submit_score',
+              description: 'Submit the relevance score for the generated SQL.',
+              parameters: {
+                type: 'object',
+                properties: {
+                  relevance: {
+                    type: 'number',
+                    description:
+                      'How well the SQL fits the user request, 0 to 1.',
+                  },
                 },
+                required: ['relevance'],
               },
-              required: ['relevance'],
             },
           },
         ],
-        tool_choice: { type: 'tool' as const, name: 'submit_score' },
-      },
-    });
+        tool_choice: { type: 'function', function: { name: 'submit_score' } },
+      }),
+    )) as ChatCompletion;
 
-    const toolUse = (
-      result as {
-        content: Array<{ type: string; name?: string; input?: unknown }>;
-      }
-    ).content.find(
-      (block) => block.type === 'tool_use' && block.name === 'submit_score',
+    const toolCall = result.choices[0]?.message.tool_calls?.find(
+      (c) => c.function.name === 'submit_score',
     );
-    const relevance = (toolUse?.input as { relevance?: number } | undefined)
-      ?.relevance;
+    const relevance = toolCall
+      ? (parseToolArguments(toolCall.function.arguments).relevance as
+          | number
+          | undefined)
+      : undefined;
 
     return {
       name: sql
@@ -192,14 +223,13 @@ export const runInsightsAgent = inngest.createFunction(
       'query-writer-model',
       {
         variants: {
-          'claude-sonnet-4-5': () =>
-            step.run('select-model', () => 'claude-sonnet-4-5'),
-          'claude-opus-4-8': () =>
-            step.run('select-model', () => 'claude-opus-4-8'),
+          'claude-opus-5': () =>
+            step.run('select-model', () => 'claude-opus-5'),
+          'glm-5.2': () => step.run('select-model', () => 'glm-5.2'),
         },
         select: experiment.weighted({
-          'claude-sonnet-4-5': 50,
-          'claude-opus-4-8': 50,
+          'claude-opus-5': 50,
+          'glm-5.2': 50,
         }),
       },
     );
@@ -226,8 +256,7 @@ export const runInsightsAgent = inngest.createFunction(
 
     const result = await runAgentLoop({
       step,
-      client: new Anthropic(),
-      model,
+      complete: (body) => chatCompletion(model, body),
       system: buildSystemPrompt({ currentQuery: clientState.currentQuery }),
       messages: [
         ...historyMessages,
@@ -252,11 +281,6 @@ export const runInsightsAgent = inngest.createFunction(
     });
 
     const latencyMs = Date.now() - startedAt;
-    const pricing = PRICING[model];
-    const costUsd = pricing
-      ? (result.tokensIn / 1_000_000) * pricing.inputPerMTok +
-        (result.tokensOut / 1_000_000) * pricing.outputPerMTok
-      : 0;
 
     await step.run('emit-scores', async () => {
       // .experiment() tags each score with its variant; runId writes them to the run span, one clean row per run.
@@ -274,7 +298,7 @@ export const runInsightsAgent = inngest.createFunction(
       });
       await inngest.score.experiment({
         name: 'query_writer_cost_usd',
-        value: costUsd,
+        value: result.costUsd,
         experiment: experimentRef,
         runId,
       });
