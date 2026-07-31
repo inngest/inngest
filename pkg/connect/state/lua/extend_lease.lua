@@ -54,9 +54,10 @@ end
 -- this field is only set if worker capacity is limited, this value represents whether we have enabled or
 -- disabled worker capacity tracking. If we have unlimited capacity, we don't track requests.
 -- If we have limited capacity, we track requests and we need to check if the request is still assigned to the worker.
+local mappedWorkerID = nil
 if workerCapUnlimitedBool == false then
-	local workerInstanceID = redis.call("GET", requestWorkerKey)
-	if workerInstanceID ~= instanceID then
+	mappedWorkerID = redis.call("GET", requestWorkerKey)
+	if mappedWorkerID ~= instanceID then
 		return {-3, ""}
 	end
 end
@@ -66,7 +67,13 @@ if requestItem.leaseID ~= leaseID and decode_ulid_time(requestItem.leaseID) > cu
 	-- one predecessor in the existing lease value so the same worker can replay
 	-- an old-SDK extension and recover the current lease ID without another key
 	-- or an unbounded history.
-	local retryOwnedByWorker = workerCapUnlimitedBool == false or requestItem.workerID == instanceID
+	local retryOwnedByWorker = requestItem.workerID == instanceID
+	if retryOwnedByWorker == false then
+		if mappedWorkerID == nil then
+			mappedWorkerID = redis.call("GET", requestWorkerKey)
+		end
+		retryOwnedByWorker = mappedWorkerID == instanceID
+	end
 	if requestItem.prevLeaseID == leaseID and retryOwnedByWorker then
 		return {3, requestItem.leaseID}
 	end

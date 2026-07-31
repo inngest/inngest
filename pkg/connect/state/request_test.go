@@ -638,6 +638,87 @@ func TestExtendRequestLeaseIdempotentReplayWithCapacityLimit(t *testing.T) {
 	require.Nil(t, wrongWorkerLeaseID)
 }
 
+func TestExtendRequestLeaseReplayAfterCapacityBecomesUnlimited(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	fakeClock := clockwork.NewFakeClock()
+	connManager := NewRedisConnectionStateManager(rc, RedisStateManagerOpt{
+		Clock: fakeClock,
+	})
+
+	envID := uuid.New()
+	requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	instanceID := "capacity-instance"
+	duration := consts.ConnectWorkerRequestLeaseDuration
+
+	require.NoError(t, connManager.SetWorkerTotalCapacity(ctx, envID, instanceID, 50))
+	initialLeaseID, err := connManager.LeaseRequest(ctx, envID, requestID, duration, net.IPv4(1, 1, 1, 1))
+	require.NoError(t, err)
+	require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, instanceID, requestID))
+
+	extendedLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		instanceID,
+		requestID,
+		*initialLeaseID,
+		duration,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, extendedLeaseID)
+
+	serializedLease, err := r.Get(connManager.keyRequestLease(envID, requestID))
+	require.NoError(t, err)
+	var storedLease Lease
+	require.NoError(t, json.Unmarshal([]byte(serializedLease), &storedLease))
+	require.Empty(t, storedLease.WorkerInstanceID)
+
+	mappingKey := connManager.requestWorkerKey(envID, requestID)
+	mappingTTLBeforeReplay := r.TTL(mappingKey)
+	require.Equal(t, consts.ConnectWorkerRequestToWorkerMappingTTL, mappingTTLBeforeReplay)
+
+	// Losing the capacity key makes the gateway treat this worker as unlimited,
+	// but the existing request-to-worker mapping still proves replay ownership.
+	require.NoError(t, connManager.SetWorkerTotalCapacity(ctx, envID, instanceID, 0))
+	workerCapacity, err := connManager.GetWorkerCapacities(ctx, envID, instanceID)
+	require.NoError(t, err)
+	require.True(t, workerCapacity.IsUnlimited())
+
+	replayedLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		instanceID,
+		requestID,
+		*initialLeaseID,
+		duration,
+		workerCapacity.IsUnlimited(),
+	)
+	require.NoError(t, err)
+	require.Equal(t, *extendedLeaseID, *replayedLeaseID)
+	require.Equal(t, mappingTTLBeforeReplay, r.TTL(mappingKey))
+
+	wrongWorkerLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		"other-instance",
+		requestID,
+		*initialLeaseID,
+		duration,
+		workerCapacity.IsUnlimited(),
+	)
+	require.ErrorIs(t, err, ErrRequestLeased)
+	require.Nil(t, wrongWorkerLeaseID)
+}
+
 func TestExtendRequestLeaseCapacityLimitedReassignment(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)

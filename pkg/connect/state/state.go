@@ -68,8 +68,9 @@ type RequestStateManager interface {
 	// LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
 	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration, executorIP net.IP) (leaseID *ulid.ULID, err error)
 
-	// ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
-	// the current lease does not match the passed leaseID (ErrRequestLeased).
+	// ExtendRequestLease attempts to extend a lease for the given request. A retry
+	// of the immediately previous lease by the same worker returns the current
+	// lease ID. Other mismatches fail with ErrRequestLeased.
 	// It also refreshes the worker instance's lease by updating the worker instance's last heartbeat.
 	ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityUnlimited bool) (newLeaseID *ulid.ULID, err error)
 
