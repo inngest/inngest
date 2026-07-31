@@ -235,4 +235,8 @@ var (
 	// ErrDeferMetaTooLarge re-exports the v1 error so v2 callers can match
 	// without importing v1.
 	ErrDeferMetaTooLarge = state.ErrDeferMetaTooLarge
+
+	// ErrDeferMetaInvalid re-exports the v1 error so v2 callers can match
+	// without importing v1.
+	ErrDeferMetaInvalid = state.ErrDeferMetaInvalid
 )
