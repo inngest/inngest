@@ -325,6 +325,79 @@ func TestExtendRequestLeaseIdempotentReplay(t *testing.T) {
 	require.ElementsMatch(t, keysBeforeExtension, r.Keys())
 }
 
+func TestExtendRequestLeaseLegacyValueCompatibility(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	fakeClock := clockwork.NewFakeClock()
+	connManager := NewRedisConnectionStateManager(rc, RedisStateManagerOpt{
+		Clock: fakeClock,
+	})
+
+	envID := uuid.New()
+	requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	instanceID := "instance-1"
+	duration := consts.ConnectWorkerRequestLeaseDuration
+	leaseKey := connManager.keyRequestLease(envID, requestID)
+	legacyLeaseID := ulid.MustNew(ulid.Timestamp(fakeClock.Now().Add(duration)), rand.Reader)
+
+	// Model a lease written by a gateway from before replay metadata was added.
+	legacyLease := struct {
+		LeaseID    ulid.ULID `json:"leaseID"`
+		ExecutorIP net.IP    `json:"executorIP"`
+	}{
+		LeaseID:    legacyLeaseID,
+		ExecutorIP: net.IPv4(1, 1, 1, 1),
+	}
+	serializedLegacyLease, err := json.Marshal(legacyLease)
+	require.NoError(t, err)
+	require.NotContains(t, string(serializedLegacyLease), `"p"`)
+	require.NotContains(t, string(serializedLegacyLease), `"w"`)
+	require.NoError(t, r.Set(leaseKey, string(serializedLegacyLease)))
+	r.SetTTL(leaseKey, consts.MaxFunctionTimeout+duration)
+
+	extendedLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		instanceID,
+		requestID,
+		legacyLeaseID,
+		duration,
+		true,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, extendedLeaseID)
+
+	serializedExtendedLease, err := r.Get(leaseKey)
+	require.NoError(t, err)
+	var storedLease Lease
+	require.NoError(t, json.Unmarshal([]byte(serializedExtendedLease), &storedLease))
+	require.Equal(t, *extendedLeaseID, storedLease.LeaseID)
+	require.Equal(t, legacyLeaseID, *storedLease.PreviousLeaseID)
+	require.Equal(t, instanceID, storedLease.WorkerInstanceID)
+	require.Equal(t, legacyLease.ExecutorIP, storedLease.ExecutorIP)
+
+	unrelatedLeaseID := ulid.MustNew(ulid.Timestamp(fakeClock.Now().Add(duration)), rand.Reader)
+	rejectedLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		instanceID,
+		requestID,
+		unrelatedLeaseID,
+		duration,
+		true,
+	)
+	require.ErrorIs(t, err, ErrRequestLeased)
+	require.Nil(t, rejectedLeaseID)
+}
+
 func TestExtendRequestLeaseReplayOwnershipClearedOnReassignment(t *testing.T) {
 	ctx := context.Background()
 	r := miniredis.RunT(t)
@@ -484,6 +557,93 @@ func TestExtendRequestLeaseIdempotentReplayWithCapacityLimit(t *testing.T) {
 	)
 	require.ErrorIs(t, err, ErrRequestWorkerDoesNotExist)
 	require.Nil(t, wrongWorkerLeaseID)
+}
+
+func TestExtendRequestLeaseCapacityLimitedReassignment(t *testing.T) {
+	ctx := context.Background()
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	fakeClock := clockwork.NewFakeClock()
+	connManager := NewRedisConnectionStateManager(rc, RedisStateManagerOpt{
+		Clock: fakeClock,
+	})
+
+	envID := uuid.New()
+	requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+	oldInstanceID := "capacity-instance-old"
+	newInstanceID := "capacity-instance-new"
+	duration := consts.ConnectWorkerRequestLeaseDuration
+	executorIP := net.IPv4(1, 1, 1, 1)
+
+	require.NoError(t, connManager.SetWorkerTotalCapacity(ctx, envID, oldInstanceID, 50))
+	require.NoError(t, connManager.SetWorkerTotalCapacity(ctx, envID, newInstanceID, 50))
+	initialLeaseID, err := connManager.LeaseRequest(ctx, envID, requestID, duration, executorIP)
+	require.NoError(t, err)
+	require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, oldInstanceID, requestID))
+
+	oldWorkerLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		oldInstanceID,
+		requestID,
+		*initialLeaseID,
+		duration,
+		false,
+	)
+	require.NoError(t, err)
+
+	advance := duration + time.Second
+	r.FastForward(advance)
+	fakeClock.Advance(advance)
+
+	reassignedLeaseID, err := connManager.LeaseRequest(ctx, envID, requestID, duration, executorIP)
+	require.NoError(t, err)
+	require.NoError(t, connManager.DeleteRequestFromWorker(ctx, envID, oldInstanceID, requestID))
+	require.NoError(t, connManager.AssignRequestToWorker(ctx, envID, newInstanceID, requestID))
+
+	// The old worker still knows a formerly valid lease ID, but ownership has
+	// moved and its replay must not be adopted by the new worker.
+	replayedLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		oldInstanceID,
+		requestID,
+		*oldWorkerLeaseID,
+		duration,
+		false,
+	)
+	require.ErrorIs(t, err, ErrRequestWorkerDoesNotExist)
+	require.Nil(t, replayedLeaseID)
+
+	newWorkerLeaseID, err := connManager.ExtendRequestLease(
+		ctx,
+		envID,
+		newInstanceID,
+		requestID,
+		*reassignedLeaseID,
+		duration,
+		false,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, newWorkerLeaseID)
+
+	mappingKey := connManager.requestWorkerKey(envID, requestID)
+	mappedInstanceID, err := r.Get(mappingKey)
+	require.NoError(t, err)
+	require.Equal(t, newInstanceID, mappedInstanceID)
+	require.Equal(t, consts.ConnectWorkerRequestToWorkerMappingTTL, r.TTL(mappingKey))
+
+	require.False(t, r.Exists(connManager.workerRequestsKey(envID, oldInstanceID)))
+	newWorkerRequests, err := r.ZMembers(connManager.workerRequestsKey(envID, newInstanceID))
+	require.NoError(t, err)
+	require.Contains(t, newWorkerRequests, requestID)
 }
 
 func TestBufferResponse(t *testing.T) {
