@@ -28,20 +28,12 @@ import { GetAccountEntitlementsDocument, ScoreKind } from '@/gql/graphql';
 import { Legend } from './Legend';
 import { ScoreCard } from './ScoreCard';
 import { ScoresEmptyState } from './ScoresEmptyState';
+import { ScoreNamesDocument, ScoreTimeSeriesDocument } from './queries';
 import type { ScoreSeries } from './types';
+import { getScoreColors } from './colors';
 
 const DEFAULT_DURATION = { hours: 24 };
 const SCORES_PANEL = 'Scores';
-
-// Red (lineColors[3]) is reserved for boolean `false` bars and must never be
-// used for a numeric line chart (nor any near-red hue). Numeric scores cycle
-// through this red-free subset of the metrics palette.
-const NUMERIC_LINE_COLORS = [
-  lineColors[2], // blue
-  lineColors[4], // purple
-  lineColors[1], // green
-  lineColors[0], // amber
-];
 
 const ScoresLookupDocument = graphql(`
   query ScoresLookup($envSlug: String!, $page: Int, $pageSize: Int) {
@@ -57,51 +49,6 @@ const ScoresLookupDocument = graphql(`
   }
 `);
 
-const ScoreNamesDocument = graphql(`
-  query ScoreNames(
-    $workspaceID: ID!
-    $functionIDs: [ID!]
-    $filter: ScoreFilter!
-  ) {
-    scoreNames(
-      workspaceID: $workspaceID
-      functionIDs: $functionIDs
-      filter: $filter
-    ) {
-      name
-      kind
-    }
-  }
-`);
-
-const ScoreTimeSeriesDocument = graphql(`
-  query ScoreTimeSeries(
-    $workspaceID: ID!
-    $functionIDs: [ID!]
-    $filter: ScoreFilter!
-    $scoreNames: [String!]
-  ) {
-    scoreTimeSeries(
-      workspaceID: $workspaceID
-      functionIDs: $functionIDs
-      filter: $filter
-      scoreNames: $scoreNames
-    ) {
-      scoreName
-      kind
-      buckets {
-        bucketStart
-        avg
-        max
-        p50
-        p90
-        p99
-        trueCount
-        falseCount
-      }
-    }
-  }
-`);
 
 export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
   const environment = useEnvironment();
@@ -184,18 +131,10 @@ export const ScoresDashboard = ({ envSlug }: { envSlug: string }) => {
     next.length ? setDisabled(next) : removeDisabled();
   };
 
-  // One stable color per score, assigned by position in the full available
-  // list so a score keeps its color regardless of which others are toggled
-  // off. Reuses the metrics palette; cycles when there are more than 5 scores.
-  const scoreColors = useMemo(() => {
-    const dark = isDark();
-    const m = new Map<string, string>();
-    availableScores.forEach((s, i) => {
-      const [token, hex] = NUMERIC_LINE_COLORS[i % NUMERIC_LINE_COLORS.length];
-      m.set(s.name, resolveColor(token, dark, hex));
-    });
-    return m;
-  }, [availableScores]);
+  const scoreColors = useMemo(
+    () => getScoreColors(availableScores),
+    [availableScores],
+  );
 
   const [{ data: seriesData, fetching: seriesFetching, error: seriesError }] =
     useQuery({

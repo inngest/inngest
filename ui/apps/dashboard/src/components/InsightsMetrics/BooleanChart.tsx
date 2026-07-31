@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import type { ExperimentVariantMetrics } from '@inngest/components/Experiments';
 import {
   Bar,
   BarChart,
@@ -12,39 +11,23 @@ import {
 } from 'recharts';
 
 import { computeChartSizing } from '@/lib/experiments/chart';
-import {
-  colorForVariant,
-  subtleColorForVariant,
-} from '@/lib/experiments/colors';
+import { AxisTick } from './AxisTick';
 import { BooleanChartTooltip } from './BooleanChartTooltip';
-import { VariantAxisTick } from './VariantAxisTick';
 
 const DOT_RADIUS = 5;
 
+// One horizontal lollipop row: a single scalar value (e.g. fraction-true for
+// a boolean score, or a boolean-kind experiment metric's average) plotted as
+// a dot at the end of a line from the axis — BoxPlot's RowData without the
+// quartile stats, since a boolean has nothing to draw a box from.
 export type RowData = {
-  variantName: string;
-  value: number;
-  /** Index of the variant in the shared list, used to pick a stable palette color. */
-  variantIndex: number;
-  runCount: number;
+  label: string;
+  avg: number;
+  count?: number;
+  color: string;
+  subtleColor: string;
   opacity: number;
 };
-
-export function rowsForMetric(
-  variants: ExperimentVariantMetrics[],
-  metricKey: string,
-  colorIndexForVariant?: Map<string, number>,
-): RowData[] {
-  return variants
-    .map((v, variantIndex) => {
-      const m = v.metrics.find((vm) => vm.key === metricKey);
-      const colorIndex = colorIndexForVariant?.get(v.variantName) ?? variantIndex;
-      return m
-        ? { variantName: v.variantName, value: m.avg, variantIndex: colorIndex, runCount: v.runCount, opacity: 1 }
-        : null;
-    })
-    .filter((r): r is RowData => r !== null);
-}
 
 type BarShapeProps = {
   x?: number;
@@ -52,7 +35,7 @@ type BarShapeProps = {
   width?: number;
   height?: number;
   fill?: string;
-  payload?: { variantIndex?: number; opacity?: number };
+  payload?: { subtleColor?: string; opacity?: number };
 };
 
 function LineDotShape({
@@ -64,10 +47,7 @@ function LineDotShape({
   payload,
 }: BarShapeProps) {
   const cy = y + height / 2;
-  const dotFill =
-    payload?.variantIndex !== undefined
-      ? subtleColorForVariant(payload.variantIndex)
-      : 'rgb(var(--color-background-canvas-base))';
+  const dotFill = payload?.subtleColor ?? 'rgb(var(--color-background-canvas-base))';
   return (
     <g opacity={payload?.opacity ?? 1}>
       <line
@@ -136,7 +116,7 @@ function HoverLine({ xAxisMap, yAxisMap, hoverX, activeRow }: HoverLineProps) {
   let plotX = hoverX;
 
   if (activeRow && scale) {
-    const snapPx = scale(activeRow.value);
+    const snapPx = scale(activeRow.avg);
     if (Math.abs(snapPx - hoverX) <= 4) {
       plotX = snapPx;
     }
@@ -162,14 +142,22 @@ type Props = {
   rows: RowData[];
   domain: [number, number];
   metricDisplayName: string;
-  hoveredVariantName?: string | null;
-  onVariantHover?: (name: string | null) => void;
+  hoveredLabel?: string | null;
+  onLabelHover?: (label: string | null) => void;
+  format?: (value: number) => string;
+  countLabel?: string;
 };
 
-export function BooleanChart({ rows, domain, metricDisplayName, hoveredVariantName, onVariantHover }: Props) {
-  const { chartHeight, yAxisWidth } = computeChartSizing(
-    rows.map((r) => r.variantName),
-  );
+export function BooleanChart({
+  rows,
+  domain,
+  metricDisplayName,
+  hoveredLabel,
+  onLabelHover,
+  format,
+  countLabel,
+}: Props) {
+  const { chartHeight, yAxisWidth } = computeChartSizing(rows.map((r) => r.label));
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [activeRow, setActiveRow] = useState<RowData | null>(null);
 
@@ -178,9 +166,9 @@ export function BooleanChart({ rows, domain, metricDisplayName, hoveredVariantNa
       rows.map((r) => ({
         ...r,
         // Only dim when the highlight comes from another chart (this chart has no active row)
-        opacity: !hoveredVariantName || activeRow !== null || r.variantName === hoveredVariantName ? 1 : 0.25,
+        opacity: !hoveredLabel || activeRow !== null || r.label === hoveredLabel ? 1 : 0.25,
       })),
-    [rows, hoveredVariantName, activeRow],
+    [rows, hoveredLabel, activeRow],
   );
 
   return (
@@ -194,18 +182,18 @@ export function BooleanChart({ rows, domain, metricDisplayName, hoveredVariantNa
           if (!state.isTooltipActive) {
             setHoverX(null);
             setActiveRow(null);
-            onVariantHover?.(null);
+            onLabelHover?.(null);
             return;
           }
           const row = (state.activePayload?.[0]?.payload as RowData | undefined) ?? null;
           setHoverX(state.chartX ?? null);
           setActiveRow(row);
-          onVariantHover?.(row?.variantName ?? null);
+          onLabelHover?.(row?.label ?? null);
         }}
         onMouseLeave={() => {
           setHoverX(null);
           setActiveRow(null);
-          onVariantHover?.(null);
+          onLabelHover?.(null);
         }}
       >
         <XAxis
@@ -218,30 +206,27 @@ export function BooleanChart({ rows, domain, metricDisplayName, hoveredVariantNa
         />
         <YAxis
           type="category"
-          dataKey="variantName"
+          dataKey="label"
           width={yAxisWidth}
-          tick={<VariantAxisTick />}
+          tick={<AxisTick />}
           axisLine={false}
           tickLine={false}
           interval={0}
         />
         <Tooltip
-          content={<BooleanChartTooltip />}
+          content={<BooleanChartTooltip format={format} countLabel={countLabel} />}
           cursor={{ fill: 'rgb(var(--color-background-canvas-subtle))' }}
-          allowEscapeViewBox={{ x: true, y: true }}
+          allowEscapeViewBox={{ x: false, y: true }}
           wrapperStyle={{ zIndex: 50, outline: 'none' }}
         />
         <Bar
-          dataKey="value"
+          dataKey="avg"
           name={metricDisplayName}
           shape={<LineDotShape />}
           background={<BackgroundLineShape />}
         >
           {rows.map((row) => (
-            <Cell
-              key={row.variantName}
-              fill={colorForVariant(row.variantIndex)}
-            />
+            <Cell key={row.label} fill={row.color} />
           ))}
         </Bar>
         <Customized

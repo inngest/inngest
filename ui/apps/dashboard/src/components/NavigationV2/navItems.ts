@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { AIOverviewIcon } from '@inngest/components/icons/sections/AIOverview';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
@@ -58,6 +59,12 @@ export const scoresItem: NavItemConfig = {
   label: 'Scores',
   route: 'scores',
   Icon: ScoresIcon,
+};
+
+export const aiOverviewItem: NavItemConfig = {
+  label: 'AI Overview',
+  route: 'ai-overview',
+  Icon: AIOverviewIcon,
 };
 
 export const sessionsItem: NavItemConfig = {

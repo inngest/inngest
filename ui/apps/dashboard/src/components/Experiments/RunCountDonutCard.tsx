@@ -5,7 +5,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { Cell, Pie, PieChart, ResponsiveContainer, Sector } from 'recharts';
 
 import { computeChartSizing, truncateCenter } from '@/lib/experiments/chart';
-import { colorForVariant, subtleColorForVariant } from '@/lib/experiments/colors';
+import { colorForVariant } from '@/lib/experiments/colors';
 
 type Props = {
   variants: ExperimentVariantMetrics[];
@@ -95,7 +95,7 @@ export function RunCountDonutCard({ variants, className, variantColorIndex, onVa
                 {data.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={subtleColorForVariant(variantColorIndex?.get(entry.name) ?? index)}
+                    fill={colorForVariant(variantColorIndex?.get(entry.name) ?? index)}
                     stroke={colorForVariant(variantColorIndex?.get(entry.name) ?? index)}
                     opacity={effectiveHighlight && entry.name !== effectiveHighlight ? 0.25 : 1}
                   />
@@ -122,7 +122,7 @@ export function RunCountDonutCard({ variants, className, variantColorIndex, onVa
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full border"
                   style={{
-                    backgroundColor: subtleColorForVariant(variantColorIndex?.get(v.variantName) ?? index),
+                    backgroundColor: colorForVariant(variantColorIndex?.get(v.variantName) ?? index),
                     borderColor: colorForVariant(variantColorIndex?.get(v.variantName) ?? index),
                   }}
                 />

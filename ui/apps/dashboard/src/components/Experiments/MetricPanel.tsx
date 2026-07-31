@@ -7,10 +7,12 @@ import {
 } from '@inngest/components/Experiments';
 import { RiTrophyLine } from '@remixicon/react';
 
+import { BooleanChart } from '@/components/InsightsMetrics/BooleanChart';
+import { BoxPlot } from '@/components/InsightsMetrics/BoxPlot';
 import { truncateCenter } from '@/lib/experiments/chart';
 import { findExtremum } from '@/lib/experiments/score';
-import { BooleanChart } from './BooleanChart';
-import { BoxPlot, rowsForMetric } from './BoxPlot';
+import { rowsForMetric } from './metricRows';
+import { formatMetricValue } from './variantsTable/metricStats';
 
 type Props = {
   metric: ExperimentScoringMetric;
@@ -27,8 +29,7 @@ export function MetricPanel({ metric, variants, variantColorIndex, hoveredVarian
   );
 
   const winner = useMemo(
-    () =>
-      findExtremum(rows, (r) => r.value, metric.invert)?.variantName ?? null,
+    () => findExtremum(rows, (r) => r.avg, metric.invert)?.label ?? null,
     [rows, metric.invert],
   );
 
@@ -50,8 +51,9 @@ export function MetricPanel({ metric, variants, variantColorIndex, hoveredVarian
             rows={rows}
             domain={domain}
             metricDisplayName={metric.displayName}
-            hoveredVariantName={hoveredVariantName}
-            onVariantHover={onVariantHover}
+            hoveredLabel={hoveredVariantName}
+            onLabelHover={onVariantHover}
+            format={formatMetricValue}
           />
         );
       case 'NUMERIC':
@@ -61,8 +63,9 @@ export function MetricPanel({ metric, variants, variantColorIndex, hoveredVarian
             rows={rows}
             domain={domain}
             metricDisplayName={metric.displayName}
-            hoveredVariantName={hoveredVariantName}
-            onVariantHover={onVariantHover}
+            hoveredLabel={hoveredVariantName}
+            onLabelHover={onVariantHover}
+            format={formatMetricValue}
           />
         );
     }

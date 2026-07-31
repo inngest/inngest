@@ -8,16 +8,11 @@ type Props = {
 };
 
 /**
- * Recharts YAxis tick that renders variant names with a center ellipsis for
- * long values. The full name is exposed via a native `<title>` tooltip so it
+ * Recharts YAxis tick that renders category labels with a center ellipsis for
+ * long values. The full label is exposed via a native `<title>` tooltip so it
  * remains accessible.
  */
-export function VariantAxisTick({
-  x = 0,
-  y = 0,
-  payload,
-  textAnchor = 'end',
-}: Props) {
+export function AxisTick({ x = 0, y = 0, payload, textAnchor = 'end' }: Props) {
   const full = payload?.value ?? '';
   const display = truncateCenter(full);
   return (
