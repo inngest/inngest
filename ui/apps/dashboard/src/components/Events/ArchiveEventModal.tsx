@@ -49,11 +49,11 @@ export default function ArchiveEventModal({
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={handleSubmit}
-      title="Archive Event"
+      title="Archive Event Type"
     >
       <p className="px-6 pt-4">
-        Are you sure you want to archive this event? This action cannot be
-        undone.
+        Archive this event type? It will be hidden from the Active events list.
+        Sending another event with this name will unarchive it.
       </p>
 
       {error && (
