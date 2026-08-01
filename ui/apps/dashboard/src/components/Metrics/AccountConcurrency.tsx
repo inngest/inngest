@@ -32,7 +32,7 @@ export function AccountConcurrency({
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">
       <div className="mb-2 flex flex-row items-center justify-between">
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
-          Account Concurrency
+          Environment Concurrency
           <Info
             action={
               <Link
@@ -42,7 +42,7 @@ export function AccountConcurrency({
                 Learn more about concurrency.
               </Link>
             }
-            text="The number of concurrently running steps across all environments"
+            text="The number of concurrently running steps in this environment"
           />
         </div>
         {!isMarketplace && (
@@ -80,7 +80,7 @@ function createChartOption({
   const series: LineSeriesOption[] = [
     {
       ...seriesOptions,
-      name: 'Account Concurrency',
+      name: 'Environment Concurrency',
       data: accountConcurrency.map(({ value }) => value),
       itemStyle: {
         color: resolveColor(lineColors[0][0], dark, lineColors[0]?.[1]),
@@ -94,12 +94,14 @@ function createChartOption({
       ...seriesOptions,
       markLine: {
         animation: false,
-        data: [{ yAxis: limit, name: 'Concurrency Limit', symbol: 'none' }],
+        data: [
+          { yAxis: limit, name: 'Account Concurrency Limit', symbol: 'none' },
+        ],
         emphasis: {
           label: {
             color: 'inherit',
             formatter: ({ value }: any) => {
-              return ` Plan Limit: ${value}\n\n`;
+              return ` Account Plan Limit: ${value}\n\n`;
             },
             position: 'insideStartTop' as const,
             show: true,
@@ -139,6 +141,6 @@ function createChartOption({
         },
       },
     },
-    [{ name: 'Account Concurrency' }],
+    [{ name: 'Environment Concurrency' }],
   );
 }
