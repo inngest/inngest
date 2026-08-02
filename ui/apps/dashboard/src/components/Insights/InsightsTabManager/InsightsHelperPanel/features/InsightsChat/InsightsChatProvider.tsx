@@ -179,6 +179,13 @@ export function InsightsChatProvider({
   // Runs whose result we haven't seen yet, keyed by thread.
   const pendingRunsRef = useRef<Map<string, PendingRun>>(new Map());
 
+  // Threads awaiting a result, from send until the first terminal outcome
+  // lands. Realtime and the run-output fallback can both deliver the same
+  // result, so whichever arrives first clears this and the other one no-ops.
+  // Kept separate from pendingRunsRef, which only exists when /api/chat
+  // returned an event id: gating on that would silently drop results.
+  const awaitingResultRef = useRef<Set<string>>(new Set());
+
   const clearPending = useCallback((threadId: string) => {
     const pending = pendingRunsRef.current.get(threadId);
     if (pending) window.clearTimeout(pending.timer);
@@ -188,6 +195,8 @@ export function InsightsChatProvider({
   // Terminal state for a thread, whichever channel delivered it.
   const finishThread = useCallback(
     (threadId: string, parts: Message['parts']) => {
+      awaitingResultRef.current.delete(threadId);
+
       if (parts.length > 0) {
         const assistantMsg: Message = {
           id: crypto.randomUUID(),
@@ -215,6 +224,8 @@ export function InsightsChatProvider({
   // which carry the same payload.
   const applyRunResult = useCallback(
     (threadId: string, data: Record<string, unknown>) => {
+      if (!awaitingResultRef.current.has(threadId)) return;
+
       const parts: Message['parts'] = [];
 
       const sql = typeof data.sql === 'string' ? data.sql : undefined;
@@ -247,6 +258,7 @@ export function InsightsChatProvider({
 
   const failThread = useCallback(
     (threadId: string, message: string) => {
+      if (!awaitingResultRef.current.has(threadId)) return;
       finishThread(threadId, [{ type: 'text', content: `Error: ${message}` }]);
     },
     [finishThread],
@@ -497,6 +509,10 @@ export function InsightsChatProvider({
 
       const clientState = threadClientStateRef.current.get(threadId);
 
+      // Marked before the await: a fast run could publish run.completed before
+      // this request even returns.
+      awaitingResultRef.current.add(threadId);
+
       try {
         const { eventId } = await sendChatMessage({
           content,
@@ -526,6 +542,8 @@ export function InsightsChatProvider({
           scheduleReconcile(threadId, IDLE_BEFORE_RECONCILE_MS);
         }
       } catch (error) {
+        awaitingResultRef.current.delete(threadId);
+
         // Remove the optimistic user message and show error
         setMessagesByThread((prev) => ({
           ...prev,
@@ -568,7 +586,9 @@ export function InsightsChatProvider({
         return next;
       });
       latestSqlByThreadRef.current.delete(threadId);
-      // Don't let a discarded thread's run report back into the cleared view.
+      // Don't let a discarded thread's run report back into the cleared view,
+      // on either channel.
+      awaitingResultRef.current.delete(threadId);
       clearPending(threadId);
     },
     [clearPending],
