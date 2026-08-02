@@ -19,6 +19,7 @@ import { Route as ApiInngestRouteImport } from './routes/api/inngest'
 import { Route as ApiFeedbackRouteImport } from './routes/api/feedback'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
 import { Route as ApiChatValidateRouteImport } from './routes/api/chat-validate'
+import { Route as ApiChatResultRouteImport } from './routes/api/chat-result'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup'
 import { Route as authSwitchOrganizationRouteImport } from './routes/(auth)/switch-organization'
@@ -161,6 +162,11 @@ const ApiCspReportRoute = ApiCspReportRouteImport.update({
 const ApiChatValidateRoute = ApiChatValidateRouteImport.update({
   id: '/api/chat-validate',
   path: '/api/chat-validate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiChatResultRoute = ApiChatResultRouteImport.update({
+  id: '/api/chat-result',
+  path: '/api/chat-result',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -719,6 +725,7 @@ export interface FileRoutesByFullPath {
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-result': typeof ApiChatResultRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/feedback': typeof ApiFeedbackRoute
@@ -823,6 +830,7 @@ export interface FileRoutesByTo {
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-result': typeof ApiChatResultRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/feedback': typeof ApiFeedbackRoute
@@ -918,6 +926,7 @@ export interface FileRoutesById {
   '/(auth)/switch-organization': typeof authSwitchOrganizationRoute
   '/(auth)/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/chat-result': typeof ApiChatResultRoute
   '/api/chat-validate': typeof ApiChatValidateRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/feedback': typeof ApiFeedbackRoute
@@ -1025,6 +1034,7 @@ export interface FileRouteTypes {
     | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
+    | '/api/chat-result'
     | '/api/chat-validate'
     | '/api/csp-report'
     | '/api/feedback'
@@ -1129,6 +1139,7 @@ export interface FileRouteTypes {
     | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
+    | '/api/chat-result'
     | '/api/chat-validate'
     | '/api/csp-report'
     | '/api/feedback'
@@ -1223,6 +1234,7 @@ export interface FileRouteTypes {
     | '/(auth)/switch-organization'
     | '/(auth)/user-setup'
     | '/api/chat'
+    | '/api/chat-result'
     | '/api/chat-validate'
     | '/api/csp-report'
     | '/api/feedback'
@@ -1327,6 +1339,7 @@ export interface RootRouteChildren {
   authSwitchOrganizationRoute: typeof authSwitchOrganizationRoute
   authUserSetupRoute: typeof authUserSetupRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiChatResultRoute: typeof ApiChatResultRoute
   ApiChatValidateRoute: typeof ApiChatValidateRoute
   ApiCspReportRoute: typeof ApiCspReportRoute
   ApiFeedbackRoute: typeof ApiFeedbackRoute
@@ -1412,6 +1425,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat-validate'
       fullPath: '/api/chat-validate'
       preLoaderRoute: typeof ApiChatValidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/chat-result': {
+      id: '/api/chat-result'
+      path: '/api/chat-result'
+      fullPath: '/api/chat-result'
+      preLoaderRoute: typeof ApiChatResultRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -2490,6 +2510,7 @@ const rootRouteChildren: RootRouteChildren = {
   authSwitchOrganizationRoute: authSwitchOrganizationRoute,
   authUserSetupRoute: authUserSetupRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiChatResultRoute: ApiChatResultRoute,
   ApiChatValidateRoute: ApiChatValidateRoute,
   ApiCspReportRoute: ApiCspReportRoute,
   ApiFeedbackRoute: ApiFeedbackRoute,

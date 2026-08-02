@@ -48,6 +48,10 @@ export function useInsightsRealtime({
     autoCloseOnTerminal: false,
     reconnect: true,
     historyLimit: 200,
+    // Hiding the tab would otherwise tear the subscription down entirely, and
+    // realtime has no replay: anything the run publishes while we're away is
+    // lost. Agent runs routinely outlast a tab switch.
+    pauseOnHidden: false,
   });
 }
 
@@ -62,7 +66,7 @@ export async function sendChatMessage(params: {
   channelKey?: string;
   state?: Record<string, unknown>;
   history?: Array<Record<string, unknown>>;
-}): Promise<{ success: boolean; threadId?: string }> {
+}): Promise<{ success: boolean; threadId?: string; eventId?: string }> {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -86,4 +90,42 @@ export async function sendChatMessage(params: {
   }
 
   return res.json();
+}
+
+export type RunResult = {
+  status: string;
+  output: Record<string, unknown> | null;
+};
+
+/**
+ * Read a chat run back from its triggering event, for when the realtime
+ * run.completed never arrived. Resolves to null when the run can't be
+ * determined, which the caller treats the same as a failure.
+ */
+export async function fetchRunResult(
+  eventId: string,
+  threadId: string,
+): Promise<RunResult | null> {
+  const res = await fetch('/api/chat-result', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ eventId }),
+  });
+  if (!res.ok) return null;
+
+  const { runs } = (await res.json()) as { runs?: RunResult[] };
+  if (!runs?.length) return null;
+
+  // One event triggers one agent run today, but match on the thread so a
+  // second run on the same event could never answer for this one.
+  return (
+    runs.find(
+      (run) =>
+        run.output &&
+        typeof run.output === 'object' &&
+        (run.output as { threadId?: unknown }).threadId === threadId,
+    ) ??
+    runs[0] ??
+    null
+  );
 }

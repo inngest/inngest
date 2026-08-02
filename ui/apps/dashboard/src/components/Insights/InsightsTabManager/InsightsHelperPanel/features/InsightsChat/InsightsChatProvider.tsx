@@ -5,11 +5,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
 
+import { assistantMessage, chatReducer, initialChatState } from './chatReducer';
+import { RunResultWatcher } from './RunResultWatcher';
 import {
   useInsightsRealtime,
   sendChatMessage,
@@ -17,7 +20,7 @@ import {
 } from './useInsightsAgent';
 import { useFetchInsights } from '@/components/Insights/InsightsStateMachineContext/useFetchInsights';
 import { useEventTypeSchemas } from '../SchemaExplorer/SchemasContext/useEventTypeSchemas';
-import type { InsightsRealtimeEvent, Message } from './types';
+import type { InsightsRealtimeEvent, Message, MessagePart } from './types';
 
 type ThreadFlags = {
   networkActive: boolean;
@@ -46,10 +49,6 @@ type ContextValue = {
   schemas: { name: string; schema: string }[];
 };
 
-const defaultFlags: ThreadFlags = {
-  networkActive: false,
-};
-
 const InsightsChatContext = createContext<ContextValue | undefined>(undefined);
 
 export function InsightsChatProvider({
@@ -61,19 +60,24 @@ export function InsightsChatProvider({
   channelKey?: string;
   children: ReactNode;
 }) {
-  // Per-thread UI flags
-  const [threadFlags, setThreadFlags] = useState<Record<string, ThreadFlags>>(
-    {},
+  const [{ messagesByThread, pendingByThread }, dispatch] = useReducer(
+    chatReducer,
+    initialChatState,
   );
-  // Per-thread messages
-  const [messagesByThread, setMessagesByThread] = useState<
-    Record<string, Message[]>
-  >({});
   // Current active thread
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   // Latest generated SQL per thread
   const latestSqlByThreadRef = useRef<Map<string, string>>(new Map());
   const [latestSqlVersion, setLatestSqlVersion] = useState(0);
+
+  // Bumping the version re-runs the editor's auto-apply, so only publish SQL
+  // we haven't already seen for this thread. The query-writer step and the
+  // completed run report the same SQL.
+  const cacheSql = useCallback((threadId: string, sql: string) => {
+    if (latestSqlByThreadRef.current.get(threadId) === sql) return;
+    latestSqlByThreadRef.current.set(threadId, sql);
+    setLatestSqlVersion((v) => v + 1);
+  }, []);
 
   // Per-thread client state map
   const threadClientStateRef = useRef<Map<string, ClientState>>(new Map());
@@ -85,8 +89,10 @@ export function InsightsChatProvider({
   );
 
   const getFlags = useCallback(
-    (threadId: string): ThreadFlags => threadFlags[threadId] ?? defaultFlags,
-    [threadFlags],
+    (threadId: string): ThreadFlags => ({
+      networkActive: threadId in pendingByThread,
+    }),
+    [pendingByThread],
   );
 
   const getLatestGeneratedSql = useCallback(
@@ -164,6 +170,51 @@ export function InsightsChatProvider({
     return 'ready';
   }, [connectionStatus]);
 
+  // Shared by the realtime run.completed event and the recovery poll, which
+  // carry the same payload.
+  const applyRunResult = useCallback(
+    (threadId: string, data: Record<string, unknown>) => {
+      const parts: MessagePart[] = [];
+
+      const sql = typeof data.sql === 'string' ? data.sql : undefined;
+      if (sql) {
+        parts.push({
+          type: 'tool-call',
+          toolName: 'generate_sql',
+          data: {
+            sql,
+            title: typeof data.title === 'string' ? data.title : undefined,
+            reasoning:
+              typeof data.reasoning === 'string' ? data.reasoning : undefined,
+          },
+        });
+
+        cacheSql(threadId, sql);
+      }
+
+      const summary =
+        typeof data.summary === 'string' ? data.summary : undefined;
+      if (summary) parts.push({ type: 'text', content: summary });
+
+      dispatch({
+        type: 'result',
+        threadId,
+        message: parts.length > 0 ? assistantMessage(threadId, parts) : null,
+      });
+    },
+    [cacheSql],
+  );
+
+  const failThread = useCallback((threadId: string, message: string) => {
+    dispatch({
+      type: 'result',
+      threadId,
+      message: assistantMessage(threadId, [
+        { type: 'text', content: `Error: ${message}` },
+      ]),
+    });
+  }, []);
+
   // Process new realtime events
   useEffect(() => {
     for (const msg of realtimeMessages.delta) {
@@ -177,83 +228,18 @@ export function InsightsChatProvider({
 
       try {
         switch (evt.event) {
-          case 'run.started': {
-            setThreadFlags((prev) => ({
-              ...prev,
-              [tid]: { networkActive: true },
-            }));
-            break;
-          }
-
           case 'step.completed': {
             // Cache SQL when query-writer step completes
             if (evt.data.step === 'query-writer') {
               const sql =
                 typeof evt.data.sql === 'string' ? evt.data.sql : undefined;
-              if (sql && sql.length > 0) {
-                latestSqlByThreadRef.current.set(tid, sql);
-                setLatestSqlVersion((v) => v + 1);
-              }
+              if (sql && sql.length > 0) cacheSql(tid, sql);
             }
             break;
           }
 
           case 'run.completed': {
-            // Build assistant message from the completed run
-            const parts: Message['parts'] = [];
-
-            // Add SQL tool call part if present
-            const sql =
-              typeof evt.data.sql === 'string' ? evt.data.sql : undefined;
-            if (sql) {
-              parts.push({
-                type: 'tool-call',
-                toolName: 'generate_sql',
-                data: {
-                  sql,
-                  title:
-                    typeof evt.data.title === 'string'
-                      ? evt.data.title
-                      : undefined,
-                  reasoning:
-                    typeof evt.data.reasoning === 'string'
-                      ? evt.data.reasoning
-                      : undefined,
-                },
-              });
-
-              // Also update the SQL cache
-              latestSqlByThreadRef.current.set(tid, sql);
-              setLatestSqlVersion((v) => v + 1);
-            }
-
-            // Add summary text part if present
-            const summary =
-              typeof evt.data.summary === 'string'
-                ? evt.data.summary
-                : undefined;
-            if (summary) {
-              parts.push({ type: 'text', content: summary });
-            }
-
-            if (parts.length > 0) {
-              const assistantMsg: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                threadId: tid,
-                parts,
-              };
-
-              setMessagesByThread((prev) => ({
-                ...prev,
-                [tid]: [...(prev[tid] || []), assistantMsg],
-              }));
-            }
-
-            setThreadFlags((prev) => ({
-              ...prev,
-              [tid]: { networkActive: false },
-            }));
+            applyRunResult(tid, evt.data);
             break;
           }
 
@@ -269,28 +255,12 @@ export function InsightsChatProvider({
           }
 
           case 'error': {
-            // Add error as an assistant message
-            const errorMessage =
+            failThread(
+              tid,
               typeof evt.data.error === 'string'
                 ? evt.data.error
-                : 'An unknown error occurred';
-
-            const errorMsg: Message = {
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              threadId: tid,
-              parts: [{ type: 'text', content: `Error: ${errorMessage}` }],
-            };
-
-            setMessagesByThread((prev) => ({
-              ...prev,
-              [tid]: [...(prev[tid] || []), errorMsg],
-            }));
-
-            setThreadFlags((prev) => ({
-              ...prev,
-              [tid]: { networkActive: false },
-            }));
+                : 'An unknown error occurred',
+            );
             break;
           }
         }
@@ -298,7 +268,13 @@ export function InsightsChatProvider({
         // Silently handle event processing errors
       }
     }
-  }, [realtimeMessages.delta, validateSql]);
+  }, [
+    realtimeMessages.delta,
+    validateSql,
+    applyRunResult,
+    failThread,
+    cacheSql,
+  ]);
 
   // Fetch event types and schemas using the same hook as SchemaExplorer
   const getEventTypeSchemas = useEventTypeSchemas();
@@ -376,15 +352,15 @@ export function InsightsChatProvider({
         parts: [{ type: 'text', content }],
       };
 
-      setMessagesByThread((prev) => ({
-        ...prev,
-        [threadId]: [...(prev[threadId] || []), userMsg],
-      }));
+      // Marks the thread pending, which is what turns the spinner on. Done
+      // before the await so a run that answers immediately still has a thread
+      // to answer into.
+      dispatch({ type: 'send', threadId, message: userMsg });
 
       const clientState = threadClientStateRef.current.get(threadId);
 
       try {
-        await sendChatMessage({
+        const { eventId } = await sendChatMessage({
           content,
           messageId,
           threadId,
@@ -402,40 +378,34 @@ export function InsightsChatProvider({
               },
           history: buildHistory(threadId),
         });
+
+        // Lets RunResultWatcher recover the result if the realtime
+        // run.completed never reaches the browser.
+        if (eventId) dispatch({ type: 'sent', threadId, eventId });
       } catch (error) {
         // Remove the optimistic user message and show error
-        setMessagesByThread((prev) => ({
-          ...prev,
-          [threadId]: [
-            ...(prev[threadId] || []).filter((m) => m.id !== messageId),
+        dispatch({
+          type: 'sendFailed',
+          threadId,
+          messageId,
+          message: assistantMessage(threadId, [
             {
-              id: crypto.randomUUID(),
-              role: 'assistant' as const,
-              threadId,
-              parts: [
-                {
-                  type: 'text' as const,
-                  content: `Error: ${
-                    error instanceof Error
-                      ? error.message
-                      : 'Failed to send message'
-                  }`,
-                },
-              ],
+              type: 'text',
+              content: `Error: ${
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to send message'
+              }`,
             },
-          ],
-        }));
+          ]),
+        });
       }
     },
     [userId, channelKey, eventsData?.names, schemas, buildHistory],
   );
 
   const clearThreadMessages = useCallback((threadId: string) => {
-    setMessagesByThread((prev) => {
-      const next = { ...prev };
-      delete next[threadId];
-      return next;
-    });
+    dispatch({ type: 'clearThread', threadId });
     latestSqlByThreadRef.current.delete(threadId);
   }, []);
 
@@ -477,6 +447,17 @@ export function InsightsChatProvider({
 
   return (
     <InsightsChatContext.Provider value={value}>
+      {Object.entries(pendingByThread).map(([threadId, eventId]) =>
+        eventId ? (
+          <RunResultWatcher
+            key={eventId}
+            eventId={eventId}
+            threadId={threadId}
+            onResult={applyRunResult}
+            onFail={failThread}
+          />
+        ) : null,
+      )}
       {children}
     </InsightsChatContext.Provider>
   );
