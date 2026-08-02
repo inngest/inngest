@@ -18,7 +18,7 @@ import { Route as ApiSentryRouteImport } from './routes/api/sentry'
 import { Route as ApiInngestRouteImport } from './routes/api/inngest'
 import { Route as ApiFeedbackRouteImport } from './routes/api/feedback'
 import { Route as ApiCspReportRouteImport } from './routes/api/csp-report'
-import { Route as ApiChatValidateRouteImport } from './routes/api/chat-validate'
+import { Route as ApiChatResultRouteImport } from './routes/api/chat-result'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as authUserSetupRouteImport } from './routes/(auth)/user-setup'
 import { Route as authSwitchOrganizationRouteImport } from './routes/(auth)/switch-organization'
@@ -32,7 +32,6 @@ import { Route as SupportImpersonationIndexRouteImport } from './routes/support/
 import { Route as AuthedEnvIndexRouteImport } from './routes/_authed/env/index'
 import { Route as AuthedCreateEnvironmentIndexRouteImport } from './routes/_authed/create-environment/index'
 import { Route as AuthedBillingIndexRouteImport } from './routes/_authed/billing/index'
-import { Route as ApiRealtimeTokenRouteImport } from './routes/api/realtime/token'
 import { Route as authSignUpSplatRouteImport } from './routes/(auth)/sign-up.$'
 import { Route as authSignInSplatRouteImport } from './routes/(auth)/sign-in.$'
 import { Route as authOrganizationListSplatRouteImport } from './routes/(auth)/organization-list.$'
@@ -158,9 +157,9 @@ const ApiCspReportRoute = ApiCspReportRouteImport.update({
   path: '/api/csp-report',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiChatValidateRoute = ApiChatValidateRouteImport.update({
-  id: '/api/chat-validate',
-  path: '/api/chat-validate',
+const ApiChatResultRoute = ApiChatResultRouteImport.update({
+  id: '/api/chat-result',
+  path: '/api/chat-result',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -229,11 +228,6 @@ const AuthedBillingIndexRoute = AuthedBillingIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthedBillingRouteRoute,
-} as any)
-const ApiRealtimeTokenRoute = ApiRealtimeTokenRouteImport.update({
-  id: '/api/realtime/token',
-  path: '/api/realtime/token',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const authSignUpSplatRoute = authSignUpSplatRouteImport.update({
   id: '/(auth)/sign-up/$',
@@ -719,7 +713,7 @@ export interface FileRoutesByFullPath {
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/chat-validate': typeof ApiChatValidateRoute
+  '/api/chat-result': typeof ApiChatResultRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
@@ -731,7 +725,6 @@ export interface FileRoutesByFullPath {
   '/organization-list/$': typeof authOrganizationListSplatRoute
   '/sign-in/$': typeof authSignInSplatRoute
   '/sign-up/$': typeof authSignUpSplatRoute
-  '/api/realtime/token': typeof ApiRealtimeTokenRoute
   '/billing/': typeof AuthedBillingIndexRoute
   '/create-environment/': typeof AuthedCreateEnvironmentIndexRoute
   '/env/': typeof AuthedEnvIndexRoute
@@ -823,7 +816,7 @@ export interface FileRoutesByTo {
   '/switch-organization': typeof authSwitchOrganizationRoute
   '/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/chat-validate': typeof ApiChatValidateRoute
+  '/api/chat-result': typeof ApiChatResultRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
@@ -834,7 +827,6 @@ export interface FileRoutesByTo {
   '/organization-list/$': typeof authOrganizationListSplatRoute
   '/sign-in/$': typeof authSignInSplatRoute
   '/sign-up/$': typeof authSignUpSplatRoute
-  '/api/realtime/token': typeof ApiRealtimeTokenRoute
   '/billing': typeof AuthedBillingIndexRoute
   '/create-environment': typeof AuthedCreateEnvironmentIndexRoute
   '/env': typeof AuthedEnvIndexRoute
@@ -918,7 +910,7 @@ export interface FileRoutesById {
   '/(auth)/switch-organization': typeof authSwitchOrganizationRoute
   '/(auth)/user-setup': typeof authUserSetupRoute
   '/api/chat': typeof ApiChatRoute
-  '/api/chat-validate': typeof ApiChatValidateRoute
+  '/api/chat-result': typeof ApiChatResultRoute
   '/api/csp-report': typeof ApiCspReportRoute
   '/api/feedback': typeof ApiFeedbackRoute
   '/api/inngest': typeof ApiInngestRoute
@@ -930,7 +922,6 @@ export interface FileRoutesById {
   '/(auth)/organization-list/$': typeof authOrganizationListSplatRoute
   '/(auth)/sign-in/$': typeof authSignInSplatRoute
   '/(auth)/sign-up/$': typeof authSignUpSplatRoute
-  '/api/realtime/token': typeof ApiRealtimeTokenRoute
   '/_authed/billing/': typeof AuthedBillingIndexRoute
   '/_authed/create-environment/': typeof AuthedCreateEnvironmentIndexRoute
   '/_authed/env/': typeof AuthedEnvIndexRoute
@@ -1025,7 +1016,7 @@ export interface FileRouteTypes {
     | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
-    | '/api/chat-validate'
+    | '/api/chat-result'
     | '/api/csp-report'
     | '/api/feedback'
     | '/api/inngest'
@@ -1037,7 +1028,6 @@ export interface FileRouteTypes {
     | '/organization-list/$'
     | '/sign-in/$'
     | '/sign-up/$'
-    | '/api/realtime/token'
     | '/billing/'
     | '/create-environment/'
     | '/env/'
@@ -1129,7 +1119,7 @@ export interface FileRouteTypes {
     | '/switch-organization'
     | '/user-setup'
     | '/api/chat'
-    | '/api/chat-validate'
+    | '/api/chat-result'
     | '/api/csp-report'
     | '/api/feedback'
     | '/api/inngest'
@@ -1140,7 +1130,6 @@ export interface FileRouteTypes {
     | '/organization-list/$'
     | '/sign-in/$'
     | '/sign-up/$'
-    | '/api/realtime/token'
     | '/billing'
     | '/create-environment'
     | '/env'
@@ -1223,7 +1212,7 @@ export interface FileRouteTypes {
     | '/(auth)/switch-organization'
     | '/(auth)/user-setup'
     | '/api/chat'
-    | '/api/chat-validate'
+    | '/api/chat-result'
     | '/api/csp-report'
     | '/api/feedback'
     | '/api/inngest'
@@ -1235,7 +1224,6 @@ export interface FileRouteTypes {
     | '/(auth)/organization-list/$'
     | '/(auth)/sign-in/$'
     | '/(auth)/sign-up/$'
-    | '/api/realtime/token'
     | '/_authed/billing/'
     | '/_authed/create-environment/'
     | '/_authed/env/'
@@ -1327,7 +1315,7 @@ export interface RootRouteChildren {
   authSwitchOrganizationRoute: typeof authSwitchOrganizationRoute
   authUserSetupRoute: typeof authUserSetupRoute
   ApiChatRoute: typeof ApiChatRoute
-  ApiChatValidateRoute: typeof ApiChatValidateRoute
+  ApiChatResultRoute: typeof ApiChatResultRoute
   ApiCspReportRoute: typeof ApiCspReportRoute
   ApiFeedbackRoute: typeof ApiFeedbackRoute
   ApiInngestRoute: typeof ApiInngestRoute
@@ -1338,7 +1326,6 @@ export interface RootRouteChildren {
   authOrganizationListSplatRoute: typeof authOrganizationListSplatRoute
   authSignInSplatRoute: typeof authSignInSplatRoute
   authSignUpSplatRoute: typeof authSignUpSplatRoute
-  ApiRealtimeTokenRoute: typeof ApiRealtimeTokenRoute
   SupportImpersonationIndexRoute: typeof SupportImpersonationIndexRoute
 }
 
@@ -1407,11 +1394,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCspReportRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/chat-validate': {
-      id: '/api/chat-validate'
-      path: '/api/chat-validate'
-      fullPath: '/api/chat-validate'
-      preLoaderRoute: typeof ApiChatValidateRouteImport
+    '/api/chat-result': {
+      id: '/api/chat-result'
+      path: '/api/chat-result'
+      fullPath: '/api/chat-result'
+      preLoaderRoute: typeof ApiChatResultRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -1504,13 +1491,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/billing/'
       preLoaderRoute: typeof AuthedBillingIndexRouteImport
       parentRoute: typeof AuthedBillingRouteRoute
-    }
-    '/api/realtime/token': {
-      id: '/api/realtime/token'
-      path: '/api/realtime/token'
-      fullPath: '/api/realtime/token'
-      preLoaderRoute: typeof ApiRealtimeTokenRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/(auth)/sign-up/$': {
       id: '/(auth)/sign-up/$'
@@ -2490,7 +2470,7 @@ const rootRouteChildren: RootRouteChildren = {
   authSwitchOrganizationRoute: authSwitchOrganizationRoute,
   authUserSetupRoute: authUserSetupRoute,
   ApiChatRoute: ApiChatRoute,
-  ApiChatValidateRoute: ApiChatValidateRoute,
+  ApiChatResultRoute: ApiChatResultRoute,
   ApiCspReportRoute: ApiCspReportRoute,
   ApiFeedbackRoute: ApiFeedbackRoute,
   ApiInngestRoute: ApiInngestRoute,
@@ -2501,7 +2481,6 @@ const rootRouteChildren: RootRouteChildren = {
   authOrganizationListSplatRoute: authOrganizationListSplatRoute,
   authSignInSplatRoute: authSignInSplatRoute,
   authSignUpSplatRoute: authSignUpSplatRoute,
-  ApiRealtimeTokenRoute: ApiRealtimeTokenRoute,
   SupportImpersonationIndexRoute: SupportImpersonationIndexRoute,
 }
 export const routeTree = rootRouteImport

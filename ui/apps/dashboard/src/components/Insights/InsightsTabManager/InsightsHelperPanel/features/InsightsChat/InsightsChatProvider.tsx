@@ -3,7 +3,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -11,13 +10,18 @@ import {
 } from 'react';
 
 import {
-  useInsightsRealtime,
-  sendChatMessage,
-  type ClientState,
-} from './useInsightsAgent';
-import { useFetchInsights } from '@/components/Insights/InsightsStateMachineContext/useFetchInsights';
+  attachRun,
+  clearThread,
+  isThreadWaiting,
+  pendingRuns,
+  settleTurn,
+  startTurn,
+  type Threads,
+} from './chatMessages';
+import { RunWatcher } from './RunWatcher';
+import { sendChatMessage, type ClientState } from './useInsightsAgent';
 import { useEventTypeSchemas } from '../SchemaExplorer/SchemasContext/useEventTypeSchemas';
-import type { InsightsRealtimeEvent, Message } from './types';
+import type { Message, MessagePart } from './types';
 
 type ThreadFlags = {
   networkActive: boolean;
@@ -26,7 +30,6 @@ type ThreadFlags = {
 type ContextValue = {
   // Messages for the current thread
   messages: Message[];
-  status: 'ready' | 'loading';
   currentThreadId: string | null;
   setCurrentThreadId: (id: string) => void;
   clearThreadMessages: (threadId: string) => void;
@@ -46,11 +49,11 @@ type ContextValue = {
   schemas: { name: string; schema: string }[];
 };
 
-const defaultFlags: ThreadFlags = {
-  networkActive: false,
-};
-
 const InsightsChatContext = createContext<ContextValue | undefined>(undefined);
+
+function errorParts(message: string): MessagePart[] {
+  return [{ type: 'text', content: `Error: ${message}` }];
+}
 
 export function InsightsChatProvider({
   userId,
@@ -61,14 +64,9 @@ export function InsightsChatProvider({
   channelKey?: string;
   children: ReactNode;
 }) {
-  // Per-thread UI flags
-  const [threadFlags, setThreadFlags] = useState<Record<string, ThreadFlags>>(
-    {},
-  );
-  // Per-thread messages
-  const [messagesByThread, setMessagesByThread] = useState<
-    Record<string, Message[]>
-  >({});
+  // Per-thread messages, and the only chat state: a turn in flight is a
+  // message, so nothing else has to track what's outstanding.
+  const [threads, setThreads] = useState<Threads>({});
   // Current active thread
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   // Latest generated SQL per thread
@@ -85,8 +83,10 @@ export function InsightsChatProvider({
   );
 
   const getFlags = useCallback(
-    (threadId: string): ThreadFlags => threadFlags[threadId] ?? defaultFlags,
-    [threadFlags],
+    (threadId: string): ThreadFlags => ({
+      networkActive: isThreadWaiting(threads, threadId),
+    }),
+    [threads],
   );
 
   const getLatestGeneratedSql = useCallback(
@@ -96,209 +96,47 @@ export function InsightsChatProvider({
     [],
   );
 
-  // Realtime subscription
-  const { messages: realtimeMessages, connectionStatus } = useInsightsRealtime({
-    channelKey,
-    enabled: !!channelKey,
-  });
+  // Bumping the version is what re-runs the editor's auto-apply.
+  const applyRunResult = useCallback(
+    (threadId: string, turnId: string, output: Record<string, unknown>) => {
+      const parts: MessagePart[] = [];
 
-  // The browser half of the agent's validate_query round trip: run the
-  // candidate SQL with this user's credentials, then report the outcome so
-  // the waiting agent run can self-correct.
-  const { fetchInsights } = useFetchInsights();
-  const validateSql = useCallback(
-    async (validationId: string, sql: string) => {
-      let result: {
-        ok: boolean;
-        columns?: string[];
-        rowCount?: number;
-        diagnostics?: { code?: string; message: string }[];
-      };
-      try {
-        const res = await fetchInsights(
-          { query: sql, queryName: 'agent-validation' },
-          () => {},
-        );
-        const errors = res.diagnostics.filter((d) => d.severity === 'error');
-        result =
-          errors.length > 0
-            ? {
-                ok: false,
-                diagnostics: errors.map((d) => ({
-                  code: d.code,
-                  message: d.message,
-                })),
-              }
-            : {
-                ok: true,
-                columns: res.columns.map((c) => c.name),
-                rowCount: res.rows.length,
-              };
-      } catch (error) {
-        result = {
-          ok: false,
-          diagnostics: [
-            {
-              message: error instanceof Error ? error.message : 'Query failed',
-            },
-          ],
-        };
-      }
-
-      try {
-        await fetch('/api/chat-validate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ validationId, ...result }),
+      const sql = typeof output.sql === 'string' ? output.sql : undefined;
+      if (sql) {
+        parts.push({
+          type: 'tool-call',
+          toolName: 'generate_sql',
+          data: {
+            sql,
+            title: typeof output.title === 'string' ? output.title : undefined,
+            reasoning:
+              typeof output.reasoning === 'string'
+                ? output.reasoning
+                : undefined,
+          },
         });
-      } catch {
-        // Nothing to do — the agent times out and proceeds unvalidated.
+
+        latestSqlByThreadRef.current.set(threadId, sql);
+        setLatestSqlVersion((v) => v + 1);
       }
+
+      const summary =
+        typeof output.summary === 'string' ? output.summary : undefined;
+      if (summary) parts.push({ type: 'text', content: summary });
+
+      setThreads((prev) => settleTurn(prev, threadId, turnId, parts));
     },
-    [fetchInsights],
+    [],
   );
 
-  // Derive loading status from connection state
-  const status: 'ready' | 'loading' = useMemo(() => {
-    if (connectionStatus === 'connecting') return 'loading';
-    return 'ready';
-  }, [connectionStatus]);
-
-  // Process new realtime events
-  useEffect(() => {
-    for (const msg of realtimeMessages.delta) {
-      if (msg.kind !== 'data' || msg.topic !== 'agent_stream') continue;
-
-      const evt = msg.data as InsightsRealtimeEvent | undefined;
-      if (!evt || typeof evt.event !== 'string') continue;
-      const tid =
-        typeof evt.data.threadId === 'string' ? evt.data.threadId : undefined;
-      if (!tid) continue;
-
-      try {
-        switch (evt.event) {
-          case 'run.started': {
-            setThreadFlags((prev) => ({
-              ...prev,
-              [tid]: { networkActive: true },
-            }));
-            break;
-          }
-
-          case 'step.completed': {
-            // Cache SQL when query-writer step completes
-            if (evt.data.step === 'query-writer') {
-              const sql =
-                typeof evt.data.sql === 'string' ? evt.data.sql : undefined;
-              if (sql && sql.length > 0) {
-                latestSqlByThreadRef.current.set(tid, sql);
-                setLatestSqlVersion((v) => v + 1);
-              }
-            }
-            break;
-          }
-
-          case 'run.completed': {
-            // Build assistant message from the completed run
-            const parts: Message['parts'] = [];
-
-            // Add SQL tool call part if present
-            const sql =
-              typeof evt.data.sql === 'string' ? evt.data.sql : undefined;
-            if (sql) {
-              parts.push({
-                type: 'tool-call',
-                toolName: 'generate_sql',
-                data: {
-                  sql,
-                  title:
-                    typeof evt.data.title === 'string'
-                      ? evt.data.title
-                      : undefined,
-                  reasoning:
-                    typeof evt.data.reasoning === 'string'
-                      ? evt.data.reasoning
-                      : undefined,
-                },
-              });
-
-              // Also update the SQL cache
-              latestSqlByThreadRef.current.set(tid, sql);
-              setLatestSqlVersion((v) => v + 1);
-            }
-
-            // Add summary text part if present
-            const summary =
-              typeof evt.data.summary === 'string'
-                ? evt.data.summary
-                : undefined;
-            if (summary) {
-              parts.push({ type: 'text', content: summary });
-            }
-
-            if (parts.length > 0) {
-              const assistantMsg: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                threadId: tid,
-                parts,
-              };
-
-              setMessagesByThread((prev) => ({
-                ...prev,
-                [tid]: [...(prev[tid] || []), assistantMsg],
-              }));
-            }
-
-            setThreadFlags((prev) => ({
-              ...prev,
-              [tid]: { networkActive: false },
-            }));
-            break;
-          }
-
-          case 'validation.requested': {
-            const validationId =
-              typeof evt.data.validationId === 'string'
-                ? evt.data.validationId
-                : undefined;
-            const sql =
-              typeof evt.data.sql === 'string' ? evt.data.sql : undefined;
-            if (validationId && sql) void validateSql(validationId, sql);
-            break;
-          }
-
-          case 'error': {
-            // Add error as an assistant message
-            const errorMessage =
-              typeof evt.data.error === 'string'
-                ? evt.data.error
-                : 'An unknown error occurred';
-
-            const errorMsg: Message = {
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              threadId: tid,
-              parts: [{ type: 'text', content: `Error: ${errorMessage}` }],
-            };
-
-            setMessagesByThread((prev) => ({
-              ...prev,
-              [tid]: [...(prev[tid] || []), errorMsg],
-            }));
-
-            setThreadFlags((prev) => ({
-              ...prev,
-              [tid]: { networkActive: false },
-            }));
-            break;
-          }
-        }
-      } catch {
-        // Silently handle event processing errors
-      }
-    }
-  }, [realtimeMessages.delta, validateSql]);
+  const failTurn = useCallback(
+    (threadId: string, turnId: string, message: string) => {
+      setThreads((prev) =>
+        settleTurn(prev, threadId, turnId, errorParts(message)),
+      );
+    },
+    [],
+  );
 
   // Fetch event types and schemas using the same hook as SchemaExplorer
   const getEventTypeSchemas = useEventTypeSchemas();
@@ -350,7 +188,7 @@ export function InsightsChatProvider({
   // Build conversation history for the backend
   const buildHistory = useCallback(
     (threadId: string): Array<Record<string, unknown>> => {
-      const msgs = messagesByThread[threadId] || [];
+      const msgs = threads[threadId] || [];
       return msgs.flatMap((msg) =>
         msg.parts
           .filter((part) => part.type === 'text')
@@ -361,7 +199,7 @@ export function InsightsChatProvider({
           })),
       );
     },
-    [messagesByThread],
+    [threads],
   );
 
   const sendMessageToThread = useCallback(
@@ -369,6 +207,7 @@ export function InsightsChatProvider({
       if (!userId) return;
 
       const messageId = crypto.randomUUID();
+      const turnId = crypto.randomUUID();
       const userMsg: Message = {
         id: messageId,
         role: 'user',
@@ -376,15 +215,14 @@ export function InsightsChatProvider({
         parts: [{ type: 'text', content }],
       };
 
-      setMessagesByThread((prev) => ({
-        ...prev,
-        [threadId]: [...(prev[threadId] || []), userMsg],
-      }));
+      // The waiting turn goes in before the await, so the spinner is on from
+      // the moment the user sends rather than from whenever the run reports in.
+      setThreads((prev) => startTurn(prev, threadId, userMsg, turnId));
 
       const clientState = threadClientStateRef.current.get(threadId);
 
       try {
-        await sendChatMessage({
+        const { eventId, receipt } = await sendChatMessage({
           content,
           messageId,
           threadId,
@@ -402,52 +240,42 @@ export function InsightsChatProvider({
               },
           history: buildHistory(threadId),
         });
+
+        if (!eventId || !receipt) {
+          // Without a run to read there's nothing to wait for.
+          failTurn(threadId, turnId, 'The request could not be tracked.');
+          return;
+        }
+
+        setThreads((prev) =>
+          attachRun(prev, threadId, turnId, { eventId, receipt }),
+        );
       } catch (error) {
-        // Remove the optimistic user message and show error
-        setMessagesByThread((prev) => ({
-          ...prev,
-          [threadId]: [
-            ...(prev[threadId] || []).filter((m) => m.id !== messageId),
-            {
-              id: crypto.randomUUID(),
-              role: 'assistant' as const,
-              threadId,
-              parts: [
-                {
-                  type: 'text' as const,
-                  content: `Error: ${
-                    error instanceof Error
-                      ? error.message
-                      : 'Failed to send message'
-                  }`,
-                },
-              ],
-            },
-          ],
-        }));
+        failTurn(
+          threadId,
+          turnId,
+          error instanceof Error ? error.message : 'Failed to send message',
+        );
       }
     },
-    [userId, channelKey, eventsData?.names, schemas, buildHistory],
+    [userId, channelKey, eventsData?.names, schemas, buildHistory, failTurn],
   );
 
   const clearThreadMessages = useCallback((threadId: string) => {
-    setMessagesByThread((prev) => {
-      const next = { ...prev };
-      delete next[threadId];
-      return next;
-    });
+    setThreads((prev) => clearThread(prev, threadId));
     latestSqlByThreadRef.current.delete(threadId);
   }, []);
 
   const messages = useMemo(
-    () => messagesByThread[currentThreadId || ''] || [],
-    [messagesByThread, currentThreadId],
+    () => threads[currentThreadId || ''] || [],
+    [threads, currentThreadId],
   );
+
+  const watched = useMemo(() => pendingRuns(threads), [threads]);
 
   const value: ContextValue = useMemo(
     () => ({
       messages,
-      status,
       currentThreadId,
       setCurrentThreadId,
       clearThreadMessages,
@@ -461,7 +289,6 @@ export function InsightsChatProvider({
     }),
     [
       messages,
-      status,
       currentThreadId,
       setCurrentThreadId,
       clearThreadMessages,
@@ -477,6 +304,16 @@ export function InsightsChatProvider({
 
   return (
     <InsightsChatContext.Provider value={value}>
+      {watched.map(({ threadId, turnId, run }) => (
+        <RunWatcher
+          key={turnId}
+          run={run}
+          threadId={threadId}
+          turnId={turnId}
+          onResult={applyRunResult}
+          onFail={failTurn}
+        />
+      ))}
       {children}
     </InsightsChatContext.Provider>
   );

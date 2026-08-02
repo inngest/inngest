@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { auth } from '@clerk/tanstack-react-start/server';
 import { z } from 'zod/v3';
 import { inngest } from '@/lib/inngest/client';
+import { signReceipt } from '@/lib/inngest/chatReceipt';
 
 //
 // Zod schema for UserMessage
@@ -89,7 +90,7 @@ export const Route = createFileRoute('/api/chat')({
 
           //
           // Send event to Inngest to trigger the agent chat
-          await inngest.send({
+          const { ids } = await inngest.send({
             name: 'insights-agent/chat.requested',
             data: {
               threadId: threadId ?? undefined,
@@ -97,19 +98,24 @@ export const Route = createFileRoute('/api/chat')({
               userMessage,
               userId,
               channelKey,
-              // The chat UI subscribes to the agent stream and can execute
-              // validate_query round trips on the agent's behalf.
-              canValidate: true,
             },
             // Groups every run for this conversation under one session in
             // the dashboard's AI > Sessions view.
             meta: threadId ? { sessions: { thread_id: threadId } } : undefined,
           });
 
+          const eventId = ids[0];
+
           return new Response(
             JSON.stringify({
               success: true,
               threadId: threadId,
+              //
+              // How the chat UI reads its answer back: it polls
+              // /api/chat-result for this event's run. The receipt is what
+              // proves the event is the caller's own — see chatReceipt.
+              eventId,
+              receipt: eventId ? signReceipt(eventId, userId) : undefined,
             }),
             {
               status: 200,

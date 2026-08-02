@@ -72,8 +72,13 @@ type InsightsChatProps = {
 };
 
 export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
-  const { query: currentSql, queryName: tabTitle } =
-    useInsightsStateMachineContext();
+  const {
+    query: currentSql,
+    queryName: tabTitle,
+    data: queryData,
+    error: queryError,
+    status: queryStatus,
+  } = useInsightsStateMachineContext();
 
   const editorActions = useSQLEditorActions();
 
@@ -81,7 +86,6 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
 
   const {
     messages,
-    status,
     currentThreadId,
     sendMessageToThread,
     getThreadFlags,
@@ -92,14 +96,18 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     schemas,
   } = useInsightsChatProvider();
 
-  const { networkActive } = useMemo(
+  const { networkActive: isLoading } = useMemo(
     () => getThreadFlags(agentThreadId),
     [getThreadFlags, agentThreadId],
   );
 
-  const isLoading = status !== 'ready' || networkActive;
-
   const rotatingMessage = useRotatingLoadingMessage(isLoading);
+
+  // The agent no longer validates its SQL mid-run, so the auto-apply below is
+  // where a broken query surfaces. Holds the applied SQL until the run it
+  // triggered reports back, at which point the result is this query's.
+  const appliedSqlRef = useRef<null | { sql: string; settled: boolean }>(null);
+  const autoCorrectedRef = useRef(false);
 
   // When active, auto-apply latest generated SQL whenever version changes
   useEffect(() => {
@@ -108,8 +116,45 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
     const latest = getLatestGeneratedSql(agentThreadId);
     if (!latest) return;
 
+    appliedSqlRef.current = { sql: latest, settled: false };
     editorActions.setQueryAndRun(latest);
   }, [currentThreadId, agentThreadId, latestSqlVersion]);
+
+  // Send one correction turn when the applied query fails. Capped at one per
+  // user message, so a correction that also fails ends there.
+  useEffect(() => {
+    const applied = appliedSqlRef.current;
+    if (!applied || applied.settled) return;
+    if (queryStatus === 'initial' || queryStatus === 'loading') return;
+
+    applied.settled = true;
+    if (queryStatus !== 'error') return;
+    if (autoCorrectedRef.current || isLoading) return;
+
+    const reasons =
+      queryData?.diagnostics
+        .filter((d) => d.severity === 'error')
+        .map((d) => `- [${d.code || 'error'}] ${d.message}`) ?? [];
+    if (reasons.length === 0 && queryError) {
+      reasons.push(`- ${queryError.message}`);
+    }
+    if (reasons.length === 0) return;
+
+    autoCorrectedRef.current = true;
+    void sendMessageToThread(
+      agentThreadId,
+      `That query failed to run:\n\n${applied.sql}\n\nErrors:\n${reasons.join(
+        '\n',
+      )}\n\nPlease fix it.`,
+    );
+  }, [
+    queryStatus,
+    queryData,
+    queryError,
+    isLoading,
+    agentThreadId,
+    sendMessageToThread,
+  ]);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -117,6 +162,7 @@ export function InsightsChat({ agentThreadId, className }: InsightsChatProps) {
       const message = inputValue.trim();
       if (!message || isLoading) return;
       setInputValue('');
+      autoCorrectedRef.current = false;
       try {
         setThreadClientState(agentThreadId, {
           sqlQuery: currentSql,

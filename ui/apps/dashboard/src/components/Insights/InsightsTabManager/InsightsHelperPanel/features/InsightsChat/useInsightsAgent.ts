@@ -1,7 +1,4 @@
-import { useRealtime } from 'inngest/react';
-import { useCallback, useMemo } from 'react';
-
-import { insightsChannel } from '@/lib/inngest/realtime';
+import type { RunRef } from './types';
 
 export type ClientState = {
   sqlQuery: string;
@@ -14,45 +11,8 @@ export type ClientState = {
 };
 
 /**
- * Thin hook wrapping useRealtime for the insights agent channel.
- * Handles token fetching and channel setup.
- */
-export function useInsightsRealtime({
-  channelKey,
-  enabled = true,
-}: {
-  channelKey?: string;
-  enabled?: boolean;
-}) {
-  const channel = useMemo(
-    () => (channelKey ? insightsChannel(channelKey) : undefined),
-    [channelKey],
-  );
-
-  const tokenFactory = useCallback(async () => {
-    if (!channelKey) throw new Error('No channel key');
-    const res = await fetch('/api/realtime/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channelKey }),
-    });
-    if (!res.ok) throw new Error('Failed to get subscription token');
-    return res.json();
-  }, [channelKey]);
-
-  return useRealtime({
-    channel,
-    topics: ['agent_stream'] as const,
-    token: channelKey ? tokenFactory : undefined,
-    enabled: enabled && !!channelKey,
-    autoCloseOnTerminal: false,
-    reconnect: true,
-    historyLimit: 200,
-  });
-}
-
-/**
- * Send a chat message to the insights agent backend.
+ * Send a chat message to the insights agent backend. The run reference it
+ * returns is how the answer gets read back — see RunWatcher.
  */
 export async function sendChatMessage(params: {
   content: string;
@@ -62,7 +22,7 @@ export async function sendChatMessage(params: {
   channelKey?: string;
   state?: Record<string, unknown>;
   history?: Array<Record<string, unknown>>;
-}): Promise<{ success: boolean; threadId?: string }> {
+}): Promise<{ success: boolean; threadId?: string } & Partial<RunRef>> {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -86,4 +46,41 @@ export async function sendChatMessage(params: {
   }
 
   return res.json();
+}
+
+export type RunResult = {
+  answer: Record<string, unknown> | null;
+  failed: boolean;
+};
+
+/**
+ * Read an agent run back from the event that triggered it. Resolves to null
+ * when the lookup itself fails, which the caller treats as "still running".
+ *
+ * While a run is in flight its output holds whichever step finished last, so an
+ * answer has to be recognised rather than assumed: only the function's own
+ * return value carries the thread id it was asked about.
+ */
+export async function fetchRunResult(
+  run: RunRef,
+  threadId: string,
+): Promise<RunResult | null> {
+  const res = await fetch('/api/chat-result', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(run),
+  });
+  if (!res.ok) return null;
+
+  const { runs, failed } = (await res.json()) as {
+    runs?: { output: Record<string, unknown> | null }[];
+    failed?: boolean;
+  };
+
+  const answer =
+    (runs ?? []).find(
+      (r) => (r.output as { threadId?: unknown } | null)?.threadId === threadId,
+    )?.output ?? null;
+
+  return { answer, failed: Boolean(failed) };
 }

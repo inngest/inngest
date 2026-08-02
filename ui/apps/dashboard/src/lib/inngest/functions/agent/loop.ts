@@ -5,9 +5,6 @@
 //
 // Wire format is OpenAI chat completions, which OpenRouter speaks natively.
 
-export const VALIDATE_QUERY = 'validate_query';
-export const VALIDATION_COMPLETED_EVENT = 'insights-agent/validation.completed';
-
 export interface ToolCall {
   id: string;
   type: 'function';
@@ -71,7 +68,6 @@ export interface QueryDraft {
 export interface ToolOutcome {
   observation: string;
   draftPatch?: Partial<QueryDraft>;
-  publish?: { event: string; data: Record<string, unknown> };
 }
 
 export interface ToolDef {
@@ -82,21 +78,6 @@ export interface ToolDef {
   ) => Promise<ToolOutcome>;
 }
 
-/** What the browser reports back after running the SQL on the agent's behalf. */
-export interface ValidationResult {
-  validationId: string;
-  ok: boolean;
-  columns?: string[];
-  rowCount?: number;
-  diagnostics?: { code?: string; message: string }[];
-}
-
-export interface ValidationFailure {
-  sql: string;
-  code: string;
-  message: string;
-}
-
 export interface AgentLoopResult {
   summary: string;
   iterations: number;
@@ -105,18 +86,12 @@ export interface AgentLoopResult {
   tokensOut: number;
   // Summed usage.cost, which OpenRouter reports on every response.
   costUsd: number;
-  validationAttempts: number;
-  validationFailures: ValidationFailure[];
 }
 
 // The minimal slice of Inngest's step toolkit the loop uses. `run` returns
 // unknown (Inngest JSON-serializes step results); call sites cast.
 interface StepTools {
   run: (id: string, fn: () => unknown) => Promise<unknown>;
-  waitForEvent: (
-    id: string,
-    opts: { event: string; timeout: string; if: string },
-  ) => Promise<{ data: Record<string, unknown> } | null>;
 }
 
 interface RunAgentLoopArgs {
@@ -131,16 +106,6 @@ interface RunAgentLoopArgs {
   tools: ToolDef[];
   ctx: ToolContext;
   draft: QueryDraft;
-  publish: (
-    id: string,
-    event: string,
-    data: Record<string, unknown>,
-  ) => Promise<unknown>;
-  runId: string;
-  // Clerk id of the user whose browser may answer validate_query round trips.
-  // The wait condition pins on it so only that user's authenticated result can
-  // complete the validation. Empty string fails closed (nothing matches).
-  userId: string;
   maxIterations?: number;
 }
 
@@ -161,8 +126,7 @@ export function parseToolArguments(raw: string): Record<string, unknown> {
 export async function runAgentLoop(
   args: RunAgentLoopArgs,
 ): Promise<AgentLoopResult> {
-  const { step, complete, system, tools, ctx, draft, publish, runId, userId } =
-    args;
+  const { step, complete, system, tools, ctx, draft } = args;
   const maxIterations = args.maxIterations ?? 12;
   const messages: AgentMessage[] = [
     { role: 'system', content: system },
@@ -184,8 +148,6 @@ export async function runAgentLoop(
   let tokensIn = 0;
   let tokensOut = 0;
   let costUsd = 0;
-  let validationAttempts = 0;
-  const validationFailures: ValidationFailure[] = [];
 
   while (iterations < maxIterations) {
     iterations++;
@@ -235,39 +197,15 @@ export async function runAgentLoop(
       const input = parseToolArguments(call.function.arguments);
       const name = call.function.name;
 
-      let outcome: ToolOutcome;
-      if (name === VALIDATE_QUERY && registry.has(VALIDATE_QUERY)) {
-        // Validation uses durable primitives that can't nest inside step.run;
-        // the registry check drops hallucinated calls when the tool wasn't offered.
-        validationAttempts++;
-        outcome = await validateQuery({
-          sql: String(input.sql ?? ''),
-          validationId: `${runId}-${toolCalls}`,
-          userId,
-          step,
-          publish,
-          iterations,
-          toolCalls,
-          validationFailures,
-        });
-      } else {
-        const def = registry.get(name);
-        outcome = def
-          ? ((await step.run(`tool-${name}-${iterations}-${toolCalls}`, () =>
-              def.execute(input, ctx),
-            )) as ToolOutcome)
-          : { observation: `Unknown tool: ${name}` };
-      }
+      const def = registry.get(name);
+      const outcome: ToolOutcome = def
+        ? ((await step.run(`tool-${name}-${iterations}-${toolCalls}`, () =>
+            def.execute(input, ctx),
+          )) as ToolOutcome)
+        : { observation: `Unknown tool: ${name}` };
 
-      // Effects are applied here, outside the memoized step (see ToolOutcome).
+      // The patch is applied here, outside the memoized step (see ToolOutcome).
       if (outcome.draftPatch) Object.assign(draft, outcome.draftPatch);
-      if (outcome.publish) {
-        await publish(
-          `publish-${outcome.publish.event}-${iterations}-${toolCalls}`,
-          outcome.publish.event,
-          outcome.publish.data,
-        );
-      }
 
       messages.push({
         role: 'tool',
@@ -284,71 +222,5 @@ export async function runAgentLoop(
     tokensIn,
     tokensOut,
     costUsd,
-    validationAttempts,
-    validationFailures,
-  };
-}
-
-// Ask the user's browser (subscribed to the agent stream) to run the SQL with
-// its own credentials, and wait for the result event. See InsightsChatProvider
-// and /api/chat-validate for the other half of the round trip.
-async function validateQuery(args: {
-  sql: string;
-  validationId: string;
-  userId: string;
-  step: StepTools;
-  publish: RunAgentLoopArgs['publish'];
-  iterations: number;
-  toolCalls: number;
-  validationFailures: ValidationFailure[];
-}): Promise<ToolOutcome> {
-  const { sql, validationId, userId, step, publish } = args;
-
-  await publish(
-    `publish-validation.requested-${args.iterations}-${args.toolCalls}`,
-    'validation.requested',
-    { validationId, sql },
-  );
-
-  // userId is stamped server-side by /api/chat-validate from the poster's
-  // Clerk session, so only the initiating user can complete this validation.
-  const completed = await step.waitForEvent(`wait-validation-${validationId}`, {
-    event: VALIDATION_COMPLETED_EVENT,
-    timeout: '20s',
-    if: `async.data.validationId == "${validationId}" && async.data.userId == "${userId}"`,
-  });
-
-  if (!completed) {
-    return {
-      observation:
-        'Validation is unavailable right now (no result within 20s). Proceed without it and do not call validate_query again this run.',
-    };
-  }
-
-  const result = completed.data as unknown as ValidationResult;
-  if (result.ok) {
-    const columns = (result.columns ?? []).join(', ');
-    const emptyNote =
-      result.rowCount === 0
-        ? ' The query is valid but returned 0 rows — consider whether the filters are too narrow.'
-        : '';
-    return {
-      observation: `Query ran successfully. Columns: ${columns}. Rows: ${result.rowCount}.${emptyNote}`,
-    };
-  }
-
-  const diagnostics = result.diagnostics ?? [];
-  for (const d of diagnostics) {
-    args.validationFailures.push({
-      sql,
-      code: d.code || 'error',
-      message: d.message,
-    });
-  }
-  const details = diagnostics
-    .map((d) => `- [${d.code || 'error'}] ${d.message}`)
-    .join('\n');
-  return {
-    observation: `Query failed validation:\n${details}\nFix the SQL and validate again.`,
   };
 }
