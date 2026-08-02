@@ -89,7 +89,7 @@ export const Route = createFileRoute('/api/chat')({
 
           //
           // Send event to Inngest to trigger the agent chat
-          await inngest.send({
+          const { ids } = await inngest.send({
             name: 'insights-agent/chat.requested',
             data: {
               threadId: threadId ?? undefined,
@@ -110,6 +110,9 @@ export const Route = createFileRoute('/api/chat')({
             JSON.stringify({
               success: true,
               threadId: threadId,
+              // Lets the chat UI recover the result via /api/chat-result if the
+              // realtime run.completed never reaches the browser.
+              eventId: ids[0],
             }),
             {
               status: 200,

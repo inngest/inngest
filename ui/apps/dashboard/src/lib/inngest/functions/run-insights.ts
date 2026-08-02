@@ -362,11 +362,14 @@ export const runInsightsAgent = inngest.createFunction(
       timestamp: Date.now(),
     });
 
+    // Mirrors the run.completed payload above: the chat UI reads this run
+    // output back when the realtime message doesn't reach the browser.
     return {
       success: true,
       threadId,
       sql: draft.sql ?? '',
       title: draft.title ?? '',
+      reasoning: draft.reasoning ?? '',
       summary,
       kind: draft.sql ? 'query' : 'answer',
       selectedEvents: draft.selectedEvents,
