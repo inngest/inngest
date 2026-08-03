@@ -32,6 +32,19 @@ export type Announcement = {
 
 export const announcements: Announcement[] = [
   {
+    id: 'lightning-lab-2026-08',
+    title: 'Inngest Lightning Lab',
+    body: 'Your agents need evals | August 12, 11AM PT/2 PM ET',
+    imageUrl: '/images/announcements/lightning-evals.png',
+    imageUrlDark: '/images/announcements/lightning-evals.png',
+    cta: {
+      label: 'Register',
+      href: 'https://luma.com/inngest-r614?utm_source=in-app',
+    },
+    startDate: '2026-08-04T17:00:00Z',
+    endDate: '2026-08-12T17:00:00Z',
+  },
+  {
     id: 'ai-observability-2026-07',
     title: 'New: AI observability',
     body: 'Score, experiment, and group your runs',
