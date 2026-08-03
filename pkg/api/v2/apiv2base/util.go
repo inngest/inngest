@@ -29,6 +29,16 @@ func getHTTPMethodAndPath(method protoreflect.MethodDescriptor) (httpMethod, pat
 	if httpRule == nil {
 		return http.MethodPost, "" // Default for gRPC
 	}
+	return httpMethodAndPathFromRule(httpRule)
+}
+
+// httpMethodAndPathFromRule extracts the HTTP method and path from a single
+// HttpRule. Split out from getHTTPMethodAndPath so additional_bindings, which
+// are themselves HttpRules, can be read with the same logic.
+func httpMethodAndPathFromRule(httpRule *annotations.HttpRule) (httpMethod, path string) {
+	if httpRule == nil {
+		return http.MethodPost, ""
+	}
 
 	// Extract both method and path from the annotation pattern
 	switch pattern := httpRule.Pattern.(type) {
@@ -59,15 +69,24 @@ func getHTTPMethod(method protoreflect.MethodDescriptor) string {
 	return httpMethod
 }
 
-// hasAuthzAnnotation checks if a method has the authz annotation requiring authorization
-func hasAuthzAnnotation(method protoreflect.MethodDescriptor) bool {
+// authzOptions returns the authz annotation for a method, or nil when absent.
+func authzOptions(method protoreflect.MethodDescriptor) *apiv2.AuthzOptions {
 	opts := method.Options()
 	if !proto.HasExtension(opts, apiv2.E_Authz) {
+		return nil
+	}
+	return proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
+}
+
+// hasAuthzAnnotation reports whether a method requires an authorization grant.
+// A method is protected when it names a grant; `exempt: true` marks the
+// deliberately public ones.
+func hasAuthzAnnotation(method protoreflect.MethodDescriptor) bool {
+	authzOpts := authzOptions(method)
+	if authzOpts == nil {
 		return false
 	}
-
-	authzOpts := proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
-	return authzOpts.RequireAuthz
+	return authzOpts.GetGrant() != ""
 }
 
 // GetInngestEnvHeader extracts the X-Inngest-Env header value from the gRPC context.
