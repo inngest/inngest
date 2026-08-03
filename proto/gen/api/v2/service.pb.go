@@ -9507,9 +9507,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x99\x87\x01\n" +
-	"\x02V2\x12\xbc\x02\n" +
-	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
+	"\x04INFO\x10\x032؋\x01\n" +
+	"\x02V2\x12\xc2\x02\n" +
+	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x88\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
 	"\x03401\x12K\n" +
 	"&Unauthorized - authentication required\x12!\n" +
@@ -9519,9 +9519,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\t\x12\a/health\x12[\n" +
-	"\v_SchemaOnly\x12\x15.api.v2.HealthRequest\x1a\x15.api.v2.ErrorResponse\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/_internal/schema-only\x12\xbf\x05\n" +
-	"\x14CreatePartnerAccount\x12\x1c.api.v2.CreateAccountRequest\x1a\x1d.api.v2.CreateAccountResponse\"\xe9\x04\x92A\xc3\x04\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x02 \x01\x82\xd3\xe4\x93\x02\t\x12\a/health\x12a\n" +
+	"\v_SchemaOnly\x12\x15.api.v2.HealthRequest\x1a\x15.api.v2.ErrorResponse\"$\x8a\xb5\x18\x02 \x01\x82\xd3\xe4\x93\x02\x18\x12\x16/_internal/schema-only\x12\xcc\x05\n" +
+	"\x14CreatePartnerAccount\x12\x1c.api.v2.CreateAccountRequest\x1a\x1d.api.v2.CreateAccountResponse\"\xf6\x04\x92A\xc3\x04\n" +
 	"\vPartner API\x12\x16Create partner account\x1a2Creates a sub-account (if you have partner access)JP\n" +
 	"\x03201\x12I\n" +
 	"\x1cAccount successfully created\x12)\n" +
@@ -9543,8 +9543,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accounts\x12\xf6\x04\n" +
-	"\tCreateEnv\x12\x18.api.v2.CreateEnvRequest\x1a\x19.api.v2.CreateEnvResponse\"\xb3\x04\x92A\x9f\x04\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:partner\x18\x02\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/partner/accounts\x12\x85\x05\n" +
+	"\tCreateEnv\x12\x18.api.v2.CreateEnvRequest\x1a\x19.api.v2.CreateEnvResponse\"\xc2\x04\x92A\x9f\x04\n" +
 	"\fEnvironments\x12\x12Create environment\x1a\x19Create custom environmentJH\n" +
 	"\x03201\x12A\n" +
 	"\x18Env successfully created\x12%\n" +
@@ -9566,9 +9566,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\n" +
-	":\x01*\"\x05/envs\x12\xe3\x04\n" +
-	"\x14FetchPartnerAccounts\x12\x1c.api.v2.FetchAccountsRequest\x1a\x1d.api.v2.FetchAccountsResponse\"\x8d\x04\x92A\xea\x03\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:env\x18\x02\x82\xd3\xe4\x93\x02\n" +
+	":\x01*\"\x05/envs\x12\xf0\x04\n" +
+	"\x14FetchPartnerAccounts\x12\x1c.api.v2.FetchAccountsRequest\x1a\x1d.api.v2.FetchAccountsResponse\"\x9a\x04\x92A\xea\x03\n" +
 	"\vPartner API\x12\x15List partner accounts\x1a/Lists sub-accounts (if you have partner access)JD\n" +
 	"\x03200\x12=\n" +
 	"\x10List of accounts\x12)\n" +
@@ -9587,8 +9587,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x02\b\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/partner/accounts\x12\xdd\x03\n" +
-	"\fFetchAccount\x12\x1b.api.v2.FetchAccountRequest\x1a\x1c.api.v2.FetchAccountResponse\"\x91\x03\x92A\xfd\x02\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:partner\x18\x01\x82\xd3\xe4\x93\x02\x13\x12\x11/partner/accounts\x12\xf0\x03\n" +
+	"\fFetchAccount\x12\x1b.api.v2.FetchAccountRequest\x1a\x1c.api.v2.FetchAccountResponse\"\xa4\x03\x92A\xfd\x02\n" +
 	"\aAccount\x12\vGet account\x1a.Returns the account for the authenticated userJ:\n" +
 	"\x03200\x123\n" +
 	"\aAccount\x12(\n" +
@@ -9604,9 +9604,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\n" +
-	"\x12\b/account\x12\x9b\x05\n" +
-	"\x10FetchAccountEnvs\x12\x1f.api.v2.FetchAccountEnvsRequest\x1a .api.v2.FetchAccountEnvsResponse\"\xc3\x04\x92A\xb2\x04\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:account\x18\x01\x82\xd3\xe4\x93\x02\n" +
+	"\x12\b/account\x12\xaa\x05\n" +
+	"\x10FetchAccountEnvs\x12\x1f.api.v2.FetchAccountEnvsRequest\x1a .api.v2.FetchAccountEnvsResponse\"\xd2\x04\x92A\xb2\x04\n" +
 	"\fEnvironments\x12\x11List environments\x1a List of all custom environments.JS\n" +
 	"\x03200\x12L\n" +
 	"\x1cList of account environments\x12,\n" +
@@ -9628,8 +9628,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\a\x12\x05/envs\x12\xa8\a\n" +
-	"\x15FetchAccountEventKeys\x12$.api.v2.FetchAccountEventKeysRequest\x1a%.api.v2.FetchAccountEventKeysResponse\"\xc1\x06\x92A\xa9\x06\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:env\x18\x01\x82\xd3\xe4\x93\x02\a\x12\x05/envs\x12\xb7\a\n" +
+	"\x15FetchAccountEventKeys\x12$.api.v2.FetchAccountEventKeysRequest\x1a%.api.v2.FetchAccountEventKeysResponse\"\xd0\x06\x92A\xa9\x06\n" +
 	"\x04Keys\x12\x17List account event keys\x1a\xaf\x01Lists event keys for a specific account, optionally filtered by environment. If the environment header isn't specified, this returns the default production environment's keys.JV\n" +
 	"\x03200\x12O\n" +
 	"\x1aList of account event keys\x121\n" +
@@ -9653,8 +9653,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00rd\n" +
 	"b\n" +
-	"\rX-Inngest-Env\x12OFilter event keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/keys/events\x12\xba\a\n" +
-	"\x17FetchAccountSigningKeys\x12&.api.v2.FetchAccountSigningKeysRequest\x1a'.api.v2.FetchAccountSigningKeysResponse\"\xcd\x06\x92A\xb4\x06\n" +
+	"\rX-Inngest-Env\x12OFilter event keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x8a\xb5\x18\v\x12\aapi:key\x18\x01\x82\xd3\xe4\x93\x02\x0e\x12\f/keys/events\x12\xc9\a\n" +
+	"\x17FetchAccountSigningKeys\x12&.api.v2.FetchAccountSigningKeysRequest\x1a'.api.v2.FetchAccountSigningKeysResponse\"\xdc\x06\x92A\xb4\x06\n" +
 	"\x04Keys\x12\x19List account signing keys\x1a\xb2\x01Lists signing keys for a specific account, optionally filtered by environment.  If the environment header isn't specified, this returns the default production environment's keys.JZ\n" +
 	"\x03200\x12S\n" +
 	"\x1cList of account signing keys\x123\n" +
@@ -9678,8 +9678,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00rf\n" +
 	"d\n" +
-	"\rX-Inngest-Env\x12QFilter signing keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/keys/signing\x12\xf8\x06\n" +
-	"\rCreateWebhook\x12\x1c.api.v2.CreateWebhookRequest\x1a\x1d.api.v2.CreateWebhookResponse\"\xa9\x06\x92A\x8d\x06\n" +
+	"\rX-Inngest-Env\x12QFilter signing keys by environment (e.g., 'production', 'staging', 'development')\x18\x01\x8a\xb5\x18\v\x12\aapi:key\x18\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/keys/signing\x12\x8b\a\n" +
+	"\rCreateWebhook\x12\x1c.api.v2.CreateWebhookRequest\x1a\x1d.api.v2.CreateWebhookResponse\"\xbc\x06\x92A\x8d\x06\n" +
 	"\bWebhooks\x12\x0eCreate webhook\x1a*Creates a new webhook for receiving eventsJP\n" +
 	"\x03201\x12I\n" +
 	"\x1cWebhook successfully created\x12)\n" +
@@ -9706,8 +9706,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00rh\n" +
 	"f\n" +
-	"\rX-Inngest-Env\x12QTarget environment for the webhook (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/env/webhooks\x12\xae\x05\n" +
-	"\fListWebhooks\x12\x1b.api.v2.ListWebhooksRequest\x1a\x1c.api.v2.ListWebhooksResponse\"\xe2\x04\x92A\xc9\x04\n" +
+	"\rX-Inngest-Env\x12QTarget environment for the webhook (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x8a\xb5\x18\x0f\x12\vapi:webhook\x18\x02\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/env/webhooks\x12\xc1\x05\n" +
+	"\fListWebhooks\x12\x1b.api.v2.ListWebhooksRequest\x1a\x1c.api.v2.ListWebhooksResponse\"\xf5\x04\x92A\xc9\x04\n" +
 	"\bWebhooks\x12\rList webhooks\x1a/Lists all webhooks in the specified environmentJC\n" +
 	"\x03200\x12<\n" +
 	"\x10List of webhooks\x12(\n" +
@@ -9728,8 +9728,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
 	"BearerAuth\x12\x00ri\n" +
 	"g\n" +
-	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\x99\x06\n" +
-	"\bPatchEnv\x12\x17.api.v2.PatchEnvRequest\x1a\x19.api.v2.PatchEnvsResponse\"\xd8\x05\x92A\xbf\x05\n" +
+	"\rX-Inngest-Env\x12RTarget environment for the webhooks (e.g., 'production', 'staging', 'development')\x18\x01(\x01\x8a\xb5\x18\x0f\x12\vapi:webhook\x18\x01\x82\xd3\xe4\x93\x02\x0f\x12\r/env/webhooks\x12\xa8\x06\n" +
+	"\bPatchEnv\x12\x17.api.v2.PatchEnvRequest\x1a\x19.api.v2.PatchEnvsResponse\"\xe7\x05\x92A\xbf\x05\n" +
 	"\fEnvironments\x12\x12Update environment\x1aLPartially updates an environment. Only the provided fields will be modified.JP\n" +
 	"\x03200\x12I\n" +
 	" Environment successfully updated\x12%\n" +
@@ -9754,63 +9754,63 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
-	"/envs/{id}\x12\xd8\x01\n" +
-	"\x0eGetFunctionRun\x12\x1d.api.v2.GetFunctionRunRequest\x1a\x1e.api.v2.GetFunctionRunResponse\"\x86\x01\x92Am\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:env\x18\x02\x82\xd3\xe4\x93\x02\x0f:\x01*2\n" +
+	"/envs/{id}\x12\xe7\x01\n" +
+	"\x0eGetFunctionRun\x12\x1d.api.v2.GetFunctionRunRequest\x1a\x1e.api.v2.GetFunctionRunResponse\"\x95\x01\x92Am\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x10Get function run\x1a;Fetches the canonical run summary for a single function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10\x12\x0e/runs/{run_id}\x12\xd4\x01\n" +
-	"\bListRuns\x12\x17.api.v2.ListRunsRequest\x1a\x18.api.v2.ListRunsResponse\"\x94\x01\x92A\x83\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:run\x18\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/runs/{run_id}\x12\xe3\x01\n" +
+	"\bListRuns\x12\x17.api.v2.ListRunsRequest\x1a\x18.api.v2.ListRunsResponse\"\xa3\x01\x92A\x83\x01\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\tList runs\x1aXLists runs in the authenticated environment, optionally filtered by app and function IDsb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\a\x12\x05/runs\x12\x84\x02\n" +
-	"\x10ListFunctionRuns\x12\x1f.api.v2.ListFunctionRunsRequest\x1a .api.v2.ListFunctionRunsResponse\"\xac\x01\x92Av\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:run\x18\x01\x82\xd3\xe4\x93\x02\a\x12\x05/runs\x12\x93\x02\n" +
+	"\x10ListFunctionRuns\x12\x1f.api.v2.ListFunctionRunsRequest\x1a .api.v2.ListFunctionRunsResponse\"\xbb\x01\x92Av\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x18List runs for a function\x1a<Lists runs for one function in the authenticated environmentb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02-\x12+/apps/{app_id}/functions/{function_id}/runs\x12\xcf\x01\n" +
-	"\fGetEventRuns\x12\x1b.api.v2.GetEventRunsRequest\x1a\x1c.api.v2.GetEventRunsResponse\"\x83\x01\x92Aa\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:run\x18\x01\x82\xd3\xe4\x93\x02-\x12+/apps/{app_id}/functions/{function_id}/runs\x12\xde\x01\n" +
+	"\fGetEventRuns\x12\x1b.api.v2.GetEventRunsRequest\x1a\x1c.api.v2.GetEventRunsResponse\"\x92\x01\x92Aa\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x0eGet event runs\x1a1Lists function runs triggered by a specific eventb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19\x12\x17/events/{event_id}/runs\x12\xcd\x01\n" +
-	"\x05Rerun\x12\x14.api.v2.RerunRequest\x1a\x15.api.v2.RerunResponse\"\x96\x01\x92At\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:run\x18\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/events/{event_id}/runs\x12\xdc\x01\n" +
+	"\x05Rerun\x12\x14.api.v2.RerunRequest\x1a\x15.api.v2.RerunResponse\"\xa5\x01\x92At\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x12Rerun function run\x1a@Creates a new run using the original run's triggering event datab\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/runs/{run_id}/rerun\x12\xbd\x01\n" +
-	"\tCancelRun\x12\x18.api.v2.CancelRunRequest\x1a\x19.api.v2.CancelRunResponse\"{\x92AX\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:run\x18\x02\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/runs/{run_id}/rerun\x12\xcd\x01\n" +
+	"\tCancelRun\x12\x18.api.v2.CancelRunRequest\x1a\x19.api.v2.CancelRunResponse\"\x8a\x01\x92AX\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x13Cancel function run\x1a#Cancels an in-progress function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/runs/{run_id}/cancel\x12\xc8\x01\n" +
-	"\x06GetApp\x12\x15.api.v2.GetAppRequest\x1a\x16.api.v2.GetAppResponse\"\x8e\x01\x92Au\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:run\x18\x02\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/runs/{run_id}/cancel\x12\xd7\x01\n" +
+	"\x06GetApp\x12\x15.api.v2.GetAppRequest\x1a\x16.api.v2.GetAppResponse\"\x9d\x01\x92Au\n" +
 	"\x04Apps\n" +
 	"\x04Beta\x12\aGet app\x1aLFetches details for a single app, including sync metadata and function countb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x10\x12\x0e/apps/{app_id}\x12\xdf\x01\n" +
-	"\aGetApps\x12\x16.api.v2.GetAppsRequest\x1a\x17.api.v2.GetAppsResponse\"\xa2\x01\x92A\x91\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:app\x18\x01\x82\xd3\xe4\x93\x02\x10\x12\x0e/apps/{app_id}\x12\xee\x01\n" +
+	"\aGetApps\x12\x16.api.v2.GetAppsRequest\x1a\x17.api.v2.GetAppsResponse\"\xb1\x01\x92A\x91\x01\n" +
 	"\x04Apps\n" +
 	"\x04Beta\x12\bGet apps\x1agLists active apps in the authenticated environment. Set archived to true to list archived apps instead.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\a\x12\x05/apps\x12\xcb\x02\n" +
-	"\vCreateScore\x12\x1a.api.v2.CreateScoreRequest\x1a\x1b.api.v2.CreateScoreResponse\"\x82\x02\x92A\xd9\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:app\x18\x01\x82\xd3\xe4\x93\x02\a\x12\x05/apps\x12\xdc\x02\n" +
+	"\vCreateScore\x12\x1a.api.v2.CreateScoreRequest\x1a\x1b.api.v2.CreateScoreResponse\"\x93\x02\x92A\xd9\x01\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\fCreate score\x1a\xaa\x01Submits one or more named scores for a function run, or for specific steps when step IDs are provided. Scores are recorded as run metadata and aggregated for experiments.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f:\x06scores\"\x15/runs/{run_id}/scores\x12\xca\x06\n" +
-	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x8d\x06\x92A\xea\x05\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\r\x12\tapi:score\x18\x02\x82\xd3\xe4\x93\x02\x1f:\x06scores\"\x15/runs/{run_id}/scores\x12\xd9\x06\n" +
+	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x9c\x06\x92A\xea\x05\n" +
 	"\x04Apps\n" +
 	"\x04Beta\x12\bSync app\x1a Sync an app at the provided URL.JE\n" +
 	"\x03200\x12>\n" +
@@ -9836,26 +9836,26 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xdb\x01\n" +
-	"\x10GetFunctionTrace\x12\x1f.api.v2.GetFunctionTraceRequest\x1a .api.v2.GetFunctionTraceResponse\"\x83\x01\x92Ad\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:app\x18\x02\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/apps/{app_id}/syncs\x12\xea\x01\n" +
+	"\x10GetFunctionTrace\x12\x1f.api.v2.GetFunctionTraceRequest\x1a .api.v2.GetFunctionTraceResponse\"\x92\x01\x92Ad\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\x12Get function trace\x1a0Fetches the trace tree for a single function runb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x16\x12\x14/runs/{run_id}/trace\x12\xfc\x01\n" +
-	"\vGetFunction\x12\x1a.api.v2.GetFunctionRequest\x1a\x1b.api.v2.GetFunctionResponse\"\xb3\x01\x92A\x81\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:run\x18\x01\x82\xd3\xe4\x93\x02\x16\x12\x14/runs/{run_id}/trace\x12\x90\x02\n" +
+	"\vGetFunction\x12\x1a.api.v2.GetFunctionRequest\x1a\x1b.api.v2.GetFunctionResponse\"\xc7\x01\x92A\x81\x01\n" +
 	"\tFunctions\n" +
 	"\x04Beta\x12\fGet function\x1aNFetches function configuration and status details for a function within an appb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xdd\x01\n" +
-	"\fGetFunctions\x12\x1b.api.v2.GetFunctionsRequest\x1a\x1c.api.v2.GetFunctionsResponse\"\x91\x01\x92An\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x10\x12\fapi:function\x18\x01\x82\xd3\xe4\x93\x02(\x12&/apps/{app_id}/functions/{function_id}\x12\xf1\x01\n" +
+	"\fGetFunctions\x12\x1b.api.v2.GetFunctionsRequest\x1a\x1c.api.v2.GetFunctionsResponse\"\xa5\x01\x92An\n" +
 	"\tFunctions\n" +
 	"\x04Beta\x12\rGet functions\x1a:Lists function configuration and status details for an appb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/apps/{app_id}/functions\x12\xfc\v\n" +
-	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\xaa\v\x92A\xee\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x10\x12\fapi:function\x18\x01\x82\xd3\xe4\x93\x02\x1a\x12\x18/apps/{app_id}/functions\x12\x90\f\n" +
+	"\x0eInvokeFunction\x12\x1d.api.v2.InvokeFunctionRequest\x1a\x1e.api.v2.InvokeFunctionResponse\"\xbe\v\x92A\xee\n" +
 	"\n" +
 	"\tFunctions\x12\x0fInvoke function\x1a\x81\x01Invokes a function, executing the function either asynchronously or synchronously based on the mode parameter in the request bodyJn\n" +
 	"\x03200\x12g\n" +
@@ -9893,8 +9893,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invoke\x12\xd2\x04\n" +
-	"\x12ListInsightsTables\x12!.api.v2.ListInsightsTablesRequest\x1a\".api.v2.ListInsightsTablesResponse\"\xf4\x03\x92A\xd8\x03\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x10\x12\fapi:function\x18\x02\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invoke\x12\xe5\x04\n" +
+	"\x12ListInsightsTables\x12!.api.v2.ListInsightsTablesRequest\x1a\".api.v2.ListInsightsTablesResponse\"\x87\x04\x92A\xd8\x03\n" +
 	"\bInsights\n" +
 	"\x04Beta\n" +
 	"\bInternal\x12\x14List insights tables\x1aOLists the available tables that can be queried via the Insights query endpoint.JZ\n" +
@@ -9912,8 +9912,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\xfe\x05\n" +
-	"\x18ListInsightsEventSchemas\x12'.api.v2.ListInsightsEventSchemasRequest\x1a(.api.v2.ListInsightsEventSchemasResponse\"\x8e\x05\x92A\xea\x04\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:insight\x18\x01\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\x91\x06\n" +
+	"\x18ListInsightsEventSchemas\x12'.api.v2.ListInsightsEventSchemasRequest\x1a(.api.v2.ListInsightsEventSchemasResponse\"\xa1\x05\x92A\xea\x04\n" +
 	"\bInsights\n" +
 	"\x04Beta\n" +
 	"\bInternal\x12\x17List event type schemas\x1a\x80\x01Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON.Jc\n" +
@@ -9934,8 +9934,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/insights/events/schemas\x12\x9e\x06\n" +
-	"\x13QueryInsightsPrompt\x12\".api.v2.QueryInsightsPromptRequest\x1a#.api.v2.QueryInsightsPromptResponse\"\xbd\x05\x92A\x98\x05\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:insight\x18\x01\x82\xd3\xe4\x93\x02\x1a\x12\x18/insights/events/schemas\x12\xb1\x06\n" +
+	"\x13QueryInsightsPrompt\x12\".api.v2.QueryInsightsPromptRequest\x1a#.api.v2.QueryInsightsPromptResponse\"\xd0\x05\x92A\x98\x05\n" +
 	"\bInsights\n" +
 	"\x04Beta\n" +
 	"\bInternal\x12#Generate insights query from prompt\x1a@Translates a natural language prompt into an Insights SQL query.JV\n" +
@@ -9959,8 +9959,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/insights/query/prompt\x12\x98\x06\n" +
-	"\rQueryInsights\x12\x1c.api.v2.QueryInsightsRequest\x1a\x1d.api.v2.QueryInsightsResponse\"\xc9\x05\x92A\xab\x05\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:insight\x18\x01\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/insights/query/prompt\x12\xab\x06\n" +
+	"\rQueryInsights\x12\x1c.api.v2.QueryInsightsRequest\x1a\x1d.api.v2.QueryInsightsResponse\"\xdc\x05\x92A\xab\x05\n" +
 	"\bInsights\n" +
 	"\x04Beta\n" +
 	"\bInternal\x12\x0eQuery insights\x1a,Query Insights using the provided SQL query.JO\n" +
@@ -9987,37 +9987,37 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/insights/query\x12\xe1\x02\n" +
-	"\x0fListExperiments\x12\x1e.api.v2.ListExperimentsRequest\x1a\x1f.api.v2.ListExperimentsResponse\"\x8c\x02\x92A\xbe\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:insight\x18\x01\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/insights/query\x12\xf7\x02\n" +
+	"\x0fListExperiments\x12\x1e.api.v2.ListExperimentsRequest\x1a\x1f.api.v2.ListExperimentsResponse\"\xa2\x02\x92A\xbe\x01\n" +
 	"\vExperiments\n" +
 	"\x04Beta\x12\x10List experiments\x1a\x84\x01Lists observed experiments in the authenticated environment. Use the nested app and function route to scope results to one function.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02DZ4\x122/apps/{app_id}/functions/{function_id}/experiments\x12\f/experiments\x12\xb5\x02\n" +
-	"\rGetExperiment\x12\x1c.api.v2.GetExperimentRequest\x1a\x1d.api.v2.GetExperimentResponse\"\xe6\x01\x92A\x95\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x12\x12\x0eapi:experiment\x18\x01\x82\xd3\xe4\x93\x02DZ4\x122/apps/{app_id}/functions/{function_id}/experiments\x12\f/experiments\x12\xcb\x02\n" +
+	"\rGetExperiment\x12\x1c.api.v2.GetExperimentRequest\x1a\x1d.api.v2.GetExperimentResponse\"\xfc\x01\x92A\x95\x01\n" +
 	"\vExperiments\n" +
 	"\x04Beta\x12\x19Get experiment aggregates\x1aSFetches variant run counts and score aggregates for one experiment on one function.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02G\x12E/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}\x12\xdd\x01\n" +
-	"\x0fListSessionKeys\x12\x1e.api.v2.ListSessionKeysRequest\x1a\x1f.api.v2.ListSessionKeysResponse\"\x88\x01\x92At\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x12\x12\x0eapi:experiment\x18\x01\x82\xd3\xe4\x93\x02G\x12E/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}\x12\xf0\x01\n" +
+	"\x0fListSessionKeys\x12\x1e.api.v2.ListSessionKeysRequest\x1a\x1f.api.v2.ListSessionKeysResponse\"\x9b\x01\x92At\n" +
 	"\bSessions\n" +
 	"\x04Beta\x12\x11List session keys\x1a=Lists session keys observed in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\v\x12\t/sessions\x12\xe8\x01\n" +
-	"\fListSessions\x12\x1b.api.v2.ListSessionsRequest\x1a\x1c.api.v2.ListSessionsResponse\"\x9c\x01\x92Az\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:session\x18\x01\x82\xd3\xe4\x93\x02\v\x12\t/sessions\x12\xfb\x01\n" +
+	"\fListSessions\x12\x1b.api.v2.ListSessionsRequest\x1a\x1c.api.v2.ListSessionsResponse\"\xaf\x01\x92Az\n" +
 	"\bSessions\n" +
 	"\x04Beta\x12\rList sessions\x1aGLists session IDs for one session key in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19\x12\x17/sessions/{session_key}\x12\x8f\x02\n" +
-	"\x0fListSessionRuns\x12\x1e.api.v2.ListSessionRunsRequest\x1a\x1f.api.v2.ListSessionRunsResponse\"\xba\x01\x92A\x82\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:session\x18\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/sessions/{session_key}\x12\xa2\x02\n" +
+	"\x0fListSessionRuns\x12\x1e.api.v2.ListSessionRunsRequest\x1a\x1f.api.v2.ListSessionRunsResponse\"\xcd\x01\x92A\x82\x01\n" +
 	"\bSessions\n" +
 	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\xe1\x05\x92A\xaa\x05\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:session\x18\x01\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\x8a\x0e\x92A\xaa\x05\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -10031,7 +10031,19 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Runs\x12\x15Inspect function runsj9\n" +
 	"\vExperiments\x12*Inspect experiment variants and aggregatesj(\n" +
 	"\bSessions\x12\x1cInspect session-grouped runsj)\n" +
-	"\vPartner API\x12\x1aPartner account managementZ1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
+	"\vPartner API\x12\x1aPartner account management\x92\xb5\x18=\n" +
+	"\vapi:account\x12\x0fAccount details\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18\\\n" +
+	"\aapi:env\x122Environments, including creating and updating them\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18]\n" +
+	"\vapi:webhook\x12/Webhooks that ingest events into an environment\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18\x85\x01\n" +
+	"\aapi:key\x12[Event keys and signing keys. Signing keys grant full SDK access, so treat this as sensitive\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18[\n" +
+	"\vapi:partner\x12-Partner sub-accounts, including creating them\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18<\n" +
+	"\aapi:app\x12\x19Apps and their sync state\x1a\x16Apps, Functions & Runs\x92\xb5\x18T\n" +
+	"\fapi:function\x12,Function definitions, and invoking functions\x1a\x16Apps, Functions & Runs\x92\xb5\x18_\n" +
+	"\aapi:run\x12<Function runs and traces, including rerunning and cancelling\x1a\x16Apps, Functions & Runs\x92\xb5\x18M\n" +
+	"\tapi:score\x12&Scores recorded against runs and steps\x1a\x18Observability & AI Evals\x92\xb5\x18I\n" +
+	"\x0eapi:experiment\x12\x1dExperiments and their results\x1a\x18Observability & AI Evals\x92\xb5\x18S\n" +
+	"\vapi:insight\x12*Insights queries, tables and event schemas\x1a\x18Observability & AI Evals\x92\xb5\x18J\n" +
+	"\vapi:session\x12!Sessions and session-grouped runs\x1a\x18Observability & AI EvalsZ1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
 
 var (
 	file_api_v2_service_proto_rawDescOnce sync.Once

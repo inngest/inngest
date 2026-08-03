@@ -22,17 +22,143 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// AuthzAction is the action half of a grant. Deliberately closed: the two
+// buckets are the whole model, and a typo'd string here would produce a grant
+// name no API key can ever match, i.e. a silent 403 on a correctly-minted key.
+type AuthzAction int32
+
+const (
+	AuthzAction_AUTHZ_ACTION_UNSPECIFIED AuthzAction = 0
+	AuthzAction_AUTHZ_ACTION_READ        AuthzAction = 1
+	AuthzAction_AUTHZ_ACTION_WRITE       AuthzAction = 2
+)
+
+// Enum value maps for AuthzAction.
+var (
+	AuthzAction_name = map[int32]string{
+		0: "AUTHZ_ACTION_UNSPECIFIED",
+		1: "AUTHZ_ACTION_READ",
+		2: "AUTHZ_ACTION_WRITE",
+	}
+	AuthzAction_value = map[string]int32{
+		"AUTHZ_ACTION_UNSPECIFIED": 0,
+		"AUTHZ_ACTION_READ":        1,
+		"AUTHZ_ACTION_WRITE":       2,
+	}
+)
+
+func (x AuthzAction) Enum() *AuthzAction {
+	p := new(AuthzAction)
+	*p = x
+	return p
+}
+
+func (x AuthzAction) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AuthzAction) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_v2_options_proto_enumTypes[0].Descriptor()
+}
+
+func (AuthzAction) Type() protoreflect.EnumType {
+	return &file_api_v2_options_proto_enumTypes[0]
+}
+
+func (x AuthzAction) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AuthzAction.Descriptor instead.
+func (AuthzAction) EnumDescriptor() ([]byte, []int) {
+	return file_api_v2_options_proto_rawDescGZIP(), []int{0}
+}
+
+// GrantDefinition declares one grant: what it's called, what it means, and
+// where the key-minting UI groups it. The name is the resource half only —
+// the action comes from each method's AuthzOptions.
+type GrantDefinition struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Resource name, no action. Must match ^api:[a-z]+$, e.g. "api:run".
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Shown in the minting UI and appended to the OpenAPI operation description.
+	Description string `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	// UI grouping only. Must be one of the categories the minting UI renders.
+	Category      string `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GrantDefinition) Reset() {
+	*x = GrantDefinition{}
+	mi := &file_api_v2_options_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GrantDefinition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GrantDefinition) ProtoMessage() {}
+
+func (x *GrantDefinition) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v2_options_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GrantDefinition.ProtoReflect.Descriptor instead.
+func (*GrantDefinition) Descriptor() ([]byte, []int) {
+	return file_api_v2_options_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *GrantDefinition) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GrantDefinition) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *GrantDefinition) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
 type AuthzOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Whether this endpoint requires authorization middleware
-	RequireAuthz  bool `protobuf:"varint,1,opt,name=require_authz,json=requireAuthz,proto3" json:"require_authz,omitempty"`
+	// Name of a grant declared via grant_definition on this file. Required
+	// unless exempt is set.
+	Grant string `protobuf:"bytes,2,opt,name=grant,proto3" json:"grant,omitempty"`
+	// Required unless exempt is set.
+	Action AuthzAction `protobuf:"varint,3,opt,name=action,proto3,enum=api.v2.AuthzAction" json:"action,omitempty"`
+	// Marks an endpoint as deliberately public. Set this rather than leaving the
+	// annotation off, so a missing annotation stays distinguishable from an
+	// intentional exemption — that distinction is what makes fail-closed
+	// enforcement safe to turn on. Always comment why.
+	Exempt        bool `protobuf:"varint,4,opt,name=exempt,proto3" json:"exempt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AuthzOptions) Reset() {
 	*x = AuthzOptions{}
-	mi := &file_api_v2_options_proto_msgTypes[0]
+	mi := &file_api_v2_options_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +170,7 @@ func (x *AuthzOptions) String() string {
 func (*AuthzOptions) ProtoMessage() {}
 
 func (x *AuthzOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_api_v2_options_proto_msgTypes[0]
+	mi := &file_api_v2_options_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,12 +183,26 @@ func (x *AuthzOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthzOptions.ProtoReflect.Descriptor instead.
 func (*AuthzOptions) Descriptor() ([]byte, []int) {
-	return file_api_v2_options_proto_rawDescGZIP(), []int{0}
+	return file_api_v2_options_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *AuthzOptions) GetRequireAuthz() bool {
+func (x *AuthzOptions) GetGrant() string {
 	if x != nil {
-		return x.RequireAuthz
+		return x.Grant
+	}
+	return ""
+}
+
+func (x *AuthzOptions) GetAction() AuthzAction {
+	if x != nil {
+		return x.Action
+	}
+	return AuthzAction_AUTHZ_ACTION_UNSPECIFIED
+}
+
+func (x *AuthzOptions) GetExempt() bool {
+	if x != nil {
+		return x.Exempt
 	}
 	return false
 }
@@ -76,6 +216,14 @@ var file_api_v2_options_proto_extTypes = []protoimpl.ExtensionInfo{
 		Tag:           "bytes,50001,opt,name=authz",
 		Filename:      "api/v2/options.proto",
 	},
+	{
+		ExtendedType:  (*descriptorpb.FileOptions)(nil),
+		ExtensionType: ([]*GrantDefinition)(nil),
+		Field:         50002,
+		Name:          "api.v2.grant_definition",
+		Tag:           "bytes,50002,rep,name=grant_definition",
+		Filename:      "api/v2/options.proto",
+	},
 }
 
 // Extension fields to descriptorpb.MethodOptions.
@@ -84,14 +232,31 @@ var (
 	E_Authz = &file_api_v2_options_proto_extTypes[0]
 )
 
+// Extension fields to descriptorpb.FileOptions.
+var (
+	// repeated api.v2.GrantDefinition grant_definition = 50002;
+	E_GrantDefinition = &file_api_v2_options_proto_extTypes[1]
+)
+
 var File_api_v2_options_proto protoreflect.FileDescriptor
 
 const file_api_v2_options_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/options.proto\x12\x06api.v2\x1a google/protobuf/descriptor.proto\"3\n" +
-	"\fAuthzOptions\x12#\n" +
-	"\rrequire_authz\x18\x01 \x01(\bR\frequireAuthz:L\n" +
-	"\x05authz\x12\x1e.google.protobuf.MethodOptions\x18ц\x03 \x01(\v2\x14.api.v2.AuthzOptionsR\x05authzB3Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
+	"\x14api/v2/options.proto\x12\x06api.v2\x1a google/protobuf/descriptor.proto\"c\n" +
+	"\x0fGrantDefinition\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1a\n" +
+	"\bcategory\x18\x03 \x01(\tR\bcategory\"o\n" +
+	"\fAuthzOptions\x12\x14\n" +
+	"\x05grant\x18\x02 \x01(\tR\x05grant\x12+\n" +
+	"\x06action\x18\x03 \x01(\x0e2\x13.api.v2.AuthzActionR\x06action\x12\x16\n" +
+	"\x06exempt\x18\x04 \x01(\bR\x06exemptJ\x04\b\x01\x10\x02*Z\n" +
+	"\vAuthzAction\x12\x1c\n" +
+	"\x18AUTHZ_ACTION_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11AUTHZ_ACTION_READ\x10\x01\x12\x16\n" +
+	"\x12AUTHZ_ACTION_WRITE\x10\x02:L\n" +
+	"\x05authz\x12\x1e.google.protobuf.MethodOptions\x18ц\x03 \x01(\v2\x14.api.v2.AuthzOptionsR\x05authz:b\n" +
+	"\x10grant_definition\x12\x1c.google.protobuf.FileOptions\x18҆\x03 \x03(\v2\x17.api.v2.GrantDefinitionR\x0fgrantDefinitionB3Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
 
 var (
 	file_api_v2_options_proto_rawDescOnce sync.Once
@@ -105,19 +270,26 @@ func file_api_v2_options_proto_rawDescGZIP() []byte {
 	return file_api_v2_options_proto_rawDescData
 }
 
-var file_api_v2_options_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_api_v2_options_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_api_v2_options_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_api_v2_options_proto_goTypes = []any{
-	(*AuthzOptions)(nil),               // 0: api.v2.AuthzOptions
-	(*descriptorpb.MethodOptions)(nil), // 1: google.protobuf.MethodOptions
+	(AuthzAction)(0),                   // 0: api.v2.AuthzAction
+	(*GrantDefinition)(nil),            // 1: api.v2.GrantDefinition
+	(*AuthzOptions)(nil),               // 2: api.v2.AuthzOptions
+	(*descriptorpb.MethodOptions)(nil), // 3: google.protobuf.MethodOptions
+	(*descriptorpb.FileOptions)(nil),   // 4: google.protobuf.FileOptions
 }
 var file_api_v2_options_proto_depIdxs = []int32{
-	1, // 0: api.v2.authz:extendee -> google.protobuf.MethodOptions
-	0, // 1: api.v2.authz:type_name -> api.v2.AuthzOptions
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	1, // [1:2] is the sub-list for extension type_name
-	0, // [0:1] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0, // 0: api.v2.AuthzOptions.action:type_name -> api.v2.AuthzAction
+	3, // 1: api.v2.authz:extendee -> google.protobuf.MethodOptions
+	4, // 2: api.v2.grant_definition:extendee -> google.protobuf.FileOptions
+	2, // 3: api.v2.authz:type_name -> api.v2.AuthzOptions
+	1, // 4: api.v2.grant_definition:type_name -> api.v2.GrantDefinition
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	3, // [3:5] is the sub-list for extension type_name
+	1, // [1:3] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_options_proto_init() }
@@ -130,13 +302,14 @@ func file_api_v2_options_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_options_proto_rawDesc), len(file_api_v2_options_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   1,
-			NumExtensions: 1,
+			NumEnums:      1,
+			NumMessages:   2,
+			NumExtensions: 2,
 			NumServices:   0,
 		},
 		GoTypes:           file_api_v2_options_proto_goTypes,
 		DependencyIndexes: file_api_v2_options_proto_depIdxs,
+		EnumInfos:         file_api_v2_options_proto_enumTypes,
 		MessageInfos:      file_api_v2_options_proto_msgTypes,
 		ExtensionInfos:    file_api_v2_options_proto_extTypes,
 	}.Build()

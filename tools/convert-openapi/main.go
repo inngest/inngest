@@ -15,6 +15,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi2"
 	"github.com/getkin/kin-openapi/openapi2conv"
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 )
 
 func main() {
@@ -84,6 +85,9 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 		// Add parameter constraints for OpenAPI v3
 		addParameterConstraints(v3Doc)
 
+		// Advertise the API key grant each operation requires
+		annotateRequiredGrants(v3Doc)
+
 		// Apply examples from external JSON file
 		applyExamples(v3Doc, inputDir)
 
@@ -151,6 +155,71 @@ func removeDefaultResponses(doc *openapi2.T) {
 		// Update the path item back to the map
 		doc.Paths[path] = pathItem
 	}
+}
+
+// requiredGrantExtension is the vendor extension naming the API key grant an
+// operation requires, e.g. "api:run:read".
+const requiredGrantExtension = "x-inngest-required-grant"
+
+// annotateRequiredGrants stamps each operation with the grant an API key must
+// hold to call it, sourced from the (authz) annotations in service.proto so the
+// docs, the enforcement middleware and the key-minting UI all read one
+// declaration.
+//
+// Routes are matched in canonical form — each path parameter reduced to "{}" —
+// because protoc-gen-openapiv2 does not reproduce the proto templates verbatim:
+// with json_names_for_fields it camelCases parameters ({app_id} -> {appId}) and
+// it drops the `=**` suffix ({session_id=**} -> {sessionId}). Matching literally
+// silently annotated only the parameterless paths.
+func annotateRequiredGrants(doc *openapi3.T) {
+	if doc == nil || doc.Paths == nil {
+		return
+	}
+
+	grants := map[string]string{}
+	for route, grant := range apiv2base.GrantsByHTTPRoute() {
+		method, path, ok := strings.Cut(route, " ")
+		if !ok {
+			continue
+		}
+		grants[apiv2base.CanonicalRoute(method, path)] = grant
+	}
+	if len(grants) == 0 {
+		fmt.Println("Warning: no grant annotations found; operations will not advertise required grants")
+		return
+	}
+
+	annotated := 0
+	for path, item := range doc.Paths.Map() {
+		if item == nil {
+			continue
+		}
+		for method, op := range item.Operations() {
+			if op == nil {
+				continue
+			}
+			grant, ok := grants[apiv2base.CanonicalRoute(method, path)]
+			if !ok {
+				// Exempt (public) operations advertise no grant.
+				continue
+			}
+			if op.Extensions == nil {
+				op.Extensions = map[string]any{}
+			}
+			op.Extensions[requiredGrantExtension] = grant
+
+			// Also state it in the description, for renderers that drop
+			// vendor extensions.
+			note := fmt.Sprintf("Requires the `%s` API key permission.", grant)
+			if op.Description == "" {
+				op.Description = note
+			} else if !strings.Contains(op.Description, note) {
+				op.Description = op.Description + "\n\n" + note
+			}
+			annotated++
+		}
+	}
+	fmt.Printf("Annotated %d operations with required grants\n", annotated)
 }
 
 // removeInternalPaths removes paths prefixed with /_internal/ — these are only

@@ -43,7 +43,7 @@ e2e-golang: ## Run Go SDK e2e tests
 .PHONY: gen
 gen: ## Run all code generators
 	go generate ./...
-	make gql schema-dump queries constraintapi-snapshots tygo
+	make gql schema-dump queries constraintapi-snapshots grant-catalog tygo
 
 .PHONY: protobuf
 protobuf: ## Generate protobuf files
@@ -103,6 +103,12 @@ gql: ## Generate GraphQL code
 tygo: ## Generate TypeScript types from Go structs
 	go run github.com/gzuidhof/tygo@latest generate
 	cd ui && pnpx prettier@2.8.8 --write --no-config --single-quote --print-width 100 "packages/components/src/generated/**/*.ts"
+
+.PHONY: grant-catalog
+grant-catalog: ## Regenerate the committed REST v2 grant catalog
+	@echo "Regenerating REST v2 grant catalog..."
+	rm -f pkg/api/v2/apiv2base/testdata/grant_catalog.json
+	cd pkg/api/v2/apiv2base && go test -run TestGrantCatalogSnapshot .
 
 .PHONY: constraintapi-snapshots
 constraintapi-snapshots: ## Regenerate constraint API Lua snapshots
