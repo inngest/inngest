@@ -21,7 +21,7 @@ type EventMeta struct {
 	// emitted this event (SDK-stamped during a run). It is an un-merged layer:
 	// ResolveSessions folds it into Sessions at ingest and clears it, so it is
 	// never persisted or forwarded downstream.
-	PropagatedSessions Sessions `json:"propagatedSessions,omitempty"`
+	PropagatedSessions Sessions `json:"propagated_sessions,omitempty"`
 }
 
 func (m EventMeta) IsZero() bool {

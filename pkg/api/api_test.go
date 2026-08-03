@@ -52,7 +52,7 @@ func TestReceiveEvent_ResolvesPropagatedSessions(t *testing.T) {
 		"data": {},
 		"meta": {
 			"sessions": {"conv_id": "manual"},
-			"propagatedSessions": {"conv_id": "propagated", "org_id": "42"}
+			"propagated_sessions": {"conv_id": "propagated", "org_id": "42"}
 		}
 	}`)
 
