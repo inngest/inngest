@@ -347,6 +347,15 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	}
 	evt := event.NewInvocationEvent(newInvOpts)
 
+	// Merge the two session layers before the event is handled
+	evt.Event.Meta.ResolveSessions()
+
+	// Validate after the merge
+	if err := evt.Event.Validate(r.Context()); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid invocation event"))
+		return
+	}
+
 	seed := event.SeededIDFromString(
 		r.Header.Get(headers.HeaderEventIDSeed),
 		0,
