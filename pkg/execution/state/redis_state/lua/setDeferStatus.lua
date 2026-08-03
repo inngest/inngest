@@ -5,6 +5,10 @@ The Aborted transition also deletes the Input and decrements the aggregate
 counter, ensuring we don't use the size budget for useless data. The meta entry
 stays so saveDefer.lua's terminal-sticky check still dedupes retransmits.
 
+Control meta (defers-control-meta) is deliberately left alone: it holds no
+aggregate budget to release, and it must never pass through cjson. Deleting the
+run drops that hash along with the rest of the run state.
+
 KEYS[1] - defers meta hash key
 KEYS[2] - defers input hash key
 KEYS[3] - run metadata hash key

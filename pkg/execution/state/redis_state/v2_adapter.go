@@ -232,6 +232,7 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 	pendingKey := fnRunState.kg.Pending(ctx, isSharded, v1id)
 	defersMetaKey := fnRunState.kg.DefersMeta(ctx, isSharded, id.FunctionID, id.RunID)
 	defersInputKey := fnRunState.kg.DefersInput(ctx, isSharded, id.FunctionID, id.RunID)
+	defersControlMetaKey := fnRunState.kg.DefersControlMeta(ctx, isSharded, id.FunctionID, id.RunID)
 
 	eventsBlob, err := json.Marshal(s.Events)
 	if err != nil {
@@ -299,6 +300,8 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 		var metaValues []string
 		var inputHashedIDs []string
 		var inputValues []string
+		var controlHashedIDs []string
+		var controlValues []string
 		for hashedID, d := range s.Defers {
 			metaJSON, err := json.Marshal(deferMeta{
 				FnSlug:         d.FnSlug,
@@ -313,6 +316,10 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 			if len(d.Input) > 0 {
 				inputHashedIDs = append(inputHashedIDs, hashedID)
 				inputValues = append(inputValues, string(d.Input))
+			}
+			if len(d.Meta) > 0 {
+				controlHashedIDs = append(controlHashedIDs, hashedID)
+				controlValues = append(controlValues, string(d.Meta))
 			}
 		}
 		if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
@@ -333,6 +340,17 @@ func (v v2) Migrate(ctx context.Context, s state.MigrateState) error {
 				return partial.Build()
 			}).Error(); err != nil {
 				return fmt.Errorf("redis_state: migrate defers input: %w", err)
+			}
+		}
+		if len(controlHashedIDs) > 0 {
+			if err := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+				partial := c.B().Hset().Key(defersControlMetaKey).FieldValue()
+				for i, h := range controlHashedIDs {
+					partial = partial.FieldValue(h, controlValues[i])
+				}
+				return partial.Build()
+			}).Error(); err != nil {
+				return fmt.Errorf("redis_state: migrate defers control meta: %w", err)
 			}
 		}
 	}
