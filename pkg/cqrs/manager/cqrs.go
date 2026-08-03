@@ -2166,6 +2166,10 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 	return cqrsTraceRuns, nil
 }
 
+func (w wrapper) HasSpanMetadataKind(ctx context.Context, kind string) (bool, error) {
+	return w.q.HasMetadataSpanKind(ctx, kind)
+}
+
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
 	run, err := w.q.GetTraceRun(ctx, id.RunID)
 	if err != nil {

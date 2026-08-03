@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/cli"
@@ -106,7 +107,31 @@ type devserver struct {
 	// single-node service instead of a dev environment.
 	singleNodeServiceOpts *SingleNodeServiceOpts
 
+	// Sticky caches for /dev's hasSeenScores/hasSeenExperiments: once a
+	// metadata span of a kind exists it can never un-exist for this DB, so
+	// we stop querying after the first true.
+	hasSeenScores      atomic.Bool
+	hasSeenExperiments atomic.Bool
+
 	log logger.Logger
+}
+
+// hasSeenMetadataKind reports whether a metadata span of the given kind has
+// ever been recorded, caching the first true result so /dev polling doesn't
+// re-scan the spans table once the answer is known.
+func (d *devserver) hasSeenMetadataKind(ctx context.Context, cache *atomic.Bool, kind string) bool {
+	if cache.Load() {
+		return true
+	}
+	seen, err := d.Data.HasSpanMetadataKind(ctx, kind)
+	if err != nil {
+		d.log.Warn("error checking for metadata span kind", "kind", kind, "error", err)
+		return false
+	}
+	if seen {
+		cache.Store(true)
+	}
+	return seen
 }
 
 type SingleNodeServiceOpts struct {

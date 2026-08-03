@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
+	dbpkg "github.com/inngest/inngest/pkg/db"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
@@ -28,6 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
+	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -533,6 +535,62 @@ func TestDevEndpoint_ReturnsInfoInDevMode(t *testing.T) {
 	var info InfoResponse
 	err := json.Unmarshal(w.Body.Bytes(), &info)
 	require.NoError(t, err)
+}
+
+func TestDevEndpoint_HasSeenScoresAndExperiments(t *testing.T) {
+	// Build the devserver inline (rather than via newTestDevServer) to keep a
+	// handle on the adapter so we can insert spans directly.
+	db, err := dbsqlite.Open(t.Context(), dbsqlite.Options{Persist: false, ForTest: true})
+	require.NoError(t, err)
+	adapter := dbsqlite.New(db)
+
+	ds := &devserver{
+		Data:        cqrsmanager.New(adapter),
+		log:         logger.StdlibLogger(t.Context()),
+		handlerLock: &sync.Mutex{},
+		handlers:    []SDKHandler{},
+		Opts: StartOpts{
+			Config: config.Config{ServerKind: headers.ServerKindDev},
+		},
+	}
+	noAuthMiddleware := func(next http.Handler) http.Handler { return next }
+	api := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: noAuthMiddleware})
+
+	getInfo := func() InfoResponse {
+		w := httptest.NewRecorder()
+		api.ServeHTTP(w, httptest.NewRequest("GET", "/dev", nil))
+		require.Equal(t, http.StatusOK, w.Code)
+		var info InfoResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &info))
+		return info
+	}
+
+	info := getInfo()
+	require.False(t, info.HasSeenScores)
+	require.False(t, info.HasSeenExperiments)
+
+	// Record a score metadata span; note the "_inngest." storage prefix on
+	// the attribute key.
+	err = adapter.Q().InsertSpan(t.Context(), dbpkg.InsertSpanParams{
+		SpanID:     ulid.Make().String(),
+		TraceID:    ulid.Make().String(),
+		Name:       "metadata",
+		StartTime:  time.Now().UTC(),
+		EndTime:    time.Now().UTC(),
+		RunID:      ulid.Make().String(),
+		AccountID:  uuid.New().String(),
+		AppID:      uuid.New().String(),
+		FunctionID: uuid.New().String(),
+		EnvID:      uuid.New().String(),
+		Attributes: []byte(`{"_inngest.metadata.kind":"inngest.score","_inngest.metadata.values":"{}"}`),
+		Links:      []byte(`[]`),
+	})
+	require.NoError(t, err)
+
+	info = getInfo()
+	require.True(t, info.HasSeenScores)
+	require.False(t, info.HasSeenExperiments)
+	require.True(t, ds.hasSeenScores.Load(), "first true result should be cached")
 }
 
 func TestRegister_DuplicateAppCleanup(t *testing.T) {

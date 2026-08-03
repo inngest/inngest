@@ -73,6 +73,10 @@ type Querier interface {
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
 	GetWorkerConnection(ctx context.Context, arg GetWorkerConnectionParams) (*WorkerConnection, error)
+	// Reports whether any metadata span of the given kind (e.g. inngest.score,
+	// inngest.experiment) has ever been recorded. Note the attribute key carries
+	// the "_inngest." storage prefix while the kind value does not.
+	HasMetadataSpanKind(ctx context.Context, kind string) (bool, error)
 	HistoryCountRuns(ctx context.Context) (int64, error)
 	//
 	// Events

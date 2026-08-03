@@ -332,6 +332,44 @@ func TestInsertSpanRoundTrip(t *testing.T) {
 	assert.Contains(t, eventIDs, "event-1")
 }
 
+func TestHasMetadataSpanKind(t *testing.T) {
+	adapter, cleanup := newTestAdapter(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	q := adapter.Q()
+
+	seen, err := q.HasMetadataSpanKind(ctx, "inngest.score")
+	require.NoError(t, err)
+	assert.False(t, seen, "no metadata spans recorded yet")
+
+	err = q.InsertSpan(ctx, db.InsertSpanParams{
+		SpanID:     ulid.Make().String(),
+		TraceID:    ulid.Make().String(),
+		Name:       "metadata",
+		StartTime:  time.Now().UTC(),
+		EndTime:    time.Now().UTC(),
+		RunID:      ulid.Make().String(),
+		AccountID:  uuid.New().String(),
+		AppID:      uuid.New().String(),
+		FunctionID: uuid.New().String(),
+		EnvID:      uuid.New().String(),
+		// The stored attribute key carries the "_inngest." prefix; the kind
+		// value does not.
+		Attributes: []byte(`{"_inngest.metadata.kind":"inngest.score","_inngest.metadata.values":"{}"}`),
+		Links:      []byte(`[]`),
+	})
+	require.NoError(t, err)
+
+	seen, err = q.HasMetadataSpanKind(ctx, "inngest.score")
+	require.NoError(t, err)
+	assert.True(t, seen)
+
+	seen, err = q.HasMetadataSpanKind(ctx, "inngest.experiment")
+	require.NoError(t, err)
+	assert.False(t, seen, "only a score metadata span was recorded")
+}
+
 // ---------------------------------------------------------------------------
 // Transaction commit + rollback
 // ---------------------------------------------------------------------------

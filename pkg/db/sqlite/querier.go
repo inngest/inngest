@@ -519,6 +519,10 @@ func (sq *sqliteQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []s
 	return out, nil
 }
 
+func (sq *sqliteQuerier) HasMetadataSpanKind(ctx context.Context, kind string) (bool, error) {
+	return sq.q.HasMetadataSpanKind(ctx, kind)
+}
+
 func (sq *sqliteQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*db.SpanRow, error) {
 	rows, err := sq.q.GetSpansByDebugRunID(ctx, debugRunID)
 	if err != nil {

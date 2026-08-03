@@ -86,6 +86,7 @@ type Querier interface {
 	GetSpanOutput(ctx context.Context, runID string, ids []string) ([]*SpanOutputRow, error)
 	GetExecutionSpanByStepIDAndAttempt(ctx context.Context, arg GetExecutionSpanByStepIDAndAttemptParams) (*SpanRow, error)
 	GetLatestExecutionSpanByStepID(ctx context.Context, arg GetLatestExecutionSpanByStepIDParams) (*SpanRow, error)
+	HasMetadataSpanKind(ctx context.Context, kind string) (bool, error)
 
 	// Traces (OpenTelemetry)
 	InsertTrace(ctx context.Context, arg InsertTraceParams) error
