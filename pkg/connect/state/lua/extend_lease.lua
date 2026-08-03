@@ -1,10 +1,11 @@
 --[[
-Output:
+Output (status, lease ID):
   -3: Request leased by a different worker instance
   -2: Request leased by somebody else
   -1: Request not leased
   1: Successfully extended lease
   2: Successfully dropped lease
+  3: Idempotent retry; returning the lease from the original extension
 
 ARGV[1]: Current lease ID
 ARGV[2]: New lease ID
@@ -43,27 +44,44 @@ local workerCapUnlimitedBool = (workerCapacityUnlimited == "true")
 
 local requestItem = get_request_lease_item(keyRequestLease)
 if requestItem == nil or requestItem == false or requestItem == cjson.null then
-	return -1
+	return {-1, ""}
 end
 
 if requestItem.leaseID == nil or requestItem.leaseID == cjson.null then
-	return -1
-end
-
-if requestItem.leaseID ~= leaseID and decode_ulid_time(requestItem.leaseID) > currentTime then
-	return -2
+	return {-1, ""}
 end
 
 -- this field is only set if worker capacity is limited, this value represents whether we have enabled or
 -- disabled worker capacity tracking. If we have unlimited capacity, we don't track requests.
 -- If we have limited capacity, we track requests and we need to check if the request is still assigned to the worker.
+local mappedWorkerID = nil
 if workerCapUnlimitedBool == false then
-	local workerInstanceID = redis.call("GET", requestWorkerKey)
-	if workerInstanceID ~= instanceID then
-		return -3
+	mappedWorkerID = redis.call("GET", requestWorkerKey)
+	if mappedWorkerID ~= instanceID then
+		return {-3, ""}
 	end
+end
 
-    -- Remove the old request from worker's set
+if requestItem.leaseID ~= leaseID and decode_ulid_time(requestItem.leaseID) > currentTime then
+	-- A successful extension can outlive the WebSocket carrying its ACK. Keep
+	-- one predecessor in the existing lease value so the same worker can replay
+	-- an old-SDK extension and recover the current lease ID without another key
+	-- or an unbounded history.
+	local retryOwnedByWorker = requestItem.workerID == instanceID
+	if retryOwnedByWorker == false then
+		if mappedWorkerID == nil then
+			mappedWorkerID = redis.call("GET", requestWorkerKey)
+		end
+		retryOwnedByWorker = mappedWorkerID == instanceID
+	end
+	if requestItem.prevLeaseID == leaseID and retryOwnedByWorker then
+		return {3, requestItem.leaseID}
+	end
+	return {-2, ""}
+end
+
+if workerCapUnlimitedBool == false then
+	-- Remove the old request from worker's set before replacing its lease.
 	redis.call("ZREM", workerRequestsKey, requestID)
 end
 
@@ -77,16 +95,24 @@ if decode_ulid_time(newLeaseID) - currentTime <= 0 then
 		redis.call("DEL", requestWorkerKey)
 	    redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
 	end
-	return 2
+	return {2, ""}
 end
 
 -- Update the request lease item with the new lease ID
+requestItem.prevLeaseID = requestItem.leaseID
 requestItem.leaseID = newLeaseID
+if workerCapUnlimitedBool == true then
+	-- Capacity-limited workers already have a bounded request-to-worker
+	-- mapping, so only unlimited workers need ownership duplicated here.
+	requestItem.workerID = instanceID
+else
+	requestItem.workerID = nil
+end
 redis.call("SET", keyRequestLease, cjson.encode(requestItem), "EX", expiry)
 
 -- If worker capacity is unlimited, we don't need to manage the set
 if workerCapUnlimitedBool == true then
-	return 1
+	return {1, newLeaseID}
 end
 
 -- Add to the new lease to the worker's set
@@ -96,4 +122,4 @@ redis.call("EXPIRE", workerRequestsKey, workerRequestsSetTTL)
 -- Update the request-worker mapping with the new TTL
 redis.call("EXPIRE", requestWorkerKey, requestWorkerMappingTTL)
 
-return 1
+return {1, newLeaseID}

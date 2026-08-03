@@ -48,6 +48,44 @@ func TestHandleWorkerRequestExtendLeaseExtendsLease(t *testing.T) {
 	require.WithinDuration(t, time.Now().Add(consts.ConnectWorkerRequestLeaseDuration), ulid.Time(parsed.Time()), 2*time.Second)
 }
 
+func TestHandleWorkerRequestExtendLeaseLostAckRetryReturnsCurrentLease(t *testing.T) {
+	res := createTestingGateway(t)
+	handshake(t, res)
+
+	requestID := "test-extend-lease-lost-ack"
+	initialLeaseID, err := res.svc.stateManager.LeaseRequest(t.Context(), res.envID, requestID, 5*time.Second, testExecutorIP)
+	require.NoError(t, err)
+
+	extension := &connectpb.WorkerRequestExtendLeaseData{
+		RequestId:    requestID,
+		AccountId:    res.accountID.String(),
+		EnvId:        res.envID.String(),
+		AppId:        res.appID.String(),
+		FunctionSlug: res.fnSlug,
+		RunId:        res.runID.String(),
+		LeaseId:      initialLeaseID.String(),
+	}
+
+	sendWorkerExtendLeaseMessage(t, res, extension)
+	firstMsg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK, firstMsg.Kind)
+
+	firstAck := connectpb.WorkerRequestExtendLeaseAckData{}
+	require.NoError(t, proto.Unmarshal(firstMsg.Payload, &firstAck))
+	require.NotNil(t, firstAck.NewLeaseId)
+
+	// Simulate an old SDK losing the first ACK: it retries the same predecessor
+	// lease ID, potentially over a replacement connection.
+	sendWorkerExtendLeaseMessage(t, res, extension)
+	retryMsg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK, retryMsg.Kind)
+
+	retryAck := connectpb.WorkerRequestExtendLeaseAckData{}
+	require.NoError(t, proto.Unmarshal(retryMsg.Payload, &retryAck))
+	require.NotNil(t, retryAck.NewLeaseId)
+	require.Equal(t, *firstAck.NewLeaseId, *retryAck.NewLeaseId)
+}
+
 func TestHandleWorkerRequestExtendLeaseDeletedLeaseNacks(t *testing.T) {
 	res := createTestingGateway(t)
 	handshake(t, res)
