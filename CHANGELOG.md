@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.41.0] - 2026-08-03
+
+### 🚀 Features
+
+- *(ai-overview)* Add insights-backed AI dashboard (#4662)
+- *(ui)* Nudge metadata usage in run details (#4683)
+
+### 🐛 Bug Fixes
+
+- *(connect)* Prevent connection state regression during gateway draining (#4685)
+- *(queue)* Isolate unavailable shards (#4688)
+- *(connect)* Make lease renewal idempotent after lost ACKs (#4687)
+
 ## [v1.40.0] - 2026-07-30
 
 ### 🚀 Features
@@ -13,6 +26,10 @@ All notable changes to this project will be documented in this file.
 
 - *(epxressions)* Add support for falsy terns (#4676)
 - *(queue)* Correct reversed errors.Is arguments for ErrQueueItemNotFound (#4679)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.40.0 (#4677)
 
 ## [v1.39.0] - 2026-07-28
 
