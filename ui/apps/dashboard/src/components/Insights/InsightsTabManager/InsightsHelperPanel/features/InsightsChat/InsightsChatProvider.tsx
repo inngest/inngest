@@ -15,7 +15,7 @@ import {
   sendChatMessage,
   type ClientState,
 } from './useInsightsAgent';
-import { trackInsightsAIMessageSent } from '@/components/Insights/tracking';
+import { trackInsightsAIMessageSent } from '@/utils/analyticsEvents';
 import { useFetchInsights } from '@/components/Insights/InsightsStateMachineContext/useFetchInsights';
 import { useEventTypeSchemas } from '../SchemaExplorer/SchemasContext/useEventTypeSchemas';
 import type { InsightsRealtimeEvent, Message } from './types';
@@ -408,6 +408,7 @@ export function InsightsChatProvider({
           history,
         });
         trackInsightsAIMessageSent({
+          feature: 'insights',
           content,
           eventTypeCount: stateEventTypes.length,
           hasCurrentQuery: Boolean(clientState?.currentQuery?.trim()),

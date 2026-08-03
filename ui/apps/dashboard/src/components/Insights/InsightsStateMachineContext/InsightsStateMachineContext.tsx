@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { makeQuerySnapshot } from '../queries';
-import { trackInsightsQueryRan } from '../tracking';
+import { trackInsightsQueryRan } from '@/utils/analyticsEvents';
 import type { InsightsQueryRunTrigger } from '../types';
 import type { InsightsFetchResult, InsightsStatus } from './types';
 import { useFetchInsights } from './useFetchInsights';
@@ -89,6 +89,7 @@ export function InsightsStateMachineContextProvider({
         );
 
         trackInsightsQueryRan({
+          feature: 'insights',
           data: result,
           durationMs: getDurationMs(),
           errorType: hasDiagnosticErrors ? 'diagnostic' : undefined,
@@ -103,6 +104,7 @@ export function InsightsStateMachineContextProvider({
         return result;
       } catch (error) {
         trackInsightsQueryRan({
+          feature: 'insights',
           durationMs: getDurationMs(),
           errorType: 'network',
           query,
