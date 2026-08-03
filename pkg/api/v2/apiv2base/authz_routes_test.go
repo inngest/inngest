@@ -250,3 +250,25 @@ func TestMatcherDoesNotConsumeRequestBody(t *testing.T) {
 	n, _ := req.Body.Read(buf)
 	require.Equal(t, body, string(buf[:n]), "matcher consumed the caller's body")
 }
+
+// IsExemptPath compares paths exactly, which is only valid while no exempt
+// route is parameterised. If one ever is, this fails and the comparison has to
+// become a real match instead.
+func TestExemptRoutesHaveNoPathParameters(t *testing.T) {
+	for _, r := range BuildAuthzRoutes() {
+		if !r.Exempt {
+			continue
+		}
+		require.NotContains(t, r.PathTemplate, "{",
+			"exempt route %s is parameterised; IsExemptPath's exact comparison is no longer valid",
+			r.PathTemplate)
+	}
+}
+
+func TestIsExemptPath(t *testing.T) {
+	require.True(t, IsExemptPath("/health"))
+	require.True(t, IsExemptPath("/_internal/schema-only"))
+	require.False(t, IsExemptPath("/runs"))
+	require.False(t, IsExemptPath("/apps/abc/syncs"))
+	require.False(t, IsExemptPath(""))
+}

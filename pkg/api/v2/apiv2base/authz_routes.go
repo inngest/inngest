@@ -141,3 +141,21 @@ func AuthzRouteFromContext(ctx context.Context) (AuthzRoute, bool) {
 	route, ok := ctx.Value(authzRouteCtxKey{}).(AuthzRoute)
 	return route, ok
 }
+
+// IsExemptPath reports whether a path belongs to a route annotated
+// `exempt: true`, i.e. one that is public by declaration.
+//
+// Matching is on the path alone, ignoring the HTTP method, because the callers
+// are path-level authentication gates. A method-aware check would turn, say,
+// POST /health from the gateway's 404 into a 401 for no benefit.
+//
+// Every exempt template today is static, so comparison is exact;
+// TestExemptRoutesHaveNoPathParameters keeps that assumption honest.
+func IsExemptPath(path string) bool {
+	for _, r := range BuildAuthzRoutes() {
+		if r.Exempt && r.PathTemplate == path {
+			return true
+		}
+	}
+	return false
+}
