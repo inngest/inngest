@@ -3,6 +3,7 @@ import type { Route } from 'next';
 import { useShared } from './SharedContext';
 
 export type PathCreator = {
+  aiOverview?: () => Route;
   app: (params: { externalAppID: string }) => Route;
   eventPopout: (params: { eventID: string }) => Route;
   eventType?: (params: { eventName: string }) => Route;

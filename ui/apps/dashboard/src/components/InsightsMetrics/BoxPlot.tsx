@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import type { ExperimentVariantMetrics } from '@inngest/components/Experiments';
 import {
   Bar,
   BarChart as RechartsBarChart,
@@ -11,12 +10,8 @@ import {
 } from 'recharts';
 
 import { computeChartSizing } from '@/lib/experiments/chart';
-import {
-  colorForVariant,
-  subtleColorForVariant,
-} from '@/lib/experiments/colors';
+import { AxisTick } from './AxisTick';
 import { BoxPlotTooltip } from './BoxPlotTooltip';
-import { VariantAxisTick } from './VariantAxisTick';
 
 const BOX_HEIGHT = 10;
 const LINE_HEIGHT = 1;
@@ -24,16 +19,15 @@ const LINE_WIDTH = 1;
 /** Snap within this many pixels of a named data point. */
 const SNAP_PX = 4;
 
+// One horizontal box-and-whisker row: true quartile stats (min/q1/med/q3/max)
+// for one labeled category (e.g. a score name, an experiment variant).
 export type RowData = {
-  variantName: string;
-  value: number;
-  /** Index of the variant in the shared list, used to pick a stable palette color. */
-  variantIndex: number;
+  label: string;
+  // Row count backing this box (e.g. run count) — optional, purely for the
+  // tooltip's stat line; omitted rows just skip that line.
+  count?: number;
 
-  runCount: number;
   avg: number;
-  stddev: number;
-
   min: number;
   q1: number;
   med: number;
@@ -43,37 +37,6 @@ export type RowData = {
   subtleColor: string;
   opacity: number;
 };
-
-export function rowsForMetric(
-  variants: ExperimentVariantMetrics[],
-  metricKey: string,
-  colorIndexForVariant?: Map<string, number>,
-): RowData[] {
-  return variants
-    .map((v, variantIndex) => {
-      const m = v.metrics.find((vm) => vm.key === metricKey);
-      const colorIndex = colorIndexForVariant?.get(v.variantName) ?? variantIndex;
-      return m
-        ? {
-            variantName: v.variantName,
-            variantIndex: colorIndex,
-            value: m.avg,
-            runCount: v.runCount,
-            avg: m.avg,
-            stddev: m.stddev,
-            min: m.min,
-            q1: m.q1,
-            med: m.med,
-            q3: m.q3,
-            max: m.max,
-            color: colorForVariant(colorIndex),
-            subtleColor: subtleColorForVariant(colorIndex),
-            opacity: 1,
-          }
-        : null;
-    })
-    .filter((r): r is RowData => r !== null);
-}
 
 type BarShapeProps = {
   x?: number;
@@ -152,7 +115,8 @@ function BoxShape({
             x2={qx}
             y1={y}
             y2={y + height}
-            stroke={payload?.color}
+            stroke={ i=== 2 ? 'rgb(var(--color-background-canvas-base))' : payload?.color}
+            strokeDashoffset={i === 2 ? 1 : undefined}
             strokeWidth={LINE_WIDTH}
           />
         ))}
@@ -280,14 +244,22 @@ type Props = {
   rows: RowData[];
   domain: [number, number];
   metricDisplayName: string;
-  hoveredVariantName?: string | null;
-  onVariantHover?: (name: string | null) => void;
+  hoveredLabel?: string | null;
+  onLabelHover?: (label: string | null) => void;
+  format?: (value: number) => string;
+  countLabel?: string;
 };
 
-export function BoxPlot({ rows, domain, metricDisplayName, hoveredVariantName, onVariantHover }: Props) {
-  const { chartHeight, yAxisWidth } = computeChartSizing(
-    rows.map((r) => r.variantName),
-  );
+export function BoxPlot({
+  rows,
+  domain,
+  metricDisplayName,
+  hoveredLabel,
+  onLabelHover,
+  format,
+  countLabel,
+}: Props) {
+  const { chartHeight, yAxisWidth } = computeChartSizing(rows.map((r) => r.label));
 
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [activeRow, setActiveRow] = useState<RowData | null>(null);
@@ -297,9 +269,9 @@ export function BoxPlot({ rows, domain, metricDisplayName, hoveredVariantName, o
       rows.map((r) => ({
         ...r,
         // Only dim when the highlight comes from another chart (this chart has no active row)
-        opacity: !hoveredVariantName || activeRow !== null || r.variantName === hoveredVariantName ? 1 : 0.25,
+        opacity: !hoveredLabel || activeRow !== null || r.label === hoveredLabel ? 1 : 0.25,
       })),
-    [rows, hoveredVariantName, activeRow],
+    [rows, hoveredLabel, activeRow],
   );
 
   const boxDataKey: (entry: RowData) => [number, number] = (entry) => [
@@ -318,18 +290,18 @@ export function BoxPlot({ rows, domain, metricDisplayName, hoveredVariantName, o
           if (!state.isTooltipActive) {
             setHoverX(null);
             setActiveRow(null);
-            onVariantHover?.(null);
+            onLabelHover?.(null);
             return;
           }
           const row = (state.activePayload?.[0]?.payload as RowData | undefined) ?? null;
           setHoverX(state.chartX ?? null);
           setActiveRow(row);
-          onVariantHover?.(row?.variantName ?? null);
+          onLabelHover?.(row?.label ?? null);
         }}
         onMouseLeave={() => {
           setHoverX(null);
           setActiveRow(null);
-          onVariantHover?.(null);
+          onLabelHover?.(null);
         }}
       >
         <XAxis
@@ -342,17 +314,17 @@ export function BoxPlot({ rows, domain, metricDisplayName, hoveredVariantName, o
         />
         <YAxis
           type="category"
-          dataKey="variantName"
+          dataKey="label"
           width={yAxisWidth}
           axisLine={false}
           tickLine={false}
-          tick={<VariantAxisTick />}
+          tick={<AxisTick />}
           interval={0}
         />
         <Tooltip
-          content={<BoxPlotTooltip />}
+          content={<BoxPlotTooltip format={format} countLabel={countLabel} />}
           cursor={{ fill: 'rgb(var(--color-background-canvas-subtle))' }}
-          allowEscapeViewBox={{ x: true, y: true }}
+          allowEscapeViewBox={{ x: false, y: true }}
           wrapperStyle={{ zIndex: 50, outline: 'none' }}
         />
         <Bar

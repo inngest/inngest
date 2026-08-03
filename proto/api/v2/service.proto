@@ -1069,6 +1069,24 @@ service V2 {
     };
   }
 
+  rpc GetApps(GetAppsRequest) returns (GetAppsResponse) {
+    option (google.api.http) = {
+      get: "/apps"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get apps"
+      tags: "Apps"
+      tags: "Beta"
+      description: "Lists active apps in the authenticated environment. Set archived to true to list archived apps instead."
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc CreateScore(CreateScoreRequest) returns (CreateScoreResponse) {
     option (google.api.http) = {
       post: "/runs/{run_id}/scores",
@@ -2240,6 +2258,32 @@ message GetAppRequest {
 message GetAppResponse {
   App data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message GetAppsRequest {
+  optional string cursor = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Pagination cursor from previous response"
+    }
+  ];
+  optional int32 limit = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Number of apps to return per page (min: 1, max: 100)"
+      default: "20"
+    }
+  ];
+  optional bool archived = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Whether to return archived apps instead of active apps"
+      default: "false"
+    }
+  ];
+}
+
+message GetAppsResponse {
+  repeated App data = 1;
+  ResponseMetadata metadata = 2;
+  Page page = 3;
 }
 
 message GetFunctionsRequest {

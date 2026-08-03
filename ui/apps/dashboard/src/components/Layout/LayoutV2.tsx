@@ -37,6 +37,7 @@ export default function Layout({
   const hideSidebar =
     pathname.startsWith('/settings') ||
     pathname.startsWith('/billing') ||
+    pathname.startsWith('/mcp') ||
     pathname === '/env' ||
     pathname === '/env/';
 

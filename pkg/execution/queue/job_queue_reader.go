@@ -70,8 +70,9 @@ func (r *jobQueueReader) LoadQueueItem(ctx context.Context, shardName string, it
 }
 
 func (r *jobQueueReader) forAccountShards(ctx context.Context, accountID uuid.UUID, fn func(context.Context, QueueShard) error) error {
-	// Fan-out is feature-flagged because querying every shard increases
-	// latency and makes a single shard failure affect the whole read.
+	// Fan-out is feature-flagged because querying every shard increases latency.
+	// Shard failures are logged and suppressed by ForEach so healthy shard
+	// results remain available.
 	if r.accountShardIterationEnabled != nil && r.accountShardIterationEnabled(ctx, accountID) {
 		return r.shards.ForEach(ctx, fn)
 	}

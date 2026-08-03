@@ -619,8 +619,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// registering functions.
 	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
 
-	// Add MCP server route
-	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data, opts.Tick)
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -746,6 +744,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("failed to create v2 handler: %w", err)
 	}
+
+	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data, opts.Tick, apiv2Handler)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev

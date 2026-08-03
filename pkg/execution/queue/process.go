@@ -140,7 +140,7 @@ func (q *queueProcessor) ProcessItem(
 				if err != nil {
 					// log error if unexpected; the queue item may be removed by a Dequeue() operation
 					// invoked by finalize() (Cancellations, Parallelism)
-					if !errors.Is(ErrQueueItemNotFound, err) {
+					if !errors.Is(err, ErrQueueItemNotFound) {
 						l.Error("error extending lease", "error", err, "qi", qi)
 					}
 
@@ -481,14 +481,35 @@ func (q *queueProcessor) ProcessItem(
 
 			qi.AtMS = at.UnixMilli()
 			requeueItem := itemWithCurrentLease(qi)
-			if err := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at); err != nil {
-				if err == ErrQueueItemNotFound {
-					// Safe. The executor may have dequeued.
+			if requeueErr := q.Requeue(context.WithoutCancel(ctx), shard.Name(), requeueItem, at); requeueErr != nil {
+				if requeueErr == ErrQueueItemNotFound {
+					// The item is gone, so there is nothing to requeue and this retry is
+					// dropped.
+					//
+					// A cancelled run is the expected, high-volume case: Finalize()
+					// dequeues the run's jobs, and the in-flight job then returns
+					// ErrFunctionCancelled, which ShouldRetry treats as retryable because
+					// it is a plain error.  The run is already terminal, so dropping the
+					// retry is correct and not worth logging -- it would emit a line for
+					// every cancellation that catches a job in flight.
+					//
+					// Any other cause is suspicious: if the run is still live, nothing
+					// remains to drive it to a terminal state, so it stays non-terminal
+					// and holds its function concurrency capacity until cancelled by hand.
+					if !errors.Is(err, state.ErrFunctionCancelled) {
+						l.Warn("dropped retry; queue item not found on requeue",
+							"cause", err,
+							"next_attempt", qi.Data.Attempt,
+							"max_attempts", qi.Data.GetMaxAttempts(),
+							"lease_id", requeueItem.LeaseID,
+							"requeue_at", at,
+						)
+					}
 					return ProcessItemResult{}, nil
 				}
 
-				l.Error("error requeuing job", "error", err, "item", requeueItem)
-				return ProcessItemResult{}, err
+				l.Error("error requeuing job", "error", requeueErr, "item", requeueItem)
+				return ProcessItemResult{}, requeueErr
 			}
 			if _, ok := err.(QuitError); ok {
 				q.quit <- err

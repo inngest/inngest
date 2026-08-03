@@ -51,7 +51,22 @@ RETURNING *;
 SELECT * FROM apps WHERE id = ?;
 
 -- name: GetApps :many
-SELECT * FROM apps WHERE archived_at IS NULL;
+SELECT * FROM apps
+WHERE (
+    (@archived AND archived_at IS NOT NULL)
+    OR (NOT @archived AND archived_at IS NULL)
+)
+AND (@method = '' OR "method" = @method)
+AND (@cursor = '00000000-0000-0000-0000-000000000000' OR id > @cursor)
+ORDER BY id ASC
+LIMIT CASE WHEN @limit_rows > 0 THEN @limit_rows ELSE -1 END;
+
+-- name: GetAppFunctionCounts :many
+SELECT app_id, COUNT(*) AS function_count
+FROM functions
+WHERE archived_at IS NULL
+AND app_id IN (sqlc.slice('app_ids'))
+GROUP BY app_id;
 
 -- name: GetAppByChecksum :one
 SELECT * FROM apps WHERE checksum = ? AND archived_at IS NULL LIMIT 1;

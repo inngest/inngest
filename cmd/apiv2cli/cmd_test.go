@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
@@ -40,6 +41,20 @@ func TestDiscoverEndpointsFromProto(t *testing.T) {
 	require.NotContains(t, byName, "get-runs")
 	require.Equal(t, "/runs", byName["get-function-runs"].path)
 	require.Empty(t, byName["get-function-runs"].pathParams)
+}
+
+func TestCanonicalCommandEndpointsPrefersExplicitNameOwner(t *testing.T) {
+	endpoints := canonicalCommandEndpoints([]apiv2endpoint.Endpoint{
+		{MethodName: "Derived", CommandName: "get-runs"},
+		{MethodName: "Explicit", CommandName: "get-runs", CommandNameExplicit: true},
+		{MethodName: "Other", CommandName: "get-app"},
+	})
+
+	methods := make([]string, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		methods = append(methods, endpoint.MethodName)
+	}
+	require.ElementsMatch(t, []string{"Explicit", "Other"}, methods)
 }
 
 func TestEndpointCommandNameNormalizesReadVerbs(t *testing.T) {

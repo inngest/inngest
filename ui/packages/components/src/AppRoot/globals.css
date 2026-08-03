@@ -174,9 +174,13 @@ input[type='number'] {
 
     /*Citrus colors*/
     --color-citrus-100: 255 223 203;
+    --color-citrus-200: 255 209 181;
     --color-citrus-300: 255 174 127;
+    --color-citrus-400: 255 143 67;
     --color-citrus-500: 255 115 0;
+    --color-citrus-600: 215 100 3;
     --color-citrus-700: 186 89 5;
+    --color-citrus-800: 141 71 5;
     --color-citrus-900: 113 59 4;
 
     /* Token Colors */
@@ -281,15 +285,33 @@ input[type='number'] {
     --color-tertiary-3xIntense: var(--color-ruby-900);
 
     --color-quaternary-cool-3xSubtle: var(--color-purplehaze-100);
+    --color-quaternary-cool-2xSubtle: var(--color-purplehaze-200);
     --color-quaternary-cool-xSubtle: var(--color-purplehaze-300);
+    --color-quaternary-cool-subtle: var(--color-purplehaze-400);
     --color-quaternary-cool-moderate: var(--color-purplehaze-500);
+    --color-quaternary-cool-intense: var(--color-purplehaze-600);
     --color-quaternary-cool-xIntense: var(--color-purplehaze-700);
+    --color-quaternary-cool-2xIntense: var(--color-purplehaze-800);
     --color-quaternary-cool-3xIntense: var(--color-purplehaze-900);
 
+    --color-quaternary-warm-3xSubtle: var(--color-blush-100);
+    --color-quaternary-warm-2xSubtle: var(--color-blush-200);
+    --color-quaternary-warm-xSubtle: var(--color-blush-300);
+    --color-quaternary-warm-subtle: var(--color-blush-400);
+    --color-quaternary-warm-moderate: var(--color-blush-500);
+    --color-quaternary-warm-intense: var(--color-blush-600);
+    --color-quaternary-warm-xIntense: var(--color-blush-700);
+    --color-quaternary-warm-2xIntense: var(--color-blush-800);
+    --color-quaternary-warm-3xIntense: var(--color-blush-900);
+
     --color-quaternary-warmer-3xSubtle: var(--color-citrus-100);
+    --color-quaternary-warmer-2xSubtle: var(--color-citrus-200);
     --color-quaternary-warmer-xSubtle: var(--color-citrus-300);
+    --color-quaternary-warmer-subtle: var(--color-citrus-400);
     --color-quaternary-warmer-moderate: var(--color-citrus-500);
+    --color-quaternary-warmer-intense: var(--color-citrus-600);
     --color-quaternary-warmer-xIntense: var(--color-citrus-700);
+    --color-quaternary-warmer-2xIntense: var(--color-citrus-800);
     --color-quaternary-warmer-3xIntense: var(--color-citrus-900);
 
     --color-accent-3xSubtle: var(--color-honey-100);
@@ -301,6 +323,20 @@ input[type='number'] {
     --color-accent-xIntense: var(--color-honey-700);
     --color-accent-2xIntense: var(--color-honey-800);
     --color-accent-3xIntense: var(--color-honey-900);
+
+    --color-chart-line-1: var(--color-primary-subtle);
+    --color-chart-line-2: var(--color-quaternary-warmer-xSubtle);
+    --color-chart-line-3: var(--color-secondary-xSubtle);
+    --color-chart-line-4: var(--color-accent-xSubtle);
+    --color-chart-line-5: var(--color-quaternary-cool-subtle);
+    --color-chart-line-6: var(--color-tertiary-subtle);
+
+    --color-chart-line-1-subtle: var(--color-primary-2xSubtle);
+    --color-chart-line-2-subtle: var(--color-quaternary-warmer-3xSubtle);
+    --color-chart-line-3-subtle: var(--color-secondary-3xSubtle);
+    --color-chart-line-4-subtle: var(--color-accent-3xSubtle);
+    --color-chart-line-5-subtle: var(--color-quaternary-cool-2xSubtle);
+    --color-chart-line-6-subtle: var(--color-tertiary-2xSubtle);
   }
 
   .dark {
@@ -410,10 +446,24 @@ input[type='number'] {
     --color-quaternary-cool-xIntense: var(--color-purplehaze-300);
     --color-quaternary-cool-3xIntense: var(--color-purplehaze-100);
 
+    --color-quaternary-warm-3xSubtle: var(--color-blush-900);
+    --color-quaternary-warm-2xSubtle: var(--color-blush-800);
+    --color-quaternary-warm-xSubtle: var(--color-blush-700);
+    --color-quaternary-warm-subtle: var(--color-blush-600);
+    --color-quaternary-warm-moderate: var(--color-blush-500);
+    --color-quaternary-warm-intense: var(--color-blush-400);
+    --color-quaternary-warm-xIntense: var(--color-blush-300);
+    --color-quaternary-warm-2xIntense: var(--color-blush-200);
+    --color-quaternary-warm-3xIntense: var(--color-blush-100);
+
     --color-quaternary-warmer-3xSubtle: var(--color-citrus-900);
+    --color-quaternary-warmer-2xSubtle: var(--color-citrus-800);
     --color-quaternary-warmer-xSubtle: var(--color-citrus-700);
+    --color-quaternary-warmer-subtle: var(--color-citrus-600);
     --color-quaternary-warmer-moderate: var(--color-citrus-500);
+    --color-quaternary-warmer-intense: var(--color-citrus-400);
     --color-quaternary-warmer-xIntense: var(--color-citrus-300);
+    --color-quaternary-warmer-2xIntense: var(--color-citrus-200);
     --color-quaternary-warmer-3xIntense: var(--color-citrus-100);
 
     --color-accent-3xSubtle: var(--color-honey-900);
@@ -425,6 +475,20 @@ input[type='number'] {
     --color-accent-xIntense: var(--color-honey-300);
     --color-accent-2xIntense: var(--color-honey-200);
     --color-accent-3xIntense: var(--color-honey-100);
+
+    --color-chart-line-1: var(--color-primary-moderate);
+    --color-chart-line-2: var(--color-quaternary-warmer-moderate);
+    --color-chart-line-3: var(--color-secondary-subtle);
+    --color-chart-line-4: var(--color-accent-intense);
+    --color-chart-line-5: var(--color-quaternary-cool-moderate);
+    --color-chart-line-6: var(--color-tertiary-moderate);
+
+    --color-chart-line-1-subtle: var(--color-primary-2xSubtle);
+    --color-chart-line-2-subtle: var(--color-quaternary-warmer-2xSubtle);
+    --color-chart-line-3-subtle: var(--color-secondary-3xSubtle);
+    --color-chart-line-4-subtle: var(--color-accent-xSubtle);
+    --color-chart-line-5-subtle: var(--color-quaternary-cool-3xSubtle);
+    --color-chart-line-6-subtle: var(--color-tertiary-2xSubtle);
   }
 }
 

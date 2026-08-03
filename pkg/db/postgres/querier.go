@@ -74,12 +74,34 @@ func (pq *pgQuerier) GetAppByURL(ctx context.Context, url string) (*db.App, erro
 	return appFromPG(r), nil
 }
 
-func (pq *pgQuerier) GetApps(ctx context.Context) ([]*db.App, error) {
-	rows, err := pq.q.GetApps(ctx)
+func (pq *pgQuerier) GetApps(ctx context.Context, arg db.GetAppsParams) ([]*db.App, error) {
+	//
+	// Compare character(36) app IDs as text so Postgres can use the ID index.
+	rows, err := pq.q.GetApps(ctx, sqlc.GetAppsParams{
+		Cursor:    arg.Cursor,
+		LimitRows: int32(arg.Limit),
+		Archived:  arg.Archived,
+		Method:    arg.Method,
+	})
 	if err != nil {
 		return nil, err
 	}
 	return convertSlice(rows, appFromPG), nil
+}
+
+func (pq *pgQuerier) GetAppFunctionCounts(ctx context.Context, appIDs []uuid.UUID) ([]db.AppFunctionCount, error) {
+	rows, err := pq.q.GetAppFunctionCounts(ctx, appIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]db.AppFunctionCount, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, db.AppFunctionCount{
+			AppID:         row.AppID,
+			FunctionCount: int(row.FunctionCount),
+		})
+	}
+	return result, nil
 }
 
 func (pq *pgQuerier) UpsertApp(ctx context.Context, arg db.UpsertAppParams) (*db.App, error) {

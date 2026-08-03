@@ -5,6 +5,7 @@ import {
   FunctionTriggerTypes,
 } from '@/gql/graphql';
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useFunction } from '@/queries/functions';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
@@ -30,6 +31,7 @@ function FunctionComponent() {
   const [replayOpen, setReplayOpen] = useState(false);
 
   const functionSlug = decodeURIComponent(slug);
+  const isAIOverviewEnabled = useBooleanFlag('ai-overview-dashboard', false);
   const [{ data, error, fetching }] = useFunction({ functionSlug });
   const [, invokeFunction] = useMutation(InvokeFunctionOnboardingDocument);
   const env = useEnvironment();
@@ -157,6 +159,16 @@ function FunctionComponent() {
               slug,
             )}/cancellations`,
           },
+          ...(isAIOverviewEnabled.value
+            ? [
+                {
+                  children: 'AI Overview',
+                  href: `/env/${envSlug}/functions/${encodeURIComponent(
+                    slug,
+                  )}/ai`,
+                },
+              ]
+            : []),
         ]}
       />
       <Outlet />

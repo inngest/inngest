@@ -23,6 +23,7 @@ import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
+import { AIMetadataNudge, traceHasAIMetadata } from './AIMetadata';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { LinkedRuns } from './LinkedRuns';
@@ -123,10 +124,11 @@ export const TopInfo = ({
     retry: 3,
   });
 
-  const metadataIsEnabled = true;
   const scoreMetadata = useMemo(() => collectScoreMetadata(trace), [trace]);
   const nonScoreMetadata = trace?.metadata?.filter((md) => !isScoreMetadata(md)) ?? [];
-  const hasMetadataTab = metadataIsEnabled && nonScoreMetadata.length > 0;
+  const hasAIMetadata = useMemo(() => traceHasAIMetadata(trace), [trace]);
+  const showNudge = Boolean(trace?.endedAt) && !hasAIMetadata;
+  const hasMetadataTab = nonScoreMetadata.length > 0 || showNudge;
 
   const prettyPayload = useMemo(() => {
     try {
@@ -367,7 +369,12 @@ export const TopInfo = ({
                   {
                     label: 'Metadata',
                     id: 'metadata',
-                    node: <MetadataAttrs metadata={nonScoreMetadata} />,
+                    node: (
+                      <MetadataAttrs
+                        metadata={nonScoreMetadata}
+                        footer={showNudge ? <AIMetadataNudge /> : null}
+                      />
+                    ),
                   },
                 ]
               : []),

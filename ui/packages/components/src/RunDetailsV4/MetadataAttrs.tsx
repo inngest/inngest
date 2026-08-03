@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 
 import { ElementWrapper, TextElement, TimeElement } from '../DetailsCard/Element';
 import type { SpanMetadata, SpanMetadataKind } from './types';
@@ -113,7 +113,13 @@ const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAtt
 };
 
 /** Displays metadata attributes as key-value pairs. Status Code is pinned to the top, remaining entries sorted alphabetically. */
-export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
+export const MetadataAttrs = ({
+  metadata,
+  footer,
+}: {
+  metadata: SpanMetadata[];
+  footer?: ReactNode;
+}) => {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (ref.current && ref.current.clientHeight > 0) {
@@ -139,6 +145,7 @@ export const MetadataAttrs = ({ metadata }: { metadata: SpanMetadata[] }) => {
           />
         );
       })}
+      {footer}
     </div>
   );
 };

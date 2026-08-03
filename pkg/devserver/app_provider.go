@@ -20,6 +20,7 @@ type cqrsAppProvider struct {
 type appProviderReader interface {
 	cqrs.AppReader
 	cqrs.FunctionV2Reader
+	GetAppFunctionCounts(context.Context, []uuid.UUID) (map[uuid.UUID]int, error)
 }
 
 // NewAppProvider returns an AppProvider that looks up apps by external ID or
@@ -50,6 +51,38 @@ func (p *cqrsAppProvider) GetApp(ctx context.Context, identifier string) (apiv2.
 	return p.toApp(ctx, app)
 }
 
+func (p *cqrsAppProvider) GetApps(ctx context.Context, opts apiv2.GetAppsOpts) (*apiv2.GetAppsResult, error) {
+	apps, err := p.reader.GetApps(ctx, consts.DevServerEnvID, &cqrs.FilterAppParam{
+		Cursor:   opts.Cursor,
+		Limit:    opts.Limit + 1,
+		Archived: opts.Archived,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := &apiv2.GetAppsResult{
+		Apps: make([]apiv2.App, 0, opts.Limit),
+	}
+	if len(apps) > opts.Limit {
+		result.HasMore = true
+		apps = apps[:opts.Limit]
+	}
+
+	appIDs := make([]uuid.UUID, 0, len(apps))
+	for _, app := range apps {
+		appIDs = append(appIDs, app.ID)
+	}
+	functionCounts, err := p.reader.GetAppFunctionCounts(ctx, appIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, app := range apps {
+		result.Apps = append(result.Apps, toApp(app, functionCounts[app.ID]))
+	}
+	return result, nil
+}
+
 func (p *cqrsAppProvider) toApp(ctx context.Context, app *cqrs.App) (apiv2.App, error) {
 	fns, err := p.reader.GetFunctionsByApp(ctx, cqrs.GetFunctionsByAppOpts{
 		AppID: app.ID,
@@ -57,7 +90,10 @@ func (p *cqrsAppProvider) toApp(ctx context.Context, app *cqrs.App) (apiv2.App, 
 	if err != nil {
 		return apiv2.App{}, err
 	}
+	return toApp(app, len(fns)), nil
+}
 
+func toApp(app *cqrs.App, functionCount int) apiv2.App {
 	//
 	// the dev server stores the user-defined app ID as the app name
 	result := apiv2.App{
@@ -67,7 +103,7 @@ func (p *cqrsAppProvider) toApp(ctx context.Context, app *cqrs.App) (apiv2.App, 
 		AppVersion:    app.AppVersion,
 		CreatedAt:     app.CreatedAt,
 		ArchivedAt:    app.DeletedAt,
-		FunctionCount: len(fns),
+		FunctionCount: functionCount,
 		LatestSync: &apiv2.AppSync{
 			SdkLanguage: app.SdkLanguage,
 			SdkVersion:  app.SdkVersion,
@@ -84,5 +120,5 @@ func (p *cqrsAppProvider) toApp(ctx context.Context, app *cqrs.App) (apiv2.App, 
 	if method, err := enums.AppMethodString(app.Method); err == nil {
 		result.Method = method
 	}
-	return result, nil
+	return result
 }

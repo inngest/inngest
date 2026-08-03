@@ -1,20 +1,51 @@
-import type Anthropic from '@anthropic-ai/sdk';
-
 // The think→act→observe loop behind the Insights agent, ported from
 // inngest-agents (packages/agent-core/src/loop.ts). Each LLM call and tool
 // call is a durable Inngest step; the loop ends when the model responds with
 // text and no tool calls.
+//
+// Wire format is OpenAI chat completions, which OpenRouter speaks natively.
 
 export const VALIDATE_QUERY = 'validate_query';
 export const VALIDATION_COMPLETED_EVENT = 'insights-agent/validation.completed';
 
-export type AgentMessage = Anthropic.MessageParam;
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  /** JSON-encoded arguments object. */
+  function: { name: string; arguments: string };
+}
 
-export type AnthropicTool = {
+export type AgentMessage =
+  | { role: 'system' | 'user'; content: string }
+  | { role: 'assistant'; content: string | null; tool_calls?: ToolCall[] }
+  | { role: 'tool'; tool_call_id: string; content: string };
+
+/** JSON Schema tool definition, translated to the wire format by the loop. */
+export type ToolSpec = {
   name: string;
   description: string;
   input_schema: { type: 'object'; [k: string]: unknown };
 };
+
+interface ChatTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface ChatCompletion {
+  choices: {
+    message: {
+      role: 'assistant';
+      content: string | null;
+      tool_calls?: ToolCall[];
+    };
+  }[];
+  usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number };
+}
 
 export interface InsightsClientState {
   eventTypes?: string[];
@@ -44,7 +75,7 @@ export interface ToolOutcome {
 }
 
 export interface ToolDef {
-  tool: AnthropicTool;
+  tool: ToolSpec;
   execute: (
     input: Record<string, unknown>,
     ctx: ToolContext,
@@ -72,6 +103,8 @@ export interface AgentLoopResult {
   toolCalls: number;
   tokensIn: number;
   tokensOut: number;
+  // Summed usage.cost, which OpenRouter reports on every response.
+  costUsd: number;
   validationAttempts: number;
   validationFailures: ValidationFailure[];
 }
@@ -88,8 +121,11 @@ interface StepTools {
 
 interface RunAgentLoopArgs {
   step: StepTools;
-  client: Anthropic;
-  model: string;
+  complete: (body: {
+    messages: AgentMessage[];
+    tools: ChatTool[];
+    max_tokens: number;
+  }) => Promise<ChatCompletion>;
   system: string;
   messages: AgentMessage[];
   tools: ToolDef[];
@@ -111,30 +147,43 @@ interface RunAgentLoopArgs {
 const FINAL_ITERATION_NUDGE =
   '[SYSTEM: This is your final iteration. If you have a query ready, call submit_query then summarize; otherwise answer or ask your clarifying question now. Do not call any other tools.]';
 
+// Degrades to no input rather than throwing, so a malformed call surfaces as the
+// tool's own validation error instead of burning the run's retries.
+export function parseToolArguments(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function runAgentLoop(
   args: RunAgentLoopArgs,
 ): Promise<AgentLoopResult> {
-  const {
-    step,
-    client,
-    model,
-    system,
-    tools,
-    ctx,
-    draft,
-    publish,
-    runId,
-    userId,
-  } = args;
+  const { step, complete, system, tools, ctx, draft, publish, runId, userId } =
+    args;
   const maxIterations = args.maxIterations ?? 12;
-  const messages: AgentMessage[] = [...args.messages];
+  const messages: AgentMessage[] = [
+    { role: 'system', content: system },
+    ...args.messages,
+  ];
   const registry = new Map(tools.map((t) => [t.tool.name, t]));
+  const chatTools: ChatTool[] = tools.map((t) => ({
+    type: 'function',
+    function: {
+      name: t.tool.name,
+      description: t.tool.description,
+      parameters: t.tool.input_schema,
+    },
+  }));
 
   let iterations = 0;
   let toolCalls = 0;
   let summary = '';
   let tokensIn = 0;
   let tokensOut = 0;
+  let costUsd = 0;
   let validationAttempts = 0;
   const validationFailures: ValidationFailure[] = [];
 
@@ -152,43 +201,42 @@ export async function runAgentLoop(
     // A thrown LLM call fails this attempt and Inngest retries the step; if all
     // retries exhaust, the run fails and onFailure reports it to the UI.
     const response = (await step.run(`think-${iterations}`, () =>
-      client.messages.create({
-        model,
-        max_tokens: 4096,
-        system,
+      complete({
         messages: turnMessages,
-        tools: tools.map((t) => t.tool) as Anthropic.Messages.Tool[],
+        tools: chatTools,
+        max_tokens: 4096,
       }),
-    )) as Anthropic.Message;
+    )) as ChatCompletion;
 
-    tokensIn += response.usage?.input_tokens ?? 0;
-    tokensOut += response.usage?.output_tokens ?? 0;
+    tokensIn += response.usage?.prompt_tokens ?? 0;
+    tokensOut += response.usage?.completion_tokens ?? 0;
+    costUsd += response.usage?.cost ?? 0;
 
-    const toolUses = response.content.filter(
-      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
-    );
-    const text = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('\n');
+    const message = response.choices[0]?.message;
+    const requestedCalls = message?.tool_calls ?? [];
+    const text = message?.content ?? '';
 
     if (text) {
       summary = text;
     }
-    if (toolUses.length === 0) {
+    if (requestedCalls.length === 0) {
       break;
     }
 
-    // The assistant turn must round-trip verbatim so tool_use ids match.
-    messages.push({ role: 'assistant', content: response.content });
+    // The assistant turn must round-trip verbatim so tool_call ids match.
+    messages.push({
+      role: 'assistant',
+      content: message?.content ?? null,
+      tool_calls: requestedCalls,
+    });
 
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    for (const toolUse of toolUses) {
+    for (const call of requestedCalls) {
       toolCalls++;
-      const input = (toolUse.input ?? {}) as Record<string, unknown>;
+      const input = parseToolArguments(call.function.arguments);
+      const name = call.function.name;
 
       let outcome: ToolOutcome;
-      if (toolUse.name === VALIDATE_QUERY && registry.has(VALIDATE_QUERY)) {
+      if (name === VALIDATE_QUERY && registry.has(VALIDATE_QUERY)) {
         // Validation uses durable primitives that can't nest inside step.run;
         // the registry check drops hallucinated calls when the tool wasn't offered.
         validationAttempts++;
@@ -203,13 +251,12 @@ export async function runAgentLoop(
           validationFailures,
         });
       } else {
-        const def = registry.get(toolUse.name);
+        const def = registry.get(name);
         outcome = def
-          ? ((await step.run(
-              `tool-${toolUse.name}-${iterations}-${toolCalls}`,
-              () => def.execute(input, ctx),
+          ? ((await step.run(`tool-${name}-${iterations}-${toolCalls}`, () =>
+              def.execute(input, ctx),
             )) as ToolOutcome)
-          : { observation: `Unknown tool: ${toolUse.name}` };
+          : { observation: `Unknown tool: ${name}` };
       }
 
       // Effects are applied here, outside the memoized step (see ToolOutcome).
@@ -222,13 +269,12 @@ export async function runAgentLoop(
         );
       }
 
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: toolUse.id,
+      messages.push({
+        role: 'tool',
+        tool_call_id: call.id,
         content: outcome.observation,
       });
     }
-    messages.push({ role: 'user', content: toolResults });
   }
 
   return {
@@ -237,6 +283,7 @@ export async function runAgentLoop(
     toolCalls,
     tokensIn,
     tokensOut,
+    costUsd,
     validationAttempts,
     validationFailures,
   };

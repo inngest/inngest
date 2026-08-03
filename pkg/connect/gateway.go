@@ -443,15 +443,22 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			err := wsproto.Write(closingWriteCtx, ws, &connectpb.ConnectMessage{
 				Kind: connectpb.GatewayMessageType_GATEWAY_CLOSING,
 			})
+
+			// Report the drain to listeners now, while draining is the connection's
+			// most advanced state. Deferring this until the drain ack window closes
+			// lets it race the disconnect cleanup below, which reports DRAINING
+			// after DISCONNECTED and leaves stale draining state in connection
+			// history.
+			for _, l := range c.lifecycles {
+				go l.OnStartDraining(context.Background(), conn)
+			}
+
 			if err != nil {
 				// Can't tell the worker so we mark as DRAINING immediately.
 				if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING, "gateway drain started after failed closing write", "err", err); statusErr != nil {
 					ch.log.ReportError(statusErr, "could not update connection status after context done")
 				}
 				ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
-				for _, l := range c.lifecycles {
-					go l.OnStartDraining(context.Background(), conn)
-				}
 				return
 			}
 
@@ -464,14 +471,22 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				ch.log.Debug("timed out waiting for drain ack, marking connection as draining")
 			}
 
-			if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING, "gateway drain completed or timed out", "drain_ack_wait_ms", time.Since(drainStart).Milliseconds()); statusErr != nil {
+			// Cleanup may have started while we waited: the worker closing the
+			// socket ends the read loop, which both moves the phase to
+			// Disconnecting and releases workerDrainedCtx. Unlike the phase,
+			// status is not ordered, so marking the connection as DRAINING here
+			// would move it backwards from DISCONNECTING/DISCONNECTED, leaving
+			// stale draining state behind, or even resurrect it after cleanup
+			// deleted the connection from the state store.
+			if phase := ch.phase(); phase >= gatewayConnPhaseDisconnecting {
+				ch.log.Debug("skipping draining status update because connection is already disconnecting",
+					"phase", phase.String(),
+					"drain_ack_wait_ms", time.Since(drainStart).Milliseconds(),
+				)
+			} else if statusErr := ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING, "gateway drain completed or timed out", "drain_ack_wait_ms", time.Since(drainStart).Milliseconds()); statusErr != nil {
 				ch.log.ReportError(statusErr, "could not update connection status after drain ack")
 			}
 			ch.stopForwardingOnce.Do(func() { close(ch.stopForwarding) })
-
-			for _, l := range c.lifecycles {
-				go l.OnStartDraining(context.Background(), conn)
-			}
 
 			metrics.HistogramConnectGatewayDrainDuration(context.Background(), time.Since(drainStart).Milliseconds(), metrics.HistogramOpt{
 				PkgName: pkgName,

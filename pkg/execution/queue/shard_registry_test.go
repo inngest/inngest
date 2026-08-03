@@ -1,12 +1,16 @@
 package queue
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -53,6 +57,14 @@ func mustSingleShardRegistry(t *testing.T, shard QueueShard) ShardRegistryContro
 func TestNewShardRegistry_RejectsEmptyTopology(t *testing.T) {
 	_, err := NewShardRegistry(nil)
 	require.Error(t, err)
+}
+
+func TestNewShardRegistry_RejectsNilShard(t *testing.T) {
+	_, err := NewShardRegistry(
+		map[string]QueueShard{"unavailable": nil},
+		WithShardSelector(alwaysShard(nil)),
+	)
+	require.EqualError(t, err, `queue: shard "unavailable" must not be nil`)
 }
 
 func TestNewShardRegistry_RequiresSelector(t *testing.T) {
@@ -154,17 +166,79 @@ func TestShardRegistry_ForEach(t *testing.T) {
 	require.Equal(t, map[string]bool{"a": true, "b": true}, visited)
 }
 
-func TestShardRegistry_ForEach_PropagatesError(t *testing.T) {
+func TestShardRegistry_ForEach_SuppressesShardErrors(t *testing.T) {
+	a := newTestShard("a", "")
+	b := newTestShard("b", "")
+	r := mustShardRegistry(t,
+		map[string]QueueShard{"a": a, "b": b},
+		WithShardSelector(alwaysShard(a)),
+	)
+	sentinel := errors.New("boom")
+	visited := map[string]bool{}
+	var mu sync.Mutex
+	err := r.ForEach(context.Background(), func(_ context.Context, shard QueueShard) error {
+		mu.Lock()
+		visited[shard.Name()] = true
+		mu.Unlock()
+		if shard.Name() == "a" {
+			return sentinel
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{"a": true, "b": true}, visited)
+}
+
+func TestShardRegistry_ForEach_LogsShardErrors(t *testing.T) {
 	a := newTestShard("a", "")
 	r := mustShardRegistry(t,
 		map[string]QueueShard{"a": a},
 		WithShardSelector(alwaysShard(a)),
 	)
-	sentinel := errors.New("boom")
-	err := r.ForEach(context.Background(), func(context.Context, QueueShard) error {
-		return sentinel
+	var logs bytes.Buffer
+	l := logger.FromSlog(slog.New(slog.NewTextHandler(&logs, nil)), slog.LevelInfo)
+	ctx := logger.WithStdlib(context.Background(), l)
+
+	err := r.ForEach(ctx, func(context.Context, QueueShard) error {
+		return errors.New("redis unavailable")
 	})
-	require.ErrorIs(t, err, sentinel)
+	require.NoError(t, err)
+	require.True(t, strings.Contains(logs.String(), `shard_name=a`), logs.String())
+	require.True(t, strings.Contains(logs.String(), `error="redis unavailable"`), logs.String())
+	require.True(t, strings.Contains(logs.String(), `operation=shard_iteration`), logs.String())
+}
+
+func TestShardRegistry_ForEach_DoesNotCancelSiblingOnShardError(t *testing.T) {
+	a := newTestShard("a", "")
+	b := newTestShard("b", "")
+	r := mustShardRegistry(t,
+		map[string]QueueShard{"a": a, "b": b},
+		WithShardSelector(alwaysShard(a)),
+	)
+
+	aFailed := make(chan struct{})
+	err := r.ForEach(context.Background(), func(ctx context.Context, shard QueueShard) error {
+		if shard.Name() == "a" {
+			close(aFailed)
+			return errors.New("unavailable")
+		}
+		<-aFailed
+		require.NoError(t, ctx.Err())
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func TestShardRegistry_ForEach_ReturnsCallerCancellation(t *testing.T) {
+	r := mustShardRegistry(t,
+		map[string]QueueShard{"a": newTestShard("a", "")},
+		WithShardSelector(alwaysShard(newTestShard("a", ""))),
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := r.ForEach(ctx, func(context.Context, QueueShard) error { return nil })
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestShardRegistry_Resolve_DelegatesToSelector(t *testing.T) {
@@ -280,14 +354,14 @@ func TestNewSingleShardRegistry(t *testing.T) {
 		require.Equal(t, []string{"only"}, visited)
 	})
 
-	t.Run("ForEach surfaces fn error", func(t *testing.T) {
+	t.Run("ForEach suppresses fn error", func(t *testing.T) {
 		r := mustSingleShardRegistry(t, newTestShard("only", ""))
 
 		want := errors.New("nope")
 		err := r.ForEach(context.Background(), func(context.Context, QueueShard) error {
 			return want
 		})
-		require.ErrorIs(t, err, want)
+		require.NoError(t, err)
 	})
 
 	t.Run("nil shard returns an error", func(t *testing.T) {

@@ -31,7 +31,7 @@ func TestNewHistoryLifecycle(t *testing.T) {
 	writer := &MockConnectionHistoryWriter{}
 
 	lifecycle := NewHistoryLifecycle(writer)
-	
+
 	require.NotNil(t, lifecycle)
 	assert.Implements(t, (*connect.ConnectGatewayLifecycleListener)(nil), lifecycle)
 }
@@ -108,7 +108,7 @@ func TestHistoryLifecycle_OnConnected(t *testing.T) {
 				CpuCores: 4,
 				MemBytes: 8192,
 				Os:       "linux",
-							},
+			},
 		},
 		Groups: map[string]*state.WorkerGroup{
 			"group1": {
@@ -220,22 +220,22 @@ func TestHistoryLifecycle_OnStartDisconnecting(t *testing.T) {
 
 func TestHistoryLifecycle_OnDisconnected(t *testing.T) {
 	tests := []struct {
-		name               string
-		closeReason        string
-		expectedReason     *string
-		expectedStatus     connectpb.ConnectionStatus
+		name           string
+		closeReason    string
+		expectedReason *string
+		expectedStatus connectpb.ConnectionStatus
 	}{
 		{
-			name:               "with close reason",
-			closeReason:        "client_disconnect",
-			expectedReason:     ptr.String("client_disconnect"),
-			expectedStatus:     connectpb.ConnectionStatus_DISCONNECTED,
+			name:           "with close reason",
+			closeReason:    "client_disconnect",
+			expectedReason: ptr.String("client_disconnect"),
+			expectedStatus: connectpb.ConnectionStatus_DISCONNECTED,
 		},
 		{
-			name:               "empty close reason",
-			closeReason:        "",
-			expectedReason:     nil,
-			expectedStatus:     connectpb.ConnectionStatus_DISCONNECTED,
+			name:           "empty close reason",
+			closeReason:    "",
+			expectedReason: nil,
+			expectedStatus: connectpb.ConnectionStatus_DISCONNECTED,
 		},
 	}
 
@@ -256,6 +256,51 @@ func TestHistoryLifecycle_OnDisconnected(t *testing.T) {
 
 			lifecycle.OnDisconnected(ctx, connection, tt.closeReason)
 
+			writer.AssertExpectations(t)
+		})
+	}
+}
+
+func TestHistoryLifecycle_MissingSystemAttributes(t *testing.T) {
+	tests := []struct {
+		name           string
+		expectedStatus connectpb.ConnectionStatus
+		invoke         func(context.Context, *historyLifecycles, *state.Connection)
+	}{
+		{
+			name:           "connected",
+			expectedStatus: connectpb.ConnectionStatus_CONNECTED,
+			invoke: func(ctx context.Context, lifecycle *historyLifecycles, connection *state.Connection) {
+				lifecycle.OnConnected(ctx, connection)
+			},
+		},
+		{
+			name:           "disconnected",
+			expectedStatus: connectpb.ConnectionStatus_DISCONNECTED,
+			invoke: func(ctx context.Context, lifecycle *historyLifecycles, connection *state.Connection) {
+				lifecycle.OnDisconnected(ctx, connection, "test")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writer := &MockConnectionHistoryWriter{}
+			lifecycle := &historyLifecycles{writer: writer}
+			connection := createTestConnection()
+			connection.Data.SystemAttributes = nil
+			ctx := context.Background()
+
+			writer.On("InsertWorkerConnection", ctx, mock.MatchedBy(func(wc *cqrs.WorkerConnection) bool {
+				return wc.Status == tt.expectedStatus &&
+					wc.CpuCores == 0 &&
+					wc.MemBytes == 0 &&
+					wc.Os == ""
+			})).Return(nil)
+
+			require.NotPanics(t, func() {
+				tt.invoke(ctx, lifecycle, connection)
+			})
 			writer.AssertExpectations(t)
 		})
 	}
@@ -307,9 +352,9 @@ func TestHistoryLifecycle_MultipleGroups(t *testing.T) {
 		GatewayId:    ulid.Make(),
 		WorkerIP:     "192.168.1.100",
 		Data: &connectpb.WorkerConnectRequestData{
-			InstanceId:       "multi-app-instance",
-			SdkLanguage:      "go",
-			SdkVersion:       "1.0.0",
+			InstanceId:  "multi-app-instance",
+			SdkLanguage: "go",
+			SdkVersion:  "1.0.0",
 			SystemAttributes: &connectpb.SystemAttributes{
 				CpuCores: 8,
 				MemBytes: 16384,
@@ -368,7 +413,7 @@ func createTestConnection() *state.Connection {
 				CpuCores: 2,
 				MemBytes: 4096,
 				Os:       "darwin",
-							},
+			},
 		},
 		Groups: map[string]*state.WorkerGroup{
 			"group1": {

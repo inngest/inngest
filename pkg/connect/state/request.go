@@ -27,8 +27,10 @@ var (
 )
 
 type Lease struct {
-	LeaseID    ulid.ULID `json:"leaseID"`
-	ExecutorIP net.IP    `json:"executorIP"`
+	LeaseID          ulid.ULID  `json:"leaseID"`
+	PreviousLeaseID  *ulid.ULID `json:"prevLeaseID,omitempty"`
+	WorkerInstanceID string     `json:"workerID,omitempty"`
+	ExecutorIP       net.IP     `json:"executorIP"`
 }
 
 // keyRequestLease points to the key storing the request lease
@@ -87,8 +89,9 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 	}
 }
 
-// ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
-// the current lease does not match the passed leaseID (ErrRequestLeased).
+// ExtendRequestLease attempts to extend a lease for the given request. A retry
+// of the immediately previous lease by the same worker returns the current
+// lease ID. Other mismatches fail with ErrRequestLeased.
 func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, instanceID string, requestID string, leaseID ulid.ULID, duration time.Duration, isWorkerCapacityUnlimited bool) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
@@ -119,14 +122,22 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		requestID,
 	}
 
-	status, err := scripts["extend_lease"].Exec(
+	result, err := scripts["extend_lease"].Exec(
 		ctx,
 		r.client,
 		keys,
 		args,
-	).AsInt64()
+	).ToArray()
 	if err != nil {
 		return nil, fmt.Errorf("could not execute lease script: %w", err)
+	}
+	if len(result) != 2 {
+		return nil, fmt.Errorf("unexpected extend lease result length %d", len(result))
+	}
+
+	status, err := result[0].AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("could not parse extend lease status: %w", err)
 	}
 
 	switch status {
@@ -136,9 +147,18 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 		return nil, ErrRequestLeased
 	case -1:
 		return nil, ErrRequestLeaseNotFound
-	case 1:
-		// Lease extended
-		return &newLeaseID, nil
+	case 1, 3:
+		// Lease extended, or an idempotent retry returned the lease generated
+		// by the original attempt.
+		leaseIDStr, err := result[1].ToString()
+		if err != nil {
+			return nil, fmt.Errorf("could not parse extended lease ID: %w", err)
+		}
+		extendedLeaseID, err := ulid.Parse(leaseIDStr)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse extended lease ID %q: %w", leaseIDStr, err)
+		}
+		return &extendedLeaseID, nil
 	case 2:
 		// Lease deleted (duration <= 0)
 		return nil, nil

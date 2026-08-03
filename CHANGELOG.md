@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.40.0] - 2026-07-30
+
+### 🚀 Features
+
+- *(mcp)* Generate mcp tools from rest api v2 (#4674)
+- *(api)* Add v2 apps list endpoint (#4657)
+
+### 🐛 Bug Fixes
+
+- *(epxressions)* Add support for falsy terns (#4676)
+- *(queue)* Correct reversed errors.Is arguments for ErrQueueItemNotFound (#4679)
+
 ## [v1.39.0] - 2026-07-28
 
 ### 🚀 Features
@@ -29,6 +41,7 @@ All notable changes to this project will be documented in this file.
 - *(logging)* Add logging middleware for API (#4646)
 - Make cancellation deadline configurable (#4659)
 - *(state)* Add primitives for cross-backend run state migration (#4654)
+- *(release)* V1.39.0 (#4651)
 
 ## [v1.38.1] - 2026-07-21
 

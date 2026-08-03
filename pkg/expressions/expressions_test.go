@@ -1185,6 +1185,23 @@ func TestEvaluateExpression(t *testing.T) {
 	}
 }
 
+func TestEvaluateTernaryWithMissingConditionField(t *testing.T) {
+	result, err := Evaluate(
+		context.Background(),
+		"event.data.primaryCandidateId ? event.data.primaryCandidateId : event.data.candidateId",
+		map[string]interface{}{
+			"event": map[string]interface{}{
+				"data": map[string]interface{}{
+					"candidateId": "candidate-123",
+				},
+			},
+		},
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, "candidate-123", result)
+}
+
 func TestFilteredAttributes(t *testing.T) {
 	tests := []struct {
 		expr     string

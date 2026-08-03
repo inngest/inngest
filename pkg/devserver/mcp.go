@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -17,6 +18,8 @@ import (
 	"github.com/inngest/inngest/internal/embeddocs"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/tel"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2mcp"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/event"
@@ -111,18 +114,43 @@ const (
 	statusOverflowed = "Overflowed"
 )
 
+// add Cloud-only endpoints here so all other new REST API v2 endpoints appear
+// in the dev server MCP without extra work.
+var unsupportedDevServerMCPMethods = map[string]struct{}{
+	"CreateEnv":                {},
+	"CreateScore":              {},
+	"CreateWebhook":            {},
+	"FetchAccount":             {},
+	"FetchAccountEnvs":         {},
+	"FetchAccountEventKeys":    {},
+	"FetchAccountSigningKeys":  {},
+	"GetExperiment":            {},
+	"ListExperiments":          {},
+	"ListInsightsEventSchemas": {},
+	"ListInsightsTables":       {},
+	"ListSessionKeys":          {},
+	"ListSessionRuns":          {},
+	"ListSessions":             {},
+	"ListWebhooks":             {},
+	"PatchEnv":                 {},
+	"QueryInsights":            {},
+	"QueryInsightsPrompt":      {},
+	"SyncApp":                  {},
+}
+
 type MCPHandler struct {
 	events api.EventHandler
 	data   cqrs.Manager
 	tick   time.Duration
-	
+	v2     http.Handler
+
 	serverOnce sync.Once
 	server     *mcp.Server
-	
+
 	// File content cache
 	fileCacheMu sync.RWMutex
 	fileCache   map[string][]byte
-	
+
 	// File info cache
 	fileInfoCache map[string]fs.FileInfo
 }
@@ -173,20 +201,25 @@ func isRunFailed(status string) bool {
 }
 
 // NewMCPHandler creates a new MCP handler for the dev server
-func NewMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration) http.Handler {
+func NewMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler) http.Handler {
 	h := &MCPHandler{
 		events:        events,
 		data:          data,
 		tick:          tick,
+		v2:            v2,
 		fileCache:     make(map[string][]byte),
 		fileInfoCache: make(map[string]fs.FileInfo),
 	}
 
-	// Create a streamable HTTP handler that returns the same server for all requests
+	originProtection := http.NewCrossOriginProtection()
+	//
+	// The dev server accepts cross-origin API requests so locally hosted UIs can connect.
+	originProtection.AddInsecureBypassPattern("/mcp")
 	return mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		return h.getMCPServer()
 	}, &mcp.StreamableHTTPOptions{
-		JSONResponse: true, // Use JSON responses for better compatibility
+		JSONResponse:          true, // Use JSON responses for better compatibility
+		CrossOriginProtection: originProtection,
 	})
 }
 
@@ -200,53 +233,101 @@ func (h *MCPHandler) getMCPServer() *mcp.Server {
 
 // createMCPServer creates an MCP server instance with dev server tools
 func (h *MCPHandler) createMCPServer() *mcp.Server {
-	server := mcp.NewServer(&mcp.Implementation{
-		Name:    mcpName,
-		Version: mcpVersion,
-		Title:   mcpTitle,
-	}, nil)
+	server := mcp.NewServer(
+		&mcp.Implementation{Name: mcpName, Version: mcpVersion, Title: mcpTitle},
+		&mcp.ServerOptions{
+			Capabilities: &mcp.ServerCapabilities{
+				Logging: &mcp.LoggingCapabilities{},
+				Tools:   &mcp.ToolCapabilities{},
+			},
+		},
+	)
+	h.addCompatibilityTools(server)
+	h.addDocsTools(server)
+	apiv2mcp.Register(server, apiv2mcp.Options{
+		BasePath: "/api/v2",
+		Execute:  h.executeV2,
+		Exclude: func(endpoint apiv2endpoint.Endpoint) bool {
+			_, unsupported := unsupportedDevServerMCPMethods[endpoint.MethodName]
+			return unsupported
+		},
+	})
+	return server
+}
 
+func (h *MCPHandler) addCompatibilityTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "send_event",
-		Description: "Send an event to the Inngest dev server which will trigger any functions listening to that event. Returns event ID and run IDs of triggered functions. Parameters: name (required string - the event name like 'test/hello.world'), data (optional - the event data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), eventIdSeed (optional string for deterministic event IDs)",
+		Title:       "Send event (deprecated)",
+		Description: "Deprecated compatibility tool retained for existing dev server integrations. Send an event to the Inngest dev server and return the event ID and any run IDs it creates. Parameters: name (required string - the event name like 'test/hello.world'), data (optional - the event data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), eventIdSeed (optional string for deterministic event IDs)",
 	}, h.sendEvent)
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "list_functions",
-		Description: "List all registered functions in the dev server",
-	}, h.listFunctions)
-
-	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_run_status",
-		Description: "Get detailed status and trace information for a specific function run. Parameters: runId (required string - the run ID returned from send_event or found in logs)",
+		Title:       "Get run status (deprecated)",
+		Description: "Deprecated compatibility tool retained for existing dev server integrations. Use get_run and get_run_trace for new integrations. Parameters: runId (required string - the run ID returned from send_event or found in logs)",
 	}, h.getRunStatus)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "poll_run_status",
-		Description: "Poll multiple function runs until they complete or timeout. Returns detailed status for all runs. Parameters: runIds (required array of strings - run IDs to poll), timeout (optional int - seconds to poll, default 30), pollInterval (optional int - milliseconds between polls, default 1000)",
+		Title:       "Poll run status (deprecated)",
+		Description: "Deprecated compatibility tool retained for existing dev server integrations. Use get_run for new integrations. Poll multiple function runs until they complete or time out. Parameters: runIds (required array of strings - run IDs to poll), timeout (optional int - seconds to poll, default 30), pollInterval (optional int - milliseconds between polls, default 1000)",
 	}, h.pollRunStatus)
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "invoke_function",
-		Description: "Directly invoke a specific function and wait for its result. Unlike send_event (which is fire-and-forget), this waits for completion and returns the function's actual output data. Parameters: functionId (required string - function slug, ID, or name), data (optional - function input data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), timeout (optional int - seconds to wait, default 30)",
+		Name:        "invoke_function_sync",
+		Title:       "Invoke function synchronously (deprecated)",
+		Description: "Deprecated compatibility tool retained for existing dev server integrations. Use invoke_function for the shared asynchronous Cloud and dev server contract. This tool waits for completion and returns the function output. Parameters: functionId (required string - function slug, ID, or name), data (optional - function input data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), timeout (optional int - seconds to wait, default 30)",
 	}, h.invokeFunction)
+}
 
+func (h *MCPHandler) addDocsTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "grep_docs",
+		Title:       "Search documentation",
 		Description: "Search documentation using exact string matching (grep). Useful for finding specific API names, error codes, or identifiers. Parameters: pattern (required string - the search pattern, regex supported), limit (optional int - maximum results, default 10)",
 	}, h.grepDocs)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "read_doc",
+		Title:       "Read documentation",
 		Description: "Read the full content of a specific documentation file. Parameters: path (required string - the doc file path relative to docs directory)",
 	}, h.readDoc)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_docs",
+		Title:       "List documentation",
 		Description: "List all available documentation categories and their document counts. No parameters required.",
 	}, h.listDocs)
+}
 
-	return server
+func (h *MCPHandler) executeV2(ctx context.Context, endpoint apiv2endpoint.Endpoint, req *http.Request) (*mcp.CallToolResult, error) {
+	metadata := tel.NewMetadata(ctx)
+	metadata.Context["tool"] = endpoint.ToolName
+	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
+
+	if h.v2 == nil {
+		return apiv2mcp.ToolError("REST API v2 is not configured", map[string]any{"status": http.StatusServiceUnavailable}), nil
+	}
+
+	recorder := httptest.NewRecorder()
+	h.v2.ServeHTTP(recorder, req.WithContext(ctx))
+	body := recorder.Body.Bytes()
+	if len(body) == 0 {
+		body = []byte(`{}`)
+	}
+
+	var structured any
+	if err := json.Unmarshal(body, &structured); err != nil {
+		structured = map[string]any{"text": string(body)}
+	}
+	if recorder.Code >= http.StatusBadRequest {
+		return apiv2mcp.ToolError(
+			fmt.Sprintf("REST API v2 returned HTTP %d: %s", recorder.Code, strings.TrimSpace(string(body))),
+			structured,
+		), nil
+	}
+	return apiv2mcp.ToolResult(structured, string(body)), nil
 }
 
 // SendEventArgs represents the arguments for sending an event
@@ -392,82 +473,6 @@ func (h *MCPHandler) sendEvent(ctx context.Context, req *mcp.CallToolRequest, ar
 			&mcp.TextContent{
 				Text: responseText,
 			},
-		},
-	}, result, nil
-}
-
-// ListFunctionsResult represents the result of listing functions
-type ListFunctionsResult struct {
-	Functions []FunctionInfo `json:"functions"`
-	Count     int            `json:"count"`
-}
-
-// FunctionInfo represents basic function information
-type FunctionInfo struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Slug    string   `json:"slug"`
-	Trigger []string `json:"triggers"`
-}
-
-// listFunctions handles the list_functions tool
-func (h *MCPHandler) listFunctions(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "list_functions"
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
-	// Get all functions using existing CQRS interface
-	functions, err := h.data.GetFunctions(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list functions: %w", err)
-	}
-
-	// Convert to our result format
-	funcList := make([]FunctionInfo, len(functions))
-	for i, fn := range functions {
-		triggers := make([]string, 0)
-
-		// Parse the function config to get trigger information
-		inngestFn, err := fn.InngestFunction()
-		if err == nil && inngestFn != nil {
-			// Add event and cron triggers
-			for _, trigger := range inngestFn.Triggers {
-				if trigger.EventTrigger != nil && trigger.EventTrigger.Event != "" {
-					triggers = append(triggers, trigger.EventTrigger.Event)
-				}
-				if trigger.CronTrigger != nil && trigger.CronTrigger.Cron != "" {
-					triggers = append(triggers, fmt.Sprintf("cron: %s", trigger.CronTrigger.Cron))
-				}
-			}
-		}
-
-		funcList[i] = FunctionInfo{
-			ID:      fn.ID.String(),
-			Name:    fn.Name,
-			Slug:    fn.Slug,
-			Trigger: triggers,
-		}
-	}
-
-	result := &ListFunctionsResult{
-		Functions: funcList,
-		Count:     len(funcList),
-	}
-
-	// Create text summary
-	text := fmt.Sprintf("Found %d registered functions:\n", len(funcList))
-	for _, fn := range funcList {
-		triggersText := ""
-		if len(fn.Trigger) > 0 {
-			triggersText = fmt.Sprintf(" (triggers: %s)", fmt.Sprintf("%v", fn.Trigger))
-		}
-		text += fmt.Sprintf("- %s%s\n", fn.Name, triggersText)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: text},
 		},
 	}, result, nil
 }
@@ -762,11 +767,10 @@ func (h *MCPHandler) pollRunStatus(ctx context.Context, req *mcp.CallToolRequest
 	}, lastResult, nil
 }
 
-// invokeFunction handles the invoke_function tool
 func (h *MCPHandler) invokeFunction(ctx context.Context, req *mcp.CallToolRequest, args InvokeFunctionArgs) (*mcp.CallToolResult, any, error) {
 	// Track MCP tool usage
 	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "invoke_function"
+	metadata.Context["tool"] = "invoke_function_sync"
 	metadata.Context["function_id"] = args.FunctionID
 	metadata.Context["timeout"] = args.Timeout
 	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
@@ -1158,6 +1162,6 @@ func (h *MCPHandler) listDocs(ctx context.Context, req *mcp.CallToolRequest, _ s
 }
 
 // AddMCPRoute adds the MCP route to the dev server router
-func AddMCPRoute(r chi.Router, events api.EventHandler, data cqrs.Manager, tick time.Duration) {
-	r.Mount("/mcp", NewMCPHandler(events, data, tick))
+func AddMCPRoute(r chi.Router, events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler) {
+	r.Handle("/mcp", NewMCPHandler(events, data, tick, v2))
 }
