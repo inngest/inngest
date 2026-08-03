@@ -22,7 +22,6 @@ export function useFakeDoorTracking(feature: FakeDoorFeature) {
     (action: FakeDoorAction) => {
       trackEvent('cli/dev_ui.fake_door.action', { feature, action });
     },
-
-    [feature],
+    [feature, trackEvent],
   );
 }
