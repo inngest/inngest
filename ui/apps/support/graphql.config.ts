@@ -28,6 +28,9 @@ const graphqlConfig = {
           preset: "client",
           config: {
             defaultScalarType: "unknown",
+            // Support consumes operation-derived types; avoid generating the
+            // shared API's full schema.
+            onlyOperationTypes: true,
             // Let unused custom scalars fall back to unknown instead of requiring
             // dashboard-wide mappings.
             strictScalars: false,
