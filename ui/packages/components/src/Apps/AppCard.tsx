@@ -1,6 +1,11 @@
 import type React from 'react';
 import { AccordionList, AccordionPrimitive } from '@inngest/components/AccordionCard/AccordionList';
 import DescriptionListItem from '@inngest/components/Apps/DescriptionListItem';
+import {
+  FeatureReadinessDetail,
+  FeatureReadinessTooltip,
+  featureReadinessTooltipClassName,
+} from '@inngest/components/Apps/FeatureReadiness';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
@@ -72,8 +77,36 @@ type CardContentProps = {
   workerCounter?: React.ReactNode;
 };
 
+function aiMetadataDetail(reason?: number | null): React.ReactNode {
+  if (reason == null) {
+    return null;
+  }
+
+  return <FeatureReadinessDetail kind="aiMetadata" reason={reason} />;
+}
+
+function aiMetadataTooltip(reason?: number | null): React.ReactNode {
+  return reason != null ? <FeatureReadinessTooltip kind="aiMetadata" /> : null;
+}
+
+function extendedTracesDetail(reason?: number | null): React.ReactNode {
+  if (reason == null) {
+    return null;
+  }
+
+  return <FeatureReadinessDetail kind="extendedTraces" reason={reason} />;
+}
+
+function extendedTracesTooltip(reason?: number | null): React.ReactNode {
+  return reason != null ? <FeatureReadinessTooltip kind="extendedTraces" /> : null;
+}
+
 export function AppCardContent({ url, app, pill, actions, workerCounter }: CardContentProps) {
   const Wrapper = url ? 'a' : 'div';
+  const aiMetadataReason = app.sdkFeatureReadiness?.aiMetadataExtraction?.reason;
+  const extendedTracesReason = app.sdkFeatureReadiness?.extendedTraces?.reason;
+  const aiMetadata = aiMetadataDetail(aiMetadataReason);
+  const extendedTraces = extendedTracesDetail(extendedTracesReason);
 
   return (
     <div className="text-basis flex flex-col justify-between p-6">
@@ -122,6 +155,24 @@ export function AppCardContent({ url, app, pill, actions, workerCounter }: CardC
         ) : (
           <DescriptionListItem term="Framework" detail={app.framework ?? '-'} />
         )}
+        {aiMetadata && (
+          <DescriptionListItem
+            term="AI OTel"
+            detail={aiMetadata}
+            tooltipContent={aiMetadataTooltip(aiMetadataReason)}
+            tooltipContentClassName={featureReadinessTooltipClassName}
+            tooltipHasArrow={false}
+          />
+        )}
+        {extendedTraces && (
+          <DescriptionListItem
+            term="Extended traces"
+            detail={extendedTraces}
+            tooltipContent={extendedTracesTooltip(extendedTracesReason)}
+            tooltipContentClassName={featureReadinessTooltipClassName}
+            tooltipHasArrow={false}
+          />
+        )}
       </dl>
     </div>
   );
@@ -156,7 +207,7 @@ export function AppCardFooter({ kind, headerTitle, headerSecondaryCTA, content }
                     <RiArrowDownSLine
                       className={cn(
                         'transform-90 transition-transform duration-500 group-data-[state=open]:-rotate-180',
-                        kindStyles[kind].text
+                        kindStyles[kind].text,
                       )}
                     />
                   }

@@ -120,9 +120,10 @@ func NewWorkerGroupFromConnRequest(
 		FunctionSlugs: slugs,
 		Hash:          hash,
 		SyncData: SyncData{
-			Functions: functions,
-			SyncToken: req.AuthData.SyncToken,
-			AppConfig: appConfig,
+			Functions:           functions,
+			SyncToken:           req.AuthData.SyncToken,
+			AppConfig:           appConfig,
+			FeatureObservations: sdk.FeatureObservations(appConfig.GetFeatureObservations()),
 		},
 		CreatedAt: time.Now(),
 	}

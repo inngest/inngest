@@ -134,9 +134,10 @@ type AuthContext struct {
 }
 
 type SyncData struct {
-	SyncToken string
-	AppConfig *connpb.AppConfiguration
-	Functions []sdk.SDKFunction
+	SyncToken           string
+	AppConfig           *connpb.AppConfiguration
+	Functions           []sdk.SDKFunction
+	FeatureObservations sdk.FeatureObservations
 }
 
 // WorkerGroup groups a list of connected workers to simplify operations, which
@@ -239,7 +240,7 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	}
 
 	// Don't attempt to sync if it's already sync'd
-	if existingGroup != nil && existingGroup.SyncID != nil && existingGroup.AppID != nil {
+	if existingGroup != nil && existingGroup.SyncID != nil && existingGroup.AppID != nil && len(g.SyncData.FeatureObservations) == 0 {
 		g.AppID = existingGroup.AppID
 		g.SyncID = existingGroup.SyncID
 		g.CreatedAt = existingGroup.CreatedAt
@@ -290,6 +291,8 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		Capabilities: cap,
 		Functions:    g.SyncData.Functions,
 		AppVersion:   appVersion,
+
+		FeatureObservations: g.SyncData.FeatureObservations,
 
 		// Deduplicate syncs in case multiple workers are coming up at the same time
 		IdempotencyKey: g.Hash,

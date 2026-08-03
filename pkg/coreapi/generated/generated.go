@@ -68,21 +68,22 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	App struct {
-		AppVersion     func(childComplexity int) int
-		Autodiscovered func(childComplexity int) int
-		Checksum       func(childComplexity int) int
-		Connected      func(childComplexity int) int
-		Error          func(childComplexity int) int
-		ExternalID     func(childComplexity int) int
-		Framework      func(childComplexity int) int
-		FunctionCount  func(childComplexity int) int
-		Functions      func(childComplexity int) int
-		ID             func(childComplexity int) int
-		Method         func(childComplexity int) int
-		Name           func(childComplexity int) int
-		SdkLanguage    func(childComplexity int) int
-		SdkVersion     func(childComplexity int) int
-		Url            func(childComplexity int) int
+		AppVersion          func(childComplexity int) int
+		Autodiscovered      func(childComplexity int) int
+		Checksum            func(childComplexity int) int
+		Connected           func(childComplexity int) int
+		Error               func(childComplexity int) int
+		ExternalID          func(childComplexity int) int
+		Framework           func(childComplexity int) int
+		FunctionCount       func(childComplexity int) int
+		Functions           func(childComplexity int) int
+		ID                  func(childComplexity int) int
+		Method              func(childComplexity int) int
+		Name                func(childComplexity int) int
+		SdkFeatureReadiness func(childComplexity int) int
+		SdkLanguage         func(childComplexity int) int
+		SdkVersion          func(childComplexity int) int
+		Url                 func(childComplexity int) int
 	}
 
 	CancellationConfiguration struct {
@@ -533,6 +534,16 @@ type ComplexityRoot struct {
 		TotalCount func(childComplexity int, preview *bool) int
 	}
 
+	SDKFeatureReadiness struct {
+		AiMetadataExtraction func(childComplexity int) int
+		ExtendedTraces       func(childComplexity int) int
+	}
+
+	SDKFeatureStatus struct {
+		Ready  func(childComplexity int) int
+		Reason func(childComplexity int) int
+	}
+
 	SingletonConfiguration struct {
 		Key  func(childComplexity int) int
 		Mode func(childComplexity int) int
@@ -628,6 +639,7 @@ type AppResolver interface {
 	Functions(ctx context.Context, obj *cqrs.App) ([]*models.Function, error)
 	Method(ctx context.Context, obj *cqrs.App) (models.AppMethod, error)
 
+	SdkFeatureReadiness(ctx context.Context, obj *cqrs.App) (*models.SDKFeatureReadiness, error)
 	Connected(ctx context.Context, obj *cqrs.App) (bool, error)
 	FunctionCount(ctx context.Context, obj *cqrs.App) (int, error)
 	Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, error)
@@ -828,6 +840,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.App.Name(childComplexity), true
+
+	case "App.sdkFeatureReadiness":
+		if e.complexity.App.SdkFeatureReadiness == nil {
+			break
+		}
+
+		return e.complexity.App.SdkFeatureReadiness(childComplexity), true
 
 	case "App.sdkLanguage":
 		if e.complexity.App.SdkLanguage == nil {
@@ -3123,6 +3142,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunsV2Connection.TotalCount(childComplexity, args["preview"].(*bool)), true
 
+	case "SDKFeatureReadiness.aiMetadataExtraction":
+		if e.complexity.SDKFeatureReadiness.AiMetadataExtraction == nil {
+			break
+		}
+
+		return e.complexity.SDKFeatureReadiness.AiMetadataExtraction(childComplexity), true
+
+	case "SDKFeatureReadiness.extendedTraces":
+		if e.complexity.SDKFeatureReadiness.ExtendedTraces == nil {
+			break
+		}
+
+		return e.complexity.SDKFeatureReadiness.ExtendedTraces(childComplexity), true
+
+	case "SDKFeatureStatus.ready":
+		if e.complexity.SDKFeatureStatus.Ready == nil {
+			break
+		}
+
+		return e.complexity.SDKFeatureStatus.Ready(childComplexity), true
+
+	case "SDKFeatureStatus.reason":
+		if e.complexity.SDKFeatureStatus.Reason == nil {
+			break
+		}
+
+		return e.complexity.SDKFeatureStatus.Reason(childComplexity), true
+
 	case "SingletonConfiguration.key":
 		if e.complexity.SingletonConfiguration.Key == nil {
 			break
@@ -3893,11 +3940,22 @@ type App {
   method: AppMethod!
 
   appVersion: String
+  sdkFeatureReadiness: SDKFeatureReadiness!
 
   # These fields are UI convenience fields
   connected: Boolean!
   functionCount: Int!
   autodiscovered: Boolean!
+}
+
+type SDKFeatureReadiness {
+  aiMetadataExtraction: SDKFeatureStatus
+  extendedTraces: SDKFeatureStatus
+}
+
+type SDKFeatureStatus {
+  ready: Boolean!
+  reason: Int
 }
 
 type Function {
@@ -5718,6 +5776,56 @@ func (ec *executionContext) fieldContext_App_appVersion(ctx context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _App_sdkFeatureReadiness(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_App_sdkFeatureReadiness(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.App().SdkFeatureReadiness(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.SDKFeatureReadiness)
+	fc.Result = res
+	return ec.marshalNSDKFeatureReadiness2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSDKFeatureReadiness(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_App_sdkFeatureReadiness(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "App",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "aiMetadataExtraction":
+				return ec.fieldContext_SDKFeatureReadiness_aiMetadataExtraction(ctx, field)
+			case "extendedTraces":
+				return ec.fieldContext_SDKFeatureReadiness_extendedTraces(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SDKFeatureReadiness", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _App_connected(ctx context.Context, field graphql.CollectedField, obj *cqrs.App) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_App_connected(ctx, field)
 	if err != nil {
@@ -6558,6 +6666,8 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnection_app(ctx conte
 				return ec.fieldContext_App_method(ctx, field)
 			case "appVersion":
 				return ec.fieldContext_App_appVersion(ctx, field)
+			case "sdkFeatureReadiness":
+				return ec.fieldContext_App_sdkFeatureReadiness(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -10264,6 +10374,8 @@ func (ec *executionContext) fieldContext_Function_app(ctx context.Context, field
 				return ec.fieldContext_App_method(ctx, field)
 			case "appVersion":
 				return ec.fieldContext_App_appVersion(ctx, field)
+			case "sdkFeatureReadiness":
+				return ec.fieldContext_App_sdkFeatureReadiness(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -11999,6 +12111,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_app(ctx context.Context, 
 				return ec.fieldContext_App_method(ctx, field)
 			case "appVersion":
 				return ec.fieldContext_App_appVersion(ctx, field)
+			case "sdkFeatureReadiness":
+				return ec.fieldContext_App_sdkFeatureReadiness(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -13896,6 +14010,8 @@ func (ec *executionContext) fieldContext_Mutation_createApp(ctx context.Context,
 				return ec.fieldContext_App_method(ctx, field)
 			case "appVersion":
 				return ec.fieldContext_App_appVersion(ctx, field)
+			case "sdkFeatureReadiness":
+				return ec.fieldContext_App_sdkFeatureReadiness(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -13983,6 +14099,8 @@ func (ec *executionContext) fieldContext_Mutation_updateApp(ctx context.Context,
 				return ec.fieldContext_App_method(ctx, field)
 			case "appVersion":
 				return ec.fieldContext_App_appVersion(ctx, field)
+			case "sdkFeatureReadiness":
+				return ec.fieldContext_App_sdkFeatureReadiness(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -14611,6 +14729,8 @@ func (ec *executionContext) fieldContext_Query_apps(ctx context.Context, field g
 				return ec.fieldContext_App_method(ctx, field)
 			case "appVersion":
 				return ec.fieldContext_App_appVersion(ctx, field)
+			case "sdkFeatureReadiness":
+				return ec.fieldContext_App_sdkFeatureReadiness(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -14695,6 +14815,8 @@ func (ec *executionContext) fieldContext_Query_app(ctx context.Context, field gr
 				return ec.fieldContext_App_method(ctx, field)
 			case "appVersion":
 				return ec.fieldContext_App_appVersion(ctx, field)
+			case "sdkFeatureReadiness":
+				return ec.fieldContext_App_sdkFeatureReadiness(ctx, field)
 			case "connected":
 				return ec.fieldContext_App_connected(ctx, field)
 			case "functionCount":
@@ -21093,6 +21215,185 @@ func (ec *executionContext) fieldContext_RunsV2Connection_totalCount(ctx context
 	return fc, nil
 }
 
+func (ec *executionContext) _SDKFeatureReadiness_aiMetadataExtraction(ctx context.Context, field graphql.CollectedField, obj *models.SDKFeatureReadiness) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDKFeatureReadiness_aiMetadataExtraction(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AiMetadataExtraction, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.SDKFeatureStatus)
+	fc.Result = res
+	return ec.marshalOSDKFeatureStatus2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSDKFeatureStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDKFeatureReadiness_aiMetadataExtraction(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDKFeatureReadiness",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "ready":
+				return ec.fieldContext_SDKFeatureStatus_ready(ctx, field)
+			case "reason":
+				return ec.fieldContext_SDKFeatureStatus_reason(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SDKFeatureStatus", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SDKFeatureReadiness_extendedTraces(ctx context.Context, field graphql.CollectedField, obj *models.SDKFeatureReadiness) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDKFeatureReadiness_extendedTraces(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExtendedTraces, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.SDKFeatureStatus)
+	fc.Result = res
+	return ec.marshalOSDKFeatureStatus2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSDKFeatureStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDKFeatureReadiness_extendedTraces(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDKFeatureReadiness",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "ready":
+				return ec.fieldContext_SDKFeatureStatus_ready(ctx, field)
+			case "reason":
+				return ec.fieldContext_SDKFeatureStatus_reason(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SDKFeatureStatus", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SDKFeatureStatus_ready(ctx context.Context, field graphql.CollectedField, obj *models.SDKFeatureStatus) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDKFeatureStatus_ready(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Ready, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDKFeatureStatus_ready(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDKFeatureStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SDKFeatureStatus_reason(ctx context.Context, field graphql.CollectedField, obj *models.SDKFeatureStatus) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDKFeatureStatus_reason(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Reason, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDKFeatureStatus_reason(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDKFeatureStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SingletonConfiguration_mode(ctx context.Context, field graphql.CollectedField, obj *models.SingletonConfiguration) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SingletonConfiguration_mode(ctx, field)
 	if err != nil {
@@ -26085,6 +26386,26 @@ func (ec *executionContext) _App(ctx context.Context, sel ast.SelectionSet, obj 
 
 			out.Values[i] = ec._App_appVersion(ctx, field, obj)
 
+		case "sdkFeatureReadiness":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._App_sdkFeatureReadiness(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "connected":
 			field := field
 
@@ -29616,6 +29937,67 @@ func (ec *executionContext) _RunsV2Connection(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var sDKFeatureReadinessImplementors = []string{"SDKFeatureReadiness"}
+
+func (ec *executionContext) _SDKFeatureReadiness(ctx context.Context, sel ast.SelectionSet, obj *models.SDKFeatureReadiness) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, sDKFeatureReadinessImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SDKFeatureReadiness")
+		case "aiMetadataExtraction":
+
+			out.Values[i] = ec._SDKFeatureReadiness_aiMetadataExtraction(ctx, field, obj)
+
+		case "extendedTraces":
+
+			out.Values[i] = ec._SDKFeatureReadiness_extendedTraces(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var sDKFeatureStatusImplementors = []string{"SDKFeatureStatus"}
+
+func (ec *executionContext) _SDKFeatureStatus(ctx context.Context, sel ast.SelectionSet, obj *models.SDKFeatureStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, sDKFeatureStatusImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SDKFeatureStatus")
+		case "ready":
+
+			out.Values[i] = ec._SDKFeatureStatus_ready(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "reason":
+
+			out.Values[i] = ec._SDKFeatureStatus_reason(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var singletonConfigurationImplementors = []string{"SingletonConfiguration"}
 
 func (ec *executionContext) _SingletonConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.SingletonConfiguration) graphql.Marshaler {
@@ -31707,6 +32089,20 @@ func (ec *executionContext) marshalNRunsV2OrderByField2githubᚗcomᚋinngestᚋ
 	return v
 }
 
+func (ec *executionContext) marshalNSDKFeatureReadiness2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSDKFeatureReadiness(ctx context.Context, sel ast.SelectionSet, v models.SDKFeatureReadiness) graphql.Marshaler {
+	return ec._SDKFeatureReadiness(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNSDKFeatureReadiness2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSDKFeatureReadiness(ctx context.Context, sel ast.SelectionSet, v *models.SDKFeatureReadiness) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SDKFeatureReadiness(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx context.Context, v interface{}) (models.SingletonMode, error) {
 	var res models.SingletonMode
 	err := res.UnmarshalGQL(v)
@@ -33067,6 +33463,13 @@ func (ec *executionContext) marshalORunsV2OrderByField2ᚖgithubᚗcomᚋinngest
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOSDKFeatureStatus2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSDKFeatureStatus(ctx context.Context, sel ast.SelectionSet, v *models.SDKFeatureStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SDKFeatureStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOSingletonConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.SingletonConfiguration) graphql.Marshaler {

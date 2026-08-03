@@ -1,0 +1,137 @@
+package state
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/google/uuid"
+	cqsync "github.com/inngest/inngest/pkg/cqrs/sync"
+	"github.com/inngest/inngest/pkg/sdk"
+	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
+	sdkfeatureobs "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1"
+	"github.com/stretchr/testify/require"
+)
+
+func TestWorkerGroupSyncIncludesFeatureObservations(t *testing.T) {
+	ctx := context.Background()
+	appID := uuid.New()
+	syncID := uuid.New()
+	existingAppID := uuid.New()
+	existingSyncID := uuid.New()
+
+	var registerReq sdk.RegisterRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/fn/register", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&registerReq))
+
+		require.NoError(t, json.NewEncoder(w).Encode(cqsync.Reply{
+			OK:     true,
+			AppID:  &appID,
+			SyncID: &syncID,
+		}))
+	}))
+	defer server.Close()
+
+	group := &WorkerGroup{
+		AccountID:  uuid.New(),
+		EnvID:      uuid.New(),
+		AppName:    "connect-app",
+		SDKLang:    "js",
+		SDKVersion: "v4.13.0",
+		Hash:       "worker-group-hash",
+		SyncData: SyncData{
+			Functions: []sdk.SDKFunction{
+				{
+					Name: "Test function",
+					Slug: "test-function",
+				},
+			},
+			FeatureObservations: sdk.FeatureObservations(testFeatureObservations()),
+		},
+	}
+	groupManager := &testWorkerGroupManager{
+		existing: &WorkerGroup{
+			AppID:  &existingAppID,
+			SyncID: &existingSyncID,
+		},
+	}
+
+	err := group.Sync(ctx, groupManager, server.URL, &connectpb.WorkerConnectRequestData{
+		AuthData:     &connectpb.AuthData{SyncToken: "sync-token"},
+		Capabilities: []byte(`{"connect":"v1"}`),
+		SdkLanguage:  "js",
+		SdkVersion:   "v4.13.0",
+	}, true)
+	require.NoError(t, err)
+
+	require.Equal(t, group.SyncData.FeatureObservations, registerReq.FeatureObservations)
+	require.Equal(t, sdk.DeployTypeConnect, registerReq.DeployType)
+	require.Equal(t, "connect-app", registerReq.AppName)
+	require.Equal(t, "worker-group-hash", registerReq.IdempotencyKey)
+	require.Equal(t, appID, *group.AppID)
+	require.Equal(t, syncID, *group.SyncID)
+	require.Equal(t, group, groupManager.updated)
+}
+
+func testFeatureObservations() []*sdkfeatureobs.FeatureObservation {
+	return []*sdkfeatureobs.FeatureObservation{
+		{
+			Feature: &sdkfeatureobs.FeatureObservation_AiMetadataExtraction{
+				AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+					ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_OTEL_PROVIDER_MISSING,
+					OtelSetup: &sdkfeatureobs.OTelSetup{
+						ProviderFound:             true,
+						ProviderSource:            sdkfeatureobs.OTelProviderSource_OTEL_PROVIDER_SOURCE_FIRST_PARTY,
+						AddSpanProcessorAttempted: true,
+						SpanProcessorAdded:        false,
+						Failure:                   sdkfeatureobs.OTelSetupFailure_OTEL_SETUP_FAILURE_NO_PROVIDER,
+					},
+				},
+			},
+		},
+		{
+			Feature: &sdkfeatureobs.FeatureObservation_ExtendedTraces{
+				ExtendedTraces: &sdkfeatureobs.ExtendedTraces{
+					ReadinessReason: sdkfeatureobs.ExtendedTracesReadinessReason_EXTENDED_TRACES_READINESS_REASON_NOT_ENABLED_BY_USER,
+					Config: &sdkfeatureobs.ExtendedTracesConfig{
+						Behavior: sdkfeatureobs.ExtendedTracesBehavior_EXTENDED_TRACES_BEHAVIOR_AUTO,
+					},
+					OtelSetup: &sdkfeatureobs.OTelSetup{
+						Path:                      sdkfeatureobs.OTelSetupPath_OTEL_SETUP_PATH_EXTEND_EXISTING_PROVIDER,
+						ProviderSource:            sdkfeatureobs.OTelProviderSource_OTEL_PROVIDER_SOURCE_USER_PROVIDED,
+						AddSpanProcessorAttempted: true,
+						SpanProcessorAdded:        true,
+					},
+				},
+			},
+		},
+		{
+			Feature: &sdkfeatureobs.FeatureObservation_SendEvents{
+				SendEvents: &sdkfeatureobs.SendEvents{
+					ReadinessReason: sdkfeatureobs.SendEventsReadinessReason_SEND_EVENTS_READINESS_REASON_READY,
+					Config: &sdkfeatureobs.SendEventsConfig{
+						HasEventKey:               true,
+						HasEventApiOriginOverride: true,
+					},
+				},
+			},
+		},
+	}
+}
+
+type testWorkerGroupManager struct {
+	existing *WorkerGroup
+	updated  *WorkerGroup
+}
+
+func (m *testWorkerGroupManager) GetWorkerGroupByHash(_ context.Context, _ uuid.UUID, _ string) (*WorkerGroup, error) {
+	return m.existing, nil
+}
+
+func (m *testWorkerGroupManager) UpdateWorkerGroup(_ context.Context, _ uuid.UUID, group *WorkerGroup) error {
+	m.updated = group
+	return nil
+}
