@@ -9,6 +9,7 @@ export const usePathCreator = () => {
 
   const pathCreator = useMemo((): PathCreator => {
     return {
+      aiOverview: () => internalPathCreator.aiOverview({ envSlug: env.slug }),
       app: (params: { externalAppID: string }) =>
         internalPathCreator.app({
           envSlug: env.slug,

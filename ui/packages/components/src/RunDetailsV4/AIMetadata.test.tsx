@@ -1,7 +1,38 @@
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { traceHasAIMetadata } from './AIMetadata';
+import { AIMetadataNudge, traceHasAIMetadata } from './AIMetadata';
 import type { SpanMetadata, Trace } from './types';
+
+const booleanFlagMock = vi.hoisted(() => vi.fn());
+const pathCreatorMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../SharedContext/useBooleanFlag', () => ({
+  useBooleanFlag: () => ({ booleanFlag: booleanFlagMock }),
+}));
+
+vi.mock('../SharedContext/usePathCreator', () => ({
+  usePathCreator: () => ({ pathCreator: pathCreatorMock() }),
+}));
+
+const renderNudge = ({
+  aiOverviewEnabled,
+  hasAIOverviewPath = true,
+}: {
+  aiOverviewEnabled: boolean;
+  hasAIOverviewPath?: boolean;
+}) => {
+  booleanFlagMock.mockReturnValue({ isReady: true, value: aiOverviewEnabled });
+  pathCreatorMock.mockReturnValue(
+    hasAIOverviewPath ? { aiOverview: () => '/env/prod/ai-overview' } : {}
+  );
+
+  render(<AIMetadataNudge />);
+};
+
+afterEach(() => {
+  cleanup();
+});
 
 const makeSpan = (overrides: Partial<Trace> = {}): Trace => ({
   attempts: 0,
@@ -53,5 +84,36 @@ describe('traceHasAIMetadata', () => {
     });
 
     expect(traceHasAIMetadata(trace)).toBe(false);
+  });
+});
+
+describe('AIMetadataNudge', () => {
+  it('always offers the documentation links', () => {
+    renderNudge({ aiOverviewEnabled: false });
+
+    expect(screen.getByRole('link', { name: 'Set up AI metadata' }).getAttribute('href')).toContain(
+      '/docs/examples/ai-metadata-quickstart'
+    );
+    expect(screen.getByRole('link', { name: 'Add custom metadata' })).toBeTruthy();
+  });
+
+  it('links to the AI Overview when the dashboard is enabled', () => {
+    renderNudge({ aiOverviewEnabled: true });
+
+    expect(screen.getByRole('link', { name: 'View AI Overview' }).getAttribute('href')).toBe(
+      '/env/prod/ai-overview'
+    );
+  });
+
+  it('omits the AI Overview link when the dashboard is disabled', () => {
+    renderNudge({ aiOverviewEnabled: false });
+
+    expect(screen.queryByRole('link', { name: 'View AI Overview' })).toBeNull();
+  });
+
+  it('omits the AI Overview link where the route does not exist', () => {
+    renderNudge({ aiOverviewEnabled: true, hasAIOverviewPath: false });
+
+    expect(screen.queryByRole('link', { name: 'View AI Overview' })).toBeNull();
   });
 });
