@@ -78,17 +78,6 @@ func authzOptions(method protoreflect.MethodDescriptor) *apiv2.AuthzOptions {
 	return proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
 }
 
-// hasAuthzAnnotation reports whether a method requires an authorization grant.
-// A method is protected when it names a grant; `exempt: true` marks the
-// deliberately public ones.
-func hasAuthzAnnotation(method protoreflect.MethodDescriptor) bool {
-	authzOpts := authzOptions(method)
-	if authzOpts == nil {
-		return false
-	}
-	return authzOpts.GetGrant() != ""
-}
-
 // GetInngestEnvHeader extracts the X-Inngest-Env header value from the gRPC context.
 // Returns an empty string if the header is not present.
 func GetInngestEnvHeader(ctx context.Context) string {
@@ -128,31 +117,4 @@ func GRPCToHTTPStatus(code codes.Code) int {
 	default:
 		return http.StatusInternalServerError
 	}
-}
-
-// BuildAuthzPathMap inspects protobuf annotations to determine which paths require authorization
-func BuildAuthzPathMap() map[string]bool {
-	authzPaths := make(map[string]bool)
-
-	// Get the service descriptor
-	serviceDesc := apiv2.File_api_v2_service_proto.Services().ByName("V2")
-	if serviceDesc == nil {
-		return authzPaths
-	}
-
-	// Iterate through all methods in the service
-	methods := serviceDesc.Methods()
-	for i := 0; i < methods.Len(); i++ {
-		method := methods.Get(i)
-
-		// Check if method has authz annotation
-		if hasAuthzAnnotation(method) {
-			// Get the HTTP path from google.api.http annotation
-			if path := getHTTPPath(method); path != "" {
-				authzPaths[path] = true
-			}
-		}
-	}
-
-	return authzPaths
 }
