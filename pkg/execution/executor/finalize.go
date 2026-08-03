@@ -317,7 +317,10 @@ func (e *executor) buildDeferEvents(
 	)
 
 	for _, d := range defers {
-		l := l.With("fn_slug", d.FnSlug, "hashed_id", d.HashedID)
+		l := l.With(
+			"fn_slug", util.SanitizeLogField(d.FnSlug),
+			"hashed_id", d.HashedID,
+		)
 
 		if err := d.Validate(); err != nil {
 			l.Error(
