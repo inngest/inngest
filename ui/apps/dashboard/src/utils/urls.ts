@@ -50,6 +50,9 @@ export const pathCreator = {
   dashboard({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/`;
   },
+  aiOverview({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/ai-overview`;
+  },
   apps({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/apps`;
   },
