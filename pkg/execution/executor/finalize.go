@@ -312,12 +312,17 @@ func (e *executor) buildDeferEvents(
 	now := e.now()
 	var events []event.Event
 
+	l := logger.StdlibLogger(ctx).With(
+		"run_id", util.SanitizeLogField(opts.Metadata.ID.RunID.String()),
+	)
+
 	for _, d := range defers {
+		l := l.With("fn_slug", d.FnSlug, "hashed_id", d.HashedID)
+
 		if err := d.Validate(); err != nil {
-			logger.StdlibLogger(ctx).Error(
+			l.Error(
 				"invalid defer",
 				"error", err,
-				"run_id", opts.Metadata.ID.RunID,
 			)
 			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
@@ -331,11 +336,9 @@ func (e *executor) buildDeferEvents(
 
 		eventID, err := event.DeferEventID(opts.Metadata.ID.RunID, d.HashedID)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error(
+			l.Error(
 				"failed to create defer event ID",
 				"error", err,
-				"hashed_id", d.HashedID,
-				"run_id", opts.Metadata.ID.RunID,
 			)
 			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
@@ -344,10 +347,9 @@ func (e *executor) buildDeferEvents(
 		data := map[string]any{}
 		if len(d.Input) > 0 {
 			if err := json.Unmarshal(d.Input, &data); err != nil {
-				logger.StdlibLogger(ctx).Error(
+				l.Error(
 					"deferred input is not a JSON object",
 					"error", err,
-					"run_id", opts.Metadata.ID.RunID,
 				)
 				metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 				continue
@@ -368,10 +370,9 @@ func (e *executor) buildDeferEvents(
 			ParentRunID:     opts.Metadata.ID.RunID,
 		}
 		if err := deferredMeta.Validate(); err != nil {
-			logger.StdlibLogger(ctx).Error(
+			l.Error(
 				"invalid deferred event metadata",
 				"error", err,
-				"run_id", opts.Metadata.ID.RunID,
 			)
 			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
@@ -382,10 +383,9 @@ func (e *executor) buildDeferEvents(
 		var evtMeta event.EventMeta
 		if len(d.Meta) > 0 {
 			if err := json.Unmarshal(d.Meta, &evtMeta); err != nil {
-				logger.StdlibLogger(ctx).Error(
+				l.Error(
 					"deferred meta is not valid JSON",
 					"error", err,
-					"run_id", opts.Metadata.ID.RunID,
 				)
 				metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 				continue
@@ -402,10 +402,9 @@ func (e *executor) buildDeferEvents(
 		//
 		// Failures are unexpected as we also validate sessions SDK side.
 		if err := evtMeta.Sessions.Validate(); err != nil {
-			logger.StdlibLogger(ctx).Error(
+			l.Error(
 				"deferred sessions failed validation after merge",
 				"error", err,
-				"run_id", opts.Metadata.ID.RunID,
 			)
 			metrics.IncrDefersFinalizedCounter(ctx, "invalid", metrics.CounterOpt{PkgName: pkgName})
 			continue
