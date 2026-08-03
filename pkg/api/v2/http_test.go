@@ -671,6 +671,96 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, rec.Code)
 	})
 
+	// The previous implementation keyed a map by the proto path template and
+	// looked it up with the concrete URL, so no parameterised path ever reached
+	// the authz middleware. Every existing case above uses a static path, which
+	// is why the bug survived. These cover the gap.
+	t.Run("authorization middleware is applied to templated paths", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, method, path string
+		}{
+			{"single path param", http.MethodPost, "/api/v2/apps/my-app/syncs"},
+			{"multiple path params", http.MethodPost, "/api/v2/apps/my-app/functions/my-fn/invoke"},
+			{"multi-segment wildcard with a literal suffix", http.MethodGet, "/api/v2/sessions/k/a/b/c/runs"},
+			{"no v2 prefix", http.MethodPost, "/v2/apps/my-app/syncs"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				authzCalled := false
+				var seenGrant string
+				authzMiddleware := func(next http.Handler) http.Handler {
+					return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						authzCalled = true
+						if route, ok := apiv2base.AuthzRouteFromContext(r.Context()); ok {
+							seenGrant = route.Grant
+						}
+						w.WriteHeader(http.StatusForbidden)
+					})
+				}
+
+				handler, err := newTestHTTPHandler(ctx, ServiceOptions{},
+					HTTPHandlerOptions{AuthzMiddleware: authzMiddleware})
+				require.NoError(t, err)
+
+				req := httptest.NewRequest(tc.method, tc.path, strings.NewReader("{}"))
+				req.Header.Set("Content-Type", "application/json")
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, req)
+
+				require.True(t, authzCalled, "authz middleware must be called for %s", tc.path)
+				require.NotEmpty(t, seenGrant, "the required grant must be on the request context")
+				require.Equal(t, http.StatusForbidden, rec.Code)
+			})
+		}
+	})
+
+	// GET and POST on one path need different grants — inexpressible in the old
+	// path-only map, which had no HTTP method in the key.
+	t.Run("authorization middleware distinguishes methods on the same path", func(t *testing.T) {
+		grants := map[string]string{}
+		for _, m := range []string{http.MethodGet, http.MethodPost} {
+			authzMiddleware := func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if route, ok := apiv2base.AuthzRouteFromContext(r.Context()); ok {
+						grants[r.Method] = route.Grant
+					}
+					w.WriteHeader(http.StatusForbidden)
+				})
+			}
+			handler, err := newTestHTTPHandler(ctx, ServiceOptions{},
+				HTTPHandlerOptions{AuthzMiddleware: authzMiddleware})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(m, "/api/v2/env/webhooks", strings.NewReader("{}"))
+			req.Header.Set("Content-Type", "application/json")
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+		}
+
+		require.Equal(t, "api:webhook:read", grants[http.MethodGet])
+		require.Equal(t, "api:webhook:write", grants[http.MethodPost])
+	})
+
+	// An unknown path must reach the gateway and 404, not be denied — a 403 on a
+	// typo'd URL is worse for callers and protects nothing.
+	t.Run("unmatched paths bypass authorization and 404", func(t *testing.T) {
+		authzCalled := false
+		authzMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authzCalled = true
+				w.WriteHeader(http.StatusForbidden)
+			})
+		}
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{},
+			HTTPHandlerOptions{AuthzMiddleware: authzMiddleware})
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/not-a-real-endpoint", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		require.False(t, authzCalled, "unmatched paths must not be denied")
+		require.NotEqual(t, http.StatusForbidden, rec.Code)
+	})
+
 	t.Run("authorization middleware not applied to health endpoint", func(t *testing.T) {
 		authzCalled := false
 		authzMiddleware := func(next http.Handler) http.Handler {
