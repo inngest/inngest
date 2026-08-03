@@ -45,6 +45,13 @@ type RunStateKeyGenerator interface {
 	// DefersInput returns the key used to store each defer's arbitrary input
 	// data. This does not include defer metadata, which is stored in DefersMeta
 	DefersInput(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
+
+	// DefersControlMeta returns the key used to store each defer's opaque
+	// control metadata (e.g. SDK-stamped session layers). Like DefersInput, the
+	// values are written verbatim and never decoded by Lua, so they are immune
+	// to cjson's number-precision and empty-object mangling. DefersMeta holds
+	// the fields Lua does read and rewrite.
+	DefersControlMeta(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 }
 
 type runStateKeyGenerator struct {
@@ -87,6 +94,10 @@ func (s runStateKeyGenerator) DefersMeta(ctx context.Context, isSharded bool, fn
 
 func (s runStateKeyGenerator) DefersInput(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:defers-input:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
+}
+
+func (s runStateKeyGenerator) DefersControlMeta(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:defers-control-meta:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
 func (s runStateKeyGenerator) Stack(ctx context.Context, isSharded bool, runID ulid.ULID) string {
