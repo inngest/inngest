@@ -56,12 +56,14 @@ func TestUnmarshalJSON(t *testing.T) {
 		r.Error(err)
 	})
 
-	t.Run("invalid session value type returns error", func(t *testing.T) {
+	t.Run("null manual session value is a tombstone, not an error", func(t *testing.T) {
 		r := require.New(t)
 
 		var evt Event
 		err := json.Unmarshal([]byte(`{"name":"test/event","data":{},"meta":{"sessions":{"conversation_id":null}}}`), &evt)
-		r.EqualError(err, `event session "conversation_id" must be a string or number`)
+		r.NoError(err)
+		// The tombstone is captured off the wire, not surfaced as a session id.
+		r.Empty(evt.Meta.Sessions)
 	})
 
 	t.Run("boolean session value returns error", func(t *testing.T) {
@@ -69,7 +71,7 @@ func TestUnmarshalJSON(t *testing.T) {
 
 		var evt Event
 		err := json.Unmarshal([]byte(`{"name":"test/event","data":{},"meta":{"sessions":{"active":true}}}`), &evt)
-		r.EqualError(err, `event session "active" must be a string or number`)
+		r.EqualError(err, `event session "active" must be a string, number, or null`)
 	})
 
 	t.Run("preserves numeric session precision", func(t *testing.T) {
