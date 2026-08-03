@@ -146,7 +146,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		"run_id", opts.Data.RunId,
 		"req_id", opts.Data.RequestId,
 		"function_id", opts.Data.FunctionId,
-		"app_id", opts.Data.AppId,
+		"fn_slug", opts.Data.FunctionSlug,
 	)
 
 	traceCtx, span := i.tracer.NewUserSpan(traceCtx, "Proxy", opts.AccountID, opts.EnvID, opts.FunctionID)
@@ -414,14 +414,13 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			span.RecordError(err)
 			l.ReportError(err, "could not assign request lease to worker", logger.WithErrorReportTags(map[string]string{
 				"instance_id": routedInstanceID,
-				"request_id":  opts.Data.RequestId,
 				"gateway_id":  route.GatewayID.String(),
 			}))
 
 		}
 
 		// Trace the request lease assignment
-		l.Trace("assigned request lease to worker", "instance_id", routedInstanceID, "request_id", opts.Data.RequestId, "gateway_id", route.GatewayID.String())
+		l.Trace("assigned request lease to worker", "instance_id", routedInstanceID, "gateway_id", route.GatewayID.String())
 
 		transport := "grpc"
 
@@ -433,9 +432,6 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				"attempt", forwardAttempt,
 				"gateway_id", route.GatewayID.String(),
 				"conn_id", route.ConnectionID.String(),
-				"req_id", opts.Data.RequestId,
-				"run_id", opts.Data.RunId,
-				"fn_slug", opts.Data.FunctionSlug,
 			)
 
 			// Forward now awaits the SDK to ack a job, so an error means that it's likely
@@ -457,7 +453,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			route, err = routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
 			if err != nil {
-				l.Warn("re-route failed", "attempt", forwardAttempt+1, "err", err, "req_id", opts.Data.RequestId, "run_id", opts.Data.RunId)
+				l.Warn("re-route failed", "attempt", forwardAttempt+1, "err", err)
 				break
 			}
 			routedInstanceID = route.InstanceID
