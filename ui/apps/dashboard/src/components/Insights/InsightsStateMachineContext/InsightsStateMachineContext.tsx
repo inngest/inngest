@@ -10,10 +10,8 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { makeQuerySnapshot } from '../queries';
-import {
-  trackInsightsQueryRan,
-  type InsightsQueryRunTrigger,
-} from '../tracking';
+import { trackInsightsQueryRan } from '../tracking';
+import type { InsightsQueryRunTrigger } from '../types';
 import type { InsightsFetchResult, InsightsStatus } from './types';
 import { useFetchInsights } from './useFetchInsights';
 

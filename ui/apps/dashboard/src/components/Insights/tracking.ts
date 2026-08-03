@@ -1,20 +1,13 @@
 import { analytics } from '@/utils/segment';
 import { UNTITLED_QUERY } from './InsightsTabManager/constants';
 import type { InsightsFetchResult } from './InsightsStateMachineContext/types';
-import type { Tab } from './types';
+import type { InsightsQueryRunTrigger, Tab } from './types';
 
 /**
  * Events tracked via Segment should always follow these patterns:
  * - Name: <Object> <Action, past tense>, using title case, with spaces, ex. "Query Created" "Dashboard Chart Added"
  * - Properties: Always snake_case
  */
-
-export type InsightsQueryRunTrigger =
-  | 'ai_assistant'
-  | 'button'
-  | 'context_menu'
-  | 'keyboard'
-  | 'unknown';
 
 type InsightsQueryRunResult = 'failure' | 'success';
 

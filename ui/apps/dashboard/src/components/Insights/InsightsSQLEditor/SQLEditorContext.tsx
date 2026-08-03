@@ -11,7 +11,7 @@ import * as Sentry from '@sentry/tanstackstart-react';
 import type { SQLEditorInstance } from '@inngest/components/SQLEditor/SQLEditor';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
-import type { InsightsQueryRunTrigger } from '../tracking';
+import type { InsightsQueryRunTrigger } from '../types';
 import { formatSQL } from './utils';
 
 type SQLEditorContextValue = {
