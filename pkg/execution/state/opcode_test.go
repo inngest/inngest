@@ -274,3 +274,50 @@ func TestDeferAddOpts_Validate(t *testing.T) {
 		require.NoError(t, opts.Validate())
 	})
 }
+
+// TestInvokeFunctionOptsPreservesSessionNulls pins that RFC 7386 null
+// tombstones on the invoke payload survive decoding into InvokeFunctionOpts.
+//
+// GeneratorOpcode.Opts is `any`, so UnmarshalAny round-trips through a generic
+// map where a JSON null stays nil and re-marshals as null, reaching
+// EventMeta.UnmarshalJSON intact. A typed intermediate would silently drop the
+// tombstones — EventMeta holds them in unexported fields and has no
+// MarshalJSON — which would both break clearing and understate the executor's
+// session adoption metric.
+func TestInvokeFunctionOptsPreservesSessionNulls(t *testing.T) {
+	cases := []struct {
+		name        string
+		sessions    string
+		wantNulling bool
+	}{
+		{name: "per-key tombstone", sessions: `{"conv_id":null}`, wantNulling: true},
+		{name: "whole-field null", sessions: `null`, wantNulling: true},
+		{name: "concrete keys only", sessions: `{"conv_id":"123"}`, wantNulling: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := require.New(t)
+
+			// Decode the SDK's opcode the way the executor does: into the
+			// generic `Opts any` field, then through InvokeFunctionOpts.
+			raw := `{"op":"InvokeFunction","id":"1","opts":{"function_id":"fn",` +
+				`"payload":{"name":"evt","meta":{"sessions":` + tc.sessions +
+				`,"propagated_sessions":{"conv_id":"inherited"}}}}}`
+			var gen GeneratorOpcode
+			r.NoError(json.Unmarshal([]byte(raw), &gen))
+
+			opts, err := gen.InvokeFunctionOpts()
+			r.NoError(err)
+			r.NotNil(opts.Payload)
+
+			res := opts.Payload.Meta.ResolveSessions()
+			r.Equal(tc.wantNulling, res.Nulling)
+			r.True(res.Propagated)
+			if tc.wantNulling {
+				r.NotContains(opts.Payload.Meta.Sessions, "conv_id",
+					"the inherited key is cut by the tombstone")
+			}
+		})
+	}
+}
