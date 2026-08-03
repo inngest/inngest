@@ -2,10 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
-import {
-  latestMetricDataValue,
-  sumScopedMetricData,
-} from '@/components/Metrics/metricAggregation';
+import { latestMetricDataValue } from '@/components/Metrics/metricAggregation';
 import { graphql } from '@/gql';
 import {
   GetBillableExecutionsDocument,
@@ -266,9 +263,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     const backlogDepth = latestBucketMetricTotal(
       volume.data?.workspace.backlog.metrics,
     );
-    const accountConcurrency = sumScopedMetricData(
-      volume.data?.workspace.stepRunning.metrics,
-    );
+    const accountConcurrency = volume.data?.accountConcurrency.data ?? [];
     const currentConcurrency = latestMetricDataValue(accountConcurrency);
     const proPlanAmountCents = pickCheapestEnabledProPlanAmount(
       availablePlans.data?.plans,
@@ -357,7 +352,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     volume.data?.workspace.sdkThroughputEnded.metrics,
     volume.data?.workspace.sdkThroughputStarted.metrics,
     volume.data?.workspace.stepThroughput.metrics,
-    volume.data?.workspace.stepRunning.metrics,
+    volume.data?.accountConcurrency.data,
     volume.data?.workspace.workerPercentageUsed.metrics,
     volume.data?.workspace.workerTotalCapacity.metrics,
   ]);

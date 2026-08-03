@@ -20,10 +20,7 @@ import {
   ConnectWorkerTotalCapacity,
 } from './ConnectWorkerMetrics';
 import { type EntityLookup } from './Dashboard';
-import {
-  sumScopedMetricData,
-  sumScopedMetricsByGroup,
-} from './metricAggregation';
+import { sumScopedMetricsByGroup } from './metricAggregation';
 import { RunsThrougput } from './RunsThroughput';
 import { SdkThroughput } from './SdkThroughput';
 import { StepsThroughput } from './StepsThroughput';
@@ -51,14 +48,22 @@ type AllFunctionConcurrencyMetrics = {
   }>;
 };
 
-type VolumeMetricsWithAllFunctionConcurrencyQuery = {
+type AccountConcurrencyMetrics = {
+  data: Array<{
+    value: number;
+    bucket: string;
+  }>;
+};
+
+type VolumeMetricsWithConcurrencyQuery = {
+  accountConcurrency: AccountConcurrencyMetrics;
   workspace: VolumeMetricsQuery['workspace'] & {
     allFunctionConcurrency: AllFunctionConcurrencyMetrics;
   };
 };
 
 const GetVolumeMetrics: TypedDocumentNode<
-  VolumeMetricsWithAllFunctionConcurrencyQuery,
+  VolumeMetricsWithConcurrencyQuery,
   VolumeMetricsQueryVariables
 > = gql`
   query VolumeMetrics(
@@ -69,6 +74,18 @@ const GetVolumeMetrics: TypedDocumentNode<
     $until: Time
     $scope: MetricsScope!
   ) {
+    # accountConcurrency is the unscoped account-level gauge, read directly as a
+    # single series. Account-scoped rows carry workspace_id = nil,
+    # so they are only reachable from the root field, never from workspace().
+    accountConcurrency: metrics(
+      opts: { name: "steps_running", from: $from, to: $until }
+    ) {
+      data {
+        bucket
+        value
+      }
+    }
+
     workspace(id: $workspaceId) {
       allFunctionConcurrency: scopedMetrics(
         filter: {
@@ -330,9 +347,7 @@ export const MetricsVolume = ({
 
   error && console.error('Error fetcthing metrics data for', variables, error);
 
-  const accountConcurrency = data
-    ? sumScopedMetricData(data.workspace.allFunctionConcurrency.metrics)
-    : undefined;
+  const accountConcurrency = data?.accountConcurrency.data;
 
   const appConcurrency = data
     ? sumScopedMetricsByGroup(
