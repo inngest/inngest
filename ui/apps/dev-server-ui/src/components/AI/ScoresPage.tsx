@@ -11,7 +11,7 @@ export function ScoresPage() {
 
   return (
     <div className="flex h-full flex-col overflow-y-scroll">
-      <Header breadcrumb={[{ text: 'AI' }, { text: 'Scores' }]} />
+      <Header breadcrumb={[{ text: 'Scores' }]} />
       <ScoresEmptyStateView
         onView={() => track('viewed')}
         onPromptCopy={() => track('prompt_copied')}

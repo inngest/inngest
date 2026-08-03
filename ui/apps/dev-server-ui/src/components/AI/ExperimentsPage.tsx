@@ -11,7 +11,7 @@ export function ExperimentsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-y-scroll">
-      <Header breadcrumb={[{ text: 'AI' }, { text: 'Experiments' }]} />
+      <Header breadcrumb={[{ text: 'Experiments' }]} />
       <ExperimentsEmptyStateView
         onView={() => track('viewed')}
         onPromptCopy={() => track('prompt_copied')}
