@@ -119,7 +119,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        # Benchmark: Depot 4 vCPU. Compare against the 2 vCPU variant before
+        # settling on a size.
+        os: [depot-ubuntu-22.04-4]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
         parallelism: [5]
