@@ -4,6 +4,8 @@ import { AlertModal } from '@inngest/components/Modal';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
+import { trackKeyRevoked } from '@/utils/analyticsEvents';
+
 import { graphql } from '@/gql';
 import { apiKeyErrorMessage } from './errorMessage';
 
@@ -42,6 +44,7 @@ export function DeleteAPIKeyModal({ isOpen, onClose, keyID, keyName }: Props) {
         setError(apiKeyErrorMessage(res.error, 'Could not delete API key.'));
         return;
       }
+      trackKeyRevoked({ feature: 'api-keys', keyID });
       toast.success('API key deleted');
       onClose();
     } finally {

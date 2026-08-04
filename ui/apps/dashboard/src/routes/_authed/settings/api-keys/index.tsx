@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
-import { Switch } from '@inngest/components/Switch';
 import {
   Tooltip,
   TooltipContent,
@@ -19,12 +18,9 @@ import {
   APIKeysTable,
   type APIKeyRow,
 } from '@/components/APIKeys/APIKeysTable';
-import {
-  allowMemberKeysEnabled,
-  AllowMemberKeysQuery,
-  settingQueryContext,
-} from '@/components/APIKeys/allowMemberKeys';
 import { CreateAPIKeyModal } from '@/components/APIKeys/CreateAPIKeyModal';
+import { APIKeyGrantsQuery } from '@/components/APIKeys/grants';
+import { MemberKeyPolicyCard } from '@/components/APIKeys/MemberKeyPolicyCard';
 import { DeleteAPIKeyModal } from '@/components/APIKeys/DeleteAPIKeyModal';
 import { RenameAPIKeyModal } from '@/components/APIKeys/RenameAPIKeyModal';
 import { useAPIKeys } from '@/components/APIKeys/useAPIKeys';
@@ -48,53 +44,20 @@ function APIKeysPage() {
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
-  const settingRes = useGraphQLQuery({
-    query: AllowMemberKeysQuery,
+  // Members may mint only when the account policy says so; the policy card
+  // below is where an admin changes it.
+  const policyRes = useGraphQLQuery({
+    query: APIKeyGrantsQuery,
     variables: {},
-    context: settingQueryContext,
   });
-  const [, setAllowMemberKeys] = useMutation(SetAllowMemberKeysMutation);
-  // Optimistic toggle value; the query refetch confirms it after the
-  // mutation invalidates AccountSetting.
-  const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null);
-  const [settingSaving, setSettingSaving] = useState(false);
-  const [settingError, setSettingError] = useState<string | null>(null);
-
-  // If the setting can't be read, members just see the admins-only default.
-  const memberKeysEnabled = allowMemberKeysEnabled(
-    settingRes.data?.account.setting?.value,
-  );
-  const canCreate = isAdmin || memberKeysEnabled;
-
-  // Clear the optimistic value once the refetch confirms it, so it can't
-  // shadow another admin's later toggle.
-  useEffect(() => {
-    if (pendingEnabled !== null && pendingEnabled === memberKeysEnabled) {
-      setPendingEnabled(null);
-    }
-  }, [pendingEnabled, memberKeysEnabled]);
+  const canCreate =
+    isAdmin || (policyRes.data?.account.memberAPIKeyPolicy.enabled ?? false);
 
   // Create modal state is owned here so it survives the empty->populated
   // transition that unmounts the EmptyState.
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<APIKeyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<APIKeyRow | null>(null);
-
-  async function toggleAllowMemberKeys(enabled: boolean) {
-    setPendingEnabled(enabled);
-    setSettingSaving(true);
-    try {
-      const mutRes = await setAllowMemberKeys({ enabled }, settingQueryContext);
-      if (mutRes.error) {
-        setPendingEnabled(null);
-        setSettingError('Could not update the policy. Try again.');
-      } else {
-        setSettingError(null);
-      }
-    } finally {
-      setSettingSaving(false);
-    }
-  }
 
   if (res.error) {
     throw res.error;
@@ -158,29 +121,7 @@ function APIKeysPage() {
         )}
       </div>
 
-      {isAdmin && (
-        <div className="border-subtle flex items-start justify-between gap-4 rounded-md border p-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-basis text-sm font-medium">
-              Allow members to create API keys
-            </span>
-            <span className="text-subtle text-sm">
-              Members can create API keys from this page or by logging in with
-              the Inngest CLI. Admins can always create API keys.
-            </span>
-            {settingError && (
-              <Alert severity="error" className="mt-2 text-sm">
-                {settingError}
-              </Alert>
-            )}
-          </div>
-          <Switch
-            checked={pendingEnabled ?? memberKeysEnabled}
-            onCheckedChange={toggleAllowMemberKeys}
-            disabled={settingSaving || settingRes.isLoading}
-          />
-        </div>
-      )}
+      {isAdmin && <MemberKeyPolicyCard />}
 
       {keys.length === 0 ? (
         <APIKeysEmptyState

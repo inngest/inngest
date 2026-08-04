@@ -70,7 +70,10 @@ type AnalyticsEventName =
   | 'Empty State Example Copied'
   | 'Empty State Prompt Copied'
   | 'Empty State Viewed'
+  | 'Key Created'
+  | 'Key Revoked'
   | 'List Viewed'
+  | 'Member Key Policy Updated'
   | 'Opened In Insights'
   | 'Scoring Weight Updated'
   | 'Waitlist Form Submitted'
@@ -217,5 +220,62 @@ export function trackWaitlistFormSubmitted({
   track('Waitlist Form Submitted', feature, {
     can_contact: canContact,
     message: message,
+  });
+}
+
+type KeyCreatedArgs = {
+  feature: AnalyticsFeature;
+  keyID: string;
+  envID: string;
+  /** Number of grants on the new key, not the grants themselves. */
+  grantCount: number;
+  /** Which mint surface: the dashboard modal or the CLI device-login page. */
+  surface: 'dashboard' | 'device-login';
+};
+
+export function trackKeyCreated({
+  feature,
+  keyID,
+  envID,
+  grantCount,
+  surface,
+}: KeyCreatedArgs) {
+  track('Key Created', feature, {
+    key_id: keyID,
+    env_id: envID,
+    grant_count: grantCount,
+    surface,
+  });
+}
+
+type KeyRevokedArgs = {
+  feature: AnalyticsFeature;
+  keyID: string;
+  /** Absent where the revoking surface doesn't have it to hand. */
+  envID?: string;
+};
+
+export function trackKeyRevoked({ feature, keyID, envID }: KeyRevokedArgs) {
+  track('Key Revoked', feature, { key_id: keyID, env_id: envID });
+}
+
+type MemberKeyPolicyUpdatedArgs = {
+  feature: AnalyticsFeature;
+  enabled: boolean;
+  allowProduction: boolean;
+  /** Count only — the grant list itself is not useful as an event property. */
+  grantCount: number;
+};
+
+export function trackMemberKeyPolicyUpdated({
+  feature,
+  enabled,
+  allowProduction,
+  grantCount,
+}: MemberKeyPolicyUpdatedArgs) {
+  track('Member Key Policy Updated', feature, {
+    enabled,
+    allow_production: allowProduction,
+    grant_count: grantCount,
   });
 }

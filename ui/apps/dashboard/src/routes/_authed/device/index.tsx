@@ -7,14 +7,15 @@ import { createFileRoute, useLoaderData } from '@tanstack/react-router';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import {
-  allowMemberKeysEnabled,
-  AllowMemberKeysQuery,
-  settingQueryContext,
-} from '@/components/APIKeys/allowMemberKeys';
-import {
   EnvironmentSelect,
   useEnvironmentSelection,
 } from '@/components/APIKeys/EnvironmentSelect';
+import { GrantPicker } from '@/components/APIKeys/GrantPicker';
+import {
+  APIKeyGrantsQuery,
+  defaultSelection,
+  permittedGrants,
+} from '@/components/APIKeys/grants';
 import ApprovalDialog from '@/components/Intent/ApprovalDialog';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
@@ -58,13 +59,25 @@ function DeviceLoginComponent() {
   // policy gates the screen.
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
-  const settingRes = useGraphQLQuery({
-    query: AllowMemberKeysQuery,
-    variables: {},
-    context: settingQueryContext,
-  });
 
   const { selectedEnv, setSelectedEnv, envGroups } = useEnvironmentSelection();
+
+  // The approving user chooses what the CLI's key may do. DeviceConfirm
+  // validates the selection against the account's member policy, so this is a
+  // convenience rather than the control.
+  const grantsRes = useGraphQLQuery({
+    query: APIKeyGrantsQuery,
+    variables: {},
+  });
+  const catalog = grantsRes.data?.apiKeyGrants ?? [];
+  const policy = grantsRes.data?.account.memberAPIKeyPolicy;
+  const permitted = permittedGrants(catalog, policy, isAdmin);
+  const [selectedGrants, setSelectedGrants] = useState<string[] | null>(null);
+  // Default to Read Only, narrowed to what this user may mint — a login flow
+  // should not hand out write access because someone clicked through quickly.
+  const grants =
+    selectedGrants ??
+    (catalog.length > 0 ? defaultSelection(catalog, permitted) : []);
 
   if (!clientID || !UUID_REGEX.test(clientID)) {
     return (
@@ -102,8 +115,7 @@ function DeviceLoginComponent() {
 
   // If the setting can't be read, members see the admins-only default; the
   // server enforces the policy on confirm anyway.
-  const canMint =
-    isAdmin || allowMemberKeysEnabled(settingRes.data?.account.setting?.value);
+  const canMint = isAdmin || (policy?.enabled ?? false);
   if (!canMint) {
     return (
       <StatusMessage title="You need permission to create API keys">
@@ -142,11 +154,18 @@ function DeviceLoginComponent() {
             Authorization: `Bearer ${sessionToken}`,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams({
-            client_id: clientID,
-            user_code: code,
-            workspace_id: selectedEnv.id,
-          }),
+          body: (() => {
+            const body = new URLSearchParams({
+              client_id: clientID,
+              user_code: code,
+              workspace_id: selectedEnv.id,
+            });
+            // Repeated field: the endpoint reads r.Form["grants"].
+            for (const grant of grants) {
+              body.append('grants', grant);
+            }
+            return body;
+          })(),
         },
       );
       if (!response.ok) {
@@ -188,6 +207,21 @@ function DeviceLoginComponent() {
                 onChange={setSelectedEnv}
               />
             </div>
+            {catalog.length > 0 && (
+              <div className="text-left">
+                <GrantPicker
+                  grants={catalog}
+                  selected={grants}
+                  onChange={setSelectedGrants}
+                  permitted={permitted}
+                  restrictionNote={
+                    isAdmin
+                      ? undefined
+                      : 'Some permissions are unavailable on this account. Ask an org admin to change what members may grant.'
+                  }
+                />
+              </div>
+            )}
             <div className="flex flex-col gap-2 text-left">
               <label
                 htmlFor="user_code"
