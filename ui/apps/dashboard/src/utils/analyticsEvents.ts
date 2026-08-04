@@ -56,6 +56,7 @@ import type { ScoreKind } from '@inngest/components/Experiments';
 // Alphabetical — this list is the only place a valid feature name is defined.
 export type AnalyticsFeature =
   | 'ai-overview'
+  | 'api-keys'
   | 'experiments'
   | 'sandboxes'
   | 'scores'
@@ -226,7 +227,8 @@ export function trackWaitlistFormSubmitted({
 type KeyCreatedArgs = {
   feature: AnalyticsFeature;
   keyID: string;
-  envID: string;
+  /** Every environment the key covers — a key may span several. */
+  envIDs: string[];
   /** Number of grants on the new key, not the grants themselves. */
   grantCount: number;
   /** Which mint surface: the dashboard modal or the CLI device-login page. */
@@ -236,13 +238,14 @@ type KeyCreatedArgs = {
 export function trackKeyCreated({
   feature,
   keyID,
-  envID,
+  envIDs,
   grantCount,
   surface,
 }: KeyCreatedArgs) {
   track('Key Created', feature, {
     key_id: keyID,
-    env_id: envID,
+    env_ids: envIDs.join(','),
+    env_count: envIDs.length,
     grant_count: grantCount,
     surface,
   });

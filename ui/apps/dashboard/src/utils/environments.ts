@@ -12,7 +12,9 @@ export type Environment = {
   hasParent: boolean;
   name: string;
   slug: string;
-  webhookSigningKey: string;
+  // Null when the environment has no active signing key. The field is nullable so
+  // one such environment cannot null the whole environments list.
+  webhookSigningKey: string | null;
   createdAt: string;
   isArchived: boolean;
   isAutoArchiveEnabled: boolean | null | undefined;

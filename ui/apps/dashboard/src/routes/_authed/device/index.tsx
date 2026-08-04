@@ -7,9 +7,9 @@ import { createFileRoute, useLoaderData } from '@tanstack/react-router';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import {
-  EnvironmentSelect,
+  EnvironmentMultiSelect,
   useEnvironmentSelection,
-} from '@/components/APIKeys/EnvironmentSelect';
+} from '@/components/APIKeys/EnvironmentMultiSelect';
 import { GrantPicker } from '@/components/APIKeys/GrantPicker';
 import {
   APIKeyGrantsQuery,
@@ -60,8 +60,6 @@ function DeviceLoginComponent() {
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
-  const { selectedEnv, setSelectedEnv, envGroups } = useEnvironmentSelection();
-
   // The approving user chooses what the CLI's key may do. DeviceConfirm
   // validates the selection against the account's member policy, so this is a
   // convenience rather than the control.
@@ -72,6 +70,11 @@ function DeviceLoginComponent() {
   const catalog = grantsRes.data?.apiKeyGrants ?? [];
   const policy = grantsRes.data?.account.memberAPIKeyPolicy;
   const permitted = permittedGrants(catalog, policy, isAdmin);
+  const allowProduction = isAdmin || (policy?.allowProduction ?? false);
+
+  const { selectedEnvs, setSelectedEnvs, envGroups } = useEnvironmentSelection({
+    allowProduction,
+  });
   const [selectedGrants, setSelectedGrants] = useState<string[] | null>(null);
   // Default to Read Only, narrowed to what this user may mint — a login flow
   // should not hand out write access because someone clicked through quickly.
@@ -105,7 +108,7 @@ function DeviceLoginComponent() {
     );
   }
 
-  if (!orgLoaded || (!isAdmin && settingRes.isLoading)) {
+  if (!orgLoaded || (!isAdmin && grantsRes.isLoading)) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoadingIcon />
@@ -133,8 +136,8 @@ function DeviceLoginComponent() {
       setError('Enter the code shown in your terminal.');
       return;
     }
-    if (!selectedEnv) {
-      setError('Select an environment for the API key.');
+    if (selectedEnvs.length === 0) {
+      setError('Select at least one environment for the API key.');
       return;
     }
     setLoading(true);
@@ -158,9 +161,12 @@ function DeviceLoginComponent() {
             const body = new URLSearchParams({
               client_id: clientID,
               user_code: code,
-              workspace_id: selectedEnv.id,
             });
-            // Repeated field: the endpoint reads r.Form["grants"].
+            // Repeated fields: the endpoint reads r.Form["workspace_ids"] and
+            // r.Form["grants"].
+            for (const env of selectedEnvs) {
+              body.append('workspace_ids', env.id);
+            }
             for (const grant of grants) {
               body.append('grants', grant);
             }
@@ -193,18 +199,24 @@ function DeviceLoginComponent() {
         <>
           <p className="my-6">
             Approving creates an API key that grants the Inngest CLI access to
-            one of your environments. The key appears on your API keys settings
-            page, where you can remove it at any time.
+            the environments you choose. The key appears on your API keys
+            settings page, where you can remove it at any time.
           </p>
-          <div className="mx-auto flex max-w-xs flex-col gap-4">
+          <div className="mx-auto flex max-w-md flex-col gap-4">
             <div className="flex flex-col gap-2 text-left">
               <label className="text-basis text-sm font-medium">
-                Environment
+                Environments
               </label>
-              <EnvironmentSelect
+              <EnvironmentMultiSelect
                 groups={envGroups}
-                value={selectedEnv}
-                onChange={setSelectedEnv}
+                value={selectedEnvs}
+                onChange={setSelectedEnvs}
+                disabled={loading}
+                productionNote={
+                  allowProduction
+                    ? undefined
+                    : 'Production is not available for member keys.'
+                }
               />
             </div>
             {catalog.length > 0 && (
@@ -214,12 +226,20 @@ function DeviceLoginComponent() {
                   selected={grants}
                   onChange={setSelectedGrants}
                   permitted={permitted}
+                  disabled={loading}
+                  summaryNote="you can narrow this key"
                   restrictionNote={
                     isAdmin
                       ? undefined
-                      : 'Some permissions are unavailable on this account. Ask an org admin to change what members may grant.'
+                      : "Your admins set which grants member keys may have. Locked grants can't be selected."
                   }
                 />
+                {!isAdmin && (
+                  <p className="text-light mt-2 text-xs">
+                    Ask an admin to update the member key policy if you need
+                    more.
+                  </p>
+                )}
               </div>
             )}
             <div className="flex flex-col gap-2 text-left">
