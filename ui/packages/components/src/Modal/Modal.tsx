@@ -48,43 +48,45 @@ export function Modal({
     <Dialog.Root open={isOpen} onOpenChange={onClose} modal>
       <AnimatePresence>
         <Dialog.Portal container={container}>
+          {/* The overlay must be a SIBLING of Dialog.Content, not its ancestor.
+              It is aria-hidden (it is decorative), and aria-hidden is inherited —
+              nesting the content inside it removed the whole modal, title, inputs
+              and buttons included, from the accessibility tree. */}
           <Dialog.Overlay
-            asChild
             className="bg-overlay/20 dark:bg-overlay/50 fixed inset-0 z-[100] transition-opacity"
             aria-hidden="true"
-          >
-            {/* Full-screen container to center the panel */}
-            <div className="fixed inset-0 z-[100]">
-              <motion.div
+          />
+          {/* Full-screen container to center the panel */}
+          <div className="fixed inset-0 z-[100]">
+            <motion.div
+              className={cn(
+                alignTop ? 'items-baseline' : 'items-center',
+                'flex h-full w-full justify-center p-6'
+              )}
+              initial={{ y: -20, opacity: 0.2 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{
+                y: -20,
+                opacity: 0.2,
+                transition: { duration: 0.2, type: 'tween' },
+              }}
+              transition={{
+                duration: 0.15,
+                type: 'tween',
+              }}
+            >
+              <Dialog.Content
                 className={cn(
-                  alignTop ? 'items-baseline' : 'items-center',
-                  'flex h-full w-full justify-center p-6'
+                  'bg-modalBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-md border shadow-2xl',
+                  className
                 )}
-                initial={{ y: -20, opacity: 0.2 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{
-                  y: -20,
-                  opacity: 0.2,
-                  transition: { duration: 0.2, type: 'tween' },
-                }}
-                transition={{
-                  duration: 0.15,
-                  type: 'tween',
-                }}
               >
-                <Dialog.Content
-                  className={cn(
-                    'bg-modalBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-md border shadow-2xl',
-                    className
-                  )}
-                >
-                  {(title || description) && <Header description={description}>{title}</Header>}
-                  {children}
-                  {footer && <Footer>{footer}</Footer>}
-                </Dialog.Content>
-              </motion.div>
-            </div>
-          </Dialog.Overlay>
+                {(title || description) && <Header description={description}>{title}</Header>}
+                {children}
+                {footer && <Footer>{footer}</Footer>}
+              </Dialog.Content>
+            </motion.div>
+          </div>
         </Dialog.Portal>
       </AnimatePresence>
     </Dialog.Root>
