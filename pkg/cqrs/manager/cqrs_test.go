@@ -16,6 +16,7 @@ import (
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
@@ -3381,6 +3382,29 @@ func TestSessionRunsUseTraceRunCandidates(t *testing.T) {
 	assert.Equal(t, queuedAt, runs[0].QueuedAt)
 	assert.Equal(t, "test-function", runs[0].FunctionSlug)
 	assert.Equal(t, "app/test", *runs[0].EventName)
+}
+
+func TestSessionKeysRespectTransactions(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	workspaceID := uuid.New()
+	tx, err := cm.WithTx(ctx)
+	require.NoError(t, err)
+	nestedTx, err := tx.WithTx(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, nestedTx.RecordSessionKeys(ctx, workspaceID, event.Sessions{"thread": "thread-1"}))
+	keys, err := tx.GetSessionKeys(ctx, workspaceID, "")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	assert.Equal(t, "thread", keys[0].SessionKey)
+
+	require.NoError(t, tx.Rollback(ctx))
+	keys, err = cm.GetSessionKeys(ctx, workspaceID, "")
+	require.NoError(t, err)
+	assert.Empty(t, keys)
 }
 
 //

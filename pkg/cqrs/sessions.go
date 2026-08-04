@@ -46,11 +46,6 @@ type SessionRun struct {
 	EndedAt      *time.Time
 }
 
-type SessionKeyRecord struct {
-	WorkspaceID uuid.UUID
-	Key         string
-}
-
 type SessionTimeRange struct {
 	From  time.Time
 	Until time.Time

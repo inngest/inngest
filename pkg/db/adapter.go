@@ -5,6 +5,14 @@ import (
 	"database/sql"
 )
 
+// DBTX is the common query interface implemented by *sql.DB and *sql.Tx.
+type DBTX interface {
+	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+	PrepareContext(context.Context, string) (*sql.Stmt, error)
+	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
+}
+
 // Dialect identifies a database backend.
 type Dialect string
 
@@ -32,6 +40,9 @@ type Adapter interface {
 
 	// Conn returns the underlying *sql.DB for raw queries (e.g. goqu dynamic SQL).
 	Conn() *sql.DB
+
+	// RawDB returns the transaction-aware executor for raw queries.
+	RawDB() DBTX
 
 	// Close releases any resources held by the adapter.
 	Close() error

@@ -14,35 +14,20 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/tracing/meta"
-	"github.com/inngest/inngest/pkg/util/ttlupsert"
 	"github.com/oklog/ulid/v2"
 )
 
 const sessionRunScanLimit = 2000
-
-func newSessionKeyUpserter() ttlupsert.Upserter[cqrs.SessionKeyRecord] {
-	return ttlupsert.NewWithKey(func(record cqrs.SessionKeyRecord) string {
-		return record.WorkspaceID.String() + ":" + record.Key
-	})
-}
 
 func (w wrapper) RecordSessionKeys(ctx context.Context, workspaceID uuid.UUID, eventSessions event.Sessions) error {
 	if workspaceID == uuid.Nil || len(eventSessions) == 0 {
 		return nil
 	}
 
-	upserts := w.sessionKeyUpserts
-	if upserts == nil {
-		upserts = newSessionKeyUpserter()
-	}
-
 	keys := uniqueSessionKeys(eventSessions)
 	var resultErr error
 	for _, key := range keys {
-		record := cqrs.SessionKeyRecord{WorkspaceID: workspaceID, Key: key}
-		_, err := upserts.Upsert(ctx, record, func(ctx context.Context) error {
-			return w.recordSessionKey(ctx, record)
-		})
+		err := w.recordSessionKey(ctx, workspaceID, key)
 		if err != nil {
 			resultErr = errors.Join(resultErr, err)
 		}
@@ -50,16 +35,16 @@ func (w wrapper) RecordSessionKeys(ctx context.Context, workspaceID uuid.UUID, e
 	return resultErr
 }
 
-func (w wrapper) recordSessionKey(ctx context.Context, record cqrs.SessionKeyRecord) error {
-	if record.WorkspaceID == uuid.Nil || record.Key == "" {
+func (w wrapper) recordSessionKey(ctx context.Context, workspaceID uuid.UUID, key string) error {
+	if workspaceID == uuid.Nil || key == "" {
 		return nil
 	}
 
 	sqlQuery, args, err := sq.Dialect(w.dialect()).
 		Insert("session_keys").
 		Rows(sq.Record{
-			"workspace_id": record.WorkspaceID.String(),
-			"session_key":  record.Key,
+			"workspace_id": workspaceID.String(),
+			"session_key":  key,
 		}).
 		OnConflict(sq.DoNothing()).
 		ToSQL()
@@ -67,7 +52,7 @@ func (w wrapper) recordSessionKey(ctx context.Context, record cqrs.SessionKeyRec
 		return fmt.Errorf("build record session key query: %w", err)
 	}
 
-	if _, err := w.adapter.Conn().ExecContext(ctx, sqlQuery, args...); err != nil {
+	if _, err := w.adapter.RawDB().ExecContext(ctx, sqlQuery, args...); err != nil {
 		return fmt.Errorf("record session key: %w", err)
 	}
 	return nil
@@ -95,7 +80,7 @@ func (w wrapper) GetSessionKeys(ctx context.Context, workspaceID uuid.UUID, sear
 		return nil, fmt.Errorf("build get session keys query: %w", err)
 	}
 
-	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
+	rows, err := w.adapter.RawDB().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get session keys: %w", err)
 	}
@@ -297,7 +282,7 @@ func (w wrapper) sessionTraceRuns(ctx context.Context, workspaceID uuid.UUID, tr
 		return nil, fmt.Errorf("build session trace runs query: %w", err)
 	}
 
-	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
+	rows, err := w.adapter.RawDB().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get session trace runs: %w", err)
 	}

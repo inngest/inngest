@@ -35,7 +35,6 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/inngest/inngest/pkg/util/ttlupsert"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 )
@@ -66,17 +65,14 @@ func New(adapter dbpkg.Adapter) cqrs.Manager {
 	// Force goqu to use prepared statements for consistency with sqlc
 	sq.SetDefaultPrepared(true)
 	return wrapper{
-		adapter:           helperAdapter,
-		q:                 helperAdapter.Q(),
-		sessionKeyUpserts: newSessionKeyUpserter(),
+		adapter: helperAdapter,
+		q:       helperAdapter.Q(),
 	}
 }
 
 type wrapper struct {
-	adapter           adapterWithHelpers
-	q                 dbpkg.Querier
-	tx                *sql.Tx
-	sessionKeyUpserts ttlupsert.Upserter[cqrs.SessionKeyRecord]
+	adapter adapterWithHelpers
+	q       dbpkg.Querier
 }
 
 var (
@@ -1043,8 +1039,7 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 }
 
 func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
-	if w.tx != nil {
-		// Already in a tx else DB would be present.
+	if _, ok := w.adapter.(dbpkg.TxAdapter); ok {
 		return w, nil
 	}
 	txAdapter, err := w.adapter.WithTx(ctx)
@@ -1061,9 +1056,8 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 	}
 
 	return &wrapper{
-		adapter:           txWithHelpers,
-		q:                 txAdapter.Q(),
-		sessionKeyUpserts: w.sessionKeyUpserts,
+		adapter: txWithHelpers,
+		q:       txAdapter.Q(),
 	}, nil
 }
 
