@@ -9,6 +9,10 @@ const Query = graphql(`
         name
         createdAt
         maskedKey
+        scopes {
+          name
+          allow
+        }
         env {
           id
           name

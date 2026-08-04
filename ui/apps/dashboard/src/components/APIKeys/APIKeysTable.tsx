@@ -1,4 +1,5 @@
 import { Button } from '@inngest/components/Button';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import { RiDeleteBin6Line, RiPencilLine } from '@remixicon/react';
@@ -22,6 +23,19 @@ type Props = {
   onDelete: (key: APIKeyRow) => void;
 };
 
+/**
+ * isLegacyKey reports whether a key predates permission grants.
+ *
+ * Such a key holds only the retired `api:app:sync` scope. The scope is shown as
+ * stored rather than translated into a modern grant: normalising it for display
+ * would hide the one thing worth knowing, which is that re-minting is what gives
+ * this key real permissions.
+ */
+function isLegacyKey(scopes: { name: string }[] | undefined): boolean {
+  if (!scopes || scopes.length === 0) return false;
+  return scopes.every((s) => s.name === 'api:app:sync');
+}
+
 const columnHelper = createColumnHelper<APIKeyRow>();
 
 export function APIKeysTable({ keys, canManage, onRename, onDelete }: Props) {
@@ -32,10 +46,23 @@ export function APIKeysTable({ keys, canManage, onRename, onDelete }: Props) {
         const row = info.row.original;
         return (
           <div className="flex flex-col">
-            <span className="text-basis text-sm">{row.name}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-basis text-sm">{row.name}</span>
+              {isLegacyKey(row.scopes) && (
+                <Pill appearance="outlined" kind="warning">
+                  Legacy
+                </Pill>
+              )}
+            </div>
             <span className="text-light font-mono text-xs">
               {row.maskedKey}
             </span>
+            {isLegacyKey(row.scopes) && (
+              <span className="text-light text-xs">
+                Predates permissions — can only sync apps. Create a new key to
+                choose what it can access.
+              </span>
+            )}
           </div>
         );
       },
