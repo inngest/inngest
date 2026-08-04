@@ -12,8 +12,6 @@ export const Route = createFileRoute(
 
 function SessionRunsPage() {
   const { sessionKey, sessionId } = Route.useParams();
-  const decodedSessionKey = decodeURIComponent(sessionKey);
-  const decodedSessionId = decodeURIComponent(sessionId);
 
   return (
     <>
@@ -21,17 +19,14 @@ function SessionRunsPage() {
         breadcrumb={[
           { text: 'Sessions', href: pathCreator.sessions({}) },
           {
-            text: decodedSessionKey,
-            href: pathCreator.sessions({ sessionKey: decodedSessionKey }),
+            text: sessionKey,
+            href: pathCreator.sessions({ sessionKey }),
           },
-          { text: decodedSessionId },
+          { text: sessionId },
         ]}
       />
       <ClientOnly>
-        <SessionRuns
-          sessionKey={decodedSessionKey}
-          sessionId={decodedSessionId}
-        />
+        <SessionRuns sessionKey={sessionKey} sessionId={sessionId} />
       </ClientOnly>
     </>
   );

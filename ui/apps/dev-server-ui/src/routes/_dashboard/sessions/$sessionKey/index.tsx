@@ -28,7 +28,6 @@ function SessionResultsPage() {
   const { last, start, end } = Route.useSearch();
   const navigate = Route.useNavigate();
   const getSessions = useSessions();
-  const decodedSessionKey = decodeURIComponent(sessionKey);
 
   const internalPathCreator = useMemo(
     () => ({
@@ -48,14 +47,14 @@ function SessionResultsPage() {
       <Header
         breadcrumb={[
           { text: 'Sessions', href: pathCreator.sessions({}) },
-          { text: decodedSessionKey },
+          { text: sessionKey },
         ]}
       />
       <ClientOnly>
         <SessionResults
           envID="local"
           maxRangeDays={7}
-          sessionKey={decodedSessionKey}
+          sessionKey={sessionKey}
           last={last}
           start={start}
           end={end}
