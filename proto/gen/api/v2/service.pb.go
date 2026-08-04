@@ -10111,7 +10111,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:session\x18\x01\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\xc5\x0e\x92A\xe5\x05\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:session\x18\x01\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\xca\r\x92A\xe5\x05\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -10127,14 +10127,14 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\vExperiments\x12*Inspect experiment variants and aggregatesj(\n" +
 	"\bSessions\x12\x1cInspect session-grouped runsj)\n" +
 	"\vPartner API\x12\x1aPartner account management\x92\xb5\x18=\n" +
-	"\vapi:account\x12\x0fAccount details\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18\\\n" +
-	"\aapi:env\x122Environments, including creating and updating them\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18]\n" +
+	"\vapi:account\x12\x0fAccount details\x1a\x1dAccounts, Environments & Keys\x92\xb5\x186\n" +
+	"\aapi:env\x12\fEnvironments\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18]\n" +
 	"\vapi:webhook\x12/Webhooks that ingest events into an environment\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18\x85\x01\n" +
-	"\aapi:key\x12[Event keys and signing keys. Signing keys grant full SDK access, so treat this as sensitive\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18[\n" +
-	"\vapi:partner\x12-Partner sub-accounts, including creating them\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18<\n" +
-	"\aapi:app\x12\x19Apps and their sync state\x1a\x16Apps, Functions & Runs\x92\xb5\x18T\n" +
-	"\fapi:function\x12,Function definitions, and invoking functions\x1a\x16Apps, Functions & Runs\x92\xb5\x18_\n" +
-	"\aapi:run\x12<Function runs and traces, including rerunning and cancelling\x1a\x16Apps, Functions & Runs\x92\xb5\x18M\n" +
+	"\aapi:key\x12[Event keys and signing keys. Signing keys grant full SDK access, so treat this as sensitive\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18B\n" +
+	"\vapi:partner\x12\x14Partner sub-accounts\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18<\n" +
+	"\aapi:app\x12\x19Apps and their sync state\x1a\x16Apps, Functions & Runs\x92\xb5\x18<\n" +
+	"\fapi:function\x12\x14Function definitions\x1a\x16Apps, Functions & Runs\x92\xb5\x18;\n" +
+	"\aapi:run\x12\x18Function runs and traces\x1a\x16Apps, Functions & Runs\x92\xb5\x18M\n" +
 	"\tapi:score\x12&Scores recorded against runs and steps\x1a\x18Observability & AI Evals\x92\xb5\x18I\n" +
 	"\x0eapi:experiment\x12\x1dExperiments and their results\x1a\x18Observability & AI Evals\x92\xb5\x18S\n" +
 	"\vapi:insight\x12*Insights queries, tables and event schemas\x1a\x18Observability & AI Evals\x92\xb5\x18J\n" +

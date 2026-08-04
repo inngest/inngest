@@ -56,7 +56,7 @@ option (grant_definition) = {
 };
 option (grant_definition) = {
   name: "api:env"
-  description: "Environments, including creating and updating them"
+  description: "Environments"
   category: "Accounts, Environments & Keys"
 };
 option (grant_definition) = {
@@ -71,7 +71,7 @@ option (grant_definition) = {
 };
 option (grant_definition) = {
   name: "api:partner"
-  description: "Partner sub-accounts, including creating them"
+  description: "Partner sub-accounts"
   category: "Accounts, Environments & Keys"
 };
 option (grant_definition) = {
@@ -81,12 +81,12 @@ option (grant_definition) = {
 };
 option (grant_definition) = {
   name: "api:function"
-  description: "Function definitions, and invoking functions"
+  description: "Function definitions"
   category: "Apps, Functions & Runs"
 };
 option (grant_definition) = {
   name: "api:run"
-  description: "Function runs and traces, including rerunning and cancelling"
+  description: "Function runs and traces"
   category: "Apps, Functions & Runs"
 };
 option (grant_definition) = {

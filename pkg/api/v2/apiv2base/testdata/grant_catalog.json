@@ -27,14 +27,14 @@
       "name": "api:env",
       "action": "read",
       "category": "Accounts, Environments & Keys",
-      "description": "Environments, including creating and updating them"
+      "description": "Environments"
     },
     {
       "grant": "api:env:write",
       "name": "api:env",
       "action": "write",
       "category": "Accounts, Environments & Keys",
-      "description": "Environments, including creating and updating them"
+      "description": "Environments"
     },
     {
       "grant": "api:experiment:read",
@@ -48,14 +48,14 @@
       "name": "api:function",
       "action": "read",
       "category": "Apps, Functions & Runs",
-      "description": "Function definitions, and invoking functions"
+      "description": "Function definitions"
     },
     {
       "grant": "api:function:write",
       "name": "api:function",
       "action": "write",
       "category": "Apps, Functions & Runs",
-      "description": "Function definitions, and invoking functions"
+      "description": "Function definitions"
     },
     {
       "grant": "api:insight:read",
@@ -76,28 +76,28 @@
       "name": "api:partner",
       "action": "read",
       "category": "Accounts, Environments & Keys",
-      "description": "Partner sub-accounts, including creating them"
+      "description": "Partner sub-accounts"
     },
     {
       "grant": "api:partner:write",
       "name": "api:partner",
       "action": "write",
       "category": "Accounts, Environments & Keys",
-      "description": "Partner sub-accounts, including creating them"
+      "description": "Partner sub-accounts"
     },
     {
       "grant": "api:run:read",
       "name": "api:run",
       "action": "read",
       "category": "Apps, Functions & Runs",
-      "description": "Function runs and traces, including rerunning and cancelling"
+      "description": "Function runs and traces"
     },
     {
       "grant": "api:run:write",
       "name": "api:run",
       "action": "write",
       "category": "Apps, Functions & Runs",
-      "description": "Function runs and traces, including rerunning and cancelling"
+      "description": "Function runs and traces"
     },
     {
       "grant": "api:score:write",
