@@ -210,7 +210,7 @@ func TestResolveSessionsTombstones(t *testing.T) {
 	}
 }
 
-// TestResolveSessionsResolution pins the SessionsResolution summary that drives
+// TestResolveSessionsResolution pins the SessionsMetrics summary that drives
 // the adoption metric's tags. It starts from wire JSON because Nulling is
 // derived from the null tombstones, which only exist after unmarshalling.
 //

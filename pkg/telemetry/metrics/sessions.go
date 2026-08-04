@@ -15,7 +15,7 @@ import "context"
 // clear-and-set within one event — the signal for whether a combined operation
 // is worth having — is manual=true AND nulling=true.
 //
-// Callers pass the fields of an event.SessionsResolution. The struct itself is
+// Callers pass the fields of an event.SessionsMetrics. The struct itself is
 // not taken directly because pkg/event depends on this package, so the import
 // cannot run the other way.
 //

@@ -260,7 +260,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				evt.User = map[string]any{}
 			}
 
-			// Merge propagated sessionsMetrics into the manual layer before validation.
+			// Merge propagated sessions into the manual layer before validation.
 			// The merge reports the pre-merge state of both layers for adoption
 			// metrics.
 			sessionsMetrics := evt.Meta.ResolveSessions()

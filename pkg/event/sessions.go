@@ -146,7 +146,7 @@ type SessionsMetrics struct {
 // lexicographic key order (matching run-level session truncation) for
 // deterministic output. PropagatedSessions is cleared so it never persists.
 //
-// The returned SessionsResolutionMetric snapshots the pre-merge state for adoption
+// The returned SessionsMetrics snapshots the pre-merge state for adoption
 // metrics; it is safe to ignore.
 //
 // Called at API ingest before Event.Validate: each layer may independently be
