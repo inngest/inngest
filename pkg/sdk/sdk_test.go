@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"encoding/json"
 	"testing"
 
 	sdkfeatureobs "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1"
@@ -37,4 +38,41 @@ func TestRegisterRequestChecksum(t *testing.T) {
 		r.NoError(err)
 		r.Equal(withoutChecksum, withChecksum)
 	})
+}
+
+func TestRegisterRequestFeatureObservationsJSONKey(t *testing.T) {
+	r := require.New(t)
+
+	req := RegisterRequest{
+		FeatureObservations: FeatureObservations{
+			{
+				Feature: &sdkfeatureobs.FeatureObservation_AiMetadataExtraction{
+					AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+						ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
+					},
+				},
+			},
+		},
+	}
+
+	byt, err := json.Marshal(req)
+	r.NoError(err)
+	r.Contains(string(byt), `"featureObservations"`)
+	r.NotContains(string(byt), `"feature_observations"`)
+
+	var decoded RegisterRequest
+	r.NoError(json.Unmarshal([]byte(`{
+		"featureObservations": [
+			{
+				"aiMetadataExtraction": {
+					"readinessReason": 1
+				}
+			}
+		]
+	}`), &decoded))
+	r.Len(decoded.FeatureObservations, 1)
+	r.Equal(
+		sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
+		decoded.FeatureObservations[0].GetAiMetadataExtraction().GetReadinessReason(),
+	)
 }

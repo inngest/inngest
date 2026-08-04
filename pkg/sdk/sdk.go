@@ -87,7 +87,7 @@ type RegisterRequest struct {
 
 	// FeatureObservations contains SDK-collected readiness data for optional
 	// features. The JSON shape mirrors the SDK payload.
-	FeatureObservations FeatureObservations `json:"feature_observations,omitempty"`
+	FeatureObservations FeatureObservations `json:"featureObservations,omitempty"`
 
 	// checksum is a memoized field.
 	checksum string
