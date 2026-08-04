@@ -19,6 +19,8 @@ type Documents = {
     "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": typeof types.DeleteApiKeyDocument,
     "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": typeof types.UpdateApiKeyDocument,
     "\n  query GetAllowMemberAPIKeysSetting {\n    account {\n      setting(name: \"allow_member_api_keys\") {\n        value\n      }\n    }\n  }\n": typeof types.GetAllowMemberApiKeysSettingDocument,
+    "\n  query GetAPIKeyGrants {\n    apiKeyGrants {\n      grant\n      name\n      action\n      description\n      category\n    }\n    account {\n      memberAPIKeyPolicy {\n        enabled\n        allowProduction\n        grants\n      }\n    }\n  }\n": typeof types.GetApiKeyGrantsDocument,
+    "\n  mutation SetMemberAPIKeyPolicy($input: MemberAPIKeyPolicyInput!) {\n    setMemberAPIKeyPolicy(input: $input) {\n      enabled\n      allowProduction\n      grants\n    }\n  }\n": typeof types.SetMemberApiKeyPolicyDocument,
     "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n        createdBy {\n          id\n          name\n          email\n        }\n      }\n    }\n  }\n": typeof types.GetApiKeysDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": typeof types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": typeof types.UnachiveAppDocument,
@@ -182,6 +184,8 @@ const documents: Documents = {
     "\n  mutation DeleteAPIKey($id: UUID!) {\n    deleteAPIKey(id: $id)\n  }\n": types.DeleteApiKeyDocument,
     "\n  mutation UpdateAPIKey($input: UpdateAPIKeyInput!) {\n    updateAPIKey(input: $input) {\n      id\n      name\n    }\n  }\n": types.UpdateApiKeyDocument,
     "\n  query GetAllowMemberAPIKeysSetting {\n    account {\n      setting(name: \"allow_member_api_keys\") {\n        value\n      }\n    }\n  }\n": types.GetAllowMemberApiKeysSettingDocument,
+    "\n  query GetAPIKeyGrants {\n    apiKeyGrants {\n      grant\n      name\n      action\n      description\n      category\n    }\n    account {\n      memberAPIKeyPolicy {\n        enabled\n        allowProduction\n        grants\n      }\n    }\n  }\n": types.GetApiKeyGrantsDocument,
+    "\n  mutation SetMemberAPIKeyPolicy($input: MemberAPIKeyPolicyInput!) {\n    setMemberAPIKeyPolicy(input: $input) {\n      enabled\n      allowProduction\n      grants\n    }\n  }\n": types.SetMemberApiKeyPolicyDocument,
     "\n  query GetAPIKeys($workspaceID: UUID) {\n    account {\n      apiKeys(workspaceID: $workspaceID) {\n        id\n        name\n        createdAt\n        maskedKey\n        env {\n          id\n          name\n          slug\n        }\n        createdBy {\n          id\n          name\n          email\n        }\n      }\n    }\n  }\n": types.GetApiKeysDocument,
     "\n  mutation AchiveApp($appID: UUID!) {\n    archiveApp(id: $appID) {\n      id\n    }\n  }\n": types.AchiveAppDocument,
     "\n  mutation UnachiveApp($appID: UUID!) {\n    unarchiveApp(id: $appID) {\n      id\n    }\n  }\n": types.UnachiveAppDocument,
@@ -374,6 +378,14 @@ export function graphql(source: "\n  mutation UpdateAPIKey($input: UpdateAPIKeyI
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  query GetAllowMemberAPIKeysSetting {\n    account {\n      setting(name: \"allow_member_api_keys\") {\n        value\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAllowMemberAPIKeysSetting {\n    account {\n      setting(name: \"allow_member_api_keys\") {\n        value\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetAPIKeyGrants {\n    apiKeyGrants {\n      grant\n      name\n      action\n      description\n      category\n    }\n    account {\n      memberAPIKeyPolicy {\n        enabled\n        allowProduction\n        grants\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetAPIKeyGrants {\n    apiKeyGrants {\n      grant\n      name\n      action\n      description\n      category\n    }\n    account {\n      memberAPIKeyPolicy {\n        enabled\n        allowProduction\n        grants\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SetMemberAPIKeyPolicy($input: MemberAPIKeyPolicyInput!) {\n    setMemberAPIKeyPolicy(input: $input) {\n      enabled\n      allowProduction\n      grants\n    }\n  }\n"): (typeof documents)["\n  mutation SetMemberAPIKeyPolicy($input: MemberAPIKeyPolicyInput!) {\n    setMemberAPIKeyPolicy(input: $input) {\n      enabled\n      allowProduction\n      grants\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
