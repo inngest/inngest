@@ -260,12 +260,18 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				evt.User = map[string]any{}
 			}
 
-			// Merge propagated sessions into the manual layer before validation,
-			// recording which layers were present for adoption metrics (read
-			// before the merge nils the propagated layer).
-			manualSessions, propagatedSessions := len(evt.Meta.Sessions) > 0, len(evt.Meta.PropagatedSessions) > 0
-			evt.Meta.ResolveSessions()
-			metrics.IncrEventSessionsResolvedCounter(ctx, "ingest", manualSessions, propagatedSessions, metrics.CounterOpt{PkgName: metricsPkgName})
+			// Merge propagated sessions into the manual layer before validation.
+			// The merge reports the pre-merge state of both layers for adoption
+			// metrics.
+			sessionsMetrics := evt.Meta.ResolveSessions()
+			metrics.IncrEventSessionsResolvedCounter(
+				ctx,
+				"ingest",
+				sessionsMetrics.Manual,
+				sessionsMetrics.Propagated,
+				sessionsMetrics.Nulling,
+				metrics.CounterOpt{PkgName: metricsPkgName},
+			)
 
 			if err := evt.Validate(ctx); err != nil {
 				return err
@@ -352,11 +358,17 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	}
 	evt := event.NewInvocationEvent(newInvOpts)
 
-	// Merge the two session layers before the event is handled, recording which
-	// layers were present for adoption metrics (read before the merge).
-	manualSessions, propagatedSessions := len(evt.Event.Meta.Sessions) > 0, len(evt.Event.Meta.PropagatedSessions) > 0
-	evt.Event.Meta.ResolveSessions()
-	metrics.IncrEventSessionsResolvedCounter(r.Context(), "invoke_http", manualSessions, propagatedSessions, metrics.CounterOpt{PkgName: metricsPkgName})
+	// Merge the two session layers before the event is handled. The merge
+	// reports the pre-merge state of both layers for adoption metrics.
+	sessionsMetrics := evt.Event.Meta.ResolveSessions()
+	metrics.IncrEventSessionsResolvedCounter(
+		r.Context(),
+		"invoke_http",
+		sessionsMetrics.Manual,
+		sessionsMetrics.Propagated,
+		sessionsMetrics.Nulling,
+		metrics.CounterOpt{PkgName: metricsPkgName},
+	)
 
 	// Validate after the merge
 	if err := evt.Event.Validate(r.Context()); err != nil {
