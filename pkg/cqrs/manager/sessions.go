@@ -2,8 +2,6 @@ package manager
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -20,7 +18,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const sessionAttrKey = "_inngest.event.sessions"
+const sessionRunScanLimit = 2000
 
 func newSessionKeyUpserter() ttlupsert.Upserter[cqrs.SessionKeyRecord] {
 	return ttlupsert.NewWithKey(func(record cqrs.SessionKeyRecord) string {
@@ -119,7 +117,7 @@ func (w wrapper) GetSessionKeys(ctx context.Context, workspaceID uuid.UUID, sear
 }
 
 func (w wrapper) GetSessions(ctx context.Context, workspaceID uuid.UUID, sessionKey string, sessionIDSearch string, tr cqrs.SessionTimeRange) ([]*cqrs.SessionGroup, error) {
-	runs, err := w.sessionRuns(ctx, workspaceID, tr, cqrs.SessionsLimit*20)
+	runs, err := w.sessionRuns(ctx, workspaceID, tr)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +171,7 @@ func (w wrapper) GetSessions(ctx context.Context, workspaceID uuid.UUID, session
 }
 
 func (w wrapper) GetSessionRuns(ctx context.Context, workspaceID uuid.UUID, sessionKey string, sessionID string, tr cqrs.SessionTimeRange) ([]*cqrs.SessionRun, error) {
-	runs, err := w.sessionRuns(ctx, workspaceID, tr, cqrs.SessionRunsLimit*10)
+	runs, err := w.sessionRuns(ctx, workspaceID, tr)
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +215,7 @@ type storedSessionRun struct {
 }
 
 type sessionTraceRun struct {
+	RunID       ulid.ULID
 	QueuedAtMS  int64
 	StartedAtMS int64
 	EndedAtMS   int64
@@ -232,103 +231,57 @@ func (r storedSessionRun) hasSession(sessionKey string, sessionID string) bool {
 	return false
 }
 
-func (w wrapper) sessionRuns(ctx context.Context, workspaceID uuid.UUID, tr cqrs.SessionTimeRange, limit int) ([]storedSessionRun, error) {
+func (w wrapper) sessionRuns(ctx context.Context, workspaceID uuid.UUID, tr cqrs.SessionTimeRange) ([]storedSessionRun, error) {
 	if workspaceID == uuid.Nil {
 		return nil, nil
-	}
-	if limit <= 0 {
-		limit = cqrs.SessionRunsLimit
 	}
 	if tr.Until.IsZero() {
 		tr.Until = time.Now()
 	}
 
-	traceRuns, err := w.sessionTraceRuns(ctx, workspaceID, tr, limit)
+	traceRuns, err := w.sessionTraceRuns(ctx, workspaceID, tr)
 	if err != nil {
 		return nil, err
 	}
-
-	sqlQuery, args, err := sq.Dialect(w.dialect()).
-		From("spans").
-		Select("run_id", "start_time", "end_time", "status", "attributes").
-		Where(
-			sq.C("env_id").Eq(workspaceID.String()),
-			sq.C("name").Eq(meta.SpanNameRun),
-			sq.C("debug_run_id").IsNull(),
-		).
-		Order(sq.C("start_time").Desc()).
-		Limit(uint(limit)).
-		ToSQL()
-	if err != nil {
-		return nil, fmt.Errorf("build session runs query: %w", err)
+	if len(traceRuns) == 0 {
+		return []storedSessionRun{}, nil
 	}
 
-	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
-	if err != nil {
-		return nil, fmt.Errorf("get session runs: %w", err)
+	runIDs := make([]ulid.ULID, len(traceRuns))
+	for i, run := range traceRuns {
+		runIDs[i] = run.RunID
 	}
-	defer rows.Close()
+	spansByRunID, err := w.GetSpansByRunIDsAndName(ctx, runIDs, meta.SpanNameRun)
+	if err != nil {
+		return nil, fmt.Errorf("get session run spans: %w", err)
+	}
 
-	out := []storedSessionRun{}
-	for rows.Next() {
-		var runIDRaw string
-		var startTimeRaw, endTimeRaw any
-		var spanStatus sql.NullString
-		var attrsRaw []byte
-		if err := rows.Scan(&runIDRaw, &startTimeRaw, &endTimeRaw, &spanStatus, &attrsRaw); err != nil {
-			return nil, fmt.Errorf("scan session run: %w", err)
-		}
-
-		sessions, functionSlug, functionName, eventName := parseSessionRunAttrs(attrsRaw)
-		if len(sessions) == 0 {
-			continue
-		}
-		runID, err := ulid.Parse(runIDRaw)
-		if err != nil {
-			continue
-		}
-		spanStart := parseDBTime(startTimeRaw)
-		spanEnd := parseDBTime(endTimeRaw)
-		traceRun, ok := traceRuns[runID.String()]
-		if !ok {
-			if !tr.From.IsZero() && spanStart.Before(tr.From) {
+	out := make([]storedSessionRun, 0, len(traceRuns))
+	for _, traceRun := range traceRuns {
+		for _, span := range spansByRunID[traceRun.RunID] {
+			attrs := span.Attributes
+			if attrs == nil || attrs.Sessions == nil || len(*attrs.Sessions) == 0 {
 				continue
 			}
-			if spanStart.After(tr.Until) {
-				continue
-			}
-			var spanStatusValue *string
-			if spanStatus.Valid {
-				spanStatusValue = &spanStatus.String
-			}
-			status, _ := runStatusFromSpanStatus(spanStatusValue)
-			traceRun = sessionTraceRun{
-				QueuedAtMS:  spanStart.UnixMilli(),
-				StartedAtMS: spanStart.UnixMilli(),
-				EndedAtMS:   spanEnd.UnixMilli(),
-				Status:      status,
-			}
-		}
 
-		out = append(out, storedSessionRun{
-			RunID:        runID,
-			QueuedAt:     time.UnixMilli(traceRun.QueuedAtMS),
-			StartedAtMS:  traceRun.StartedAtMS,
-			EndedAtMS:    traceRun.EndedAtMS,
-			Status:       traceRun.Status,
-			FunctionSlug: functionSlug,
-			FunctionName: functionName,
-			EventName:    eventName,
-			Sessions:     sessions,
-		})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate session runs: %w", err)
+			out = append(out, storedSessionRun{
+				RunID:        traceRun.RunID,
+				QueuedAt:     time.UnixMilli(traceRun.QueuedAtMS),
+				StartedAtMS:  traceRun.StartedAtMS,
+				EndedAtMS:    traceRun.EndedAtMS,
+				Status:       traceRun.Status,
+				FunctionSlug: stringValue(attrs.FunctionSlug),
+				FunctionName: stringValue(attrs.FunctionName),
+				EventName:    stringValue(attrs.TriggeringEventName),
+				Sessions:     *attrs.Sessions,
+			})
+			break
+		}
 	}
 	return out, nil
 }
 
-func (w wrapper) sessionTraceRuns(ctx context.Context, workspaceID uuid.UUID, tr cqrs.SessionTimeRange, limit int) (map[string]sessionTraceRun, error) {
+func (w wrapper) sessionTraceRuns(ctx context.Context, workspaceID uuid.UUID, tr cqrs.SessionTimeRange) ([]sessionTraceRun, error) {
 	sqlQuery, args, err := sq.Dialect(w.dialect()).
 		From("trace_runs").
 		Select("run_id", "queued_at", "started_at", "ended_at", "status").
@@ -337,8 +290,8 @@ func (w wrapper) sessionTraceRuns(ctx context.Context, workspaceID uuid.UUID, tr
 			sq.C("queued_at").Gte(tr.From.UnixMilli()),
 			sq.C("queued_at").Lte(tr.Until.UnixMilli()),
 		).
-		Order(sq.C("queued_at").Desc()).
-		Limit(uint(limit)).
+		Order(sq.C("queued_at").Desc(), sq.C("run_id").Desc()).
+		Limit(sessionRunScanLimit).
 		ToSQL()
 	if err != nil {
 		return nil, fmt.Errorf("build session trace runs query: %w", err)
@@ -350,7 +303,7 @@ func (w wrapper) sessionTraceRuns(ctx context.Context, workspaceID uuid.UUID, tr
 	}
 	defer rows.Close()
 
-	out := map[string]sessionTraceRun{}
+	out := make([]sessionTraceRun, 0, sessionRunScanLimit)
 	for rows.Next() {
 		var runIDRaw any
 		var queuedAtMS, startedAtMS, endedAtMS int64
@@ -362,12 +315,13 @@ func (w wrapper) sessionTraceRuns(ctx context.Context, workspaceID uuid.UUID, tr
 		if !ok {
 			continue
 		}
-		out[runID] = sessionTraceRun{
+		out = append(out, sessionTraceRun{
+			RunID:       ulid.MustParse(runID),
 			QueuedAtMS:  queuedAtMS,
 			StartedAtMS: startedAtMS,
 			EndedAtMS:   endedAtMS,
 			Status:      traceRunStatusFromDB(int64(statusCode)),
-		}
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate session trace runs: %w", err)
@@ -375,30 +329,9 @@ func (w wrapper) sessionTraceRuns(ctx context.Context, workspaceID uuid.UUID, tr
 	return out, nil
 }
 
-func parseSessionRunAttrs(raw []byte) (meta.EventSessions, string, string, string) {
-	attrs := map[string]any{}
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil, "", "", ""
-	}
-	if err := json.Unmarshal(raw, &attrs); err != nil {
-		return nil, "", "", ""
-	}
-
-	sessionsRaw, _ := attrs[sessionAttrKey].(string)
-	if sessionsRaw == "" {
-		return nil, attrString(attrs, "_inngest.function.slug"), attrString(attrs, "_inngest.function.name"), attrString(attrs, "_inngest.event.trigger.name")
-	}
-
-	sessions := meta.EventSessions{}
-	if err := json.Unmarshal([]byte(sessionsRaw), &sessions); err != nil {
-		return nil, "", "", ""
-	}
-	return sessions, attrString(attrs, "_inngest.function.slug"), attrString(attrs, "_inngest.function.name"), attrString(attrs, "_inngest.event.trigger.name")
-}
-
-func attrString(attrs map[string]any, key string) string {
-	if val, ok := attrs[key].(string); ok {
-		return val
+func stringValue(value *string) string {
+	if value != nil {
+		return *value
 	}
 	return ""
 }
@@ -433,37 +366,6 @@ func canonicalRunIDBytes(raw []byte) (string, bool) {
 		return "", false
 	}
 	return id.String(), true
-}
-
-func parseDBTime(raw any) time.Time {
-	switch val := raw.(type) {
-	case time.Time:
-		return val
-	case string:
-		return parseDBTimeString(val)
-	case []byte:
-		return parseDBTimeString(string(val))
-	default:
-		return time.Time{}
-	}
-}
-
-func parseDBTimeString(raw string) time.Time {
-	raw = strings.Split(raw, " m=")[0]
-	layouts := []string{
-		"2006-01-02 15:04:05.999999999 -0700 MST",
-		time.RFC3339Nano,
-		"2006-01-02 15:04:05.999999999Z07:00",
-		"2006-01-02 15:04:05.999999999",
-		"2006-01-02 15:04:05",
-	}
-	for _, layout := range layouts {
-		parsed, err := time.Parse(layout, raw)
-		if err == nil {
-			return parsed
-		}
-	}
-	return time.Time{}
 }
 
 func uniqueSessionKeys(eventSessions event.Sessions) []string {
