@@ -57,64 +57,81 @@ export const CATEGORY_ORDER = [
 
 export type GrantGroup = {
   category: string;
-  // One row per resource, with whichever actions that resource actually
-  // exposes. A resource with no write endpoint shows no write toggle.
-  resources: {
-    name: string;
-    description: string;
-    read?: string;
-    write?: string;
-  }[];
+  /**
+   * One row per grant, so `api:env:read` and `api:env:write` are separate
+   * switches. The action is part of the identity a key actually stores, and
+   * showing it that way means the row label matches what the 403 message names.
+   */
+  grants: Grant[];
 };
 
-/**
- * groupGrants turns the flat catalog into the shape the picker renders: grouped
- * by category, then by resource, with read and write as separate toggles on one
- * row.
- */
-export function groupGrants(grants: Grant[]): GrantGroup[] {
-  const byCategory = new Map<
-    string,
-    Map<string, GrantGroup['resources'][number]>
-  >();
+// read before write within a resource: the pair reads as a widening, and it puts
+// the more dangerous switch second.
+const ACTION_ORDER = ['read', 'write'];
 
+function compareGrants(a: Grant, b: Grant): number {
+  if (a.name !== b.name) return a.name.localeCompare(b.name);
+  const ai = ACTION_ORDER.indexOf(a.action);
+  const bi = ACTION_ORDER.indexOf(b.action);
+  return (
+    (ai === -1 ? ACTION_ORDER.length : ai) -
+    (bi === -1 ? ACTION_ORDER.length : bi)
+  );
+}
+
+/** groupGrants buckets the flat catalog by category, in a fixed order. */
+export function groupGrants(grants: Grant[]): GrantGroup[] {
+  const byCategory = new Map<string, Grant[]>();
   for (const g of grants) {
-    if (!byCategory.has(g.category)) {
-      byCategory.set(g.category, new Map());
+    const list = byCategory.get(g.category);
+    if (list) {
+      list.push(g);
+    } else {
+      byCategory.set(g.category, [g]);
     }
-    const resources = byCategory.get(g.category)!;
-    const row = resources.get(g.name) ?? {
-      name: g.name,
-      description: g.description,
-    };
-    if (g.action === 'read') row.read = g.grant;
-    if (g.action === 'write') row.write = g.grant;
-    resources.set(g.name, row);
   }
 
   const ordered: GrantGroup[] = [];
-  for (const category of CATEGORY_ORDER) {
-    const resources = byCategory.get(category);
-    if (!resources || resources.size === 0) continue;
-    ordered.push({
-      category,
-      resources: [...resources.values()].sort((a, b) =>
-        a.name.localeCompare(b.name),
-      ),
-    });
+  const take = (category: string) => {
+    const list = byCategory.get(category);
+    if (!list?.length) return;
+    ordered.push({ category, grants: [...list].sort(compareGrants) });
     byCategory.delete(category);
-  }
+  };
+
+  for (const category of CATEGORY_ORDER) take(category);
   // Anything in a category we don't know about still renders, after the known
   // ones — better than silently hiding a permission.
-  for (const [category, resources] of byCategory) {
-    ordered.push({
-      category,
-      resources: [...resources.values()].sort((a, b) =>
-        a.name.localeCompare(b.name),
-      ),
-    });
-  }
+  for (const category of [...byCategory.keys()]) take(category);
   return ordered;
+}
+
+export type PresetName = 'readOnly' | 'fullAccess' | 'custom';
+
+function sameSet(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((g) => set.has(g));
+}
+
+/**
+ * activePreset reports which preset chip should read as selected. `custom` is a
+ * derived state, not something the user picks — it lights up whenever the
+ * selection stops matching a preset, which is the only honest way to label a
+ * hand-edited set.
+ *
+ * Compared against the presets narrowed to `permitted`, so a member who picks
+ * Read Only still sees Read Only selected rather than Custom.
+ */
+export function activePreset(
+  selected: string[],
+  grants: Grant[],
+  permitted: Set<string>,
+): PresetName {
+  const narrow = (preset: string[]) => preset.filter((g) => permitted.has(g));
+  if (sameSet(selected, narrow(readOnlyPreset(grants)))) return 'readOnly';
+  if (sameSet(selected, narrow(fullAccessPreset(grants)))) return 'fullAccess';
+  return 'custom';
 }
 
 /**

@@ -13,11 +13,18 @@ const Query = graphql(`
           name
           allow
         }
+        grants
+        envScope
+        envs {
+          id
+          name
+        }
         env {
           id
           name
           slug
         }
+        createdByViewer
         createdBy {
           id
           name
