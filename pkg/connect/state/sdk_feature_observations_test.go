@@ -81,7 +81,8 @@ func TestWorkerGroupSyncSkipsWhenFeatureObservationsAreUnchanged(t *testing.T) {
 	existingAppID := uuid.New()
 	existingSyncID := uuid.New()
 	observations := sdk.FeatureObservations(testFeatureObservations())
-	existingObservations := sdk.FeatureObservations(testFeatureObservations())
+	observationsHash, err := sdkFeatureObservationsHash(sdk.FeatureObservations(testFeatureObservations()))
+	require.NoError(t, err)
 
 	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		t.Fatal("expected unchanged feature observations to skip sync")
@@ -107,15 +108,13 @@ func TestWorkerGroupSyncSkipsWhenFeatureObservationsAreUnchanged(t *testing.T) {
 	}
 	groupManager := &testWorkerGroupManager{
 		existing: &WorkerGroup{
-			AppID:  &existingAppID,
-			SyncID: &existingSyncID,
-			SyncData: SyncData{
-				FeatureObservations: existingObservations,
-			},
+			AppID:                   &existingAppID,
+			SyncID:                  &existingSyncID,
+			FeatureObservationsHash: observationsHash,
 		},
 	}
 
-	err := group.Sync(ctx, groupManager, server.URL, &connectpb.WorkerConnectRequestData{
+	err = group.Sync(ctx, groupManager, server.URL, &connectpb.WorkerConnectRequestData{
 		AuthData:     &connectpb.AuthData{SyncToken: "sync-token"},
 		Capabilities: []byte(`{"connect":"v1"}`),
 		SdkLanguage:  "js",

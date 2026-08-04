@@ -3,6 +3,8 @@ package state
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -180,6 +182,12 @@ type WorkerGroup struct {
 	// - User provided identifier (e.g. git sha, release tag, etc)
 	Hash string `json:"hash"`
 
+	// FeatureObservationsHash is persisted separately from SyncData, which is
+	// request-scoped and intentionally not serialized. This lets reconnects
+	// detect changed SDK feature observations without forcing a sync every time
+	// observations are present.
+	FeatureObservationsHash string `json:"feature_observations_hash,omitempty"`
+
 	// CreatedAt records the time this worker group was first created
 	CreatedAt time.Time `json:"created_at"`
 
@@ -246,11 +254,15 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	hasExistingSync := existingGroup != nil &&
 		existingGroup.SyncID != nil &&
 		existingGroup.AppID != nil
+
+	featureObservationsHash, err := sdkFeatureObservationsHash(g.SyncData.FeatureObservations)
+	if err != nil {
+		return fmt.Errorf("error hashing feature observations: %w", err)
+	}
+	g.FeatureObservationsHash = featureObservationsHash
+
 	sdkFeatureObsUnchanged := hasExistingSync &&
-		sdkFeatureObsEqual(
-			g.SyncData.FeatureObservations,
-			existingGroup.SyncData.FeatureObservations,
-		)
+		g.FeatureObservationsHash == existingGroup.FeatureObservationsHash
 	if hasExistingSync && sdkFeatureObsUnchanged {
 		g.AppID = existingGroup.AppID
 		g.SyncID = existingGroup.SyncID
@@ -427,25 +439,18 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	return nil
 }
 
-func sdkFeatureObsEqual(
-	a sdk.FeatureObservations,
-	b sdk.FeatureObservations,
-) bool {
-	if len(a) == 0 && len(b) == 0 {
-		return true
+func sdkFeatureObservationsHash(observations sdk.FeatureObservations) (string, error) {
+	if len(observations) == 0 {
+		return "", nil
 	}
 
-	aBytes, err := json.Marshal(a)
+	byt, err := json.Marshal(observations)
 	if err != nil {
-		return false
+		return "", err
 	}
 
-	bBytes, err := json.Marshal(b)
-	if err != nil {
-		return false
-	}
-
-	return bytes.Equal(aBytes, bBytes)
+	sum := sha256.Sum256(byt)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 type WorkerCapacity struct {
