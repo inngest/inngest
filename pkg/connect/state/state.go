@@ -239,8 +239,19 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
 
-	// Don't attempt to sync if it's already sync'd
-	if existingGroup != nil && existingGroup.SyncID != nil && existingGroup.AppID != nil && len(g.SyncData.FeatureObservations) == 0 {
+	// Don't attempt to sync if it's already sync'd. Feature observations are not
+	// part of the worker group hash, so compare them explicitly; changed
+	// observations still need to reach the API even when function config is the
+	// same.
+	hasExistingSync := existingGroup != nil &&
+		existingGroup.SyncID != nil &&
+		existingGroup.AppID != nil
+	sdkFeatureObsUnchanged := hasExistingSync &&
+		sdkFeatureObsEqual(
+			g.SyncData.FeatureObservations,
+			existingGroup.SyncData.FeatureObservations,
+		)
+	if hasExistingSync && sdkFeatureObsUnchanged {
 		g.AppID = existingGroup.AppID
 		g.SyncID = existingGroup.SyncID
 		g.CreatedAt = existingGroup.CreatedAt
@@ -414,6 +425,27 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	}
 
 	return nil
+}
+
+func sdkFeatureObsEqual(
+	a sdk.FeatureObservations,
+	b sdk.FeatureObservations,
+) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+
+	aBytes, err := json.Marshal(a)
+	if err != nil {
+		return false
+	}
+
+	bBytes, err := json.Marshal(b)
+	if err != nil {
+		return false
+	}
+
+	return bytes.Equal(aBytes, bBytes)
 }
 
 type WorkerCapacity struct {

@@ -50,7 +50,7 @@ func TestSdkFeatureReadinessFromMetadata(t *testing.T) {
 	r.Nil(readiness.AiMetadataExtraction)
 	r.Nil(readiness.ExtendedTraces)
 
-	status := sdkFeatureStatusFromReadinessReason(2)
+	status := sdkFeatureStatusFromReadinessReason(2, sdk.AIMetadataExtractionReadinessReasonReady)
 	r.False(status.Ready)
 	r.NotNil(status.Reason)
 	r.Equal(2, *status.Reason)

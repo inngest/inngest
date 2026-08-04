@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
 	"github.com/inngest/inngest/pkg/registration"
+	"github.com/inngest/inngest/pkg/sdk"
 )
 
 func (qr queryResolver) Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error) {
@@ -87,6 +88,7 @@ func sdkFeatureReadinessFromMetadata(metadata map[string]string) (*models.SDKFea
 		if aiMetadataExtraction := observation.GetAiMetadataExtraction(); aiMetadataExtraction != nil && readiness.AiMetadataExtraction == nil {
 			readiness.AiMetadataExtraction = sdkFeatureStatusFromReadinessReason(
 				int(aiMetadataExtraction.GetReadinessReason()),
+				sdk.AIMetadataExtractionReadinessReasonReady,
 			)
 			continue
 		}
@@ -94,6 +96,7 @@ func sdkFeatureReadinessFromMetadata(metadata map[string]string) (*models.SDKFea
 		if extendedTraces := observation.GetExtendedTraces(); extendedTraces != nil && readiness.ExtendedTraces == nil {
 			readiness.ExtendedTraces = sdkFeatureStatusFromReadinessReason(
 				int(extendedTraces.GetReadinessReason()),
+				sdk.ExtendedTracesReadinessReasonReady,
 			)
 		}
 	}
@@ -101,9 +104,12 @@ func sdkFeatureReadinessFromMetadata(metadata map[string]string) (*models.SDKFea
 	return readiness, nil
 }
 
-func sdkFeatureStatusFromReadinessReason(reason int) *models.SDKFeatureStatus {
+func sdkFeatureStatusFromReadinessReason(
+	reason int,
+	readyReason int,
+) *models.SDKFeatureStatus {
 	return &models.SDKFeatureStatus{
-		Ready:  reason == 1,
+		Ready:  reason == readyReason,
 		Reason: &reason,
 	}
 }

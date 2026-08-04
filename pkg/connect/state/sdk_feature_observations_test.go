@@ -76,6 +76,57 @@ func TestWorkerGroupSyncIncludesFeatureObservations(t *testing.T) {
 	require.Equal(t, group, groupManager.updated)
 }
 
+func TestWorkerGroupSyncSkipsWhenFeatureObservationsAreUnchanged(t *testing.T) {
+	ctx := context.Background()
+	existingAppID := uuid.New()
+	existingSyncID := uuid.New()
+	observations := sdk.FeatureObservations(testFeatureObservations())
+	existingObservations := sdk.FeatureObservations(testFeatureObservations())
+
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		t.Fatal("expected unchanged feature observations to skip sync")
+	}))
+	defer server.Close()
+
+	group := &WorkerGroup{
+		AccountID:  uuid.New(),
+		EnvID:      uuid.New(),
+		AppName:    "connect-app",
+		SDKLang:    "js",
+		SDKVersion: "v4.13.0",
+		Hash:       "worker-group-hash",
+		SyncData: SyncData{
+			Functions: []sdk.SDKFunction{
+				{
+					Name: "Test function",
+					Slug: "test-function",
+				},
+			},
+			FeatureObservations: observations,
+		},
+	}
+	groupManager := &testWorkerGroupManager{
+		existing: &WorkerGroup{
+			AppID:  &existingAppID,
+			SyncID: &existingSyncID,
+			SyncData: SyncData{
+				FeatureObservations: existingObservations,
+			},
+		},
+	}
+
+	err := group.Sync(ctx, groupManager, server.URL, &connectpb.WorkerConnectRequestData{
+		AuthData:     &connectpb.AuthData{SyncToken: "sync-token"},
+		Capabilities: []byte(`{"connect":"v1"}`),
+		SdkLanguage:  "js",
+		SdkVersion:   "v4.13.0",
+	}, true)
+	require.NoError(t, err)
+	require.Equal(t, existingAppID, *group.AppID)
+	require.Equal(t, existingSyncID, *group.SyncID)
+	require.Nil(t, groupManager.updated)
+}
+
 func testFeatureObservations() []*sdkfeatureobs.FeatureObservation {
 	return []*sdkfeatureobs.FeatureObservation{
 		{
