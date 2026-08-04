@@ -12,9 +12,9 @@ import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { GrantPicker } from './GrantPicker';
 import { APIKeyGrantsQuery, defaultSelection, permittedGrants } from './grants';
 import {
-  EnvironmentSelect,
+  EnvironmentMultiSelect,
   useEnvironmentSelection,
-} from './EnvironmentSelect';
+} from './EnvironmentMultiSelect';
 import { apiKeyErrorMessage } from './errorMessage';
 import { RevealKeyCard } from './RevealKeyCard';
 import { validateAPIKeyName } from './validation';
@@ -53,9 +53,6 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   // in state (which would leak the key into the next modal-open).
   const cancelledRef = useRef(false);
 
-  const { selectedEnv, setSelectedEnv, envGroups } =
-    useEnvironmentSelection(isOpen);
-
   const { membership } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
@@ -65,6 +62,12 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   });
   const catalog = grantsRes.data?.apiKeyGrants ?? [];
   const policy = grantsRes.data?.account.memberAPIKeyPolicy;
+  const allowProduction = isAdmin || (policy?.allowProduction ?? false);
+
+  const { selectedEnvs, setSelectedEnvs, envGroups } = useEnvironmentSelection({
+    active: isOpen,
+    allowProduction,
+  });
   // Admins may select anything in the catalog; members are narrowed to the
   // account policy. The server enforces this too — this only avoids offering a
   // toggle that would be rejected.
@@ -83,8 +86,8 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
       setError(nameErr);
       return;
     }
-    if (!selectedEnv) {
-      setError('Select an environment.');
+    if (selectedEnvs.length === 0) {
+      setError('Select at least one environment.');
       return;
     }
     if (grants.length === 0) {
@@ -97,7 +100,13 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
     setIsSubmitting(true);
     try {
       const res = await create(
-        { input: { name: trimmed, workspaceID: selectedEnv.id, grants } },
+        {
+          input: {
+            name: trimmed,
+            workspaceIDs: selectedEnvs.map((e) => e.id),
+            grants,
+          },
+        },
         { additionalTypenames: ['APIKey'] },
       );
       if (cancelledRef.current) {
@@ -107,16 +116,16 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
         setError(apiKeyErrorMessage(res.error, 'Could not create API key.'));
         return;
       }
-      const pt = res.data?.createAPIKey?.plaintextKey;
-      if (!pt) {
+      const created = res.data?.createAPIKey;
+      if (!created?.plaintextKey) {
         setError('Unexpected response from server.');
         return;
       }
-      setPlaintextKey(pt);
+      setPlaintextKey(created.plaintextKey);
       trackKeyCreated({
         feature: 'api-keys',
-        keyID: res.data.createAPIKey.apiKey.id,
-        envID: selectedEnv.id,
+        keyID: created.apiKey.id,
+        envIDs: selectedEnvs.map((e) => e.id),
         grantCount: grants.length,
         surface: 'dashboard',
       });
@@ -130,7 +139,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   function close() {
     cancelledRef.current = true;
     setName('');
-    setSelectedEnv(null);
+    setSelectedEnvs([]);
     setSelectedGrants(null);
     setPlaintextKey(null);
     setError(null);
@@ -178,12 +187,18 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
 
             <div className="flex flex-col gap-2">
               <label className="text-basis text-sm font-medium">
-                Environment
+                Environments
               </label>
-              <EnvironmentSelect
+              <EnvironmentMultiSelect
                 groups={envGroups}
-                value={selectedEnv}
-                onChange={setSelectedEnv}
+                value={selectedEnvs}
+                onChange={setSelectedEnvs}
+                disabled={isSubmitting}
+                productionNote={
+                  allowProduction
+                    ? undefined
+                    : 'Production is not available for member keys.'
+                }
               />
             </div>
 
@@ -197,7 +212,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
                 restrictionNote={
                   isAdmin
                     ? undefined
-                    : 'Some permissions are unavailable on this account. Ask an org admin to change what members may grant.'
+                    : "Your admins set which grants member keys may have. Locked grants can't be selected."
                 }
               />
             )}

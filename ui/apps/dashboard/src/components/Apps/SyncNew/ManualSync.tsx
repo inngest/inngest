@@ -140,7 +140,9 @@ export const ManualSync = ({ appsURL }: Props) => {
       <Secret
         className="my-6"
         kind="event-key"
-        secret={env.webhookSigningKey}
+        // Null only when the environment has no active signing key, which is a
+        // data defect rather than a state to design for.
+        secret={env.webhookSigningKey ?? ''}
       />
 
       <div className="border-subtle border-t">
