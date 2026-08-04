@@ -3,9 +3,14 @@ import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
+import { useOrganization } from '@clerk/tanstack-react-start';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
+import { trackKeyCreated } from '@/utils/analyticsEvents';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { GrantPicker } from './GrantPicker';
+import { APIKeyGrantsQuery, defaultSelection, permittedGrants } from './grants';
 import {
   EnvironmentSelect,
   useEnvironmentSelection,
@@ -50,6 +55,25 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
 
   const { selectedEnv, setSelectedEnv, envGroups } =
     useEnvironmentSelection(isOpen);
+
+  const { membership } = useOrganization();
+  const isAdmin = membership?.role === 'org:admin';
+
+  const grantsRes = useGraphQLQuery({
+    query: APIKeyGrantsQuery,
+    variables: {},
+  });
+  const catalog = grantsRes.data?.apiKeyGrants ?? [];
+  const policy = grantsRes.data?.account.memberAPIKeyPolicy;
+  // Admins may select anything in the catalog; members are narrowed to the
+  // account policy. The server enforces this too — this only avoids offering a
+  // toggle that would be rejected.
+  const permitted = permittedGrants(catalog, policy, isAdmin);
+  const [selectedGrants, setSelectedGrants] = useState<string[] | null>(null);
+  // Read Only by default, narrowed to what the caller may mint.
+  const grants =
+    selectedGrants ??
+    (catalog.length > 0 ? defaultSelection(catalog, permitted) : []);
   const [, create] = useMutation(Mutation);
 
   async function submit() {
@@ -63,13 +87,17 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
       setError('Select an environment.');
       return;
     }
+    if (grants.length === 0) {
+      setError('Select at least one permission.');
+      return;
+    }
     const trimmed = name.trim();
 
     cancelledRef.current = false;
     setIsSubmitting(true);
     try {
       const res = await create(
-        { input: { name: trimmed, workspaceID: selectedEnv.id } },
+        { input: { name: trimmed, workspaceID: selectedEnv.id, grants } },
         { additionalTypenames: ['APIKey'] },
       );
       if (cancelledRef.current) {
@@ -85,6 +113,13 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
         return;
       }
       setPlaintextKey(pt);
+      trackKeyCreated({
+        feature: 'api-keys',
+        keyID: res.data.createAPIKey.apiKey.id,
+        envID: selectedEnv.id,
+        grantCount: grants.length,
+        surface: 'dashboard',
+      });
     } finally {
       if (!cancelledRef.current) {
         setIsSubmitting(false);
@@ -96,6 +131,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
     cancelledRef.current = true;
     setName('');
     setSelectedEnv(null);
+    setSelectedGrants(null);
     setPlaintextKey(null);
     setError(null);
     setIsSubmitting(false);
@@ -150,6 +186,21 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
                 onChange={setSelectedEnv}
               />
             </div>
+
+            {catalog.length > 0 && (
+              <GrantPicker
+                grants={catalog}
+                selected={grants}
+                onChange={setSelectedGrants}
+                permitted={permitted}
+                disabled={isSubmitting}
+                restrictionNote={
+                  isAdmin
+                    ? undefined
+                    : 'Some permissions are unavailable on this account. Ask an org admin to change what members may grant.'
+                }
+              />
+            )}
 
             {error && <Alert severity="error">{error}</Alert>}
           </div>
