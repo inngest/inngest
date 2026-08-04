@@ -90,8 +90,10 @@ func (a router) getEvents(w http.ResponseWriter, r *http.Request) {
 
 	events, err := a.API.GetEvents(ctx, &opts)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("error querying events", "error", err)
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Unable to query events"))
+		// Pass the error through rather than re-wrapping as 500: GetEvents
+		// already assigns a status, and blanket-wrapping turned its 401 for a
+		// missing workspace into a server error. It logs the query failure too.
+		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
 
