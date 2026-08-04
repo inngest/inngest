@@ -13,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -55,7 +54,11 @@ func (a router) getEvents(w http.ResponseWriter, r *http.Request) {
 	if limit == 0 {
 		limit = DefaultEvents
 	}
-	opts.Limit = util.Bound(limit, 1, cqrs.MaxEvents)
+	if limit < 1 || limit > cqrs.MaxEvents {
+		_ = publicerr.WriteHTTP(w, publicerr.Errorf(400, "Invalid limit query parameter: must be between 1 and %d", cqrs.MaxEvents))
+		return
+	}
+	opts.Limit = limit
 
 	if cursor := r.FormValue("cursor"); cursor != "" {
 		parsed, err := ulid.Parse(cursor)
