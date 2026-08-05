@@ -93,13 +93,46 @@ type Error struct {
 	Err error `json:"-"`
 }
 
+// WriteHTTP renders an error to the response as JSON.
+//
+// An error that did not come from this package carries no status, and used to
+// fall through to WriteHeader's implicit 200 — so a handler passing one along
+// answered with what every client reads as success: status 200 and a body of
+// `{}`, since a plain error has no exported fields to marshal. A failed query
+// was indistinguishable from an empty result. Those now render as 500.
+//
+// The response says nothing more than the default message. An error that never
+// went through this package was not written to be read by the public and may
+// name internals; the caller keeps the original for logging.
 func WriteHTTP(w http.ResponseWriter, e error) error {
-	if pe, ok := e.(Error); ok {
-		w.WriteHeader(pe.Status)
-	} else if pe, ok := e.(*Error); ok && pe != nil {
-		w.WriteHeader(pe.Status)
+	pe, ok := asError(e)
+	if !ok {
+		pe = Error{Message: DefaultMessage, Status: DefaultStatus, Err: e}
 	}
-	return json.NewEncoder(w).Encode(e)
+	if pe.Status == 0 {
+		// WriteHeader(0) panics, so an Error built without a status still has to
+		// resolve to something. 500 is the honest answer: it reached here as an
+		// error.
+		pe.Status = DefaultStatus
+	}
+	w.WriteHeader(pe.Status)
+	return json.NewEncoder(w).Encode(pe)
+}
+
+// asError returns the public error e carries, if it is one. Deliberately a
+// direct type check rather than errors.As: promoting a status out of a wrapped
+// error would change what existing handlers answer, which is a wider change than
+// this needs to make.
+func asError(e error) (Error, bool) {
+	switch v := e.(type) {
+	case Error:
+		return v, true
+	case *Error:
+		if v != nil {
+			return *v, true
+		}
+	}
+	return Error{}, false
 }
 
 // Error fulfils the builtin go error interface.  This returns the original root cause
