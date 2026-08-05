@@ -37,6 +37,10 @@ type Grant struct {
 	// declared per resource, so it covers both actions: a resource whose read
 	// half is dangerous has no safe half to preselect.
 	Sensitive bool
+	// Internal marks a grant that is enforced but never offered for minting.
+	// Grants carrying it are absent from GrantCatalog entirely, so only AllGrants
+	// ever reports one.
+	Internal bool
 }
 
 // String returns the human-facing label, e.g. "api:run:read".
@@ -72,11 +76,33 @@ func actionString(a apiv2.AuthzAction) string {
 	}
 }
 
-// GrantCatalog returns every (grant, action) pair that some endpoint actually
-// requires, sorted by name then action. A pair no endpoint requires is
-// deliberately absent: offering a toggle that gates nothing would be a lie in
-// the minting UI.
+// GrantCatalog returns the grants an API key may be minted with: every (grant,
+// action) pair some endpoint requires, minus the ones declared internal, sorted
+// by name then action.
+//
+// This is the one list every minting surface reads — the key-creation UI, the
+// member policy, and the presets — so excluding a grant here withdraws it from
+// all of them at once. A pair no endpoint requires is deliberately absent too:
+// offering a toggle that gates nothing would be a lie in the minting UI.
+//
+// Enforcement does not read this. The middleware resolves a route's requirement
+// through GrantForMethod, and the OpenAPI docs through GrantsByHTTPRoute, so an
+// internal grant is still required on its routes — it just cannot be asked for.
 func GrantCatalog() []Grant {
+	return collectGrants(false)
+}
+
+// AllGrants returns every declared (grant, action) pair, internal ones included.
+//
+// Only the committed catalog snapshot uses it: the snapshot is where a reviewer
+// sees what the API declares, so hiding internal grants from it would make
+// flipping the flag invisible in review — which is the opposite of what that
+// artifact is for.
+func AllGrants() []Grant {
+	return collectGrants(true)
+}
+
+func collectGrants(includeInternal bool) []Grant {
 	defs := grantDefinitions()
 
 	seen := map[string]Grant{}
@@ -90,12 +116,16 @@ func GrantCatalog() []Grant {
 			return
 		}
 		def := defs[name]
+		if def.GetInternal() && !includeInternal {
+			return
+		}
 		g := Grant{
 			Name:        name,
 			Action:      action,
 			Description: def.GetDescription(),
 			Category:    def.GetCategory(),
 			Sensitive:   def.GetSensitive(),
+			Internal:    def.GetInternal(),
 		}
 		seen[g.String()] = g
 	})
