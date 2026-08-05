@@ -68,11 +68,18 @@ option (grant_definition) = {
   name: "api:key"
   description: "Event keys and signing keys. Signing keys grant full SDK access, so treat this as sensitive"
   category: "Accounts, Environments & Keys"
+  // The read half returns the decrypted signing key, which is the documented
+  // credential for the SDKs and for v0/v1 — so a key holding this can do
+  // everything the write grants exist to gate. Never preselected.
+  sensitive: true
 };
 option (grant_definition) = {
   name: "api:partner"
   description: "Partner sub-accounts"
   category: "Accounts, Environments & Keys"
+  // The read half crosses account boundaries: FetchAccount serves any child
+  // account to a caller holding it. Not something a default bundle should carry.
+  sensitive: true
 };
 option (grant_definition) = {
   name: "api:app"

@@ -37,6 +37,11 @@ message GrantDefinition {
   string description = 2;
   // UI grouping only. Must be one of the categories the minting UI renders.
   string category = 3;
+  // Sensitive grants are left out of the Read Only preset and out of the
+  // default member policy, so holding one is always a deliberate choice. Set it
+  // where the read half hands over something that is itself a credential, or
+  // reaches outside the key's environment.
+  bool sensitive = 4;
 }
 
 message AuthzOptions {
