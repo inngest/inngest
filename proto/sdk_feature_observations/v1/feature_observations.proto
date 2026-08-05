@@ -1,0 +1,98 @@
+syntax = "proto3";
+package sdk_feature_observations.v1;
+
+option go_package = "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1;sdkfeatureobs";
+
+message FeatureObservations {
+  AIMetadataExtraction ai_metadata_extraction = 1;
+  ExtendedTraces extended_traces = 2;
+  SendEvents send_events = 3;
+}
+
+message OTelSetup {
+  OTelSetupPath path = 1;
+  bool provider_found = 2;
+  OTelProviderSource provider_source = 3;
+  bool add_span_processor_attempted = 4;
+  bool span_processor_added = 5;
+  OTelSetupFailure failure = 6;
+}
+
+enum OTelProviderSource {
+  OTEL_PROVIDER_SOURCE_UNSPECIFIED = 0;
+  OTEL_PROVIDER_SOURCE_FIRST_PARTY = 1;
+  OTEL_PROVIDER_SOURCE_USER_PROVIDED = 2;
+  OTEL_PROVIDER_SOURCE_LEGACY_SDK = 3;
+}
+
+enum OTelSetupPath {
+  OTEL_SETUP_PATH_UNSPECIFIED = 0;
+  OTEL_SETUP_PATH_EXTEND_EXISTING_PROVIDER = 1;
+  OTEL_SETUP_PATH_LEGACY_CREATE_PROVIDER = 2;
+}
+
+enum OTelSetupFailure {
+  OTEL_SETUP_FAILURE_UNSPECIFIED = 0;
+  OTEL_SETUP_FAILURE_NO_PROVIDER = 1;
+  OTEL_SETUP_FAILURE_NOT_ADDED = 2;
+  OTEL_SETUP_FAILURE_PROVIDER_CREATION_FAILED = 3;
+  OTEL_SETUP_FAILURE_UNKNOWN_ERROR = 4;
+}
+
+message AIMetadataExtraction {
+  AIMetadataExtractionReadinessReason readiness_reason = 1;
+  OTelSetup otel_setup = 2;
+}
+
+enum AIMetadataExtractionReadinessReason {
+  AI_METADATA_EXTRACTION_READINESS_REASON_UNSPECIFIED = 0;
+  AI_METADATA_EXTRACTION_READINESS_REASON_READY = 1;
+  AI_METADATA_EXTRACTION_READINESS_REASON_DISABLED_BY_USER = 2;
+  AI_METADATA_EXTRACTION_READINESS_REASON_OTEL_PROVIDER_MISSING = 3;
+  AI_METADATA_EXTRACTION_READINESS_REASON_OTEL_SPAN_PROCESSOR_NOT_ADDED = 4;
+}
+
+message ExtendedTraces {
+  ExtendedTracesReadinessReason readiness_reason = 1;
+  ExtendedTracesConfig config = 2;
+  OTelSetup otel_setup = 3;
+}
+
+message ExtendedTracesConfig {
+  ExtendedTracesBehavior behavior = 1;
+}
+
+enum ExtendedTracesReadinessReason {
+  EXTENDED_TRACES_READINESS_REASON_UNSPECIFIED = 0;
+  EXTENDED_TRACES_READINESS_REASON_READY = 1;
+  EXTENDED_TRACES_READINESS_REASON_NOT_ENABLED_BY_USER = 2;
+  EXTENDED_TRACES_READINESS_REASON_DISABLED_BY_USER = 3;
+  EXTENDED_TRACES_READINESS_REASON_OTEL_PROVIDER_MISSING = 4;
+  EXTENDED_TRACES_READINESS_REASON_OTEL_SPAN_PROCESSOR_NOT_ADDED = 5;
+  EXTENDED_TRACES_READINESS_REASON_OTEL_PROVIDER_CREATION_FAILED = 6;
+}
+
+enum ExtendedTracesBehavior {
+  EXTENDED_TRACES_BEHAVIOR_UNSPECIFIED = 0;
+  EXTENDED_TRACES_BEHAVIOR_EXTEND_PROVIDER = 1;
+  EXTENDED_TRACES_BEHAVIOR_OFF = 2;
+  EXTENDED_TRACES_BEHAVIOR_AUTO = 3;
+  EXTENDED_TRACES_BEHAVIOR_CREATE_PROVIDER = 4;
+  EXTENDED_TRACES_BEHAVIOR_UNKNOWN = 5;
+}
+
+message SendEvents {
+  SendEventsReadinessReason readiness_reason = 1;
+  SendEventsConfig config = 2;
+}
+
+message SendEventsConfig {
+  bool event_key_configured = 1;
+  bool event_api_origin_override_configured = 2;
+}
+
+enum SendEventsReadinessReason {
+  SEND_EVENTS_READINESS_REASON_UNSPECIFIED = 0;
+  SEND_EVENTS_READINESS_REASON_READY = 1;
+  SEND_EVENTS_READINESS_REASON_EVENT_KEY_MISSING = 2;
+}

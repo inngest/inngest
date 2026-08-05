@@ -109,20 +109,32 @@ func NewWorkerGroupFromConnRequest(
 		slugs[i] = fn.Slug
 	}
 
+	featureObservations := sdk.FeatureObservationsFromProto(appConfig.GetFeatureObservations())
+	featureObservationsHash, err := sdkFeatureObservationsHash(featureObservations)
+	if err != nil {
+		return nil, &connecterrors.SocketError{
+			SysCode:    syscode.CodeConnectInternal,
+			StatusCode: websocket.StatusInternalError,
+			Msg:        "Invalid SDK feature observations",
+		}
+	}
+
 	workerGroup := &WorkerGroup{
-		AccountID:     authResp.AccountID,
-		EnvID:         authResp.EnvID,
-		AppName:       appConfig.AppName,
-		SDKLang:       req.SdkLanguage,
-		SDKVersion:    req.SdkVersion,
-		SDKPlatform:   req.GetPlatform(),
-		AppVersion:    appConfig.AppVersion,
-		FunctionSlugs: slugs,
-		Hash:          hash,
+		AccountID:               authResp.AccountID,
+		EnvID:                   authResp.EnvID,
+		AppName:                 appConfig.AppName,
+		SDKLang:                 req.SdkLanguage,
+		SDKVersion:              req.SdkVersion,
+		SDKPlatform:             req.GetPlatform(),
+		AppVersion:              appConfig.AppVersion,
+		FunctionSlugs:           slugs,
+		Hash:                    hash,
+		FeatureObservationsHash: featureObservationsHash,
 		SyncData: SyncData{
-			Functions: functions,
-			SyncToken: req.AuthData.SyncToken,
-			AppConfig: appConfig,
+			Functions:           functions,
+			SyncToken:           req.AuthData.SyncToken,
+			AppConfig:           appConfig,
+			FeatureObservations: featureObservations,
 		},
 		CreatedAt: time.Now(),
 	}

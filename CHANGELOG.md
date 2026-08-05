@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.41.1] - 2026-08-05
+
+### ⚙️ Miscellaneous Tasks
+
+- *(support)* Add graphql-codegen to support app (#4701)
+- *(e2e)* Run more tests on Depot (#4710)
+
 ## [v1.41.0] - 2026-08-03
 
 ### 🚀 Features
@@ -14,6 +21,10 @@ All notable changes to this project will be documented in this file.
 - *(connect)* Prevent connection state regression during gateway draining (#4685)
 - *(queue)* Isolate unavailable shards (#4688)
 - *(connect)* Make lease renewal idempotent after lost ACKs (#4687)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.41.0 (#4686)
 
 ## [v1.40.0] - 2026-07-30
 

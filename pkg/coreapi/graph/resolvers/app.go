@@ -3,6 +3,7 @@ package resolvers
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
+	"github.com/inngest/inngest/pkg/registration"
+	"github.com/inngest/inngest/pkg/sdk"
 )
 
 func (qr queryResolver) Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error) {
@@ -59,6 +62,53 @@ func (a appResolver) Error(ctx context.Context, obj *cqrs.App) (*string, error) 
 		return &obj.Error.String, nil
 	}
 	return nil, nil
+}
+
+func (a appResolver) SdkFeatureReadiness(ctx context.Context, obj *cqrs.App) (*models.SDKFeatureReadiness, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("no app defined")
+	}
+
+	return sdkFeatureReadinessFromMetadata(obj.Metadata)
+}
+
+func sdkFeatureReadinessFromMetadata(metadata map[string]string) (*models.SDKFeatureReadiness, error) {
+	readiness := &models.SDKFeatureReadiness{}
+
+	observations, err := registration.FeatureObservationsFromAppMetadata(metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	if observations == nil {
+		return readiness, nil
+	}
+
+	if aiMetadataExtraction := observations.GetAiMetadataExtraction(); aiMetadataExtraction != nil {
+		readiness.AiMetadataExtraction = sdkFeatureStatusFromReadinessReason(
+			int(aiMetadataExtraction.GetReadinessReason()),
+			sdk.AIMetadataExtractionReadinessReasonReady,
+		)
+	}
+
+	if extendedTraces := observations.GetExtendedTraces(); extendedTraces != nil {
+		readiness.ExtendedTraces = sdkFeatureStatusFromReadinessReason(
+			int(extendedTraces.GetReadinessReason()),
+			sdk.ExtendedTracesReadinessReasonReady,
+		)
+	}
+
+	return readiness, nil
+}
+
+func sdkFeatureStatusFromReadinessReason(
+	reason int,
+	readyReason int,
+) *models.SDKFeatureStatus {
+	return &models.SDKFeatureStatus{
+		Ready:  reason == readyReason,
+		Reason: &reason,
+	}
 }
 
 func (a appResolver) Functions(ctx context.Context, obj *cqrs.App) ([]*models.Function, error) {

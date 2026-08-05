@@ -2,6 +2,7 @@ syntax = "proto3";
 package connect.v1;
 
 import "google/protobuf/timestamp.proto";
+import "sdk_feature_observations/v1/feature_observations.proto";
 
 option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
 
@@ -33,6 +34,7 @@ message AppConfiguration {
 	string app_name = 1;
 	optional string app_version = 2;
 	bytes functions = 4;
+	sdk_feature_observations.v1.FeatureObservations feature_observations = 5;
 }
 
 message AuthData {

@@ -80,6 +80,7 @@ message CreateSandboxRequest {
   string name = 1;
   uint32 vcpu = 2;
   uint32 memory_mb = 3;
+  map<string, string> environment = 4;
 }
 
 message ListSandboxesRequest {

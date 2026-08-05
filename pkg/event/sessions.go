@@ -121,12 +121,33 @@ func parseManualSessions(raw json.RawMessage) (sessions Sessions, tombstones []s
 	return sessions, tombstones, false, nil
 }
 
+// SessionsMetrics summarizes the pre-merge state of the two session layers,
+// for adoption metrics. ResolveSessions returns it because the state it
+// describes — in particular the null tombstones, which live in unexported
+// fields — is consumed by the merge and unreadable to callers afterwards.
+type SessionsMetrics struct {
+	// Manual is true when the user set at least one concrete session key.
+	Manual bool
+
+	// Propagated is true when the event carried an inherited session layer.
+	Propagated bool
+
+	// Nulling is true when the manual layer used a JSON null to suppress
+	// inherited sessions: either the whole `sessions` field (clear all) or at
+	// least one per-key tombstone. It is independent of Manual — an event may
+	// both set keys and null others.
+	Nulling bool
+}
+
 // ResolveSessions folds the propagated (inherited) session layer into the
 // manual layer, producing the single Sessions map carried downstream. Manual
 // keys always win and are never evicted; remaining slots up to
 // consts.MaxEventSessions are filled from propagated sessions in
 // lexicographic key order (matching run-level session truncation) for
 // deterministic output. PropagatedSessions is cleared so it never persists.
+//
+// The returned SessionsMetrics snapshots the pre-merge state for adoption
+// metrics; it is safe to ignore.
 //
 // Called at API ingest before Event.Validate: each layer may independently be
 // up to MaxEventSessions, so the pre-merge union can exceed the cap —
@@ -137,7 +158,13 @@ func parseManualSessions(raw json.RawMessage) (sessions Sessions, tombstones []s
 // are always consumed here: a whole-field-null manual layer clears every
 // inherited session, and per-key nulls cut the matching inherited keys.
 // Tombstones never survive into Sessions and so never count against the cap.
-func (m *EventMeta) ResolveSessions() {
+func (m *EventMeta) ResolveSessions() SessionsMetrics {
+	res := SessionsMetrics{
+		Manual:     len(m.Sessions) > 0,
+		Propagated: len(m.PropagatedSessions) > 0,
+		Nulling:    m.clearPropagated || len(m.sessionTombstones) > 0,
+	}
+
 	// Apply the manual layer's tombstones to the inherited candidates before
 	// merging. Whole-field null wins over individual tombstones (there is nothing
 	// left to cut once everything is cleared).
@@ -158,11 +185,12 @@ func (m *EventMeta) ResolveSessions() {
 		if len(m.Sessions) == 0 {
 			m.Sessions = nil
 		}
-		return
+		return res
 	}
 
 	m.Sessions = mergeSessions(m.PropagatedSessions, m.Sessions)
 	m.PropagatedSessions = nil
+	return res
 }
 
 // mergeSessions folds the propagated (inherited) session candidates into the

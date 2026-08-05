@@ -630,6 +630,7 @@ type CreateSandboxRequest struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Vcpu          uint32                 `protobuf:"varint,2,opt,name=vcpu,proto3" json:"vcpu,omitempty"`
 	MemoryMb      uint32                 `protobuf:"varint,3,opt,name=memory_mb,json=memoryMb,proto3" json:"memory_mb,omitempty"`
+	Environment   map[string]string      `protobuf:"bytes,4,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -683,6 +684,13 @@ func (x *CreateSandboxRequest) GetMemoryMb() uint32 {
 		return x.MemoryMb
 	}
 	return 0
+}
+
+func (x *CreateSandboxRequest) GetEnvironment() map[string]string {
+	if x != nil {
+		return x.Environment
+	}
+	return nil
 }
 
 type ListSandboxesRequest struct {
@@ -2432,11 +2440,15 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxH\x00R\x04data\x88\x01\x01\x12@\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataH\x01R\bmetadata\x88\x01\x01B\a\n" +
 	"\x05_dataB\v\n" +
-	"\t_metadata\"[\n" +
+	"\t_metadata\"\xec\x01\n" +
 	"\x14CreateSandboxRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04vcpu\x18\x02 \x01(\rR\x04vcpu\x12\x1b\n" +
-	"\tmemory_mb\x18\x03 \x01(\rR\bmemoryMb\"c\n" +
+	"\tmemory_mb\x18\x03 \x01(\rR\bmemoryMb\x12O\n" +
+	"\venvironment\x18\x04 \x03(\v2-.api.v2.CreateSandboxRequest.EnvironmentEntryR\venvironment\x1a>\n" +
+	"\x10EnvironmentEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"c\n" +
 	"\x14ListSandboxesRequest\x12\x1b\n" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
 	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01B\t\n" +
@@ -2631,7 +2643,7 @@ func file_api_v2_sandbox_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v2_sandbox_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_api_v2_sandbox_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_api_v2_sandbox_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_api_v2_sandbox_proto_goTypes = []any{
 	(SandboxStatus)(0),                         // 0: api.v2.SandboxStatus
 	(SandboxProcessState)(0),                   // 1: api.v2.SandboxProcessState
@@ -2674,58 +2686,60 @@ var file_api_v2_sandbox_proto_goTypes = []any{
 	(*GetSandboxProcessOutputResponse)(nil),    // 38: api.v2.GetSandboxProcessOutputResponse
 	(*StreamSandboxProcessOutputRequest)(nil),  // 39: api.v2.StreamSandboxProcessOutputRequest
 	(*StreamSandboxProcessOutputResponse)(nil), // 40: api.v2.StreamSandboxProcessOutputResponse
-	nil,                           // 41: api.v2.ExecSandboxRequest.EnvironmentEntry
-	nil,                           // 42: api.v2.StartSandboxProcessRequest.EnvironmentEntry
-	(*timestamppb.Timestamp)(nil), // 43: google.protobuf.Timestamp
-	(*httpbody.HttpBody)(nil),     // 44: google.api.HttpBody
+	nil,                           // 41: api.v2.CreateSandboxRequest.EnvironmentEntry
+	nil,                           // 42: api.v2.ExecSandboxRequest.EnvironmentEntry
+	nil,                           // 43: api.v2.StartSandboxProcessRequest.EnvironmentEntry
+	(*timestamppb.Timestamp)(nil), // 44: google.protobuf.Timestamp
+	(*httpbody.HttpBody)(nil),     // 45: google.api.HttpBody
 }
 var file_api_v2_sandbox_proto_depIdxs = []int32{
-	43, // 0: api.v2.SandboxResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
+	44, // 0: api.v2.SandboxResponseMetadata.fetched_at:type_name -> google.protobuf.Timestamp
 	0,  // 1: api.v2.Sandbox.status:type_name -> api.v2.SandboxStatus
 	3,  // 2: api.v2.Sandbox.resources:type_name -> api.v2.SandboxResourceSpec
-	43, // 3: api.v2.Sandbox.created_at:type_name -> google.protobuf.Timestamp
-	43, // 4: api.v2.Sandbox.started_at:type_name -> google.protobuf.Timestamp
-	43, // 5: api.v2.Sandbox.ended_at:type_name -> google.protobuf.Timestamp
+	44, // 3: api.v2.Sandbox.created_at:type_name -> google.protobuf.Timestamp
+	44, // 4: api.v2.Sandbox.started_at:type_name -> google.protobuf.Timestamp
+	44, // 5: api.v2.Sandbox.ended_at:type_name -> google.protobuf.Timestamp
 	6,  // 6: api.v2.CreateSandboxResponse.data:type_name -> api.v2.Sandbox
 	4,  // 7: api.v2.CreateSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
 	6,  // 8: api.v2.GetSandboxResponse.data:type_name -> api.v2.Sandbox
 	4,  // 9: api.v2.GetSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
 	6,  // 10: api.v2.DestroySandboxResponse.data:type_name -> api.v2.Sandbox
 	4,  // 11: api.v2.DestroySandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	6,  // 12: api.v2.ListSandboxesResponse.data:type_name -> api.v2.Sandbox
-	4,  // 13: api.v2.ListSandboxesResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	5,  // 14: api.v2.ListSandboxesResponse.page:type_name -> api.v2.SandboxPage
-	41, // 15: api.v2.ExecSandboxRequest.environment:type_name -> api.v2.ExecSandboxRequest.EnvironmentEntry
-	16, // 16: api.v2.ExecSandboxResponse.data:type_name -> api.v2.ExecSandboxData
-	4,  // 17: api.v2.ExecSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	2,  // 18: api.v2.SandboxLogChunk.stream:type_name -> api.v2.SandboxLogStream
-	43, // 19: api.v2.SandboxLogChunk.at:type_name -> google.protobuf.Timestamp
-	19, // 20: api.v2.StreamSandboxLogsResponse.data:type_name -> api.v2.SandboxLogChunk
-	44, // 21: api.v2.WriteSandboxFileRequest.body:type_name -> google.api.HttpBody
-	22, // 22: api.v2.WriteSandboxFileResponse.data:type_name -> api.v2.WriteSandboxFileData
-	4,  // 23: api.v2.WriteSandboxFileResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	1,  // 24: api.v2.SandboxProcess.state:type_name -> api.v2.SandboxProcessState
-	43, // 25: api.v2.SandboxProcess.started_at:type_name -> google.protobuf.Timestamp
-	43, // 26: api.v2.SandboxProcess.ended_at:type_name -> google.protobuf.Timestamp
-	25, // 27: api.v2.StartSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
-	4,  // 28: api.v2.StartSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	25, // 29: api.v2.GetSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
-	4,  // 30: api.v2.GetSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	25, // 31: api.v2.WaitSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
-	4,  // 32: api.v2.WaitSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	42, // 33: api.v2.StartSandboxProcessRequest.environment:type_name -> api.v2.StartSandboxProcessRequest.EnvironmentEntry
-	25, // 34: api.v2.ListSandboxProcessesResponse.data:type_name -> api.v2.SandboxProcess
-	4,  // 35: api.v2.ListSandboxProcessesResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	5,  // 36: api.v2.ListSandboxProcessesResponse.page:type_name -> api.v2.SandboxPage
-	19, // 37: api.v2.GetSandboxProcessOutputData.chunks:type_name -> api.v2.SandboxLogChunk
-	37, // 38: api.v2.GetSandboxProcessOutputResponse.data:type_name -> api.v2.GetSandboxProcessOutputData
-	4,  // 39: api.v2.GetSandboxProcessOutputResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
-	19, // 40: api.v2.StreamSandboxProcessOutputResponse.data:type_name -> api.v2.SandboxLogChunk
-	41, // [41:41] is the sub-list for method output_type
-	41, // [41:41] is the sub-list for method input_type
-	41, // [41:41] is the sub-list for extension type_name
-	41, // [41:41] is the sub-list for extension extendee
-	0,  // [0:41] is the sub-list for field type_name
+	41, // 12: api.v2.CreateSandboxRequest.environment:type_name -> api.v2.CreateSandboxRequest.EnvironmentEntry
+	6,  // 13: api.v2.ListSandboxesResponse.data:type_name -> api.v2.Sandbox
+	4,  // 14: api.v2.ListSandboxesResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	5,  // 15: api.v2.ListSandboxesResponse.page:type_name -> api.v2.SandboxPage
+	42, // 16: api.v2.ExecSandboxRequest.environment:type_name -> api.v2.ExecSandboxRequest.EnvironmentEntry
+	16, // 17: api.v2.ExecSandboxResponse.data:type_name -> api.v2.ExecSandboxData
+	4,  // 18: api.v2.ExecSandboxResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	2,  // 19: api.v2.SandboxLogChunk.stream:type_name -> api.v2.SandboxLogStream
+	44, // 20: api.v2.SandboxLogChunk.at:type_name -> google.protobuf.Timestamp
+	19, // 21: api.v2.StreamSandboxLogsResponse.data:type_name -> api.v2.SandboxLogChunk
+	45, // 22: api.v2.WriteSandboxFileRequest.body:type_name -> google.api.HttpBody
+	22, // 23: api.v2.WriteSandboxFileResponse.data:type_name -> api.v2.WriteSandboxFileData
+	4,  // 24: api.v2.WriteSandboxFileResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	1,  // 25: api.v2.SandboxProcess.state:type_name -> api.v2.SandboxProcessState
+	44, // 26: api.v2.SandboxProcess.started_at:type_name -> google.protobuf.Timestamp
+	44, // 27: api.v2.SandboxProcess.ended_at:type_name -> google.protobuf.Timestamp
+	25, // 28: api.v2.StartSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
+	4,  // 29: api.v2.StartSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	25, // 30: api.v2.GetSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
+	4,  // 31: api.v2.GetSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	25, // 32: api.v2.WaitSandboxProcessResponse.data:type_name -> api.v2.SandboxProcess
+	4,  // 33: api.v2.WaitSandboxProcessResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	43, // 34: api.v2.StartSandboxProcessRequest.environment:type_name -> api.v2.StartSandboxProcessRequest.EnvironmentEntry
+	25, // 35: api.v2.ListSandboxProcessesResponse.data:type_name -> api.v2.SandboxProcess
+	4,  // 36: api.v2.ListSandboxProcessesResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	5,  // 37: api.v2.ListSandboxProcessesResponse.page:type_name -> api.v2.SandboxPage
+	19, // 38: api.v2.GetSandboxProcessOutputData.chunks:type_name -> api.v2.SandboxLogChunk
+	37, // 39: api.v2.GetSandboxProcessOutputResponse.data:type_name -> api.v2.GetSandboxProcessOutputData
+	4,  // 40: api.v2.GetSandboxProcessOutputResponse.metadata:type_name -> api.v2.SandboxResponseMetadata
+	19, // 41: api.v2.StreamSandboxProcessOutputResponse.data:type_name -> api.v2.SandboxLogChunk
+	42, // [42:42] is the sub-list for method output_type
+	42, // [42:42] is the sub-list for method input_type
+	42, // [42:42] is the sub-list for extension type_name
+	42, // [42:42] is the sub-list for extension extendee
+	0,  // [0:42] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_sandbox_proto_init() }
@@ -2755,7 +2769,7 @@ func file_api_v2_sandbox_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_sandbox_proto_rawDesc), len(file_api_v2_sandbox_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   40,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

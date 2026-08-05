@@ -210,6 +210,79 @@ func TestResolveSessionsTombstones(t *testing.T) {
 	}
 }
 
+// TestResolveSessionsResolution pins the SessionsMetrics summary that drives
+// the adoption metric's tags. It starts from wire JSON because Nulling is
+// derived from the null tombstones, which only exist after unmarshalling.
+//
+// Manual and Nulling are deliberately independent: an event may set keys, null
+// keys, both, or neither. "Any manual interaction" is Manual || Nulling, and
+// clear-and-set within one event is Manual && Nulling.
+func TestResolveSessionsResolution(t *testing.T) {
+	cases := []struct {
+		name string
+		// meta is the raw JSON of an event's `meta` object.
+		meta string
+		want SessionsMetrics
+	}{
+		{
+			name: "absent meta is the empty denominator case",
+			meta: `{}`,
+			want: SessionsMetrics{},
+		},
+		{
+			name: "empty manual object is not an interaction (RFC 7386 empty patch)",
+			meta: `{"sessions":{}}`,
+			want: SessionsMetrics{},
+		},
+		{
+			name: "manual keys only",
+			meta: `{"sessions":{"conv_id":"123"}}`,
+			want: SessionsMetrics{Manual: true},
+		},
+		{
+			name: "propagated only",
+			meta: `{"propagated_sessions":{"conv_id":"123"}}`,
+			want: SessionsMetrics{Propagated: true},
+		},
+		{
+			name: "both layers present",
+			meta: `{"sessions":{"a":"1"},"propagated_sessions":{"b":"2"}}`,
+			want: SessionsMetrics{Manual: true, Propagated: true},
+		},
+		{
+			name: "per-key tombstone is nulling, not manual",
+			meta: `{"sessions":{"conv_id":null},"propagated_sessions":{"conv_id":"123"}}`,
+			want: SessionsMetrics{Nulling: true, Propagated: true},
+		},
+		{
+			name: "whole-field null is nulling, not manual",
+			meta: `{"sessions":null,"propagated_sessions":{"a":"1"}}`,
+			want: SessionsMetrics{Nulling: true, Propagated: true},
+		},
+		{
+			name: "clear-and-set in one event is both manual and nulling",
+			meta: `{"sessions":{"conv_id":null,"new_id":"456"},"propagated_sessions":{"conv_id":"123"}}`,
+			want: SessionsMetrics{Manual: true, Nulling: true, Propagated: true},
+		},
+		{
+			name: "nulling with nothing inherited still counts as an interaction",
+			meta: `{"sessions":{"ghost":null}}`,
+			want: SessionsMetrics{Nulling: true},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := require.New(t)
+
+			var m EventMeta
+			r.NoError(json.Unmarshal([]byte(tc.meta), &m))
+
+			r.Equal(tc.want, m.ResolveSessions())
+		})
+	}
+}
+
 // TestParseManualSessionsRejectsBool ensures non-string/number/null manual
 // values are rejected, mirroring the propagated-layer decoding.
 func TestParseManualSessionsRejectsBool(t *testing.T) {

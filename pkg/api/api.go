@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -259,8 +260,18 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				evt.User = map[string]any{}
 			}
 
-			// Merge propagated sessions into the manual layer before validation
-			evt.Meta.ResolveSessions()
+			// Merge propagated sessions into the manual layer before validation.
+			// The merge reports the pre-merge state of both layers for adoption
+			// metrics.
+			sessionsMetrics := evt.Meta.ResolveSessions()
+			metrics.IncrEventSessionsResolvedCounter(
+				ctx,
+				"ingest",
+				sessionsMetrics.Manual,
+				sessionsMetrics.Propagated,
+				sessionsMetrics.Nulling,
+				metrics.CounterOpt{PkgName: metricsPkgName},
+			)
 
 			if err := evt.Validate(ctx); err != nil {
 				return err
@@ -347,8 +358,17 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	}
 	evt := event.NewInvocationEvent(newInvOpts)
 
-	// Merge the two session layers before the event is handled
-	evt.Event.Meta.ResolveSessions()
+	// Merge the two session layers before the event is handled. The merge
+	// reports the pre-merge state of both layers for adoption metrics.
+	sessionsMetrics := evt.Event.Meta.ResolveSessions()
+	metrics.IncrEventSessionsResolvedCounter(
+		r.Context(),
+		"invoke_http",
+		sessionsMetrics.Manual,
+		sessionsMetrics.Propagated,
+		sessionsMetrics.Nulling,
+		metrics.CounterOpt{PkgName: metricsPkgName},
+	)
 
 	// Validate after the merge
 	if err := evt.Event.Validate(r.Context()); err != nil {

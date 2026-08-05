@@ -47,6 +47,7 @@ export type App = {
   id: Scalars['ID'];
   method: AppMethod;
   name: Scalars['String'];
+  sdkFeatureReadiness: SdkFeatureReadiness;
   sdkLanguage: Scalars['String'];
   sdkVersion: Scalars['String'];
   url: Maybe<Scalars['String']>;
@@ -934,6 +935,18 @@ export enum RunsV2OrderByField {
   StartedAt = 'STARTED_AT'
 }
 
+export type SdkFeatureReadiness = {
+  __typename?: 'SDKFeatureReadiness';
+  aiMetadataExtraction: Maybe<SdkFeatureStatus>;
+  extendedTraces: Maybe<SdkFeatureStatus>;
+};
+
+export type SdkFeatureStatus = {
+  __typename?: 'SDKFeatureStatus';
+  ready: Scalars['Boolean'];
+  reason: Maybe<Scalars['Int']>;
+};
+
 export type SingletonConfiguration = {
   __typename?: 'SingletonConfiguration';
   key: Maybe<Scalars['String']>;
@@ -1096,14 +1109,14 @@ export type GetFunctionQuery = { __typename?: 'Query', functionBySlug: { __typen
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, appVersion: string | null, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
+export type GetAppsQuery = { __typename?: 'Query', apps: Array<{ __typename?: 'App', id: string, name: string, appVersion: string | null, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, sdkFeatureReadiness: { __typename?: 'SDKFeatureReadiness', aiMetadataExtraction: { __typename?: 'SDKFeatureStatus', ready: boolean, reason: number | null } | null, extendedTraces: { __typename?: 'SDKFeatureStatus', ready: boolean, reason: number | null } | null }, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string }> }> };
 
 export type GetAppQueryVariables = Exact<{
   id: Scalars['UUID'];
 }>;
 
 
-export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, appVersion: string | null, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
+export type GetAppQuery = { __typename?: 'Query', app: { __typename?: 'App', id: string, name: string, appVersion: string | null, sdkLanguage: string, sdkVersion: string, framework: string | null, url: string | null, error: string | null, connected: boolean, functionCount: number, autodiscovered: boolean, method: AppMethod, sdkFeatureReadiness: { __typename?: 'SDKFeatureReadiness', aiMetadataExtraction: { __typename?: 'SDKFeatureStatus', ready: boolean, reason: number | null } | null, extendedTraces: { __typename?: 'SDKFeatureStatus', ready: boolean, reason: number | null } | null }, functions: Array<{ __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null }> } | null };
 
 export type CreateAppMutationVariables = Exact<{
   input: CreateAppInput;
@@ -1516,6 +1529,16 @@ export const GetAppsDocument = `
     functionCount
     autodiscovered
     method
+    sdkFeatureReadiness {
+      aiMetadataExtraction {
+        ready
+        reason
+      }
+      extendedTraces {
+        ready
+        reason
+      }
+    }
     functions {
       name
       id
@@ -1542,6 +1565,16 @@ export const GetAppDocument = `
     functionCount
     autodiscovered
     method
+    sdkFeatureReadiness {
+      aiMetadataExtraction {
+        ready
+        reason
+      }
+      extendedTraces {
+        ready
+        reason
+      }
+    }
     functions {
       name
       id

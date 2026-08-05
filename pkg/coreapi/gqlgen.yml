@@ -31,6 +31,8 @@ models:
     fields:
       externalID:
         resolver: true
+      sdkFeatureReadiness:
+        resolver: true
   FunctionVersion:
     model: github.com/inngest/inngest/pkg/function.FunctionVersion
   FunctionRunFinish:

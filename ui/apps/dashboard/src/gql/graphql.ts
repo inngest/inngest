@@ -839,18 +839,12 @@ export type Event = {
   firstSeen: Maybe<Scalars['Time']['output']>;
   integrationName: Maybe<Scalars['String']['output']>;
   name: Scalars['String']['output'];
-  recent: Array<ArchivedEvent>;
   schemaSource: Maybe<Scalars['SchemaSource']['output']>;
   usage: Usage;
   versionCount: Scalars['Int']['output'];
   versions: Array<Maybe<EventType>>;
   workflows: Array<Workflow>;
   workspaceID: Maybe<Scalars['UUID']['output']>;
-};
-
-
-export type EventRecentArgs = {
-  count: InputMaybe<Scalars['Int']['input']>;
 };
 
 
@@ -874,31 +868,6 @@ export enum EventSchemaFormat {
   JsonSchema = 'JSON_SCHEMA',
   Typescript = 'TYPESCRIPT'
 }
-
-export type EventSearchConnection = {
-  __typename?: 'EventSearchConnection';
-  edges: Maybe<Array<Maybe<EventSearchItemEdge>>>;
-  pageInfo: PageInfo;
-};
-
-export type EventSearchFilter = {
-  lowerTime: Scalars['Time']['input'];
-  query: Scalars['String']['input'];
-  upperTime: Scalars['Time']['input'];
-};
-
-export type EventSearchItem = {
-  __typename?: 'EventSearchItem';
-  id: Scalars['ULID']['output'];
-  name: Scalars['String']['output'];
-  receivedAt: Scalars['Time']['output'];
-};
-
-export type EventSearchItemEdge = {
-  __typename?: 'EventSearchItemEdge';
-  cursor: Scalars['String']['output'];
-  node: EventSearchItem;
-};
 
 export type EventSource = {
   __typename?: 'EventSource';
@@ -1119,9 +1088,7 @@ export type FunctionRun = {
   batchID: Maybe<Scalars['ULID']['output']>;
   canRerun: Maybe<Scalars['Boolean']['output']>;
   endedAt: Maybe<Scalars['Time']['output']>;
-  event: Maybe<ArchivedEvent>;
   eventID: Maybe<Scalars['ULID']['output']>;
-  events: Maybe<Array<ArchivedEvent>>;
   function: Workflow;
   id: Scalars['ULID']['output'];
   output: Maybe<Scalars['Bytes']['output']>;
@@ -2855,13 +2822,11 @@ export type Workspace = {
   appByExternalID: App;
   appCheck: AppCheckResult;
   apps: Array<App>;
-  archivedEvent: Maybe<ArchivedEvent>;
   cdcConnections: Array<CdcConnection>;
   connectWorkerMetrics: ScopedMetricsResponse;
   createdAt: Scalars['Time']['output'];
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
-  eventSearch: EventSearchConnection;
   eventType: EventTypeV2;
   eventTypes: PaginatedEventTypes;
   eventTypesV2: EventTypesConnection;
@@ -2915,11 +2880,6 @@ export type WorkspaceAppsArgs = {
 };
 
 
-export type WorkspaceArchivedEventArgs = {
-  id: Scalars['ULID']['input'];
-};
-
-
 export type WorkspaceConnectWorkerMetricsArgs = {
   filter: ConnectV1WorkerMetricsFilter;
 };
@@ -2932,13 +2892,6 @@ export type WorkspaceEventArgs = {
 
 export type WorkspaceEventByNamesArgs = {
   names: Array<Scalars['String']['input']>;
-};
-
-
-export type WorkspaceEventSearchArgs = {
-  after: InputMaybe<Scalars['String']['input']>;
-  filter: EventSearchFilter;
-  first?: Scalars['Int']['input'];
 };
 
 

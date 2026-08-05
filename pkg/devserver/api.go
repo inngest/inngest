@@ -280,6 +280,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			Valid:  r.Framework != "",
 		},
 		Url:        r.URL,
+		Metadata:   registration.AppMetadataForRegisterRequest(r),
 		Checksum:   sum,
 		Method:     method.String(),
 		AppVersion: r.AppVersion,
@@ -353,6 +354,12 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvID, sum); err == nil {
 		if !app.Error.Valid {
+			if r.FeatureObservations != nil && r.FeatureObservations.HasAny() {
+				if _, err := a.devserver.Data.UpsertAppByName(ctx, appParams); err != nil {
+					return nil, publicerr.Wrap(err, 500, "Error updating app observations")
+				}
+			}
+
 			// Skip registration since the app was already successfully
 			// registered.
 			return &sync.Reply{

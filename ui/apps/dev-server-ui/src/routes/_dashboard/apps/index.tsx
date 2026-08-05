@@ -71,8 +71,8 @@ function AppsComponent() {
               name: !app.name
                 ? 'Syncing...'
                 : !app.connected
-                ? `Syncing to ${app.name}`
-                : app.name,
+                  ? `Syncing to ${app.name}`
+                  : app.name,
             }}
             pill={
               status || app.autodiscovered ? (

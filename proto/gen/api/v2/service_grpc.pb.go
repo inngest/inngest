@@ -16,8 +16,8 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-// Requires gRPC-Go v1.62.0 or later.
-const _ = grpc.SupportPackageIsVersion8
+// Requires gRPC-Go v1.64.0 or later.
+const _ = grpc.SupportPackageIsVersion9
 
 const (
 	V2_Health_FullMethodName                     = "/api.v2.V2/Health"
@@ -104,16 +104,16 @@ type V2Client interface {
 	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
 	DestroySandbox(ctx context.Context, in *DestroySandboxRequest, opts ...grpc.CallOption) (*DestroySandboxResponse, error)
 	ExecSandbox(ctx context.Context, in *ExecSandboxRequest, opts ...grpc.CallOption) (*ExecSandboxResponse, error)
-	StreamSandboxLogs(ctx context.Context, in *StreamSandboxLogsRequest, opts ...grpc.CallOption) (V2_StreamSandboxLogsClient, error)
+	StreamSandboxLogs(ctx context.Context, in *StreamSandboxLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxLogsResponse], error)
 	WriteSandboxFile(ctx context.Context, in *WriteSandboxFileRequest, opts ...grpc.CallOption) (*WriteSandboxFileResponse, error)
-	ReadSandboxFile(ctx context.Context, in *ReadSandboxFileRequest, opts ...grpc.CallOption) (V2_ReadSandboxFileClient, error)
+	ReadSandboxFile(ctx context.Context, in *ReadSandboxFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[httpbody.HttpBody], error)
 	StartSandboxProcess(ctx context.Context, in *StartSandboxProcessRequest, opts ...grpc.CallOption) (*StartSandboxProcessResponse, error)
 	ListSandboxProcesses(ctx context.Context, in *ListSandboxProcessesRequest, opts ...grpc.CallOption) (*ListSandboxProcessesResponse, error)
 	GetSandboxProcess(ctx context.Context, in *GetSandboxProcessRequest, opts ...grpc.CallOption) (*GetSandboxProcessResponse, error)
 	SignalSandboxProcess(ctx context.Context, in *SignalSandboxProcessRequest, opts ...grpc.CallOption) (*SignalSandboxProcessResponse, error)
 	WaitSandboxProcess(ctx context.Context, in *WaitSandboxProcessRequest, opts ...grpc.CallOption) (*WaitSandboxProcessResponse, error)
 	GetSandboxProcessOutput(ctx context.Context, in *GetSandboxProcessOutputRequest, opts ...grpc.CallOption) (*GetSandboxProcessOutputResponse, error)
-	StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (V2_StreamSandboxProcessOutputClient, error)
+	StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse], error)
 	CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
@@ -389,13 +389,13 @@ func (c *v2Client) ExecSandbox(ctx context.Context, in *ExecSandboxRequest, opts
 	return out, nil
 }
 
-func (c *v2Client) StreamSandboxLogs(ctx context.Context, in *StreamSandboxLogsRequest, opts ...grpc.CallOption) (V2_StreamSandboxLogsClient, error) {
+func (c *v2Client) StreamSandboxLogs(ctx context.Context, in *StreamSandboxLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxLogsResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &V2_ServiceDesc.Streams[0], V2_StreamSandboxLogs_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &v2StreamSandboxLogsClient{ClientStream: stream}
+	x := &grpc.GenericClientStream[StreamSandboxLogsRequest, StreamSandboxLogsResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -405,22 +405,8 @@ func (c *v2Client) StreamSandboxLogs(ctx context.Context, in *StreamSandboxLogsR
 	return x, nil
 }
 
-type V2_StreamSandboxLogsClient interface {
-	Recv() (*StreamSandboxLogsResponse, error)
-	grpc.ClientStream
-}
-
-type v2StreamSandboxLogsClient struct {
-	grpc.ClientStream
-}
-
-func (x *v2StreamSandboxLogsClient) Recv() (*StreamSandboxLogsResponse, error) {
-	m := new(StreamSandboxLogsResponse)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamSandboxLogsClient = grpc.ServerStreamingClient[StreamSandboxLogsResponse]
 
 func (c *v2Client) WriteSandboxFile(ctx context.Context, in *WriteSandboxFileRequest, opts ...grpc.CallOption) (*WriteSandboxFileResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -432,13 +418,13 @@ func (c *v2Client) WriteSandboxFile(ctx context.Context, in *WriteSandboxFileReq
 	return out, nil
 }
 
-func (c *v2Client) ReadSandboxFile(ctx context.Context, in *ReadSandboxFileRequest, opts ...grpc.CallOption) (V2_ReadSandboxFileClient, error) {
+func (c *v2Client) ReadSandboxFile(ctx context.Context, in *ReadSandboxFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[httpbody.HttpBody], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &V2_ServiceDesc.Streams[1], V2_ReadSandboxFile_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &v2ReadSandboxFileClient{ClientStream: stream}
+	x := &grpc.GenericClientStream[ReadSandboxFileRequest, httpbody.HttpBody]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -448,22 +434,8 @@ func (c *v2Client) ReadSandboxFile(ctx context.Context, in *ReadSandboxFileReque
 	return x, nil
 }
 
-type V2_ReadSandboxFileClient interface {
-	Recv() (*httpbody.HttpBody, error)
-	grpc.ClientStream
-}
-
-type v2ReadSandboxFileClient struct {
-	grpc.ClientStream
-}
-
-func (x *v2ReadSandboxFileClient) Recv() (*httpbody.HttpBody, error) {
-	m := new(httpbody.HttpBody)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_ReadSandboxFileClient = grpc.ServerStreamingClient[httpbody.HttpBody]
 
 func (c *v2Client) StartSandboxProcess(ctx context.Context, in *StartSandboxProcessRequest, opts ...grpc.CallOption) (*StartSandboxProcessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -525,13 +497,13 @@ func (c *v2Client) GetSandboxProcessOutput(ctx context.Context, in *GetSandboxPr
 	return out, nil
 }
 
-func (c *v2Client) StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (V2_StreamSandboxProcessOutputClient, error) {
+func (c *v2Client) StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &V2_ServiceDesc.Streams[2], V2_StreamSandboxProcessOutput_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &v2StreamSandboxProcessOutputClient{ClientStream: stream}
+	x := &grpc.GenericClientStream[StreamSandboxProcessOutputRequest, StreamSandboxProcessOutputResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -541,22 +513,8 @@ func (c *v2Client) StreamSandboxProcessOutput(ctx context.Context, in *StreamSan
 	return x, nil
 }
 
-type V2_StreamSandboxProcessOutputClient interface {
-	Recv() (*StreamSandboxProcessOutputResponse, error)
-	grpc.ClientStream
-}
-
-type v2StreamSandboxProcessOutputClient struct {
-	grpc.ClientStream
-}
-
-func (x *v2StreamSandboxProcessOutputClient) Recv() (*StreamSandboxProcessOutputResponse, error) {
-	m := new(StreamSandboxProcessOutputResponse)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamSandboxProcessOutputClient = grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse]
 
 func (c *v2Client) CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -710,7 +668,7 @@ func (c *v2Client) ListSessionRuns(ctx context.Context, in *ListSessionRunsReque
 
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
-// for forward compatibility
+// for forward compatibility.
 type V2Server interface {
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	// Internal method to ensure ErrorResponse schema generation (not exposed via HTTP).
@@ -740,16 +698,16 @@ type V2Server interface {
 	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
 	DestroySandbox(context.Context, *DestroySandboxRequest) (*DestroySandboxResponse, error)
 	ExecSandbox(context.Context, *ExecSandboxRequest) (*ExecSandboxResponse, error)
-	StreamSandboxLogs(*StreamSandboxLogsRequest, V2_StreamSandboxLogsServer) error
+	StreamSandboxLogs(*StreamSandboxLogsRequest, grpc.ServerStreamingServer[StreamSandboxLogsResponse]) error
 	WriteSandboxFile(context.Context, *WriteSandboxFileRequest) (*WriteSandboxFileResponse, error)
-	ReadSandboxFile(*ReadSandboxFileRequest, V2_ReadSandboxFileServer) error
+	ReadSandboxFile(*ReadSandboxFileRequest, grpc.ServerStreamingServer[httpbody.HttpBody]) error
 	StartSandboxProcess(context.Context, *StartSandboxProcessRequest) (*StartSandboxProcessResponse, error)
 	ListSandboxProcesses(context.Context, *ListSandboxProcessesRequest) (*ListSandboxProcessesResponse, error)
 	GetSandboxProcess(context.Context, *GetSandboxProcessRequest) (*GetSandboxProcessResponse, error)
 	SignalSandboxProcess(context.Context, *SignalSandboxProcessRequest) (*SignalSandboxProcessResponse, error)
 	WaitSandboxProcess(context.Context, *WaitSandboxProcessRequest) (*WaitSandboxProcessResponse, error)
 	GetSandboxProcessOutput(context.Context, *GetSandboxProcessOutputRequest) (*GetSandboxProcessOutputResponse, error)
-	StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, V2_StreamSandboxProcessOutputServer) error
+	StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]) error
 	CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
@@ -768,161 +726,165 @@ type V2Server interface {
 	mustEmbedUnimplementedV2Server()
 }
 
-// UnimplementedV2Server must be embedded to have forward compatible implementations.
-type UnimplementedV2Server struct {
-}
+// UnimplementedV2Server must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedV2Server struct{}
 
 func (UnimplementedV2Server) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
+	return nil, status.Error(codes.Unimplemented, "method Health not implemented")
 }
 func (UnimplementedV2Server) XSchemaOnly(context.Context, *HealthRequest) (*ErrorResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method XSchemaOnly not implemented")
+	return nil, status.Error(codes.Unimplemented, "method XSchemaOnly not implemented")
 }
 func (UnimplementedV2Server) CreatePartnerAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreatePartnerAccount not implemented")
+	return nil, status.Error(codes.Unimplemented, "method CreatePartnerAccount not implemented")
 }
 func (UnimplementedV2Server) CreateEnv(context.Context, *CreateEnvRequest) (*CreateEnvResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateEnv not implemented")
+	return nil, status.Error(codes.Unimplemented, "method CreateEnv not implemented")
 }
 func (UnimplementedV2Server) FetchPartnerAccounts(context.Context, *FetchAccountsRequest) (*FetchAccountsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchPartnerAccounts not implemented")
+	return nil, status.Error(codes.Unimplemented, "method FetchPartnerAccounts not implemented")
 }
 func (UnimplementedV2Server) FetchAccount(context.Context, *FetchAccountRequest) (*FetchAccountResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchAccount not implemented")
+	return nil, status.Error(codes.Unimplemented, "method FetchAccount not implemented")
 }
 func (UnimplementedV2Server) FetchAccountEnvs(context.Context, *FetchAccountEnvsRequest) (*FetchAccountEnvsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountEnvs not implemented")
+	return nil, status.Error(codes.Unimplemented, "method FetchAccountEnvs not implemented")
 }
 func (UnimplementedV2Server) FetchAccountEventKeys(context.Context, *FetchAccountEventKeysRequest) (*FetchAccountEventKeysResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountEventKeys not implemented")
+	return nil, status.Error(codes.Unimplemented, "method FetchAccountEventKeys not implemented")
 }
 func (UnimplementedV2Server) FetchAccountSigningKeys(context.Context, *FetchAccountSigningKeysRequest) (*FetchAccountSigningKeysResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FetchAccountSigningKeys not implemented")
+	return nil, status.Error(codes.Unimplemented, "method FetchAccountSigningKeys not implemented")
 }
 func (UnimplementedV2Server) CreateWebhook(context.Context, *CreateWebhookRequest) (*CreateWebhookResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateWebhook not implemented")
+	return nil, status.Error(codes.Unimplemented, "method CreateWebhook not implemented")
 }
 func (UnimplementedV2Server) ListWebhooks(context.Context, *ListWebhooksRequest) (*ListWebhooksResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListWebhooks not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListWebhooks not implemented")
 }
 func (UnimplementedV2Server) PatchEnv(context.Context, *PatchEnvRequest) (*PatchEnvsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PatchEnv not implemented")
+	return nil, status.Error(codes.Unimplemented, "method PatchEnv not implemented")
 }
 func (UnimplementedV2Server) GetFunctionRun(context.Context, *GetFunctionRunRequest) (*GetFunctionRunResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetFunctionRun not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetFunctionRun not implemented")
 }
 func (UnimplementedV2Server) ListRuns(context.Context, *ListRunsRequest) (*ListRunsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListRuns not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListRuns not implemented")
 }
 func (UnimplementedV2Server) ListFunctionRuns(context.Context, *ListFunctionRunsRequest) (*ListFunctionRunsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListFunctionRuns not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListFunctionRuns not implemented")
 }
 func (UnimplementedV2Server) GetEventRuns(context.Context, *GetEventRunsRequest) (*GetEventRunsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetEventRuns not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetEventRuns not implemented")
 }
 func (UnimplementedV2Server) Rerun(context.Context, *RerunRequest) (*RerunResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Rerun not implemented")
+	return nil, status.Error(codes.Unimplemented, "method Rerun not implemented")
 }
 func (UnimplementedV2Server) CancelRun(context.Context, *CancelRunRequest) (*CancelRunResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CancelRun not implemented")
+	return nil, status.Error(codes.Unimplemented, "method CancelRun not implemented")
 }
 func (UnimplementedV2Server) GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetApp not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetApp not implemented")
 }
 func (UnimplementedV2Server) GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetApps not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetApps not implemented")
 }
 func (UnimplementedV2Server) CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateSandbox not implemented")
+	return nil, status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
 }
 func (UnimplementedV2Server) ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListSandboxes not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListSandboxes not implemented")
 }
 func (UnimplementedV2Server) GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetSandbox not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetSandbox not implemented")
 }
 func (UnimplementedV2Server) DestroySandbox(context.Context, *DestroySandboxRequest) (*DestroySandboxResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DestroySandbox not implemented")
+	return nil, status.Error(codes.Unimplemented, "method DestroySandbox not implemented")
 }
 func (UnimplementedV2Server) ExecSandbox(context.Context, *ExecSandboxRequest) (*ExecSandboxResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ExecSandbox not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ExecSandbox not implemented")
 }
-func (UnimplementedV2Server) StreamSandboxLogs(*StreamSandboxLogsRequest, V2_StreamSandboxLogsServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamSandboxLogs not implemented")
+func (UnimplementedV2Server) StreamSandboxLogs(*StreamSandboxLogsRequest, grpc.ServerStreamingServer[StreamSandboxLogsResponse]) error {
+	return status.Error(codes.Unimplemented, "method StreamSandboxLogs not implemented")
 }
 func (UnimplementedV2Server) WriteSandboxFile(context.Context, *WriteSandboxFileRequest) (*WriteSandboxFileResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method WriteSandboxFile not implemented")
+	return nil, status.Error(codes.Unimplemented, "method WriteSandboxFile not implemented")
 }
-func (UnimplementedV2Server) ReadSandboxFile(*ReadSandboxFileRequest, V2_ReadSandboxFileServer) error {
-	return status.Errorf(codes.Unimplemented, "method ReadSandboxFile not implemented")
+func (UnimplementedV2Server) ReadSandboxFile(*ReadSandboxFileRequest, grpc.ServerStreamingServer[httpbody.HttpBody]) error {
+	return status.Error(codes.Unimplemented, "method ReadSandboxFile not implemented")
 }
 func (UnimplementedV2Server) StartSandboxProcess(context.Context, *StartSandboxProcessRequest) (*StartSandboxProcessResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartSandboxProcess not implemented")
+	return nil, status.Error(codes.Unimplemented, "method StartSandboxProcess not implemented")
 }
 func (UnimplementedV2Server) ListSandboxProcesses(context.Context, *ListSandboxProcessesRequest) (*ListSandboxProcessesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListSandboxProcesses not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListSandboxProcesses not implemented")
 }
 func (UnimplementedV2Server) GetSandboxProcess(context.Context, *GetSandboxProcessRequest) (*GetSandboxProcessResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetSandboxProcess not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetSandboxProcess not implemented")
 }
 func (UnimplementedV2Server) SignalSandboxProcess(context.Context, *SignalSandboxProcessRequest) (*SignalSandboxProcessResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SignalSandboxProcess not implemented")
+	return nil, status.Error(codes.Unimplemented, "method SignalSandboxProcess not implemented")
 }
 func (UnimplementedV2Server) WaitSandboxProcess(context.Context, *WaitSandboxProcessRequest) (*WaitSandboxProcessResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method WaitSandboxProcess not implemented")
+	return nil, status.Error(codes.Unimplemented, "method WaitSandboxProcess not implemented")
 }
 func (UnimplementedV2Server) GetSandboxProcessOutput(context.Context, *GetSandboxProcessOutputRequest) (*GetSandboxProcessOutputResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetSandboxProcessOutput not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetSandboxProcessOutput not implemented")
 }
-func (UnimplementedV2Server) StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, V2_StreamSandboxProcessOutputServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamSandboxProcessOutput not implemented")
+func (UnimplementedV2Server) StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]) error {
+	return status.Error(codes.Unimplemented, "method StreamSandboxProcessOutput not implemented")
 }
 func (UnimplementedV2Server) CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateScore not implemented")
+	return nil, status.Error(codes.Unimplemented, "method CreateScore not implemented")
 }
 func (UnimplementedV2Server) SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SyncApp not implemented")
+	return nil, status.Error(codes.Unimplemented, "method SyncApp not implemented")
 }
 func (UnimplementedV2Server) GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetFunctionTrace not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetFunctionTrace not implemented")
 }
 func (UnimplementedV2Server) GetFunction(context.Context, *GetFunctionRequest) (*GetFunctionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetFunction not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetFunction not implemented")
 }
 func (UnimplementedV2Server) GetFunctions(context.Context, *GetFunctionsRequest) (*GetFunctionsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetFunctions not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetFunctions not implemented")
 }
 func (UnimplementedV2Server) InvokeFunction(context.Context, *InvokeFunctionRequest) (*InvokeFunctionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method InvokeFunction not implemented")
+	return nil, status.Error(codes.Unimplemented, "method InvokeFunction not implemented")
 }
 func (UnimplementedV2Server) ListInsightsTables(context.Context, *ListInsightsTablesRequest) (*ListInsightsTablesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListInsightsTables not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListInsightsTables not implemented")
 }
 func (UnimplementedV2Server) ListInsightsEventSchemas(context.Context, *ListInsightsEventSchemasRequest) (*ListInsightsEventSchemasResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListInsightsEventSchemas not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListInsightsEventSchemas not implemented")
 }
 func (UnimplementedV2Server) QueryInsightsPrompt(context.Context, *QueryInsightsPromptRequest) (*QueryInsightsPromptResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryInsightsPrompt not implemented")
+	return nil, status.Error(codes.Unimplemented, "method QueryInsightsPrompt not implemented")
 }
 func (UnimplementedV2Server) QueryInsights(context.Context, *QueryInsightsRequest) (*QueryInsightsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryInsights not implemented")
+	return nil, status.Error(codes.Unimplemented, "method QueryInsights not implemented")
 }
 func (UnimplementedV2Server) ListExperiments(context.Context, *ListExperimentsRequest) (*ListExperimentsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListExperiments not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListExperiments not implemented")
 }
 func (UnimplementedV2Server) GetExperiment(context.Context, *GetExperimentRequest) (*GetExperimentResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetExperiment not implemented")
+	return nil, status.Error(codes.Unimplemented, "method GetExperiment not implemented")
 }
 func (UnimplementedV2Server) ListSessionKeys(context.Context, *ListSessionKeysRequest) (*ListSessionKeysResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListSessionKeys not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListSessionKeys not implemented")
 }
 func (UnimplementedV2Server) ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListSessions not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListSessions not implemented")
 }
 func (UnimplementedV2Server) ListSessionRuns(context.Context, *ListSessionRunsRequest) (*ListSessionRunsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListSessionRuns not implemented")
+	return nil, status.Error(codes.Unimplemented, "method ListSessionRuns not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
+func (UnimplementedV2Server) testEmbeddedByValue()            {}
 
 // UnsafeV2Server may be embedded to opt out of forward compatibility for this service.
 // Use of this interface is not recommended, as added methods to V2Server will
@@ -932,6 +894,13 @@ type UnsafeV2Server interface {
 }
 
 func RegisterV2Server(s grpc.ServiceRegistrar, srv V2Server) {
+	// If the following call panics, it indicates UnimplementedV2Server was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
 	s.RegisterService(&V2_ServiceDesc, srv)
 }
 
@@ -1390,21 +1359,11 @@ func _V2_StreamSandboxLogs_Handler(srv interface{}, stream grpc.ServerStream) er
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(V2Server).StreamSandboxLogs(m, &v2StreamSandboxLogsServer{ServerStream: stream})
+	return srv.(V2Server).StreamSandboxLogs(m, &grpc.GenericServerStream[StreamSandboxLogsRequest, StreamSandboxLogsResponse]{ServerStream: stream})
 }
 
-type V2_StreamSandboxLogsServer interface {
-	Send(*StreamSandboxLogsResponse) error
-	grpc.ServerStream
-}
-
-type v2StreamSandboxLogsServer struct {
-	grpc.ServerStream
-}
-
-func (x *v2StreamSandboxLogsServer) Send(m *StreamSandboxLogsResponse) error {
-	return x.ServerStream.SendMsg(m)
-}
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamSandboxLogsServer = grpc.ServerStreamingServer[StreamSandboxLogsResponse]
 
 func _V2_WriteSandboxFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(WriteSandboxFileRequest)
@@ -1429,21 +1388,11 @@ func _V2_ReadSandboxFile_Handler(srv interface{}, stream grpc.ServerStream) erro
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(V2Server).ReadSandboxFile(m, &v2ReadSandboxFileServer{ServerStream: stream})
+	return srv.(V2Server).ReadSandboxFile(m, &grpc.GenericServerStream[ReadSandboxFileRequest, httpbody.HttpBody]{ServerStream: stream})
 }
 
-type V2_ReadSandboxFileServer interface {
-	Send(*httpbody.HttpBody) error
-	grpc.ServerStream
-}
-
-type v2ReadSandboxFileServer struct {
-	grpc.ServerStream
-}
-
-func (x *v2ReadSandboxFileServer) Send(m *httpbody.HttpBody) error {
-	return x.ServerStream.SendMsg(m)
-}
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_ReadSandboxFileServer = grpc.ServerStreamingServer[httpbody.HttpBody]
 
 func _V2_StartSandboxProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartSandboxProcessRequest)
@@ -1558,21 +1507,11 @@ func _V2_StreamSandboxProcessOutput_Handler(srv interface{}, stream grpc.ServerS
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(V2Server).StreamSandboxProcessOutput(m, &v2StreamSandboxProcessOutputServer{ServerStream: stream})
+	return srv.(V2Server).StreamSandboxProcessOutput(m, &grpc.GenericServerStream[StreamSandboxProcessOutputRequest, StreamSandboxProcessOutputResponse]{ServerStream: stream})
 }
 
-type V2_StreamSandboxProcessOutputServer interface {
-	Send(*StreamSandboxProcessOutputResponse) error
-	grpc.ServerStream
-}
-
-type v2StreamSandboxProcessOutputServer struct {
-	grpc.ServerStream
-}
-
-func (x *v2StreamSandboxProcessOutputServer) Send(m *StreamSandboxProcessOutputResponse) error {
-	return x.ServerStream.SendMsg(m)
-}
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamSandboxProcessOutputServer = grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]
 
 func _V2_CreateScore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateScoreRequest)

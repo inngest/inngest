@@ -95,6 +95,77 @@ func TestSaveDefer(t *testing.T) {
 		require.Equal(t, d, defers[d.HashedID])
 	})
 
+	t.Run("meta round-trips through save and load", func(t *testing.T) {
+		v2svc, id := newDeferTestRunService(t)
+
+		d := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"user_id":"u_123"}`),
+			Meta:           json.RawMessage(`{"propagated_sessions":{"tenant":"acme"}}`),
+		}
+		require.NoError(t, v2svc.SaveDefer(ctx, id, d))
+
+		// Meta must survive the full-view load...
+		defers, err := v2svc.LoadDefers(ctx, id)
+		require.NoError(t, err)
+		require.JSONEq(t, string(d.Meta), string(defers[d.HashedID].Meta))
+
+		// ...and the Input-less metadata view, which is what finalize reads.
+		metas, err := v2svc.LoadDefersMeta(ctx, id)
+		require.NoError(t, err)
+		require.JSONEq(t, string(d.Meta), string(metas[d.HashedID].Meta))
+	})
+
+	t.Run("control meta is stored verbatim", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		// Key order and number formatting must come back exactly as sent, the
+		// same guarantee Input gets from its own hash.
+		meta := `{"propagated_sessions":{"id":1234567890123456789,"empty":{},"tenant":"acme"}}`
+		d := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-step-1",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Meta:           json.RawMessage(meta),
+		}
+		r.NoError(v2svc.SaveDefer(ctx, id, d))
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		r.Equal(meta, string(defers[d.HashedID].Meta))
+	})
+
+	t.Run("aggregate-cap rejection stores no control meta", func(t *testing.T) {
+		r := require.New(t)
+		v2svc, id := newDeferTestRunService(t)
+
+		big := statev2.Defer{
+			FnSlug:         "onDefer-score",
+			HashedID:       "hash-first",
+			ScheduleStatus: enums.DeferStatusAfterRun,
+			Input:          json.RawMessage(`{"msg": "` + strings.Repeat("a", consts.MaxDeferInputAggregateSize-64) + `"}`),
+		}
+		r.NoError(v2svc.SaveDefer(ctx, id, big))
+
+		// Overflows the aggregate input budget, so this becomes a Rejected
+		// sentinel. A rejected defer is never scheduled, so its Meta is dead
+		// weight and is not persisted.
+		overflow := big
+		overflow.HashedID = "hash-second"
+		overflow.Meta = json.RawMessage(`{"propagated_sessions":{"tenant":"acme"}}`)
+		r.ErrorIs(v2svc.SaveDefer(ctx, id, overflow), statev2.ErrDeferInputAggregateExceeded)
+
+		defers, err := v2svc.LoadDefers(ctx, id)
+		r.NoError(err)
+		got := defers["hash-second"]
+		r.Equal(enums.DeferStatusRejected, got.ScheduleStatus)
+		r.Empty(got.Input)
+		r.Empty(got.Meta)
+	})
+
 	t.Run("idempotent", func(t *testing.T) {
 		v2svc, id := newDeferTestRunService(t)
 
@@ -385,6 +456,55 @@ func TestSetDeferStatus(t *testing.T) {
 				r.Equal(d.HashedID, got.HashedID)
 				r.Equal(enums.DeferStatusAborted, got.ScheduleStatus)
 				r.Empty(got.Input)
+			})
+		}
+	})
+
+	t.Run("control meta survives abort byte-for-byte", func(t *testing.T) {
+		// Meta is stored in defers-control-meta precisely so that the cjson
+		// decode/re-encode in this script cannot touch it. Assert exact bytes,
+		// not JSONEq: a re-encode that preserved semantics but reordered keys
+		// or reformatted numbers would still be a regression.
+		cases := []struct {
+			name string
+			meta string
+		}{
+			{"empty object", `{}`},
+			{"nested empty object", `{"propagated_sessions":{}}`},
+			// 2^53 + 1 — the first integer a float64 cannot hold exactly.
+			// cjson's %.14g encoding mangles it, and any session ID beyond
+			// 14 significant digits, on the way back out.
+			{"integer above 2^53", `{"propagated_sessions":{"external_id":9007199254740993}}`},
+			{"19-digit session id", `{"propagated_sessions":{"id":1234567890123456789}}`},
+			{"float", `{"propagated_sessions":{"score":0.30000000000000004}}`},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				r := require.New(t)
+				v2svc, id := newDeferTestRunService(t)
+
+				d := statev2.Defer{
+					FnSlug:         "onDefer-score",
+					HashedID:       "hash-step-1",
+					ScheduleStatus: enums.DeferStatusAfterRun,
+					Input:          json.RawMessage(`{"user_id":"u_123"}`),
+					Meta:           json.RawMessage(tc.meta),
+				}
+				r.NoError(v2svc.SaveDefer(ctx, id, d))
+				r.NoError(v2svc.SetDeferStatus(ctx, id, d.HashedID, enums.DeferStatusAborted))
+
+				defers, err := v2svc.LoadDefers(ctx, id)
+				r.NoError(err)
+				got := defers[d.HashedID]
+				r.Equal(enums.DeferStatusAborted, got.ScheduleStatus)
+				r.Empty(got.Input, "abort releases the input budget")
+				r.Equal(tc.meta, string(got.Meta))
+
+				// The metadata-only view is what finalize reads.
+				metas, err := v2svc.LoadDefersMeta(ctx, id)
+				r.NoError(err)
+				r.Equal(tc.meta, string(metas[d.HashedID].Meta))
 			})
 		}
 	})

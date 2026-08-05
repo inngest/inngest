@@ -7,6 +7,7 @@
 package connect
 
 import (
+	v1 "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -322,12 +323,13 @@ func (x *ConnectMessage) GetPayload() []byte {
 }
 
 type AppConfiguration struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AppName       string                 `protobuf:"bytes,1,opt,name=app_name,json=appName,proto3" json:"app_name,omitempty"`
-	AppVersion    *string                `protobuf:"bytes,2,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
-	Functions     []byte                 `protobuf:"bytes,4,opt,name=functions,proto3" json:"functions,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState  `protogen:"open.v1"`
+	AppName             string                  `protobuf:"bytes,1,opt,name=app_name,json=appName,proto3" json:"app_name,omitempty"`
+	AppVersion          *string                 `protobuf:"bytes,2,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
+	Functions           []byte                  `protobuf:"bytes,4,opt,name=functions,proto3" json:"functions,omitempty"`
+	FeatureObservations *v1.FeatureObservations `protobuf:"bytes,5,opt,name=feature_observations,json=featureObservations,proto3" json:"feature_observations,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *AppConfiguration) Reset() {
@@ -377,6 +379,13 @@ func (x *AppConfiguration) GetAppVersion() string {
 func (x *AppConfiguration) GetFunctions() []byte {
 	if x != nil {
 		return x.Functions
+	}
+	return nil
+}
+
+func (x *AppConfiguration) GetFeatureObservations() *v1.FeatureObservations {
+	if x != nil {
+		return x.FeatureObservations
 	}
 	return nil
 }
@@ -1891,15 +1900,16 @@ var File_connect_v1_connect_proto protoreflect.FileDescriptor
 const file_connect_v1_connect_proto_rawDesc = "" +
 	"\n" +
 	"\x18connect/v1/connect.proto\x12\n" +
-	"connect.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"^\n" +
+	"connect.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a6sdk_feature_observations/v1/feature_observations.proto\"^\n" +
 	"\x0eConnectMessage\x122\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1e.connect.v1.GatewayMessageTypeR\x04kind\x12\x18\n" +
-	"\apayload\x18\x02 \x01(\fR\apayload\"\x81\x01\n" +
+	"\apayload\x18\x02 \x01(\fR\apayload\"\xe6\x01\n" +
 	"\x10AppConfiguration\x12\x19\n" +
 	"\bapp_name\x18\x01 \x01(\tR\aappName\x12$\n" +
 	"\vapp_version\x18\x02 \x01(\tH\x00R\n" +
 	"appVersion\x88\x01\x01\x12\x1c\n" +
-	"\tfunctions\x18\x04 \x01(\fR\tfunctionsB\x0e\n" +
+	"\tfunctions\x18\x04 \x01(\fR\tfunctions\x12c\n" +
+	"\x14feature_observations\x18\x05 \x01(\v20.sdk_feature_observations.v1.FeatureObservationsR\x13featureObservationsB\x0e\n" +
 	"\f_app_version\"N\n" +
 	"\bAuthData\x12#\n" +
 	"\rsession_token\x18\x01 \x01(\tR\fsessionToken\x12\x1d\n" +
@@ -2159,28 +2169,30 @@ var file_connect_v1_connect_proto_goTypes = []any{
 	(*SystemError)(nil),                     // 23: connect.v1.SystemError
 	nil,                                     // 24: connect.v1.ConnMetadata.AllWorkerGroupsEntry
 	nil,                                     // 25: connect.v1.ConnMetadata.SyncedWorkerGroupsEntry
-	(*timestamppb.Timestamp)(nil),           // 26: google.protobuf.Timestamp
+	(*v1.FeatureObservations)(nil),          // 26: sdk_feature_observations.v1.FeatureObservations
+	(*timestamppb.Timestamp)(nil),           // 27: google.protobuf.Timestamp
 }
 var file_connect_v1_connect_proto_depIdxs = []int32{
 	0,  // 0: connect.v1.ConnectMessage.kind:type_name -> connect.v1.GatewayMessageType
-	6,  // 1: connect.v1.WorkerConnectRequestData.auth_data:type_name -> connect.v1.AuthData
-	5,  // 2: connect.v1.WorkerConnectRequestData.apps:type_name -> connect.v1.AppConfiguration
-	17, // 3: connect.v1.WorkerConnectRequestData.system_attributes:type_name -> connect.v1.SystemAttributes
-	26, // 4: connect.v1.WorkerConnectRequestData.started_at:type_name -> google.protobuf.Timestamp
-	1,  // 5: connect.v1.SDKResponse.status:type_name -> connect.v1.SDKResponseStatus
-	24, // 6: connect.v1.ConnMetadata.all_worker_groups:type_name -> connect.v1.ConnMetadata.AllWorkerGroupsEntry
-	25, // 7: connect.v1.ConnMetadata.synced_worker_groups:type_name -> connect.v1.ConnMetadata.SyncedWorkerGroupsEntry
-	2,  // 8: connect.v1.ConnMetadata.status:type_name -> connect.v1.ConnectionStatus
-	26, // 9: connect.v1.ConnMetadata.last_heartbeat_at:type_name -> google.protobuf.Timestamp
-	17, // 10: connect.v1.ConnMetadata.attributes:type_name -> connect.v1.SystemAttributes
-	16, // 11: connect.v1.ConnGroup.conns:type_name -> connect.v1.ConnMetadata
-	26, // 12: connect.v1.PubSubAckMessage.ts:type_name -> google.protobuf.Timestamp
-	23, // 13: connect.v1.PubSubAckMessage.nack_reason:type_name -> connect.v1.SystemError
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	26, // 1: connect.v1.AppConfiguration.feature_observations:type_name -> sdk_feature_observations.v1.FeatureObservations
+	6,  // 2: connect.v1.WorkerConnectRequestData.auth_data:type_name -> connect.v1.AuthData
+	5,  // 3: connect.v1.WorkerConnectRequestData.apps:type_name -> connect.v1.AppConfiguration
+	17, // 4: connect.v1.WorkerConnectRequestData.system_attributes:type_name -> connect.v1.SystemAttributes
+	27, // 5: connect.v1.WorkerConnectRequestData.started_at:type_name -> google.protobuf.Timestamp
+	1,  // 6: connect.v1.SDKResponse.status:type_name -> connect.v1.SDKResponseStatus
+	24, // 7: connect.v1.ConnMetadata.all_worker_groups:type_name -> connect.v1.ConnMetadata.AllWorkerGroupsEntry
+	25, // 8: connect.v1.ConnMetadata.synced_worker_groups:type_name -> connect.v1.ConnMetadata.SyncedWorkerGroupsEntry
+	2,  // 9: connect.v1.ConnMetadata.status:type_name -> connect.v1.ConnectionStatus
+	27, // 10: connect.v1.ConnMetadata.last_heartbeat_at:type_name -> google.protobuf.Timestamp
+	17, // 11: connect.v1.ConnMetadata.attributes:type_name -> connect.v1.SystemAttributes
+	16, // 12: connect.v1.ConnGroup.conns:type_name -> connect.v1.ConnMetadata
+	27, // 13: connect.v1.PubSubAckMessage.ts:type_name -> google.protobuf.Timestamp
+	23, // 14: connect.v1.PubSubAckMessage.nack_reason:type_name -> connect.v1.SystemError
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_connect_v1_connect_proto_init() }

@@ -3,6 +3,8 @@ package state
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -134,9 +136,10 @@ type AuthContext struct {
 }
 
 type SyncData struct {
-	SyncToken string
-	AppConfig *connpb.AppConfiguration
-	Functions []sdk.SDKFunction
+	SyncToken           string
+	AppConfig           *connpb.AppConfiguration
+	Functions           []sdk.SDKFunction
+	FeatureObservations *sdk.FeatureObservations
 }
 
 // WorkerGroup groups a list of connected workers to simplify operations, which
@@ -178,6 +181,12 @@ type WorkerGroup struct {
 	// - Function Configurations
 	// - User provided identifier (e.g. git sha, release tag, etc)
 	Hash string `json:"hash"`
+
+	// FeatureObservationsHash is persisted separately from SyncData, which is
+	// request-scoped and intentionally not serialized. This lets reconnects
+	// detect changed SDK feature observations without forcing a sync every time
+	// observations are present.
+	FeatureObservationsHash string `json:"feature_observations_hash,omitempty"`
 
 	// CreatedAt records the time this worker group was first created
 	CreatedAt time.Time `json:"created_at"`
@@ -238,8 +247,23 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		return fmt.Errorf("error attempting to retrieve worker group: %w", err)
 	}
 
-	// Don't attempt to sync if it's already sync'd
-	if existingGroup != nil && existingGroup.SyncID != nil && existingGroup.AppID != nil {
+	// Don't attempt to sync if it's already sync'd. Feature observations are not
+	// part of the worker group hash, so compare them explicitly; changed
+	// observations still need to reach the API even when function config is the
+	// same.
+	hasExistingSync := existingGroup != nil &&
+		existingGroup.SyncID != nil &&
+		existingGroup.AppID != nil
+
+	featureObservationsHash, err := sdkFeatureObservationsHash(g.SyncData.FeatureObservations)
+	if err != nil {
+		return fmt.Errorf("error hashing feature observations: %w", err)
+	}
+	g.FeatureObservationsHash = featureObservationsHash
+
+	sdkFeatureObsUnchanged := hasExistingSync &&
+		g.FeatureObservationsHash == existingGroup.FeatureObservationsHash
+	if hasExistingSync && sdkFeatureObsUnchanged {
 		g.AppID = existingGroup.AppID
 		g.SyncID = existingGroup.SyncID
 		g.CreatedAt = existingGroup.CreatedAt
@@ -290,6 +314,8 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		Capabilities: cap,
 		Functions:    g.SyncData.Functions,
 		AppVersion:   appVersion,
+
+		FeatureObservations: g.SyncData.FeatureObservations,
 
 		// Deduplicate syncs in case multiple workers are coming up at the same time
 		IdempotencyKey: g.Hash,
@@ -411,6 +437,20 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	}
 
 	return nil
+}
+
+func sdkFeatureObservationsHash(observations *sdk.FeatureObservations) (string, error) {
+	if observations == nil || !observations.HasAny() {
+		return "", nil
+	}
+
+	byt, err := json.Marshal(observations)
+	if err != nil {
+		return "", err
+	}
+
+	sum := sha256.Sum256(byt)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 type WorkerCapacity struct {

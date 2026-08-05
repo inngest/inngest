@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -23,6 +24,8 @@ var (
 	ErrStepOutputTooLarge = fmt.Errorf("step output size is greater than the limit")
 	ErrDeferInputTooLarge = fmt.Errorf("defer input size is greater than the limit")
 	ErrDeferInputInvalid  = fmt.Errorf("defer input is not a valid JSON object")
+	ErrDeferMetaTooLarge  = fmt.Errorf("defer meta size is greater than the limit")
+	ErrDeferMetaInvalid   = fmt.Errorf("defer meta is not a valid JSON object")
 )
 
 type GeneratorOpcode struct {
@@ -424,6 +427,12 @@ func (g GeneratorOpcode) DeferAddOpts() (*DeferAddOpts, error) {
 type DeferAddOpts struct {
 	FnSlug string          `json:"fn_slug"`
 	Input  json.RawMessage `json:"input,omitempty"`
+
+	// Meta carries control metadata (SDK-stamped session layers) for the
+	// deferred run. Opaque here: persisted with the defer and resolved onto
+	// the inngest/deferred.schedule event at finalize. Distinct from Input,
+	// which is the user payload.
+	Meta json.RawMessage `json:"meta,omitempty"`
 }
 
 func (d *DeferAddOpts) Validate() error {
@@ -439,6 +448,29 @@ func (d *DeferAddOpts) Validate() error {
 		// Redis (per defer × per run) and inflating them into the
 		// deferred.schedule event bus on Finalize.
 		return ErrDeferInputTooLarge
+	}
+	// Meta is optional. A literal `null` is accepted as a special case.
+	if meta := bytes.TrimSpace(d.Meta); len(meta) > 0 && !bytes.Equal(meta, []byte("null")) {
+		if !util.IsJSONObject(meta) {
+			// Object shape is checked here rather than left to finalize: a
+			// non-object Meta (`3`, `"x"`, `[1]`) would persist happily and only fail
+			// in buildDeferEvents, after the parent run has finished, where the
+			// deferred run can only be dropped. Rejecting at op receipt turns it
+			// into a rejectReason with the existing metric and rejected span.
+			return ErrDeferMetaInvalid
+		}
+	}
+	if len(d.Meta) > consts.MaxEventMetaSize {
+		// Meta is persisted as a raw, unparsed blob until the parent run
+		// finalizes (up to a year, x MaxDefersPerRun), so this byte cap is its
+		// only bound before then. A raw length check avoids parsing here,
+		// keeping the tombstone single-hop invariant intact; shape and size of
+		// the sessions themselves are validated post-merge at finalize. The
+		// sibling primitives don't need this cap: invoke materializes and
+		// validates its payload at op receipt and resolves in-request, and
+		// sendEvent meta rides inside the event, bounded by the event-size
+		// caps at API ingest.
+		return ErrDeferMetaTooLarge
 	}
 	return nil
 }

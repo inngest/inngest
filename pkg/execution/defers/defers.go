@@ -57,6 +57,10 @@ func SaveFromOp(
 	if err != nil {
 		if errors.Is(err, state.ErrDeferInputTooLarge) {
 			rejectReason = "per_defer_size"
+		} else if errors.Is(err, state.ErrDeferMetaTooLarge) {
+			rejectReason = "meta_size"
+		} else if errors.Is(err, state.ErrDeferMetaInvalid) {
+			rejectReason = "invalid_meta"
 		} else if errors.Is(err, state.ErrDeferInputInvalid) {
 			rejectReason = "invalid_input"
 		} else {
@@ -85,6 +89,7 @@ func SaveFromOp(
 			HashedID:       op.ID,
 			ScheduleStatus: enums.DeferStatusAfterRun,
 			Input:          opts.Input,
+			Meta:           opts.Meta,
 		})
 		switch {
 		case errors.Is(saveErr, statev2.ErrDeferLimitExceeded):

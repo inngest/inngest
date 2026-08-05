@@ -170,11 +170,22 @@ type App {
   method: AppMethod!
 
   appVersion: String
+  sdkFeatureReadiness: SDKFeatureReadiness!
 
   # These fields are UI convenience fields
   connected: Boolean!
   functionCount: Int!
   autodiscovered: Boolean!
+}
+
+type SDKFeatureReadiness {
+  aiMetadataExtraction: SDKFeatureStatus
+  extendedTraces: SDKFeatureStatus
+}
+
+type SDKFeatureStatus {
+  ready: Boolean!
+  reason: Int
 }
 
 type Function {

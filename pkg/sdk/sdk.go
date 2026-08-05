@@ -85,6 +85,10 @@ type RegisterRequest struct {
 	// IdempotencyKey is an optional input to deduplicate syncs.
 	IdempotencyKey string `json:"idempotencyKey"`
 
+	// FeatureObservations contains SDK-collected readiness data for optional
+	// features. The JSON shape mirrors the SDK payload.
+	FeatureObservations *FeatureObservations `json:"featureObservations,omitempty"`
+
 	// checksum is a memoized field.
 	checksum string
 
@@ -112,7 +116,16 @@ func (f *RegisterRequest) Checksum() (string, error) {
 	if f.checksum != "" {
 		return f.checksum, nil
 	}
-	byt, err := json.Marshal(f)
+
+	checksumRequest := *f
+	// Ignore feature observations in the checksum. This prevents feature
+	// observation changes from affecting sync dedupe logic. In other words, if
+	// the only change was a feature observation then it shouldn't cause us to
+	// go thru the whole app sync flow.
+	checksumRequest.FeatureObservations = nil
+	checksumRequest.checksum = ""
+
+	byt, err := json.Marshal(checksumRequest)
 	if err != nil {
 		return "", err
 	}
@@ -140,7 +153,6 @@ func (f RegisterRequest) SDKVersion() string {
 func (f RegisterRequest) IsConnect() bool {
 	return f.Capabilities.Connect == ConnectV1 && f.DeployType == DeployTypeConnect
 }
-
 
 func (f *RegisterRequest) normalize(forceHTTPS bool) error {
 	f.URL = util.NormalizeAppURL(f.URL, forceHTTPS)
