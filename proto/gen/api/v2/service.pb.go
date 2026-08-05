@@ -10131,7 +10131,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\aapi:env\x12\fEnvironments\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18]\n" +
 	"\vapi:webhook\x12/Webhooks that ingest events into an environment\x1a\x1dAccounts, Environments & Keys\x92\xb5\x18\x87\x01\n" +
 	"\aapi:key\x12[Event keys and signing keys. Signing keys grant full SDK access, so treat this as sensitive\x1a\x1dAccounts, Environments & Keys \x01\x92\xb5\x18D\n" +
-	"\vapi:partner\x12\x14Partner sub-accounts\x1a\x1dAccounts, Environments & Keys \x01\x92\xb5\x18<\n" +
+	"\vapi:partner\x12\x14Partner sub-accounts\x1a\x1dAccounts, Environments & Keys(\x01\x92\xb5\x18<\n" +
 	"\aapi:app\x12\x19Apps and their sync state\x1a\x16Apps, Functions & Runs\x92\xb5\x18<\n" +
 	"\fapi:function\x12\x14Function definitions\x1a\x16Apps, Functions & Runs\x92\xb5\x18;\n" +
 	"\aapi:run\x12\x18Function runs and traces\x1a\x16Apps, Functions & Runs\x92\xb5\x18M\n" +

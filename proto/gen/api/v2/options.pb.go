@@ -87,9 +87,14 @@ type GrantDefinition struct {
 	Category string `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
 	// Sensitive grants are left out of the Read Only preset and out of the
 	// default member policy, so holding one is always a deliberate choice. Set it
-	// where the read half hands over something that is itself a credential, or
-	// reaches outside the key's environment.
-	Sensitive     bool `protobuf:"varint,4,opt,name=sensitive,proto3" json:"sensitive,omitempty"`
+	// where the read half hands over something that is itself a credential.
+	Sensitive bool `protobuf:"varint,4,opt,name=sensitive,proto3" json:"sensitive,omitempty"`
+	// Internal grants are enforced on their routes but never offered for minting:
+	// absent from GrantCatalog, so the key-creation UI does not render them, the
+	// mint policy rejects them, and no preset can include them. Set it where the
+	// grant belongs to keys provisioned out of band rather than to anything a
+	// customer creates for themselves.
+	Internal      bool `protobuf:"varint,5,opt,name=internal,proto3" json:"internal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -148,6 +153,13 @@ func (x *GrantDefinition) GetCategory() string {
 func (x *GrantDefinition) GetSensitive() bool {
 	if x != nil {
 		return x.Sensitive
+	}
+	return false
+}
+
+func (x *GrantDefinition) GetInternal() bool {
+	if x != nil {
+		return x.Internal
 	}
 	return false
 }
@@ -254,12 +266,13 @@ var File_api_v2_options_proto protoreflect.FileDescriptor
 
 const file_api_v2_options_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/options.proto\x12\x06api.v2\x1a google/protobuf/descriptor.proto\"\x81\x01\n" +
+	"\x14api/v2/options.proto\x12\x06api.v2\x1a google/protobuf/descriptor.proto\"\x9d\x01\n" +
 	"\x0fGrantDefinition\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1a\n" +
 	"\bcategory\x18\x03 \x01(\tR\bcategory\x12\x1c\n" +
-	"\tsensitive\x18\x04 \x01(\bR\tsensitive\"o\n" +
+	"\tsensitive\x18\x04 \x01(\bR\tsensitive\x12\x1a\n" +
+	"\binternal\x18\x05 \x01(\bR\binternal\"o\n" +
 	"\fAuthzOptions\x12\x14\n" +
 	"\x05grant\x18\x02 \x01(\tR\x05grant\x12+\n" +
 	"\x06action\x18\x03 \x01(\x0e2\x13.api.v2.AuthzActionR\x06action\x12\x16\n" +
