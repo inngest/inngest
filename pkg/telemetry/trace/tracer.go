@@ -243,6 +243,12 @@ type tracer struct {
 	propagator propagation.TextMapPropagator
 	shutdown   func(context.Context)
 	processor  trace.SpanProcessor
+
+	// mirror ships spans to an external OTLP collector in addition to
+	// processor. It is registered on provider as well, so spans created
+	// through the normal otel API reach it without any help from us; the
+	// field exists for Export, which deliberately bypasses the provider.
+	mirror trace.SpanProcessor
 }
 
 func (t *tracer) Provider() *trace.TracerProvider {
@@ -266,6 +272,16 @@ func (t *tracer) Export(span trace.ReadOnlySpan) error {
 	}
 
 	t.processor.OnEnd(span)
+
+	// Legacy run and step spans (pkg/run) only ever reach an exporter through
+	// here, so skipping the mirror would hide exactly the spans an external
+	// backend is wanted for. These spans can be emitted more than once as a
+	// run progresses, by design: Inngest's own ingestion dedupes them, and
+	// trace backends key on trace and span IDs, so the last write wins.
+	if t.mirror != nil {
+		t.mirror.OnEnd(span)
+	}
+
 	return nil
 }
 
@@ -301,20 +317,29 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 		return nil, err
 	}
 
+	// A misconfigured mirror degrades telemetry; it must not stop the server
+	// from booting, since the sink the platform itself depends on is already
+	// up by this point.
 	mirror, err := newMirrorSpanProcessor(ctx)
 	if err != nil {
-		return nil, err
+		logger.StdlibLogger(ctx).Error(
+			"error configuring external OTLP trace export; continuing without it",
+			"error", err,
+			"service", opts.ServiceName,
+		)
+		return t, nil
 	}
 	if mirror != nil {
 		// Provider shutdown drains registered processors, so the tracer's own
 		// shutdown func needs no changes.
-		t.Provider().RegisterSpanProcessor(mirror)
+		t.provider.RegisterSpanProcessor(mirror)
+		t.mirror = mirror
 	}
 
 	return t, nil
 }
 
-func newSinkTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newSinkTracer(ctx context.Context, opts TracerOpts) (*tracer, error) {
 	switch opts.Type {
 	case TracerTypeOTLP:
 		return newOTLPGRPCTraceProvider(ctx, opts)
@@ -333,7 +358,7 @@ func newSinkTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	}
 }
 
-func newJaegerTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newJaegerTraceProvider(ctx context.Context, opts TracerOpts) (*tracer, error) {
 	exp, err := jaegerExporter()
 	if err != nil {
 		return nil, fmt.Errorf("error setting up Jaeger exporter: %w", err)
@@ -359,7 +384,7 @@ func newJaegerTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error
 }
 
 // IOTraceProvider is expected to be used for debugging purposes and not for production usage
-func newIOTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newIOTraceProvider(ctx context.Context, opts TracerOpts) (*tracer, error) {
 	exp, err := stdouttrace.New(
 		stdouttrace.WithWriter(os.Stderr),
 	)
@@ -388,7 +413,7 @@ func newIOTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	}, nil
 }
 
-func newNoopTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newNoopTraceProvider(ctx context.Context, opts TracerOpts) (*tracer, error) {
 	tp := trace.NewTracerProvider(
 		trace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -402,7 +427,7 @@ func newNoopTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 	}, nil
 }
 
-func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (*tracer, error) {
 	endpoint := opts.Endpoint()
 	urlpath := opts.URLPath()
 
@@ -438,7 +463,7 @@ func newOTLPHTTPTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 	}, nil
 }
 
-func newOTLPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newOTLPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (*tracer, error) {
 	endpoint := opts.Endpoint()
 	maxPayloadSize := opts.MaxPayloadSizeBytes()
 
@@ -502,7 +527,7 @@ func newTextMapPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (*tracer, error) {
 	if len(opts.NATS) == 0 {
 		return nil, fmt.Errorf("nats options not provided")
 	}
@@ -564,7 +589,7 @@ func newNatsTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) 
 	}, nil
 }
 
-func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (Tracer, error) {
+func newKafkaTraceExporter(ctx context.Context, opts TracerOpts) (*tracer, error) {
 	exp, err := exporters.NewKafkaSpanExporter(ctx, opts.Kafka...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Kafka trace client: %w", err)

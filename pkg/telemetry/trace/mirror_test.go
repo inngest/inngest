@@ -8,10 +8,15 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // clearOTLPEnv makes the OTLP environment hermetic. Both mirror.go and the
@@ -352,6 +357,129 @@ func TestNewTracerWithoutMirrorEnv(t *testing.T) {
 	require.Equal(t, map[string]string{"unmirrored-span": "test"}, sink.spans(t))
 }
 
+// TestTracerExportFansOutToSinkAndMirror covers the path that carries the
+// entire legacy run and step span tree: pkg/run builds its own ReadOnlySpans
+// and ends them through Export (see run.Span.End), which writes straight to the
+// span processors and never touches the provider's tracer. Until Export learned
+// about the mirror, exactly the spans an external backend is wanted for were
+// the ones it never saw, while spans created through the otel API arrived
+// normally - a gap no provider-level test can catch.
+func TestTracerExportFansOutToSinkAndMirror(t *testing.T) {
+	ctx := context.Background()
+
+	clearOTLPEnv(t)
+
+	sink := newTraceSink(t)
+	collector := newTraceSink(t)
+
+	// Per-signal endpoints are used verbatim by the upstream exporter, so the
+	// full path an operator would configure is spelled out here.
+	t.Setenv(envSignalEndpoint, collector.URL+"/v1/traces")
+
+	tracer, err := newTracer(ctx, TracerOpts{
+		Type:          TracerTypeOTLPHTTP,
+		TraceEndpoint: sink.Listener.Addr().String(),
+		TraceURLPath:  "/dev/traces",
+		ServiceName:   "test",
+	})
+	require.NoError(t, err)
+	t.Cleanup(tracer.Shutdown(ctx))
+
+	require.NoError(t, tracer.Export(exportedSpan("exported-span")))
+
+	// Export enqueues on the processors directly, but both of them are batch
+	// processors registered on the provider, so the provider's ForceFlush
+	// drains them however the span was queued. Shutdown would drain them too
+	// (it calls the same ForceFlush) but it also closes the tracer, so
+	// ForceFlush is used here to keep the assertions on a live one.
+	require.NoError(t, tracer.Provider().ForceFlush(ctx))
+
+	// Because Export bypasses the provider, the resource that reaches a
+	// collector is the span's own rather than the tracer's. Pinning it on both
+	// copies proves the mirror ships the span it was handed instead of a
+	// re-attributed one, which is what external backends group by.
+	expected := map[string]string{"exported-span": "test"}
+	require.Equal(t, expected, sink.spans(t), "internal sink did not receive the exported span")
+	require.Equal(t, expected, collector.spans(t), "external collector did not receive the exported span")
+
+	// Fanning out must not move the internal sink: the dev server only ingests
+	// traces on the configured path.
+	for _, req := range sink.received() {
+		require.Equal(t, "/dev/traces", req.path)
+	}
+}
+
+// TestTracerExportWithoutMirror is the other half of that contract. With no
+// external endpoint configured there is no mirror to fan out to, and Export
+// must still deliver to the internal sink rather than dereferencing a nil
+// processor or bailing out before the sink is written.
+func TestTracerExportWithoutMirror(t *testing.T) {
+	ctx := context.Background()
+
+	clearOTLPEnv(t)
+
+	sink := newTraceSink(t)
+
+	tr, err := newTracer(ctx, TracerOpts{
+		Type:          TracerTypeOTLPHTTP,
+		TraceEndpoint: sink.Listener.Addr().String(),
+		TraceURLPath:  "/dev/traces",
+		ServiceName:   "test",
+	})
+	require.NoError(t, err)
+	t.Cleanup(tr.Shutdown(ctx))
+
+	concrete, ok := tr.(*tracer)
+	require.True(t, ok)
+	require.Nil(t, concrete.mirror, "an unconfigured process must not attach a mirror to the tracer")
+
+	require.NoError(t, tr.Export(exportedSpan("unmirrored-export")))
+	require.NoError(t, tr.Provider().ForceFlush(ctx))
+
+	require.Equal(t, map[string]string{"unmirrored-export": "test"}, sink.spans(t))
+}
+
+// TestNewTracerDegradesOnUnsupportedMirrorProtocol is the regression guard for
+// a telemetry typo taking the server down with it. http/json is a real OTLP
+// spec value with no Go trace exporter, so the constructor rejects it (see
+// TestNewMirrorSpanProcessorRejectsUnsupportedProtocol); newTracer has to log
+// that and hand back a working tracer regardless, because a returned error here
+// propagates out of every server component that traces and prevents startup -
+// for a signal the platform does not depend on.
+func TestNewTracerDegradesOnUnsupportedMirrorProtocol(t *testing.T) {
+	ctx := context.Background()
+
+	clearOTLPEnv(t)
+
+	sink := newTraceSink(t)
+
+	// Nothing needs to listen on the mirror endpoint: the protocol is rejected
+	// before an exporter is built, let alone connected. It only has to be
+	// non-empty, since that is what asks for a mirror at all.
+	t.Setenv(envSignalEndpoint, "http://127.0.0.1:4318/v1/traces")
+	t.Setenv(envSignalProtocol, "http/json")
+
+	tr, err := newTracer(ctx, TracerOpts{
+		Type:          TracerTypeOTLPHTTP,
+		TraceEndpoint: sink.Listener.Addr().String(),
+		TraceURLPath:  "/dev/traces",
+		ServiceName:   "test",
+	})
+	require.NoError(t, err, "a mirror misconfiguration must not stop the server from booting")
+	require.NotNil(t, tr)
+	t.Cleanup(tr.Shutdown(ctx))
+
+	concrete, ok := tr.(*tracer)
+	require.True(t, ok)
+	require.Nil(t, concrete.mirror, "a rejected mirror must not be attached to the tracer")
+
+	// Degraded, not dead: the sink the platform itself depends on still works.
+	require.NoError(t, tr.Export(exportedSpan("degraded-export")))
+	require.NoError(t, tr.Provider().ForceFlush(ctx))
+
+	require.Equal(t, map[string]string{"degraded-export": "test"}, sink.spans(t))
+}
+
 // traceSink is an in-process stand-in for an OTLP/HTTP collector. It accepts
 // any path and records every request so tests can assert which sinks a span
 // actually reached.
@@ -435,4 +563,30 @@ func (s *traceSink) spans(t *testing.T) map[string]string {
 	}
 
 	return out
+}
+
+// exportedSpan stands in for the spans pkg/run hands to Export: ReadOnlySpans
+// assembled by hand that never pass through a tracer provider, which is the
+// whole reason Export exists. A real run.Span cannot be used here because
+// pkg/run imports this package, so the upstream stub plays its part. The
+// timestamps and IDs are fixed so the encoded payload is identical on every
+// run, and the resource carries service.name because Export bypasses the
+// provider that would otherwise supply one.
+func exportedSpan(name string) trace.ReadOnlySpan {
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	return tracetest.SpanStub{
+		Name: name,
+		SpanContext: oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
+			TraceID:    oteltrace.TraceID{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10},
+			SpanID:     oteltrace.SpanID{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8},
+			TraceFlags: oteltrace.FlagsSampled,
+		}),
+		StartTime: start,
+		EndTime:   start.Add(time.Millisecond),
+		Resource: resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("test"),
+		),
+	}.Snapshot()
 }
