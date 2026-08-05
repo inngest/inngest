@@ -1,5 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
+import type React from 'react';
 
+import {
+  FeatureReadinessDetail,
+  FeatureReadinessTooltip,
+  featureReadinessTooltipClassName,
+} from '@inngest/components/Apps/FeatureReadiness';
 import { FunctionList } from '@inngest/components/Apps/FunctionList';
 import { Header } from '@inngest/components/Header/Header';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
@@ -24,6 +30,32 @@ export const Route = createFileRoute('/_dashboard/apps/app/')({
   component: AppComponent,
 });
 
+function aiMetadataDetail(reason?: number | null): React.ReactNode {
+  if (reason == null) {
+    return '-';
+  }
+
+  return <FeatureReadinessDetail kind="aiMetadata" reason={reason} />;
+}
+
+function aiMetadataTooltip(reason?: number | null): React.ReactNode {
+  return reason != null ? <FeatureReadinessTooltip kind="aiMetadata" /> : null;
+}
+
+function extendedTracesDetail(reason?: number | null): React.ReactNode {
+  if (reason == null) {
+    return '-';
+  }
+
+  return <FeatureReadinessDetail kind="extendedTraces" reason={reason} />;
+}
+
+function extendedTracesTooltip(reason?: number | null): React.ReactNode {
+  return reason != null ? (
+    <FeatureReadinessTooltip kind="extendedTraces" />
+  ) : null;
+}
+
 function AppComponent() {
   const [id] = useSearchParam('id');
   if (!id) {
@@ -44,6 +76,8 @@ function AppPage({ id }: { id: string }) {
   }
 
   const { app } = data;
+  const aiMetadataReason = app.sdkFeatureReadiness.aiMetadataExtraction?.reason;
+  const extendedTracesReason = app.sdkFeatureReadiness.extendedTraces?.reason;
 
   let lastSyncedAt = null;
 
@@ -66,6 +100,20 @@ function AppPage({ id }: { id: string }) {
           <AppDetailsCard.Item
             term="App version"
             detail={app.appVersion ? <Pill>{app.appVersion}</Pill> : '-'}
+          />
+          <AppDetailsCard.Item
+            term="AI OTel"
+            detail={aiMetadataDetail(aiMetadataReason)}
+            tooltipContent={aiMetadataTooltip(aiMetadataReason)}
+            tooltipContentClassName={featureReadinessTooltipClassName}
+            tooltipHasArrow={false}
+          />
+          <AppDetailsCard.Item
+            term="Extended traces"
+            detail={extendedTracesDetail(extendedTracesReason)}
+            tooltipContent={extendedTracesTooltip(extendedTracesReason)}
+            tooltipContentClassName={featureReadinessTooltipClassName}
+            tooltipHasArrow={false}
           />
           <AppDetailsCard.Item
             term="Last synced at"

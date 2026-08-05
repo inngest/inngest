@@ -9,6 +9,17 @@ export type App = {
   url?: string | null;
   externalID?: string;
   appVersion?: string | null;
+  sdkFeatureReadiness?: SDKFeatureReadiness;
+};
+
+export type SDKFeatureReadiness = {
+  aiMetadataExtraction?: SDKFeatureStatus | null;
+  extendedTraces?: SDKFeatureStatus | null;
+};
+
+export type SDKFeatureStatus = {
+  ready: boolean;
+  reason?: number | null;
 };
 
 export const methodTypes = {

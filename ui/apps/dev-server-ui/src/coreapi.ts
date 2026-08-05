@@ -148,6 +148,16 @@ export const APPS = gql`
       functionCount
       autodiscovered
       method
+      sdkFeatureReadiness {
+        aiMetadataExtraction {
+          ready
+          reason
+        }
+        extendedTraces {
+          ready
+          reason
+        }
+      }
       functions {
         name
         id
@@ -175,6 +185,16 @@ export const GET_APP = gql`
       functionCount
       autodiscovered
       method
+      sdkFeatureReadiness {
+        aiMetadataExtraction {
+          ready
+          reason
+        }
+        extendedTraces {
+          ready
+          reason
+        }
+      }
       functions {
         name
         id

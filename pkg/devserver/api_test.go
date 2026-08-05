@@ -25,8 +25,10 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
+	sdkfeatureobs "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -128,6 +130,143 @@ func TestRegister_FunctionVersionIncrement(t *testing.T) {
 
 		// Verify the function was created with version 1
 		fnVersions := getFunctionIDandVersion(t, ds, req.AppName)
+		require.Len(t, fnVersions, 1)
+		for _, fnVersion := range fnVersions {
+			require.Equal(t, 1, fnVersion)
+		}
+	})
+
+	t.Run("stores AI metadata extraction readiness from feature observations", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		api := &devapi{
+			devserver: ds,
+		}
+
+		observedReq := req
+		observedReq.FeatureObservations = sdk.FeatureObservationsFromProto(&sdkfeatureobs.FeatureObservations{
+			AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+				ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_OTEL_PROVIDER_MISSING,
+				OtelSetup: &sdkfeatureobs.OTelSetup{
+					ProviderSource: sdkfeatureobs.OTelProviderSource_OTEL_PROVIDER_SOURCE_FIRST_PARTY,
+				},
+			},
+		})
+
+		_, err := api.register(ctx, observedReq)
+		require.NoError(t, err)
+
+		app, err := ds.Data.GetAppByName(ctx, consts.DevServerEnvID, observedReq.AppName)
+		require.NoError(t, err)
+		require.Len(t, app.Metadata, 1)
+		requireFeatureObservationsJSON(t, app.Metadata,
+			`{"aiMetadataExtraction":{"readinessReason":3,"otelSetup":{"providerSource":1}}}`,
+		)
+
+		updatedReq := observedReq
+		updatedReq.FeatureObservations.GetAiMetadataExtraction().ReadinessReason = sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY
+
+		_, err = api.register(ctx, updatedReq)
+		require.NoError(t, err)
+
+		app, err = ds.Data.GetAppByName(ctx, consts.DevServerEnvID, observedReq.AppName)
+		require.NoError(t, err)
+		requireFeatureObservationsJSON(t, app.Metadata,
+			`{"aiMetadataExtraction":{"readinessReason":1,"otelSetup":{"providerSource":1}}}`,
+		)
+
+		fnVersions := getFunctionIDandVersion(t, ds, observedReq.AppName)
+		require.Len(t, fnVersions, 1)
+		for _, fnVersion := range fnVersions {
+			require.Equal(t, 1, fnVersion)
+		}
+	})
+
+	t.Run("updates feature observations on duplicate checksum without syncing functions", func(t *testing.T) {
+		r := require.New(t)
+
+		ds := newTestDevServer(t)
+		api := &devapi{
+			devserver: ds,
+		}
+
+		checksumReq := req
+		sum, err := checksumReq.Checksum()
+		r.NoError(err)
+
+		appID := inngest.DeterministicAppUUID(req.AppName)
+		_, err = ds.Data.UpsertApp(ctx, cqrs.UpsertAppParams{
+			ID:          appID,
+			Name:        req.AppName,
+			SdkLanguage: req.SDKLanguage(),
+			SdkVersion:  req.SDKVersion(),
+			Checksum:    sum,
+			Url:         req.URL,
+			Method:      enums.AppMethodServe.String(),
+			Metadata:    "{}",
+		})
+		r.NoError(err)
+
+		observedReq := req
+		observedReq.FeatureObservations = sdk.FeatureObservationsFromProto(&sdkfeatureobs.FeatureObservations{
+			AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+				ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
+			},
+		})
+
+		_, err = api.register(ctx, observedReq)
+		r.NoError(err)
+
+		app, err := ds.Data.GetAppByName(ctx, consts.DevServerEnvID, observedReq.AppName)
+		r.NoError(err)
+		r.Len(app.Metadata, 1)
+		requireFeatureObservationsJSON(t, app.Metadata,
+			`{"aiMetadataExtraction":{"readinessReason":1}}`,
+		)
+
+		fns, err := ds.Data.GetFunctionsByAppInternalID(ctx, appID)
+		r.NoError(err)
+		r.Empty(fns)
+	})
+
+	t.Run("stores Extended Traces readiness from feature observations", func(t *testing.T) {
+		ds := newTestDevServer(t)
+		api := &devapi{
+			devserver: ds,
+		}
+
+		observedReq := req
+		observedReq.FeatureObservations = sdk.FeatureObservationsFromProto(&sdkfeatureobs.FeatureObservations{
+			ExtendedTraces: &sdkfeatureobs.ExtendedTraces{
+				ReadinessReason: sdkfeatureobs.ExtendedTracesReadinessReason_EXTENDED_TRACES_READINESS_REASON_OTEL_PROVIDER_MISSING,
+				OtelSetup: &sdkfeatureobs.OTelSetup{
+					ProviderSource: sdkfeatureobs.OTelProviderSource_OTEL_PROVIDER_SOURCE_USER_PROVIDED,
+				},
+			},
+		})
+
+		_, err := api.register(ctx, observedReq)
+		require.NoError(t, err)
+
+		app, err := ds.Data.GetAppByName(ctx, consts.DevServerEnvID, observedReq.AppName)
+		require.NoError(t, err)
+		require.Len(t, app.Metadata, 1)
+		requireFeatureObservationsJSON(t, app.Metadata,
+			`{"extendedTraces":{"readinessReason":4,"otelSetup":{"providerSource":2}}}`,
+		)
+
+		updatedReq := observedReq
+		updatedReq.FeatureObservations.GetExtendedTraces().ReadinessReason = sdkfeatureobs.ExtendedTracesReadinessReason_EXTENDED_TRACES_READINESS_REASON_READY
+
+		_, err = api.register(ctx, updatedReq)
+		require.NoError(t, err)
+
+		app, err = ds.Data.GetAppByName(ctx, consts.DevServerEnvID, observedReq.AppName)
+		require.NoError(t, err)
+		requireFeatureObservationsJSON(t, app.Metadata,
+			`{"extendedTraces":{"readinessReason":1,"otelSetup":{"providerSource":2}}}`,
+		)
+
+		fnVersions := getFunctionIDandVersion(t, ds, observedReq.AppName)
 		require.Len(t, fnVersions, 1)
 		for _, fnVersion := range fnVersions {
 			require.Equal(t, 1, fnVersion)
@@ -1078,4 +1217,15 @@ func TestDevEndpoint_Returns404InCloudMode(t *testing.T) {
 
 	// Should return 404
 	require.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func requireFeatureObservationsJSON(t *testing.T, metadata map[string]string, expected string) {
+	t.Helper()
+
+	observations, err := registration.FeatureObservationsFromAppMetadata(metadata)
+	require.NoError(t, err)
+
+	byt, err := json.Marshal(observations)
+	require.NoError(t, err)
+	require.JSONEq(t, expected, string(byt))
 }

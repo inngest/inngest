@@ -7,12 +7,16 @@ export default function DescriptionListItem({
   term,
   loading = false,
   tooltipContent,
+  tooltipContentClassName,
+  tooltipHasArrow = true,
   className,
 }: {
   detail: React.ReactNode;
   term: string;
   loading?: boolean;
   tooltipContent?: string | React.ReactNode;
+  tooltipContentClassName?: string;
+  tooltipHasArrow?: boolean;
   className?: string;
 }) {
   return (
@@ -24,7 +28,10 @@ export default function DescriptionListItem({
             <TooltipTrigger>
               <RiInformationLine className="text-light h-4 w-4" />
             </TooltipTrigger>
-            <TooltipContent className="whitespace-pre-line text-left">
+            <TooltipContent
+              className={tooltipContentClassName ?? 'whitespace-pre-line text-left'}
+              hasArrow={tooltipHasArrow}
+            >
               {tooltipContent}
             </TooltipContent>
           </Tooltip>
