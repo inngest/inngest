@@ -100,10 +100,16 @@ export function TextElement({ children }: React.PropsWithChildren) {
   );
 }
 
-export function TimeElement({ date }: { date: Date }) {
+export function TimeElement({
+  date,
+  tooltipDescription,
+}: {
+  date: Date;
+  tooltipDescription?: string;
+}) {
   return (
     <span className={cn(cellStyles, 'font-medium')}>
-      <Time value={date} />
+      <Time value={date} tooltipDescription={tooltipDescription} />
     </span>
   );
 }
