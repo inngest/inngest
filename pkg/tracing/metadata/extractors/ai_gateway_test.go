@@ -54,7 +54,7 @@ func TestExtractAIGatewayMetadata_OpenAIChatCompletion(t *testing.T) {
 	assert.Equal(t, "gpt-4o-2024-08-06", aiMd.ResponseModel)
 	assert.Equal(t, "chatcmpl-abc123", aiMd.ResponseID)
 	assert.Equal(t, []string{"stop"}, aiMd.FinishReasons)
-	assert.Equal(t, "openai", aiMd.Provider)
+	assert.Equal(t, "openai-chat", aiMd.Provider)
 	assert.Equal(t, int64(25), aiMd.InputTokens)
 	assert.Equal(t, int64(50), aiMd.OutputTokens)
 	assert.Equal(t, util.ToPtr[int64](75), aiMd.TotalTokens)
@@ -164,7 +164,7 @@ func TestExtractAIGatewayMetadata_RequestParams(t *testing.T) {
 	}
 }
 
-func TestExtractAIGatewayMetadata_UnknownHostKeepsFormatAsProvider(t *testing.T) {
+func TestExtractAIGatewayMetadata_UnknownModelHasNoEstimatedCost(t *testing.T) {
 	t.Parallel()
 
 	req := aigateway.Request{
@@ -181,7 +181,6 @@ func TestExtractAIGatewayMetadata_UnknownHostKeepsFormatAsProvider(t *testing.T)
 
 	aiMd := extractGatewayAIMetadata(t, req, resp, 0)
 
-	assert.Equal(t, "openai-chat", aiMd.Provider)
 	assert.Nil(t, aiMd.EstimatedCost, "Should not estimate cost for unknown models")
 }
 
@@ -203,78 +202,4 @@ func TestExtractAIGatewayMetadata_NoFinishReasonsWhenStopReasonEmpty(t *testing.
 	aiMd := extractGatewayAIMetadata(t, req, resp, 0)
 
 	assert.Nil(t, aiMd.FinishReasons)
-}
-
-func TestAIProviderFromRequest(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name   string
-		host   string
-		format string
-		want   string
-	}{
-		{
-			name:   "anthropic format",
-			host:   "llm-proxy.internal",
-			format: aigateway.FormatAnthropic,
-			want:   "anthropic",
-		},
-		{
-			name:   "gemini format",
-			host:   "llm-proxy.internal",
-			format: aigateway.FormatGemini,
-			want:   "gcp.gemini",
-		},
-		{
-			name:   "bedrock format",
-			host:   "bedrock-runtime.us-east-1.amazonaws.com",
-			format: aigateway.FormatBedrock,
-			want:   "aws.bedrock",
-		},
-		{
-			name:   "openai host with openai format",
-			host:   "api.openai.com",
-			format: aigateway.FormatOpenAIChat,
-			want:   "openai",
-		},
-		{
-			name:   "openai host with explicit port",
-			host:   "api.openai.com:443",
-			format: aigateway.FormatOpenAIChat,
-			want:   "openai",
-		},
-		{
-			name:   "openai host is case-insensitive",
-			host:   "API.OpenAI.com",
-			format: aigateway.FormatOpenAIChat,
-			want:   "openai",
-		},
-		{
-			name:   "openai-compatible host keeps format verbatim",
-			host:   "api.groq.com",
-			format: aigateway.FormatOpenAIChat,
-			want:   "openai-chat",
-		},
-		{
-			name:   "unknown host with port keeps format verbatim",
-			host:   "my-llm.internal:8080",
-			format: aigateway.FormatOpenAIChat,
-			want:   "openai-chat",
-		},
-		{
-			name:   "lookalike host does not match",
-			host:   "evilapi.openai.com",
-			format: aigateway.FormatOpenAIChat,
-			want:   "openai-chat",
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, tc.want, aiProviderFromRequest(tc.host, tc.format))
-		})
-	}
 }

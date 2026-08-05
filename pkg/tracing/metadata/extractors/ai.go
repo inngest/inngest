@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"math"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -110,7 +109,7 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		RequestModel:  parsedInput.Model,
 		ResponseModel: parsedOutput.Model,
 		ResponseID:    parsedOutput.ID,
-		Provider:      aiProviderFromRequest(u.Host, req.Format),
+		Provider:      req.Format,
 
 		InputTokens:  int64(parsedOutput.TokensIn),
 		OutputTokens: int64(parsedOutput.TokensOut),
@@ -151,31 +150,6 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 			ResponseStatus:      util.ToPtr(int64(respStatus)),
 		},
 	}, nil
-}
-
-// aiProviderFromRequest resolves a provider identifier from the request
-// format. The OpenAI chat format is shared by many compatible providers
-// (Groq, DeepSeek, local endpoints), so only api.openai.com itself maps to
-// "openai"; other hosts keep the format verbatim, with the endpoint visible
-// in the adjacent HTTP metadata.
-func aiProviderFromRequest(host, format string) string {
-	switch format {
-	case aigateway.FormatAnthropic:
-		return "anthropic"
-	case aigateway.FormatGemini:
-		return "gcp.gemini"
-	case aigateway.FormatBedrock:
-		return "aws.bedrock"
-	}
-
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	if strings.EqualFold(host, "api.openai.com") {
-		return "openai"
-	}
-
-	return format
 }
 
 type vercelAIUsage struct {
