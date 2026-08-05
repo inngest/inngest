@@ -251,6 +251,46 @@ func TestMatcherDoesNotConsumeRequestBody(t *testing.T) {
 	require.Equal(t, body, string(buf[:n]), "matcher consumed the caller's body")
 }
 
+// Callers pass r.URL.Path, which net/http has already percent-decoded. The
+// matcher must not decode it a second time: the gateway splits that exact
+// string on "/", so an extra decode can invent segments the gateway never saw,
+// turn a protected route into a miss, and skip the grant check.
+//
+// Each case is a path that reaches the gateway looking exactly like this.
+func TestMatcherDoesNotDecodeThePathAgain(t *testing.T) {
+	m := newTestMatcher(t)
+
+	// Wire /runs/x%252Fy/cancel — the gateway sees three segments and cancels a
+	// run. Re-parsing turned "%2F" into a separator and matched nothing.
+	got, ok := m.Match(http.MethodPost, "/runs/x%2Fy/cancel")
+	require.True(t, ok, "a literal %%2F in a path parameter must not split the path")
+	require.Equal(t, "api:run:write", got.Grant)
+	require.Equal(t, "/runs/{run_id}/cancel", got.PathTemplate)
+
+	// Wire /sessions/a%20b. Re-parsing rejected the space as a malformed
+	// request line and panicked before it could match.
+	got, ok = m.Match(http.MethodGet, "/sessions/a b")
+	require.True(t, ok, "a decoded space must not panic or miss")
+	require.Equal(t, "api:session:read", got.Grant)
+
+	// Wire /runs/50%25. Re-parsing panicked on the dangling escape.
+	got, ok = m.Match(http.MethodGet, "/runs/50%")
+	require.True(t, ok, "a bare %% must not panic or miss")
+	require.Equal(t, "api:run:read", got.Grant)
+}
+
+// A miss is not a decision, so nothing may read it as one. This pins the
+// contract the caller relies on to fail closed.
+func TestMatcherMissIsNotExempt(t *testing.T) {
+	m := newTestMatcher(t)
+
+	route, ok := m.Match(http.MethodGet, "/nope")
+	require.False(t, ok)
+	require.False(t, route.Exempt,
+		"a miss must not look like a declared-public route")
+	require.Empty(t, route.Grant)
+}
+
 // IsExemptPath compares paths exactly, which is only valid while no exempt
 // route is parameterised. If one ever is, this fails and the comparison has to
 // become a real match instead.
