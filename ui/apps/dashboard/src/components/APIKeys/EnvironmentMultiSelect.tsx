@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   SelectWithSearch,
   type Option,
@@ -54,10 +54,21 @@ export function useEnvironmentSelection({
 
   // Auto-select Production only when there's exactly one and nothing has been
   // chosen; a user with several should make an explicit choice.
+  //
+  // Once per activation, not on every empty selection: keying off "empty" alone
+  // makes Select none unobservable, because clearing the list re-runs the effect
+  // and immediately re-adds Production. Resetting when `active` goes false means
+  // a reopened modal still defaults to Production.
+  const autoSelected = useRef(false);
   useEffect(() => {
-    if (!active || selectedEnvs.length > 0) return;
+    if (!active) {
+      autoSelected.current = false;
+      return;
+    }
+    if (autoSelected.current || selectedEnvs.length > 0) return;
     const only = envGroups.production[0];
     if (envGroups.production.length === 1 && only) {
+      autoSelected.current = true;
       setSelectedEnvs([only]);
     }
   }, [active, selectedEnvs, envGroups.production]);
