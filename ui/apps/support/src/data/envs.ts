@@ -1,25 +1,8 @@
 import { queryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { getAuthHeaders, inngestGQLAPI } from "./gqlApi";
-import { graphql } from "@/gql";
-
-const GetEnvironmentBySlugDocument = graphql(`
-  query GetEnvironmentBySlug($slug: String!) {
-    envBySlug(slug: $slug) {
-      id
-      name
-      slug
-      parentID
-      test
-      type
-      createdAt
-      lastDeployedAt
-      isArchived
-      isAutoArchiveEnabled
-      webhookSigningKey
-    }
-  }
-`);
+import type { GetEnvironmentBySlugQuery } from "@/gql/graphql";
+import { GetEnvironmentBySlugDocument } from "@/gql/graphql";
 
 export const envQueryOptions = (slug: string) =>
   queryOptions({
@@ -31,7 +14,7 @@ export const fetchEnvBySlug = createServerFn({ method: "GET" })
   .inputValidator((data: { slug: string }) => data)
   .handler(async ({ data }) => {
     console.info(`gql api fetching env by slug ${data.slug}...`);
-    return await inngestGQLAPI.request(
+    return await inngestGQLAPI.request<GetEnvironmentBySlugQuery>(
       GetEnvironmentBySlugDocument,
       {
         slug: data.slug,
