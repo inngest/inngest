@@ -18,7 +18,7 @@ import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Actions } from './Actions';
 import { Nav } from './Nav';
-import { formatDuration } from './runDetailsUtils';
+import { formatDuration, getScheduledFor } from './runDetailsUtils';
 
 type Props = {
   standalone: boolean;
@@ -45,6 +45,7 @@ type Run = {
     childrenSpans?: unknown[];
     endedAt: string | null;
     queuedAt: string;
+    scheduledAt?: string | null;
     startedAt: string | null;
     status: string;
     stepID?: string | null;
@@ -63,6 +64,9 @@ export const RunInfo = ({
 }: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
+  const scheduledFor = isLazyDone(run)
+    ? getScheduledFor(run.trace.queuedAt, run.trace.scheduledAt)
+    : null;
   const { pathCreator } = usePathCreator();
 
   return (
@@ -180,6 +184,15 @@ export const RunInfo = ({
               return <TimeElement date={new Date(run.trace.queuedAt)} />;
             }}
           </OptimisticElementWrapper>
+
+          {scheduledFor && (
+            <ElementWrapper label="Scheduled at">
+              <TimeElement
+                date={scheduledFor}
+                tooltipDescription="Scheduled to run at, based on the triggering event."
+              />
+            </ElementWrapper>
+          )}
 
           <OptimisticElementWrapper
             label="Started at"
