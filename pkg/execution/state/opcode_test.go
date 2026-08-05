@@ -273,6 +273,77 @@ func TestDeferAddOpts_Validate(t *testing.T) {
 		opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(atLimit)}
 		require.NoError(t, opts.Validate())
 	})
+
+	t.Run("accepts object Meta", func(t *testing.T) {
+		opts := DeferAddOpts{
+			FnSlug: "fn",
+			Input:  json.RawMessage(`{}`),
+			Meta:   json.RawMessage(`{"sessions":{"conversation_id":"conversation_1234"}}`),
+		}
+		require.NoError(t, opts.Validate())
+	})
+
+	t.Run("accepts a whole-field sessions tombstone", func(t *testing.T) {
+		// `sessions: null` clears every inherited session (RFC 7386). The
+		// envelope is still an object, so it must pass the shape check.
+		opts := DeferAddOpts{
+			FnSlug: "fn",
+			Input:  json.RawMessage(`{}`),
+			Meta:   json.RawMessage(`{"sessions":null}`),
+		}
+		require.NoError(t, opts.Validate())
+	})
+
+	t.Run("accepts absent and null Meta", func(t *testing.T) {
+		// Meta is optional, and a literal `null` is equivalent to absent.
+		for _, meta := range []json.RawMessage{nil, json.RawMessage(`null`), json.RawMessage(" null ")} {
+			opts := DeferAddOpts{FnSlug: "fn", Input: json.RawMessage(`{}`), Meta: meta}
+			require.NoError(t, opts.Validate(), "Meta %q must be treated as absent", meta)
+		}
+	})
+
+	t.Run("rejects non-object Meta", func(t *testing.T) {
+		// Valid JSON that isn't an object would persist fine and then fail to
+		// unmarshal into event.EventMeta at finalize, where the only remaining
+		// outcome is silently dropping the deferred run. Reject at op receipt so
+		// it becomes a soft rejection the caller can see.
+		for _, meta := range []string{`3`, `"sessions"`, `[{"sessions":{}}]`, `true`} {
+			opts := DeferAddOpts{
+				FnSlug: "fn",
+				Input:  json.RawMessage(`{}`),
+				Meta:   json.RawMessage(meta),
+			}
+			require.ErrorIs(t, opts.Validate(), ErrDeferMetaInvalid,
+				"non-object Meta %s must be rejected at validation, not dropped at finalize", meta)
+		}
+	})
+
+	t.Run("rejects Meta larger than MaxEventMetaSize", func(t *testing.T) {
+		oversized, _ := json.Marshal(map[string]any{
+			"sessions": map[string]string{"k": string(bytes.Repeat([]byte("x"), consts.MaxEventMetaSize))},
+		})
+		opts := DeferAddOpts{
+			FnSlug: "fn",
+			Input:  json.RawMessage(`{}`),
+			Meta:   json.RawMessage(oversized),
+		}
+		require.ErrorIs(t, opts.Validate(), ErrDeferMetaTooLarge,
+			"Meta is persisted unparsed until finalize, so the byte cap is its only bound")
+	})
+
+	t.Run("accepts Meta at exactly MaxEventMetaSize", func(t *testing.T) {
+		// Boundary: equal-to-limit must pass; only strictly greater fails.
+		envelope := `{"sessions":{"k":""}}`
+		atLimit := json.RawMessage(`{"sessions":{"k":"` +
+			string(bytes.Repeat([]byte("x"), consts.MaxEventMetaSize-len(envelope))) + `"}}`)
+		require.Equal(t, consts.MaxEventMetaSize, len(atLimit))
+		opts := DeferAddOpts{
+			FnSlug: "fn",
+			Input:  json.RawMessage(`{}`),
+			Meta:   json.RawMessage(atLimit),
+		}
+		require.NoError(t, opts.Validate())
+	})
 }
 
 // TestInvokeFunctionOptsPreservesSessionNulls pins that RFC 7386 null
