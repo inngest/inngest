@@ -109,7 +109,7 @@ func NewWorkerGroupFromConnRequest(
 		slugs[i] = fn.Slug
 	}
 
-	featureObservations := sdk.FeatureObservations(appConfig.GetFeatureObservations())
+	featureObservations := sdk.FeatureObservationsFromProto(appConfig.GetFeatureObservations())
 	featureObservationsHash, err := sdkFeatureObservationsHash(featureObservations)
 	if err != nil {
 		return nil, &connecterrors.SocketError{

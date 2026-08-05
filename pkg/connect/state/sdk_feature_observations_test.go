@@ -13,6 +13,7 @@ import (
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	sdkfeatureobs "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestWorkerGroupSyncIncludesFeatureObservations(t *testing.T) {
@@ -49,7 +50,7 @@ func TestWorkerGroupSyncIncludesFeatureObservations(t *testing.T) {
 					Slug: "test-function",
 				},
 			},
-			FeatureObservations: sdk.FeatureObservations(testFeatureObservations()),
+			FeatureObservations: sdk.FeatureObservationsFromProto(testFeatureObservations()),
 		},
 	}
 	groupManager := &testWorkerGroupManager{
@@ -67,7 +68,7 @@ func TestWorkerGroupSyncIncludesFeatureObservations(t *testing.T) {
 	}, true)
 	require.NoError(t, err)
 
-	require.Equal(t, group.SyncData.FeatureObservations, registerReq.FeatureObservations)
+	require.True(t, proto.Equal(group.SyncData.FeatureObservations.Proto(), registerReq.FeatureObservations.Proto()))
 	require.Equal(t, sdk.DeployTypeConnect, registerReq.DeployType)
 	require.Equal(t, "connect-app", registerReq.AppName)
 	require.Equal(t, "worker-group-hash", registerReq.IdempotencyKey)
@@ -80,8 +81,8 @@ func TestWorkerGroupSyncSkipsWhenFeatureObservationsAreUnchanged(t *testing.T) {
 	ctx := context.Background()
 	existingAppID := uuid.New()
 	existingSyncID := uuid.New()
-	observations := sdk.FeatureObservations(testFeatureObservations())
-	observationsHash, err := sdkFeatureObservationsHash(sdk.FeatureObservations(testFeatureObservations()))
+	observations := sdk.FeatureObservationsFromProto(testFeatureObservations())
+	observationsHash, err := sdkFeatureObservationsHash(observations)
 	require.NoError(t, err)
 
 	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
@@ -126,47 +127,35 @@ func TestWorkerGroupSyncSkipsWhenFeatureObservationsAreUnchanged(t *testing.T) {
 	require.Nil(t, groupManager.updated)
 }
 
-func testFeatureObservations() []*sdkfeatureobs.FeatureObservation {
-	return []*sdkfeatureobs.FeatureObservation{
-		{
-			Feature: &sdkfeatureobs.FeatureObservation_AiMetadataExtraction{
-				AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
-					ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_OTEL_PROVIDER_MISSING,
-					OtelSetup: &sdkfeatureobs.OTelSetup{
-						ProviderFound:             true,
-						ProviderSource:            sdkfeatureobs.OTelProviderSource_OTEL_PROVIDER_SOURCE_FIRST_PARTY,
-						AddSpanProcessorAttempted: true,
-						SpanProcessorAdded:        false,
-						Failure:                   sdkfeatureobs.OTelSetupFailure_OTEL_SETUP_FAILURE_NO_PROVIDER,
-					},
-				},
+func testFeatureObservations() *sdkfeatureobs.FeatureObservations {
+	return &sdkfeatureobs.FeatureObservations{
+		AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+			ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_OTEL_PROVIDER_MISSING,
+			OtelSetup: &sdkfeatureobs.OTelSetup{
+				ProviderFound:             true,
+				ProviderSource:            sdkfeatureobs.OTelProviderSource_OTEL_PROVIDER_SOURCE_FIRST_PARTY,
+				AddSpanProcessorAttempted: true,
+				SpanProcessorAdded:        false,
+				Failure:                   sdkfeatureobs.OTelSetupFailure_OTEL_SETUP_FAILURE_NO_PROVIDER,
 			},
 		},
-		{
-			Feature: &sdkfeatureobs.FeatureObservation_ExtendedTraces{
-				ExtendedTraces: &sdkfeatureobs.ExtendedTraces{
-					ReadinessReason: sdkfeatureobs.ExtendedTracesReadinessReason_EXTENDED_TRACES_READINESS_REASON_NOT_ENABLED_BY_USER,
-					Config: &sdkfeatureobs.ExtendedTracesConfig{
-						Behavior: sdkfeatureobs.ExtendedTracesBehavior_EXTENDED_TRACES_BEHAVIOR_AUTO,
-					},
-					OtelSetup: &sdkfeatureobs.OTelSetup{
-						Path:                      sdkfeatureobs.OTelSetupPath_OTEL_SETUP_PATH_EXTEND_EXISTING_PROVIDER,
-						ProviderSource:            sdkfeatureobs.OTelProviderSource_OTEL_PROVIDER_SOURCE_USER_PROVIDED,
-						AddSpanProcessorAttempted: true,
-						SpanProcessorAdded:        true,
-					},
-				},
+		ExtendedTraces: &sdkfeatureobs.ExtendedTraces{
+			ReadinessReason: sdkfeatureobs.ExtendedTracesReadinessReason_EXTENDED_TRACES_READINESS_REASON_NOT_ENABLED_BY_USER,
+			Config: &sdkfeatureobs.ExtendedTracesConfig{
+				Behavior: sdkfeatureobs.ExtendedTracesBehavior_EXTENDED_TRACES_BEHAVIOR_AUTO,
+			},
+			OtelSetup: &sdkfeatureobs.OTelSetup{
+				Path:                      sdkfeatureobs.OTelSetupPath_OTEL_SETUP_PATH_EXTEND_EXISTING_PROVIDER,
+				ProviderSource:            sdkfeatureobs.OTelProviderSource_OTEL_PROVIDER_SOURCE_USER_PROVIDED,
+				AddSpanProcessorAttempted: true,
+				SpanProcessorAdded:        true,
 			},
 		},
-		{
-			Feature: &sdkfeatureobs.FeatureObservation_SendEvents{
-				SendEvents: &sdkfeatureobs.SendEvents{
-					ReadinessReason: sdkfeatureobs.SendEventsReadinessReason_SEND_EVENTS_READINESS_REASON_READY,
-					Config: &sdkfeatureobs.SendEventsConfig{
-						HasEventKey:               true,
-						HasEventApiOriginOverride: true,
-					},
-				},
+		SendEvents: &sdkfeatureobs.SendEvents{
+			ReadinessReason: sdkfeatureobs.SendEventsReadinessReason_SEND_EVENTS_READINESS_REASON_READY,
+			Config: &sdkfeatureobs.SendEventsConfig{
+				EventKeyConfigured:               true,
+				EventApiOriginOverrideConfigured: true,
 			},
 		},
 	}

@@ -80,25 +80,22 @@ func sdkFeatureReadinessFromMetadata(metadata map[string]string) (*models.SDKFea
 		return nil, err
 	}
 
-	for _, observation := range observations {
-		if observation == nil {
-			continue
-		}
+	if observations == nil {
+		return readiness, nil
+	}
 
-		if aiMetadataExtraction := observation.GetAiMetadataExtraction(); aiMetadataExtraction != nil && readiness.AiMetadataExtraction == nil {
-			readiness.AiMetadataExtraction = sdkFeatureStatusFromReadinessReason(
-				int(aiMetadataExtraction.GetReadinessReason()),
-				sdk.AIMetadataExtractionReadinessReasonReady,
-			)
-			continue
-		}
+	if aiMetadataExtraction := observations.GetAiMetadataExtraction(); aiMetadataExtraction != nil {
+		readiness.AiMetadataExtraction = sdkFeatureStatusFromReadinessReason(
+			int(aiMetadataExtraction.GetReadinessReason()),
+			sdk.AIMetadataExtractionReadinessReasonReady,
+		)
+	}
 
-		if extendedTraces := observation.GetExtendedTraces(); extendedTraces != nil && readiness.ExtendedTraces == nil {
-			readiness.ExtendedTraces = sdkFeatureStatusFromReadinessReason(
-				int(extendedTraces.GetReadinessReason()),
-				sdk.ExtendedTracesReadinessReasonReady,
-			)
-		}
+	if extendedTraces := observations.GetExtendedTraces(); extendedTraces != nil {
+		readiness.ExtendedTraces = sdkFeatureStatusFromReadinessReason(
+			int(extendedTraces.GetReadinessReason()),
+			sdk.ExtendedTracesReadinessReasonReady,
+		)
 	}
 
 	return readiness, nil

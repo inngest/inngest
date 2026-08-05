@@ -323,11 +323,11 @@ func (x *ConnectMessage) GetPayload() []byte {
 }
 
 type AppConfiguration struct {
-	state               protoimpl.MessageState   `protogen:"open.v1"`
-	AppName             string                   `protobuf:"bytes,1,opt,name=app_name,json=appName,proto3" json:"app_name,omitempty"`
-	AppVersion          *string                  `protobuf:"bytes,2,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
-	Functions           []byte                   `protobuf:"bytes,4,opt,name=functions,proto3" json:"functions,omitempty"`
-	FeatureObservations []*v1.FeatureObservation `protobuf:"bytes,5,rep,name=feature_observations,json=featureObservations,proto3" json:"feature_observations,omitempty"`
+	state               protoimpl.MessageState  `protogen:"open.v1"`
+	AppName             string                  `protobuf:"bytes,1,opt,name=app_name,json=appName,proto3" json:"app_name,omitempty"`
+	AppVersion          *string                 `protobuf:"bytes,2,opt,name=app_version,json=appVersion,proto3,oneof" json:"app_version,omitempty"`
+	Functions           []byte                  `protobuf:"bytes,4,opt,name=functions,proto3" json:"functions,omitempty"`
+	FeatureObservations *v1.FeatureObservations `protobuf:"bytes,5,opt,name=feature_observations,json=featureObservations,proto3" json:"feature_observations,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -383,7 +383,7 @@ func (x *AppConfiguration) GetFunctions() []byte {
 	return nil
 }
 
-func (x *AppConfiguration) GetFeatureObservations() []*v1.FeatureObservation {
+func (x *AppConfiguration) GetFeatureObservations() *v1.FeatureObservations {
 	if x != nil {
 		return x.FeatureObservations
 	}
@@ -1903,13 +1903,13 @@ const file_connect_v1_connect_proto_rawDesc = "" +
 	"connect.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a6sdk_feature_observations/v1/feature_observations.proto\"^\n" +
 	"\x0eConnectMessage\x122\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1e.connect.v1.GatewayMessageTypeR\x04kind\x12\x18\n" +
-	"\apayload\x18\x02 \x01(\fR\apayload\"\xe5\x01\n" +
+	"\apayload\x18\x02 \x01(\fR\apayload\"\xe6\x01\n" +
 	"\x10AppConfiguration\x12\x19\n" +
 	"\bapp_name\x18\x01 \x01(\tR\aappName\x12$\n" +
 	"\vapp_version\x18\x02 \x01(\tH\x00R\n" +
 	"appVersion\x88\x01\x01\x12\x1c\n" +
-	"\tfunctions\x18\x04 \x01(\fR\tfunctions\x12b\n" +
-	"\x14feature_observations\x18\x05 \x03(\v2/.sdk_feature_observations.v1.FeatureObservationR\x13featureObservationsB\x0e\n" +
+	"\tfunctions\x18\x04 \x01(\fR\tfunctions\x12c\n" +
+	"\x14feature_observations\x18\x05 \x01(\v20.sdk_feature_observations.v1.FeatureObservationsR\x13featureObservationsB\x0e\n" +
 	"\f_app_version\"N\n" +
 	"\bAuthData\x12#\n" +
 	"\rsession_token\x18\x01 \x01(\tR\fsessionToken\x12\x1d\n" +
@@ -2169,12 +2169,12 @@ var file_connect_v1_connect_proto_goTypes = []any{
 	(*SystemError)(nil),                     // 23: connect.v1.SystemError
 	nil,                                     // 24: connect.v1.ConnMetadata.AllWorkerGroupsEntry
 	nil,                                     // 25: connect.v1.ConnMetadata.SyncedWorkerGroupsEntry
-	(*v1.FeatureObservation)(nil),           // 26: sdk_feature_observations.v1.FeatureObservation
+	(*v1.FeatureObservations)(nil),          // 26: sdk_feature_observations.v1.FeatureObservations
 	(*timestamppb.Timestamp)(nil),           // 27: google.protobuf.Timestamp
 }
 var file_connect_v1_connect_proto_depIdxs = []int32{
 	0,  // 0: connect.v1.ConnectMessage.kind:type_name -> connect.v1.GatewayMessageType
-	26, // 1: connect.v1.AppConfiguration.feature_observations:type_name -> sdk_feature_observations.v1.FeatureObservation
+	26, // 1: connect.v1.AppConfiguration.feature_observations:type_name -> sdk_feature_observations.v1.FeatureObservations
 	6,  // 2: connect.v1.WorkerConnectRequestData.auth_data:type_name -> connect.v1.AuthData
 	5,  // 3: connect.v1.WorkerConnectRequestData.apps:type_name -> connect.v1.AppConfiguration
 	17, // 4: connect.v1.WorkerConnectRequestData.system_attributes:type_name -> connect.v1.SystemAttributes

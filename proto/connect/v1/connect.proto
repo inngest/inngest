@@ -34,7 +34,7 @@ message AppConfiguration {
 	string app_name = 1;
 	optional string app_version = 2;
 	bytes functions = 4;
-	repeated sdk_feature_observations.v1.FeatureObservation feature_observations = 5;
+	sdk_feature_observations.v1.FeatureObservations feature_observations = 5;
 }
 
 message AuthData {

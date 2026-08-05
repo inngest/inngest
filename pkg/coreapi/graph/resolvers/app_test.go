@@ -14,22 +14,14 @@ func TestSdkFeatureReadinessFromMetadata(t *testing.T) {
 	r := require.New(t)
 
 	metadata := appMetadataForRegisterRequest(t, sdk.RegisterRequest{
-		FeatureObservations: sdk.FeatureObservations{
-			{
-				Feature: &sdkfeatureobs.FeatureObservation_AiMetadataExtraction{
-					AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
-						ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
-					},
-				},
+		FeatureObservations: sdk.FeatureObservationsFromProto(&sdkfeatureobs.FeatureObservations{
+			AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+				ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
 			},
-			{
-				Feature: &sdkfeatureobs.FeatureObservation_ExtendedTraces{
-					ExtendedTraces: &sdkfeatureobs.ExtendedTraces{
-						ReadinessReason: sdkfeatureobs.ExtendedTracesReadinessReason_EXTENDED_TRACES_READINESS_REASON_OTEL_PROVIDER_MISSING,
-					},
-				},
+			ExtendedTraces: &sdkfeatureobs.ExtendedTraces{
+				ReadinessReason: sdkfeatureobs.ExtendedTracesReadinessReason_EXTENDED_TRACES_READINESS_REASON_OTEL_PROVIDER_MISSING,
 			},
-		},
+		}),
 	})
 
 	readiness, err := sdkFeatureReadinessFromMetadata(metadata)

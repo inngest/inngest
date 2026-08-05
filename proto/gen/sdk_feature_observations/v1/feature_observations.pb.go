@@ -400,32 +400,29 @@ func (SendEventsReadinessReason) EnumDescriptor() ([]byte, []int) {
 	return file_sdk_feature_observations_v1_feature_observations_proto_rawDescGZIP(), []int{6}
 }
 
-type FeatureObservation struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Feature:
-	//
-	//	*FeatureObservation_AiMetadataExtraction
-	//	*FeatureObservation_ExtendedTraces
-	//	*FeatureObservation_SendEvents
-	Feature       isFeatureObservation_Feature `protobuf_oneof:"feature"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+type FeatureObservations struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	AiMetadataExtraction *AIMetadataExtraction  `protobuf:"bytes,1,opt,name=ai_metadata_extraction,json=aiMetadataExtraction,proto3" json:"ai_metadata_extraction,omitempty"`
+	ExtendedTraces       *ExtendedTraces        `protobuf:"bytes,2,opt,name=extended_traces,json=extendedTraces,proto3" json:"extended_traces,omitempty"`
+	SendEvents           *SendEvents            `protobuf:"bytes,3,opt,name=send_events,json=sendEvents,proto3" json:"send_events,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
-func (x *FeatureObservation) Reset() {
-	*x = FeatureObservation{}
+func (x *FeatureObservations) Reset() {
+	*x = FeatureObservations{}
 	mi := &file_sdk_feature_observations_v1_feature_observations_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *FeatureObservation) String() string {
+func (x *FeatureObservations) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*FeatureObservation) ProtoMessage() {}
+func (*FeatureObservations) ProtoMessage() {}
 
-func (x *FeatureObservation) ProtoReflect() protoreflect.Message {
+func (x *FeatureObservations) ProtoReflect() protoreflect.Message {
 	mi := &file_sdk_feature_observations_v1_feature_observations_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -437,66 +434,31 @@ func (x *FeatureObservation) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use FeatureObservation.ProtoReflect.Descriptor instead.
-func (*FeatureObservation) Descriptor() ([]byte, []int) {
+// Deprecated: Use FeatureObservations.ProtoReflect.Descriptor instead.
+func (*FeatureObservations) Descriptor() ([]byte, []int) {
 	return file_sdk_feature_observations_v1_feature_observations_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *FeatureObservation) GetFeature() isFeatureObservation_Feature {
+func (x *FeatureObservations) GetAiMetadataExtraction() *AIMetadataExtraction {
 	if x != nil {
-		return x.Feature
+		return x.AiMetadataExtraction
 	}
 	return nil
 }
 
-func (x *FeatureObservation) GetAiMetadataExtraction() *AIMetadataExtraction {
+func (x *FeatureObservations) GetExtendedTraces() *ExtendedTraces {
 	if x != nil {
-		if x, ok := x.Feature.(*FeatureObservation_AiMetadataExtraction); ok {
-			return x.AiMetadataExtraction
-		}
+		return x.ExtendedTraces
 	}
 	return nil
 }
 
-func (x *FeatureObservation) GetExtendedTraces() *ExtendedTraces {
+func (x *FeatureObservations) GetSendEvents() *SendEvents {
 	if x != nil {
-		if x, ok := x.Feature.(*FeatureObservation_ExtendedTraces); ok {
-			return x.ExtendedTraces
-		}
+		return x.SendEvents
 	}
 	return nil
 }
-
-func (x *FeatureObservation) GetSendEvents() *SendEvents {
-	if x != nil {
-		if x, ok := x.Feature.(*FeatureObservation_SendEvents); ok {
-			return x.SendEvents
-		}
-	}
-	return nil
-}
-
-type isFeatureObservation_Feature interface {
-	isFeatureObservation_Feature()
-}
-
-type FeatureObservation_AiMetadataExtraction struct {
-	AiMetadataExtraction *AIMetadataExtraction `protobuf:"bytes,1,opt,name=ai_metadata_extraction,json=aiMetadataExtraction,proto3,oneof"`
-}
-
-type FeatureObservation_ExtendedTraces struct {
-	ExtendedTraces *ExtendedTraces `protobuf:"bytes,2,opt,name=extended_traces,json=extendedTraces,proto3,oneof"`
-}
-
-type FeatureObservation_SendEvents struct {
-	SendEvents *SendEvents `protobuf:"bytes,3,opt,name=send_events,json=sendEvents,proto3,oneof"`
-}
-
-func (*FeatureObservation_AiMetadataExtraction) isFeatureObservation_Feature() {}
-
-func (*FeatureObservation_ExtendedTraces) isFeatureObservation_Feature() {}
-
-func (*FeatureObservation_SendEvents) isFeatureObservation_Feature() {}
 
 type OTelSetup struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
@@ -791,11 +753,11 @@ func (x *SendEvents) GetConfig() *SendEventsConfig {
 }
 
 type SendEventsConfig struct {
-	state                     protoimpl.MessageState `protogen:"open.v1"`
-	HasEventKey               bool                   `protobuf:"varint,1,opt,name=has_event_key,json=hasEventKey,proto3" json:"has_event_key,omitempty"`
-	HasEventApiOriginOverride bool                   `protobuf:"varint,2,opt,name=has_event_api_origin_override,json=hasEventApiOriginOverride,proto3" json:"has_event_api_origin_override,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	state                            protoimpl.MessageState `protogen:"open.v1"`
+	EventKeyConfigured               bool                   `protobuf:"varint,1,opt,name=event_key_configured,json=eventKeyConfigured,proto3" json:"event_key_configured,omitempty"`
+	EventApiOriginOverrideConfigured bool                   `protobuf:"varint,2,opt,name=event_api_origin_override_configured,json=eventApiOriginOverrideConfigured,proto3" json:"event_api_origin_override_configured,omitempty"`
+	unknownFields                    protoimpl.UnknownFields
+	sizeCache                        protoimpl.SizeCache
 }
 
 func (x *SendEventsConfig) Reset() {
@@ -828,16 +790,16 @@ func (*SendEventsConfig) Descriptor() ([]byte, []int) {
 	return file_sdk_feature_observations_v1_feature_observations_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *SendEventsConfig) GetHasEventKey() bool {
+func (x *SendEventsConfig) GetEventKeyConfigured() bool {
 	if x != nil {
-		return x.HasEventKey
+		return x.EventKeyConfigured
 	}
 	return false
 }
 
-func (x *SendEventsConfig) GetHasEventApiOriginOverride() bool {
+func (x *SendEventsConfig) GetEventApiOriginOverrideConfigured() bool {
 	if x != nil {
-		return x.HasEventApiOriginOverride
+		return x.EventApiOriginOverrideConfigured
 	}
 	return false
 }
@@ -846,13 +808,12 @@ var File_sdk_feature_observations_v1_feature_observations_proto protoreflect.Fil
 
 const file_sdk_feature_observations_v1_feature_observations_proto_rawDesc = "" +
 	"\n" +
-	"6sdk_feature_observations/v1/feature_observations.proto\x12\x1bsdk_feature_observations.v1\"\xae\x02\n" +
-	"\x12FeatureObservation\x12i\n" +
-	"\x16ai_metadata_extraction\x18\x01 \x01(\v21.sdk_feature_observations.v1.AIMetadataExtractionH\x00R\x14aiMetadataExtraction\x12V\n" +
-	"\x0fextended_traces\x18\x02 \x01(\v2+.sdk_feature_observations.v1.ExtendedTracesH\x00R\x0eextendedTraces\x12J\n" +
-	"\vsend_events\x18\x03 \x01(\v2'.sdk_feature_observations.v1.SendEventsH\x00R\n" +
-	"sendEventsB\t\n" +
-	"\afeature\"\x88\x03\n" +
+	"6sdk_feature_observations/v1/feature_observations.proto\x12\x1bsdk_feature_observations.v1\"\x9e\x02\n" +
+	"\x13FeatureObservations\x12g\n" +
+	"\x16ai_metadata_extraction\x18\x01 \x01(\v21.sdk_feature_observations.v1.AIMetadataExtractionR\x14aiMetadataExtraction\x12T\n" +
+	"\x0fextended_traces\x18\x02 \x01(\v2+.sdk_feature_observations.v1.ExtendedTracesR\x0eextendedTraces\x12H\n" +
+	"\vsend_events\x18\x03 \x01(\v2'.sdk_feature_observations.v1.SendEventsR\n" +
+	"sendEvents\"\x88\x03\n" +
 	"\tOTelSetup\x12>\n" +
 	"\x04path\x18\x01 \x01(\x0e2*.sdk_feature_observations.v1.OTelSetupPathR\x04path\x12%\n" +
 	"\x0eprovider_found\x18\x02 \x01(\bR\rproviderFound\x12X\n" +
@@ -874,10 +835,10 @@ const file_sdk_feature_observations_v1_feature_observations_proto_rawDesc = "" +
 	"\n" +
 	"SendEvents\x12a\n" +
 	"\x10readiness_reason\x18\x01 \x01(\x0e26.sdk_feature_observations.v1.SendEventsReadinessReasonR\x0freadinessReason\x12E\n" +
-	"\x06config\x18\x02 \x01(\v2-.sdk_feature_observations.v1.SendEventsConfigR\x06config\"x\n" +
-	"\x10SendEventsConfig\x12\"\n" +
-	"\rhas_event_key\x18\x01 \x01(\bR\vhasEventKey\x12@\n" +
-	"\x1dhas_event_api_origin_override\x18\x02 \x01(\bR\x19hasEventApiOriginOverride*\xad\x01\n" +
+	"\x06config\x18\x02 \x01(\v2-.sdk_feature_observations.v1.SendEventsConfigR\x06config\"\x94\x01\n" +
+	"\x10SendEventsConfig\x120\n" +
+	"\x14event_key_configured\x18\x01 \x01(\bR\x12eventKeyConfigured\x12N\n" +
+	"$event_api_origin_override_configured\x18\x02 \x01(\bR eventApiOriginOverrideConfigured*\xad\x01\n" +
 	"\x12OTelProviderSource\x12$\n" +
 	" OTEL_PROVIDER_SOURCE_UNSPECIFIED\x10\x00\x12$\n" +
 	" OTEL_PROVIDER_SOURCE_FIRST_PARTY\x10\x01\x12&\n" +
@@ -941,7 +902,7 @@ var file_sdk_feature_observations_v1_feature_observations_proto_goTypes = []any{
 	(ExtendedTracesReadinessReason)(0),       // 4: sdk_feature_observations.v1.ExtendedTracesReadinessReason
 	(ExtendedTracesBehavior)(0),              // 5: sdk_feature_observations.v1.ExtendedTracesBehavior
 	(SendEventsReadinessReason)(0),           // 6: sdk_feature_observations.v1.SendEventsReadinessReason
-	(*FeatureObservation)(nil),               // 7: sdk_feature_observations.v1.FeatureObservation
+	(*FeatureObservations)(nil),              // 7: sdk_feature_observations.v1.FeatureObservations
 	(*OTelSetup)(nil),                        // 8: sdk_feature_observations.v1.OTelSetup
 	(*AIMetadataExtraction)(nil),             // 9: sdk_feature_observations.v1.AIMetadataExtraction
 	(*ExtendedTraces)(nil),                   // 10: sdk_feature_observations.v1.ExtendedTraces
@@ -950,9 +911,9 @@ var file_sdk_feature_observations_v1_feature_observations_proto_goTypes = []any{
 	(*SendEventsConfig)(nil),                 // 13: sdk_feature_observations.v1.SendEventsConfig
 }
 var file_sdk_feature_observations_v1_feature_observations_proto_depIdxs = []int32{
-	9,  // 0: sdk_feature_observations.v1.FeatureObservation.ai_metadata_extraction:type_name -> sdk_feature_observations.v1.AIMetadataExtraction
-	10, // 1: sdk_feature_observations.v1.FeatureObservation.extended_traces:type_name -> sdk_feature_observations.v1.ExtendedTraces
-	12, // 2: sdk_feature_observations.v1.FeatureObservation.send_events:type_name -> sdk_feature_observations.v1.SendEvents
+	9,  // 0: sdk_feature_observations.v1.FeatureObservations.ai_metadata_extraction:type_name -> sdk_feature_observations.v1.AIMetadataExtraction
+	10, // 1: sdk_feature_observations.v1.FeatureObservations.extended_traces:type_name -> sdk_feature_observations.v1.ExtendedTraces
+	12, // 2: sdk_feature_observations.v1.FeatureObservations.send_events:type_name -> sdk_feature_observations.v1.SendEvents
 	1,  // 3: sdk_feature_observations.v1.OTelSetup.path:type_name -> sdk_feature_observations.v1.OTelSetupPath
 	0,  // 4: sdk_feature_observations.v1.OTelSetup.provider_source:type_name -> sdk_feature_observations.v1.OTelProviderSource
 	2,  // 5: sdk_feature_observations.v1.OTelSetup.failure:type_name -> sdk_feature_observations.v1.OTelSetupFailure
@@ -975,11 +936,6 @@ func init() { file_sdk_feature_observations_v1_feature_observations_proto_init()
 func file_sdk_feature_observations_v1_feature_observations_proto_init() {
 	if File_sdk_feature_observations_v1_feature_observations_proto != nil {
 		return
-	}
-	file_sdk_feature_observations_v1_feature_observations_proto_msgTypes[0].OneofWrappers = []any{
-		(*FeatureObservation_AiMetadataExtraction)(nil),
-		(*FeatureObservation_ExtendedTraces)(nil),
-		(*FeatureObservation_SendEvents)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
