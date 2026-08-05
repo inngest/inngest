@@ -80,6 +80,17 @@ func TestResponseEnumMarshalerLeavesNonProtoValuesUnchanged(t *testing.T) {
 	require.Equal(t, "FUNCTION_RUN_STATUS_COMPLETED", body["status"])
 }
 
+func TestResponseEnumMarshalerShortensStreamResults(t *testing.T) {
+	marshaler := newResponseEnumMarshaler()
+	response := &apiv2.StreamSandboxLogsResponse{
+		Data: &apiv2.SandboxLogChunk{Stream: apiv2.SandboxLogStream_SANDBOX_LOG_STREAM_STDOUT},
+	}
+	data, err := marshaler.Marshal(map[string]any{"result": response})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"result":{"data":{"stream":"STDOUT"}}}`, string(data))
+	require.Equal(t, "application/x-ndjson", marshaler.(interface{ StreamContentType(any) string }).StreamContentType(response))
+}
+
 func TestResponseEnumMarshalerReturnsMarshalErrors(t *testing.T) {
 	marshaler := newResponseEnumMarshaler()
 

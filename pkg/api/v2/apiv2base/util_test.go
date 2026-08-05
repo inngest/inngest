@@ -256,6 +256,7 @@ func TestGRPCToHTTPStatus(t *testing.T) {
 		{"NotFound", codes.NotFound, 404},
 		{"AlreadyExists", codes.AlreadyExists, 409},
 		{"ResourceExhausted", codes.ResourceExhausted, 429},
+		{"DeadlineExceeded", codes.DeadlineExceeded, 504},
 		{"Unimplemented", codes.Unimplemented, 501},
 		{"Unavailable", codes.Unavailable, 503},
 		{"Internal", codes.Internal, 500},
