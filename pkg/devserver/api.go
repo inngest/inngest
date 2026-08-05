@@ -95,6 +95,10 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 
 	// Only register static file serving if UI is enabled
 	if !a.disableUI {
+		if a.devserver.Opts.Config.GetServerKind() != headers.ServerKindDev {
+			a.Get("/sessions", http.NotFound)
+			a.Get("/sessions/*", http.NotFound)
+		}
 		//
 		// Create filesystem rooted at static/client for Tanstack assets
 		staticFS, _ := fs.Sub(static, "static/client")

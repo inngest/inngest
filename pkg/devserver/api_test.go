@@ -1217,6 +1217,11 @@ func TestDevEndpoint_Returns404InCloudMode(t *testing.T) {
 
 	// Should return 404
 	require.Equal(t, http.StatusNotFound, w.Code)
+
+	req = httptest.NewRequest("GET", "/sessions/test", nil)
+	w = httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+	require.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func requireFeatureObservationsJSON(t *testing.T, metadata map[string]string, expected string) {

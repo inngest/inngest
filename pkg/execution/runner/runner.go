@@ -26,6 +26,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -306,7 +307,11 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if err != nil {
 		return err
 	}
-	_ = s.cqrs.RecordSessionKeys(ctx, tracked.GetWorkspaceID(), tracked.GetEvent().Meta.Sessions)
+	if s.config.GetServerKind() == headers.ServerKindDev {
+		if err := s.cqrs.RecordSessionKeys(ctx, tracked.GetWorkspaceID(), tracked.GetEvent().Meta.Sessions); err != nil {
+			s.log.Warn("failed to record session keys", "event_id", tracked.GetEvent().ID, "error", err)
+		}
+	}
 
 	l := s.log.With(
 		"event", tracked.GetEvent().Name,

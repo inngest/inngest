@@ -2,14 +2,19 @@ package resolvers
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/headers"
 )
 
 func (qr *queryResolver) SessionKeys(ctx context.Context, search *string) ([]*models.SessionKey, error) {
+	if err := qr.requireDevSessions(); err != nil {
+		return nil, err
+	}
 	query := ""
 	if search != nil {
 		query = *search
@@ -31,6 +36,9 @@ func (qr *queryResolver) SessionKeys(ctx context.Context, search *string) ([]*mo
 }
 
 func (qr *queryResolver) Sessions(ctx context.Context, sessionKey string, sessionIDSearch *string, timeRange *models.TimeRangeInput) ([]*models.SessionGroup, error) {
+	if err := qr.requireDevSessions(); err != nil {
+		return nil, err
+	}
 	search := ""
 	if sessionIDSearch != nil {
 		search = *sessionIDSearch
@@ -62,6 +70,9 @@ func (qr *queryResolver) Sessions(ctx context.Context, sessionKey string, sessio
 }
 
 func (qr *queryResolver) SessionRuns(ctx context.Context, sessionKey string, sessionID string, timeRange *models.TimeRangeInput) ([]*models.SessionRun, error) {
+	if err := qr.requireDevSessions(); err != nil {
+		return nil, err
+	}
 	runs, err := qr.Data.GetSessionRuns(ctx, consts.DevServerEnvID, sessionKey, sessionID, sessionTimeRange(timeRange))
 	if err != nil {
 		return nil, err
@@ -80,6 +91,13 @@ func (qr *queryResolver) SessionRuns(ctx context.Context, sessionKey string, ses
 		})
 	}
 	return out, nil
+}
+
+func (qr *queryResolver) requireDevSessions() error {
+	if qr.ServerKind != headers.ServerKindDev {
+		return errors.New("sessions are only available in inngest dev")
+	}
+	return nil
 }
 
 func sessionTimeRange(input *models.TimeRangeInput) cqrs.SessionTimeRange {
