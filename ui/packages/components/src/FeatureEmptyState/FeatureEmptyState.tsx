@@ -29,22 +29,14 @@ export type FeatureEmptyStateProps = {
     tabs: TabsProps[];
     height?: number;
   };
-  // Renders a small bordered card (title, description, and the copyable
-  // prompt only — no value props grid, no code example) instead of the
-  // full immersive page — for callers that show this alongside other
-  // content (e.g. a banner above a dashboard's own skeleton/empty charts)
-  // rather than in place of it.
-  compact?: boolean;
   // When set, replaces the onboarding body (value props grid + "Get
-  // started" section) in the full layout while keeping the title,
-  // description, and docs link. Used by the dev server's fake-door pages
-  // to show a CTA card to users who have already used the feature.
+  // started" section) while keeping the title, description, and docs
+  // link. Used by the dev server's fake-door pages to show a CTA card to
+  // users who have already used the feature.
   contentOverride?: ReactNode;
-  className?: string;
 };
 
 const PROMPT_HEIGHT = 124;
-const COMPACT_PROMPT_HEIGHT = 80;
 
 function ValuePropItem({
   icon: Icon,
@@ -107,9 +99,7 @@ export function FeatureEmptyState({
   valueProps,
   prompt,
   example,
-  compact = false,
   contentOverride,
-  className,
 }: FeatureEmptyStateProps) {
   // Fire once on view. The ref guards against React 18 StrictMode's
   // double-invoke so we don't double-count.
@@ -119,38 +109,6 @@ export function FeatureEmptyState({
     viewedRef.current = true;
     onView?.();
   }, []);
-
-  if (compact) {
-    return (
-      <div
-        className={`border-subtle bg-canvasBase flex flex-col gap-3 rounded-md border p-4 ${
-          className ?? ''
-        }`}
-      >
-        <div className="flex flex-col gap-3">
-          <h2 className="text-basis text-base font-medium">{title}</h2>
-          <p className="text-muted text-sm leading-relaxed">{description}</p>
-        </div>
-
-        <CommandBlock.Wrapper>
-          <CommandBlock.Header className="flex items-center justify-between px-4 py-2.5">
-            <p className="text-subtle text-sm">{prompt.description}</p>
-            <CommandBlock.CopyButton content={prompt.content} onCopy={() => onPromptCopy?.()} />
-          </CommandBlock.Header>
-          <CommandBlock
-            height={COMPACT_PROMPT_HEIGHT}
-            currentTabContent={{
-              title: 'Prompt',
-              content: prompt.content,
-              readOnly: true,
-              language: 'plaintext',
-              wordWrap: 'on',
-            }}
-          />
-        </CommandBlock.Wrapper>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-canvasBase flex flex-1 flex-col items-center overflow-auto px-6 py-12">
