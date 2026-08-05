@@ -8,6 +8,7 @@ export default function NavSection({
   collapsed,
   first = false,
   errors,
+  dots,
 }: {
   group: NavGroupConfig;
   collapsed: boolean;
@@ -17,6 +18,8 @@ export default function NavSection({
   first?: boolean;
   // Error state per item href (e.g. the Apps syncing-error badge).
   errors?: Record<string, boolean | undefined>;
+  // Unread-dot state per item href (e.g. detected scores/experiments).
+  dots?: Record<string, boolean | undefined>;
 }) {
   if (group.items.length === 0) {
     return null;
@@ -48,6 +51,7 @@ export default function NavSection({
           text={item.label}
           exact={item.exact}
           error={errors?.[item.href]}
+          dot={dots?.[item.href]}
           icon={<item.Icon className="h-[16px] w-[16px]" />}
         />
       ))}

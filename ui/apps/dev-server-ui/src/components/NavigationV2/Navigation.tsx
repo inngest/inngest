@@ -1,9 +1,11 @@
+import { useFakeDoorNavDots } from '@/components/AI/useFakeDoorNavDots';
 import { useAppsSyncingError } from '@/hooks/useAppsSyncingError';
 import NavSection from './NavSection';
 import { ai, setup, workflow } from './navItems';
 
 export default function Navigation({ collapsed }: { collapsed: boolean }) {
   const hasSyncingError = useAppsSyncingError();
+  const aiDots = useFakeDoorNavDots();
 
   return (
     <div
@@ -17,7 +19,7 @@ export default function Navigation({ collapsed }: { collapsed: boolean }) {
         errors={{ '/apps': hasSyncingError }}
         first
       />
-      <NavSection group={ai} collapsed={collapsed} />
+      <NavSection group={ai} collapsed={collapsed} dots={aiDots} />
       <NavSection group={setup} collapsed={collapsed} />
     </div>
   );

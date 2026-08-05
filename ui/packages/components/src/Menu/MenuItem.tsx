@@ -18,6 +18,7 @@ export const MenuItem = ({
   comingSoon = false,
   beta = false,
   error = false,
+  dot = false,
   className,
 }: {
   text: string;
@@ -30,6 +31,8 @@ export const MenuItem = ({
   comingSoon?: boolean;
   beta?: boolean;
   error?: boolean;
+  // Renders a small unread-style dot; pills (beta/error) take precedence.
+  dot?: boolean;
   className?: string;
 }) => {
   const location = useLocation();
@@ -65,6 +68,9 @@ export const MenuItem = ({
             <Pill kind="error" className="ml-auto h-4 px-1.5 text-[10px]">
               Error
             </Pill>
+          )}
+          {!collapsed && dot && !beta && !error && (
+            <span className="bg-primary-intense ml-auto h-1.5 w-1.5 shrink-0 rounded-full" />
           )}
         </div>
       </OptionalTooltip>

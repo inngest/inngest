@@ -1,13 +1,19 @@
+import { useEffect } from 'react';
+
 import { ExperimentsEmptyStateView } from '@inngest/components/FeatureEmptyState/ExperimentsEmptyStateView';
 import { Header } from '@inngest/components/Header/Header';
 
 import { useInfoQuery } from '@/store/devApi';
 import { FakeDoorCard } from './FakeDoorCard';
+import { markFakeDoorVisited } from './useFakeDoorNavDots';
 import { useFakeDoorTracking } from './useFakeDoorTracking';
 
 export function ExperimentsPage() {
   const track = useFakeDoorTracking('experiments');
   const { data: info } = useInfoQuery();
+
+  // Clears the nav unread dot after the first visit.
+  useEffect(() => markFakeDoorVisited('experiments'), []);
 
   return (
     <div className="flex h-full flex-col overflow-y-scroll">
