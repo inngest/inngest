@@ -84,7 +84,12 @@ type GrantDefinition struct {
 	// Shown in the minting UI and appended to the OpenAPI operation description.
 	Description string `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	// UI grouping only. Must be one of the categories the minting UI renders.
-	Category      string `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
+	Category string `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
+	// Sensitive grants are left out of the Read Only preset and out of the
+	// default member policy, so holding one is always a deliberate choice. Set it
+	// where the read half hands over something that is itself a credential, or
+	// reaches outside the key's environment.
+	Sensitive     bool `protobuf:"varint,4,opt,name=sensitive,proto3" json:"sensitive,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -138,6 +143,13 @@ func (x *GrantDefinition) GetCategory() string {
 		return x.Category
 	}
 	return ""
+}
+
+func (x *GrantDefinition) GetSensitive() bool {
+	if x != nil {
+		return x.Sensitive
+	}
+	return false
 }
 
 type AuthzOptions struct {
@@ -242,11 +254,12 @@ var File_api_v2_options_proto protoreflect.FileDescriptor
 
 const file_api_v2_options_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/options.proto\x12\x06api.v2\x1a google/protobuf/descriptor.proto\"c\n" +
+	"\x14api/v2/options.proto\x12\x06api.v2\x1a google/protobuf/descriptor.proto\"\x81\x01\n" +
 	"\x0fGrantDefinition\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1a\n" +
-	"\bcategory\x18\x03 \x01(\tR\bcategory\"o\n" +
+	"\bcategory\x18\x03 \x01(\tR\bcategory\x12\x1c\n" +
+	"\tsensitive\x18\x04 \x01(\bR\tsensitive\"o\n" +
 	"\fAuthzOptions\x12\x14\n" +
 	"\x05grant\x18\x02 \x01(\tR\x05grant\x12+\n" +
 	"\x06action\x18\x03 \x01(\x0e2\x13.api.v2.AuthzActionR\x06action\x12\x16\n" +

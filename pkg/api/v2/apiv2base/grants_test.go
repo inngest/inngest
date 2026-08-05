@@ -162,6 +162,10 @@ func TestGrantCatalogSnapshot(t *testing.T) {
 		Action      string `json:"action"`
 		Category    string `json:"category"`
 		Description string `json:"description"`
+		// Recorded so flipping `sensitive` in the proto shows up here. It changes
+		// what the Read Only preset and the default member policy hand out, which
+		// is exactly the kind of one-line edit this snapshot exists to surface.
+		Sensitive bool `json:"sensitive"`
 	}
 	type snapshot struct {
 		Comment string            `json:"_comment"`
@@ -175,6 +179,7 @@ func TestGrantCatalogSnapshot(t *testing.T) {
 		entries = append(entries, entry{
 			Grant: g.String(), Name: g.Name, Action: g.Action,
 			Category: g.Category, Description: g.Description,
+			Sensitive: g.Sensitive,
 		})
 	}
 	snap := snapshot{
