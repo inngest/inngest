@@ -3,7 +3,7 @@ package apiv2base
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
+	"net/url"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -85,21 +85,45 @@ func NewAuthzMatcher(routes []AuthzRoute) (*AuthzMatcher, error) {
 }
 
 // Match reports the route a method and path resolve to. The second return is
-// false when nothing matched, which callers should treat as "not a v2 endpoint"
-// rather than as a denial — the gateway will 404 it.
+// false when nothing matched. Callers must fail closed on that: a miss means
+// "this matcher could not tell you what the gateway will do", which is not the
+// same as "the gateway will refuse it".
 //
 // The request handed to the matcher is synthetic, carrying only the method and
 // path. Passing the real one would be unsafe: ServeMux.ServeHTTP calls
 // r.ParseForm() when X-HTTP-Method-Override is set on a form-encoded POST, which
 // consumes the body the real gateway still needs, and it rewrites r.Method.
+//
+// It is assembled field by field rather than with httptest.NewRequest, which
+// would re-parse the path. Callers pass r.URL.Path, which net/http has already
+// percent-decoded once, so a second parse decodes it again and the matcher stops
+// seeing what the gateway sees:
+//
+//	wire /runs/x%252Fy/cancel -> gateway /runs/x%2Fy/cancel (3 segments, matches)
+//	                          -> re-parsed /runs/x/y/cancel (4 segments, misses)
+//
+// Every such divergence adds segments, so it can only turn a matched protected
+// route into a miss — the direction that skips authorization. Re-parsing also
+// panics outright on a decoded path holding a space or a bare "%", which
+// httptest.NewRequest rejects as a malformed request line.
+//
+// ServeMux reads only Method and URL.Path (RawPath is consulted solely under a
+// non-default unescaping mode, which neither mux sets), so those are all this
+// needs to carry.
 func (m *AuthzMatcher) Match(httpMethod, path string) (AuthzRoute, bool) {
 	if m == nil || m.mux == nil {
 		return AuthzRoute{}, false
 	}
 
 	var matched AuthzRoute
-	req := httptest.NewRequest(httpMethod, path, nil)
-	req = req.WithContext(context.WithValue(req.Context(), matchedRouteKey{}, &matched))
+	ctx := context.WithValue(context.Background(), matchedRouteKey{}, &matched)
+	req := (&http.Request{
+		Method: httpMethod,
+		URL:    &url.URL{Path: path},
+		// Non-nil so the mux's header reads and its POST->GET fallback check are
+		// answered by an absent header rather than a nil map.
+		Header: http.Header{},
+	}).WithContext(ctx)
 
 	m.mux.ServeHTTP(discardWriter{}, req)
 

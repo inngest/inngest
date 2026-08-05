@@ -182,22 +182,39 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 		// The middleware is invoked only when the route actually requires a
 		// grant, so its contract is simple: if you are called, authorization is
 		// required, and the route is on the request context.
-		//
-		// The two cases that skip it are deliberate. Routes annotated `exempt`
-		// are public by declaration. Requests matching no route fall through to
-		// the gateway, which 404s them — denying here would turn a typo'd URL
-		// into a 403 and gain nothing, since every routable path carries an
-		// annotation by construction.
 		serve := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			gwmux.ServeHTTP(w, r)
 		}))
 
 		route, matched := authzMatcher.Match(req.Method, req.URL.Path)
-		if matched && !route.Exempt && httpOpts.AuthzMiddleware != nil {
+		switch {
+		case !matched:
+			// A request the matcher cannot identify is never handed to the
+			// gateway. Both route sets are built from the same service
+			// descriptor, so anything the gateway can serve the matcher knows
+			// about — which makes a miss either a genuine 404, or the two
+			// disagreeing about what this path is. Forwarding the second case
+			// would run a handler whose grant nobody checked, and there is no way
+			// to tell the two apart from here.
+			//
+			// This used to fall through on the reasoning that denying would turn
+			// a typo'd URL into a 403 for no gain. Answering 404 keeps that true —
+			// a mistyped URL still gets 404 — without betting that the matcher and
+			// the gateway can never disagree.
+			base.WriteHTTPError(w, http.StatusNotFound, apiv2base.ErrorNotFound,
+				"the requested endpoint does not exist")
+
+		case route.Exempt:
+			// Public by declaration, e.g. /health.
+			serve.ServeHTTP(w, req)
+
+		case httpOpts.AuthzMiddleware == nil:
+			// No authorization configured; nothing to enforce.
+			serve.ServeHTTP(w, req)
+
+		default:
 			req = req.WithContext(apiv2base.WithAuthzRoute(req.Context(), route))
 			httpOpts.AuthzMiddleware(serve).ServeHTTP(w, req)
-		} else {
-			serve.ServeHTTP(w, req)
 		}
 
 		// Restore original path for logging

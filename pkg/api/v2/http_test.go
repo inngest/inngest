@@ -77,24 +77,27 @@ func TestHTTPGateway_Health(t *testing.T) {
 		require.NoError(t, err, "fetchedAt should be a valid RFC3339 timestamp")
 	})
 
-	t.Run("POST /api/v2/health returns method not allowed", func(t *testing.T) {
+	// Health is declared GET-only, so another method resolves to no route. Such
+	// a request is refused before the gateway sees it — the matcher could not say
+	// what it is, so nobody could have checked its grant — which makes it a 404
+	// rather than the gateway's 501.
+	t.Run("POST /api/v2/health is not an endpoint", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/v2/health", strings.NewReader("{}"))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
 
-		// gRPC gateway only supports GET for health endpoint according to proto definition
-		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
-	t.Run("PUT /api/v2/health returns method not allowed", func(t *testing.T) {
+	t.Run("PUT /api/v2/health is not an endpoint", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPut, "/api/v2/health", nil)
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
 
-		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Equal(t, http.StatusNotFound, rec.Code)
 	})
 }
 
@@ -1067,14 +1070,16 @@ func TestHTTPGateway_InvokeFunction(t *testing.T) {
 		require.Contains(t, response.Errors[0].Code, "not_implemented")
 	})
 
-	t.Run("GET invoke returns not implemented", func(t *testing.T) {
+	// Invoke is POST-only. The 501s above come from the handler itself, which is
+	// genuinely unimplemented here; this one is a method that matches no route at
+	// all, so it stops at the router with a 404.
+	t.Run("GET invoke is not an endpoint", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/hello-world/invoke", nil)
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
 
-		// grpc-gateway returns 501 for unsupported HTTP methods on valid endpoints
-		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Equal(t, http.StatusNotFound, rec.Code)
 	})
 }
 
