@@ -21,15 +21,11 @@ func TestRegisterRequestChecksum(t *testing.T) {
 
 		withoutObservations := base
 		withObservations := base
-		withObservations.FeatureObservations = FeatureObservations{
-			{
-				Feature: &sdkfeatureobs.FeatureObservation_AiMetadataExtraction{
-					AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
-						ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_OTEL_PROVIDER_MISSING,
-					},
-				},
+		withObservations.FeatureObservations = FeatureObservationsFromProto(&sdkfeatureobs.FeatureObservations{
+			AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+				ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_OTEL_PROVIDER_MISSING,
 			},
-		}
+		})
 
 		withoutChecksum, err := withoutObservations.Checksum()
 		r.NoError(err)
@@ -44,15 +40,11 @@ func TestRegisterRequestFeatureObservationsJSONKey(t *testing.T) {
 	r := require.New(t)
 
 	req := RegisterRequest{
-		FeatureObservations: FeatureObservations{
-			{
-				Feature: &sdkfeatureobs.FeatureObservation_AiMetadataExtraction{
-					AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
-						ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
-					},
-				},
+		FeatureObservations: FeatureObservationsFromProto(&sdkfeatureobs.FeatureObservations{
+			AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+				ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
 			},
-		},
+		}),
 	}
 
 	byt, err := json.Marshal(req)
@@ -62,17 +54,15 @@ func TestRegisterRequestFeatureObservationsJSONKey(t *testing.T) {
 
 	var decoded RegisterRequest
 	r.NoError(json.Unmarshal([]byte(`{
-		"featureObservations": [
-			{
-				"aiMetadataExtraction": {
-					"readinessReason": 1
-				}
+		"featureObservations": {
+			"aiMetadataExtraction": {
+				"readinessReason": 1
 			}
-		]
+		}
 	}`), &decoded))
-	r.Len(decoded.FeatureObservations, 1)
+	r.NotNil(decoded.FeatureObservations)
 	r.Equal(
 		sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
-		decoded.FeatureObservations[0].GetAiMetadataExtraction().GetReadinessReason(),
+		decoded.FeatureObservations.GetAiMetadataExtraction().GetReadinessReason(),
 	)
 }

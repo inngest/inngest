@@ -13,15 +13,11 @@ func TestFeatureObservationsAppMetadata(t *testing.T) {
 	r := require.New(t)
 
 	registerReq := sdk.RegisterRequest{
-		FeatureObservations: sdk.FeatureObservations{
-			{
-				Feature: &sdkfeatureobs.FeatureObservation_AiMetadataExtraction{
-					AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
-						ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
-					},
-				},
+		FeatureObservations: sdk.FeatureObservationsFromProto(&sdkfeatureobs.FeatureObservations{
+			AiMetadataExtraction: &sdkfeatureobs.AIMetadataExtraction{
+				ReadinessReason: sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
 			},
-		},
+		}),
 	}
 
 	var metadata map[string]string
@@ -29,10 +25,10 @@ func TestFeatureObservationsAppMetadata(t *testing.T) {
 
 	observations, err := FeatureObservationsFromAppMetadata(metadata)
 	r.NoError(err)
-	r.Len(observations, 1)
+	r.NotNil(observations)
 	r.Equal(
 		sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_READY,
-		observations[0].GetAiMetadataExtraction().GetReadinessReason(),
+		observations.GetAiMetadataExtraction().GetReadinessReason(),
 	)
 
 	observations, err = FeatureObservationsFromAppMetadata(nil)

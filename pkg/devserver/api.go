@@ -354,7 +354,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 	if app, err := a.devserver.Data.GetAppByChecksum(ctx, consts.DevServerEnvID, sum); err == nil {
 		if !app.Error.Valid {
-			if len(r.FeatureObservations) > 0 {
+			if r.FeatureObservations != nil && r.FeatureObservations.HasAny() {
 				if _, err := a.devserver.Data.UpsertAppByName(ctx, appParams); err != nil {
 					return nil, publicerr.Wrap(err, 500, "Error updating app observations")
 				}

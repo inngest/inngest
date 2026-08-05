@@ -2,13 +2,58 @@ package sdk
 
 import (
 	"bytes"
-	"encoding/json"
 
 	sdkfeatureobs "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-type FeatureObservations []*sdkfeatureobs.FeatureObservation
+type FeatureObservations struct {
+	observations *sdkfeatureobs.FeatureObservations
+}
+
+func FeatureObservationsFromProto(observations *sdkfeatureobs.FeatureObservations) *FeatureObservations {
+	if observations == nil {
+		return nil
+	}
+
+	return &FeatureObservations{observations: observations}
+}
+
+func (f *FeatureObservations) Proto() *sdkfeatureobs.FeatureObservations {
+	if f == nil || f.observations == nil {
+		return nil
+	}
+
+	return f.observations
+}
+
+func (f *FeatureObservations) HasAny() bool {
+	return f.GetAiMetadataExtraction() != nil || f.GetExtendedTraces() != nil || f.GetSendEvents() != nil
+}
+
+func (f *FeatureObservations) GetAiMetadataExtraction() *sdkfeatureobs.AIMetadataExtraction {
+	if f == nil {
+		return nil
+	}
+
+	return f.Proto().GetAiMetadataExtraction()
+}
+
+func (f *FeatureObservations) GetExtendedTraces() *sdkfeatureobs.ExtendedTraces {
+	if f == nil {
+		return nil
+	}
+
+	return f.Proto().GetExtendedTraces()
+}
+
+func (f *FeatureObservations) GetSendEvents() *sdkfeatureobs.SendEvents {
+	if f == nil {
+		return nil
+	}
+
+	return f.Proto().GetSendEvents()
+}
 
 const (
 	AIMetadataExtractionReadinessReasonUnknown                   = int(sdkfeatureobs.AIMetadataExtractionReadinessReason_AI_METADATA_EXTRACTION_READINESS_REASON_UNSPECIFIED)
@@ -28,62 +73,28 @@ const (
 	ExtendedTracesReadinessReasonOtelProviderCreationFailed = int(sdkfeatureobs.ExtendedTracesReadinessReason_EXTENDED_TRACES_READINESS_REASON_OTEL_PROVIDER_CREATION_FAILED)
 )
 
-func (f FeatureObservations) MarshalJSON() ([]byte, error) {
+func (f *FeatureObservations) MarshalJSON() ([]byte, error) {
 	if f == nil {
 		return []byte("null"), nil
 	}
 
 	marshal := protojson.MarshalOptions{UseEnumNumbers: true}
-	buf := bytes.NewBufferString("[")
-	for i, observation := range f {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-
-		if observation == nil {
-			buf.WriteString("null")
-			continue
-		}
-
-		byt, err := marshal.Marshal(observation)
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(byt)
-	}
-	buf.WriteByte(']')
-
-	return buf.Bytes(), nil
+	return marshal.Marshal(f.Proto())
 }
 
 func (f *FeatureObservations) UnmarshalJSON(byt []byte) error {
 	byt = bytes.TrimSpace(byt)
 	if bytes.Equal(byt, []byte("null")) {
-		*f = nil
+		f.observations = nil
 		return nil
 	}
 
-	var rawObservations []json.RawMessage
-	if err := json.Unmarshal(byt, &rawObservations); err != nil {
+	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: true}
+	observations := &sdkfeatureobs.FeatureObservations{}
+	if err := unmarshal.Unmarshal(byt, observations); err != nil {
 		return err
 	}
 
-	unmarshal := protojson.UnmarshalOptions{DiscardUnknown: true}
-	observations := make(FeatureObservations, 0, len(rawObservations))
-	for _, raw := range rawObservations {
-		raw = bytes.TrimSpace(raw)
-		if bytes.Equal(raw, []byte("null")) {
-			observations = append(observations, nil)
-			continue
-		}
-
-		observation := &sdkfeatureobs.FeatureObservation{}
-		if err := unmarshal.Unmarshal(raw, observation); err != nil {
-			return err
-		}
-		observations = append(observations, observation)
-	}
-
-	*f = observations
+	f.observations = observations
 	return nil
 }

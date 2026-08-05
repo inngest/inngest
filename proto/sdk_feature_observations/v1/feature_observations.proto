@@ -3,12 +3,10 @@ package sdk_feature_observations.v1;
 
 option go_package = "github.com/inngest/inngest/proto/gen/sdk_feature_observations/v1;sdkfeatureobs";
 
-message FeatureObservation {
-  oneof feature {
-    AIMetadataExtraction ai_metadata_extraction = 1;
-    ExtendedTraces extended_traces = 2;
-    SendEvents send_events = 3;
-  }
+message FeatureObservations {
+  AIMetadataExtraction ai_metadata_extraction = 1;
+  ExtendedTraces extended_traces = 2;
+  SendEvents send_events = 3;
 }
 
 message OTelSetup {
@@ -89,8 +87,8 @@ message SendEvents {
 }
 
 message SendEventsConfig {
-  bool has_event_key = 1;
-  bool has_event_api_origin_override = 2;
+  bool event_key_configured = 1;
+  bool event_api_origin_override_configured = 2;
 }
 
 enum SendEventsReadinessReason {

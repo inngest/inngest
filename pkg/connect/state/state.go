@@ -139,7 +139,7 @@ type SyncData struct {
 	SyncToken           string
 	AppConfig           *connpb.AppConfiguration
 	Functions           []sdk.SDKFunction
-	FeatureObservations sdk.FeatureObservations
+	FeatureObservations *sdk.FeatureObservations
 }
 
 // WorkerGroup groups a list of connected workers to simplify operations, which
@@ -439,8 +439,8 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	return nil
 }
 
-func sdkFeatureObservationsHash(observations sdk.FeatureObservations) (string, error) {
-	if len(observations) == 0 {
+func sdkFeatureObservationsHash(observations *sdk.FeatureObservations) (string, error) {
+	if observations == nil || !observations.HasAny() {
 		return "", nil
 	}
 
