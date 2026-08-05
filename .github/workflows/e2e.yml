@@ -119,9 +119,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Depot 2 vCPU: these suites are latency-bound, not CPU-bound, so 4 vCPU
-        # measured within 3% of 2 vCPU (identical medians) for double the cost.
-        # The win here is queue time, not cores.
         os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
