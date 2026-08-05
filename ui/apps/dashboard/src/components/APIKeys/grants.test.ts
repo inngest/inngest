@@ -3,12 +3,14 @@ import { describe, expect, test } from 'vitest';
 import {
   activePreset,
   defaultSelection,
+  fullAccessPreset,
   groupGrants,
   permittedGrants,
+  readOnlyPreset,
   type Grant,
 } from './grants';
 
-function grant(g: string, category: string): Grant {
+function grant(g: string, category: string, sensitive = false): Grant {
   const [, name, action] = g.split(':');
   return {
     grant: g,
@@ -16,6 +18,7 @@ function grant(g: string, category: string): Grant {
     action,
     description: `${action} ${name}`,
     category,
+    sensitive,
   };
 }
 
@@ -90,6 +93,42 @@ describe('activePreset', () => {
 
   test('an empty selection is Custom, not a preset', () => {
     expect(activePreset([], CATALOG, all)).toBe('custom');
+  });
+});
+
+// api:key:read returns the decrypted signing key, so a "read only" key holding
+// it can do everything the write grants gate. It stays selectable, but nothing
+// may hand it out without being asked.
+describe('sensitive grants', () => {
+  const SENSITIVE: Grant[] = [
+    ...CATALOG,
+    grant('api:key:read', ACCOUNTS, true),
+  ];
+  const all = new Set(SENSITIVE.map((g) => g.grant));
+
+  test('Read only leaves them out', () => {
+    expect(readOnlyPreset(SENSITIVE)).toEqual([
+      'api:app:read',
+      'api:run:read',
+      'api:env:read',
+    ]);
+  });
+
+  test('Full access still includes them — it means everything', () => {
+    expect(fullAccessPreset(SENSITIVE)).toContain('api:key:read');
+  });
+
+  test('they are not preselected, even for an admin', () => {
+    const permitted = permittedGrants(SENSITIVE, undefined, true);
+    expect(permitted.has('api:key:read')).toBe(true);
+    expect(defaultSelection(SENSITIVE, permitted)).not.toContain(
+      'api:key:read',
+    );
+  });
+
+  test('adding one on top of Read only reads as Custom', () => {
+    const selected = [...readOnlyPreset(SENSITIVE), 'api:key:read'];
+    expect(activePreset(selected, SENSITIVE, all)).toBe('custom');
   });
 });
 

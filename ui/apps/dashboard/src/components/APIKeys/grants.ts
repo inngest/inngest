@@ -11,6 +11,7 @@ export const APIKeyGrantsQuery = graphql(`
       action
       description
       category
+      sensitive
     }
     account {
       memberAPIKeyPolicy {
@@ -38,6 +39,7 @@ export type Grant = {
   action: string;
   description: string;
   category: string;
+  sensitive: boolean;
 };
 
 export type MemberPolicy = {
@@ -135,12 +137,20 @@ export function activePreset(
 }
 
 /**
- * readOnlyPreset returns every read grant. Full Access and Read Only both
- * enumerate grants that exist right now rather than storing a wildcard, so a
- * key minted today does not silently widen when a permission is added later.
+ * readOnlyPreset returns every read grant except the sensitive ones. Full Access
+ * and Read Only both enumerate grants that exist right now rather than storing a
+ * wildcard, so a key minted today does not silently widen when a permission is
+ * added later.
+ *
+ * Sensitive reads are excluded because they are not read-only in effect —
+ * `api:key:read` returns the decrypted signing key, which is the credential the
+ * SDKs authenticate with. They stay selectable; they are just never the default.
+ * The server applies the same rule, so a hand-built request gains nothing.
  */
 export function readOnlyPreset(grants: Grant[]): string[] {
-  return grants.filter((g) => g.action === 'read').map((g) => g.grant);
+  return grants
+    .filter((g) => g.action === 'read' && !g.sensitive)
+    .map((g) => g.grant);
 }
 
 export function fullAccessPreset(grants: Grant[]): string[] {

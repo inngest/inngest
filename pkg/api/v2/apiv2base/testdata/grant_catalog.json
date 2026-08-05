@@ -6,126 +6,144 @@
       "name": "api:account",
       "action": "read",
       "category": "Accounts, Environments & Keys",
-      "description": "Account details"
+      "description": "Account details",
+      "sensitive": false
     },
     {
       "grant": "api:app:read",
       "name": "api:app",
       "action": "read",
       "category": "Apps, Functions & Runs",
-      "description": "Apps and their sync state"
+      "description": "Apps and their sync state",
+      "sensitive": false
     },
     {
       "grant": "api:app:write",
       "name": "api:app",
       "action": "write",
       "category": "Apps, Functions & Runs",
-      "description": "Apps and their sync state"
+      "description": "Apps and their sync state",
+      "sensitive": false
     },
     {
       "grant": "api:env:read",
       "name": "api:env",
       "action": "read",
       "category": "Accounts, Environments & Keys",
-      "description": "Environments"
+      "description": "Environments",
+      "sensitive": false
     },
     {
       "grant": "api:env:write",
       "name": "api:env",
       "action": "write",
       "category": "Accounts, Environments & Keys",
-      "description": "Environments"
+      "description": "Environments",
+      "sensitive": false
     },
     {
       "grant": "api:experiment:read",
       "name": "api:experiment",
       "action": "read",
       "category": "Observability & AI Evals",
-      "description": "Experiments and their results"
+      "description": "Experiments and their results",
+      "sensitive": false
     },
     {
       "grant": "api:function:read",
       "name": "api:function",
       "action": "read",
       "category": "Apps, Functions & Runs",
-      "description": "Function definitions"
+      "description": "Function definitions",
+      "sensitive": false
     },
     {
       "grant": "api:function:write",
       "name": "api:function",
       "action": "write",
       "category": "Apps, Functions & Runs",
-      "description": "Function definitions"
+      "description": "Function definitions",
+      "sensitive": false
     },
     {
       "grant": "api:insight:read",
       "name": "api:insight",
       "action": "read",
       "category": "Observability & AI Evals",
-      "description": "Insights queries, tables and event schemas"
+      "description": "Insights queries, tables and event schemas",
+      "sensitive": false
     },
     {
       "grant": "api:key:read",
       "name": "api:key",
       "action": "read",
       "category": "Accounts, Environments & Keys",
-      "description": "Event keys and signing keys. Signing keys grant full SDK access, so treat this as sensitive"
+      "description": "Event keys and signing keys. Signing keys grant full SDK access, so treat this as sensitive",
+      "sensitive": true
     },
     {
       "grant": "api:partner:read",
       "name": "api:partner",
       "action": "read",
       "category": "Accounts, Environments & Keys",
-      "description": "Partner sub-accounts"
+      "description": "Partner sub-accounts",
+      "sensitive": true
     },
     {
       "grant": "api:partner:write",
       "name": "api:partner",
       "action": "write",
       "category": "Accounts, Environments & Keys",
-      "description": "Partner sub-accounts"
+      "description": "Partner sub-accounts",
+      "sensitive": true
     },
     {
       "grant": "api:run:read",
       "name": "api:run",
       "action": "read",
       "category": "Apps, Functions & Runs",
-      "description": "Function runs and traces"
+      "description": "Function runs and traces",
+      "sensitive": false
     },
     {
       "grant": "api:run:write",
       "name": "api:run",
       "action": "write",
       "category": "Apps, Functions & Runs",
-      "description": "Function runs and traces"
+      "description": "Function runs and traces",
+      "sensitive": false
     },
     {
       "grant": "api:score:write",
       "name": "api:score",
       "action": "write",
       "category": "Observability & AI Evals",
-      "description": "Scores recorded against runs and steps"
+      "description": "Scores recorded against runs and steps",
+      "sensitive": false
     },
     {
       "grant": "api:session:read",
       "name": "api:session",
       "action": "read",
       "category": "Observability & AI Evals",
-      "description": "Sessions and session-grouped runs"
+      "description": "Sessions and session-grouped runs",
+      "sensitive": false
     },
     {
       "grant": "api:webhook:read",
       "name": "api:webhook",
       "action": "read",
       "category": "Accounts, Environments & Keys",
-      "description": "Webhooks that ingest events into an environment"
+      "description": "Webhooks that ingest events into an environment",
+      "sensitive": false
     },
     {
       "grant": "api:webhook:write",
       "name": "api:webhook",
       "action": "write",
       "category": "Accounts, Environments & Keys",
-      "description": "Webhooks that ingest events into an environment"
+      "description": "Webhooks that ingest events into an environment",
+      "sensitive": false
     }
   ],
   "routesByGrant": {

@@ -33,6 +33,10 @@ type Grant struct {
 	Action      string
 	Description string
 	Category    string
+	// Sensitive marks a grant that must never be handed out by a preset. It is
+	// declared per resource, so it covers both actions: a resource whose read
+	// half is dangerous has no safe half to preselect.
+	Sensitive bool
 }
 
 // String returns the human-facing label, e.g. "api:run:read".
@@ -91,6 +95,7 @@ func GrantCatalog() []Grant {
 			Action:      action,
 			Description: def.GetDescription(),
 			Category:    def.GetCategory(),
+			Sensitive:   def.GetSensitive(),
 		}
 		seen[g.String()] = g
 	})
