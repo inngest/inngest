@@ -401,6 +401,53 @@ func TestTracerExportWithoutMirror(t *testing.T) {
 	require.Equal(t, map[string]string{"unmirrored-export": "test"}, sink.spans(t))
 }
 
+// TestTracerExportMirrorsWithoutSink covers the noop tracer that
+// UserTracer/SystemTracer fall back to when nothing configured them: it has no
+// processor, so the mirror must not depend on one to receive Export's spans.
+func TestTracerExportMirrorsWithoutSink(t *testing.T) {
+	ctx := context.Background()
+
+	clearOTLPEnv(t)
+
+	collector := newTraceSink(t)
+
+	// Per-signal endpoints are used verbatim, so spell out the full path.
+	t.Setenv(envSignalEndpoint, collector.URL+"/v1/traces")
+
+	tr, err := newTracer(ctx, TracerOpts{
+		Type:        TracerTypeNoop,
+		ServiceName: "test",
+	})
+	require.NoError(t, err)
+	t.Cleanup(tr.Shutdown(ctx))
+
+	concrete, ok := tr.(*tracer)
+	require.True(t, ok)
+	// Should the noop provider ever gain a processor, this test stops covering
+	// the bug it was written for and needs updating rather than deleting.
+	require.Nil(t, concrete.processor, "the noop sink must not have a processor")
+	require.NotNil(t, concrete.mirror, "a configured mirror must be attached to the tracer")
+
+	require.NoError(t, tr.Export(exportedSpan("noop-sink-export")))
+	require.NoError(t, tr.Provider().ForceFlush(ctx))
+
+	require.Equal(t, map[string]string{"noop-sink-export": "test"}, collector.spans(t))
+}
+
+// TestTracerExportWithoutSinkOrMirror pins the other end of the same guard:
+// nowhere to send a span is not an error, and must not panic.
+func TestTracerExportWithoutSinkOrMirror(t *testing.T) {
+	ctx := context.Background()
+
+	clearOTLPEnv(t)
+
+	tr, err := newTracer(ctx, TracerOpts{Type: TracerTypeNoop, ServiceName: "test"})
+	require.NoError(t, err)
+	t.Cleanup(tr.Shutdown(ctx))
+
+	require.NoError(t, tr.Export(exportedSpan("dropped-export")))
+}
+
 // TestNewTracerDegradesOnUnsupportedMirrorProtocol guards against a telemetry
 // typo taking the server down: an error here propagates out of every component
 // that traces and prevents startup, for a signal nothing depends on.

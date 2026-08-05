@@ -264,12 +264,16 @@ func (t *tracer) Shutdown(ctx context.Context) func() {
 }
 
 func (t *tracer) Export(span trace.ReadOnlySpan) error {
-	if t.processor == nil {
+	if t.processor == nil && t.mirror == nil {
 		logger.StdlibLogger(context.Background()).Trace("no exporter available to export custom spans")
 		return nil
 	}
 
-	t.processor.OnEnd(span)
+	// The noop tracer has no processor, so the two sinks are independent: a
+	// configured mirror still has to receive the span.
+	if t.processor != nil {
+		t.processor.OnEnd(span)
+	}
 
 	// Legacy run and step spans (pkg/run) only reach an exporter here, and
 	// are re-emitted as a run progresses. Ingestion dedupes them, and trace
