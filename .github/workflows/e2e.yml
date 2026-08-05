@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
@@ -119,8 +119,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Benchmark: Depot 2 vCPU. Compare against the 4 vCPU variant before
-        # settling on a size.
+        # Depot 2 vCPU: these suites are latency-bound, not CPU-bound, so 4 vCPU
+        # measured within 3% of 2 vCPU (identical medians) for double the cost.
+        # The win here is queue time, not cores.
         os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
@@ -222,7 +223,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
         splitBatchPartition: [false, true]
@@ -321,7 +322,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
     runs-on: ${{ matrix.os }}
@@ -418,7 +419,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
