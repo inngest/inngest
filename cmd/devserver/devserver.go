@@ -72,6 +72,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
 	connectGatewayGRPCPort := localconfig.GetIntValue(cmd, "connect-gateway-grpc-port", devserver.DefaultConnectGatewayGRPCPort)
 	connectExecutorGRPCPort := localconfig.GetIntValue(cmd, "connect-executor-grpc-port", devserver.DefaultConnectExecutorGRPCPort)
+	connectGatewayGRPCIP := localconfig.GetValue(cmd, "connect-gateway-grpc-ip", connectgrpc.DefaultConnectGRPCIP)
+	connectExecutorGRPCIP := localconfig.GetValue(cmd, "connect-executor-grpc-ip", connectgrpc.DefaultConnectGRPCIP)
+	if err := localconfig.ValidateConnectGRPCIPs(connectGatewayGRPCIP, connectExecutorGRPCIP); err != nil {
+		return err
+	}
 
 	postgresURI := localconfig.GetValue(cmd, "postgres-uri", "")
 	postgresMaxIdleConns := localconfig.GetIntValue(cmd, "postgres-max-idle-conns", 10)
@@ -94,8 +99,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		ConnectGatewayHost: conf.CoreAPI.Addr,
 		ConnectGRPCConfig: connectConfig.NewGRPCConfig(
 			ctx,
-			connectgrpc.DefaultConnectGRPCIP, connectGatewayGRPCPort,
-			connectgrpc.DefaultConnectGRPCIP, connectExecutorGRPCPort,
+			connectGatewayGRPCIP, connectGatewayGRPCPort,
+			connectExecutorGRPCIP, connectExecutorGRPCPort,
 		),
 		Persist:                 persist,
 		SQLiteDir:               sqliteDir,

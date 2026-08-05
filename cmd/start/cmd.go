@@ -2,6 +2,7 @@ package start
 
 import (
 	"github.com/inngest/inngest/pkg/api"
+	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/urfave/cli/v3"
 )
@@ -115,6 +116,30 @@ func Command() *cli.Command {
 				Name:     "connect-gateway-port",
 				Value:    devserver.DefaultConnectGatewayPort,
 				Usage:    "Port to expose connect gateway endpoint",
+			},
+			&cli.IntFlag{
+				Category: "Advanced",
+				Name:     "connect-gateway-grpc-port",
+				Value:    devserver.DefaultConnectGatewayGRPCPort,
+				Usage:    "Port to expose connect gateway gRPC endpoint",
+			},
+			&cli.IntFlag{
+				Category: "Advanced",
+				Name:     "connect-executor-grpc-port",
+				Value:    devserver.DefaultConnectExecutorGRPCPort,
+				Usage:    "Port to expose connect executor gRPC endpoint",
+			},
+			&cli.StringFlag{
+				Category: "Advanced",
+				Name:     "connect-gateway-grpc-ip",
+				Value:    connectgrpc.DefaultConnectGRPCIP,
+				Usage:    "IP address other instances use to reach the connect gateway gRPC server",
+			},
+			&cli.StringFlag{
+				Category: "Advanced",
+				Name:     "connect-executor-grpc-ip",
+				Value:    connectgrpc.DefaultConnectGRPCIP,
+				Usage:    "IP address other instances use to reach the connect executor gRPC server",
 			},
 			&cli.BoolFlag{
 				Category: "Advanced",

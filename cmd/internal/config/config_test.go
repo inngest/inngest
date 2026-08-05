@@ -342,6 +342,114 @@ func TestGetValueHelperFunctions(t *testing.T) {
 	})
 }
 
+func TestConnectGRPCIPConfigurationPrecedence(t *testing.T) {
+	tests := []struct {
+		name        string
+		key         string
+		envKey      string
+		configIP    string
+		envIP       string
+		cliIP       string
+		configValue func(*Config) string
+	}{
+		{
+			name:        "gateway IP",
+			key:         "connect-gateway-grpc-ip",
+			envKey:      "INNGEST_CONNECT_GATEWAY_GRPC_IP",
+			configIP:    "10.0.0.1",
+			envIP:       "10.0.0.2",
+			cliIP:       "10.0.0.3",
+			configValue: func(c *Config) string { return c.ConnectGatewayGRPCIP },
+		},
+		{
+			name:        "executor IP",
+			key:         "connect-executor-grpc-ip",
+			envKey:      "INNGEST_CONNECT_EXECUTOR_GRPC_IP",
+			configIP:    "10.1.0.1",
+			envIP:       "10.1.0.2",
+			cliIP:       "10.1.0.3",
+			configValue: func(c *Config) string { return c.ConnectExecutorGRPCIP },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setupTest()
+
+			configFile := filepath.Join(t.TempDir(), "inngest.yml")
+			err := os.WriteFile(configFile, []byte(tt.key+": "+tt.configIP+"\n"), 0644)
+			require.NoError(t, err)
+
+			require.NoError(t, loadConfigFromPath(configFile))
+			require.NoError(t, unmarshalConfig())
+			assert.Equal(t, tt.configIP, tt.configValue(GetConfig()))
+			assert.Equal(t, tt.configIP, GetValue(&cli.Command{}, tt.key, "127.0.0.1"))
+
+			t.Setenv(tt.envKey, tt.envIP)
+			require.NoError(t, loadEnvironmentVariables())
+			require.NoError(t, unmarshalConfig())
+
+			assert.Equal(t, tt.envIP, tt.configValue(GetConfig()))
+
+			var resolved string
+			cmd := &cli.Command{
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: tt.key},
+				},
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					resolved = GetValue(cmd, tt.key, "127.0.0.1")
+					return nil
+				},
+			}
+			require.NoError(t, cmd.Run(context.Background(), []string{"inngest", "--" + tt.key, tt.cliIP}))
+			assert.Equal(t, tt.cliIP, resolved)
+		})
+	}
+}
+
+func TestValidateConnectGRPCIPs(t *testing.T) {
+	tests := []struct {
+		name       string
+		gatewayIP  string
+		executorIP string
+		err        string
+	}{
+		{
+			name:       "valid IPv4 addresses",
+			gatewayIP:  "10.0.0.1",
+			executorIP: "10.0.0.2",
+		},
+		{
+			name:       "valid IPv6 addresses",
+			gatewayIP:  "2001:db8::1",
+			executorIP: "2001:db8::2",
+		},
+		{
+			name:       "invalid gateway IP",
+			gatewayIP:  "gateway.example.com",
+			executorIP: "10.0.0.2",
+			err:        `invalid connect gateway gRPC IP "gateway.example.com": must be an IP address`,
+		},
+		{
+			name:       "invalid executor IP",
+			gatewayIP:  "10.0.0.1",
+			executorIP: "$(POD_IP)",
+			err:        `invalid connect executor gRPC IP "$(POD_IP)": must be an IP address`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateConnectGRPCIPs(tt.gatewayIP, tt.executorIP)
+			if tt.err == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, tt.err)
+		})
+	}
+}
+
 func TestConfigFileDiscovery(t *testing.T) {
 	setupTest()
 
