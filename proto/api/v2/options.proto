@@ -39,9 +39,14 @@ message GrantDefinition {
   string category = 3;
   // Sensitive grants are left out of the Read Only preset and out of the
   // default member policy, so holding one is always a deliberate choice. Set it
-  // where the read half hands over something that is itself a credential, or
-  // reaches outside the key's environment.
+  // where the read half hands over something that is itself a credential.
   bool sensitive = 4;
+  // Internal grants are enforced on their routes but never offered for minting:
+  // absent from GrantCatalog, so the key-creation UI does not render them, the
+  // mint policy rejects them, and no preset can include them. Set it where the
+  // grant belongs to keys provisioned out of band rather than to anything a
+  // customer creates for themselves.
+  bool internal = 5;
 }
 
 message AuthzOptions {

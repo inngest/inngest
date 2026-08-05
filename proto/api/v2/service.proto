@@ -74,9 +74,12 @@ option (grant_definition) = {
   name: "api:partner"
   description: "Partner sub-accounts"
   category: "Accounts, Environments & Keys"
-  // The read half crosses account boundaries: FetchAccount serves any child
-  // account to a caller holding it. Not something a default bundle should carry.
-  sensitive: true
+  // Not mintable, and not shown anywhere a key is created. The partner routes
+  // cross account boundaries — FetchAccount serves any child account to a caller
+  // holding the read half — and the keys that use them are provisioned out of
+  // band with wildcard scopes, never selected from the catalog. The routes stay
+  // enforced; only the offer is withdrawn.
+  internal: true
 };
 option (grant_definition) = {
   name: "api:app"
