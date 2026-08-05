@@ -6,10 +6,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestTracerOptsURLPath covers the resolution order of the exported URLPath
-// accessor. The final case is a regression: it used to return the empty string
-// when neither the struct field nor the environment supplied a path, handing
-// callers a path they cannot POST to.
+// The final case is a regression: URLPath used to return the empty string when
+// neither the struct field nor the environment supplied a path.
 func TestTracerOptsURLPath(t *testing.T) {
 	const envURLPath = "OTEL_TRACE_COLLECTOR_URL_PATH"
 

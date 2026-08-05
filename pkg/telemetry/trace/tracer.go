@@ -244,10 +244,8 @@ type tracer struct {
 	shutdown   func(context.Context)
 	processor  trace.SpanProcessor
 
-	// mirror ships spans to an external OTLP collector in addition to
-	// processor. It is registered on provider as well, so spans created
-	// through the normal otel API reach it without any help from us; the
-	// field exists for Export, which deliberately bypasses the provider.
+	// mirror is registered on provider too; the field exists for Export,
+	// which bypasses the provider.
 	mirror trace.SpanProcessor
 }
 
@@ -273,11 +271,9 @@ func (t *tracer) Export(span trace.ReadOnlySpan) error {
 
 	t.processor.OnEnd(span)
 
-	// Legacy run and step spans (pkg/run) only ever reach an exporter through
-	// here, so skipping the mirror would hide exactly the spans an external
-	// backend is wanted for. These spans can be emitted more than once as a
-	// run progresses, by design: Inngest's own ingestion dedupes them, and
-	// trace backends key on trace and span IDs, so the last write wins.
+	// Legacy run and step spans (pkg/run) only reach an exporter here, and
+	// are re-emitted as a run progresses. Ingestion dedupes them, and trace
+	// backends key on trace and span IDs, so the last write wins.
 	if t.mirror != nil {
 		t.mirror.OnEnd(span)
 	}
@@ -307,19 +303,15 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 }
 
 // NewTracerProvider creates a new tracer with a provider and exporter based
-// on the passed in `TraceType`.
-//
-// When an external OTLP endpoint is configured (see mirror.go), spans are
-// additionally exported there, leaving the type-specific sink untouched.
+// on the passed in `TraceType`, plus the external OTLP mirror if one is
+// configured.
 func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	t, err := newSinkTracer(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	// A misconfigured mirror degrades telemetry; it must not stop the server
-	// from booting, since the sink the platform itself depends on is already
-	// up by this point.
+	// Telemetry misconfiguration must not stop the server from booting.
 	mirror, err := newMirrorSpanProcessor(ctx)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error(
@@ -330,8 +322,7 @@ func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 		return t, nil
 	}
 	if mirror != nil {
-		// Provider shutdown drains registered processors, so the tracer's own
-		// shutdown func needs no changes.
+		// Provider shutdown drains registered processors.
 		t.provider.RegisterSpanProcessor(mirror)
 		t.mirror = mirror
 	}
