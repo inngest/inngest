@@ -98,8 +98,7 @@ func (o TracerOpts) URLPath() string {
 		return o.TraceURLPath
 	}
 
-	urlpath := os.Getenv("OTEL_TRACE_COLLECTOR_URL_PATH")
-	if urlpath == "" {
+	if urlpath := os.Getenv("OTEL_TRACE_COLLECTOR_URL_PATH"); urlpath != "" {
 		return urlpath
 	}
 
@@ -293,7 +292,29 @@ func TracerSetup(svc string, ttype TracerType) (func(), error) {
 
 // NewTracerProvider creates a new tracer with a provider and exporter based
 // on the passed in `TraceType`.
+//
+// When an external OTLP endpoint is configured (see mirror.go), spans are
+// additionally exported there, leaving the type-specific sink untouched.
 func newTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
+	t, err := newSinkTracer(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	mirror, err := newMirrorSpanProcessor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if mirror != nil {
+		// Provider shutdown drains registered processors, so the tracer's own
+		// shutdown func needs no changes.
+		t.Provider().RegisterSpanProcessor(mirror)
+	}
+
+	return t, nil
+}
+
+func newSinkTracer(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	switch opts.Type {
 	case TracerTypeOTLP:
 		return newOTLPGRPCTraceProvider(ctx, opts)
