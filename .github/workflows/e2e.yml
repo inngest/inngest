@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
@@ -119,7 +119,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
         parallelism: [5]
@@ -220,7 +220,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
         splitBatchPartition: [false, true]
@@ -319,7 +319,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
         database: [sqlite, postgres]
     runs-on: ${{ matrix.os }}
@@ -416,7 +416,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [depot-ubuntu-22.04]
         experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
