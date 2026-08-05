@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,12 +30,16 @@ type Config struct {
 	Port        string   `koanf:"port"`
 
 	// Advanced dev command configuration
-	PollInterval       int   `koanf:"poll-interval"`
-	RetryInterval      int   `koanf:"retry-interval"`
-	QueueWorkers       int   `koanf:"queue-workers"`
-	Tick               int   `koanf:"tick"`
-	ConnectGatewayPort int   `koanf:"connect-gateway-port"`
-	Persist            *bool `koanf:"persist"`
+	PollInterval            int    `koanf:"poll-interval"`
+	RetryInterval           int    `koanf:"retry-interval"`
+	QueueWorkers            int    `koanf:"queue-workers"`
+	Tick                    int    `koanf:"tick"`
+	ConnectGatewayPort      int    `koanf:"connect-gateway-port"`
+	ConnectGatewayGRPCIP    string `koanf:"connect-gateway-grpc-ip"`
+	ConnectGatewayGRPCPort  int    `koanf:"connect-gateway-grpc-port"`
+	ConnectExecutorGRPCIP   string `koanf:"connect-executor-grpc-ip"`
+	ConnectExecutorGRPCPort int    `koanf:"connect-executor-grpc-port"`
+	Persist                 *bool  `koanf:"persist"`
 
 	// Start command configuration
 	SigningKey string   `koanf:"signing-key"`
@@ -257,6 +262,19 @@ func GetIntValue(cmd *cli.Command, key string, defaultValue int) int {
 
 	// Finally return default
 	return defaultValue
+}
+
+// ValidateConnectGRPCIPs ensures the advertised Connect addresses are valid IP
+// addresses instead of allowing NewGRPCConfig to fall back to localhost.
+func ValidateConnectGRPCIPs(gatewayIP, executorIP string) error {
+	if net.ParseIP(gatewayIP) == nil {
+		return fmt.Errorf("invalid connect gateway gRPC IP %q: must be an IP address", gatewayIP)
+	}
+	if net.ParseIP(executorIP) == nil {
+		return fmt.Errorf("invalid connect executor gRPC IP %q: must be an IP address", executorIP)
+	}
+
+	return nil
 }
 
 // GetStringSlice gets a string slice configuration value with proper priority
