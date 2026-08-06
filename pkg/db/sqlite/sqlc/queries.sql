@@ -733,13 +733,3 @@ WHERE m.name = ?
   AND m.run_id IN (sqlc.slice('run_ids'))
 GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id
 ORDER BY s.run_id, span_start_time;
-
--- name: HasMetadataSpanKind :one
--- Reports whether any metadata span of the given kind (e.g. inngest.score,
--- inngest.experiment) has ever been recorded. Note the attribute key carries
--- the "_inngest." storage prefix while the kind value does not.
-SELECT EXISTS(
-  SELECT 1 FROM spans
-  WHERE name = 'metadata'
-    AND json_extract(attributes, '$."_inngest.metadata.kind"') = CAST(sqlc.arg(kind) AS TEXT)
-);

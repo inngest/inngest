@@ -601,10 +601,6 @@ func (pq *pgQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []strin
 	return out, nil
 }
 
-func (pq *pgQuerier) HasMetadataSpanKind(ctx context.Context, kind string) (bool, error) {
-	return pq.q.HasMetadataSpanKind(ctx, kind)
-}
-
 func (pq *pgQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*db.SpanRow, error) {
 	// Postgres sqlc expects string for this query.
 	rows, err := pq.q.GetSpansByDebugRunID(ctx, debugRunID.String)

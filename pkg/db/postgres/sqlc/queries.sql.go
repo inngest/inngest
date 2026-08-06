@@ -2040,24 +2040,6 @@ func (q *Queries) GetWorkerConnection(ctx context.Context, arg GetWorkerConnecti
 	return &i, err
 }
 
-const hasMetadataSpanKind = `-- name: HasMetadataSpanKind :one
-SELECT EXISTS(
-  SELECT 1 FROM spans
-  WHERE name = 'metadata'
-    AND attributes->>'_inngest.metadata.kind' = $1::text
-)
-`
-
-// Reports whether any metadata span of the given kind (e.g. inngest.score,
-// inngest.experiment) has ever been recorded. Note the attribute key carries
-// the "_inngest." storage prefix while the kind value does not.
-func (q *Queries) HasMetadataSpanKind(ctx context.Context, kind string) (bool, error) {
-	row := q.db.QueryRowContext(ctx, hasMetadataSpanKind, kind)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const historyCountRuns = `-- name: HistoryCountRuns :one
 SELECT COUNT(DISTINCT run_id) FROM history
 `

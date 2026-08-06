@@ -32,7 +32,6 @@ import (
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/registration"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	ptrace "go.opentelemetry.io/collector/pdata/ptrace"
@@ -196,12 +195,6 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		IsMissingSigningKey: a.devserver.Opts.RequireKeys && !a.devserver.HasSigningKey(),
 		IsMissingEventKeys:  a.devserver.Opts.RequireKeys && !a.devserver.HasEventKeys(),
 		Features:            features,
-		HasSeenScores: a.devserver.hasSeenMetadataKind(
-			r.Context(), &a.devserver.hasSeenScores, string(metadata.KindInngestScore),
-		),
-		HasSeenExperiments: a.devserver.hasSeenMetadataKind(
-			r.Context(), &a.devserver.hasSeenExperiments, string(metadata.KindInngestExperiment),
-		),
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	byt, _ := json.MarshalIndent(ir, "", "  ")
@@ -841,9 +834,4 @@ type InfoResponse struct {
 
 	// Features acts as an in-memory feature flag for the UI
 	Features map[string]bool `json:"features"`
-
-	// Whether metadata spans of these kinds have ever been recorded in this
-	// dev server's DB — used by the UI's fake-door Scores/Experiments pages.
-	HasSeenScores      bool `json:"hasSeenScores"`
-	HasSeenExperiments bool `json:"hasSeenExperiments"`
 }

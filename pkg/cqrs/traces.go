@@ -415,9 +415,6 @@ type TraceReadWriterDev interface {
 	FindOrBuildTraceRun(ctx context.Context, opts FindOrCreateTraceRunOpt) (*TraceRun, error)
 	// Returns a list of TraceRun triggered by triggerID
 	GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*TraceRun, error)
-	// HasSpanMetadataKind reports whether any metadata span of the given
-	// kind (e.g. inngest.score, inngest.experiment) has ever been recorded.
-	HasSpanMetadataKind(ctx context.Context, kind string) (bool, error)
 }
 
 type TraceReader interface {

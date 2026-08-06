@@ -751,13 +751,3 @@ WHERE run_id = CAST(sqlc.arg(run_id) AS CHAR(26)) AND span_id = sqlc.arg(span_id
 GROUP BY dynamic_span_id, run_id, trace_id, parent_span_id
 ORDER BY start_time ASC
 LIMIT 1;
-
--- name: HasMetadataSpanKind :one
--- Reports whether any metadata span of the given kind (e.g. inngest.score,
--- inngest.experiment) has ever been recorded. Note the attribute key carries
--- the "_inngest." storage prefix while the kind value does not.
-SELECT EXISTS(
-  SELECT 1 FROM spans
-  WHERE name = 'metadata'
-    AND attributes->>'_inngest.metadata.kind' = sqlc.arg(kind)::text
-);
