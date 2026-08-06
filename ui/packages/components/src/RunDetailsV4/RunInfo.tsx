@@ -188,7 +188,7 @@ export const RunInfo = ({
           {scheduledFor && (
             <ElementWrapper
               label="Scheduled at"
-              tooltip="Scheduled to run at, based on the triggering event."
+              tooltip="When this run is scheduled to start, taken from the triggering event's ts timestamp."
             >
               <TimeElement date={scheduledFor} />
             </ElementWrapper>
