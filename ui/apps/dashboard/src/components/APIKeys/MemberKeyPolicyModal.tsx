@@ -91,6 +91,7 @@ export function MemberKeyPolicyModal({ isOpen, onClose }: Props) {
         grantCount: draft.grants.length,
       });
       setDraft(null);
+      onClose();
     } finally {
       setSaving(false);
     }
@@ -290,6 +291,14 @@ export function MemberKeyPolicyModal({ isOpen, onClose }: Props) {
               : 'Members choose from the allowed grants only.'}
           </span>
           <div className="flex shrink-0 gap-2">
+            <Button
+              appearance="ghost"
+              kind="secondary"
+              size="small"
+              label="Cancel"
+              disabled={saving}
+              onClick={onClose}
+            />
             <Button
               appearance="outlined"
               kind="secondary"

@@ -93,12 +93,12 @@ export function Modal({
   );
 }
 
-function Body({ children }: React.PropsWithChildren<{}>) {
-  return <div className="text-basis m-6">{children}</div>;
+function Body({ children, className }: React.PropsWithChildren<{ className?: string }>) {
+  return <div className={cn('text-basis m-6', className)}>{children}</div>;
 }
 
 function Footer({ children, className }: React.PropsWithChildren<{ className?: string }>) {
-  return <div className={cn('border-subtle border-t p-6', className)}>{children}</div>;
+  return <div className={cn('border-subtle shrink-0 border-t p-6', className)}>{children}</div>;
 }
 
 function Header({
@@ -106,7 +106,7 @@ function Header({
   description,
 }: React.PropsWithChildren<{ description?: React.ReactNode }>) {
   return (
-    <div className="bg-modalBase border-subtle border-b p-6">
+    <div className="bg-modalBase border-subtle shrink-0 border-b p-6">
       <Dialog.Title className="text-basis text-xl">{children}</Dialog.Title>
 
       {description && (

@@ -151,7 +151,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
 
   return (
     <Modal
-      className="w-full max-w-xl overflow-visible"
+      className="flex max-h-[78vh] w-full max-w-xl flex-col overflow-y-hidden"
       isOpen={isOpen}
       onClose={close}
     >
@@ -159,14 +159,16 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
         {inRevealStep ? 'Copy your API key' : 'Create API key'}
       </Modal.Header>
 
-      <Modal.Body>
+      {/* The body scrolls so the footer buttons stay on screen: the grant list
+          plus the member-policy notes overflow a laptop viewport. */}
+      <Modal.Body className="min-h-0 overflow-y-auto">
         {inRevealStep ? (
           <RevealKeyCard plaintextKey={plaintextKey} />
         ) : (
           <div className="flex flex-col gap-5">
             <p className="text-subtle text-sm">
               Generate an API key to give your applications secure access to
-              Inngest. You can remove keys at any time.
+              Inngest. You can revoke keys at any time.
             </p>
 
             <div className="flex flex-col gap-2">
@@ -174,7 +176,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
                 htmlFor="api-key-name"
                 className="text-basis text-sm font-medium"
               >
-                API key name
+                API key name <span className="text-error">*</span>
               </label>
               <Input
                 id="api-key-name"
@@ -187,7 +189,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
 
             <div className="flex flex-col gap-2">
               <label className="text-basis text-sm font-medium">
-                Environments
+                Environments <span className="text-error">*</span>
               </label>
               <EnvironmentMultiSelect
                 groups={envGroups}
