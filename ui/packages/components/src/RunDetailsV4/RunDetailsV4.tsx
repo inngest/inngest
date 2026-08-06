@@ -300,7 +300,6 @@ export const RunDetailsV4 = ({
               run={nullishToLazy(runData)}
               runID={runID}
               standalone={standalone}
-              result={resultData}
               isDurableEndpoint={runData?.isDurableEndpoint}
               readOnly={readOnly}
             />

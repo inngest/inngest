@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { RiArrowRightSLine } from '@remixicon/react';
 
-import { AITrace } from '../AI/AITrace';
-import { parseAIOutput } from '../AI/utils';
 import {
   ElementWrapper,
   IDElement,
@@ -14,7 +12,6 @@ import {
 } from '../DetailsCard/Element';
 import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
-import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { AICell } from '../Table/Cell';
 import { toMaybeDate } from '../utils/date';
@@ -29,7 +26,6 @@ type Props = {
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
-  result?: TraceResult;
   isDurableEndpoint?: boolean;
   readOnly?: boolean;
 };
@@ -62,13 +58,11 @@ export const RunInfo = ({
   run,
   runID,
   standalone,
-  result,
   isDurableEndpoint,
   readOnly,
 }: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
-  const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const { pathCreator } = usePathCreator();
 
   return (
@@ -162,7 +156,7 @@ export const RunInfo = ({
               const queuedAt = toMaybeDate(run.trace.queuedAt);
               if (queuedAt) {
                 durationText = formatDuration(
-                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - queuedAt.getTime(),
+                  (toMaybeDate(run.trace.endedAt) ?? new Date()).getTime() - queuedAt.getTime()
                 );
               }
 
@@ -220,7 +214,6 @@ export const RunInfo = ({
               return <TimeElement date={endedAt} />;
             }}
           </OptimisticElementWrapper>
-          {aiOutput && <AITrace aiOutput={aiOutput} />}
         </div>
       )}
     </div>
