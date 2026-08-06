@@ -186,11 +186,11 @@ export const RunInfo = ({
           </OptimisticElementWrapper>
 
           {scheduledFor && (
-            <ElementWrapper label="Scheduled at">
-              <TimeElement
-                date={scheduledFor}
-                tooltipDescription="Scheduled to run at, based on the triggering event."
-              />
+            <ElementWrapper
+              label="Scheduled at"
+              tooltip="Scheduled to run at, based on the triggering event."
+            >
+              <TimeElement date={scheduledFor} />
             </ElementWrapper>
           )}
 

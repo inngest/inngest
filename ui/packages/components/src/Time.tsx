@@ -16,11 +16,6 @@ type Props = {
   format?: 'relative';
   value: Date | string;
   copyable?: boolean;
-  /**
-   * Optional description shown in the tooltip alongside the UTC/local
-   * timestamps, e.g. to explain where the time comes from.
-   */
-  tooltipDescription?: string;
 };
 
 function formatDate(date: Date) {
@@ -31,7 +26,7 @@ function formatUTCDate(date: Date) {
   return formatInTimeZone(date, 'UTC', 'dd MMM yyyy, HH:mm:ss');
 }
 
-export function Time({ className, format, value, copyable = true, tooltipDescription }: Props) {
+export function Time({ className, format, value, copyable = true }: Props) {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard');
@@ -86,11 +81,6 @@ export function Time({ className, format, value, copyable = true, tooltipDescrip
           </div>
           <time className="text-onContrast">{localTimeString}</time>
         </div>
-        {tooltipDescription && (
-          <div className="text-light mb-[6px] ml-3 mr-4 max-w-xs whitespace-normal text-sm">
-            {tooltipDescription}
-          </div>
-        )}
       </TooltipContent>
     </Tooltip>
   );
