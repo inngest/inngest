@@ -29,9 +29,9 @@ export type FeatureEmptyStateProps = {
     tabs: TabsProps[];
     height?: number;
   };
-  // Rendered between the title/description/docs-link block and the value
-  // props grid. Used by the dev server's fake-door pages to show a
-  // cloud-availability note and CTA above the onboarding content.
+  // Rendered between the value props grid and the "Get started" divider.
+  // Used by the dev server's fake-door pages to show a cloud-availability
+  // note and CTA within the onboarding content.
   banner?: ReactNode;
 };
 
@@ -120,13 +120,13 @@ export function FeatureEmptyState({
           </Link>
         </div>
 
-        {banner}
-
         <div className="grid grid-cols-2 gap-x-8 gap-y-6">
           {valueProps.map((valueProp) => (
             <ValuePropItem key={valueProp.title} {...valueProp} />
           ))}
         </div>
+
+        {banner}
 
         <hr className="border-subtle" />
 

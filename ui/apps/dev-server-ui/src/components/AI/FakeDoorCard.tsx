@@ -69,22 +69,24 @@ export function FakeDoorCard({ feature }: { feature: FakeDoorFeature }) {
   const copy = COPY[feature];
 
   return (
-    <div className="border-subtle bg-canvasSubtle flex flex-col items-start gap-3 rounded-md border p-4">
+    <div className="border-subtle bg-canvasBase flex flex-col items-start gap-4 rounded-md border p-6 shadow-sm">
       {clicked ? (
-        <>
+        <div className="flex flex-col gap-1">
           <h2 className="text-basis text-base font-medium">
             {copy.thanksTitle}
           </h2>
           <p className="text-muted text-sm leading-relaxed">
             {copy.thanksDescription}
           </p>
-        </>
+        </div>
       ) : (
         <>
-          <h2 className="text-basis text-base font-medium">{copy.title}</h2>
-          <p className="text-muted text-sm leading-relaxed">
-            {copy.description}
-          </p>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-basis text-base font-medium">{copy.title}</h2>
+            <p className="text-muted text-sm leading-relaxed">
+              {copy.description}
+            </p>
+          </div>
           <Button
             kind="primary"
             appearance="solid"
