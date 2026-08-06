@@ -3,6 +3,7 @@ package apiv2base
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -270,6 +271,16 @@ func JSONTypeValidationMiddleware() func(http.Handler) http.Handler {
 			// Read the request body
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
+				var maxBytesErr *http.MaxBytesError
+				if errors.As(err, &maxBytesErr) {
+					writeHTTPError(
+						w,
+						http.StatusRequestEntityTooLarge,
+						ErrorInvalidRequest,
+						fmt.Sprintf("Request body cannot exceed %d bytes", maxBytesErr.Limit),
+					)
+					return
+				}
 				writeHTTPError(w, http.StatusBadRequest, ErrorInvalidRequest, "Failed to read request body")
 				return
 			}
