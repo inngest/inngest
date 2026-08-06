@@ -7,7 +7,6 @@ import (
 	"iter"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -16,7 +15,7 @@ type Queue interface {
 	Consumer
 
 	JobQueueReader
-	Migrator
+	MigrationLocker
 	Unpauser
 	AttemptResetter
 	RoleStatusReader
@@ -125,15 +124,10 @@ type RoleStatusReader interface {
 	ActiveRoles() []QueueRoleStatus
 }
 
-type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
-
-type Migrator interface {
+type MigrationLocker interface {
 	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
 	// another queue shard
 	SetFunctionMigrate(ctx context.Context, sourceShard string, scope Scope, migrateLockUntil *time.Time) error
-	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
-	// The sore goal is to grab things and migrate them to somewhere else
-	Migrate(ctx context.Context, shard string, scope Scope, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
 }
 
 type Unpauser interface {
@@ -314,31 +308,4 @@ type JobQueueReader interface {
 	// NOTE
 	// The queue technically shouldn't know about runIDs, so we should make this more generic with certain type of indices in the future
 	ItemsByRunID(ctx context.Context, queueShard QueueShard, scope Scope, runID ulid.ULID) ([]*QueueItem, error)
-}
-
-// MigratePayload stores the information to be used when migrating a queue shard to another one
-type MigratePayload struct {
-	AccountID  uuid.UUID
-	EnvID      uuid.UUID
-	FunctionID uuid.UUID
-
-	// Source is the source queue where the migration will occur on
-	Source string
-	// Dest is the target destination the queue will be moved to
-	Dest string
-
-	// DisableFnPause is a flag to disable the function pausing during migration
-	// if it's considered okay to do so
-	DisableFnPause bool
-
-	// Concurrency optionally specifies the concurrency for running the migrate handler over each batch of queue items.
-	Concurrency int
-}
-
-func (p MigratePayload) Scope() Scope {
-	return Scope{
-		AccountID:  p.AccountID,
-		EnvID:      p.EnvID,
-		FunctionID: p.FunctionID,
-	}
 }

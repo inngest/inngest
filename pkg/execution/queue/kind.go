@@ -9,8 +9,7 @@ const (
 	KindPause           = "pause"
 	KindDebounce        = "debounce"
 	KindScheduleBatch   = "schedule-batch"
-	KindEdgeError       = "edge-error" // KindEdgeError is used to indicate a final step error attempting a graceful save.
-	KindQueueMigrate    = "queue-migrate"
+	KindEdgeError       = "edge-error"        // KindEdgeError is used to indicate a final step error attempting a graceful save.
 	KindPauseBlockFlush = "pbf"               // Flushes pauses from the buffer to blocks.
 	KindJobPromote      = "jps"               // job promotion service
 	KindCancel          = "cancel"            // cancel signals eager cancellation of queue items

@@ -105,7 +105,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 	})
 
 	t.Run("system queue", func(t *testing.T) {
-		sysQueueName := osqueue.KindQueueMigrate
+		sysQueueName := osqueue.KindCancel
 
 		expected := osqueue.QueueBacklog{
 			// expect default backlog to be used
@@ -693,7 +693,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 	})
 
 	t.Run("system queue", func(t *testing.T) {
-		sysQueueName := osqueue.KindQueueMigrate
+		sysQueueName := osqueue.KindCancel
 
 		expected := osqueue.QueueShadowPartition{
 			PartitionID:     sysQueueName,
@@ -706,7 +706,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		shadowPart := osqueue.ItemShadowPartition(ctx, osqueue.QueueItem{
 			ID: "test",
 			Data: osqueue.Item{
-				Kind:                  osqueue.KindQueueMigrate,
+				Kind:                  osqueue.KindCancel,
 				Identifier:            state.Identifier{},
 				Throttle:              nil,
 				CustomConcurrencyKeys: nil,
