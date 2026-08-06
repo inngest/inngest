@@ -7,7 +7,11 @@ import {
   TooltipTrigger,
 } from '@inngest/components/Tooltip';
 import { useOrganization } from '@clerk/tanstack-react-start';
-import { RiAddLine, RiInformationLine } from '@remixicon/react';
+import {
+  RiAddLine,
+  RiInformationLine,
+  RiShieldUserLine,
+} from '@remixicon/react';
 import { createFileRoute } from '@tanstack/react-router';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
@@ -18,7 +22,7 @@ import {
 } from '@/components/APIKeys/APIKeysTable';
 import { CreateAPIKeyModal } from '@/components/APIKeys/CreateAPIKeyModal';
 import { APIKeyGrantsQuery } from '@/components/APIKeys/grants';
-import { MemberKeyPolicySidebar } from '@/components/APIKeys/MemberKeyPolicySidebar';
+import { MemberKeyPolicyModal } from '@/components/APIKeys/MemberKeyPolicyModal';
 import { DeleteAPIKeyModal } from '@/components/APIKeys/DeleteAPIKeyModal';
 import { RenameAPIKeyModal } from '@/components/APIKeys/RenameAPIKeyModal';
 import { useAPIKeys } from '@/components/APIKeys/useAPIKeys';
@@ -35,8 +39,8 @@ function APIKeysPage() {
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
-  // Members may mint only when the account policy says so; the policy card
-  // below is where an admin changes it.
+  // Members may mint only when the account policy says so; the policy modal
+  // is where an admin changes it.
   const policyRes = useGraphQLQuery({
     query: APIKeyGrantsQuery,
     variables: {},
@@ -48,6 +52,7 @@ function APIKeysPage() {
   // Create modal state is owned here so it survives the empty->populated
   // transition that unmounts the EmptyState.
   const [createOpen, setCreateOpen] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<APIKeyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<APIKeyRow | null>(null);
 
@@ -90,7 +95,7 @@ function APIKeysPage() {
   );
 
   return (
-    <div className="flex w-full gap-6 py-8">
+    <div className="w-full py-8">
       <div className="mx-auto flex w-full max-w-[1000px] min-w-0 flex-col gap-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
@@ -107,16 +112,28 @@ function APIKeysPage() {
               </Link>
             </p>
           </div>
-          {canCreate ? (
-            createButton
-          ) : (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>{createButton}</span>
-              </TooltipTrigger>
-              <TooltipContent>{ADMIN_TOOLTIP}</TooltipContent>
-            </Tooltip>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {isAdmin && (
+              <Button
+                appearance="outlined"
+                kind="secondary"
+                icon={<RiShieldUserLine />}
+                iconSide="left"
+                label="Member key policy"
+                onClick={() => setPolicyOpen(true)}
+              />
+            )}
+            {canCreate ? (
+              createButton
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>{createButton}</span>
+                </TooltipTrigger>
+                <TooltipContent>{ADMIN_TOOLTIP}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
 
         {/* Says out loud what a member can and cannot do here, rather than
@@ -147,7 +164,12 @@ function APIKeysPage() {
         )}
       </div>
 
-      {isAdmin && <MemberKeyPolicySidebar />}
+      {isAdmin && (
+        <MemberKeyPolicyModal
+          isOpen={policyOpen}
+          onClose={() => setPolicyOpen(false)}
+        />
+      )}
 
       <CreateAPIKeyModal
         isOpen={createOpen}
