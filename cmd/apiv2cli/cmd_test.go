@@ -44,6 +44,8 @@ func TestDiscoverEndpointsFromProto(t *testing.T) {
 	require.NotContains(t, byName, "get-runs")
 	require.Equal(t, "/runs", byName["get-function-runs"].path)
 	require.Empty(t, byName["get-function-runs"].pathParams)
+	require.Equal(t, http.MethodPost, byName["send-event"].method)
+	require.Equal(t, "/events", byName["send-event"].path)
 }
 
 func TestCanonicalCommandEndpointsPrefersExplicitNameOwner(t *testing.T) {
@@ -350,6 +352,47 @@ func TestWriteSandboxFileFlagsDoNotConflict(t *testing.T) {
 	require.Equal(t, 1, counts["body-file"])
 	require.Equal(t, 1, counts["path"])
 	require.Equal(t, 1, counts["mode"])
+}
+
+func TestCommandSendsEvent(t *testing.T) {
+	var gotBody map[string]any
+	var gotEnv string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/v2/events", r.URL.Path)
+		gotEnv = r.Header.Get("X-Inngest-Env")
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"eventId":"01K1QQ3VQ8R3M8QX4D51J8G7XH"}}`))
+	}))
+	defer srv.Close()
+
+	cmd := Command()
+	out := bytes.Buffer{}
+	cmd.Writer = &out
+
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", srv.URL,
+		"--env", "branch-a",
+		"send-event",
+		"--name", "app/user.created",
+		"--data", `{"userId":"user-1"}`,
+		"--user", `{"id":"user-1"}`,
+		"--id", "event-1",
+		"--ts", "1786032000000",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "branch-a", gotEnv)
+	require.Equal(t, map[string]any{
+		"name": "app/user.created",
+		"data": map[string]any{"userId": "user-1"},
+		"user": map[string]any{"id": "user-1"},
+		"id":   "event-1",
+		"ts":   float64(1786032000000),
+	}, gotBody)
+	require.Contains(t, out.String(), `"eventId": "01K1QQ3VQ8R3M8QX4D51J8G7XH"`)
 }
 
 func TestCommandBuildsRerunFromStepBody(t *testing.T) {

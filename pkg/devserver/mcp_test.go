@@ -67,8 +67,9 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	require.Equal(t, "Search documentation", titles["grep_docs"])
 	require.Equal(t, "Read documentation", titles["read_doc"])
 	require.Equal(t, "List documentation", titles["list_docs"])
+	require.Equal(t, "Send event", titles["send_event"])
+	require.NotContains(t, strings.ToLower(descriptions["send_event"]), "deprecated")
 	for _, name := range []string{
-		"send_event",
 		"get_run_status",
 		"poll_run_status",
 		"invoke_function_sync",

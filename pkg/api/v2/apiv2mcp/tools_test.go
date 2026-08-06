@@ -33,6 +33,31 @@ func TestRequest(t *testing.T) {
 	}, body)
 }
 
+func TestSendEventRequest(t *testing.T) {
+	endpoint := endpointByMethod(t, "SendEvent")
+	req, err := Request(context.Background(), endpoint, map[string]any{
+		"env":  "branch-a",
+		"name": "app/user.created",
+		"data": map[string]any{"userId": "user-1"},
+		"id":   "event-1",
+	}, Options{EnvHeader: "X-Inngest-Env"})
+	require.NoError(t, err)
+	require.Equal(t, http.MethodPost, req.Method)
+	require.Equal(t, "/api/v2/events", req.URL.Path)
+	require.Equal(t, "branch-a", req.Header.Get("X-Inngest-Env"))
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+	require.Equal(t, map[string]any{
+		"name": "app/user.created",
+		"data": map[string]any{"userId": "user-1"},
+		"id":   "event-1",
+	}, body)
+
+	schema := InputSchema(endpoint)
+	require.ElementsMatch(t, []string{"name"}, schema["required"])
+}
+
 func TestInputSchema(t *testing.T) {
 	endpoint := endpointByMethod(t, "InvokeFunction")
 	schema := InputSchema(endpoint)
@@ -51,6 +76,7 @@ func TestToolAnnotations(t *testing.T) {
 		destructive bool
 	}{
 		{method: "GetFunctions", readOnly: true, destructive: false},
+		{method: "SendEvent", readOnly: false, destructive: true},
 		{method: "InvokeFunction", readOnly: false, destructive: true},
 		{method: "CancelRun", readOnly: false, destructive: true},
 	} {

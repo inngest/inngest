@@ -282,12 +282,6 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 
 func (h *MCPHandler) addCompatibilityTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "send_event",
-		Title:       "Send event (deprecated)",
-		Description: "Deprecated compatibility tool retained for existing dev server integrations. Send an event to the Inngest dev server and return the event ID and any run IDs it creates. Parameters: name (required string - the event name like 'test/hello.world'), data (optional - the event data, must be a JSON object or will be wrapped in {\"value\": data}), user (optional JSON object - user context), eventIdSeed (optional string for deterministic event IDs)",
-	}, h.sendEvent)
-
-	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_run_status",
 		Title:       "Get run status (deprecated)",
 		Description: "Deprecated compatibility tool retained for existing dev server integrations. Use get_run and get_run_trace for new integrations. Parameters: runId (required string - the run ID returned from send_event or found in logs)",
@@ -355,28 +349,12 @@ func (h *MCPHandler) executeV2(ctx context.Context, endpoint apiv2endpoint.Endpo
 	return apiv2mcp.ToolResult(structured, string(body)), nil
 }
 
-// SendEventArgs represents the arguments for sending an event
-type SendEventArgs struct {
-	Name        string `json:"name"`
-	Data        any    `json:"data,omitempty" jsonschema:"true"`
-	User        any    `json:"user,omitempty" jsonschema:"true"`
-	EventIDSeed string `json:"eventIdSeed,omitempty"`
-}
-
 // InvokeFunctionArgs represents the arguments for invoking a function
 type InvokeFunctionArgs struct {
 	FunctionID string `json:"functionId"`
 	Data       any    `json:"data,omitempty" jsonschema:"true"`
 	User       any    `json:"user,omitempty" jsonschema:"true"`
 	Timeout    int    `json:"timeout,omitempty"`
-}
-
-// SendEventResult represents the result of sending an event
-type SendEventResult struct {
-	EventID string   `json:"eventId"`
-	RunIDs  []string `json:"runIds,omitempty"`
-	Status  string   `json:"status"`
-	Message string   `json:"message"`
 }
 
 // InvokeFunctionResult represents the result of invoking a function
@@ -428,78 +406,6 @@ type ListDocsResult struct {
 	TotalChunks int            `json:"totalChunks"`
 	Categories  map[string]int `json:"categories"`
 	SDKs        map[string]int `json:"sdks"`
-}
-
-func (h *MCPHandler) sendEvent(ctx context.Context, req *mcp.CallToolRequest, args SendEventArgs) (*mcp.CallToolResult, any, error) {
-	// Track MCP tool usage
-	metadata := tel.NewMetadata(ctx)
-	metadata.Context["tool"] = "send_event"
-	metadata.Context["event_name"] = args.Name
-	if args.EventIDSeed != "" {
-		metadata.Context["has_event_id_seed"] = true
-	}
-	tel.SendEvent(ctx, "cli/mcp.tool.executed", metadata)
-
-	evt := event.Event{
-		Name: args.Name,
-	}
-
-	// Set event data and user using helper functions
-	evt.Data = convertToDataMap(args.Data)
-	evt.User = convertToUserMap(args.User)
-
-	// Create seed for event ID
-	var seed *event.SeededID
-	if args.EventIDSeed != "" {
-		seed = event.SeededIDFromString(args.EventIDSeed, 0)
-	}
-
-	// Send the event via the event handler
-	evtID, err := h.events(ctx, &evt, seed)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to send event: %w", err)
-	}
-
-	// Parse the event ID to get run IDs
-	eventULID, err := ulid.Parse(evtID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse event ID: %w", err)
-	}
-
-	// Wait a moment for the event to be processed and runs to be created
-	time.Sleep(h.tick * 3)
-
-	// Get the function runs triggered by this event using existing CQRS interface
-	var runIDs []string
-	runs, err := h.data.GetEventRuns(ctx, eventULID, consts.DevServerAccountID, consts.DevServerEnvID)
-	if err == nil && runs != nil {
-		for _, run := range runs {
-			runIDs = append(runIDs, run.RunID.String())
-		}
-	}
-
-	// Return success result
-	result := &SendEventResult{
-		EventID: evtID,
-		RunIDs:  runIDs,
-		Status:  "accepted",
-		Message: fmt.Sprintf("Event '%s' sent successfully", args.Name),
-	}
-
-	responseText := result.Message + "\nEvent ID: " + result.EventID
-	if len(result.RunIDs) > 0 {
-		responseText += fmt.Sprintf("\nTriggered %d function run(s): %v", len(result.RunIDs), result.RunIDs)
-	} else {
-		responseText += "\nNo functions were triggered by this event"
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: responseText,
-			},
-		},
-	}, result, nil
 }
 
 // GetRunStatusArgs represents the arguments for getting run status

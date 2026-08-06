@@ -6,6 +6,7 @@ import "google/protobuf/struct.proto";
 import "third_party/google/api/httpbody.proto";
 import "api/v2/sandbox.proto";
 import "third_party/google/api/annotations.proto";
+import "third_party/google/api/field_behavior.proto";
 import "api/v2/options.proto";
 import "third_party/protoc-gen-openapiv2/options/annotations.proto";
 
@@ -36,6 +37,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Keys"         description: "Manage event and signing keys" }
   tags: { name: "Webhooks"     description: "Create and manage inbound webhooks" }
   tags: { name: "Apps"         description: "Sync and manage" }
+  tags: { name: "Events"       description: "Send events" }
   tags: { name: "Functions"    description: "Invoke and manage functions" }
   tags: { name: "Runs"         description: "Inspect function runs" }
   tags: { name: "Insights"     description: "Query event and function data" }
@@ -1500,6 +1502,90 @@ service V2 {
     };
   }
 
+  rpc SendEvent(SendEventRequest) returns (SendEventResponse) {
+    option (google.api.http) = {
+      post: "/events",
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Send event"
+      description: "Sends an event to the selected environment. Use the returned event ID with the event runs endpoint to inspect any function runs triggered by the event."
+      tags: "Events"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+      responses: {
+        key: "200"
+        value: {
+          description: "Event accepted"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2SendEventResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "400"
+        value: {
+          description: "Bad Request - invalid event data"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "401"
+        value: {
+          description: "Unauthorized - authentication required"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "403"
+        value: {
+          description: "Forbidden - events cannot be sent to the selected environment"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "429"
+        value: {
+          description: "Too Many Requests - API rate limit exceeded. The request was rejected and no event was sent."
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal Server Error"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+    };
+  }
+
   rpc InvokeFunction(InvokeFunctionRequest) returns (InvokeFunctionResponse) {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/{function_id}/invoke",
@@ -2807,6 +2893,54 @@ message PatchEnvRequest {
 message PatchEnvsResponse {
   Env data = 1;
   ResponseMetadata metadata = 2;
+}
+
+message SendEventRequest {
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Event name"
+      example: "\"app/user.created\""
+    }
+  ];
+  optional google.protobuf.Struct data = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "JSON object containing event data"
+      example: "{\"userId\": \"01H08WQHKQ9H8S7F7NQGQ0M1NZ\"}"
+    }
+  ];
+  optional google.protobuf.Struct user = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Deprecated user data. Put user data in the data field instead."
+      example: "{\"id\": \"01H08WQHKQ9H8S7F7NQGQ0M1NZ\", \"email\": \"ada@example.com\"}"
+    }
+  ];
+  optional string id = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional event ID used for idempotency when scheduling function runs"
+      example: "\"user-created-01H08WQHKQ9H8S7F7NQGQ0M1NZ\""
+    }
+  ];
+  optional int64 ts = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Optional event timestamp as Unix time in milliseconds. Defaults to the current time."
+      example: "1754496000000"
+    }
+  ];
+}
+
+message SendEventResponse {
+  SendEventData data = 1;
+  ResponseMetadata metadata = 2;
+}
+
+message SendEventData {
+  string event_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
+      description: "Internal event ID assigned by Inngest"
+      example: "\"01K1QQ3VQ8R3M8QX4D51J8G7XH\""
+    }
+  ];
 }
 
 message InvokeFunctionRequest {

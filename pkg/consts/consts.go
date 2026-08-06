@@ -16,6 +16,9 @@ const (
 	// AbsoluteMaxEventSize is the absolute maximum size of the event payload we process.
 	AbsoluteMaxEventSize = 3 * 1024 * 1024
 
+	// MaxEventNameLength is the maximum event name accepted by event ingestion.
+	MaxEventNameLength = 512
+
 	// DefaultMaxStepLimit is the maximum number of steps per function allowed.
 	DefaultMaxStepLimit = 1_000
 

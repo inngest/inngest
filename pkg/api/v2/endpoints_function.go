@@ -196,7 +196,8 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 
 	// Create an invoke event using the data from the above request.
 	// Pass this into an event publisher, and use this event within the schedule request.
-	eventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	receivedAt := time.Now()
+	eventID := ulid.MustNew(ulid.Timestamp(receivedAt), rand.Reader)
 	data := req.GetData().AsMap()
 	data[consts.InngestEventDataPrefix] = event.InngestMetadata{
 		InvokeType:           "api",
@@ -207,11 +208,12 @@ func (s *Service) InvokeFunction(ctx context.Context, req *apiv2.InvokeFunctionR
 		ID:          eventID,
 		AccountID:   f.AccountID,
 		WorkspaceID: f.EnvironmentID,
+		ReceivedAt:  &receivedAt,
 		Event: event.Event{
 			ID:        eventID.String(),
 			Name:      consts.FnInvokeName,
 			Data:      data,
-			Timestamp: time.Now().UnixMilli(),
+			Timestamp: receivedAt.UnixMilli(),
 		},
 	}
 	if err := s.eventPublisher.Publish(context.WithoutCancel(ctx), event); err != nil {
