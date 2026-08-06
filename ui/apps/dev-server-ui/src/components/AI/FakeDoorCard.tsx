@@ -9,19 +9,31 @@ import {
 
 const COPY: Record<
   FakeDoorFeature,
-  { title: string; description: string; cta: string }
+  {
+    title: string;
+    description: string;
+    cta: string;
+    thanksTitle: string;
+    thanksDescription: string;
+  }
 > = {
   scores: {
-    title: 'Want to see scores in the Dev Server?',
+    title: 'See your scores in Inngest Cloud once you deploy',
     description:
-      "At the moment, scores aren't displayed in the Dev Server. However, you'll be able to view them once you deploy your app to Cloud.",
-    cta: 'I want to see my scores in the Dev Server',
+      "The Dev Server doesn't display scores yet. Want them here too?",
+    cta: 'Yes, I want this',
+    thanksTitle: "Thanks, we've heard you!",
+    thanksDescription:
+      'Your feedback helps us decide whether to bring scores to the Dev Server. Until then, deploy your app to see them in Cloud.',
   },
   experiments: {
-    title: 'Want to see experiments in the Dev Server?',
+    title: 'See your experiments in Inngest Cloud once you deploy',
     description:
-      "At the moment, experiments aren't displayed in the Dev Server. However, you'll be able to view them once you deploy your app to Cloud.",
-    cta: 'I want to see my experiments in the Dev Server',
+      "The Dev Server doesn't display experiments yet. Want them here too?",
+    cta: 'Yes, I want this',
+    thanksTitle: "Thanks, we've heard you!",
+    thanksDescription:
+      'Your feedback helps us decide whether to bring experiments to the Dev Server. Until then, deploy your app to see them in Cloud.',
   },
 };
 
@@ -29,10 +41,11 @@ const storageKey = (feature: FakeDoorFeature) =>
   `inngest:fakeDoor:${feature}:ctaClicked`;
 
 // Fake-door banner shown on the Scores/Experiments pages above the
-// onboarding content. The CTA only records interest; the acknowledged
-// state persists in localStorage so the same user isn't re-asked on
-// every visit. Its view needs no separate tracking — it equals the
-// page's own `viewed` event.
+// onboarding content. It leads with where the data actually lives (Cloud,
+// after deploying); the CTA only records interest in local support. The
+// acknowledged state persists in localStorage so the same user isn't
+// re-asked on every visit. Its view needs no separate tracking — it equals
+// the page's own `viewed` event.
 export function FakeDoorCard({ feature }: { feature: FakeDoorFeature }) {
   const track = useFakeDoorTracking(feature);
   const [clicked, setClicked] = useState(() => {
@@ -53,31 +66,29 @@ export function FakeDoorCard({ feature }: { feature: FakeDoorFeature }) {
     setClicked(true);
   };
 
+  const copy = COPY[feature];
+
   return (
     <div className="border-subtle bg-canvasSubtle flex flex-col items-start gap-3 rounded-md border p-4">
       {clicked ? (
         <>
           <h2 className="text-basis text-base font-medium">
-            Thanks — we&apos;ve heard you!
+            {copy.thanksTitle}
           </h2>
           <p className="text-muted text-sm leading-relaxed">
-            We&apos;re using this feedback to decide whether to bring {feature}{' '}
-            to the Dev Server. In the meantime, {feature} will show up in your
-            Inngest Cloud dashboard once you deploy your app.
+            {copy.thanksDescription}
           </p>
         </>
       ) : (
         <>
-          <h2 className="text-basis text-base font-medium">
-            {COPY[feature].title}
-          </h2>
+          <h2 className="text-basis text-base font-medium">{copy.title}</h2>
           <p className="text-muted text-sm leading-relaxed">
-            {COPY[feature].description}
+            {copy.description}
           </p>
           <Button
             kind="primary"
             appearance="solid"
-            label={COPY[feature].cta}
+            label={copy.cta}
             onClick={onClick}
           />
         </>
