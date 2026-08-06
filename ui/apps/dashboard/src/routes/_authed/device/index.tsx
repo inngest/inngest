@@ -54,6 +54,9 @@ function UserCodeInput({
 
   return (
     <div className="relative mx-auto w-fit">
+      {/* No maxLength: it truncates the raw paste before onChange runs, so a
+          pasted "ZZZ-ZZZ" loses its last character once the dash is stripped.
+          sanitizeUserCode caps the length instead. */}
       <input
         id="user_code"
         name="user_code"
@@ -61,7 +64,6 @@ function UserCodeInput({
         onChange={(e) => onChange(sanitizeUserCode(e.target.value))}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        maxLength={CODE_LENGTH}
         autoComplete="one-time-code"
         autoFocus
         disabled={disabled}
