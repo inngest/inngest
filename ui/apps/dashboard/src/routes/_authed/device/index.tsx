@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Input } from '@inngest/components/Forms/Input';
+import { Fragment, useState } from 'react';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
+import { cn } from '@inngest/components/utils/classNames';
 import { useAuth, useOrganization } from '@clerk/tanstack-react-start';
 import { RiTerminalBoxLine } from '@remixicon/react';
 import { createFileRoute, useLoaderData } from '@tanstack/react-router';
@@ -28,6 +28,73 @@ const UUID_REGEX =
 
 // User codes are 6 base-20 characters (0-9, A-J), optionally grouped ZZZ-ZZZ.
 const USER_CODE_REGEX = /^[0-9A-J]{3}-?[0-9A-J]{3}$/i;
+const CODE_LENGTH = 6;
+
+/** Uppercases and drops anything that can't be part of a code, e.g. a pasted dash. */
+function sanitizeUserCode(raw: string): string {
+  return raw
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, '')
+    .slice(0, CODE_LENGTH);
+}
+
+/**
+ * Six single-character cells with the grouping dash drawn between them.
+ *
+ * One real input, made transparent and stretched across the cells, rather than
+ * six inputs: native typing, paste and backspace keep working without moving
+ * focus between fields, and paste of a "ZZZ-ZZZ" code just drops the dash.
+ */
+function UserCodeInput({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+  disabled?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <div className="relative mx-auto w-fit">
+      <input
+        id="user_code"
+        name="user_code"
+        value={value}
+        onChange={(e) => onChange(sanitizeUserCode(e.target.value))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        maxLength={CODE_LENGTH}
+        autoComplete="one-time-code"
+        autoFocus
+        disabled={disabled}
+        aria-label="Code from your terminal"
+        className="absolute inset-0 z-10 w-full cursor-text opacity-0 disabled:cursor-not-allowed"
+      />
+      <div aria-hidden className="flex items-center gap-1.5">
+        {Array.from({ length: CODE_LENGTH }, (_, i) => (
+          <Fragment key={i}>
+            {i === CODE_LENGTH / 2 && (
+              <span className="text-muted px-1 text-xl">–</span>
+            )}
+            <span
+              className={cn(
+                'text-basis flex h-12 w-10 items-center justify-center rounded border font-mono text-2xl',
+                focused && i === Math.min(value.length, CODE_LENGTH - 1)
+                  ? 'border-active'
+                  : 'border-muted',
+                disabled && 'text-disabled',
+              )}
+            >
+              {value[i] ?? ''}
+            </span>
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function StatusMessage({
   title,
@@ -200,9 +267,22 @@ function DeviceLoginComponent() {
           <p className="my-6">
             Approving creates an API key that grants the Inngest CLI access to
             the environments you choose. The key appears on your API keys
-            settings page, where you can remove it at any time.
+            settings page, where you can revoke it at any time.
           </p>
           <div className="mx-auto flex max-w-md flex-col gap-4">
+            <div className="flex flex-col gap-2 text-left">
+              <label
+                htmlFor="user_code"
+                className="text-basis text-sm font-medium"
+              >
+                Code from your terminal
+              </label>
+              <UserCodeInput
+                value={userCode}
+                onChange={setUserCode}
+                disabled={loading}
+              />
+            </div>
             <div className="flex flex-col gap-2 text-left">
               <label className="text-basis text-sm font-medium">
                 Environments
@@ -242,25 +322,6 @@ function DeviceLoginComponent() {
                 )}
               </div>
             )}
-            <div className="flex flex-col gap-2 text-left">
-              <label
-                htmlFor="user_code"
-                className="text-basis text-sm font-medium"
-              >
-                Code from your terminal
-              </label>
-              <Input
-                id="user_code"
-                name="user_code"
-                value={userCode}
-                onChange={(e) => setUserCode(e.target.value.toUpperCase())}
-                placeholder="ZZZ-ZZZ"
-                autoComplete="off"
-                autoFocus
-                disabled={loading}
-                className="text-center font-mono text-2xl tracking-[0.2em]"
-              />
-            </div>
           </div>
           <p className="text-subtle my-6 text-sm">
             Only enter a code you generated yourself by running{' '}

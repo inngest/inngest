@@ -41,11 +41,11 @@ export function DeleteAPIKeyModal({ isOpen, onClose, keyID, keyName }: Props) {
     try {
       const res = await del({ id: keyID }, { additionalTypenames: ['APIKey'] });
       if (res.error) {
-        setError(apiKeyErrorMessage(res.error, 'Could not delete API key.'));
+        setError(apiKeyErrorMessage(res.error, 'Could not revoke API key.'));
         return;
       }
       trackKeyRevoked({ feature: 'api-keys', keyID });
-      toast.success('API key deleted');
+      toast.success('API key revoked');
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -58,10 +58,10 @@ export function DeleteAPIKeyModal({ isOpen, onClose, keyID, keyName }: Props) {
       isOpen={isOpen}
       onClose={onClose}
       onSubmit={submit}
-      title={keyName ? `Delete "${keyName}"?` : 'Delete API key?'}
+      title={keyName ? `Revoke "${keyName}"?` : 'Revoke API key?'}
       description="Any application using this key will immediately lose access. This cannot be undone."
       confirmButtonKind="danger"
-      confirmButtonLabel="Delete"
+      confirmButtonLabel="Revoke"
       cancelButtonLabel="Cancel"
       isLoading={isSubmitting}
       autoClose={false}
