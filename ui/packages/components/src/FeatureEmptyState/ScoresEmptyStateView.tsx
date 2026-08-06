@@ -9,7 +9,7 @@ type ScoresEmptyStateViewProps = {
   onPromptCopy?: () => void;
   onExampleCopy?: () => void;
   onDocsLinkClick?: () => void;
-  contentOverride?: ReactNode;
+  banner?: ReactNode;
 };
 
 // Shared onboarding empty state for Scores, rendered identically by the

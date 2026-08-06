@@ -14,7 +14,7 @@ type ExperimentsEmptyStateViewProps = {
   onPromptCopy?: () => void;
   onExampleCopy?: () => void;
   onDocsLinkClick?: () => void;
-  contentOverride?: ReactNode;
+  banner?: ReactNode;
 };
 
 // Shared onboarding empty state for Experiments, rendered identically by

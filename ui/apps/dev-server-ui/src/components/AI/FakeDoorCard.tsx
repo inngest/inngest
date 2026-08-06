@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@inngest/components/Button';
 
@@ -28,10 +28,11 @@ const COPY: Record<
 const storageKey = (feature: FakeDoorFeature) =>
   `inngest:fakeDoor:${feature}:ctaClicked`;
 
-// Fake-door card shown on the Scores/Experiments pages instead of the
-// onboarding content once the dev server has seen the feature being used.
-// The CTA only records interest; the acknowledged state persists in
-// localStorage so the same user isn't re-asked on every visit.
+// Fake-door banner shown on the Scores/Experiments pages above the
+// onboarding content. The CTA only records interest; the acknowledged
+// state persists in localStorage so the same user isn't re-asked on
+// every visit. Its view needs no separate tracking — it equals the
+// page's own `viewed` event.
 export function FakeDoorCard({ feature }: { feature: FakeDoorFeature }) {
   const track = useFakeDoorTracking(feature);
   const [clicked, setClicked] = useState(() => {
@@ -41,16 +42,6 @@ export function FakeDoorCard({ feature }: { feature: FakeDoorFeature }) {
       return false;
     }
   });
-
-  // Fire once on view (ref-guarded against StrictMode double-invoke). This
-  // fires from the card's own mount, not the page view, so the detected
-  // cohort is counted even when /dev resolves after the page has rendered.
-  const viewedRef = useRef(false);
-  useEffect(() => {
-    if (viewedRef.current) return;
-    viewedRef.current = true;
-    track('detected_viewed');
-  }, [track]);
 
   const onClick = () => {
     track('cta_clicked');
@@ -63,7 +54,7 @@ export function FakeDoorCard({ feature }: { feature: FakeDoorFeature }) {
   };
 
   return (
-    <div className="border-subtle bg-canvasBase flex flex-col items-start gap-3 rounded-md border p-6">
+    <div className="border-subtle bg-canvasSubtle flex flex-col items-start gap-3 rounded-md border p-4">
       {clicked ? (
         <>
           <h2 className="text-basis text-base font-medium">

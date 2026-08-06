@@ -20,11 +20,6 @@ const serverInfoSchema = z.object({
   version: z.string().optional(),
   isSingleNodeService: z.boolean().optional(),
   startOpts: z.record(z.unknown()).optional(),
-  // Whether this dev server has ever recorded score/experiment usage —
-  // drives the fake-door CTA on the AI pages. Note zod strips unknown
-  // keys, so /dev fields must be declared here to survive parsing.
-  hasSeenScores: z.boolean().optional(),
-  hasSeenExperiments: z.boolean().optional(),
 });
 
 export interface ServerInfo extends z.output<typeof serverInfoSchema> {

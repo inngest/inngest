@@ -29,11 +29,10 @@ export type FeatureEmptyStateProps = {
     tabs: TabsProps[];
     height?: number;
   };
-  // When set, replaces the onboarding body (value props grid + "Get
-  // started" section) while keeping the title, description, and docs
-  // link. Used by the dev server's fake-door pages to show a CTA card to
-  // users who have already used the feature.
-  contentOverride?: ReactNode;
+  // Rendered between the title/description/docs-link block and the value
+  // props grid. Used by the dev server's fake-door pages to show a
+  // cloud-availability note and CTA above the onboarding content.
+  banner?: ReactNode;
 };
 
 const PROMPT_HEIGHT = 124;
@@ -99,7 +98,7 @@ export function FeatureEmptyState({
   valueProps,
   prompt,
   example,
-  contentOverride,
+  banner,
 }: FeatureEmptyStateProps) {
   // Fire once on view. The ref guards against React 18 StrictMode's
   // double-invoke so we don't double-count.
@@ -121,43 +120,38 @@ export function FeatureEmptyState({
           </Link>
         </div>
 
-        {contentOverride ?? (
-          <>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-              {valueProps.map((valueProp) => (
-                <ValuePropItem key={valueProp.title} {...valueProp} />
-              ))}
-            </div>
+        {banner}
 
-            <hr className="border-subtle" />
+        <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+          {valueProps.map((valueProp) => (
+            <ValuePropItem key={valueProp.title} {...valueProp} />
+          ))}
+        </div>
 
-            <div className="flex flex-col gap-6">
-              <h2 className="text-basis text-lg">Get started</h2>
+        <hr className="border-subtle" />
 
-              <CommandBlock.Wrapper>
-                <CommandBlock.Header className="flex items-center justify-between px-4 py-2.5">
-                  <p className="text-subtle text-sm">{prompt.description}</p>
-                  <CommandBlock.CopyButton
-                    content={prompt.content}
-                    onCopy={() => onPromptCopy?.()}
-                  />
-                </CommandBlock.Header>
-                <CommandBlock
-                  height={PROMPT_HEIGHT}
-                  currentTabContent={{
-                    title: 'Prompt',
-                    content: prompt.content,
-                    readOnly: true,
-                    language: 'plaintext',
-                    wordWrap: 'on',
-                  }}
-                />
-              </CommandBlock.Wrapper>
+        <div className="flex flex-col gap-6">
+          <h2 className="text-basis text-lg">Get started</h2>
 
-              <ExampleBlock {...example} onExampleCopy={onExampleCopy} />
-            </div>
-          </>
-        )}
+          <CommandBlock.Wrapper>
+            <CommandBlock.Header className="flex items-center justify-between px-4 py-2.5">
+              <p className="text-subtle text-sm">{prompt.description}</p>
+              <CommandBlock.CopyButton content={prompt.content} onCopy={() => onPromptCopy?.()} />
+            </CommandBlock.Header>
+            <CommandBlock
+              height={PROMPT_HEIGHT}
+              currentTabContent={{
+                title: 'Prompt',
+                content: prompt.content,
+                readOnly: true,
+                language: 'plaintext',
+                wordWrap: 'on',
+              }}
+            />
+          </CommandBlock.Wrapper>
+
+          <ExampleBlock {...example} onExampleCopy={onExampleCopy} />
+        </div>
       </div>
     </div>
   );

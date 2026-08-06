@@ -9,9 +9,7 @@ export type FakeDoorAction =
   | 'prompt_copied'
   | 'example_copied'
   | 'docs_clicked'
-  | 'detected_viewed'
-  | 'cta_clicked'
-  | 'nav_dot_seen';
+  | 'cta_clicked';
 
 // Tracks interactions with the fake-door Scores/Experiments pages via a
 // single event, so reach and click-through can be compared against the
