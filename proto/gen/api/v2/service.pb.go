@@ -8365,6 +8365,7 @@ type ListRunsRequest struct {
 	FunctionId    []string               `protobuf:"bytes,9,rep,name=function_id,json=functionId,proto3" json:"function_id,omitempty"`
 	IsDeferred    *bool                  `protobuf:"varint,10,opt,name=is_deferred,json=isDeferred,proto3,oneof" json:"is_deferred,omitempty"`
 	Order         string                 `protobuf:"bytes,11,opt,name=order,proto3" json:"order,omitempty"`
+	Query         *string                `protobuf:"bytes,12,opt,name=query,proto3,oneof" json:"query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8476,6 +8477,13 @@ func (x *ListRunsRequest) GetOrder() string {
 	return ""
 }
 
+func (x *ListRunsRequest) GetQuery() string {
+	if x != nil && x.Query != nil {
+		return *x.Query
+	}
+	return ""
+}
+
 type ListFunctionRunsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AppId         string                 `protobuf:"bytes,1,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
@@ -8489,6 +8497,7 @@ type ListFunctionRunsRequest struct {
 	Status        []string               `protobuf:"bytes,9,rep,name=status,proto3" json:"status,omitempty"`
 	IsDeferred    *bool                  `protobuf:"varint,10,opt,name=is_deferred,json=isDeferred,proto3,oneof" json:"is_deferred,omitempty"`
 	Order         string                 `protobuf:"bytes,11,opt,name=order,proto3" json:"order,omitempty"`
+	Query         *string                `protobuf:"bytes,12,opt,name=query,proto3,oneof" json:"query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8596,6 +8605,13 @@ func (x *ListFunctionRunsRequest) GetIsDeferred() bool {
 func (x *ListFunctionRunsRequest) GetOrder() string {
 	if x != nil {
 		return x.Order
+	}
+	return ""
+}
+
+func (x *ListFunctionRunsRequest) GetQuery() string {
+	if x != nil && x.Query != nil {
+		return *x.Query
 	}
 	return ""
 }
@@ -9571,7 +9587,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampH\x02R\aendedAt\x88\x01\x01B\r\n" +
 	"\v_event_nameB\r\n" +
 	"\v_started_atB\v\n" +
-	"\t_ended_at\"\xf5\b\n" +
+	"\t_ended_at\"\xe3\t\n" +
 	"\x0fListRunsRequest\x12*\n" +
 	"\x0einclude_output\x18\x01 \x01(\bH\x00R\rincludeOutput\x88\x01\x01\x12J\n" +
 	"\x06cursor\x18\x02 \x01(\tB-\x92A*2(Pagination cursor from previous responseH\x01R\x06cursor\x88\x01\x01\x12X\n" +
@@ -9587,13 +9603,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\vis_deferred\x18\n" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
-	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05orderB\x11\n" +
+	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05order\x12b\n" +
+	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01B\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
-	"\f_is_deferred\"\xc6\b\n" +
+	"\f_is_deferredB\b\n" +
+	"\x06_query\"\xb4\t\n" +
 	"\x17ListFunctionRunsRequest\x12\x15\n" +
 	"\x06app_id\x18\x01 \x01(\tR\x05appId\x12\x1f\n" +
 	"\vfunction_id\x18\x02 \x01(\tR\n" +
@@ -9609,13 +9627,15 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\vis_deferred\x18\n" +
 	" \x01(\bB:\x92A725Whether to include only deferred or non-deferred runsH\x05R\n" +
 	"isDeferred\x88\x01\x01\x12E\n" +
-	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05orderB\x11\n" +
+	"\x05order\x18\v \x01(\tB/\x92A,2$Sort direction. Accepts ASC or DESC.:\x04DESCR\x05order\x12b\n" +
+	"\x05query\x18\f \x01(\tBG\x92AD2BCEL expression used to filter runs by event, output, or error dataH\x06R\x05query\x88\x01\x01B\x11\n" +
 	"\x0f_include_outputB\t\n" +
 	"\a_cursorB\b\n" +
 	"\x06_limitB\a\n" +
 	"\x05_fromB\b\n" +
 	"\x06_untilB\x0e\n" +
-	"\f_is_deferred\"\x93\x01\n" +
+	"\f_is_deferredB\b\n" +
+	"\x06_query\"\x93\x01\n" +
 	"\x10ListRunsResponse\x12'\n" +
 	"\x04data\x18\x01 \x03(\v2\x13.api.v2.FunctionRunR\x04data\x124\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\x12 \n" +

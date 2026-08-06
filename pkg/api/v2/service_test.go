@@ -1095,6 +1095,7 @@ func TestService_ListRuns(t *testing.T) {
 			FunctionIDs:   []string{"test-fn"},
 			IsDeferred:    &isDeferred,
 			Order:         OrderDirectionAsc,
+			CEL:           `event.data.userId == "123"`,
 		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, HasMore: true}, nil).Once()
 		t.Cleanup(func() {
 			reader.AssertExpectations(t)
@@ -1113,6 +1114,7 @@ func TestService_ListRuns(t *testing.T) {
 			FunctionId:    []string{"test-fn"},
 			IsDeferred:    &isDeferred,
 			Order:         "asc",
+			Query:         strPtr(`event.data.userId == "123"`),
 		})
 
 		require.NoError(t, err)
@@ -1196,6 +1198,7 @@ func TestService_ListFunctionRuns(t *testing.T) {
 		AppIDs:      []string{"inngest ai"},
 		FunctionIDs: []string{"hello/world"},
 		Order:       OrderDirectionDesc,
+		CEL:         `output.status == "sent"`,
 	}).Return(&GetRunsResult{Runs: []*RunListItem{run}}, nil).Once()
 	t.Cleanup(func() {
 		reader.AssertExpectations(t)
@@ -1206,6 +1209,7 @@ func TestService_ListFunctionRuns(t *testing.T) {
 		AppId:      "inngest%20ai",
 		FunctionId: "hello%2Fworld",
 		Limit:      &limit,
+		Query:      strPtr(`output.status == "sent"`),
 	})
 
 	require.NoError(t, err)

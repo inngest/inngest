@@ -226,13 +226,14 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 			FunctionIDs: []string{"test-fn"},
 			IsDeferred:  &isDeferred,
 			Order:       OrderDirectionAsc,
+			CEL:         `event.data.userId == "123"`,
 		}).Return(&GetRunsResult{}, nil).Once()
 
 		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { runs.AssertExpectations(t) })
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=test-fn&isDeferred=true&order=ASC", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?limit=3&timeField=STARTED_AT&status=COMPLETED&status=FAILED&appId=my-app&functionId=test-fn&isDeferred=true&order=ASC&query=event.data.userId%20%3D%3D%20%22123%22", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 
@@ -248,13 +249,14 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 			AppIDs:      []string{"my-app"},
 			FunctionIDs: []string{"test-fn"},
 			Order:       OrderDirectionDesc,
+			CEL:         `output.status == "sent"`,
 		}).Return(&GetRunsResult{}, nil).Once()
 
 		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
 		require.NoError(t, err)
 		t.Cleanup(func() { runs.AssertExpectations(t) })
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs?query=output.status%20%3D%3D%20%22sent%22", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 

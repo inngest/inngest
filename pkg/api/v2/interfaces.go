@@ -102,6 +102,7 @@ type GetRunsOpts struct {
 	FunctionIDs   []string
 	IsDeferred    *bool
 	Order         OrderDirection
+	CEL           string
 }
 
 type RunTimeField int
@@ -137,6 +138,7 @@ type RunListItem struct {
 
 type GetRunsResult struct {
 	Runs    []*RunListItem
+	Cursor  string
 	HasMore bool
 }
 

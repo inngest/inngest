@@ -110,6 +110,7 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
 		FunctionId:    []string{decodePathParam(req.FunctionId)},
 		IsDeferred:    req.IsDeferred,
 		Order:         req.Order,
+		Query:         req.Query,
 	})
 	if err != nil {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorInvalidFieldFormat, err.Error())
@@ -302,6 +303,7 @@ func listRunsOpts(req *apiv2.ListRunsRequest) (GetRunsOpts, error) {
 		FunctionIDs:   req.GetFunctionId(),
 		IsDeferred:    req.IsDeferred,
 		Order:         order,
+		CEL:           req.GetQuery(),
 	}, nil
 }
 
