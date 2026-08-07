@@ -227,11 +227,10 @@ export function trackWaitlistFormSubmitted({
 type KeyCreatedArgs = {
   feature: AnalyticsFeature;
   keyID: string;
-  /** Every environment the key covers — a key may span several. */
+  /** A key may span several environments. */
   envIDs: string[];
-  /** Number of grants on the new key, not the grants themselves. */
+  /** Count only; the grant list is not useful as an event property. */
   grantCount: number;
-  /** Which mint surface: the dashboard modal or the CLI device-login page. */
   surface: 'dashboard' | 'device-login';
 };
 
@@ -266,7 +265,7 @@ type MemberKeyPolicyUpdatedArgs = {
   feature: AnalyticsFeature;
   enabled: boolean;
   allowProduction: boolean;
-  /** Count only — the grant list itself is not useful as an event property. */
+  /** Count only; the grant list is not useful as an event property. */
   grantCount: number;
 };
 

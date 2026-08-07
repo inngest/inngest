@@ -56,8 +56,8 @@ export const Route = createFileRoute('/_authed')({
   },
 });
 
-// Standalone surfaces are approval screens reached from outside the dashboard,
-// so the nav would only offer a way to wander off mid-flow.
+// Approval screens reached from outside the dashboard, where the nav would
+// only offer a way to leave mid-flow.
 const STANDALONE_PATHS = ['/device'];
 
 function Authed() {

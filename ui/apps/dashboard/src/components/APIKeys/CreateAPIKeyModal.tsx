@@ -68,12 +68,8 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
     active: isOpen,
     allowProduction,
   });
-  // Admins may select anything in the catalog; members are narrowed to the
-  // account policy. The server enforces this too — this only avoids offering a
-  // toggle that would be rejected.
   const permitted = permittedGrants(catalog, policy, isAdmin);
   const [selectedGrants, setSelectedGrants] = useState<string[] | null>(null);
-  // Read Only by default, narrowed to what the caller may mint.
   const grants =
     selectedGrants ??
     (catalog.length > 0 ? defaultSelection(catalog, permitted) : []);
@@ -159,8 +155,8 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
         {inRevealStep ? 'Copy your API key' : 'Create API key'}
       </Modal.Header>
 
-      {/* The body scrolls so the footer buttons stay on screen: the grant list
-          plus the member-policy notes overflow a laptop viewport. */}
+      {/* The body scrolls so the footer buttons stay on screen; the grant list
+          can overflow a laptop viewport. */}
       <Modal.Body className="min-h-0 overflow-y-auto">
         {inRevealStep ? (
           <RevealKeyCard plaintextKey={plaintextKey} />
