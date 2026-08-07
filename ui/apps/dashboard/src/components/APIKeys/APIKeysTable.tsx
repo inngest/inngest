@@ -10,6 +10,9 @@ export type APIKeyRow = {
   maskedKey: string;
   createdAt: string;
   env: { id: string; name: string } | null;
+  // Null for pre-attribution keys, machine-provisioned keys, and keys whose
+  // creator was deleted.
+  createdBy: { name: string | null; email: string } | null;
 };
 
 type Props = {
@@ -54,6 +57,16 @@ export function APIKeysTable({ keys, canManage, onRename, onDelete }: Props) {
         />
       ),
     }),
+    columnHelper.accessor(
+      (row) => row.createdBy?.name ?? row.createdBy?.email ?? null,
+      {
+        id: 'createdBy',
+        header: 'Created by',
+        cell: (info) => (
+          <span className="text-subtle text-sm">{info.getValue() ?? '—'}</span>
+        ),
+      },
+    ),
     columnHelper.display({
       id: 'actions',
       header: () => <span className="sr-only">Actions</span>,

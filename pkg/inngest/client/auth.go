@@ -56,10 +56,11 @@ func (c httpClient) StartDeviceLogin(ctx context.Context, clientID uuid.UUID) (*
 		return nil, fmt.Errorf("Please provide a valid client ID")
 	}
 
-	req, err := c.NewRequest(http.MethodPost, fmt.Sprintf("/v1/login/device/new?client_id=%s", clientID), nil)
+	req, err := c.NewRequest(http.MethodPost, fmt.Sprintf("/v2/login/device/new?client_id=%s", clientID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating login request: %s", err)
 	}
+	req = req.WithContext(ctx)
 
 	resp, err := c.Do(req)
 	if err != nil {
@@ -84,10 +85,12 @@ func (c httpClient) PollDeviceLogin(ctx context.Context, clientID, deviceCode uu
 	data := url.Values{}
 	data.Set("client_id", clientID.String())
 	data.Set("device_code", deviceCode.String())
-	req, err := c.NewRequest(http.MethodPost, "/v1/login/device/poll", strings.NewReader(data.Encode()))
+	req, err := c.NewRequest(http.MethodPost, "/v2/login/device/poll", strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("error creating login request: %s", err)
 	}
+	// Cancellation (Ctrl-C, code expiry) must abort the server-side long-poll.
+	req = req.WithContext(ctx)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := c.Do(req)
 	if err != nil {
@@ -105,6 +108,26 @@ func (c httpClient) PollDeviceLogin(ctx context.Context, clientID, deviceCode uu
 	return r, nil
 }
 
+// RevokeDeviceLogin revokes the API key the client is configured with.
+func (c httpClient) RevokeDeviceLogin(ctx context.Context) error {
+	req, err := c.NewRequest(http.MethodPost, "/v2/login/device/revoke", nil)
+	if err != nil {
+		return fmt.Errorf("error creating revoke request: %s", err)
+	}
+	req = req.WithContext(ctx)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.creds))
+	resp, err := c.Do(req)
+	if err != nil {
+		return fmt.Errorf("error performing revoke request: %s", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		byt, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unable to revoke the API key: %s", byt)
+	}
+	return nil
+}
+
 type StartDeviceLoginResponse struct {
 	DeviceCode      uuid.UUID `json:"device_code"`
 	ExpiresIn       int       `json:"expires_in"`
@@ -114,8 +137,10 @@ type StartDeviceLoginResponse struct {
 }
 
 type DeviceLoginResponse struct {
-	Error       string `json:"error"`
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	Expires     int    `json:"expires"`
+	Error       string    `json:"error"`
+	AccessToken string    `json:"access_token"`
+	AccountID   uuid.UUID `json:"account_id"`
+	AccountName string    `json:"account_name"`
+	UserID      uuid.UUID `json:"user_id"`
+	Env         string    `json:"env"`
 }

@@ -4,8 +4,10 @@ import {
   createFileRoute,
   notFound,
   Outlet,
+  useLocation,
   useMatch,
 } from '@tanstack/react-router';
+import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 
 import LayoutV1 from '@/components/Layout/Layout';
 import LayoutV2 from '@/components/Layout/LayoutV2';
@@ -54,6 +56,10 @@ export const Route = createFileRoute('/_authed')({
   },
 });
 
+// Standalone surfaces are approval screens reached from outside the dashboard,
+// so the nav would only offer a way to wander off mid-flow.
+const STANDALONE_PATHS = ['/device'];
+
 function Authed() {
   const { navCollapsed, profile } = Route.useLoaderData();
   const Layout = useNavigationV2() ? LayoutV2 : LayoutV1;
@@ -63,9 +69,27 @@ function Authed() {
     select: (match) => match.loaderData?.env,
   });
 
+  const { pathname } = useLocation();
+  if (STANDALONE_PATHS.some((p) => pathname === p || pathname === `${p}/`)) {
+    return <StandaloneShell />;
+  }
+
   return (
     <Layout collapsed={navCollapsed} activeEnv={activeEnv} profile={profile}>
       <Outlet />
     </Layout>
+  );
+}
+
+function StandaloneShell() {
+  return (
+    <div className="flex h-full flex-col overflow-y-auto">
+      <header className="px-6 py-6">
+        <InngestLogo />
+      </header>
+      <div className="mx-auto flex w-full max-w-screen-xl grow items-center px-6">
+        <Outlet />
+      </div>
+    </div>
   );
 }
