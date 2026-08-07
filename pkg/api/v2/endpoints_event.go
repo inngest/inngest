@@ -17,6 +17,26 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// SendEventBodyLimitMiddleware limits event bodies before grpc-gateway decodes them.
+func SendEventBodyLimitMiddleware(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		limited := apiv2base.MaxRequestBodyBytesMiddleware(maxBytes)(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.Path
+			if after, ok := strings.CutPrefix(path, "/api/v2"); ok {
+				path = after
+			} else if after, ok := strings.CutPrefix(path, "/v2"); ok {
+				path = after
+			}
+			if r.Method == http.MethodPost && path == "/events" {
+				limited.ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func (s *Service) SendEvent(ctx context.Context, req *apiv2.SendEventRequest) (*apiv2.SendEventResponse, error) {
 	receivedAt := time.Now()
 	if req == nil || req.Name == "" {
