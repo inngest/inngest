@@ -79,29 +79,29 @@ func TestWithQueueRoles(t *testing.T) {
 	})
 }
 
-func TestConfigureScannerRolesReplacesDefaultByName(t *testing.T) {
+func TestConfigureScannerRolesAppendsUniqueRoles(t *testing.T) {
 	opts := NewQueueOptions()
 	qp := &queueProcessor{QueueOptions: opts}
 	qp.configureQueueRoles()
 
-	customSequential := NewSequentialRole(WithRoleRunInterval(time.Second))
-	qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{customSequential}})
+	require.NoError(t, qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{NewSequentialRole()}}))
+	require.Contains(t, roleNames(qp.roles), QueueRoleSequential)
+}
 
-	sequential := []QueueRole{}
-	for _, role := range qp.roles {
-		if role.Name() == QueueRoleSequential {
-			sequential = append(sequential, role)
-		}
-	}
-	require.Len(t, sequential, 1)
-	require.Equal(t, time.Second, sequential[0].RunInterval())
+func TestConfigureScannerRolesRejectsDuplicateNames(t *testing.T) {
+	opts := NewQueueOptions(WithQueueRoles(NewSequentialRole()))
+	qp := &queueProcessor{QueueOptions: opts}
+	qp.configureQueueRoles()
+
+	err := qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{NewSequentialRole()}})
+	require.EqualError(t, err, `queue scanner role "sequential" is already configured`)
 }
 
 func TestConfigureScannerRolesHonorsSequentialFilter(t *testing.T) {
 	opts := NewQueueOptions(WithAllowQueueNames("critical"))
 	qp := &queueProcessor{QueueOptions: opts}
 	qp.configureQueueRoles()
-	qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{NewSequentialRole()}})
+	require.NoError(t, qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{NewSequentialRole()}}))
 	require.NotContains(t, roleNames(qp.roles), QueueRoleSequential)
 }
 
@@ -117,7 +117,9 @@ func configuredRoleOptions(options ...QueueOpt) *QueueOptions {
 	opts := NewQueueOptions(options...)
 	qp := &queueProcessor{QueueOptions: opts}
 	qp.configureQueueRoles()
-	qp.configureScannerRoles(partitionQueueScanner{q: qp})
+	if err := qp.configureScannerRoles(partitionQueueScanner{q: qp}); err != nil {
+		panic(err)
+	}
 	return opts
 }
 

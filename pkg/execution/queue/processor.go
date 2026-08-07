@@ -237,7 +237,9 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 			scanner = shardScanner
 		}
 	}
-	q.configureScannerRoles(scanner)
+	if err := q.configureScannerRoles(scanner); err != nil {
+		return err
+	}
 	for _, role := range q.roles {
 		go q.runRole(ctx, role)
 	}
