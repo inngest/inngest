@@ -164,7 +164,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	authzPaths := base.BuildAuthzPathMap()
 
 	r := chi.NewRouter()
-	r.Use(apiv2base.MaxRequestBodyBytesMiddleware(consts.AbsoluteMaxEventSize))
+	r.Use(SendEventBodyLimitMiddleware(consts.AbsoluteMaxEventSize))
 
 	// Add authentication middleware first
 	if httpOpts.AuthnMiddleware != nil {

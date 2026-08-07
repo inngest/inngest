@@ -265,6 +265,20 @@ func TestHTTPGateway_SendEventRejectsOversizedRequestBody(t *testing.T) {
 	}
 }
 
+func TestHTTPGateway_SendEventBodyLimitDoesNotApplyToOtherRoutes(t *testing.T) {
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v2/health", strings.NewReader(`{}`))
+	req.ContentLength = consts.AbsoluteMaxEventSize + 1
+	req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	require.NotEqual(t, http.StatusRequestEntityTooLarge, recorder.Code)
+}
+
 func stringPointer(value string) *string {
 	return &value
 }
