@@ -38,6 +38,16 @@ const query = graphql(`
         name
         method
         isParentArchived
+        sdkFeatureReadiness {
+          aiMetadataExtraction {
+            ready
+            reason
+          }
+          extendedTraces {
+            ready
+            reason
+          }
+        }
         latestSync {
           error
           framework

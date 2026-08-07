@@ -25,6 +25,16 @@ const query = graphql(`
         appVersion
         name
         method
+        sdkFeatureReadiness {
+          aiMetadataExtraction {
+            ready
+            reason
+          }
+          extendedTraces {
+            ready
+            reason
+          }
+        }
         latestSync {
           commitAuthor
           commitHash
