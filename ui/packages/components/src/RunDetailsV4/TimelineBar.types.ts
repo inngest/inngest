@@ -244,9 +244,11 @@ export interface TimingDetail {
  * Complete timeline data for rendering.
  */
 export interface TimelineData {
-  /** Overall timeline bounds */
+  /** Overall timeline bounds. `maxTime` is null while the run is in
+   *  progress — Timeline substitutes a live `Date.now()` each render so the
+   *  right edge stays in sync with sub-bar timing computations. */
   minTime: Date;
-  maxTime: Date;
+  maxTime: Date | null;
 
   /** Root-level bars (steps) */
   bars: TimelineBarData[];
@@ -321,11 +323,13 @@ export interface TimingBreakdownData {
   /** Total Inngest-side overhead (queue delay + system latency) */
   inngestMs: number;
 
-  /** Execution time (SERVER) */
-  executionMs: number;
+  /** Execution time (SERVER). `null` while the span is in progress —
+   *  consumers should recompute live from `bar.startTime + bar.delayMs` to
+   *  `Date.now()` so the value can't be frozen by a memoization boundary. */
+  executionMs: number | null;
 
-  /** Total duration */
-  totalMs: number;
+  /** Total duration. `null` while the span is in progress — see executionMs. */
+  totalMs: number | null;
 }
 
 /**

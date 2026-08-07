@@ -219,13 +219,35 @@ function generatePhaseSegments<T extends { totalMs: number }>(
 }
 
 /**
+ * Resolve a bar's timing breakdown against `nowMs`. For completed spans the
+ * baked numbers are returned verbatim; for in-progress spans (executionMs ==
+ * null) we recompute executionMs against the live `nowMs` so the
+ * inngest/execution ratio can't drift from the parent bar's live width.
+ */
+function getLiveTimingForBar(
+  bar: TimelineBarData,
+  nowMs: number
+): { inngestMs: number; executionMs: number; totalMs: number } | null {
+  if (!bar.timingBreakdown) return null;
+  const { inngestMs, executionMs, totalMs } = bar.timingBreakdown;
+  if (executionMs != null && totalMs != null) {
+    return { inngestMs, executionMs, totalMs };
+  }
+  // In-progress: executionMs runs from startedAt (= startTime + delayMs) to now.
+  const startedAtMs = bar.startTime.getTime() + (bar.delayMs ?? 0);
+  const liveExec = Math.max(0, nowMs - startedAtMs);
+  return { inngestMs, executionMs: liveExec, totalMs: inngestMs + liveExec };
+}
+
+/**
  * Generate segments for a compound bar based on timing breakdown.
  * Uses gray delay bar for the queue portion (matching V3's visual distinction).
  */
-function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
-  if (!bar.timingBreakdown) return undefined;
+function generateBarSegments(bar: TimelineBarData, nowMs: number): BarSegment[] | undefined {
+  const live = getLiveTimingForBar(bar, nowMs);
+  if (!live) return undefined;
 
-  const { inngestMs, executionMs, totalMs } = bar.timingBreakdown;
+  const { inngestMs, executionMs, totalMs } = live;
 
   if (totalMs <= 0) return undefined;
 
@@ -396,11 +418,15 @@ function buildTimingDetails(bar: TimelineBarData): TimingDetail[] | undefined {
     details.push(...detailsFromPhases(RUN_INNGEST_PHASES, bar.runInngestBreakdown));
   }
 
-  // Timing breakdown (queue + execution) — no matching phase array
+  // Timing breakdown (queue + execution) — no matching phase array.
+  // For in-progress spans `executionMs` is null; the live value is computed
+  // by the renderer, so we just skip it here (the row's own duration label
+  // shows wall-clock progress).
   if (bar.timingBreakdown) {
     const b = bar.timingBreakdown;
     if (b.inngestMs > 0) details.push({ label: 'Inngest', durationMs: b.inngestMs });
-    if (b.executionMs > 0) details.push({ label: 'Your server', durationMs: b.executionMs });
+    if (b.executionMs != null && b.executionMs > 0)
+      details.push({ label: 'Your server', durationMs: b.executionMs });
   }
 
   // HTTP timing breakdown
@@ -455,6 +481,9 @@ type TimelineBarRendererProps = {
   depth: number;
   minTime: Date;
   maxTime: Date;
+  /** Live `Date.now()` snapshot for this render; used to compute in-progress
+   *  executionMs so it stays in sync with the parent bar's live width. */
+  nowMs: number;
   leftWidth: number;
   orgName?: string;
   expandedBars: Set<string>;
@@ -479,6 +508,7 @@ function TimelineBarRenderer({
   depth,
   minTime,
   maxTime,
+  nowMs,
   leftWidth,
   orgName,
   expandedBars,
@@ -512,7 +542,7 @@ function TimelineBarRenderer({
 
   // Generate segments for compound bar visualization
   // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
-  const segments = generateBarSegments(bar) ?? generateDelaySegments(bar);
+  const segments = generateBarSegments(bar, nowMs) ?? generateDelaySegments(bar);
 
   // Pre-compute timing sub-bar positions from the parent bar's position.
   // This ensures sub-bars visually align with the parent's compound segments.
@@ -520,9 +550,12 @@ function TimelineBarRenderer({
   // For the Inngest portion: prefer timingBreakdown.inngestMs (from metadata),
   // but fall back to inngestBreakdown.totalMs (from timestamps) so we still
   // show the Inngest bar even when metadata is missing or reports 0.
+  //
+  // `executionMs` is live for in-progress spans — see getLiveTimingForBar.
   const timingPositions = (() => {
-    const breakdownInngestMs = bar.timingBreakdown?.inngestMs ?? 0;
-    const executionMs = bar.timingBreakdown?.executionMs ?? 0;
+    const live = getLiveTimingForBar(bar, nowMs);
+    const breakdownInngestMs = live?.inngestMs ?? 0;
+    const executionMs = live?.executionMs ?? 0;
     const inngestMs =
       breakdownInngestMs > 0 ? breakdownInngestMs : bar.inngestBreakdown?.totalMs ?? 0;
     const totalMs = inngestMs + executionMs;
@@ -707,6 +740,7 @@ function TimelineBarRenderer({
                 depth={depth + 2}
                 minTime={minTime}
                 maxTime={maxTime}
+                nowMs={nowMs}
                 leftWidth={leftWidth}
                 orgName={orgName}
                 expandedBars={expandedBars}
@@ -823,6 +857,7 @@ function TimelineBarRenderer({
             depth={depth + 1}
             minTime={minTime}
             maxTime={maxTime}
+            nowMs={nowMs}
             leftWidth={leftWidth}
             orgName={orgName}
             expandedBars={expandedBars}
@@ -853,7 +888,13 @@ function TimelineBarRenderer({
  * - Column resize handling (planned)
  */
 export function Timeline({ data, onSelectStep }: Props): JSX.Element {
-  const { minTime, maxTime, bars, leftWidth, orgName } = data;
+  const { minTime, maxTime: bakedMaxTime, bars, leftWidth, orgName } = data;
+  // Substitute a live `Date.now()` for in-progress runs (where maxTime is
+  // null). This is computed once per render and shared with TimelineHeader
+  // and every TimelineBarRenderer so the timeline's right edge stays in
+  // sync with the executionMs we compute for in-progress sub-bars.
+  const nowMs = Date.now();
+  const maxTime = bakedMaxTime ?? new Date(nowMs);
 
   const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
 
@@ -950,6 +991,7 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
           depth={0}
           minTime={minTime}
           maxTime={maxTime}
+          nowMs={nowMs}
           leftWidth={leftWidth}
           orgName={orgName}
           expandedBars={expandedBars}
