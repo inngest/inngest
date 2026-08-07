@@ -128,6 +128,12 @@ type Loaders struct {
 	DebugSessionLoader    *dataloader.Loader
 	RunDefersLoader       *dataloader.Loader
 	RunDeferredFromLoader *dataloader.Loader
+	// AppLoader and FunctionByInternalUUIDLoader back the dashboard /runs
+	// list view. Without them, FunctionRunV2.app and FunctionRunV2.function
+	// fan out one DB lookup per run row, breaking broad-range queries under
+	// load (see #4326).
+	AppLoader                    *dataloader.Loader
+	FunctionByInternalUUIDLoader *dataloader.Loader
 }
 
 func NewLoaders(params LoaderParams) *Loaders {
@@ -135,6 +141,8 @@ func NewLoaders(params LoaderParams) *Loaders {
 	tr := &traceReader{loaders: loaders, reader: params.DB}
 	er := &eventReader{loaders: loaders, reader: params.DB}
 	dr := &deferReader{reader: params.DB}
+	ar := &appReader{reader: params.DB}
+	fr := &functionReader{reader: params.DB}
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
 	loaders.LegacyRunTraceLoader = dataloader.NewBatchedLoader(tr.GetLegacyRunTrace)
@@ -144,6 +152,8 @@ func NewLoaders(params LoaderParams) *Loaders {
 	loaders.DebugSessionLoader = dataloader.NewBatchedLoader(tr.GetDebugSessionTrace)
 	loaders.RunDefersLoader = dataloader.NewBatchedLoader(dr.GetRunDefers)
 	loaders.RunDeferredFromLoader = dataloader.NewBatchedLoader(dr.GetRunDeferredFrom)
+	loaders.AppLoader = dataloader.NewBatchedLoader(ar.GetApps)
+	loaders.FunctionByInternalUUIDLoader = dataloader.NewBatchedLoader(fr.GetFunctions)
 
 	return loaders
 }
