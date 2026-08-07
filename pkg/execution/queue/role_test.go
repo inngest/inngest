@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"crypto/rand"
 	"sync"
 	"testing"
@@ -9,6 +10,13 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
+
+type roleProvidingScanner struct {
+	roles []QueueRole
+}
+
+func (roleProvidingScanner) Run(context.Context, QueueScannerRuntime) error { return nil }
+func (s roleProvidingScanner) QueueScannerRoles() []QueueRole               { return s.roles }
 
 func TestWithQueueRoles(t *testing.T) {
 	t.Run("appends custom roles to defaults", func(t *testing.T) {
@@ -69,6 +77,32 @@ func TestWithQueueRoles(t *testing.T) {
 		require.Contains(t, names, QueueRoleInstrumentation)
 		require.Contains(t, names, "custom")
 	})
+}
+
+func TestConfigureScannerRolesReplacesDefaultByName(t *testing.T) {
+	opts := NewQueueOptions()
+	qp := &queueProcessor{QueueOptions: opts}
+	qp.configureQueueRoles()
+
+	customSequential := NewSequentialRole(WithRoleRunInterval(time.Second))
+	qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{customSequential}})
+
+	sequential := []QueueRole{}
+	for _, role := range qp.roles {
+		if role.Name() == QueueRoleSequential {
+			sequential = append(sequential, role)
+		}
+	}
+	require.Len(t, sequential, 1)
+	require.Equal(t, time.Second, sequential[0].RunInterval())
+}
+
+func TestConfigureScannerRolesHonorsSequentialFilter(t *testing.T) {
+	opts := NewQueueOptions(WithAllowQueueNames("critical"))
+	qp := &queueProcessor{QueueOptions: opts}
+	qp.configureQueueRoles()
+	qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{NewSequentialRole()}})
+	require.NotContains(t, roleNames(qp.roles), QueueRoleSequential)
 }
 
 func roleNames(roles []QueueRole) map[string]struct{} {

@@ -231,15 +231,15 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		l.Info("Executor started in assignedQueueShard Mode", "queue_shard", q.Shard().Name())
 	}
 
-	for _, role := range q.roles {
-		go q.runRole(ctx, role)
-	}
-
 	scanner := QueueScanner(partitionQueueScanner{q: q})
 	if shard := q.Shard(); shard != nil {
 		if shardScanner, ok := shard.(QueueScanner); ok {
 			scanner = shardScanner
 		}
+	}
+	q.configureScannerRoles(scanner)
+	for _, role := range q.roles {
+		go q.runRole(ctx, role)
 	}
 
 	dispatch := func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
@@ -258,7 +258,7 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		Leaser:          q,
 		Dispatch:        dispatch,
 		WorkerSemaphore: q.Semaphore(),
-		IsSequential:    q.isSequential,
+		IsRoleActive:    q.isRoleActive,
 	}
 	if rt.Leaser == nil {
 		return ErrQueueScannerMissingLeaser

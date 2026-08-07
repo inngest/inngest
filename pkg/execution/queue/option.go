@@ -910,6 +910,32 @@ func (q *queueProcessor) configureQueueRoles() {
 	q.roles = filterQueueRoles(q.QueueOptions, q.roles)
 }
 
+// configureScannerRoles replaces processor defaults with roles declared by a
+// custom scanner. Registration happens after shard selection and before role
+// goroutines start, which also supports dynamically assigned shard groups.
+func (q *queueProcessor) configureScannerRoles(scanner QueueScanner) {
+	provider, ok := scanner.(QueueScannerRoleProvider)
+	if !ok {
+		return
+	}
+	provided := filterQueueRoles(q.QueueOptions, provider.QueueScannerRoles())
+	if len(provided) == 0 {
+		return
+	}
+
+	replaced := make(map[string]struct{}, len(provided))
+	for _, role := range provided {
+		replaced[role.Name()] = struct{}{}
+	}
+	roles := make([]QueueRole, 0, len(q.roles)+len(provided))
+	for _, role := range q.roles {
+		if _, ok := replaced[role.Name()]; !ok {
+			roles = append(roles, role)
+		}
+	}
+	q.roles = append(roles, provided...)
+}
+
 func (q *queueProcessor) defaultQueueRoles() []QueueRole {
 	roles := []QueueRole{}
 	if includeSequentialRole(q.QueueOptions) {
