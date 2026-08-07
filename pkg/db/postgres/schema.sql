@@ -190,6 +190,17 @@ CREATE TABLE public.queue_snapshot_chunks (
 );
 
 --
+-- Name: session_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.session_keys (
+    workspace_id character(36) NOT NULL,
+    session_key text NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+--
 -- Name: spans; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -341,6 +352,13 @@ ALTER TABLE ONLY public.migrations
 
 ALTER TABLE ONLY public.queue_snapshot_chunks
     ADD CONSTRAINT queue_snapshot_chunks_pkey PRIMARY KEY (snapshot_id, chunk_id);
+
+--
+-- Name: session_keys session_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.session_keys
+    ADD CONSTRAINT session_keys_pkey PRIMARY KEY (workspace_id, session_key);
 
 --
 -- Name: spans spans_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -524,6 +542,12 @@ CREATE INDEX idx_trace_runs_acct_ws_started ON public.trace_runs USING btree (ac
 --
 
 CREATE INDEX idx_traces_trace_id ON public.traces USING btree (trace_id);
+
+--
+-- Name: session_keys_workspace_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX session_keys_workspace_created_at ON public.session_keys USING btree (workspace_id, created_at DESC);
 
 --
 -- PostgreSQL database dump complete

@@ -16,6 +16,7 @@ import (
 	dbpostgres "github.com/inngest/inngest/pkg/db/postgres"
 	dbsqlite "github.com/inngest/inngest/pkg/db/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/tests/testutil"
 	"github.com/oklog/ulid/v2"
@@ -3318,6 +3319,92 @@ func TestExtendedTraceReparenting(t *testing.T) {
 		require.Len(t, child.Children, 1, "grandchild should be attached under the interior node")
 		assert.Equal(t, "dyn-ul-grandchild", child.Children[0].SpanID)
 	})
+}
+
+func TestSessionRunsUseTraceRunCandidates(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	workspaceID := uuid.New()
+	queuedAt := time.Now().Add(-time.Hour).Truncate(time.Millisecond)
+	runID := ulid.MustNew(ulid.Timestamp(queuedAt), rand.Reader)
+	spanOnlyRunID := ulid.MustNew(ulid.Timestamp(queuedAt.Add(time.Minute)), rand.Reader)
+
+	q := cm.(wrapper).q
+	require.NoError(t, q.InsertTraceRun(ctx, dbpkg.InsertTraceRunParams{
+		RunID:       runID,
+		AccountID:   uuid.New(),
+		WorkspaceID: workspaceID,
+		AppID:       uuid.New(),
+		FunctionID:  uuid.New(),
+		TraceID:     []byte("trace-id"),
+		QueuedAt:    queuedAt.UnixMilli(),
+		StartedAt:   queuedAt.Add(time.Second).UnixMilli(),
+		EndedAt:     queuedAt.Add(2 * time.Second).UnixMilli(),
+		Status:      int64(enums.RunStatusCompleted),
+		SourceID:    "event-id",
+		TriggerIds:  []byte(`[]`),
+	}))
+
+	sessionsJSON, err := json.Marshal(meta.EventSessions{{Key: "thread", ID: "thread-1"}})
+	require.NoError(t, err)
+	attrs, err := json.Marshal(map[string]any{
+		"_inngest.event.sessions":      string(sessionsJSON),
+		"_inngest.function.slug":       "test-function",
+		"_inngest.function.name":       "Test Function",
+		"_inngest.event.trigger.name": "app/test",
+	})
+	require.NoError(t, err)
+
+	for _, id := range []ulid.ULID{runID, spanOnlyRunID} {
+		insertTestSpan(t, cm, testSpanFields{
+			RunID:         id.String(),
+			DynamicSpanID: "root-" + id.String(),
+			Name:          meta.SpanNameRun,
+			StartTime:     queuedAt,
+			AccountID:     uuid.NewString(),
+			AppID:         uuid.NewString(),
+			FunctionID:    uuid.NewString(),
+			EnvID:         workspaceID.String(),
+			Attributes:    attrs,
+		})
+	}
+
+	runs, err := cm.GetSessionRuns(ctx, workspaceID, "thread", "thread-1", cqrs.SessionTimeRange{
+		From:  queuedAt.Add(-time.Minute),
+		Until: queuedAt.Add(time.Minute),
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	assert.Equal(t, runID, runs[0].ID)
+	assert.Equal(t, enums.RunStatusCompleted, runs[0].Status)
+	assert.Equal(t, queuedAt, runs[0].QueuedAt)
+	assert.Equal(t, "test-function", runs[0].FunctionSlug)
+	assert.Equal(t, "app/test", *runs[0].EventName)
+}
+
+func TestSessionKeysRespectTransactions(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	ctx := t.Context()
+	workspaceID := uuid.New()
+	tx, err := cm.WithTx(ctx)
+	require.NoError(t, err)
+	nestedTx, err := tx.WithTx(ctx)
+	require.NoError(t, err)
+
+	require.NoError(t, nestedTx.RecordSessionKeys(ctx, workspaceID, event.Sessions{"thread": "thread-1"}))
+	keys, err := tx.GetSessionKeys(ctx, workspaceID, "")
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	assert.Equal(t, "thread", keys[0].SessionKey)
+
+	require.NoError(t, tx.Rollback(ctx))
+	keys, err = cm.GetSessionKeys(ctx, workspaceID, "")
+	require.NoError(t, err)
+	assert.Empty(t, keys)
 }
 
 //

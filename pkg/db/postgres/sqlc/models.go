@@ -133,6 +133,13 @@ type QueueSnapshotChunk struct {
 	Data       []byte
 }
 
+type SessionKey struct {
+	WorkspaceID string
+	SessionKey  string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Span struct {
 	SpanID         string
 	TraceID        string

@@ -32,6 +32,7 @@ type Manager interface {
 	HistoryReader
 	HistoryWriter
 	GetRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
+	SessionManager
 
 	// Trace / dev only
 	TraceReadWriter

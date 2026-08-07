@@ -73,7 +73,6 @@ func New(adapter dbpkg.Adapter) cqrs.Manager {
 type wrapper struct {
 	adapter adapterWithHelpers
 	q       dbpkg.Querier
-	tx      *sql.Tx
 }
 
 var (
@@ -1040,8 +1039,7 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 }
 
 func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
-	if w.tx != nil {
-		// Already in a tx else DB would be present.
+	if _, ok := w.adapter.(dbpkg.TxAdapter); ok {
 		return w, nil
 	}
 	txAdapter, err := w.adapter.WithTx(ctx)

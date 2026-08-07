@@ -1,9 +1,18 @@
 import { useAppsSyncingError } from '@/hooks/useAppsSyncingError';
+import { useInfoQuery } from '@/store/devApi';
 import NavSection from './NavSection';
 import { setup, workflow } from './navItems';
 
 export default function Navigation({ collapsed }: { collapsed: boolean }) {
   const hasSyncingError = useAppsSyncingError();
+  const { data: info } = useInfoQuery();
+  const workflowGroup =
+    info && !info.isSingleNodeService
+      ? workflow
+      : {
+          ...workflow,
+          items: workflow.items.filter(({ href }) => href !== '/sessions'),
+        };
 
   return (
     <div
@@ -12,7 +21,7 @@ export default function Navigation({ collapsed }: { collapsed: boolean }) {
       }`}
     >
       <NavSection
-        group={workflow}
+        group={workflowGroup}
         collapsed={collapsed}
         errors={{ '/apps': hasSyncingError }}
         first
