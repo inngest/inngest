@@ -35,4 +35,8 @@ func TestDiscover(t *testing.T) {
 	require.Equal(t, "get_run_trace", byMethod["GetFunctionTrace"].ToolName)
 	require.Equal(t, http.MethodPost, byMethod["InvokeFunction"].HTTPMethod)
 	require.Equal(t, "/apps/{app_id}/functions/{function_id}/invoke", byMethod["InvokeFunction"].Path)
+	require.Equal(t, "send-event", byMethod["SendEvent"].CommandName)
+	require.Equal(t, "send_event", byMethod["SendEvent"].ToolName)
+	require.Equal(t, http.MethodPost, byMethod["SendEvent"].HTTPMethod)
+	require.Equal(t, "/events", byMethod["SendEvent"].Path)
 }

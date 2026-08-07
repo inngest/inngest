@@ -330,6 +330,58 @@
       }
     }
   },
+  "/events": {
+    "post": {
+      "200": {
+        "data": {
+          "eventId": "01K1QQ3VQ8R3M8QX4D51J8G7XH"
+        },
+        "metadata": {
+          "fetchedAt": "2026-08-06T16:00:00Z"
+        }
+      },
+      "400": {
+        "errors": [
+          {
+            "code": "validation_error",
+            "message": "timestamp is before Jan 1, 1980"
+          }
+        ]
+      },
+      "401": {
+        "errors": [
+          {
+            "code": "authorization_header_missing",
+            "message": "authorization header missing or invalid"
+          }
+        ]
+      },
+      "403": {
+        "errors": [
+          {
+            "code": "access_denied",
+            "message": "Cannot send events to an archived environment"
+          }
+        ]
+      },
+      "429": {
+        "errors": [
+          {
+            "code": "rate_limited",
+            "message": "API rate limit exceeded. The request was rejected and no event was sent."
+          }
+        ]
+      },
+      "500": {
+        "errors": [
+          {
+            "code": "internal_error",
+            "message": "Unable to send event"
+          }
+        ]
+      }
+    }
+  },
   "/events/{eventId}/runs": {
     "get": {
       "200": {
