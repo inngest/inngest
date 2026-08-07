@@ -835,10 +835,9 @@ func authToken(ctx context.Context, cmd *cli.Command, target *url.URL) (string, 
 	return storedCredential(ctx, target), nil
 }
 
-// storedCredential returns the API key saved by `inngest auth login`, and only
-// when the request targets the host that minted it.  Without that check a cloud
-// key would be handed to whatever --api-host names — including the local dev
-// server, which needs no auth.
+// Returns the saved key only when the request targets the host that minted it.
+// Without that check a cloud key would be handed to whatever --api-host names,
+// including the local dev server, which needs no auth.
 func storedCredential(ctx context.Context, target *url.URL) string {
 	host := credentialHost()
 	if host == "" || !strings.EqualFold(target.Host, host) {
