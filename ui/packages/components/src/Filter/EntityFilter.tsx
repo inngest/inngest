@@ -24,7 +24,11 @@ export default function EntityFilter({
   const selectedValues = entities.filter((entity) =>
     temporarySelectedValues.some((id) => id === entity.id)
   );
-  const areAllEntitiesSelected = temporarySelectedValues.length === entities.length;
+  // Compare by membership, not length: selected IDs can be absent from
+  // entities (e.g. a URL filter referencing a since-archived function), and a
+  // length comparison would misreport those selections as "All".
+  const areAllEntitiesSelected =
+    entities.length > 0 && entities.every((entity) => temporarySelectedValues.includes(entity.id));
 
   const filteredOptions =
     query === ''
@@ -75,7 +79,9 @@ export default function EntityFilter({
       <SelectWithSearch.Button isLabelVisible className={className} ref={comboboxRef} size="small">
         <div className="min-w-7 max-w-24 truncate text-nowrap text-left">
           {temporarySelectedValues.length === 1 && !areAllEntitiesSelected && (
-            <span>{selectedValues[0]?.name}</span>
+            // The selected ID may not resolve to an entity (stale URL value or
+            // entities still loading), so fall back to a count label.
+            <span>{selectedValues[0]?.name ?? `1 ${type}`}</span>
           )}
           {temporarySelectedValues.length > 1 && !areAllEntitiesSelected && (
             <span>

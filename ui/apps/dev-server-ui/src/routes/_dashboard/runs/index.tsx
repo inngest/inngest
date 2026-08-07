@@ -4,6 +4,7 @@ import { client } from '@/store/baseApi';
 import { useInfoQuery } from '@/store/devApi';
 import {
   useGetAppsQuery,
+  useGetFunctionsQuery,
   GetRunsQuery,
   GetRunsDocument,
   CountRunsQuery,
@@ -61,6 +62,7 @@ function RunsComponent() {
   const [preview, setPreview] = useState(false);
 
   const [filterApp] = useStringArraySearchParam('filterApp');
+  const [filterFunction] = useStringArraySearchParam('filterFunction');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam(
     'filterStatus',
@@ -77,6 +79,9 @@ function RunsComponent() {
   const [search] = useSearchParam('search');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
   const appsRes = useGetAppsQuery();
+  const functionsRes = useGetFunctionsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
 
   useEffect(() => {
     if (pollingFlagReady && pollingDisabled) {
@@ -92,6 +97,7 @@ function RunsComponent() {
     async ({ pageParam }: { pageParam: string | null }) => {
       const data: GetRunsQuery = await client.request(GetRunsDocument, {
         appIDs: filterApp,
+        functionIDs: filterFunction,
         functionRunCursor: pageParam,
         startTime: calculatedStartTime,
         endTime: endTime,
@@ -122,8 +128,10 @@ function RunsComponent() {
     },
     [
       filterApp,
+      filterFunction,
       filteredStatus,
       calculatedStartTime,
+      endTime,
       timeField,
       search,
       preview,
@@ -137,6 +145,7 @@ function RunsComponent() {
         'runs',
         {
           filterApp,
+          filterFunction,
           filteredStatus,
           calculatedStartTime,
           endTime,
@@ -165,6 +174,8 @@ function RunsComponent() {
     setTotalCount(undefined);
     (async () => {
       const data: CountRunsQuery = await client.request(CountRunsDocument, {
+        appIDs: filterApp,
+        functionIDs: filterFunction,
         startTime: calculatedStartTime,
         endTime,
         status: filteredStatus,
@@ -176,6 +187,8 @@ function RunsComponent() {
       setTotalCount(data.runs.totalCount);
     })();
   }, [
+    filterApp,
+    filterFunction,
     calculatedStartTime,
     endTime,
     filteredStatus,
@@ -209,6 +222,26 @@ function RunsComponent() {
     return out;
   }, [data?.pages]);
 
+  // Options for the function filter dropdown. Function names are only unique
+  // per app, so disambiguate duplicates with the app name.
+  const functionEntities = useMemo(() => {
+    const fns = functionsRes.data?.functions;
+    if (!fns) {
+      return [];
+    }
+    const nameCounts = new Map<string, number>();
+    for (const fn of fns) {
+      nameCounts.set(fn.name, (nameCounts.get(fn.name) ?? 0) + 1);
+    }
+    return fns.map((fn) => ({
+      id: fn.id,
+      name:
+        (nameCounts.get(fn.name) ?? 0) > 1
+          ? `${fn.name} (${fn.app.name})`
+          : fn.name,
+    }));
+  }, [functionsRes.data?.functions]);
+
   const getTrigger = useGetTrigger();
 
   const onScrollToTop = useCallback(() => {
@@ -240,6 +273,7 @@ function RunsComponent() {
       />
       <RunsPage
         apps={appsRes.data?.apps || []}
+        functions={functionEntities}
         data={runs ?? []}
         defaultVisibleColumns={[
           'status',
