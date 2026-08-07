@@ -938,9 +938,6 @@ func (q *queueProcessor) configureScannerRoles(scanner QueueScanner) {
 
 func (q *queueProcessor) defaultQueueRoles() []QueueRole {
 	roles := []QueueRole{}
-	if includeSequentialRole(q.QueueOptions) {
-		roles = append(roles, NewSequentialRole())
-	}
 	if q.runMode.Scavenger {
 		roles = append(roles, NewScavengerRole())
 	}

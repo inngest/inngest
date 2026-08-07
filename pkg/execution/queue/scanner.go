@@ -34,6 +34,10 @@ type partitionQueueScanner struct {
 	q *queueProcessor
 }
 
+func (partitionQueueScanner) QueueScannerRoles() []QueueRole {
+	return []QueueRole{NewSequentialRole()}
+}
+
 func (s partitionQueueScanner) Run(ctx context.Context, rt QueueScannerRuntime) error {
 	q := s.q
 

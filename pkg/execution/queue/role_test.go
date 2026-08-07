@@ -117,6 +117,7 @@ func configuredRoleOptions(options ...QueueOpt) *QueueOptions {
 	opts := NewQueueOptions(options...)
 	qp := &queueProcessor{QueueOptions: opts}
 	qp.configureQueueRoles()
+	qp.configureScannerRoles(partitionQueueScanner{q: qp})
 	return opts
 }
 
