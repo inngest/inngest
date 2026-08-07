@@ -93,13 +93,40 @@ type Error struct {
 	Err error `json:"-"`
 }
 
+// WriteHTTP renders an error to the response as JSON.
+//
+// An error that did not come from this package carries no status. Those used to
+// fall through to WriteHeader's implicit 200, so a failed query answered with
+// status 200 and a body of `{}` and was indistinguishable from an empty result.
+// They now render as 500 with the default message only, because such an error
+// was not written to be read by the public and may name internals. The caller
+// keeps the original for logging.
 func WriteHTTP(w http.ResponseWriter, e error) error {
-	if pe, ok := e.(Error); ok {
-		w.WriteHeader(pe.Status)
-	} else if pe, ok := e.(*Error); ok && pe != nil {
-		w.WriteHeader(pe.Status)
+	pe, ok := asError(e)
+	if !ok {
+		pe = Error{Message: DefaultMessage, Status: DefaultStatus, Err: e}
 	}
-	return json.NewEncoder(w).Encode(e)
+	if pe.Status == 0 {
+		// WriteHeader(0) panics, so an Error built without a status still has to
+		// resolve to something.
+		pe.Status = DefaultStatus
+	}
+	w.WriteHeader(pe.Status)
+	return json.NewEncoder(w).Encode(pe)
+}
+
+// A direct type check rather than errors.As: promoting a status out of a
+// wrapped error would change what existing handlers answer.
+func asError(e error) (Error, bool) {
+	switch v := e.(type) {
+	case Error:
+		return v, true
+	case *Error:
+		if v != nil {
+			return *v, true
+		}
+	}
+	return Error{}, false
 }
 
 // Error fulfils the builtin go error interface.  This returns the original root cause

@@ -29,6 +29,15 @@ func getHTTPMethodAndPath(method protoreflect.MethodDescriptor) (httpMethod, pat
 	if httpRule == nil {
 		return http.MethodPost, "" // Default for gRPC
 	}
+	return httpMethodAndPathFromRule(httpRule)
+}
+
+// Split out from getHTTPMethodAndPath so additional_bindings, which are
+// themselves HttpRules, can be read with the same logic.
+func httpMethodAndPathFromRule(httpRule *annotations.HttpRule) (httpMethod, path string) {
+	if httpRule == nil {
+		return http.MethodPost, ""
+	}
 
 	// Extract both method and path from the annotation pattern
 	switch pattern := httpRule.Pattern.(type) {
@@ -59,15 +68,12 @@ func getHTTPMethod(method protoreflect.MethodDescriptor) string {
 	return httpMethod
 }
 
-// hasAuthzAnnotation checks if a method has the authz annotation requiring authorization
-func hasAuthzAnnotation(method protoreflect.MethodDescriptor) bool {
+func authzOptions(method protoreflect.MethodDescriptor) *apiv2.AuthzOptions {
 	opts := method.Options()
 	if !proto.HasExtension(opts, apiv2.E_Authz) {
-		return false
+		return nil
 	}
-
-	authzOpts := proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
-	return authzOpts.RequireAuthz
+	return proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
 }
 
 // GetInngestEnvHeader extracts the X-Inngest-Env header value from the gRPC context.
@@ -107,31 +113,4 @@ func GRPCToHTTPStatus(code codes.Code) int {
 	default:
 		return http.StatusInternalServerError
 	}
-}
-
-// BuildAuthzPathMap inspects protobuf annotations to determine which paths require authorization
-func BuildAuthzPathMap() map[string]bool {
-	authzPaths := make(map[string]bool)
-
-	// Get the service descriptor
-	serviceDesc := apiv2.File_api_v2_service_proto.Services().ByName("V2")
-	if serviceDesc == nil {
-		return authzPaths
-	}
-
-	// Iterate through all methods in the service
-	methods := serviceDesc.Methods()
-	for i := 0; i < methods.Len(); i++ {
-		method := methods.Get(i)
-
-		// Check if method has authz annotation
-		if hasAuthzAnnotation(method) {
-			// Get the HTTP path from google.api.http annotation
-			if path := getHTTPPath(method); path != "" {
-				authzPaths[path] = true
-			}
-		}
-	}
-
-	return authzPaths
 }

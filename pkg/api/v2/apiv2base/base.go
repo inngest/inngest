@@ -51,10 +51,6 @@ func (b *Base) GRPCToHTTPStatus(code codes.Code) int {
 	return GRPCToHTTPStatus(code)
 }
 
-func (b *Base) BuildAuthzPathMap() map[string]bool {
-	return BuildAuthzPathMap()
-}
-
 func (b *Base) GetInngestEnvHeader(ctx context.Context) string {
 	return GetInngestEnvHeader(ctx)
 }

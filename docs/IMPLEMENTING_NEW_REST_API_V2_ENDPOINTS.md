@@ -31,10 +31,18 @@ service V2 {
       get: "/your-resource/{id}"
     };
 
-    // Optional: Add authorization requirement
+    // Required: the API key permission this endpoint needs. The grant must be
+    // declared once via `option (grant_definition)` at the top of
+    // service.proto; reuse an existing one unless the resource is genuinely
+    // new. Action is READ for anything that only fetches, WRITE for anything
+    // that mutates or has side effects.
     option (authz) = {
-      require_authz: true
+      grant: "api:your-resource"
+      action: AUTHZ_ACTION_READ
     };
+    // ...or, for a deliberately public endpoint, exempt it and say why:
+    //   // Exempt: <reason>
+    //   option (authz) = { exempt: true };
 
     // OpenAPI documentation
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -141,6 +149,33 @@ When you are done defining your endpoint, request and response, run:
 ```sh
 make protobuf
 ```
+
+#### Authorization Grants
+
+Every rpc must carry an `(authz)` option: either a grant or `exempt: true`.
+`TestGrantCatalogIsValid` fails the build otherwise, which is deliberate: an
+endpoint with no annotation would otherwise ship unprotected.
+
+Grants are declared once at the top of `service.proto`:
+
+```protobuf
+option (grant_definition) = {
+  name: "api:run"                      // ^api:[a-z]+$, resource only, no action
+  description: "Function runs and traces, including rerunning and cancelling"
+  category: "Apps, Functions & Runs"   // one of the four minting-UI categories
+};
+```
+
+A grant covers many endpoints, which is why the description lives on the
+declaration rather than on each method. See `proto/api/v2/options.proto`.
+
+After changing grants or annotations, run `make grant-catalog` and review the
+diff in `pkg/api/v2/apiv2base/testdata/grant_catalog.json`. That file is the
+committed record of every permission the API offers, and CI checks it is current.
+
+If you add `additional_bindings` to a method, both paths inherit the same grant
+automatically, but confirm it in the catalog diff, since a missed binding is a
+route that enforcement would not cover.
 
 #### Key Conventions
 

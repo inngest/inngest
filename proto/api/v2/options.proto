@@ -10,7 +10,55 @@ extend google.protobuf.MethodOptions {
   AuthzOptions authz = 50001;
 }
 
+// Grants are declared once per API, at file level, and referenced by name from
+// each method. A grant covers many endpoints (api:run covers eight), so its
+// description and category cannot live on the method without being duplicated
+// and drifting.
+extend google.protobuf.FileOptions {
+  repeated GrantDefinition grant_definition = 50002;
+}
+
+// AuthzAction is the action half of a grant. An enum rather than a string,
+// because a typo would produce a grant name no API key can match, i.e. a silent
+// 403 on a correctly minted key.
+enum AuthzAction {
+  AUTHZ_ACTION_UNSPECIFIED = 0;
+  AUTHZ_ACTION_READ = 1;
+  AUTHZ_ACTION_WRITE = 2;
+}
+
+// GrantDefinition declares one grant. The name is the resource half only; the
+// action comes from each method's AuthzOptions.
+message GrantDefinition {
+  // Resource name, no action. Must match ^api:[a-z]+$, e.g. "api:run".
+  string name = 1;
+  // Shown in the minting UI and appended to the OpenAPI operation description.
+  string description = 2;
+  // UI grouping only. Must be one of the categories the minting UI renders.
+  string category = 3;
+  // Sensitive grants are left out of the Read Only preset and out of the
+  // default member policy, so holding one is always a deliberate choice. Set it
+  // where the read half hands over something that is itself a credential.
+  bool sensitive = 4;
+  // Internal grants are enforced on their routes but never offered for minting:
+  // absent from GrantCatalog, so the key-creation UI does not render them, the
+  // mint policy rejects them, and no preset can include them. Set it where the
+  // grant belongs to keys provisioned out of band rather than to anything a
+  // customer creates for themselves.
+  bool internal = 5;
+}
+
 message AuthzOptions {
-  // Whether this endpoint requires authorization middleware
-  bool require_authz = 1;
+  reserved 1;  // was: bool require_authz
+
+  // Name of a grant declared via grant_definition on this file. Required
+  // unless exempt is set.
+  string grant = 2;
+  // Required unless exempt is set.
+  AuthzAction action = 3;
+  // Marks an endpoint as deliberately public. Set this rather than leaving the
+  // annotation off, so a missing annotation stays distinguishable from an
+  // intentional exemption, which is what makes fail-closed enforcement safe to
+  // turn on. Always comment why.
+  bool exempt = 4;
 }

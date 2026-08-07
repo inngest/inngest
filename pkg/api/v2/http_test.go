@@ -77,24 +77,26 @@ func TestHTTPGateway_Health(t *testing.T) {
 		require.NoError(t, err, "fetchedAt should be a valid RFC3339 timestamp")
 	})
 
-	t.Run("POST /api/v2/health returns method not allowed", func(t *testing.T) {
+	// Health is declared GET-only, so another method resolves to no route. The
+	// matcher cannot say what such a request is, so nobody could have checked its
+	// grant, and it is refused with a 404 rather than the gateway's 501.
+	t.Run("POST /api/v2/health is not an endpoint", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/api/v2/health", strings.NewReader("{}"))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
 
-		// gRPC gateway only supports GET for health endpoint according to proto definition
-		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
-	t.Run("PUT /api/v2/health returns method not allowed", func(t *testing.T) {
+	t.Run("PUT /api/v2/health is not an endpoint", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPut, "/api/v2/health", nil)
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
 
-		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Equal(t, http.StatusNotFound, rec.Code)
 	})
 }
 
@@ -671,6 +673,94 @@ func TestHTTPGateway_Middleware(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, rec.Code)
 	})
 
+	// Every case above uses a static path. These cover parameterised paths,
+	// which a template-keyed map looked up by concrete URL would never match.
+	t.Run("authorization middleware is applied to templated paths", func(t *testing.T) {
+		for _, tc := range []struct {
+			name, method, path string
+		}{
+			{"single path param", http.MethodPost, "/api/v2/apps/my-app/syncs"},
+			{"multiple path params", http.MethodPost, "/api/v2/apps/my-app/functions/my-fn/invoke"},
+			{"multi-segment wildcard with a literal suffix", http.MethodGet, "/api/v2/sessions/k/a/b/c/runs"},
+			{"no v2 prefix", http.MethodPost, "/v2/apps/my-app/syncs"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				authzCalled := false
+				var seenGrant string
+				authzMiddleware := func(next http.Handler) http.Handler {
+					return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						authzCalled = true
+						if route, ok := apiv2base.AuthzRouteFromContext(r.Context()); ok {
+							seenGrant = route.Grant
+						}
+						w.WriteHeader(http.StatusForbidden)
+					})
+				}
+
+				handler, err := newTestHTTPHandler(ctx, ServiceOptions{},
+					HTTPHandlerOptions{AuthzMiddleware: authzMiddleware})
+				require.NoError(t, err)
+
+				req := httptest.NewRequest(tc.method, tc.path, strings.NewReader("{}"))
+				req.Header.Set("Content-Type", "application/json")
+				rec := httptest.NewRecorder()
+				handler.ServeHTTP(rec, req)
+
+				require.True(t, authzCalled, "authz middleware must be called for %s", tc.path)
+				require.NotEmpty(t, seenGrant, "the required grant must be on the request context")
+				require.Equal(t, http.StatusForbidden, rec.Code)
+			})
+		}
+	})
+
+	// GET and POST on one path need different grants, which a path-only map
+	// cannot express.
+	t.Run("authorization middleware distinguishes methods on the same path", func(t *testing.T) {
+		grants := map[string]string{}
+		for _, m := range []string{http.MethodGet, http.MethodPost} {
+			authzMiddleware := func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if route, ok := apiv2base.AuthzRouteFromContext(r.Context()); ok {
+						grants[r.Method] = route.Grant
+					}
+					w.WriteHeader(http.StatusForbidden)
+				})
+			}
+			handler, err := newTestHTTPHandler(ctx, ServiceOptions{},
+				HTTPHandlerOptions{AuthzMiddleware: authzMiddleware})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(m, "/api/v2/env/webhooks", strings.NewReader("{}"))
+			req.Header.Set("Content-Type", "application/json")
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+		}
+
+		require.Equal(t, "api:webhook:read", grants[http.MethodGet])
+		require.Equal(t, "api:webhook:write", grants[http.MethodPost])
+	})
+
+	// An unknown path must reach the gateway and 404. A 403 on a typo'd URL is
+	// worse for callers and protects nothing.
+	t.Run("unmatched paths bypass authorization and 404", func(t *testing.T) {
+		authzCalled := false
+		authzMiddleware := func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				authzCalled = true
+				w.WriteHeader(http.StatusForbidden)
+			})
+		}
+		handler, err := newTestHTTPHandler(ctx, ServiceOptions{},
+			HTTPHandlerOptions{AuthzMiddleware: authzMiddleware})
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/not-a-real-endpoint", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		require.False(t, authzCalled, "unmatched paths must not be denied")
+		require.NotEqual(t, http.StatusForbidden, rec.Code)
+	})
+
 	t.Run("authorization middleware not applied to health endpoint", func(t *testing.T) {
 		authzCalled := false
 		authzMiddleware := func(next http.Handler) http.Handler {
@@ -977,14 +1067,16 @@ func TestHTTPGateway_InvokeFunction(t *testing.T) {
 		require.Contains(t, response.Errors[0].Code, "not_implemented")
 	})
 
-	t.Run("GET invoke returns not implemented", func(t *testing.T) {
+	// Invoke is POST-only. The 501s above come from the handler, which is
+	// unimplemented here; this method matches no route, so it stops at the
+	// router with a 404.
+	t.Run("GET invoke is not an endpoint", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/hello-world/invoke", nil)
 		rec := httptest.NewRecorder()
 
 		handler.ServeHTTP(rec, req)
 
-		// grpc-gateway returns 501 for unsupported HTTP methods on valid endpoints
-		require.Equal(t, http.StatusNotImplemented, rec.Code)
+		require.Equal(t, http.StatusNotFound, rec.Code)
 	})
 }
 

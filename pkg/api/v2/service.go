@@ -146,8 +146,12 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 		return nil, fmt.Errorf("failed to register v2 gateway handler: %w", err)
 	}
 
-	// Build map of paths that require authorization
-	authzPaths := base.BuildAuthzPathMap()
+	// Built once; the matcher compiles the path templates with grpc-gateway's
+	// own compiler.
+	authzMatcher, err := apiv2base.NewAuthzMatcher(apiv2base.BuildAuthzRoutes())
+	if err != nil {
+		return nil, fmt.Errorf("failed to build v2 authz route matcher: %w", err)
+	}
 
 	r := chi.NewRouter()
 
@@ -170,22 +174,37 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 			req.URL.Path = after
 		}
 
-		// Apply authorization middleware if this path requires it
-		if requiresAuthz := authzPaths[req.URL.Path]; requiresAuthz && httpOpts.AuthzMiddleware != nil {
-			authzHandler := httpOpts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Add JSON validation after authorization for protected paths
-				validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					gwmux.ServeHTTP(w, r)
-				}))
-				validationHandler.ServeHTTP(w, r)
-			}))
-			authzHandler.ServeHTTP(w, req)
-		} else {
-			// Add JSON validation for unprotected paths
-			validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				gwmux.ServeHTTP(w, r)
-			}))
-			validationHandler.ServeHTTP(w, req)
+		// Authorization runs here rather than as router middleware because the
+		// /api/v2 and /v2 prefixes are only stripped above, so a middleware added
+		// via r.Use would see the prefixed path and match no route template.
+		//
+		// The middleware is invoked only when the route requires a grant: if it is
+		// called, authorization is required and the route is on the context.
+		serve := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gwmux.ServeHTTP(w, r)
+		}))
+
+		route, matched := authzMatcher.Match(req.Method, req.URL.Path)
+		switch {
+		case !matched:
+			// A request the matcher cannot identify is never handed to the
+			// gateway. Both route sets are built from the same service
+			// descriptor, so a miss is either a genuine 404 or the two
+			// disagreeing about the path, and forwarding the second case would
+			// run a handler whose grant nobody checked. Answering 404 still gives
+			// a mistyped URL a 404, without betting the two can never disagree.
+			base.WriteHTTPError(w, http.StatusNotFound, apiv2base.ErrorNotFound,
+				"the requested endpoint does not exist")
+
+		case route.Exempt:
+			serve.ServeHTTP(w, req)
+
+		case httpOpts.AuthzMiddleware == nil:
+			serve.ServeHTTP(w, req)
+
+		default:
+			req = req.WithContext(apiv2base.WithAuthzRoute(req.Context(), route))
+			httpOpts.AuthzMiddleware(serve).ServeHTTP(w, req)
 		}
 
 		// Restore original path for logging

@@ -60,27 +60,26 @@ func NewAuthStreamInterceptor(authnMiddleware, authzMiddleware func(http.Handler
 	}
 }
 
-// requiresAuthorization checks if a gRPC method requires authorization based on protobuf annotations
+// The gRPC server is not started anywhere in production, since grpc-gateway is
+// registered in-process and HTTP requests never reach these interceptors. This
+// exists so the two transports cannot disagree if it ever is started.
 func requiresAuthorization(fullMethod string) bool {
-	// Parse the method name from the full method path
-	// Full method format: "/package.service/MethodName"
 	methodName := parseMethodName(fullMethod)
 	if methodName == "" {
 		return false
 	}
 
-	// Get the service descriptor
 	serviceDesc := apiv2.File_api_v2_service_proto.Services().ByName("V2")
 	if serviceDesc == nil {
 		return false
 	}
 
-	// Find the method descriptor
 	methods := serviceDesc.Methods()
 	for i := 0; i < methods.Len(); i++ {
 		method := methods.Get(i)
 		if string(method.Name()) == methodName {
-			return hasAuthzAnnotation(method)
+			_, protected := GrantForMethod(method)
+			return protected
 		}
 	}
 
