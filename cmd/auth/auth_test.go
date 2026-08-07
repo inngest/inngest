@@ -14,8 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestLogoutKeepsIdentity pins the invariant that logout clears the session but
-// not the identity telemetry reports.
+// Logout clears the session but not the identity telemetry reports.
 func TestLogoutKeepsIdentity(t *testing.T) {
 	ctx := context.Background()
 	accountID, userID := uuid.New(), uuid.New()

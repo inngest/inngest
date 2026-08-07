@@ -176,9 +176,9 @@ func loadState() (*State, error) {
 }
 
 // StoredCredentials returns the credential saved by `inngest auth login`,
-// ignoring any $INNGEST_AUTH_TOKEN override.  Callers that act on the key
-// itself — revoking it, say — must use this rather than GetState so they never
-// touch a key the CLI didn't mint.
+// ignoring any $INNGEST_AUTH_TOKEN override. Callers that act on the key itself,
+// such as revoking it, must use this rather than GetState so they never touch a
+// key the CLI didn't mint.
 func StoredCredentials(ctx context.Context) ([]byte, error) {
 	state, err := loadState()
 	if err != nil {

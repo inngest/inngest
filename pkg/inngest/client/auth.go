@@ -108,8 +108,7 @@ func (c httpClient) PollDeviceLogin(ctx context.Context, clientID, deviceCode uu
 	return r, nil
 }
 
-// RevokeDeviceLogin revokes the API key the client is configured with, so a
-// logged-out credential can no longer be used.
+// RevokeDeviceLogin revokes the API key the client is configured with.
 func (c httpClient) RevokeDeviceLogin(ctx context.Context) error {
 	req, err := c.NewRequest(http.MethodPost, "/v2/login/device/revoke", nil)
 	if err != nil {

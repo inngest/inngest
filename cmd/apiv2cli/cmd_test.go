@@ -810,9 +810,9 @@ func TestCommandPrefersAPIKeyOverSigningKeyEnv(t *testing.T) {
 	require.Equal(t, "Bearer sk-inn-api-test", gotAuth)
 }
 
-// loginAs writes a state file holding creds and points ~ at a temp dir, so the
-// stored-credential tests never read the developer's real login.  loginHost is
-// the API the credential was minted against; pass "" for Inngest Cloud.
+// Points ~ at a temp dir so the stored-credential tests never read the
+// developer's real login. loginHost is the API the credential was minted
+// against; pass "" for Inngest Cloud.
 func loginAs(t *testing.T, creds string, loginHost string) {
 	t.Helper()
 
@@ -875,8 +875,8 @@ func TestCommandUsesStoredCredential(t *testing.T) {
 
 func TestCommandWithholdsStoredCredentialFromOtherHosts(t *testing.T) {
 	host, auth := stubAPI(t)
-	// Logged in to Inngest Cloud while the request targets something else.  Covers
-	// the default dev server target too: it is never the login host.
+	// Logged in to Inngest Cloud while the request targets something else. Covers
+	// the default dev server target too, which is never the login host.
 	loginAs(t, "stored-key", "")
 
 	runHealth(t, host)
