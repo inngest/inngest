@@ -212,6 +212,9 @@ export const pathCreator = {
   integrations() {
     return `/settings/integrations`;
   },
+  metrics({ envSlug, ref }: { envSlug: string; ref?: string }) {
+    return `/env/${envSlug}/metrics${ref ? `?ref=${ref}` : ''}`;
+  },
   keys({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/manage/keys`;
   },
