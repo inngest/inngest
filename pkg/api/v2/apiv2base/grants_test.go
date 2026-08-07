@@ -13,9 +13,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// allowedCategories is the set the key-minting UI groups by. Keep in sync with
-// the categories in the spec; a new one needs a UI decision, not just a proto
-// edit, which is why this list lives in the test rather than being inferred.
+// The set the key-minting UI groups by. Listed here rather than inferred
+// because a new category needs a UI decision, not just a proto edit.
 var allowedCategories = []string{
 	"Accounts, Environments & Keys",
 	"Apps, Functions & Runs",
@@ -45,9 +44,8 @@ func TestEveryMethodIsAnnotated(t *testing.T) {
 		}
 	})
 
-	// The security-relevant assertions: nothing is unannotated, and the public
-	// set is exactly these two. Deliberately not asserting a total count — that
-	// only breaks every time an endpoint is added, without protecting anything.
+	// A total count is not asserted: it would break every time an endpoint is
+	// added without protecting anything.
 	require.Empty(t, missing, "every rpc needs a grant or exempt: true")
 	require.ElementsMatch(t, []string{"Health", "_SchemaOnly"}, exempt,
 		"adding a public endpoint is a deliberate decision; update this list with the reason")
@@ -55,8 +53,8 @@ func TestEveryMethodIsAnnotated(t *testing.T) {
 }
 
 // GrantCatalog is the single list every minting surface reads, so an internal
-// grant being absent from it is what withdraws the offer everywhere at once. The
-// routes still require it — enforcement reads GrantForMethod, not this.
+// grant being absent from it withdraws the offer everywhere at once. The routes
+// still require it, since enforcement reads GrantForMethod.
 func TestInternalGrantsAreNotMintable(t *testing.T) {
 	var internal []string
 	for _, g := range AllGrants() {
@@ -78,7 +76,6 @@ func TestInternalGrantsAreNotMintable(t *testing.T) {
 		require.False(t, catalog[g], "%s is mintable", g)
 	}
 
-	// Still enforced: the routes that need it are unchanged.
 	routes := GrantsByHTTPRoute()
 	require.Equal(t, "api:partner:read", routes["GET /partner/accounts"])
 	require.Equal(t, "api:partner:write", routes["POST /partner/accounts"])
@@ -123,17 +120,15 @@ func TestGrantCatalogShape(t *testing.T) {
 	}
 }
 
-// The app-sync grant is the one the legacy alias in chunk 4 depends on, and
-// the partner grants are what Replit's keys exercise. Pin them so a rename is
-// a deliberate act rather than a silent break.
+// The legacy scope alias depends on the app-sync grant, and the partner
+// grants back existing customer keys. Pinned so a rename is deliberate.
 func TestLoadBearingGrants(t *testing.T) {
 	routes := GrantsByHTTPRoute()
 	require.Equal(t, "api:app:write", routes["POST /apps/{app_id}/syncs"])
 	require.Equal(t, "api:partner:write", routes["POST /partner/accounts"])
 	require.Equal(t, "api:partner:read", routes["GET /partner/accounts"])
 
-	// Same path, different methods, different grants — the bug the old
-	// path-keyed map could not express.
+	// Same path, different methods, different grants.
 	require.Equal(t, "api:webhook:read", routes["GET /env/webhooks"])
 	require.Equal(t, "api:webhook:write", routes["POST /env/webhooks"])
 }
@@ -166,8 +161,8 @@ func TestActionStringRejectsUnspecified(t *testing.T) {
 	require.Equal(t, ActionWrite, actionString(apiv2.AuthzAction_AUTHZ_ACTION_WRITE))
 }
 
-// Every route in the map is reachable prose-wise: the label is what OpenAPI
-// advertises and what a key stores, so it must always be name + ":" + action.
+// The label is what OpenAPI advertises and what a key stores, so it must
+// always be name + ":" + action.
 func TestGrantLabelsAreWellFormed(t *testing.T) {
 	for route, grant := range GrantsByHTTPRoute() {
 		parts := strings.Split(grant, ":")
@@ -180,8 +175,8 @@ func TestGrantLabelsAreWellFormed(t *testing.T) {
 // TestGrantCatalogSnapshot pins the effective grant set to a committed file.
 //
 // The generated OpenAPI document is gitignored and its docs deploy is manual,
-// so without this the aggregate set — what the minting UI offers and what
-// "Full Access" resolves to at mint time — would not be visible in review. A
+// so without this the aggregate set would not be visible in review: what the
+// minting UI offers, and what "Full Access" resolves to at mint time. A
 // one-line proto edit can add a toggle to the product; this makes that a diff.
 //
 // Regenerate with: make grant-catalog
@@ -193,13 +188,11 @@ func TestGrantCatalogSnapshot(t *testing.T) {
 		Category    string `json:"category"`
 		Description string `json:"description"`
 		// Recorded so flipping `sensitive` in the proto shows up here. It changes
-		// what the Read Only preset and the default member policy hand out, which
-		// is exactly the kind of one-line edit this snapshot exists to surface.
+		// what the Read Only preset and the default member policy hand out.
 		Sensitive bool `json:"sensitive"`
-		// Likewise for `internal`, which is stronger: it removes the grant from
-		// every minting surface. Built from AllGrants so an internal grant is
-		// still listed here — the point of the artifact is that a reviewer can see
-		// what the API declares, including what it declines to offer.
+		// Likewise for `internal`, which removes the grant from every minting
+		// surface. Built from AllGrants so an internal grant is still listed and a
+		// reviewer can see what the API declines to offer.
 		Internal bool `json:"internal"`
 	}
 	type snapshot struct {
@@ -226,8 +219,8 @@ func TestGrantCatalogSnapshot(t *testing.T) {
 		Routes: GrantsByHTTPRoute(),
 	}
 
-	// Encode without HTML escaping — the categories contain "&", and a
-	// committed artifact reviewers read should not be full of &.
+	// The categories contain "&", which would otherwise be escaped throughout
+	// an artifact reviewers have to read.
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
@@ -249,9 +242,8 @@ func TestGrantCatalogSnapshot(t *testing.T) {
 			"review the diff — it shows exactly which permissions the API now offers")
 }
 
-// additional_bindings are real: ListExperiments answers on two paths, and both
-// need the same grant or a request on the secondary route matches no rule.
-// This was missed on the first pass — the route map only read primary bindings.
+// ListExperiments answers on two paths, and both need the same grant or a
+// request on the secondary route matches no rule.
 func TestAdditionalBindingsAreCovered(t *testing.T) {
 	routes := GrantsByHTTPRoute()
 	require.Equal(t, "api:experiment:read", routes["GET /experiments"])
@@ -263,12 +255,10 @@ func TestAdditionalBindingsAreCovered(t *testing.T) {
 // The generated OpenAPI document does not reproduce proto path templates
 // verbatim, so anything matching routes across the two needs canonical form.
 func TestCanonicalRouteNormalizesParams(t *testing.T) {
-	// Proto template and the camelCased OpenAPI path collapse to one key.
 	require.Equal(t,
 		CanonicalRoute("GET", "/apps/{app_id}/functions/{function_id}"),
 		CanonicalRoute("get", "/apps/{appId}/functions/{functionId}"))
 
-	// So do the `=**` and its stripped OpenAPI counterpart.
 	require.Equal(t,
 		CanonicalRoute("GET", "/sessions/{session_key}/{session_id=**}/runs"),
 		CanonicalRoute("GET", "/sessions/{sessionKey}/{sessionId}/runs"))
@@ -276,7 +266,6 @@ func TestCanonicalRouteNormalizesParams(t *testing.T) {
 	require.Equal(t, "GET /runs/{}", CanonicalRoute("GET", "/runs/{run_id}"))
 	require.Equal(t, "GET /health", CanonicalRoute("GET", "/health"))
 
-	// Distinct routes must not collide.
 	require.NotEqual(t,
 		CanonicalRoute("GET", "/runs/{run_id}"),
 		CanonicalRoute("GET", "/sessions/{session_key}"))

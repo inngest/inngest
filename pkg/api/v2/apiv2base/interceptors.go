@@ -60,12 +60,9 @@ func NewAuthStreamInterceptor(authnMiddleware, authzMiddleware func(http.Handler
 	}
 }
 
-// requiresAuthorization reports whether a gRPC method needs an authorization
-// grant, matching the HTTP path's behaviour. Exempt methods return false.
-//
-// Note the gRPC server is not started anywhere in production — grpc-gateway is
-// registered in-process, so HTTP requests never reach these interceptors. This
-// exists so the two transports cannot disagree if it ever is.
+// The gRPC server is not started anywhere in production, since grpc-gateway is
+// registered in-process and HTTP requests never reach these interceptors. This
+// exists so the two transports cannot disagree if it ever is started.
 func requiresAuthorization(fullMethod string) bool {
 	methodName := parseMethodName(fullMethod)
 	if methodName == "" {

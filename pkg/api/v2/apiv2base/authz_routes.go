@@ -10,8 +10,8 @@ import (
 )
 
 // AuthzRoute is one HTTP route and the grant an API key must hold to call it.
-// Exempt routes appear with an empty Grant so a matched-but-public request stays
-// distinguishable from one that matched nothing at all.
+// Exempt routes carry an empty Grant, so a matched-but-public request stays
+// distinguishable from one that matched nothing.
 type AuthzRoute struct {
 	HTTPMethod string
 	// PathTemplate is the proto template, e.g. "/apps/{app_id}/syncs".
@@ -19,19 +19,15 @@ type AuthzRoute struct {
 	// Grant is the required grant label, e.g. "api:app:write". Empty when the
 	// route is exempt.
 	Grant string
-	// Exempt marks a deliberately public route.
 	Exempt bool
 }
 
 // BuildAuthzRoutes returns every HTTP route the v2 service exposes, including
 // additional_bindings, with the grant each one requires.
 //
-// Order is proto declaration order and must stay that way. Some templates
-// overlap — `{experiment_id=**}` also matches the ListExperiments binding one
-// segment shorter — so which route wins depends on registration order.
-// grpc-gateway's own registration follows declaration order, so preserving it
-// here is what keeps the matcher's answer identical to the routing decision the
-// gateway actually made. Sorting these would silently change precedence.
+// Order is proto declaration order and must stay that way. Templates overlap,
+// so which route wins depends on registration order, and grpc-gateway registers
+// in declaration order. Sorting these would silently change precedence.
 func BuildAuthzRoutes() []AuthzRoute {
 	var out []AuthzRoute
 	forEachMethod(func(method protoreflect.MethodDescriptor) {
@@ -50,22 +46,21 @@ func BuildAuthzRoutes() []AuthzRoute {
 	return out
 }
 
-// AuthzMatcher answers "which v2 route is this request, and what does it
-// require?" for a concrete method and path.
+// AuthzMatcher reports which v2 route a method and path resolve to, and what
+// that route requires.
 //
-// It works by asking grpc-gateway's own router. That matters: the alternative —
-// compiling the templates into regexps or into a chi router — would be a second
-// implementation of path-template semantics that has to agree with the real
-// routing, and when it disagreed the failure would be a silently wrong grant.
-// runtime.ServeMux.HandlePath compiles templates with the same httprule compiler
-// the gateway uses, and it is the only public door to that compiler.
+// It asks grpc-gateway's own router. Compiling the templates into regexps or a
+// chi router would be a second implementation of path-template semantics, and
+// when the two disagreed the failure would be a silently wrong grant.
+// runtime.ServeMux.HandlePath is the only public door to the same httprule
+// compiler the gateway uses.
 type AuthzMatcher struct {
 	mux *runtime.ServeMux
 }
 
 type matchedRouteKey struct{}
 
-// NewAuthzMatcher builds a matcher over the given routes. Callers normally pass
+// NewAuthzMatcher builds a matcher over the given routes, normally
 // BuildAuthzRoutes().
 func NewAuthzMatcher(routes []AuthzRoute) (*AuthzMatcher, error) {
 	mux := runtime.NewServeMux()
@@ -84,32 +79,29 @@ func NewAuthzMatcher(routes []AuthzRoute) (*AuthzMatcher, error) {
 	return &AuthzMatcher{mux: mux}, nil
 }
 
-// Match reports the route a method and path resolve to. The second return is
-// false when nothing matched. Callers must fail closed on that: a miss means
-// "this matcher could not tell you what the gateway will do", which is not the
-// same as "the gateway will refuse it".
+// Match reports the route a method and path resolve to. Callers must fail
+// closed when the second return is false: a miss means this matcher could not
+// tell what the gateway will do, not that the gateway will refuse the request.
 //
-// The request handed to the matcher is synthetic, carrying only the method and
-// path. Passing the real one would be unsafe: ServeMux.ServeHTTP calls
-// r.ParseForm() when X-HTTP-Method-Override is set on a form-encoded POST, which
-// consumes the body the real gateway still needs, and it rewrites r.Method.
+// The request handed to the matcher is synthetic. Passing the real one would be
+// unsafe, because ServeMux.ServeHTTP calls r.ParseForm() when
+// X-HTTP-Method-Override is set on a form-encoded POST, consuming the body the
+// gateway still needs, and it rewrites r.Method.
 //
 // It is assembled field by field rather than with httptest.NewRequest, which
 // would re-parse the path. Callers pass r.URL.Path, which net/http has already
-// percent-decoded once, so a second parse decodes it again and the matcher stops
-// seeing what the gateway sees:
+// percent-decoded once, so a second parse decodes it again:
 //
 //	wire /runs/x%252Fy/cancel -> gateway /runs/x%2Fy/cancel (3 segments, matches)
 //	                          -> re-parsed /runs/x/y/cancel (4 segments, misses)
 //
 // Every such divergence adds segments, so it can only turn a matched protected
-// route into a miss — the direction that skips authorization. Re-parsing also
-// panics outright on a decoded path holding a space or a bare "%", which
-// httptest.NewRequest rejects as a malformed request line.
+// route into a miss, the direction that skips authorization. Re-parsing also
+// panics on a decoded path holding a space or a bare "%".
 //
-// ServeMux reads only Method and URL.Path (RawPath is consulted solely under a
-// non-default unescaping mode, which neither mux sets), so those are all this
-// needs to carry.
+// ServeMux reads only Method and URL.Path, so those are all this needs to
+// carry. RawPath is consulted solely under a non-default unescaping mode, which
+// neither mux sets.
 func (m *AuthzMatcher) Match(httpMethod, path string) (AuthzRoute, bool) {
 	if m == nil || m.mux == nil {
 		return AuthzRoute{}, false
@@ -120,8 +112,8 @@ func (m *AuthzMatcher) Match(httpMethod, path string) (AuthzRoute, bool) {
 	req := (&http.Request{
 		Method: httpMethod,
 		URL:    &url.URL{Path: path},
-		// Non-nil so the mux's header reads and its POST->GET fallback check are
-		// answered by an absent header rather than a nil map.
+		// Non-nil so the mux's header reads and its POST->GET fallback check see
+		// an absent header rather than a nil map.
 		Header: http.Header{},
 	}).WithContext(ctx)
 
@@ -133,8 +125,8 @@ func (m *AuthzMatcher) Match(httpMethod, path string) (AuthzRoute, bool) {
 	return matched, true
 }
 
-// discardWriter swallows whatever the matcher mux writes — on a miss it renders
-// a 404 through its routing error handler, which we read from the absence of a
+// discardWriter swallows whatever the matcher mux writes. On a miss it renders
+// a 404 through its routing error handler, which this reads as the absence of a
 // match instead.
 type discardWriter struct{ header http.Header }
 
@@ -149,31 +141,31 @@ func (d discardWriter) WriteHeader(int)             {}
 
 type authzRouteCtxKey struct{}
 
-// WithAuthzRoute stores the route a request resolved to, so an authorization
-// middleware downstream can read the required grant without re-deriving it.
+// WithAuthzRoute stores the route a request resolved to, so a downstream
+// authorization middleware can read the required grant without re-deriving it.
 //
-// This is the seam between the two repos: the open-source side decides *what* a
-// route requires, and the caller supplying AuthzMiddleware decides whether to
-// enforce it.
+// This is the seam between the two repos: this side decides what a route
+// requires, and the caller supplying AuthzMiddleware decides whether to enforce
+// it.
 func WithAuthzRoute(ctx context.Context, route AuthzRoute) context.Context {
 	return context.WithValue(ctx, authzRouteCtxKey{}, route)
 }
 
 // AuthzRouteFromContext returns the route stored by WithAuthzRoute. The second
-// return is false when the request did not resolve to a known v2 route.
+// return is false when the request resolved to no known v2 route.
 func AuthzRouteFromContext(ctx context.Context) (AuthzRoute, bool) {
 	route, ok := ctx.Value(authzRouteCtxKey{}).(AuthzRoute)
 	return route, ok
 }
 
 // IsExemptPath reports whether a path belongs to a route annotated
-// `exempt: true`, i.e. one that is public by declaration.
+// `exempt: true`.
 //
-// Matching is on the path alone, ignoring the HTTP method, because the callers
-// are path-level authentication gates. A method-aware check would turn, say,
-// POST /health from the gateway's 404 into a 401 for no benefit.
+// Matching ignores the HTTP method because the callers are path-level
+// authentication gates. A method-aware check would turn POST /health from the
+// gateway's 404 into a 401 for no benefit.
 //
-// Every exempt template today is static, so comparison is exact;
+// Every exempt template today is static, so comparison is exact.
 // TestExemptRoutesHaveNoPathParameters keeps that assumption honest.
 func IsExemptPath(path string) bool {
 	for _, r := range BuildAuthzRoutes() {

@@ -85,7 +85,6 @@ func convertOpenAPIFiles(inputDir, outputDir string) error {
 		// Add parameter constraints for OpenAPI v3
 		addParameterConstraints(v3Doc)
 
-		// Advertise the API key grant each operation requires
 		annotateRequiredGrants(v3Doc)
 
 		// Apply examples from external JSON file
@@ -161,15 +160,13 @@ func removeDefaultResponses(doc *openapi2.T) {
 // operation requires, e.g. "api:run:read".
 const requiredGrantExtension = "x-inngest-required-grant"
 
-// annotateRequiredGrants stamps each operation with the grant an API key must
-// hold to call it, sourced from the (authz) annotations in service.proto so the
-// docs, the enforcement middleware and the key-minting UI all read one
-// declaration.
+// Grants are sourced from the (authz) annotations in service.proto, so the
+// docs, the enforcement middleware and the key-minting UI read one declaration.
 //
-// Routes are matched in canonical form — each path parameter reduced to "{}" —
+// Routes are matched in canonical form, each path parameter reduced to "{}",
 // because protoc-gen-openapiv2 does not reproduce the proto templates verbatim:
 // with json_names_for_fields it camelCases parameters ({app_id} -> {appId}) and
-// it drops the `=**` suffix ({session_id=**} -> {sessionId}). Matching literally
+// drops the `=**` suffix ({session_id=**} -> {sessionId}). Matching literally
 // silently annotated only the parameterless paths.
 func annotateRequiredGrants(doc *openapi3.T) {
 	if doc == nil || doc.Paths == nil {

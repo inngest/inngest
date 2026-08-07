@@ -17,11 +17,10 @@ func decode(t *testing.T, rec *httptest.ResponseRecorder) Error {
 	return got
 }
 
-// The bug: an error that never went through this package has no status, so
-// WriteHTTP fell through to WriteHeader's implicit 200 and encoded a value with
-// no exported fields. Handlers passing one along — a failed trace-reader query,
-// a marshalling failure — answered 200 with `{}`, which every client reads as a
-// successful empty result.
+// An error that never went through this package has no status, so WriteHTTP
+// used to fall through to WriteHeader's implicit 200 and encode a value with no
+// exported fields. A failed query answered 200 with `{}`, which every client
+// reads as a successful empty result.
 func TestWriteHTTPFailsClosedOnABareError(t *testing.T) {
 	rec := httptest.NewRecorder()
 	err := WriteHTTP(rec, errors.New("connection refused: 10.0.0.7:5432"))
