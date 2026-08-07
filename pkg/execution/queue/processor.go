@@ -258,6 +258,7 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		Leaser:          q,
 		Dispatch:        dispatch,
 		WorkerSemaphore: q.Semaphore(),
+		IsSequential:    q.isSequential,
 	}
 	if rt.Leaser == nil {
 		return ErrQueueScannerMissingLeaser

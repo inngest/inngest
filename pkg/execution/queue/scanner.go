@@ -11,6 +11,10 @@ type QueueScannerRuntime struct {
 	Leaser          QueueItemLeaser
 	Dispatch        DispatchFunc
 	WorkerSemaphore util.TrackingSemaphore
+	// IsSequential reports whether this processor currently owns the sequential
+	// scanner role. Custom scanners should evaluate it for each scan pass because
+	// role ownership can change while Run is active.
+	IsSequential func() bool
 }
 
 // QueueScanner discovers and leases queue work. It should hand leased items to
