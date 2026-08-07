@@ -181,7 +181,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         id: app.id,
         name: app.externalID,
       }))}
-      banner={<AccountConcurrencyBanner refreshNonce={refreshNonce} />}
+      banner={
+        <AccountConcurrencyBanner refreshNonce={refreshNonce} scope={scope} />
+      }
       data={runs}
       features={{
         history: features.data?.history ?? 7,

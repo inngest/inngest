@@ -5,6 +5,7 @@ import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import {
   ACCOUNT_CONCURRENCY_LIMIT_METRIC,
   buildConcurrencyWindow,
+  countMinutesWithHits,
   isConcurrencyPressured,
   type ConcurrencyWindow,
 } from './accountConcurrency';
@@ -62,6 +63,9 @@ const AccountConcurrencyPressureDocument: TypedDocumentNode<
 
 type AccountConcurrencyPressure = {
   isPressured: boolean;
+  // How many minutes in the window recorded hits. Reported on the view event so
+  // reactions can be read against how strong the signal was.
+  minutesWithHits: number;
   // Undefined until the identity query resolves. The banner can't key its
   // dismissal — or render at all — before this is known.
   accountID: string | undefined;
@@ -119,5 +123,6 @@ export function useAccountConcurrencyPressure({
   return {
     accountID,
     isPressured: isConcurrencyPressured(data?.concurrencyLimitHits.data),
+    minutesWithHits: countMinutesWithHits(data?.concurrencyLimitHits.data),
   };
 }

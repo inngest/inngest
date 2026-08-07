@@ -77,15 +77,64 @@ export function buildConcurrencyWindow(now: number): ConcurrencyWindow {
 type Bucket = { value: number };
 
 /**
+ * How many of the returned minute buckets recorded at least one limit hit.
+ * Counting buckets rather than summing values is what keeps a single minute of
+ * heavy contention from standing in for sustained pressure. Also reported on
+ * the banner's view event, so reactions can be read against signal strength.
+ */
+export function countMinutesWithHits(buckets: Bucket[] | undefined): number {
+  if (!buckets) return 0;
+
+  return buckets.filter(({ value }) => value > 0).length;
+}
+
+/**
  * True when at least CONCURRENCY_HIT_MINUTES_THRESHOLD of the returned buckets
- * recorded a limit hit. Counts buckets rather than summing values so a single
- * minute of heavy contention can't trip the banner on its own.
+ * recorded a limit hit.
  */
 export function isConcurrencyPressured(buckets: Bucket[] | undefined): boolean {
-  if (!buckets) return false;
+  return countMinutesWithHits(buckets) >= CONCURRENCY_HIT_MINUTES_THRESHOLD;
+}
 
-  const minutesWithHits = buckets.filter(({ value }) => value > 0).length;
-  return minutesWithHits >= CONCURRENCY_HIT_MINUTES_THRESHOLD;
+const VIEW_TRACKED_STORAGE_KEY_PREFIX = 'viewedAccountConcurrencyBanner';
+
+/**
+ * Session-scoped so the view event fires at most once per account per browser
+ * session. The banner re-resolves on every mount and every Refresh, so without
+ * this the impression count inflates and the click/dismiss rates it exists to
+ * anchor come out too low.
+ *
+ * Keyed by scope as well as account: the banner renders on both the
+ * environment-wide and per-function runs lists, and click/dismiss events carry
+ * the scope they fired from. An account-only key would let a view on one scope
+ * suppress the impression for the other, leaving those events without a
+ * matching denominator.
+ */
+export function viewTrackedStorageKey(
+  accountID: string,
+  scope?: string,
+): string {
+  return `${VIEW_TRACKED_STORAGE_KEY_PREFIX}:${accountID}:${scope ?? 'none'}`;
+}
+
+export function hasTrackedView(accountID: string, scope?: string): boolean {
+  try {
+    const key = viewTrackedStorageKey(accountID, scope);
+    return window.sessionStorage.getItem(key) !== null;
+  } catch (error) {
+    // Treat an unreadable store as "already tracked" so a failure here can
+    // only ever under-count, never spam duplicate impressions.
+    console.warn('error reading sessionStorage for banner view:', error);
+    return true;
+  }
+}
+
+export function markViewTracked(accountID: string, scope?: string): void {
+  try {
+    window.sessionStorage.setItem(viewTrackedStorageKey(accountID, scope), '1');
+  } catch (error) {
+    console.warn('error writing sessionStorage for banner view:', error);
+  }
 }
 
 /**
