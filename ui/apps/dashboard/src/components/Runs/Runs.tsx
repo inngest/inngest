@@ -1,4 +1,10 @@
-import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from 'react';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
 import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
@@ -14,6 +20,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
+import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
 import { AppFilterDocument, CountRunsDocument } from './queries';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
@@ -152,9 +159,14 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     // Not needed with new hook, but keeping for compatibility
   }, []);
 
+  // The concurrency banner doesn't poll, so it piggybacks on the same refresh
+  // funnel the header button and the imperative ref both go through.
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
   const onRefresh = useCallback(() => {
     reset();
     countRefetch();
+    setRefreshNonce((n) => n + 1);
   }, [reset]);
 
   useImperativeHandle(ref, () => ({
@@ -169,6 +181,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         id: app.id,
         name: app.externalID,
       }))}
+      banner={<AccountConcurrencyBanner refreshNonce={refreshNonce} />}
       data={runs}
       features={{
         history: features.data?.history ?? 7,
