@@ -8,6 +8,7 @@ export type Trace = {
   name: string;
   outputID: string | null;
   queuedAt: string;
+  scheduledAt?: string | null;
   spanID: string;
   stepID?: string | null;
   startedAt: string | null;

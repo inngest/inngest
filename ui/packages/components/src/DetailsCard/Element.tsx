@@ -8,7 +8,9 @@ import {
 } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiInformationLine } from '@remixicon/react';
 
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 
@@ -18,10 +20,23 @@ export function ElementWrapper({
   label,
   children,
   className,
-}: React.PropsWithChildren<{ label: string; className?: string }>) {
+  tooltip,
+}: React.PropsWithChildren<{ label: string; className?: string; tooltip?: React.ReactNode }>) {
   return (
     <div className={cn('text-sm', className)}>
-      <dt className="text-muted text-xs">{label}</dt>
+      <dt className="text-muted flex items-center gap-1 text-xs">
+        {label}
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger>
+              <RiInformationLine className="text-muted h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs whitespace-normal text-left">
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </dt>
       <dd className="truncate">{children}</dd>
     </div>
   );

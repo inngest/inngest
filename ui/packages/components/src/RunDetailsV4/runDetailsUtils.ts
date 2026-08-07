@@ -155,6 +155,37 @@ export const formatDuration = (ms: number): string => {
   return `${hours}h ${minutes}m`;
 };
 
+//
+// The executor pins a run's scheduledAt to be >= queuedAt, so the two differ
+// by a few milliseconds on every run. Only a materially later scheduledAt
+// (e.g. a triggering event with a future `ts`) means the run was deliberately
+// deferred.
+const SCHEDULED_FOR_THRESHOLD_MS = 1_000;
+
+//
+// Returns the time a run was deliberately scheduled to start in the future,
+// or null when the run was scheduled to start immediately.
+export const getScheduledFor = (
+  queuedAt: string,
+  scheduledAt: string | null | undefined
+): Date | null => {
+  if (!scheduledAt) {
+    return null;
+  }
+
+  const queued = new Date(queuedAt);
+  const scheduled = new Date(scheduledAt);
+  if (isNaN(queued.getTime()) || isNaN(scheduled.getTime())) {
+    return null;
+  }
+
+  if (scheduled.getTime() - queued.getTime() <= SCHEDULED_FOR_THRESHOLD_MS) {
+    return null;
+  }
+
+  return scheduled;
+};
+
 export const getSpanName = (name: string) => {
   return name === FINAL_SPAN_NAME ? FINAL_SPAN_DISPLAY : name;
 };
