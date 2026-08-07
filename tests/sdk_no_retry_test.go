@@ -35,11 +35,14 @@ func TestSDKNoRetry(t *testing.T) {
 		test.SetRequestEvent(evt),
 		test.SendTrigger(),
 
-		test.Printf("Expecting StepError opcode"),
+		test.Printf("Expecting StepFailed opcode"),
 
 		test.ExpectRequest("Initial request", "step", time.Second),
+		// Newer SDKs report a non-retriable error as an OpcodeStepFailed
+		// (rather than OpcodeStepError) and carry the serialized error as the
+		// step data. The stack is redacted by ExpectGeneratorResponse.
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:          enums.OpcodeStepError,
+			Op:          enums.OpcodeStepFailed,
 			ID:          "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
 			Name:        "first step",
 			DisplayName: inngestgo.StrPtr(`first step`),
@@ -47,7 +50,7 @@ func TestSDKNoRetry(t *testing.T) {
 				Name:    "NonRetriableError",
 				Message: "no retry plz",
 			},
-			Data: []byte(`null`),
+			Data: []byte(`{"__serialized":true,"name":"NonRetriableError","message":"no retry plz","stack":""}`),
 		}}),
 
 		test.Printf("Expecting Try/Catch request"),
@@ -66,7 +69,9 @@ func TestSDKNoRetry(t *testing.T) {
 				"error": map[string]any{
 					"message": "no retry plz",
 					"name":    "NonRetriableError",
-					"noRetry": true,
+					// Newer SDKs report the failure as OpcodeStepFailed, which is
+					// inherently terminal, so the recorded error no longer carries
+					// a separate noRetry flag.
 					// stack is ignored for now, as it has absolute paths.
 				},
 			},
