@@ -28,6 +28,15 @@ func (c *connectionHandler) handleWorkerRequestExtendLease(msg *connectpb.Connec
 		}
 	}
 
+	// Scope the logger to the request so every log emitted while handling this
+	// message can be correlated with the run it belongs to. `ReportError` also
+	// promotes these attrs to error report tags.
+	l := c.log.With(
+		"req_id", data.RequestId,
+		"run_id", data.RunId,
+		"fn_slug", data.FunctionSlug,
+	)
+
 	leaseID, err := ulid.Parse(data.LeaseId)
 	if err != nil {
 		return &connecterrors.SocketError{
@@ -39,7 +48,7 @@ func (c *connectionHandler) handleWorkerRequestExtendLease(msg *connectpb.Connec
 
 	workerCap, err := c.svc.stateManager.GetWorkerCapacities(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId)
 	if err != nil {
-		c.log.ReportError(err, "failed to get worker available capacity",
+		l.ReportError(err, "failed to get worker available capacity",
 			logger.WithErrorReportTags(map[string]string{
 				"instance_id": c.conn.Data.InstanceId,
 				"env_id":      c.conn.EnvID.String(),
@@ -50,7 +59,7 @@ func (c *connectionHandler) handleWorkerRequestExtendLease(msg *connectpb.Connec
 			Msg:        "failed to get total worker capacity",
 		}
 	}
-	c.log.Trace("worker capacity info before extending lease", "account_id", c.conn.AccountID, "env_id", c.conn.EnvID, "instance_id", c.conn.Data.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available)
+	l.Trace("worker capacity info before extending lease", "account_id", c.conn.AccountID, "env_id", c.conn.EnvID, "instance_id", c.conn.Data.InstanceId, "worker_total_capacity", workerCap.Total, "worker_available_capacity", workerCap.Available)
 
 	newLeaseID, err := c.svc.stateManager.ExtendRequestLease(context.Background(), c.conn.EnvID, c.conn.Data.InstanceId,
 		data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration, workerCap.IsUnlimited())
@@ -61,18 +70,16 @@ func (c *connectionHandler) handleWorkerRequestExtendLease(msg *connectpb.Connec
 			errors.Is(err, state.ErrRequestLeaseNotFound),
 			errors.Is(err, state.ErrRequestWorkerDoesNotExist):
 
-			c.log.ReportError(err, "lease was claimed by other worker, expired, or worker does not exist",
+			l.ReportError(err, "lease was claimed by other worker, expired, or worker does not exist",
 				logger.WithErrorReportTags(map[string]string{
-					"req_id":   data.RequestId,
 					"lease_id": leaseID.String(),
 				}))
 
 			return c.writeWorkerRequestExtendLeaseAck(&data, nil, "failed to marshal nack payload")
 
 		default:
-			c.log.ReportError(err, "unexpected error extending lease",
+			l.ReportError(err, "unexpected error extending lease",
 				logger.WithErrorReportTags(map[string]string{
-					"req_id":   data.RequestId,
 					"lease_id": leaseID.String(),
 				}))
 
@@ -95,7 +102,7 @@ func (c *connectionHandler) handleWorkerRequestExtendLease(msg *connectpb.Connec
 		return serr
 	}
 
-	c.log.Debug("extended lease for long-running request", "req_id", data.RequestId)
+	l.Debug("extended lease for long-running request")
 	return nil
 }
 
@@ -120,7 +127,11 @@ func (c *connectionHandler) writeWorkerRequestExtendLeaseAck(data *connectpb.Wor
 	ackWriteCtx, ackWriteCancel := context.WithTimeout(context.Background(), wsWriteTimeout)
 	defer ackWriteCancel()
 	if !c.canWrite(connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK) {
-		c.log.Trace("skipping worker request extend lease ack because connection phase cannot write", "phase", c.phase().String())
+		c.log.Trace("skipping worker request extend lease ack because connection phase cannot write",
+			"phase", c.phase().String(),
+			"req_id", data.RequestId,
+			"run_id", data.RunId,
+		)
 		return nil
 	}
 	if err := wsproto.Write(ackWriteCtx, c.ws, &connectpb.ConnectMessage{
