@@ -2,6 +2,7 @@ package queue
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -910,11 +911,32 @@ func (q *queueProcessor) configureQueueRoles() {
 	q.roles = filterQueueRoles(q.QueueOptions, q.roles)
 }
 
+// configureScannerRoles appends roles declared by the selected scanner.
+// Registration happens after shard selection and before role goroutines start,
+// which also supports dynamically assigned shard groups.
+func (q *queueProcessor) configureScannerRoles(scanner QueueScanner) error {
+	provider, ok := scanner.(QueueScannerRoleProvider)
+	if !ok {
+		return nil
+	}
+	provided := filterQueueRoles(q.QueueOptions, provider.QueueScannerRoles())
+	existing := make(map[string]struct{}, len(q.roles)+len(provided))
+	for _, role := range q.roles {
+		existing[role.Name()] = struct{}{}
+	}
+	for _, role := range provided {
+		name := role.Name()
+		if _, ok := existing[name]; ok {
+			return fmt.Errorf("queue scanner role %q is already configured", name)
+		}
+		existing[name] = struct{}{}
+	}
+	q.roles = append(q.roles, provided...)
+	return nil
+}
+
 func (q *queueProcessor) defaultQueueRoles() []QueueRole {
 	roles := []QueueRole{}
-	if includeSequentialRole(q.QueueOptions) {
-		roles = append(roles, NewSequentialRole())
-	}
 	if q.runMode.Scavenger {
 		roles = append(roles, NewScavengerRole())
 	}

@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"crypto/rand"
 	"sync"
 	"testing"
@@ -9,6 +10,13 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
+
+type roleProvidingScanner struct {
+	roles []QueueRole
+}
+
+func (roleProvidingScanner) Run(context.Context, QueueScannerRuntime) error { return nil }
+func (s roleProvidingScanner) QueueScannerRoles() []QueueRole               { return s.roles }
 
 func TestWithQueueRoles(t *testing.T) {
 	t.Run("appends custom roles to defaults", func(t *testing.T) {
@@ -71,6 +79,32 @@ func TestWithQueueRoles(t *testing.T) {
 	})
 }
 
+func TestConfigureScannerRolesAppendsUniqueRoles(t *testing.T) {
+	opts := NewQueueOptions()
+	qp := &queueProcessor{QueueOptions: opts}
+	qp.configureQueueRoles()
+
+	require.NoError(t, qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{NewSequentialRole()}}))
+	require.Contains(t, roleNames(qp.roles), QueueRoleSequential)
+}
+
+func TestConfigureScannerRolesRejectsDuplicateNames(t *testing.T) {
+	opts := NewQueueOptions(WithQueueRoles(NewSequentialRole()))
+	qp := &queueProcessor{QueueOptions: opts}
+	qp.configureQueueRoles()
+
+	err := qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{NewSequentialRole()}})
+	require.EqualError(t, err, `queue scanner role "sequential" is already configured`)
+}
+
+func TestConfigureScannerRolesHonorsSequentialFilter(t *testing.T) {
+	opts := NewQueueOptions(WithAllowQueueNames("critical"))
+	qp := &queueProcessor{QueueOptions: opts}
+	qp.configureQueueRoles()
+	require.NoError(t, qp.configureScannerRoles(roleProvidingScanner{roles: []QueueRole{NewSequentialRole()}}))
+	require.NotContains(t, roleNames(qp.roles), QueueRoleSequential)
+}
+
 func roleNames(roles []QueueRole) map[string]struct{} {
 	names := map[string]struct{}{}
 	for _, role := range roles {
@@ -83,6 +117,9 @@ func configuredRoleOptions(options ...QueueOpt) *QueueOptions {
 	opts := NewQueueOptions(options...)
 	qp := &queueProcessor{QueueOptions: opts}
 	qp.configureQueueRoles()
+	if err := qp.configureScannerRoles(partitionQueueScanner{q: qp}); err != nil {
+		panic(err)
+	}
 	return opts
 }
 
