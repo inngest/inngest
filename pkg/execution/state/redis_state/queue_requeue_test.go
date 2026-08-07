@@ -705,7 +705,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		// use future timestamp because scores will be bounded to the present
 		at := now.Add(10 * time.Minute)
 
-		sysQueueName := osqueue.KindQueueMigrate
+		sysQueueName := osqueue.KindCancel
 
 		t.Run("should requeue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)

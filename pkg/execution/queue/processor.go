@@ -72,7 +72,7 @@ func New(
 		),
 		Consumer:        NewConsumer(shards),
 		JobQueueReader:  newJobQueueReader(shards, o.AccountShardIterationEnabled),
-		Migrator:        newQueueMigrator(shards, o.Clock),
+		MigrationLocker: newQueueMigrationLocker(shards),
 		Unpauser:        newQueueUnpauser(shards),
 		AttemptResetter: newAttemptResetter(shards),
 
@@ -110,7 +110,7 @@ type queueProcessor struct {
 	Producer
 	Consumer
 	JobQueueReader
-	Migrator
+	MigrationLocker
 	Unpauser
 	AttemptResetter
 
