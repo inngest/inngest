@@ -33,34 +33,28 @@ func TestBuildAuthzRoutesCoversEveryBinding(t *testing.T) {
 		require.NotEmpty(t, r.HTTPMethod)
 		require.NotEmpty(t, r.PathTemplate)
 	}
-	// Exactly two public routes; everything else must require a grant. Totals
-	// are deliberately not pinned — they change whenever an endpoint is added,
-	// and the per-route assertions above are what actually matter.
+	// Totals are not pinned, since they change whenever an endpoint is added
+	// and the per-route assertions above are what matter.
 	require.Equal(t, 2, exempt)
 	require.Greater(t, protected, 0)
 }
 
-// These are the cases the previous path-keyed map got wrong: it stored the
-// template and looked up the concrete URL, so anything parameterised never
-// matched, and it had no HTTP method in the key at all.
+// A path-keyed map cannot serve these: it would store the template and be
+// looked up by concrete URL, so anything parameterised never matches.
 func TestMatcherResolvesConcreteURLs(t *testing.T) {
 	m := newTestMatcher(t)
 
 	cases := []struct {
 		method, path, wantGrant string
 	}{
-		// Single path parameter — never matched under the old map.
 		{http.MethodPost, "/apps/abc-123/syncs", "api:app:write"},
 		{http.MethodGet, "/runs/01JPVDWE5Q1K8ZH3JW31HNW5QS", "api:run:read"},
-		// Multiple parameters.
 		{http.MethodGet, "/apps/my-app/functions/my-fn", "api:function:read"},
 		{http.MethodPost, "/apps/my-app/functions/my-fn/invoke", "api:function:write"},
-		// Multi-segment wildcard with a literal suffix after it — the case that
+		// Multi-segment wildcard with a literal suffix after it, the case that
 		// disqualified chi, whose wildcards must be terminal.
 		{http.MethodGet, "/sessions/key-1/sess/nested/id/runs", "api:session:read"},
-		// Multi-segment wildcard at the end.
 		{http.MethodGet, "/apps/a/functions/f/experiments/exp/nested", "api:experiment:read"},
-		// Static paths still work.
 		{http.MethodGet, "/runs", "api:run:read"},
 		{http.MethodGet, "/account", "api:account:read"},
 	}
@@ -75,8 +69,8 @@ func TestMatcherResolvesConcreteURLs(t *testing.T) {
 	}
 }
 
-// Same path, different method, different grant — inexpressible in the old
-// path-only map, which would have applied one grant to both.
+// Same path, different method, different grant, which a path-only map
+// cannot express.
 func TestMatcherDistinguishesMethods(t *testing.T) {
 	m := newTestMatcher(t)
 
@@ -106,9 +100,8 @@ func TestMatcherReportsExemptRoutes(t *testing.T) {
 	require.Empty(t, got.Grant)
 }
 
-// A miss must be distinguishable from an exempt match: the caller passes
-// unmatched requests through to the gateway, which 404s them, rather than
-// denying and turning a typo'd URL into a 403.
+// A miss must be distinguishable from an exempt match, so the caller can
+// answer 404 rather than turning a typo'd URL into a 403.
 func TestMatcherMisses(t *testing.T) {
 	m := newTestMatcher(t)
 
@@ -121,7 +114,6 @@ func TestMatcherMisses(t *testing.T) {
 		require.False(t, ok, "%s should not match any v2 route", path)
 	}
 
-	// Right path, wrong method.
 	_, ok := m.Match(http.MethodDelete, "/runs")
 	require.False(t, ok)
 }
@@ -141,14 +133,13 @@ func TestMatcherCoversAdditionalBindings(t *testing.T) {
 	require.Equal(t, "api:experiment:read", secondary.Grant)
 }
 
-// Templates can legitimately overlap: `{experiment_id=**}` also matches the
-// ListExperiments binding one segment shorter, so which route wins depends on
+// Templates can legitimately overlap, so which route wins depends on
 // registration order. That is safe only while overlapping routes agree on the
-// grant — otherwise which permission is enforced would depend on proto
-// declaration order, which is not a property anyone should have to reason about.
+// grant; otherwise the permission enforced would depend on proto declaration
+// order.
 //
-// This asserts the safe version: every template is reachable, and whatever route
-// a probe lands on requires the same grant as the template it came from.
+// This asserts every template is reachable and that whatever route a probe
+// lands on requires the same grant as the template it came from.
 func TestOverlappingRoutesAgreeOnGrant(t *testing.T) {
 	routes := BuildAuthzRoutes()
 	m := newTestMatcher(t)
@@ -204,8 +195,7 @@ func concreteProbe(template string) string {
 				}
 				j++
 			}
-			// A "=**" parameter spans multiple segments; give it two so the
-			// probe genuinely exercises the wildcard.
+			// A "=**" parameter spans multiple segments, so give it two.
 			if containsWildcard(template[i:j]) {
 				out += "probe/probe2"
 			} else {
@@ -244,7 +234,6 @@ func TestMatcherDoesNotConsumeRequestBody(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "api:app:write", got.Grant)
 
-	// The original request is untouched: same method, body still readable.
 	require.Equal(t, http.MethodPost, req.Method)
 	buf := make([]byte, len(body))
 	n, _ := req.Body.Read(buf)
@@ -252,16 +241,16 @@ func TestMatcherDoesNotConsumeRequestBody(t *testing.T) {
 }
 
 // Callers pass r.URL.Path, which net/http has already percent-decoded. The
-// matcher must not decode it a second time: the gateway splits that exact
-// string on "/", so an extra decode can invent segments the gateway never saw,
-// turn a protected route into a miss, and skip the grant check.
+// matcher must not decode it again: the gateway splits that exact string on
+// "/", so an extra decode invents segments the gateway never saw, turns a
+// protected route into a miss, and skips the grant check.
 //
 // Each case is a path that reaches the gateway looking exactly like this.
 func TestMatcherDoesNotDecodeThePathAgain(t *testing.T) {
 	m := newTestMatcher(t)
 
-	// Wire /runs/x%252Fy/cancel — the gateway sees three segments and cancels a
-	// run. Re-parsing turned "%2F" into a separator and matched nothing.
+	// Wire /runs/x%252Fy/cancel. The gateway sees three segments and cancels a
+	// run; re-parsing turns "%2F" into a separator and matches nothing.
 	got, ok := m.Match(http.MethodPost, "/runs/x%2Fy/cancel")
 	require.True(t, ok, "a literal %%2F in a path parameter must not split the path")
 	require.Equal(t, "api:run:write", got.Grant)

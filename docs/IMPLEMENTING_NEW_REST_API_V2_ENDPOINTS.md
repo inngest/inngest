@@ -152,7 +152,7 @@ make protobuf
 
 #### Authorization Grants
 
-Every rpc must carry an `(authz)` option — either a grant or `exempt: true`.
+Every rpc must carry an `(authz)` option: either a grant or `exempt: true`.
 `TestGrantCatalogIsValid` fails the build otherwise, which is deliberate: an
 endpoint with no annotation would otherwise ship unprotected.
 
@@ -160,21 +160,21 @@ Grants are declared once at the top of `service.proto`:
 
 ```protobuf
 option (grant_definition) = {
-  name: "api:run"                      // ^api:[a-z]+$ — resource only, no action
+  name: "api:run"                      // ^api:[a-z]+$, resource only, no action
   description: "Function runs and traces, including rerunning and cancelling"
   category: "Apps, Functions & Runs"   // one of the four minting-UI categories
 };
 ```
 
 A grant covers many endpoints, which is why the description lives on the
-declaration rather than on each method — see `proto/api/v2/options.proto`.
+declaration rather than on each method. See `proto/api/v2/options.proto`.
 
 After changing grants or annotations, run `make grant-catalog` and review the
 diff in `pkg/api/v2/apiv2base/testdata/grant_catalog.json`. That file is the
 committed record of every permission the API offers, and CI checks it is current.
 
 If you add `additional_bindings` to a method, both paths inherit the same grant
-automatically — but confirm it in the catalog diff, since a missed binding is a
+automatically, but confirm it in the catalog diff, since a missed binding is a
 route that enforcement would not cover.
 
 #### Key Conventions

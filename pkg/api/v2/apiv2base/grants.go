@@ -12,42 +12,38 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// grantNameRe constrains a grant to namespace + resource, with no action
-// segment accidentally baked into the name.
+// A grant name is namespace + resource, with no action segment baked in.
 var grantNameRe = regexp.MustCompile(`^api:[a-z]+$`)
 
-// Actions a grant can be held for. These mirror the AuthzAction enum; the
-// wire format stores them as the action list on an API key's scope rule.
+// Mirror the AuthzAction enum. The wire format stores these as the action list
+// on an API key's scope rule.
 const (
 	ActionRead  = "read"
 	ActionWrite = "write"
 )
 
-// Grant is one selectable permission: a resource plus an action, with the
-// prose the minting UI and the OpenAPI docs both render.
+// Grant is one selectable permission: a resource plus an action.
 //
-// Name is the resource half only ("api:run"); the label shown to people is
+// Name is the resource half only ("api:run"). The label shown to people is
 // Name + ":" + Action, which is also what an OpenAPI operation advertises.
 type Grant struct {
 	Name        string
 	Action      string
 	Description string
 	Category    string
-	// Sensitive marks a grant that must never be handed out by a preset. It is
-	// declared per resource, so it covers both actions: a resource whose read
-	// half is dangerous has no safe half to preselect.
+	// Sensitive grants are never handed out by a preset. Declared per resource,
+	// so it covers both actions: a resource whose read half is dangerous has no
+	// safe half to preselect.
 	Sensitive bool
-	// Internal marks a grant that is enforced but never offered for minting.
-	// Grants carrying it are absent from GrantCatalog entirely, so only AllGrants
-	// ever reports one.
+	// Internal grants are enforced but never offered for minting. They are
+	// absent from GrantCatalog, so only AllGrants reports one.
 	Internal bool
 }
 
-// String returns the human-facing label, e.g. "api:run:read".
+// String returns the label, e.g. "api:run:read".
 func (g Grant) String() string { return g.Name + ":" + g.Action }
 
-// grantDefinitions returns the grant catalog declared as file options on
-// service.proto, keyed by name.
+// The catalog is declared as file options on service.proto.
 func grantDefinitions() map[string]*apiv2.GrantDefinition {
 	out := map[string]*apiv2.GrantDefinition{}
 	opts := apiv2.File_api_v2_service_proto.Options()
@@ -64,7 +60,6 @@ func grantDefinitions() map[string]*apiv2.GrantDefinition {
 	return out
 }
 
-// actionString maps the annotation enum onto the stored action name.
 func actionString(a apiv2.AuthzAction) string {
 	switch a {
 	case apiv2.AuthzAction_AUTHZ_ACTION_READ:
@@ -77,27 +72,25 @@ func actionString(a apiv2.AuthzAction) string {
 }
 
 // GrantCatalog returns the grants an API key may be minted with: every (grant,
-// action) pair some endpoint requires, minus the ones declared internal, sorted
-// by name then action.
+// action) pair some endpoint requires, minus the internal ones, sorted by name
+// then action.
 //
-// This is the one list every minting surface reads — the key-creation UI, the
-// member policy, and the presets — so excluding a grant here withdraws it from
-// all of them at once. A pair no endpoint requires is deliberately absent too:
-// offering a toggle that gates nothing would be a lie in the minting UI.
+// Every minting surface reads this one list, so excluding a grant withdraws it
+// from all of them at once. A pair no endpoint requires is absent too, since a
+// toggle that gates nothing would mislead.
 //
 // Enforcement does not read this. The middleware resolves a route's requirement
-// through GrantForMethod, and the OpenAPI docs through GrantsByHTTPRoute, so an
-// internal grant is still required on its routes — it just cannot be asked for.
+// through GrantForMethod and the OpenAPI docs through GrantsByHTTPRoute, so an
+// internal grant is still required on its routes; it just cannot be asked for.
 func GrantCatalog() []Grant {
 	return collectGrants(false)
 }
 
 // AllGrants returns every declared (grant, action) pair, internal ones included.
 //
-// Only the committed catalog snapshot uses it: the snapshot is where a reviewer
-// sees what the API declares, so hiding internal grants from it would make
-// flipping the flag invisible in review — which is the opposite of what that
-// artifact is for.
+// Only the committed catalog snapshot uses it. The snapshot is where a reviewer
+// sees what the API declares, so hiding internal grants would make flipping the
+// flag invisible in review.
 func AllGrants() []Grant {
 	return collectGrants(true)
 }
@@ -143,9 +136,8 @@ func collectGrants(includeInternal bool) []Grant {
 	return out
 }
 
-// GrantForMethod returns the grant label an endpoint requires, e.g.
-// "api:run:read". The second return is false for exempt or unannotated
-// methods.
+// GrantForMethod returns the grant label an endpoint requires. The second
+// return is false for exempt or unannotated methods.
 func GrantForMethod(method protoreflect.MethodDescriptor) (string, bool) {
 	opts := authzOptions(method)
 	if opts == nil || opts.GetExempt() {
@@ -158,16 +150,14 @@ func GrantForMethod(method protoreflect.MethodDescriptor) (string, bool) {
 	return name + ":" + action, true
 }
 
-// HTTPBinding is one HTTP route an rpc answers on. A method can have several:
-// google.api.http supports additional_bindings, and every binding needs the
-// same grant or a request arriving on the secondary route would match no rule.
+// HTTPBinding is one HTTP route an rpc answers on. A method can have several
+// through additional_bindings, and every binding needs the same grant or a
+// request arriving on the secondary route would match no rule.
 type HTTPBinding struct {
 	Method string
 	Path   string
 }
 
-// httpBindings returns every route a method answers on — the primary binding
-// plus any additional_bindings.
 func httpBindings(method protoreflect.MethodDescriptor) []HTTPBinding {
 	rule := getHTTPRule(method)
 	if rule == nil {
@@ -188,13 +178,12 @@ func httpBindings(method protoreflect.MethodDescriptor) []HTTPBinding {
 	return out
 }
 
-// GrantsByHTTPRoute maps "METHOD /path/template" to the grant label that route
+// GrantsByHTTPRoute maps "METHOD /path/template" to the grant that route
 // requires, covering every binding of every protected method.
 //
-// Keys use the proto path template verbatim. Note that the generated OpenAPI
-// document does NOT use these keys as-is — protoc-gen-openapiv2 camelCases path
-// parameters and drops the `=**` suffix — so a docs consumer has to canonicalize
-// both sides rather than matching literally.
+// Keys use the proto path template verbatim. The generated OpenAPI document
+// does not: protoc-gen-openapiv2 camelCases path parameters and drops the `=**`
+// suffix, so a docs consumer has to canonicalize both sides.
 func GrantsByHTTPRoute() map[string]string {
 	out := map[string]string{}
 	forEachMethod(func(method protoreflect.MethodDescriptor) {
@@ -209,19 +198,17 @@ func GrantsByHTTPRoute() map[string]string {
 	return out
 }
 
-// CanonicalRoute reduces a route to "METHOD /a/{}/b" by replacing each path
-// parameter with an empty placeholder. This makes proto templates comparable
-// with the generated OpenAPI paths, whose parameter names are camelCased and
-// whose `=**` suffixes are stripped.
+// CanonicalRoute reduces a route to "METHOD /a/{}/b", making proto templates
+// comparable with the generated OpenAPI paths, whose parameter names are
+// camelCased and whose `=**` suffixes are stripped.
 func CanonicalRoute(httpMethod, path string) string {
 	return strings.ToUpper(httpMethod) + " " + pathParamRe.ReplaceAllString(path, "{}")
 }
 
 var pathParamRe = regexp.MustCompile(`\{[^}]*\}`)
 
-// ValidateGrantCatalog checks the annotations hold together. It is called from
-// tests rather than at startup: a violation is a build-time authoring mistake,
-// not a runtime condition.
+// Called from tests rather than at startup: a violation is a build-time
+// authoring mistake, not a runtime condition.
 func ValidateGrantCatalog(allowedCategories []string) error {
 	defs := grantDefinitions()
 	allowed := map[string]bool{}
@@ -232,7 +219,6 @@ func ValidateGrantCatalog(allowedCategories []string) error {
 	var errs []string
 	referenced := map[string]bool{}
 
-	// Declarations are well-formed.
 	for name, d := range defs {
 		if !grantNameRe.MatchString(name) {
 			errs = append(errs, fmt.Sprintf("grant %q: name must match %s", name, grantNameRe))
@@ -245,7 +231,6 @@ func ValidateGrantCatalog(allowedCategories []string) error {
 		}
 	}
 
-	// Every method is either annotated with a declared grant, or exempt.
 	forEachMethod(func(method protoreflect.MethodDescriptor) {
 		name := string(method.Name())
 		opts := authzOptions(method)
@@ -272,7 +257,6 @@ func ValidateGrantCatalog(allowedCategories []string) error {
 		referenced[opts.GetGrant()] = true
 	})
 
-	// No declared grant is unreachable.
 	for name := range defs {
 		if !referenced[name] {
 			errs = append(errs, fmt.Sprintf("grant %q is declared but no rpc requires it — the minting UI would offer a toggle that gates nothing", name))
@@ -286,7 +270,6 @@ func ValidateGrantCatalog(allowedCategories []string) error {
 	return nil
 }
 
-// forEachMethod walks the V2 service's methods.
 func forEachMethod(fn func(protoreflect.MethodDescriptor)) {
 	serviceDesc := apiv2.File_api_v2_service_proto.Services().ByName("V2")
 	if serviceDesc == nil {

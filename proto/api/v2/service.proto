@@ -65,9 +65,9 @@ option (grant_definition) = {
   name: "api:key"
   description: "Event keys and signing keys. Signing keys grant full SDK access, so treat this as sensitive"
   category: "Accounts, Environments & Keys"
-  // The read half returns the decrypted signing key, which is the documented
-  // credential for the SDKs and for v0/v1 — so a key holding this can do
-  // everything the write grants exist to gate. Never preselected.
+  // The read half returns the decrypted signing key, the documented credential
+  // for the SDKs and for v0/v1, so a key holding this can do everything the
+  // write grants exist to gate. Never preselected.
   sensitive: true
 };
 option (grant_definition) = {
@@ -75,10 +75,10 @@ option (grant_definition) = {
   description: "Partner sub-accounts"
   category: "Accounts, Environments & Keys"
   // Not mintable, and not shown anywhere a key is created. The partner routes
-  // cross account boundaries — FetchAccount serves any child account to a caller
-  // holding the read half — and the keys that use them are provisioned out of
-  // band with wildcard scopes, never selected from the catalog. The routes stay
-  // enforced; only the offer is withdrawn.
+  // cross account boundaries, since FetchAccount serves any child account to a
+  // caller holding the read half, and the keys that use them are provisioned out
+  // of band with wildcard scopes. The routes stay enforced; only the offer is
+  // withdrawn.
   internal: true
 };
 option (grant_definition) = {

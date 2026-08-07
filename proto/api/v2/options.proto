@@ -18,18 +18,17 @@ extend google.protobuf.FileOptions {
   repeated GrantDefinition grant_definition = 50002;
 }
 
-// AuthzAction is the action half of a grant. Deliberately closed: the two
-// buckets are the whole model, and a typo'd string here would produce a grant
-// name no API key can ever match, i.e. a silent 403 on a correctly-minted key.
+// AuthzAction is the action half of a grant. An enum rather than a string,
+// because a typo would produce a grant name no API key can match, i.e. a silent
+// 403 on a correctly minted key.
 enum AuthzAction {
   AUTHZ_ACTION_UNSPECIFIED = 0;
   AUTHZ_ACTION_READ = 1;
   AUTHZ_ACTION_WRITE = 2;
 }
 
-// GrantDefinition declares one grant: what it's called, what it means, and
-// where the key-minting UI groups it. The name is the resource half only —
-// the action comes from each method's AuthzOptions.
+// GrantDefinition declares one grant. The name is the resource half only; the
+// action comes from each method's AuthzOptions.
 message GrantDefinition {
   // Resource name, no action. Must match ^api:[a-z]+$, e.g. "api:run".
   string name = 1;
@@ -59,7 +58,7 @@ message AuthzOptions {
   AuthzAction action = 3;
   // Marks an endpoint as deliberately public. Set this rather than leaving the
   // annotation off, so a missing annotation stays distinguishable from an
-  // intentional exemption — that distinction is what makes fail-closed
-  // enforcement safe to turn on. Always comment why.
+  // intentional exemption, which is what makes fail-closed enforcement safe to
+  // turn on. Always comment why.
   bool exempt = 4;
 }

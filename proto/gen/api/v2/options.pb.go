@@ -22,9 +22,9 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// AuthzAction is the action half of a grant. Deliberately closed: the two
-// buckets are the whole model, and a typo'd string here would produce a grant
-// name no API key can ever match, i.e. a silent 403 on a correctly-minted key.
+// AuthzAction is the action half of a grant. An enum rather than a string,
+// because a typo would produce a grant name no API key can match, i.e. a silent
+// 403 on a correctly minted key.
 type AuthzAction int32
 
 const (
@@ -74,9 +74,8 @@ func (AuthzAction) EnumDescriptor() ([]byte, []int) {
 	return file_api_v2_options_proto_rawDescGZIP(), []int{0}
 }
 
-// GrantDefinition declares one grant: what it's called, what it means, and
-// where the key-minting UI groups it. The name is the resource half only —
-// the action comes from each method's AuthzOptions.
+// GrantDefinition declares one grant. The name is the resource half only; the
+// action comes from each method's AuthzOptions.
 type GrantDefinition struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Resource name, no action. Must match ^api:[a-z]+$, e.g. "api:run".
@@ -173,8 +172,8 @@ type AuthzOptions struct {
 	Action AuthzAction `protobuf:"varint,3,opt,name=action,proto3,enum=api.v2.AuthzAction" json:"action,omitempty"`
 	// Marks an endpoint as deliberately public. Set this rather than leaving the
 	// annotation off, so a missing annotation stays distinguishable from an
-	// intentional exemption — that distinction is what makes fail-closed
-	// enforcement safe to turn on. Always comment why.
+	// intentional exemption, which is what makes fail-closed enforcement safe to
+	// turn on. Always comment why.
 	Exempt        bool `protobuf:"varint,4,opt,name=exempt,proto3" json:"exempt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

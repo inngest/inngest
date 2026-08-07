@@ -95,15 +95,12 @@ type Error struct {
 
 // WriteHTTP renders an error to the response as JSON.
 //
-// An error that did not come from this package carries no status, and used to
-// fall through to WriteHeader's implicit 200 — so a handler passing one along
-// answered with what every client reads as success: status 200 and a body of
-// `{}`, since a plain error has no exported fields to marshal. A failed query
-// was indistinguishable from an empty result. Those now render as 500.
-//
-// The response says nothing more than the default message. An error that never
-// went through this package was not written to be read by the public and may
-// name internals; the caller keeps the original for logging.
+// An error that did not come from this package carries no status. Those used to
+// fall through to WriteHeader's implicit 200, so a failed query answered with
+// status 200 and a body of `{}` and was indistinguishable from an empty result.
+// They now render as 500 with the default message only, because such an error
+// was not written to be read by the public and may name internals. The caller
+// keeps the original for logging.
 func WriteHTTP(w http.ResponseWriter, e error) error {
 	pe, ok := asError(e)
 	if !ok {
@@ -111,18 +108,15 @@ func WriteHTTP(w http.ResponseWriter, e error) error {
 	}
 	if pe.Status == 0 {
 		// WriteHeader(0) panics, so an Error built without a status still has to
-		// resolve to something. 500 is the honest answer: it reached here as an
-		// error.
+		// resolve to something.
 		pe.Status = DefaultStatus
 	}
 	w.WriteHeader(pe.Status)
 	return json.NewEncoder(w).Encode(pe)
 }
 
-// asError returns the public error e carries, if it is one. Deliberately a
-// direct type check rather than errors.As: promoting a status out of a wrapped
-// error would change what existing handlers answer, which is a wider change than
-// this needs to make.
+// A direct type check rather than errors.As: promoting a status out of a
+// wrapped error would change what existing handlers answer.
 func asError(e error) (Error, bool) {
 	switch v := e.(type) {
 	case Error:

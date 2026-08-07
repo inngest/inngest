@@ -32,9 +32,8 @@ func getHTTPMethodAndPath(method protoreflect.MethodDescriptor) (httpMethod, pat
 	return httpMethodAndPathFromRule(httpRule)
 }
 
-// httpMethodAndPathFromRule extracts the HTTP method and path from a single
-// HttpRule. Split out from getHTTPMethodAndPath so additional_bindings, which
-// are themselves HttpRules, can be read with the same logic.
+// Split out from getHTTPMethodAndPath so additional_bindings, which are
+// themselves HttpRules, can be read with the same logic.
 func httpMethodAndPathFromRule(httpRule *annotations.HttpRule) (httpMethod, path string) {
 	if httpRule == nil {
 		return http.MethodPost, ""
@@ -69,7 +68,6 @@ func getHTTPMethod(method protoreflect.MethodDescriptor) string {
 	return httpMethod
 }
 
-// authzOptions returns the authz annotation for a method, or nil when absent.
 func authzOptions(method protoreflect.MethodDescriptor) *apiv2.AuthzOptions {
 	opts := method.Options()
 	if !proto.HasExtension(opts, apiv2.E_Authz) {
