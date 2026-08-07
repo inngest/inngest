@@ -39,7 +39,7 @@ func BenchmarkKeyQueues(b *testing.B) {
 		osqueue.WithKindToQueueMapping(map[string]string{
 			osqueue.KindPause:           osqueue.KindPause,
 			osqueue.KindDebounce:        osqueue.KindDebounce,
-			osqueue.KindQueueMigrate:    osqueue.KindQueueMigrate,
+			osqueue.KindCancel:          osqueue.KindCancel,
 			osqueue.KindPauseBlockFlush: osqueue.KindPauseBlockFlush,
 			osqueue.KindScheduleBatch:   osqueue.KindScheduleBatch,
 		}),

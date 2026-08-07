@@ -1422,7 +1422,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		t.Run("should lease item", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
 
-			sysQueueName := osqueue.KindQueueMigrate
+			sysQueueName := osqueue.KindCancel
 
 			item1 := osqueue.QueueItem{
 				ID: "test",

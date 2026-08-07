@@ -282,9 +282,6 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleCron(ctx, item)
 		case queue.KindCronHealthCheck:
 			err = s.handleCronHealthCheck(ctx, item)
-		case queue.KindQueueMigrate:
-			// NOOP:
-			// this kind don't work in the Dev server
 		case queue.KindFunctionPause, queue.KindFunctionUnpause:
 			// NOOP:
 			// Function pausing and unpausing is not implemented in the dev server.

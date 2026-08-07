@@ -27,7 +27,7 @@ func TestSystemQueueConfigs(t *testing.T) {
 		queue.KindScheduleBatch: queue.KindScheduleBatch,
 		"pause-event":           "pause-event",
 		queue.KindDebounce:      queue.KindDebounce,
-		queue.KindQueueMigrate:  queue.KindQueueMigrate,
+		queue.KindCancel:        queue.KindCancel,
 	}
 
 	r := miniredis.RunT(t)
