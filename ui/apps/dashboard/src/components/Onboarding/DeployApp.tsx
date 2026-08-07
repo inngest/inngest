@@ -115,7 +115,7 @@ export default function DeployApp() {
           </p>
           <Secret
             kind="signing-key"
-            secret={env.webhookSigningKey}
+            secret={env.webhookSigningKey ?? ''}
             className="mb-6"
           />
           <Button
@@ -282,7 +282,7 @@ export default function DeployApp() {
           <div className="text-basis mb-2 text-sm font-medium">Signing key</div>
           <Secret
             kind="signing-key"
-            secret={env.webhookSigningKey}
+            secret={env.webhookSigningKey ?? ''}
             className="mb-6"
           />
           <Button

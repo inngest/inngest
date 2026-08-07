@@ -48,55 +48,56 @@ export function Modal({
     <Dialog.Root open={isOpen} onOpenChange={onClose} modal>
       <AnimatePresence>
         <Dialog.Portal container={container}>
+          {/* The overlay must be a sibling of Dialog.Content, not its ancestor.
+              It is aria-hidden, and aria-hidden is inherited, so nesting the
+              content inside it removed the whole modal from the accessibility
+              tree. */}
           <Dialog.Overlay
-            asChild
             className="bg-overlay/20 dark:bg-overlay/50 fixed inset-0 z-[100] transition-opacity"
             aria-hidden="true"
-          >
-            {/* Full-screen container to center the panel */}
-            <div className="fixed inset-0 z-[100]">
-              <motion.div
+          />
+          <div className="fixed inset-0 z-[100]">
+            <motion.div
+              className={cn(
+                alignTop ? 'items-baseline' : 'items-center',
+                'flex h-full w-full justify-center p-6'
+              )}
+              initial={{ y: -20, opacity: 0.2 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{
+                y: -20,
+                opacity: 0.2,
+                transition: { duration: 0.2, type: 'tween' },
+              }}
+              transition={{
+                duration: 0.15,
+                type: 'tween',
+              }}
+            >
+              <Dialog.Content
                 className={cn(
-                  alignTop ? 'items-baseline' : 'items-center',
-                  'flex h-full w-full justify-center p-6'
+                  'bg-modalBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-md border shadow-2xl',
+                  className
                 )}
-                initial={{ y: -20, opacity: 0.2 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{
-                  y: -20,
-                  opacity: 0.2,
-                  transition: { duration: 0.2, type: 'tween' },
-                }}
-                transition={{
-                  duration: 0.15,
-                  type: 'tween',
-                }}
               >
-                <Dialog.Content
-                  className={cn(
-                    'bg-modalBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-md border shadow-2xl',
-                    className
-                  )}
-                >
-                  {(title || description) && <Header description={description}>{title}</Header>}
-                  {children}
-                  {footer && <Footer>{footer}</Footer>}
-                </Dialog.Content>
-              </motion.div>
-            </div>
-          </Dialog.Overlay>
+                {(title || description) && <Header description={description}>{title}</Header>}
+                {children}
+                {footer && <Footer>{footer}</Footer>}
+              </Dialog.Content>
+            </motion.div>
+          </div>
         </Dialog.Portal>
       </AnimatePresence>
     </Dialog.Root>
   );
 }
 
-function Body({ children }: React.PropsWithChildren<{}>) {
-  return <div className="text-basis m-6">{children}</div>;
+function Body({ children, className }: React.PropsWithChildren<{ className?: string }>) {
+  return <div className={cn('text-basis m-6', className)}>{children}</div>;
 }
 
 function Footer({ children, className }: React.PropsWithChildren<{ className?: string }>) {
-  return <div className={cn('border-subtle border-t p-6', className)}>{children}</div>;
+  return <div className={cn('border-subtle shrink-0 border-t p-6', className)}>{children}</div>;
 }
 
 function Header({
@@ -104,7 +105,7 @@ function Header({
   description,
 }: React.PropsWithChildren<{ description?: React.ReactNode }>) {
   return (
-    <div className="bg-modalBase border-subtle border-b p-6">
+    <div className="bg-modalBase border-subtle shrink-0 border-b p-6">
       <Dialog.Title className="text-basis text-xl">{children}</Dialog.Title>
 
       {description && (

@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
+import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Link } from '@inngest/components/Link';
-import { Switch } from '@inngest/components/Switch';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@inngest/components/Tooltip';
 import { useOrganization } from '@clerk/tanstack-react-start';
-import { RiAddLine } from '@remixicon/react';
+import {
+  RiAddLine,
+  RiInformationLine,
+  RiShieldUserLine,
+} from '@remixicon/react';
 import { createFileRoute } from '@tanstack/react-router';
-import { useMutation } from 'urql';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import { APIKeysEmptyState } from '@/components/APIKeys/EmptyState';
@@ -19,23 +20,13 @@ import {
   APIKeysTable,
   type APIKeyRow,
 } from '@/components/APIKeys/APIKeysTable';
-import {
-  allowMemberKeysEnabled,
-  AllowMemberKeysQuery,
-  settingQueryContext,
-} from '@/components/APIKeys/allowMemberKeys';
 import { CreateAPIKeyModal } from '@/components/APIKeys/CreateAPIKeyModal';
+import { APIKeyGrantsQuery } from '@/components/APIKeys/grants';
+import { MemberKeyPolicyModal } from '@/components/APIKeys/MemberKeyPolicyModal';
 import { DeleteAPIKeyModal } from '@/components/APIKeys/DeleteAPIKeyModal';
 import { RenameAPIKeyModal } from '@/components/APIKeys/RenameAPIKeyModal';
 import { useAPIKeys } from '@/components/APIKeys/useAPIKeys';
-import { graphql } from '@/gql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
-
-const SetAllowMemberKeysMutation = graphql(`
-  mutation SetAllowMemberAPIKeys($enabled: Boolean!) {
-    setAllowMemberAPIKeys(enabled: $enabled)
-  }
-`);
 
 export const Route = createFileRoute('/_authed/settings/api-keys/')({
   component: APIKeysPage,
@@ -48,53 +39,20 @@ function APIKeysPage() {
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
-  const settingRes = useGraphQLQuery({
-    query: AllowMemberKeysQuery,
+  const policyRes = useGraphQLQuery({
+    query: APIKeyGrantsQuery,
     variables: {},
-    context: settingQueryContext,
   });
-  const [, setAllowMemberKeys] = useMutation(SetAllowMemberKeysMutation);
-  // Optimistic toggle value; the query refetch confirms it after the
-  // mutation invalidates AccountSetting.
-  const [pendingEnabled, setPendingEnabled] = useState<boolean | null>(null);
-  const [settingSaving, setSettingSaving] = useState(false);
-  const [settingError, setSettingError] = useState<string | null>(null);
-
-  // If the setting can't be read, members just see the admins-only default.
-  const memberKeysEnabled = allowMemberKeysEnabled(
-    settingRes.data?.account.setting?.value,
-  );
-  const canCreate = isAdmin || memberKeysEnabled;
-
-  // Clear the optimistic value once the refetch confirms it, so it can't
-  // shadow another admin's later toggle.
-  useEffect(() => {
-    if (pendingEnabled !== null && pendingEnabled === memberKeysEnabled) {
-      setPendingEnabled(null);
-    }
-  }, [pendingEnabled, memberKeysEnabled]);
+  const canCreate =
+    isAdmin || (policyRes.data?.account.memberAPIKeyPolicy.enabled ?? false);
+  const catalog = policyRes.data?.apiKeyGrants ?? [];
 
   // Create modal state is owned here so it survives the empty->populated
   // transition that unmounts the EmptyState.
   const [createOpen, setCreateOpen] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<APIKeyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<APIKeyRow | null>(null);
-
-  async function toggleAllowMemberKeys(enabled: boolean) {
-    setPendingEnabled(enabled);
-    setSettingSaving(true);
-    try {
-      const mutRes = await setAllowMemberKeys({ enabled }, settingQueryContext);
-      if (mutRes.error) {
-        setPendingEnabled(null);
-        setSettingError('Could not update the policy. Try again.');
-      } else {
-        setSettingError(null);
-      }
-    } finally {
-      setSettingSaving(false);
-    }
-  }
 
   if (res.error) {
     throw res.error;
@@ -113,6 +71,11 @@ function APIKeysPage() {
     maskedKey: k.maskedKey,
     createdAt: k.createdAt,
     env: k.env ? { id: k.env.id, name: k.env.name } : null,
+    envs: k.envs.map((e) => ({ id: e.id, name: e.name })),
+    envScope: k.envScope,
+    scopes: k.scopes.map((s) => ({ name: s.name, allow: s.allow })),
+    grants: k.grants,
+    createdByViewer: k.createdByViewer,
     createdBy: k.createdBy
       ? { name: k.createdBy.name, email: k.createdBy.email }
       : null,
@@ -130,70 +93,79 @@ function APIKeysPage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 py-8">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-basis text-2xl">API keys</h1>
-          <p className="text-subtle max-w-2xl text-sm">
-            API keys are shared credentials that allow your applications to
-            authenticate with Inngest. They provide a secure way to connect, run
-            functions, and manage workflows.{' '}
-            <Link
-              href="https://www.inngest.com/docs/platform/api-keys?ref=dashboard-api-keys"
-              className="inline-flex"
-            >
-              Learn more
-            </Link>
-          </p>
+    <div className="w-full py-8">
+      <div className="mx-auto flex w-full max-w-[1000px] min-w-0 flex-col gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-basis text-2xl">API keys</h1>
+            <p className="text-subtle max-w-2xl text-sm">
+              API keys are shared credentials that allow your applications to
+              authenticate with Inngest. They provide a secure way to connect,
+              run functions, and manage workflows.{' '}
+              <Link
+                href="https://www.inngest.com/docs/platform/api-keys?ref=dashboard-api-keys"
+                className="inline-flex"
+              >
+                Learn more
+              </Link>
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {isAdmin && (
+              <Button
+                appearance="outlined"
+                kind="secondary"
+                icon={<RiShieldUserLine />}
+                iconSide="left"
+                label="Member key policy"
+                onClick={() => setPolicyOpen(true)}
+              />
+            )}
+            {canCreate ? (
+              createButton
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0}>{createButton}</span>
+                </TooltipTrigger>
+                <TooltipContent>{ADMIN_TOOLTIP}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
-        {canCreate ? (
-          createButton
+
+        {/* Spells out member limits rather than leaving them to be inferred
+            from which rows have buttons. */}
+        {!isAdmin && (
+          <div className="border-subtle bg-canvasSubtle text-subtle flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs">
+            <RiInformationLine className="text-muted h-3.5 w-3.5 shrink-0" />
+            You can see every key in this account. You can only rename or revoke
+            keys you created, and new keys you create are limited to the
+            permissions your admins allow.
+          </div>
+        )}
+
+        {keys.length === 0 ? (
+          <APIKeysEmptyState
+            onCreate={() => setCreateOpen(true)}
+            canCreate={canCreate}
+            disabledTooltip={ADMIN_TOOLTIP}
+          />
         ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span tabIndex={0}>{createButton}</span>
-            </TooltipTrigger>
-            <TooltipContent>{ADMIN_TOOLTIP}</TooltipContent>
-          </Tooltip>
+          <APIKeysTable
+            keys={keys}
+            catalog={catalog}
+            isAdmin={isAdmin}
+            onRename={setRenameTarget}
+            onDelete={setDeleteTarget}
+          />
         )}
       </div>
 
       {isAdmin && (
-        <div className="border-subtle flex items-start justify-between gap-4 rounded-md border p-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-basis text-sm font-medium">
-              Allow members to create API keys
-            </span>
-            <span className="text-subtle text-sm">
-              Members can create API keys from this page or by logging in with
-              the Inngest CLI. Admins can always create API keys.
-            </span>
-            {settingError && (
-              <Alert severity="error" className="mt-2 text-sm">
-                {settingError}
-              </Alert>
-            )}
-          </div>
-          <Switch
-            checked={pendingEnabled ?? memberKeysEnabled}
-            onCheckedChange={toggleAllowMemberKeys}
-            disabled={settingSaving || settingRes.isLoading}
-          />
-        </div>
-      )}
-
-      {keys.length === 0 ? (
-        <APIKeysEmptyState
-          onCreate={() => setCreateOpen(true)}
-          canCreate={canCreate}
-          disabledTooltip={ADMIN_TOOLTIP}
-        />
-      ) : (
-        <APIKeysTable
-          keys={keys}
-          canManage={isAdmin}
-          onRename={setRenameTarget}
-          onDelete={setDeleteTarget}
+        <MemberKeyPolicyModal
+          isOpen={policyOpen}
+          onClose={() => setPolicyOpen(false)}
         />
       )}
 

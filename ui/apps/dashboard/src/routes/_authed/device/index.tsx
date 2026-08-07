@@ -1,20 +1,21 @@
-import { useState } from 'react';
-import { Input } from '@inngest/components/Forms/Input';
+import { Fragment, useState } from 'react';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
+import { cn } from '@inngest/components/utils/classNames';
 import { useAuth, useOrganization } from '@clerk/tanstack-react-start';
 import { RiTerminalBoxLine } from '@remixicon/react';
 import { createFileRoute, useLoaderData } from '@tanstack/react-router';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import {
-  allowMemberKeysEnabled,
-  AllowMemberKeysQuery,
-  settingQueryContext,
-} from '@/components/APIKeys/allowMemberKeys';
-import {
-  EnvironmentSelect,
+  EnvironmentMultiSelect,
   useEnvironmentSelection,
-} from '@/components/APIKeys/EnvironmentSelect';
+} from '@/components/APIKeys/EnvironmentMultiSelect';
+import { GrantPicker } from '@/components/APIKeys/GrantPicker';
+import {
+  APIKeyGrantsQuery,
+  defaultSelection,
+  permittedGrants,
+} from '@/components/APIKeys/grants';
 import ApprovalDialog from '@/components/Intent/ApprovalDialog';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
@@ -27,6 +28,71 @@ const UUID_REGEX =
 
 // User codes are 6 base-20 characters (0-9, A-J), optionally grouped ZZZ-ZZZ.
 const USER_CODE_REGEX = /^[0-9A-J]{3}-?[0-9A-J]{3}$/i;
+const CODE_LENGTH = 6;
+
+function sanitizeUserCode(raw: string): string {
+  return raw
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, '')
+    .slice(0, CODE_LENGTH);
+}
+
+/**
+ * One transparent input stretched across six cells, rather than six inputs:
+ * typing, paste and backspace keep working without moving focus between fields.
+ */
+function UserCodeInput({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (code: string) => void;
+  disabled?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <div className="relative mx-auto w-fit">
+      {/* No maxLength: it truncates the raw paste before onChange runs, so a
+          pasted "ZZZ-ZZZ" loses its last character once the dash is stripped.
+          sanitizeUserCode caps the length instead. */}
+      <input
+        id="user_code"
+        name="user_code"
+        value={value}
+        onChange={(e) => onChange(sanitizeUserCode(e.target.value))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        autoComplete="one-time-code"
+        autoFocus
+        disabled={disabled}
+        aria-label="Code from your terminal"
+        className="absolute inset-0 z-10 w-full cursor-text opacity-0 disabled:cursor-not-allowed"
+      />
+      <div aria-hidden className="flex items-center gap-1.5">
+        {Array.from({ length: CODE_LENGTH }, (_, i) => (
+          <Fragment key={i}>
+            {i === CODE_LENGTH / 2 && (
+              <span className="text-muted px-1 text-xl">–</span>
+            )}
+            <span
+              className={cn(
+                'text-basis flex h-12 w-10 items-center justify-center rounded border font-mono text-2xl',
+                focused && i === Math.min(value.length, CODE_LENGTH - 1)
+                  ? 'border-active'
+                  : 'border-muted',
+                disabled && 'text-disabled',
+              )}
+            >
+              {value[i] ?? ''}
+            </span>
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function StatusMessage({
   title,
@@ -55,22 +121,35 @@ function DeviceLoginComponent() {
   );
 
   // Approving mints the same API key as "Create API key", so the same org
-  // policy gates the screen.
+  // policy gates this screen.
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
-  const settingRes = useGraphQLQuery({
-    query: AllowMemberKeysQuery,
-    variables: {},
-    context: settingQueryContext,
-  });
 
-  const { selectedEnv, setSelectedEnv, envGroups } = useEnvironmentSelection();
+  // DeviceConfirm validates the selection against the account's member policy,
+  // so this picker is a convenience rather than the control.
+  const grantsRes = useGraphQLQuery({
+    query: APIKeyGrantsQuery,
+    variables: {},
+  });
+  const catalog = grantsRes.data?.apiKeyGrants ?? [];
+  const policy = grantsRes.data?.account.memberAPIKeyPolicy;
+  const permitted = permittedGrants(catalog, policy, isAdmin);
+  const allowProduction = isAdmin || (policy?.allowProduction ?? false);
+
+  const { selectedEnvs, setSelectedEnvs, envGroups } = useEnvironmentSelection({
+    allowProduction,
+  });
+  const [selectedGrants, setSelectedGrants] = useState<string[] | null>(null);
+  // Read Only by default: a login flow should not hand out write access
+  // because someone clicked through quickly.
+  const grants =
+    selectedGrants ??
+    (catalog.length > 0 ? defaultSelection(catalog, permitted) : []);
 
   if (!clientID || !UUID_REGEX.test(clientID)) {
     return (
       <StatusMessage title="Invalid device-login link">
-        This device-login link is invalid — restart the login from your
-        terminal.
+        This device-login link is invalid. Restart the login from your terminal.
       </StatusMessage>
     );
   }
@@ -92,7 +171,7 @@ function DeviceLoginComponent() {
     );
   }
 
-  if (!orgLoaded || (!isAdmin && settingRes.isLoading)) {
+  if (!orgLoaded || (!isAdmin && grantsRes.isLoading)) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoadingIcon />
@@ -100,10 +179,9 @@ function DeviceLoginComponent() {
     );
   }
 
-  // If the setting can't be read, members see the admins-only default; the
+  // If the setting can't be read, members see the admins-only default. The
   // server enforces the policy on confirm anyway.
-  const canMint =
-    isAdmin || allowMemberKeysEnabled(settingRes.data?.account.setting?.value);
+  const canMint = isAdmin || (policy?.enabled ?? false);
   if (!canMint) {
     return (
       <StatusMessage title="You need permission to create API keys">
@@ -121,8 +199,8 @@ function DeviceLoginComponent() {
       setError('Enter the code shown in your terminal.');
       return;
     }
-    if (!selectedEnv) {
-      setError('Select an environment for the API key.');
+    if (selectedEnvs.length === 0) {
+      setError('Select at least one environment for the API key.');
       return;
     }
     setLoading(true);
@@ -142,11 +220,21 @@ function DeviceLoginComponent() {
             Authorization: `Bearer ${sessionToken}`,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams({
-            client_id: clientID,
-            user_code: code,
-            workspace_id: selectedEnv.id,
-          }),
+          body: (() => {
+            const body = new URLSearchParams({
+              client_id: clientID,
+              user_code: code,
+            });
+            // Repeated fields: the endpoint reads r.Form["workspace_ids"] and
+            // r.Form["grants"].
+            for (const env of selectedEnvs) {
+              body.append('workspace_ids', env.id);
+            }
+            for (const grant of grants) {
+              body.append('grants', grant);
+            }
+            return body;
+          })(),
         },
       );
       if (!response.ok) {
@@ -174,20 +262,10 @@ function DeviceLoginComponent() {
         <>
           <p className="my-6">
             Approving creates an API key that grants the Inngest CLI access to
-            one of your environments. The key appears on your API keys settings
-            page, where you can remove it at any time.
+            the environments you choose. The key appears on your API keys
+            settings page, where you can revoke it at any time.
           </p>
-          <div className="mx-auto flex max-w-xs flex-col gap-4">
-            <div className="flex flex-col gap-2 text-left">
-              <label className="text-basis text-sm font-medium">
-                Environment
-              </label>
-              <EnvironmentSelect
-                groups={envGroups}
-                value={selectedEnv}
-                onChange={setSelectedEnv}
-              />
-            </div>
+          <div className="mx-auto flex max-w-md flex-col gap-4">
             <div className="flex flex-col gap-2 text-left">
               <label
                 htmlFor="user_code"
@@ -195,18 +273,51 @@ function DeviceLoginComponent() {
               >
                 Code from your terminal
               </label>
-              <Input
-                id="user_code"
-                name="user_code"
+              <UserCodeInput
                 value={userCode}
-                onChange={(e) => setUserCode(e.target.value.toUpperCase())}
-                placeholder="ZZZ-ZZZ"
-                autoComplete="off"
-                autoFocus
+                onChange={setUserCode}
                 disabled={loading}
-                className="text-center font-mono text-2xl tracking-[0.2em]"
               />
             </div>
+            <div className="flex flex-col gap-2 text-left">
+              <label className="text-basis text-sm font-medium">
+                Environments
+              </label>
+              <EnvironmentMultiSelect
+                groups={envGroups}
+                value={selectedEnvs}
+                onChange={setSelectedEnvs}
+                disabled={loading}
+                productionNote={
+                  allowProduction
+                    ? undefined
+                    : 'Production is not available for member keys.'
+                }
+              />
+            </div>
+            {catalog.length > 0 && (
+              <div className="text-left">
+                <GrantPicker
+                  grants={catalog}
+                  selected={grants}
+                  onChange={setSelectedGrants}
+                  permitted={permitted}
+                  disabled={loading}
+                  summaryNote="you can narrow this key"
+                  restrictionNote={
+                    isAdmin
+                      ? undefined
+                      : "Your admins set which grants member keys may have. Locked grants can't be selected."
+                  }
+                />
+                {!isAdmin && (
+                  <p className="text-light mt-2 text-xs">
+                    Ask an admin to update the member key policy if you need
+                    more.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <p className="text-subtle my-6 text-sm">
             Only enter a code you generated yourself by running{' '}

@@ -9,11 +9,22 @@ const Query = graphql(`
         name
         createdAt
         maskedKey
+        scopes {
+          name
+          allow
+        }
+        grants
+        envScope
+        envs {
+          id
+          name
+        }
         env {
           id
           name
           slug
         }
+        createdByViewer
         createdBy {
           id
           name

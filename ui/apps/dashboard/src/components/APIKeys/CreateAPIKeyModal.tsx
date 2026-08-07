@@ -3,13 +3,18 @@ import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Modal } from '@inngest/components/Modal';
+import { useOrganization } from '@clerk/tanstack-react-start';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
+import { trackKeyCreated } from '@/utils/analyticsEvents';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
+import { GrantPicker } from './GrantPicker';
+import { APIKeyGrantsQuery, defaultSelection, permittedGrants } from './grants';
 import {
-  EnvironmentSelect,
+  EnvironmentMultiSelect,
   useEnvironmentSelection,
-} from './EnvironmentSelect';
+} from './EnvironmentMultiSelect';
 import { apiKeyErrorMessage } from './errorMessage';
 import { RevealKeyCard } from './RevealKeyCard';
 import { validateAPIKeyName } from './validation';
@@ -48,8 +53,26 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   // in state (which would leak the key into the next modal-open).
   const cancelledRef = useRef(false);
 
-  const { selectedEnv, setSelectedEnv, envGroups } =
-    useEnvironmentSelection(isOpen);
+  const { membership } = useOrganization();
+  const isAdmin = membership?.role === 'org:admin';
+
+  const grantsRes = useGraphQLQuery({
+    query: APIKeyGrantsQuery,
+    variables: {},
+  });
+  const catalog = grantsRes.data?.apiKeyGrants ?? [];
+  const policy = grantsRes.data?.account.memberAPIKeyPolicy;
+  const allowProduction = isAdmin || (policy?.allowProduction ?? false);
+
+  const { selectedEnvs, setSelectedEnvs, envGroups } = useEnvironmentSelection({
+    active: isOpen,
+    allowProduction,
+  });
+  const permitted = permittedGrants(catalog, policy, isAdmin);
+  const [selectedGrants, setSelectedGrants] = useState<string[] | null>(null);
+  const grants =
+    selectedGrants ??
+    (catalog.length > 0 ? defaultSelection(catalog, permitted) : []);
   const [, create] = useMutation(Mutation);
 
   async function submit() {
@@ -59,8 +82,12 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
       setError(nameErr);
       return;
     }
-    if (!selectedEnv) {
-      setError('Select an environment.');
+    if (selectedEnvs.length === 0) {
+      setError('Select at least one environment.');
+      return;
+    }
+    if (grants.length === 0) {
+      setError('Select at least one permission.');
       return;
     }
     const trimmed = name.trim();
@@ -69,7 +96,13 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
     setIsSubmitting(true);
     try {
       const res = await create(
-        { input: { name: trimmed, workspaceID: selectedEnv.id } },
+        {
+          input: {
+            name: trimmed,
+            workspaceIDs: selectedEnvs.map((e) => e.id),
+            grants,
+          },
+        },
         { additionalTypenames: ['APIKey'] },
       );
       if (cancelledRef.current) {
@@ -79,12 +112,19 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
         setError(apiKeyErrorMessage(res.error, 'Could not create API key.'));
         return;
       }
-      const pt = res.data?.createAPIKey?.plaintextKey;
-      if (!pt) {
+      const created = res.data?.createAPIKey;
+      if (!created?.plaintextKey) {
         setError('Unexpected response from server.');
         return;
       }
-      setPlaintextKey(pt);
+      setPlaintextKey(created.plaintextKey);
+      trackKeyCreated({
+        feature: 'api-keys',
+        keyID: created.apiKey.id,
+        envIDs: selectedEnvs.map((e) => e.id),
+        grantCount: grants.length,
+        surface: 'dashboard',
+      });
     } finally {
       if (!cancelledRef.current) {
         setIsSubmitting(false);
@@ -95,7 +135,8 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
   function close() {
     cancelledRef.current = true;
     setName('');
-    setSelectedEnv(null);
+    setSelectedEnvs([]);
+    setSelectedGrants(null);
     setPlaintextKey(null);
     setError(null);
     setIsSubmitting(false);
@@ -106,7 +147,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
 
   return (
     <Modal
-      className="w-full max-w-xl overflow-visible"
+      className="flex max-h-[78vh] w-full max-w-xl flex-col overflow-y-hidden"
       isOpen={isOpen}
       onClose={close}
     >
@@ -114,14 +155,16 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
         {inRevealStep ? 'Copy your API key' : 'Create API key'}
       </Modal.Header>
 
-      <Modal.Body>
+      {/* The body scrolls so the footer buttons stay on screen; the grant list
+          can overflow a laptop viewport. */}
+      <Modal.Body className="min-h-0 overflow-y-auto">
         {inRevealStep ? (
           <RevealKeyCard plaintextKey={plaintextKey} />
         ) : (
           <div className="flex flex-col gap-5">
             <p className="text-subtle text-sm">
               Generate an API key to give your applications secure access to
-              Inngest. You can remove keys at any time.
+              Inngest. You can revoke keys at any time.
             </p>
 
             <div className="flex flex-col gap-2">
@@ -129,7 +172,7 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
                 htmlFor="api-key-name"
                 className="text-basis text-sm font-medium"
               >
-                API key name
+                API key name <span className="text-error">*</span>
               </label>
               <Input
                 id="api-key-name"
@@ -142,14 +185,35 @@ export function CreateAPIKeyModal({ isOpen, onClose }: Props) {
 
             <div className="flex flex-col gap-2">
               <label className="text-basis text-sm font-medium">
-                Environment
+                Environments <span className="text-error">*</span>
               </label>
-              <EnvironmentSelect
+              <EnvironmentMultiSelect
                 groups={envGroups}
-                value={selectedEnv}
-                onChange={setSelectedEnv}
+                value={selectedEnvs}
+                onChange={setSelectedEnvs}
+                disabled={isSubmitting}
+                productionNote={
+                  allowProduction
+                    ? undefined
+                    : 'Production is not available for member keys.'
+                }
               />
             </div>
+
+            {catalog.length > 0 && (
+              <GrantPicker
+                grants={catalog}
+                selected={grants}
+                onChange={setSelectedGrants}
+                permitted={permitted}
+                disabled={isSubmitting}
+                restrictionNote={
+                  isAdmin
+                    ? undefined
+                    : "Your admins set which grants member keys may have. Locked grants can't be selected."
+                }
+              />
+            )}
 
             {error && <Alert severity="error">{error}</Alert>}
           </div>
