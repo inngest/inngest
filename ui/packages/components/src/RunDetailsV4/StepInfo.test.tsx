@@ -63,10 +63,6 @@ vi.mock('../Time', () => ({
   Time: ({ value }: { value: Date }) => <time>{value.toISOString()}</time>,
 }));
 
-vi.mock('../AI/AITrace', () => ({
-  AITrace: () => null,
-}));
-
 vi.mock('../Rerun/RerunModal', () => ({
   RerunModal: ({ editableInput }: { editableInput?: boolean }) => (
     <div data-input-editable={String(editableInput)} data-testid="mock-rerun-modal" />
