@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-import { VALIDATE_QUERY, type ToolDef } from './loop';
+import { type ToolDef } from './loop';
 
 // Tools for the Insights agent. The static table schemas live in the system
 // prompt (system.md); these tools cover the dynamic events layer (names and
-// per-event data schemas come from client state), validation, and submission.
+// per-event data schemas come from client state) and submission.
 
 const FindEventsParams = z.object({
   search: z
@@ -84,27 +84,6 @@ export const getEventSchemasTool: ToolDef = {
   },
 };
 
-// Execution is intercepted by the loop (it needs durable wait primitives);
-// this entry only contributes the tool schema the model sees.
-export const validateQueryTool: ToolDef = {
-  tool: {
-    name: VALIDATE_QUERY,
-    description:
-      'Run a SQL query against the live environment to check that it executes. Returns the result columns and row count, or the exact error diagnostics. Always validate before submit_query; fix and re-validate on failure (at most 2 retries).',
-    input_schema: z.toJSONSchema(
-      z.object({
-        sql: z
-          .string()
-          .min(1)
-          .describe('The ClickHouse SELECT statement to validate.'),
-      }),
-    ) as { type: 'object'; [k: string]: unknown },
-  },
-  execute: async () => {
-    throw new Error('validate_query is executed by the agent loop');
-  },
-};
-
 const SubmitQueryParams = z.object({
   sql: z
     .string()
@@ -134,7 +113,7 @@ export const submitQueryTool: ToolDef = {
   tool: {
     name: 'submit_query',
     description:
-      'Record the final SQL query for the user. Call exactly once, when the query is ready (after validating it if validate_query is available), then respond with a short natural-language summary to finish.',
+      'Record the final SQL query for the user. Call exactly once, when the query is ready, then respond with a short natural-language summary to finish.',
     input_schema: z.toJSONSchema(SubmitQueryParams) as {
       type: 'object';
       [k: string]: unknown;
@@ -158,10 +137,6 @@ export const submitQueryTool: ToolDef = {
           event_name,
           reason: 'used in query',
         })),
-      },
-      publish: {
-        event: 'step.completed',
-        data: { step: 'query-writer', sql, title, reasoning },
       },
     };
   },

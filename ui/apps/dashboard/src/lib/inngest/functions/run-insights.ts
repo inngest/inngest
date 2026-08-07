@@ -12,7 +12,7 @@ import {
   type QueryDraft,
 } from './agent/loop';
 import { buildSystemPrompt } from './agent/system';
-import { insightsTools, validateQueryTool } from './agent/tools';
+import { insightsTools } from './agent/tools';
 
 type ChatEventData = {
   threadId?: string;
@@ -29,9 +29,6 @@ type ChatEventData = {
   requestId?: string;
   channelKey?: string;
   history?: Array<Record<string, unknown>>;
-  // True when a browser is subscribed to the agent stream and can execute
-  // validate_query round trips (set by /api/chat; absent for the headless API).
-  canValidate?: boolean;
 };
 
 // All LLM calls route through OpenRouter. Requires OPENROUTER_API_KEY.
@@ -155,29 +152,6 @@ export const runInsightsAgent = inngest.createFunction(
     id: 'run-insights-agent',
     name: 'Insights SQL Agent',
     triggers: [{ event: 'insights-agent/chat.requested' }],
-    // Runs after all step retries exhaust; without it the chat UI spins
-    // forever waiting for a run.completed that will never arrive.
-    onFailure: async ({ event, step }) => {
-      const original = event.data.event.data as ChatEventData;
-      const targetChannel =
-        original.channelKey ||
-        (original.userId
-          ? `user:${original.userId}`
-          : `acct:${original.accountId}:${original.requestId}`);
-      await step.realtime.publish(
-        'publish-run-error',
-        insightsChannel(targetChannel).agent_stream,
-        {
-          event: 'error',
-          data: {
-            threadId: original.threadId ?? '',
-            error:
-              'The Insights agent could not complete this request. Please try again.',
-          },
-          timestamp: Date.now(),
-        },
-      );
-    },
   },
   async ({ event, step, group, defer, runId }) => {
     const {
@@ -188,7 +162,6 @@ export const runInsightsAgent = inngest.createFunction(
       requestId,
       channelKey,
       history,
-      canValidate,
     } = event.data as ChatEventData;
 
     if (!userId && (!accountId || !requestId)) {
@@ -211,12 +184,6 @@ export const runInsightsAgent = inngest.createFunction(
     const clientState = (userMessage.state || {}) as InsightsClientState;
 
     const ch = insightsChannel(targetChannel);
-
-    await step.realtime.publish('publish-run-started', ch.agent_stream, {
-      event: 'run.started',
-      data: { threadId, userId },
-      timestamp: Date.now(),
-    });
 
     // Select the model once up front; the loop reuses it every iteration.
     const { result: model, experimentRef } = await group.experiment(
@@ -250,8 +217,8 @@ export const runInsightsAgent = inngest.createFunction(
     const draft: QueryDraft = { selectedEvents: [] };
 
     // Memoized so it survives re-invocation: the run body re-executes after
-    // every suspend (waitForEvent in validate_query, checkpoint maxRuntime),
-    // and a bare Date.now() here would reset the latency clock each time.
+    // every suspend (checkpoint maxRuntime), and a bare Date.now() here would
+    // reset the latency clock each time.
     const startedAt = await step.run('record-start', () => Date.now());
 
     const result = await runAgentLoop({
@@ -262,21 +229,9 @@ export const runInsightsAgent = inngest.createFunction(
         ...historyMessages,
         { role: 'user', content: userMessage.content },
       ],
-      tools: canValidate
-        ? [...insightsTools, validateQueryTool]
-        : insightsTools,
+      tools: insightsTools,
       ctx: { clientState },
       draft,
-      publish: (id, eventName, data) =>
-        step.realtime.publish(id, ch.agent_stream, {
-          event: eventName,
-          data: { ...data, threadId },
-          timestamp: Date.now(),
-        }),
-      runId,
-      // Pins validate_query completions to the initiating user; empty (the
-      // headless path, which never offers the tool) fails closed.
-      userId: userId ?? '',
       maxIterations: 12,
     });
 
@@ -314,14 +269,6 @@ export const runInsightsAgent = inngest.createFunction(
         name: 'insights_agent_tool_calls',
         value: result.toolCalls,
       });
-      await inngest.score({
-        name: 'insights_agent_validation_attempts',
-        value: result.validationAttempts,
-      });
-      await inngest.score({
-        name: 'insights_agent_validation_failures',
-        value: result.validationFailures.length,
-      });
     });
 
     const summary =
@@ -345,6 +292,10 @@ export const runInsightsAgent = inngest.createFunction(
       data: { sql: draft.sql ?? '', summary, chatContext },
     });
 
+    // The one realtime message left, and the only consumer is
+    // POST /v2/insights/query/prompt: it subscribes server-side before sending
+    // the event, so it has no loss window. The chat UI reads the run output
+    // below instead.
     await step.realtime.publish('publish-run-completed', ch.agent_stream, {
       event: 'run.completed',
       data: {

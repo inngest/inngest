@@ -57,7 +57,7 @@ describe('getEventSchemasTool', () => {
 });
 
 describe('submitQueryTool', () => {
-  it('records the draft patch and a step.completed publish', async () => {
+  it('records the draft patch', async () => {
     const out = await submitQueryTool.execute(
       {
         sql: "SELECT count() FROM runs WHERE status = 'Failed'",
@@ -70,8 +70,6 @@ describe('submitQueryTool', () => {
 
     expect(out.draftPatch?.sql).toContain('FROM runs');
     expect(out.draftPatch?.selectedEvents).toEqual([]);
-    expect(out.publish?.event).toBe('step.completed');
-    expect(out.publish?.data.step).toBe('query-writer');
     expect(out.observation).toContain('summary');
   });
 

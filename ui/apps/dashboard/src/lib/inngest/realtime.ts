@@ -1,12 +1,9 @@
 import { realtime } from 'inngest';
 import { z } from 'zod';
 
-export type InsightsRealtimeEvent = {
-  event: string;
-  data: Record<string, unknown>;
-  timestamp: number;
-};
-
+// Publish-only: the last consumer of this channel is the cloud's
+// POST /v2/insights/query/prompt, which subscribes server-side before sending
+// its event. The Insights chat UI reads run output instead — see RunWatcher.
 const insightsRealtimeEventSchema = z.object({
   event: z.string(),
   data: z.record(z.string(), z.unknown()),
