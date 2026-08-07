@@ -78,7 +78,7 @@ describe('activePreset', () => {
   });
 
   // A member's Read only is narrower than an admin's. Comparing against the
-  // unnarrowed preset would label their own preset click "Custom".
+  // full preset would label their own preset click "Custom".
   test('a member picking Read only still reads as Read only', () => {
     const policy = {
       enabled: true,
@@ -97,8 +97,8 @@ describe('activePreset', () => {
 });
 
 // api:key:read returns the decrypted signing key, so a "read only" key holding
-// it can do everything the write grants gate. It stays selectable, but nothing
-// may hand it out without being asked.
+// it can do everything the write grants gate. It stays selectable, but is never
+// handed out unasked.
 describe('sensitive grants', () => {
   const SENSITIVE: Grant[] = [
     ...CATALOG,

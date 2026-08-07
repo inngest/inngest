@@ -23,9 +23,9 @@ export type APIKeyRow = {
   envs: { id: string; name: string }[];
   envScope: string;
   scopes: { name: string; allow: string[] }[];
-  /** Catalog grants this key authorizes, resolved server-side. */
+  /** Resolved server-side, so legacy scopes are already translated out. */
   grants: string[];
-  /** Whether the viewer minted it — the ownership half of "may I manage this". */
+  /** Read with admin status to decide whether the viewer may manage the key. */
   createdByViewer: boolean;
   // Null for pre-attribution keys, machine-provisioned keys, and keys whose
   // creator was deleted.
@@ -34,7 +34,7 @@ export type APIKeyRow = {
 
 type Props = {
   keys: APIKeyRow[];
-  /** Catalog, so every key's grid shows the same rows in the same order. */
+  /** Full catalog, so every key's grid shows the same rows in the same order. */
   catalog: Grant[];
   isAdmin: boolean;
   onRename: (key: APIKeyRow) => void;
@@ -42,12 +42,10 @@ type Props = {
 };
 
 /**
- * isLegacyKey reports whether a key predates permission grants.
- *
- * Such a key holds only the retired `api:app:sync` scope. The scope is shown as
- * stored rather than translated into a modern grant: normalising it for display
- * would hide the one thing worth knowing, which is that re-minting is what gives
- * this key real permissions.
+ * A key predating permission grants holds only the retired `api:app:sync`
+ * scope. It is shown as stored rather than translated, because translating it
+ * would hide the one thing worth knowing: re-minting is what gives the key real
+ * permissions.
  */
 function isLegacyKey(scopes: { name: string }[] | undefined): boolean {
   if (!scopes || scopes.length === 0) return false;
@@ -131,8 +129,8 @@ export function APIKeysTable({
                 </div>
                 {isLegacyKey(key.scopes) && (
                   <span className="text-light text-xs">
-                    Predates permissions — can only sync apps. Create a new key
-                    to choose what it can access.
+                    Predates permissions, so it can only sync apps. Create a new
+                    key to choose what it can access.
                   </span>
                 )}
               </div>

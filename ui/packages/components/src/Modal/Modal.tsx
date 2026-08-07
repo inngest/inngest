@@ -48,15 +48,14 @@ export function Modal({
     <Dialog.Root open={isOpen} onOpenChange={onClose} modal>
       <AnimatePresence>
         <Dialog.Portal container={container}>
-          {/* The overlay must be a SIBLING of Dialog.Content, not its ancestor.
-              It is aria-hidden (it is decorative), and aria-hidden is inherited —
-              nesting the content inside it removed the whole modal, title, inputs
-              and buttons included, from the accessibility tree. */}
+          {/* The overlay must be a sibling of Dialog.Content, not its ancestor.
+              It is aria-hidden, and aria-hidden is inherited, so nesting the
+              content inside it removed the whole modal from the accessibility
+              tree. */}
           <Dialog.Overlay
             className="bg-overlay/20 dark:bg-overlay/50 fixed inset-0 z-[100] transition-opacity"
             aria-hidden="true"
           />
-          {/* Full-screen container to center the panel */}
           <div className="fixed inset-0 z-[100]">
             <motion.div
               className={cn(

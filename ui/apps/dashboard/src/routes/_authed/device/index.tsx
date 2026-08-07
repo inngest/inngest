@@ -30,7 +30,6 @@ const UUID_REGEX =
 const USER_CODE_REGEX = /^[0-9A-J]{3}-?[0-9A-J]{3}$/i;
 const CODE_LENGTH = 6;
 
-/** Uppercases and drops anything that can't be part of a code, e.g. a pasted dash. */
 function sanitizeUserCode(raw: string): string {
   return raw
     .toUpperCase()
@@ -39,11 +38,8 @@ function sanitizeUserCode(raw: string): string {
 }
 
 /**
- * Six single-character cells with the grouping dash drawn between them.
- *
- * One real input, made transparent and stretched across the cells, rather than
- * six inputs: native typing, paste and backspace keep working without moving
- * focus between fields, and paste of a "ZZZ-ZZZ" code just drops the dash.
+ * One transparent input stretched across six cells, rather than six inputs:
+ * typing, paste and backspace keep working without moving focus between fields.
  */
 function UserCodeInput({
   value,
@@ -123,13 +119,12 @@ function DeviceLoginComponent() {
   );
 
   // Approving mints the same API key as "Create API key", so the same org
-  // policy gates the screen.
+  // policy gates this screen.
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
-  // The approving user chooses what the CLI's key may do. DeviceConfirm
-  // validates the selection against the account's member policy, so this is a
-  // convenience rather than the control.
+  // DeviceConfirm validates the selection against the account's member policy,
+  // so this picker is a convenience rather than the control.
   const grantsRes = useGraphQLQuery({
     query: APIKeyGrantsQuery,
     variables: {},
@@ -143,8 +138,8 @@ function DeviceLoginComponent() {
     allowProduction,
   });
   const [selectedGrants, setSelectedGrants] = useState<string[] | null>(null);
-  // Default to Read Only, narrowed to what this user may mint — a login flow
-  // should not hand out write access because someone clicked through quickly.
+  // Read Only by default: a login flow should not hand out write access
+  // because someone clicked through quickly.
   const grants =
     selectedGrants ??
     (catalog.length > 0 ? defaultSelection(catalog, permitted) : []);
@@ -152,8 +147,7 @@ function DeviceLoginComponent() {
   if (!clientID || !UUID_REGEX.test(clientID)) {
     return (
       <StatusMessage title="Invalid device-login link">
-        This device-login link is invalid — restart the login from your
-        terminal.
+        This device-login link is invalid. Restart the login from your terminal.
       </StatusMessage>
     );
   }
@@ -183,7 +177,7 @@ function DeviceLoginComponent() {
     );
   }
 
-  // If the setting can't be read, members see the admins-only default; the
+  // If the setting can't be read, members see the admins-only default. The
   // server enforces the policy on confirm anyway.
   const canMint = isAdmin || (policy?.enabled ?? false);
   if (!canMint) {

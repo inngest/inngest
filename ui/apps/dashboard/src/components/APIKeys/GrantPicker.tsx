@@ -15,14 +15,12 @@ type Props = {
   selected: string[];
   onChange: (grants: string[]) => void;
   /**
-   * Grants this caller may select. Anything outside it renders locked with an
-   * explanation, rather than being hidden — a member should be able to see that
-   * a permission exists and that an admin controls it.
+   * Anything outside this renders locked rather than hidden, so a member can
+   * see that a permission exists and that an admin controls it.
    */
   permitted: Set<string>;
   /** Shown once above the list when some grants are locked. */
   restrictionNote?: string;
-  /** Appended to the summary line, for surfaces that need to qualify it. */
   summaryNote?: string;
   disabled?: boolean;
 };
@@ -49,9 +47,9 @@ export function GrantPicker({
   const selectedSet = new Set(selected);
   const preset = activePreset(selected, grants, permitted);
 
-  // Locked rows change the whole list's shape: every row gains a state icon, and
-  // the group counts switch from "how many are selected" to "how many you may
-  // select". Driven off the data rather than a mode flag so the two can't disagree.
+  // Locked rows change the list's shape: every row gains a state icon and the
+  // group counts switch to "how many you may select". Derived from the data
+  // rather than a mode flag so the two cannot disagree.
   const restricted = grants.some((g) => !permitted.has(g.grant));
 
   function toggle(grant: string, checked: boolean) {
@@ -65,8 +63,8 @@ export function GrantPicker({
   }
 
   function applyPreset(grantsInPreset: string[]) {
-    // Presets never select something the caller may not mint, so a member
-    // clicking Full access gets the most they are allowed rather than an error.
+    // A member clicking Full access gets the most they are allowed rather than
+    // an error.
     onChange(grantsInPreset.filter((g) => permitted.has(g)).sort());
   }
 
@@ -102,8 +100,8 @@ export function GrantPicker({
         >
           Full access
         </button>
-        {/* Custom is a derived state, not a choice — it reports that the
-            selection no longer matches a preset. */}
+        {/* Custom is derived, not a choice: it reports that the selection no
+            longer matches a preset. */}
         <span
           className={cn(
             chipClass(false),

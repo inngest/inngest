@@ -16,13 +16,11 @@ type EnvGroups = {
 };
 
 /**
- * Environment choice for minting an API key, shared by the create-key modal and
- * the device-login approval page so both offer the same environments.
+ * `active` gates the Production auto-select, e.g. only while a modal is open.
  *
- * `active` gates the Production auto-select (e.g. only while a modal is open).
- * `allowProduction` false drops Production from the list outright rather than
- * rendering it disabled — the underlying CheckboxOption doesn't forward
- * `disabled` to the option, so a "disabled" row would still be selectable.
+ * `allowProduction` false drops Production from the list rather than rendering
+ * it disabled, because CheckboxOption doesn't forward `disabled` to the option
+ * and a "disabled" row would still be selectable.
  */
 export function useEnvironmentSelection({
   active = true,
@@ -31,9 +29,8 @@ export function useEnvironmentSelection({
   const [selectedEnvs, setSelectedEnvs] = useState<Option[]>([]);
   const [{ data: envs }] = useEnvironments();
 
-  // Branch-env keys live on the parent (a parent-scoped key authenticates
-  // every child, mirroring signing/event keys), so offer the parent and hide
-  // the programmatically-created children.
+  // Branch-env keys live on the parent, which authenticates every child, so
+  // offer the parent and hide the children.
   const envGroups = useMemo<EnvGroups>(() => {
     const production: Option[] = [];
     const test: Option[] = [];
@@ -52,13 +49,13 @@ export function useEnvironmentSelection({
     return { production, test, branches };
   }, [envs, allowProduction]);
 
-  // Auto-select Production only when there's exactly one and nothing has been
-  // chosen; a user with several should make an explicit choice.
+  // Auto-select Production only when there is exactly one; with several, the
+  // user should choose.
   //
-  // Once per activation, not on every empty selection: keying off "empty" alone
-  // makes Select none unobservable, because clearing the list re-runs the effect
-  // and immediately re-adds Production. Resetting when `active` goes false means
-  // a reopened modal still defaults to Production.
+  // Runs once per activation rather than whenever the selection is empty:
+  // keying off empty makes Select none unobservable, since clearing re-runs the
+  // effect and re-adds Production. Resetting on `active` false means a reopened
+  // modal still defaults to Production.
   const autoSelected = useRef(false);
   useEffect(() => {
     if (!active) {
@@ -119,9 +116,8 @@ export function EnvironmentMultiSelect({
   return (
     <div className="flex flex-col gap-1.5">
       {/* Above the control rather than inside the dropdown: the options panel is
-          a listbox, and a browser prunes anything that is not an option from its
-          accessibility tree — so bulk actions placed in there are invisible to a
-          screen reader. Here they are also readable without opening it. */}
+          a listbox, and browsers prune non-options from its accessibility tree,
+          so bulk actions placed in there are invisible to a screen reader. */}
       <div className="flex items-center justify-between gap-3">
         <span className="text-light text-xs">
           {value.length} of {all.length} selected

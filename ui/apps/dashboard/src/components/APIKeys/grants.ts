@@ -1,8 +1,7 @@
 import { graphql } from '@/gql';
 
-// Shared by the API keys settings page and the device-login approval page, in
-// one file so graphql-codegen sees a single operation — same reason
-// allowMemberKeys.ts is structured this way.
+// One file so graphql-codegen sees a single operation, shared by the API keys
+// page and the device-login page.
 export const APIKeyGrantsQuery = graphql(`
   query GetAPIKeyGrants {
     apiKeyGrants {
@@ -48,8 +47,8 @@ export type MemberPolicy = {
   grants: string[];
 };
 
-// Category order is fixed rather than derived, so the picker doesn't reshuffle
-// when a grant is added. A category absent from the catalog renders nothing.
+// Fixed rather than derived so the picker doesn't reshuffle when a grant is
+// added. A category absent from the catalog renders nothing.
 export const CATEGORY_ORDER = [
   'Accounts, Environments & Keys',
   'Apps, Functions & Runs',
@@ -61,14 +60,12 @@ export type GrantGroup = {
   category: string;
   /**
    * One row per grant, so `api:env:read` and `api:env:write` are separate
-   * switches. The action is part of the identity a key actually stores, and
-   * showing it that way means the row label matches what the 403 message names.
+   * switches and each row label matches what a 403 names.
    */
   grants: Grant[];
 };
 
-// read before write within a resource: the pair reads as a widening, and it puts
-// the more dangerous switch second.
+// Read before write within a resource, so the more dangerous switch is second.
 const ACTION_ORDER = ['read', 'write'];
 
 function compareGrants(a: Grant, b: Grant): number {
@@ -81,7 +78,6 @@ function compareGrants(a: Grant, b: Grant): number {
   );
 }
 
-/** groupGrants buckets the flat catalog by category, in a fixed order. */
 export function groupGrants(grants: Grant[]): GrantGroup[] {
   const byCategory = new Map<string, Grant[]>();
   for (const g of grants) {
@@ -102,8 +98,8 @@ export function groupGrants(grants: Grant[]): GrantGroup[] {
   };
 
   for (const category of CATEGORY_ORDER) take(category);
-  // Anything in a category we don't know about still renders, after the known
-  // ones — better than silently hiding a permission.
+  // Unknown categories still render, after the known ones, so a permission is
+  // never silently hidden.
   for (const category of [...byCategory.keys()]) take(category);
   return ordered;
 }
@@ -117,13 +113,9 @@ function sameSet(a: string[], b: string[]): boolean {
 }
 
 /**
- * activePreset reports which preset chip should read as selected. `custom` is a
- * derived state, not something the user picks — it lights up whenever the
- * selection stops matching a preset, which is the only honest way to label a
- * hand-edited set.
- *
- * Compared against the presets narrowed to `permitted`, so a member who picks
- * Read Only still sees Read Only selected rather than Custom.
+ * `custom` is derived, not chosen: it means the selection no longer matches a
+ * preset. Presets are narrowed to `permitted` first, so a member who picks Read
+ * Only sees Read Only rather than Custom.
  */
 export function activePreset(
   selected: string[],
@@ -137,15 +129,12 @@ export function activePreset(
 }
 
 /**
- * readOnlyPreset returns every read grant except the sensitive ones. Full Access
- * and Read Only both enumerate grants that exist right now rather than storing a
- * wildcard, so a key minted today does not silently widen when a permission is
- * added later.
+ * Both presets enumerate the grants that exist now rather than storing a
+ * wildcard, so a key minted today does not widen when a permission is added.
  *
- * Sensitive reads are excluded because they are not read-only in effect —
- * `api:key:read` returns the decrypted signing key, which is the credential the
- * SDKs authenticate with. They stay selectable; they are just never the default.
- * The server applies the same rule, so a hand-built request gains nothing.
+ * Sensitive reads are excluded because they are not read-only in effect:
+ * `api:key:read` returns the decrypted signing key. They stay selectable, just
+ * never preselected. The server applies the same rule.
  */
 export function readOnlyPreset(grants: Grant[]): string[] {
   return grants
@@ -158,9 +147,8 @@ export function fullAccessPreset(grants: Grant[]): string[] {
 }
 
 /**
- * permittedGrants returns what this caller may actually select. Admins get the
- * whole catalog; members are narrowed to the account policy. The server
- * enforces this too — this only avoids showing toggles that would be rejected.
+ * The server enforces this too. Narrowing here only avoids showing toggles that
+ * would be rejected.
  */
 export function permittedGrants(
   grants: Grant[],
@@ -174,7 +162,6 @@ export function permittedGrants(
   );
 }
 
-/** Read Only, narrowed to what the caller may mint — the default selection. */
 export function defaultSelection(
   grants: Grant[],
   permitted: Set<string>,

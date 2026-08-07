@@ -26,17 +26,12 @@ type Props = {
 };
 
 /**
- * MemberKeyPolicyModal is the org-admin control over what members may mint:
- * whether they may mint at all, whether they may target Production, and which
- * permissions they may select.
+ * The policy applies at mint time only. Tightening it never alters an existing
+ * key, so reducing someone's access means revoking their key too.
  *
- * The policy applies at mint time only. Tightening it never alters a key that
- * already exists, so reducing someone's access means revoking their key too —
- * which the copy says out loud, because it is easy to assume otherwise.
- *
- * Each grant is an Allowed/Blocked choice rather than a switch, deliberately:
- * this list is what members *may* have, not what any key *does* have, and the two
- * read identically when both are toggles.
+ * Each grant is an Allowed/Blocked choice rather than a switch because this
+ * list is what members may have, not what any key does have, and the two read
+ * identically when both are toggles.
  */
 export function MemberKeyPolicyModal({ isOpen, onClose }: Props) {
   const res = useGraphQLQuery({ query: APIKeyGrantsQuery, variables: {} });
@@ -56,7 +51,7 @@ export function MemberKeyPolicyModal({ isOpen, onClose }: Props) {
 
   const current = draft ?? saved;
 
-  // Admins are choosing what to permit, so every grant is selectable here.
+  // Admins may permit any grant, so nothing is narrowed here.
   const allGrants = new Set(catalog.map((g) => g.grant));
   const groups = groupGrants(catalog);
   const allowed = new Set(current?.grants ?? []);
@@ -191,8 +186,7 @@ export function MemberKeyPolicyModal({ isOpen, onClose }: Props) {
                       {label}
                     </button>
                   ))}
-                  {/* Custom is arrived at, not chosen — it lights up when the
-                      selection stops matching a preset, so there is nothing to
+                  {/* Custom is derived, not chosen, so there is nothing to
                       apply when it is not already active. */}
                   <button
                     type="button"
@@ -287,7 +281,7 @@ export function MemberKeyPolicyModal({ isOpen, onClose }: Props) {
         <div className="flex items-center justify-between gap-3">
           <span className="text-subtle text-xs">
             {dirty
-              ? 'Applies to new keys only — existing member keys keep their permissions until revoked.'
+              ? 'Applies to new keys only. Existing member keys keep their permissions until revoked.'
               : 'Members choose from the allowed grants only.'}
           </span>
           <div className="flex shrink-0 gap-2">

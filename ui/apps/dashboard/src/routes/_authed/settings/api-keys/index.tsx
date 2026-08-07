@@ -39,8 +39,6 @@ function APIKeysPage() {
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const isAdmin = membership?.role === 'org:admin';
 
-  // Members may mint only when the account policy says so; the policy modal
-  // is where an admin changes it.
   const policyRes = useGraphQLQuery({
     query: APIKeyGrantsQuery,
     variables: {},
@@ -136,8 +134,8 @@ function APIKeysPage() {
           </div>
         </div>
 
-        {/* Says out loud what a member can and cannot do here, rather than
-            leaving them to infer it from which rows have buttons. */}
+        {/* Spells out member limits rather than leaving them to be inferred
+            from which rows have buttons. */}
         {!isAdmin && (
           <div className="border-subtle bg-canvasSubtle text-subtle flex items-center gap-2 rounded-md border px-3 py-2.5 text-xs">
             <RiInformationLine className="text-muted h-3.5 w-3.5 shrink-0" />
