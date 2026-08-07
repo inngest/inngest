@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -31,12 +32,14 @@ func CreateMetadataSpan(ctx context.Context, tracerProvider TracerProvider, pare
 // avoiding redundant serialization when the caller has already called Serialize.
 func CreateMetadataSpanFromValues(ctx context.Context, tracerProvider TracerProvider, parent *meta.SpanReference, location, pkgName string, stateMetadata *statev2.Metadata, kind metadata.Kind, op metadata.Opcode, values metadata.Values, scope metadata.Scope, opts ...MetadataSpanAttrOpts) (*meta.SpanReference, error) {
 	// Every metadata span, regardless of caller, passes through here — so
-	// this is the single chokepoint to backfill EstimatedCost for
-	// "inngest.ai" metadata that arrived without one (e.g. submitted
-	// directly via inngest.metadata.update or the AddRunMetadata API,
-	// bypassing the AIMetadata-producing extractors). A no-op when
-	// EstimatedCost is already set.
-	if kind == extractors.KindInngestAI {
+	// this is the single chokepoint to backfill TotalTokens and
+	// EstimatedCost for "inngest.ai" metadata that arrived without them
+	// (e.g. submitted directly via inngest.metadata.update or the
+	// AddRunMetadata API, bypassing the AIMetadata-producing extractors).
+	// No-ops when the values are already set. Delete values are keys to
+	// remove, not metrics, so they are never backfilled.
+	if kind == extractors.KindInngestAI && op != enums.MetadataOpcodeDelete {
+		extractors.BackfillTotalTokensInValues(values)
 		extractors.BackfillEstimatedCostInValues(values)
 	}
 

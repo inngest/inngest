@@ -469,3 +469,83 @@ func TestExtractAIOutputMetadata_TypicalStepOutput(t *testing.T) {
 		assert.Nil(t, md, "Non-AI step output should return nil: %s", string(output))
 	}
 }
+
+func TestBackfillTotalTokensInValues(t *testing.T) {
+	t.Parallel()
+
+	valuesOf := func(v map[string]any) metadata.Values {
+		values := metadata.Values{}
+		for k, val := range v {
+			b, err := json.Marshal(val)
+			require.NoError(t, err)
+			values[k] = b
+		}
+		return values
+	}
+
+	totalOf := func(t *testing.T, values metadata.Values) *int64 {
+		raw, ok := values["total_tokens"]
+		if !ok {
+			return nil
+		}
+		var total *int64
+		require.NoError(t, json.Unmarshal(raw, &total))
+		return total
+	}
+
+	cases := []struct {
+		name      string
+		values    map[string]any
+		wantTotal *int64
+	}{
+		{
+			name: "backfills from input and output tokens",
+			values: map[string]any{
+				"input_tokens":  int64(100),
+				"output_tokens": int64(50),
+			},
+			wantTotal: util.ToPtr[int64](150),
+		},
+		{
+			name: "leaves an existing non-null total untouched",
+			values: map[string]any{
+				"input_tokens":  int64(100),
+				"output_tokens": int64(50),
+				"total_tokens":  int64(999),
+			},
+			wantTotal: util.ToPtr[int64](999),
+		},
+		{
+			name: "overwrites an explicit null total",
+			values: map[string]any{
+				"input_tokens":  int64(100),
+				"output_tokens": int64(50),
+				"total_tokens":  nil,
+			},
+			wantTotal: util.ToPtr[int64](150),
+		},
+		{
+			name: "no usage means no total",
+			values: map[string]any{
+				"request_model": "gpt-4o",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			values := valuesOf(tc.values)
+			BackfillTotalTokensInValues(values)
+
+			total := totalOf(t, values)
+			if tc.wantTotal == nil {
+				assert.Nil(t, total)
+				return
+			}
+			require.NotNil(t, total)
+			assert.Equal(t, *tc.wantTotal, *total)
+		})
+	}
+}

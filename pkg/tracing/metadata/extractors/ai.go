@@ -100,10 +100,6 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 		}
 	}
 
-	inputTokens := int64(parsedOutput.TokensIn)
-	outputTokens := int64(parsedOutput.TokensOut)
-	totalTokens := inputTokens + outputTokens
-
 	var latencyMs *int64
 	if serverProcessingMs > 0 {
 		latencyMs = &serverProcessingMs
@@ -112,14 +108,32 @@ func ExtractAIGatewayMetadata(req aigateway.Request, respStatus int, resp []byte
 	aiMd := &AIMetadata{
 		RequestModel:  parsedInput.Model,
 		ResponseModel: parsedOutput.Model,
+		ResponseID:    parsedOutput.ID,
 		Provider:      req.Format,
-		OperationName: "",
 
-		InputTokens:  inputTokens,
-		OutputTokens: outputTokens,
-		TotalTokens:  &totalTokens,
+		InputTokens:  int64(parsedOutput.TokensIn),
+		OutputTokens: int64(parsedOutput.TokensOut),
 		LatencyMs:    latencyMs,
 	}
+
+	if parsedOutput.StopReason != "" {
+		aiMd.FinishReasons = []string{parsedOutput.StopReason}
+	}
+
+	aiMd.Temperature = parsedInput.Temperature
+	aiMd.TopP = parsedInput.TopP
+	maxTokens := parsedInput.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = parsedInput.MaxCompletionTokens
+	}
+	if maxTokens != 0 {
+		aiMd.MaxTokens = util.ToPtr(int64(maxTokens))
+	}
+	if parsedInput.Seed != nil {
+		aiMd.Seed = util.ToPtr(int64(*parsedInput.Seed))
+	}
+
+	backfillTotalTokens(aiMd)
 	backfillEstimatedCost(aiMd)
 
 	return []metadata.Structured{
@@ -345,6 +359,44 @@ func backfillEstimatedCost(md *AIMetadata) {
 		return
 	}
 	md.EstimatedCost = estimatedCostForTokens(md.ResponseModel, md.RequestModel, md.InputTokens, md.OutputTokens)
+}
+
+// backfillTotalTokens sets md.TotalTokens by summing input and output tokens
+// only when the emitter didn't supply a total and there is usage to sum.
+func backfillTotalTokens(md *AIMetadata) {
+	if md.TotalTokens != nil || (md.InputTokens == 0 && md.OutputTokens == 0) {
+		return
+	}
+	totalTokens := md.InputTokens + md.OutputTokens
+	md.TotalTokens = &totalTokens
+}
+
+// BackfillTotalTokensInValues fills a "total_tokens" entry into raw
+// "inngest.ai" metadata values when one isn't already present, mirroring
+// BackfillEstimatedCostInValues for token totals.
+func BackfillTotalTokensInValues(values metadata.Values) {
+	if values == nil {
+		return
+	}
+
+	if raw, ok := values["total_tokens"]; ok {
+		var existing *int64
+		if err := json.Unmarshal(raw, &existing); err == nil && existing != nil {
+			return
+		}
+	}
+
+	var inputTokens, outputTokens int64
+	_ = json.Unmarshal(values["input_tokens"], &inputTokens)
+	_ = json.Unmarshal(values["output_tokens"], &outputTokens)
+	if inputTokens == 0 && outputTokens == 0 {
+		return
+	}
+
+	totalTokens := inputTokens + outputTokens
+	if b, err := json.Marshal(totalTokens); err == nil {
+		values["total_tokens"] = b
+	}
 }
 
 // BackfillEstimatedCostInValues fills an "estimated_cost" entry into raw
