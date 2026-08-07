@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   buildConcurrencyWindow,
   CONCURRENCY_LAG_OFFSET_MS,
+  countMinutesWithHits,
   dismissalStorageKey,
   DISMISSAL_LIFETIME_MS,
   isConcurrencyPressured,
   isDismissalActive,
+  viewTrackedStorageKey,
 } from './accountConcurrency';
 
 const bucket = (value: number) => ({ value });
@@ -88,6 +90,52 @@ describe('isConcurrencyPressured', () => {
     // does not.
     expect(isConcurrencyPressured([100, 100].map(bucket))).toBe(false);
     expect(isConcurrencyPressured([1, 1, 1].map(bucket))).toBe(true);
+  });
+});
+
+describe('countMinutesWithHits', () => {
+  it('is 0 when no data has loaded yet', () => {
+    expect(countMinutesWithHits(undefined)).toBe(0);
+  });
+
+  // Reported on the view event, so it has to describe breadth of pressure
+  // rather than volume — otherwise it can't be compared against the threshold.
+  it('counts minutes rather than summing hits', () => {
+    expect(countMinutesWithHits([500, 500].map(bucket))).toBe(2);
+    expect(countMinutesWithHits([1, 1, 1].map(bucket))).toBe(3);
+  });
+
+  it('ignores zero-filled buckets', () => {
+    expect(countMinutesWithHits([0, 1, 0, 2, 0].map(bucket))).toBe(2);
+  });
+
+  it('agrees with the pressure threshold at the boundary', () => {
+    const belowThreshold = [1, 1, 0].map(bucket);
+    const atThreshold = [1, 1, 1].map(bucket);
+
+    expect(countMinutesWithHits(belowThreshold)).toBe(2);
+    expect(isConcurrencyPressured(belowThreshold)).toBe(false);
+    expect(countMinutesWithHits(atThreshold)).toBe(3);
+    expect(isConcurrencyPressured(atThreshold)).toBe(true);
+  });
+});
+
+describe('viewTrackedStorageKey', () => {
+  const accountA = '5d258962-2c37-4a5d-b875-ebe72792c47f';
+  const accountB = 'e8ea18c4-dbb4-4e98-a6a4-8ff8b3801765';
+
+  it('gives different accounts different keys', () => {
+    expect(viewTrackedStorageKey(accountA)).not.toBe(
+      viewTrackedStorageKey(accountB),
+    );
+  });
+
+  // Distinct namespaces: dismissal is durable and per-account, the view marker
+  // is session-scoped. Sharing a key would make dismissing suppress impressions.
+  it('does not collide with the dismissal key', () => {
+    expect(viewTrackedStorageKey(accountA)).not.toBe(
+      dismissalStorageKey(accountA),
+    );
   });
 });
 
