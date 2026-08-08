@@ -36,7 +36,7 @@ func (q *queueProducer) selectShard(ctx context.Context, shardName string, qi Qu
 	if shardName != "" {
 		shard, err := q.shards.ByName(shardName)
 		if err != nil {
-			return nil, fmt.Errorf("tried to force invalid queue shard %q", shardName)
+			return nil, fmt.Errorf("tried to force queue shard %q: %w", shardName, err)
 		}
 		return shard, nil
 	}
