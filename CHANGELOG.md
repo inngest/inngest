@@ -2,12 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.42.0] - 2026-08-08
+
+### 🚀 Features
+
+- Add SDK feature observations (#4700)
+- *(connect)* Adding support for connect HA (#4714)
+- *(queue)* Let custom scanners declare roles (#4723)
+
+### 🐛 Bug Fixes
+
+- *(traces)* Scope span self-join by run_id (#4718)
+
+### 🚜 Refactor
+
+- *(runs)* Remove legacy tokens from run output header (#4721)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(queue)* Remove system queue migrations (#4722)
+
 ## [v1.41.1] - 2026-08-05
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(support)* Add graphql-codegen to support app (#4701)
 - *(e2e)* Run more tests on Depot (#4710)
+- *(release)* V1.41.1 (#4707)
 
 ## [v1.41.0] - 2026-08-03
 
