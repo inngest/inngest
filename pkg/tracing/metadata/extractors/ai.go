@@ -258,10 +258,10 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 	return []metadata.Structured{aiMd}, nil
 }
 
-// ModelPricing contains input/output pricing per 1M tokens in USD.
+// ModelPricing contains input/output pricing per token in USD.
 type ModelPricing struct {
-	InputPer1M  float64
-	OutputPer1M float64
+	InputPerToken  float64
+	OutputPerToken float64
 }
 
 //go:embed model_prices.json
@@ -284,7 +284,7 @@ type modelPriceEntry struct {
 const modelPricingPlaceholderKey = "sample_spec"
 
 // modelPricing is the exact-match pricing table, keyed by lowercase model
-// name, in USD per 1M tokens. It's parsed at init time from the embedded
+// name, in USD per token. It's parsed at init time from the embedded
 // model_prices.json snapshot.
 var modelPricing = mustLoadModelPricing()
 
@@ -310,8 +310,8 @@ func mustLoadModelPricing() map[string]ModelPricing {
 			continue
 		}
 		pricing[strings.ToLower(model)] = ModelPricing{
-			InputPer1M:  *entry.InputCostPerToken * 1_000_000,
-			OutputPer1M: *entry.OutputCostPerToken * 1_000_000,
+			InputPerToken:  *entry.InputCostPerToken,
+			OutputPerToken: *entry.OutputCostPerToken,
 		}
 	}
 
@@ -392,9 +392,9 @@ func EstimateCost(model string, inputTokens, outputTokens int64) *float64 {
 		return nil
 	}
 
-	// Calculate cost: (tokens / 1M) * price_per_1M
-	inputCost := (float64(inputTokens) / 1_000_000) * pricing.InputPer1M
-	outputCost := (float64(outputTokens) / 1_000_000) * pricing.OutputPer1M
+	// Calculate cost: tokens * price_per_token
+	inputCost := float64(inputTokens) * pricing.InputPerToken
+	outputCost := float64(outputTokens) * pricing.OutputPerToken
 	totalCost := inputCost + outputCost
 
 	// Round to 6 decimal places

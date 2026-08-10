@@ -466,8 +466,8 @@ func TestFindPricingBySegment(t *testing.T) {
 			model:     "gpt-4o",
 			wantMatch: true,
 			wantPricing: &ModelPricing{
-				InputPer1M:  modelPricing["gpt-4o"].InputPer1M,
-				OutputPer1M: modelPricing["gpt-4o"].OutputPer1M,
+				InputPerToken:  modelPricing["gpt-4o"].InputPerToken,
+				OutputPerToken: modelPricing["gpt-4o"].OutputPerToken,
 			},
 		},
 		{
@@ -475,8 +475,8 @@ func TestFindPricingBySegment(t *testing.T) {
 			model:     "gpt-4-turbo-2024-04-09-preview",
 			wantMatch: true,
 			wantPricing: &ModelPricing{
-				InputPer1M:  modelPricing["gpt-4-turbo-2024-04-09"].InputPer1M,
-				OutputPer1M: modelPricing["gpt-4-turbo-2024-04-09"].OutputPer1M,
+				InputPerToken:  modelPricing["gpt-4-turbo-2024-04-09"].InputPerToken,
+				OutputPerToken: modelPricing["gpt-4-turbo-2024-04-09"].OutputPerToken,
 			},
 		},
 		{
@@ -484,8 +484,8 @@ func TestFindPricingBySegment(t *testing.T) {
 			model:     "gpt-4-turbo-2024-04-09-preview-canary",
 			wantMatch: true,
 			wantPricing: &ModelPricing{
-				InputPer1M:  modelPricing["gpt-4-turbo-2024-04-09"].InputPer1M,
-				OutputPer1M: modelPricing["gpt-4-turbo-2024-04-09"].OutputPer1M,
+				InputPerToken:  modelPricing["gpt-4-turbo-2024-04-09"].InputPerToken,
+				OutputPerToken: modelPricing["gpt-4-turbo-2024-04-09"].OutputPerToken,
 			},
 		},
 		{
@@ -498,8 +498,8 @@ func TestFindPricingBySegment(t *testing.T) {
 			model:     "gpt-5-mini.preview",
 			wantMatch: true,
 			wantPricing: &ModelPricing{
-				InputPer1M:  modelPricing["gpt-5"].InputPer1M,
-				OutputPer1M: modelPricing["gpt-5"].OutputPer1M,
+				InputPerToken:  modelPricing["gpt-5"].InputPerToken,
+				OutputPerToken: modelPricing["gpt-5"].OutputPerToken,
 			},
 		},
 		{
