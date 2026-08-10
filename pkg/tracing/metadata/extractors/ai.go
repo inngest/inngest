@@ -2,7 +2,9 @@ package extractors
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/url"
@@ -256,71 +258,71 @@ func ExtractAIOutputMetadata(output []byte, stepDurationMs int64) ([]metadata.St
 	return []metadata.Structured{aiMd}, nil
 }
 
-// ModelPricing contains input/output pricing per 1M tokens in USD
+// ModelPricing contains input/output pricing per token in USD.
 type ModelPricing struct {
-	InputPer1M  float64
-	OutputPer1M float64
+	InputPerToken  float64
+	OutputPerToken float64
 }
 
-// modelPricing is the exact match pricing table - prices in USD per 1M tokens
-// Source: https://openai.com/pricing, https://anthropic.com/pricing, https://ai.google.dev/pricing
-var modelPricing = map[string]ModelPricing{
-	"gpt-5.2":     {1.75, 14.00},
-	"gpt-5.1":     {1.25, 10.00},
-	"gpt-5":       {1.25, 10.00},
-	"gpt-5-mini":  {0.25, 2.00},
-	"gpt-5-nano":  {0.05, 0.40},
-	"gpt-5.2-pro": {21.00, 168.00},
-	"gpt-5-pro":   {15.00, 120.00},
+//go:embed model_prices.json
+var modelPricesFile embed.FS
 
-	"gpt-4.1":      {2.00, 8.00},
-	"gpt-4.1-mini": {0.40, 1.60},
-	"gpt-4.1-nano": {0.10, 0.40},
+// modelPriceEntry mirrors the fields we need from LiteLLM's
+// model_prices_and_context_window.json (https://github.com/BerriAI/litellm,
+// MIT licensed outside its enterprise/ directory), the community-maintained
+// source of model cost data that tools like tokencost also republish. Costs
+// are USD per token. Refresh the embedded snapshot with
+// scripts/update-model-prices.sh.
+type modelPriceEntry struct {
+	InputCostPerToken  *float64 `json:"input_cost_per_token"`
+	OutputCostPerToken *float64 `json:"output_cost_per_token"`
+}
 
-	"gpt-4o":      {2.50, 10.00},
-	"gpt-4o-mini": {0.15, 0.60},
-	"gpt-4-turbo": {10.00, 30.00},
+// modelPricingPlaceholderKey is a documentation-only placeholder entry
+// present in the upstream file (a template showing every possible field,
+// with dummy zero-value costs) - it isn't a real model and must be excluded.
+const modelPricingPlaceholderKey = "sample_spec"
 
-	"o1":      {15.00, 60.00},
-	"o1-pro":  {150.00, 600.00},
-	"o1-mini": {1.10, 4.40},
-	"o3":      {2.00, 8.00},
-	"o3-pro":  {20.00, 80.00},
-	"o3-mini": {1.10, 4.40},
-	"o4-mini": {1.10, 4.40},
+// modelPricing is the exact-match pricing table, keyed by lowercase model
+// name, in USD per token. It's parsed at init time from the embedded
+// model_prices.json snapshot.
+var modelPricing = mustLoadModelPricing()
 
-	"claude-opus-4-5":   {5.00, 25.00},
-	"claude-opus-4-1":   {15.00, 75.00},
-	"claude-opus-4":     {15.00, 75.00},
-	"claude-sonnet-4-5": {3.00, 15.00},
-	"claude-sonnet-4":   {3.00, 15.00},
-	"claude-haiku-4-5":  {1.00, 5.00},
+func mustLoadModelPricing() map[string]ModelPricing {
+	raw, err := modelPricesFile.ReadFile("model_prices.json")
+	if err != nil {
+		panic(fmt.Errorf("extractors: reading embedded model_prices.json: %w", err))
+	}
 
-	"claude-haiku-3-5": {0.80, 4.00},
+	var entries map[string]modelPriceEntry
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		panic(fmt.Errorf("extractors: parsing embedded model_prices.json: %w", err))
+	}
 
-	"claude-3-haiku": {0.25, 1.25},
+	pricing := make(map[string]ModelPricing, len(entries))
+	for model, entry := range entries {
+		if model == modelPricingPlaceholderKey {
+			continue
+		}
+		if entry.InputCostPerToken == nil || entry.OutputCostPerToken == nil {
+			// Non-token-priced entries (image/audio/embedding models, etc.)
+			// aren't usable for our per-token cost estimate.
+			continue
+		}
+		if *entry.InputCostPerToken == 0 && *entry.OutputCostPerToken == 0 {
+			// A model priced at exactly zero for both input and output is
+			// almost always an unfilled upstream placeholder, not a
+			// genuinely free model - excluding it avoids a real model's
+			// usage silently costing nothing.
+			continue
+		}
+		pricing[strings.ToLower(model)] = ModelPricing{
+			InputPerToken:  *entry.InputCostPerToken,
+			OutputPerToken: *entry.OutputCostPerToken,
+		}
+	}
 
-	"gemini-3-pro-preview":   {2.00, 12.00},
-	"gemini-3-flash-preview": {0.50, 3.00},
-
-	"gemini-2.5-pro":        {1.25, 10.00},
-	"gemini-2.5-flash":      {0.30, 2.50},
-	"gemini-2.5-flash-lite": {0.10, 0.40},
-
-	"gemini-2.0-flash":      {0.10, 0.40},
-	"gemini-2.0-flash-lite": {0.075, 0.30},
-
-	"mistral-large-latest":  {4.00, 12.00},
-	"mistral-medium-latest": {2.70, 8.10},
-	"mistral-small-latest":  {1.00, 3.00},
-	"open-mistral-7b":       {0.25, 0.25},
-	"open-mixtral-8x7b":     {0.70, 0.70},
-	"open-mixtral-8x22b":    {2.00, 6.00},
-
-	"command-r-plus": {3.00, 15.00},
-	"command-r":      {0.50, 1.50},
-	"command":        {1.00, 2.00},
-	"command-light":  {0.30, 0.60},
+	return pricing
 }
 
 // estimatedCostForTokens prefers the response model (the model that actually
@@ -392,19 +394,14 @@ func EstimateCost(model string, inputTokens, outputTokens int64) *float64 {
 
 	modelLower := strings.ToLower(model)
 
-	// try exact match first
-	pricing, ok := modelPricing[modelLower]
+	pricing, ok := findPricingBySegment(modelLower)
 	if !ok {
-		// try prefix match, find the longest matching prefix
-		pricing, ok = findPricingByPrefix(modelLower)
-		if !ok {
-			return nil
-		}
+		return nil
 	}
 
-	// Calculate cost: (tokens / 1M) * price_per_1M
-	inputCost := (float64(inputTokens) / 1_000_000) * pricing.InputPer1M
-	outputCost := (float64(outputTokens) / 1_000_000) * pricing.OutputPer1M
+	// Calculate cost: tokens * price_per_token
+	inputCost := float64(inputTokens) * pricing.InputPerToken
+	outputCost := float64(outputTokens) * pricing.OutputPerToken
 	totalCost := inputCost + outputCost
 
 	// Round to 6 decimal places
@@ -413,24 +410,21 @@ func EstimateCost(model string, inputTokens, outputTokens int64) *float64 {
 	return &rounded
 }
 
-// findPricingByPrefix finds the pricing for a model by matching the longest prefix.
-func findPricingByPrefix(model string) (ModelPricing, bool) {
-	var bestMatch string
-	var bestPricing ModelPricing
-
-	for key, pricing := range modelPricing {
-		if strings.HasPrefix(model, key) {
-			// Keep the longest matching prefix
-			if len(key) > len(bestMatch) {
-				bestMatch = key
-				bestPricing = pricing
-			}
+// findPricingBySegment finds pricing for a model by exact match, falling back
+// to progressively dropping trailing "-"-delimited segments (e.g.
+// "a-b-c-date" tries "a-b-c-date", then "a-b-c", then "a-b", then "a") until
+// an exact match is found. This avoids substring-prefix false positives, e.g.
+// "gpt-5.7-newmodel" must not match a pricing entry for "gpt-5.6-luna".
+func findPricingBySegment(model string) (ModelPricing, bool) {
+	for {
+		if pricing, ok := modelPricing[model]; ok {
+			return pricing, true
 		}
-	}
 
-	if bestMatch == "" {
-		return ModelPricing{}, false
+		idx := strings.LastIndex(model, "-")
+		if idx == -1 {
+			return ModelPricing{}, false
+		}
+		model = model[:idx]
 	}
-
-	return bestPricing, true
 }
