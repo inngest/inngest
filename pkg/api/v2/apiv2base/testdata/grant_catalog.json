@@ -128,6 +128,24 @@
       "internal": false
     },
     {
+      "grant": "api:sandbox:read",
+      "name": "api:sandbox",
+      "action": "read",
+      "category": "Compute",
+      "description": "Sandboxes, the processes inside them and their files",
+      "sensitive": false,
+      "internal": false
+    },
+    {
+      "grant": "api:sandbox:write",
+      "name": "api:sandbox",
+      "action": "write",
+      "category": "Compute",
+      "description": "Sandboxes, the processes inside them and their files",
+      "sensitive": false,
+      "internal": false
+    },
+    {
       "grant": "api:score:write",
       "name": "api:score",
       "action": "write",
@@ -165,6 +183,7 @@
     }
   ],
   "routesByGrant": {
+    "DELETE /sandboxes/{sandbox_id}": "api:sandbox:write",
     "GET /account": "api:account:read",
     "GET /apps": "api:app:read",
     "GET /apps/{app_id}": "api:app:read",
@@ -185,6 +204,14 @@
     "GET /runs": "api:run:read",
     "GET /runs/{run_id}": "api:run:read",
     "GET /runs/{run_id}/trace": "api:run:read",
+    "GET /sandboxes": "api:sandbox:read",
+    "GET /sandboxes/{sandbox_id}": "api:sandbox:read",
+    "GET /sandboxes/{sandbox_id}/files": "api:sandbox:read",
+    "GET /sandboxes/{sandbox_id}/logs": "api:sandbox:read",
+    "GET /sandboxes/{sandbox_id}/processes": "api:sandbox:read",
+    "GET /sandboxes/{sandbox_id}/processes/{process_id}": "api:sandbox:read",
+    "GET /sandboxes/{sandbox_id}/processes/{process_id}/output": "api:sandbox:read",
+    "GET /sandboxes/{sandbox_id}/processes/{process_id}/output/stream": "api:sandbox:read",
     "GET /sessions": "api:session:read",
     "GET /sessions/{session_key}": "api:session:read",
     "GET /sessions/{session_key}/{session_id=**}/runs": "api:session:read",
@@ -198,6 +225,12 @@
     "POST /partner/accounts": "api:partner:write",
     "POST /runs/{run_id}/cancel": "api:run:write",
     "POST /runs/{run_id}/rerun": "api:run:write",
-    "POST /runs/{run_id}/scores": "api:score:write"
+    "POST /runs/{run_id}/scores": "api:score:write",
+    "POST /sandboxes": "api:sandbox:write",
+    "POST /sandboxes/{sandbox_id}/exec": "api:sandbox:write",
+    "POST /sandboxes/{sandbox_id}/processes": "api:sandbox:write",
+    "POST /sandboxes/{sandbox_id}/processes/{process_id}/signals": "api:sandbox:write",
+    "POST /sandboxes/{sandbox_id}/processes/{process_id}/wait": "api:sandbox:read",
+    "PUT /sandboxes/{sandbox_id}/files": "api:sandbox:write"
   }
 }

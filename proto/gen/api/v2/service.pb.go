@@ -9508,7 +9508,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032ޢ\x01\n" +
+	"\x04INFO\x10\x032\xff\xa4\x01\n" +
 	"\x02V2\x12\xc2\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x88\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -9804,100 +9804,100 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\bGet apps\x1agLists active apps in the authenticated environment. Set archived to true to list archived apps instead.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:app\x18\x01\x82\xd3\xe4\x93\x02\a\x12\x05/apps\x12\x9b\x01\n" +
-	"\rCreateSandbox\x12\x1c.api.v2.CreateSandboxRequest\x1a\x1d.api.v2.CreateSandboxResponse\"M\x92A5\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\v\x12\aapi:app\x18\x01\x82\xd3\xe4\x93\x02\a\x12\x05/apps\x12\xae\x01\n" +
+	"\rCreateSandbox\x12\x1c.api.v2.CreateSandboxRequest\x1a\x1d.api.v2.CreateSandboxResponse\"`\x92A5\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x10Create a sandboxb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
-	"/sandboxes\x12\x96\x01\n" +
-	"\rListSandboxes\x12\x1c.api.v2.ListSandboxesRequest\x1a\x1d.api.v2.ListSandboxesResponse\"H\x92A3\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x02\x82\xd3\xe4\x93\x02\x0f:\x01*\"\n" +
+	"/sandboxes\x12\xa9\x01\n" +
+	"\rListSandboxes\x12\x1c.api.v2.ListSandboxesRequest\x1a\x1d.api.v2.ListSandboxesResponse\"[\x92A3\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x0eList sandboxesb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\f\x12\n" +
-	"/sandboxes\x12\x99\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x02\f\x12\n" +
+	"/sandboxes\x12\xac\x01\n" +
 	"\n" +
-	"GetSandbox\x12\x19.api.v2.GetSandboxRequest\x1a\x1a.api.v2.GetSandboxResponse\"T\x92A2\n" +
+	"GetSandbox\x12\x19.api.v2.GetSandboxRequest\x1a\x1a.api.v2.GetSandboxResponse\"g\x92A2\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\rGet a sandboxb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19\x12\x17/sandboxes/{sandbox_id}\x12\xa9\x01\n" +
-	"\x0eDestroySandbox\x12\x1d.api.v2.DestroySandboxRequest\x1a\x1e.api.v2.DestroySandboxResponse\"X\x92A6\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x02\x19\x12\x17/sandboxes/{sandbox_id}\x12\xbc\x01\n" +
+	"\x0eDestroySandbox\x12\x1d.api.v2.DestroySandboxRequest\x1a\x1e.api.v2.DestroySandboxResponse\"k\x92A6\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x11Destroy a sandboxb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x19*\x17/sandboxes/{sandbox_id}\x12\xb5\x01\n" +
-	"\vExecSandbox\x12\x1a.api.v2.ExecSandboxRequest\x1a\x1b.api.v2.ExecSandboxResponse\"m\x92AC\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x02\x82\xd3\xe4\x93\x02\x19*\x17/sandboxes/{sandbox_id}\x12\xc9\x01\n" +
+	"\vExecSandbox\x12\x1a.api.v2.ExecSandboxRequest\x1a\x1b.api.v2.ExecSandboxResponse\"\x80\x01\x92AC\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x1eExecute a command in a sandboxb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/sandboxes/{sandbox_id}/exec\x12\xbb\x01\n" +
-	"\x11StreamSandboxLogs\x12 .api.v2.StreamSandboxLogsRequest\x1a!.api.v2.StreamSandboxLogsResponse\"_\x92A8\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x02\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/sandboxes/{sandbox_id}/exec\x12\xce\x01\n" +
+	"\x11StreamSandboxLogs\x12 .api.v2.StreamSandboxLogsRequest\x1a!.api.v2.StreamSandboxLogsResponse\"r\x92A8\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x13Stream sandbox logsb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1e\x12\x1c/sandboxes/{sandbox_id}/logs0\x01\x12\xbe\x01\n" +
-	"\x10WriteSandboxFile\x12\x1f.api.v2.WriteSandboxFileRequest\x1a .api.v2.WriteSandboxFileResponse\"g\x92A9\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x02\x1e\x12\x1c/sandboxes/{sandbox_id}/logs0\x01\x12\xd1\x01\n" +
+	"\x10WriteSandboxFile\x12\x1f.api.v2.WriteSandboxFileRequest\x1a .api.v2.WriteSandboxFileResponse\"z\x92A9\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x14Write a sandbox fileb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02%:\x04body\x1a\x1d/sandboxes/{sandbox_id}/files\x12\xab\x01\n" +
-	"\x0fReadSandboxFile\x12\x1e.api.v2.ReadSandboxFileRequest\x1a\x14.google.api.HttpBody\"`\x92A8\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x02\x82\xd3\xe4\x93\x02%:\x04body\x1a\x1d/sandboxes/{sandbox_id}/files\x12\xbe\x01\n" +
+	"\x0fReadSandboxFile\x12\x1e.api.v2.ReadSandboxFileRequest\x1a\x14.google.api.HttpBody\"s\x92A8\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x13Read a sandbox fileb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f\x12\x1d/sandboxes/{sandbox_id}/files0\x01\x12\xcb\x01\n" +
-	"\x13StartSandboxProcess\x12\".api.v2.StartSandboxProcessRequest\x1a#.api.v2.StartSandboxProcessResponse\"k\x92A<\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x02\x1f\x12\x1d/sandboxes/{sandbox_id}/files0\x01\x12\xde\x01\n" +
+	"\x13StartSandboxProcess\x12\".api.v2.StartSandboxProcessRequest\x1a#.api.v2.StartSandboxProcessResponse\"~\x92A<\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x17Start a sandbox processb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02&:\x01*\"!/sandboxes/{sandbox_id}/processes\x12\xca\x01\n" +
-	"\x14ListSandboxProcesses\x12#.api.v2.ListSandboxProcessesRequest\x1a$.api.v2.ListSandboxProcessesResponse\"g\x92A;\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x02\x82\xd3\xe4\x93\x02&:\x01*\"!/sandboxes/{sandbox_id}/processes\x12\xdd\x01\n" +
+	"\x14ListSandboxProcesses\x12#.api.v2.ListSandboxProcessesRequest\x1a$.api.v2.ListSandboxProcessesResponse\"z\x92A;\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x16List sandbox processesb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02#\x12!/sandboxes/{sandbox_id}/processes\x12\xcd\x01\n" +
-	"\x11GetSandboxProcess\x12 .api.v2.GetSandboxProcessRequest\x1a!.api.v2.GetSandboxProcessResponse\"s\x92A:\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x02#\x12!/sandboxes/{sandbox_id}/processes\x12\xe1\x01\n" +
+	"\x11GetSandboxProcess\x12 .api.v2.GetSandboxProcessRequest\x1a!.api.v2.GetSandboxProcessResponse\"\x86\x01\x92A:\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x15Get a sandbox processb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x020\x12./sandboxes/{sandbox_id}/processes/{process_id}\x12\xe5\x01\n" +
-	"\x14SignalSandboxProcess\x12#.api.v2.SignalSandboxProcessRequest\x1a$.api.v2.SignalSandboxProcessResponse\"\x81\x01\x92A=\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x020\x12./sandboxes/{sandbox_id}/processes/{process_id}\x12\xf8\x01\n" +
+	"\x14SignalSandboxProcess\x12#.api.v2.SignalSandboxProcessRequest\x1a$.api.v2.SignalSandboxProcessResponse\"\x94\x01\x92A=\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x18Signal a sandbox processb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02;:\x01*\"6/sandboxes/{sandbox_id}/processes/{process_id}/signals\x12\xda\x01\n" +
-	"\x12WaitSandboxProcess\x12!.api.v2.WaitSandboxProcessRequest\x1a\".api.v2.WaitSandboxProcessResponse\"}\x92A?\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x02\x82\xd3\xe4\x93\x02;:\x01*\"6/sandboxes/{sandbox_id}/processes/{process_id}/signals\x12\xee\x01\n" +
+	"\x12WaitSandboxProcess\x12!.api.v2.WaitSandboxProcessRequest\x1a\".api.v2.WaitSandboxProcessResponse\"\x90\x01\x92A?\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x1aWait for a sandbox processb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x025\"3/sandboxes/{sandbox_id}/processes/{process_id}/wait\x12\xeb\x01\n" +
-	"\x17GetSandboxProcessOutput\x12&.api.v2.GetSandboxProcessOutputRequest\x1a'.api.v2.GetSandboxProcessOutputResponse\"\x7f\x92A?\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x025\"3/sandboxes/{sandbox_id}/processes/{process_id}/wait\x12\xff\x01\n" +
+	"\x17GetSandboxProcessOutput\x12&.api.v2.GetSandboxProcessOutputRequest\x1a'.api.v2.GetSandboxProcessOutputResponse\"\x92\x01\x92A?\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x1aGet sandbox process outputb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x027\x125/sandboxes/{sandbox_id}/processes/{process_id}/output\x12\x81\x02\n" +
-	"\x1aStreamSandboxProcessOutput\x12).api.v2.StreamSandboxProcessOutputRequest\x1a*.api.v2.StreamSandboxProcessOutputResponse\"\x89\x01\x92AB\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x027\x125/sandboxes/{sandbox_id}/processes/{process_id}/output\x12\x94\x02\n" +
+	"\x1aStreamSandboxProcessOutput\x12).api.v2.StreamSandboxProcessOutputRequest\x1a*.api.v2.StreamSandboxProcessOutputResponse\"\x9c\x01\x92AB\n" +
 	"\tSandboxes\n" +
 	"\x04Beta\x12\x1dStream sandbox process outputb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02>\x12</sandboxes/{sandbox_id}/processes/{process_id}/output/stream0\x01\x12\xdc\x02\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:sandbox\x18\x01\x82\xd3\xe4\x93\x02>\x12</sandboxes/{sandbox_id}/processes/{process_id}/output/stream0\x01\x12\xdc\x02\n" +
 	"\vCreateScore\x12\x1a.api.v2.CreateScoreRequest\x1a\x1b.api.v2.CreateScoreResponse\"\x93\x02\x92A\xd9\x01\n" +
 	"\x04Runs\n" +
 	"\x04Beta\x12\fCreate score\x1a\xaa\x01Submits one or more named scores for a function run, or for specific steps when step IDs are provided. Scores are recorded as run metadata and aggregated for experiments.b\x10\n" +
@@ -10111,7 +10111,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:session\x18\x01\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\xce\r\x92A\xe5\x05\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x8a\xb5\x18\x0f\x12\vapi:session\x18\x01\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\x9e\x0e\x92A\xe5\x05\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -10138,7 +10138,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\tapi:score\x12&Scores recorded against runs and steps\x1a\x18Observability & AI Evals\x92\xb5\x18I\n" +
 	"\x0eapi:experiment\x12\x1dExperiments and their results\x1a\x18Observability & AI Evals\x92\xb5\x18S\n" +
 	"\vapi:insight\x12*Insights queries, tables and event schemas\x1a\x18Observability & AI Evals\x92\xb5\x18J\n" +
-	"\vapi:session\x12!Sessions and session-grouped runs\x1a\x18Observability & AI EvalsZ1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
+	"\vapi:session\x12!Sessions and session-grouped runs\x1a\x18Observability & AI Evals\x92\xb5\x18L\n" +
+	"\vapi:sandbox\x124Sandboxes, the processes inside them and their files\x1a\aComputeZ1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
 
 var (
 	file_api_v2_service_proto_rawDescOnce sync.Once

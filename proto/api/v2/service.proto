@@ -119,6 +119,11 @@ option (grant_definition) = {
   description: "Sessions and session-grouped runs"
   category: "Observability & AI Evals"
 };
+option (grant_definition) = {
+  name: "api:sandbox"
+  description: "Sandboxes, the processes inside them and their files"
+  category: "Compute"
+};
 
 
 
@@ -1246,6 +1251,10 @@ service V2 {
       post: "/sandboxes"
       body: "*"
     };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_WRITE
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create a sandbox"
       tags: "Sandboxes"
@@ -1261,6 +1270,10 @@ service V2 {
 
   rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse) {
     option (google.api.http) = { get: "/sandboxes" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List sandboxes"
       tags: "Sandboxes"
@@ -1276,6 +1289,10 @@ service V2 {
 
   rpc GetSandbox(GetSandboxRequest) returns (GetSandboxResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get a sandbox"
       tags: "Sandboxes"
@@ -1291,6 +1308,10 @@ service V2 {
 
   rpc DestroySandbox(DestroySandboxRequest) returns (DestroySandboxResponse) {
     option (google.api.http) = { delete: "/sandboxes/{sandbox_id}" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_WRITE
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Destroy a sandbox"
       tags: "Sandboxes"
@@ -1309,6 +1330,10 @@ service V2 {
       post: "/sandboxes/{sandbox_id}/exec"
       body: "*"
     };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_WRITE
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Execute a command in a sandbox"
       tags: "Sandboxes"
@@ -1324,6 +1349,10 @@ service V2 {
 
   rpc StreamSandboxLogs(StreamSandboxLogsRequest) returns (stream StreamSandboxLogsResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/logs" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Stream sandbox logs"
       tags: "Sandboxes"
@@ -1342,6 +1371,10 @@ service V2 {
       put: "/sandboxes/{sandbox_id}/files"
       body: "body"
     };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_WRITE
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Write a sandbox file"
       tags: "Sandboxes"
@@ -1357,6 +1390,10 @@ service V2 {
 
   rpc ReadSandboxFile(ReadSandboxFileRequest) returns (stream google.api.HttpBody) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/files" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Read a sandbox file"
       tags: "Sandboxes"
@@ -1375,6 +1412,10 @@ service V2 {
       post: "/sandboxes/{sandbox_id}/processes"
       body: "*"
     };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_WRITE
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Start a sandbox process"
       tags: "Sandboxes"
@@ -1390,6 +1431,10 @@ service V2 {
 
   rpc ListSandboxProcesses(ListSandboxProcessesRequest) returns (ListSandboxProcessesResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List sandbox processes"
       tags: "Sandboxes"
@@ -1405,6 +1450,10 @@ service V2 {
 
   rpc GetSandboxProcess(GetSandboxProcessRequest) returns (GetSandboxProcessResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get a sandbox process"
       tags: "Sandboxes"
@@ -1423,6 +1472,10 @@ service V2 {
       post: "/sandboxes/{sandbox_id}/processes/{process_id}/signals"
       body: "*"
     };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_WRITE
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Signal a sandbox process"
       tags: "Sandboxes"
@@ -1438,6 +1491,10 @@ service V2 {
 
   rpc WaitSandboxProcess(WaitSandboxProcessRequest) returns (WaitSandboxProcessResponse) {
     option (google.api.http) = { post: "/sandboxes/{sandbox_id}/processes/{process_id}/wait" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Wait for a sandbox process"
       tags: "Sandboxes"
@@ -1453,6 +1510,10 @@ service V2 {
 
   rpc GetSandboxProcessOutput(GetSandboxProcessOutputRequest) returns (GetSandboxProcessOutputResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}/output" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get sandbox process output"
       tags: "Sandboxes"
@@ -1468,6 +1529,10 @@ service V2 {
 
   rpc StreamSandboxProcessOutput(StreamSandboxProcessOutputRequest) returns (stream StreamSandboxProcessOutputResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}/output/stream" };
+    option (authz) = {
+      grant: "api:sandbox"
+      action: AUTHZ_ACTION_READ
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Stream sandbox process output"
       tags: "Sandboxes"
