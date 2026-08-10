@@ -27,14 +27,18 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // User codes are 6 base-20 characters (0-9, A-J), optionally grouped ZZZ-ZZZ.
-const USER_CODE_REGEX = /^[0-9A-J]{3}-?[0-9A-J]{3}$/i;
+// Both regexes derive from CODE_CHARS so what the input accepts can't drift from
+// what submission validates.
+const CODE_CHARS = '0-9A-J';
+const USER_CODE_REGEX = new RegExp(
+  `^[${CODE_CHARS}]{3}-?[${CODE_CHARS}]{3}$`,
+  'i',
+);
+const NON_CODE_CHARS = new RegExp(`[^${CODE_CHARS}]`, 'g');
 const CODE_LENGTH = 6;
 
 function sanitizeUserCode(raw: string): string {
-  return raw
-    .toUpperCase()
-    .replace(/[^0-9A-Z]/g, '')
-    .slice(0, CODE_LENGTH);
+  return raw.toUpperCase().replace(NON_CODE_CHARS, '').slice(0, CODE_LENGTH);
 }
 
 /**
