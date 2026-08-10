@@ -77,6 +77,34 @@ func TestMCPToolsMatchGeneratedContractWithCompatibilityTools(t *testing.T) {
 	}
 }
 
+func TestSandboxMethodsExcludedFromDevServerMCP(t *testing.T) {
+	discovered := map[string]struct{}{}
+	for _, endpoint := range apiv2endpoint.Discover() {
+		discovered[endpoint.MethodName] = struct{}{}
+	}
+
+	for _, method := range []string{
+		"CreateSandbox",
+		"ListSandboxes",
+		"GetSandbox",
+		"DestroySandbox",
+		"ExecSandbox",
+		"StreamSandboxLogs",
+		"WriteSandboxFile",
+		"ReadSandboxFile",
+		"StartSandboxProcess",
+		"ListSandboxProcesses",
+		"GetSandboxProcess",
+		"SignalSandboxProcess",
+		"WaitSandboxProcess",
+		"GetSandboxProcessOutput",
+		"StreamSandboxProcessOutput",
+	} {
+		require.Contains(t, discovered, method)
+		require.Contains(t, unsupportedDevServerMCPMethods, method)
+	}
+}
+
 func TestMCPRoutesDoNotCaptureSetupPage(t *testing.T) {
 	router := chi.NewRouter()
 	AddMCPRoute(router, nil, nil, 0, nil)

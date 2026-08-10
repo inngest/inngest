@@ -8,6 +8,7 @@ package apiv2
 
 import (
 	context "context"
+	httpbody "google.golang.org/genproto/googleapis/api/httpbody"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -19,41 +20,56 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	V2_Health_FullMethodName                   = "/api.v2.V2/Health"
-	V2_XSchemaOnly_FullMethodName              = "/api.v2.V2/_SchemaOnly"
-	V2_CreatePartnerAccount_FullMethodName     = "/api.v2.V2/CreatePartnerAccount"
-	V2_CreateEnv_FullMethodName                = "/api.v2.V2/CreateEnv"
-	V2_FetchPartnerAccounts_FullMethodName     = "/api.v2.V2/FetchPartnerAccounts"
-	V2_FetchAccount_FullMethodName             = "/api.v2.V2/FetchAccount"
-	V2_FetchAccountEnvs_FullMethodName         = "/api.v2.V2/FetchAccountEnvs"
-	V2_FetchAccountEventKeys_FullMethodName    = "/api.v2.V2/FetchAccountEventKeys"
-	V2_FetchAccountSigningKeys_FullMethodName  = "/api.v2.V2/FetchAccountSigningKeys"
-	V2_CreateWebhook_FullMethodName            = "/api.v2.V2/CreateWebhook"
-	V2_ListWebhooks_FullMethodName             = "/api.v2.V2/ListWebhooks"
-	V2_PatchEnv_FullMethodName                 = "/api.v2.V2/PatchEnv"
-	V2_GetFunctionRun_FullMethodName           = "/api.v2.V2/GetFunctionRun"
-	V2_ListRuns_FullMethodName                 = "/api.v2.V2/ListRuns"
-	V2_ListFunctionRuns_FullMethodName         = "/api.v2.V2/ListFunctionRuns"
-	V2_GetEventRuns_FullMethodName             = "/api.v2.V2/GetEventRuns"
-	V2_Rerun_FullMethodName                    = "/api.v2.V2/Rerun"
-	V2_CancelRun_FullMethodName                = "/api.v2.V2/CancelRun"
-	V2_GetApp_FullMethodName                   = "/api.v2.V2/GetApp"
-	V2_GetApps_FullMethodName                  = "/api.v2.V2/GetApps"
-	V2_CreateScore_FullMethodName              = "/api.v2.V2/CreateScore"
-	V2_SyncApp_FullMethodName                  = "/api.v2.V2/SyncApp"
-	V2_GetFunctionTrace_FullMethodName         = "/api.v2.V2/GetFunctionTrace"
-	V2_GetFunction_FullMethodName              = "/api.v2.V2/GetFunction"
-	V2_GetFunctions_FullMethodName             = "/api.v2.V2/GetFunctions"
-	V2_InvokeFunction_FullMethodName           = "/api.v2.V2/InvokeFunction"
-	V2_ListInsightsTables_FullMethodName       = "/api.v2.V2/ListInsightsTables"
-	V2_ListInsightsEventSchemas_FullMethodName = "/api.v2.V2/ListInsightsEventSchemas"
-	V2_QueryInsightsPrompt_FullMethodName      = "/api.v2.V2/QueryInsightsPrompt"
-	V2_QueryInsights_FullMethodName            = "/api.v2.V2/QueryInsights"
-	V2_ListExperiments_FullMethodName          = "/api.v2.V2/ListExperiments"
-	V2_GetExperiment_FullMethodName            = "/api.v2.V2/GetExperiment"
-	V2_ListSessionKeys_FullMethodName          = "/api.v2.V2/ListSessionKeys"
-	V2_ListSessions_FullMethodName             = "/api.v2.V2/ListSessions"
-	V2_ListSessionRuns_FullMethodName          = "/api.v2.V2/ListSessionRuns"
+	V2_Health_FullMethodName                     = "/api.v2.V2/Health"
+	V2_XSchemaOnly_FullMethodName                = "/api.v2.V2/_SchemaOnly"
+	V2_CreatePartnerAccount_FullMethodName       = "/api.v2.V2/CreatePartnerAccount"
+	V2_CreateEnv_FullMethodName                  = "/api.v2.V2/CreateEnv"
+	V2_FetchPartnerAccounts_FullMethodName       = "/api.v2.V2/FetchPartnerAccounts"
+	V2_FetchAccount_FullMethodName               = "/api.v2.V2/FetchAccount"
+	V2_FetchAccountEnvs_FullMethodName           = "/api.v2.V2/FetchAccountEnvs"
+	V2_FetchAccountEventKeys_FullMethodName      = "/api.v2.V2/FetchAccountEventKeys"
+	V2_FetchAccountSigningKeys_FullMethodName    = "/api.v2.V2/FetchAccountSigningKeys"
+	V2_CreateWebhook_FullMethodName              = "/api.v2.V2/CreateWebhook"
+	V2_ListWebhooks_FullMethodName               = "/api.v2.V2/ListWebhooks"
+	V2_PatchEnv_FullMethodName                   = "/api.v2.V2/PatchEnv"
+	V2_GetFunctionRun_FullMethodName             = "/api.v2.V2/GetFunctionRun"
+	V2_ListRuns_FullMethodName                   = "/api.v2.V2/ListRuns"
+	V2_ListFunctionRuns_FullMethodName           = "/api.v2.V2/ListFunctionRuns"
+	V2_GetEventRuns_FullMethodName               = "/api.v2.V2/GetEventRuns"
+	V2_Rerun_FullMethodName                      = "/api.v2.V2/Rerun"
+	V2_CancelRun_FullMethodName                  = "/api.v2.V2/CancelRun"
+	V2_GetApp_FullMethodName                     = "/api.v2.V2/GetApp"
+	V2_GetApps_FullMethodName                    = "/api.v2.V2/GetApps"
+	V2_CreateSandbox_FullMethodName              = "/api.v2.V2/CreateSandbox"
+	V2_ListSandboxes_FullMethodName              = "/api.v2.V2/ListSandboxes"
+	V2_GetSandbox_FullMethodName                 = "/api.v2.V2/GetSandbox"
+	V2_DestroySandbox_FullMethodName             = "/api.v2.V2/DestroySandbox"
+	V2_ExecSandbox_FullMethodName                = "/api.v2.V2/ExecSandbox"
+	V2_StreamSandboxLogs_FullMethodName          = "/api.v2.V2/StreamSandboxLogs"
+	V2_WriteSandboxFile_FullMethodName           = "/api.v2.V2/WriteSandboxFile"
+	V2_ReadSandboxFile_FullMethodName            = "/api.v2.V2/ReadSandboxFile"
+	V2_StartSandboxProcess_FullMethodName        = "/api.v2.V2/StartSandboxProcess"
+	V2_ListSandboxProcesses_FullMethodName       = "/api.v2.V2/ListSandboxProcesses"
+	V2_GetSandboxProcess_FullMethodName          = "/api.v2.V2/GetSandboxProcess"
+	V2_SignalSandboxProcess_FullMethodName       = "/api.v2.V2/SignalSandboxProcess"
+	V2_WaitSandboxProcess_FullMethodName         = "/api.v2.V2/WaitSandboxProcess"
+	V2_GetSandboxProcessOutput_FullMethodName    = "/api.v2.V2/GetSandboxProcessOutput"
+	V2_StreamSandboxProcessOutput_FullMethodName = "/api.v2.V2/StreamSandboxProcessOutput"
+	V2_CreateScore_FullMethodName                = "/api.v2.V2/CreateScore"
+	V2_SyncApp_FullMethodName                    = "/api.v2.V2/SyncApp"
+	V2_GetFunctionTrace_FullMethodName           = "/api.v2.V2/GetFunctionTrace"
+	V2_GetFunction_FullMethodName                = "/api.v2.V2/GetFunction"
+	V2_GetFunctions_FullMethodName               = "/api.v2.V2/GetFunctions"
+	V2_InvokeFunction_FullMethodName             = "/api.v2.V2/InvokeFunction"
+	V2_ListInsightsTables_FullMethodName         = "/api.v2.V2/ListInsightsTables"
+	V2_ListInsightsEventSchemas_FullMethodName   = "/api.v2.V2/ListInsightsEventSchemas"
+	V2_QueryInsightsPrompt_FullMethodName        = "/api.v2.V2/QueryInsightsPrompt"
+	V2_QueryInsights_FullMethodName              = "/api.v2.V2/QueryInsights"
+	V2_ListExperiments_FullMethodName            = "/api.v2.V2/ListExperiments"
+	V2_GetExperiment_FullMethodName              = "/api.v2.V2/GetExperiment"
+	V2_ListSessionKeys_FullMethodName            = "/api.v2.V2/ListSessionKeys"
+	V2_ListSessions_FullMethodName               = "/api.v2.V2/ListSessions"
+	V2_ListSessionRuns_FullMethodName            = "/api.v2.V2/ListSessionRuns"
 )
 
 // V2Client is the client API for V2 service.
@@ -83,6 +99,21 @@ type V2Client interface {
 	CancelRun(ctx context.Context, in *CancelRunRequest, opts ...grpc.CallOption) (*CancelRunResponse, error)
 	GetApp(ctx context.Context, in *GetAppRequest, opts ...grpc.CallOption) (*GetAppResponse, error)
 	GetApps(ctx context.Context, in *GetAppsRequest, opts ...grpc.CallOption) (*GetAppsResponse, error)
+	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (*CreateSandboxResponse, error)
+	ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error)
+	GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error)
+	DestroySandbox(ctx context.Context, in *DestroySandboxRequest, opts ...grpc.CallOption) (*DestroySandboxResponse, error)
+	ExecSandbox(ctx context.Context, in *ExecSandboxRequest, opts ...grpc.CallOption) (*ExecSandboxResponse, error)
+	StreamSandboxLogs(ctx context.Context, in *StreamSandboxLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxLogsResponse], error)
+	WriteSandboxFile(ctx context.Context, in *WriteSandboxFileRequest, opts ...grpc.CallOption) (*WriteSandboxFileResponse, error)
+	ReadSandboxFile(ctx context.Context, in *ReadSandboxFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[httpbody.HttpBody], error)
+	StartSandboxProcess(ctx context.Context, in *StartSandboxProcessRequest, opts ...grpc.CallOption) (*StartSandboxProcessResponse, error)
+	ListSandboxProcesses(ctx context.Context, in *ListSandboxProcessesRequest, opts ...grpc.CallOption) (*ListSandboxProcessesResponse, error)
+	GetSandboxProcess(ctx context.Context, in *GetSandboxProcessRequest, opts ...grpc.CallOption) (*GetSandboxProcessResponse, error)
+	SignalSandboxProcess(ctx context.Context, in *SignalSandboxProcessRequest, opts ...grpc.CallOption) (*SignalSandboxProcessResponse, error)
+	WaitSandboxProcess(ctx context.Context, in *WaitSandboxProcessRequest, opts ...grpc.CallOption) (*WaitSandboxProcessResponse, error)
+	GetSandboxProcessOutput(ctx context.Context, in *GetSandboxProcessOutputRequest, opts ...grpc.CallOption) (*GetSandboxProcessOutputResponse, error)
+	StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse], error)
 	CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error)
 	SyncApp(ctx context.Context, in *SyncAppRequest, opts ...grpc.CallOption) (*SyncAppResponse, error)
 	GetFunctionTrace(ctx context.Context, in *GetFunctionTraceRequest, opts ...grpc.CallOption) (*GetFunctionTraceResponse, error)
@@ -308,6 +339,183 @@ func (c *v2Client) GetApps(ctx context.Context, in *GetAppsRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *v2Client) CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (*CreateSandboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateSandboxResponse)
+	err := c.cc.Invoke(ctx, V2_CreateSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListSandboxes(ctx context.Context, in *ListSandboxesRequest, opts ...grpc.CallOption) (*ListSandboxesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSandboxesResponse)
+	err := c.cc.Invoke(ctx, V2_ListSandboxes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetSandbox(ctx context.Context, in *GetSandboxRequest, opts ...grpc.CallOption) (*GetSandboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSandboxResponse)
+	err := c.cc.Invoke(ctx, V2_GetSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) DestroySandbox(ctx context.Context, in *DestroySandboxRequest, opts ...grpc.CallOption) (*DestroySandboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DestroySandboxResponse)
+	err := c.cc.Invoke(ctx, V2_DestroySandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ExecSandbox(ctx context.Context, in *ExecSandboxRequest, opts ...grpc.CallOption) (*ExecSandboxResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExecSandboxResponse)
+	err := c.cc.Invoke(ctx, V2_ExecSandbox_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) StreamSandboxLogs(ctx context.Context, in *StreamSandboxLogsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxLogsResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &V2_ServiceDesc.Streams[0], V2_StreamSandboxLogs_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamSandboxLogsRequest, StreamSandboxLogsResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamSandboxLogsClient = grpc.ServerStreamingClient[StreamSandboxLogsResponse]
+
+func (c *v2Client) WriteSandboxFile(ctx context.Context, in *WriteSandboxFileRequest, opts ...grpc.CallOption) (*WriteSandboxFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WriteSandboxFileResponse)
+	err := c.cc.Invoke(ctx, V2_WriteSandboxFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ReadSandboxFile(ctx context.Context, in *ReadSandboxFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[httpbody.HttpBody], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &V2_ServiceDesc.Streams[1], V2_ReadSandboxFile_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ReadSandboxFileRequest, httpbody.HttpBody]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_ReadSandboxFileClient = grpc.ServerStreamingClient[httpbody.HttpBody]
+
+func (c *v2Client) StartSandboxProcess(ctx context.Context, in *StartSandboxProcessRequest, opts ...grpc.CallOption) (*StartSandboxProcessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartSandboxProcessResponse)
+	err := c.cc.Invoke(ctx, V2_StartSandboxProcess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) ListSandboxProcesses(ctx context.Context, in *ListSandboxProcessesRequest, opts ...grpc.CallOption) (*ListSandboxProcessesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSandboxProcessesResponse)
+	err := c.cc.Invoke(ctx, V2_ListSandboxProcesses_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetSandboxProcess(ctx context.Context, in *GetSandboxProcessRequest, opts ...grpc.CallOption) (*GetSandboxProcessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSandboxProcessResponse)
+	err := c.cc.Invoke(ctx, V2_GetSandboxProcess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) SignalSandboxProcess(ctx context.Context, in *SignalSandboxProcessRequest, opts ...grpc.CallOption) (*SignalSandboxProcessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SignalSandboxProcessResponse)
+	err := c.cc.Invoke(ctx, V2_SignalSandboxProcess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) WaitSandboxProcess(ctx context.Context, in *WaitSandboxProcessRequest, opts ...grpc.CallOption) (*WaitSandboxProcessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WaitSandboxProcessResponse)
+	err := c.cc.Invoke(ctx, V2_WaitSandboxProcess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) GetSandboxProcessOutput(ctx context.Context, in *GetSandboxProcessOutputRequest, opts ...grpc.CallOption) (*GetSandboxProcessOutputResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSandboxProcessOutputResponse)
+	err := c.cc.Invoke(ctx, V2_GetSandboxProcessOutput_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *v2Client) StreamSandboxProcessOutput(ctx context.Context, in *StreamSandboxProcessOutputRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &V2_ServiceDesc.Streams[2], V2_StreamSandboxProcessOutput_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamSandboxProcessOutputRequest, StreamSandboxProcessOutputResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamSandboxProcessOutputClient = grpc.ServerStreamingClient[StreamSandboxProcessOutputResponse]
+
 func (c *v2Client) CreateScore(ctx context.Context, in *CreateScoreRequest, opts ...grpc.CallOption) (*CreateScoreResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateScoreResponse)
@@ -485,6 +693,21 @@ type V2Server interface {
 	CancelRun(context.Context, *CancelRunRequest) (*CancelRunResponse, error)
 	GetApp(context.Context, *GetAppRequest) (*GetAppResponse, error)
 	GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error)
+	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
+	ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error)
+	GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error)
+	DestroySandbox(context.Context, *DestroySandboxRequest) (*DestroySandboxResponse, error)
+	ExecSandbox(context.Context, *ExecSandboxRequest) (*ExecSandboxResponse, error)
+	StreamSandboxLogs(*StreamSandboxLogsRequest, grpc.ServerStreamingServer[StreamSandboxLogsResponse]) error
+	WriteSandboxFile(context.Context, *WriteSandboxFileRequest) (*WriteSandboxFileResponse, error)
+	ReadSandboxFile(*ReadSandboxFileRequest, grpc.ServerStreamingServer[httpbody.HttpBody]) error
+	StartSandboxProcess(context.Context, *StartSandboxProcessRequest) (*StartSandboxProcessResponse, error)
+	ListSandboxProcesses(context.Context, *ListSandboxProcessesRequest) (*ListSandboxProcessesResponse, error)
+	GetSandboxProcess(context.Context, *GetSandboxProcessRequest) (*GetSandboxProcessResponse, error)
+	SignalSandboxProcess(context.Context, *SignalSandboxProcessRequest) (*SignalSandboxProcessResponse, error)
+	WaitSandboxProcess(context.Context, *WaitSandboxProcessRequest) (*WaitSandboxProcessResponse, error)
+	GetSandboxProcessOutput(context.Context, *GetSandboxProcessOutputRequest) (*GetSandboxProcessOutputResponse, error)
+	StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]) error
 	CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error)
 	SyncApp(context.Context, *SyncAppRequest) (*SyncAppResponse, error)
 	GetFunctionTrace(context.Context, *GetFunctionTraceRequest) (*GetFunctionTraceResponse, error)
@@ -569,6 +792,51 @@ func (UnimplementedV2Server) GetApp(context.Context, *GetAppRequest) (*GetAppRes
 }
 func (UnimplementedV2Server) GetApps(context.Context, *GetAppsRequest) (*GetAppsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetApps not implemented")
+}
+func (UnimplementedV2Server) CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateSandbox not implemented")
+}
+func (UnimplementedV2Server) ListSandboxes(context.Context, *ListSandboxesRequest) (*ListSandboxesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSandboxes not implemented")
+}
+func (UnimplementedV2Server) GetSandbox(context.Context, *GetSandboxRequest) (*GetSandboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSandbox not implemented")
+}
+func (UnimplementedV2Server) DestroySandbox(context.Context, *DestroySandboxRequest) (*DestroySandboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DestroySandbox not implemented")
+}
+func (UnimplementedV2Server) ExecSandbox(context.Context, *ExecSandboxRequest) (*ExecSandboxResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExecSandbox not implemented")
+}
+func (UnimplementedV2Server) StreamSandboxLogs(*StreamSandboxLogsRequest, grpc.ServerStreamingServer[StreamSandboxLogsResponse]) error {
+	return status.Error(codes.Unimplemented, "method StreamSandboxLogs not implemented")
+}
+func (UnimplementedV2Server) WriteSandboxFile(context.Context, *WriteSandboxFileRequest) (*WriteSandboxFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteSandboxFile not implemented")
+}
+func (UnimplementedV2Server) ReadSandboxFile(*ReadSandboxFileRequest, grpc.ServerStreamingServer[httpbody.HttpBody]) error {
+	return status.Error(codes.Unimplemented, "method ReadSandboxFile not implemented")
+}
+func (UnimplementedV2Server) StartSandboxProcess(context.Context, *StartSandboxProcessRequest) (*StartSandboxProcessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartSandboxProcess not implemented")
+}
+func (UnimplementedV2Server) ListSandboxProcesses(context.Context, *ListSandboxProcessesRequest) (*ListSandboxProcessesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSandboxProcesses not implemented")
+}
+func (UnimplementedV2Server) GetSandboxProcess(context.Context, *GetSandboxProcessRequest) (*GetSandboxProcessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSandboxProcess not implemented")
+}
+func (UnimplementedV2Server) SignalSandboxProcess(context.Context, *SignalSandboxProcessRequest) (*SignalSandboxProcessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SignalSandboxProcess not implemented")
+}
+func (UnimplementedV2Server) WaitSandboxProcess(context.Context, *WaitSandboxProcessRequest) (*WaitSandboxProcessResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WaitSandboxProcess not implemented")
+}
+func (UnimplementedV2Server) GetSandboxProcessOutput(context.Context, *GetSandboxProcessOutputRequest) (*GetSandboxProcessOutputResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSandboxProcessOutput not implemented")
+}
+func (UnimplementedV2Server) StreamSandboxProcessOutput(*StreamSandboxProcessOutputRequest, grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]) error {
+	return status.Error(codes.Unimplemented, "method StreamSandboxProcessOutput not implemented")
 }
 func (UnimplementedV2Server) CreateScore(context.Context, *CreateScoreRequest) (*CreateScoreResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateScore not implemented")
@@ -996,6 +1264,255 @@ func _V2_GetApps_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_CreateSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).CreateSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_CreateSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).CreateSandbox(ctx, req.(*CreateSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListSandboxes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSandboxesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListSandboxes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListSandboxes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListSandboxes(ctx, req.(*ListSandboxesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetSandbox(ctx, req.(*GetSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_DestroySandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DestroySandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).DestroySandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_DestroySandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).DestroySandbox(ctx, req.(*DestroySandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ExecSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExecSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ExecSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ExecSandbox_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ExecSandbox(ctx, req.(*ExecSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_StreamSandboxLogs_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamSandboxLogsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(V2Server).StreamSandboxLogs(m, &grpc.GenericServerStream[StreamSandboxLogsRequest, StreamSandboxLogsResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamSandboxLogsServer = grpc.ServerStreamingServer[StreamSandboxLogsResponse]
+
+func _V2_WriteSandboxFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteSandboxFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).WriteSandboxFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_WriteSandboxFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).WriteSandboxFile(ctx, req.(*WriteSandboxFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ReadSandboxFile_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ReadSandboxFileRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(V2Server).ReadSandboxFile(m, &grpc.GenericServerStream[ReadSandboxFileRequest, httpbody.HttpBody]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_ReadSandboxFileServer = grpc.ServerStreamingServer[httpbody.HttpBody]
+
+func _V2_StartSandboxProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartSandboxProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).StartSandboxProcess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_StartSandboxProcess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).StartSandboxProcess(ctx, req.(*StartSandboxProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_ListSandboxProcesses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSandboxProcessesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).ListSandboxProcesses(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_ListSandboxProcesses_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).ListSandboxProcesses(ctx, req.(*ListSandboxProcessesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetSandboxProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSandboxProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetSandboxProcess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetSandboxProcess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetSandboxProcess(ctx, req.(*GetSandboxProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_SignalSandboxProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SignalSandboxProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).SignalSandboxProcess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_SignalSandboxProcess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).SignalSandboxProcess(ctx, req.(*SignalSandboxProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_WaitSandboxProcess_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WaitSandboxProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).WaitSandboxProcess(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_WaitSandboxProcess_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).WaitSandboxProcess(ctx, req.(*WaitSandboxProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_GetSandboxProcessOutput_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSandboxProcessOutputRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).GetSandboxProcessOutput(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_GetSandboxProcessOutput_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).GetSandboxProcessOutput(ctx, req.(*GetSandboxProcessOutputRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _V2_StreamSandboxProcessOutput_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamSandboxProcessOutputRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(V2Server).StreamSandboxProcessOutput(m, &grpc.GenericServerStream[StreamSandboxProcessOutputRequest, StreamSandboxProcessOutputResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type V2_StreamSandboxProcessOutputServer = grpc.ServerStreamingServer[StreamSandboxProcessOutputResponse]
+
 func _V2_CreateScore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateScoreRequest)
 	if err := dec(in); err != nil {
@@ -1354,6 +1871,54 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_GetApps_Handler,
 		},
 		{
+			MethodName: "CreateSandbox",
+			Handler:    _V2_CreateSandbox_Handler,
+		},
+		{
+			MethodName: "ListSandboxes",
+			Handler:    _V2_ListSandboxes_Handler,
+		},
+		{
+			MethodName: "GetSandbox",
+			Handler:    _V2_GetSandbox_Handler,
+		},
+		{
+			MethodName: "DestroySandbox",
+			Handler:    _V2_DestroySandbox_Handler,
+		},
+		{
+			MethodName: "ExecSandbox",
+			Handler:    _V2_ExecSandbox_Handler,
+		},
+		{
+			MethodName: "WriteSandboxFile",
+			Handler:    _V2_WriteSandboxFile_Handler,
+		},
+		{
+			MethodName: "StartSandboxProcess",
+			Handler:    _V2_StartSandboxProcess_Handler,
+		},
+		{
+			MethodName: "ListSandboxProcesses",
+			Handler:    _V2_ListSandboxProcesses_Handler,
+		},
+		{
+			MethodName: "GetSandboxProcess",
+			Handler:    _V2_GetSandboxProcess_Handler,
+		},
+		{
+			MethodName: "SignalSandboxProcess",
+			Handler:    _V2_SignalSandboxProcess_Handler,
+		},
+		{
+			MethodName: "WaitSandboxProcess",
+			Handler:    _V2_WaitSandboxProcess_Handler,
+		},
+		{
+			MethodName: "GetSandboxProcessOutput",
+			Handler:    _V2_GetSandboxProcessOutput_Handler,
+		},
+		{
 			MethodName: "CreateScore",
 			Handler:    _V2_CreateScore_Handler,
 		},
@@ -1414,6 +1979,22 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _V2_ListSessionRuns_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamSandboxLogs",
+			Handler:       _V2_StreamSandboxLogs_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ReadSandboxFile",
+			Handler:       _V2_ReadSandboxFile_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamSandboxProcessOutput",
+			Handler:       _V2_StreamSandboxProcessOutput_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "api/v2/service.proto",
 }

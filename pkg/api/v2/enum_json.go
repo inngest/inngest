@@ -18,6 +18,9 @@ var responseEnumPrefixes = []string{
 	"FUNCTION_SINGLETON_MODE_",
 	"TRACE_SPAN_STATUS_",
 	"TRACE_STEP_OP_",
+	"SANDBOX_STATUS_",
+	"SANDBOX_PROCESS_STATE_",
+	"SANDBOX_LOG_STREAM_",
 }
 
 type responseEnumMarshaler struct {
@@ -32,17 +35,32 @@ func NewResponseEnumMarshaler() runtime.Marshaler {
 	return responseEnumMarshaler{JSONPb: &runtime.JSONPb{}}
 }
 
+func (responseEnumMarshaler) StreamContentType(any) string {
+	return "application/x-ndjson"
+}
+
 func (m responseEnumMarshaler) Marshal(v any) ([]byte, error) {
 	data, err := m.JSONPb.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, ok := v.(proto.Message); !ok {
+	if !containsProtoResponse(v) {
 		return data, nil
 	}
 
 	return shortenResponseEnumNames(data)
+}
+
+func containsProtoResponse(v any) bool {
+	if _, ok := v.(proto.Message); ok {
+		return true
+	}
+	if values, ok := v.(map[string]any); ok {
+		_, ok := values["result"].(proto.Message)
+		return ok
+	}
+	return false
 }
 
 func (m responseEnumMarshaler) NewEncoder(w io.Writer) runtime.Encoder {

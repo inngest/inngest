@@ -47,7 +47,8 @@ gen: ## Run all code generators
 
 .PHONY: protobuf
 protobuf: ## Generate protobuf files
-	buf generate
+	# HttpBody uses the upstream Go package and cannot share the source-relative annotations output directory.
+	buf generate --exclude-path proto/third_party/google/api/httpbody.proto
 	buf generate --path proto/api/v2 --template proto/api/v2/buf.gen.yaml
 	buf generate --path proto/connect/v1 --template proto/connect/v1/buf.gen.yaml
 	buf generate --path proto/debug/v1 --template proto/debug/v1/buf.gen.yaml

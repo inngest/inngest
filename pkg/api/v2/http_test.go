@@ -98,6 +98,30 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_SandboxesNotImplementedInDevServer(t *testing.T) {
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+
+	for _, test := range []struct {
+		name string
+		path string
+	}{
+		{name: "unary", path: "/api/v2/sandboxes"},
+		{name: "streaming", path: "/api/v2/sandboxes/sandbox-id/logs"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, test.path, nil))
+
+			require.Equal(t, http.StatusNotImplemented, response.Code)
+			var body errorResponse
+			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+			require.Len(t, body.Errors, 1)
+			require.Equal(t, "api_error", body.Errors[0].Code)
+		})
+	}
+}
+
 func TestHTTPGateway_CreateScoreAcceptsArrayBody(t *testing.T) {
 	ctx := context.Background()
 	runID := ulid.MustParse("01KVDHCS8VTWZHBAHTMYJHBPKJ")

@@ -98,6 +98,8 @@ func GRPCToHTTPStatus(code codes.Code) int {
 		return http.StatusConflict
 	case codes.ResourceExhausted:
 		return http.StatusTooManyRequests
+	case codes.DeadlineExceeded:
+		return http.StatusGatewayTimeout
 	case codes.Unimplemented:
 		return http.StatusNotImplemented
 	case codes.Unavailable:

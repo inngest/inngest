@@ -46,6 +46,7 @@ type endpoint struct {
 	body       string
 	input      protoreflect.MessageDescriptor
 	pathParams []string
+	streaming  bool
 }
 
 func Command() *cli.Command {
@@ -195,7 +196,21 @@ func endpointArguments(ep endpoint) []cli.Argument {
 
 func endpointFlags(ep endpoint) []cli.Flag {
 	var flags []cli.Flag
-	if ep.body != "" {
+	rawBody := isRawHTTPBodyEndpoint(ep)
+	if rawBody {
+		flags = append(flags,
+			&cli.StringFlag{
+				Category: "Body",
+				Name:     "body",
+				Usage:    "Raw request body.",
+			},
+			&cli.StringFlag{
+				Category: "Body",
+				Name:     "body-file",
+				Usage:    "Path to a raw request body file, or '-' for stdin.",
+			},
+		)
+	} else if ep.body != "" {
 		flags = append(flags,
 			&cli.StringFlag{
 				Category: "Body",
@@ -214,11 +229,14 @@ func endpointFlags(ep endpoint) []cli.Flag {
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
 		name := string(field.Name())
+		if rawBody && name == ep.body {
+			continue
+		}
 		flagName := kebab(name)
 		category := "Query"
 		if slices.Contains(ep.pathParams, name) {
 			category = "Path"
-		} else if ep.body != "" {
+		} else if ep.body != "" && !rawBody {
 			category = "Body"
 		}
 
@@ -284,6 +302,7 @@ func discoverEndpoints() []endpoint {
 			body:       discovered.Body,
 			input:      discovered.Input,
 			pathParams: discovered.PathParams,
+			streaming:  discovered.ServerStreaming,
 		})
 	}
 
@@ -352,7 +371,11 @@ func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
 		return err
 	}
 
-	client := &http.Client{Timeout: cmd.Duration("timeout")}
+	timeout := cmd.Duration("timeout")
+	if ep.streaming && !cmd.IsSet("timeout") {
+		timeout = 0
+	}
+	client := &http.Client{Timeout: timeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		if req.URL.Scheme+"://"+req.URL.Host == defaultDevServerOrigin {
@@ -362,21 +385,32 @@ func callEndpoint(ctx context.Context, cmd *cli.Command, ep endpoint) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
-	if err != nil {
-		return err
-	}
-	if int64(len(body)) > maxResponseBytes {
-		return fmt.Errorf("response body exceeded %d bytes", maxResponseBytes)
-	}
-
 	if resp.StatusCode >= http.StatusBadRequest {
+		body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+		if err != nil {
+			return err
+		}
+		if int64(len(body)) > maxResponseBytes {
+			return fmt.Errorf("response body exceeded %d bytes", maxResponseBytes)
+		}
 		return fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 
 	writer := cmd.Root().Writer
 	if writer == nil {
 		writer = os.Stdout
+	}
+	if ep.streaming {
+		_, err = io.Copy(writer, resp.Body)
+		return err
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	if err != nil {
+		return err
+	}
+	if int64(len(body)) > maxResponseBytes {
+		return fmt.Errorf("response body exceeded %d bytes", maxResponseBytes)
 	}
 
 	if cmd.Bool("raw") {
@@ -411,11 +445,6 @@ func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Req
 	}
 	u.Path = strings.TrimRight(u.Path, "/") + path
 
-	body, err := requestBody(cmd, ep)
-	if err != nil {
-		return nil, err
-	}
-
 	query, err := queryParams(cmd, ep)
 	if err != nil {
 		return nil, err
@@ -423,7 +452,15 @@ func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Req
 	u.RawQuery = query.Encode()
 
 	var reader io.Reader
-	if body != nil {
+	rawBody := isRawHTTPBodyEndpoint(ep)
+	if rawBody {
+		reader, err = rawHTTPRequestBody(cmd)
+		if err != nil {
+			return nil, err
+		}
+	} else if body, err := requestBody(cmd, ep); err != nil {
+		return nil, err
+	} else if body != nil {
 		encoded, err := json.Marshal(body)
 		if err != nil {
 			return nil, err
@@ -435,7 +472,9 @@ func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Req
 	if err != nil {
 		return nil, err
 	}
-	if body != nil {
+	if rawBody {
+		req.Header.Set("Content-Type", "application/octet-stream")
+	} else if reader != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "application/json")
@@ -599,7 +638,7 @@ func pathParamValue(cmd *cli.Command, _ endpoint, name string) (string, bool) {
 
 func queryParams(cmd *cli.Command, ep endpoint) (url.Values, error) {
 	values := url.Values{}
-	if ep.body != "" {
+	if ep.body != "" && !isRawHTTPBodyEndpoint(ep) {
 		return values, nil
 	}
 
@@ -607,7 +646,7 @@ func queryParams(cmd *cli.Command, ep endpoint) (url.Values, error) {
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
 		name := string(field.Name())
-		if slices.Contains(ep.pathParams, name) {
+		if slices.Contains(ep.pathParams, name) || name == ep.body {
 			continue
 		}
 
@@ -625,6 +664,35 @@ func queryParams(cmd *cli.Command, ep endpoint) (url.Values, error) {
 	}
 
 	return values, nil
+}
+
+func isRawHTTPBodyEndpoint(ep endpoint) bool {
+	if ep.body == "" || ep.body == "*" {
+		return false
+	}
+	field := ep.input.Fields().ByName(protoreflect.Name(ep.body))
+	return field != nil && field.Message() != nil && field.Message().FullName() == "google.api.HttpBody"
+}
+
+func rawHTTPRequestBody(cmd *cli.Command) (io.Reader, error) {
+	if cmd.IsSet("body") && cmd.IsSet("body-file") {
+		return nil, errors.New("--body and --body-file cannot both be set")
+	}
+	if cmd.IsSet("body") {
+		return strings.NewReader(cmd.String("body")), nil
+	}
+	if !cmd.IsSet("body-file") {
+		return nil, errors.New("missing --body or --body-file")
+	}
+	path := cmd.String("body-file")
+	if path == "-" {
+		reader := cmd.Root().Reader
+		if reader == nil {
+			reader = os.Stdin
+		}
+		return reader, nil
+	}
+	return os.Open(path)
 }
 
 func requestBody(cmd *cli.Command, ep endpoint) (map[string]any, error) {
