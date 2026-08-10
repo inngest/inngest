@@ -309,6 +309,13 @@ func mustLoadModelPricing() map[string]ModelPricing {
 			// aren't usable for our per-token cost estimate.
 			continue
 		}
+		if *entry.InputCostPerToken == 0 && *entry.OutputCostPerToken == 0 {
+			// A model priced at exactly zero for both input and output is
+			// almost always an unfilled upstream placeholder, not a
+			// genuinely free model - excluding it avoids a real model's
+			// usage silently costing nothing.
+			continue
+		}
 		pricing[strings.ToLower(model)] = ModelPricing{
 			InputPerToken:  *entry.InputCostPerToken,
 			OutputPerToken: *entry.OutputCostPerToken,

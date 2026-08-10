@@ -14,5 +14,7 @@ src_url="https://raw.githubusercontent.com/BerriAI/litellm/refs/heads/litellm_in
 echo "Fetching ${src_url}"
 curl -sSfL "${src_url}" -o "${dest}"
 
-echo "Wrote $(wc -l <"${dest}" | tr -d ' ') lines to ${dest}"
+echo "Slimming ${dest} to only the fields we use"
+(cd "${repo_root}" && go run ./tools/model-prices -in "${dest}")
+
 echo "Run 'go test ./pkg/tracing/metadata/extractors/...' to verify the update."
