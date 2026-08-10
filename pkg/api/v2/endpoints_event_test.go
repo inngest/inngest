@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
@@ -19,14 +19,18 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type testEventPublisher struct {
-	event event.TrackedEvent
+type testEventSender struct {
+	event *event.Event
+	id    string
 	err   error
 }
 
-func (p *testEventPublisher) Publish(_ context.Context, evt event.TrackedEvent) error {
-	p.event = evt
-	return p.err
+func (s *testEventSender) Send(_ context.Context, evt *event.Event) (string, error) {
+	s.event = evt
+	if s.id == "" {
+		s.id = "01K1QQ3VQ8R3M8QX4D51J8G7XH"
+	}
+	return s.id, s.err
 }
 
 type testEventRateLimiter struct {
@@ -40,8 +44,6 @@ func (l *testEventRateLimiter) CheckRateLimit(_ context.Context, method string) 
 }
 
 func TestService_SendEvent(t *testing.T) {
-	accountID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	workspaceID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	timestamp := time.Date(2026, 8, 6, 12, 0, 0, 0, time.UTC).UnixMilli()
 	data, err := structpb.NewStruct(map[string]any{
 		"message":  "hello",
@@ -50,17 +52,11 @@ func TestService_SendEvent(t *testing.T) {
 	require.NoError(t, err)
 	user, err := structpb.NewStruct(map[string]any{"id": "user-1"})
 	require.NoError(t, err)
-	publisher := &testEventPublisher{}
+	sender := &testEventSender{}
 	limiter := &testEventRateLimiter{}
 	service := NewService(ServiceOptions{
-		EventPublisher: publisher,
-		EventContext: func(context.Context) (EventPublishContext, error) {
-			return EventPublishContext{
-				AccountID:    accountID,
-				WorkspaceID:  workspaceID,
-				MaxSizeBytes: 1024,
-			}, nil
-		},
+		EventSender:       sender.Send,
+		MaxEventSize:      1024,
 		RateLimitProvider: limiter,
 	})
 
@@ -75,22 +71,18 @@ func TestService_SendEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp.Metadata.GetFetchedAt())
 	require.Equal(t, apiv2.V2_SendEvent_FullMethodName, limiter.method)
-	require.NotNil(t, publisher.event)
-	require.Equal(t, resp.Data.EventId, publisher.event.GetInternalID().String())
-	require.Equal(t, accountID, publisher.event.GetAccountID())
-	require.Equal(t, workspaceID, publisher.event.GetWorkspaceID())
-	require.Equal(t, "event-idempotency-key", publisher.event.GetEvent().ID)
-	require.Equal(t, "app/user.created", publisher.event.GetEvent().Name)
-	require.Equal(t, timestamp, publisher.event.GetEvent().Timestamp)
-	require.Equal(t, map[string]any{"message": "hello"}, publisher.event.GetEvent().Data)
-	require.Equal(t, map[string]any{"id": "user-1"}, publisher.event.GetEvent().User)
-	require.WithinDuration(t, time.Now(), publisher.event.GetReceivedAt(), time.Second)
-	require.NotEqual(t, time.UnixMilli(timestamp), publisher.event.GetReceivedAt())
+	require.Equal(t, sender.id, resp.Data.EventId)
+	require.NotNil(t, sender.event)
+	require.Equal(t, "event-idempotency-key", sender.event.ID)
+	require.Equal(t, "app/user.created", sender.event.Name)
+	require.Equal(t, timestamp, sender.event.Timestamp)
+	require.Equal(t, map[string]any{"message": "hello"}, sender.event.Data)
+	require.Equal(t, map[string]any{"id": "user-1"}, sender.event.User)
 }
 
 func TestService_SendEventValidation(t *testing.T) {
-	publisher := &testEventPublisher{}
-	service := NewService(ServiceOptions{EventPublisher: publisher})
+	sender := &testEventSender{}
+	service := NewService(ServiceOptions{EventSender: sender.Send})
 
 	tests := []struct {
 		name    string
@@ -130,12 +122,12 @@ func TestService_SendEventValidation(t *testing.T) {
 			require.ErrorContains(t, err, tt.error)
 		})
 	}
-	require.Nil(t, publisher.event)
+	require.Nil(t, sender.event)
 }
 
 func TestService_SendEventAcceptsV1MaximumEventNameLength(t *testing.T) {
-	publisher := &testEventPublisher{}
-	service := NewService(ServiceOptions{EventPublisher: publisher})
+	sender := &testEventSender{}
+	service := NewService(ServiceOptions{EventSender: sender.Send})
 
 	resp, err := service.SendEvent(context.Background(), &apiv2.SendEventRequest{
 		Name: strings.Repeat("a", consts.MaxEventNameLength),
@@ -143,14 +135,14 @@ func TestService_SendEventAcceptsV1MaximumEventNameLength(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.NotNil(t, publisher.event)
+	require.NotNil(t, sender.event)
 }
 
 func TestService_SendEventRejectsRateLimitAndOversizedPayload(t *testing.T) {
 	t.Run("rate limited", func(t *testing.T) {
-		publisher := &testEventPublisher{}
+		sender := &testEventSender{}
 		service := NewService(ServiceOptions{
-			EventPublisher:    publisher,
+			EventSender:       sender.Send,
 			RateLimitProvider: &testEventRateLimiter{limited: true},
 		})
 
@@ -158,18 +150,16 @@ func TestService_SendEventRejectsRateLimitAndOversizedPayload(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "API rate limit exceeded")
-		require.Nil(t, publisher.event)
+		require.Nil(t, sender.event)
 	})
 
 	t.Run("payload too large", func(t *testing.T) {
-		publisher := &testEventPublisher{}
+		sender := &testEventSender{}
 		data, err := structpb.NewStruct(map[string]any{"value": strings.Repeat("x", 100)})
 		require.NoError(t, err)
 		service := NewService(ServiceOptions{
-			EventPublisher: publisher,
-			EventContext: func(context.Context) (EventPublishContext, error) {
-				return EventPublishContext{MaxSizeBytes: 50}, nil
-			},
+			EventSender:  sender.Send,
+			MaxEventSize: 50,
 		})
 
 		resp, err := service.SendEvent(context.Background(), &apiv2.SendEventRequest{
@@ -179,13 +169,13 @@ func TestService_SendEventRejectsRateLimitAndOversizedPayload(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Event payload cannot exceed 50 bytes")
-		require.Nil(t, publisher.event)
+		require.Nil(t, sender.event)
 	})
 }
 
 func TestService_SendEventPublishFailure(t *testing.T) {
 	service := NewService(ServiceOptions{
-		EventPublisher: &testEventPublisher{err: errors.New("publish failed")},
+		EventSender: (&testEventSender{err: errors.New("publish failed")}).Send,
 	})
 
 	resp, err := service.SendEvent(context.Background(), &apiv2.SendEventRequest{Name: "test/event"})
@@ -195,8 +185,8 @@ func TestService_SendEventPublishFailure(t *testing.T) {
 }
 
 func TestHTTPGateway_SendEvent(t *testing.T) {
-	publisher := &testEventPublisher{}
-	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{EventPublisher: publisher}, HTTPHandlerOptions{})
+	sender := &testEventSender{}
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{EventSender: sender.Send}, HTTPHandlerOptions{})
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(
@@ -220,10 +210,56 @@ func TestHTTPGateway_SendEvent(t *testing.T) {
 		} `json:"metadata"`
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &body))
-	require.Equal(t, publisher.event.GetInternalID().String(), body.Data.EventID)
+	require.Equal(t, sender.id, body.Data.EventID)
 	require.False(t, body.Metadata.FetchedAt.IsZero())
-	require.Equal(t, "custom-id", publisher.event.GetEvent().ID)
-	require.Equal(t, map[string]any{"message": "hello"}, publisher.event.GetEvent().Data)
+	require.Equal(t, "custom-id", sender.event.ID)
+	require.Equal(t, map[string]any{"message": "hello"}, sender.event.Data)
+}
+
+func TestHTTPGateway_SendEventNullFields(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       string
+		statusCode int
+		errorCode  string
+	}{
+		{
+			name:       "optional fields are unset",
+			body:       `{"name":"test/event","data":null,"user":null,"id":null,"ts":null}`,
+			statusCode: http.StatusOK,
+		},
+		{
+			name:       "required name is missing",
+			body:       `{"name":null}`,
+			statusCode: http.StatusBadRequest,
+			errorCode:  apiv2base.ErrorMissingField,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sender := &testEventSender{}
+			handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{EventSender: sender.Send}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/api/v2/events", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			recorder := httptest.NewRecorder()
+
+			handler.ServeHTTP(recorder, req)
+
+			require.Equal(t, tt.statusCode, recorder.Code, recorder.Body.String())
+			if tt.errorCode != "" {
+				require.Contains(t, recorder.Body.String(), `"code":"`+tt.errorCode+`"`)
+				return
+			}
+			require.NotNil(t, sender.event)
+			require.Empty(t, sender.event.Data)
+			require.Empty(t, sender.event.User)
+			require.Empty(t, sender.event.ID)
+			require.NotZero(t, sender.event.Timestamp)
+		})
+	}
 }
 
 func TestHTTPGateway_SendEventRejectsOversizedRequestBody(t *testing.T) {

@@ -364,6 +364,14 @@
           }
         ]
       },
+      "413": {
+        "errors": [
+          {
+            "code": "invalid_request",
+            "message": "Request body cannot exceed 3145728 bytes"
+          }
+        ]
+      },
       "429": {
         "errors": [
           {

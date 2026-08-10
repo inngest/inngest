@@ -1509,7 +1509,7 @@ service V2 {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Send event"
-      description: "Sends an event to the selected environment. Use the returned event ID with the event runs endpoint to inspect any function runs triggered by the event."
+      description: "Sends one event for testing and debugging. The request accepts the name, data, user, id, and ts fields; send batches and other Event API fields through an Inngest SDK or the Event API. This endpoint uses REST API rate limits and is not intended for high-volume ingestion. Use the returned event ID with the event runs endpoint to inspect any function runs triggered by the event."
       tags: "Events"
       security: {
         security_requirement: {
@@ -1554,6 +1554,17 @@ service V2 {
         key: "403"
         value: {
           description: "Forbidden - events cannot be sent to the selected environment"
+          schema: {
+            json_schema: {
+              ref: "#/definitions/v2ErrorResponse"
+            }
+          }
+        }
+      }
+      responses: {
+        key: "413"
+        value: {
+          description: "Payload Too Large - request body exceeds the endpoint limit"
           schema: {
             json_schema: {
               ref: "#/definitions/v2ErrorResponse"

@@ -83,13 +83,7 @@ type EventPublisher interface {
 	Publish(ctx context.Context, event event.TrackedEvent) error
 }
 
-type EventPublishContext struct {
-	AccountID    uuid.UUID
-	WorkspaceID  uuid.UUID
-	MaxSizeBytes int
-}
-
-type EventPublishContextProvider func(context.Context) (EventPublishContext, error)
+type EventSender func(context.Context, *event.Event) (string, error)
 
 type GetRunOpts struct {
 	IncludeOutput bool

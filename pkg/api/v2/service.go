@@ -29,7 +29,8 @@ type Service struct {
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
-	eventContext   EventPublishContextProvider
+	eventSender    EventSender
+	maxEventSize   int
 	scores         ScoreProvider
 	rateLimiter    RateLimitProvider
 	base           *apiv2base.Base
@@ -46,7 +47,8 @@ type ServiceOptions struct {
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
-	EventContext        EventPublishContextProvider
+	EventSender         EventSender
+	MaxEventSize        int
 	Scores              ScoreProvider
 	RateLimitProvider   RateLimitProvider
 }
@@ -56,15 +58,9 @@ func NewService(opts ServiceOptions) *Service {
 	if rateLimiter == nil {
 		rateLimiter = noopRateLimitProvider{}
 	}
-	eventContext := opts.EventContext
-	if eventContext == nil {
-		eventContext = func(context.Context) (EventPublishContext, error) {
-			return EventPublishContext{
-				AccountID:    consts.DevServerAccountID,
-				WorkspaceID:  consts.DevServerEnvID,
-				MaxSizeBytes: consts.AbsoluteMaxEventSize,
-			}, nil
-		}
+	maxEventSize := opts.MaxEventSize
+	if maxEventSize <= 0 {
+		maxEventSize = consts.AbsoluteMaxEventSize
 	}
 	return &Service{
 		signingKeys:    opts.SigningKeysProvider,
@@ -76,7 +72,8 @@ func NewService(opts ServiceOptions) *Service {
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
-		eventContext:   eventContext,
+		eventSender:    opts.EventSender,
+		maxEventSize:   maxEventSize,
 		scores:         opts.Scores,
 		rateLimiter:    rateLimiter,
 		base:           apiv2base.NewBase(),

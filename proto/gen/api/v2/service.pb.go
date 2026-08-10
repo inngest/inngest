@@ -9696,7 +9696,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032٤\x01\n" +
+	"\x04INFO\x10\x032\xa6\xa7\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -10136,10 +10136,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\rGet functions\x1a:Lists function configuration and status details for an appb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/apps/{app_id}/functions\x12\xb5\x06\n" +
-	"\tSendEvent\x12\x18.api.v2.SendEventRequest\x1a\x19.api.v2.SendEventResponse\"\xf2\x05\x92A\xdc\x05\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/apps/{app_id}/functions\x12\x82\t\n" +
+	"\tSendEvent\x12\x18.api.v2.SendEventRequest\x1a\x19.api.v2.SendEventResponse\"\xbf\b\x92A\xa9\b\n" +
 	"\x06Events\x12\n" +
-	"Send event\x1a\x97\x01Sends an event to the selected environment. Use the returned event ID with the event runs endpoint to inspect any function runs triggered by the event.J>\n" +
+	"Send event\x1a\xfb\x02Sends one event for testing and debugging. The request accepts the name, data, user, id, and ts fields; send batches and other Event API fields through an Inngest SDK or the Event API. This endpoint uses REST API rate limits and is not intended for high-volume ingestion. Use the returned event ID with the event runs endpoint to inspect any function runs triggered by the event.J>\n" +
 	"\x03200\x127\n" +
 	"\x0eEvent accepted\x12%\n" +
 	"#\x1a!#/definitions/v2SendEventResponseJL\n" +
@@ -10151,6 +10151,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJi\n" +
 	"\x03403\x12b\n" +
 	"=Forbidden - events cannot be sent to the selected environment\x12!\n" +
+	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJg\n" +
+	"\x03413\x12`\n" +
+	";Payload Too Large - request body exceeds the endpoint limit\x12!\n" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseJ\x89\x01\n" +
 	"\x03429\x12\x81\x01\n" +
 	"\\Too Many Requests - API rate limit exceeded. The request was rejected and no event was sent.\x12!\n" +

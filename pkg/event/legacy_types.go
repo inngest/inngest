@@ -51,11 +51,10 @@ func NewBaseTrackedEventFromString(data string) (*BaseTrackedEvent, error) {
 }
 
 type BaseTrackedEvent struct {
-	ID          ulid.ULID  `json:"internal_id"`
-	AccountID   uuid.UUID  `json:"account_id"`
-	WorkspaceID uuid.UUID  `json:"workspace_id"`
-	Event       Event      `json:"event"`
-	ReceivedAt  *time.Time `json:"received_at,omitempty"`
+	ID          ulid.ULID `json:"internal_id"`
+	AccountID   uuid.UUID `json:"account_id"`
+	WorkspaceID uuid.UUID `json:"workspace_id"`
+	Event       Event     `json:"event"`
 }
 
 func (o BaseTrackedEvent) GetEvent() Event {
@@ -75,10 +74,7 @@ func (o BaseTrackedEvent) GetAccountID() uuid.UUID {
 }
 
 func (o BaseTrackedEvent) GetReceivedAt() time.Time {
-	if o.ReceivedAt == nil {
-		return time.Time{}
-	}
-	return *o.ReceivedAt
+	return time.Time{}
 }
 
 func (o BaseTrackedEvent) GetWorkspaceID() uuid.UUID {

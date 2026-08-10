@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-// MaxRequestBodyBytesMiddleware bounds request bodies before grpc-gateway decodes them.
+// Rejects request bodies that exceed the size limit before grpc-gateway reads them.
 func MaxRequestBodyBytesMiddleware(maxBytes int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

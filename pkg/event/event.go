@@ -178,7 +178,7 @@ func (e Event) CorrelationID() string {
 }
 
 func (e Event) IsInternal() bool {
-	return strings.HasPrefix(e.Name, InternalNamePrefix)
+	return strings.HasPrefix(strings.ToLower(e.Name), InternalNamePrefix)
 }
 
 // IsFinishedEvent returns true if the event is a function finished event.
