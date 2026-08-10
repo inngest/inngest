@@ -1,4 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Alert } from '@inngest/components/Alert';
+import { Card } from '@inngest/components/Card';
+import { InlineCode } from '@inngest/components/Code';
+import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
+import { CodeLine } from '@inngest/components/CodeLine';
+import { Pill } from '@inngest/components/Pill';
+import { Skeleton } from '@inngest/components/Skeleton';
+import { ClientOnly } from '@tanstack/react-router';
 
 type JSONSchema = {
   properties?: Record<string, JSONSchemaProperty>;
@@ -94,7 +102,17 @@ const toolType = (schema: JSONSchemaProperty) => {
   return schema.enum ? 'enum' : schema.type ?? 'value';
 };
 
-const createConfigs = (endpoint: string, isDevServer: boolean, bearerTokenEnvVar?: string) => {
+const CLIENT_TABS = {
+  claude: 'Claude Code',
+  codex: 'Codex CLI',
+  cursor: 'Cursor',
+} as const;
+
+const createClientTabs = (
+  endpoint: string,
+  isDevServer: boolean,
+  bearerTokenEnvVar?: string
+): TabsProps[] => {
   const serverName = isDevServer ? 'inngest-dev' : 'inngest-cloud';
   const authorizationHeader = bearerTokenEnvVar
     ? ` --header "Authorization: Bearer $${bearerTokenEnvVar}"`
@@ -103,22 +121,19 @@ const createConfigs = (endpoint: string, isDevServer: boolean, bearerTokenEnvVar
 
   return [
     {
-      id: 'claude',
-      label: 'Claude Code',
-      language: 'bash',
-      value: `claude mcp add --transport http ${serverName} ${endpoint}${authorizationHeader}`,
+      title: CLIENT_TABS.claude,
+      language: 'shell',
+      content: `claude mcp add --transport http ${serverName} ${endpoint}${authorizationHeader}`,
     },
     {
-      id: 'codex',
-      label: 'Codex CLI',
-      language: 'bash',
-      value: `codex mcp add ${serverName} --url ${endpoint}${bearerTokenOption}`,
+      title: CLIENT_TABS.codex,
+      language: 'shell',
+      content: `codex mcp add ${serverName} --url ${endpoint}${bearerTokenOption}`,
     },
     {
-      id: 'cursor',
-      label: 'Cursor',
+      title: CLIENT_TABS.cursor,
       language: 'json',
-      value: JSON.stringify(
+      content: JSON.stringify(
         {
           mcpServers: {
             [serverName]: {
@@ -241,47 +256,31 @@ export const MCPSetup = ({
   headers = emptyHeaders,
   isDevServer = false,
 }: MCPSetupProps) => {
-  const [copiedText, setCopiedText] = useState<string>();
   const surfaceName = isDevServer ? 'Dev Server' : 'Cloud';
   const { error, loading, tools } = useMCPTools(endpoint, headers, getAccessToken);
-  const configs = createConfigs(endpoint, isDevServer, bearerTokenEnvVar);
+  const clientTabs = createClientTabs(endpoint, isDevServer, bearerTokenEnvVar);
+  const [activeTab, setActiveTab] = useState<string>(CLIENT_TABS.claude);
+  const currentTabContent = clientTabs.find((tab) => tab.title === activeTab) ?? clientTabs[0];
   const examples = isDevServer ? devServerExamples : cloudExamples;
 
-  const copyToClipboard = (text: string, id: string) => {
-    void navigator.clipboard.writeText(text);
-    setCopiedText(id);
-    window.setTimeout(() => setCopiedText(undefined), 2000);
-  };
-
   return (
-    <div className="bg-canvasBase min-h-screen">
+    <div className="bg-canvasBase min-h-full">
       <div className="mx-auto max-w-5xl px-8 py-8">
-        <header className="mb-12">
-          <h1 className="text-basis text-3xl font-semibold">{surfaceName} MCP Setup</h1>
-          <p className="text-muted mt-2 text-base">
+        <header className="mb-10">
+          <h1 className="text-basis text-2xl font-medium">{surfaceName} MCP Setup</h1>
+          <p className="text-muted mt-1 text-sm">
             Connect your AI assistant to Inngest {surfaceName} using the Model Context Protocol.
           </p>
         </header>
 
-        <section className="mb-12">
-          <h2 className="text-basis mb-4 text-2xl font-semibold">MCP Endpoint</h2>
-          <div className="bg-canvasSubtle border-subtle rounded border p-4">
-            <div className="flex items-center justify-between gap-4">
-              <code className="text-basis flex-1 break-all font-mono text-lg">{endpoint}</code>
-              <button
-                type="button"
-                onClick={() => copyToClipboard(endpoint, 'endpoint')}
-                className="bg-canvasBase border-subtle hover:bg-canvasMuted shrink-0 rounded border px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {copiedText === 'endpoint' ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          </div>
+        <section className="mb-10">
+          <h2 className="text-basis mb-3 text-lg font-medium">MCP endpoint</h2>
+          <CodeLine code={endpoint} />
         </section>
 
         {bearerTokenEnvVar && (
-          <section className="mb-12">
-            <h2 className="text-basis mb-2 text-2xl font-semibold">Authentication</h2>
+          <section className="mb-10">
+            <h2 className="text-basis mb-2 text-lg font-medium">Authentication</h2>
             <p className="text-muted text-sm">
               Installed MCP clients use an Inngest API key. See the{' '}
               <a
@@ -292,98 +291,59 @@ export const MCPSetup = ({
               >
                 authentication docs
               </a>{' '}
-              to create one, then export it as{' '}
-              <code className="bg-canvasSubtle rounded px-1 py-0.5">{bearerTokenEnvVar}</code>.
+              to create one, then export it as <InlineCode>{bearerTokenEnvVar}</InlineCode>.
             </p>
           </section>
         )}
 
-        <section className="mb-12">
-          <h2 className="text-basis mb-4 text-2xl font-semibold">Connect Your AI Tool</h2>
-          {configs.map((config) => (
-            <div className="mb-4" key={config.id}>
-              <h3 className="text-basis mb-2 text-lg font-medium">{config.label}</h3>
-              <div className="bg-canvasSubtle border-subtle relative rounded border">
-                <div className="border-subtle flex items-center justify-between border-b px-4 py-2">
-                  <span className="text-muted text-xs font-medium">{config.language}</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(config.value, config.id)}
-                    className="text-muted hover:text-basis text-xs"
-                  >
-                    {copiedText === config.id ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-                <pre className="overflow-x-auto p-4">
-                  <code className="text-basis text-sm">{config.value}</code>
-                </pre>
-              </div>
-            </div>
-          ))}
-
-          <div className="bg-canvasSubtle border-subtle mb-4 rounded border p-4">
-            <h3 className="text-basis mb-2 text-lg font-medium">Codex/ChatGPT Desktop</h3>
-            <p className="text-basis text-sm">
-              Codex CLI and the ChatGPT desktop app share MCP configuration. Run the Codex CLI
-              command above, restart the desktop app, then use{' '}
-              <strong>Settings → MCP servers</strong> to confirm the server is enabled. You can also
-              add it there by choosing <strong>Streamable HTTP</strong> and entering the endpoint
-              URL.
-            </p>
-          </div>
-
-          <div className="bg-canvasSubtle border-subtle mb-4 rounded border p-4">
-            <h3 className="text-basis mb-2 text-lg font-medium">Claude Desktop</h3>
-            <p className="text-basis text-sm">
-              For the desktop app&apos;s <strong>Code</strong> tab, run the Claude Code command
-              above and restart Claude Desktop. The Code tab loads the same Claude MCP
-              configuration.
-            </p>
-            {isDevServer ? (
-              <p className="text-muted mt-2 text-sm">
-                Claude Desktop&apos;s main chat connects to custom HTTP connectors from
-                Anthropic&apos;s cloud, so it cannot reach this localhost endpoint directly. That
-                flow requires a publicly reachable MCP URL under{' '}
-                <strong>Customize → Connectors</strong>.
-              </p>
-            ) : (
-              <p className="text-muted mt-2 text-sm">
-                Claude Desktop&apos;s main chat uses remote connectors with OAuth. Cloud MCP
-                currently uses API key authentication, so use the Code tab for this connection.
-              </p>
-            )}
-          </div>
+        <section className="mb-10">
+          <h2 className="text-basis mb-3 text-lg font-medium">Connect your AI tool</h2>
+          <ClientOnly fallback={<Skeleton className="h-24 w-full" />}>
+            <CommandBlock.Wrapper>
+              <CommandBlock.Header className="flex items-center justify-between pr-4">
+                <CommandBlock.Tabs
+                  tabs={clientTabs}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                />
+                <CommandBlock.CopyButton content={currentTabContent?.content} />
+              </CommandBlock.Header>
+              <CommandBlock currentTabContent={currentTabContent} />
+            </CommandBlock.Wrapper>
+          </ClientOnly>
+          <ClientNotes activeTab={activeTab} isDevServer={isDevServer} />
         </section>
 
-        <section className="mb-12">
-          <h2 className="text-basis mb-4 text-2xl font-semibold">Try It</h2>
+        <section className="mb-10">
+          <h2 className="text-basis mb-3 text-lg font-medium">Try it</h2>
+          <p className="text-muted mb-3 text-sm">
+            Ask your AI assistant a question that uses the Inngest tools:
+          </p>
           <div className="space-y-2">
             {examples.map((example) => (
-              <div className="bg-canvasSubtle border-subtle rounded border p-3" key={example}>
-                <code className="text-basis text-sm">{example}</code>
-              </div>
+              <CodeLine code={example} key={example} />
             ))}
           </div>
         </section>
 
-        <section className="mb-12">
-          <h2 className="text-basis mb-2 text-2xl font-semibold">Available MCP Tools</h2>
+        <section className="mb-10">
+          <h2 className="text-basis mb-3 text-lg font-medium">Available MCP tools</h2>
           {isDevServer && (
-            <div className="bg-warning/10 border-warning/30 mb-6 rounded border p-4">
-              <p className="text-basis font-medium">Dev server MCP compatibility changes</p>
-              <p className="text-muted mt-1 text-sm">
+            <Alert className="mb-6" severity="warning">
+              <p className="font-medium">Dev server MCP compatibility changes</p>
+              <p className="mt-1 text-sm">
                 <code>list_functions</code> and <code>invoke_function</code> now use the shared REST
                 API v2 contract so they work the same in the dev server and Inngest Cloud.{' '}
                 <code>list_functions</code> now requires an <code>appId</code>, and{' '}
                 <code>invoke_function</code> starts a run without waiting for it to finish. The old
                 synchronous invoke behavior remains available as <code>invoke_function_sync</code>.
               </p>
-              <p className="text-muted mt-2 text-sm">
+              <p className="mt-2 text-sm">
                 The dev server keeps <code>send_event</code>, <code>get_run_status</code>,{' '}
                 <code>poll_run_status</code>, and <code>invoke_function_sync</code> for existing
                 integrations. They are deprecated and may be removed in a future release.
               </p>
-            </div>
+            </Alert>
           )}
 
           <MCPToolList error={error} loading={loading} tools={tools} />
@@ -401,6 +361,55 @@ export const MCPSetup = ({
   );
 };
 
+const ClientNotes = ({ activeTab, isDevServer }: { activeTab: string; isDevServer: boolean }) => {
+  if (activeTab === CLIENT_TABS.claude) {
+    return (
+      <div className="text-muted mt-3 text-sm">
+        <p>
+          For the desktop app&apos;s <strong>Code</strong> tab, run the command above and restart
+          Claude Desktop. The Code tab loads the same Claude MCP configuration.
+        </p>
+        {isDevServer ? (
+          <p className="mt-2">
+            Claude Desktop&apos;s main chat connects to custom HTTP connectors from Anthropic&apos;s
+            cloud, so it cannot reach this localhost endpoint directly. That flow requires a
+            publicly reachable MCP URL under <strong>Customize → Connectors</strong>.
+          </p>
+        ) : (
+          <p className="mt-2">
+            Claude Desktop&apos;s main chat uses remote connectors with OAuth. Cloud MCP currently
+            uses API key authentication, so use the Code tab for this connection.
+          </p>
+        )}
+      </div>
+    );
+  }
+  if (activeTab === CLIENT_TABS.codex) {
+    return (
+      <div className="text-muted mt-3 text-sm">
+        <p>
+          Codex CLI and the ChatGPT desktop app share MCP configuration. Run the command above,
+          restart the desktop app, then use <strong>Settings → MCP servers</strong> to confirm the
+          server is enabled. You can also add it there by choosing <strong>Streamable HTTP</strong>{' '}
+          and entering the endpoint URL.
+        </p>
+      </div>
+    );
+  }
+  if (activeTab === CLIENT_TABS.cursor) {
+    return (
+      <div className="text-muted mt-3 text-sm">
+        <p>
+          Add this to <InlineCode>.cursor/mcp.json</InlineCode> in your project, or to{' '}
+          <InlineCode>~/.cursor/mcp.json</InlineCode> to enable it in every project, then reload
+          Cursor.
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 const MCPToolList = ({
   error,
   loading,
@@ -411,14 +420,20 @@ const MCPToolList = ({
   tools: MCPTool[];
 }) => {
   if (loading) {
-    return <p className="text-muted">Loading tools…</p>;
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-28 w-full" />
+      </div>
+    );
   }
   if (error) {
     return (
-      <div className="bg-canvasSubtle border-subtle rounded border p-4">
-        <p className="text-basis font-medium">Unable to load MCP tools</p>
-        <p className="text-muted mt-1 text-sm">{error}</p>
-      </div>
+      <Alert severity="error">
+        <p className="font-medium">Unable to load MCP tools</p>
+        <p className="mt-1 text-sm">{error}</p>
+      </Alert>
     );
   }
 
@@ -439,34 +454,37 @@ const MCPToolCard = ({ tool }: { tool: MCPTool }) => {
   const properties = Object.entries(tool.inputSchema.properties ?? {});
 
   return (
-    <div className="bg-canvasSubtle border-subtle rounded border p-4">
-      <h3 className="text-basis text-lg font-medium">{tool.title ?? tool.name}</h3>
-      <code className="text-muted text-xs">{tool.name}</code>
-      {tool.description && <p className="text-basis mt-2 text-sm">{tool.description}</p>}
-      {properties.length > 0 && (
-        <ul className="text-basis mt-3 space-y-1 text-sm">
-          {properties.map(([name, schema]) => (
-            <li key={name}>
-              <code className="bg-canvasBase rounded px-1 py-0.5">{name}</code>{' '}
-              <span className="text-muted">
-                ({toolType(schema)}, {required.has(name) ? 'required' : 'optional'})
-                {schema.description ? `: ${schema.description}` : ''}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <Card>
+      <Card.Content>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <h3 className="text-basis text-base font-medium">{tool.title ?? tool.name}</h3>
+          <InlineCode>{tool.name}</InlineCode>
+        </div>
+        {tool.description && <p className="text-basis mt-2 text-sm">{tool.description}</p>}
+        {properties.length > 0 && (
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {properties.map(([name, schema]) => (
+              <li className="flex flex-wrap items-center gap-x-2 gap-y-1" key={name}>
+                <InlineCode>{name}</InlineCode>
+                <span className="text-muted">{toolType(schema)}</span>
+                {required.has(name) && <Pill appearance="outlined">required</Pill>}
+                {schema.description && <span className="text-muted">{schema.description}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card.Content>
+    </Card>
   );
 };
 
 const DevServerBestPractices = () => (
-  <section className="mb-12">
-    <h2 className="text-basis mb-4 text-2xl font-semibold">Best Practices</h2>
+  <section className="mb-10">
+    <h2 className="text-basis mb-4 text-lg font-medium">Best practices</h2>
 
     <div className="mb-6">
-      <h3 className="text-basis mb-3 text-xl font-semibold">Function Testing</h3>
-      <ul className="text-basis ml-6 list-disc space-y-2 text-base">
+      <h3 className="text-basis mb-2 text-base font-medium">Function testing</h3>
+      <ul className="text-basis ml-6 list-disc space-y-1.5 text-sm">
         <li>Test individual functions before testing a multi-function workflow.</li>
         <li>Use clear event names and payloads so failures are easier to trace.</li>
         <li>Inspect the run after each test and verify both step input and output.</li>
@@ -475,30 +493,26 @@ const DevServerBestPractices = () => (
     </div>
 
     <div className="mb-6">
-      <h3 className="text-basis mb-3 text-xl font-semibold">Debugging Workflows</h3>
-      <ul className="text-basis ml-6 list-disc space-y-2 text-base">
+      <h3 className="text-basis mb-2 text-base font-medium">Debugging workflows</h3>
+      <ul className="text-basis ml-6 list-disc space-y-1.5 text-sm">
         <li>
-          Use <code className="bg-canvasSubtle rounded px-1.5 py-0.5">get_run</code> for run state
-          and output.
+          Use <InlineCode>get_run</InlineCode> for run state and output.
         </li>
         <li>
-          Use <code className="bg-canvasSubtle rounded px-1.5 py-0.5">get_run_trace</code> to
-          inspect step-by-step execution.
+          Use <InlineCode>get_run_trace</InlineCode> to inspect step-by-step execution.
         </li>
         <li>Review the error message, stack trace, inputs, and outputs together.</li>
       </ul>
     </div>
 
     <div>
-      <h3 className="text-basis mb-3 text-xl font-semibold">Documentation Usage</h3>
-      <ul className="text-basis ml-6 list-disc space-y-2 text-base">
+      <h3 className="text-basis mb-2 text-base font-medium">Documentation usage</h3>
+      <ul className="text-basis ml-6 list-disc space-y-1.5 text-sm">
         <li>
-          Use <code className="bg-canvasSubtle rounded px-1.5 py-0.5">grep_docs</code> to find
-          relevant guides and examples.
+          Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
         </li>
         <li>
-          Use <code className="bg-canvasSubtle rounded px-1.5 py-0.5">read_doc</code> to read the
-          complete source after finding a match.
+          Use <InlineCode>read_doc</InlineCode> to read the complete source after finding a match.
         </li>
       </ul>
     </div>
@@ -506,14 +520,13 @@ const DevServerBestPractices = () => (
 );
 
 const DevServerTroubleshooting = ({ endpoint }: { endpoint: string }) => (
-  <section className="mb-12">
-    <h2 className="text-basis mb-4 text-2xl font-semibold">Troubleshooting</h2>
+  <section className="mb-10">
+    <h2 className="text-basis mb-3 text-lg font-medium">Troubleshooting</h2>
     <div className="space-y-4">
       <TroubleshootingItem title="MCP server not found">
         <li>Restart the dev server if the endpoint is not responding.</li>
         <li>
-          Confirm your client uses{' '}
-          <code className="bg-canvasBase rounded px-1 py-0.5">{endpoint}</code>.
+          Confirm your client uses <InlineCode>{endpoint}</InlineCode>.
         </li>
         <li>Check that the client sends its API calls with the streamable HTTP transport.</li>
       </TroubleshootingItem>
@@ -531,26 +544,35 @@ const DevServerTroubleshooting = ({ endpoint }: { endpoint: string }) => (
 );
 
 const TroubleshootingItem = ({ children, title }: { children: ReactNode; title: string }) => (
-  <div className="bg-canvasSubtle border-subtle rounded border p-4">
-    <h3 className="text-basis mb-2 text-lg font-semibold">{title}</h3>
-    <ul className="text-basis ml-4 list-disc space-y-1 text-sm">{children}</ul>
-  </div>
+  <Card>
+    <Card.Content>
+      <h3 className="text-basis mb-2 text-base font-medium">{title}</h3>
+      <ul className="text-basis ml-4 list-disc space-y-1 text-sm">{children}</ul>
+    </Card.Content>
+  </Card>
 );
 
 const Resources = () => (
-  <section className="mb-12">
-    <h2 className="text-basis mb-4 text-2xl font-semibold">Resources</h2>
+  <section className="mb-10">
+    <h2 className="text-basis mb-3 text-lg font-medium">Resources</h2>
     <div className="grid gap-4 md:grid-cols-2">
       {resources.map((resource) => (
         <a
-          className="bg-canvasSubtle border-subtle hover:border-emphasis block rounded border p-4 transition-colors"
+          className="block"
           href={resource.href}
           key={resource.href}
           rel="noopener noreferrer"
           target="_blank"
         >
-          <h3 className="text-basis mb-2 text-base font-semibold">{resource.title}</h3>
-          <p className="text-muted text-sm">{resource.description}</p>
+          <Card
+            className="h-full"
+            contentClassName="hover:border-emphasis h-full transition-colors"
+          >
+            <Card.Content>
+              <h3 className="text-basis mb-1 text-sm font-medium">{resource.title}</h3>
+              <p className="text-muted text-sm">{resource.description}</p>
+            </Card.Content>
+          </Card>
         </a>
       ))}
     </div>
