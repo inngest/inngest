@@ -268,6 +268,19 @@ func TestMatcherDoesNotDecodeThePathAgain(t *testing.T) {
 	require.Equal(t, "api:run:read", got.Grant)
 }
 
+// The mux writes response headers on the miss path, and a future version may
+// read one back. Header must therefore behave like a real ResponseWriter's and
+// hand out the same map every time, rather than a fresh one that drops writes.
+func TestDiscardWriterHeaderPersists(t *testing.T) {
+	w := &discardWriter{}
+
+	w.Header().Set("Content-Type", "application/json")
+	require.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	w.Header().Del("Content-Type")
+	require.Empty(t, w.Header().Get("Content-Type"))
+}
+
 // A miss is not a decision, so nothing may read it as one. This pins the
 // contract the caller relies on to fail closed.
 func TestMatcherMissIsNotExempt(t *testing.T) {

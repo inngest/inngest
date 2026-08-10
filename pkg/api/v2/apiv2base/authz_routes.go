@@ -117,7 +117,7 @@ func (m *AuthzMatcher) Match(httpMethod, path string) (AuthzRoute, bool) {
 		Header: http.Header{},
 	}).WithContext(ctx)
 
-	m.mux.ServeHTTP(discardWriter{}, req)
+	m.mux.ServeHTTP(&discardWriter{}, req)
 
 	if matched.PathTemplate == "" {
 		return AuthzRoute{}, false
@@ -128,16 +128,22 @@ func (m *AuthzMatcher) Match(httpMethod, path string) (AuthzRoute, bool) {
 // discardWriter swallows whatever the matcher mux writes. On a miss it renders
 // a 404 through its routing error handler, which this reads as the absence of a
 // match instead.
+//
+// Pointer receiver, and one map for the writer's whole life: ResponseWriter
+// promises that Header returns the same map every call, so a caller may set a
+// header and read it back. Returning a fresh map per call would drop the write.
+// The gateway only ever sets headers on this path, but that is its behavior to
+// change, not an invariant we get to depend on.
 type discardWriter struct{ header http.Header }
 
-func (d discardWriter) Header() http.Header {
+func (d *discardWriter) Header() http.Header {
 	if d.header == nil {
-		return http.Header{}
+		d.header = http.Header{}
 	}
 	return d.header
 }
-func (d discardWriter) Write(b []byte) (int, error) { return len(b), nil }
-func (d discardWriter) WriteHeader(int)             {}
+func (d *discardWriter) Write(b []byte) (int, error) { return len(b), nil }
+func (d *discardWriter) WriteHeader(int)             {}
 
 type authzRouteCtxKey struct{}
 
