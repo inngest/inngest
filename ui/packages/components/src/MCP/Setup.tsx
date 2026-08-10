@@ -48,6 +48,11 @@ type ToolsListResponse = {
 
 const emptyHeaders: Record<string, string> = {};
 
+// Abort the tools handshake if it hangs (an unresponsive proxy, a stalled
+// auth-token fetch) so the loading skeletons resolve into an actionable
+// error instead of shimmering forever.
+const toolsFetchTimeoutMs = 15_000;
+
 const devServerExamples = [
   'List my registered Inngest functions and their triggers',
   'Inspect recent function runs and their traces',
@@ -171,12 +176,29 @@ const useMCPTools = (
     const controller = new AbortController();
     let sessionID: string | null = null;
     let requestHeaders = headers;
+    // Distinguishes unmount (stay silent) from the watchdog abort below
+    // (surface a timeout error) — both flip controller.signal.aborted.
+    let unmounted = false;
+    const watchdog = window.setTimeout(() => controller.abort(), toolsFetchTimeoutMs);
+    // getAccessToken is outside fetch's abort handling, so race it against
+    // the watchdog too; a hung token fetch would otherwise never settle.
+    const abortSignal = new Promise<never>((_, reject) => {
+      const fail = () => reject(new Error('aborted'));
+      if (controller.signal.aborted) {
+        fail();
+        return;
+      }
+      controller.signal.addEventListener('abort', fail, { once: true });
+    });
 
     const load = async () => {
       setLoading(true);
       setError(undefined);
       try {
-        const accessToken = await getAccessTokenRef.current?.();
+        const accessToken = await Promise.race([
+          getAccessTokenRef.current?.() ?? null,
+          abortSignal,
+        ]);
         requestHeaders = accessToken
           ? { ...headers, Authorization: `Bearer ${accessToken}` }
           : headers;
@@ -224,11 +246,20 @@ const useMCPTools = (
         }
         setTools(body.result?.tools ?? []);
       } catch (error) {
-        if (!controller.signal.aborted) {
-          setError(error instanceof Error ? error.message : 'Unable to list MCP tools');
+        if (!unmounted) {
+          setError(
+            controller.signal.aborted
+              ? `The MCP endpoint did not respond within ${
+                  toolsFetchTimeoutMs / 1000
+                } seconds. Check that ${endpoint} is reachable from this page.`
+              : error instanceof Error
+              ? error.message
+              : 'Unable to list MCP tools'
+          );
         }
       } finally {
-        if (!controller.signal.aborted) {
+        window.clearTimeout(watchdog);
+        if (!unmounted) {
           setLoading(false);
         }
       }
@@ -236,6 +267,8 @@ const useMCPTools = (
 
     void load();
     return () => {
+      unmounted = true;
+      window.clearTimeout(watchdog);
       controller.abort();
       if (sessionID) {
         void fetch(endpoint, {
