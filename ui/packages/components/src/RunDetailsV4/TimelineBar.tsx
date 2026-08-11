@@ -21,6 +21,7 @@ import {
   RiFunctionLine,
   RiInformationLine,
   RiMailLine,
+  RiPercentLine,
   RiSettings3Line,
   RiStopCircleFill,
   RiTimeLine,
@@ -29,6 +30,7 @@ import { format } from 'date-fns';
 
 import { formatVariantWeight } from '../Experiments/format';
 import { HoverCardContent, HoverCardRoot, HoverCardTrigger } from '../HoverCard';
+import { formatScoreValue } from '../RunDetails/ScoresAttrs';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip/Tooltip';
@@ -40,6 +42,7 @@ import type {
   BarSegment,
   BarStyle,
   BarStyleKey,
+  ScoreBadgeData,
   TimelineBarProps,
   TimingDetail,
 } from './TimelineBar.types';
@@ -478,6 +481,9 @@ function BarHoverCardContent({
   );
 }
 
+const BADGE_CLASS =
+  'bg-canvasSubtle border-subtle text-subtle hover:bg-canvasMuted inline-flex h-5 w-5 items-center justify-center rounded border transition-colors';
+
 /**
  * Experiment badge shown beside a step that ran under an experiment. Renders
  * the flask icon in the standard IconTile treatment (subtle bg + border, thin
@@ -494,9 +500,6 @@ function ExperimentBadge({ metadata }: { metadata?: TimelineBarProps['experiment
         })
       : null;
 
-  const badgeClass =
-    'bg-canvasSubtle border-subtle text-subtle hover:bg-canvasMuted inline-flex h-5 w-5 items-center justify-center rounded border transition-colors';
-
   const badge = <RiFlaskLine className="h-3 w-3" />;
 
   return (
@@ -505,7 +508,7 @@ function ExperimentBadge({ metadata }: { metadata?: TimelineBarProps['experiment
         {href ? (
           <a
             href={href}
-            className={badgeClass}
+            className={BADGE_CLASS}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -513,7 +516,7 @@ function ExperimentBadge({ metadata }: { metadata?: TimelineBarProps['experiment
           </a>
         ) : (
           <span
-            className={badgeClass}
+            className={BADGE_CLASS}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -593,6 +596,51 @@ function ExperimentHoverCardContent({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Score badge shown beside a span that recorded scores. Mirrors the experiment
+ * badge treatment; scores have no dedicated page, so the badge never links out
+ * and clicks fall through to row selection.
+ */
+function ScoreBadge({ scores }: { scores: ScoreBadgeData[] }) {
+  return (
+    <HoverCardRoot openDelay={200} closeDelay={0}>
+      <HoverCardTrigger asChild>
+        <span data-testid="score-badge" className={BADGE_CLASS}>
+          <RiPercentLine className="h-3 w-3" />
+        </span>
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="start" className="border-muted max-w-none border">
+        <ScoreHoverCardContent scores={scores} />
+      </HoverCardContent>
+    </HoverCardRoot>
+  );
+}
+
+/**
+ * Hover card content for the score badge, listing each recorded score name and
+ * its formatted value.
+ */
+function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
+  return (
+    <div className="whitespace-nowrap px-1 py-0.5 text-xs">
+      <p className="text-light mb-0.5">Scores</p>
+      <div className="border-subtle flex justify-between gap-6 border-b pb-1">
+        <span className="text-light">Score</span>
+        <span className="text-light">Value</span>
+      </div>
+      {scores.map((score) => (
+        <div
+          key={score.name}
+          className="border-subtle flex items-center justify-between gap-6 border-b py-1 last:border-b-0"
+        >
+          <span className="text-basis font-medium">{score.name}</span>
+          <span className="text-basis font-mono tabular-nums">{formatScoreValue(score.value)}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -781,6 +829,7 @@ export function TimelineBar({
   hasExperiment,
   insideExperiment,
   experimentMetadata,
+  scores,
 }: TimelineBarProps): JSX.Element {
   const showExperimentBackground = hasExperiment || insideExperiment;
   const barStyle = getBarStyle(style);
@@ -910,9 +959,11 @@ export function TimelineBar({
           </span>
         </div>
 
-        {/* Experiment badge - centered between left panel and bars */}
-        <span className="inline-flex w-7 shrink-0 items-center justify-center">
+        {/* Experiment and score badges - centered between left panel and bars.
+            Width is fixed so bars stay aligned across rows regardless of badges. */}
+        <span className="inline-flex w-12 shrink-0 items-center justify-center gap-1">
           {hasExperiment && <ExperimentBadge metadata={experimentMetadata} />}
+          {scores && scores.length > 0 && <ScoreBadge scores={scores} />}
         </span>
 
         {/* Right panel - visual bar with optional hover card */}
