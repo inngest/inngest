@@ -76,7 +76,7 @@ function InfoTooltip({ tooltip }: { tooltip: string }) {
       <TooltipTrigger>
         <RiInformationLine className="text-subtle h-3.5 w-3.5" />
       </TooltipTrigger>
-      <TooltipContent>{tooltip}</TooltipContent>
+      <TooltipContent className="whitespace-pre-line">{tooltip}</TooltipContent>
     </Tooltip>
   );
 }

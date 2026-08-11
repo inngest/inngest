@@ -2132,7 +2132,6 @@ export enum ReplayRunStatus {
 }
 
 export enum ReplayType {
-  Event = 'EVENT',
   Function = 'FUNCTION'
 }
 

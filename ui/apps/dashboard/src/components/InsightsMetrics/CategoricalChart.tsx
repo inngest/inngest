@@ -51,6 +51,12 @@ type Props = {
   // side by side (multi-measure form only).
   stacked?: boolean;
   format?: (value: number) => string;
+  // Overrides `format` for the persistent value-label column
+  // (`showValueLabels`) only — e.g. a bar-chart-specific cost formatter that
+  // collapses sub-cent values to "<$0.01", while the hover tooltip (still
+  // using `format`) keeps full precision for drill-down. Defaults to
+  // `format`.
+  valueLabelFormat?: (value: number) => string;
   // Maps an item's raw identifier to its y-axis display label — e.g.
   // resolving a function slug to its human-readable name. Defaults to the
   // identifier as-is (already human-readable for callers like model names).
@@ -227,6 +233,7 @@ export function CategoricalChart({
   series,
   stacked = false,
   format = defaultFormat,
+  valueLabelFormat = format,
   formatIdentifier = (identifier) => identifier,
   showYAxisLine = true,
   showValueLabels = false,
@@ -367,7 +374,7 @@ export function CategoricalChart({
       <g>
         {effectiveSeries.map((s, i) => {
           const raw = row?.[s.valueName];
-          const text = typeof raw === 'number' ? format(raw) : '';
+          const text = typeof raw === 'number' ? valueLabelFormat(raw) : '';
           const columnX = x + i * VALUE_COLUMN_STEP;
           return (
             <g key={s.valueName}>
