@@ -1368,7 +1368,7 @@ service V2 {
       responses: {
         key: "200"
         value: {
-          description: "App synced successfully"
+          description: "App sync completed successfully or the app was already up to date"
           schema: {
             json_schema: {
               ref: "#/definitions/v2SyncAppResponse"
@@ -2445,7 +2445,11 @@ message AppSync {
 
   optional string status = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Status of the latest sync"
+      description: "Status of the latest sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress."
+      enum: "pending"
+      enum: "success"
+      enum: "error"
+      enum: "duplicate"
     }
   ];
   optional google.protobuf.Timestamp synced_at = 11 [
@@ -2991,7 +2995,11 @@ message SyncAppData {
   ];
   string status = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Status"
+      description: "Status of the sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress."
+      enum: "pending"
+      enum: "success"
+      enum: "error"
+      enum: "duplicate"
     }
   ];
   string app_id = 3 [
