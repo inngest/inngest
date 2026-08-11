@@ -33,7 +33,7 @@ export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
 
 // Trim floating-point noise and excess precision from non-integer scores;
 // integers and booleans render as-is.
-function formatScoreValue(value: number | boolean): string {
+export function formatScoreValue(value: number | boolean): string {
   if (typeof value === 'number' && !Number.isInteger(value)) {
     return String(Number(value.toPrecision(4)));
   }
