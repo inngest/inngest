@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/Code';
@@ -6,6 +6,11 @@ import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/Comm
 import { CodeLine } from '@inngest/components/CodeLine';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
+import TabCards from '@inngest/components/TabCards/TabCards';
+import { IconClaude } from '@inngest/components/icons/ai/Claude';
+import { IconCursor } from '@inngest/components/icons/ai/Cursor';
+import { IconOpenAI } from '@inngest/components/icons/ai/OpenAI';
+import { LINE_HEIGHT } from '@inngest/components/utils/monaco';
 import { ClientOnly } from '@tanstack/react-router';
 
 type JSONSchema = {
@@ -107,17 +112,18 @@ const toolType = (schema: JSONSchemaProperty) => {
   return schema.enum ? 'enum' : schema.type ?? 'value';
 };
 
-const CLIENT_TABS = {
-  claude: 'Claude Code',
-  codex: 'Codex CLI',
-  cursor: 'Cursor',
-} as const;
+type MCPClient = {
+  id: 'claude' | 'codex' | 'cursor';
+  name: string;
+  Icon: ComponentType<{ className?: string; size?: number }>;
+  snippet: TabsProps;
+};
 
-const createClientTabs = (
+const createClients = (
   endpoint: string,
   isDevServer: boolean,
   bearerTokenEnvVar?: string
-): TabsProps[] => {
+): MCPClient[] => {
   const serverName = isDevServer ? 'inngest-dev' : 'inngest-cloud';
   const authorizationHeader = bearerTokenEnvVar
     ? ` --header "Authorization: Bearer $${bearerTokenEnvVar}"`
@@ -126,37 +132,57 @@ const createClientTabs = (
 
   return [
     {
-      title: CLIENT_TABS.claude,
-      language: 'shell',
-      content: `claude mcp add --transport http ${serverName} ${endpoint}${authorizationHeader}`,
+      id: 'claude',
+      name: 'Claude Code',
+      Icon: IconClaude,
+      snippet: {
+        title: 'Terminal command',
+        language: 'shell',
+        content: `claude mcp add --transport http ${serverName} ${endpoint}${authorizationHeader}`,
+      },
     },
     {
-      title: CLIENT_TABS.codex,
-      language: 'shell',
-      content: `codex mcp add ${serverName} --url ${endpoint}${bearerTokenOption}`,
+      id: 'codex',
+      name: 'Codex CLI',
+      Icon: IconOpenAI,
+      snippet: {
+        title: 'Terminal command',
+        language: 'shell',
+        content: `codex mcp add ${serverName} --url ${endpoint}${bearerTokenOption}`,
+      },
     },
     {
-      title: CLIENT_TABS.cursor,
-      language: 'json',
-      content: JSON.stringify(
-        {
-          mcpServers: {
-            [serverName]: {
-              url: endpoint,
-              ...(bearerTokenEnvVar && {
-                headers: {
-                  Authorization: `Bearer \${env:${bearerTokenEnvVar}}`,
-                },
-              }),
+      id: 'cursor',
+      name: 'Cursor',
+      Icon: IconCursor,
+      snippet: {
+        title: 'mcp.json',
+        language: 'json',
+        content: JSON.stringify(
+          {
+            mcpServers: {
+              [serverName]: {
+                url: endpoint,
+                ...(bearerTokenEnvVar && {
+                  headers: {
+                    Authorization: `Bearer \${env:${bearerTokenEnvVar}}`,
+                  },
+                }),
+              },
             },
           },
-        },
-        null,
-        2
-      ),
+          null,
+          2
+        ),
+      },
     },
   ];
 };
+
+// Approximate rendered height of a CommandBlock (tabs header + monaco padding
+// + content lines) so the SSR fallback skeleton matches and hydration doesn't
+// shift the page.
+const snippetHeight = (snippet: TabsProps) => snippet.content.split('\n').length * LINE_HEIGHT + 60;
 
 const useMCPTools = (
   endpoint: string,
@@ -291,9 +317,7 @@ export const MCPSetup = ({
 }: MCPSetupProps) => {
   const surfaceName = isDevServer ? 'Dev Server' : 'Cloud';
   const { error, loading, tools } = useMCPTools(endpoint, headers, getAccessToken);
-  const clientTabs = createClientTabs(endpoint, isDevServer, bearerTokenEnvVar);
-  const [activeTab, setActiveTab] = useState<string>(CLIENT_TABS.claude);
-  const currentTabContent = clientTabs.find((tab) => tab.title === activeTab) ?? clientTabs[0];
+  const clients = createClients(endpoint, isDevServer, bearerTokenEnvVar);
   const examples = isDevServer ? devServerExamples : cloudExamples;
 
   return (
@@ -331,20 +355,43 @@ export const MCPSetup = ({
 
         <section className="mb-10">
           <h2 className="text-basis mb-3 text-lg font-medium">Connect your AI tool</h2>
-          <ClientOnly fallback={<Skeleton className="h-24 w-full" />}>
-            <CommandBlock.Wrapper>
-              <CommandBlock.Header className="flex items-center justify-between pr-4">
-                <CommandBlock.Tabs
-                  tabs={clientTabs}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                />
-                <CommandBlock.CopyButton content={currentTabContent?.content} />
-              </CommandBlock.Header>
-              <CommandBlock currentTabContent={currentTabContent} />
-            </CommandBlock.Wrapper>
-          </ClientOnly>
-          <ClientNotes activeTab={activeTab} isDevServer={isDevServer} />
+          <TabCards defaultValue="claude">
+            <TabCards.ButtonList>
+              {clients.map((client) => (
+                <TabCards.Button className="w-36" key={client.id} value={client.id}>
+                  <div className="flex items-center gap-1.5">
+                    <client.Icon className="h-4 w-4" /> {client.name}
+                  </div>
+                </TabCards.Button>
+              ))}
+            </TabCards.ButtonList>
+            {clients.map((client) => (
+              <TabCards.Content className="min-h-[24rem]" key={client.id} value={client.id}>
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
+                    <client.Icon className="text-basis h-4 w-4" />
+                  </div>
+                  <p className="text-basis">{client.name}</p>
+                </div>
+                <ClientOnly
+                  fallback={
+                    <div style={{ height: snippetHeight(client.snippet) }}>
+                      <Skeleton className="h-full w-full" />
+                    </div>
+                  }
+                >
+                  <CommandBlock.Wrapper>
+                    <CommandBlock.Header className="flex items-center justify-between pr-4">
+                      <CommandBlock.Tabs tabs={[client.snippet]} activeTab={client.snippet.title} />
+                      <CommandBlock.CopyButton content={client.snippet.content} />
+                    </CommandBlock.Header>
+                    <CommandBlock currentTabContent={client.snippet} />
+                  </CommandBlock.Wrapper>
+                </ClientOnly>
+                <ClientNotes client={client.id} isDevServer={isDevServer} />
+              </TabCards.Content>
+            ))}
+          </TabCards>
         </section>
 
         <section className="mb-10">
@@ -394,8 +441,14 @@ export const MCPSetup = ({
   );
 };
 
-const ClientNotes = ({ activeTab, isDevServer }: { activeTab: string; isDevServer: boolean }) => {
-  if (activeTab === CLIENT_TABS.claude) {
+const ClientNotes = ({
+  client,
+  isDevServer,
+}: {
+  client: MCPClient['id'];
+  isDevServer: boolean;
+}) => {
+  if (client === 'claude') {
     return (
       <div className="text-muted mt-3 text-sm">
         <p>
@@ -417,7 +470,7 @@ const ClientNotes = ({ activeTab, isDevServer }: { activeTab: string; isDevServe
       </div>
     );
   }
-  if (activeTab === CLIENT_TABS.codex) {
+  if (client === 'codex') {
     return (
       <div className="text-muted mt-3 text-sm">
         <p>
@@ -429,7 +482,7 @@ const ClientNotes = ({ activeTab, isDevServer }: { activeTab: string; isDevServe
       </div>
     );
   }
-  if (activeTab === CLIENT_TABS.cursor) {
+  if (client === 'cursor') {
     return (
       <div className="text-muted mt-3 text-sm">
         <p>
