@@ -8939,9 +8939,9 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"latestSync\x88\x01\x01B\x0e\n" +
 	"\f_app_versionB\x0e\n" +
 	"\f_archived_atB\x0e\n" +
-	"\f_latest_syncJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\r\x10\x0eR\fsdk_languageR\vsdk_versionR\tframeworkR\x03urlR\x05error\"\xb4\a\n" +
-	"\aAppSync\x12;\n" +
-	"\x06status\x18\x01 \x01(\tB\x1e\x92A\x1b2\x19Status of the latest syncH\x00R\x06status\x88\x01\x01\x12n\n" +
+	"\f_latest_syncJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\a\x10\bJ\x04\b\b\x10\tJ\x04\b\r\x10\x0eR\fsdk_languageR\vsdk_versionR\tframeworkR\x03urlR\x05error\"\xee\t\n" +
+	"\aAppSync\x12\xf4\x02\n" +
+	"\x06status\x18\x01 \x01(\tB\xd6\x02\x92A\xd2\x022\xa7\x02Status of the latest sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress.\xf2\x02\apending\xf2\x02\asuccess\xf2\x02\x05error\xf2\x02\tduplicateH\x00R\x06status\x88\x01\x01\x12n\n" +
 	"\tsynced_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB0\x92A-2+Timestamp for the latest sync, if availableH\x01R\bsyncedAt\x88\x01\x01\x12b\n" +
 	"\fsdk_language\x18\x04 \x01(\tB:\x92A72'Language of the SDK that synced the appJ\f\"typescript\"H\x02R\vsdkLanguage\x88\x01\x01\x12[\n" +
 	"\vsdk_version\x18\x05 \x01(\tB5\x92A22&Version of the SDK that synced the appJ\b\"3.22.0\"H\x03R\n" +
@@ -9184,10 +9184,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x03url\x18\x02 \x01(\tBO\x92AL2'URL for the Inngest endpoint in the appJ!\"https://example.com/api/inngest\"R\x03url\"p\n" +
 	"\x0fSyncAppResponse\x12'\n" +
 	"\x04data\x18\x01 \x01(\v2\x13.api.v2.SyncAppDataR\x04data\x124\n" +
-	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\xd4\x01\n" +
+	"\bmetadata\x18\x02 \x01(\v2\x18.api.v2.ResponseMetadataR\bmetadata\"\x9a\x04\n" +
 	"\vSyncAppData\x12\x17\n" +
-	"\x02id\x18\x01 \x01(\tB\a\x92A\x042\x02IDR\x02id\x12#\n" +
-	"\x06status\x18\x02 \x01(\tB\v\x92A\b2\x06StatusR\x06status\x12\"\n" +
+	"\x02id\x18\x01 \x01(\tB\a\x92A\x042\x02IDR\x02id\x12\xe8\x02\n" +
+	"\x06status\x18\x02 \x01(\tB\xcf\x02\x92A\xcb\x022\xa0\x02Status of the sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress.\xf2\x02\apending\xf2\x02\asuccess\xf2\x02\x05error\xf2\x02\tduplicateR\x06status\x12\"\n" +
 	"\x06app_id\x18\x03 \x01(\tB\v\x92A\b2\x06App IDR\x05appId\x12Y\n" +
 	"\x05error\x18\x04 \x01(\v2\x14.api.v2.SyncAppErrorB(\x92A%2#Error, including a code and messageH\x00R\x05error\x88\x01\x01B\b\n" +
 	"\x06_error\"<\n" +
@@ -9508,7 +9508,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05ERROR\x10\x01\x12\v\n" +
 	"\aWARNING\x10\x02\x12\b\n" +
-	"\x04INFO\x10\x032\x9f\x9e\x01\n" +
+	"\x04INFO\x10\x032\xa1\x9e\x01\n" +
 	"\x02V2\x12\xbc\x02\n" +
 	"\x06Health\x12\x15.api.v2.HealthRequest\x1a\x16.api.v2.HealthResponse\"\x82\x02\x92A\xef\x01\n" +
 	"\bInternal\x12\fHealth check\x1a,Returns the health status of the API serviceJR\n" +
@@ -9903,12 +9903,12 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\fCreate score\x1a\xaa\x01Submits one or more named scores for a function run, or for specific steps when step IDs are provided. Scores are recorded as run metadata and aggregated for experiments.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f:\x06scores\"\x15/runs/{run_id}/scores\x12\xca\x06\n" +
-	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\x8d\x06\x92A\xea\x05\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1f:\x06scores\"\x15/runs/{run_id}/scores\x12\xf4\x06\n" +
+	"\aSyncApp\x12\x16.api.v2.SyncAppRequest\x1a\x17.api.v2.SyncAppResponse\"\xb7\x06\x92A\x94\x06\n" +
 	"\x04Apps\n" +
-	"\x04Beta\x12\bSync app\x1a Sync an app at the provided URL.JE\n" +
-	"\x03200\x12>\n" +
-	"\x17App synced successfully\x12#\n" +
+	"\x04Beta\x12\bSync app\x1a Sync an app at the provided URL.Jo\n" +
+	"\x03200\x12h\n" +
+	"AApp sync completed successfully or the app was already up to date\x12#\n" +
 	"!\x1a\x1f#/definitions/v2SyncAppResponseJL\n" +
 	"\x03400\x12E\n" +
 	" Bad Request - invalid input data\x12!\n" +
@@ -9987,11 +9987,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invoke\x12\xd2\x04\n" +
-	"\x12ListInsightsTables\x12!.api.v2.ListInsightsTablesRequest\x1a\".api.v2.ListInsightsTablesResponse\"\xf4\x03\x92A\xd8\x03\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x022:\x01*\"-/apps/{app_id}/functions/{function_id}/invoke\x12\xc8\x04\n" +
+	"\x12ListInsightsTables\x12!.api.v2.ListInsightsTablesRequest\x1a\".api.v2.ListInsightsTablesResponse\"\xea\x03\x92A\xce\x03\n" +
 	"\bInsights\n" +
-	"\x04Beta\n" +
-	"\bInternal\x12\x14List insights tables\x1aOLists the available tables that can be queried via the Insights query endpoint.JZ\n" +
+	"\x04Beta\x12\x14List insights tables\x1aOLists the available tables that can be queried via the Insights query endpoint.JZ\n" +
 	"\x03200\x12S\n" +
 	"!List of available insights tables\x12.\n" +
 	",\x1a*#/definitions/v2ListInsightsTablesResponseJR\n" +
@@ -10006,11 +10005,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\xfe\x05\n" +
-	"\x18ListInsightsEventSchemas\x12'.api.v2.ListInsightsEventSchemasRequest\x1a(.api.v2.ListInsightsEventSchemasResponse\"\x8e\x05\x92A\xea\x04\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x12\x12\x10/insights/tables\x12\xf4\x05\n" +
+	"\x18ListInsightsEventSchemas\x12'.api.v2.ListInsightsEventSchemasRequest\x1a(.api.v2.ListInsightsEventSchemasResponse\"\x84\x05\x92A\xe0\x04\n" +
 	"\bInsights\n" +
-	"\x04Beta\n" +
-	"\bInternal\x12\x17List event type schemas\x1a\x80\x01Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON.Jc\n" +
+	"\x04Beta\x12\x17List event type schemas\x1a\x80\x01Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON.Jc\n" +
 	"\x03200\x12\\\n" +
 	"$Paginated list of event type schemas\x124\n" +
 	"2\x1a0#/definitions/v2ListInsightsEventSchemasResponseJR\n" +
@@ -10028,11 +10026,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/insights/events/schemas\x12\x9e\x06\n" +
-	"\x13QueryInsightsPrompt\x12\".api.v2.QueryInsightsPromptRequest\x1a#.api.v2.QueryInsightsPromptResponse\"\xbd\x05\x92A\x98\x05\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1a\x12\x18/insights/events/schemas\x12\x94\x06\n" +
+	"\x13QueryInsightsPrompt\x12\".api.v2.QueryInsightsPromptRequest\x1a#.api.v2.QueryInsightsPromptResponse\"\xb3\x05\x92A\x8e\x05\n" +
 	"\bInsights\n" +
-	"\x04Beta\n" +
-	"\bInternal\x12#Generate insights query from prompt\x1a@Translates a natural language prompt into an Insights SQL query.JV\n" +
+	"\x04Beta\x12#Generate insights query from prompt\x1a@Translates a natural language prompt into an Insights SQL query.JV\n" +
 	"\x03200\x12O\n" +
 	"\x1cQuery generated successfully\x12/\n" +
 	"-\x1a+#/definitions/v2QueryInsightsPromptResponseJL\n" +
@@ -10053,11 +10050,10 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x1f\x1a\x1d#/definitions/v2ErrorResponseb\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/insights/query/prompt\x12\x98\x06\n" +
-	"\rQueryInsights\x12\x1c.api.v2.QueryInsightsRequest\x1a\x1d.api.v2.QueryInsightsResponse\"\xc9\x05\x92A\xab\x05\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02\x1b:\x01*\"\x16/insights/query/prompt\x12\x8e\x06\n" +
+	"\rQueryInsights\x12\x1c.api.v2.QueryInsightsRequest\x1a\x1d.api.v2.QueryInsightsResponse\"\xbf\x05\x92A\xa1\x05\n" +
 	"\bInsights\n" +
-	"\x04Beta\n" +
-	"\bInternal\x12\x0eQuery insights\x1a,Query Insights using the provided SQL query.JO\n" +
+	"\x04Beta\x12\x0eQuery insights\x1a,Query Insights using the provided SQL query.JO\n" +
 	"\x03200\x12H\n" +
 	"\x1bQuery executed successfully\x12)\n" +
 	"'\x1a%#/definitions/v2QueryInsightsResponseJL\n" +
@@ -10111,7 +10107,7 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\x04Beta\x12\x11List session runs\x1aKLists runs associated with one session ID in the authenticated environment.b\x10\n" +
 	"\x0e\n" +
 	"\n" +
-	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\x9c\x06\x92A\xe5\x05\x12\x9b\x01\n" +
+	"BearerAuth\x12\x00\x82\xd3\xe4\x93\x02.\x12,/sessions/{session_key}/{session_id=**}/runsB\xc7\x06\x92A\x90\x06\x12\x9b\x01\n" +
 	"\x13Inngest REST API v2\x12}The v2 API delivers a significantly improved developer experience with consistent design patterns and enhanced functionality.2\x052.0.0\x1a\x0fapi.inngest.com\"\x03/v2*\x01\x02ZX\n" +
 	"V\n" +
 	"\n" +
@@ -10122,7 +10118,8 @@ const file_api_v2_service_proto_rawDesc = "" +
 	"\bWebhooks\x12\"Create and manage inbound webhooksj\x17\n" +
 	"\x04Apps\x12\x0fSync and managej(\n" +
 	"\tFunctions\x12\x1bInvoke and manage functionsj\x1d\n" +
-	"\x04Runs\x12\x15Inspect function runsj9\n" +
+	"\x04Runs\x12\x15Inspect function runsj)\n" +
+	"\bInsights\x12\x1dQuery event and function dataj9\n" +
 	"\tSandboxes\x12,Create and manage isolated compute sandboxesj9\n" +
 	"\vExperiments\x12*Inspect experiment variants and aggregatesj(\n" +
 	"\bSessions\x12\x1cInspect session-grouped runsj)\n" +

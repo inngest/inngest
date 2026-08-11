@@ -38,6 +38,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Apps"         description: "Sync and manage" }
   tags: { name: "Functions"    description: "Invoke and manage functions" }
   tags: { name: "Runs"         description: "Inspect function runs" }
+  tags: { name: "Insights"     description: "Query event and function data" }
   tags: { name: "Sandboxes"    description: "Create and manage isolated compute sandboxes" }
   tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
   tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
@@ -1368,7 +1369,7 @@ service V2 {
       responses: {
         key: "200"
         value: {
-          description: "App synced successfully"
+          description: "App sync completed successfully or the app was already up to date"
           schema: {
             json_schema: {
               ref: "#/definitions/v2SyncAppResponse"
@@ -1646,7 +1647,6 @@ service V2 {
       summary: "List insights tables"
       tags: "Insights"
       tags: "Beta"
-      tags: "Internal"
       description: "Lists the available tables that can be queried via the Insights query endpoint."
       security: {
         security_requirement: {
@@ -1709,7 +1709,6 @@ service V2 {
       summary: "List event type schemas"
       tags: "Insights"
       tags: "Beta"
-      tags: "Internal"
       description: "Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON."
       security: {
         security_requirement: {
@@ -1784,7 +1783,6 @@ service V2 {
       summary: "Generate insights query from prompt"
       tags: "Insights"
       tags: "Beta"
-      tags: "Internal"
       description: "Translates a natural language prompt into an Insights SQL query."
       security: {
         security_requirement: {
@@ -1870,7 +1868,6 @@ service V2 {
       summary: "Query insights"
       tags: "Insights"
       tags: "Beta"
-      tags: "Internal"
       description: "Query Insights using the provided SQL query."
       security: {
         security_requirement: {
@@ -2445,7 +2442,11 @@ message AppSync {
 
   optional string status = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Status of the latest sync"
+      description: "Status of the latest sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress."
+      enum: "pending"
+      enum: "success"
+      enum: "error"
+      enum: "duplicate"
     }
   ];
   optional google.protobuf.Timestamp synced_at = 11 [
@@ -2991,7 +2992,11 @@ message SyncAppData {
   ];
   string status = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Status"
+      description: "Status of the sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress."
+      enum: "pending"
+      enum: "success"
+      enum: "error"
+      enum: "duplicate"
     }
   ];
   string app_id = 3 [
