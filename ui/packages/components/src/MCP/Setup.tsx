@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -60,8 +67,10 @@ const emptyHeaders: Record<string, string> = {};
 
 // Abort the tools handshake if it hangs (an unresponsive proxy, a stalled
 // auth-token fetch) so the loading skeletons resolve into an actionable
-// error instead of shimmering forever.
-const toolsFetchTimeoutMs = 15_000;
+// error instead of shimmering forever. The clock starts at mount and a cold
+// dev start can block the main thread for a while before the responses are
+// processed, so keep the budget generous to avoid false timeouts.
+const toolsFetchTimeoutMs = 30_000;
 
 const devServerExamples = [
   'List my registered Inngest functions and their triggers',
@@ -201,6 +210,7 @@ const useMCPTools = (
   const [tools, setTools] = useState<MCPTool[]>([]);
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const [attempt, setAttempt] = useState(0);
   const getAccessTokenRef = useRef(getAccessToken);
 
   useEffect(() => {
@@ -312,9 +322,11 @@ const useMCPTools = (
         });
       }
     };
-  }, [endpoint, headers]);
+  }, [endpoint, headers, attempt]);
 
-  return { error, loading, tools };
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+
+  return { error, loading, retry, tools };
 };
 
 export const MCPSetup = ({
@@ -326,7 +338,7 @@ export const MCPSetup = ({
   isDevServer = false,
 }: MCPSetupProps) => {
   const surfaceName = isDevServer ? 'Dev Server' : 'Cloud';
-  const { error, loading, tools } = useMCPTools(endpoint, headers, getAccessToken);
+  const { error, loading, retry, tools } = useMCPTools(endpoint, headers, getAccessToken);
   const clients = createClients(endpoint, isDevServer, bearerTokenEnvVar);
   const examples = isDevServer ? devServerExamples : cloudExamples;
   const hasAuthStep = Boolean(bearerTokenEnvVar);
@@ -419,7 +431,7 @@ export const MCPSetup = ({
             </Alert>
           )}
 
-          <MCPToolList error={error} loading={loading} tools={tools} />
+          <MCPToolList error={error} loading={loading} retry={retry} tools={tools} />
         </section>
 
         {isDevServer && (
@@ -605,10 +617,12 @@ const matchesToolSearch = (tool: MCPTool, query: string) => {
 const MCPToolList = ({
   error,
   loading,
+  retry,
   tools,
 }: {
   error?: string;
   loading: boolean;
+  retry: () => void;
   tools: MCPTool[];
 }) => {
   const [search, setSearch] = useState('');
@@ -624,7 +638,10 @@ const MCPToolList = ({
   }
   if (error) {
     return (
-      <Alert severity="error">
+      <Alert
+        button={<Button appearance="outlined" kind="secondary" label="Retry" onClick={retry} />}
+        severity="error"
+      >
         <p className="font-medium">Unable to load MCP tools</p>
         <p className="mt-1 text-sm">{error}</p>
       </Alert>
