@@ -358,7 +358,9 @@ export const MCPSetup = ({
                 ) : (
                   <>Create one in your organization&apos;s API keys settings</>
                 )}
-                , then export it as an environment variable. See the{' '}
+                , then run this in your terminal to make it available as{' '}
+                <InlineCode>{bearerTokenEnvVar}</InlineCode>. Each tool&apos;s tab in step 2
+                explains how it uses the variable. See the{' '}
                 <a
                   className="text-link hover:underline"
                   href="https://api-docs.inngest.com/authentication"
@@ -382,7 +384,11 @@ export const MCPSetup = ({
               use this MCP endpoint:
             </p>
             <CodeLine className={`mb-4 ${mutedCopyButton}`} code={endpoint} />
-            <ClientPicker clients={clients} isDevServer={isDevServer} />
+            <ClientPicker
+              bearerTokenEnvVar={bearerTokenEnvVar}
+              clients={clients}
+              isDevServer={isDevServer}
+            />
           </Step>
 
           <Step isLast number={tryStep} title="Try it">
@@ -457,7 +463,15 @@ const Step = ({
   </div>
 );
 
-const ClientPicker = ({ clients, isDevServer }: { clients: MCPClient[]; isDevServer: boolean }) => (
+const ClientPicker = ({
+  bearerTokenEnvVar,
+  clients,
+  isDevServer,
+}: {
+  bearerTokenEnvVar?: string;
+  clients: MCPClient[];
+  isDevServer: boolean;
+}) => (
   <TabCards defaultValue="claude">
     <TabCards.ButtonList>
       {clients.map((client) => (
@@ -501,7 +515,11 @@ const ClientPicker = ({ clients, isDevServer }: { clients: MCPClient[]; isDevSer
               <CommandBlock currentTabContent={client.snippet} />
             </CommandBlock.Wrapper>
           </ClientOnly>
-          <ClientNotes client={client.id} isDevServer={isDevServer} />
+          <ClientNotes
+            bearerTokenEnvVar={bearerTokenEnvVar}
+            client={client.id}
+            isDevServer={isDevServer}
+          />
         </TabCards.Content>
       ))}
     </div>
@@ -509,15 +527,25 @@ const ClientPicker = ({ clients, isDevServer }: { clients: MCPClient[]; isDevSer
 );
 
 const ClientNotes = ({
+  bearerTokenEnvVar,
   client,
   isDevServer,
 }: {
+  bearerTokenEnvVar?: string;
   client: MCPClient['id'];
   isDevServer: boolean;
 }) => {
   if (client === 'claude') {
     return (
       <div className="text-muted mt-3 text-sm">
+        {bearerTokenEnvVar && (
+          <p className="mb-2">
+            Your shell fills in <InlineCode>${bearerTokenEnvVar}</InlineCode> when you run this
+            command, and Claude Code saves the key into its own configuration — so the variable from
+            step 1 only needs to be set in the terminal where you run it. You can also replace{' '}
+            <InlineCode>${bearerTokenEnvVar}</InlineCode> with the key itself.
+          </p>
+        )}
         <p>
           For the desktop app&apos;s <strong>Code</strong> tab, run the command above and restart
           Claude Desktop. The Code tab loads the same Claude MCP configuration.
@@ -540,6 +568,14 @@ const ClientNotes = ({
   if (client === 'codex') {
     return (
       <div className="text-muted mt-3 text-sm">
+        {bearerTokenEnvVar && (
+          <p className="mb-2">
+            Codex stores the variable&apos;s <em>name</em> and looks up{' '}
+            <InlineCode>{bearerTokenEnvVar}</InlineCode> every time it starts — so add the export
+            line from step 1 to your shell profile (for example <InlineCode>~/.zshrc</InlineCode>)
+            to keep it available.
+          </p>
+        )}
         <p>
           Codex CLI and the ChatGPT desktop app share MCP configuration. Run the command above,
           restart the desktop app, then use <strong>Settings → MCP servers</strong> to confirm the
@@ -557,6 +593,14 @@ const ClientNotes = ({
           <InlineCode>~/.cursor/mcp.json</InlineCode> to enable it in every project, then reload
           Cursor.
         </p>
+        {bearerTokenEnvVar && (
+          <p className="mt-2">
+            Cursor fills in <InlineCode>{`\${env:${bearerTokenEnvVar}}`}</InlineCode> from its
+            environment when it launches — so add the export line from step 1 to your shell profile
+            (for example <InlineCode>~/.zshrc</InlineCode>), or simply replace it with the key
+            itself in this file.
+          </p>
+        )}
       </div>
     );
   }
