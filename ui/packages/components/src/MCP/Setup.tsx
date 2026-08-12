@@ -579,6 +579,9 @@ const MCPToolList = ({
       <p className="text-muted text-sm">
         {tools.length} {tools.length === 1 ? 'tool' : 'tools'} available
       </p>
+      {/* Accordion content on this page uses forceMount + CSS hiding so the
+          full text stays in the DOM: agents and scrapers reading the page get
+          everything without having to expand each row. */}
       <AccordionList type="multiple" defaultValue={[]}>
         {tools.map((tool) => (
           <AccordionList.Item key={tool.name} value={tool.name}>
@@ -588,7 +591,7 @@ const MCPToolList = ({
                 <InlineCode>{tool.name}</InlineCode>
               </div>
             </AccordionList.Trigger>
-            <AccordionList.Content>
+            <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
               <MCPToolDetails tool={tool} />
             </AccordionList.Content>
           </AccordionList.Item>
@@ -629,7 +632,7 @@ const DevServerBestPractices = () => (
         <AccordionList.Trigger>
           <span className="text-basis font-medium">Function testing</span>
         </AccordionList.Trigger>
-        <AccordionList.Content>
+        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
           <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
             <li>Test individual functions before testing a multi-function workflow.</li>
             <li>Use clear event names and payloads so failures are easier to trace.</li>
@@ -642,7 +645,7 @@ const DevServerBestPractices = () => (
         <AccordionList.Trigger>
           <span className="text-basis font-medium">Debugging workflows</span>
         </AccordionList.Trigger>
-        <AccordionList.Content>
+        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
           <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
             <li>
               Use <InlineCode>get_run</InlineCode> for run state and output.
@@ -658,7 +661,7 @@ const DevServerBestPractices = () => (
         <AccordionList.Trigger>
           <span className="text-basis font-medium">Documentation usage</span>
         </AccordionList.Trigger>
-        <AccordionList.Content>
+        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
           <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
             <li>
               Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
@@ -682,7 +685,7 @@ const DevServerTroubleshooting = ({ endpoint }: { endpoint: string }) => (
         <AccordionList.Trigger>
           <span className="text-basis font-medium">MCP server not found</span>
         </AccordionList.Trigger>
-        <AccordionList.Content>
+        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
           <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
             <li>Restart the dev server if the endpoint is not responding.</li>
             <li>
@@ -696,7 +699,7 @@ const DevServerTroubleshooting = ({ endpoint }: { endpoint: string }) => (
         <AccordionList.Trigger>
           <span className="text-basis font-medium">Functions not listed</span>
         </AccordionList.Trigger>
-        <AccordionList.Content>
+        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
           <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
             <li>Confirm your app has synced successfully with the dev server.</li>
             <li>Check the dev-server logs for registration or connection errors.</li>
@@ -708,7 +711,7 @@ const DevServerTroubleshooting = ({ endpoint }: { endpoint: string }) => (
         <AccordionList.Trigger>
           <span className="text-basis font-medium">Run data is missing</span>
         </AccordionList.Trigger>
-        <AccordionList.Content>
+        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
           <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
             <li>Allow a moment for event and run data to be stored.</li>
             <li>Confirm the run ID and function trigger match the test you sent.</li>
