@@ -210,7 +210,7 @@ const useMCPTools = (
     let sessionID: string | null = null;
     let requestHeaders = headers;
     // Distinguishes unmount (stay silent) from the watchdog abort below
-    // (surface a timeout error) — both flip controller.signal.aborted.
+    // (surface a timeout error); both flip controller.signal.aborted.
     let unmounted = false;
     const watchdog = window.setTimeout(() => controller.abort(), toolsFetchTimeoutMs);
     // getAccessToken is outside fetch's abort handling, so race it against
@@ -358,9 +358,7 @@ export const MCPSetup = ({
                 ) : (
                   <>Create one in your organization&apos;s API keys settings</>
                 )}
-                , then run this in your terminal to make it available as{' '}
-                <InlineCode>{bearerTokenEnvVar}</InlineCode>. Each tool&apos;s tab in step 2
-                explains how it uses the variable. See the{' '}
+                , then export it in your terminal. See the{' '}
                 <a
                   className="text-link hover:underline"
                   href="https://api-docs.inngest.com/authentication"
@@ -538,14 +536,6 @@ const ClientNotes = ({
   if (client === 'claude') {
     return (
       <div className="text-muted mt-3 text-sm">
-        {bearerTokenEnvVar && (
-          <p className="mb-2">
-            Your shell fills in <InlineCode>${bearerTokenEnvVar}</InlineCode> when you run this
-            command, and Claude Code saves the key into its own configuration — so the variable from
-            step 1 only needs to be set in the terminal where you run it. You can also replace{' '}
-            <InlineCode>${bearerTokenEnvVar}</InlineCode> with the key itself.
-          </p>
-        )}
         <p>
           For the desktop app&apos;s <strong>Code</strong> tab, run the command above and restart
           Claude Desktop. The Code tab loads the same Claude MCP configuration.
@@ -570,10 +560,8 @@ const ClientNotes = ({
       <div className="text-muted mt-3 text-sm">
         {bearerTokenEnvVar && (
           <p className="mb-2">
-            Codex stores the variable&apos;s <em>name</em> and looks up{' '}
-            <InlineCode>{bearerTokenEnvVar}</InlineCode> every time it starts — so add the export
-            line from step 1 to your shell profile (for example <InlineCode>~/.zshrc</InlineCode>)
-            to keep it available.
+            Codex reads <InlineCode>{bearerTokenEnvVar}</InlineCode> on every launch, so keep the
+            export from step 1 in your shell profile.
           </p>
         )}
         <p>
@@ -595,10 +583,9 @@ const ClientNotes = ({
         </p>
         {bearerTokenEnvVar && (
           <p className="mt-2">
-            Cursor fills in <InlineCode>{`\${env:${bearerTokenEnvVar}}`}</InlineCode> from its
-            environment when it launches — so add the export line from step 1 to your shell profile
-            (for example <InlineCode>~/.zshrc</InlineCode>), or simply replace it with the key
-            itself in this file.
+            Cursor reads <InlineCode>{`\${env:${bearerTokenEnvVar}}`}</InlineCode> on launch, so
+            keep the export from step 1 in your shell profile, or replace it with your key in this
+            file.
           </p>
         )}
       </div>
