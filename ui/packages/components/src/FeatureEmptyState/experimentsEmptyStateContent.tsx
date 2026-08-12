@@ -1,12 +1,6 @@
 import type { ComponentType } from 'react';
-import {
-  RiEqualizerLine,
-  RiGroupLine,
-  RiLineChartLine,
-  RiScalesLine,
-} from '@remixicon/react';
-
 import type { TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
+import { RiEqualizerLine, RiGroupLine, RiLineChartLine, RiScalesLine } from '@remixicon/react';
 
 export const DOCS_URL =
   'https://www.inngest.com/docs/features/inngest-functions/steps-workflows/step-experiments';

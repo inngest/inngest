@@ -1,11 +1,10 @@
-import { FeatureEmptyState } from '@/components/FeatureEmptyState/FeatureEmptyState';
+import { ExperimentsEmptyStateView } from '@inngest/components/FeatureEmptyState/ExperimentsEmptyStateView';
+
 import {
-  DOCS_URL,
-  INTRO_DESCRIPTION,
-  PROMPT,
-  USE_CASES,
-  VARIANT_TABS,
-} from './experimentsEmptyStateContent';
+  trackEmptyStateExampleCopied,
+  trackEmptyStatePromptCopied,
+  trackEmptyStateViewed,
+} from '@/utils/analyticsEvents';
 
 type ExperimentsEmptyStateProps = {
   onDocsLinkClick?: () => void;
@@ -15,26 +14,15 @@ export function ExperimentsEmptyState({
   onDocsLinkClick,
 }: ExperimentsEmptyStateProps) {
   return (
-    <FeatureEmptyState
-      feature="experiments"
-      title="Experiments"
-      description={INTRO_DESCRIPTION}
-      docsUrl={DOCS_URL}
+    <ExperimentsEmptyStateView
+      onView={() => trackEmptyStateViewed({ feature: 'experiments' })}
+      onPromptCopy={() =>
+        trackEmptyStatePromptCopied({ feature: 'experiments' })
+      }
+      onExampleCopy={() =>
+        trackEmptyStateExampleCopied({ feature: 'experiments' })
+      }
       onDocsLinkClick={onDocsLinkClick}
-      valueProps={USE_CASES.map(({ Icon, title, description }) => ({
-        icon: Icon,
-        title,
-        description,
-      }))}
-      prompt={{
-        description:
-          'Copy this prompt to learn about this feature and implement experiments',
-        content: PROMPT,
-      }}
-      example={{
-        tabs: VARIANT_TABS,
-        height: 280,
-      }}
     />
   );
 }
