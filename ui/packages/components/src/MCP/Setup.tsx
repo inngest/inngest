@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/Code';
 import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
@@ -347,18 +348,9 @@ export const MCPSetup = ({
           {bearerTokenEnvVar && (
             <Step number={1} title="Create an API key">
               <p className="text-muted mb-3 text-sm">
-                MCP clients authenticate with an Inngest API key.{' '}
-                {apiKeysHref ? (
-                  <>
-                    Create one in{' '}
-                    <a className="text-link hover:underline" href={apiKeysHref}>
-                      API keys settings
-                    </a>
-                  </>
-                ) : (
-                  <>Create one in your organization&apos;s API keys settings</>
-                )}
-                , then export it in your terminal. See the{' '}
+                MCP clients authenticate with an Inngest API key. Create one
+                {!apiKeysHref && <> in your organization&apos;s API keys settings</>}, then export
+                it in your terminal. See the{' '}
                 <a
                   className="text-link hover:underline"
                   href="https://api-docs.inngest.com/authentication"
@@ -369,6 +361,11 @@ export const MCPSetup = ({
                 </a>{' '}
                 to learn more.
               </p>
+              {apiKeysHref && (
+                <div className="mb-3">
+                  <Button href={apiKeysHref} kind="primary" label="Create API key" />
+                </div>
+              )}
               <CodeLine
                 className={mutedCopyButton}
                 code={`export ${bearerTokenEnvVar}=<your-api-key>`}
