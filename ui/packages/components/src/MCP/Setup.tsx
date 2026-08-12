@@ -21,7 +21,6 @@ import { IconClaude } from '@inngest/components/icons/ai/Claude';
 import { IconCursor } from '@inngest/components/icons/ai/Cursor';
 import { IconOpenAI } from '@inngest/components/icons/ai/OpenAI';
 import { LINE_HEIGHT } from '@inngest/components/utils/monaco';
-import { RiExternalLinkLine } from '@remixicon/react';
 import { ClientOnly } from '@tanstack/react-router';
 
 type JSONSchema = {
@@ -93,34 +92,33 @@ const resources: Array<{
   title: string;
 }> = [
   {
-    description: 'Learn about MCP transports, tools, and client capabilities.',
+    description: 'MCP transports, tools, and clients.',
     href: 'https://modelcontextprotocol.io/introduction',
     title: 'Model Context Protocol',
   },
   {
-    description: 'Learn how to run and configure Inngest locally.',
+    description: 'Run and configure Inngest locally.',
     devServerOnly: true,
     href: 'https://www.inngest.com/docs/dev-server',
     title: 'Inngest Dev Server',
   },
   {
-    description: 'See patterns for durable AI agents and retrieval workflows.',
+    description: 'Patterns for durable AI agents and retrieval.',
     href: 'https://www.inngest.com/docs/examples/ai-agents-and-rag',
     title: 'AI Agents and RAG Examples',
   },
   {
-    description: 'Learn how tools and context fit into reliable AI applications.',
+    description: 'How tools and context fit into AI applications.',
     href: 'https://www.inngest.com/blog/context-engineering-is-software-engineering-for-llms',
     title: 'Context Engineering',
   },
   {
-    description:
-      'Configure MCP servers for Codex CLI, ChatGPT Desktop, and the Codex IDE extension.',
+    description: 'MCP servers for Codex CLI and ChatGPT Desktop.',
     href: 'https://learn.chatgpt.com/docs/extend/mcp',
     title: 'Codex MCP Setup',
   },
   {
-    description: 'Understand local and remote MCP connections in Claude Desktop.',
+    description: 'Local and remote MCP connections in Claude.',
     href: 'https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp',
     title: 'Claude Desktop Connectors',
   },
@@ -891,7 +889,7 @@ const Resources = ({ isDevServer }: { isDevServer: boolean }) => (
         .filter((resource) => isDevServer || !resource.devServerOnly)
         .map((resource) => (
           <a
-            className="block"
+            className="group block"
             href={resource.href}
             key={resource.href}
             rel="noopener noreferrer"
@@ -899,14 +897,11 @@ const Resources = ({ isDevServer }: { isDevServer: boolean }) => (
           >
             <Card
               className="h-full"
-              contentClassName="hover:border-emphasis h-full transition-colors"
+              contentClassName="group-hover:border-muted h-full transition-colors"
             >
-              <Card.Content>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <h3 className="text-basis text-sm font-medium">{resource.title}</h3>
-                  <RiExternalLinkLine className="text-muted h-4 w-4 shrink-0" />
-                </div>
-                <p className="text-muted text-sm">{resource.description}</p>
+              <Card.Content className="group-hover:bg-canvasSubtle h-full transition-colors">
+                <h3 className="text-basis mb-1 truncate text-sm font-medium">{resource.title}</h3>
+                <p className="text-muted truncate text-sm">{resource.description}</p>
               </Card.Content>
             </Card>
           </a>
