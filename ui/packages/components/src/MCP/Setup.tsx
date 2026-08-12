@@ -187,6 +187,10 @@ const createClients = (
 // shift the page.
 const snippetHeight = (snippet: TabsProps) => snippet.content.split('\n').length * LINE_HEIGHT + 60;
 
+// CodeLine's ghost copy button renders text-basis, which reads too heavy
+// against this page's code lines; mute it until hovered.
+const mutedCopyButton = '[&_button]:text-muted [&_button:hover]:text-basis';
+
 const useMCPTools = (
   endpoint: string,
   headers: Record<string, string>,
@@ -352,22 +356,23 @@ export const MCPSetup = ({
                     </a>
                   </>
                 ) : (
-                  <>
-                    See the{' '}
-                    <a
-                      className="text-link hover:underline"
-                      href="https://api-docs.inngest.com/authentication"
-                      rel="noopener noreferrer"
-                      target="_blank"
-                    >
-                      authentication docs
-                    </a>{' '}
-                    to create one
-                  </>
+                  <>Create one in your organization&apos;s API keys settings</>
                 )}
-                , then export it as an environment variable:
+                , then export it as an environment variable. See the{' '}
+                <a
+                  className="text-link hover:underline"
+                  href="https://api-docs.inngest.com/authentication"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  authentication docs
+                </a>{' '}
+                to learn more.
               </p>
-              <CodeLine code={`export ${bearerTokenEnvVar}=<your-api-key>`} />
+              <CodeLine
+                className={mutedCopyButton}
+                code={`export ${bearerTokenEnvVar}=<your-api-key>`}
+              />
             </Step>
           )}
 
@@ -376,7 +381,7 @@ export const MCPSetup = ({
               Add the Inngest MCP server to your tool of choice. If your tool asks for a server URL,
               use this MCP endpoint:
             </p>
-            <CodeLine className="mb-4" code={endpoint} />
+            <CodeLine className={`mb-4 ${mutedCopyButton}`} code={endpoint} />
             <ClientPicker clients={clients} isDevServer={isDevServer} />
           </Step>
 
@@ -386,7 +391,7 @@ export const MCPSetup = ({
             </p>
             <div className="space-y-2">
               {examples.map((example) => (
-                <CodeLine code={example} key={example} />
+                <CodeLine className={mutedCopyButton} code={example} key={example} />
               ))}
             </div>
           </Step>
@@ -440,7 +445,7 @@ const Step = ({
 }) => (
   <div className="flex gap-4">
     <div className="flex flex-col items-center">
-      <div className="border-subtle bg-canvasSubtle text-basis flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
+      <div className="border-subtle bg-canvasBase text-basis flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
         {number}
       </div>
       {!isLast && <div className="border-subtle my-1 w-px flex-1 border-l" />}
@@ -463,32 +468,43 @@ const ClientPicker = ({ clients, isDevServer }: { clients: MCPClient[]; isDevSer
         </TabCards.Button>
       ))}
     </TabCards.ButtonList>
-    {clients.map((client) => (
-      <TabCards.Content className="min-h-[24rem]" key={client.id} value={client.id}>
-        <div className="mb-4 flex items-center gap-2">
-          <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
-            <client.Icon className="text-basis h-4 w-4" />
-          </div>
-          <p className="text-basis">{client.name}</p>
-        </div>
-        <ClientOnly
-          fallback={
-            <div style={{ height: snippetHeight(client.snippet) }}>
-              <Skeleton className="h-full w-full" />
-            </div>
-          }
+    {/* All three panels stay mounted, stacked in the same grid cell with the
+        inactive ones invisible: the container is always as tall as the
+        tallest card, so switching tools never shifts the page, and every
+        snippet stays in the DOM for agents reading the page. */}
+    <div className="grid">
+      {clients.map((client) => (
+        <TabCards.Content
+          className="col-start-1 row-start-1 data-[state=inactive]:invisible"
+          forceMount
+          key={client.id}
+          value={client.id}
         >
-          <CommandBlock.Wrapper>
-            <CommandBlock.Header className="flex items-center justify-between pr-4">
-              <CommandBlock.Tabs tabs={[client.snippet]} activeTab={client.snippet.title} />
-              <CommandBlock.CopyButton content={client.snippet.content} />
-            </CommandBlock.Header>
-            <CommandBlock currentTabContent={client.snippet} />
-          </CommandBlock.Wrapper>
-        </ClientOnly>
-        <ClientNotes client={client.id} isDevServer={isDevServer} />
-      </TabCards.Content>
-    ))}
+          <div className="mb-4 flex items-center gap-2">
+            <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
+              <client.Icon className="text-basis h-4 w-4" />
+            </div>
+            <p className="text-basis">{client.name}</p>
+          </div>
+          <ClientOnly
+            fallback={
+              <div style={{ height: snippetHeight(client.snippet) }}>
+                <Skeleton className="h-full w-full" />
+              </div>
+            }
+          >
+            <CommandBlock.Wrapper>
+              <CommandBlock.Header className="flex items-center justify-between pr-4">
+                <CommandBlock.Tabs tabs={[client.snippet]} activeTab={client.snippet.title} />
+                <CommandBlock.CopyButton content={client.snippet.content} />
+              </CommandBlock.Header>
+              <CommandBlock currentTabContent={client.snippet} />
+            </CommandBlock.Wrapper>
+          </ClientOnly>
+          <ClientNotes client={client.id} isDevServer={isDevServer} />
+        </TabCards.Content>
+      ))}
+    </div>
   </TabCards>
 );
 
