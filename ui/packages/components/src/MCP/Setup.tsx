@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/Code';
@@ -33,6 +34,8 @@ type MCPTool = {
 };
 
 type MCPSetupProps = {
+  /** In-app path to the API keys settings page, linked from the auth step. */
+  apiKeysHref?: string;
   bearerTokenEnvVar?: string;
   endpoint: string;
   getAccessToken?: () => Promise<string | null>;
@@ -309,6 +312,7 @@ const useMCPTools = (
 };
 
 export const MCPSetup = ({
+  apiKeysHref,
   bearerTokenEnvVar,
   endpoint,
   getAccessToken,
@@ -319,11 +323,14 @@ export const MCPSetup = ({
   const { error, loading, tools } = useMCPTools(endpoint, headers, getAccessToken);
   const clients = createClients(endpoint, isDevServer, bearerTokenEnvVar);
   const examples = isDevServer ? devServerExamples : cloudExamples;
+  const hasAuthStep = Boolean(bearerTokenEnvVar);
+  const connectStep = hasAuthStep ? 2 : 1;
+  const tryStep = connectStep + 1;
 
   return (
     <div className="bg-canvasBase min-h-full">
       <div className="mx-auto max-w-5xl px-8 py-8">
-        <header className="mb-10">
+        <header className="mb-8">
           <h1 className="text-basis text-2xl font-medium">{surfaceName} MCP Setup</h1>
           <p className="text-muted mt-1 text-sm">
             Connect your AI assistant to Inngest {surfaceName} using the Model Context Protocol.
@@ -331,82 +338,61 @@ export const MCPSetup = ({
         </header>
 
         <section className="mb-10">
-          <h2 className="text-basis mb-3 text-lg font-medium">MCP endpoint</h2>
-          <CodeLine code={endpoint} />
-        </section>
+          <h2 className="text-basis mb-6 text-lg font-medium">Get started</h2>
 
-        {bearerTokenEnvVar && (
-          <section className="mb-10">
-            <h2 className="text-basis mb-2 text-lg font-medium">Authentication</h2>
-            <p className="text-muted text-sm">
-              Installed MCP clients use an Inngest API key. See the{' '}
-              <a
-                className="text-link hover:underline"
-                href="https://api-docs.inngest.com/authentication"
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                authentication docs
-              </a>{' '}
-              to create one, then export it as <InlineCode>{bearerTokenEnvVar}</InlineCode>.
+          {bearerTokenEnvVar && (
+            <Step number={1} title="Create an API key">
+              <p className="text-muted mb-3 text-sm">
+                MCP clients authenticate with an Inngest API key.{' '}
+                {apiKeysHref ? (
+                  <>
+                    Create one in{' '}
+                    <a className="text-link hover:underline" href={apiKeysHref}>
+                      API keys settings
+                    </a>
+                  </>
+                ) : (
+                  <>
+                    See the{' '}
+                    <a
+                      className="text-link hover:underline"
+                      href="https://api-docs.inngest.com/authentication"
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      authentication docs
+                    </a>{' '}
+                    to create one
+                  </>
+                )}
+                , then export it as an environment variable:
+              </p>
+              <CodeLine code={`export ${bearerTokenEnvVar}=<your-api-key>`} />
+            </Step>
+          )}
+
+          <Step number={connectStep} title="Connect your AI tool">
+            <p className="text-muted mb-2 text-sm">
+              Add the Inngest MCP server to your tool of choice. If your tool asks for a server URL,
+              use this MCP endpoint:
             </p>
-          </section>
-        )}
+            <CodeLine className="mb-4" code={endpoint} />
+            <ClientPicker clients={clients} isDevServer={isDevServer} />
+          </Step>
 
-        <section className="mb-10">
-          <h2 className="text-basis mb-3 text-lg font-medium">Connect your AI tool</h2>
-          <TabCards defaultValue="claude">
-            <TabCards.ButtonList>
-              {clients.map((client) => (
-                <TabCards.Button className="w-36" key={client.id} value={client.id}>
-                  <div className="flex items-center gap-1.5">
-                    <client.Icon className="h-4 w-4" /> {client.name}
-                  </div>
-                </TabCards.Button>
+          <Step isLast number={tryStep} title="Try it">
+            <p className="text-muted mb-3 text-sm">
+              Ask your AI assistant a question that uses the Inngest tools:
+            </p>
+            <div className="space-y-2">
+              {examples.map((example) => (
+                <CodeLine code={example} key={example} />
               ))}
-            </TabCards.ButtonList>
-            {clients.map((client) => (
-              <TabCards.Content className="min-h-[24rem]" key={client.id} value={client.id}>
-                <div className="mb-4 flex items-center gap-2">
-                  <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
-                    <client.Icon className="text-basis h-4 w-4" />
-                  </div>
-                  <p className="text-basis">{client.name}</p>
-                </div>
-                <ClientOnly
-                  fallback={
-                    <div style={{ height: snippetHeight(client.snippet) }}>
-                      <Skeleton className="h-full w-full" />
-                    </div>
-                  }
-                >
-                  <CommandBlock.Wrapper>
-                    <CommandBlock.Header className="flex items-center justify-between pr-4">
-                      <CommandBlock.Tabs tabs={[client.snippet]} activeTab={client.snippet.title} />
-                      <CommandBlock.CopyButton content={client.snippet.content} />
-                    </CommandBlock.Header>
-                    <CommandBlock currentTabContent={client.snippet} />
-                  </CommandBlock.Wrapper>
-                </ClientOnly>
-                <ClientNotes client={client.id} isDevServer={isDevServer} />
-              </TabCards.Content>
-            ))}
-          </TabCards>
+            </div>
+          </Step>
         </section>
 
-        <section className="mb-10">
-          <h2 className="text-basis mb-3 text-lg font-medium">Try it</h2>
-          <p className="text-muted mb-3 text-sm">
-            Ask your AI assistant a question that uses the Inngest tools:
-          </p>
-          <div className="space-y-2">
-            {examples.map((example) => (
-              <CodeLine code={example} key={example} />
-            ))}
-          </div>
-        </section>
-
-        <section className="mb-10">
+        <section className="border-subtle mb-10 border-t pt-8">
           <h2 className="text-basis mb-3 text-lg font-medium">Available MCP tools</h2>
           {isDevServer && (
             <Alert className="mb-6" severity="warning">
@@ -430,16 +416,81 @@ export const MCPSetup = ({
         </section>
 
         {isDevServer && (
-          <>
+          <section className="border-subtle mb-10 border-t pt-8">
             <DevServerBestPractices />
             <DevServerTroubleshooting endpoint={endpoint} />
             <Resources />
-          </>
+          </section>
         )}
       </div>
     </div>
   );
 };
+
+const Step = ({
+  children,
+  isLast = false,
+  number,
+  title,
+}: {
+  children: ReactNode;
+  isLast?: boolean;
+  number: number;
+  title: string;
+}) => (
+  <div className="flex gap-4">
+    <div className="flex flex-col items-center">
+      <div className="border-subtle bg-canvasSubtle text-basis flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
+        {number}
+      </div>
+      {!isLast && <div className="border-subtle my-1 w-px flex-1 border-l" />}
+    </div>
+    <div className={`min-w-0 flex-1 ${isLast ? '' : 'pb-8'}`}>
+      <h3 className="text-basis mb-2 text-base font-medium leading-7">{title}</h3>
+      {children}
+    </div>
+  </div>
+);
+
+const ClientPicker = ({ clients, isDevServer }: { clients: MCPClient[]; isDevServer: boolean }) => (
+  <TabCards defaultValue="claude">
+    <TabCards.ButtonList>
+      {clients.map((client) => (
+        <TabCards.Button className="w-36" key={client.id} value={client.id}>
+          <div className="flex items-center gap-1.5">
+            <client.Icon className="h-4 w-4" /> {client.name}
+          </div>
+        </TabCards.Button>
+      ))}
+    </TabCards.ButtonList>
+    {clients.map((client) => (
+      <TabCards.Content className="min-h-[24rem]" key={client.id} value={client.id}>
+        <div className="mb-4 flex items-center gap-2">
+          <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
+            <client.Icon className="text-basis h-4 w-4" />
+          </div>
+          <p className="text-basis">{client.name}</p>
+        </div>
+        <ClientOnly
+          fallback={
+            <div style={{ height: snippetHeight(client.snippet) }}>
+              <Skeleton className="h-full w-full" />
+            </div>
+          }
+        >
+          <CommandBlock.Wrapper>
+            <CommandBlock.Header className="flex items-center justify-between pr-4">
+              <CommandBlock.Tabs tabs={[client.snippet]} activeTab={client.snippet.title} />
+              <CommandBlock.CopyButton content={client.snippet.content} />
+            </CommandBlock.Header>
+            <CommandBlock currentTabContent={client.snippet} />
+          </CommandBlock.Wrapper>
+        </ClientOnly>
+        <ClientNotes client={client.id} isDevServer={isDevServer} />
+      </TabCards.Content>
+    ))}
+  </TabCards>
+);
 
 const ClientNotes = ({
   client,
@@ -524,122 +575,152 @@ const MCPToolList = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <p className="text-muted text-sm">
         {tools.length} {tools.length === 1 ? 'tool' : 'tools'} available
       </p>
-      {tools.map((tool) => (
-        <MCPToolCard key={tool.name} tool={tool} />
-      ))}
+      <AccordionList type="multiple" defaultValue={[]}>
+        {tools.map((tool) => (
+          <AccordionList.Item key={tool.name} value={tool.name}>
+            <AccordionList.Trigger>
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-left">
+                <span className="text-basis font-medium">{tool.title ?? tool.name}</span>
+                <InlineCode>{tool.name}</InlineCode>
+              </div>
+            </AccordionList.Trigger>
+            <AccordionList.Content>
+              <MCPToolDetails tool={tool} />
+            </AccordionList.Content>
+          </AccordionList.Item>
+        ))}
+      </AccordionList>
     </div>
   );
 };
 
-const MCPToolCard = ({ tool }: { tool: MCPTool }) => {
+const MCPToolDetails = ({ tool }: { tool: MCPTool }) => {
   const required = new Set(tool.inputSchema.required ?? []);
   const properties = Object.entries(tool.inputSchema.properties ?? {});
 
   return (
-    <Card>
-      <Card.Content>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <h3 className="text-basis text-base font-medium">{tool.title ?? tool.name}</h3>
-          <InlineCode>{tool.name}</InlineCode>
-        </div>
-        {tool.description && <p className="text-basis mt-2 text-sm">{tool.description}</p>}
-        {properties.length > 0 && (
-          <ul className="mt-3 space-y-1.5 text-sm">
-            {properties.map(([name, schema]) => (
-              <li className="flex flex-wrap items-center gap-x-2 gap-y-1" key={name}>
-                <InlineCode>{name}</InlineCode>
-                <span className="text-muted">{toolType(schema)}</span>
-                {required.has(name) && <Pill appearance="outlined">required</Pill>}
-                {schema.description && <span className="text-muted">{schema.description}</span>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card.Content>
-    </Card>
+    <>
+      {tool.description && <p className="text-basis text-sm">{tool.description}</p>}
+      {properties.length > 0 && (
+        <ul className="mt-3 space-y-1.5 text-sm">
+          {properties.map(([name, schema]) => (
+            <li className="flex flex-wrap items-center gap-x-2 gap-y-1" key={name}>
+              <InlineCode>{name}</InlineCode>
+              <span className="text-muted">{toolType(schema)}</span>
+              {required.has(name) && <Pill appearance="outlined">required</Pill>}
+              {schema.description && <span className="text-muted">{schema.description}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 };
 
 const DevServerBestPractices = () => (
-  <section className="mb-10">
-    <h2 className="text-basis mb-4 text-lg font-medium">Best practices</h2>
-
-    <div className="mb-6">
-      <h3 className="text-basis mb-2 text-base font-medium">Function testing</h3>
-      <ul className="text-basis ml-6 list-disc space-y-1.5 text-sm">
-        <li>Test individual functions before testing a multi-function workflow.</li>
-        <li>Use clear event names and payloads so failures are easier to trace.</li>
-        <li>Inspect the run after each test and verify both step input and output.</li>
-        <li>Test expected failure paths as well as successful runs.</li>
-      </ul>
-    </div>
-
-    <div className="mb-6">
-      <h3 className="text-basis mb-2 text-base font-medium">Debugging workflows</h3>
-      <ul className="text-basis ml-6 list-disc space-y-1.5 text-sm">
-        <li>
-          Use <InlineCode>get_run</InlineCode> for run state and output.
-        </li>
-        <li>
-          Use <InlineCode>get_run_trace</InlineCode> to inspect step-by-step execution.
-        </li>
-        <li>Review the error message, stack trace, inputs, and outputs together.</li>
-      </ul>
-    </div>
-
-    <div>
-      <h3 className="text-basis mb-2 text-base font-medium">Documentation usage</h3>
-      <ul className="text-basis ml-6 list-disc space-y-1.5 text-sm">
-        <li>
-          Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
-        </li>
-        <li>
-          Use <InlineCode>read_doc</InlineCode> to read the complete source after finding a match.
-        </li>
-      </ul>
-    </div>
-  </section>
+  <div className="mb-10">
+    <h2 className="text-basis mb-3 text-lg font-medium">Best practices</h2>
+    <AccordionList type="multiple" defaultValue={[]}>
+      <AccordionList.Item value="function-testing">
+        <AccordionList.Trigger>
+          <span className="text-basis font-medium">Function testing</span>
+        </AccordionList.Trigger>
+        <AccordionList.Content>
+          <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
+            <li>Test individual functions before testing a multi-function workflow.</li>
+            <li>Use clear event names and payloads so failures are easier to trace.</li>
+            <li>Inspect the run after each test and verify both step input and output.</li>
+            <li>Test expected failure paths as well as successful runs.</li>
+          </ul>
+        </AccordionList.Content>
+      </AccordionList.Item>
+      <AccordionList.Item value="debugging-workflows">
+        <AccordionList.Trigger>
+          <span className="text-basis font-medium">Debugging workflows</span>
+        </AccordionList.Trigger>
+        <AccordionList.Content>
+          <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
+            <li>
+              Use <InlineCode>get_run</InlineCode> for run state and output.
+            </li>
+            <li>
+              Use <InlineCode>get_run_trace</InlineCode> to inspect step-by-step execution.
+            </li>
+            <li>Review the error message, stack trace, inputs, and outputs together.</li>
+          </ul>
+        </AccordionList.Content>
+      </AccordionList.Item>
+      <AccordionList.Item value="documentation-usage">
+        <AccordionList.Trigger>
+          <span className="text-basis font-medium">Documentation usage</span>
+        </AccordionList.Trigger>
+        <AccordionList.Content>
+          <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
+            <li>
+              Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
+            </li>
+            <li>
+              Use <InlineCode>read_doc</InlineCode> to read the complete source after finding a
+              match.
+            </li>
+          </ul>
+        </AccordionList.Content>
+      </AccordionList.Item>
+    </AccordionList>
+  </div>
 );
 
 const DevServerTroubleshooting = ({ endpoint }: { endpoint: string }) => (
-  <section className="mb-10">
+  <div className="mb-10">
     <h2 className="text-basis mb-3 text-lg font-medium">Troubleshooting</h2>
-    <div className="space-y-4">
-      <TroubleshootingItem title="MCP server not found">
-        <li>Restart the dev server if the endpoint is not responding.</li>
-        <li>
-          Confirm your client uses <InlineCode>{endpoint}</InlineCode>.
-        </li>
-        <li>Check that the client sends its API calls with the streamable HTTP transport.</li>
-      </TroubleshootingItem>
-      <TroubleshootingItem title="Functions not listed">
-        <li>Confirm your app has synced successfully with the dev server.</li>
-        <li>Check the dev-server logs for registration or connection errors.</li>
-        <li>Refresh the MCP tool call after the app finishes syncing.</li>
-      </TroubleshootingItem>
-      <TroubleshootingItem title="Run data is missing">
-        <li>Allow a moment for event and run data to be stored.</li>
-        <li>Confirm the run ID and function trigger match the test you sent.</li>
-      </TroubleshootingItem>
-    </div>
-  </section>
-);
-
-const TroubleshootingItem = ({ children, title }: { children: ReactNode; title: string }) => (
-  <Card>
-    <Card.Content>
-      <h3 className="text-basis mb-2 text-base font-medium">{title}</h3>
-      <ul className="text-basis ml-4 list-disc space-y-1 text-sm">{children}</ul>
-    </Card.Content>
-  </Card>
+    <AccordionList type="multiple" defaultValue={[]}>
+      <AccordionList.Item value="server-not-found">
+        <AccordionList.Trigger>
+          <span className="text-basis font-medium">MCP server not found</span>
+        </AccordionList.Trigger>
+        <AccordionList.Content>
+          <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
+            <li>Restart the dev server if the endpoint is not responding.</li>
+            <li>
+              Confirm your client uses <InlineCode>{endpoint}</InlineCode>.
+            </li>
+            <li>Check that the client sends its API calls with the streamable HTTP transport.</li>
+          </ul>
+        </AccordionList.Content>
+      </AccordionList.Item>
+      <AccordionList.Item value="functions-not-listed">
+        <AccordionList.Trigger>
+          <span className="text-basis font-medium">Functions not listed</span>
+        </AccordionList.Trigger>
+        <AccordionList.Content>
+          <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
+            <li>Confirm your app has synced successfully with the dev server.</li>
+            <li>Check the dev-server logs for registration or connection errors.</li>
+            <li>Refresh the MCP tool call after the app finishes syncing.</li>
+          </ul>
+        </AccordionList.Content>
+      </AccordionList.Item>
+      <AccordionList.Item value="run-data-missing">
+        <AccordionList.Trigger>
+          <span className="text-basis font-medium">Run data is missing</span>
+        </AccordionList.Trigger>
+        <AccordionList.Content>
+          <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
+            <li>Allow a moment for event and run data to be stored.</li>
+            <li>Confirm the run ID and function trigger match the test you sent.</li>
+          </ul>
+        </AccordionList.Content>
+      </AccordionList.Item>
+    </AccordionList>
+  </div>
 );
 
 const Resources = () => (
-  <section className="mb-10">
+  <div>
     <h2 className="text-basis mb-3 text-lg font-medium">Resources</h2>
     <div className="grid gap-4 md:grid-cols-2">
       {resources.map((resource) => (
@@ -662,5 +743,5 @@ const Resources = () => (
         </a>
       ))}
     </div>
-  </section>
+  </div>
 );
