@@ -783,16 +783,9 @@ const DevServerBestPractices = () => (
         tileClassName="bg-primary-3xSubtle"
         title="Function testing"
       >
-        <BestPracticeItem>
-          Test individual functions before testing a multi-function workflow.
-        </BestPracticeItem>
-        <BestPracticeItem>
-          Use clear event names and payloads so failures are easier to trace.
-        </BestPracticeItem>
-        <BestPracticeItem>
-          Inspect the run after each test and verify both step input and output.
-        </BestPracticeItem>
-        <BestPracticeItem>Test expected failure paths as well as successful runs.</BestPracticeItem>
+        <BestPracticeItem>Test functions individually before whole workflows.</BestPracticeItem>
+        <BestPracticeItem>Use clear event names and payloads.</BestPracticeItem>
+        <BestPracticeItem>Verify step input and output, including failure paths.</BestPracticeItem>
       </BestPracticeCard>
       <BestPracticeCard
         Icon={RiBugLine}
@@ -803,11 +796,9 @@ const DevServerBestPractices = () => (
           Use <InlineCode>get_run</InlineCode> for run state and output.
         </BestPracticeItem>
         <BestPracticeItem>
-          Use <InlineCode>get_run_trace</InlineCode> to inspect step-by-step execution.
+          Use <InlineCode>get_run_trace</InlineCode> for step-by-step execution.
         </BestPracticeItem>
-        <BestPracticeItem>
-          Review the error message, stack trace, inputs, and outputs together.
-        </BestPracticeItem>
+        <BestPracticeItem>Review errors with their inputs and outputs.</BestPracticeItem>
       </BestPracticeCard>
       <BestPracticeCard
         Icon={RiBookOpenLine}
@@ -815,10 +806,10 @@ const DevServerBestPractices = () => (
         title="Documentation usage"
       >
         <BestPracticeItem>
-          Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
+          Use <InlineCode>grep_docs</InlineCode> to find guides and examples.
         </BestPracticeItem>
         <BestPracticeItem>
-          Use <InlineCode>read_doc</InlineCode> to read the complete source after finding a match.
+          Use <InlineCode>read_doc</InlineCode> to read a match in full.
         </BestPracticeItem>
       </BestPracticeCard>
     </div>
