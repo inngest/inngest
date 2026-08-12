@@ -9,6 +9,7 @@ import {
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/Code';
 import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
 import { CodeLine } from '@inngest/components/CodeLine';
@@ -20,6 +21,7 @@ import { IconClaude } from '@inngest/components/icons/ai/Claude';
 import { IconCursor } from '@inngest/components/icons/ai/Cursor';
 import { IconOpenAI } from '@inngest/components/icons/ai/OpenAI';
 import { LINE_HEIGHT } from '@inngest/components/utils/monaco';
+import { RiBookOpenLine, RiBugLine, RiCheckLine, RiFlaskLine } from '@remixicon/react';
 import { ClientOnly } from '@tanstack/react-router';
 
 type JSONSchema = {
@@ -743,42 +745,82 @@ const MCPToolDetails = ({ tool }: { tool: MCPTool }) => {
   );
 };
 
+const BestPracticeCard = ({
+  children,
+  Icon,
+  tileClassName,
+  title,
+}: {
+  children: ReactNode;
+  Icon: ComponentType<{ className?: string }>;
+  tileClassName: string;
+  title: string;
+}) => (
+  <Card className="h-full">
+    <Card.Content className="h-full p-4">
+      <div className={`${tileClassName} w-fit rounded-sm p-[10px]`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="text-basis mb-2 mt-3 font-medium">{title}</p>
+      <ul className="space-y-1.5">{children}</ul>
+    </Card.Content>
+  </Card>
+);
+
+const BestPracticeItem = ({ children }: { children: ReactNode }) => (
+  <li className="text-muted flex gap-2 text-sm">
+    <RiCheckLine aria-hidden="true" className="text-primary-moderate mt-0.5 h-4 w-4 shrink-0" />
+    <span>{children}</span>
+  </li>
+);
+
 const DevServerBestPractices = () => (
   <div>
     <h2 className="text-basis mb-4 text-lg font-medium">Best practices</h2>
-    <div className="grid gap-6 md:grid-cols-3">
-      <div>
-        <h3 className="text-basis mb-2 text-sm font-medium">Function testing</h3>
-        <ul className="text-muted ml-4 list-disc space-y-1.5 text-sm">
-          <li>Test individual functions before testing a multi-function workflow.</li>
-          <li>Use clear event names and payloads so failures are easier to trace.</li>
-          <li>Inspect the run after each test and verify both step input and output.</li>
-          <li>Test expected failure paths as well as successful runs.</li>
-        </ul>
-      </div>
-      <div>
-        <h3 className="text-basis mb-2 text-sm font-medium">Debugging workflows</h3>
-        <ul className="text-muted ml-4 list-disc space-y-1.5 text-sm">
-          <li>
-            Use <InlineCode>get_run</InlineCode> for run state and output.
-          </li>
-          <li>
-            Use <InlineCode>get_run_trace</InlineCode> to inspect step-by-step execution.
-          </li>
-          <li>Review the error message, stack trace, inputs, and outputs together.</li>
-        </ul>
-      </div>
-      <div>
-        <h3 className="text-basis mb-2 text-sm font-medium">Documentation usage</h3>
-        <ul className="text-muted ml-4 list-disc space-y-1.5 text-sm">
-          <li>
-            Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
-          </li>
-          <li>
-            Use <InlineCode>read_doc</InlineCode> to read the complete source after finding a match.
-          </li>
-        </ul>
-      </div>
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <BestPracticeCard
+        Icon={RiFlaskLine}
+        tileClassName="bg-primary-3xSubtle"
+        title="Function testing"
+      >
+        <BestPracticeItem>
+          Test individual functions before testing a multi-function workflow.
+        </BestPracticeItem>
+        <BestPracticeItem>
+          Use clear event names and payloads so failures are easier to trace.
+        </BestPracticeItem>
+        <BestPracticeItem>
+          Inspect the run after each test and verify both step input and output.
+        </BestPracticeItem>
+        <BestPracticeItem>Test expected failure paths as well as successful runs.</BestPracticeItem>
+      </BestPracticeCard>
+      <BestPracticeCard
+        Icon={RiBugLine}
+        tileClassName="bg-tertiary-3xSubtle"
+        title="Debugging workflows"
+      >
+        <BestPracticeItem>
+          Use <InlineCode>get_run</InlineCode> for run state and output.
+        </BestPracticeItem>
+        <BestPracticeItem>
+          Use <InlineCode>get_run_trace</InlineCode> to inspect step-by-step execution.
+        </BestPracticeItem>
+        <BestPracticeItem>
+          Review the error message, stack trace, inputs, and outputs together.
+        </BestPracticeItem>
+      </BestPracticeCard>
+      <BestPracticeCard
+        Icon={RiBookOpenLine}
+        tileClassName="bg-quaternary-cool3xSubtle"
+        title="Documentation usage"
+      >
+        <BestPracticeItem>
+          Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
+        </BestPracticeItem>
+        <BestPracticeItem>
+          Use <InlineCode>read_doc</InlineCode> to read the complete source after finding a match.
+        </BestPracticeItem>
+      </BestPracticeCard>
     </div>
   </div>
 );
@@ -794,7 +836,9 @@ const Troubleshooting = ({
 }) => (
   <div>
     <h2 className="text-basis mb-3 text-lg font-medium">Troubleshooting</h2>
-    <AccordionList type="multiple" defaultValue={[]}>
+    {/* Borderless FAQ treatment (same as AppFAQ) so this section reads
+        differently from the boxed tool list above. */}
+    <AccordionList className="rounded-none border-0" type="multiple" defaultValue={[]}>
       <AccordionList.Item value="server-not-found">
         <AccordionList.Trigger>
           <span className="text-basis font-medium">MCP server not found</span>
