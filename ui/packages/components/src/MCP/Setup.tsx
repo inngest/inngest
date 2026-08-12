@@ -335,7 +335,7 @@ export const MCPSetup = ({
           </p>
         </header>
 
-        <section className="mb-10">
+        <section className="mb-12">
           <h2 className="text-basis mb-6 text-lg font-medium">Get started</h2>
 
           {bearerTokenEnvVar && (
@@ -391,7 +391,7 @@ export const MCPSetup = ({
           </Step>
         </section>
 
-        <section className="border-subtle mb-10 border-t pt-8">
+        <section className="mb-12">
           <h2 className="text-basis mb-3 text-lg font-medium">Available MCP tools</h2>
           {isDevServer && (
             <Alert className="mb-6" severity="warning">
@@ -415,12 +415,12 @@ export const MCPSetup = ({
         </section>
 
         {isDevServer && (
-          <section className="border-subtle mb-10 border-t pt-8">
+          <section className="mb-12">
             <DevServerBestPractices />
           </section>
         )}
 
-        <section className="border-subtle mb-10 border-t pt-8">
+        <section className="mb-12">
           <Troubleshooting
             bearerTokenEnvVar={bearerTokenEnvVar}
             endpoint={endpoint}
@@ -602,8 +602,10 @@ const matchesToolSearch = (tool: MCPTool, query: string) => {
 
 // Tool names follow a verb_resource convention (list_functions, get_run_trace,
 // send_event), so the resource token gives the list its shape without any
-// backend support. Order matters: runs before functions so get_function_run
-// style names group under Runs. Unknown names land in Other.
+// backend support. Definition order is MATCH priority, not display order:
+// the more specific resource wins when a name contains two (sandbox before
+// env, webhook before event, run before function). Unknown names land in
+// Other.
 const toolGroupDefs: Array<{ label: string; tokens: string[] }> = [
   { label: 'Sandboxes', tokens: ['sandbox', 'sandboxes'] },
   { label: 'Environments', tokens: ['env', 'envs', 'environment', 'environments'] },
@@ -613,6 +615,19 @@ const toolGroupDefs: Array<{ label: string; tokens: string[] }> = [
   { label: 'Webhooks', tokens: ['webhook', 'webhooks'] },
   { label: 'Events', tokens: ['event', 'events'] },
   { label: 'Docs', tokens: ['doc', 'docs'] },
+];
+
+// Display order, most-used resources first.
+const toolGroupDisplayOrder = [
+  'Apps',
+  'Runs',
+  'Functions',
+  'Environments',
+  'Events',
+  'Webhooks',
+  'Sandboxes',
+  'Docs',
+  'Other',
 ];
 
 const toolGroup = (tool: MCPTool): string => {
@@ -625,12 +640,10 @@ const toolGroup = (tool: MCPTool): string => {
   return 'Other';
 };
 
-const groupTools = (tools: MCPTool[]) => {
-  const order = [...toolGroupDefs.map((group) => group.label), 'Other'];
-  return order
+const groupTools = (tools: MCPTool[]) =>
+  toolGroupDisplayOrder
     .map((label) => ({ label, tools: tools.filter((tool) => toolGroup(tool) === label) }))
     .filter((group) => group.tools.length > 0);
-};
 
 const MCPToolList = ({
   error,
