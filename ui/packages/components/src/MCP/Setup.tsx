@@ -9,7 +9,6 @@ import {
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/Code';
 import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
 import { CodeLine } from '@inngest/components/CodeLine';
@@ -83,45 +82,6 @@ const cloudExamples = [
   'List my Inngest environments',
   'List my registered Inngest functions and their triggers',
   'Inspect a failed function run and explain the error',
-];
-
-const resources: Array<{
-  description: string;
-  devServerOnly?: boolean;
-  href: string;
-  title: string;
-}> = [
-  {
-    description: 'MCP transports, tools, and clients.',
-    href: 'https://modelcontextprotocol.io/introduction',
-    title: 'Model Context Protocol',
-  },
-  {
-    description: 'Run and configure Inngest locally.',
-    devServerOnly: true,
-    href: 'https://www.inngest.com/docs/dev-server',
-    title: 'Inngest Dev Server',
-  },
-  {
-    description: 'Patterns for durable AI agents and retrieval.',
-    href: 'https://www.inngest.com/docs/examples/ai-agents-and-rag',
-    title: 'AI Agents and RAG Examples',
-  },
-  {
-    description: 'How tools and context fit into AI applications.',
-    href: 'https://www.inngest.com/blog/context-engineering-is-software-engineering-for-llms',
-    title: 'Context Engineering',
-  },
-  {
-    description: 'MCP servers for Codex CLI and ChatGPT Desktop.',
-    href: 'https://learn.chatgpt.com/docs/extend/mcp',
-    title: 'Codex MCP Setup',
-  },
-  {
-    description: 'Local and remote MCP connections in Claude.',
-    href: 'https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp',
-    title: 'Claude Desktop Connectors',
-  },
 ];
 
 const toolType = (schema: JSONSchemaProperty) => {
@@ -452,14 +412,18 @@ export const MCPSetup = ({
           <MCPToolList error={error} loading={loading} retry={retry} tools={tools} />
         </section>
 
+        {isDevServer && (
+          <section className="border-subtle mb-10 border-t pt-8">
+            <DevServerBestPractices />
+          </section>
+        )}
+
         <section className="border-subtle mb-10 border-t pt-8">
-          {isDevServer && <DevServerBestPractices />}
           <Troubleshooting
             bearerTokenEnvVar={bearerTokenEnvVar}
             endpoint={endpoint}
             isDevServer={isDevServer}
           />
-          <Resources isDevServer={isDevServer} />
         </section>
       </div>
     </div>
@@ -672,21 +636,13 @@ const MCPToolList = ({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted flex items-center gap-2 text-sm">
-          <span aria-hidden="true" className="bg-primary-moderate h-2 w-2 rounded-full" />
-          {search
-            ? `${visibleTools.length} of ${tools.length} tools`
-            : `${tools.length} ${tools.length === 1 ? 'tool' : 'tools'} available`}
-        </p>
-        <Search
-          className="w-[182px]"
-          name="search"
-          onUpdate={setSearch}
-          placeholder="Search tools"
-          value={search}
-        />
-      </div>
+      <Search
+        className="w-[182px]"
+        name="search"
+        onUpdate={setSearch}
+        placeholder="Search tools"
+        value={search}
+      />
       {visibleTools.length === 0 ? (
         <p className="text-muted py-4 text-sm">
           No tools match <span className="text-basis">{search}</span>.
@@ -744,55 +700,42 @@ const MCPToolDetails = ({ tool }: { tool: MCPTool }) => {
 };
 
 const DevServerBestPractices = () => (
-  <div className="mb-10">
-    <h2 className="text-basis mb-3 text-lg font-medium">Best practices</h2>
-    <AccordionList type="multiple" defaultValue={[]}>
-      <AccordionList.Item value="function-testing">
-        <AccordionList.Trigger>
-          <span className="text-basis font-medium">Function testing</span>
-        </AccordionList.Trigger>
-        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
-          <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
-            <li>Test individual functions before testing a multi-function workflow.</li>
-            <li>Use clear event names and payloads so failures are easier to trace.</li>
-            <li>Inspect the run after each test and verify both step input and output.</li>
-            <li>Test expected failure paths as well as successful runs.</li>
-          </ul>
-        </AccordionList.Content>
-      </AccordionList.Item>
-      <AccordionList.Item value="debugging-workflows">
-        <AccordionList.Trigger>
-          <span className="text-basis font-medium">Debugging workflows</span>
-        </AccordionList.Trigger>
-        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
-          <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
-            <li>
-              Use <InlineCode>get_run</InlineCode> for run state and output.
-            </li>
-            <li>
-              Use <InlineCode>get_run_trace</InlineCode> to inspect step-by-step execution.
-            </li>
-            <li>Review the error message, stack trace, inputs, and outputs together.</li>
-          </ul>
-        </AccordionList.Content>
-      </AccordionList.Item>
-      <AccordionList.Item value="documentation-usage">
-        <AccordionList.Trigger>
-          <span className="text-basis font-medium">Documentation usage</span>
-        </AccordionList.Trigger>
-        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
-          <ul className="text-basis ml-4 list-disc space-y-1.5 text-sm">
-            <li>
-              Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
-            </li>
-            <li>
-              Use <InlineCode>read_doc</InlineCode> to read the complete source after finding a
-              match.
-            </li>
-          </ul>
-        </AccordionList.Content>
-      </AccordionList.Item>
-    </AccordionList>
+  <div>
+    <h2 className="text-basis mb-4 text-lg font-medium">Best practices</h2>
+    <div className="grid gap-6 md:grid-cols-3">
+      <div>
+        <h3 className="text-basis mb-2 text-sm font-medium">Function testing</h3>
+        <ul className="text-muted ml-4 list-disc space-y-1.5 text-sm">
+          <li>Test individual functions before testing a multi-function workflow.</li>
+          <li>Use clear event names and payloads so failures are easier to trace.</li>
+          <li>Inspect the run after each test and verify both step input and output.</li>
+          <li>Test expected failure paths as well as successful runs.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 className="text-basis mb-2 text-sm font-medium">Debugging workflows</h3>
+        <ul className="text-muted ml-4 list-disc space-y-1.5 text-sm">
+          <li>
+            Use <InlineCode>get_run</InlineCode> for run state and output.
+          </li>
+          <li>
+            Use <InlineCode>get_run_trace</InlineCode> to inspect step-by-step execution.
+          </li>
+          <li>Review the error message, stack trace, inputs, and outputs together.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 className="text-basis mb-2 text-sm font-medium">Documentation usage</h3>
+        <ul className="text-muted ml-4 list-disc space-y-1.5 text-sm">
+          <li>
+            Use <InlineCode>grep_docs</InlineCode> to find relevant guides and examples.
+          </li>
+          <li>
+            Use <InlineCode>read_doc</InlineCode> to read the complete source after finding a match.
+          </li>
+        </ul>
+      </div>
+    </div>
   </div>
 );
 
@@ -805,7 +748,7 @@ const Troubleshooting = ({
   endpoint: string;
   isDevServer: boolean;
 }) => (
-  <div className="mb-10">
+  <div>
     <h2 className="text-basis mb-3 text-lg font-medium">Troubleshooting</h2>
     <AccordionList type="multiple" defaultValue={[]}>
       <AccordionList.Item value="server-not-found">
@@ -878,34 +821,5 @@ const Troubleshooting = ({
         </AccordionList.Item>
       )}
     </AccordionList>
-  </div>
-);
-
-const Resources = ({ isDevServer }: { isDevServer: boolean }) => (
-  <div>
-    <h2 className="text-basis mb-3 text-lg font-medium">Resources</h2>
-    <div className="grid gap-4 md:grid-cols-2">
-      {resources
-        .filter((resource) => isDevServer || !resource.devServerOnly)
-        .map((resource) => (
-          <a
-            className="group block"
-            href={resource.href}
-            key={resource.href}
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            <Card
-              className="h-full"
-              contentClassName="group-hover:border-muted h-full transition-colors"
-            >
-              <Card.Content className="group-hover:bg-canvasSubtle h-full transition-colors">
-                <h3 className="text-basis mb-1 truncate text-sm font-medium">{resource.title}</h3>
-                <p className="text-muted truncate text-sm">{resource.description}</p>
-              </Card.Content>
-            </Card>
-          </a>
-        ))}
-    </div>
   </div>
 );
