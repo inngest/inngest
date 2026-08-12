@@ -446,7 +446,7 @@ const Step = ({
       <div className="border-subtle bg-canvasBase text-basis flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-medium">
         {number}
       </div>
-      {!isLast && <div className="border-subtle my-1 w-px flex-1 border-l" />}
+      <div className="border-subtle my-1 w-px flex-1 border-l" />
     </div>
     <div className={`min-w-0 flex-1 ${isLast ? '' : 'pb-8'}`}>
       <h3 className="text-basis mb-2 text-base font-medium leading-7">{title}</h3>
@@ -603,10 +603,12 @@ const matchesToolSearch = (tool: MCPTool, query: string) => {
 // backend support. Order matters: runs before functions so get_function_run
 // style names group under Runs. Unknown names land in Other.
 const toolGroupDefs: Array<{ label: string; tokens: string[] }> = [
+  { label: 'Sandboxes', tokens: ['sandbox', 'sandboxes'] },
   { label: 'Environments', tokens: ['env', 'envs', 'environment', 'environments'] },
   { label: 'Apps', tokens: ['app', 'apps'] },
   { label: 'Runs', tokens: ['run', 'runs'] },
   { label: 'Functions', tokens: ['function', 'functions'] },
+  { label: 'Webhooks', tokens: ['webhook', 'webhooks'] },
   { label: 'Events', tokens: ['event', 'events'] },
   { label: 'Docs', tokens: ['doc', 'docs'] },
 ];
