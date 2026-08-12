@@ -598,6 +598,36 @@ const matchesToolSearch = (tool: MCPTool, query: string) => {
   );
 };
 
+// Tool names follow a verb_resource convention (list_functions, get_run_trace,
+// send_event), so the resource token gives the list its shape without any
+// backend support. Order matters: runs before functions so get_function_run
+// style names group under Runs. Unknown names land in Other.
+const toolGroupDefs: Array<{ label: string; tokens: string[] }> = [
+  { label: 'Environments', tokens: ['env', 'envs', 'environment', 'environments'] },
+  { label: 'Apps', tokens: ['app', 'apps'] },
+  { label: 'Runs', tokens: ['run', 'runs'] },
+  { label: 'Functions', tokens: ['function', 'functions'] },
+  { label: 'Events', tokens: ['event', 'events'] },
+  { label: 'Docs', tokens: ['doc', 'docs'] },
+];
+
+const toolGroup = (tool: MCPTool): string => {
+  const tokens = tool.name.toLowerCase().split(/[^a-z0-9]+/);
+  for (const group of toolGroupDefs) {
+    if (group.tokens.some((token) => tokens.includes(token))) {
+      return group.label;
+    }
+  }
+  return 'Other';
+};
+
+const groupTools = (tools: MCPTool[]) => {
+  const order = [...toolGroupDefs.map((group) => group.label), 'Other'];
+  return order
+    .map((label) => ({ label, tools: tools.filter((tool) => toolGroup(tool) === label) }))
+    .filter((group) => group.tools.length > 0);
+};
+
 const MCPToolList = ({
   error,
   loading,
@@ -633,9 +663,10 @@ const MCPToolList = ({
   }
 
   const visibleTools = tools.filter((tool) => matchesToolSearch(tool, search));
+  const groups = groupTools(visibleTools);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <Search
         className="w-[182px]"
         name="search"
@@ -643,7 +674,7 @@ const MCPToolList = ({
         placeholder="Search tools"
         value={search}
       />
-      {visibleTools.length === 0 ? (
+      {groups.length === 0 ? (
         <p className="text-muted py-4 text-sm">
           No tools match <span className="text-basis">{search}</span>.
         </p>
@@ -651,26 +682,37 @@ const MCPToolList = ({
         /* Accordion content on this page uses forceMount + CSS hiding so the
            full text stays in the DOM: agents and scrapers reading the page get
            everything without having to expand each row. */
-        <AccordionList type="multiple" defaultValue={[]}>
-          {visibleTools.map((tool) => (
-            <AccordionList.Item key={tool.name} value={tool.name}>
-              <AccordionList.Trigger>
-                <div className="flex min-w-0 flex-1 items-baseline gap-x-2 overflow-hidden text-left">
-                  <span className="text-basis shrink-0 font-medium">{tool.title ?? tool.name}</span>
-                  <InlineCode>{tool.name}</InlineCode>
-                  {tool.description && (
-                    <span className="text-muted min-w-0 truncate font-normal group-data-[state=open]:hidden">
-                      {tool.description}
-                    </span>
-                  )}
-                </div>
-              </AccordionList.Trigger>
-              <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
-                <MCPToolDetails tool={tool} />
-              </AccordionList.Content>
-            </AccordionList.Item>
-          ))}
-        </AccordionList>
+        groups.map((group) => (
+          <div key={group.label}>
+            {!(groups.length === 1 && group.label === 'Other') && (
+              <h3 className="text-muted mb-2 text-xs font-medium uppercase tracking-wide">
+                {group.label}
+              </h3>
+            )}
+            <AccordionList type="multiple" defaultValue={[]}>
+              {group.tools.map((tool) => (
+                <AccordionList.Item key={tool.name} value={tool.name}>
+                  <AccordionList.Trigger>
+                    <div className="flex min-w-0 flex-1 items-baseline gap-x-2 overflow-hidden text-left">
+                      <span className="text-basis shrink-0 font-medium">
+                        {tool.title ?? tool.name}
+                      </span>
+                      <InlineCode>{tool.name}</InlineCode>
+                      {tool.description && (
+                        <span className="text-muted min-w-0 truncate font-normal group-data-[state=open]:hidden">
+                          {tool.description}
+                        </span>
+                      )}
+                    </div>
+                  </AccordionList.Trigger>
+                  <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
+                    <MCPToolDetails tool={tool} />
+                  </AccordionList.Content>
+                </AccordionList.Item>
+              ))}
+            </AccordionList>
+          </div>
+        ))
       )}
     </div>
   );
