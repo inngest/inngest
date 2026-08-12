@@ -236,6 +236,12 @@ const useMCPTools = (
       controller.signal.addEventListener('abort', fail, { once: true });
     });
 
+    // Which stage was in flight when the watchdog fired, so the timeout
+    // message names the actual culprit: a hung auth-session fetch (for
+    // example Clerk on a domain it is not registered for) never contacts
+    // the endpoint at all.
+    let stage: 'auth' | 'endpoint' = 'auth';
+
     const load = async () => {
       setLoading(true);
       setError(undefined);
@@ -244,6 +250,7 @@ const useMCPTools = (
           getAccessTokenRef.current?.() ?? null,
           abortSignal,
         ]);
+        stage = 'endpoint';
         requestHeaders = accessToken
           ? { ...headers, Authorization: `Bearer ${accessToken}` }
           : headers;
@@ -294,9 +301,15 @@ const useMCPTools = (
         if (!unmounted) {
           setError(
             controller.signal.aborted
-              ? `The MCP endpoint did not respond within ${
-                  toolsFetchTimeoutMs / 1000
-                } seconds. Check that ${endpoint} is reachable from this page.`
+              ? stage === 'auth'
+                ? `Timed out waiting for an auth session after ${
+                    toolsFetchTimeoutMs / 1000
+                  } seconds. The MCP endpoint was never contacted. This usually means this page's domain is not registered with the auth provider (common on preview deployments).`
+                : `The MCP endpoint did not respond within ${
+                    toolsFetchTimeoutMs / 1000
+                  } seconds. Check that ${endpoint} is reachable from this page.`
+              : error instanceof TypeError
+              ? `Could not connect to ${endpoint}. Check that the server is running and reachable from this page.`
               : error instanceof Error
               ? error.message
               : 'Unable to list MCP tools'
