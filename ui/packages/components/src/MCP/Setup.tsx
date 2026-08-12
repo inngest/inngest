@@ -640,10 +640,21 @@ const toolGroup = (tool: MCPTool): string => {
   return 'Other';
 };
 
-const groupTools = (tools: MCPTool[]) =>
-  toolGroupDisplayOrder
+const groupTools = (tools: MCPTool[]) => {
+  // A group defined for matching but missing from the display order must not
+  // hide its tools: slot any such group in before Other.
+  const missing = toolGroupDefs
+    .map((group) => group.label)
+    .filter((label) => !toolGroupDisplayOrder.includes(label));
+  const order = [
+    ...toolGroupDisplayOrder.filter((label) => label !== 'Other'),
+    ...missing,
+    'Other',
+  ];
+  return order
     .map((label) => ({ label, tools: tools.filter((tool) => toolGroup(tool) === label) }))
     .filter((group) => group.tools.length > 0);
+};
 
 const MCPToolList = ({
   error,
