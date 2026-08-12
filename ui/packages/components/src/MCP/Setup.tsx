@@ -21,6 +21,7 @@ import { IconClaude } from '@inngest/components/icons/ai/Claude';
 import { IconCursor } from '@inngest/components/icons/ai/Cursor';
 import { IconOpenAI } from '@inngest/components/icons/ai/OpenAI';
 import { LINE_HEIGHT } from '@inngest/components/utils/monaco';
+import { RiExternalLinkLine } from '@remixicon/react';
 import { ClientOnly } from '@tanstack/react-router';
 
 type JSONSchema = {
@@ -85,7 +86,12 @@ const cloudExamples = [
   'Inspect a failed function run and explain the error',
 ];
 
-const resources = [
+const resources: Array<{
+  description: string;
+  devServerOnly?: boolean;
+  href: string;
+  title: string;
+}> = [
   {
     description: 'Learn about MCP transports, tools, and client capabilities.',
     href: 'https://modelcontextprotocol.io/introduction',
@@ -93,6 +99,7 @@ const resources = [
   },
   {
     description: 'Learn how to run and configure Inngest locally.',
+    devServerOnly: true,
     href: 'https://www.inngest.com/docs/dev-server',
     title: 'Inngest Dev Server',
   },
@@ -447,13 +454,15 @@ export const MCPSetup = ({
           <MCPToolList error={error} loading={loading} retry={retry} tools={tools} />
         </section>
 
-        {isDevServer && (
-          <section className="border-subtle mb-10 border-t pt-8">
-            <DevServerBestPractices />
-            <DevServerTroubleshooting endpoint={endpoint} />
-            <Resources />
-          </section>
-        )}
+        <section className="border-subtle mb-10 border-t pt-8">
+          {isDevServer && <DevServerBestPractices />}
+          <Troubleshooting
+            bearerTokenEnvVar={bearerTokenEnvVar}
+            endpoint={endpoint}
+            isDevServer={isDevServer}
+          />
+          <Resources isDevServer={isDevServer} />
+        </section>
       </div>
     </div>
   );
@@ -666,7 +675,8 @@ const MCPToolList = ({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted text-sm">
+        <p className="text-muted flex items-center gap-2 text-sm">
+          <span aria-hidden="true" className="bg-primary-moderate h-2 w-2 rounded-full" />
           {search
             ? `${visibleTools.length} of ${tools.length} tools`
             : `${tools.length} ${tools.length === 1 ? 'tool' : 'tools'} available`}
@@ -691,9 +701,14 @@ const MCPToolList = ({
           {visibleTools.map((tool) => (
             <AccordionList.Item key={tool.name} value={tool.name}>
               <AccordionList.Trigger>
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-left">
-                  <span className="text-basis font-medium">{tool.title ?? tool.name}</span>
+                <div className="flex min-w-0 flex-1 items-baseline gap-x-2 overflow-hidden text-left">
+                  <span className="text-basis shrink-0 font-medium">{tool.title ?? tool.name}</span>
                   <InlineCode>{tool.name}</InlineCode>
+                  {tool.description && (
+                    <span className="text-muted min-w-0 truncate font-normal group-data-[state=open]:hidden">
+                      {tool.description}
+                    </span>
+                  )}
                 </div>
               </AccordionList.Trigger>
               <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
@@ -783,7 +798,15 @@ const DevServerBestPractices = () => (
   </div>
 );
 
-const DevServerTroubleshooting = ({ endpoint }: { endpoint: string }) => (
+const Troubleshooting = ({
+  bearerTokenEnvVar,
+  endpoint,
+  isDevServer,
+}: {
+  bearerTokenEnvVar?: string;
+  endpoint: string;
+  isDevServer: boolean;
+}) => (
   <div className="mb-10">
     <h2 className="text-basis mb-3 text-lg font-medium">Troubleshooting</h2>
     <AccordionList type="multiple" defaultValue={[]}>
@@ -793,64 +816,101 @@ const DevServerTroubleshooting = ({ endpoint }: { endpoint: string }) => (
         </AccordionList.Trigger>
         <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
           <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
-            <li>Restart the dev server if the endpoint is not responding.</li>
+            {isDevServer && <li>Restart the dev server if the endpoint is not responding.</li>}
             <li>
               Confirm your client uses <InlineCode>{endpoint}</InlineCode>.
             </li>
             <li>Check that the client sends its API calls with the streamable HTTP transport.</li>
+            <li>Restart the client after adding or changing the server configuration.</li>
           </ul>
         </AccordionList.Content>
       </AccordionList.Item>
+      {!isDevServer && bearerTokenEnvVar && (
+        <AccordionList.Item value="unauthorized">
+          <AccordionList.Trigger>
+            <span className="text-basis font-medium">Requests fail with HTTP 401</span>
+          </AccordionList.Trigger>
+          <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
+            <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
+              <li>
+                Confirm <InlineCode>{bearerTokenEnvVar}</InlineCode> is exported in the shell your
+                client runs from, then restart the client.
+              </li>
+              <li>Check that the API key has not been deleted or expired.</li>
+              <li>Terminal-based clients do not see keys exported in another terminal window.</li>
+            </ul>
+          </AccordionList.Content>
+        </AccordionList.Item>
+      )}
       <AccordionList.Item value="functions-not-listed">
         <AccordionList.Trigger>
           <span className="text-basis font-medium">Functions not listed</span>
         </AccordionList.Trigger>
         <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
           <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
-            <li>Confirm your app has synced successfully with the dev server.</li>
-            <li>Check the dev-server logs for registration or connection errors.</li>
-            <li>Refresh the MCP tool call after the app finishes syncing.</li>
+            {isDevServer ? (
+              <>
+                <li>Confirm your app has synced successfully with the dev server.</li>
+                <li>Check the dev-server logs for registration or connection errors.</li>
+                <li>Refresh the MCP tool call after the app finishes syncing.</li>
+              </>
+            ) : (
+              <>
+                <li>Confirm your app has synced successfully in this environment.</li>
+                <li>
+                  <InlineCode>list_functions</InlineCode> requires an <InlineCode>appId</InlineCode>
+                  ; list apps first to find it.
+                </li>
+              </>
+            )}
           </ul>
         </AccordionList.Content>
       </AccordionList.Item>
-      <AccordionList.Item value="run-data-missing">
-        <AccordionList.Trigger>
-          <span className="text-basis font-medium">Run data is missing</span>
-        </AccordionList.Trigger>
-        <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
-          <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
-            <li>Allow a moment for event and run data to be stored.</li>
-            <li>Confirm the run ID and function trigger match the test you sent.</li>
-          </ul>
-        </AccordionList.Content>
-      </AccordionList.Item>
+      {isDevServer && (
+        <AccordionList.Item value="run-data-missing">
+          <AccordionList.Trigger>
+            <span className="text-basis font-medium">Run data is missing</span>
+          </AccordionList.Trigger>
+          <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
+            <ul className="text-basis ml-4 list-disc space-y-1 text-sm">
+              <li>Allow a moment for event and run data to be stored.</li>
+              <li>Confirm the run ID and function trigger match the test you sent.</li>
+            </ul>
+          </AccordionList.Content>
+        </AccordionList.Item>
+      )}
     </AccordionList>
   </div>
 );
 
-const Resources = () => (
+const Resources = ({ isDevServer }: { isDevServer: boolean }) => (
   <div>
     <h2 className="text-basis mb-3 text-lg font-medium">Resources</h2>
     <div className="grid gap-4 md:grid-cols-2">
-      {resources.map((resource) => (
-        <a
-          className="block"
-          href={resource.href}
-          key={resource.href}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <Card
-            className="h-full"
-            contentClassName="hover:border-emphasis h-full transition-colors"
+      {resources
+        .filter((resource) => isDevServer || !resource.devServerOnly)
+        .map((resource) => (
+          <a
+            className="block"
+            href={resource.href}
+            key={resource.href}
+            rel="noopener noreferrer"
+            target="_blank"
           >
-            <Card.Content>
-              <h3 className="text-basis mb-1 text-sm font-medium">{resource.title}</h3>
-              <p className="text-muted text-sm">{resource.description}</p>
-            </Card.Content>
-          </Card>
-        </a>
-      ))}
+            <Card
+              className="h-full"
+              contentClassName="hover:border-emphasis h-full transition-colors"
+            >
+              <Card.Content>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <h3 className="text-basis text-sm font-medium">{resource.title}</h3>
+                  <RiExternalLinkLine className="text-muted h-4 w-4 shrink-0" />
+                </div>
+                <p className="text-muted text-sm">{resource.description}</p>
+              </Card.Content>
+            </Card>
+          </a>
+        ))}
     </div>
   </div>
 );
