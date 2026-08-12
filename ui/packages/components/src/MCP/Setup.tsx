@@ -6,6 +6,7 @@ import { Card } from '@inngest/components/Card';
 import { InlineCode } from '@inngest/components/Code';
 import CommandBlock, { type TabsProps } from '@inngest/components/CodeBlock/CommandBlock';
 import { CodeLine } from '@inngest/components/CodeLine';
+import { Search } from '@inngest/components/Forms/Search';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import TabCards from '@inngest/components/TabCards/TabCards';
@@ -361,15 +362,15 @@ export const MCPSetup = ({
                 </a>{' '}
                 to learn more.
               </p>
-              {apiKeysHref && (
-                <div className="mb-3">
-                  <Button href={apiKeysHref} kind="primary" label="Create API key" />
-                </div>
-              )}
               <CodeLine
                 className={mutedCopyButton}
                 code={`export ${bearerTokenEnvVar}=<your-api-key>`}
               />
+              {apiKeysHref && (
+                <div className="mt-3">
+                  <Button href={apiKeysHref} kind="primary" label="Create API key" />
+                </div>
+              )}
             </Step>
           )}
 
@@ -591,6 +592,16 @@ const ClientNotes = ({
   return null;
 };
 
+const matchesToolSearch = (tool: MCPTool, query: string) => {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return true;
+  }
+  return [tool.name, tool.title, tool.description].some((field) =>
+    field?.toLowerCase().includes(q)
+  );
+};
+
 const MCPToolList = ({
   error,
   loading,
@@ -600,6 +611,8 @@ const MCPToolList = ({
   loading: boolean;
   tools: MCPTool[];
 }) => {
+  const [search, setSearch] = useState('');
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -618,29 +631,48 @@ const MCPToolList = ({
     );
   }
 
+  const visibleTools = tools.filter((tool) => matchesToolSearch(tool, search));
+
   return (
     <div className="space-y-3">
-      <p className="text-muted text-sm">
-        {tools.length} {tools.length === 1 ? 'tool' : 'tools'} available
-      </p>
-      {/* Accordion content on this page uses forceMount + CSS hiding so the
-          full text stays in the DOM: agents and scrapers reading the page get
-          everything without having to expand each row. */}
-      <AccordionList type="multiple" defaultValue={[]}>
-        {tools.map((tool) => (
-          <AccordionList.Item key={tool.name} value={tool.name}>
-            <AccordionList.Trigger>
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-left">
-                <span className="text-basis font-medium">{tool.title ?? tool.name}</span>
-                <InlineCode>{tool.name}</InlineCode>
-              </div>
-            </AccordionList.Trigger>
-            <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
-              <MCPToolDetails tool={tool} />
-            </AccordionList.Content>
-          </AccordionList.Item>
-        ))}
-      </AccordionList>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-muted text-sm">
+          {search
+            ? `${visibleTools.length} of ${tools.length} tools`
+            : `${tools.length} ${tools.length === 1 ? 'tool' : 'tools'} available`}
+        </p>
+        <Search
+          className="w-[182px]"
+          name="search"
+          onUpdate={setSearch}
+          placeholder="Search tools"
+          value={search}
+        />
+      </div>
+      {visibleTools.length === 0 ? (
+        <p className="text-muted py-4 text-sm">
+          No tools match <span className="text-basis">{search}</span>.
+        </p>
+      ) : (
+        /* Accordion content on this page uses forceMount + CSS hiding so the
+           full text stays in the DOM: agents and scrapers reading the page get
+           everything without having to expand each row. */
+        <AccordionList type="multiple" defaultValue={[]}>
+          {visibleTools.map((tool) => (
+            <AccordionList.Item key={tool.name} value={tool.name}>
+              <AccordionList.Trigger>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-left">
+                  <span className="text-basis font-medium">{tool.title ?? tool.name}</span>
+                  <InlineCode>{tool.name}</InlineCode>
+                </div>
+              </AccordionList.Trigger>
+              <AccordionList.Content className="data-[state=closed]:hidden" forceMount>
+                <MCPToolDetails tool={tool} />
+              </AccordionList.Content>
+            </AccordionList.Item>
+          ))}
+        </AccordionList>
+      )}
     </div>
   );
 };
