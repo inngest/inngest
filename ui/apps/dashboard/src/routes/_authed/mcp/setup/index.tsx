@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/tanstack-react-start';
 import { createFileRoute } from '@tanstack/react-router';
 
 const MCPSetupPage = () => {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded } = useAuth();
 
   return (
     <div className="flex h-full flex-col">
@@ -15,6 +15,7 @@ const MCPSetupPage = () => {
           bearerTokenEnvVar="INNGEST_API_KEY"
           endpoint={new URL('/mcp', import.meta.env.VITE_API_URL).toString()}
           getAccessToken={getToken}
+          isAuthReady={isLoaded}
         />
       </div>
     </div>

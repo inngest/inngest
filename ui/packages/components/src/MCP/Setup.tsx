@@ -51,6 +51,14 @@ type MCPSetupProps = {
   getAccessToken?: () => Promise<string | null>;
   headers?: Record<string, string>;
   isDevServer?: boolean;
+  /**
+   * Whether the auth provider backing getAccessToken has finished loading.
+   * Defaults to true (no auth provider to wait on, e.g. the dev server).
+   * Callers with an async auth provider (Clerk, etc.) should pass their
+   * "isLoaded" state so the tools fetch doesn't call getAccessToken before
+   * the provider is ready to answer it.
+   */
+  isAuthReady?: boolean;
 };
 
 type MCPRequest = {
@@ -172,17 +180,30 @@ const mutedCopyButton = '[&_button]:text-muted [&_button:hover]:text-basis';
 const useMCPTools = (
   endpoint: string,
   headers: Record<string, string>,
-  getAccessToken?: () => Promise<string | null>
+  getAccessToken?: () => Promise<string | null>,
+  isAuthReady = true
 ) => {
   const [tools, setTools] = useState<MCPTool[]>([]);
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const getAccessTokenRef = useRef(getAccessToken);
+  const isAuthReadyRef = useRef(isAuthReady);
+  // Resolved by the isAuthReady effect below the first time the auth
+  // provider reports ready; read by any in-flight load() via the ref.
+  const authReadyListenersRef = useRef(new Set<() => void>());
 
   useEffect(() => {
     getAccessTokenRef.current = getAccessToken;
   }, [getAccessToken]);
+
+  useEffect(() => {
+    isAuthReadyRef.current = isAuthReady;
+    if (isAuthReady) {
+      authReadyListenersRef.current.forEach((notify) => notify());
+      authReadyListenersRef.current.clear();
+    }
+  }, [isAuthReady]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -204,19 +225,46 @@ const useMCPTools = (
     });
 
     // Which stage was in flight when the watchdog fired, so the timeout
-    // message names the actual culprit: a hung auth-session fetch (for
-    // example Clerk on a domain it is not registered for) never contacts
-    // the endpoint at all.
+    // message names the actual culprit: the auth provider never finishing
+    // initialization, or a hung auth-session fetch (for example Clerk on a
+    // domain it is not registered for) that never contacts the endpoint at
+    // all.
     let stage: 'auth' | 'endpoint' = 'auth';
+
+    // getAccessToken can queue internally until its auth provider finishes
+    // loading (e.g. Clerk before Clerk.load() resolves), so wait for the
+    // caller's isAuthReady flag before calling it at all — otherwise the
+    // call races the provider's own startup instead of depending on it.
+    const waitForAuthReady = () =>
+      new Promise<void>((resolve) => {
+        if (isAuthReadyRef.current) {
+          resolve();
+          return;
+        }
+        authReadyListenersRef.current.add(resolve);
+      });
+
+    const fetchAccessToken = async () => {
+      await Promise.race([waitForAuthReady(), abortSignal]);
+      return Promise.race([
+        Promise.resolve(getAccessTokenRef.current?.() ?? null),
+        abortSignal,
+      ]);
+    };
 
     const load = async () => {
       setLoading(true);
       setError(undefined);
       try {
-        const accessToken = await Promise.race([
-          getAccessTokenRef.current?.() ?? null,
-          abortSignal,
-        ]);
+        const accessToken = await fetchAccessToken();
+        // The token can resolve in the same tick the watchdog fires; check
+        // explicitly instead of assuming "fetchAccessToken resolved" means
+        // there's budget left, otherwise the endpoint fetch below aborts
+        // instantly and the error wrongly blames the endpoint instead of
+        // the auth step that consumed the whole timeout.
+        if (controller.signal.aborted) {
+          throw new Error('aborted');
+        }
         stage = 'endpoint';
         requestHeaders = accessToken
           ? { ...headers, Authorization: `Bearer ${accessToken}` }
@@ -315,10 +363,16 @@ export const MCPSetup = ({
   endpoint,
   getAccessToken,
   headers = emptyHeaders,
+  isAuthReady = true,
   isDevServer = false,
 }: MCPSetupProps) => {
   const surfaceName = isDevServer ? 'Dev Server' : 'Cloud';
-  const { error, loading, retry, tools } = useMCPTools(endpoint, headers, getAccessToken);
+  const { error, loading, retry, tools } = useMCPTools(
+    endpoint,
+    headers,
+    getAccessToken,
+    isAuthReady
+  );
   const clients = createClients(endpoint, isDevServer, bearerTokenEnvVar);
   const examples = isDevServer ? devServerExamples : cloudExamples;
   const hasAuthStep = Boolean(bearerTokenEnvVar);
