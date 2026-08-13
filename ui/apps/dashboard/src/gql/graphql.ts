@@ -2302,6 +2302,64 @@ export enum SdkMode {
   Dev = 'DEV'
 }
 
+export type Sandbox = {
+  __typename?: 'Sandbox';
+  command: Array<Scalars['String']['output']>;
+  createdAt: Scalars['Time']['output'];
+  endedAt: Maybe<Scalars['Time']['output']>;
+  environmentVariableNames: Array<Scalars['String']['output']>;
+  failedAt: Maybe<Scalars['Time']['output']>;
+  id: Scalars['UUID']['output'];
+  imageID: Scalars['String']['output'];
+  launchUnknownAt: Maybe<Scalars['Time']['output']>;
+  macAddress: Scalars['String']['output'];
+  memoryMB: Scalars['Int']['output'];
+  name: Scalars['String']['output'];
+  networkRateLimitMBPS: Scalars['Int']['output'];
+  privateIPv4: Scalars['String']['output'];
+  startedAt: Maybe<Scalars['Time']['output']>;
+  status: SandboxStatus;
+  timeoutSeconds: Scalars['Int64']['output'];
+  vcpu: Scalars['Int']['output'];
+  vpcID: Scalars['UUID']['output'];
+};
+
+export type SandboxEdge = {
+  __typename?: 'SandboxEdge';
+  cursor: Scalars['String']['output'];
+  node: Sandbox;
+};
+
+export enum SandboxStatus {
+  Failed = 'FAILED',
+  LaunchUnknown = 'LAUNCH_UNKNOWN',
+  Pending = 'PENDING',
+  Running = 'RUNNING',
+  Stopped = 'STOPPED',
+  Stopping = 'STOPPING'
+}
+
+export type SandboxSummary = {
+  __typename?: 'SandboxSummary';
+  active: Scalars['Int']['output'];
+  failureRate: Scalars['Float']['output'];
+  launchUnknown: Scalars['Int']['output'];
+  p95StartTimeMS: Maybe<Scalars['Float']['output']>;
+  totalCreated: Scalars['Int']['output'];
+};
+
+export type SandboxesConnection = {
+  __typename?: 'SandboxesConnection';
+  edges: Array<SandboxEdge>;
+  pageInfo: PageInfo;
+  summary: SandboxSummary;
+};
+
+export type SandboxesFilter = {
+  from?: InputMaybe<Scalars['Time']['input']>;
+  until?: InputMaybe<Scalars['Time']['input']>;
+};
+
 export type ScopedFunctionStatusResponse = {
   __typename?: 'ScopedFunctionStatusResponse';
   cancelled: Scalars['Int']['output'];
@@ -2859,6 +2917,8 @@ export type Workspace = {
   runTraceSpanOutputByID: RunTraceSpanOutput;
   runTrigger: RunTraceTrigger;
   runs: RunsConnection;
+  sandbox: Maybe<Sandbox>;
+  sandboxes: SandboxesConnection;
   scopedFunctionStatus: ScopedFunctionStatusResponse;
   scopedMetrics: ScopedMetricsResponse;
   sessionKeys: Array<SessionKey>;
@@ -2972,6 +3032,18 @@ export type WorkspaceRunsArgs = {
   first?: Scalars['Int']['input'];
   orderBy: Array<RunsOrderBy>;
   preview: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
+export type WorkspaceSandboxArgs = {
+  id: Scalars['UUID']['input'];
+};
+
+
+export type WorkspaceSandboxesArgs = {
+  after: InputMaybe<Scalars['String']['input']>;
+  filter: InputMaybe<SandboxesFilter>;
+  first?: Scalars['Int']['input'];
 };
 
 
@@ -3906,6 +3978,23 @@ export type AccountConcurrencyPressureQueryVariables = Exact<{
 
 
 export type AccountConcurrencyPressureQuery = { __typename?: 'Query', concurrencyLimitHits: { __typename?: 'MetricsResponse', data: Array<{ __typename?: 'MetricsData', bucket: string, value: number }> } };
+export type SandboxDetailQueryVariables = Exact<{
+  envSlug: Scalars['String']['input'];
+  sandboxID: Scalars['UUID']['input'];
+}>;
+
+
+export type SandboxDetailQuery = { __typename?: 'Query', envBySlug: { __typename?: 'Workspace', sandbox: { __typename?: 'Sandbox', id: string, name: string, status: SandboxStatus, imageID: string, vcpu: number, memoryMB: number, networkRateLimitMBPS: number, timeoutSeconds: number, vpcID: string, privateIPv4: string, macAddress: string, command: Array<string>, environmentVariableNames: Array<string>, createdAt: string, startedAt: string | null, endedAt: string | null, failedAt: string | null, launchUnknownAt: string | null } | null } | null };
+
+export type SandboxesListQueryVariables = Exact<{
+  envSlug: Scalars['String']['input'];
+  from: Scalars['Time']['input'];
+  until: Scalars['Time']['input'];
+  after: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type SandboxesListQuery = { __typename?: 'Query', envBySlug: { __typename?: 'Workspace', sandboxes: { __typename?: 'SandboxesConnection', edges: Array<{ __typename?: 'SandboxEdge', cursor: string, node: { __typename?: 'Sandbox', id: string, name: string, status: SandboxStatus, vcpu: number, memoryMB: number, createdAt: string, startedAt: string | null } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor: string | null }, summary: { __typename?: 'SandboxSummary', active: number, totalCreated: number, p95StartTimeMS: number | null } } } | null };
 
 export type ScoresLookupQueryVariables = Exact<{
   envSlug: Scalars['String']['input'];
@@ -4440,6 +4529,8 @@ export const CountRunsDocument = {"kind":"Document","definitions":[{"kind":"Oper
 export const AppFilterDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AppFilter"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"env"},"name":{"kind":"Name","value":"envBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"apps"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"externalID"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode<AppFilterQuery, AppFilterQueryVariables>;
 export const AccountConcurrencyIdentityDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AccountConcurrencyIdentity"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"account"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<AccountConcurrencyIdentityQuery, AccountConcurrencyIdentityQueryVariables>;
 export const AccountConcurrencyPressureDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"AccountConcurrencyPressure"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"from"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"to"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"concurrencyLimitHits"},"name":{"kind":"Name","value":"metrics"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"opts"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"from"},"value":{"kind":"Variable","name":{"kind":"Name","value":"from"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"to"},"value":{"kind":"Variable","name":{"kind":"Name","value":"to"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"bucket"}},{"kind":"Field","name":{"kind":"Name","value":"value"}}]}}]}}]}}]} as unknown as DocumentNode<AccountConcurrencyPressureQuery, AccountConcurrencyPressureQueryVariables>;
+export const SandboxDetailDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SandboxDetail"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"sandboxID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"UUID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"envBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sandbox"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"sandboxID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"imageID"}},{"kind":"Field","name":{"kind":"Name","value":"vcpu"}},{"kind":"Field","name":{"kind":"Name","value":"memoryMB"}},{"kind":"Field","name":{"kind":"Name","value":"networkRateLimitMBPS"}},{"kind":"Field","name":{"kind":"Name","value":"timeoutSeconds"}},{"kind":"Field","name":{"kind":"Name","value":"vpcID"}},{"kind":"Field","name":{"kind":"Name","value":"privateIPv4"}},{"kind":"Field","name":{"kind":"Name","value":"macAddress"}},{"kind":"Field","name":{"kind":"Name","value":"command"}},{"kind":"Field","name":{"kind":"Name","value":"environmentVariableNames"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","name":{"kind":"Name","value":"failedAt"}},{"kind":"Field","name":{"kind":"Name","value":"launchUnknownAt"}}]}}]}}]}}]} as unknown as DocumentNode<SandboxDetailQuery, SandboxDetailQueryVariables>;
+export const SandboxesListDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SandboxesList"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"from"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"until"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"after"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"envBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sandboxes"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"first"},"value":{"kind":"IntValue","value":"50"}},{"kind":"Argument","name":{"kind":"Name","value":"after"},"value":{"kind":"Variable","name":{"kind":"Name","value":"after"}}},{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"from"},"value":{"kind":"Variable","name":{"kind":"Name","value":"from"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"until"},"value":{"kind":"Variable","name":{"kind":"Name","value":"until"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"edges"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cursor"}},{"kind":"Field","name":{"kind":"Name","value":"node"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"vcpu"}},{"kind":"Field","name":{"kind":"Name","value":"memoryMB"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}},{"kind":"Field","name":{"kind":"Name","value":"endCursor"}}]}},{"kind":"Field","name":{"kind":"Name","value":"summary"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"active"}},{"kind":"Field","name":{"kind":"Name","value":"totalCreated"}},{"kind":"Field","name":{"kind":"Name","value":"p95StartTimeMS"}}]}}]}}]}}]}}]} as unknown as DocumentNode<SandboxesListQuery, SandboxesListQueryVariables>;
 export const ScoresLookupDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ScoresLookup"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"page"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pageSize"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"envBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"workflows"},"directives":[{"kind":"Directive","name":{"kind":"Name","value":"paginated"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"perPage"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pageSize"}}},{"kind":"Argument","name":{"kind":"Name","value":"page"},"value":{"kind":"Variable","name":{"kind":"Name","value":"page"}}}]}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ScoresLookupQuery, ScoresLookupQueryVariables>;
 export const ScoreNamesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ScoreNames"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionIDs"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"filter"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ScoreFilter"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"scoreNames"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"functionIDs"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionIDs"}}},{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"Variable","name":{"kind":"Name","value":"filter"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}}]}}]}}]} as unknown as DocumentNode<ScoreNamesQuery, ScoreNamesQueryVariables>;
 export const ScoreTimeSeriesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ScoreTimeSeries"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionIDs"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"filter"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ScoreFilter"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"scoreNames"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"scoreTimeSeries"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"workspaceID"}}},{"kind":"Argument","name":{"kind":"Name","value":"functionIDs"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionIDs"}}},{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"Variable","name":{"kind":"Name","value":"filter"}}},{"kind":"Argument","name":{"kind":"Name","value":"scoreNames"},"value":{"kind":"Variable","name":{"kind":"Name","value":"scoreNames"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"scoreName"}},{"kind":"Field","name":{"kind":"Name","value":"kind"}},{"kind":"Field","name":{"kind":"Name","value":"buckets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"bucketStart"}},{"kind":"Field","name":{"kind":"Name","value":"avg"}},{"kind":"Field","name":{"kind":"Name","value":"max"}},{"kind":"Field","name":{"kind":"Name","value":"p50"}},{"kind":"Field","name":{"kind":"Name","value":"p90"}},{"kind":"Field","name":{"kind":"Name","value":"p99"}},{"kind":"Field","name":{"kind":"Name","value":"trueCount"}},{"kind":"Field","name":{"kind":"Name","value":"falseCount"}}]}}]}}]}}]} as unknown as DocumentNode<ScoreTimeSeriesQuery, ScoreTimeSeriesQueryVariables>;
