@@ -73,6 +73,11 @@ const emptyHeaders: Record<string, string> = {};
 // processed, so keep the budget generous to avoid false timeouts.
 const toolsFetchTimeoutMs = 30_000;
 
+// First-attempt budget for the auth-session fetch; on expiry the fetch is
+// retried once (with the remaining watchdog budget) before an auth timeout
+// is surfaced, so a token request racing app startup self-heals.
+const authRetryBudgetMs = 8_000;
+
 const devServerExamples = [
   'List my registered Inngest functions and their triggers',
   'Inspect recent function runs and their traces',
@@ -209,14 +214,29 @@ const useMCPTools = (
     // the endpoint at all.
     let stage: 'auth' | 'endpoint' = 'auth';
 
+    // A token fetch that races app startup can stall even though the auth
+    // provider is healthy, so give the first attempt a short budget and ask
+    // once more before letting the watchdog surface an auth timeout.
+    const fetchAccessToken = async () => {
+      const tokenPromise = () => Promise.resolve(getAccessTokenRef.current?.() ?? null);
+      const firstAttemptBudget = new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error('auth attempt timed out')), authRetryBudgetMs);
+      });
+      try {
+        return await Promise.race([tokenPromise(), firstAttemptBudget, abortSignal]);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          throw error;
+        }
+        return await Promise.race([tokenPromise(), abortSignal]);
+      }
+    };
+
     const load = async () => {
       setLoading(true);
       setError(undefined);
       try {
-        const accessToken = await Promise.race([
-          getAccessTokenRef.current?.() ?? null,
-          abortSignal,
-        ]);
+        const accessToken = await fetchAccessToken();
         stage = 'endpoint';
         requestHeaders = accessToken
           ? { ...headers, Authorization: `Bearer ${accessToken}` }
@@ -271,7 +291,7 @@ const useMCPTools = (
               ? stage === 'auth'
                 ? `Timed out waiting for an auth session after ${
                     toolsFetchTimeoutMs / 1000
-                  } seconds. The MCP endpoint was never contacted. This usually means this page's domain is not registered with the auth provider (common on preview deployments).`
+                  } seconds. The MCP endpoint was never contacted. This usually means a browser extension (such as an ad blocker) blocked the auth script, or this page's domain is not registered with the auth provider (common on preview deployments).`
                 : `The MCP endpoint did not respond within ${
                     toolsFetchTimeoutMs / 1000
                   } seconds. Check that ${endpoint} is reachable from this page.`
