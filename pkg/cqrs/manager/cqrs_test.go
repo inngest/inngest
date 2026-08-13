@@ -3608,3 +3608,48 @@ func TestCQRSGetSpanReparentsUserland(t *testing.T) {
 		})
 	}
 }
+
+// dynamic_span_id is deterministic per step position, so it collides across
+// runs; a query scoped to one run must not surface another run's groups.
+func TestCQRSGetSpansByRunIDsAndNameNoCrossRunBleed(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	runA := ulid.MustNew(ulid.Now(), rand.Reader)
+	runB := ulid.MustNew(ulid.Now(), rand.Reader)
+	const dynamicSpanID = "step-x"
+	sharedTraceID := ulid.MustNew(ulid.Now(), rand.Reader).String()
+
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runA.String(),
+		TraceID:       sharedTraceID,
+		DynamicSpanID: dynamicSpanID,
+		Name:          meta.SpanNameRun,
+		Attributes:    []byte(`{"_inngest.dynamic.status":"Running"}`),
+	})
+	// UpdateSpan follow-up: shares run A's run_id and dynamic_span_id, not its name.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runA.String(),
+		TraceID:       sharedTraceID,
+		DynamicSpanID: dynamicSpanID,
+		Name:          meta.SpanNameDynamicExtension,
+		Attributes:    []byte(`{"_inngest.dynamic.status":"Completed"}`),
+	})
+	// Colliding dynamic_span_id from an unrelated run.
+	insertTestSpan(t, cm, testSpanFields{
+		RunID:         runB.String(),
+		DynamicSpanID: dynamicSpanID,
+		Name:          meta.SpanNameRun,
+		Attributes:    []byte(`{"_inngest.dynamic.status":"Running"}`),
+	})
+
+	spansByRun, err := cm.(wrapper).GetSpansByRunIDsAndName(t.Context(), []ulid.ULID{runA}, meta.SpanNameRun)
+	require.NoError(t, err)
+
+	require.Len(t, spansByRun, 1, "only run A should be present in the result")
+	require.NotContains(t, spansByRun, runB, "run B must not bleed into a query scoped to run A")
+
+	groupA := spansByRun[runA]
+	require.Len(t, groupA, 1, "run A's single dynamic_span_id should collapse into one merged span")
+	assert.Equal(t, enums.StepStatusCompleted, groupA[0].Status, "the EXTEND follow-up's status must be merged onto the named row")
+}

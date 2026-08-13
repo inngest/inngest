@@ -1,0 +1,251 @@
+syntax = "proto3";
+package api.v2;
+
+import "google/protobuf/timestamp.proto";
+import "third_party/google/api/httpbody.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;apiv2";
+
+enum SandboxStatus {
+  SANDBOX_STATUS_UNSPECIFIED = 0;
+  SANDBOX_STATUS_PENDING = 1;
+  SANDBOX_STATUS_STARTING = 2;
+  SANDBOX_STATUS_RUNNING = 3;
+  SANDBOX_STATUS_PAUSED = 4;
+  SANDBOX_STATUS_TERMINATING = 5;
+  SANDBOX_STATUS_TERMINATED = 6;
+  SANDBOX_STATUS_FAILED = 7;
+}
+
+enum SandboxProcessState {
+  SANDBOX_PROCESS_STATE_UNSPECIFIED = 0;
+  SANDBOX_PROCESS_STATE_STARTING = 1;
+  SANDBOX_PROCESS_STATE_RUNNING = 2;
+  SANDBOX_PROCESS_STATE_EXITED = 3;
+  SANDBOX_PROCESS_STATE_KILLED = 4;
+  SANDBOX_PROCESS_STATE_FAILED = 5;
+  SANDBOX_PROCESS_STATE_LOST = 6;
+}
+
+enum SandboxLogStream {
+  SANDBOX_LOG_STREAM_UNSPECIFIED = 0;
+  SANDBOX_LOG_STREAM_STDOUT = 1;
+  SANDBOX_LOG_STREAM_STDERR = 2;
+}
+
+message SandboxResourceSpec {
+  uint32 vcpu = 1;
+  uint32 memory_mb = 2;
+}
+
+message SandboxResponseMetadata {
+  google.protobuf.Timestamp fetched_at = 1;
+}
+
+message SandboxPage {
+  optional string cursor = 1;
+  bool has_more = 2;
+  int32 limit = 3;
+}
+
+message Sandbox {
+  string id = 1;
+  string name = 2;
+  SandboxStatus status = 3;
+  string vpc_id = 4;
+  string image_ref = 5;
+  SandboxResourceSpec resources = 6;
+  google.protobuf.Timestamp created_at = 7;
+  optional google.protobuf.Timestamp started_at = 8;
+  optional google.protobuf.Timestamp ended_at = 9;
+  optional string error = 10;
+}
+
+message CreateSandboxResponse {
+  Sandbox data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message GetSandboxResponse {
+  Sandbox data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message DestroySandboxResponse {
+  optional Sandbox data = 1;
+  optional SandboxResponseMetadata metadata = 2;
+}
+
+message CreateSandboxRequest {
+  string name = 1;
+  uint32 vcpu = 2;
+  uint32 memory_mb = 3;
+  map<string, string> environment = 4;
+}
+
+message ListSandboxesRequest {
+  optional string cursor = 1;
+  optional int32 limit = 2;
+}
+
+message ListSandboxesResponse {
+  repeated Sandbox data = 1;
+  SandboxResponseMetadata metadata = 2;
+  SandboxPage page = 3;
+}
+
+message GetSandboxRequest {
+  string sandbox_id = 1;
+}
+
+message DestroySandboxRequest {
+  string sandbox_id = 1;
+}
+
+message ExecSandboxRequest {
+  string sandbox_id = 1;
+  repeated string command = 2;
+  map<string, string> environment = 3;
+  optional string cwd = 4;
+  optional string timeout = 5;
+}
+
+message ExecSandboxData {
+  bytes stdout = 1;
+  bytes stderr = 2;
+  string encoding = 3;
+  optional int32 exit_code = 4;
+}
+
+message ExecSandboxResponse {
+  ExecSandboxData data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message StreamSandboxLogsRequest {
+  string sandbox_id = 1;
+  optional bool follow = 2;
+}
+
+message SandboxLogChunk {
+  SandboxLogStream stream = 1;
+  bytes data = 2;
+  string encoding = 3;
+  optional google.protobuf.Timestamp at = 4;
+}
+
+message StreamSandboxLogsResponse {
+  SandboxLogChunk data = 1;
+}
+
+message WriteSandboxFileRequest {
+  string sandbox_id = 1;
+  string path = 2;
+  optional string mode = 3;
+  google.api.HttpBody body = 4;
+}
+
+message WriteSandboxFileData {
+  string path = 1;
+  uint64 bytes_written = 2;
+}
+
+message WriteSandboxFileResponse {
+  WriteSandboxFileData data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message ReadSandboxFileRequest {
+  string sandbox_id = 1;
+  string path = 2;
+}
+
+message SandboxProcess {
+  string id = 1;
+  repeated string command = 2;
+  optional int32 pid = 3;
+  SandboxProcessState state = 4;
+  optional int32 exit_code = 5;
+  optional int32 termination_signal = 6;
+  optional google.protobuf.Timestamp started_at = 7;
+  optional google.protobuf.Timestamp ended_at = 8;
+}
+
+message StartSandboxProcessResponse {
+  SandboxProcess data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message GetSandboxProcessResponse {
+  SandboxProcess data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message WaitSandboxProcessResponse {
+  SandboxProcess data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message StartSandboxProcessRequest {
+  string sandbox_id = 1;
+  repeated string command = 2;
+  map<string, string> environment = 3;
+  optional string cwd = 4;
+}
+
+message ListSandboxProcessesRequest {
+  string sandbox_id = 1;
+  optional string cursor = 2;
+  optional int32 limit = 3;
+}
+
+message ListSandboxProcessesResponse {
+  repeated SandboxProcess data = 1;
+  SandboxResponseMetadata metadata = 2;
+  SandboxPage page = 3;
+}
+
+message GetSandboxProcessRequest {
+  string sandbox_id = 1;
+  string process_id = 2;
+}
+
+message SignalSandboxProcessRequest {
+  string sandbox_id = 1;
+  string process_id = 2;
+  int32 signal = 3;
+  optional bool include_children = 4;
+}
+
+message SignalSandboxProcessResponse {}
+
+message WaitSandboxProcessRequest {
+  string sandbox_id = 1;
+  string process_id = 2;
+  optional string timeout = 3;
+}
+
+message GetSandboxProcessOutputRequest {
+  string sandbox_id = 1;
+  string process_id = 2;
+  optional uint32 tail_bytes = 3;
+}
+
+message GetSandboxProcessOutputData {
+  repeated SandboxLogChunk chunks = 1;
+}
+
+message GetSandboxProcessOutputResponse {
+  GetSandboxProcessOutputData data = 1;
+  SandboxResponseMetadata metadata = 2;
+}
+
+message StreamSandboxProcessOutputRequest {
+  string sandbox_id = 1;
+  string process_id = 2;
+  optional uint32 tail_bytes = 3;
+}
+
+message StreamSandboxProcessOutputResponse {
+  SandboxLogChunk data = 1;
+}
