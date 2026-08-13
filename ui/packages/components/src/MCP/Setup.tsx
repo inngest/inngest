@@ -6,6 +6,7 @@ import {
   type ComponentType,
   type ReactNode,
 } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
@@ -185,190 +186,136 @@ const authTimeoutMessage = (seconds: number) =>
   "never contacted. This usually means this page's domain is not registered with the auth " +
   'provider (common on preview deployments).';
 
+const isAbortDueToTimeout = (error: unknown) =>
+  error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError');
+
+// AbortSignal.any isn't in this package's TS lib target; combine the two
+// signals fetch needs to respect (react-query's own cancellation, and our
+// timeout) by hand instead.
+const combineAbortSignals = (a: AbortSignal, b: AbortSignal): AbortSignal => {
+  if (a.aborted) return a;
+  if (b.aborted) return b;
+  const controller = new AbortController();
+  a.addEventListener('abort', () => controller.abort(a.reason), { once: true });
+  b.addEventListener('abort', () => controller.abort(b.reason), { once: true });
+  return controller.signal;
+};
+
 const useMCPTools = (
   endpoint: string,
   headers: Record<string, string>,
   getAccessToken?: () => Promise<string | null>,
   isAuthReady = true
 ) => {
-  const [tools, setTools] = useState<MCPTool[]>([]);
-  const [error, setError] = useState<string>();
-  const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
-  const getAccessTokenRef = useRef(getAccessToken);
-  // The deadline for the whole attempt, including time spent waiting for
-  // isAuthReady. A ref (not state) so it survives the effect re-running
-  // when isAuthReady flips, and undefined so effect start computes it
-  // fresh on mount and after retry() clears it.
-  const deadlineRef = useRef<number>();
-
+  // isAuthReady=false has no fetch in flight for react-query to time out on
+  // its own, so track that wait with a plain timer instead. Reset whenever
+  // isAuthReady or attempt changes, so a Retry click while still waiting
+  // gets a fresh window rather than reusing an already-expired one.
+  const [authTimedOut, setAuthTimedOut] = useState(false);
   useEffect(() => {
-    getAccessTokenRef.current = getAccessToken;
-  }, [getAccessToken]);
-
-  // isAuthReady is a real dependency: the effect below re-runs when it
-  // changes instead of a resolver smuggled across effects through a ref.
-  // That means no in-flight cross-effect handoff to keep in sync — nothing
-  // to leave stale, double-fire, or race.
-  useEffect(() => {
-    deadlineRef.current ??= Date.now() + toolsFetchTimeoutMs;
-    const deadline = deadlineRef.current;
-    const remainingMs = deadline - Date.now();
-
-    if (!isAuthReady) {
-      // The auth provider hasn't finished loading. Nothing has been
-      // contacted yet, so if the deadline passes here it's unambiguously
-      // an auth timeout — no fetch stage to race against or mislabel.
-      if (remainingMs <= 0) {
-        setLoading(false);
-        setError(authTimeoutMessage(toolsFetchTimeoutMs / 1000));
-        return;
-      }
-      setLoading(true);
-      setError(undefined);
-      const timer = window.setTimeout(() => {
-        setLoading(false);
-        setError(authTimeoutMessage(toolsFetchTimeoutMs / 1000));
-      }, remainingMs);
-      return () => window.clearTimeout(timer);
-    }
-
-    // isAuthReady only just became true, possibly with little or none of
-    // the deadline left (a slow-loading auth provider can eat the whole
-    // budget). Report that deterministically instead of starting a fetch
-    // that would abort before it sends anything and get blamed on the
-    // endpoint.
-    if (remainingMs <= 0) {
-      setLoading(false);
-      setError(authTimeoutMessage(toolsFetchTimeoutMs / 1000));
+    setAuthTimedOut(false);
+    if (isAuthReady) {
       return;
     }
+    const timer = window.setTimeout(() => setAuthTimedOut(true), toolsFetchTimeoutMs);
+    return () => window.clearTimeout(timer);
+  }, [isAuthReady, attempt]);
 
-    const controller = new AbortController();
-    let sessionID: string | null = null;
-    let requestHeaders = headers;
-    // Distinguishes unmount (stay silent) from the watchdog abort below
-    // (surface a timeout error); both flip controller.signal.aborted.
-    let unmounted = false;
-    const watchdog = window.setTimeout(() => controller.abort(), remainingMs);
-    // getAccessToken is outside fetch's abort handling, so race it against
-    // the watchdog too; a hung token fetch would otherwise never settle.
-    const abortSignal = new Promise<never>((_, reject) => {
-      const fail = () => reject(new Error('aborted'));
-      if (controller.signal.aborted) {
-        fail();
-        return;
-      }
-      controller.signal.addEventListener('abort', fail, { once: true });
-    });
-
-    // Which stage was in flight when the watchdog fired, so the timeout
-    // message names the actual culprit: a hung auth-session fetch (for
-    // example Clerk on a domain it is not registered for) never contacts
-    // the endpoint at all.
-    let stage: 'auth' | 'endpoint' = 'auth';
-
-    const load = async () => {
-      setLoading(true);
-      setError(undefined);
-      try {
-        const accessToken = await Promise.race([
-          Promise.resolve(getAccessTokenRef.current?.() ?? null),
-          abortSignal,
-        ]);
-        stage = 'endpoint';
-        requestHeaders = accessToken
-          ? { ...headers, Authorization: `Bearer ${accessToken}` }
-          : headers;
-        const baseHeaders = {
-          Accept: 'application/json, text/event-stream',
-          'Content-Type': 'application/json',
-          ...requestHeaders,
-        };
-        const post = (request: MCPRequest, headers = baseHeaders) =>
-          fetch(endpoint, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ jsonrpc: '2.0', ...request }),
-            signal: controller.signal,
-          });
-
-        const initialize = await post({
-          id: 1,
-          method: 'initialize',
-          params: {
-            protocolVersion: '2025-06-18',
-            capabilities: {},
-            clientInfo: { name: 'inngest-mcp-page', version: '1.0.0' },
-          },
-        });
-        if (!initialize.ok) {
-          throw new Error(`MCP initialization returned HTTP ${initialize.status}`);
-        }
-        await initialize.json();
-
-        sessionID = initialize.headers.get('Mcp-Session-Id');
-        const sessionHeaders = sessionID
-          ? { ...baseHeaders, 'Mcp-Session-Id': sessionID }
-          : baseHeaders;
-        await post({ method: 'notifications/initialized' }, sessionHeaders);
-
-        const response = await post({ id: 2, method: 'tools/list' }, sessionHeaders);
-        if (!response.ok) {
-          throw new Error(`MCP returned HTTP ${response.status}`);
-        }
-
-        const body = (await response.json()) as ToolsListResponse;
-        if (body.error) {
-          throw new Error(body.error.message ?? 'Unable to list MCP tools');
-        }
-        setTools(body.result?.tools ?? []);
-      } catch (error) {
-        if (!unmounted) {
-          setError(
-            controller.signal.aborted
-              ? stage === 'auth'
-                ? authTimeoutMessage(toolsFetchTimeoutMs / 1000)
-                : `The MCP endpoint did not respond within ${
-                    toolsFetchTimeoutMs / 1000
-                  } seconds. Check that ${endpoint} is reachable from this page.`
-              : error instanceof TypeError
-              ? `Could not connect to ${endpoint}. Check that the server is running and reachable from this page.`
-              : error instanceof Error
-              ? error.message
-              : 'Unable to list MCP tools'
-          );
-        }
-      } finally {
-        window.clearTimeout(watchdog);
-        if (!unmounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void load();
+  // Tracked only for the best-effort DELETE below; not used for anything
+  // user-visible, so a superseded attempt racing to write this after a
+  // newer one is a harmless "last write wins," not a correctness issue.
+  const sessionRef = useRef<{ id: string; headers: Record<string, string> } | null>(null);
+  useEffect(() => {
     return () => {
-      unmounted = true;
-      window.clearTimeout(watchdog);
-      controller.abort();
-      if (sessionID) {
+      const session = sessionRef.current;
+      if (session) {
         void fetch(endpoint, {
           method: 'DELETE',
-          headers: { ...requestHeaders, 'Mcp-Session-Id': sessionID },
+          headers: { ...session.headers, 'Mcp-Session-Id': session.id },
         });
       }
     };
-  }, [endpoint, headers, attempt, isAuthReady]);
+  }, [endpoint]);
 
-  const retry = useCallback(() => {
-    // Fresh 30s budget for the new attempt, rather than picking up
-    // whatever was left of the previous one.
-    deadlineRef.current = undefined;
-    setAttempt((n) => n + 1);
-  }, []);
+  const query = useQuery({
+    queryKey: ['mcp-tools', endpoint, attempt],
+    queryFn: async ({ signal: querySignal }): Promise<MCPTool[]> => {
+      const signal = combineAbortSignals(querySignal, AbortSignal.timeout(toolsFetchTimeoutMs));
+      const accessToken = (await getAccessToken?.()) ?? null;
+      const requestHeaders = accessToken
+        ? { ...headers, Authorization: `Bearer ${accessToken}` }
+        : headers;
+      const baseHeaders = {
+        Accept: 'application/json, text/event-stream',
+        'Content-Type': 'application/json',
+        ...requestHeaders,
+      };
+      const post = (request: MCPRequest, postHeaders = baseHeaders) =>
+        fetch(endpoint, {
+          method: 'POST',
+          headers: postHeaders,
+          body: JSON.stringify({ jsonrpc: '2.0', ...request }),
+          signal,
+        });
 
-  return { error, loading, retry, tools };
+      const initialize = await post({
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-06-18',
+          capabilities: {},
+          clientInfo: { name: 'inngest-mcp-page', version: '1.0.0' },
+        },
+      });
+      if (!initialize.ok) {
+        throw new Error(`MCP initialization returned HTTP ${initialize.status}`);
+      }
+      await initialize.json();
+
+      const sessionID = initialize.headers.get('Mcp-Session-Id');
+      const sessionHeaders = sessionID
+        ? { ...baseHeaders, 'Mcp-Session-Id': sessionID }
+        : baseHeaders;
+      sessionRef.current = sessionID ? { id: sessionID, headers: baseHeaders } : null;
+      await post({ method: 'notifications/initialized' }, sessionHeaders);
+
+      const response = await post({ id: 2, method: 'tools/list' }, sessionHeaders);
+      if (!response.ok) {
+        throw new Error(`MCP returned HTTP ${response.status}`);
+      }
+
+      const body = (await response.json()) as ToolsListResponse;
+      if (body.error) {
+        throw new Error(body.error.message ?? 'Unable to list MCP tools');
+      }
+      return body.result?.tools ?? [];
+    },
+    enabled: isAuthReady,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+
+  const error = authTimedOut
+    ? authTimeoutMessage(toolsFetchTimeoutMs / 1000)
+    : query.error
+    ? isAbortDueToTimeout(query.error)
+      ? `The MCP endpoint did not respond within ${
+          toolsFetchTimeoutMs / 1000
+        } seconds. Check that ${endpoint} is reachable from this page.`
+      : query.error instanceof TypeError
+      ? `Could not connect to ${endpoint}. Check that the server is running and reachable from this page.`
+      : query.error.message || 'Unable to list MCP tools'
+    : undefined;
+
+  return {
+    error,
+    loading: !isAuthReady ? !authTimedOut : query.isFetching,
+    retry,
+    tools: query.data ?? [],
+  };
 };
 
 export const MCPSetup = ({
