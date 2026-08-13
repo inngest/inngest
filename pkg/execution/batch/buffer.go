@@ -492,7 +492,14 @@ func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchMan
 		At: at,
 	})
 	if scheduleErr != nil {
-		ab.log.Error("failed to schedule batch execution", "error", scheduleErr)
+		ab.log.Error(
+			"failed to schedule batch execution",
+			"error", scheduleErr,
+			"batchID", batchID,
+			"function_id", fn.ID,
+			"schedule_type", scheduleType,
+			"scheduled_at", at,
+		)
 		metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags:    map[string]any{"schedule_type": scheduleType, "status": "error"},
