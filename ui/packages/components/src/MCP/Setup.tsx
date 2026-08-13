@@ -177,6 +177,14 @@ const snippetHeight = (snippet: TabsProps) => snippet.content.split('\n').length
 // against this page's code lines; mute it until hovered.
 const mutedCopyButton = '[&_button]:text-muted [&_button:hover]:text-basis';
 
+// Composed into the same string wherever the auth step exhausts the
+// timeout budget: never having reached isAuthReady, or having reached it
+// too late to leave any time for the token fetch itself.
+const authTimeoutMessage = (seconds: number) =>
+  `Timed out waiting for an auth session after ${seconds} seconds. The MCP endpoint was ` +
+  "never contacted. This usually means this page's domain is not registered with the auth " +
+  'provider (common on preview deployments).';
+
 const useMCPTools = (
   endpoint: string,
   headers: Record<string, string>,
@@ -188,32 +196,61 @@ const useMCPTools = (
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   const getAccessTokenRef = useRef(getAccessToken);
-  const isAuthReadyRef = useRef(isAuthReady);
-  // The one in-flight load()'s waitForAuthReady resolver, if isAuthReady
-  // wasn't already true when it asked. There's at most one at a time: each
-  // effect run's load() calls waitForAuthReady exactly once.
-  const authReadyResolveRef = useRef<(() => void) | null>(null);
+  // The deadline for the whole attempt, including time spent waiting for
+  // isAuthReady. A ref (not state) so it survives the effect re-running
+  // when isAuthReady flips, and undefined so effect start computes it
+  // fresh on mount and after retry() clears it.
+  const deadlineRef = useRef<number>();
 
   useEffect(() => {
     getAccessTokenRef.current = getAccessToken;
   }, [getAccessToken]);
 
+  // isAuthReady is a real dependency: the effect below re-runs when it
+  // changes instead of a resolver smuggled across effects through a ref.
+  // That means no in-flight cross-effect handoff to keep in sync — nothing
+  // to leave stale, double-fire, or race.
   useEffect(() => {
-    isAuthReadyRef.current = isAuthReady;
-    if (isAuthReady) {
-      authReadyResolveRef.current?.();
-      authReadyResolveRef.current = null;
-    }
-  }, [isAuthReady]);
+    deadlineRef.current ??= Date.now() + toolsFetchTimeoutMs;
+    const deadline = deadlineRef.current;
+    const remainingMs = deadline - Date.now();
 
-  useEffect(() => {
+    if (!isAuthReady) {
+      // The auth provider hasn't finished loading. Nothing has been
+      // contacted yet, so if the deadline passes here it's unambiguously
+      // an auth timeout — no fetch stage to race against or mislabel.
+      if (remainingMs <= 0) {
+        setLoading(false);
+        setError(authTimeoutMessage(toolsFetchTimeoutMs / 1000));
+        return;
+      }
+      setLoading(true);
+      setError(undefined);
+      const timer = window.setTimeout(() => {
+        setLoading(false);
+        setError(authTimeoutMessage(toolsFetchTimeoutMs / 1000));
+      }, remainingMs);
+      return () => window.clearTimeout(timer);
+    }
+
+    // isAuthReady only just became true, possibly with little or none of
+    // the deadline left (a slow-loading auth provider can eat the whole
+    // budget). Report that deterministically instead of starting a fetch
+    // that would abort before it sends anything and get blamed on the
+    // endpoint.
+    if (remainingMs <= 0) {
+      setLoading(false);
+      setError(authTimeoutMessage(toolsFetchTimeoutMs / 1000));
+      return;
+    }
+
     const controller = new AbortController();
     let sessionID: string | null = null;
     let requestHeaders = headers;
     // Distinguishes unmount (stay silent) from the watchdog abort below
     // (surface a timeout error); both flip controller.signal.aborted.
     let unmounted = false;
-    const watchdog = window.setTimeout(() => controller.abort(), toolsFetchTimeoutMs);
+    const watchdog = window.setTimeout(() => controller.abort(), remainingMs);
     // getAccessToken is outside fetch's abort handling, so race it against
     // the watchdog too; a hung token fetch would otherwise never settle.
     const abortSignal = new Promise<never>((_, reject) => {
@@ -226,46 +263,19 @@ const useMCPTools = (
     });
 
     // Which stage was in flight when the watchdog fired, so the timeout
-    // message names the actual culprit: the auth provider never finishing
-    // initialization, or a hung auth-session fetch (for example Clerk on a
-    // domain it is not registered for) that never contacts the endpoint at
-    // all.
+    // message names the actual culprit: a hung auth-session fetch (for
+    // example Clerk on a domain it is not registered for) never contacts
+    // the endpoint at all.
     let stage: 'auth' | 'endpoint' = 'auth';
-
-    // getAccessToken can queue internally until its auth provider finishes
-    // loading (e.g. Clerk before Clerk.load() resolves), so wait for the
-    // caller's isAuthReady flag before calling it at all — otherwise the
-    // call races the provider's own startup instead of depending on it.
-    const waitForAuthReady = () =>
-      new Promise<void>((resolve) => {
-        if (isAuthReadyRef.current) {
-          resolve();
-          return;
-        }
-        authReadyResolveRef.current = resolve;
-      });
-
-    const fetchAccessToken = async () => {
-      await Promise.race([waitForAuthReady(), abortSignal]);
-      return Promise.race([
-        Promise.resolve(getAccessTokenRef.current?.() ?? null),
-        abortSignal,
-      ]);
-    };
 
     const load = async () => {
       setLoading(true);
       setError(undefined);
       try {
-        const accessToken = await fetchAccessToken();
-        // The token can resolve in the same tick the watchdog fires; check
-        // explicitly instead of assuming "fetchAccessToken resolved" means
-        // there's budget left, otherwise the endpoint fetch below aborts
-        // instantly and the error wrongly blames the endpoint instead of
-        // the auth step that consumed the whole timeout.
-        if (controller.signal.aborted) {
-          throw new Error('aborted');
-        }
+        const accessToken = await Promise.race([
+          Promise.resolve(getAccessTokenRef.current?.() ?? null),
+          abortSignal,
+        ]);
         stage = 'endpoint';
         requestHeaders = accessToken
           ? { ...headers, Authorization: `Bearer ${accessToken}` }
@@ -318,9 +328,7 @@ const useMCPTools = (
           setError(
             controller.signal.aborted
               ? stage === 'auth'
-                ? `Timed out waiting for an auth session after ${
-                    toolsFetchTimeoutMs / 1000
-                  } seconds. The MCP endpoint was never contacted. This usually means this page's domain is not registered with the auth provider (common on preview deployments).`
+                ? authTimeoutMessage(toolsFetchTimeoutMs / 1000)
                 : `The MCP endpoint did not respond within ${
                     toolsFetchTimeoutMs / 1000
                   } seconds. Check that ${endpoint} is reachable from this page.`
@@ -351,9 +359,14 @@ const useMCPTools = (
         });
       }
     };
-  }, [endpoint, headers, attempt]);
+  }, [endpoint, headers, attempt, isAuthReady]);
 
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const retry = useCallback(() => {
+    // Fresh 30s budget for the new attempt, rather than picking up
+    // whatever was left of the previous one.
+    deadlineRef.current = undefined;
+    setAttempt((n) => n + 1);
+  }, []);
 
   return { error, loading, retry, tools };
 };
