@@ -37,6 +37,15 @@ type scheduleErrorBatchManager struct {
 	err error
 }
 
+func (m scheduleErrorBatchManager) BulkAppend(context.Context, []BatchItem, inngest.Function) (*BulkAppendResult, error) {
+	return &BulkAppendResult{
+		Status:       "new",
+		BatchID:      ulid.Make().String(),
+		BatchPointer: "batch-pointer",
+		Committed:    1,
+	}, nil
+}
+
 func (m scheduleErrorBatchManager) ScheduleExecution(context.Context, ScheduleBatchOpts) error {
 	return m.err
 }
@@ -61,7 +70,7 @@ func TestScheduleBatchExecutionErrorLog(t *testing.T) {
 			scheduledAt,
 			"new",
 		)
-		require.NoError(t, err)
+		require.ErrorContains(t, err, "schedule failed")
 	})
 
 	entry := map[string]any{}
@@ -71,6 +80,45 @@ func TestScheduleBatchExecutionErrorLog(t *testing.T) {
 	require.Equal(t, functionID.String(), entry["function_id"])
 	require.Equal(t, "new", entry["schedule_type"])
 	require.Equal(t, scheduledAt.Format(time.RFC3339), entry["scheduled_at"])
+}
+
+func TestAppendBufferFlushReturnsSchedulingError(t *testing.T) {
+	scheduleErr := errors.New("queue unavailable")
+	pending := &pendingResult{done: make(chan struct{})}
+	fn := inngest.Function{
+		ID: uuid.New(),
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "30s",
+		},
+	}
+	item := BatchItem{
+		WorkspaceID: uuid.New(),
+		FunctionID:  fn.ID,
+		EventID:     ulid.Make(),
+	}
+	buf := &batchBuffer{
+		items: []pendingItem{{
+			item:    item,
+			fn:      fn,
+			pending: pending,
+		}},
+		pendingResults: map[string]*pendingResult{item.EventID.String(): pending},
+		fn:             fn,
+		createdAt:      time.Now(),
+	}
+	buffer := newAppendBuffer(time.Second, 10, 1024, logger.VoidLogger())
+	buffer.totalPendingItems.Store(1)
+
+	buffer.flush(buf, scheduleErrorBatchManager{err: scheduleErr}, "timer")
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatal("flush did not notify the pending append")
+	case <-pending.done:
+		// flush completed and notified the pending append
+	}
+	require.ErrorIs(t, pending.err, scheduleErr)
 }
 
 func TestBulkAppend(t *testing.T) {
