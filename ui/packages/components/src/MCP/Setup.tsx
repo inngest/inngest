@@ -189,9 +189,10 @@ const useMCPTools = (
   const [attempt, setAttempt] = useState(0);
   const getAccessTokenRef = useRef(getAccessToken);
   const isAuthReadyRef = useRef(isAuthReady);
-  // Resolved by the isAuthReady effect below the first time the auth
-  // provider reports ready; read by any in-flight load() via the ref.
-  const authReadyListenersRef = useRef(new Set<() => void>());
+  // The one in-flight load()'s waitForAuthReady resolver, if isAuthReady
+  // wasn't already true when it asked. There's at most one at a time: each
+  // effect run's load() calls waitForAuthReady exactly once.
+  const authReadyResolveRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     getAccessTokenRef.current = getAccessToken;
@@ -200,8 +201,8 @@ const useMCPTools = (
   useEffect(() => {
     isAuthReadyRef.current = isAuthReady;
     if (isAuthReady) {
-      authReadyListenersRef.current.forEach((notify) => notify());
-      authReadyListenersRef.current.clear();
+      authReadyResolveRef.current?.();
+      authReadyResolveRef.current = null;
     }
   }, [isAuthReady]);
 
@@ -241,7 +242,7 @@ const useMCPTools = (
           resolve();
           return;
         }
-        authReadyListenersRef.current.add(resolve);
+        authReadyResolveRef.current = resolve;
       });
 
     const fetchAccessToken = async () => {
