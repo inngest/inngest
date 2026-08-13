@@ -58,7 +58,6 @@ export type AnalyticsFeature =
   | 'account-concurrency'
   | 'ai-overview'
   | 'experiments'
-  | 'sandboxes'
   | 'scores'
   | 'sessions';
 
@@ -76,9 +75,7 @@ type AnalyticsEventName =
   | 'Empty State Viewed'
   | 'List Viewed'
   | 'Opened In Insights'
-  | 'Scoring Weight Updated'
-  | 'Waitlist Form Submitted'
-  | 'Waitlist Joined';
+  | 'Scoring Weight Updated';
 
 type AnalyticsEventProperties = Record<
   string,
@@ -260,27 +257,4 @@ type DocsLinkOpenedArgs = { feature: AnalyticsFeature };
 
 export function trackDocsLinkOpened({ feature }: DocsLinkOpenedArgs) {
   track('Docs Link Opened', feature);
-}
-
-type WaitlistJoinedArgs = { feature: AnalyticsFeature };
-
-export function trackWaitlistJoined({ feature }: WaitlistJoinedArgs) {
-  track('Waitlist Joined', feature);
-}
-
-type WaitlistFormSubmittedArgs = {
-  feature: AnalyticsFeature;
-  canContact: boolean;
-  message: string;
-};
-
-export function trackWaitlistFormSubmitted({
-  feature,
-  canContact,
-  message,
-}: WaitlistFormSubmittedArgs) {
-  track('Waitlist Form Submitted', feature, {
-    can_contact: canContact,
-    message: message,
-  });
 }
