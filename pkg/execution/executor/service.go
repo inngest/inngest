@@ -744,7 +744,7 @@ func (s *svc) handleEagerCancelBacklog(ctx context.Context, c cqrs.Cancellation)
 		return fmt.Errorf("error selecting shard for cancellation: %w", err)
 	}
 
-	items, err := shard.ItemsByBacklog(ctx, c.TargetID, from, c.StartedBefore)
+	items, err := s.queue.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
 	if err != nil {
 		return fmt.Errorf("error retrieving backlog iterator: %w", err)
 	}

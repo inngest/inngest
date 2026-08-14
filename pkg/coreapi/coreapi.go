@@ -39,7 +39,7 @@ type Options struct {
 	Logger         logger.Logger
 	Runner         runner.Runner
 	State          state.Manager
-	QueueReader    queue.JobQueueReader
+	QueueReader    queue.RunQueueReader
 	EventHandler   api.EventHandler
 	Executor       execution.Executor
 	HistoryReader  history_reader.Reader

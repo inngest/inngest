@@ -87,8 +87,8 @@ type Opts struct {
 	Executor execution.Executor
 	// TracerProvider is used to create spans within the APIv1 endpoints and allows the checkpointing API to write traces.
 	TracerProvider tracing.TracerProvider
-	// Queue allows the checkppinting API to continue by enqueueing new queue items.
-	Queue queue.Queue
+	// Queue contains only the queue capabilities used by checkpointing.
+	Queue CheckpointQueue
 	// MetricsProvider reports usage metrics.
 	MetricsProvider MetricsProvider
 	// BackoffFunc computes the retry time for a given attempt number.
@@ -101,6 +101,13 @@ type Opts struct {
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
 	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
+}
+
+// CheckpointQueue is the reduced queue surface used by checkpointing.
+type CheckpointQueue interface {
+	queue.Producer
+	queue.QueueItemReader
+	queue.AttemptResetter
 }
 
 func New(o Opts) Checkpointer {
