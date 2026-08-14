@@ -1,10 +1,11 @@
 import { cn } from '@inngest/components/utils/classNames';
-import { Bar, BarChart, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, Cell, ResponsiveContainer } from 'recharts';
 
 type MiniStackedBarChartProps = {
   data: {
     startCount: number;
     failureCount?: number;
+    concurrencyLimitReached?: boolean;
   }[];
   className?: string;
 };
@@ -16,6 +17,16 @@ export default function MiniStackedBarChart({ data, className = '' }: MiniStacke
     nonFailureCount: d.startCount - (d.failureCount ?? 0),
     failureCount: d.failureCount ?? 0,
   }));
+
+  const cells = data.map((slot, index) => (
+    <Cell
+      className={cn(
+        'fill-primary-xSubtle',
+        slot.concurrencyLimitReached && 'fill-accent-xSubtle dark:fill-accent-xIntense'
+      )}
+      key={index}
+    />
+  ));
 
   return (
     <div className={cn('h-8 w-40', className)}>
@@ -35,11 +46,12 @@ export default function MiniStackedBarChart({ data, className = '' }: MiniStacke
           <Bar
             dataKey="nonFailureCount"
             stackId="slot"
-            fill={`rgb(var(--color-primary-xSubtle))`}
             minPointSize={1}
             barSize={4}
             radius={[1, 1, 0, 0]}
-          />
+          >
+            {cells}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

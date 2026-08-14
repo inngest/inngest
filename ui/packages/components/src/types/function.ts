@@ -12,6 +12,7 @@ export type Function = {
     dailyVolumeSlots: {
       startCount: number;
       failureCount: number;
+      concurrencyLimitReached?: boolean;
     }[];
   };
   app?: {

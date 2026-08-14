@@ -4,6 +4,7 @@ import type {
   MetricsData,
   TimeSeriesPoint,
 } from '@/gql/graphql';
+import { concurrencyLimitReachedBySlot } from '@/components/Functions/concurrency';
 import type { Function as FunctionRow } from '@inngest/components/types/function';
 import type { InfraPlan, InfraPlanSku, InfraTierId } from './placeholderData';
 
@@ -921,16 +922,24 @@ export function calculateUsageShare(value: number, total: number): number {
 }
 
 export function buildTopFunctionRows({
+  concurrency,
   functions,
   limit = 50,
   usage,
 }: {
+  concurrency?: Array<{
+    id: string;
+    data: Array<Pick<MetricsData, 'bucket' | 'value'>>;
+  }>;
   functions?: WorkflowSummary[] | undefined;
   limit?: number;
   usage: WorkflowUsage[] | undefined;
 }): TopFunctionRow[] {
   const summariesBySlug = new Map(
     functions?.map((fn) => [fn.slug, fn] as const) ?? [],
+  );
+  const concurrencyByFunction = new Map(
+    concurrency?.map((metric) => [metric.id, metric.data] as const) ?? [],
   );
 
   return (
@@ -944,6 +953,10 @@ export function buildTopFunctionRows({
         const failureRate = dailyFinishedCount
           ? Math.round((dailyFailureCount / dailyFinishedCount) * 10000) / 100
           : 0;
+        const concurrencyLimitReached = concurrencyLimitReachedBySlot(
+          fn.dailyStarts.data,
+          concurrencyByFunction.get(summary.id),
+        );
 
         return {
           app: summary?.app
@@ -965,6 +978,7 @@ export function buildTopFunctionRows({
             })) ?? [],
           usage: {
             dailyVolumeSlots: fn.dailyStarts.data.map((usageSlot, index) => ({
+              concurrencyLimitReached: concurrencyLimitReached[index] ?? false,
               failureCount: fn.dailyFailures.data[index]?.count ?? 0,
               startCount: usageSlot.count,
             })),

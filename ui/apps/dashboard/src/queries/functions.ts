@@ -32,6 +32,7 @@ const GetFunctionsUsageDocument = graphql(`
           dailyStarts: usage(opts: { period: "hour", range: "day" }, event: "started") {
             total
             data {
+              slot
               count
             }
           }
@@ -246,6 +247,18 @@ const GetFunctionUsageDocument = graphql(`
   query GetFunctionUsage($id: ID!, $environmentID: ID!, $startTime: Time!, $endTime: Time!) {
     workspace(id: $environmentID) {
       workflow(id: $id) {
+        concurrencyLimitReached: metrics(
+          opts: {
+            name: "concurrency_limit_reached_total"
+            from: $startTime
+            to: $endTime
+          }
+        ) {
+          data {
+            bucket
+            value
+          }
+        }
         dailyStarts: usage(opts: { from: $startTime, to: $endTime }, event: "started") {
           period
           total
