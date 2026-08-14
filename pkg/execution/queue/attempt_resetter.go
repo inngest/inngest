@@ -3,10 +3,11 @@ package queue
 import "context"
 
 type attemptResetter struct {
-	shards QueueShardRegistry
+	shards ShardRegistry
 }
 
-func newAttemptResetter(shards QueueShardRegistry) AttemptResetter {
+// NewAttemptResetter returns an attempt resetter backed by the provided shard registry.
+func NewAttemptResetter(shards ShardRegistry) AttemptResetter {
 	return &attemptResetter{shards: shards}
 }
 

@@ -28,26 +28,32 @@ func NewDebugAPI(o Opts) service.Service {
 	}
 
 	return &debugAPI{
-		rpc:          grpc.NewServer(),
-		port:         port,
-		log:          o.Log,
-		db:           o.DB,
-		queueReader:  o.QueueReader,
-		state:        o.State,
-		croner:       o.Cron,
-		shards:       o.ShardRegistry,
-		pm:           o.PauseManager,
-		cm:           o.CapacityManager,
-		sm:           o.SemaphoreManager,
-		batchManager: o.BatchManager,
-		debouncer:    o.Debouncer,
+		rpc:           grpc.NewServer(),
+		port:          port,
+		log:           o.Log,
+		db:            o.DB,
+		runReader:     o.RunReader,
+		itemReader:    o.ItemReader,
+		partReader:    o.PartitionReader,
+		backlogReader: o.BacklogReader,
+		state:         o.State,
+		croner:        o.Cron,
+		shards:        o.ShardRegistry,
+		pm:            o.PauseManager,
+		cm:            o.CapacityManager,
+		sm:            o.SemaphoreManager,
+		batchManager:  o.BatchManager,
+		debouncer:     o.Debouncer,
 	}
 }
 
 type Opts struct {
 	Log              logger.Logger
 	DB               cqrs.Manager
-	QueueReader      queue.JobQueueReader
+	RunReader        queue.RunQueueReader
+	ItemReader       queue.QueueItemReader
+	PartitionReader  queue.QueuePartitionReader
+	BacklogReader    queue.QueueBacklogReader
 	State            state.Manager
 	Cron             cron.CronManager
 	PauseManager     pauses.Manager
@@ -71,13 +77,16 @@ type debugAPI struct {
 	log    logger.Logger
 	shards queue.ShardRegistry
 
-	db          cqrs.Manager
-	queueReader queue.JobQueueReader
-	state       state.Manager
-	croner      cron.CronManager
-	pm          pauses.Manager
-	cm          constraintapi.CapacityManager
-	sm          constraintapi.SemaphoreManager
+	db            cqrs.Manager
+	runReader     queue.RunQueueReader
+	itemReader    queue.QueueItemReader
+	partReader    queue.QueuePartitionReader
+	backlogReader queue.QueueBacklogReader
+	state         state.Manager
+	croner        cron.CronManager
+	pm            pauses.Manager
+	cm            constraintapi.CapacityManager
+	sm            constraintapi.SemaphoreManager
 
 	// Dependencies for batching and debounce insights
 	batchManager batch.BatchManager

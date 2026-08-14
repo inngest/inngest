@@ -59,6 +59,8 @@ func TestFinalizePublishesFnFinishedOnce(t *testing.T) {
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue())
 	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
 	require.NoError(t, err)
+	rq, err := queue.New(ctx, "test-queue", shardRegistry)
+	require.NoError(t, err)
 
 	fnID := uuid.New()
 	accountID := uuid.New()
@@ -108,6 +110,7 @@ func TestFinalizePublishesFnFinishedOnce(t *testing.T) {
 	exec, err := executorpkg.NewExecutor(
 		executorpkg.WithStateManager(smv2),
 		executorpkg.WithPauseManager(pauseMgr),
+		executorpkg.WithQueue(rq),
 		executorpkg.WithLogger(logger.StdlibLogger(ctx)),
 		executorpkg.WithShardRegistry(shardRegistry),
 		executorpkg.WithFinalizer(func(ctx context.Context, id statev2.ID, evts []event.Event) error {
@@ -188,6 +191,8 @@ func TestFinalizeRetriesFnFinishedAfterPublishFailure(t *testing.T) {
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue())
 	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
 	require.NoError(t, err)
+	rq, err := queue.New(ctx, "test-queue", shardRegistry)
+	require.NoError(t, err)
 
 	fnID := uuid.New()
 	accountID := uuid.New()
@@ -236,6 +241,7 @@ func TestFinalizeRetriesFnFinishedAfterPublishFailure(t *testing.T) {
 	exec, err := executorpkg.NewExecutor(
 		executorpkg.WithStateManager(smv2),
 		executorpkg.WithPauseManager(pauseMgr),
+		executorpkg.WithQueue(rq),
 		executorpkg.WithLogger(logger.StdlibLogger(ctx)),
 		executorpkg.WithShardRegistry(shardRegistry),
 		executorpkg.WithFinalizer(func(ctx context.Context, id statev2.ID, evts []event.Event) error {
@@ -329,6 +335,8 @@ func TestFinalizeDeleteFailureDoesNotLoseFinishEffects(t *testing.T) {
 	queueShard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue())
 	shardRegistry, err := queue.NewSingleShardRegistry(queueShard)
 	require.NoError(t, err)
+	rq, err := queue.New(ctx, "test-queue", shardRegistry)
+	require.NoError(t, err)
 
 	fnID := uuid.New()
 	accountID := uuid.New()
@@ -377,6 +385,7 @@ func TestFinalizeDeleteFailureDoesNotLoseFinishEffects(t *testing.T) {
 	exec, err := executorpkg.NewExecutor(
 		executorpkg.WithStateManager(stateSvc),
 		executorpkg.WithPauseManager(pauseMgr),
+		executorpkg.WithQueue(rq),
 		executorpkg.WithLogger(logger.StdlibLogger(ctx)),
 		executorpkg.WithShardRegistry(shardRegistry),
 		executorpkg.WithFinalizer(func(ctx context.Context, id statev2.ID, evts []event.Event) error {

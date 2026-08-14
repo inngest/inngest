@@ -121,8 +121,9 @@ func (a router) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jobs, err := shard.RunJobs(
+	jobs, err := a.opts.RunQueueReader.RunJobs(
 		ctx,
+		shard.Name(),
 		scope,
 		runID,
 		10,

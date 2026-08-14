@@ -470,8 +470,9 @@ func (e *executor) doRemoveRunJobs(ctx context.Context, l logger.Logger, shard q
 	//
 	// XXX: Remove this typecast and normalize queue interface to a single package
 	// Find all items for the current function run.
-	jobs, err := shard.RunJobs(
+	jobs, err := e.queue.RunJobs(
 		ctx,
+		shard.Name(),
 		queue.Scope{
 			AccountID:  opts.Metadata.ID.Tenant.AccountID,
 			EnvID:      opts.Metadata.ID.Tenant.EnvID,
