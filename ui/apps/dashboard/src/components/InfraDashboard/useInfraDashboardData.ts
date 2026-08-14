@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { gql, useClient, useQuery, type TypedDocumentNode } from 'urql';
+import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { latestMetricDataValue } from '@/components/Metrics/metricAggregation';
@@ -105,34 +105,14 @@ const InfraDashboardEventsCountDocument = graphql(`
   }
 `);
 
-type InfraDashboardConcurrencyLimitQuery = {
-  workspace: {
-    concurrencyLimit: {
-      metrics: Array<{
-        id: string;
-        data: Array<{ value: number }>;
-      }>;
-    };
-  };
-};
-
-type InfraDashboardConcurrencyLimitQueryVariables = {
-  envID: string;
-  from: string;
-  until?: string | null;
-};
-
-const InfraDashboardConcurrencyLimitDocument: TypedDocumentNode<
-  InfraDashboardConcurrencyLimitQuery,
-  InfraDashboardConcurrencyLimitQueryVariables
-> = gql`
+const InfraDashboardConcurrencyLimitDocument = graphql(`
   query InfraDashboardConcurrencyLimit(
     $envID: ID!
     $from: Time!
     $until: Time
   ) {
     workspace(id: $envID) {
-      concurrencyLimit: scopedMetrics(
+      concurrencyLimitReached: scopedMetrics(
         filter: {
           name: "concurrency_limit_reached_total"
           scope: FN
@@ -143,13 +123,14 @@ const InfraDashboardConcurrencyLimitDocument: TypedDocumentNode<
         metrics {
           id
           data {
+            bucket
             value
           }
         }
       }
     }
   }
-`;
+`);
 
 function cacheKey({
   envID,
@@ -383,7 +364,8 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       stepRunning: currentConcurrency,
       topFunctions: buildTopFunctionRows({
         concurrency:
-          functionConcurrencyLimit.data?.workspace.concurrencyLimit.metrics,
+          functionConcurrencyLimit.data?.workspace.concurrencyLimitReached
+            .metrics,
         limit: topFunctionsLimit,
         usage: usageRows,
       }),
@@ -406,7 +388,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     currentPlan.data?.account.plan?.name,
     currentPlan.fetching,
     events.data?.environment.eventsV2.totalCount,
-    functionConcurrencyLimit.data?.workspace.concurrencyLimit.metrics,
+    functionConcurrencyLimit.data?.workspace.concurrencyLimitReached.metrics,
     functionUsage.data?.workspace.workflows.data,
     functions.data?.workspace.workflows.page,
     lookups.data?.envBySlug?.apps,

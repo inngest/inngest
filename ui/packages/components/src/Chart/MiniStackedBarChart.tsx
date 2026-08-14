@@ -16,10 +16,9 @@ export default function MiniStackedBarChart({ data, className = '' }: MiniStacke
   const mappedData = data.map((d) => ({
     nonFailureCount: d.startCount - (d.failureCount ?? 0),
     failureCount: d.failureCount ?? 0,
-    concurrencyLimitReached: d.concurrencyLimitReached ?? false,
   }));
 
-  const cells = mappedData.map((slot, index) => (
+  const cells = data.map((slot, index) => (
     <Cell
       className={cn(
         'fill-primary-xSubtle',
@@ -47,7 +46,6 @@ export default function MiniStackedBarChart({ data, className = '' }: MiniStacke
           <Bar
             dataKey="nonFailureCount"
             stackId="slot"
-            fill={`rgb(var(--color-primary-xSubtle))`}
             minPointSize={1}
             barSize={4}
             radius={[1, 1, 0, 0]}
