@@ -449,6 +449,92 @@ func TestBackfillEstimatedCostInValues(t *testing.T) {
 	}
 }
 
+func TestFindPricingBySegment(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		model     string
+		wantMatch bool
+		// wantPricing, when set, is asserted against the exact pricing entry
+		// that a specific known model key resolves to, verifying which key
+		// matched rather than just that some entry did.
+		wantPricing *ModelPricing
+	}{
+		{
+			name:      "exact match resolves without trimming",
+			model:     "gpt-4o",
+			wantMatch: true,
+			wantPricing: &ModelPricing{
+				InputPerToken:  modelPricing["gpt-4o"].InputPerToken,
+				OutputPerToken: modelPricing["gpt-4o"].OutputPerToken,
+			},
+		},
+		{
+			name:      "one segment trimmed to reach an exact match",
+			model:     "gpt-4-turbo-2024-04-09-preview",
+			wantMatch: true,
+			wantPricing: &ModelPricing{
+				InputPerToken:  modelPricing["gpt-4-turbo-2024-04-09"].InputPerToken,
+				OutputPerToken: modelPricing["gpt-4-turbo-2024-04-09"].OutputPerToken,
+			},
+		},
+		{
+			name:      "multiple segments trimmed to reach an exact match",
+			model:     "gpt-4-turbo-2024-04-09-preview-canary",
+			wantMatch: true,
+			wantPricing: &ModelPricing{
+				InputPerToken:  modelPricing["gpt-4-turbo-2024-04-09"].InputPerToken,
+				OutputPerToken: modelPricing["gpt-4-turbo-2024-04-09"].OutputPerToken,
+			},
+		},
+		{
+			name:      "shares a dash-delimited segment prefix but must not over-match",
+			model:     "gpt-5.7-newmodel",
+			wantMatch: false,
+		},
+		{
+			name:      "trailing segment may itself contain a dot",
+			model:     "gpt-5-mini.preview",
+			wantMatch: true,
+			wantPricing: &ModelPricing{
+				InputPerToken:  modelPricing["gpt-5"].InputPerToken,
+				OutputPerToken: modelPricing["gpt-5"].OutputPerToken,
+			},
+		},
+		{
+			name:      "no dashes and no exact match",
+			model:     "unknownmodel",
+			wantMatch: false,
+		},
+		{
+			name:      "empty string has no match",
+			model:     "",
+			wantMatch: false,
+		},
+	}
+
+	// Sanity-check the fixture assumptions this test relies on, so a failure
+	// here points at a stale embedded snapshot rather than the matching logic.
+	require.Contains(t, modelPricing, "gpt-4o")
+	require.Contains(t, modelPricing, "gpt-4-turbo-2024-04-09")
+	require.Contains(t, modelPricing, "gpt-5")
+	require.NotContains(t, modelPricing, "gpt-5.7-newmodel")
+	require.NotContains(t, modelPricing, "gpt-5.7")
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			pricing, ok := findPricingBySegment(tc.model)
+			require.Equal(t, tc.wantMatch, ok)
+			if tc.wantPricing != nil {
+				assert.Equal(t, *tc.wantPricing, pricing)
+			}
+		})
+	}
+}
+
 func TestExtractAIOutputMetadata_TypicalStepOutput(t *testing.T) {
 	t.Parallel()
 

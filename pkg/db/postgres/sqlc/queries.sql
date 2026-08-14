@@ -520,7 +520,7 @@ SELECT
     'input_span_id', CASE WHEN s.input IS NOT NULL THEN s.span_id ELSE NULL END
   ) ORDER BY s.start_time ASC, s.end_time ASC, s.span_id ASC) AS span_fragments
 FROM spans AS s
-JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id
+JOIN spans AS m ON m.dynamic_span_id = s.dynamic_span_id AND m.run_id = s.run_id
 WHERE m.name = sqlc.arg('name')
   AND m.run_id IN (SELECT UNNEST(sqlc.slice('run_ids')::TEXT[]))
 GROUP BY s.run_id, s.trace_id, s.dynamic_span_id, s.parent_span_id

@@ -3,6 +3,8 @@ package api.v2;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
+import "third_party/google/api/httpbody.proto";
+import "api/v2/sandbox.proto";
 import "third_party/google/api/annotations.proto";
 import "api/v2/options.proto";
 import "third_party/protoc-gen-openapiv2/options/annotations.proto";
@@ -36,6 +38,8 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   tags: { name: "Apps"         description: "Sync and manage" }
   tags: { name: "Functions"    description: "Invoke and manage functions" }
   tags: { name: "Runs"         description: "Inspect function runs" }
+  tags: { name: "Insights"     description: "Query event and function data" }
+  tags: { name: "Sandboxes"    description: "Create and manage isolated compute sandboxes" }
   tags: { name: "Experiments"  description: "Inspect experiment variants and aggregates" }
   tags: { name: "Sessions"     description: "Inspect session-grouped runs" }
   tags: { name: "Partner API"  description: "Partner account management" }
@@ -1087,6 +1091,246 @@ service V2 {
     };
   }
 
+  rpc CreateSandbox(CreateSandboxRequest) returns (CreateSandboxResponse) {
+    option (google.api.http) = {
+      post: "/sandboxes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a sandbox"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse) {
+    option (google.api.http) = { get: "/sandboxes" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List sandboxes"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetSandbox(GetSandboxRequest) returns (GetSandboxResponse) {
+    option (google.api.http) = { get: "/sandboxes/{sandbox_id}" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get a sandbox"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc DestroySandbox(DestroySandboxRequest) returns (DestroySandboxResponse) {
+    option (google.api.http) = { delete: "/sandboxes/{sandbox_id}" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Destroy a sandbox"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ExecSandbox(ExecSandboxRequest) returns (ExecSandboxResponse) {
+    option (google.api.http) = {
+      post: "/sandboxes/{sandbox_id}/exec"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Execute a command in a sandbox"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc StreamSandboxLogs(StreamSandboxLogsRequest) returns (stream StreamSandboxLogsResponse) {
+    option (google.api.http) = { get: "/sandboxes/{sandbox_id}/logs" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Stream sandbox logs"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc WriteSandboxFile(WriteSandboxFileRequest) returns (WriteSandboxFileResponse) {
+    option (google.api.http) = {
+      put: "/sandboxes/{sandbox_id}/files"
+      body: "body"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Write a sandbox file"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ReadSandboxFile(ReadSandboxFileRequest) returns (stream google.api.HttpBody) {
+    option (google.api.http) = { get: "/sandboxes/{sandbox_id}/files" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Read a sandbox file"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc StartSandboxProcess(StartSandboxProcessRequest) returns (StartSandboxProcessResponse) {
+    option (google.api.http) = {
+      post: "/sandboxes/{sandbox_id}/processes"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start a sandbox process"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc ListSandboxProcesses(ListSandboxProcessesRequest) returns (ListSandboxProcessesResponse) {
+    option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List sandbox processes"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetSandboxProcess(GetSandboxProcessRequest) returns (GetSandboxProcessResponse) {
+    option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get a sandbox process"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc SignalSandboxProcess(SignalSandboxProcessRequest) returns (SignalSandboxProcessResponse) {
+    option (google.api.http) = {
+      post: "/sandboxes/{sandbox_id}/processes/{process_id}/signals"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Signal a sandbox process"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc WaitSandboxProcess(WaitSandboxProcessRequest) returns (WaitSandboxProcessResponse) {
+    option (google.api.http) = { post: "/sandboxes/{sandbox_id}/processes/{process_id}/wait" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Wait for a sandbox process"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc GetSandboxProcessOutput(GetSandboxProcessOutputRequest) returns (GetSandboxProcessOutputResponse) {
+    option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}/output" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get sandbox process output"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
+  rpc StreamSandboxProcessOutput(StreamSandboxProcessOutputRequest) returns (stream StreamSandboxProcessOutputResponse) {
+    option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}/output/stream" };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Stream sandbox process output"
+      tags: "Sandboxes"
+      tags: "Beta"
+      security: {
+        security_requirement: {
+          key: "BearerAuth"
+          value: {}
+        }
+      }
+    };
+  }
+
   rpc CreateScore(CreateScoreRequest) returns (CreateScoreResponse) {
     option (google.api.http) = {
       post: "/runs/{run_id}/scores",
@@ -1125,7 +1369,7 @@ service V2 {
       responses: {
         key: "200"
         value: {
-          description: "App synced successfully"
+          description: "App sync completed successfully or the app was already up to date"
           schema: {
             json_schema: {
               ref: "#/definitions/v2SyncAppResponse"
@@ -1403,7 +1647,6 @@ service V2 {
       summary: "List insights tables"
       tags: "Insights"
       tags: "Beta"
-      tags: "Internal"
       description: "Lists the available tables that can be queried via the Insights query endpoint."
       security: {
         security_requirement: {
@@ -1466,7 +1709,6 @@ service V2 {
       summary: "List event type schemas"
       tags: "Insights"
       tags: "Beta"
-      tags: "Internal"
       description: "Returns a paginated list of event type schemas, where each schema describes the shape of a specific event's data as nested JSON."
       security: {
         security_requirement: {
@@ -1541,7 +1783,6 @@ service V2 {
       summary: "Generate insights query from prompt"
       tags: "Insights"
       tags: "Beta"
-      tags: "Internal"
       description: "Translates a natural language prompt into an Insights SQL query."
       security: {
         security_requirement: {
@@ -1627,7 +1868,6 @@ service V2 {
       summary: "Query insights"
       tags: "Insights"
       tags: "Beta"
-      tags: "Internal"
       description: "Query Insights using the provided SQL query."
       security: {
         security_requirement: {
@@ -2202,7 +2442,11 @@ message AppSync {
 
   optional string status = 1 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Status of the latest sync"
+      description: "Status of the latest sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress."
+      enum: "pending"
+      enum: "success"
+      enum: "error"
+      enum: "duplicate"
     }
   ];
   optional google.protobuf.Timestamp synced_at = 11 [
@@ -2748,7 +2992,11 @@ message SyncAppData {
   ];
   string status = 2 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {
-      description: "Status"
+      description: "Status of the sync. `success` and `duplicate` are successful terminal states. `duplicate` means the sync payload matched the previous successful sync, so no function configuration changes were applied. `error` is a failed terminal state, and `pending` means the sync is still in progress."
+      enum: "pending"
+      enum: "success"
+      enum: "error"
+      enum: "duplicate"
     }
   ];
   string app_id = 3 [

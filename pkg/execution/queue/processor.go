@@ -72,7 +72,7 @@ func New(
 		),
 		Consumer:        NewConsumer(shards),
 		JobQueueReader:  newJobQueueReader(shards, o.AccountShardIterationEnabled),
-		Migrator:        newQueueMigrator(shards, o.Clock),
+		MigrationLocker: newQueueMigrationLocker(shards),
 		Unpauser:        newQueueUnpauser(shards),
 		AttemptResetter: newAttemptResetter(shards),
 
@@ -110,7 +110,7 @@ type queueProcessor struct {
 	Producer
 	Consumer
 	JobQueueReader
-	Migrator
+	MigrationLocker
 	Unpauser
 	AttemptResetter
 
@@ -231,15 +231,17 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		l.Info("Executor started in assignedQueueShard Mode", "queue_shard", q.Shard().Name())
 	}
 
-	for _, role := range q.roles {
-		go q.runRole(ctx, role)
-	}
-
 	scanner := QueueScanner(partitionQueueScanner{q: q})
 	if shard := q.Shard(); shard != nil {
 		if shardScanner, ok := shard.(QueueScanner); ok {
 			scanner = shardScanner
 		}
+	}
+	if err := q.configureScannerRoles(scanner); err != nil {
+		return err
+	}
+	for _, role := range q.roles {
+		go q.runRole(ctx, role)
 	}
 
 	dispatch := func(ctx context.Context, item ProcessItem) (DispatchedItem, error) {
@@ -258,6 +260,7 @@ func (q *queueProcessor) Run(ctx context.Context, f RunFunc) error {
 		Leaser:          q,
 		Dispatch:        dispatch,
 		WorkerSemaphore: q.Semaphore(),
+		IsRoleActive:    q.isRoleActive,
 	}
 	if rt.Leaser == nil {
 		return ErrQueueScannerMissingLeaser

@@ -1,13 +1,37 @@
 package apiv2base
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func TestCustomErrorHandlerPreservesExactHTTPStatus(t *testing.T) {
+	for _, code := range []int{http.StatusRequestEntityTooLarge, http.StatusGatewayTimeout} {
+		t.Run(http.StatusText(code), func(t *testing.T) {
+			response := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+
+			CustomErrorHandler(NewBase())(
+				context.Background(),
+				nil,
+				nil,
+				response,
+				request,
+				NewError(code, ErrorInvalidRequest, "test error"),
+			)
+
+			if response.Code != code {
+				t.Fatalf("expected HTTP %d, got %d", code, response.Code)
+			}
+		})
+	}
+}
 
 func TestNewSingleError(t *testing.T) {
 	tests := []struct {
@@ -177,6 +201,8 @@ func TestHTTPToGRPCStatus(t *testing.T) {
 		{http.StatusConflict, codes.AlreadyExists},
 		{http.StatusUnprocessableEntity, codes.FailedPrecondition},
 		{http.StatusTooManyRequests, codes.ResourceExhausted},
+		{http.StatusRequestEntityTooLarge, codes.ResourceExhausted},
+		{http.StatusGatewayTimeout, codes.DeadlineExceeded},
 		{http.StatusInternalServerError, codes.Internal},
 		{http.StatusNotImplemented, codes.Unimplemented},
 		{http.StatusServiceUnavailable, codes.Unavailable},

@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"testing"
@@ -267,6 +270,86 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 		"idempotencyKey": "idem-1",
 	}, gotBody)
 	require.Contains(t, out.String(), `"runId": "01J00000000000000000000000"`)
+}
+
+func TestWriteSandboxFileSendsRawBodyAndQueryParameters(t *testing.T) {
+	filePath := filepath.Join(t.TempDir(), "upload.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte("sandbox file"), 0o600))
+
+	var gotBody []byte
+	var gotQuery url.Values
+	var gotContentType string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		gotBody, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		gotQuery = r.URL.Query()
+		gotContentType = r.Header.Get("Content-Type")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"path":"/tmp/upload.txt","bytesWritten":"12"}}`))
+	}))
+	defer server.Close()
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", server.URL,
+		"write-sandbox-file",
+		"sandbox-id",
+		"--path", "/tmp/upload.txt",
+		"--mode", "0640",
+		"--body-file", filePath,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []byte("sandbox file"), gotBody)
+	require.Equal(t, "/tmp/upload.txt", gotQuery.Get("path"))
+	require.Equal(t, "0640", gotQuery.Get("mode"))
+	require.Equal(t, "application/octet-stream", gotContentType)
+}
+
+func TestReadSandboxFileStreamsRawResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/tmp/download.txt", r.URL.Query().Get("path"))
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = w.Write([]byte{'a', 0, 'b'})
+	}))
+	defer server.Close()
+
+	cmd := Command()
+	output := &bytes.Buffer{}
+	cmd.Writer = output
+	err := cmd.Run(context.Background(), []string{
+		"api",
+		"--api-host", server.URL,
+		"read-sandbox-file",
+		"sandbox-id",
+		"--path", "/tmp/download.txt",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []byte{'a', 0, 'b'}, output.Bytes())
+}
+
+func TestWriteSandboxFileFlagsDoNotConflict(t *testing.T) {
+	var writeFile endpoint
+	for _, ep := range discoverEndpoints() {
+		if ep.name == "write-sandbox-file" {
+			writeFile = ep
+			break
+		}
+	}
+	require.NotEmpty(t, writeFile.name)
+
+	counts := map[string]int{}
+	for _, flag := range endpointFlags(writeFile) {
+		counts[flag.Names()[0]]++
+	}
+	require.Equal(t, 1, counts["body"])
+	require.Equal(t, 1, counts["body-file"])
+	require.Equal(t, 1, counts["path"])
+	require.Equal(t, 1, counts["mode"])
 }
 
 func TestCommandBuildsRerunFromStepBody(t *testing.T) {

@@ -43,6 +43,7 @@ type Endpoint struct {
 	Body                string
 	Input               protoreflect.MessageDescriptor
 	PathParams          []string
+	ServerStreaming     bool
 }
 
 func Discover() []Endpoint {
@@ -83,6 +84,7 @@ func Discover() []Endpoint {
 			Body:                rule.Body,
 			Input:               method.Input(),
 			PathParams:          PathParams(path),
+			ServerStreaming:     method.IsStreamingServer(),
 		})
 	}
 
