@@ -197,8 +197,7 @@ export function useColumns({
               <RiInformationLine className="text-subtle h-3.5 w-3.5" />
             </TooltipTrigger>
             <TooltipContent>
-              The total number of function runs in the last 24 hours. Highlighted bars indicate that
-              the concurrency limit was reached.
+              Highlighted bars show when this function reached its concurrency limit.
             </TooltipContent>
           </Tooltip>
         </div>

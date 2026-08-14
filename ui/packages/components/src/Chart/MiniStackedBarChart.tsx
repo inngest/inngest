@@ -18,16 +18,8 @@ export default function MiniStackedBarChart({ data, className = '' }: MiniStacke
     failureCount: d.failureCount ?? 0,
     concurrencyLimitReached: d.concurrencyLimitReached ?? false,
   }));
-  const concurrencyLimitReached = mappedData.some((slot) => slot.concurrencyLimitReached);
-
   return (
-    <div
-      className={cn(
-        'h-8 w-40 [--color-concurrency-limit:var(--color-accent-xSubtle)] dark:[--color-concurrency-limit:var(--color-accent-xIntense)]',
-        className
-      )}
-      title={concurrencyLimitReached ? 'Concurrency limit reached in the last 24 hours' : undefined}
-    >
+    <div className={cn('h-8 w-40', className)}>
       <ResponsiveContainer>
         <BarChart
           data={mappedData}
@@ -51,10 +43,10 @@ export default function MiniStackedBarChart({ data, className = '' }: MiniStacke
           >
             {mappedData.map((slot, index) => (
               <Cell
-                fill={
+                className={
                   slot.concurrencyLimitReached
-                    ? 'rgb(var(--color-concurrency-limit))'
-                    : 'rgb(var(--color-primary-xSubtle))'
+                    ? 'fill-accent-xSubtle dark:fill-accent-xIntense'
+                    : 'fill-primary-xSubtle'
                 }
                 key={index}
               />
