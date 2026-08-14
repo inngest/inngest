@@ -340,47 +340,36 @@ const ClientPicker = ({
         </TabCards.Button>
       ))}
     </TabCards.ButtonList>
-    {/* All three panels stay mounted, stacked in the same grid cell with the
-        inactive ones invisible: the container is always as tall as the
-        tallest card, so switching tools never shifts the page, and every
-        snippet stays in the DOM for agents reading the page. */}
-    <div className="grid">
-      {clients.map((client) => (
-        <TabCards.Content
-          className="col-start-1 row-start-1 data-[state=inactive]:invisible"
-          forceMount
-          key={client.id}
-          value={client.id}
-        >
-          <div className="mb-4 flex items-center gap-2">
-            <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
-              <client.Icon className="text-basis h-4 w-4" />
-            </div>
-            <p className="text-basis">{client.name}</p>
+    {clients.map((client) => (
+      <TabCards.Content key={client.id} value={client.id}>
+        <div className="mb-4 flex items-center gap-2">
+          <div className="bg-canvasMuted flex h-9 w-9 items-center justify-center rounded">
+            <client.Icon className="text-basis h-4 w-4" />
           </div>
-          <ClientOnly
-            fallback={
-              <div style={{ height: snippetHeight(client.snippet) }}>
-                <Skeleton className="h-full w-full" />
-              </div>
-            }
-          >
-            <CommandBlock.Wrapper>
-              <CommandBlock.Header className="flex items-center justify-between pr-4">
-                <CommandBlock.Tabs tabs={[client.snippet]} activeTab={client.snippet.title} />
-                <CommandBlock.CopyButton content={client.snippet.content} />
-              </CommandBlock.Header>
-              <CommandBlock currentTabContent={client.snippet} />
-            </CommandBlock.Wrapper>
-          </ClientOnly>
-          <ClientNotes
-            bearerTokenEnvVar={bearerTokenEnvVar}
-            client={client.id}
-            isDevServer={isDevServer}
-          />
-        </TabCards.Content>
-      ))}
-    </div>
+          <p className="text-basis">{client.name}</p>
+        </div>
+        <ClientOnly
+          fallback={
+            <div style={{ height: snippetHeight(client.snippet) }}>
+              <Skeleton className="h-full w-full" />
+            </div>
+          }
+        >
+          <CommandBlock.Wrapper>
+            <CommandBlock.Header className="flex items-center justify-between pr-4">
+              <CommandBlock.Tabs tabs={[client.snippet]} activeTab={client.snippet.title} />
+              <CommandBlock.CopyButton content={client.snippet.content} />
+            </CommandBlock.Header>
+            <CommandBlock currentTabContent={client.snippet} />
+          </CommandBlock.Wrapper>
+        </ClientOnly>
+        <ClientNotes
+          bearerTokenEnvVar={bearerTokenEnvVar}
+          client={client.id}
+          isDevServer={isDevServer}
+        />
+      </TabCards.Content>
+    ))}
   </TabCards>
 );
 
