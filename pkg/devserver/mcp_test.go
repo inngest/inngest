@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2operations"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
 )
@@ -117,6 +118,36 @@ func TestMCPRoutesDoNotCaptureSetupPage(t *testing.T) {
 	router.ServeHTTP(recorder, req)
 
 	require.Equal(t, http.StatusTeapot, recorder.Code)
+}
+
+func TestMCPOperations(t *testing.T) {
+	handler := newMCPHandler(nil, nil, 0, nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/operations", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.Operations(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Equal(t, "*", recorder.Header().Get("Access-Control-Allow-Origin"))
+	require.Equal(t, "public, max-age=300, stale-while-revalidate=3600", recorder.Header().Get("Cache-Control"))
+
+	var response operationsResponse
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+
+	operations := map[string]apiv2operations.Operation{}
+	for _, operation := range response.Data.Operations {
+		operations[operation.MCP.Name] = operation
+	}
+
+	getRun := operations["get_run"]
+	require.Equal(t, "GetFunctionRun", getRun.ID)
+	require.Equal(t, "GET", getRun.HTTP.Method)
+	require.Equal(t, "get-function-run", getRun.CLI.Command)
+
+	grepDocs := operations["grep_docs"]
+	require.Equal(t, "mcp.grep_docs", grepDocs.ID)
+	require.Nil(t, grepDocs.HTTP)
+	require.Nil(t, grepDocs.CLI)
 }
 
 func TestMCPBrowserRequests(t *testing.T) {
