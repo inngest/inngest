@@ -361,7 +361,13 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 			continue
 		}
 
-		ab.handleScheduling(bulkResult, fn, chunk[0], mgr)
+		if err := ab.handleScheduling(bulkResult, fn, chunk[0], mgr); err != nil {
+			for _, p := range chunkPending {
+				p.pending.err = err
+				close(p.pending.done)
+			}
+			continue
+		}
 
 		go func() {
 			metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
@@ -416,7 +422,7 @@ func (ab *appendBuffer) mapBulkStatus(bulkStatus string, itemIndex int) enums.Ba
 }
 
 // handleScheduling schedules batch execution based on the bulk append result.
-func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Function, firstItem BatchItem, mgr BatchManager) {
+func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Function, firstItem BatchItem, mgr BatchManager) error {
 	timeout, err := time.ParseDuration(fn.EventBatch.Timeout)
 	if err != nil {
 		ab.log.Error("failed to parse batch timeout", "error", err, "timeout", fn.EventBatch.Timeout)
@@ -438,36 +444,37 @@ func (ab *appendBuffer) handleScheduling(result *BulkAppendResult, fn inngest.Fu
 	// This is safe because batcher.ScheduleExecution is idempotent for a given batchID, so if a job already exists, the schedule call is a no-op.
 	if result.Status == "new" || result.Duplicates > 0 {
 		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now().Add(timeout), "new"); err != nil {
-			return
+			return err
 		}
 	}
 
 	// Schedule immediate execution for the full batch
 	if result.Status == "full" || result.Status == "maxsize" {
 		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), result.Status); err != nil {
-			return
+			return err
 		}
 	}
 
 	if result.Status == "overflow" {
 		// Schedule immediate execution for the current full batch
 		if err := ab.scheduleBatchExecution(ctx, mgr, result.BatchID, result, firstItem, fn, time.Now(), "overflow_full"); err != nil {
-			return
+			return err
 		}
 
 		// Schedule execution after timeout for the overflow batch
 		if result.NextBatchID != "" {
 			if err := ab.scheduleBatchExecution(ctx, mgr, result.NextBatchID, result, firstItem, fn, time.Now().Add(timeout), "overflow_next"); err != nil {
-				return
+				return err
 			}
 		}
 	}
 
 	// For "append" where no duplicates are present, no action is needed. The batch was already scheduled from when it was created
+	return nil
 }
 
 // scheduleBatchExecution parses a batch ID, schedules execution, and emits metrics.
-// Returns a non-nil error only if parsing the batch ID fails.
+// Returns any batch ID parsing or execution scheduling error.
 func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchManager, rawBatchID string, result *BulkAppendResult, firstItem BatchItem, fn inngest.Function, at time.Time, scheduleType string) error {
 	batchID, err := ulid.Parse(rawBatchID)
 	if err != nil {
@@ -508,6 +515,7 @@ func (ab *appendBuffer) scheduleBatchExecution(ctx context.Context, mgr BatchMan
 			PkgName: pkgName,
 			Tags:    map[string]any{"error_type": "schedule"},
 		})
+		return scheduleErr
 	} else {
 		metrics.IncrBatchBufferScheduleCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
