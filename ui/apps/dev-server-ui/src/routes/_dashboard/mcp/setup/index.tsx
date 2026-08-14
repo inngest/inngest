@@ -9,10 +9,21 @@ export const Route = createFileRoute('/_dashboard/mcp/setup/')({
 
 function MCPComponent() {
   const endpoint = createDevServerURL('/mcp');
+  const operationsEndpoint = createDevServerURL('/api/v2/operations');
   const absoluteEndpoint =
     typeof window === 'undefined'
       ? endpoint
       : new URL(endpoint, window.location.origin).toString();
+  const absoluteOperationsEndpoint =
+    typeof window === 'undefined'
+      ? operationsEndpoint
+      : new URL(operationsEndpoint, window.location.origin).toString();
 
-  return <MCPSetup endpoint={absoluteEndpoint} isDevServer />;
+  return (
+    <MCPSetup
+      endpoint={absoluteEndpoint}
+      isDevServer
+      operationsEndpoint={absoluteOperationsEndpoint}
+    />
+  );
 }

@@ -161,6 +161,10 @@ type MCPHandler struct {
 
 	serverOnce sync.Once
 	server     *mcp.Server
+	endpoints  []apiv2endpoint.Endpoint
+
+	operationsMu   sync.Mutex
+	operationsJSON []byte
 
 	// File content cache
 	fileCacheMu sync.RWMutex
@@ -217,7 +221,11 @@ func isRunFailed(status string) bool {
 
 // NewMCPHandler creates a new MCP handler for the dev server
 func NewMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler) http.Handler {
-	h := &MCPHandler{
+	return newMCPHandler(events, data, tick, v2).handler()
+}
+
+func newMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler) *MCPHandler {
+	return &MCPHandler{
 		events:        events,
 		data:          data,
 		tick:          tick,
@@ -225,7 +233,9 @@ func NewMCPHandler(events api.EventHandler, data cqrs.Manager, tick time.Duratio
 		fileCache:     make(map[string][]byte),
 		fileInfoCache: make(map[string]fs.FileInfo),
 	}
+}
 
+func (h *MCPHandler) handler() http.Handler {
 	originProtection := http.NewCrossOriginProtection()
 	//
 	// The dev server accepts cross-origin API requests so locally hosted UIs can connect.
@@ -259,7 +269,7 @@ func (h *MCPHandler) createMCPServer() *mcp.Server {
 	)
 	h.addCompatibilityTools(server)
 	h.addDocsTools(server)
-	apiv2mcp.Register(server, apiv2mcp.Options{
+	h.endpoints = apiv2mcp.Register(server, apiv2mcp.Options{
 		BasePath: "/api/v2",
 		Execute:  h.executeV2,
 		Exclude: func(endpoint apiv2endpoint.Endpoint) bool {
@@ -1178,5 +1188,9 @@ func (h *MCPHandler) listDocs(ctx context.Context, req *mcp.CallToolRequest, _ s
 
 // AddMCPRoute adds the MCP route to the dev server router
 func AddMCPRoute(r chi.Router, events api.EventHandler, data cqrs.Manager, tick time.Duration, v2 http.Handler) {
-	r.Handle("/mcp", NewMCPHandler(events, data, tick, v2))
+	addMCPRoute(r, newMCPHandler(events, data, tick, v2))
+}
+
+func addMCPRoute(r chi.Router, handler *MCPHandler) {
+	r.Handle("/mcp", handler.handler())
 }
