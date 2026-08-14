@@ -7,6 +7,7 @@ import { getHumanReadableCron } from '@inngest/components/hooks/useCron';
 import { type Function } from '@inngest/components/types/function';
 import { TriggerTypes } from '@inngest/components/types/trigger';
 import { cn } from '@inngest/components/utils/classNames';
+import { RiInformationLine } from '@remixicon/react';
 import { createColumnHelper, type Row } from '@tanstack/react-table';
 
 import { FunctionsTable } from './FunctionsTable';
@@ -188,7 +189,20 @@ export function useColumns({
         const functionID = info.row.original.id;
         return <UsageCell functionID={functionID} getFunctionVolume={getFunctionVolume} />;
       },
-      header: 'Volume (24h)',
+      header: () => (
+        <div className="flex items-center gap-1">
+          <span>Volume (24h)</span>
+          <Tooltip>
+            <TooltipTrigger>
+              <RiInformationLine className="text-subtle h-3.5 w-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>
+              The total number of function runs in the last 24 hours. Highlighted bars indicate that
+              the concurrency limit was reached.
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      ),
       enableSorting: false,
       id: ensureColumnID('usage'),
     }),

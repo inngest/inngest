@@ -110,6 +110,9 @@ export function useFunctionVolume() {
       // Creates an array of objects containing the start and failure count for each usage slot (1 hour)
       const dailyVolumeSlots = workflow.dailyStarts.data.map(
         (usageSlot, index) => ({
+          concurrencyLimitReached: Boolean(
+            workflow.concurrencyLimit.data[index]?.value,
+          ),
           startCount: usageSlot.count,
           failureCount: workflow.dailyFailures.data[index]?.count ?? 0,
         }),

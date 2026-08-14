@@ -870,6 +870,40 @@ describe('infra dashboard top functions', () => {
 
     expect(rows.map((row) => row.name)).toEqual(['Function 2', 'Function 4']);
   });
+
+  it('marks functions that reached their concurrency limit', () => {
+    const usage = [1, 2].map((total, index) => ({
+      id: `fn-${index + 1}`,
+      slug: `function-${index + 1}`,
+      triggers: [],
+      dailyStarts: { total, data: [{ count: total }, { count: total }] },
+      dailyCompleted: { total, data: [] },
+      dailyCancelled: { total: 0, data: [] },
+      dailyFailures: { total: 0, data: [{ count: 0 }, { count: 0 }] },
+    })) as unknown as NonNullable<
+      Parameters<typeof buildTopFunctionRows>[0]['usage']
+    >;
+
+    const rows = buildTopFunctionRows({
+      concurrency: [
+        { id: 'fn-1', data: [{ value: 0 }] },
+        { id: 'fn-2', data: [{ value: 0 }, { value: 3 }] },
+      ],
+      usage,
+    });
+
+    expect(
+      rows.map(({ id, usage }) => ({
+        id,
+        concurrencyLimitReached: usage?.dailyVolumeSlots.map(
+          (slot) => slot.concurrencyLimitReached,
+        ),
+      })),
+    ).toEqual([
+      { id: 'fn-2', concurrencyLimitReached: [false, true] },
+      { id: 'fn-1', concurrencyLimitReached: [false, false] },
+    ]);
+  });
 });
 
 describe('MenuItem exact matching', () => {

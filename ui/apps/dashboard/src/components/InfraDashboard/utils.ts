@@ -921,16 +921,24 @@ export function calculateUsageShare(value: number, total: number): number {
 }
 
 export function buildTopFunctionRows({
+  concurrency,
   functions,
   limit = 50,
   usage,
 }: {
+  concurrency?: Array<{
+    id: string;
+    data: Array<Pick<MetricsData, 'value'>>;
+  }>;
   functions?: WorkflowSummary[] | undefined;
   limit?: number;
   usage: WorkflowUsage[] | undefined;
 }): TopFunctionRow[] {
   const summariesBySlug = new Map(
     functions?.map((fn) => [fn.slug, fn] as const) ?? [],
+  );
+  const concurrencyByFunction = new Map(
+    concurrency?.map((metric) => [metric.id, metric.data] as const) ?? [],
   );
 
   return (
@@ -965,6 +973,9 @@ export function buildTopFunctionRows({
             })) ?? [],
           usage: {
             dailyVolumeSlots: fn.dailyStarts.data.map((usageSlot, index) => ({
+              concurrencyLimitReached: Boolean(
+                concurrencyByFunction.get(summary?.id ?? fn.id)?.[index]?.value,
+              ),
               failureCount: fn.dailyFailures.data[index]?.count ?? 0,
               startCount: usageSlot.count,
             })),

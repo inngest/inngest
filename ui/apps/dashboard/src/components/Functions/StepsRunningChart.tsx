@@ -82,7 +82,7 @@ export default function StepsRunningChart({
   return (
     <SimpleLineChart
       title="Step Running - Point in Time"
-      desc="The number of steps running for this function at point in time. This data shows the value at the time of instrumentation, and is different from throughput."
+      desc="The number of steps running for this function at point in time. This data shows the value at the time of instrumentation, and is different from throughput. The chart background changes color when the function's concurrency limit is reached."
       data={metrics}
       legend={[
         {
