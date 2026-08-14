@@ -1,8 +1,12 @@
 package batch
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -25,6 +30,47 @@ func TestMain(m *testing.M) {
 		goleak.IgnoreTopFunction("github.com/karlseguin/ccache/v2.(*Cache).worker"),
 		goleak.IgnoreTopFunction("github.com/redis/rueidis.(*call).LazyDo.func1"),
 	)
+}
+
+type scheduleErrorBatchManager struct {
+	BatchManager
+	err error
+}
+
+func (m scheduleErrorBatchManager) ScheduleExecution(context.Context, ScheduleBatchOpts) error {
+	return m.err
+}
+
+func TestScheduleBatchExecutionErrorLog(t *testing.T) {
+	var output bytes.Buffer
+	log := logger.FromSlog(slog.New(slog.NewJSONHandler(&output, nil)), slog.LevelDebug)
+	buffer := newAppendBuffer(time.Second, 1, 1, log)
+	batchID := ulid.MustParse("01K0T21HZW9DHDZ5P5TQKBN1E6")
+	functionID := uuid.MustParse("2bbf4f69-6e0d-466f-9cdd-2cfa2f684c8b")
+	scheduledAt := time.Date(2026, time.August, 13, 12, 30, 0, 0, time.UTC)
+
+	// Return a synthetic scheduling failure to exercise the scheduleErr != nil logging path.
+	require.NotPanics(t, func() {
+		err := buffer.scheduleBatchExecution(
+			context.Background(),
+			scheduleErrorBatchManager{err: errors.New("schedule failed")},
+			batchID.String(),
+			&BulkAppendResult{BatchPointer: "pointer"},
+			BatchItem{},
+			inngest.Function{ID: functionID},
+			scheduledAt,
+			"new",
+		)
+		require.NoError(t, err)
+	})
+
+	entry := map[string]any{}
+	require.NoError(t, json.Unmarshal(output.Bytes(), &entry))
+	require.Equal(t, "schedule failed", entry["error"])
+	require.Equal(t, batchID.String(), entry["batchID"])
+	require.Equal(t, functionID.String(), entry["function_id"])
+	require.Equal(t, "new", entry["schedule_type"])
+	require.Equal(t, scheduledAt.Format(time.RFC3339), entry["scheduled_at"])
 }
 
 func TestBulkAppend(t *testing.T) {
