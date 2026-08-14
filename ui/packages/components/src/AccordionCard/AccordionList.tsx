@@ -42,7 +42,12 @@ const AccordionTrigger = forwardRef<
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
 >(({ children, className, ...props }, forwardedRef) => {
   return (
-    <AccordionPrimitive.Header className={cn('flex items-center text-sm', className)}>
+    <AccordionPrimitive.Header
+      className={cn(
+        'data-[state=open]:border-subtle flex items-center text-sm data-[state=open]:border-b',
+        className
+      )}
+    >
       <AccordionPrimitive.Trigger
         {...props}
         ref={forwardedRef}
