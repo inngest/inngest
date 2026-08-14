@@ -34,7 +34,7 @@ export const announcements: Announcement[] = [
   {
     id: 'cloud-mcp-2026-08',
     title: 'New: Cloud MCP',
-    body: 'Connect Claude, Codex, or any of your favorite AI assistant',
+    body: 'Connect Claude, Codex, or any of your AI assistants',
     imageUrl: '/images/announcements/Lt-Cloud MCP.png',
     imageUrlDark: '/images/announcements/Dk-Cloud MCP.png',
     cta: {
