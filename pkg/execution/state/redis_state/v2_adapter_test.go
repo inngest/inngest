@@ -1009,6 +1009,36 @@ func TestV2AdapterLookupIdempotency(t *testing.T) {
 	assert.True(t, entry.IsTombstone)
 }
 
+func TestV2AdapterLookupIdempotencyCleansUpOldMarkerOnlyTombstone(t *testing.T) {
+	ctx := context.Background()
+	svc, redis := mustV2Service(t, ctx)
+	id := statev2.ID{
+		RunID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		FunctionID: uuid.New(),
+		Tenant: statev2.Tenant{
+			AccountID: uuid.New(),
+			EnvID:     uuid.New(),
+			AppID:     uuid.New(),
+		},
+	}
+	key := "old-marker-only-tombstone"
+	redisKey := fmt.Sprintf("{estate:%s}:key:%s", id.Tenant.AccountID, key)
+	require.NoError(t, redis.Set(redisKey, string(consts.FunctionIdempotencyTombstone)))
+
+	entry, err := svc.LookupIdempotency(ctx, id, key)
+	require.NoError(t, err)
+	assert.Nil(t, entry)
+	assert.False(t, redis.Exists(redisKey))
+
+	require.NoError(t, redis.Set(redisKey, string(consts.FunctionIdempotencyTombstone)))
+	redis.SetTTL(redisKey, time.Hour)
+	entry, err = svc.LookupIdempotency(ctx, id, key)
+	require.NoError(t, err)
+	require.NotNil(t, entry)
+	assert.True(t, entry.IsTombstone)
+	assert.True(t, redis.Exists(redisKey))
+}
+
 // recordingPauseDeleter counts DeletePausesForRun calls for verifying
 // Delete's cascade behavior.
 type recordingPauseDeleter struct{ calls int }
