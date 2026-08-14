@@ -51,10 +51,8 @@ type Operation = {
 };
 
 type OperationsResponse = {
-  data?: { operations?: Operation[] };
+  data: { operations: Operation[] };
 };
-
-const operationsFetchTimeoutMs = 30_000;
 
 const devServerExamples = [
   'List my registered Inngest functions and their triggers',
@@ -152,60 +150,25 @@ const snippetHeight = (snippet: TabsProps) => snippet.content.split('\n').length
 // against this page's code lines; mute it until hovered.
 const mutedCopyButton = '[&_button]:text-muted [&_button:hover]:text-basis';
 
-const isAbortDueToTimeout = (error: unknown) =>
-  error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError');
-
-// AbortSignal.any isn't in this package's TS lib target; combine the two
-// signals fetch needs to respect (react-query's own cancellation, and our
-// timeout) by hand instead.
-const combineAbortSignals = (a: AbortSignal, b: AbortSignal): AbortSignal => {
-  if (a.aborted) return a;
-  if (b.aborted) return b;
-  const controller = new AbortController();
-  a.addEventListener('abort', () => controller.abort(a.reason), { once: true });
-  b.addEventListener('abort', () => controller.abort(b.reason), { once: true });
-  return controller.signal;
-};
-
 const useMCPTools = (operationsEndpoint: string) => {
   const query = useQuery({
     queryKey: ['v2-operations', operationsEndpoint],
-    queryFn: async ({ signal: querySignal }): Promise<MCPTool[]> => {
-      const signal = combineAbortSignals(
-        querySignal,
-        AbortSignal.timeout(operationsFetchTimeoutMs)
-      );
-      const response = await fetch(operationsEndpoint, {
-        headers: { Accept: 'application/json' },
-        signal,
-      });
+    queryFn: async (): Promise<MCPTool[]> => {
+      const response = await fetch(operationsEndpoint);
       if (!response.ok) {
         throw new Error(`Operations endpoint returned HTTP ${response.status}`);
       }
 
       const body = (await response.json()) as OperationsResponse;
-      if (!body.data?.operations) {
-        throw new Error('Operations endpoint returned an invalid response');
-      }
       return body.data.operations.flatMap((operation) => (operation.mcp ? [operation.mcp] : []));
     },
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  const error = query.error
-    ? isAbortDueToTimeout(query.error)
-      ? `The operations endpoint did not respond within ${
-          operationsFetchTimeoutMs / 1000
-        } seconds. Check that ${operationsEndpoint} is reachable from this page.`
-      : query.error instanceof TypeError
-      ? `Could not connect to ${operationsEndpoint}. Check that the server is running and reachable from this page.`
-      : query.error.message || 'Unable to list MCP tools'
-    : undefined;
-
   return {
-    error,
-    loading: query.isFetching,
+    error: query.error?.message,
+    loading: query.isPending,
     retry: () => void query.refetch(),
     tools: query.data ?? [],
   };
