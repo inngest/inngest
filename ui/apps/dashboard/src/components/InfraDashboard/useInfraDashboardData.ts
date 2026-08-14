@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -198,12 +199,6 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
   const env = useEnvironment();
   const client = useClient();
   const range = useMemo(() => getUtcMonthToDateRange(), [timeRange.id]);
-  const topFunctionsRange = useMemo(() => {
-    const until = new Date();
-    const from = new Date(until.getTime() - 24 * 60 * 60 * 1000);
-
-    return { from, until };
-  }, [timeRange.id]);
   const key = useMemo(
     () => cacheKey({ envID: env.id, month: range.month, year: range.year }),
     [env.id, range.month, range.year],
@@ -244,8 +239,8 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     query: InfraDashboardConcurrencyLimitDocument,
     variables: {
       envID: env.id,
-      from: topFunctionsRange.from.toISOString(),
-      until: topFunctionsRange.until.toISOString(),
+      from: getTimestampDaysAgo({ currentDate: range.until, days: 1 }).toISOString(),
+      until: range.until.toISOString(),
     },
   });
 
