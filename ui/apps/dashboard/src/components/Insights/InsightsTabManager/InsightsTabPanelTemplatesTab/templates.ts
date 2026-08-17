@@ -1,6 +1,7 @@
 import type { QueryTemplate } from '@/components/Insights/types';
 
 export const TEMPLATES: QueryTemplate[] = [
+  // Events templates
   {
     id: 'recent-events',
     name: 'Recent events',
@@ -21,8 +22,7 @@ FROM
 WHERE
     ts > toUnixTimestamp64Milli(subtractDays(now64(), 3))
 GROUP BY
-    hour_bucket,
-    name
+    ALL
 ORDER BY
     hour_bucket,
     name DESC`,
@@ -42,8 +42,7 @@ WHERE
     ts > toUnixTimestamp64Milli(subtractDays(now64(), 3))
     AND name = '{{ event_name }}'
 GROUP BY
-    hour_bucket,
-    name
+    ALL
 ORDER BY
     hour_bucket,
     name DESC`,
@@ -62,7 +61,7 @@ WHERE
     name = 'inngest/function.failed'
     AND ts > toUnixTimestamp64Milli(subtractDays(now64(), 1))
 GROUP BY
-    function_id
+    ALL
 ORDER BY
     failed_count DESC`,
     explanation: 'View failed function runs within the past 24 hours.',
@@ -80,31 +79,117 @@ WHERE
     name = 'inngest/function.cancelled'
     AND ts > toUnixTimestamp64Milli(subtractDays(now64(), 1))
 GROUP BY
-    function_id
+    ALL
 ORDER BY
     cancelled_count DESC`,
     explanation: 'View cancelled function runs within the past 24 hours.',
     templateKind: 'warning',
   },
-  /*
+  // Runs templates
   {
-    id: 'recent-function-successes',
-    name: 'Recent function successes',
+    id: 'runs-count-by-status',
+    name: 'Count runs by status',
     query: `SELECT
-    data.function_id AS function_id,
-    COUNT(*) as success_count
+    function_id,
+    status,
+    COUNT(*) AS count
 FROM
-    events
+    runs
 WHERE
-    name = 'inngest/function.finished'
-    AND JSONExtractBool(data, 'result', 'success') = true
-    AND ts > toUnixTimestamp64Milli(subtractDays(now64(), 1))
+    queued_at > now() - INTERVAL 1 DAY
 GROUP BY
-    function_id
+    ALL
 ORDER BY
-    success_count DESC`,
-    explanation: 'View successful function runs within the past 24 hours.',
-    templateKind: 'success',
+    count DESC`,
+    explanation: 'Count runs by status in the last 24 hours.',
+    templateKind: 'time',
   },
-  */
+  {
+    id: 'errors-by-message',
+    name: 'Errors by message',
+    query: `SELECT
+    error.message AS error_message,
+    COUNT(*) AS error_count
+FROM
+    runs
+WHERE
+    status = 'Failed'
+    AND queued_at > now() - INTERVAL 7 DAY
+GROUP BY
+    ALL
+ORDER BY
+    error_count DESC
+LIMIT 20`,
+    explanation: 'Analyze errors by message to find common failure patterns.',
+    templateKind: 'error',
+  },
+  {
+    id: 'failed-runs-for-function',
+    name: 'Failed runs for function',
+    query: `SELECT
+    toStartOfHour(queued_at) AS hour,
+    left(error.message, 50) AS error_message_prefix,
+    COUNT(*) AS count
+FROM
+    runs
+WHERE
+    app_id = '{{ app_id }}'
+    AND function_id = '{{ function_id }}'
+    AND status = 'Failed'
+    AND queued_at > now() - INTERVAL 3 DAY
+GROUP BY
+    ALL
+ORDER BY
+    hour DESC,
+    count DESC`,
+    explanation:
+      'Group failed runs by hour and error message for a specific function.',
+    templateKind: 'error',
+  },
+  {
+    id: 'duration-percentiles-by-hour',
+    name: 'Duration percentiles by hour',
+    query: `WITH
+    ended_at - started_at AS duration
+SELECT
+    function_id,
+    formatDateTime(queued_at, '%Y-%m-%d %H') AS bucket,
+    quantile(0.5)(duration) AS p50_duration,
+    quantile(0.9)(duration) AS p90_duration,
+    quantile(0.99)(duration) AS p99_duration
+FROM
+    runs
+WHERE
+    queued_at > now() - INTERVAL 7 DAY
+GROUP BY
+    ALL
+ORDER BY
+    bucket DESC,
+    function_id`,
+    explanation: 'Analyze function duration percentiles by hour over 7 days.',
+    templateKind: 'time',
+  },
+  {
+    id: 'function-start-latency',
+    name: 'Function start latency',
+    query: `WITH
+    started_at - fromUnixTimestamp64Milli(toUInt64(input.ts)) AS function_start_latency
+SELECT
+    function_id,
+    formatDateTime(queued_at, '%Y-%m-%d') AS bucket,
+    quantile(0.5)(function_start_latency) AS p50_latency,
+    quantile(0.9)(function_start_latency) AS p90_latency,
+    quantile(0.99)(function_start_latency) AS p99_latency
+FROM
+    runs
+WHERE
+    queued_at > now() - INTERVAL 5 MINUTE
+GROUP BY
+    ALL
+ORDER BY
+    bucket DESC,
+    function_id`,
+    explanation: 'Analyze function start latency percentiles.',
+    templateKind: 'time',
+  },
 ];
