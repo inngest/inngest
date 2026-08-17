@@ -1,4 +1,4 @@
-import { inngest } from "@/inngest/client";
+import { inngest } from "@/v3/client";
 import { NonRetriableError } from "inngest";
 
 export const testNonRetriableError = inngest.createFunction(

@@ -1,4 +1,4 @@
-import { inngest } from "@/inngest/client";
+import { inngest } from "@/v3/client";
 
 export const testSdkSteps = inngest.createFunction(
   { id: "step-test" },
