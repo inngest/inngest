@@ -16,7 +16,7 @@ type Resolver struct {
 	Data          cqrs.Manager
 	HistoryReader history_reader.Reader
 	Runner        runner.Runner
-	QueueReader   queue.JobQueueReader
+	QueueReader   queue.RunQueueReader
 	EventHandler  api.EventHandler
 	Executor      execution.Executor
 	ServerKind    string

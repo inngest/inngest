@@ -254,12 +254,6 @@ type ShadowProcessingOperations interface {
 		options ...BacklogRefillOptionFn,
 	) (*BacklogRefillResult, error)
 	BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error
-	BacklogsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
-	BacklogSize(ctx context.Context, backlogID string) (int64, error)
-	BacklogByID(ctx context.Context, backlogID string) (*QueueBacklog, error)
-
-	ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
-
 	ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error)
 	BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*PeekResult[QueueItem], error)
 	PeekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error)
@@ -267,6 +261,16 @@ type ShadowProcessingOperations interface {
 	ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error)
 	PeekShadowPartitions(ctx context.Context, accountID *uuid.UUID, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error)
 	BacklogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) (*BacklogPeekResult, error)
+}
+
+// BacklogOperations is the optional per-shard read surface for key-queue
+// backlogs. Queue shards without key-queue support need not implement it.
+type BacklogOperations interface {
+	PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error)
+	BacklogsByPartition(ctx context.Context, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
+	BacklogSize(ctx context.Context, backlogID string) (int64, error)
+	BacklogByID(ctx context.Context, backlogID string) (*QueueBacklog, error)
+	ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error)
 }
 
 // InsightsOperations is the per-shard surface for queue inspection and metrics.
@@ -277,7 +281,6 @@ type InsightsOperations interface {
 	// Total queue depth of all partitions including backlog and ready state items
 	TotalSystemQueueDepth(ctx context.Context) (int64, error)
 
-	PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error)
 	OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error)
 	RunningCount(ctx context.Context, scope Scope) (int64, error)
 	StatusCount(ctx context.Context, scope Scope, status string) (int64, error)

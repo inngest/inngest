@@ -32,42 +32,16 @@ export type Announcement = {
 
 export const announcements: Announcement[] = [
   {
-    id: 'lightning-lab-2026-08',
-    title: 'Inngest Lightning Lab',
-    body: 'Your agents need evals | August 12, 11AM PT/2 PM ET',
-    imageUrl: '/images/announcements/lightning-evals.png',
-    imageUrlDark: '/images/announcements/lightning-evals.png',
+    id: 'cloud-mcp-2026-08',
+    title: 'New: Cloud MCP',
+    body: 'Connect Claude, Codex, or any of your AI assistants',
+    imageUrl: '/images/announcements/Lt-Cloud MCP.png',
+    imageUrlDark: '/images/announcements/Dk-Cloud MCP.png',
     cta: {
-      label: 'Register',
-      href: 'https://luma.com/inngest-r614?utm_source=in-app',
+      label: 'Get started',
+      href: 'https://app.inngest.com/mcp/setup',
     },
-    startDate: '2026-08-04T17:00:00Z',
-    endDate: '2026-08-12T17:00:00Z',
-  },
-  {
-    id: 'ai-observability-2026-07',
-    title: 'New: AI observability',
-    body: 'Score, experiment, and group your runs',
-    imageUrl: '/images/announcements/ai-light.png',
-    imageUrlDark: '/images/announcements/ai-dark.png',
-    cta: {
-      label: 'Learn more',
-      href: 'https://www.inngest.com/blog/introducing-agent-evals',
-    },
-    startDate: '2026-06-30T00:00:00Z',
-    endDate: '2026-07-30T00:00:00Z',
-  },
-  {
-    id: 'announcing-defer-2026-06',
-    title: 'Introducing defer ( )',
-    body: 'Schedule runs when the parent run finishes.',
-    imageUrl: '/images/announcements/defer-light.png',
-    imageUrlDark: '/images/announcements/defer-dark.png',
-    cta: {
-      label: 'Learn more',
-      href: 'https://www.inngest.com/blog/announcing-defer',
-    },
-    startDate: '2026-06-01T00:00:00Z',
-    endDate: '2026-07-01T00:00:00Z',
+    startDate: '2026-08-12T17:00:00Z',
+    endDate: '2026-09-12T17:00:00Z',
   },
 ];

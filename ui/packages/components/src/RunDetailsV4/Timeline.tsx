@@ -885,39 +885,54 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
     [onSelectStep]
   );
 
+  const expandableIds = useMemo(() => collectExpandableIds(bars), [bars]);
+
   const handleExpandAll = useCallback(() => {
-    const allExpandableIds = collectExpandableIds(bars);
-    setExpandedBars(new Set([...rootBarIds, ...allExpandableIds]));
-  }, [bars, rootBarIds]);
+    setExpandedBars(new Set([...rootBarIds, ...expandableIds]));
+  }, [expandableIds, rootBarIds]);
 
   const handleCollapseAll = useCallback(() => {
     setExpandedBars(new Set(rootBarIds));
   }, [rootBarIds]);
 
+  // Only offer each action when it would actually change something: expanding
+  // requires a collapsed expandable bar, collapsing requires an expanded
+  // non-root bar (roots are always expanded).
+  const canExpandAll = expandableIds.some((id) => !expandedBars.has(id));
+  const canCollapseAll = useMemo(() => {
+    const roots = new Set(rootBarIds);
+    return [...expandedBars].some((id) => !roots.has(id));
+  }, [expandedBars, rootBarIds]);
+
   const expandCollapseActions = useMemo(
-    () => (
-      <span className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-        <Button
-          size="small"
-          appearance="ghost"
-          icon={<RiExpandUpDownLine className="h-3.5 w-3.5" />}
-          title="Expand all"
-          tooltip="Expand all"
-          aria-label="Expand all"
-          onClick={handleExpandAll}
-        />
-        <Button
-          size="small"
-          appearance="ghost"
-          icon={<RiContractUpDownLine className="h-3.5 w-3.5" />}
-          title="Collapse all"
-          tooltip="Collapse all"
-          aria-label="Collapse all"
-          onClick={handleCollapseAll}
-        />
-      </span>
-    ),
-    [handleExpandAll, handleCollapseAll]
+    () =>
+      canExpandAll || canCollapseAll ? (
+        <span className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+          {canExpandAll && (
+            <Button
+              size="small"
+              appearance="ghost"
+              icon={<RiExpandUpDownLine className="h-3.5 w-3.5" />}
+              title="Expand all"
+              tooltip="Expand all"
+              aria-label="Expand all"
+              onClick={handleExpandAll}
+            />
+          )}
+          {canCollapseAll && (
+            <Button
+              size="small"
+              appearance="ghost"
+              icon={<RiContractUpDownLine className="h-3.5 w-3.5" />}
+              title="Collapse all"
+              tooltip="Collapse all"
+              aria-label="Collapse all"
+              onClick={handleCollapseAll}
+            />
+          )}
+        </span>
+      ) : undefined,
+    [canExpandAll, canCollapseAll, handleExpandAll, handleCollapseAll]
   );
 
   // Handle timeline brush selection change

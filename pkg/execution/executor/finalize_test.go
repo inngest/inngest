@@ -108,6 +108,10 @@ func (q *racingQueue) Dequeue(ctx context.Context, shardName string, i queue.Que
 	return q.shard.Dequeue(ctx, i, opts...)
 }
 
+func (q *racingQueue) RunJobs(ctx context.Context, shardName string, scope queue.Scope, runID ulid.ULID, limit, offset int64) ([]queue.JobResponse, error) {
+	return q.shard.RunJobs(ctx, scope, runID, limit, offset)
+}
+
 func TestFinalizeRemoveJobs_CatchesPostSweepEnqueue(t *testing.T) {
 	// Setup: an initial item exists in the queue. After the first sweep removes
 	// it, a new item is injected (simulating a concurrent enqueue during the

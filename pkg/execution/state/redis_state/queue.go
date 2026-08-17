@@ -47,6 +47,7 @@ func (q *queue) ShardAssignmentConfig() osqueue.ShardAssignmentConfig {
 
 type RedisQueueShard interface {
 	osqueue.QueueShard
+	osqueue.BacklogOperations
 	Client() *QueueClient
 
 	QueueIterator(ctx context.Context, opts QueueIteratorOpts) (partitionCount int64, queueItemCount int64, err error)

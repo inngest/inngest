@@ -240,6 +240,50 @@ describe('Timeline', () => {
       fireEvent.click(screen.getByRole('button', { name: /expand all/i }));
       expect(screen.getByText('Inngest')).toBeTruthy();
     });
+
+    it('hides both actions when there is nothing to expand or collapse', () => {
+      const dataWithNothingExpandable: TimelineData = {
+        ...mockData,
+        bars: [
+          {
+            id: 'root',
+            name: 'Run',
+            startTime: new Date('2024-01-01T00:00:00Z'),
+            endTime: new Date('2024-01-01T00:00:10Z'),
+            style: 'root',
+            isRoot: true,
+            status: 'QUEUED',
+          },
+        ],
+      };
+
+      render(<Timeline data={dataWithNothingExpandable} />, { wrapper: Wrapper });
+
+      expect(screen.queryByRole('button', { name: /expand all/i })).toBeNull();
+      expect(screen.queryByRole('button', { name: /collapse all/i })).toBeNull();
+    });
+
+    it('hides collapse all until something is expanded', () => {
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
+
+      expect(screen.getByRole('button', { name: /expand all/i })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: /collapse all/i })).toBeNull();
+
+      // Expand the first step manually
+      const rows = screen.getAllByTestId('timeline-bar-row');
+      fireEvent.click(rows[1]!);
+
+      expect(screen.getByRole('button', { name: /collapse all/i })).toBeTruthy();
+    });
+
+    it('hides expand all once everything is expanded', () => {
+      render(<Timeline data={mockData} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole('button', { name: /expand all/i }));
+
+      expect(screen.queryByRole('button', { name: /expand all/i })).toBeNull();
+      expect(screen.getByRole('button', { name: /collapse all/i })).toBeTruthy();
+    });
   });
 
   describe('nested steps', () => {

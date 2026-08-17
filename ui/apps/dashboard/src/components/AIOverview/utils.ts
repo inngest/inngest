@@ -43,21 +43,38 @@ export function formatCostAxis(value: number): string {
   return `$${parseFloat(toSigFigs(value, 3))}`;
 }
 
-// headlineCaveat surfaces the ai_headline registry entry's unpriced-usage
-// tracking (see pkg/applogic/dashboards/registry.go) as a human caveat, so
-// the cost tile doesn't look artificially complete when some calls used a
-// model the pricing table doesn't know about.
-export function headlineCaveat(values: NamedValue[] | undefined): string | undefined {
-  if (!values) return undefined;
+// formatCostAxisBar is formatCostAxis's bar-chart counterpart — sub-cent
+// values collapse to "<$0.01" rather than a string of leading zeros, which
+// reads as noise at axis-label size. Bar charts (unlike line charts) plot
+// discrete per-bucket totals that can legitimately land near zero, so this
+// only applies there.
+export function formatCostAxisBar(value: number): string {
+  if (value > 0 && value < 0.01) {
+    return '<$0.01';
+  }
+  return formatCostAxis(value);
+}
+
+// COST_TOOLTIP explains how every cost figure across the AI Overview/
+// FunctionAI dashboards is derived, so each cost tile/chart can share the
+// same wording via its `tooltip` prop.
+export const COST_TOOLTIP =
+  "Estimated from uncached input and output token usage, priced using each model's published per-token rates.";
+
+// headlineCaveat is COST_TOOLTIP plus the ai_headline registry entry's
+// unpriced-usage tracking (see pkg/applogic/dashboards/registry.go), shown
+// when some calls used a model the pricing table doesn't know about.
+export function headlineCaveat(values: NamedValue[] | undefined): string {
+  if (!values) return COST_TOOLTIP;
   const byName = new Map(values.map((v) => [v.name, v.value]));
   const unpricedCalls = byName.get('unpriced_calls') ?? 0;
-  if (unpricedCalls <= 0) return undefined;
+  if (unpricedCalls <= 0) return COST_TOOLTIP;
 
   const unpricedTokens =
     (byName.get('unpriced_input_tokens') ?? 0) +
     (byName.get('unpriced_output_tokens') ?? 0);
 
-  return `${formatCompactNumber(unpricedCalls)} call${unpricedCalls === 1 ? '' : 's'} (${formatCompactNumber(unpricedTokens)} tokens) used a model without pricing data and are excluded from cost.`;
+  return `${COST_TOOLTIP}\n${formatCompactNumber(unpricedCalls)} call${unpricedCalls === 1 ? '' : 's'} (${formatCompactNumber(unpricedTokens)} tokens) used a model without pricing data and are excluded from cost.`;
 }
 
 // withTotalTokens appends a synthetic `total_tokens` value (input_tokens +

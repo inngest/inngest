@@ -34,6 +34,25 @@ type mockConsumer struct {
 	shardName atomic.Value
 }
 
+type mockQueueStatusReader struct {
+	QueueStatusReader
+	called atomic.Bool
+}
+
+func (m *mockQueueStatusReader) RunningCount(context.Context, Scope) (int64, error) {
+	m.called.Store(true)
+	return 42, nil
+}
+
+type mockAttemptResetter struct {
+	called atomic.Bool
+}
+
+func (m *mockAttemptResetter) ResetAttemptsByJobID(context.Context, string, Scope, string) error {
+	m.called.Store(true)
+	return nil
+}
+
 func (m *mockConsumer) Dequeue(_ context.Context, shardName string, _ QueueItem, _ ...DequeueOptionFn) error {
 	m.called.Store(true)
 	m.shardName.Store(shardName)
@@ -55,6 +74,10 @@ func (m *mockQueueScanner) Run(_ context.Context, rt QueueScannerRuntime) error 
 type mockScannerShard struct {
 	*mockShardForIterator
 	scanner QueueScanner
+}
+
+type shardWithoutBacklogOperations struct {
+	QueueShard
 }
 
 func (m *mockScannerShard) Run(ctx context.Context, rt QueueScannerRuntime) error {
@@ -90,6 +113,49 @@ func TestProcessorWithQueueConsumerOverridesDefaultConsumer(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, consumer.called.Load())
 	require.Equal(t, "custom-shard", consumer.shardName.Load())
+}
+
+func TestProcessorWithQueueStatusReaderOverridesDefaultReader(t *testing.T) {
+	ctx := context.Background()
+	shard := &mockShardForIterator{name: "shard-a"}
+	registry, err := NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	reader := &mockQueueStatusReader{}
+	q, err := New(ctx, "test", registry, WithQueueStatusReader(reader))
+	require.NoError(t, err)
+
+	count, err := q.RunningCount(ctx, Scope{})
+	require.NoError(t, err)
+	require.Equal(t, int64(42), count)
+	require.True(t, reader.called.Load())
+}
+
+func TestProcessorWithQueueAttemptResetterOverridesDefaultResetter(t *testing.T) {
+	ctx := context.Background()
+	shard := &mockShardForIterator{name: "shard-a"}
+	registry, err := NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	resetter := &mockAttemptResetter{}
+	q, err := New(ctx, "test", registry, WithQueueAttemptResetter(resetter))
+	require.NoError(t, err)
+
+	require.NoError(t, q.ResetAttemptsByJobID(ctx, "shard-a", Scope{}, "job-a"))
+	require.True(t, resetter.called.Load())
+}
+
+func TestQueueBacklogReaderRequiresShardCapability(t *testing.T) {
+	ctx := context.Background()
+	shard := &shardWithoutBacklogOperations{
+		QueueShard: &mockShardForIterator{name: "shard-a"},
+	}
+	registry, err := NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	reader := NewQueueBacklogReader(registry, nil)
+	_, err = reader.BacklogSize(ctx, shard, "backlog-a")
+	require.ErrorContains(t, err, "does not support backlog reads")
 }
 
 func TestProcessorRunUsesShardQueueScanner(t *testing.T) {

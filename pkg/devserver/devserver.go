@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -658,7 +659,10 @@ func start(ctx context.Context, opts StartOpts) error {
 			CachingMiddleware: caching,
 			FunctionReader:    ds.Data,
 			Executor:          ds.Executor,
-			Queue:             rq,
+			QueueProducer:     rq,
+			RunQueueReader:    rq,
+			QueueItemReader:   rq,
+			AttemptResetter:   rq,
 			QueueShards:       shardRegistry,
 			Broadcaster:       broadcaster,
 			TraceReader:       ds.Data,
@@ -745,7 +749,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create v2 handler: %w", err)
 	}
 
-	AddMCPRoute(devAPI, ds.HandleEvent, ds.Data, opts.Tick, apiv2Handler)
+	mcpHandler := newMCPHandler(ds.HandleEvent, ds.Data, opts.Tick, apiv2Handler)
+	addMCPRoute(devAPI, mcpHandler)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -757,6 +762,8 @@ func start(ctx context.Context, opts StartOpts) error {
 	mounts := []api.Mount{
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
+		{At: "/api/v2/operations", Handler: http.HandlerFunc(mcpHandler.Operations)},
+		{At: "/v2/operations", Handler: http.HandlerFunc(mcpHandler.Operations)},
 		{At: "/api/v2", Handler: apiv2Handler},
 		{At: "/v2", Handler: apiv2Handler},
 		{At: "/debug", Handler: middleware.Profiler()},
@@ -805,7 +812,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
 			Log:              l,
 			DB:               ds.Data,
-			QueueReader:      rq,
+			RunReader:        rq,
+			ItemReader:       rq,
+			PartitionReader:  rq,
+			BacklogReader:    rq,
 			State:            ds.State,
 			Cron:             croner,
 			ShardRegistry:    shardRegistry,

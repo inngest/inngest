@@ -870,6 +870,54 @@ describe('infra dashboard top functions', () => {
 
     expect(rows.map((row) => row.name)).toEqual(['Function 2', 'Function 4']);
   });
+
+  it('marks functions that reached their concurrency limit', () => {
+    const slots = [
+      { count: 1, slot: '2026-08-14T10:00:00Z' },
+      { count: 1, slot: '2026-08-14T10:30:00Z' },
+    ];
+    const usage = [1, 2].map((total, index) => ({
+      id: `fn-${index + 1}`,
+      slug: `function-${index + 1}`,
+      triggers: [],
+      dailyStarts: { total, data: slots },
+      dailyCompleted: { total, data: [] },
+      dailyCancelled: { total: 0, data: [] },
+      dailyFailures: { total: 0, data: [{ count: 0 }, { count: 0 }] },
+    })) as unknown as NonNullable<
+      Parameters<typeof buildTopFunctionRows>[0]['usage']
+    >;
+
+    const rows = buildTopFunctionRows({
+      concurrency: [
+        {
+          id: 'fn-1',
+          data: [{ bucket: '2026-08-14T10:00:00Z', value: 0 }],
+        },
+        {
+          id: 'fn-2',
+          data: [
+            { bucket: '2026-08-14T10:30:00Z', value: 3 },
+            { bucket: '2026-08-14T11:00:00Z', value: 2 },
+          ],
+        },
+      ],
+      usage,
+    });
+
+    const rowsByID = new Map(rows.map((row) => [row.id, row]));
+
+    expect(
+      rowsByID
+        .get('fn-1')
+        ?.usage?.dailyVolumeSlots.map((slot) => slot.concurrencyLimitReached),
+    ).toEqual([false, false]);
+    expect(
+      rowsByID
+        .get('fn-2')
+        ?.usage?.dailyVolumeSlots.map((slot) => slot.concurrencyLimitReached),
+    ).toEqual([false, true]);
+  });
 });
 
 describe('MenuItem exact matching', () => {

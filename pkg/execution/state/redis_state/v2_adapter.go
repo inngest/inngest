@@ -26,7 +26,17 @@ end
 return 0
 `
 
-var releaseFinalizationClaimScript = NewClusterLuaScript(releaseFinalizationClaimLua)
+const cleanupOldIdempotencyKeyLua = `
+if redis.call("GET", KEYS[1]) == ARGV[1] and redis.call("TTL", KEYS[1]) == -1 then
+	return redis.call("DEL", KEYS[1])
+end
+return 0
+`
+
+var (
+	releaseFinalizationClaimScript = NewClusterLuaScript(releaseFinalizationClaimLua)
+	cleanupOldIdempotencyKeyScript = NewClusterLuaScript(cleanupOldIdempotencyKeyLua)
+)
 
 func MustRunServiceV2(m statev1.Manager, opts ...MgrV2Opt) state.RunService {
 	o := &mgrV2Opts{}
@@ -424,6 +434,30 @@ func (v v2) LookupIdempotency(ctx context.Context, id state.ID, key string) (*st
 	if len(val) > 0 && val[0] == consts.FunctionIdempotencyTombstone {
 		entry.IsTombstone = true
 		val = val[1:]
+		if val == "" {
+			deleted, err := cleanupOldIdempotencyKeyScript.Exec(
+				ctx,
+				client,
+				[]string{redisKey},
+				[]string{string(consts.FunctionIdempotencyTombstone)},
+			).AsInt64()
+			if err != nil {
+				logger.StdlibLogger(ctx).Warn(
+					"failed to clean up old idempotency key",
+					"error", err,
+					"redis_key", redisKey,
+				)
+				return entry, nil
+			}
+			if deleted == 1 {
+				logger.StdlibLogger(ctx).Warn(
+					"deleted old idempotency key with no TTL",
+					"redis_key", redisKey,
+				)
+				return nil, nil
+			}
+			return entry, nil
+		}
 	}
 	runID, err := ulid.Parse(val)
 	if err != nil {

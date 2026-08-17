@@ -478,6 +478,12 @@ type QueueOptions struct {
 	queueKindMapping        map[string]string
 	queueProducer           Producer
 	queueConsumer           Consumer
+	queueRunReader          RunQueueReader
+	queueStatusReader       QueueStatusReader
+	queuePartitionReader    QueuePartitionReader
+	queueBacklogReader      QueueBacklogReader
+	queueItemReader         QueueItemReader
+	queueAttemptResetter    AttemptResetter
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
 	peekSizeForFunctions    map[string]int64
@@ -649,6 +655,38 @@ func WithQueueProducer(producer Producer) QueueOpt {
 func WithQueueConsumer(consumer Consumer) QueueOpt {
 	return func(q *QueueOptions) {
 		q.queueConsumer = consumer
+	}
+}
+
+// WithQueueRunReader overrides the queue's default run reader.
+func WithQueueRunReader(reader RunQueueReader) QueueOpt {
+	return func(q *QueueOptions) { q.queueRunReader = reader }
+}
+
+// WithQueueStatusReader overrides the queue's default status reader.
+func WithQueueStatusReader(reader QueueStatusReader) QueueOpt {
+	return func(q *QueueOptions) { q.queueStatusReader = reader }
+}
+
+// WithQueuePartitionReader overrides the queue's default partition reader.
+func WithQueuePartitionReader(reader QueuePartitionReader) QueueOpt {
+	return func(q *QueueOptions) { q.queuePartitionReader = reader }
+}
+
+// WithQueueBacklogReader overrides the queue's default backlog reader.
+func WithQueueBacklogReader(reader QueueBacklogReader) QueueOpt {
+	return func(q *QueueOptions) { q.queueBacklogReader = reader }
+}
+
+// WithQueueItemReader overrides the queue's default item reader.
+func WithQueueItemReader(reader QueueItemReader) QueueOpt {
+	return func(q *QueueOptions) { q.queueItemReader = reader }
+}
+
+// WithQueueAttemptResetter overrides the queue's default shard-backed attempt resetter.
+func WithQueueAttemptResetter(resetter AttemptResetter) QueueOpt {
+	return func(q *QueueOptions) {
+		q.queueAttemptResetter = resetter
 	}
 }
 

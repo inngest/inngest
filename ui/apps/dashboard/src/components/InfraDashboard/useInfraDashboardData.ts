@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { useClient, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -41,7 +42,7 @@ export const TIME_RANGE_OPTIONS: TimeRangeOption[] = [
 ];
 
 const cacheTTL = 60 * 60 * 1000;
-const cacheVersion = 3;
+const cacheVersion = 4;
 const functionCountPageSize = 1;
 const topFunctionsUsagePageSize = 1000;
 const topFunctionsLimit = 50;
@@ -100,6 +101,33 @@ const InfraDashboardEventsCountDocument = graphql(`
         }
       ) {
         totalCount
+      }
+    }
+  }
+`);
+
+const InfraDashboardConcurrencyLimitDocument = graphql(`
+  query InfraDashboardConcurrencyLimit(
+    $envID: ID!
+    $from: Time!
+    $until: Time
+  ) {
+    workspace(id: $envID) {
+      concurrencyLimitReached: scopedMetrics(
+        filter: {
+          name: "concurrency_limit_reached_total"
+          scope: FN
+          from: $from
+          until: $until
+        }
+      ) {
+        metrics {
+          id
+          data {
+            bucket
+            value
+          }
+        }
       }
     }
   }
@@ -204,6 +232,15 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
       environmentID: env.id,
       page: 1,
       pageSize: topFunctionsUsagePageSize,
+    },
+  });
+
+  const [functionConcurrencyLimit] = useQuery({
+    query: InfraDashboardConcurrencyLimitDocument,
+    variables: {
+      envID: env.id,
+      from: getTimestampDaysAgo({ currentDate: range.until, days: 1 }).toISOString(),
+      until: range.until.toISOString(),
     },
   });
 
@@ -321,6 +358,9 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
         sumMetricValues(volume.data?.workspace.sdkThroughputEnded.metrics),
       stepRunning: currentConcurrency,
       topFunctions: buildTopFunctionRows({
+        concurrency:
+          functionConcurrencyLimit.data?.workspace.concurrencyLimitReached
+            .metrics,
         limit: topFunctionsLimit,
         usage: usageRows,
       }),
@@ -343,6 +383,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     currentPlan.data?.account.plan?.name,
     currentPlan.fetching,
     events.data?.environment.eventsV2.totalCount,
+    functionConcurrencyLimit.data?.workspace.concurrencyLimitReached.metrics,
     functionUsage.data?.workspace.workflows.data,
     functions.data?.workspace.workflows.page,
     lookups.data?.envBySlug?.apps,
@@ -361,6 +402,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     lookups.data &&
       functions.data &&
       functionUsage.data &&
+      functionConcurrencyLimit.data &&
       events.data &&
       volume.data &&
       billableExecutions.data &&
@@ -379,6 +421,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     lookups.error ||
     functions.error ||
     functionUsage.error ||
+    functionConcurrencyLimit.error ||
     events.error ||
     volume.error ||
     billableExecutions.error ||
@@ -391,6 +434,7 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
     (lookups.fetching ||
       functions.fetching ||
       functionUsage.fetching ||
+      functionConcurrencyLimit.fetching ||
       volume.fetching ||
       billableExecutions.fetching ||
       currentPlan.fetching ||
@@ -414,7 +458,8 @@ export function useInfraDashboardData(timeRange: TimeRangeOption) {
           (!billableExecutions.data?.usage && volume.fetching),
         executors: volume.fetching,
         queue: volume.fetching,
-        topFunctions: functionUsage.fetching,
+        topFunctions:
+          functionUsage.fetching || functionConcurrencyLimit.fetching,
       };
 
   useEffect(() => {

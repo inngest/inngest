@@ -12,55 +12,104 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-type jobQueueReader struct {
-	shards                       QueueShardRegistry
+type shardBackedReaders struct {
+	shards                       ShardRegistry
 	accountShardIterationEnabled AccountShardIterationEnabled
 }
 
-func newJobQueueReader(shards QueueShardRegistry, accountShardIterationEnabled AccountShardIterationEnabled) JobQueueReader {
-	return &jobQueueReader{
+func backlogOperations(shard QueueShard) (BacklogOperations, error) {
+	reader, ok := shard.(BacklogOperations)
+	if !ok {
+		return nil, fmt.Errorf("queue shard %q does not support backlog reads", shard.Name())
+	}
+	return reader, nil
+}
+
+func newShardBackedReaders(shards ShardRegistry, accountShardIterationEnabled AccountShardIterationEnabled) *shardBackedReaders {
+	return &shardBackedReaders{
 		shards:                       shards,
 		accountShardIterationEnabled: accountShardIterationEnabled,
 	}
 }
 
-// BacklogSize implements JobQueueReader.
-func (r *jobQueueReader) BacklogSize(ctx context.Context, shard QueueShard, backlogID string) (int64, error) {
-	return shard.BacklogSize(ctx, backlogID)
+// NewRunQueueReader returns a run reader backed by the provided shard registry.
+func NewRunQueueReader(shards ShardRegistry, accountShardIterationEnabled AccountShardIterationEnabled) RunQueueReader {
+	return newShardBackedReaders(shards, accountShardIterationEnabled)
 }
 
-// BacklogByID implements JobQueueReader.
-func (r *jobQueueReader) BacklogByID(ctx context.Context, shard QueueShard, backlogID string) (*QueueBacklog, error) {
-	return shard.BacklogByID(ctx, backlogID)
+// NewQueueStatusReader returns a status reader backed by the provided shard registry.
+func NewQueueStatusReader(shards ShardRegistry, accountShardIterationEnabled AccountShardIterationEnabled) QueueStatusReader {
+	return newShardBackedReaders(shards, accountShardIterationEnabled)
 }
 
-// BacklogsByPartition implements JobQueueReader.
-func (r *jobQueueReader) BacklogsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
-	return shard.BacklogsByPartition(ctx, partitionID, from, until, opts...)
+// NewQueuePartitionReader returns a partition reader backed by the provided shard registry.
+func NewQueuePartitionReader(shards ShardRegistry, accountShardIterationEnabled AccountShardIterationEnabled) QueuePartitionReader {
+	return newShardBackedReaders(shards, accountShardIterationEnabled)
 }
 
-// ItemExists implements JobQueueReader.
-func (r *jobQueueReader) ItemExists(ctx context.Context, shard QueueShard, scope Scope, jobID string) (bool, error) {
+// NewQueueBacklogReader returns a backlog reader backed by the provided shard registry.
+func NewQueueBacklogReader(shards ShardRegistry, accountShardIterationEnabled AccountShardIterationEnabled) QueueBacklogReader {
+	return newShardBackedReaders(shards, accountShardIterationEnabled)
+}
+
+// NewQueueItemReader returns an item reader backed by the provided shard registry.
+func NewQueueItemReader(shards ShardRegistry, accountShardIterationEnabled AccountShardIterationEnabled) QueueItemReader {
+	return newShardBackedReaders(shards, accountShardIterationEnabled)
+}
+
+// BacklogSize implements QueueBacklogReader.
+func (r *shardBackedReaders) BacklogSize(ctx context.Context, shard QueueShard, backlogID string) (int64, error) {
+	reader, err := backlogOperations(shard)
+	if err != nil {
+		return 0, err
+	}
+	return reader.BacklogSize(ctx, backlogID)
+}
+
+// BacklogByID implements QueueBacklogReader.
+func (r *shardBackedReaders) BacklogByID(ctx context.Context, shard QueueShard, backlogID string) (*QueueBacklog, error) {
+	reader, err := backlogOperations(shard)
+	if err != nil {
+		return nil, err
+	}
+	return reader.BacklogByID(ctx, backlogID)
+}
+
+// BacklogsByPartition implements QueueBacklogReader.
+func (r *shardBackedReaders) BacklogsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
+	reader, err := backlogOperations(shard)
+	if err != nil {
+		return nil, err
+	}
+	return reader.BacklogsByPartition(ctx, partitionID, from, until, opts...)
+}
+
+// ItemExists implements QueueItemReader.
+func (r *shardBackedReaders) ItemExists(ctx context.Context, shard QueueShard, scope Scope, jobID string) (bool, error) {
 	return shard.ItemExists(ctx, scope, jobID)
 }
 
-// ItemsByBacklog implements JobQueueReader.
-func (r *jobQueueReader) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
-	return shard.ItemsByBacklog(ctx, backlogID, from, until, opts...)
+// ItemsByBacklog implements QueueBacklogReader.
+func (r *shardBackedReaders) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
+	reader, err := backlogOperations(shard)
+	if err != nil {
+		return nil, err
+	}
+	return reader.ItemsByBacklog(ctx, backlogID, from, until, opts...)
 }
 
-// ItemsByPartition implements JobQueueReader.
-func (r *jobQueueReader) ItemsByPartition(ctx context.Context, shard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
+// ItemsByPartition implements QueuePartitionReader.
+func (r *shardBackedReaders) ItemsByPartition(ctx context.Context, shard QueueShard, scope Scope, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueItem], error) {
 	return shard.ItemsByPartition(ctx, scope, partitionID, from, until, opts...)
 }
 
-// ItemsByRunID implements JobQueueReader.
-func (r *jobQueueReader) ItemsByRunID(ctx context.Context, shard QueueShard, scope Scope, runID ulid.ULID) ([]*QueueItem, error) {
+// ItemsByRunID implements RunQueueReader.
+func (r *shardBackedReaders) ItemsByRunID(ctx context.Context, shard QueueShard, scope Scope, runID ulid.ULID) ([]*QueueItem, error) {
 	return shard.ItemsByRunID(ctx, scope, runID)
 }
 
-// LoadQueueItem implements JobQueueReader.
-func (r *jobQueueReader) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error) {
+// LoadQueueItem implements QueueItemReader.
+func (r *shardBackedReaders) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*QueueItem, error) {
 	shard, err := r.shards.ByName(shardName)
 	if err != nil {
 		return nil, err
@@ -69,7 +118,7 @@ func (r *jobQueueReader) LoadQueueItem(ctx context.Context, shardName string, it
 	return shard.LoadQueueItem(ctx, itemID)
 }
 
-func (r *jobQueueReader) forAccountShards(ctx context.Context, accountID uuid.UUID, fn func(context.Context, QueueShard) error) error {
+func (r *shardBackedReaders) forAccountShards(ctx context.Context, accountID uuid.UUID, fn func(context.Context, QueueShard) error) error {
 	// Fan-out is feature-flagged because querying every shard increases latency.
 	// Shard failures are logged and suppressed by ForEach so healthy shard
 	// results remain available.
@@ -84,12 +133,16 @@ func (r *jobQueueReader) forAccountShards(ctx context.Context, accountID uuid.UU
 	return fn(ctx, shard)
 }
 
-// PartitionBacklogSize implements JobQueueReader.
-func (r *jobQueueReader) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
+// PartitionBacklogSize implements QueueBacklogReader.
+func (r *shardBackedReaders) PartitionBacklogSize(ctx context.Context, scope Scope, partitionID string) (int64, error) {
 	var totalCount int64
 
 	err := r.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
-		backlogSize, err := shard.PartitionBacklogSize(ctx, scope, partitionID)
+		reader, err := backlogOperations(shard)
+		if err != nil {
+			return err
+		}
+		backlogSize, err := reader.PartitionBacklogSize(ctx, scope, partitionID)
 		if err != nil {
 			return fmt.Errorf("could not load partition backlog size: %w", err)
 		}
@@ -104,8 +157,8 @@ func (r *jobQueueReader) PartitionBacklogSize(ctx context.Context, scope Scope, 
 	return totalCount, nil
 }
 
-// PartitionSize implements JobQueueReader.
-func (r *jobQueueReader) PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error) {
+// PartitionSize implements QueuePartitionReader.
+func (r *shardBackedReaders) PartitionSize(ctx context.Context, scope Scope, partitionID string, until time.Time) (int64, error) {
 	var totalCount int64
 
 	err := r.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
@@ -122,13 +175,13 @@ func (r *jobQueueReader) PartitionSize(ctx context.Context, scope Scope, partiti
 	return totalCount, nil
 }
 
-// PartitionByID implements JobQueueReader.
-func (r *jobQueueReader) PartitionByID(ctx context.Context, shard QueueShard, scope Scope, partitionID string) (*PartitionInspectionResult, error) {
+// PartitionByID implements QueuePartitionReader.
+func (r *shardBackedReaders) PartitionByID(ctx context.Context, shard QueueShard, scope Scope, partitionID string) (*PartitionInspectionResult, error) {
 	return shard.PartitionByID(ctx, scope, partitionID)
 }
 
-// OutstandingJobCount implements JobQueueReader.
-func (r *jobQueueReader) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
+// OutstandingJobCount implements RunQueueReader.
+func (r *shardBackedReaders) OutstandingJobCount(ctx context.Context, scope Scope, runID ulid.ULID) (int, error) {
 	var totalCount int64
 
 	err := r.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
@@ -145,8 +198,8 @@ func (r *jobQueueReader) OutstandingJobCount(ctx context.Context, scope Scope, r
 	return int(totalCount), nil
 }
 
-// RunJobs implements JobQueueReader.
-func (r *jobQueueReader) RunJobs(ctx context.Context, shardName string, scope Scope, runID ulid.ULID, limit int64, offset int64) ([]JobResponse, error) {
+// RunJobs implements RunQueueReader.
+func (r *shardBackedReaders) RunJobs(ctx context.Context, shardName string, scope Scope, runID ulid.ULID, limit int64, offset int64) ([]JobResponse, error) {
 	shard, err := r.shards.ByName(shardName)
 	if err != nil {
 		return nil, err
@@ -155,8 +208,8 @@ func (r *jobQueueReader) RunJobs(ctx context.Context, shardName string, scope Sc
 	return shard.RunJobs(ctx, scope, runID, limit, offset)
 }
 
-// RunningCount implements JobQueueReader.
-func (r *jobQueueReader) RunningCount(ctx context.Context, scope Scope) (int64, error) {
+// RunningCount implements QueueStatusReader.
+func (r *shardBackedReaders) RunningCount(ctx context.Context, scope Scope) (int64, error) {
 	var totalCount int64
 
 	err := r.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
@@ -173,8 +226,8 @@ func (r *jobQueueReader) RunningCount(ctx context.Context, scope Scope) (int64, 
 	return totalCount, nil
 }
 
-// StatusCount implements JobQueueReader.
-func (r *jobQueueReader) StatusCount(ctx context.Context, scope Scope, status string) (int64, error) {
+// StatusCount implements QueueStatusReader.
+func (r *shardBackedReaders) StatusCount(ctx context.Context, scope Scope, status string) (int64, error) {
 	var totalCount int64
 
 	err := r.forAccountShards(ctx, scope.AccountID, func(ctx context.Context, shard QueueShard) error {
@@ -190,3 +243,11 @@ func (r *jobQueueReader) StatusCount(ctx context.Context, scope Scope, status st
 	}
 	return totalCount, nil
 }
+
+var (
+	_ RunQueueReader       = (*shardBackedReaders)(nil)
+	_ QueueStatusReader    = (*shardBackedReaders)(nil)
+	_ QueuePartitionReader = (*shardBackedReaders)(nil)
+	_ QueueBacklogReader   = (*shardBackedReaders)(nil)
+	_ QueueItemReader      = (*shardBackedReaders)(nil)
+)

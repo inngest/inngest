@@ -38,8 +38,14 @@ type Opts struct {
 
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
-	// Queue allows the checkppinting API to continue by enqueueing new queue items.
-	Queue queue.Queue
+	// QueueProducer allows checkpointing to continue runs by enqueueing items.
+	QueueProducer queue.Producer
+	// RunQueueReader supports run-job reads.
+	RunQueueReader queue.RunQueueReader
+	// QueueItemReader supports async dispatch validation.
+	QueueItemReader queue.QueueItemReader
+	// AttemptResetter resets attempts after successful async checkpoints.
+	AttemptResetter queue.AttemptResetter
 	// FunctionReader reads functions from a backing store.
 	FunctionReader cqrs.FunctionReader
 	// CancellationReadWriter reads and writes cancellations to/from a backing store.
@@ -90,6 +96,12 @@ type Opts struct {
 
 	// MetadataOpts represents the required opts for the metadadata API
 	MetadataOpts MetadataOpts
+}
+
+type checkpointQueue struct {
+	queue.Producer
+	queue.QueueItemReader
+	queue.AttemptResetter
 }
 
 func noopRateChecker(r *http.Request, w http.ResponseWriter, route string) bool {
