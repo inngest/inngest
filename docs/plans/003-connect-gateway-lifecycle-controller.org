@@ -570,10 +570,13 @@ Either way, a transient =getOrCreateGRPCClient= or =Ack= failure should not
 automatically close the worker websocket after the worker ACK was parsed and
 accepted.
 
+Decision: use Option A. A parsed =WORKER_REQUEST_ACK= completes local
+=Forward= delivery, and executor notification is best-effort.
+
 *** Implementation checklist
 
 - [X] Choose Option A or Option B.
-- [ ] Encode the chosen order in one helper.
+- [X] Encode the chosen order in one helper.
 - [X] Make unknown request ACKs non-fatal and clearly logged.
 - [X] Make executor ACK failures return request-level failure or warning,
   according to the chosen option.
@@ -582,11 +585,11 @@ accepted.
 
 *** Test checklist
 
-- [ ] gRPC client creation failure during =WORKER_REQUEST_ACK= does not close
+- [X] gRPC client creation failure during =WORKER_REQUEST_ACK= does not close
   the websocket unless chosen policy explicitly requires it;
 - [X] gRPC =Ack= RPC failure behavior matches chosen policy;
 - [X] =reply.Success=false= behavior matches chosen policy;
-- [ ] =Forward= result matches chosen policy.
+- [X] =Forward= result matches chosen policy.
 
 *** Validation checklist
 
