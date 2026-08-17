@@ -949,6 +949,8 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 					logger.WithErrorReportTags(map[string]string{
 						"gateway_id": c.conn.GatewayId.String(),
 						"conn_id":    c.conn.ConnectionId.String(),
+						"req_id":     data.RequestId,
+						"run_id":     data.RunId,
 					}))
 				msg.Result <- err
 				continue
@@ -1037,7 +1039,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				case <-time.After(consts.ConnectWorkerRequestLeaseDuration + consts.ConnectWorkerRequestGracePeriod):
 					if c.pendingAcks.CompareAndDelete(data.RequestId, ackCh) {
 						msg.Result <- fmt.Errorf("worker did not ACK request %s", data.RequestId)
-						log.Warn("worker did not ACK request in time", "req_id", data.RequestId)
+						log.Warn("worker did not ACK request in time")
 					} else {
 						msg.Result <- <-ackCh
 					}
