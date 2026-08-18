@@ -496,7 +496,7 @@ func (q *queueProcessor) ProcessShadowPartitionBacklog(
 	now := q.Clock().Now()
 	operationIdempotencyKey := fmt.Sprintf("%s-%d", backlog.BacklogID, now.UnixMilli())
 
-	constraintCheckRes, err := q.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now)
+	constraintCheckRes, err := q.BacklogRefillConstraintCheck(ctx, shadowPart, backlog, constraints, items, operationIdempotencyKey, now, enableKeyQueues)
 	if err != nil {
 		// Do not pass on error further, we want to prevent quitting the queue
 		l.ReportError(err, "could not check constraints for backlogRefill")
