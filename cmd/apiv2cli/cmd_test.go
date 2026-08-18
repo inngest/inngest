@@ -230,6 +230,7 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 	var gotAuth string
 	var gotEnv string
 	var gotContentType string
+	var gotUserAgent string
 	var gotBody map[string]any
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -237,6 +238,7 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 		gotAuth = r.Header.Get("Authorization")
 		gotEnv = r.Header.Get("X-Inngest-Env")
 		gotContentType = r.Header.Get("Content-Type")
+		gotUserAgent = r.UserAgent()
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotBody))
 
 		w.Header().Set("Content-Type", "application/json")
@@ -265,6 +267,7 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 	require.Equal(t, "Bearer signkey-test-abc", gotAuth)
 	require.Equal(t, "branch-a", gotEnv)
 	require.Equal(t, "application/json", gotContentType)
+	require.Contains(t, gotUserAgent, "inngest-cli/")
 	require.Equal(t, map[string]any{
 		"data":           map[string]any{"message": "hi"},
 		"idempotencyKey": "idem-1",
