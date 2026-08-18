@@ -15,6 +15,12 @@ import { useFunctionVolume } from './useFunctionVolume';
 
 const columnHelper = createColumnHelper<Function>();
 
+const volumeLegend = [
+  ['Completed runs', 'bg-primary-xSubtle'],
+  ['Concurrency limit hit', 'bg-accent-xSubtle dark:bg-accent-xIntense'],
+  ['Failed runs', 'bg-tertiary-subtle'],
+] as const;
+
 const columnsIDs = ['name', 'functions', 'usage'] as const;
 export type ColumnID = (typeof columnsIDs)[number];
 export function isColumnID(value: unknown): value is ColumnID {
@@ -74,9 +80,22 @@ function UsageCell({
           term={data.usage.totalVolume === 1 ? 'run' : 'runs'}
         />
       </div>
-      <div className="[&_*]:cursor-pointer">
-        <MiniStackedBarChart data={data.usage.dailyVolumeSlots} />
-      </div>
+      <Tooltip delayDuration={1000}>
+        <TooltipTrigger asChild>
+          <div className="[&_*]:cursor-pointer">
+            <MiniStackedBarChart data={data.usage.dailyVolumeSlots} />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="space-y-2 p-3 text-xs" side="bottom">
+          <div className="font-medium">Runs volume over 24h</div>
+          {volumeLegend.map(([label, color]) => (
+            <div className="flex items-center gap-2" key={label}>
+              <span className={cn('h-2 w-2 rounded-full', color)} />
+              <span>{label}</span>
+            </div>
+          ))}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

@@ -86,7 +86,7 @@ export default function StepsRunningChart({
       data={metrics}
       legend={[
         {
-          name: 'Concurrency Limit',
+          name: 'Concurrency Limit Hit',
           dataKey: 'concurrencyLimit',
           color: colors.amber['500'],
           referenceArea: true,
