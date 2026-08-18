@@ -269,7 +269,12 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			close(replySubscribed)
 
-			reply = <-replyReceived
+			select {
+			case reply = <-replyReceived:
+			case <-ctx.Done():
+				// Unsubscribe never closes the channel.
+				return
+			}
 
 			span.AddEvent("ReplyReceivedGRPC")
 			metrics.IncrConnectGatewayGRPCReplyCounter(ctx, 1, metrics.CounterOpt{})
