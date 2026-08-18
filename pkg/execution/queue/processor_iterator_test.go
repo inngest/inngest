@@ -306,7 +306,7 @@ func (m *mockShardForIterator) PeekAccountPartitions(ctx context.Context, accoun
 	return nil, nil
 }
 
-func (m *mockShardForIterator) BacklogRefillConstraintCheck(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, constraints PartitionConstraintConfig, items []*QueueItem, operationIdempotencyKey string, now time.Time) (*BacklogRefillConstraintCheckResult, error) {
+func (m *mockShardForIterator) BacklogRefillConstraintCheck(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, constraints PartitionConstraintConfig, items []*QueueItem, operationIdempotencyKey string, now time.Time, enableKeyQueues bool) (*BacklogRefillConstraintCheckResult, error) {
 	return nil, nil
 }
 
@@ -452,7 +452,7 @@ func (m *mockShardForIterator) RunJobs(ctx context.Context, scope Scope, runID u
 	return nil, nil
 }
 
-func (m *mockQueueProcessor) BacklogRefillConstraintCheck(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, constraints PartitionConstraintConfig, items []*QueueItem, operationIdempotencyKey string, now time.Time) (*BacklogRefillConstraintCheckResult, error) {
+func (m *mockQueueProcessor) BacklogRefillConstraintCheck(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, constraints PartitionConstraintConfig, items []*QueueItem, operationIdempotencyKey string, now time.Time, enableKeyQueues bool) (*BacklogRefillConstraintCheckResult, error) {
 	return nil, nil
 }
 
