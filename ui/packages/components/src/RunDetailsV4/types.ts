@@ -1,6 +1,8 @@
 import {
+  KindInngestAISummary,
   KindInngestScore,
   type AIMetadata,
+  type AISummaryMetadata,
   type SpanMetadataKind as GeneratedSpanMetadataKind,
   type SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
   type SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
@@ -47,6 +49,7 @@ export type SpanMetadataScope = 'run' | 'step' | 'step_attempt' | 'extended_trac
 
 export type SpanMetadata =
   | SpanMetadataInngestAI
+  | SpanMetadataInngestAISummary
   | SpanMetadataInngestExperiment
   | SpanMetadataInngestHTTP
   | SpanMetadataInngestHTTPTiming
@@ -62,6 +65,14 @@ export type SpanMetadataInngestAI = {
   kind: 'inngest.ai';
   updatedAt: string;
   values: AIMetadata;
+};
+
+// Synthesized at read time on the root span only; never persisted.
+export type SpanMetadataInngestAISummary = {
+  scope: 'run';
+  kind: typeof KindInngestAISummary;
+  updatedAt: string;
+  values: AISummaryMetadata;
 };
 
 export type SpanMetadataInngestExperiment = {

@@ -3,14 +3,19 @@ import { useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { ElementWrapper, TextElement, TimeElement } from '../DetailsCard/Element';
 import type { SpanMetadata, SpanMetadataKind } from './types';
 
+// Keyed by full kind, not by the first suffix segment: `inngest.ai` and
+// `inngest.ai.summary` (and `inngest.http` / `inngest.http.timing`) are
+// distinct kinds that would otherwise collide onto one label.
 const inngestKindLabels: Record<string, string> = {
-  ai: 'AI Metadata',
-  experiment: 'Experiment',
-  http: 'HTTP Metadata',
-  response_headers: 'Response Headers',
-  score: 'Scores',
-  usage: 'Run Usage',
-  warnings: 'Warnings',
+  'inngest.ai': 'AI Metadata',
+  'inngest.ai.summary': 'AI Summary',
+  'inngest.experiment': 'Experiment',
+  'inngest.http': 'HTTP Metadata',
+  'inngest.http.timing': 'HTTP Timing',
+  'inngest.response_headers': 'Response Headers',
+  'inngest.score': 'Scores',
+  'inngest.usage': 'Run Usage',
+  'inngest.warnings': 'Warnings',
 };
 
 const formatBytes = (bytes: number): string => {
@@ -29,7 +34,7 @@ const getKindLabel = (kind: SpanMetadataKind): string => {
   }
 
   if (namespace === 'inngest') {
-    return inngestKindLabels[kindName] || `Metadata (${kindName})`;
+    return inngestKindLabels[kind] || `Metadata (${kindName})`;
   }
 
   if (kindName === 'default') {
@@ -53,6 +58,11 @@ type MetadataAttrRowProps = {
 };
 
 const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAttrRowProps) => {
+  // A partial AI summary is known-incomplete (e.g. usage from invoked child
+  // runs is not folded in), so the totals must not read as authoritative.
+  const isPartialSummary =
+    kind === 'inngest.ai.summary' && Boolean((values as { partial?: boolean } | null)?.partial);
+
   const sortedEntries = useMemo(
     () =>
       Object.entries(values ?? {}).sort(([a], [b]) => {
@@ -66,7 +76,14 @@ const MetadataAttrRow = ({ kind, scope, values, updatedAt, isLast }: MetadataAtt
   return (
     <div className="flex flex-col justify-start gap-2">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4 pt-2">
-        <span className="text-basis text-sm font-medium">{getKindLabel(kind)}</span>
+        <span className="text-basis text-sm font-medium">
+          {getKindLabel(kind)}
+          {isPartialSummary && (
+            <span className="text-muted ml-2 text-xs font-normal">
+              partial — may exclude invoked child run usage
+            </span>
+          )}
+        </span>
       </div>
       <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
         <ElementWrapper label="Metadata Kind">
@@ -136,7 +153,7 @@ export const MetadataAttrs = ({
 
         return (
           <MetadataAttrRow
-            key={`metadata-attr-${md.scope}-${md.kind}`}
+            key={`metadata-attr-${idx}-${md.scope}-${md.kind}`}
             kind={md.kind}
             scope={md.scope}
             values={md.values}
