@@ -80,7 +80,7 @@ function UsageCell({
           term={data.usage.totalVolume === 1 ? 'run' : 'runs'}
         />
       </div>
-      <Tooltip>
+      <Tooltip delayDuration={1000}>
         <TooltipTrigger asChild>
           <div className="[&_*]:cursor-pointer">
             <MiniStackedBarChart data={data.usage.dailyVolumeSlots} />
