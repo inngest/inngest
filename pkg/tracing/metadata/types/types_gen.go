@@ -58,6 +58,35 @@ type AIMetadata struct {
 	Seed             *int64   `json:"seed,omitempty"`
 }
 
+// From ai_summary.go
+const (
+	// KindInngestAISummary is the run-scoped rollup of all AI usage within a
+	// run. It is synthesized every time a run's span tree is read and is never
+	// persisted, so it can never double-count itself. It must never be added
+	// to the allowedInngestKinds allowlist.
+	KindInngestAISummary = "inngest.ai.summary"
+)
+
+// From ai_summary.go
+type AISummaryMetadata struct {
+	InputTokens  int64 `json:"input_tokens"`
+	OutputTokens int64 `json:"output_tokens"`
+	TotalTokens  int64 `json:"total_tokens"`
+
+	// Absent when no call reported them; cache tokens are summed raw and never
+	// reconciled against InputTokens.
+	CacheReadTokens     *int64 `json:"cache_read_tokens,omitempty"`
+	CacheCreationTokens *int64 `json:"cache_creation_tokens,omitempty"`
+	ReasoningTokens     *int64 `json:"reasoning_tokens,omitempty"`
+
+	EstimatedCost *float64 `json:"estimated_cost,omitempty"`
+	Models        []string `json:"models,omitempty"`
+	Providers     []string `json:"providers,omitempty"`
+	// Partial marks the summary as known-incomplete: usage from invoked child
+	// runs is not folded in.
+	Partial bool `json:"partial"`
+}
+
 // From experiment.go
 const (
 	KindInngestExperiment = "inngest.experiment"

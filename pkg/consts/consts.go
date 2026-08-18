@@ -50,6 +50,15 @@ const (
 	// MaxRunMetadataSize is the maximum cumulative metadata size per function run in bytes (1 MB).
 	MaxRunMetadataSize = 1024 * 1024
 
+	// MaxSpanMetadataEntries is the maximum number of metadata entries a single
+	// span carries when a run's span tree is read. Kinds that roll up to one
+	// merged entry per (span, kind) never approach it; inngest.ai keeps one
+	// entry per emission, and MaxRunMetadataSize does not apply to metadata
+	// written with no run state (the extended trace ingest path), so the count
+	// is otherwise unbounded. Read-side display cap only: run-level rollups are
+	// summed before it is applied.
+	MaxSpanMetadataEntries = 500
+
 	// MaxUserlandTraceBodySize bounds the /v1/traces/userland request body. The
 	// cap gate runs only after the body is read and parsed (it needs the parsed
 	// spans to meter ingress bytes), so without this an over-cap or abusive

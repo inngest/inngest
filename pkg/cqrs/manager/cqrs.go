@@ -34,6 +34,7 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -493,11 +494,11 @@ fragmentLoop:
 	}
 
 	if info != nil && isMetadata && parentSpanIDPtr != nil {
-		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
+		mds, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
 		} else {
-			info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], metadata)
+			info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], mds...)
 		}
 	}
 
@@ -731,6 +732,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 				}
 			}
 		}
+		span.Metadata = truncateSpanMetadata(ctx, span)
 
 		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
 			root, _ = spanMap.Get(span.SpanID)
@@ -811,17 +813,32 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		return nil, fmt.Errorf("no root span found for run %s", runID.String())
 	}
 
+	// Fold order doesn't matter: the builder rounds the summed cost to
+	// extractors.RoundCost's granularity, absorbing float addition's order
+	// sensitivity, and every other field is order-independent.
+	aiUsage := extractors.NewAISummaryBuilder()
+	addCountedAIMetadata(ctx, aiUsage, metadataByParent, root.RunID)
+
 	sorter(root)
 	computeAndAttachUsageMetadata(root)
+	computeAndAttachAISummaryMetadata(ctx, root, aiUsage)
 
 	return root, nil
 }
 
-func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any, updatedAt time.Time) (*cqrs.SpanMetadata, error) {
+// rollupSpanMetadataFromFragments folds a metadata span group's fragments into
+// the entries a span carries. Every kind collapses to a single merged entry
+// stamped with updatedAt, except inngest.ai: its merge opcode is
+// last-write-wins, so folding two AI emissions that share a (parent, kind)
+// dynamic span ID would silently discard the earlier call's usage. AI
+// fragments are therefore kept one entry per emission, each stamped with its
+// own fragment's start time so call order survives.
+func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string]any, updatedAt time.Time) ([]*cqrs.SpanMetadata, error) {
 	ret := &cqrs.SpanMetadata{
 		Values:    metadata.Values{},
 		UpdatedAt: updatedAt,
 	}
+	var perEmission []*cqrs.SpanMetadata
 
 	for _, fragment := range fragments {
 		attrs, ok := fragmentAttributesJSON(fragment["attributes"])
@@ -883,6 +900,25 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 			return nil, err
 		}
 
+		if ret.Kind == extractors.KindInngestAI {
+			// Each emission is stamped with its own fragment's start time. The
+			// group's parsed end time is a single value shared by every
+			// fragment, so using it here would erase the order of the calls a
+			// step made. Cloud's ClickHouse rollup stamps the same value.
+			emittedAt := updatedAt
+			if ts, ok := parseFragmentTime(fragment["start_time"]); ok {
+				emittedAt = ts
+			}
+
+			perEmission = append(perEmission, &cqrs.SpanMetadata{
+				Kind:      ret.Kind,
+				Scope:     ret.Scope,
+				Values:    fragmentMetadata,
+				UpdatedAt: emittedAt,
+			})
+			continue
+		}
+
 		err = ret.Values.Combine(fragmentMetadata, *fragmentAttr.Op)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error rolling up metadata span metadata", "error", err)
@@ -890,7 +926,40 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 		}
 	}
 
-	return ret, nil
+	if len(perEmission) > 0 {
+		return perEmission, nil
+	}
+
+	return []*cqrs.SpanMetadata{ret}, nil
+}
+
+// truncateSpanMetadata bounds the number of metadata entries one span carries
+// in an assembled span tree.
+//
+// inngest.ai now yields one entry per emission, and the per-emission count is
+// effectively unbounded on the extended trace ingest path: apiv1.commitSpan
+// passes a nil state metadata to CreateMetadataSpan, which skips the per-run
+// consts.MaxRunMetadataSize check, leaving only the per-span
+// consts.MaxMetadataSpanSize to bound each individual emission.
+//
+// Truncating here only affects what a reader displays. The run's
+// inngest.ai.summary is summed from the rolled-up fragments in
+// metadataByParent, before this cap is applied, so it stays exact past the
+// cap.
+func truncateSpanMetadata(ctx context.Context, span *cqrs.OtelSpan) []*cqrs.SpanMetadata {
+	if len(span.Metadata) <= consts.MaxSpanMetadataEntries {
+		return span.Metadata
+	}
+
+	logger.StdlibLogger(ctx).Warn(
+		"truncating span metadata entries",
+		"run_id", span.RunID.String(),
+		"span_id", span.SpanID,
+		"entries", len(span.Metadata),
+		"limit", consts.MaxSpanMetadataEntries,
+	)
+
+	return span.Metadata[:consts.MaxSpanMetadataEntries]
 }
 
 // computeAndAttachUsageMetadata walks the span tree, sums the size of all
@@ -935,6 +1004,76 @@ func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
 	for _, child := range span.Children {
 		walkMetadataSize(child, total)
 	}
+}
+
+// computeAndAttachAISummaryMetadata attaches a synthetic run-scoped
+// "inngest.ai.summary" entry to the root span from a builder already seeded
+// with every counted inngest.ai entry in the run. Like inngest.usage, the
+// summary is recomputed on every read and never persisted; any stored
+// entries of that kind are stripped first so the computed value is
+// authoritative.
+//
+// The builder is seeded flat rather than by walking the tree so that usage
+// whose parent span is missing, dropped, or excluded from the tree still
+// counts.
+//
+// Usage from invoked child runs is not folded in, so the summary is marked
+// partial whenever the tree contains invoke steps. A run with no in-run usage
+// gets no summary at all, even when it invokes child runs: a zero-valued
+// partial entry would put an AI card on every invoke-bearing run.
+func computeAndAttachAISummaryMetadata(ctx context.Context, root *cqrs.OtelSpan, builder *extractors.AISummaryBuilder) {
+	removeStoredAISummary(root)
+
+	if builder.Empty() {
+		return
+	}
+	if walkAIInvokes(root) {
+		builder.MarkPartial()
+	}
+
+	values, err := builder.Summary().Serialize()
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error serializing AI summary metadata", "error", err)
+		return
+	}
+
+	ts := root.EndTime
+	if ts.IsZero() {
+		ts = root.StartTime
+	}
+
+	root.Metadata = append(root.Metadata, &cqrs.SpanMetadata{
+		Scope:     enums.MetadataScopeRun,
+		Kind:      extractors.KindInngestAISummary,
+		Values:    values,
+		UpdatedAt: ts,
+	})
+}
+
+func removeStoredAISummary(span *cqrs.OtelSpan) {
+	span.Metadata = slices.DeleteFunc(span.Metadata, func(m *cqrs.SpanMetadata) bool {
+		return m.Kind == extractors.KindInngestAISummary
+	})
+	for _, child := range span.Children {
+		removeStoredAISummary(child)
+	}
+}
+
+// walkAIInvokes reports whether the tree contains invoke steps — including
+// ones whose child run ID hasn't been stamped yet. Usage itself is summed
+// flat, not walked; see computeAndAttachAISummaryMetadata.
+func walkAIInvokes(span *cqrs.OtelSpan) bool {
+	if span.IsInvokeStep() {
+		return true
+	}
+
+	for _, child := range span.Children {
+		if walkAIInvokes(child) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // extendedTraceKey is the map key used when indexing and reparenting orphaned
@@ -1010,7 +1149,7 @@ func sorter(span *cqrs.OtelSpan) {
 		return span.Children[i].SpanID < span.Children[j].SpanID
 	})
 
-	slices.SortFunc(span.Metadata, func(a, b *cqrs.SpanMetadata) int {
+	slices.SortStableFunc(span.Metadata, func(a, b *cqrs.SpanMetadata) int {
 		return cmp.Or(
 			cmp.Compare(a.Scope, b.Scope),
 			cmp.Compare(a.Kind, b.Kind))

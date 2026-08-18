@@ -128,6 +128,18 @@ func (s *OtelSpan) GetParentSpanID() *string {
 	return s.ParentSpanID
 }
 
+// IsInvokeStep reports whether this span is a step.invoke step, including
+// ones whose child run ID hasn't been stamped yet.
+func (s *OtelSpan) IsInvokeStep() bool {
+	if s.Attributes == nil {
+		return false
+	}
+	if s.Attributes.StepInvokeRunID != nil {
+		return true
+	}
+	return s.Attributes.StepOp != nil && *s.Attributes.StepOp == enums.OpcodeInvokeFunction
+}
+
 func (s *OtelSpan) GetIsRoot() bool {
 	parentSpanID := s.GetParentSpanID()
 

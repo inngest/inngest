@@ -67,6 +67,16 @@ func TestKind_ValidateAllowed(t *testing.T) {
 			wantErr: ErrKindNotAllowed,
 		},
 		{
+			name:    "inngest.ai.summary is reserved for the read-time rollup",
+			kind:    "inngest.ai.summary",
+			wantErr: ErrKindNotAllowed,
+		},
+		{
+			name:    "inngest.usage is reserved for the read-time rollup",
+			kind:    "inngest.usage",
+			wantErr: ErrKindNotAllowed,
+		},
+		{
 			name:    "inngest.internal is rejected",
 			kind:    "inngest.internal",
 			wantErr: ErrKindNotAllowed,
