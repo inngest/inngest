@@ -220,25 +220,6 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		opts.Data.UserTraceCtx = marshaled
 	}
 
-	{
-		// Receive worker acknowledgement for o11y
-		ch := i.gatewayGRPCManager.SubscribeWorkerAck(ctx, opts.Data.RequestId)
-		defer i.gatewayGRPCManager.UnsubscribeWorkerAck(ctx, opts.Data.RequestId)
-
-		go func() {
-			<-ch
-
-			span.AddEvent("WorkerAck")
-			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"kind":      "worker",
-					"transport": "grpc",
-				},
-			})
-		}()
-	}
-
 	// Await SDK response forwarded by gateway
 
 	reply := &connectpb.SDKResponse{}
@@ -288,7 +269,12 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			close(replySubscribed)
 
-			reply = <-replyReceived
+			select {
+			case reply = <-replyReceived:
+			case <-ctx.Done():
+				// Unsubscribe never closes the channel.
+				return
+			}
 
 			span.AddEvent("ReplyReceivedGRPC")
 			metrics.IncrConnectGatewayGRPCReplyCounter(ctx, 1, metrics.CounterOpt{})
@@ -477,6 +463,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
 
+		span.AddEvent("WorkerAck")
 		metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
