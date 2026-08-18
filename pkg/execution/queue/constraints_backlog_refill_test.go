@@ -62,6 +62,7 @@ func TestBacklogRefillConstraintCheckMissingAccountReturnsEmptyResult(t *testing
 		},
 		"op-1",
 		time.Now(),
+		true,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, res)

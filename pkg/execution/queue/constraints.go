@@ -220,12 +220,19 @@ func (q *queueProcessor) BacklogRefillConstraintCheck(
 	items []*QueueItem,
 	operationIdempotencyKey string,
 	now time.Time,
+	keyQueuesEnabled bool,
 ) (*BacklogRefillConstraintCheckResult, error) {
 	itemIDs := make([]string, len(items))
 	itemRunIDs := make(map[string]ulid.ULID)
 	for i, item := range items {
 		itemIDs[i] = item.ID
 		itemRunIDs[item.ID] = item.Data.Identifier.RunID
+	}
+
+	if !keyQueuesEnabled {
+		return &BacklogRefillConstraintCheckResult{
+			ItemsToRefill: itemIDs,
+		}, nil
 	}
 
 	if q.CapacityManager == nil {

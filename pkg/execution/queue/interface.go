@@ -80,6 +80,7 @@ type KeyQueueProcessor interface {
 		items []*QueueItem,
 		operationIdempotencyKey string,
 		now time.Time,
+		keyQueuesEnabled bool,
 	) (*BacklogRefillConstraintCheckResult, error)
 }
 

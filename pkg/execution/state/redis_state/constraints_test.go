@@ -786,7 +786,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
 		opIdempotencyKey := "refill1"
-		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now(), true)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "missing accountID")
 		require.ErrorContains(t, err, "missing envID")
@@ -825,7 +825,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
 		opIdempotencyKey := "refill1"
-		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now(), true)
 		require.NoError(t, err)
 
 		// No lease acquired
@@ -863,7 +863,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
 		opIdempotencyKey := "refill1"
-		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now(), true)
 		require.NoError(t, err)
 
 		require.NotNil(t, res.ItemCapacityLeases)
@@ -899,7 +899,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
 		opIdempotencyKey := "refill1"
-		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now(), true)
 		require.NoError(t, err)
 
 		// Acquired lease and request to skip checks
@@ -957,7 +957,7 @@ func TestBacklogRefillConstraintCheck(t *testing.T) {
 		backlog := osqueue.ItemBacklog(ctx, qi)
 
 		opIdempotencyKey := "refill1"
-		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now())
+		res, err := q.BacklogRefillConstraintCheck(ctx, &sp, &backlog, constraints, []*osqueue.QueueItem{&qi}, opIdempotencyKey, clock.Now(), true)
 		require.NoError(t, err)
 
 		// Acquired lease and request to skip checks
