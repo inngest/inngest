@@ -9,7 +9,6 @@ import {
   monitor,
   sandboxesItem,
   scoresItem,
-  sessionsItem,
   workflow,
   type NavGroupConfig,
   type NavItemConfig,
@@ -36,7 +35,6 @@ export default function Navigation({ collapsed, activeEnv }: NavProps) {
     ...(isAIOverviewEnabled.value ? [aiOverviewItem] : []),
     experimentsItem,
     ...(isLegacyScoresPageEnabled.value ? [scoresItem] : []),
-    sessionsItem,
     sandboxesItem,
   ];
 

@@ -38,6 +38,7 @@ export const workflow: NavGroupConfig = {
     { label: 'Runs', route: 'runs', Icon: RunsIcon },
     { label: 'Event Types', route: 'event-types', Icon: EventsIcon },
     { label: 'Events', route: 'events', Icon: EventLogsIcon },
+    { label: 'Sessions', route: 'sessions', Icon: SessionsIcon, beta: true },
   ],
 };
 
@@ -65,12 +66,6 @@ export const aiOverviewItem: NavItemConfig = {
   label: 'AI Overview',
   route: 'ai-overview',
   Icon: AIOverviewIcon,
-};
-
-export const sessionsItem: NavItemConfig = {
-  label: 'Sessions',
-  route: 'sessions',
-  Icon: SessionsIcon,
 };
 
 export const sandboxesItem: NavItemConfig = {
