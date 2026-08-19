@@ -23,6 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
+	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -478,6 +479,7 @@ func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Req
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "inngest-cli/"+version.Version)
 
 	if token, err := authToken(cmd); err != nil {
 		return nil, err
