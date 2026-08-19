@@ -2,12 +2,59 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.42.0] - 2026-08-19
+
+### 🚀 Features
+
+- Add SDK feature observations (#4700)
+- *(connect)* Adding support for connect HA (#4714)
+- *(queue)* Let custom scanners declare roles (#4723)
+- *(api)* Add v2 sandbox contracts (#4716)
+- Surface event scheduling in the dashboard (#4720)
+- *(ai metadata)* More robust AI model cost data (#4728)
+- *(improvement)* Add-scores-and-experiments-empty-states-to-dev-server (#4697)
+- *(improvement)* Cloud MCP UI (#4729)
+- *(ui-mcp)* Re-add MCP setup page (#4740)
+- *(mcp)* Restore setup docs with public operations (#4748)
+- *(ui)* Adding a concurrency color in the graph (#4744)
+- *(api)* Add v2 send event endpoint (#4724)
+
+### 🐛 Bug Fixes
+
+- *(traces)* Scope span self-join by run_id (#4718)
+- 64 bit linux download link for install.sh script (#4727)
+- *(queue)* Preserve sentinel shard selection errors (#4726)
+- Revert "feat(improvement): Cloud MCP UI (#4729)" (#4739)
+- *(ui-mcp)* Revert MCP setup page redesign (#4745)
+- *(redis-state)* Tolerate legacy idempotency tombstones (#4747)
+- *(batch)* Propagate timeout scheduling errors so source events retry (#4749)
+- *(traces)* Hide expand/collapse all when there is nothing to toggle (#4737)
+- *(ui)* Adding legend for concurrency limit on hover (#4753)
+- *(queue)* Disable constraint checks when key queues are disabled (#4754)
+
+### 🚜 Refactor
+
+- *(runs)* Remove legacy tokens from run output header (#4721)
+- *(queue)* Split queue reader capabilities (#4743)
+- *(connect)* Remove the async ACK gateway -> executor (#4215)
+
+### 📚 Documentation
+
+- *(api)* Improve v2 app sync and insights docs (#4732)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(queue)* Remove system queue migrations (#4722)
+- *(batch)* Add more context to schedule batch execution (#4742)
+- *(connect)* Adding run id to logs (#4698)
+
 ## [v1.41.1] - 2026-08-05
 
 ### ⚙️ Miscellaneous Tasks
 
 - *(support)* Add graphql-codegen to support app (#4701)
 - *(e2e)* Run more tests on Depot (#4710)
+- *(release)* V1.41.1 (#4707)
 
 ## [v1.41.0] - 2026-08-03
 
