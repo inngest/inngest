@@ -241,29 +241,11 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 
-			if evt.IsInternal() {
-				err := fmt.Errorf("event name is reserved for internal use: %s", evt.Name)
+			ts := time.Now()
+			sessionsMetrics, err := event.NormalizeInbound(ctx, &evt, ts)
+			if err != nil {
 				return err
 			}
-
-			// External event (i.e. doesn't have the "inngest/" prefix) data
-			// must not have internal metadata since it can cause issues. For
-			// example, if an invoked function's event data is forwarded into a
-			// new event then it may accidentally fulfill the invocation
-			delete(evt.Data, "_inngest")
-
-			ts := time.Now()
-			if evt.Timestamp == 0 {
-				evt.Timestamp = ts.UnixMilli()
-			}
-			if evt.User == nil {
-				evt.User = map[string]any{}
-			}
-
-			// Merge propagated sessions into the manual layer before validation.
-			// The merge reports the pre-merge state of both layers for adoption
-			// metrics.
-			sessionsMetrics := evt.Meta.ResolveSessions()
 			metrics.IncrEventSessionsResolvedCounter(
 				ctx,
 				"ingest",
@@ -272,10 +254,6 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				sessionsMetrics.Nulling,
 				metrics.CounterOpt{PkgName: metricsPkgName},
 			)
-
-			if err := evt.Validate(ctx); err != nil {
-				return err
-			}
 
 			ctx, span := itrace.UserTracer().Provider().
 				Tracer(consts.OtelScopeEvent).

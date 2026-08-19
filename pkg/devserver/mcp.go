@@ -144,6 +144,7 @@ var unsupportedDevServerMCPMethods = map[string]struct{}{
 	"QueryInsights":              {},
 	"QueryInsightsPrompt":        {},
 	"ReadSandboxFile":            {},
+	"SendEvent":                  {},
 	"SignalSandboxProcess":       {},
 	"StartSandboxProcess":        {},
 	"StreamSandboxLogs":          {},

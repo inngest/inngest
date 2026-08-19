@@ -11,6 +11,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"github.com/inngest/inngest/pkg/consts"
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -28,6 +29,8 @@ type Service struct {
 	traces         FunctionTraceReader
 	executor       FunctionScheduler
 	eventPublisher EventPublisher
+	eventSender    EventSender
+	maxEventSize   int
 	scores         ScoreProvider
 	rateLimiter    RateLimitProvider
 	base           *apiv2base.Base
@@ -44,6 +47,8 @@ type ServiceOptions struct {
 	FunctionTraces      FunctionTraceReader
 	Executor            FunctionScheduler
 	EventPublisher      EventPublisher
+	EventSender         EventSender
+	MaxEventSize        int
 	Scores              ScoreProvider
 	RateLimitProvider   RateLimitProvider
 }
@@ -52,6 +57,10 @@ func NewService(opts ServiceOptions) *Service {
 	rateLimiter := opts.RateLimitProvider
 	if rateLimiter == nil {
 		rateLimiter = noopRateLimitProvider{}
+	}
+	maxEventSize := opts.MaxEventSize
+	if maxEventSize <= 0 {
+		maxEventSize = consts.AbsoluteMaxEventSize
 	}
 	return &Service{
 		signingKeys:    opts.SigningKeysProvider,
@@ -63,6 +72,8 @@ func NewService(opts ServiceOptions) *Service {
 		traces:         opts.FunctionTraces,
 		executor:       opts.Executor,
 		eventPublisher: opts.EventPublisher,
+		eventSender:    opts.EventSender,
+		maxEventSize:   maxEventSize,
 		scores:         opts.Scores,
 		rateLimiter:    rateLimiter,
 		base:           apiv2base.NewBase(),
@@ -150,6 +161,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	authzPaths := base.BuildAuthzPathMap()
 
 	r := chi.NewRouter()
+	r.Use(SendEventBodyLimitMiddleware(consts.AbsoluteMaxEventSize))
 
 	// Add authentication middleware first
 	if httpOpts.AuthnMiddleware != nil {

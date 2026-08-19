@@ -728,6 +728,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		FunctionTraces:      NewFunctionTraceReader(dbcqrs),
 		Executor:            exec,
 		EventPublisher:      runner,
+		EventSender: func(ctx context.Context, evt *event.Event) (string, error) {
+			return ds.HandleEvent(ctx, evt, nil)
+		},
 		Scores: apiv2.NewStateScoreProvider(apiv2.StateScoreProviderOptions{
 			State:          smv2,
 			TracerProvider: tp,

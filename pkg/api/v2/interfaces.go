@@ -83,6 +83,8 @@ type EventPublisher interface {
 	Publish(ctx context.Context, event event.TrackedEvent) error
 }
 
+type EventSender func(context.Context, *event.Event) (string, error)
+
 type GetRunOpts struct {
 	IncludeOutput bool
 }
