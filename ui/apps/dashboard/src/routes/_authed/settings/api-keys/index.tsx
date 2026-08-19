@@ -8,7 +8,7 @@ import {
 } from '@inngest/components/Tooltip';
 import { useOrganization } from '@clerk/tanstack-react-start';
 import { RiAddLine } from '@remixicon/react';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, getRouteApi } from '@tanstack/react-router';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import { APIKeysEmptyState } from '@/components/APIKeys/EmptyState';
@@ -20,17 +20,23 @@ import { CreateAPIKeyModal } from '@/components/APIKeys/CreateAPIKeyModal';
 import { DeleteAPIKeyModal } from '@/components/APIKeys/DeleteAPIKeyModal';
 import { RenameAPIKeyModal } from '@/components/APIKeys/RenameAPIKeyModal';
 import { useAPIKeys } from '@/components/APIKeys/useAPIKeys';
+import { canManageAPIKeys } from '@/components/APIKeys/permissions';
 
 export const Route = createFileRoute('/_authed/settings/api-keys/')({
   component: APIKeysPage,
 });
 
 const ADMIN_TOOLTIP = 'Only organization admins can manage API keys.';
+const authedRoute = getRouteApi('/_authed');
 
 function APIKeysPage() {
   const res = useAPIKeys();
+  const { profile } = authedRoute.useLoaderData();
   const { membership, isLoaded: orgLoaded } = useOrganization();
-  const isAdmin = membership?.role === 'org:admin';
+  const canManage = canManageAPIKeys({
+    isMarketplace: profile.isMarketplace,
+    organizationRole: membership?.role,
+  });
 
   // Create modal state is owned here so it survives the empty->populated
   // transition that unmounts the EmptyState.
@@ -41,7 +47,7 @@ function APIKeysPage() {
   if (res.error) {
     throw res.error;
   }
-  if ((res.isLoading && !res.data) || !orgLoaded) {
+  if ((res.isLoading && !res.data) || (!profile.isMarketplace && !orgLoaded)) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoadingIcon />
@@ -64,7 +70,7 @@ function APIKeysPage() {
       iconSide="left"
       label="Create API key"
       onClick={() => setCreateOpen(true)}
-      disabled={!isAdmin}
+      disabled={!canManage}
     />
   );
 
@@ -85,7 +91,7 @@ function APIKeysPage() {
             </Link>
           </p>
         </div>
-        {isAdmin ? (
+        {canManage ? (
           createButton
         ) : (
           <Tooltip>
@@ -100,13 +106,13 @@ function APIKeysPage() {
       {keys.length === 0 ? (
         <APIKeysEmptyState
           onCreate={() => setCreateOpen(true)}
-          canCreate={isAdmin}
+          canCreate={canManage}
           disabledTooltip={ADMIN_TOOLTIP}
         />
       ) : (
         <APIKeysTable
           keys={keys}
-          canManage={isAdmin}
+          canManage={canManage}
           onRename={setRenameTarget}
           onDelete={setDeleteTarget}
         />
