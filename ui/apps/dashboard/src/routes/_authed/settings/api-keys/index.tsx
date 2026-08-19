@@ -34,7 +34,7 @@ function APIKeysPage() {
   const { profile } = authedRoute.useLoaderData();
   const { membership, isLoaded: orgLoaded } = useOrganization();
   const canManage = canManageAPIKeys({
-    isMarketplace: profile.isMarketplace,
+    marketplace: profile.marketplace,
     organizationRole: membership?.role,
   });
 
@@ -47,7 +47,7 @@ function APIKeysPage() {
   if (res.error) {
     throw res.error;
   }
-  if ((res.isLoading && !res.data) || (!profile.isMarketplace && !orgLoaded)) {
+  if ((res.isLoading && !res.data) || (!canManage && !orgLoaded)) {
     return (
       <div className="flex h-full w-full items-center justify-center">
         <LoadingIcon />

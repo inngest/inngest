@@ -1,4 +1,5 @@
 import { graphql } from '@/gql';
+import { type Marketplace } from '@/gql/graphql';
 import {
   auth,
   clerkClient,
@@ -16,6 +17,7 @@ export type ProfileType = {
 
 export type ProfileDisplayType = {
   isMarketplace: boolean;
+  marketplace: Marketplace | null;
   orgName?: string;
   displayName: string;
   orgProfilePic: string | null;
@@ -60,6 +62,7 @@ export const getProfileDisplay = createServerFn({
 
   return {
     isMarketplace: Boolean(res.account.marketplace),
+    marketplace: res.account.marketplace,
     orgName,
     displayName,
     orgProfilePic,

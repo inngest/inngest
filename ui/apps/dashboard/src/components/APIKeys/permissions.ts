@@ -1,12 +1,18 @@
+import { Marketplace } from '@/gql/graphql';
+
 type APIKeyPermissions = {
-  isMarketplace: boolean;
+  marketplace: Marketplace | null;
   organizationRole?: string;
 };
 
 export const canManageAPIKeys = ({
-  isMarketplace,
+  marketplace,
   organizationRole,
 }: APIKeyPermissions) => {
-  // Marketplace sessions use JWT auth and have no Clerk organization role.
-  return isMarketplace || organizationRole === 'org:admin';
+  // Vercel and DigitalOcean sessions use their provisioned admin over JWT.
+  return (
+    marketplace === Marketplace.Vercel ||
+    marketplace === Marketplace.DigitalOcean ||
+    organizationRole === 'org:admin'
+  );
 };
