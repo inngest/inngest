@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
+	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v3"
 )
@@ -226,6 +227,15 @@ func TestEndpointDescriptionReferencesValidFlags(t *testing.T) {
 }
 
 func TestCommandCallsGeneratedEndpoint(t *testing.T) {
+	previousVersion := version.Version
+	previousHash := version.Hash
+	version.Version = "v1.2.3-rc1"
+	version.Hash = "a1b2c3d"
+	t.Cleanup(func() {
+		version.Version = previousVersion
+		version.Hash = previousHash
+	})
+
 	var gotPath string
 	var gotAuth string
 	var gotEnv string
@@ -267,7 +277,7 @@ func TestCommandCallsGeneratedEndpoint(t *testing.T) {
 	require.Equal(t, "Bearer signkey-test-abc", gotAuth)
 	require.Equal(t, "branch-a", gotEnv)
 	require.Equal(t, "application/json", gotContentType)
-	require.Contains(t, gotUserAgent, "inngest-cli/")
+	require.Equal(t, "inngest-cli/v1.2.3-rc1", gotUserAgent)
 	require.Equal(t, map[string]any{
 		"data":           map[string]any{"message": "hi"},
 		"idempotencyKey": "idem-1",
