@@ -24,6 +24,7 @@ func RoundCost(v float64) float64 {
 	return math.Round(v*costPrecision) / costPrecision
 }
 
+//tygo:generate
 const (
 	// KindInngestAISummary is the run-scoped rollup of all AI usage within a
 	// run. It is synthesized every time a run's span tree is read and is never
@@ -38,6 +39,8 @@ const (
 // implement metadata.Structured or be passed to tracing.CreateMetadataSpan.
 // It lives here because Cloud imports the counting rules; usage.go has the
 // same shape already.
+
+//tygo:generate
 type AISummaryMetadata struct {
 	InputTokens  int64 `json:"input_tokens"`
 	OutputTokens int64 `json:"output_tokens"`
@@ -91,19 +94,15 @@ func AIUsageStepScoped(scope metadata.Scope) bool {
 // step-attempt entries are executor-reported usage and run-scoped entries are
 // how users report out-of-step usage, so those always count.
 //
-// extended_trace is conditional in both directions. On the SDK path every
-// OTel-derived LLM call made inside a step is reported twice with identical
-// tokens and cost — once at step scope by the SDK's metadata processor, once
-// at extended trace scope — so counting extended_trace unconditionally
-// reports 2x. But a blanket exclusion reads zero for gen_ai usage that never
-// reaches a counted scope at all: emitted outside any step, or from a source
-// with no metadata processor, where the OTLP endpoint is the only carrier.
-// Deciding per run — extended_trace counts only when the run reports no
-// step-scoped AI (runHasStepScopedAI, per AIUsageStepScoped) — closes that
-// gap without double-counting. The cost is that a mixed run — one step
-// reporting through the SDK, another making a raw OTel LLM call — still
-// undercounts; resolving that needs a per-step correlation key that only
-// extended-trace metadata spans carry.
+// An OTel LLM call inside a step arrives twice with identical usage: summed
+// into a step-scoped entry by the SDK's metadata processor, and re-extracted
+// at extended_trace scope from the OTLP export. Counting extended_trace
+// unconditionally therefore reports 2x, but excluding it always reads zero
+// when it is the only carrier (calls outside any step, or sources with no
+// metadata processor). Counting it only when the run reports no step-scoped
+// AI closes that gap without double-counting. A mixed run, where one step
+// reports via the SDK and another via raw OTel, still undercounts; fixing
+// that needs the per-step correlation the read path currently discards.
 func AIUsageEntryCounted(scope metadata.Scope, runHasStepScopedAI bool) bool {
 	switch scope {
 	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt, enums.MetadataScopeRun:

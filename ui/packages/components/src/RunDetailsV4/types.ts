@@ -1,6 +1,8 @@
 import {
+  KindInngestAISummary,
   KindInngestScore,
   type AIMetadata,
+  type AISummaryMetadata,
   type SpanMetadataKind as GeneratedSpanMetadataKind,
   type SpanMetadataKindInngestScore as GeneratedSpanMetadataKindInngestScore,
   type SpanMetadataKindUserland as GeneratedSpanMetadataKindUserland,
@@ -47,6 +49,7 @@ export type SpanMetadataScope = 'run' | 'step' | 'step_attempt' | 'extended_trac
 
 export type SpanMetadata =
   | SpanMetadataInngestAI
+  | SpanMetadataInngestAISummary
   | SpanMetadataInngestExperiment
   | SpanMetadataInngestHTTP
   | SpanMetadataInngestHTTPTiming
@@ -62,6 +65,15 @@ export type SpanMetadataInngestAI = {
   kind: 'inngest.ai';
   updatedAt: string;
   values: AIMetadata;
+};
+
+// The run-level AI usage rollup synthesized by the backend on every span-tree
+// read; it only ever appears on the root span.
+export type SpanMetadataInngestAISummary = {
+  scope: 'run';
+  kind: typeof KindInngestAISummary;
+  updatedAt: string;
+  values: AISummaryMetadata;
 };
 
 export type SpanMetadataInngestExperiment = {
@@ -243,4 +255,8 @@ export function isExperimentMetadata(md: SpanMetadata): md is SpanMetadataInnges
 
 export function isScoreMetadata(md: SpanMetadata): md is SpanMetadataInngestScore {
   return md.kind === KindInngestScore;
+}
+
+export function isAISummaryMetadata(md: SpanMetadata): md is SpanMetadataInngestAISummary {
+  return md.kind === KindInngestAISummary;
 }

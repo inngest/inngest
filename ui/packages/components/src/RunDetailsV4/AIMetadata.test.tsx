@@ -1,8 +1,19 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { AIMetadataNudge, traceHasAIMetadata } from './AIMetadata';
-import type { SpanMetadata, Trace } from './types';
+import { TooltipProvider } from '../Tooltip/Tooltip';
+import { AIMetadataNudge, AISummaryAttrs, traceHasAIMetadata } from './AIMetadata';
+import type { SpanMetadata, SpanMetadataInngestAISummary, Trace } from './types';
+
+// jsdom lacks ResizeObserver, which Pill uses for truncation detection.
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+);
 
 const booleanFlagMock = vi.hoisted(() => vi.fn());
 const pathCreatorMock = vi.hoisted(() => vi.fn());
@@ -84,6 +95,69 @@ describe('traceHasAIMetadata', () => {
     });
 
     expect(traceHasAIMetadata(trace)).toBe(false);
+  });
+});
+
+const aiSummaryMetadata: SpanMetadataInngestAISummary = {
+  scope: 'run',
+  kind: 'inngest.ai.summary',
+  updatedAt: '2026-01-01T00:00:05Z',
+  values: {
+    input_tokens: 1200,
+    output_tokens: 3400,
+    total_tokens: 4600,
+    estimated_cost: 0.004235,
+    models: ['claude-opus-4', 'gpt-4o-mini'],
+    providers: ['anthropic', 'openai'],
+  },
+};
+
+const renderSummary = (metadata: SpanMetadataInngestAISummary) =>
+  render(
+    <TooltipProvider>
+      <AISummaryAttrs metadata={metadata} />
+    </TooltipProvider>
+  );
+
+describe('AISummaryAttrs', () => {
+  it('renders formatted token totals, cost, models, and providers', () => {
+    renderSummary(aiSummaryMetadata);
+
+    expect(screen.getByText('AI Usage')).toBeTruthy();
+    expect(screen.getByText('4,600')).toBeTruthy();
+    expect(screen.getByText('1,200')).toBeTruthy();
+    expect(screen.getByText('3,400')).toBeTruthy();
+    expect(screen.getByText('$0.004235')).toBeTruthy();
+    // Pill renders its text twice: once visibly, once in a hidden measuring span.
+    expect(screen.getAllByText('claude-opus-4').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('gpt-4o-mini').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('anthropic').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('openai').length).toBeGreaterThan(0);
+  });
+
+  it('renders a zero-valued optional token count instead of omitting it', () => {
+    renderSummary({
+      ...aiSummaryMetadata,
+      values: { ...aiSummaryMetadata.values, cache_read_tokens: 0 },
+    });
+
+    expect(screen.getByText('Cache read tokens')).toBeTruthy();
+    expect(screen.getByText('0')).toBeTruthy();
+  });
+
+  it('omits rows for absent optional fields', () => {
+    renderSummary({
+      ...aiSummaryMetadata,
+      values: { input_tokens: 1, output_tokens: 2, total_tokens: 3 },
+    });
+
+    expect(screen.getByText('Total tokens')).toBeTruthy();
+    expect(screen.queryByText('Cache read tokens')).toBeNull();
+    expect(screen.queryByText('Cache creation tokens')).toBeNull();
+    expect(screen.queryByText('Reasoning tokens')).toBeNull();
+    expect(screen.queryByText('Estimated cost')).toBeNull();
+    expect(screen.queryByText('Models')).toBeNull();
+    expect(screen.queryByText('Providers')).toBeNull();
   });
 });
 
