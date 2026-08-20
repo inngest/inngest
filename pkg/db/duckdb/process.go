@@ -31,9 +31,21 @@ var errProcessDisabled = errors.New("duckdb: subprocess permanently disabled aft
 // subprocess, restart it, and retry — even though database/sql may drive
 // health checks, queries, and Close from different call paths over the
 // process's lifetime.
+//
+// procCtx/procCancel give the subprocess its own OS-lifetime context,
+// independent of whatever per-call ctx triggered a given exec/spawn/restart.
+// exec.CommandContext kills its process for the context's entire lifetime,
+// not just at start — so spawning with a short-lived, per-request ctx (the
+// shape Task 8's dualwrite package uses: one context per batch flush or hook
+// call) would kill a freshly-restarted, perfectly healthy subprocess the
+// instant that unrelated context ended. procCtx is created once, alongside
+// the process, and cancelled only by Connector.Close.
 type process struct {
 	binaryPath string
 	dbFile     string
+
+	procCtx    context.Context
+	procCancel context.CancelFunc
 
 	mu       sync.Mutex
 	cmd      *exec.Cmd
@@ -47,14 +59,23 @@ type process struct {
 
 // startProcess spawns the subprocess and health-checks it before returning,
 // so a caller (Connector.Connect / Open) never receives a process handle
-// that hasn't proven it can round-trip a query.
+// that hasn't proven it can round-trip a query. The ctx passed in only
+// bounds the health check; the subprocess's own OS lifetime is governed by
+// the process-owned procCtx (see the process doc comment), not this ctx.
 func startProcess(ctx context.Context, binaryPath, dbFile string) (*process, error) {
-	p := &process{binaryPath: binaryPath, dbFile: dbFile}
+	procCtx, procCancel := context.WithCancel(context.Background())
+	p := &process{
+		binaryPath: binaryPath,
+		dbFile:     dbFile,
+		procCtx:    procCtx,
+		procCancel: procCancel,
+	}
 
 	p.mu.Lock()
-	err := p.spawnLocked(ctx)
+	err := p.spawnLocked()
 	p.mu.Unlock()
 	if err != nil {
+		procCancel()
 		return nil, err
 	}
 
@@ -65,9 +86,12 @@ func startProcess(ctx context.Context, binaryPath, dbFile string) (*process, err
 	return p, nil
 }
 
-// spawnLocked assumes mu is already held.
-func (p *process) spawnLocked(ctx context.Context) error {
-	cmd := exec.CommandContext(ctx, p.binaryPath, p.dbFile, "-jsonlines")
+// spawnLocked assumes mu is already held. It always starts the subprocess
+// under p.procCtx (the process's own long-lived context), never the ctx of
+// whichever call (initial start, or a later restart triggered by exec)
+// happened to trigger the spawn — see the process doc comment.
+func (p *process) spawnLocked() error {
+	cmd := exec.CommandContext(p.procCtx, p.binaryPath, p.dbFile, "-jsonlines")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -86,7 +110,7 @@ func (p *process) spawnLocked(ctx context.Context) error {
 		return fmt.Errorf("duckdb: starting subprocess: %w", err)
 	}
 
-	go logStderr(ctx, stderr)
+	go logStderr(p.procCtx, stderr)
 
 	p.cmd = cmd
 	p.stdin = stdin
@@ -129,7 +153,7 @@ func (p *process) healthCheck(ctx context.Context) error {
 // same as a failed restart.
 func (p *process) restartLocked(ctx context.Context) error {
 	_ = p.closeLocked(ctx)
-	if err := p.spawnLocked(ctx); err != nil {
+	if err := p.spawnLocked(); err != nil {
 		return err
 	}
 	return p.healthCheckLocked(ctx)
@@ -247,15 +271,19 @@ func (c *Connector) Driver() driver.Driver { return &Driver{} }
 
 // Close implements io.Closer so *sql.DB.Close() tears down the supervised
 // subprocess (stdin close → bounded Wait → Kill fallback, per
-// process.close). io.Closer.Close takes no context, so a fixed grace period
-// is used here instead of propagating a caller context.
+// process.close), then cancels the process's own procCtx so the subprocess
+// cannot outlive the connector even if the graceful teardown above somehow
+// left it running. io.Closer.Close takes no context, so a fixed grace
+// period is used here instead of propagating a caller context.
 func (c *Connector) Close() error {
 	if c.proc == nil {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	return c.proc.close(ctx)
+	err := c.proc.close(ctx)
+	c.proc.procCancel()
+	return err
 }
 
 // Open returns a *sql.DB backed by a single supervised duckdb subprocess,

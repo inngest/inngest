@@ -1,10 +1,12 @@
 package duckdb
 
 import (
+	"context"
 	"database/sql"
 	"os/exec"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -252,4 +254,49 @@ func TestProcessHealthCheckAndRestartAreRaceFree(t *testing.T) {
 
 	wg.Wait()
 	require.NoError(t, p.healthCheck(t.Context()))
+}
+
+// TestRestartSurvivesTriggeringContextCancellation is a regression test for
+// a bug introduced by the exec-triggered-restart fix above: spawnLocked must
+// start the subprocess under the process's own long-lived procCtx, not the
+// per-call ctx that happened to trigger the spawn. exec.CommandContext kills
+// its process for the *entire* lifetime of the context passed to it, not
+// just while starting — so if a restart is triggered from inside a
+// short-lived, per-request context (exactly the shape Task 8's dualwrite
+// package uses: one context per batch flush or hook call), spawning under
+// that ctx would kill the freshly-restarted, perfectly healthy subprocess
+// the instant that unrelated context ends.
+//
+// This crashes the subprocess, triggers a restart via a real p.exec call
+// using a ctx that is cancelled immediately after that call returns, and
+// then confirms the restarted subprocess is still alive and healthy well
+// after that cancellation — proving its OS lifetime is governed by
+// process's own procCtx, not the triggering call's ctx.
+func TestRestartSurvivesTriggeringContextCancellation(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	p, err := startProcess(t.Context(), binPath, ":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	// Simulate a crash out from under the session.
+	require.NoError(t, p.cmd.Process.Kill())
+	_, _ = p.cmd.Process.Wait()
+
+	// Trigger the restart through a short-lived context, mirroring a single
+	// dualwrite batch-flush/hook-call context.
+	shortCtx, cancel := context.WithCancel(t.Context())
+	_, err = p.exec(shortCtx, "SELECT 1;")
+	require.NoError(t, err, "exec should transparently restart and succeed")
+
+	// End the triggering context shortly after the call returns, as a real
+	// per-request context would.
+	cancel()
+
+	// Give an incorrectly context-tied subprocess time to be killed by
+	// ctx cancellation before we check on it.
+	time.Sleep(200 * time.Millisecond)
+
+	require.NoError(t, p.healthCheck(t.Context()),
+		"restarted subprocess must survive the triggering call's context ending")
 }
