@@ -109,12 +109,27 @@ func WithLogger(l logger.Logger) func(s *svc) {
 	}
 }
 
+func WithSyncLifecycleListeners(l ...execution.SyncLifecycleListener) func(s *svc) {
+	return func(s *svc) {
+		s.syncLifecycles = append(s.syncLifecycles, l...)
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) Runner {
 	svc := &svc{config: c, log: logger.StdlibLogger(context.Background())}
 	for _, o := range opts {
 		o(svc)
 	}
 	return svc
+}
+
+// notifySyncLifecyclesEventReceived invokes all registered sync lifecycle
+// listeners synchronously (inline) whenever an event is durably created,
+// regardless of whether it later matches a function.
+func (s *svc) notifySyncLifecyclesEventReceived(ctx context.Context, evt event.TrackedEvent) {
+	for _, l := range s.syncLifecycles {
+		l.OnEventReceived(ctx, evt)
+	}
 }
 
 type svc struct {
@@ -137,6 +152,10 @@ type svc struct {
 	batcher batch.BatchManager
 	// croner handles cron operations
 	croner cron.CronManager
+
+	// syncLifecycles are invoked synchronously (inline) whenever an event is
+	// durably created, regardless of whether it later matches a function.
+	syncLifecycles []execution.SyncLifecycleListener
 
 	log logger.Logger
 }
@@ -306,6 +325,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if err != nil {
 		return err
 	}
+	s.notifySyncLifecyclesEventReceived(ctx, tracked)
 
 	l := s.log.With(
 		"event", tracked.GetEvent().Name,
