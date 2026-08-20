@@ -57,11 +57,3 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	}
 	return newMapRows(rows), nil
 }
-
-// interpolate is a temporary no-op stub. This transport has no wire-level
-// bind protocol, so parameters must be encoded as SQL literals directly into
-// the query text; Task 6 replaces this with real literal encoding
-// (encodeArgs) and reintroduces test coverage for parameter substitution.
-func interpolate(query string, args []driver.NamedValue) (string, error) {
-	return query, nil
-}
