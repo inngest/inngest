@@ -287,6 +287,14 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 
 			c.processMetadata(ctx, l, input.AccountID, input.Metadata, stepSpanRef, op, "checkpoint.SyncStep.metadata")
 
+			// Notify sync listeners (e.g. dualwrite) the same way
+			// executor.handleGeneratorStep does for the async/queue-backed
+			// path — checkpointed steps build their own span directly above
+			// rather than going through that path at all, so without this
+			// call sync listeners would never see step.run/step opcodes
+			// checkpointed from a sync (API-based) function.
+			c.Executor.RunStepRunFinishedLifecycle(ctx, *input.Metadata, runCtx.LifecycleItem(), inngest.SourceEdge, op, time.Now())
+
 			go c.MetricsProvider.OnStepFinished(ctx, MetricCardinality{
 				AccountID: input.AccountID,
 				EnvID:     input.EnvID,
@@ -582,6 +590,13 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 
 			c.processMetadata(ctx, l, input.AccountID, &md, stepSpanRef, op, "checkpoint.AsyncStep.metadata")
+
+			// See checkpointSyncSteps's identical call for why this is
+			// needed. item is a placeholder zero value here (like
+			// inngest.SourceEdge elsewhere in this file) — reconstructing
+			// the real queue.Item behind input.QueueItemRef isn't needed
+			// for a sync listener to record this step.
+			c.Executor.RunStepRunFinishedLifecycle(ctx, md, queue.Item{}, inngest.SourceEdge, op, time.Now())
 
 		case enums.OpcodeStepPlanned:
 			// When the SDK announces a step is about to run, we open a Running

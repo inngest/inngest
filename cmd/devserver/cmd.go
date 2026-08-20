@@ -112,6 +112,18 @@ func Command() *cli.Command {
 				Usage:    "Directory for where to write SQLite database.",
 				Hidden:   true,
 			},
+			&cli.BoolFlag{
+				Category: "Advanced",
+				Name:     "duckdb",
+				Usage:    "Enable the experimental DuckDB dual-write POC",
+				Value:    false,
+			},
+			&cli.BoolFlag{
+				Category: "Advanced",
+				Name:     "duckdb-reads",
+				Usage:    "Serve the GQL API and REST trace/run endpoints from DuckDB (requires --duckdb)",
+				Value:    false,
+			},
 			&cli.StringFlag{
 				Category: "Persistence",
 				Name:     "postgres-uri",

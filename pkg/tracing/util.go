@@ -244,8 +244,14 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 			if opts, err := op.InvokeFunctionOpts(); err == nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepInvokeFunctionID, &opts.FunctionID)
 
-				if id, err := ulid.Parse(opts.Payload.ID); err == nil {
-					meta.AddAttr(rawAttrs, meta.Attrs.StepInvokeTriggerEventID, &id)
+				// opts.Payload is explicitly allowed to be nil —
+				// InvokeFunctionOpts.Validate() treats a nil Payload as
+				// valid, not an error — so it must be nil-checked before
+				// dereferencing .ID.
+				if opts.Payload != nil {
+					if id, err := ulid.Parse(opts.Payload.ID); err == nil {
+						meta.AddAttr(rawAttrs, meta.Attrs.StepInvokeTriggerEventID, &id)
+					}
 				}
 
 				if expiry, err := opts.Expires(); err == nil {
@@ -581,7 +587,11 @@ func DeferSpanRef(parentRunID ulid.ULID, hashedID string) *meta.SpanReference {
 	}
 }
 
-func spanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {
+// SpanContextFromMetadata builds a trace.SpanContext from a SpanReference's
+// W3C traceparent/tracestate. Exported for pkg/tracing/v3, a second
+// TracerProvider implementation that can't reach this package's other
+// unexported helpers — see its doc comment.
+func SpanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {
 	if m == nil {
 		return trace.SpanContext{}
 	}
