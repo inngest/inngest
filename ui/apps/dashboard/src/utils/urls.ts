@@ -141,8 +141,29 @@ export const pathCreator = {
   envs() {
     return '/env';
   },
-  functions({ envSlug }: { envSlug: string }) {
-    return `/env/${envSlug}/functions`;
+  functions({
+    envSlug,
+    appIDs,
+    archived,
+  }: {
+    envSlug: string;
+    appIDs?: string[];
+    archived?: boolean;
+  }) {
+    const path = `/env/${envSlug}/functions`;
+    const query = new URLSearchParams();
+    if (appIDs?.length) {
+      // The functions table reads its app filter from a JSON-encoded array of
+      // app IDs, matching `useStringArraySearchParam('filterApp')`.
+      query.set('filterApp', JSON.stringify(appIDs));
+    }
+    // The table defaults to active functions, so archived functions are only
+    // visible when the status filter is explicitly set.
+    if (archived) {
+      query.set('archived', 'true');
+    }
+
+    return query.toString() ? `${path}?${query.toString()}` : path;
   },
   function({
     envSlug,
