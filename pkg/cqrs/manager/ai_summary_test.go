@@ -240,10 +240,11 @@ func TestAISummaryExtendedTraceOnlyCounts(t *testing.T) {
 	})
 }
 
-func TestAISummaryMultipleEmissionsOneDynamicSpanSum(t *testing.T) {
-	// Two emissions share one dynamic span ID. The rollup's merge opcode is
-	// last-write-wins, so the summary must be seeded from the raw fragments or
-	// the first call's usage is silently dropped.
+func TestAISummaryMultipleEmissionsOneDynamicSpanMerge(t *testing.T) {
+	// Two emissions share one dynamic span ID. The merge opcode makes the
+	// later one a per-key update of the same entry — not a new call — so the
+	// summary counts the merged entry once, matching the state the span
+	// itself carries.
 	eachEncoding(t, func(t *testing.T, enc attrEncoding) {
 		rows := []testSpanRow{
 			runRow(),
@@ -256,11 +257,34 @@ func TestAISummaryMultipleEmissionsOneDynamicSpanSum(t *testing.T) {
 
 		summary := requireSummary(t, buildRoot(t, enc, rows))
 
-		require.Equal(t, int64(37+30), summary.InputTokens)
-		require.Equal(t, int64(10+19), summary.OutputTokens)
-		require.Equal(t, int64(47+49), summary.TotalTokens)
+		require.Equal(t, int64(30), summary.InputTokens)
+		require.Equal(t, int64(19), summary.OutputTokens)
+		require.Equal(t, int64(49), summary.TotalTokens)
 		require.NotNil(t, summary.EstimatedCost)
-		require.InDelta(t, 0.000073+0.000108, *summary.EstimatedCost, 1e-12)
+		require.InDelta(t, 0.000108, *summary.EstimatedCost, 1e-12)
+	})
+}
+
+func TestAISummaryPartialUpdateNotDoubleCounted(t *testing.T) {
+	// A later emission carrying only a corrected cost updates the entry's
+	// cost in place; its tokens and original cost must not be summed again.
+	eachEncoding(t, func(t *testing.T, enc attrEncoding) {
+		rows := []testSpanRow{
+			runRow(),
+			stepRow("step-a", nil),
+			aiMetadataRow("md-update", "step-a",
+				aiMetadataFragment(t, enums.MetadataScopeStep, stepCallA),
+				aiMetadataFragment(t, enums.MetadataScopeStep, map[string]any{"estimated_cost": 0.0002}),
+			),
+		}
+
+		summary := requireSummary(t, buildRoot(t, enc, rows))
+
+		require.Equal(t, int64(37), summary.InputTokens)
+		require.Equal(t, int64(10), summary.OutputTokens)
+		require.Equal(t, int64(47), summary.TotalTokens)
+		require.NotNil(t, summary.EstimatedCost)
+		require.InDelta(t, 0.0002, *summary.EstimatedCost, 1e-12)
 	})
 }
 
@@ -301,7 +325,8 @@ func aiMetadataAttributes(t *testing.T, scope metadata.Scope, values map[string]
 // insertRunScopedAI writes a root span plus one metadata span per call, all
 // sharing a single dynamic span ID. Two run-scoped AddRunMetadata POSTs collide
 // this way: the parent comes from the run and the dynamic span ID from
-// (parent, kind), so distinct calls differ only in span_id.
+// (parent, kind), so distinct calls differ only in span_id and merge
+// last-write-wins into one entry.
 func insertRunScopedAI(t *testing.T, cm cqrs.Manager, calls ...map[string]any) *cqrs.OtelSpan {
 	t.Helper()
 
@@ -332,20 +357,16 @@ func insertRunScopedAI(t *testing.T, cm cqrs.Manager, calls ...map[string]any) *
 	return root
 }
 
-func TestAISummaryRunScopedDistinctCallsSum(t *testing.T) {
+func TestAISummaryRunScopedCallsMergeLastWriteWins(t *testing.T) {
 	cm, cleanup := initCQRS(t)
 	defer cleanup()
 
 	root := insertRunScopedAI(t, cm, stepCallA, stepCallB)
 	summary := requireSummary(t, root)
 
-	require.Equal(t, int64(37+30), summary.InputTokens)
-	require.Equal(t, int64(10+19), summary.OutputTokens)
-	require.Equal(t, int64(47+49), summary.TotalTokens)
-
-	// inngest.ai merges last-write-wins, so the entry the span itself carries
-	// holds a single call's values while the summary holds both. Which call
-	// wins is left to fragment order, which the sqlite query does not pin.
+	// The summary must agree with the merged entry the span itself carries.
+	// Which call wins is left to fragment order, which the sqlite query does
+	// not pin.
 	var stored []*cqrs.SpanMetadata
 	for _, md := range root.Metadata {
 		if md.Kind == extractors.KindInngestAI {
@@ -356,17 +377,5 @@ func TestAISummaryRunScopedDistinctCallsSum(t *testing.T) {
 	var storedInput int64
 	require.NoError(t, json.Unmarshal(stored[0].Values["input_tokens"], &storedInput))
 	require.Contains(t, []int64{37, 30}, storedInput)
-}
-
-func TestAISummaryRunScopedIdenticalCallsBothCount(t *testing.T) {
-	cm, cleanup := initCQRS(t)
-	defer cleanup()
-
-	// Identical payloads are legitimately reachable (temperature 0, cache
-	// hits), so the fold must not dedupe on the values blob.
-	root := insertRunScopedAI(t, cm, stepCallA, stepCallA)
-	summary := requireSummary(t, root)
-
-	require.Equal(t, int64(37*2), summary.InputTokens)
-	require.Equal(t, int64(10*2), summary.OutputTokens)
+	require.Equal(t, storedInput, summary.InputTokens)
 }
