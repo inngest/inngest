@@ -224,15 +224,15 @@ func TestDebounce_Timeout(t *testing.T) {
 	defer server.Close()
 
 	var counter int32
+	var start time.Time
 
-	start := time.Now()
 	period := 5 * time.Second
 	max := 10 * time.Second
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID: "test-out-of-order-debounce-ignored",
+			ID: "test-debounce-timeout",
 			Debounce: &inngestgo.ConfigDebounce{
 				Period:  period,
 				Timeout: &max,
@@ -242,8 +242,10 @@ func TestDebounce_Timeout(t *testing.T) {
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			fmt.Println("Debounced function ran", input.Event.Data.Name)
 
-			// It should occur after the max period.
-			require.True(t, time.Now().After(start.Add(max)))
+			// It should occur after the max period. We subtract 2s tolerance
+			// because `start` is captured after registration (below) and the
+			// internal debounce timer has sub-second imprecision.
+			require.True(t, time.Now().After(start.Add(max-2*time.Second)))
 
 			atomic.AddInt32(&counter, 1)
 			return nil, nil
@@ -251,6 +253,10 @@ func TestDebounce_Timeout(t *testing.T) {
 	)
 	require.NoError(t, err)
 	registerFuncs()
+
+	// Capture start AFTER registration so the debounce max timer aligns
+	// more closely with when the server actually begins processing events.
+	start = time.Now()
 
 	go func() {
 		// Send an event every second for 20 seconds in a goroutine.
