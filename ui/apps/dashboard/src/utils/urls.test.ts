@@ -1,9 +1,22 @@
+import { defaultParseSearch } from '@tanstack/react-router';
 import { describe, expect, it } from 'vitest';
 
 import { pathCreator } from './urls';
 
+//
+// The functions table reads its filters with `useStringArraySearchParam` and
+// `useSearchParam`, which both require the router to hand them a *string*.
+// These tests round-trip through the router's own parser, because that parsing
+// step is what a hand-rolled URLSearchParams query gets wrong: it produces
+// `filterApp=["id"]`, which parses into an array and gets discarded.
+//
+const parse = (path: string) => {
+  const [, search = ''] = path.split('?');
+  return defaultParseSearch(search) as Record<string, unknown>;
+};
+
 describe('pathCreator.functions', () => {
-  it('returns the unfiltered path when no apps are given', () => {
+  it('returns the unfiltered path when no filters are given', () => {
     expect(pathCreator.functions({ envSlug: 'production' })).toBe(
       '/env/production/functions',
     );
@@ -12,34 +25,34 @@ describe('pathCreator.functions', () => {
     );
   });
 
-  it('encodes app IDs the way the functions table parses them', () => {
-    const path = pathCreator.functions({
-      envSlug: 'production',
-      appIDs: ['app-1', 'app-2'],
-    });
-
-    const filterApp = new URL(path, 'https://app.inngest.com').searchParams.get(
-      'filterApp',
+  it('encodes app IDs so the router yields the string the filter expects', () => {
+    const search = parse(
+      pathCreator.functions({
+        envSlug: 'production',
+        appIDs: ['app-1', 'app-2'],
+      }),
     );
-    expect(filterApp).not.toBeNull();
-    expect(JSON.parse(filterApp!)).toEqual(['app-1', 'app-2']);
+
+    // `useStringArraySearchParam` rejects anything but a string, then parses it.
+    expect(typeof search.filterApp).toBe('string');
+    expect(JSON.parse(search.filterApp as string)).toEqual(['app-1', 'app-2']);
   });
 
-  it('sets the archived status filter for archived apps', () => {
-    const params = new URL(
+  it('encodes the archived filter as the string the table compares against', () => {
+    const search = parse(
       pathCreator.functions({
         envSlug: 'production',
         appIDs: ['app-1'],
         archived: true,
       }),
-      'https://app.inngest.com',
-    ).searchParams;
+    );
 
-    expect(params.get('archived')).toBe('true');
-    expect(JSON.parse(params.get('filterApp')!)).toEqual(['app-1']);
+    // The table does `filteredStatus === 'true'`, so a boolean would read false.
+    expect(search.archived).toBe('true');
+    expect(typeof search.filterApp).toBe('string');
   });
 
-  it('omits the archived status filter for active apps', () => {
+  it('omits the archived filter for active apps', () => {
     expect(
       pathCreator.functions({
         envSlug: 'production',

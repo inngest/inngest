@@ -1,3 +1,5 @@
+import { defaultStringifySearch } from '@tanstack/react-router';
+
 export const WEBSITE_PRICING_URL = 'https://www.inngest.com/pricing';
 export const WEBSITE_CONTACT_URL = 'https://www.inngest.com/contact';
 export const DISCORD_URL = 'https://www.inngest.com/discord';
@@ -151,19 +153,24 @@ export const pathCreator = {
     archived?: boolean;
   }) {
     const path = `/env/${envSlug}/functions`;
-    const query = new URLSearchParams();
+    const search: Record<string, string> = {};
     if (appIDs?.length) {
       // The functions table reads its app filter from a JSON-encoded array of
       // app IDs, matching `useStringArraySearchParam('filterApp')`.
-      query.set('filterApp', JSON.stringify(appIDs));
+      search.filterApp = JSON.stringify(appIDs);
     }
     // The table defaults to active functions, so archived functions are only
     // visible when the status filter is explicitly set.
     if (archived) {
-      query.set('archived', 'true');
+      search.archived = 'true';
     }
 
-    return query.toString() ? `${path}?${query.toString()}` : path;
+    // Both filters read their params as strings. The router's serializer
+    // double-encodes JSON-looking strings so they survive parsing as strings,
+    // so build the query with it rather than by hand: URLSearchParams would
+    // emit `filterApp=["id"]`, which the router parses into an array and the
+    // filter hooks then discard.
+    return `${path}${defaultStringifySearch(search)}`;
   },
   function({
     envSlug,
