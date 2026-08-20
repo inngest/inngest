@@ -1,13 +1,51 @@
-import { graphql } from '@/gql';
+import { gql, type TypedDocumentNode } from 'urql';
+
+import { ApiKeyOwnershipType } from '@/gql/graphql';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-const Query = graphql(`
+type GetAPIKeysResult = {
+  [key: string]: unknown;
+  session: {
+    user: {
+      id: string;
+    };
+  } | null;
+  account: {
+    apiKeys: {
+      id: string;
+      name: string;
+      createdAt: string;
+      ownershipType: ApiKeyOwnershipType;
+      ownerUserID: string | null;
+      maskedKey: string;
+      env: {
+        id: string;
+        name: string;
+        slug: string;
+      } | null;
+    }[];
+  };
+};
+
+type GetAPIKeysVariables = {
+  [key: string]: unknown;
+  workspaceID: string | null;
+};
+
+const Query: TypedDocumentNode<GetAPIKeysResult, GetAPIKeysVariables> = gql`
   query GetAPIKeys($workspaceID: UUID) {
+    session {
+      user {
+        id
+      }
+    }
     account {
       apiKeys(workspaceID: $workspaceID) {
         id
         name
         createdAt
+        ownershipType
+        ownerUserID
         maskedKey
         env {
           id
@@ -17,7 +55,7 @@ const Query = graphql(`
       }
     }
   }
-`);
+`;
 
 const queryContext = { additionalTypenames: ['APIKey'] };
 

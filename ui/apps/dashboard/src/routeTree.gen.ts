@@ -38,6 +38,7 @@ import { Route as authSignInSplatRouteImport } from './routes/(auth)/sign-in.$'
 import { Route as authOrganizationListSplatRouteImport } from './routes/(auth)/organization-list.$'
 import { Route as AuthedEnvEnvSlugRouteRouteImport } from './routes/_authed/env/$envSlug/route'
 import { Route as AuthedSettingsIntegrationsIndexRouteImport } from './routes/_authed/settings/integrations/index'
+import { Route as AuthedSettingsCreateApiKeyIndexRouteImport } from './routes/_authed/settings/create-api-key/index'
 import { Route as AuthedSettingsApiKeysIndexRouteImport } from './routes/_authed/settings/api-keys/index'
 import { Route as AuthedMcpSetupIndexRouteImport } from './routes/_authed/mcp/setup/index'
 import { Route as AuthedIntentSetupAwsMarketplaceIndexRouteImport } from './routes/_authed/intent/setup-aws-marketplace/index'
@@ -58,6 +59,7 @@ import { Route as AuthedSettingsIntegrationsSupabaseIndexRouteImport } from './r
 import { Route as AuthedSettingsIntegrationsPrometheusIndexRouteImport } from './routes/_authed/settings/integrations/prometheus/index'
 import { Route as AuthedSettingsIntegrationsNeonIndexRouteImport } from './routes/_authed/settings/integrations/neon/index'
 import { Route as AuthedSettingsIntegrationsDatadogIndexRouteImport } from './routes/_authed/settings/integrations/datadog/index'
+import { Route as AuthedSettingsApiKeysApiKeyIDIndexRouteImport } from './routes/_authed/settings/api-keys/$apiKeyID/index'
 import { Route as AuthedIntegrationsVercelCallbackIndexRouteImport } from './routes/_authed/integrations/vercel/callback/index'
 import { Route as AuthedEnvEnvSlugUnattachedSyncsIndexRouteImport } from './routes/_authed/env/$envSlug/unattached-syncs/index'
 import { Route as AuthedEnvEnvSlugSessionsIndexRouteImport } from './routes/_authed/env/$envSlug/sessions/index'
@@ -262,6 +264,12 @@ const AuthedSettingsIntegrationsIndexRoute =
     path: '/integrations/',
     getParentRoute: () => AuthedSettingsRouteRoute,
   } as any)
+const AuthedSettingsCreateApiKeyIndexRoute =
+  AuthedSettingsCreateApiKeyIndexRouteImport.update({
+    id: '/create-api-key/',
+    path: '/create-api-key/',
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any)
 const AuthedSettingsApiKeysIndexRoute =
   AuthedSettingsApiKeysIndexRouteImport.update({
     id: '/api-keys/',
@@ -375,6 +383,12 @@ const AuthedSettingsIntegrationsDatadogIndexRoute =
   AuthedSettingsIntegrationsDatadogIndexRouteImport.update({
     id: '/integrations/datadog/',
     path: '/integrations/datadog/',
+    getParentRoute: () => AuthedSettingsRouteRoute,
+  } as any)
+const AuthedSettingsApiKeysApiKeyIDIndexRoute =
+  AuthedSettingsApiKeysApiKeyIDIndexRouteImport.update({
+    id: '/api-keys/$apiKeyID/',
+    path: '/api-keys/$apiKeyID/',
     getParentRoute: () => AuthedSettingsRouteRoute,
   } as any)
 const AuthedIntegrationsVercelCallbackIndexRoute =
@@ -751,6 +765,7 @@ export interface FileRoutesByFullPath {
   '/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
   '/mcp/setup/': typeof AuthedMcpSetupIndexRoute
   '/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
+  '/settings/create-api-key/': typeof AuthedSettingsCreateApiKeyIndexRoute
   '/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
   '/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren
   '/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren
@@ -776,6 +791,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/sessions/': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/integrations/vercel/callback/': typeof AuthedIntegrationsVercelCallbackIndexRoute
+  '/settings/api-keys/$apiKeyID/': typeof AuthedSettingsApiKeysApiKeyIDIndexRoute
   '/settings/integrations/datadog/': typeof AuthedSettingsIntegrationsDatadogIndexRoute
   '/settings/integrations/neon/': typeof AuthedSettingsIntegrationsNeonIndexRoute
   '/settings/integrations/prometheus/': typeof AuthedSettingsIntegrationsPrometheusIndexRoute
@@ -851,6 +867,7 @@ export interface FileRoutesByTo {
   '/intent/setup-aws-marketplace': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
   '/mcp/setup': typeof AuthedMcpSetupIndexRoute
   '/settings/api-keys': typeof AuthedSettingsApiKeysIndexRoute
+  '/settings/create-api-key': typeof AuthedSettingsCreateApiKeyIndexRoute
   '/settings/integrations': typeof AuthedSettingsIntegrationsIndexRoute
   '/env/$envSlug/ai-overview': typeof AuthedEnvEnvSlugAiOverviewIndexRoute
   '/env/$envSlug/apps': typeof AuthedEnvEnvSlugAppsIndexRoute
@@ -868,6 +885,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/sessions': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/env/$envSlug/unattached-syncs': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/integrations/vercel/callback': typeof AuthedIntegrationsVercelCallbackIndexRoute
+  '/settings/api-keys/$apiKeyID': typeof AuthedSettingsApiKeysApiKeyIDIndexRoute
   '/settings/integrations/datadog': typeof AuthedSettingsIntegrationsDatadogIndexRoute
   '/settings/integrations/neon': typeof AuthedSettingsIntegrationsNeonIndexRoute
   '/settings/integrations/prometheus': typeof AuthedSettingsIntegrationsPrometheusIndexRoute
@@ -950,6 +968,7 @@ export interface FileRoutesById {
   '/_authed/intent/setup-aws-marketplace/': typeof AuthedIntentSetupAwsMarketplaceIndexRoute
   '/_authed/mcp/setup/': typeof AuthedMcpSetupIndexRoute
   '/_authed/settings/api-keys/': typeof AuthedSettingsApiKeysIndexRoute
+  '/_authed/settings/create-api-key/': typeof AuthedSettingsCreateApiKeyIndexRoute
   '/_authed/settings/integrations/': typeof AuthedSettingsIntegrationsIndexRoute
   '/_authed/env/$envSlug/apps/$externalID': typeof AuthedEnvEnvSlugAppsExternalIDRouteRouteWithChildren
   '/_authed/env/$envSlug/apps/sync-new': typeof AuthedEnvEnvSlugAppsSyncNewRouteRouteWithChildren
@@ -975,6 +994,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/sessions/': typeof AuthedEnvEnvSlugSessionsIndexRoute
   '/_authed/env/$envSlug/unattached-syncs/': typeof AuthedEnvEnvSlugUnattachedSyncsIndexRoute
   '/_authed/integrations/vercel/callback/': typeof AuthedIntegrationsVercelCallbackIndexRoute
+  '/_authed/settings/api-keys/$apiKeyID/': typeof AuthedSettingsApiKeysApiKeyIDIndexRoute
   '/_authed/settings/integrations/datadog/': typeof AuthedSettingsIntegrationsDatadogIndexRoute
   '/_authed/settings/integrations/neon/': typeof AuthedSettingsIntegrationsNeonIndexRoute
   '/_authed/settings/integrations/prometheus/': typeof AuthedSettingsIntegrationsPrometheusIndexRoute
@@ -1057,6 +1077,7 @@ export interface FileRouteTypes {
     | '/intent/setup-aws-marketplace/'
     | '/mcp/setup/'
     | '/settings/api-keys/'
+    | '/settings/create-api-key/'
     | '/settings/integrations/'
     | '/env/$envSlug/apps/$externalID'
     | '/env/$envSlug/apps/sync-new'
@@ -1082,6 +1103,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/sessions/'
     | '/env/$envSlug/unattached-syncs/'
     | '/integrations/vercel/callback/'
+    | '/settings/api-keys/$apiKeyID/'
     | '/settings/integrations/datadog/'
     | '/settings/integrations/neon/'
     | '/settings/integrations/prometheus/'
@@ -1157,6 +1179,7 @@ export interface FileRouteTypes {
     | '/intent/setup-aws-marketplace'
     | '/mcp/setup'
     | '/settings/api-keys'
+    | '/settings/create-api-key'
     | '/settings/integrations'
     | '/env/$envSlug/ai-overview'
     | '/env/$envSlug/apps'
@@ -1174,6 +1197,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/sessions'
     | '/env/$envSlug/unattached-syncs'
     | '/integrations/vercel/callback'
+    | '/settings/api-keys/$apiKeyID'
     | '/settings/integrations/datadog'
     | '/settings/integrations/neon'
     | '/settings/integrations/prometheus'
@@ -1255,6 +1279,7 @@ export interface FileRouteTypes {
     | '/_authed/intent/setup-aws-marketplace/'
     | '/_authed/mcp/setup/'
     | '/_authed/settings/api-keys/'
+    | '/_authed/settings/create-api-key/'
     | '/_authed/settings/integrations/'
     | '/_authed/env/$envSlug/apps/$externalID'
     | '/_authed/env/$envSlug/apps/sync-new'
@@ -1280,6 +1305,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/sessions/'
     | '/_authed/env/$envSlug/unattached-syncs/'
     | '/_authed/integrations/vercel/callback/'
+    | '/_authed/settings/api-keys/$apiKeyID/'
     | '/_authed/settings/integrations/datadog/'
     | '/_authed/settings/integrations/neon/'
     | '/_authed/settings/integrations/prometheus/'
@@ -1547,6 +1573,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSettingsIntegrationsIndexRouteImport
       parentRoute: typeof AuthedSettingsRouteRoute
     }
+    '/_authed/settings/create-api-key/': {
+      id: '/_authed/settings/create-api-key/'
+      path: '/create-api-key'
+      fullPath: '/settings/create-api-key/'
+      preLoaderRoute: typeof AuthedSettingsCreateApiKeyIndexRouteImport
+      parentRoute: typeof AuthedSettingsRouteRoute
+    }
     '/_authed/settings/api-keys/': {
       id: '/_authed/settings/api-keys/'
       path: '/api-keys'
@@ -1685,6 +1718,13 @@ declare module '@tanstack/react-router' {
       path: '/integrations/datadog'
       fullPath: '/settings/integrations/datadog/'
       preLoaderRoute: typeof AuthedSettingsIntegrationsDatadogIndexRouteImport
+      parentRoute: typeof AuthedSettingsRouteRoute
+    }
+    '/_authed/settings/api-keys/$apiKeyID/': {
+      id: '/_authed/settings/api-keys/$apiKeyID/'
+      path: '/api-keys/$apiKeyID'
+      fullPath: '/settings/api-keys/$apiKeyID/'
+      preLoaderRoute: typeof AuthedSettingsApiKeysApiKeyIDIndexRouteImport
       parentRoute: typeof AuthedSettingsRouteRoute
     }
     '/_authed/integrations/vercel/callback/': {
@@ -2140,9 +2180,11 @@ interface AuthedSettingsRouteRouteChildren {
   AuthedSettingsOrganizationSplatRoute: typeof AuthedSettingsOrganizationSplatRoute
   AuthedSettingsUserSplatRoute: typeof AuthedSettingsUserSplatRoute
   AuthedSettingsApiKeysIndexRoute: typeof AuthedSettingsApiKeysIndexRoute
+  AuthedSettingsCreateApiKeyIndexRoute: typeof AuthedSettingsCreateApiKeyIndexRoute
   AuthedSettingsIntegrationsIndexRoute: typeof AuthedSettingsIntegrationsIndexRoute
   AuthedSettingsIntegrationsNeonStepRouteRoute: typeof AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren
   AuthedSettingsIntegrationsSupabaseStepRouteRoute: typeof AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren
+  AuthedSettingsApiKeysApiKeyIDIndexRoute: typeof AuthedSettingsApiKeysApiKeyIDIndexRoute
   AuthedSettingsIntegrationsDatadogIndexRoute: typeof AuthedSettingsIntegrationsDatadogIndexRoute
   AuthedSettingsIntegrationsNeonIndexRoute: typeof AuthedSettingsIntegrationsNeonIndexRoute
   AuthedSettingsIntegrationsPrometheusIndexRoute: typeof AuthedSettingsIntegrationsPrometheusIndexRoute
@@ -2161,11 +2203,14 @@ const AuthedSettingsRouteRouteChildren: AuthedSettingsRouteRouteChildren = {
   AuthedSettingsOrganizationSplatRoute: AuthedSettingsOrganizationSplatRoute,
   AuthedSettingsUserSplatRoute: AuthedSettingsUserSplatRoute,
   AuthedSettingsApiKeysIndexRoute: AuthedSettingsApiKeysIndexRoute,
+  AuthedSettingsCreateApiKeyIndexRoute: AuthedSettingsCreateApiKeyIndexRoute,
   AuthedSettingsIntegrationsIndexRoute: AuthedSettingsIntegrationsIndexRoute,
   AuthedSettingsIntegrationsNeonStepRouteRoute:
     AuthedSettingsIntegrationsNeonStepRouteRouteWithChildren,
   AuthedSettingsIntegrationsSupabaseStepRouteRoute:
     AuthedSettingsIntegrationsSupabaseStepRouteRouteWithChildren,
+  AuthedSettingsApiKeysApiKeyIDIndexRoute:
+    AuthedSettingsApiKeysApiKeyIDIndexRoute,
   AuthedSettingsIntegrationsDatadogIndexRoute:
     AuthedSettingsIntegrationsDatadogIndexRoute,
   AuthedSettingsIntegrationsNeonIndexRoute:

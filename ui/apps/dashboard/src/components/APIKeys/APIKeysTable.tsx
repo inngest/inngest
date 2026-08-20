@@ -2,11 +2,16 @@ import { Button } from '@inngest/components/Button';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
 import { RiDeleteBin6Line, RiPencilLine } from '@remixicon/react';
+import { Link } from '@tanstack/react-router';
 import { createColumnHelper } from '@tanstack/react-table';
+
+import { ApiKeyOwnershipType } from '@/gql/graphql';
 
 export type APIKeyRow = {
   id: string;
   name: string;
+  ownershipType: ApiKeyOwnershipType;
+  ownerUserID: string | null;
   maskedKey: string;
   createdAt: string;
   env: { id: string; name: string } | null;
@@ -29,7 +34,13 @@ export function APIKeysTable({ keys, canManage, onRename, onDelete }: Props) {
         const row = info.row.original;
         return (
           <div className="flex flex-col">
-            <span className="text-basis text-sm">{row.name}</span>
+            <Link
+              className="text-basis hover:text-primary-moderate text-sm"
+              to="/settings/api-keys/$apiKeyID"
+              params={{ apiKeyID: row.id }}
+            >
+              {row.name}
+            </Link>
             <span className="text-light font-mono text-xs">
               {row.maskedKey}
             </span>
