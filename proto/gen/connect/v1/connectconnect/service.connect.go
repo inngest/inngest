@@ -41,8 +41,6 @@ const (
 	ConnectGatewayPingProcedure = "/connect.v1.ConnectGateway/Ping"
 	// ConnectExecutorReplyProcedure is the fully-qualified name of the ConnectExecutor's Reply RPC.
 	ConnectExecutorReplyProcedure = "/connect.v1.ConnectExecutor/Reply"
-	// ConnectExecutorAckProcedure is the fully-qualified name of the ConnectExecutor's Ack RPC.
-	ConnectExecutorAckProcedure = "/connect.v1.ConnectExecutor/Ack"
 	// ConnectExecutorPingProcedure is the fully-qualified name of the ConnectExecutor's Ping RPC.
 	ConnectExecutorPingProcedure = "/connect.v1.ConnectExecutor/Ping"
 )
@@ -146,7 +144,6 @@ func (UnimplementedConnectGatewayHandler) Ping(context.Context, *connect.Request
 // ConnectExecutorClient is a client for the connect.v1.ConnectExecutor service.
 type ConnectExecutorClient interface {
 	Reply(context.Context, *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error)
-	Ack(context.Context, *connect.Request[v1.AckMessage]) (*connect.Response[v1.AckResponse], error)
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
 }
 
@@ -167,12 +164,6 @@ func NewConnectExecutorClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(connectExecutorMethods.ByName("Reply")),
 			connect.WithClientOptions(opts...),
 		),
-		ack: connect.NewClient[v1.AckMessage, v1.AckResponse](
-			httpClient,
-			baseURL+ConnectExecutorAckProcedure,
-			connect.WithSchema(connectExecutorMethods.ByName("Ack")),
-			connect.WithClientOptions(opts...),
-		),
 		ping: connect.NewClient[v1.PingRequest, v1.PingResponse](
 			httpClient,
 			baseURL+ConnectExecutorPingProcedure,
@@ -185,18 +176,12 @@ func NewConnectExecutorClient(httpClient connect.HTTPClient, baseURL string, opt
 // connectExecutorClient implements ConnectExecutorClient.
 type connectExecutorClient struct {
 	reply *connect.Client[v1.ReplyRequest, v1.ReplyResponse]
-	ack   *connect.Client[v1.AckMessage, v1.AckResponse]
 	ping  *connect.Client[v1.PingRequest, v1.PingResponse]
 }
 
 // Reply calls connect.v1.ConnectExecutor.Reply.
 func (c *connectExecutorClient) Reply(ctx context.Context, req *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error) {
 	return c.reply.CallUnary(ctx, req)
-}
-
-// Ack calls connect.v1.ConnectExecutor.Ack.
-func (c *connectExecutorClient) Ack(ctx context.Context, req *connect.Request[v1.AckMessage]) (*connect.Response[v1.AckResponse], error) {
-	return c.ack.CallUnary(ctx, req)
 }
 
 // Ping calls connect.v1.ConnectExecutor.Ping.
@@ -207,7 +192,6 @@ func (c *connectExecutorClient) Ping(ctx context.Context, req *connect.Request[v
 // ConnectExecutorHandler is an implementation of the connect.v1.ConnectExecutor service.
 type ConnectExecutorHandler interface {
 	Reply(context.Context, *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error)
-	Ack(context.Context, *connect.Request[v1.AckMessage]) (*connect.Response[v1.AckResponse], error)
 	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
 }
 
@@ -224,12 +208,6 @@ func NewConnectExecutorHandler(svc ConnectExecutorHandler, opts ...connect.Handl
 		connect.WithSchema(connectExecutorMethods.ByName("Reply")),
 		connect.WithHandlerOptions(opts...),
 	)
-	connectExecutorAckHandler := connect.NewUnaryHandler(
-		ConnectExecutorAckProcedure,
-		svc.Ack,
-		connect.WithSchema(connectExecutorMethods.ByName("Ack")),
-		connect.WithHandlerOptions(opts...),
-	)
 	connectExecutorPingHandler := connect.NewUnaryHandler(
 		ConnectExecutorPingProcedure,
 		svc.Ping,
@@ -240,8 +218,6 @@ func NewConnectExecutorHandler(svc ConnectExecutorHandler, opts ...connect.Handl
 		switch r.URL.Path {
 		case ConnectExecutorReplyProcedure:
 			connectExecutorReplyHandler.ServeHTTP(w, r)
-		case ConnectExecutorAckProcedure:
-			connectExecutorAckHandler.ServeHTTP(w, r)
 		case ConnectExecutorPingProcedure:
 			connectExecutorPingHandler.ServeHTTP(w, r)
 		default:
@@ -255,10 +231,6 @@ type UnimplementedConnectExecutorHandler struct{}
 
 func (UnimplementedConnectExecutorHandler) Reply(context.Context, *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("connect.v1.ConnectExecutor.Reply is not implemented"))
-}
-
-func (UnimplementedConnectExecutorHandler) Ack(context.Context, *connect.Request[v1.AckMessage]) (*connect.Response[v1.AckResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("connect.v1.ConnectExecutor.Ack is not implemented"))
 }
 
 func (UnimplementedConnectExecutorHandler) Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
