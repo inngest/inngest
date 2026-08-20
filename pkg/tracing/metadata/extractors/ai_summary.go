@@ -164,11 +164,13 @@ func NewAISummaryBuilder() *AISummaryBuilder {
 }
 
 // aiUsageValues is the minimal projection of an inngest.ai entry needed to
-// aggregate usage. It deliberately does not reuse AIMetadata: that struct
-// types optional counts like cache_read_tokens as *int64, but producers can
-// emit them as floats, so unmarshalling the full struct fails and would drop
-// the entry's tokens entirely. Numerics are float64 here so both integer and
-// fractional encodings parse.
+// aggregate usage. It deliberately does not reuse AIMetadata: producers emit
+// values as arbitrary JSON and may encode counts like cache_read_tokens as
+// floats, which fail to unmarshal into *int64 and would drop the entry's
+// tokens entirely. Loosening AIMetadata's types would not help — it is a
+// producer-side struct that is never decoded from stored JSON, so this read
+// path must tolerate float encodings regardless. Numerics are float64 here
+// so both integer and fractional encodings parse.
 type aiUsageValues struct {
 	InputTokens         float64  `json:"input_tokens"`
 	OutputTokens        float64  `json:"output_tokens"`

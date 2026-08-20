@@ -281,16 +281,11 @@ type spanRollupInfo struct {
 	// This is needed because parent_span_id in the DB is an OTEL span ID,
 	// but the span tree is keyed by dynamic_span_id.
 	otelToDynamic map[string]string
-	// aiCandidates collects every raw inngest.ai fragment emission, before
-	// rollup: the AI merge opcode is last-write-wins per key, so summing from
-	// rolled-up entries would silently drop all but the last emission that
-	// shares a dynamic span ID.
-	aiCandidates []aiCandidate
-}
-
-type aiCandidate struct {
-	scope metadata.Scope
-	raw   []byte
+	// aiEntries collects each rolled-up inngest.ai metadata entry, including
+	// entries whose parent span is missing from the tree. Rolled-up values are
+	// summed — never raw fragments — because the AI merge opcode makes a later
+	// emission a per-key update of the same entry, not a new call.
+	aiEntries []*cqrs.SpanMetadata
 }
 
 // fragmentAttributesJSON returns the attributes field of a span fragment as
@@ -504,18 +499,15 @@ fragmentLoop:
 	}
 
 	if info != nil && isMetadata {
-		for _, fragment := range fragments {
-			if candidate, ok := parseAICandidate(fragment); ok {
-				info.aiCandidates = append(info.aiCandidates, candidate)
+		rolled, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
+		} else {
+			if rolled.Kind == extractors.KindInngestAI {
+				info.aiEntries = append(info.aiEntries, rolled)
 			}
-		}
-
-		if parentSpanIDPtr != nil {
-			metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
-			} else {
-				info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], metadata)
+			if parentSpanIDPtr != nil {
+				info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], rolled)
 			}
 		}
 	}
@@ -835,14 +827,14 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	// extractors.RoundCost's granularity, absorbing float addition's order
 	// sensitivity, and every other field is order-independent.
 	aiUsage := extractors.NewAISummaryBuilder()
-	hasStepAI := slices.ContainsFunc(info.aiCandidates, func(c aiCandidate) bool {
-		return extractors.AIUsageStepScoped(c.scope)
+	hasStepAI := slices.ContainsFunc(info.aiEntries, func(md *cqrs.SpanMetadata) bool {
+		return extractors.AIUsageStepScoped(md.Scope)
 	})
-	for _, c := range info.aiCandidates {
-		if !extractors.AIUsageEntryCounted(c.scope, hasStepAI) {
+	for _, md := range info.aiEntries {
+		if !extractors.AIUsageEntryCounted(md.Scope, hasStepAI) {
 			continue
 		}
-		if err := aiUsage.AddCallJSON(c.raw); err != nil {
+		if err := aiUsage.AddCall(md.Values); err != nil {
 			logger.StdlibLogger(ctx).Warn(
 				"skipping malformed inngest.ai metadata entry",
 				"run_id", root.RunID.String(),
@@ -934,34 +926,6 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 	return ret, nil
 }
 
-// parseAICandidate pulls the scope and raw values JSON from a single
-// inngest.ai fragment. Collection is best effort — fragments that fail to
-// parse are dropped here, and entries the summary builder can't parse are
-// skipped there — leaving the rollup's error handling untouched.
-func parseAICandidate(fragment map[string]any) (aiCandidate, bool) {
-	attrs, ok := fragmentAttributesJSON(fragment["attributes"])
-	if !ok {
-		return aiCandidate{}, false
-	}
-
-	var fragmentAttr struct {
-		Scope  *metadata.Scope `json:"_inngest.metadata.scope"`
-		Kind   *metadata.Kind  `json:"_inngest.metadata.kind"`
-		Values *string         `json:"_inngest.metadata.values"`
-	}
-	if err := json.Unmarshal(attrs, &fragmentAttr); err != nil {
-		return aiCandidate{}, false
-	}
-	if fragmentAttr.Scope == nil || fragmentAttr.Kind == nil || fragmentAttr.Values == nil {
-		return aiCandidate{}, false
-	}
-	if *fragmentAttr.Kind != extractors.KindInngestAI {
-		return aiCandidate{}, false
-	}
-
-	return aiCandidate{scope: *fragmentAttr.Scope, raw: []byte(*fragmentAttr.Values)}, true
-}
-
 // computeAndAttachUsageMetadata walks the span tree, sums the size of all
 // non-usage metadata values, and attaches a synthetic "inngest.usage" metadata
 // entry to the root span. Any previously stored usage metadata entries are
@@ -1009,9 +973,9 @@ func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
 // computeAndAttachAISummaryMetadata attaches a synthetic run-scoped
 // "inngest.ai.summary" entry to the root span from a builder already seeded
 // with every counted inngest.ai entry in the run. Like inngest.usage, the
-// summary is recomputed on every read and never persisted; any stored
-// entries of that kind are stripped first so the computed value is
-// authoritative.
+// summary is recomputed on every read and never persisted. Unlike
+// inngest.usage there is no strip-before-attach pass: the kind allowlist
+// rejects writes of this kind, so no stored entry can exist to conflict.
 //
 // The builder is seeded flat rather than by walking the tree so that usage
 // whose parent span is missing, dropped, or excluded from the tree still
@@ -1020,8 +984,6 @@ func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
 // The summary covers only this run. Usage from invoked child runs is never
 // folded in, and a run with no in-run usage gets no summary at all.
 func computeAndAttachAISummaryMetadata(ctx context.Context, root *cqrs.OtelSpan, builder *extractors.AISummaryBuilder) {
-	removeStoredAISummary(root)
-
 	if builder.Empty() {
 		return
 	}
@@ -1042,15 +1004,6 @@ func computeAndAttachAISummaryMetadata(ctx context.Context, root *cqrs.OtelSpan,
 		Values:    values,
 		UpdatedAt: ts,
 	})
-}
-
-func removeStoredAISummary(span *cqrs.OtelSpan) {
-	span.Metadata = slices.DeleteFunc(span.Metadata, func(m *cqrs.SpanMetadata) bool {
-		return m.Kind == extractors.KindInngestAISummary
-	})
-	for _, child := range span.Children {
-		removeStoredAISummary(child)
-	}
 }
 
 // extendedTraceKey is the map key used when indexing and reparenting orphaned
