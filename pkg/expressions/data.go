@@ -36,13 +36,14 @@ func NewData(data map[string]interface{}) *Data {
 // expression.  Initializing a new Data instance parses and formats the
 // data, copying values into a new map.
 //
-// Data is safe to use from multiple goroutines.
+// Data is safe to evaluate from multiple goroutines. Callers must not mutate
+// values returned by Map while the Data is in use.
 type Data struct {
 	// data represents the data being passed into an expression
 	data map[string]interface{}
 }
 
-// Map returns the data as a map.
+// Clone returns a copy of the data.
 func (d Data) Clone() *Data {
 	return &Data{
 		data: mapify(d.data),
@@ -50,7 +51,7 @@ func (d Data) Clone() *Data {
 
 }
 
-// Map returns the data as a map.
+// Map returns the underlying data map. Callers must treat it as read-only.
 func (d Data) Map() map[string]interface{} {
 	return d.data
 }
@@ -58,11 +59,6 @@ func (d Data) Map() map[string]interface{} {
 // MarshalJSON returns the data as JSON.
 func (d Data) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.data)
-}
-
-// Add adds data to be evaluated, overwriting existing data on conflicts.
-func (d *Data) Add(m map[string]interface{}) {
-	merge(d.data, m)
 }
 
 // Partial returns a PartialActivation for CEL.  This inspects the given expression to determine
@@ -193,25 +189,4 @@ func mapify(data map[string]interface{}) map[string]interface{} {
 	}
 
 	return copied
-}
-
-// merge recursively merges map[string]interface{} elements together.
-func merge(to, from map[string]interface{}) {
-	for key, val := range from {
-		oldVal, ok := to[key]
-		if !ok {
-			to[key] = val
-			continue
-		}
-
-		_, fromMap := val.(map[string]interface{})
-		_, isPrevMap := oldVal.(map[string]interface{})
-
-		if fromMap && isPrevMap {
-			merge(to[key].(map[string]interface{}), val.(map[string]interface{}))
-			continue
-		}
-
-		to[key] = val
-	}
 }
