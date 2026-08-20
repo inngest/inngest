@@ -6,12 +6,23 @@ import (
 	"errors"
 )
 
+// sqlExecer abstracts over what runs a SQL statement and collects its JSON
+// rows. *session (rows.go) implements it directly — Task 4's tests exercise
+// conn against a fake io.ReadWriter transport via a bare *session. *process
+// (process.go) implements it too, additionally providing crash detection,
+// one-restart-then-permanently-disable recovery, and locking around the real
+// subprocess. conn is deliberately transport-agnostic so both keep working
+// unchanged.
+type sqlExecer interface {
+	exec(ctx context.Context, sqlText string) ([]map[string]any, error)
+}
+
 // conn implements database/sql/driver.Conn, ExecerContext, and QueryerContext
 // over a single duckdb subprocess session. Parameter binding is handled by
 // literal.go (encodeArgs) since this transport has no wire-level bind
 // protocol — see docs/plans/006-duckdb-poc-subprocess-dual-write.md.
 type conn struct {
-	sess *session
+	sess sqlExecer
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
