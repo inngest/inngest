@@ -34,6 +34,7 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -280,6 +281,16 @@ type spanRollupInfo struct {
 	// This is needed because parent_span_id in the DB is an OTEL span ID,
 	// but the span tree is keyed by dynamic_span_id.
 	otelToDynamic map[string]string
+	// aiCandidates collects every raw inngest.ai fragment emission, before
+	// rollup: the AI merge opcode is last-write-wins per key, so summing from
+	// rolled-up entries would silently drop all but the last emission that
+	// shares a dynamic span ID.
+	aiCandidates []aiCandidate
+}
+
+type aiCandidate struct {
+	scope metadata.Scope
+	raw   []byte
 }
 
 // fragmentAttributesJSON returns the attributes field of a span fragment as
@@ -492,12 +503,20 @@ fragmentLoop:
 		}
 	}
 
-	if info != nil && isMetadata && parentSpanIDPtr != nil {
-		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
-		} else {
-			info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], metadata)
+	if info != nil && isMetadata {
+		for _, fragment := range fragments {
+			if candidate, ok := parseAICandidate(fragment); ok {
+				info.aiCandidates = append(info.aiCandidates, candidate)
+			}
+		}
+
+		if parentSpanIDPtr != nil {
+			metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
+			} else {
+				info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], metadata)
+			}
 		}
 	}
 
@@ -581,12 +600,13 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	var runID ulid.ULID
 	var err error
 
+	info := spanRollupInfo{
+		dynamicRefs:      dynamicRefs,
+		metadataByParent: metadataByParent,
+		otelToDynamic:    otelToDynamic,
+	}
+
 	for _, span := range spans {
-		info := spanRollupInfo{
-			dynamicRefs:      dynamicRefs,
-			metadataByParent: metadataByParent,
-			otelToDynamic:    otelToDynamic,
-		}
 		newSpan, err := mapSpanFromRow(ctx, span, &info)
 		if err != nil {
 			return nil, err
@@ -811,8 +831,29 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		return nil, fmt.Errorf("no root span found for run %s", runID.String())
 	}
 
+	// Fold order doesn't matter: the builder rounds the summed cost to
+	// extractors.RoundCost's granularity, absorbing float addition's order
+	// sensitivity, and every other field is order-independent.
+	aiUsage := extractors.NewAISummaryBuilder()
+	hasStepAI := slices.ContainsFunc(info.aiCandidates, func(c aiCandidate) bool {
+		return extractors.AIUsageStepScoped(c.scope)
+	})
+	for _, c := range info.aiCandidates {
+		if !extractors.AIUsageEntryCounted(c.scope, hasStepAI) {
+			continue
+		}
+		if err := aiUsage.AddCallJSON(c.raw); err != nil {
+			logger.StdlibLogger(ctx).Warn(
+				"skipping malformed inngest.ai metadata entry",
+				"run_id", root.RunID.String(),
+				"error", err,
+			)
+		}
+	}
+
 	sorter(root)
 	computeAndAttachUsageMetadata(root)
+	computeAndAttachAISummaryMetadata(ctx, root, aiUsage)
 
 	return root, nil
 }
@@ -893,6 +934,34 @@ func rollupSpanMetadataFromFragments(ctx context.Context, fragments []map[string
 	return ret, nil
 }
 
+// parseAICandidate pulls the scope and raw values JSON from a single
+// inngest.ai fragment. Collection is best effort — fragments that fail to
+// parse are dropped here, and entries the summary builder can't parse are
+// skipped there — leaving the rollup's error handling untouched.
+func parseAICandidate(fragment map[string]any) (aiCandidate, bool) {
+	attrs, ok := fragmentAttributesJSON(fragment["attributes"])
+	if !ok {
+		return aiCandidate{}, false
+	}
+
+	var fragmentAttr struct {
+		Scope  *metadata.Scope `json:"_inngest.metadata.scope"`
+		Kind   *metadata.Kind  `json:"_inngest.metadata.kind"`
+		Values *string         `json:"_inngest.metadata.values"`
+	}
+	if err := json.Unmarshal(attrs, &fragmentAttr); err != nil {
+		return aiCandidate{}, false
+	}
+	if fragmentAttr.Scope == nil || fragmentAttr.Kind == nil || fragmentAttr.Values == nil {
+		return aiCandidate{}, false
+	}
+	if *fragmentAttr.Kind != extractors.KindInngestAI {
+		return aiCandidate{}, false
+	}
+
+	return aiCandidate{scope: *fragmentAttr.Scope, raw: []byte(*fragmentAttr.Values)}, true
+}
+
 // computeAndAttachUsageMetadata walks the span tree, sums the size of all
 // non-usage metadata values, and attaches a synthetic "inngest.usage" metadata
 // entry to the root span. Any previously stored usage metadata entries are
@@ -934,6 +1003,53 @@ func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
 	}
 	for _, child := range span.Children {
 		walkMetadataSize(child, total)
+	}
+}
+
+// computeAndAttachAISummaryMetadata attaches a synthetic run-scoped
+// "inngest.ai.summary" entry to the root span from a builder already seeded
+// with every counted inngest.ai entry in the run. Like inngest.usage, the
+// summary is recomputed on every read and never persisted; any stored
+// entries of that kind are stripped first so the computed value is
+// authoritative.
+//
+// The builder is seeded flat rather than by walking the tree so that usage
+// whose parent span is missing, dropped, or excluded from the tree still
+// counts.
+//
+// The summary covers only this run. Usage from invoked child runs is never
+// folded in, and a run with no in-run usage gets no summary at all.
+func computeAndAttachAISummaryMetadata(ctx context.Context, root *cqrs.OtelSpan, builder *extractors.AISummaryBuilder) {
+	removeStoredAISummary(root)
+
+	if builder.Empty() {
+		return
+	}
+	values, err := builder.Summary().Serialize()
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error serializing AI summary metadata", "error", err)
+		return
+	}
+
+	ts := root.EndTime
+	if ts.IsZero() {
+		ts = root.StartTime
+	}
+
+	root.Metadata = append(root.Metadata, &cqrs.SpanMetadata{
+		Scope:     enums.MetadataScopeRun,
+		Kind:      extractors.KindInngestAISummary,
+		Values:    values,
+		UpdatedAt: ts,
+	})
+}
+
+func removeStoredAISummary(span *cqrs.OtelSpan) {
+	span.Metadata = slices.DeleteFunc(span.Metadata, func(m *cqrs.SpanMetadata) bool {
+		return m.Kind == extractors.KindInngestAISummary
+	})
+	for _, child := range span.Children {
+		removeStoredAISummary(child)
 	}
 }
 
