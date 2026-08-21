@@ -35,17 +35,15 @@ func IncrBatchMetricTierRefreshCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
-// HistogramBatchPayloadSizeBytes records serialized bytes committed by one
-// append or bulk-append Redis operation. Its exported sum is the total number
-// of serialized bytes committed.
-func HistogramBatchPayloadSizeBytes(ctx context.Context, bytes int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, bytes, HistogramOpt{
+// IncrBatchCommittedBytesCounter records serialized bytes committed to batch
+// storage. The counter can be summed by account_tier and backend for throughput
+// and capacity planning.
+func IncrBatchCommittedBytesCounter(ctx context.Context, bytes int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, bytes, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "batch_payload_size_bytes",
-		Description: "Distribution of serialized BatchItem bytes committed per Redis operation",
-		Unit:        "By",
+		MetricName:  "batch_committed_bytes_total",
+		Description: "Total serialized BatchItem bytes committed to batch storage",
 		Tags:        opts.Tags,
-		Boundaries:  batchByteBoundaries,
 	})
 }
 

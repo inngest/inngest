@@ -93,11 +93,7 @@ func TestAppendBufferFlushReturnsSchedulingError(t *testing.T) {
 		},
 	}
 	item := BatchItem{
-		AccountID:   uuid.New(),
-		WorkspaceID: uuid.New(),
-		FunctionID:  fn.ID,
-		EventID:     ulid.Make(),
-		Event:       event.Event{ID: "test"},
+		EventID: ulid.Make(),
 	}
 	buf := &batchBuffer{
 		items: []pendingItem{{
