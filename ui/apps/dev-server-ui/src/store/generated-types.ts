@@ -1178,7 +1178,9 @@ export type RerunFromStepMutation = { __typename?: 'Mutation', rerun: any };
 
 export type GetRunsQueryVariables = Exact<{
   appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  functionIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
   startTime: Scalars['Time'];
+  endTime?: InputMaybe<Scalars['Time']>;
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
   functionRunCursor?: InputMaybe<Scalars['String']>;
@@ -1191,9 +1193,13 @@ export type GetRunsQueryVariables = Exact<{
 export type GetRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', edges: Array<{ __typename?: 'FunctionRunV2Edge', node: { __typename?: 'FunctionRunV2', cronSchedule: string | null, eventName: string | null, id: any, isBatch: boolean, queuedAt: any, endedAt: any | null, startedAt: any | null, status: FunctionRunStatus, hasAI: boolean, isDeferred: boolean, app: { __typename?: 'App', externalID: string, name: string }, function: { __typename?: 'Function', name: string, slug: string }, deferredFrom: Array<{ __typename?: 'RunDeferredFrom', runID: any, function: { __typename?: 'Function', name: string, slug: string } }> } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, hasPreviousPage: boolean, startCursor: string | null, endCursor: string | null } } };
 
 export type CountRunsQueryVariables = Exact<{
+  appIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
+  functionIDs: InputMaybe<Array<Scalars['UUID']> | Scalars['UUID']>;
   startTime: Scalars['Time'];
+  endTime?: InputMaybe<Scalars['Time']>;
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
+  celQuery?: InputMaybe<Scalars['String']>;
   preview?: InputMaybe<Scalars['Boolean']>;
   isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
