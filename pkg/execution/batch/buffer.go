@@ -336,19 +336,26 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		end := min(start+batchMaxSize, len(items))
 		chunk := items[start:end]
 		chunkPending := pending[start:end]
-
+		metricTags := batchStorageMetricTags(batchTierUnknown, batchBackendDefault)
 		redisStart := time.Now()
-		bulkResult, err := mgr.BulkAppend(ctx, chunk, fn)
+		var bulkResult *BulkAppendResult
+		var err error
+		if redisMgr, ok := mgr.(*redisBatchManager); ok {
+			accountTier := redisMgr.accountTierMetricTag(ctx, chunk[0].AccountID)
+			metricTags = batchStorageMetricTags(accountTier, redisMgr.metricBackend)
+			bulkResult, err = redisMgr.bulkAppend(ctx, chunk, fn, accountTier)
+		} else {
+			bulkResult, err = mgr.BulkAppend(ctx, chunk, fn)
+		}
 		redisDurationMs := time.Since(redisStart).Milliseconds()
-
-		metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName})
+		metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName, Tags: metricTags})
 
 		if err != nil {
 			ab.log.Error("error bulk-appending events to batch ", "chunk_size", len(chunk), "first_event", chunk[0].EventID, "function_id", fn.ID, "error", err)
 
 			metrics.IncrBatchBufferErrorsCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"error_type": "bulk_append"},
+				Tags:    withBatchMetricTags(metricTags, map[string]any{"error_type": "bulk_append"}),
 			})
 			for _, p := range chunkPending {
 				p.pending.err = err
@@ -360,7 +367,6 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		if bulkResult == nil {
 			continue
 		}
-
 		if err := ab.handleScheduling(bulkResult, fn, chunk[0], mgr); err != nil {
 			for _, p := range chunkPending {
 				p.pending.err = err
@@ -372,13 +378,13 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		go func() {
 			metrics.IncrBatchBufferBulkAppendCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"status": bulkResult.Status},
+				Tags:    withBatchMetricTags(metricTags, map[string]any{"status": bulkResult.Status}),
 			})
 			if bulkResult.Committed > 0 {
-				metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName})
+				metrics.IncrBatchBufferItemsCommittedCounter(ctx, int64(bulkResult.Committed), metrics.CounterOpt{PkgName: pkgName, Tags: metricTags})
 			}
 			if bulkResult.Duplicates > 0 {
-				metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName})
+				metrics.IncrBatchBufferItemsDuplicatedCounter(ctx, int64(bulkResult.Duplicates), metrics.CounterOpt{PkgName: pkgName, Tags: metricTags})
 			}
 		}()
 
