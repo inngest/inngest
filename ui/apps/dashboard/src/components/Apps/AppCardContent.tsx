@@ -46,7 +46,16 @@ const getAppCardContent = ({
 
   const footerHeaderSecondaryCTA =
     !app.error && app.functionCount > 0 ? (
-      <Link size="small" to={pathCreator.functions({ envSlug: envSlug })}>
+      <Link
+        size="small"
+        to={pathCreator.functions({
+          envSlug: envSlug,
+          appIDs: [app.id],
+          // An archived app's functions are archived too, so the status filter
+          // has to match or the filtered view lands on an empty table.
+          archived: app.isArchived,
+        })}
+      >
         View functions
       </Link>
     ) : null;

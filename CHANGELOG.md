@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.43.0] - 2026-08-20
+
+### 🚀 Features
+
+- *(cli)* Add cli user agent for api analytics (#4752)
+- *(dashboard)* Add app filtering to functions table (#4199)
+
+### 🐛 Bug Fixes
+
+- *(ci)* Add --force-with-lease to the Sync Staging workflow push (#4629)
+
 ## [v1.42.0] - 2026-08-19
 
 ### 🚀 Features
@@ -47,6 +58,7 @@ All notable changes to this project will be documented in this file.
 - *(queue)* Remove system queue migrations (#4722)
 - *(batch)* Add more context to schedule batch execution (#4742)
 - *(connect)* Adding run id to logs (#4698)
+- *(release)* V1.42.0 (#4715)
 
 ## [v1.41.1] - 2026-08-05
 
