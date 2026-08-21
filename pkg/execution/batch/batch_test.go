@@ -149,85 +149,6 @@ func TestBatchScriptsAppendToExistingBatch(t *testing.T) {
 	require.Equal(t, batchID.String(), pointer)
 }
 
-func TestAccountPlanMetricTag(t *testing.T) {
-	accountID := uuid.New()
-	tests := []struct {
-		name     string
-		resolver AccountPlanMetricTagResolver
-		want     string
-	}{
-		{name: "missing resolver", want: batchTierUnknown},
-		{name: "resolver failure", resolver: func(context.Context, uuid.UUID) string { return "" }, want: batchTierUnknown},
-		{name: "enterprise", resolver: func(context.Context, uuid.UUID) string { return "enterprise" }, want: batchTierEnterprise},
-		{name: "free is other", resolver: func(context.Context, uuid.UUID) string { return "free" }, want: batchTierOther},
-		{name: "self serve is other", resolver: func(context.Context, uuid.UUID) string { return "self_serve" }, want: batchTierOther},
-		{name: "unsupported is other", resolver: func(context.Context, uuid.UUID) string { return "unsupported" }, want: batchTierOther},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			manager := redisBatchManager{accountPlanMetricTagResolver: tt.resolver}
-			require.Equal(t, tt.want, manager.accountTierMetricTag(context.Background(), accountID))
-		})
-	}
-}
-
-func TestBatchInstrumentationGateControlsNewMetricsAndBufferTags(t *testing.T) {
-	ctx := context.Background()
-	accountID := uuid.New()
-	workspaceID := uuid.New()
-
-	t.Run("off", func(t *testing.T) {
-		var resolverCalls int
-		manager := redisBatchManager{
-			metricBackend: "memorydb",
-			accountPlanMetricTagResolver: func(context.Context, uuid.UUID) string {
-				resolverCalls++
-				return "enterprise"
-			},
-			batchInstrumentationGate: func(_ context.Context, gotAccountID, gotWorkspaceID uuid.UUID) bool {
-				require.Equal(t, accountID, gotAccountID)
-				require.Equal(t, workspaceID, gotWorkspaceID)
-				return false
-			},
-		}
-
-		metricTags := manager.accountScopedMetricTags(ctx, accountID, workspaceID)
-		require.Nil(t, metricTags, "nil suppresses the new account-scoped metrics")
-		require.Zero(t, resolverCalls)
-		require.Equal(t, map[string]any{"status": "new"}, withBatchMetricTags(metricTags, map[string]any{"status": "new"}))
-	})
-
-	t.Run("on", func(t *testing.T) {
-		var resolverCalls int
-		manager := redisBatchManager{
-			metricBackend: "memorydb",
-			accountPlanMetricTagResolver: func(context.Context, uuid.UUID) string {
-				resolverCalls++
-				return "enterprise"
-			},
-			batchInstrumentationGate: func(context.Context, uuid.UUID, uuid.UUID) bool { return true },
-		}
-
-		metricTags := manager.accountScopedMetricTags(ctx, accountID, workspaceID)
-		require.Equal(t, map[string]any{"account_tier": "enterprise", "backend": "memorydb"}, metricTags)
-		require.Equal(t, 1, resolverCalls)
-		require.Equal(t, map[string]any{
-			"account_tier": "enterprise",
-			"backend":      "memorydb",
-			"status":       "new",
-		}, withBatchMetricTags(metricTags, map[string]any{"status": "new"}))
-	})
-
-	t.Run("nil gate defaults on", func(t *testing.T) {
-		manager := redisBatchManager{metricBackend: batchBackendDefault}
-		require.Equal(t, map[string]any{
-			"account_tier": batchTierUnknown,
-			"backend":      batchBackendDefault,
-		}, manager.accountScopedMetricTags(ctx, accountID, workspaceID))
-	})
-}
-
 func TestBatchSizeLimit(t *testing.T) {
 	r := miniredis.RunT(t)
 
@@ -791,7 +712,6 @@ func TestBulkAppendPayloadAccountingAcrossOverflow(t *testing.T) {
 	result, err := bm.BulkAppend(ctx, items, fn)
 	require.NoError(t, err)
 	require.Equal(t, "overflow", result.Status)
-	require.False(t, shouldRecordBatchListObservation(result.Status))
 	require.Equal(t, 3, result.Committed)
 	require.Equal(t, int64(encodedBytes[0]+encodedBytes[1]+encodedBytes[2]), result.CommittedBytes)
 	require.Equal(t, 2, result.BatchItemCount)

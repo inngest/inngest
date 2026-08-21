@@ -272,7 +272,7 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 		return nil, fmt.Errorf("failed to decode append result: %v", err)
 	}
 	if result.Committed > 0 && metricTags != nil {
-		b.metricRecorder.RecordCommit(ctx, metricTags, result.Status.String(), result.CommittedBytes, result.BatchListResidentBytes, result.BatchItemCount)
+		b.metricRecorder.RecordCommit(ctx, metricTags, result.CommittedBytes, result.BatchListResidentBytes, result.BatchItemCount)
 	}
 
 	return result, nil
@@ -606,7 +606,7 @@ func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, f
 		return nil, fmt.Errorf("failed to decode bulk append result: %v", err)
 	}
 	if result.Committed > 0 && metricTags != nil {
-		b.metricRecorder.RecordCommit(ctx, metricTags, result.Status, result.CommittedBytes, result.BatchListResidentBytes, result.BatchItemCount)
+		b.metricRecorder.RecordCommit(ctx, metricTags, result.CommittedBytes, result.BatchListResidentBytes, result.BatchItemCount)
 	}
 
 	return result, nil

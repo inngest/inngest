@@ -92,7 +92,7 @@ type BatchManager interface {
 // operation results needed to record them.
 type BatchMetricRecorder interface {
 	AccountScopedTags(ctx context.Context, accountID, workspaceID uuid.UUID) map[string]any
-	RecordCommit(ctx context.Context, tags map[string]any, status string, committedBytes, listResidentBytes int64, listItemCount int)
+	RecordCommit(ctx context.Context, tags map[string]any, committedBytes, listResidentBytes int64, listItemCount int)
 	RecordRetrieve(ctx context.Context, status string, itemCount int64, duration time.Duration)
 	RecordDelete(ctx context.Context, status string, duration time.Duration)
 }
