@@ -93,7 +93,9 @@ func TestAppendBufferFlushReturnsSchedulingError(t *testing.T) {
 		},
 	}
 	item := BatchItem{
-		EventID: ulid.Make(),
+		WorkspaceID: uuid.New(),
+		FunctionID:  fn.ID,
+		EventID:     ulid.Make(),
 	}
 	buf := &batchBuffer{
 		items: []pendingItem{{
@@ -107,9 +109,8 @@ func TestAppendBufferFlushReturnsSchedulingError(t *testing.T) {
 	}
 	buffer := newAppendBuffer(time.Second, 10, 1024, logger.VoidLogger())
 	buffer.totalPendingItems.Store(1)
-	mgr := scheduleErrorBatchManager{err: scheduleErr}
 
-	buffer.flush(buf, mgr, "timer")
+	buffer.flush(buf, scheduleErrorBatchManager{err: scheduleErr}, "timer")
 
 	select {
 	case <-time.After(time.Second):

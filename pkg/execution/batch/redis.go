@@ -385,7 +385,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("error enqueueing batch scheduler: %w", err)
+		return fmt.Errorf("error enqueueing batch scheduler: %v", err)
 	}
 
 	return nil
