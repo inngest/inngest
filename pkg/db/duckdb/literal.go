@@ -3,10 +3,22 @@ package duckdb
 import (
 	"database/sql/driver"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// timestampLayout is the layout every time.Time is encoded with. Microsecond
+// precision is load-bearing, not cosmetic: the spec's append-only,
+// no-correlation-state design has readers reconstruct a run's sequencing "from
+// timestamps at query time", so a step's scheduled/started/finished rows —
+// which in a fast dev run all land inside the same second — must remain
+// orderable. DuckDB's TIMESTAMP type is microsecond-precision and round-trips
+// this layout exactly (verified against the real binary); it renders a
+// zero-fraction timestamp back without the fractional part, which the
+// read-side layout list in store.go's asTimestamp already handles.
+const timestampLayout = "2006-01-02 15:04:05.000000"
 
 // encodeLiteral converts a bound driver.Value into DuckDB SQL literal text.
 // This exists because the stdio/JSON-lines transport has no wire-level
@@ -26,6 +38,20 @@ func encodeLiteral(v driver.Value) (string, error) {
 	case int64:
 		return strconv.FormatInt(val, 10), nil
 	case float64:
+		// NaN/±Inf have no bare numeric spelling DuckDB's parser accepts, so
+		// they must go over the wire as casts of their special string forms
+		// ('NaN'::DOUBLE etc., verified against the real binary). Emitting the
+		// Go spellings ("NaN", "+Inf") unquoted would produce invalid SQL —
+		// which used to fail silently, and now (see session.exec's stderr
+		// correlation) would fail the whole batch loudly instead.
+		switch {
+		case math.IsNaN(val):
+			return "'NaN'::DOUBLE", nil
+		case math.IsInf(val, 1):
+			return "'Infinity'::DOUBLE", nil
+		case math.IsInf(val, -1):
+			return "'-Infinity'::DOUBLE", nil
+		}
 		return strconv.FormatFloat(val, 'f', -1, 64), nil
 	case string:
 		return "'" + strings.ReplaceAll(val, "'", "''") + "'", nil
@@ -38,7 +64,7 @@ func encodeLiteral(v driver.Value) (string, error) {
 		sb.WriteString("'::BLOB")
 		return sb.String(), nil
 	case time.Time:
-		return "TIMESTAMP '" + val.UTC().Format("2006-01-02 15:04:05") + "'", nil
+		return "TIMESTAMP '" + val.UTC().Format(timestampLayout) + "'", nil
 	default:
 		return "", fmt.Errorf("duckdb: unsupported literal type %T", v)
 	}
