@@ -256,9 +256,31 @@ func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function) *b
 	return buf
 }
 
-// flush commits all pending items in a buffer to Redis atomically.
+// batchBufferManager exposes the optional metric-aware bulk append path used by
+// managers in this package. Other BatchManager implementations can still use
+// appendBuffer through the public BulkAppend contract.
+type batchBufferManager interface {
+	BatchManager
+	accountScopedMetricTags(context.Context, uuid.UUID, uuid.UUID) map[string]any
+	bulkAppend(context.Context, []BatchItem, inngest.Function, map[string]any) (*BulkAppendResult, error)
+}
+
+var _ batchBufferManager = (*redisBatchManager)(nil)
+
+func withBatchMetricTags(base, extra map[string]any) map[string]any {
+	tags := make(map[string]any, len(base)+len(extra))
+	for key, value := range base {
+		tags[key] = value
+	}
+	for key, value := range extra {
+		tags[key] = value
+	}
+	return tags
+}
+
+// flush commits all pending items in a buffer to storage atomically.
 // trigger indicates why the flush occurred: "timer", "size", or "close".
-func (ab *appendBuffer) flush(buf *batchBuffer, mgr *redisBatchManager, trigger string) {
+func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string) {
 	buf.mu.Lock()
 
 	// nothing to flush.  buffer may have been appended to after timer started
@@ -301,6 +323,14 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr *redisBatchManager, trigger 
 	if fn.EventBatch != nil && fn.EventBatch.MaxSize > 0 {
 		batchMaxSize = fn.EventBatch.MaxSize
 	}
+	// Evaluate account-scoped instrumentation once per flush and before the
+	// storage latency measurement. Managers without the optional metric-aware
+	// path keep existing buffer metrics untagged.
+	var metricTags map[string]any
+	metricMgr, hasMetricManager := mgr.(batchBufferManager)
+	if hasMetricManager {
+		metricTags = metricMgr.accountScopedMetricTags(ctx, items[0].AccountID, items[0].WorkspaceID)
+	}
 
 	// Record per-flush metrics once for the entire flush, independent of how
 	// many BulkAppend calls are made below.
@@ -336,13 +366,16 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr *redisBatchManager, trigger 
 		end := min(start+batchMaxSize, len(items))
 		chunk := items[start:end]
 		chunkPending := pending[start:end]
-		accountTier := mgr.accountTierMetricTag(ctx, chunk[0].AccountID)
-		metricTags := batchStorageMetricTags(accountTier, mgr.metricBackend)
-
-		redisStart := time.Now()
-		bulkResult, err := mgr.bulkAppend(ctx, chunk, fn, accountTier)
-		redisDurationMs := time.Since(redisStart).Milliseconds()
-		metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName, Tags: metricTags})
+		storageStart := time.Now()
+		var bulkResult *BulkAppendResult
+		var err error
+		if hasMetricManager {
+			bulkResult, err = metricMgr.bulkAppend(ctx, chunk, fn, metricTags)
+		} else {
+			bulkResult, err = mgr.BulkAppend(ctx, chunk, fn)
+		}
+		storageDurationMs := time.Since(storageStart).Milliseconds()
+		metrics.HistogramBatchBufferRedisFlushDuration(ctx, storageDurationMs, metrics.HistogramOpt{PkgName: pkgName, Tags: metricTags})
 
 		if err != nil {
 			ab.log.Error("error bulk-appending events to batch ", "chunk_size", len(chunk), "first_event", chunk[0].EventID, "function_id", fn.ID, "error", err)

@@ -16,7 +16,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -36,22 +35,6 @@ func TestMain(m *testing.M) {
 type scheduleErrorBatchManager struct {
 	BatchManager
 	err error
-}
-
-type scheduleErrorProducer struct {
-	err error
-}
-
-func (p scheduleErrorProducer) Enqueue(context.Context, queue.Item, time.Time, queue.EnqueueOpts) error {
-	return p.err
-}
-
-func (p scheduleErrorProducer) Requeue(context.Context, string, queue.QueueItem, time.Time, ...queue.RequeueOptionFn) error {
-	return nil
-}
-
-func (p scheduleErrorProducer) RequeueByJobID(context.Context, queue.Scope, string, string, time.Time) error {
-	return nil
 }
 
 func (m scheduleErrorBatchManager) BulkAppend(context.Context, []BatchItem, inngest.Function) (*BulkAppendResult, error) {
@@ -100,14 +83,6 @@ func TestScheduleBatchExecutionErrorLog(t *testing.T) {
 }
 
 func TestAppendBufferFlushReturnsSchedulingError(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	t.Cleanup(rc.Close)
-
 	scheduleErr := errors.New("queue unavailable")
 	pending := &pendingResult{done: make(chan struct{})}
 	fn := inngest.Function{
@@ -136,8 +111,7 @@ func TestAppendBufferFlushReturnsSchedulingError(t *testing.T) {
 	}
 	buffer := newAppendBuffer(time.Second, 10, 1024, logger.VoidLogger())
 	buffer.totalPendingItems.Store(1)
-	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
-	mgr := NewRedisBatchManager(bc, scheduleErrorProducer{err: scheduleErr}, WithoutBuffer()).(*redisBatchManager)
+	mgr := scheduleErrorBatchManager{err: scheduleErr}
 
 	buffer.flush(buf, mgr, "timer")
 

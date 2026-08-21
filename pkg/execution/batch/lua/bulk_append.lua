@@ -88,7 +88,7 @@ if #eventsToAdd == 0 then
   })
 end
 
--- Get current batch length.
+-- Get current batch length
 local currentLen = redis.call("LLEN", batchKey)
 local capacity = batchLimit - currentLen
 

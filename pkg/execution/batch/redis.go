@@ -48,6 +48,14 @@ func WithLogger(l logger.Logger) RedisBatchManagerOpt {
 	}
 }
 
+// WithBatchMetricRecorder observes batch storage operations without coupling
+// the batch manager to a particular metrics backend or tagging policy.
+func WithBatchMetricRecorder(recorder BatchMetricRecorder) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.metricRecorder = recorder
+	}
+}
+
 // WithBufferSettings changes in-memory buffering before committing.  events are buffered
 // for up to maxDuration or until maxSize events, whichever comes first.  when buffering is enabled,
 // Append() blocks until the batch is committed to Redis.
@@ -101,7 +109,6 @@ func NewRedisBatchManager(b *redis_state.BatchClient, q queue.Producer, opts ...
 		sizeLimit:         defaultBatchSizeLimit,
 		idempotenceSetTTL: defaultEventIdempotenceSetTTL,
 		log:               logger.StdlibLogger(context.Background()),
-		metricBackend:     batchBackendDefault,
 	}
 
 	// add default buffer
@@ -129,14 +136,32 @@ type redisBatchManager struct {
 	// and flushed periodically or when the buffer is full.
 	buffer *appendBuffer
 
-	accountPlanMetricTagResolver AccountPlanMetricTagResolver
-	metricBackend                string
+	metricRecorder BatchMetricRecorder
 
 	// splitBatchPartitionByFunction, when non-nil and returning true for a
 	// given accountID, causes ScheduleExecution to enqueue the batch-scheduling
 	// job to a function-scoped system partition rather than the shared
 	// schedule-batch partition.
 	splitBatchPartitionByFunction func(ctx context.Context, accountID uuid.UUID) (enable bool)
+}
+
+func (b *redisBatchManager) accountScopedMetricTags(ctx context.Context, accountID, workspaceID uuid.UUID) map[string]any {
+	if b.metricRecorder == nil {
+		return nil
+	}
+	return b.metricRecorder.AccountScopedTags(ctx, accountID, workspaceID)
+}
+
+func (b *redisBatchManager) recordRetrieveMetric(ctx context.Context, status string, itemCount int64, started time.Time) {
+	if b.metricRecorder != nil {
+		b.metricRecorder.RecordRetrieve(ctx, status, itemCount, time.Since(started))
+	}
+}
+
+func (b *redisBatchManager) recordDeleteMetric(ctx context.Context, status string, started time.Time) {
+	if b.metricRecorder != nil {
+		b.metricRecorder.RecordDelete(ctx, status, time.Since(started))
+	}
 }
 
 func (b *redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
@@ -195,6 +220,7 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 	if b.buffer != nil {
 		return b.buffer.append(ctx, bi, fn, b)
 	}
+	metricTags := b.accountScopedMetricTags(ctx, bi.AccountID, bi.WorkspaceID)
 
 	config := fn.EventBatch
 	if config == nil {
@@ -245,12 +271,8 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 	if err := json.Unmarshal(resp, result); err != nil {
 		return nil, fmt.Errorf("failed to decode append result: %v", err)
 	}
-	if result.Committed > 0 {
-		accountTier := b.accountTierMetricTag(ctx, bi.AccountID)
-		recordBatchCommitMetrics(ctx, accountTier, b.metricBackend, result.CommittedBytes)
-		if shouldRecordBatchListObservation(result.Status.String()) {
-			recordBatchListObservation(ctx, accountTier, b.metricBackend, result.BatchListResidentBytes, int64(result.BatchItemCount))
-		}
+	if result.Committed > 0 && metricTags != nil {
+		b.metricRecorder.RecordCommit(ctx, metricTags, result.Status.String(), result.CommittedBytes, result.BatchListResidentBytes, result.BatchItemCount)
 	}
 
 	return result, nil
@@ -266,7 +288,7 @@ func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.U
 		[]string{},
 	).AsStrSlice()
 	if err != nil {
-		recordBatchRetrieveMetrics(ctx, b.metricBackend, "error", 0, started)
+		b.recordRetrieveMetric(ctx, "error", 0, started)
 		return nil, fmt.Errorf("failed to retrieve list of events for batch '%s': %v", batchID, err)
 	}
 	items := make([]BatchItem, len(itemStrList))
@@ -281,10 +303,10 @@ func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.U
 		})
 	}
 	if err := eg.Wait(); err != nil {
-		recordBatchRetrieveMetrics(ctx, b.metricBackend, "decode_error", 0, started)
+		b.recordRetrieveMetric(ctx, "decode_error", 0, started)
 		return nil, err
 	}
-	recordBatchRetrieveMetrics(ctx, b.metricBackend, "success", int64(len(itemStrList)), started)
+	b.recordRetrieveMetric(ctx, "success", int64(len(itemStrList)), started)
 
 	return items, nil
 }
@@ -383,10 +405,10 @@ func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID
 		keys,
 		[]string{},
 	).AsInt64(); err != nil {
-		recordBatchDeleteMetrics(ctx, b.metricBackend, "error", started)
+		b.recordDeleteMetric(ctx, "error", started)
 		return fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
 	}
-	recordBatchDeleteMetrics(ctx, b.metricBackend, "success", started)
+	b.recordDeleteMetric(ctx, "success", started)
 
 	return nil
 }
@@ -522,10 +544,11 @@ func (b *redisBatchManager) BulkAppend(ctx context.Context, items []BatchItem, f
 	if len(items) == 0 {
 		return nil, fmt.Errorf("no items to append")
 	}
-	return b.bulkAppend(ctx, items, fn, b.accountTierMetricTag(ctx, items[0].AccountID))
+	metricTags := b.accountScopedMetricTags(ctx, items[0].AccountID, items[0].WorkspaceID)
+	return b.bulkAppend(ctx, items, fn, metricTags)
 }
 
-func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function, accountTier string) (*BulkAppendResult, error) {
+func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, fn inngest.Function, metricTags map[string]any) (*BulkAppendResult, error) {
 	config := fn.EventBatch
 	if config == nil {
 		return nil, fmt.Errorf("no batch config found for function: %s", fn.Slug)
@@ -582,11 +605,8 @@ func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, f
 	if err := json.Unmarshal(resp, result); err != nil {
 		return nil, fmt.Errorf("failed to decode bulk append result: %v", err)
 	}
-	if result.Committed > 0 {
-		recordBatchCommitMetrics(ctx, accountTier, b.metricBackend, result.CommittedBytes)
-		if shouldRecordBatchListObservation(result.Status) {
-			recordBatchListObservation(ctx, accountTier, b.metricBackend, result.BatchListResidentBytes, int64(result.BatchItemCount))
-		}
+	if result.Committed > 0 && metricTags != nil {
+		b.metricRecorder.RecordCommit(ctx, metricTags, result.Status, result.CommittedBytes, result.BatchListResidentBytes, result.BatchItemCount)
 	}
 
 	return result, nil

@@ -172,6 +172,62 @@ func TestAccountPlanMetricTag(t *testing.T) {
 	}
 }
 
+func TestBatchInstrumentationGateControlsNewMetricsAndBufferTags(t *testing.T) {
+	ctx := context.Background()
+	accountID := uuid.New()
+	workspaceID := uuid.New()
+
+	t.Run("off", func(t *testing.T) {
+		var resolverCalls int
+		manager := redisBatchManager{
+			metricBackend: "memorydb",
+			accountPlanMetricTagResolver: func(context.Context, uuid.UUID) string {
+				resolverCalls++
+				return "enterprise"
+			},
+			batchInstrumentationGate: func(_ context.Context, gotAccountID, gotWorkspaceID uuid.UUID) bool {
+				require.Equal(t, accountID, gotAccountID)
+				require.Equal(t, workspaceID, gotWorkspaceID)
+				return false
+			},
+		}
+
+		metricTags := manager.accountScopedMetricTags(ctx, accountID, workspaceID)
+		require.Nil(t, metricTags, "nil suppresses the new account-scoped metrics")
+		require.Zero(t, resolverCalls)
+		require.Equal(t, map[string]any{"status": "new"}, withBatchMetricTags(metricTags, map[string]any{"status": "new"}))
+	})
+
+	t.Run("on", func(t *testing.T) {
+		var resolverCalls int
+		manager := redisBatchManager{
+			metricBackend: "memorydb",
+			accountPlanMetricTagResolver: func(context.Context, uuid.UUID) string {
+				resolverCalls++
+				return "enterprise"
+			},
+			batchInstrumentationGate: func(context.Context, uuid.UUID, uuid.UUID) bool { return true },
+		}
+
+		metricTags := manager.accountScopedMetricTags(ctx, accountID, workspaceID)
+		require.Equal(t, map[string]any{"account_tier": "enterprise", "backend": "memorydb"}, metricTags)
+		require.Equal(t, 1, resolverCalls)
+		require.Equal(t, map[string]any{
+			"account_tier": "enterprise",
+			"backend":      "memorydb",
+			"status":       "new",
+		}, withBatchMetricTags(metricTags, map[string]any{"status": "new"}))
+	})
+
+	t.Run("nil gate defaults on", func(t *testing.T) {
+		manager := redisBatchManager{metricBackend: batchBackendDefault}
+		require.Equal(t, map[string]any{
+			"account_tier": batchTierUnknown,
+			"backend":      batchBackendDefault,
+		}, manager.accountScopedMetricTags(ctx, accountID, workspaceID))
+	})
+}
+
 func TestBatchSizeLimit(t *testing.T) {
 	r := miniredis.RunT(t)
 
