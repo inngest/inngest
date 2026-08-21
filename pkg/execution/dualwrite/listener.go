@@ -13,6 +13,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -172,43 +173,119 @@ func (l *listener) OnFunctionCancelled(_ context.Context, md sv2.Metadata, _ exe
 }
 
 func (l *listener) OnStepScheduled(_ context.Context, md sv2.Metadata, _ queue.Item, stepName *string) {
-	row := map[string]any{
-		"run_id":     md.ID.RunID.String(),
-		"event_type": "step_scheduled",
-		"created_at": time.Now().UTC(),
-	}
+	row := spanRow(md, "step_scheduled")
 	if stepName != nil {
 		row["step_name"] = *stepName
-	}
-	for k, v := range runPartitionFields(md) {
-		row[k] = v
 	}
 	l.sendSpan(row)
 }
 
 func (l *listener) OnStepStarted(_ context.Context, md sv2.Metadata, _ queue.Item, _ inngest.Edge, _ string) {
-	row := map[string]any{
-		"run_id":     md.ID.RunID.String(),
-		"event_type": "step_started",
-		"created_at": time.Now().UTC(),
-	}
-	for k, v := range runPartitionFields(md) {
-		row[k] = v
+	l.sendSpan(spanRow(md, "step_started"))
+}
+
+func (l *listener) OnStepFinished(_ context.Context, md sv2.Metadata, _ queue.Item, _ inngest.Edge, _ *statev1.DriverResponse, stepErr error) {
+	row := spanRow(md, "step_finished")
+	if stepErr != nil {
+		row["error"] = stepErr.Error()
 	}
 	l.sendSpan(row)
 }
 
-func (l *listener) OnStepFinished(_ context.Context, md sv2.Metadata, _ queue.Item, _ inngest.Edge, _ *statev1.DriverResponse, stepErr error) {
+// spanRow is the shared shape every run_spans_staging row uses: the run it
+// belongs to, what happened, when, and the partition columns. Optional
+// columns (step_name, error) are only added when there is a value for them,
+// exactly as OnStepScheduled/OnStepFinished already do — batcher.insert
+// unions the keys across a batch, so a row omitting one still writes NULL for
+// it (see batch.go).
+func spanRow(md sv2.Metadata, eventType string) map[string]any {
 	row := map[string]any{
 		"run_id":     md.ID.RunID.String(),
-		"event_type": "step_finished",
+		"event_type": eventType,
 		"created_at": time.Now().UTC(),
-	}
-	if stepErr != nil {
-		row["error"] = stepErr.Error()
 	}
 	for k, v := range runPartitionFields(md) {
 		row[k] = v
+	}
+	return row
+}
+
+// The generator-opcode hooks below cover the sleep/wait/invoke half of the
+// spec's run_spans hook coverage. Like the step hooks above, each produces one
+// append-only row from a single hook call's own data — no correlation between
+// a wait and its resume is done in memory; a reader reconstructs the pairing
+// from run_id + step_name + created_at at query time.
+
+func (l *listener) OnSleep(_ context.Context, md sv2.Metadata, _ queue.Item, gen statev1.GeneratorOpcode, until time.Time) {
+	row := spanRow(md, "sleep")
+	if gen.Name != "" {
+		row["step_name"] = gen.Name
+	}
+	l.sendSpan(row)
+}
+
+func (l *listener) OnWaitForEvent(_ context.Context, md sv2.Metadata, _ queue.Item, gen statev1.GeneratorOpcode, _ statev1.Pause) {
+	row := spanRow(md, "wait_for_event")
+	if gen.Name != "" {
+		row["step_name"] = gen.Name
+	}
+	l.sendSpan(row)
+}
+
+func (l *listener) OnWaitForEventResumed(_ context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
+	l.sendSpan(resumeRow(md, "wait_for_event_resumed", pause, r))
+}
+
+func (l *listener) OnWaitForSignal(_ context.Context, md sv2.Metadata, _ queue.Item, gen statev1.GeneratorOpcode, _ statev1.Pause) {
+	row := spanRow(md, "wait_for_signal")
+	if gen.Name != "" {
+		row["step_name"] = gen.Name
+	}
+	l.sendSpan(row)
+}
+
+func (l *listener) OnWaitForSignalResumed(_ context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
+	l.sendSpan(resumeRow(md, "wait_for_signal_resumed", pause, r))
+}
+
+func (l *listener) OnInvokeFunction(_ context.Context, md sv2.Metadata, _ queue.Item, gen statev1.GeneratorOpcode, _ event.Event) {
+	row := spanRow(md, "invoke_function")
+	if gen.Name != "" {
+		row["step_name"] = gen.Name
+	}
+	l.sendSpan(row)
+}
+
+func (l *listener) OnInvokeFunctionResumed(_ context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
+	l.sendSpan(resumeRow(md, "invoke_function_resumed", pause, r))
+}
+
+// resumeRow is shared by the three *Resumed hooks, whose signatures and
+// available data are identical. A resume carries its step name on either the
+// ResumeRequest or the pause, and a timed-out resume is recorded through the
+// error column rather than a dedicated event_type, keeping the resume rows
+// uniform.
+func resumeRow(md sv2.Metadata, eventType string, pause statev1.Pause, r execution.ResumeRequest) map[string]any {
+	row := spanRow(md, eventType)
+	switch {
+	case r.StepName != "":
+		row["step_name"] = r.StepName
+	case pause.StepName != "":
+		row["step_name"] = pause.StepName
+	}
+	if r.IsTimeout {
+		row["error"] = "timeout"
+	}
+	return row
+}
+
+func (l *listener) OnStepGatewayRequestFinished(_ context.Context, md sv2.Metadata, _ queue.Item, _ inngest.Edge, gen statev1.GeneratorOpcode, _ *http.Response, userErr *statev1.UserError) {
+	row := spanRow(md, "step_gateway_request_finished")
+	if gen.Name != "" {
+		row["step_name"] = gen.Name
+	}
+	if userErr != nil {
+		row["error"] = userErr.Message
 	}
 	l.sendSpan(row)
 }

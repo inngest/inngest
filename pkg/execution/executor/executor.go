@@ -3520,13 +3520,22 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		for _, e := range e.lifecycles {
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnInvokeFunctionResumed(ctx, md, pause, r)
+		}
 	case enums.OpcodeWaitForSignal:
 		for _, e := range e.lifecycles {
 			go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnWaitForSignalResumed(ctx, md, pause, r)
+		}
 	case enums.OpcodeWaitForEvent:
 		for _, e := range e.lifecycles {
 			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnWaitForEventResumed(ctx, md, pause, r)
 		}
 	}
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
@@ -3710,13 +3719,22 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnInvokeFunctionResumed(ctx, md, pause, r)
+			}
 		case enums.OpcodeWaitForSignal:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnWaitForSignalResumed(ctx, md, pause, r)
+			}
 		case enums.OpcodeWaitForEvent:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
+			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnWaitForEventResumed(ctx, md, pause, r)
 			}
 		}
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
@@ -4774,6 +4792,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, until)
 	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnSleep(ctx, *runCtx.Metadata(), lifecycleItem, gen, until)
+	}
 
 	return err
 }
@@ -4826,6 +4847,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 			for _, e := range e.lifecycles {
 				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
+			}
 
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
@@ -4839,6 +4863,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 		lifecycleItem := runCtx.LifecycleItem()
 		for _, e := range e.lifecycles {
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 		}
 	} else {
 		headers := make(map[string]string)
@@ -4868,6 +4895,9 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, runCtx execution.
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
 		}
 	}
 
@@ -4982,6 +5012,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 				// step statuses when a step finishes.
 				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 			}
+			for _, sl := range e.syncLifecycles {
+				sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
+			}
 
 			// This will retry, as it hits the queue directly.
 			return fmt.Errorf("error making inference request: %w", err)
@@ -5003,6 +5036,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, &userLandErr)
 		}
 	} else {
 		rawBody := resp.Body
@@ -5034,6 +5070,9 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, runCtx executio
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
 			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
+		}
+		for _, sl := range e.syncLifecycles {
+			sl.OnStepGatewayRequestFinished(ctx, *runCtx.Metadata(), lifecycleItem, edge.Edge, gen, nil, nil)
 		}
 	}
 
@@ -5234,6 +5273,15 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 	for _, e := range e.lifecycles {
 		go e.OnWaitForSignal(
 			context.WithoutCancel(ctx),
+			*runCtx.Metadata(),
+			lifecycleItem,
+			gen,
+			pause,
+		)
+	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnWaitForSignal(
+			ctx,
 			*runCtx.Metadata(),
 			lifecycleItem,
 			gen,
@@ -5449,6 +5497,9 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	for _, e := range e.lifecycles {
 		go e.OnInvokeFunction(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, evt.Event)
 	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnInvokeFunction(ctx, *runCtx.Metadata(), lifecycleItem, gen, evt.Event)
+	}
 
 	return err
 }
@@ -5657,6 +5708,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 
 	for _, e := range e.lifecycles {
 		go e.OnWaitForEvent(context.WithoutCancel(ctx), *runCtx.Metadata(), lifecycleItem, gen, pause)
+	}
+	for _, sl := range e.syncLifecycles {
+		sl.OnWaitForEvent(ctx, *runCtx.Metadata(), lifecycleItem, gen, pause)
 	}
 
 	return err

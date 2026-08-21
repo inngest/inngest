@@ -3,6 +3,8 @@ package execution
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"time"
 
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -83,6 +85,88 @@ type SyncLifecycleListener interface {
 		error,
 	)
 
+	// OnStepGatewayRequestFinished is called synchronously when a step's
+	// offloaded request finishes, successfully or not.
+	OnStepGatewayRequestFinished(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		inngest.Edge,
+		statev1.GeneratorOpcode,
+		*http.Response,
+		*statev1.UserError,
+	)
+
+	// OnSleep is called synchronously when a sleep step is scheduled. The
+	// statev1.GeneratorOpcode contains the sleep details.
+	OnSleep(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		statev1.GeneratorOpcode,
+		time.Time, // Sleeping until this time.
+	)
+
+	// OnWaitForEvent is called synchronously when a wait for event step is
+	// scheduled. The statev1.GeneratorOpcode contains the wait for event
+	// details.
+	OnWaitForEvent(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		statev1.GeneratorOpcode,
+		statev1.Pause,
+	)
+
+	// OnWaitForEventResumed is called synchronously when a function is
+	// resumed from waiting for an event.
+	OnWaitForEventResumed(
+		context.Context,
+		statev2.Metadata,
+		statev1.Pause,
+		ResumeRequest,
+	)
+
+	// OnWaitForSignal is called synchronously when a wait for signal step is
+	// scheduled. The statev1.GeneratorOpcode contains the wait for signal
+	// details.
+	OnWaitForSignal(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		statev1.GeneratorOpcode,
+		statev1.Pause,
+	)
+
+	// OnWaitForSignalResumed is called synchronously when a function is
+	// resumed from waiting for a signal.
+	OnWaitForSignalResumed(
+		context.Context,
+		statev2.Metadata,
+		statev1.Pause,
+		ResumeRequest,
+	)
+
+	// OnInvokeFunction is called synchronously when a function is invoked
+	// from a step.
+	OnInvokeFunction(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		statev1.GeneratorOpcode,
+		event.Event,
+	)
+
+	// OnInvokeFunctionResumed is called synchronously when a function is
+	// resumed from an invoke function step, either because the invoked
+	// function completed or because the step timed out while waiting.
+	OnInvokeFunctionResumed(
+		context.Context,
+		statev2.Metadata,
+		statev1.Pause,
+		ResumeRequest,
+	)
+
 	// OnEventReceived is called synchronously at the point an event is
 	// durably created, regardless of whether (or how many times) it matches
 	// a function. There is no equivalent hook on EventLifecycleListener,
@@ -113,6 +197,30 @@ func (NoopSyncLifecycleListener) OnStepStarted(context.Context, statev2.Metadata
 }
 
 func (NoopSyncLifecycleListener) OnStepFinished(context.Context, statev2.Metadata, queue.Item, inngest.Edge, *statev1.DriverResponse, error) {
+}
+
+func (NoopSyncLifecycleListener) OnStepGatewayRequestFinished(context.Context, statev2.Metadata, queue.Item, inngest.Edge, statev1.GeneratorOpcode, *http.Response, *statev1.UserError) {
+}
+
+func (NoopSyncLifecycleListener) OnSleep(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, time.Time) {
+}
+
+func (NoopSyncLifecycleListener) OnWaitForEvent(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, statev1.Pause) {
+}
+
+func (NoopSyncLifecycleListener) OnWaitForEventResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest) {
+}
+
+func (NoopSyncLifecycleListener) OnWaitForSignal(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, statev1.Pause) {
+}
+
+func (NoopSyncLifecycleListener) OnWaitForSignalResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest) {
+}
+
+func (NoopSyncLifecycleListener) OnInvokeFunction(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, event.Event) {
+}
+
+func (NoopSyncLifecycleListener) OnInvokeFunctionResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest) {
 }
 
 func (NoopSyncLifecycleListener) OnEventReceived(context.Context, event.TrackedEvent) {}
