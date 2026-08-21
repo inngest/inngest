@@ -500,6 +500,18 @@ func start(ctx context.Context, opts StartOpts) error {
 		url = "127.0.0.1"
 	}
 
+	// Best-effort DuckDB dual-write (docs/plans/006-duckdb-poc-subprocess-dual-write.md):
+	// nil on any failure (missing binary, failed spawn, failed migration),
+	// in which case the rest of devserver startup proceeds unaffected. When
+	// non-nil, stopDualWrite tears down its background goroutines and the
+	// duckdb subprocess when start() returns (i.e. once service.StartAll
+	// below has finished shutting every other service down).
+	var dualWriteListeners []execution.SyncLifecycleListener
+	if dw := setupDualWrite(ctx, "duckdb", opts.SQLiteDir); dw != nil {
+		dualWriteListeners = append(dualWriteListeners, dw)
+		defer stopDualWrite(context.Background(), dw)
+	}
+
 	executorOpts := []executor.ExecutorOpt{
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
@@ -534,6 +546,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}, metrics.NewLifecycleListeners()...)...,
 		),
 		executor.WithEventLifecycleListeners(execution.NoopEventLifecycleListener{}),
+		executor.WithSyncLifecycleListeners(dualWriteListeners...),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
 				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
@@ -607,6 +620,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithCronManager(croner),
 		runner.WithPublisher(pb),
 		runner.WithLogger(l),
+		runner.WithSyncLifecycleListeners(dualWriteListeners...),
 	)
 
 	// The devserver embeds the event API.

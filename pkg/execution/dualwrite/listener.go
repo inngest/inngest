@@ -13,6 +13,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -40,6 +41,15 @@ type listener struct {
 	droppedRuns   atomic.Int64
 	droppedSpans  atomic.Int64
 	droppedEvents atomic.Int64
+
+	// db and batchers/wg back Close (below) — the shutdown path that stops
+	// the background batcher goroutines this listener starts and closes the
+	// db handed to NewListener. Task 8 deliberately left this out (see
+	// NewListener's doc comment); Task 9 (pkg/devserver) is the first real
+	// caller with a shutdown path to drive it.
+	db       *sql.DB
+	batchers []*batcher
+	wg       sync.WaitGroup
 }
 
 func newListenerWithChannels(runsCap, spansCap, eventsCap int) *listener {
@@ -234,15 +244,28 @@ func defaultSetupOpts() setupOpts {
 	}
 }
 
+// Closer is implemented by the listener NewListener returns. Callers hold
+// an execution.SyncLifecycleListener, so reaching this requires a type
+// assertion (`l.(dualwrite.Closer)`); it is exported specifically to make
+// that assertion possible from outside this package (e.g. pkg/devserver's
+// shutdown path) without depending on the unexported listener type.
+type Closer interface {
+	// Close stops every batcher goroutine started by NewListener — each
+	// flushes any rows it's buffered one final time before exiting (see
+	// batcher.run's stopc case) — waits for them to exit (bounded by ctx),
+	// then closes the db passed to NewListener. Call at most once.
+	Close(ctx context.Context) error
+}
+
 // NewListener returns an execution.SyncLifecycleListener that dual-writes
 // runs/run_spans/events into db, and starts its own background batching
 // goroutines (batch.go) that drain the listener's channels and flush into
 // the runs_staging/run_spans_staging/events_staging tables. The batching
-// goroutines run for the lifetime of the process (context.Background()) —
-// compaction of staged rows out to Parquet, and any coordinated shutdown of
-// these goroutines, is out of scope for this POC's minimal wiring (deferred
-// by the coordinator; see docs/plans/006-duckdb-poc-subprocess-dual-write.md
-// and Task 9).
+// goroutines run for the lifetime of the process (context.Background())
+// unless the caller stops them via Close (the returned value always
+// implements Closer). Compaction of staged rows out to Parquet is out of
+// scope for this POC's minimal wiring (descoped by the coordinator; see
+// docs/plans/006-duckdb-poc-subprocess-dual-write.md).
 func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 	o := defaultSetupOpts()
 	for _, apply := range opts {
@@ -250,6 +273,7 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 	}
 
 	l := newListenerWithChannels(o.runsCap, o.spansCap, o.eventsCap)
+	l.db = db
 
 	tables := map[string]chan map[string]any{
 		"runs_staging":      l.runs,
@@ -258,8 +282,36 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 	}
 	for table, ch := range tables {
 		b := newBatcher(db, table, ch, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval})
-		go b.run(context.Background())
+		l.batchers = append(l.batchers, b)
+		l.wg.Add(1)
+		go func() {
+			defer l.wg.Done()
+			b.run(context.Background())
+		}()
 	}
 
 	return l
+}
+
+// Close implements Closer. See the Closer doc comment.
+func (l *listener) Close(ctx context.Context) error {
+	for _, b := range l.batchers {
+		b.stop()
+	}
+
+	done := make(chan struct{})
+	go func() {
+		l.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-ctx.Done():
+	}
+
+	if l.db != nil {
+		return l.db.Close()
+	}
+	return nil
 }
