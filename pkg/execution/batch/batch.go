@@ -167,10 +167,13 @@ type BatchAppendResult struct {
 	Status          enums.Batch `json:"status"`
 	BatchID         string      `json:"batchID,omitempty"`
 	BatchPointerKey string      `json:"batchPointerKey"`
-	Committed       int         `json:"committed"`
-	Duplicates      int         `json:"duplicates"`
-	CommittedBytes  int64       `json:"committedBytes"`
-	BatchItemCount  int         `json:"batchItemCount"`
+	// The accounting fields below are populated only by direct Append calls
+	// when buffering is disabled. Buffered Append results are per-item views of
+	// a chunk-level BulkAppend result and intentionally leave them at zero.
+	Committed      int   `json:"committed"`
+	Duplicates     int   `json:"duplicates"`
+	CommittedBytes int64 `json:"committedBytes"`
+	BatchItemCount int   `json:"batchItemCount"`
 	// BatchListResidentBytes is Redis MEMORY USAGE for the current batch list
 	// only; it excludes pointers, metadata, and idempotency keys.
 	BatchListResidentBytes int64 `json:"batchListResidentBytes"`

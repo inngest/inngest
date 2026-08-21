@@ -337,12 +337,17 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		chunk := items[start:end]
 		chunkPending := pending[start:end]
 		metricTags := batchStorageMetricTags(batchTierUnknown, batchBackendDefault)
-		redisStart := time.Now()
 		var bulkResult *BulkAppendResult
 		var err error
-		if redisMgr, ok := mgr.(*redisBatchManager); ok {
-			accountTier := redisMgr.accountTierMetricTag(ctx, chunk[0].AccountID)
+		redisMgr, isRedisManager := mgr.(*redisBatchManager)
+		accountTier := batchTierUnknown
+		if isRedisManager {
+			accountTier = redisMgr.accountTierMetricTag(ctx, chunk[0].AccountID)
 			metricTags = batchStorageMetricTags(accountTier, redisMgr.metricBackend)
+		}
+
+		redisStart := time.Now()
+		if isRedisManager {
 			bulkResult, err = redisMgr.bulkAppend(ctx, chunk, fn, accountTier)
 		} else {
 			bulkResult, err = mgr.BulkAppend(ctx, chunk, fn)
