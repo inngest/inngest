@@ -29,6 +29,22 @@ func init() {
 	}
 }
 
+func configureLogHandler(cmd *cli.Command, stdoutIsTerminal bool) {
+	if cmd.IsSet("json") {
+		if cmd.Bool("json") {
+			os.Setenv("LOG_HANDLER", "json")
+		} else {
+			os.Setenv("LOG_HANDLER", "dev")
+		}
+		return
+	}
+
+	if !stdoutIsTerminal {
+		// Always use JSON when not in a terminal
+		os.Setenv("LOG_HANDLER", "json")
+	}
+}
+
 // globalFlags are the flags that should be available on all commands
 var globalFlags = []cli.Flag{
 	&cli.BoolFlag{
@@ -58,11 +74,7 @@ func execute() {
 		)),
 		Version: inngestversion.Print(),
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			// Set LOG_HANDLER environment variable based on --json flag
-			// This ensures the logger respects the JSON output setting
-			if cmd.Bool("json") {
-				os.Setenv("LOG_HANDLER", "json")
-			}
+			configureLogHandler(cmd, isatty.IsTerminal(os.Stdout.Fd()))
 
 			if os.Getenv("LOG_LEVEL") == "" {
 				// Set LOG_LEVEL environment variable so the logger picks it up
@@ -100,11 +112,6 @@ func execute() {
 			start.Command(),
 			alpha(),
 		},
-	}
-
-	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		// Always use JSON when not in a terminal
-		os.Setenv("LOG_HANDLER", "json")
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
