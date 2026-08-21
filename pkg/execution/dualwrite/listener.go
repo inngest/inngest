@@ -4,9 +4,9 @@
 // runner call this listener's hooks synchronously, so every hook body must
 // do nothing but build a row and non-blocking-send it onto a per-table
 // channel. Separate background goroutines (batch.go) drain those channels
-// and flush batches into DuckDB staging tables, and a further set of
-// goroutines (compactor.go) periodically roll staged rows out to
-// Hive-partitioned Parquet.
+// and flush batches into DuckDB staging tables. Compaction of staged rows out
+// to Hive-partitioned Parquet is deliberately out of scope for this POC and
+// is not implemented here.
 package dualwrite
 
 import (
@@ -280,8 +280,12 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 		"run_spans_staging": l.spans,
 		"events_staging":    l.events,
 	}
+	// One shared disabledState across all three batchers, so the driver's
+	// terminal duckdb.ErrDisabled state stops the whole dual-write path and
+	// is logged exactly once rather than once per table.
+	disabled := &disabledState{}
 	for table, ch := range tables {
-		b := newBatcher(db, table, ch, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval})
+		b := newBatcher(db, table, ch, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: disabled})
 		l.batchers = append(l.batchers, b)
 		l.wg.Add(1)
 		go func() {

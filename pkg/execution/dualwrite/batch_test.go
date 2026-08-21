@@ -3,10 +3,14 @@ package dualwrite
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -172,4 +176,117 @@ func TestBatcherDrainsChannelOnStopBeforeExiting(t *testing.T) {
 	var count int
 	require.NoError(t, db.QueryRowContext(context.Background(), "SELECT count(*) FROM events_staging;").Scan(&count))
 	require.Equal(t, n, count, "every row buffered before stop() must be flushed, not dropped")
+}
+
+// disabledDriver is a database/sql driver whose every statement fails with
+// duckdb.ErrDisabled — exactly what the real driver returns once the
+// subprocess has died and its one restart attempt has failed. It counts
+// attempts so a test can prove the batcher stops trying.
+type disabledDriver struct{ attempts atomic.Int64 }
+
+func (d *disabledDriver) Open(string) (driver.Conn, error) { return &disabledConn{drv: d}, nil }
+
+type disabledConn struct{ drv *disabledDriver }
+
+func (c *disabledConn) Prepare(string) (driver.Stmt, error) {
+	return nil, errors.New("not supported")
+}
+func (c *disabledConn) Close() error              { return nil }
+func (c *disabledConn) Begin() (driver.Tx, error) { return nil, errors.New("not supported") }
+func (c *disabledConn) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {
+	c.drv.attempts.Add(1)
+	return nil, duckdb.ErrDisabled
+}
+
+// TestBatcherStopsFlushingOnceDriverDisabled covers Fix 5: before it, the
+// driver's terminal "disabled" state was unobservable to the batcher, so the
+// batchers kept draining channels, building INSERTs, calling ExecContext and
+// logging a Warn on every single flush, forever. The spec wants dual-write
+// disabled for the process lifetime with the warning logged once.
+func TestBatcherStopsFlushingOnceDriverDisabled(t *testing.T) {
+	drv := &disabledDriver{}
+	name := fmt.Sprintf("duckdb-disabled-test-%d", time.Now().UnixNano())
+	sql.Register(name, drv)
+
+	db, err := sql.Open(name, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	ch := make(chan map[string]any, 100)
+	b := newBatcher(db, "events_staging", ch, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond})
+
+	done := make(chan struct{})
+	go func() {
+		b.run(context.Background())
+		close(done)
+	}()
+	t.Cleanup(b.stop)
+
+	ch <- eventRow("1", "a")
+
+	// The batcher must exit of its own accord once it observes ErrDisabled,
+	// rather than spinning on a subprocess that will never come back.
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("batcher kept running after the driver reported ErrDisabled")
+	}
+
+	require.Equal(t, int64(1), drv.attempts.Load(),
+		"exactly one flush attempt should have been made before giving up")
+	require.True(t, b.opts.disabled.disabled())
+
+	// Further rows are simply never flushed: no more ExecContext calls.
+	ch <- eventRow("2", "b")
+	time.Sleep(100 * time.Millisecond)
+	require.Equal(t, int64(1), drv.attempts.Load())
+}
+
+// TestDisabledStateSharedAcrossBatchersLogsOnce proves the shared
+// disabledState NewListener hands to every table's batcher makes the terminal
+// state stop the whole dual-write path — one batcher observing ErrDisabled
+// stops the others too — and that the warning is emitted once rather than
+// once per table.
+func TestDisabledStateSharedAcrossBatchersLogsOnce(t *testing.T) {
+	shared := &disabledState{}
+
+	drv := &disabledDriver{}
+	name := fmt.Sprintf("duckdb-disabled-shared-test-%d", time.Now().UnixNano())
+	sql.Register(name, drv)
+	db, err := sql.Open(name, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	// Only this batcher ever gets a row, so only it can discover the
+	// terminal state.
+	discoverer := make(chan map[string]any, 10)
+	bystander := make(chan map[string]any, 10)
+
+	b1 := newBatcher(db, "events_staging", discoverer, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
+	b2 := newBatcher(db, "runs_staging", bystander, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
+
+	done1, done2 := make(chan struct{}), make(chan struct{})
+	go func() { b1.run(context.Background()); close(done1) }()
+	go func() { b2.run(context.Background()); close(done2) }()
+	t.Cleanup(func() { b1.stop(); b2.stop() })
+
+	discoverer <- eventRow("1", "a")
+
+	for _, done := range []chan struct{}{done1, done2} {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("a batcher kept running after the shared disabled state was set")
+		}
+	}
+
+	// The bystander never even attempted a flush, so the driver saw exactly
+	// the discoverer's single attempt.
+	require.Equal(t, int64(1), drv.attempts.Load())
+
+	// sync.Once is what bounds the warning to one emission; calling disable
+	// again must not re-log.
+	logged := 0
+	shared.once.Do(func() { logged++ })
+	require.Equal(t, 0, logged, "the warning must already have been logged exactly once")
 }

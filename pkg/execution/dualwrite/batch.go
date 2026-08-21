@@ -3,13 +3,39 @@ package dualwrite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/logger"
 )
+
+// disabledState tracks the driver's terminal state — duckdb.ErrDisabled, i.e.
+// the subprocess died, its one restart attempt failed, and it will never be
+// respawned. It is shared by every batcher so the spec's "dual-write disabled
+// for the process lifetime; warning logged once" really is once for the whole
+// dual-write path, not once per table per flush.
+type disabledState struct {
+	flag atomic.Bool
+	once sync.Once
+}
+
+func (d *disabledState) disable(ctx context.Context, err error) {
+	d.flag.Store(true)
+	d.once.Do(func() {
+		logger.StdlibLogger(ctx).Warn(
+			"dualwrite: duckdb dual-write permanently disabled for this process's lifetime; no further rows will be staged",
+			"error", err,
+		)
+	})
+}
+
+func (d *disabledState) disabled() bool { return d.flag.Load() }
 
 type batcherOpts struct {
 	// maxSize mirrors pkg/telemetry/exporters' defaultBatchMaxSize (10_000)
@@ -17,12 +43,19 @@ type batcherOpts struct {
 	maxSize int
 	// flushInterval mirrors pkg/telemetry/exporters' defaultBatchTimeout (200ms).
 	flushInterval time.Duration
+	// disabled is shared across every table's batcher (NewListener passes one
+	// instance to all of them). Left nil, each batcher gets its own — fine
+	// for tests, wrong for production, which is why NewListener sets it.
+	disabled *disabledState
 }
 
 // batcher drains a single per-table channel, buffering rows until maxSize or
 // flushInterval, then flushes them into <table> via INSERT. A flush failure
-// (e.g. subprocess down) is logged and the batch is dropped — it is never
-// surfaced to the channel's senders.
+// (e.g. subprocess down, or a row DuckDB rejects) is logged and the batch is
+// dropped — it is never surfaced to the channel's senders. The one exception
+// is duckdb.ErrDisabled, which is terminal rather than transient: it stops
+// the batcher for good (see run) instead of being retried and re-logged on
+// every subsequent flush.
 type batcher struct {
 	db    *sql.DB
 	table string
@@ -38,6 +71,9 @@ func newBatcher(db *sql.DB, table string, in chan map[string]any, opts batcherOp
 	if opts.flushInterval <= 0 {
 		opts.flushInterval = 200 * time.Millisecond
 	}
+	if opts.disabled == nil {
+		opts.disabled = &disabledState{}
+	}
 	return &batcher{db: db, table: table, in: in, opts: opts, stopc: make(chan struct{})}
 }
 
@@ -52,8 +88,20 @@ func (b *batcher) run(ctx context.Context) {
 		if len(buf) == 0 {
 			return
 		}
+		if b.opts.disabled.disabled() {
+			buf = buf[:0]
+			return
+		}
 		if err := b.insert(ctx, buf); err != nil {
-			logger.StdlibLogger(ctx).Warn("dualwrite: dropping batch after flush failure", "table", b.table, "error", err, "rows", len(buf))
+			// duckdb.ErrDisabled is terminal: the subprocess is gone for
+			// good, so every future flush would fail identically. Record it
+			// (logging exactly once across all tables) instead of warning
+			// on every flush forever.
+			if errors.Is(err, duckdb.ErrDisabled) {
+				b.opts.disabled.disable(ctx, err)
+			} else {
+				logger.StdlibLogger(ctx).Warn("dualwrite: dropping batch after flush failure", "table", b.table, "error", err, "rows", len(buf))
+			}
 		}
 		buf = buf[:0]
 	}
@@ -80,6 +128,15 @@ func (b *batcher) run(ctx context.Context) {
 	}
 
 	for {
+		// Terminal state: stop draining and flushing entirely rather than
+		// building INSERTs for a subprocess that no longer exists. The
+		// listener's hooks keep working untouched — their channels simply
+		// fill up, after which each send takes the drop-and-count path,
+		// which is the designed no-backpressure behaviour.
+		if b.opts.disabled.disabled() {
+			return
+		}
+
 		select {
 		case row := <-b.in:
 			buf = append(buf, row)
