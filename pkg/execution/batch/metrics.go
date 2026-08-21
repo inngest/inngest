@@ -22,13 +22,16 @@ const (
 
 // AccountPlanMetricTagResolver returns an account's plan name for metrics only.
 // Values are normalized to enterprise, other, or unknown before being emitted.
-// The resolver is called synchronously while flushing buffered writes, so it
-// must use local data only and must not block or perform network I/O.
+// The resolver is called synchronously by direct Append, BulkAppend, and each
+// buffered flush chunk, so it must use local data only and must not block or
+// perform network I/O.
 type AccountPlanMetricTagResolver func(ctx context.Context, accountID uuid.UUID) string
 
-// WithAccountPlanMetricTagResolver adds a low-cardinality account tier tag to
-// batch metrics. Resolver failures should return an empty string.
-func WithAccountPlanMetricTagResolver(resolver AccountPlanMetricTagResolver) RedisBatchManagerOpt {
+// WithNonBlockingAccountTierResolver adds a low-cardinality account tier tag to
+// batch metrics. The resolver is invoked by direct Append, BulkAppend, and each
+// buffered flush chunk, so it must not block or perform network I/O. Resolver
+// failures should return an empty string.
+func WithNonBlockingAccountTierResolver(resolver AccountPlanMetricTagResolver) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
 		m.accountPlanMetricTagResolver = resolver
 	}

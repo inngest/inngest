@@ -248,7 +248,9 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 	if result.Committed > 0 {
 		accountTier := b.accountTierMetricTag(ctx, bi.AccountID)
 		recordBatchCommitMetrics(ctx, accountTier, b.metricBackend, result.CommittedBytes)
-		recordBatchListObservation(ctx, accountTier, b.metricBackend, result.BatchListResidentBytes, int64(result.BatchItemCount))
+		if shouldRecordBatchListObservation(result.Status.String()) {
+			recordBatchListObservation(ctx, accountTier, b.metricBackend, result.BatchListResidentBytes, int64(result.BatchItemCount))
+		}
 	}
 
 	return result, nil
@@ -361,7 +363,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("error enqueueing batch scheduler: %v", err)
+		return fmt.Errorf("error enqueueing batch scheduler: %w", err)
 	}
 
 	return nil

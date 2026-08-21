@@ -258,7 +258,7 @@ func (ab *appendBuffer) getOrCreateBuffer(key bufferKey, fn inngest.Function) *b
 
 // flush commits all pending items in a buffer to Redis atomically.
 // trigger indicates why the flush occurred: "timer", "size", or "close".
-func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string) {
+func (ab *appendBuffer) flush(buf *batchBuffer, mgr *redisBatchManager, trigger string) {
 	buf.mu.Lock()
 
 	// nothing to flush.  buffer may have been appended to after timer started
@@ -336,22 +336,11 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		end := min(start+batchMaxSize, len(items))
 		chunk := items[start:end]
 		chunkPending := pending[start:end]
-		metricTags := batchStorageMetricTags(batchTierUnknown, batchBackendDefault)
-		var bulkResult *BulkAppendResult
-		var err error
-		redisMgr, isRedisManager := mgr.(*redisBatchManager)
-		accountTier := batchTierUnknown
-		if isRedisManager {
-			accountTier = redisMgr.accountTierMetricTag(ctx, chunk[0].AccountID)
-			metricTags = batchStorageMetricTags(accountTier, redisMgr.metricBackend)
-		}
+		accountTier := mgr.accountTierMetricTag(ctx, chunk[0].AccountID)
+		metricTags := batchStorageMetricTags(accountTier, mgr.metricBackend)
 
 		redisStart := time.Now()
-		if isRedisManager {
-			bulkResult, err = redisMgr.bulkAppend(ctx, chunk, fn, accountTier)
-		} else {
-			bulkResult, err = mgr.BulkAppend(ctx, chunk, fn)
-		}
+		bulkResult, err := mgr.bulkAppend(ctx, chunk, fn, accountTier)
 		redisDurationMs := time.Since(redisStart).Milliseconds()
 		metrics.HistogramBatchBufferRedisFlushDuration(ctx, redisDurationMs, metrics.HistogramOpt{PkgName: pkgName, Tags: metricTags})
 

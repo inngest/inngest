@@ -161,6 +161,7 @@ func TestAccountPlanMetricTag(t *testing.T) {
 		{name: "enterprise", resolver: func(context.Context, uuid.UUID) string { return "enterprise" }, want: batchTierEnterprise},
 		{name: "free is other", resolver: func(context.Context, uuid.UUID) string { return "free" }, want: batchTierOther},
 		{name: "self serve is other", resolver: func(context.Context, uuid.UUID) string { return "self_serve" }, want: batchTierOther},
+		{name: "unsupported is other", resolver: func(context.Context, uuid.UUID) string { return "unsupported" }, want: batchTierOther},
 	}
 
 	for _, tt := range tests {

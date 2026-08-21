@@ -8,6 +8,8 @@ import (
 var (
 	batchItemCountBoundaries = []float64{1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000, 2_500, 5_000, 10_000}
 	batchByteBoundaries      = []float64{
+		128,
+		512,
 		1 * 1024,
 		4 * 1024,
 		16 * 1024,
