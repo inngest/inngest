@@ -58,6 +58,12 @@ export const pathCreator = {
   apps({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/apps`;
   },
+  sandboxes({ envSlug }: { envSlug: string }) {
+    return `/env/${envSlug}/sandboxes`;
+  },
+  sandbox({ envSlug, sandboxID }: { envSlug: string; sandboxID: string }) {
+    return `/env/${envSlug}/sandboxes/${sandboxID}`;
+  },
   app({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }) {
     return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}`;
   },

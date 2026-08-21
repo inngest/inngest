@@ -92,6 +92,7 @@ import { Route as AuthedSettingsIntegrationsDatadogFinishIndexRouteImport } from
 import { Route as AuthedSettingsIntegrationsDatadogConnectEnvIndexRouteImport } from './routes/_authed/settings/integrations/datadog/connect-env/index'
 import { Route as AuthedIntegrationsVercelCallbackSuccessIndexRouteImport } from './routes/_authed/integrations/vercel/callback/success/index'
 import { Route as AuthedEnvEnvSlugSessionsSessionKeyIndexRouteImport } from './routes/_authed/env/$envSlug/sessions/$sessionKey/index'
+import { Route as AuthedEnvEnvSlugSandboxesSandboxIDIndexRouteImport } from './routes/_authed/env/$envSlug/sandboxes/$sandboxID/index'
 import { Route as AuthedEnvEnvSlugRunsRunIDIndexRouteImport } from './routes/_authed/env/$envSlug/runs/$runID/index'
 import { Route as AuthedEnvEnvSlugOnboardingStepIndexRouteImport } from './routes/_authed/env/$envSlug/onboarding/$step/index'
 import { Route as AuthedEnvEnvSlugManageSigningKeyIndexRouteImport } from './routes/_authed/env/$envSlug/manage/signing-key/index'
@@ -581,6 +582,12 @@ const AuthedEnvEnvSlugSessionsSessionKeyIndexRoute =
     path: '/sessions/$sessionKey/',
     getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
   } as any)
+const AuthedEnvEnvSlugSandboxesSandboxIDIndexRoute =
+  AuthedEnvEnvSlugSandboxesSandboxIDIndexRouteImport.update({
+    id: '/sandboxes/$sandboxID/',
+    path: '/sandboxes/$sandboxID/',
+    getParentRoute: () => AuthedEnvEnvSlugRouteRoute,
+  } as any)
 const AuthedEnvEnvSlugRunsRunIDIndexRoute =
   AuthedEnvEnvSlugRunsRunIDIndexRouteImport.update({
     id: '/runs/$runID/',
@@ -791,6 +798,7 @@ export interface FileRoutesByFullPath {
   '/env/$envSlug/manage/signing-key/': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
   '/env/$envSlug/onboarding/$step/': typeof AuthedEnvEnvSlugOnboardingStepIndexRoute
   '/env/$envSlug/runs/$runID/': typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  '/env/$envSlug/sandboxes/$sandboxID/': typeof AuthedEnvEnvSlugSandboxesSandboxIDIndexRoute
   '/env/$envSlug/sessions/$sessionKey/': typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRoute
   '/integrations/vercel/callback/success/': typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute
   '/settings/integrations/datadog/connect-env/': typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute
@@ -883,6 +891,7 @@ export interface FileRoutesByTo {
   '/env/$envSlug/manage/signing-key': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
   '/env/$envSlug/onboarding/$step': typeof AuthedEnvEnvSlugOnboardingStepIndexRoute
   '/env/$envSlug/runs/$runID': typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  '/env/$envSlug/sandboxes/$sandboxID': typeof AuthedEnvEnvSlugSandboxesSandboxIDIndexRoute
   '/env/$envSlug/sessions/$sessionKey': typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRoute
   '/integrations/vercel/callback/success': typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute
   '/settings/integrations/datadog/connect-env': typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute
@@ -990,6 +999,7 @@ export interface FileRoutesById {
   '/_authed/env/$envSlug/manage/signing-key/': typeof AuthedEnvEnvSlugManageSigningKeyIndexRoute
   '/_authed/env/$envSlug/onboarding/$step/': typeof AuthedEnvEnvSlugOnboardingStepIndexRoute
   '/_authed/env/$envSlug/runs/$runID/': typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  '/_authed/env/$envSlug/sandboxes/$sandboxID/': typeof AuthedEnvEnvSlugSandboxesSandboxIDIndexRoute
   '/_authed/env/$envSlug/sessions/$sessionKey/': typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRoute
   '/_authed/integrations/vercel/callback/success/': typeof AuthedIntegrationsVercelCallbackSuccessIndexRoute
   '/_authed/settings/integrations/datadog/connect-env/': typeof AuthedSettingsIntegrationsDatadogConnectEnvIndexRoute
@@ -1097,6 +1107,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage/signing-key/'
     | '/env/$envSlug/onboarding/$step/'
     | '/env/$envSlug/runs/$runID/'
+    | '/env/$envSlug/sandboxes/$sandboxID/'
     | '/env/$envSlug/sessions/$sessionKey/'
     | '/integrations/vercel/callback/success/'
     | '/settings/integrations/datadog/connect-env/'
@@ -1189,6 +1200,7 @@ export interface FileRouteTypes {
     | '/env/$envSlug/manage/signing-key'
     | '/env/$envSlug/onboarding/$step'
     | '/env/$envSlug/runs/$runID'
+    | '/env/$envSlug/sandboxes/$sandboxID'
     | '/env/$envSlug/sessions/$sessionKey'
     | '/integrations/vercel/callback/success'
     | '/settings/integrations/datadog/connect-env'
@@ -1295,6 +1307,7 @@ export interface FileRouteTypes {
     | '/_authed/env/$envSlug/manage/signing-key/'
     | '/_authed/env/$envSlug/onboarding/$step/'
     | '/_authed/env/$envSlug/runs/$runID/'
+    | '/_authed/env/$envSlug/sandboxes/$sandboxID/'
     | '/_authed/env/$envSlug/sessions/$sessionKey/'
     | '/_authed/integrations/vercel/callback/success/'
     | '/_authed/settings/integrations/datadog/connect-env/'
@@ -1925,6 +1938,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRouteImport
       parentRoute: typeof AuthedEnvEnvSlugRouteRoute
     }
+    '/_authed/env/$envSlug/sandboxes/$sandboxID/': {
+      id: '/_authed/env/$envSlug/sandboxes/$sandboxID/'
+      path: '/sandboxes/$sandboxID'
+      fullPath: '/env/$envSlug/sandboxes/$sandboxID/'
+      preLoaderRoute: typeof AuthedEnvEnvSlugSandboxesSandboxIDIndexRouteImport
+      parentRoute: typeof AuthedEnvEnvSlugRouteRoute
+    }
     '/_authed/env/$envSlug/runs/$runID/': {
       id: '/_authed/env/$envSlug/runs/$runID/'
       path: '/runs/$runID'
@@ -2402,6 +2422,7 @@ interface AuthedEnvEnvSlugRouteRouteChildren {
   AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute: typeof AuthedEnvEnvSlugDebuggerFunctionSlugIndexRoute
   AuthedEnvEnvSlugEventsEventIDIndexRoute: typeof AuthedEnvEnvSlugEventsEventIDIndexRoute
   AuthedEnvEnvSlugRunsRunIDIndexRoute: typeof AuthedEnvEnvSlugRunsRunIDIndexRoute
+  AuthedEnvEnvSlugSandboxesSandboxIDIndexRoute: typeof AuthedEnvEnvSlugSandboxesSandboxIDIndexRoute
   AuthedEnvEnvSlugSessionsSessionKeyIndexRoute: typeof AuthedEnvEnvSlugSessionsSessionKeyIndexRoute
   AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute: typeof AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute
   AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute: typeof AuthedEnvEnvSlugSessionsSessionKeySessionIdIndexRoute
@@ -2437,6 +2458,8 @@ const AuthedEnvEnvSlugRouteRouteChildren: AuthedEnvEnvSlugRouteRouteChildren = {
   AuthedEnvEnvSlugEventsEventIDIndexRoute:
     AuthedEnvEnvSlugEventsEventIDIndexRoute,
   AuthedEnvEnvSlugRunsRunIDIndexRoute: AuthedEnvEnvSlugRunsRunIDIndexRoute,
+  AuthedEnvEnvSlugSandboxesSandboxIDIndexRoute:
+    AuthedEnvEnvSlugSandboxesSandboxIDIndexRoute,
   AuthedEnvEnvSlugSessionsSessionKeyIndexRoute:
     AuthedEnvEnvSlugSessionsSessionKeyIndexRoute,
   AuthedEnvEnvSlugExperimentsFunctionSlugExperimentNameIndexRoute:
