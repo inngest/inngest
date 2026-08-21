@@ -68,6 +68,87 @@ func TestAppendCommittedBytes(t *testing.T) {
 	require.Zero(t, duplicate.CommittedBytes)
 }
 
+func TestBatchScriptsAppendToExistingBatch(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer())
+	accountID := uuid.New()
+	functionID := uuid.New()
+	batchID := ulid.MustNew(ulid.Now(), rand.Reader)
+	fn := inngest.Function{
+		ID: functionID,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	}
+
+	// Seed only the pointer, list, and status written by batching before the
+	// metrics fields existed. The new scripts must continue this batch without
+	// requiring a metadata migration or creating a replacement batch.
+	legacyItem := BatchItem{
+		AccountID:  accountID,
+		FunctionID: functionID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "legacy"},
+	}
+	legacyJSON, err := json.Marshal(legacyItem)
+	require.NoError(t, err)
+	pointerKey := bc.KeyGenerator().BatchPointer(ctx, functionID)
+	batchKey := bc.KeyGenerator().Batch(ctx, functionID, batchID)
+	metadataKey := bc.KeyGenerator().BatchMetadata(ctx, functionID, batchID)
+	require.NoError(t, r.Set(pointerKey, batchID.String()))
+	_, err = r.RPush(batchKey, string(legacyJSON))
+	require.NoError(t, err)
+	r.HSet(metadataKey, "status", enums.BatchStatusPending.String())
+
+	appendItem := BatchItem{
+		AccountID:  accountID,
+		FunctionID: functionID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "append"},
+	}
+	appendResult, err := bm.Append(ctx, appendItem, fn)
+	require.NoError(t, err)
+	require.Equal(t, batchID.String(), appendResult.BatchID)
+	require.Equal(t, enums.BatchAppend, appendResult.Status)
+	require.Equal(t, 1, appendResult.Committed)
+	require.Equal(t, 2, appendResult.BatchItemCount)
+
+	bulkItem := BatchItem{
+		AccountID:  accountID,
+		FunctionID: functionID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "bulk-append"},
+	}
+	bulkResult, err := bm.BulkAppend(ctx, []BatchItem{bulkItem}, fn)
+	require.NoError(t, err)
+	require.Equal(t, batchID.String(), bulkResult.BatchID)
+	require.Equal(t, "append", bulkResult.Status)
+	require.Equal(t, 1, bulkResult.Committed)
+	require.Equal(t, 3, bulkResult.BatchItemCount)
+
+	items, err := bm.RetrieveItems(ctx, functionID, batchID)
+	require.NoError(t, err)
+	require.Len(t, items, 3)
+	require.Equal(t, []string{"legacy", "append", "bulk-append"}, []string{
+		items[0].Event.ID,
+		items[1].Event.ID,
+		items[2].Event.ID,
+	})
+	pointer, err := r.Get(pointerKey)
+	require.NoError(t, err)
+	require.Equal(t, batchID.String(), pointer)
+}
+
 func TestAccountPlanMetricTag(t *testing.T) {
 	accountID := uuid.New()
 	tests := []struct {
