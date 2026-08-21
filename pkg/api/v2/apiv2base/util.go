@@ -53,6 +53,41 @@ func getHTTPPath(method protoreflect.MethodDescriptor) string {
 	return path
 }
 
+func getHTTPPaths(method protoreflect.MethodDescriptor) []string {
+	httpRule := getHTTPRule(method)
+	if httpRule == nil {
+		return nil
+	}
+
+	paths := []string{}
+	if path := getHTTPPathFromRule(httpRule); path != "" {
+		paths = append(paths, path)
+	}
+	for _, binding := range httpRule.AdditionalBindings {
+		if path := getHTTPPathFromRule(binding); path != "" {
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
+
+func getHTTPPathFromRule(httpRule *annotations.HttpRule) string {
+	switch pattern := httpRule.Pattern.(type) {
+	case *annotations.HttpRule_Get:
+		return pattern.Get
+	case *annotations.HttpRule_Post:
+		return pattern.Post
+	case *annotations.HttpRule_Put:
+		return pattern.Put
+	case *annotations.HttpRule_Delete:
+		return pattern.Delete
+	case *annotations.HttpRule_Patch:
+		return pattern.Patch
+	default:
+		return ""
+	}
+}
+
 // getHTTPMethod extracts the HTTP method from google.api.http annotation
 func getHTTPMethod(method protoreflect.MethodDescriptor) string {
 	httpMethod, _ := getHTTPMethodAndPath(method)
@@ -68,6 +103,17 @@ func hasAuthzAnnotation(method protoreflect.MethodDescriptor) bool {
 
 	authzOpts := proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
 	return authzOpts.RequireAuthz
+}
+
+// getAuthzPermission returns the permission declared on a method's authz annotation.
+func getAuthzPermission(method protoreflect.MethodDescriptor) string {
+	opts := method.Options()
+	if !proto.HasExtension(opts, apiv2.E_Authz) {
+		return ""
+	}
+
+	authzOpts := proto.GetExtension(opts, apiv2.E_Authz).(*apiv2.AuthzOptions)
+	return authzOpts.Permission
 }
 
 // GetInngestEnvHeader extracts the X-Inngest-Env header value from the gRPC context.
@@ -128,10 +174,34 @@ func BuildAuthzPathMap() map[string]bool {
 
 		// Check if method has authz annotation
 		if hasAuthzAnnotation(method) {
-			// Get the HTTP path from google.api.http annotation
-			if path := getHTTPPath(method); path != "" {
+			// Get HTTP paths from google.api.http annotation, including additional bindings.
+			for _, path := range getHTTPPaths(method) {
 				authzPaths[path] = true
 			}
+		}
+	}
+
+	return authzPaths
+}
+
+// BuildAuthzPermissionPathMap inspects protobuf annotations to determine each path's required permission.
+func BuildAuthzPermissionPathMap() map[string]string {
+	authzPaths := make(map[string]string)
+
+	serviceDesc := apiv2.File_api_v2_service_proto.Services().ByName("V2")
+	if serviceDesc == nil {
+		return authzPaths
+	}
+
+	methods := serviceDesc.Methods()
+	for i := 0; i < methods.Len(); i++ {
+		method := methods.Get(i)
+		if !hasAuthzAnnotation(method) {
+			continue
+		}
+
+		for _, path := range getHTTPPaths(method) {
+			authzPaths[path] = getAuthzPermission(method)
 		}
 	}
 

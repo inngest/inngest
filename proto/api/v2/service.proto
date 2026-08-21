@@ -104,6 +104,7 @@ service V2 {
     };
     option (authz) = {
       require_authz: true
+      permission: "partners:write:create_account"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create partner account"
@@ -188,6 +189,10 @@ service V2 {
     option (google.api.http) = {
       post: "/envs",
       body : "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "environments:write:create"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create environment"
@@ -274,6 +279,7 @@ service V2 {
     };
     option (authz) = {
       require_authz: true
+      permission: "partners:read:list_accounts"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List partner accounts"
@@ -347,6 +353,10 @@ service V2 {
     option (google.api.http) = {
       get: "/account"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "accounts:read:get"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get account"
       description: "Returns the account for the authenticated user"
@@ -407,6 +417,10 @@ service V2 {
   rpc FetchAccountEnvs(FetchAccountEnvsRequest) returns (FetchAccountEnvsResponse) {
     option (google.api.http) = {
       get: "/envs"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "environments:read:list"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List environments"
@@ -490,6 +504,10 @@ service V2 {
   rpc FetchAccountEventKeys(FetchAccountEventKeysRequest) returns (FetchAccountEventKeysResponse) {
     option (google.api.http) = {
       get: "/keys/events"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "event_keys:read:list"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List account event keys"
@@ -582,6 +600,10 @@ service V2 {
     option (google.api.http) = {
       get: "/keys/signing"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "signing_keys:read:list"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List account signing keys"
       tags: "Keys"
@@ -673,6 +695,10 @@ service V2 {
     option (google.api.http) = {
       post: "/env/webhooks",
       body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "webhooks:write:create"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create webhook"
@@ -776,6 +802,10 @@ service V2 {
     option (google.api.http) = {
       get: "/env/webhooks"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "webhooks:read:list"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List webhooks"
       description: "Lists all webhooks in the specified environment"
@@ -856,6 +886,10 @@ service V2 {
     option (google.api.http) = {
       patch: "/envs/{id}",
       body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "environments:write:update"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update environment"
@@ -951,6 +985,10 @@ service V2 {
     option (google.api.http) = {
       get: "/runs/{run_id}"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:read:get"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get function run"
       tags: "Runs"
@@ -968,6 +1006,10 @@ service V2 {
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {
     option (google.api.http) = {
       get: "/runs"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:read:list"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List runs"
@@ -987,6 +1029,10 @@ service V2 {
     option (google.api.http) = {
       get: "/apps/{app_id}/functions/{function_id}/runs"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:read:list"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List runs for a function"
       tags: "Runs"
@@ -1004,6 +1050,10 @@ service V2 {
   rpc GetEventRuns(GetEventRunsRequest) returns (GetEventRunsResponse) {
     option (google.api.http) = {
       get: "/events/{event_id}/runs"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:read:list"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get event runs"
@@ -1024,6 +1074,10 @@ service V2 {
       post: "/runs/{run_id}/rerun"
       body: "*"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:write:rerun"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Rerun function run"
       tags: "Runs"
@@ -1043,6 +1097,10 @@ service V2 {
       post: "/runs/{run_id}/cancel"
       body: "*"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:write:cancel"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Cancel function run"
       tags: "Runs"
@@ -1061,6 +1119,10 @@ service V2 {
     option (google.api.http) = {
       get: "/apps/{app_id}"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "apps:read:get"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get app"
       tags: "Apps"
@@ -1078,6 +1140,10 @@ service V2 {
   rpc GetApps(GetAppsRequest) returns (GetAppsResponse) {
     option (google.api.http) = {
       get: "/apps"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "apps:read:list"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get apps"
@@ -1098,6 +1164,10 @@ service V2 {
       post: "/sandboxes"
       body: "*"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:create"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create a sandbox"
       tags: "Sandboxes"
@@ -1113,6 +1183,10 @@ service V2 {
 
   rpc ListSandboxes(ListSandboxesRequest) returns (ListSandboxesResponse) {
     option (google.api.http) = { get: "/sandboxes" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:list"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List sandboxes"
       tags: "Sandboxes"
@@ -1128,6 +1202,10 @@ service V2 {
 
   rpc GetSandbox(GetSandboxRequest) returns (GetSandboxResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:get"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get a sandbox"
       tags: "Sandboxes"
@@ -1143,6 +1221,10 @@ service V2 {
 
   rpc DestroySandbox(DestroySandboxRequest) returns (DestroySandboxResponse) {
     option (google.api.http) = { delete: "/sandboxes/{sandbox_id}" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:destroy"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Destroy a sandbox"
       tags: "Sandboxes"
@@ -1161,6 +1243,10 @@ service V2 {
       post: "/sandboxes/{sandbox_id}/exec"
       body: "*"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:exec"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Execute a command in a sandbox"
       tags: "Sandboxes"
@@ -1176,6 +1262,10 @@ service V2 {
 
   rpc StreamSandboxLogs(StreamSandboxLogsRequest) returns (stream StreamSandboxLogsResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/logs" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:stream_logs"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Stream sandbox logs"
       tags: "Sandboxes"
@@ -1194,6 +1284,10 @@ service V2 {
       put: "/sandboxes/{sandbox_id}/files"
       body: "body"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:write_file"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Write a sandbox file"
       tags: "Sandboxes"
@@ -1209,6 +1303,10 @@ service V2 {
 
   rpc ReadSandboxFile(ReadSandboxFileRequest) returns (stream google.api.HttpBody) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/files" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:read_file"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Read a sandbox file"
       tags: "Sandboxes"
@@ -1227,6 +1325,10 @@ service V2 {
       post: "/sandboxes/{sandbox_id}/processes"
       body: "*"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:start_process"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Start a sandbox process"
       tags: "Sandboxes"
@@ -1242,6 +1344,10 @@ service V2 {
 
   rpc ListSandboxProcesses(ListSandboxProcessesRequest) returns (ListSandboxProcessesResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:list_processes"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List sandbox processes"
       tags: "Sandboxes"
@@ -1257,6 +1363,10 @@ service V2 {
 
   rpc GetSandboxProcess(GetSandboxProcessRequest) returns (GetSandboxProcessResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:get_process"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get a sandbox process"
       tags: "Sandboxes"
@@ -1275,6 +1385,10 @@ service V2 {
       post: "/sandboxes/{sandbox_id}/processes/{process_id}/signals"
       body: "*"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:write:signal_process"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Signal a sandbox process"
       tags: "Sandboxes"
@@ -1290,6 +1404,10 @@ service V2 {
 
   rpc WaitSandboxProcess(WaitSandboxProcessRequest) returns (WaitSandboxProcessResponse) {
     option (google.api.http) = { post: "/sandboxes/{sandbox_id}/processes/{process_id}/wait" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:wait_process"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Wait for a sandbox process"
       tags: "Sandboxes"
@@ -1305,6 +1423,10 @@ service V2 {
 
   rpc GetSandboxProcessOutput(GetSandboxProcessOutputRequest) returns (GetSandboxProcessOutputResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}/output" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:get_process_output"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get sandbox process output"
       tags: "Sandboxes"
@@ -1320,6 +1442,10 @@ service V2 {
 
   rpc StreamSandboxProcessOutput(StreamSandboxProcessOutputRequest) returns (stream StreamSandboxProcessOutputResponse) {
     option (google.api.http) = { get: "/sandboxes/{sandbox_id}/processes/{process_id}/output/stream" };
+    option (authz) = {
+      require_authz: true
+      permission: "sandboxes:read:stream_process_output"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Stream sandbox process output"
       tags: "Sandboxes"
@@ -1337,6 +1463,10 @@ service V2 {
     option (google.api.http) = {
       post: "/runs/{run_id}/scores",
       body: "scores"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:write:create_score"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create score"
@@ -1356,6 +1486,10 @@ service V2 {
     option (google.api.http) = {
       post: "/apps/{app_id}/syncs",
       body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "apps:write:sync"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Sync app"
@@ -1452,6 +1586,10 @@ service V2 {
     option (google.api.http) = {
       get: "/runs/{run_id}/trace"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:read:get_trace"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get function trace"
       tags: "Runs"
@@ -1470,6 +1608,10 @@ service V2 {
     option (google.api.http) = {
       get: "/apps/{app_id}/functions/{function_id}"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:read:get"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get function"
       description: "Fetches function configuration and status details for a function within an app"
@@ -1487,6 +1629,10 @@ service V2 {
   rpc GetFunctions(GetFunctionsRequest) returns (GetFunctionsResponse) {
     option (google.api.http) = {
       get: "/apps/{app_id}/functions"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:read:list"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get functions"
@@ -1601,6 +1747,10 @@ service V2 {
     option (google.api.http) = {
       post: "/apps/{app_id}/functions/{function_id}/invoke",
       body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "functions:write:invoke"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Invoke function"
@@ -1740,6 +1890,10 @@ service V2 {
     option (google.api.http) = {
       get: "/insights/tables"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "insights:read:list_tables"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List insights tables"
       tags: "Insights"
@@ -1801,6 +1955,10 @@ service V2 {
   rpc ListInsightsEventSchemas(ListInsightsEventSchemasRequest) returns (ListInsightsEventSchemasResponse) {
     option (google.api.http) = {
       get: "/insights/events/schemas"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "insights:read:list_event_schemas"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List event type schemas"
@@ -1875,6 +2033,10 @@ service V2 {
     option (google.api.http) = {
       post: "/insights/query/prompt",
       body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "insights:read:prompt"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Generate insights query from prompt"
@@ -1960,6 +2122,10 @@ service V2 {
     option (google.api.http) = {
       post: "/insights/query",
       body: "*"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "insights:read:query"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Query insights"
@@ -2059,6 +2225,10 @@ service V2 {
         get: "/apps/{app_id}/functions/{function_id}/experiments"
       }
     };
+    option (authz) = {
+      require_authz: true
+      permission: "experiments:read:list"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List experiments"
       tags: "Experiments"
@@ -2076,6 +2246,10 @@ service V2 {
   rpc GetExperiment(GetExperimentRequest) returns (GetExperimentResponse) {
     option (google.api.http) = {
       get: "/apps/{app_id}/functions/{function_id}/experiments/{experiment_id=**}"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "experiments:read:get"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get experiment aggregates"
@@ -2095,6 +2269,10 @@ service V2 {
     option (google.api.http) = {
       get: "/sessions"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "sessions:read:list_keys"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List session keys"
       tags: "Sessions"
@@ -2113,6 +2291,10 @@ service V2 {
     option (google.api.http) = {
       get: "/sessions/{session_key}"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "sessions:read:list"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List sessions"
       tags: "Sessions"
@@ -2130,6 +2312,10 @@ service V2 {
   rpc ListSessionRuns(ListSessionRunsRequest) returns (ListSessionRunsResponse) {
     option (google.api.http) = {
       get: "/sessions/{session_key}/{session_id=**}/runs"
+    };
+    option (authz) = {
+      require_authz: true
+      permission: "runs:read:list"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List session runs"

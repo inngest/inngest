@@ -79,14 +79,14 @@ func TestGetHTTPMethodAndPath(t *testing.T) {
 
 			// All methods should return some HTTP method (at minimum POST as default)
 			validMethods := []string{"GET", "POST", "PUT", "DELETE", "PATCH"}
-			assert.Contains(t, validMethods, httpMethod, 
+			assert.Contains(t, validMethods, httpMethod,
 				"Method %s should return valid HTTP method", method.Name())
 
 			// If we find a method with a path, verify it's valid
 			if path != "" {
 				foundAnnotatedMethod = true
 				assert.True(t, len(path) > 0, "Path should not be empty string")
-				assert.True(t, path[0] == '/' || path == "", 
+				assert.True(t, path[0] == '/' || path == "",
 					"Path should start with / or be empty, got: %s", path)
 				t.Logf("Method %s: %s %s", method.Name(), httpMethod, path)
 			}
@@ -109,7 +109,7 @@ func TestGetHTTPMethodAndPath(t *testing.T) {
 			// Even methods without annotations should get defaults
 			if path == "" {
 				// Methods without HTTP annotation should default to POST
-				assert.Equal(t, "POST", httpMethod, 
+				assert.Equal(t, "POST", httpMethod,
 					"Method without HTTP annotation should default to POST")
 				t.Logf("Method %s defaults to: %s (no path)", method.Name(), httpMethod)
 			}
@@ -149,7 +149,7 @@ func TestGetHTTPMethod(t *testing.T) {
 			method := methods.Get(i)
 			httpMethod := getHTTPMethod(method)
 
-			assert.Contains(t, validMethods, httpMethod, 
+			assert.Contains(t, validMethods, httpMethod,
 				"Should return valid HTTP method for %s", method.Name())
 			t.Logf("Method %s uses HTTP method: %s", method.Name(), httpMethod)
 		}
@@ -227,7 +227,7 @@ func TestGetInngestEnvHeader(t *testing.T) {
 			expected   string
 		}{
 			{"x-inngest-env", "test-env"},
-			{"X-Inngest-Env", "test-env-2"},  
+			{"X-Inngest-Env", "test-env-2"},
 			{"X-INNGEST-ENV", "test-env-3"},
 		}
 
@@ -261,7 +261,7 @@ func TestGRPCToHTTPStatus(t *testing.T) {
 		{"Unavailable", codes.Unavailable, 503},
 		{"Internal", codes.Internal, 500},
 		{"Unknown", codes.Unknown, 500},
-		{"OK", codes.OK, 500}, // Default fallback
+		{"OK", codes.OK, 500},             // Default fallback
 		{"Canceled", codes.Canceled, 500}, // Default fallback
 	}
 
@@ -306,6 +306,18 @@ func TestBuildAuthzPathMap(t *testing.T) {
 		pathMap := BuildAuthzPathMap()
 		assert.NotNil(t, pathMap, "Should return empty map even if service not found")
 	})
+}
+
+func TestBuildAuthzPermissionPathMap(t *testing.T) {
+	pathMap := BuildAuthzPermissionPathMap()
+
+	assert.Equal(t, "runs:read:list", pathMap["/runs"])
+	assert.Equal(t, "runs:read:get", pathMap["/runs/{run_id}"])
+	assert.Equal(t, "functions:write:invoke", pathMap["/apps/{app_id}/functions/{function_id}/invoke"])
+	assert.Equal(t, "experiments:read:list", pathMap["/experiments"])
+	assert.Equal(t, "experiments:read:list", pathMap["/apps/{app_id}/functions/{function_id}/experiments"])
+	assert.Equal(t, "sandboxes:write:exec", pathMap["/sandboxes/{sandbox_id}/exec"])
+	assert.NotContains(t, pathMap, "/events")
 }
 
 // Base instance tests - testing utils through the base instance
@@ -354,13 +366,13 @@ func TestBase_BuildAuthzPathMap(t *testing.T) {
 
 		// Verify consistency with direct function call
 		directMap := BuildAuthzPathMap()
-		assert.Equal(t, len(directMap), len(pathMap), 
+		assert.Equal(t, len(directMap), len(pathMap),
 			"Base instance should return same result as direct call")
 
 		for path, requiresAuthz := range pathMap {
 			directRequiresAuthz, exists := directMap[path]
 			assert.True(t, exists, "Path should exist in both maps: %s", path)
-			assert.Equal(t, directRequiresAuthz, requiresAuthz, 
+			assert.Equal(t, directRequiresAuthz, requiresAuthz,
 				"Authorization requirement should match for path: %s", path)
 		}
 	})
@@ -381,7 +393,7 @@ func BenchmarkGetHTTPMethodAndPath(b *testing.B) {
 	}
 
 	method := methods.Get(0)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = getHTTPMethodAndPath(method)
@@ -402,7 +414,7 @@ func BenchmarkHasAuthzAnnotation(b *testing.B) {
 	}
 
 	method := methods.Get(0)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = hasAuthzAnnotation(method)
@@ -412,12 +424,12 @@ func BenchmarkHasAuthzAnnotation(b *testing.B) {
 func BenchmarkGRPCToHTTPStatus(b *testing.B) {
 	codes := []codes.Code{
 		codes.InvalidArgument,
-		codes.Unauthenticated, 
+		codes.Unauthenticated,
 		codes.PermissionDenied,
 		codes.NotFound,
 		codes.Internal,
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		code := codes[i%len(codes)]
@@ -428,7 +440,7 @@ func BenchmarkGRPCToHTTPStatus(b *testing.B) {
 func BenchmarkGetInngestEnvHeader(b *testing.B) {
 	md := metadata.Pairs("x-inngest-env", "benchmark-env")
 	ctx := metadata.NewIncomingContext(context.Background(), md)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = GetInngestEnvHeader(ctx)
@@ -447,11 +459,11 @@ func BenchmarkBase_GRPCToHTTPStatus(b *testing.B) {
 	codes := []codes.Code{
 		codes.InvalidArgument,
 		codes.Unauthenticated,
-		codes.PermissionDenied, 
+		codes.PermissionDenied,
 		codes.NotFound,
 		codes.Internal,
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		code := codes[i%len(codes)]

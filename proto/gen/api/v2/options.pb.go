@@ -25,7 +25,9 @@ const (
 type AuthzOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Whether this endpoint requires authorization middleware
-	RequireAuthz  bool `protobuf:"varint,1,opt,name=require_authz,json=requireAuthz,proto3" json:"require_authz,omitempty"`
+	RequireAuthz bool `protobuf:"varint,1,opt,name=require_authz,json=requireAuthz,proto3" json:"require_authz,omitempty"`
+	// Permission required to call this endpoint when authorized by an API key.
+	Permission    string `protobuf:"bytes,2,opt,name=permission,proto3" json:"permission,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -67,6 +69,13 @@ func (x *AuthzOptions) GetRequireAuthz() bool {
 	return false
 }
 
+func (x *AuthzOptions) GetPermission() string {
+	if x != nil {
+		return x.Permission
+	}
+	return ""
+}
+
 var file_api_v2_options_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.MethodOptions)(nil),
@@ -88,9 +97,12 @@ var File_api_v2_options_proto protoreflect.FileDescriptor
 
 const file_api_v2_options_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/options.proto\x12\x06api.v2\x1a google/protobuf/descriptor.proto\"3\n" +
+	"\x14api/v2/options.proto\x12\x06api.v2\x1a google/protobuf/descriptor.proto\"S\n" +
 	"\fAuthzOptions\x12#\n" +
-	"\rrequire_authz\x18\x01 \x01(\bR\frequireAuthz:L\n" +
+	"\rrequire_authz\x18\x01 \x01(\bR\frequireAuthz\x12\x1e\n" +
+	"\n" +
+	"permission\x18\x02 \x01(\tR\n" +
+	"permission:L\n" +
 	"\x05authz\x12\x1e.google.protobuf.MethodOptions\x18ц\x03 \x01(\v2\x14.api.v2.AuthzOptionsR\x05authzB3Z1github.com/inngest/inngest/proto/gen/api/v2;apiv2b\x06proto3"
 
 var (
