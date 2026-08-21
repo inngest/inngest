@@ -176,7 +176,7 @@ func TestExecTriggersRestartAfterCrash(t *testing.T) {
 // TestExecPermanentlyDisablesAfterFailedRestart covers the failure path of
 // review finding #3: if the one restart attempt also fails, the process
 // must be permanently disabled so further calls fail fast with
-// errProcessDisabled rather than repeatedly retrying a respawn that cannot
+// ErrDisabled rather than repeatedly retrying a respawn that cannot
 // succeed. The restart is made to fail deterministically by corrupting the
 // binary path after the initial (successful) connect — simulating an
 // environment where the duckdb binary becomes unavailable — then crashing
@@ -205,10 +205,10 @@ func TestExecPermanentlyDisablesAfterFailedRestart(t *testing.T) {
 	_, err = db.ExecContext(t.Context(), "SELECT 1;")
 	require.Error(t, err)
 
-	// Every subsequent call must fail fast with errProcessDisabled instead
+	// Every subsequent call must fail fast with ErrDisabled instead
 	// of attempting another (still-doomed) restart.
 	_, err = db.ExecContext(t.Context(), "SELECT 1;")
-	require.ErrorIs(t, err, errProcessDisabled)
+	require.ErrorIs(t, err, ErrDisabled)
 }
 
 // TestProcessHealthCheckAndRestartAreRaceFree covers review finding #4
@@ -299,4 +299,186 @@ func TestRestartSurvivesTriggeringContextCancellation(t *testing.T) {
 
 	require.NoError(t, p.healthCheck(t.Context()),
 		"restarted subprocess must survive the triggering call's context ending")
+}
+
+// TestExecSurfacesConstraintViolation is the regression test for the silent
+// data-loss bug the final review found: the DuckDB CLI reports constraint /
+// type / schema errors only on stderr and *still* emits the next statement's
+// marker on stdout, so a driver that watched stdout alone reported success
+// for statements DuckDB had actually rejected. The subprocess must stay
+// healthy and usable afterwards — a rejected statement is not a crash.
+func TestExecSurfacesConstraintViolation(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:"})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE t (id INTEGER NOT NULL);")
+	require.NoError(t, err)
+
+	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES (NULL);")
+	require.Error(t, err, "a NOT NULL violation must not be reported as success")
+	require.ErrorIs(t, err, errStatementFailed)
+	require.Contains(t, err.Error(), "Constraint Error")
+
+	// The row must genuinely not be there, and the session must still be
+	// usable: a SQL error is not a transport failure, so no restart happened.
+	var count int
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) AS c FROM t;").Scan(&count))
+	require.Equal(t, 0, count)
+
+	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES (1);")
+	require.NoError(t, err)
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) AS c FROM t;").Scan(&count))
+	require.Equal(t, 1, count)
+}
+
+// TestExecSurfacesTypeAndSchemaErrors covers the other two shapes of SQL
+// failure the dual-write path can hit — a type/conversion failure and schema
+// drift (a column that doesn't exist) — since DuckDB reports each with a
+// different "<Kind> Error:" prefix and isErrorDiagnostic must catch them all.
+func TestExecSurfacesTypeAndSchemaErrors(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:"})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE t (id INTEGER);")
+	require.NoError(t, err)
+
+	// Conversion Error.
+	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES ('not-an-int');")
+	require.ErrorIs(t, err, errStatementFailed)
+
+	// Binder Error: schema drift, i.e. a column the migration never created.
+	_, err = db.ExecContext(t.Context(), "INSERT INTO t (nonexistent_column) VALUES (1);")
+	require.ErrorIs(t, err, errStatementFailed)
+
+	// Catalog Error: a missing table.
+	_, err = db.ExecContext(t.Context(), "INSERT INTO nonexistent_table VALUES (1);")
+	require.ErrorIs(t, err, errStatementFailed)
+
+	// Still healthy after three rejected statements.
+	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES (1);")
+	require.NoError(t, err)
+}
+
+// TestExecStatementErrorDoesNotRestartSubprocess pins the classification
+// itself: a SQL error must not be mistaken for a dead subprocess, because
+// exec's restart-then-disable policy would otherwise burn its single restart
+// attempt (and eventually disable dual-write entirely) on a bad row.
+func TestExecStatementErrorDoesNotRestartSubprocess(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	c := &Connector{opts: Options{BinaryPath: binPath, DBFile: ":memory:"}}
+	db := sql.OpenDB(c)
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err := db.ExecContext(t.Context(), "CREATE TABLE t (id INTEGER NOT NULL);")
+	require.NoError(t, err)
+
+	pidBefore := c.proc.cmd.Process.Pid
+
+	_, err = db.ExecContext(t.Context(), "INSERT INTO t VALUES (NULL);")
+	require.Error(t, err)
+
+	require.Equal(t, pidBefore, c.proc.cmd.Process.Pid,
+		"a rejected statement must not respawn the subprocess")
+	c.proc.mu.Lock()
+	disabled := c.proc.disabled
+	c.proc.mu.Unlock()
+	require.False(t, disabled)
+}
+
+// TestExecRespectsContextCancellation covers session.exec's previously
+// ignored ctx parameter. Cancelling mid-statement must return promptly with
+// the context error rather than blocking in a pipe read, and — because
+// abandoning a statement leaves the session unable to frame the subprocess's
+// remaining output — the driver must still be usable afterwards, via the
+// respawn exec performs to resync.
+func TestExecRespectsContextCancellation(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	db, err := Open(t.Context(), Options{BinaryPath: binPath, DBFile: ":memory:"})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	start := time.Now()
+	_, err = db.ExecContext(ctx, "SELECT 1;")
+	require.Error(t, err)
+	require.Less(t, time.Since(start), 5*time.Second, "a cancelled exec must not block on the read")
+
+	// database/sql may reject a pre-cancelled ctx before ever reaching the
+	// driver, so this only asserts the pool recovers — the desync/resync path
+	// itself is covered directly below.
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.NoError(t, err)
+}
+
+// TestSessionExecCancelMidStatementDesyncsAndProcessResyncs drives the
+// cancellation path at the layer that owns it, bypassing database/sql's own
+// pre-flight ctx check. The statement is written to a live subprocess and then
+// abandoned, which must (a) return the ctx error, (b) mark the session
+// unusable rather than letting the next exec read this statement's output as
+// its own, and (c) leave process.exec able to recover by respawning.
+func TestSessionExecCancelMidStatementDesyncsAndProcessResyncs(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	p, err := startProcess(t.Context(), binPath, ":memory:")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = p.close(t.Context()) })
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, err = p.sess.exec(ctx, "SELECT 42 AS answer;")
+	require.ErrorIs(t, err, errSessionDesynced)
+	require.ErrorIs(t, err, context.Canceled)
+
+	// A desynced session refuses further work outright, so the abandoned
+	// statement's queued output can never be misread as another statement's
+	// result.
+	_, err = p.sess.exec(t.Context(), "SELECT 1 AS ok;")
+	require.ErrorIs(t, err, errSessionDesynced)
+
+	// process.exec recognises the desync as recoverable-by-respawn and does
+	// so, using a context detached from the (dead) caller ctx for the health
+	// check.
+	rows, err := p.exec(t.Context(), "SELECT 7 AS seven;")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, float64(7), rows[0]["seven"])
+}
+
+// TestExecFailedRestartWrapsErrDisabledImmediately pins Fix 5's contract: the
+// *first* error a caller sees once the one-restart-then-disable policy fires
+// already wraps ErrDisabled, so pkg/execution/dualwrite can stop flushing
+// immediately instead of having to fail a second time to learn the state is
+// terminal.
+func TestExecFailedRestartWrapsErrDisabledImmediately(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	c := &Connector{opts: Options{BinaryPath: binPath, DBFile: ":memory:"}}
+	db := sql.OpenDB(c)
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err := db.ExecContext(t.Context(), "SELECT 1;")
+	require.NoError(t, err)
+
+	c.proc.mu.Lock()
+	c.proc.binaryPath = "/nonexistent/path/to/duckdb"
+	c.proc.mu.Unlock()
+
+	require.NoError(t, c.proc.cmd.Process.Kill())
+	_, _ = c.proc.cmd.Process.Wait()
+
+	_, err = db.ExecContext(t.Context(), "SELECT 1;")
+	require.ErrorIs(t, err, ErrDisabled, "the disabling error itself must be observable as ErrDisabled")
 }
