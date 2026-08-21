@@ -294,6 +294,21 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 }
 
 // Close implements Closer. See the Closer doc comment.
+//
+// If ctx is bounded (callers should always pass a bounded ctx — see
+// pkg/devserver's stopDualWrite caller) and expires before every batcher has
+// drained, Close does not wait forever: it falls through and closes db
+// anyway. session.exec (pkg/db/duckdb/rows.go) blocks on a synchronous
+// stdout read that ignores context cancellation entirely, so a batcher
+// genuinely wedged on a dead/hung subprocess cannot be interrupted directly
+// — but db.Close() kills the subprocess (process.closeLocked), which closes
+// its stdout pipe and unblocks that read with an error. That, in turn, lets
+// the wedged batcher's flush return, the batcher goroutine exit, and the
+// internal wg-wait goroutine above finish and exit too — so the "leak" in
+// the timeout case is self-resolving within roughly db.Close()'s own
+// teardown bound (closeLocked's 2s Wait-then-Kill, plus Connector.Close's
+// 5s ceiling), not permanent, and it exists only for a process that is
+// itself already exiting.
 func (l *listener) Close(ctx context.Context) error {
 	for _, b := range l.batchers {
 		b.stop()

@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
@@ -21,19 +19,6 @@ import (
 )
 
 func action(ctx context.Context, cmd *cli.Command) error {
-	go func() {
-		ctx, cleanup := signal.NotifyContext(
-			context.Background(),
-			os.Interrupt,
-			syscall.SIGTERM,
-			syscall.SIGINT,
-			syscall.SIGQUIT,
-		)
-		defer cleanup()
-		<-ctx.Done()
-		os.Exit(0)
-	}()
-
 	conf, err := config.Dev(ctx)
 	if err != nil {
 		fmt.Println(err.Error())

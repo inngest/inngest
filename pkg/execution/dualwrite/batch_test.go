@@ -3,6 +3,7 @@ package dualwrite
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -125,4 +126,50 @@ func TestBatcherHandlesMixedColumnsAcrossRowsInABatch(t *testing.T) {
 		"SELECT step_name FROM run_spans_staging WHERE event_type = 'step_started';",
 	).Scan(&stepName))
 	require.False(t, stepName.Valid, "step_started row never had a step_name")
+}
+
+// TestBatcherDrainsChannelOnStopBeforeExiting is a regression test for a
+// real shutdown data-loss bug found while wiring Close() into pkg/devserver
+// (Task 9): stop() closes stopc, but run()'s select statement has no
+// priority ordering between `case row := <-b.in` and `case <-b.stopc` — when
+// both are simultaneously ready (rows already buffered in the channel at
+// the moment stop() is called), Go's select picks between them uniformly at
+// random. Before this fix, that meant a row already sent by a synchronous
+// hook call (e.g. OnEventReceived) right before shutdown had roughly even
+// odds of being silently dropped instead of flushed, once per affected row.
+//
+// This test forces the exact race: stop() is called before run() ever
+// starts, so run()'s very first select iteration must choose between a
+// ready b.in (n rows already buffered) and an already-closed stopc. Without
+// drainRemaining, this is not merely flaky -- it fails close to
+// deterministically, since the very first select is guaranteed to have both
+// cases ready simultaneously.
+func TestBatcherDrainsChannelOnStopBeforeExiting(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+
+	const n = 50
+	ch := make(chan map[string]any, n)
+	b := newBatcher(db, "events_staging", ch, batcherOpts{maxSize: n * 10, flushInterval: time.Hour})
+
+	for i := 0; i < n; i++ {
+		ch <- eventRow(fmt.Sprintf("id-%d", i), "burst")
+	}
+	b.stop()
+
+	done := make(chan struct{})
+	go func() {
+		b.run(context.Background())
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("batcher did not exit after stop")
+	}
+
+	var count int
+	require.NoError(t, db.QueryRowContext(context.Background(), "SELECT count(*) FROM events_staging;").Scan(&count))
+	require.Equal(t, n, count, "every row buffered before stop() must be flushed, not dropped")
 }

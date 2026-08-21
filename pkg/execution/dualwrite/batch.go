@@ -58,6 +58,27 @@ func (b *batcher) run(ctx context.Context) {
 		buf = buf[:0]
 	}
 
+	// drainRemaining does one final non-blocking sweep of b.in before the
+	// last flush on exit. Without this, a row already sitting in the
+	// channel when stop()/ctx cancellation fires can be lost: select's
+	// pseudo-random tie-break between a ready `row := <-b.in` case and a
+	// ready `<-b.stopc`/`<-ctx.Done()` case can pick the exit case even
+	// though a row is waiting, and once this goroutine returns nothing
+	// ever reads that row again. Only a non-blocking drain is safe here —
+	// senders never close b.in (see sendEvent/sendRun/sendSpan), so a
+	// blocking drain-until-empty could run forever if a hook is still
+	// actively sending.
+	drainRemaining := func() {
+		for {
+			select {
+			case row := <-b.in:
+				buf = append(buf, row)
+			default:
+				return
+			}
+		}
+	}
+
 	for {
 		select {
 		case row := <-b.in:
@@ -70,9 +91,11 @@ func (b *batcher) run(ctx context.Context) {
 			flush()
 			timer.Reset(b.opts.flushInterval)
 		case <-b.stopc:
+			drainRemaining()
 			flush()
 			return
 		case <-ctx.Done():
+			drainRemaining()
 			flush()
 			return
 		}

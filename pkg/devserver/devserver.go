@@ -509,7 +509,15 @@ func start(ctx context.Context, opts StartOpts) error {
 	var dualWriteListeners []execution.SyncLifecycleListener
 	if dw := setupDualWrite(ctx, "duckdb", opts.SQLiteDir); dw != nil {
 		dualWriteListeners = append(dualWriteListeners, dw)
-		defer stopDualWrite(context.Background(), dw)
+		defer func() {
+			// Bounded like every other service.Service's Stop (see
+			// pkg/service's defaultTimeout/stopTimeout, 30s) -- Close must
+			// never hang start()'s return indefinitely if a batcher flush
+			// wedges on an unresponsive subprocess.
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			stopDualWrite(shutdownCtx, dw)
+		}()
 	}
 
 	executorOpts := []executor.ExecutorOpt{
