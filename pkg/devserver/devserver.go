@@ -500,8 +500,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		url = "127.0.0.1"
 	}
 
-	// Best-effort DuckDB dual-write (docs/plans/006-duckdb-poc-subprocess-dual-write.md):
-	// nil on any failure (missing binary, failed spawn, failed migration),
+	// Opt-in, best-effort DuckDB dual-write
+	// (docs/plans/006-duckdb-poc-subprocess-dual-write.md): nil unless
+	// INNGEST_DUCKDB_DUALWRITE is set truthy, and nil on any failure
+	// (missing binary, failed spawn, failed migration),
 	// in which case the rest of devserver startup proceeds unaffected. When
 	// non-nil, stopDualWrite tears down its background goroutines and the
 	// duckdb subprocess when start() returns (i.e. once service.StartAll
