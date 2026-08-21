@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -49,6 +50,10 @@ const restartHealthTimeout = 10 * time.Second
 type process struct {
 	binaryPath string
 	dbFile     string
+	// duckLake is nil unless the caller opted into DuckLake (Options.DuckLake).
+	// When set, every freshly spawned subprocess is re-bootstrapped from it —
+	// see bootstrapDuckLakeLocked for why that has to happen per spawn.
+	duckLake *DuckLakeOptions
 
 	procCtx    context.Context
 	procCancel context.CancelFunc
@@ -70,10 +75,17 @@ type process struct {
 // bounds the health check; the subprocess's own OS lifetime is governed by
 // the process-owned procCtx (see the process doc comment), not this ctx.
 func startProcess(ctx context.Context, binaryPath, dbFile string) (*process, error) {
+	return startProcessWithDuckLake(ctx, binaryPath, dbFile, nil)
+}
+
+// startProcessWithDuckLake is startProcess with the opt-in DuckLake bootstrap.
+// duckLake may be nil, which is exactly the pre-DuckLake behaviour.
+func startProcessWithDuckLake(ctx context.Context, binaryPath, dbFile string, duckLake *DuckLakeOptions) (*process, error) {
 	procCtx, procCancel := context.WithCancel(context.Background())
 	p := &process{
 		binaryPath: binaryPath,
 		dbFile:     dbFile,
+		duckLake:   duckLake,
 		procCtx:    procCtx,
 		procCancel: procCancel,
 	}
@@ -86,13 +98,16 @@ func startProcess(ctx context.Context, binaryPath, dbFile string) (*process, err
 		return nil, err
 	}
 
-	if err := p.healthCheck(ctx); err != nil {
+	p.mu.Lock()
+	err = p.initSessionLocked(ctx)
+	p.mu.Unlock()
+	if err != nil {
 		_ = p.close(ctx)
 		// Match the spawn-failure path above: nothing else will ever cancel
 		// procCtx, since no *process is returned for Connector.Close to
 		// reach.
 		procCancel()
-		return nil, fmt.Errorf("duckdb: subprocess failed initial health check: %w", err)
+		return nil, fmt.Errorf("duckdb: subprocess failed initial startup: %w", err)
 	}
 	return p, nil
 }
@@ -172,16 +187,110 @@ func (p *process) healthCheck(ctx context.Context) error {
 	return p.healthCheckLocked(ctx)
 }
 
+// initSessionLocked assumes mu is already held. It runs everything a *freshly
+// spawned* subprocess needs before it can be handed to a caller: prove it can
+// round-trip a query, then re-establish any DuckLake attachment.
+//
+// Both are per-spawn concerns, which is why they are paired here and why both
+// spawn paths (startProcessWithDuckLake and restartLocked) go through this one
+// function — a crash-triggered restart that only health-checked would come
+// back looking perfectly healthy with no lake catalog attached at all.
+//
+// The bootstrap deliberately lives here rather than inside healthCheckLocked:
+// healthCheck is also called repeatedly against an *already running* session
+// (tests do it, and nothing stops a caller from doing it), and re-running
+// ATTACH on a session that already has the catalog is a hard error from DuckDB
+// ("Binder Error: Failed to attach database: database with name \"lake\"
+// already exists"), which session.exec would correctly surface as a failed
+// statement. Keying the bootstrap to spawn instead of to health keeps
+// healthCheck a pure, repeatable liveness probe.
+func (p *process) initSessionLocked(ctx context.Context) error {
+	if err := p.healthCheckLocked(ctx); err != nil {
+		return err
+	}
+	return p.bootstrapDuckLakeLocked(ctx)
+}
+
+// bootstrapDuckLakeLocked assumes mu is already held. It is a no-op unless the
+// caller opted into DuckLake, so every existing caller is unaffected.
+//
+// A duckdb subprocess starts with a completely fresh, unattached session every
+// single time it spawns: extensions it loaded are gone, and so is the ATTACHed
+// lake catalog. Nothing about the DuckLake state is carried in the main
+// database file, so this must run after *every* spawn — initial start and
+// crash-triggered restart alike — or a restarted subprocess would pass its
+// health check and then fail every lake.* statement with a Catalog Error.
+//
+// The statements are the verified DuckLake sequence:
+//
+//	INSTALL ducklake;                            -- no-op once cached
+//	LOAD ducklake;
+//	ATTACH IF NOT EXISTS 'ducklake:<catalog>' AS lake (DATA_PATH '<data>/');
+//
+// None of the three produce any output on the merged stdout+stderr stream when
+// they succeed (verified against duckdb v1.5.5 over this exact transport), so
+// they neither add phantom rows to session.exec's result nor emit anything that
+// reportDiagnostics could misclassify as an error. Failures do print the usual
+// "<Kind> Error: " diagnostics, which session.exec turns into
+// errStatementFailed — surfaced here as a real error, never swallowed.
+//
+// IF NOT EXISTS makes the ATTACH idempotent so a re-bootstrap of a session
+// that already has the catalog is harmless rather than a hard Binder Error.
+func (p *process) bootstrapDuckLakeLocked(ctx context.Context) error {
+	if p.duckLake == nil {
+		return nil
+	}
+	opts := *p.duckLake
+
+	if opts.CatalogPath == "" {
+		return fmt.Errorf("duckdb: DuckLake enabled but CatalogPath is empty")
+	}
+	if opts.DataPath == "" {
+		return fmt.Errorf("duckdb: DuckLake enabled but DataPath is empty")
+	}
+
+	// DuckLake requires the data directory to exist before ATTACH runs.
+	// MkdirAll is idempotent, so re-running it on every respawn is free.
+	if err := os.MkdirAll(opts.DataPath, 0o755); err != nil {
+		return fmt.Errorf("duckdb: creating DuckLake data path %q: %w", opts.DataPath, err)
+	}
+
+	// DATA_PATH is interpreted as a directory only when it ends in a
+	// separator; the paths themselves are quoted through the same escaping the
+	// literal encoder uses, since this transport has no parameter binding.
+	catalogLiteral, err := encodeLiteral("ducklake:" + opts.CatalogPath)
+	if err != nil {
+		return fmt.Errorf("duckdb: encoding DuckLake catalog path: %w", err)
+	}
+	dataLiteral, err := encodeLiteral(strings.TrimSuffix(opts.DataPath, "/") + "/")
+	if err != nil {
+		return fmt.Errorf("duckdb: encoding DuckLake data path: %w", err)
+	}
+
+	stmts := []string{
+		"INSTALL ducklake;",
+		"LOAD ducklake;",
+		fmt.Sprintf("ATTACH IF NOT EXISTS %s AS %s (DATA_PATH %s);", catalogLiteral, DuckLakeAlias, dataLiteral),
+	}
+	for _, stmt := range stmts {
+		if _, err := p.sess.exec(ctx, stmt); err != nil {
+			return fmt.Errorf("duckdb: DuckLake bootstrap failed on %q: %w", stmt, err)
+		}
+	}
+	return nil
+}
+
 // restartLocked assumes mu is already held. It closes the current
-// subprocess, spawns a fresh one, and health-checks it before declaring the
-// restart successful — a respawned-but-unresponsive process is treated the
-// same as a failed restart.
+// subprocess, spawns a fresh one, and re-initializes it (health check plus any
+// DuckLake bootstrap) before declaring the restart successful — a
+// respawned-but-unresponsive, or respawned-but-unattached, process is treated
+// the same as a failed restart.
 func (p *process) restartLocked(ctx context.Context) error {
 	_ = p.closeLocked(ctx)
 	if err := p.spawnLocked(); err != nil {
 		return err
 	}
-	return p.healthCheckLocked(ctx)
+	return p.initSessionLocked(ctx)
 }
 
 // restart attempts one respawn after a detected failure. Exposed for tests;
@@ -299,6 +408,30 @@ func (p *process) close(ctx context.Context) error {
 	return p.closeLocked(ctx)
 }
 
+// DuckLakeAlias is the catalog name the DuckLake bootstrap attaches under, so
+// callers address DuckLake-backed tables as lake.<table>. It is fixed for this
+// POC; making it configurable is future work.
+const DuckLakeAlias = "lake"
+
+// DuckLakeOptions opts a process into DuckLake. It is exploratory groundwork:
+// nothing in the existing Migrate / dual-write path sets it yet.
+//
+// Both fields are required when this struct is used. Presence of the struct
+// itself is the enable switch (Options.DuckLake == nil means "disabled, behave
+// exactly as before"), so there is no separate boolean to keep in sync.
+type DuckLakeOptions struct {
+	// CatalogPath is the path to the DuckLake metadata catalog file, attached
+	// as 'ducklake:<CatalogPath>'. It is created by DuckDB on first attach and
+	// is distinct from Options.DBFile: the main database can be ":memory:"
+	// while the lake still persists to disk.
+	CatalogPath string
+	// DataPath is the directory DuckLake writes its Parquet data files into.
+	// It is created (os.MkdirAll) before ATTACH runs, because DuckLake
+	// requires it to exist. A trailing separator is added if absent, since
+	// DuckLake only treats DATA_PATH as a directory when it ends in one.
+	DataPath string
+}
+
 // Options configures Open.
 type Options struct {
 	// BinaryPath is the path to the duckdb executable. Leave empty to resolve
@@ -306,6 +439,13 @@ type Options struct {
 	BinaryPath string
 	// DBFile is the path to the .duckdb catalog file, or ":memory:".
 	DBFile string
+	// DuckLake, when non-nil, installs and loads the ducklake extension and
+	// attaches a DuckLake catalog as DuckLakeAlias after every successful
+	// health check of a freshly spawned subprocess — including the respawn
+	// after a crash, since a new subprocess starts with an unattached session.
+	// Leave nil (the zero value) to disable DuckLake entirely; that path is
+	// byte-for-byte the previous behaviour.
+	DuckLake *DuckLakeOptions
 }
 
 // Connector implements database/sql/driver.Connector over one supervised
@@ -328,7 +468,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 			}
 			binPath = resolved
 		}
-		p, err := startProcess(ctx, binPath, c.opts.DBFile)
+		p, err := startProcessWithDuckLake(ctx, binPath, c.opts.DBFile, c.opts.DuckLake)
 		if err != nil {
 			return nil, err
 		}
