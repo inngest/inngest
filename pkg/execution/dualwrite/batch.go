@@ -133,6 +133,10 @@ func (b *batcher) run(ctx context.Context) {
 		// listener's hooks keep working untouched — their channels simply
 		// fill up, after which each send takes the drop-and-count path,
 		// which is the designed no-backpressure behaviour.
+		//
+		// A batcher that did not discover the state itself notices within
+		// one flushInterval (200ms in production), since the timer case
+		// wakes it even with an idle channel.
 		if b.opts.disabled.disabled() {
 			return
 		}
