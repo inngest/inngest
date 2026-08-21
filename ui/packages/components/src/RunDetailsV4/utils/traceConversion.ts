@@ -11,12 +11,14 @@ import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
   InngestBreakdownData,
+  ScoreBadgeData,
   TimelineBarData,
   TimelineData,
 } from '../TimelineBar.types';
 import { traceWalk } from '../runDetailsUtils';
 import {
   isExperimentMetadata,
+  isScoreMetadata,
   isStepInfoRun,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
@@ -212,6 +214,27 @@ function getHTTPTimingFromMetadata(metadata?: SpanMetadata[]): HTTPTimingBreakdo
 }
 
 /**
+ * Extract scores recorded directly on this span. Child spans are deliberately
+ * not walked: the timeline already renders them as their own bars.
+ */
+function getScores(metadata?: SpanMetadata[]): ScoreBadgeData[] | undefined {
+  const scores =
+    metadata
+      ?.filter(isScoreMetadata)
+      .flatMap((md) =>
+        Object.entries(md.values).flatMap(([name, raw]) => {
+          const value = raw?.value;
+          return typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))
+            ? [{ name, value }]
+            : [];
+        })
+      )
+      .sort((a, b) => a.name.localeCompare(b.name)) ?? [];
+
+  return scores.length > 0 ? scores : undefined;
+}
+
+/**
  * Convert a single Trace to TimelineBarData
  */
 function traceToBarData(
@@ -288,6 +311,7 @@ function traceToBarData(
     delayMs,
     hasExperiment,
     experimentMetadata,
+    scores: getScores(trace.metadata),
   };
 }
 
