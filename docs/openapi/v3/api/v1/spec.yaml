@@ -54,7 +54,7 @@ paths:
         - schema:
             type: number
             minimum: 1
-            maximum: 100
+            maximum: 51
           in: query
           name: limit
           description: The number of events to list
