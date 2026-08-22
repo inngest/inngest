@@ -56,6 +56,7 @@ end
 -- Dedup: per-event SET keys (O(1))
 local eventsToAdd = {}
 local duplicateCount = 0
+local committedBytes = 0
 local argOffset = 11
 
 for i = 1, eventCount do
@@ -67,6 +68,7 @@ for i = 1, eventCount do
   if not newEvent then newEvent = false end
   if newEvent then
     table.insert(eventsToAdd, eventData)
+    committedBytes = committedBytes + string.len(eventData)
   else
     duplicateCount = duplicateCount + 1
   end
@@ -79,7 +81,8 @@ if #eventsToAdd == 0 then
     batchID = batchID,
     batchPointerKey = batchPointerKey,
     committed = 0,
-    duplicates = duplicateCount
+    duplicates = duplicateCount,
+    committedBytes = 0
   })
 end
 
@@ -168,5 +171,6 @@ return cjson.encode({
   committed = #eventsToAdd,
   duplicates = duplicateCount,
   nextBatchID = nextBatchID,
-  overflowCount = overflowCount
+  overflowCount = overflowCount,
+  committedBytes = committedBytes
 })

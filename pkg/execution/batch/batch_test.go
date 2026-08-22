@@ -3,6 +3,7 @@ package batch
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -16,6 +17,165 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
+
+type recordedBatchDelete struct {
+	residencyDuration time.Duration
+}
+
+type recordingBatchMetricRecorder struct {
+	committedBytes []int64
+	deletes        []recordedBatchDelete
+}
+
+func (r *recordingBatchMetricRecorder) AccountScopedTags(context.Context, uuid.UUID, uuid.UUID) map[string]any {
+	return map[string]any{"backend": "test"}
+}
+
+func (r *recordingBatchMetricRecorder) RecordCommit(_ context.Context, _ map[string]any, committedBytes int64) {
+	r.committedBytes = append(r.committedBytes, committedBytes)
+}
+
+func (r *recordingBatchMetricRecorder) RecordDelete(_ context.Context, residencyDuration time.Duration) {
+	r.deletes = append(r.deletes, recordedBatchDelete{
+		residencyDuration: residencyDuration,
+	})
+}
+
+func TestAppendCommittedBytes(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	recorder := &recordingBatchMetricRecorder{}
+	bm := NewRedisBatchManager(
+		bc,
+		nil,
+		WithoutBuffer(),
+		WithBatchMetricRecorder(recorder),
+	)
+
+	fnID := uuid.New()
+	fn := inngest.Function{
+		ID: fnID,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	}
+	item := BatchItem{
+		AccountID:  uuid.New(),
+		FunctionID: fnID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "one", Data: map[string]any{"value": "first"}},
+	}
+	encoded, err := json.Marshal(item)
+	require.NoError(t, err)
+
+	_, err = bm.Append(ctx, item, fn)
+	require.NoError(t, err)
+	require.Equal(t, []int64{int64(len(encoded))}, recorder.committedBytes)
+
+	secondItem := BatchItem{
+		AccountID:  item.AccountID,
+		FunctionID: fnID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "two", Data: map[string]any{"value": "second"}},
+	}
+	secondEncoded, err := json.Marshal(secondItem)
+	require.NoError(t, err)
+	_, err = bm.Append(ctx, secondItem, fn)
+	require.NoError(t, err)
+	require.Equal(t, []int64{int64(len(encoded)), int64(len(secondEncoded))}, recorder.committedBytes)
+
+	duplicate, err := bm.Append(ctx, item, fn)
+	require.NoError(t, err)
+	require.Equal(t, enums.BatchItemExists, duplicate.Status)
+	require.Equal(t, []int64{int64(len(encoded)), int64(len(secondEncoded))}, recorder.committedBytes)
+}
+
+func TestBatchScriptsAppendToExistingBatch(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer())
+	accountID := uuid.New()
+	functionID := uuid.New()
+	batchID := ulid.MustNew(ulid.Now(), rand.Reader)
+	fn := inngest.Function{
+		ID: functionID,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	}
+
+	// Seed only the pointer, list, and status written by batching before the
+	// metrics fields existed. The new scripts must continue this batch without
+	// requiring a metadata migration or creating a replacement batch.
+	legacyItem := BatchItem{
+		AccountID:  accountID,
+		FunctionID: functionID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "legacy"},
+	}
+	legacyJSON, err := json.Marshal(legacyItem)
+	require.NoError(t, err)
+	pointerKey := bc.KeyGenerator().BatchPointer(ctx, functionID)
+	batchKey := bc.KeyGenerator().Batch(ctx, functionID, batchID)
+	metadataKey := bc.KeyGenerator().BatchMetadata(ctx, functionID, batchID)
+	require.NoError(t, r.Set(pointerKey, batchID.String()))
+	_, err = r.RPush(batchKey, string(legacyJSON))
+	require.NoError(t, err)
+	r.HSet(metadataKey, "status", enums.BatchStatusPending.String())
+
+	appendItem := BatchItem{
+		AccountID:  accountID,
+		FunctionID: functionID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "append"},
+	}
+	appendResult, err := bm.Append(ctx, appendItem, fn)
+	require.NoError(t, err)
+	require.Equal(t, batchID.String(), appendResult.BatchID)
+	require.Equal(t, enums.BatchAppend, appendResult.Status)
+
+	bulkItem := BatchItem{
+		AccountID:  accountID,
+		FunctionID: functionID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "bulk-append"},
+	}
+	bulkResult, err := bm.BulkAppend(ctx, []BatchItem{bulkItem}, fn)
+	require.NoError(t, err)
+	require.Equal(t, batchID.String(), bulkResult.BatchID)
+	require.Equal(t, "append", bulkResult.Status)
+	require.Equal(t, 1, bulkResult.Committed)
+	items, err := bm.RetrieveItems(ctx, functionID, batchID)
+	require.NoError(t, err)
+	require.Len(t, items, 3)
+	require.Equal(t, []string{"legacy", "append", "bulk-append"}, []string{
+		items[0].Event.ID,
+		items[1].Event.ID,
+		items[2].Event.ID,
+	})
+	pointer, err := r.Get(pointerKey)
+	require.NoError(t, err)
+	require.Equal(t, batchID.String(), pointer)
+}
 
 func TestBatchSizeLimit(t *testing.T) {
 	r := miniredis.RunT(t)
@@ -516,12 +676,19 @@ func TestPerEventIdempotenceBulkAppend(t *testing.T) {
 		{AccountID: uuid.New(), FunctionID: fnId, EventID: event2ID, Event: event.Event{ID: "e2"}},
 		{AccountID: uuid.New(), FunctionID: fnId, EventID: event3ID, Event: event.Event{ID: "e3"}},
 	}
+	var committedBytes int64
+	for _, item := range items {
+		encoded, err := json.Marshal(item)
+		require.NoError(t, err)
+		committedBytes += int64(len(encoded))
+	}
 
 	// Bulk append 3 events
 	res, err := bm.BulkAppend(context.Background(), items, fn)
 	require.NoError(t, err)
 	require.Equal(t, 3, res.Committed)
 	require.Equal(t, 0, res.Duplicates)
+	require.Equal(t, committedBytes, res.CommittedBytes)
 
 	// Bulk append same 3 events again — all should be duplicates
 	res, err = bm.BulkAppend(context.Background(), items, fn)
@@ -529,6 +696,7 @@ func TestPerEventIdempotenceBulkAppend(t *testing.T) {
 	require.Equal(t, "itemexists", res.Status)
 	require.Equal(t, 0, res.Committed)
 	require.Equal(t, 3, res.Duplicates)
+	require.Zero(t, res.CommittedBytes)
 
 	// Bulk append mix of new and duplicate
 	event4ID := ulid.MustNew(ulid.Now(), rand.Reader)
@@ -540,6 +708,68 @@ func TestPerEventIdempotenceBulkAppend(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, res.Committed)
 	require.Equal(t, 1, res.Duplicates)
+	encodedEvent4, err := json.Marshal(mixedItems[1])
+	require.NoError(t, err)
+	require.Equal(t, int64(len(encodedEvent4)), res.CommittedBytes)
+}
+
+func TestBulkAppendPayloadAccountingAcrossOverflow(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer())
+	fnID := uuid.New()
+	fn := inngest.Function{ID: fnID, EventBatch: &inngest.EventBatchConfig{MaxSize: 2, Timeout: "60s"}}
+	accountID := uuid.New()
+	items := []BatchItem{
+		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "one"}},
+		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "two"}},
+		{AccountID: accountID, FunctionID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), Event: event.Event{ID: "three"}},
+	}
+	encodedBytes := make([]int, len(items))
+	for i, item := range items {
+		encoded, err := json.Marshal(item)
+		require.NoError(t, err)
+		encodedBytes[i] = len(encoded)
+	}
+
+	result, err := bm.BulkAppend(ctx, items, fn)
+	require.NoError(t, err)
+	require.Equal(t, "overflow", result.Status)
+	require.Equal(t, 3, result.Committed)
+	require.Equal(t, int64(encodedBytes[0]+encodedBytes[1]+encodedBytes[2]), result.CommittedBytes)
+}
+
+func TestDeleteKeysRecordsResidency(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	recorder := &recordingBatchMetricRecorder{}
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithBatchMetricRecorder(recorder))
+	functionID := uuid.New()
+	batchID := ulid.MustNew(ulid.Timestamp(time.Now().Add(-2*time.Minute)), rand.Reader)
+	batchKey := bc.KeyGenerator().Batch(ctx, functionID, batchID)
+	metadataKey := bc.KeyGenerator().BatchMetadata(ctx, functionID, batchID)
+
+	_, err = r.RPush(batchKey, "payload")
+	require.NoError(t, err)
+	r.HSet(metadataKey, "status", enums.BatchStatusPending.String())
+
+	require.NoError(t, bm.DeleteKeys(ctx, functionID, batchID))
+	require.Len(t, recorder.deletes, 1)
+	require.InDelta(t, (2 * time.Minute).Milliseconds(), recorder.deletes[0].residencyDuration.Milliseconds(), 2_000)
+
+	// Idempotent retries do not record removal or residency a second time.
+	require.NoError(t, bm.DeleteKeys(ctx, functionID, batchID))
+	require.Len(t, recorder.deletes, 1)
 }
 
 func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {
