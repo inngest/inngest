@@ -6,20 +6,21 @@ import (
 )
 
 var (
-	batchItemCountBoundaries = []float64{1, 2, 5, 10, 20, 50, 100, 200, 500, 1_000, 2_500, 5_000, 10_000}
-	batchByteBoundaries      = []float64{
-		128,
-		512,
-		1 * 1024,
-		4 * 1024,
-		16 * 1024,
-		64 * 1024,
-		256 * 1024,
-		1 * 1024 * 1024,
-		2 * 1024 * 1024,
-		4 * 1024 * 1024,
-		8 * 1024 * 1024,
-		16 * 1024 * 1024,
+	batchResidencyDurationBoundaries = []float64{
+		100,
+		500,
+		1_000,
+		5_000,
+		10_000,
+		30_000,
+		60_000,
+		5 * 60_000,
+		10 * 60_000,
+		30 * 60_000,
+		60 * 60_000,
+		6 * 60 * 60_000,
+		12 * 60 * 60_000,
+		24 * 60 * 60_000,
 	}
 )
 
@@ -47,61 +48,50 @@ func IncrBatchCommittedBytesCounter(ctx context.Context, bytes int64, opts Count
 	})
 }
 
-// HistogramBatchListResidentSizeBytes records a write-weighted, append-time
-// Redis MEMORY USAGE sample for the current batch list. It is not an inventory
-// or a final/peak batch-size measurement, and it excludes pointers, metadata,
-// and idempotency keys.
-func HistogramBatchListResidentSizeBytes(ctx context.Context, bytes int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, bytes, HistogramOpt{
+// GaugeBatchBufferBytesPending records the event payload bytes currently held
+// in the in-process batching buffer. It does not attempt to include Go object
+// overhead.
+func GaugeBatchBufferBytesPending(ctx context.Context, bytes int64, opts GaugeOpt) {
+	RecordGaugeMetric(ctx, bytes, GaugeOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "batch_list_resident_size_bytes",
-		Description: "Write-weighted distribution of append-time Redis resident bytes for the current batch list only",
-		Unit:        "By",
+		MetricName:  "batch_buffer_bytes_pending",
+		Description: "Event payload bytes currently held in the in-process batching buffer",
 		Tags:        opts.Tags,
-		Boundaries:  batchByteBoundaries,
 	})
 }
 
-// HistogramBatchListItemCount records the write-weighted current batch list
-// length paired with each resident-size observation.
-func HistogramBatchListItemCount(ctx context.Context, count int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, count, HistogramOpt{
+// IncrBatchBufferBytesAddedCounter records event payload bytes accepted into
+// the in-process batching buffer.
+func IncrBatchBufferBytesAddedCounter(ctx context.Context, bytes int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, bytes, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "batch_list_item_count",
-		Description: "Write-weighted distribution of current batch list lengths after Redis writes",
+		MetricName:  "batch_buffer_bytes_added_total",
+		Description: "Total event payload bytes accepted into the in-process batching buffer",
 		Tags:        opts.Tags,
-		Boundaries:  batchItemCountBoundaries,
 	})
 }
 
-func HistogramBatchRetrieveItemsDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+// IncrBatchBufferBytesRemovedCounter records event payload bytes released from
+// the in-process batching buffer when a flush takes ownership of them.
+func IncrBatchBufferBytesRemovedCounter(ctx context.Context, bytes int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, bytes, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "batch_buffer_bytes_removed_total",
+		Description: "Total event payload bytes released from the in-process batching buffer",
+		Tags:        opts.Tags,
+	})
+}
+
+// HistogramBatchResidencyDuration records how long a batch list existed before
+// it was actually deleted. Its sum is total batch residency time and its count
+// is the number of deleted batches.
+func HistogramBatchResidencyDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "batch_retrieve_items_duration",
-		Description: "Distribution of batch item retrieval latency",
+		MetricName:  "batch_residency_duration",
+		Description: "Distribution of time batch lists remain in batch storage before deletion",
 		Unit:        "ms",
 		Tags:        opts.Tags,
-		Boundaries:  DefaultBoundaries,
-	})
-}
-
-func HistogramBatchRetrievedItemCount(ctx context.Context, count int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, count, HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "batch_retrieved_item_count",
-		Description: "Distribution of items returned by batch retrievals",
-		Tags:        opts.Tags,
-		Boundaries:  batchItemCountBoundaries,
-	})
-}
-
-func HistogramBatchDeleteKeysDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "batch_delete_keys_duration",
-		Description: "Distribution of batch key deletion latency",
-		Unit:        "ms",
-		Tags:        opts.Tags,
-		Boundaries:  DefaultBoundaries,
+		Boundaries:  batchResidencyDurationBoundaries,
 	})
 }

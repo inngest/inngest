@@ -40,6 +40,7 @@ type appendBuffer struct {
 	closed            chan struct{} // signals shutdown to unblock waiting appends
 	log               logger.Logger
 	totalPendingItems atomic.Int64 // tracks total items across all buffers
+	totalPendingBytes atomic.Int64 // tracks event payload bytes across all buffers
 }
 
 // bufferKey identifies a unique buffer based on function and batch pointer,
@@ -156,7 +157,8 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 		pending: pr,
 	})
 	buf.pendingResults[eventIDStr] = pr
-	buf.byteSize += bi.Event.Size()
+	eventBytes := int64(bi.Event.Size())
+	buf.byteSize += int(eventBytes)
 
 	// Set createdAt on first item
 	if buf.createdAt.IsZero() {
@@ -166,6 +168,9 @@ func (ab *appendBuffer) append(ctx context.Context, bi BatchItem, fn inngest.Fun
 	// Track pending items gauge
 	pending := ab.totalPendingItems.Add(1)
 	metrics.GaugeBatchBufferItemsPending(ctx, pending, metrics.GaugeOpt{PkgName: pkgName})
+	pendingBytes := ab.totalPendingBytes.Add(eventBytes)
+	metrics.GaugeBatchBufferBytesPending(ctx, pendingBytes, metrics.GaugeOpt{PkgName: pkgName})
+	metrics.IncrBatchBufferBytesAddedCounter(ctx, eventBytes, metrics.CounterOpt{PkgName: pkgName})
 
 	// Check if we should flush based on function's batch config or buffer's global max
 	batchMaxSize := ab.maxSize
@@ -296,6 +301,7 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		fn         = buf.fn
 		createdAt  = buf.createdAt
 		flushCount = int64(len(buf.items))
+		flushBytes = int64(buf.byteSize)
 	)
 	buf.reset()
 	buf.mu.Unlock()
@@ -306,6 +312,11 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 	// Decrement pending items and record gauge
 	newPending := ab.totalPendingItems.Add(-flushCount)
 	metrics.GaugeBatchBufferItemsPending(ctx, newPending, metrics.GaugeOpt{PkgName: pkgName})
+	newPendingBytes := ab.totalPendingBytes.Add(-flushBytes)
+	metrics.GaugeBatchBufferBytesPending(ctx, newPendingBytes, metrics.GaugeOpt{PkgName: pkgName})
+	if flushBytes > 0 {
+		metrics.IncrBatchBufferBytesRemovedCounter(ctx, flushBytes, metrics.CounterOpt{PkgName: pkgName, Tags: triggerTags})
+	}
 
 	// Record wait duration if createdAt was set
 	var waitDurationMs int64
@@ -394,6 +405,7 @@ func (ab *appendBuffer) flush(buf *batchBuffer, mgr BatchManager, trigger string
 		if bulkResult == nil {
 			continue
 		}
+
 		if err := ab.handleScheduling(bulkResult, fn, chunk[0], mgr); err != nil {
 			for _, p := range chunkPending {
 				p.pending.err = err

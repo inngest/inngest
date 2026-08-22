@@ -82,9 +82,7 @@ if #eventsToAdd == 0 then
     batchPointerKey = batchPointerKey,
     committed = 0,
     duplicates = duplicateCount,
-    committedBytes = 0,
-    batchItemCount = 0,
-    batchListResidentBytes = 0
+    committedBytes = 0
   })
 end
 
@@ -174,7 +172,5 @@ return cjson.encode({
   duplicates = duplicateCount,
   nextBatchID = nextBatchID,
   overflowCount = overflowCount,
-  committedBytes = committedBytes,
-  batchItemCount = finalLen,
-  batchListResidentBytes = batchMemorySize
+  committedBytes = committedBytes
 })

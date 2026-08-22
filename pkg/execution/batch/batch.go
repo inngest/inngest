@@ -92,9 +92,8 @@ type BatchManager interface {
 // operation results needed to record them.
 type BatchMetricRecorder interface {
 	AccountScopedTags(ctx context.Context, accountID, workspaceID uuid.UUID) map[string]any
-	RecordCommit(ctx context.Context, tags map[string]any, committedBytes, listResidentBytes int64, listItemCount int)
-	RecordRetrieve(ctx context.Context, status string, itemCount int64, duration time.Duration)
-	RecordDelete(ctx context.Context, status string, duration time.Duration)
+	RecordCommit(ctx context.Context, tags map[string]any, committedBytes int64)
+	RecordDelete(ctx context.Context, residencyDuration time.Duration)
 }
 
 // BatchInfo contains information about a batch for debugging purposes.
@@ -177,16 +176,6 @@ type BatchAppendResult struct {
 	Status          enums.Batch `json:"status"`
 	BatchID         string      `json:"batchID,omitempty"`
 	BatchPointerKey string      `json:"batchPointerKey"`
-	// The accounting fields below are populated only by direct Append calls
-	// when buffering is disabled. Buffered Append results are per-item views of
-	// a chunk-level BulkAppend result and intentionally leave them at zero.
-	Committed      int   `json:"committed"`
-	Duplicates     int   `json:"duplicates"`
-	CommittedBytes int64 `json:"committedBytes"`
-	BatchItemCount int   `json:"batchItemCount"`
-	// BatchListResidentBytes is Redis MEMORY USAGE for the current batch list
-	// only; it excludes pointers, metadata, and idempotency keys.
-	BatchListResidentBytes int64 `json:"batchListResidentBytes"`
 }
 
 type ScheduleBatchOpts struct {

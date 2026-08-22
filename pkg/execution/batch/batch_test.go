@@ -18,6 +18,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type recordedBatchDelete struct {
+	residencyDuration time.Duration
+}
+
+type recordingBatchMetricRecorder struct {
+	committedBytes []int64
+	deletes        []recordedBatchDelete
+}
+
+func (r *recordingBatchMetricRecorder) AccountScopedTags(context.Context, uuid.UUID, uuid.UUID) map[string]any {
+	return map[string]any{"backend": "test"}
+}
+
+func (r *recordingBatchMetricRecorder) RecordCommit(_ context.Context, _ map[string]any, committedBytes int64) {
+	r.committedBytes = append(r.committedBytes, committedBytes)
+}
+
+func (r *recordingBatchMetricRecorder) RecordDelete(_ context.Context, residencyDuration time.Duration) {
+	r.deletes = append(r.deletes, recordedBatchDelete{
+		residencyDuration: residencyDuration,
+	})
+}
+
 func TestAppendCommittedBytes(t *testing.T) {
 	r := miniredis.RunT(t)
 
@@ -30,10 +53,12 @@ func TestAppendCommittedBytes(t *testing.T) {
 
 	ctx := context.Background()
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	recorder := &recordingBatchMetricRecorder{}
 	bm := NewRedisBatchManager(
 		bc,
 		nil,
 		WithoutBuffer(),
+		WithBatchMetricRecorder(recorder),
 	)
 
 	fnID := uuid.New()
@@ -53,19 +78,26 @@ func TestAppendCommittedBytes(t *testing.T) {
 	encoded, err := json.Marshal(item)
 	require.NoError(t, err)
 
-	first, err := bm.Append(ctx, item, fn)
+	_, err = bm.Append(ctx, item, fn)
 	require.NoError(t, err)
-	require.Equal(t, 1, first.Committed)
-	require.Zero(t, first.Duplicates)
-	require.Equal(t, int64(len(encoded)), first.CommittedBytes)
-	require.Equal(t, 1, first.BatchItemCount)
-	require.Positive(t, first.BatchListResidentBytes)
+	require.Equal(t, []int64{int64(len(encoded))}, recorder.committedBytes)
+
+	secondItem := BatchItem{
+		AccountID:  item.AccountID,
+		FunctionID: fnID,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event:      event.Event{ID: "two", Data: map[string]any{"value": "second"}},
+	}
+	secondEncoded, err := json.Marshal(secondItem)
+	require.NoError(t, err)
+	_, err = bm.Append(ctx, secondItem, fn)
+	require.NoError(t, err)
+	require.Equal(t, []int64{int64(len(encoded)), int64(len(secondEncoded))}, recorder.committedBytes)
 
 	duplicate, err := bm.Append(ctx, item, fn)
 	require.NoError(t, err)
-	require.Zero(t, duplicate.Committed)
-	require.Equal(t, 1, duplicate.Duplicates)
-	require.Zero(t, duplicate.CommittedBytes)
+	require.Equal(t, enums.BatchItemExists, duplicate.Status)
+	require.Equal(t, []int64{int64(len(encoded)), int64(len(secondEncoded))}, recorder.committedBytes)
 }
 
 func TestBatchScriptsAppendToExistingBatch(t *testing.T) {
@@ -120,8 +152,6 @@ func TestBatchScriptsAppendToExistingBatch(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, batchID.String(), appendResult.BatchID)
 	require.Equal(t, enums.BatchAppend, appendResult.Status)
-	require.Equal(t, 1, appendResult.Committed)
-	require.Equal(t, 2, appendResult.BatchItemCount)
 
 	bulkItem := BatchItem{
 		AccountID:  accountID,
@@ -134,8 +164,6 @@ func TestBatchScriptsAppendToExistingBatch(t *testing.T) {
 	require.Equal(t, batchID.String(), bulkResult.BatchID)
 	require.Equal(t, "append", bulkResult.Status)
 	require.Equal(t, 1, bulkResult.Committed)
-	require.Equal(t, 3, bulkResult.BatchItemCount)
-
 	items, err := bm.RetrieveItems(ctx, functionID, batchID)
 	require.NoError(t, err)
 	require.Len(t, items, 3)
@@ -714,8 +742,34 @@ func TestBulkAppendPayloadAccountingAcrossOverflow(t *testing.T) {
 	require.Equal(t, "overflow", result.Status)
 	require.Equal(t, 3, result.Committed)
 	require.Equal(t, int64(encodedBytes[0]+encodedBytes[1]+encodedBytes[2]), result.CommittedBytes)
-	require.Equal(t, 2, result.BatchItemCount)
-	require.Positive(t, result.BatchListResidentBytes)
+}
+
+func TestDeleteKeysRecordsResidency(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r.Addr()}, DisableCache: true})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	recorder := &recordingBatchMetricRecorder{}
+	bm := NewRedisBatchManager(bc, nil, WithoutBuffer(), WithBatchMetricRecorder(recorder))
+	functionID := uuid.New()
+	batchID := ulid.MustNew(ulid.Timestamp(time.Now().Add(-2*time.Minute)), rand.Reader)
+	batchKey := bc.KeyGenerator().Batch(ctx, functionID, batchID)
+	metadataKey := bc.KeyGenerator().BatchMetadata(ctx, functionID, batchID)
+
+	_, err = r.RPush(batchKey, "payload")
+	require.NoError(t, err)
+	r.HSet(metadataKey, "status", enums.BatchStatusPending.String())
+
+	require.NoError(t, bm.DeleteKeys(ctx, functionID, batchID))
+	require.Len(t, recorder.deletes, 1)
+	require.InDelta(t, (2 * time.Minute).Milliseconds(), recorder.deletes[0].residencyDuration.Milliseconds(), 2_000)
+
+	// Idempotent retries do not record removal or residency a second time.
+	require.NoError(t, bm.DeleteKeys(ctx, functionID, batchID))
+	require.Len(t, recorder.deletes, 1)
 }
 
 func TestBatchCleanupIdempotenceKeyExpires(t *testing.T) {

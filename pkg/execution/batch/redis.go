@@ -152,18 +152,6 @@ func (b *redisBatchManager) accountScopedMetricTags(ctx context.Context, account
 	return b.metricRecorder.AccountScopedTags(ctx, accountID, workspaceID)
 }
 
-func (b *redisBatchManager) recordRetrieveMetric(ctx context.Context, status string, itemCount int64, started time.Time) {
-	if b.metricRecorder != nil {
-		b.metricRecorder.RecordRetrieve(ctx, status, itemCount, time.Since(started))
-	}
-}
-
-func (b *redisBatchManager) recordDeleteMetric(ctx context.Context, status string, started time.Time) {
-	if b.metricRecorder != nil {
-		b.metricRecorder.RecordDelete(ctx, status, time.Since(started))
-	}
-}
-
 func (b *redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
 	if fn.EventBatch.Key == nil {
 		return "default", nil
@@ -257,6 +245,7 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 	if err != nil {
 		return nil, fmt.Errorf("error preparing batch: %w", err)
 	}
+
 	resp, err := retriableScripts["append"].Exec(
 		ctx,
 		b.b.Client(),
@@ -267,20 +256,23 @@ func (b *redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest
 		return nil, fmt.Errorf("failed to append event: '%s' to a batch: %v", bi.EventID, err)
 	}
 
-	result := &BatchAppendResult{}
-	if err := json.Unmarshal(resp, result); err != nil {
+	result := struct {
+		BatchAppendResult
+		Committed      int   `json:"committed"`
+		CommittedBytes int64 `json:"committedBytes"`
+	}{}
+	if err := json.Unmarshal(resp, &result); err != nil {
 		return nil, fmt.Errorf("failed to decode append result: %v", err)
 	}
 	if result.Committed > 0 && metricTags != nil {
-		b.metricRecorder.RecordCommit(ctx, metricTags, result.CommittedBytes, result.BatchListResidentBytes, result.BatchItemCount)
+		b.metricRecorder.RecordCommit(ctx, metricTags, result.CommittedBytes)
 	}
 
-	return result, nil
+	return &result.BatchAppendResult, nil
 }
 
 // RetrieveItems retrieve the data associated with the specified batch.
 func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) ([]BatchItem, error) {
-	started := time.Now()
 	itemStrList, err := retriableScripts["retrieve"].Exec(
 		ctx,
 		b.b.Client(),
@@ -288,9 +280,9 @@ func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.U
 		[]string{},
 	).AsStrSlice()
 	if err != nil {
-		b.recordRetrieveMetric(ctx, "error", 0, started)
 		return nil, fmt.Errorf("failed to retrieve list of events for batch '%s': %v", batchID, err)
 	}
+
 	items := make([]BatchItem, len(itemStrList))
 	var eg errgroup.Group
 	eg.SetLimit(20)
@@ -303,10 +295,8 @@ func (b *redisBatchManager) RetrieveItems(ctx context.Context, functionId uuid.U
 		})
 	}
 	if err := eg.Wait(); err != nil {
-		b.recordRetrieveMetric(ctx, "decode_error", 0, started)
 		return nil, err
 	}
-	b.recordRetrieveMetric(ctx, "success", int64(len(itemStrList)), started)
 
 	return items, nil
 }
@@ -355,6 +345,7 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 		// No queue producer configured, skip scheduling (useful for tests)
 		return nil
 	}
+
 	jobID := opts.JobID()
 	maxAttempts := consts.MaxRetries + 1
 
@@ -393,22 +384,28 @@ func (b *redisBatchManager) ScheduleExecution(ctx context.Context, opts Schedule
 
 // DeleteKeys drops keys related to the provided batchID.
 func (b *redisBatchManager) DeleteKeys(ctx context.Context, functionId uuid.UUID, batchID ulid.ULID) error {
-	started := time.Now()
 	keys := []string{
 		b.b.KeyGenerator().Batch(ctx, functionId, batchID),
 		b.b.KeyGenerator().BatchMetadata(ctx, functionId, batchID),
 	}
 
-	if _, err := retriableScripts["drop_keys"].Exec(
+	batchExisted, err := retriableScripts["drop_keys"].Exec(
 		ctx,
 		b.b.Client(),
 		keys,
 		[]string{},
-	).AsInt64(); err != nil {
-		b.recordDeleteMetric(ctx, "error", started)
+	).AsInt64()
+	if err != nil {
 		return fmt.Errorf("failed to delete batch '%s' related keys: %v", batchID, err)
 	}
-	b.recordDeleteMetric(ctx, "success", started)
+	if batchExisted > 0 && b.metricRecorder != nil {
+		createdAt := time.UnixMilli(int64(batchID.Time()))
+		residencyDuration := time.Since(createdAt)
+		if residencyDuration < 0 {
+			residencyDuration = 0
+		}
+		b.metricRecorder.RecordDelete(ctx, residencyDuration)
+	}
 
 	return nil
 }
@@ -526,16 +523,14 @@ func (b *redisBatchManager) RunBatch(ctx context.Context, opts RunBatchOpts) (*R
 
 // BulkAppendResult represents the result of a bulk append operation.
 type BulkAppendResult struct {
-	Status                 string `json:"status"`                  // "new", "append", "full", "overflow", "maxsize", "itemexists"
-	BatchID                string `json:"batchID"`                 // The batch ID that events were added to
-	BatchPointer           string `json:"batchPointerKey"`         // The batch pointer key
-	Committed              int    `json:"committed"`               // Number of events committed
-	Duplicates             int    `json:"duplicates"`              // Number of duplicate events skipped
-	NextBatchID            string `json:"nextBatchID,omitempty"`   // If overflow, the new batch ID
-	OverflowCount          int    `json:"overflowCount,omitempty"` // Number of events in overflow batch
-	CommittedBytes         int64  `json:"committedBytes"`          // Serialized bytes committed to batch lists
-	BatchItemCount         int    `json:"batchItemCount"`          // Number of items in the current Redis batch list
-	BatchListResidentBytes int64  `json:"batchListResidentBytes"`  // MEMORY USAGE of the current Redis batch list
+	Status         string `json:"status"`                  // "new", "append", "full", "overflow", "maxsize", "itemexists"
+	BatchID        string `json:"batchID"`                 // The batch ID that events were added to
+	BatchPointer   string `json:"batchPointerKey"`         // The batch pointer key
+	Committed      int    `json:"committed"`               // Number of events committed
+	Duplicates     int    `json:"duplicates"`              // Number of duplicate events skipped
+	NextBatchID    string `json:"nextBatchID,omitempty"`   // If overflow, the new batch ID
+	OverflowCount  int    `json:"overflowCount,omitempty"` // Number of events in overflow batch
+	CommittedBytes int64  `json:"committedBytes"`          // Serialized bytes committed to batch lists
 }
 
 // BulkAppend appends multiple items to a batch atomically. If the batch becomes full,
@@ -606,7 +601,7 @@ func (b *redisBatchManager) bulkAppend(ctx context.Context, items []BatchItem, f
 		return nil, fmt.Errorf("failed to decode bulk append result: %v", err)
 	}
 	if result.Committed > 0 && metricTags != nil {
-		b.metricRecorder.RecordCommit(ctx, metricTags, result.CommittedBytes, result.BatchListResidentBytes, result.BatchItemCount)
+		b.metricRecorder.RecordCommit(ctx, metricTags, result.CommittedBytes)
 	}
 
 	return result, nil
