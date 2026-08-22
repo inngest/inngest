@@ -24,18 +24,6 @@ var (
 	}
 )
 
-// IncrBatchMetricTierRefreshCounter records background batch metric tier
-// refreshes by whether the lookup resolved a tier. An unknown result is not
-// necessarily an error; it can also mean missing data or an unsupported plan.
-func IncrBatchMetricTierRefreshCounter(ctx context.Context, opts CounterOpt) {
-	RecordCounterMetric(ctx, 1, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "batch_metric_tier_refresh_total",
-		Description: "Total number of background batch metric tier refreshes",
-		Tags:        opts.Tags,
-	})
-}
-
 // IncrBatchCommittedBytesCounter records serialized bytes committed to batch
 // storage. The counter can be summed by account_tier and backend for throughput
 // and capacity planning.
