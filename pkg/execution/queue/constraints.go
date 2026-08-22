@@ -18,6 +18,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+const capacityLeaseRenewalGracePeriod = 2 * time.Second
+
 type PartitionConstraintConfig struct {
 	FunctionVersion int `json:"fv,omitempty,omitzero"`
 
@@ -403,7 +405,40 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		}
 	)
 
-	switch hasValidCapacityLease(item, now) {
+	// A refilled item can wait in the ready queue long enough that its capacity
+	// lease no longer covers the first renewal interval. Refresh a still-active
+	// lease before dispatch so it cannot expire while the step is running but
+	// before ProcessItem's first renewal tick.
+	if item.CapacityLease != nil &&
+		!q.hasReusableCapacityLease(item, now) &&
+		item.CapacityLease.LeaseID.Timestamp().After(now) {
+		currentLease := item.CapacityLease
+		res, err := q.CapacityManager.ExtendLease(ctx, &constraintapi.CapacityExtendLeaseRequest{
+			AccountID:      *shadowPart.AccountID,
+			IdempotencyKey: currentLease.LeaseID.String(),
+			LeaseID:        currentLease.LeaseID,
+			Duration:       QueueLeaseDuration,
+			Source: constraintapi.LeaseSource{
+				Location:          constraintapi.CallerLocationItemLease,
+				Service:           constraintapi.ServiceExecutor,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+			LeaseIssuedAt: time.UnixMilli(currentLease.IssuedAtMS),
+		})
+		if err != nil {
+			return ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not refresh capacity lease before processing: %w", err)
+		}
+		if res.LeaseID == nil {
+			return ItemLeaseConstraintCheckResult{}, fmt.Errorf("could not refresh capacity lease before processing: lease expired")
+		}
+
+		item.CapacityLease = &CapacityLease{
+			LeaseID:    *res.LeaseID,
+			IssuedAtMS: currentLease.IssuedAtMS,
+		}
+	}
+
+	switch q.hasReusableCapacityLease(item, now) {
 	case true:
 		// in this case, key queues claimed a bunch of constraints up front and we already have some
 		// capacity claimed.
@@ -554,8 +589,15 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 	}, nil
 }
 
-func hasValidCapacityLease(item *QueueItem, now time.Time) bool {
-	return item.CapacityLease != nil && item.CapacityLease.LeaseID.Timestamp().After(now.Add(2*time.Second))
+func (q *queueProcessor) hasReusableCapacityLease(item *QueueItem, now time.Time) bool {
+	if item.CapacityLease == nil {
+		return false
+	}
+
+	// Allow enough time for ProcessItem to reach its first renewal tick, plus
+	// the existing safety margin for scheduling and request latency.
+	minimumTTL := q.CapacityLeaseExtendInterval + capacityLeaseRenewalGracePeriod
+	return item.CapacityLease.LeaseID.Timestamp().After(now.Add(minimumTTL))
 }
 
 func (q *queueProcessor) semaphoreConstraintChecksDisabled(ctx context.Context, accountID uuid.UUID) bool {

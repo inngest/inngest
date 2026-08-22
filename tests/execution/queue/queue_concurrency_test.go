@@ -18,6 +18,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/service"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
@@ -185,6 +186,197 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	diff := time.Since(start).Seconds()
 	require.Greater(t, int(diff), 10, "10 jobs should have taken at least 10 seconds")
 	require.Less(t, int(diff), 40, "10 jobs should have taken fewer than 40 seconds") // an extra 2x latency due to race checker
+}
+
+func TestKeyQueueConcurrencyOneDoesNotOverlapSteps(t *testing.T) {
+	ctx := context.Background()
+
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+	r.SetTime(clock.Now())
+
+	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
+	constraints := osqueue.PartitionConstraintConfig{
+		FunctionVersion: 1,
+		Concurrency: osqueue.PartitionConcurrency{
+			AccountConcurrency:  osqueue.NoConcurrencyLimit,
+			FunctionConcurrency: 1,
+		},
+	}
+	options := []osqueue.QueueOpt{
+		osqueue.WithClock(clock),
+		osqueue.WithNumWorkers(2),
+		osqueue.WithAllowKeyQueues(func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) bool {
+			return true
+		}),
+		osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+		osqueue.WithCapacityLeaseExtendInterval(osqueue.QueueLeaseDuration / 2),
+		osqueue.WithPartitionConstraintConfigGetter(func(context.Context, osqueue.PartitionIdentifier) osqueue.PartitionConstraintConfig {
+			return constraints
+		}),
+	}
+
+	cm, err := constraintapi.NewRedisCapacityManager(
+		constraintapi.WithClient(rc),
+		constraintapi.WithShardName("test"),
+		constraintapi.WithClock(clock),
+	)
+	require.NoError(t, err)
+	options = append(options, osqueue.WithCapacityManager(cm))
+
+	shard := redis_state.NewQueueShard(
+		"test",
+		redis_state.NewQueueClient(rc, redis_state.QueueDefaultKey),
+		options...,
+	)
+	registry, err := osqueue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+	q, err := osqueue.New(ctx, "test", registry, options...)
+	require.NoError(t, err)
+
+	makeItem := func(jobID string) osqueue.QueueItem {
+		return osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				JobID:       &jobID,
+				WorkspaceID: envID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					WorkflowID:  fnID,
+					RunID:       ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader),
+				},
+			},
+		}
+	}
+
+	first, err := shard.EnqueueItem(ctx, makeItem("first"), clock.Now(), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+	_, err = shard.EnqueueItem(ctx, makeItem("second"), clock.Now(), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	backlog := osqueue.ItemBacklog(ctx, first)
+	shadowPartition := osqueue.ItemShadowPartition(ctx, first)
+	refillUntil := clock.Now().Add(time.Second)
+	refill, _, err := q.ProcessShadowPartitionBacklog(ctx, &shadowPartition, &backlog, refillUntil, constraints)
+	require.NoError(t, err)
+	require.Len(t, refill.RefilledItems, 1, "concurrency 1 should only refill one item")
+
+	// Leave the refilled capacity lease with less time remaining than one full
+	// renewal interval. Without a synchronous refresh before dispatch,
+	// ProcessItem would not attempt its first renewal until after expiry.
+	clock.Advance(osqueue.QueueLeaseDuration - 3*time.Second)
+	r.FastForward(osqueue.QueueLeaseDuration - 3*time.Second)
+	r.SetTime(clock.Now())
+	refilledItem, err := shard.LoadQueueItem(ctx, refill.RefilledItems[0])
+	require.NoError(t, err)
+	require.NotNil(t, refilledItem.CapacityLease)
+	require.Equal(t, 3*time.Second, refilledItem.CapacityLease.LeaseID.Timestamp().Sub(clock.Now()))
+
+	partition := osqueue.ItemPartition(ctx, first)
+	dispatchReady := func() *osqueue.ProcessItem {
+		items, err := shard.Peek(ctx, &partition, clock.Now().Add(time.Second), 10)
+		require.NoError(t, err)
+		if len(items) == 0 {
+			return nil
+		}
+
+		iterator := osqueue.ProcessorIterator{
+			Partition:  &partition,
+			Items:      items,
+			Queue:      q,
+			Dispatch:   dispatchToOSQueueWorkers(q.Workers()),
+			StaticTime: clock.Now(),
+		}
+		require.NoError(t, iterator.Iterate(ctx))
+
+		select {
+		case work := <-q.Workers():
+			return &work
+		default:
+			return nil
+		}
+	}
+
+	firstWork := dispatchReady()
+	require.NotNil(t, firstWork)
+
+	var active, maxActive atomic.Int32
+	started := make(chan struct{}, 2)
+	finish := make(chan struct{})
+	var finishOnce sync.Once
+	finishWork := func() {
+		finishOnce.Do(func() { close(finish) })
+	}
+	defer finishWork()
+	process := func(work osqueue.ProcessItem) <-chan error {
+		done := make(chan error, 1)
+		go func() {
+			_, err := q.ProcessItem(ctx, work, func(context.Context, osqueue.RunInfo, osqueue.Item) (osqueue.RunResult, error) {
+				running := active.Add(1)
+				for {
+					observed := maxActive.Load()
+					if running <= observed || maxActive.CompareAndSwap(observed, running) {
+						break
+					}
+				}
+				started <- struct{}{}
+				<-finish
+				active.Add(-1)
+				return osqueue.RunResult{}, nil
+			})
+			q.Semaphore().Release(1)
+			done <- err
+		}()
+		return done
+	}
+
+	firstDone := process(*firstWork)
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		require.FailNow(t, "first item did not start")
+	}
+
+	// Advance past the original lease's expiry and scavenge it. The refreshed
+	// lease must continue holding the concurrency slot while the first callback
+	// is running.
+	clock.Advance(4 * time.Second)
+	r.FastForward(4 * time.Second)
+	r.SetTime(clock.Now())
+	_, err = cm.Scavenge(ctx)
+	require.NoError(t, err)
+
+	_, _, err = q.ProcessShadowPartitionBacklog(ctx, &shadowPartition, &backlog, clock.Now().Add(time.Second), constraints)
+	require.NoError(t, err)
+	secondWork := dispatchReady()
+	var secondDone <-chan error
+	if secondWork != nil {
+		secondDone = process(*secondWork)
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			require.FailNow(t, "second item was dispatched but did not start")
+		}
+	}
+
+	finishWork()
+	require.NoError(t, <-firstDone)
+	if secondDone != nil {
+		require.NoError(t, <-secondDone)
+	}
+	service.Wait()
+
+	require.LessOrEqual(t, maxActive.Load(), int32(1), "steps sharing concurrency 1 must never overlap")
 }
 
 type testLifecycleListener struct {
