@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.43.1] - 2026-08-22
+
+### 🐛 Bug Fixes
+
+- *(queue)* Renew capacity leases before dispatch (#4766)
+
+### ⚡ Performance
+
+- *(expressions)* Avoid cloning event data per evaluation (#4762)
+
 ## [v1.43.0] - 2026-08-20
 
 ### 🚀 Features
@@ -12,6 +22,10 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - *(ci)* Add --force-with-lease to the Sync Staging workflow push (#4629)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.43.0 (#4756)
 
 ## [v1.42.0] - 2026-08-19
 
