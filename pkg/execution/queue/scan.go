@@ -47,11 +47,15 @@ func isTransientScanError(err error) bool {
 	if errors.As(err, &opErr) {
 		return true
 	}
-	// Transient resolver failures, e.g. "server misbehaving" from a DNS
-	// hiccup in the container network.
+	// Resolver failures, but only the ones that report themselves as transient
+	// -- e.g. SERVFAIL ("server misbehaving") from a DNS hiccup in the
+	// container network, which sets IsTemporary. A permanent NXDOMAIN from a
+	// misconfigured endpoint sets IsNotFound instead and must stay fatal:
+	// retrying it forever would leave the server up and healthy-looking while
+	// it can never reach its state store again.
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {
-		return true
+		return dnsErr.IsTimeout || dnsErr.IsTemporary
 	}
 	// Anything else that self-reports as a timeout.
 	var netErr net.Error

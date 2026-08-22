@@ -60,13 +60,43 @@ func TestIsTransientScanError(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "transient DNS failure",
+			// SERVFAIL from a resolver hiccup. This is the shape actually
+			// observed when a container network's DNS went bad for ~30 minutes.
+			name: "transient DNS failure (SERVFAIL sets IsTemporary)",
 			err: &net.DNSError{
 				Err:         "server misbehaving",
 				Name:        "example.redis.azure.net",
 				IsTemporary: true,
 			},
 			want: true,
+		},
+		{
+			name: "DNS timeout",
+			err: &net.DNSError{
+				Err:       "i/o timeout",
+				Name:      "example.redis.azure.net",
+				IsTimeout: true,
+			},
+			want: true,
+		},
+		// A permanent NXDOMAIN means the endpoint is misconfigured or gone.
+		// Retrying forever would keep the process up and passing health checks
+		// while it can never reach its state store, which hides the fault
+		// instead of surfacing it.
+		{
+			name: "permanent DNS not-found is NOT transient",
+			err: &net.DNSError{
+				Err:        "no such host",
+				Name:       "typo.redis.azure.net",
+				IsNotFound: true,
+			},
+			want: false,
+		},
+		{
+			name: "wrapped permanent DNS not-found is NOT transient",
+			err: fmt.Errorf("could not peek global partitions: %w",
+				&net.DNSError{Err: "no such host", Name: "typo.redis.azure.net", IsNotFound: true}),
+			want: false,
 		},
 		// Cancellation is a shutdown signal, not a transient fault: the loop
 		// must still exit so a real SIGTERM drains cleanly.
