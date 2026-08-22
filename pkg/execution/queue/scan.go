@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,6 +17,49 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"golang.org/x/sync/errgroup"
 )
+
+// isTransientScanError reports whether a queue scan failure is a transient I/O
+// condition that should be retried with backoff rather than treated as fatal.
+//
+// The scan loops already retry context.DeadlineExceeded, which covers a
+// deadline the server sets itself. A deadline hit at the socket layer while
+// talking to the backing store surfaces as os.ErrDeadlineExceeded instead --
+// a distinct sentinel that prints as "i/o timeout" -- so it fell through to
+// the fatal path and tore down every service on a single blip from Redis or
+// Postgres. Connection resets, refused connections and transient resolver
+// failures reach the same loop the same way.
+//
+// None of these justify exiting the process: if the condition is transient the
+// next tick recovers, and if it is not, backing off in place is still strictly
+// better than a crash loop that drops queue leases and restarts from scratch.
+func isTransientScanError(err error) bool {
+	// A deadline the server set itself.
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	// A deadline hit at the socket layer.
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return true
+	}
+	// Any network-layer failure talking to the backing store: timeouts,
+	// connection resets, refused connections, broken pipes.
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	// Transient resolver failures, e.g. "server misbehaving" from a DNS
+	// hiccup in the container network.
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	// Anything else that self-reports as a timeout.
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	return false
+}
 
 func (q *queueProcessor) executionScan(ctx context.Context, dispatch DispatchFunc) error {
 	l := logger.StdlibLogger(ctx).With(
@@ -53,8 +98,11 @@ LOOP:
 			}
 
 			if err = q.scan(ctx, dispatch); err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					l.Warn("deadline exceeded scanning partition pointers")
+				if isTransientScanError(err) {
+					l.Warn("transient error scanning partition pointers, retrying",
+						"error", err,
+						"backoff", backoff.String(),
+					)
 					<-time.After(backoff)
 
 					// Backoff doubles up to 3 seconds.
@@ -323,8 +371,11 @@ func (q *queueProcessor) shadowScan(ctx context.Context) error {
 			now := q.Clock().Now()
 			scanUntil := now.Truncate(time.Second).Add(ShadowPartitionLookahead)
 			if err := q.ScanShadowPartitions(ctx, scanUntil, q.qspc); err != nil {
-				if errors.Is(err, context.DeadlineExceeded) {
-					l.Warn("deadline exceeded scanning shadow partitions")
+				if isTransientScanError(err) {
+					l.Warn("transient error scanning shadow partitions, retrying",
+						"error", err,
+						"backoff", backoff.String(),
+					)
 					<-time.After(backoff)
 
 					// Backoff doubles up to 5 seconds
