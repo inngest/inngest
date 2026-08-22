@@ -215,6 +215,46 @@ func (q *queueProcessor) ProcessItem(
 		extendCapacityLeaseTick = q.Clock().NewTicker(q.CapacityLeaseExtendInterval)
 		defer extendCapacityLeaseTick.Stop()
 
+		// Cancel processing if the current capacity lease reaches its expiry
+		// before a renewal succeeds. The renewal request itself may be delayed or
+		// hang, so relying only on its eventual response can allow work to
+		// continue after the concurrency reservation has been scavenged.
+		go func() {
+			for {
+				currentCapacityLease := capacityLeaseID.get()
+				if currentCapacityLease == nil {
+					return
+				}
+
+				untilExpiry := currentCapacityLease.Timestamp().Sub(q.Clock().Now())
+				if untilExpiry > 0 {
+					expiryTimer := q.Clock().NewTimer(untilExpiry)
+					select {
+					case <-extendCapacityLeaseCtx.Done():
+						expiryTimer.Stop()
+						return
+					case <-expiryTimer.Chan():
+					}
+				}
+
+				if extendCapacityLeaseCtx.Err() != nil {
+					return
+				}
+
+				latestCapacityLease := capacityLeaseID.get()
+				if latestCapacityLease != nil && latestCapacityLease.Timestamp().After(q.Clock().Now()) {
+					// A renewal won the race with the previous lease's expiry.
+					continue
+				}
+
+				select {
+				case errCh <- AlwaysRetryError(fmt.Errorf("capacity lease expired while processing")):
+				case <-extendCapacityLeaseCtx.Done():
+				}
+				return
+			}
+		}()
+
 		go func() {
 			lastCapacityLeaseExtension := time.Now()
 			for {
