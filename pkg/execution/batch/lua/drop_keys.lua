@@ -2,7 +2,9 @@
 --- Deletes the provided keys
 ---
 
-local batchExists = redis.call("EXISTS", KEYS[1])
+-- DeleteKeys passes the batch list first and its metadata hash second.
+local batchKey = KEYS[1]
+local batchExists = redis.call("EXISTS", batchKey)
 
 for i, key in ipairs(KEYS) do
   if i > 0 then
