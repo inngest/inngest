@@ -417,8 +417,6 @@ function InfraPlanDropdown({
               <span className="bg-canvasMuted rounded px-1.5 py-0.5 font-medium">
                 {selectedPlan.displaySku ?? selectedPlan.sku}
               </span>
-              <span>{selectedPlan.eventStream}</span>
-              <span className="text-disabled">·</span>
               <span>{selectedPlan.queueDepth} depth</span>
               <span className="text-disabled">·</span>
               <span>{selectedPlan.execConcurrency} concurrency</span>
@@ -434,7 +432,7 @@ function InfraPlanDropdown({
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
-          className="w-[min(calc(100vw-2rem),640px)] overflow-hidden p-0"
+          className="w-[min(calc(100vw-2rem),420px)] overflow-hidden p-0"
         >
           <div className="border-subtle bg-canvasSubtle flex items-center gap-1 border-b p-2">
             <button
@@ -455,12 +453,11 @@ function InfraPlanDropdown({
           </div>
 
           <div className="overflow-x-auto">
-            <div className="min-w-[580px]">
-              <div className="bg-canvasSubtle text-muted grid grid-cols-[96px_140px_140px_160px_1fr] px-3 py-2 text-left text-[11px] font-medium uppercase">
+            <div className="min-w-[360px]">
+              <div className="bg-canvasSubtle text-muted grid grid-cols-[4.25rem_1fr_1fr_auto] gap-x-3 px-3 py-2 text-left text-[11px] font-medium uppercase">
                 <span>SKU</span>
-                <span>Events</span>
                 <span>Queue depth</span>
-                <span>Exec concurrency</span>
+                <span>Concurrency</span>
                 <span className="text-right">Price / mo</span>
               </div>
               {plans.map((plan) => {
@@ -487,7 +484,7 @@ function InfraPlanDropdown({
                 return (
                   <button
                     className={cn(
-                      'border-subtle text-basis grid w-full grid-cols-[96px_140px_140px_160px_1fr] items-center border-t px-3 py-2.5 text-left text-xs disabled:cursor-default disabled:opacity-100',
+                      'border-subtle text-basis grid w-full grid-cols-[4.25rem_1fr_1fr_auto] items-center gap-x-3 border-t px-3 py-2.5 text-left text-xs disabled:cursor-default disabled:opacity-100',
                       isCurrent && 'bg-canvasSubtle',
                       isActionable &&
                         'hover:bg-canvasSubtle focus:bg-canvasSubtle focus:outline-none',
@@ -509,7 +506,6 @@ function InfraPlanDropdown({
                         {plan.sku}
                       </span>
                     </span>
-                    <PlanMetric value={plan.eventStream} />
                     <PlanMetric value={plan.queueDepth} />
                     <PlanMetric value={plan.execConcurrency} />
                     <span className="flex min-w-0 items-center justify-end gap-2">
