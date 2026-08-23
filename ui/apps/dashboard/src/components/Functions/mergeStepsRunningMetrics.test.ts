@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { mergeStepsRunningMetrics } from './mergeStepsRunningMetrics';
 
 describe('mergeStepsRunningMetrics', () => {
-  test('joins sparse series by timestamp without inventing zeroes', () => {
+  test('shows running gaps lasting at least three minutes as inferred zeroes', () => {
     expect(
       mergeStepsRunningMetrics(
         [
@@ -12,6 +12,8 @@ describe('mergeStepsRunningMetrics', () => {
         ],
         [{ bucket: '2026-08-23T03:18:00Z', value: 1 }],
         '1m',
+        '2026-08-23T03:16:00Z',
+        '2026-08-23T03:21:00Z',
       ),
     ).toEqual([
       {
@@ -20,15 +22,18 @@ describe('mergeStepsRunningMetrics', () => {
       },
       {
         name: '2026-08-23T03:17:00.000Z',
-        values: {},
+        values: { running: 0 },
+        inferred: ['running'],
       },
       {
         name: '2026-08-23T03:18:00Z',
-        values: { concurrencyLimit: true },
+        values: { concurrencyLimit: true, running: 0 },
+        inferred: ['running'],
       },
       {
         name: '2026-08-23T03:19:00.000Z',
-        values: {},
+        values: { running: 0 },
+        inferred: ['running'],
       },
       {
         name: '2026-08-23T03:20:00Z',

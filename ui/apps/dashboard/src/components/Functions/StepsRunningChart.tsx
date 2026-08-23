@@ -73,10 +73,15 @@ export default function StepsRunningChart({
     data?.environment.function?.running.granularity ??
     data?.environment.function?.concurrencyLimit.granularity ??
     '1m';
+  // Both responses cover the same requested range, so use either one for the bounds.
+  const rangeStart = data?.environment.function?.running.from ?? startTime;
+  const rangeEnd = data?.environment.function?.running.to ?? endTime;
   const metrics = mergeStepsRunningMetrics(
     running,
     concurrencyLimit,
     granularity,
+    rangeStart,
+    rangeEnd,
   );
 
   return (

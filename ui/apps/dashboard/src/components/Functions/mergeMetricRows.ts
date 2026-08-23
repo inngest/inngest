@@ -1,3 +1,5 @@
+import { findSustainedMissingBuckets } from './findSustainedMissingBuckets';
+
 export type Metric = {
   bucket: string;
   value: number;
@@ -7,17 +9,21 @@ export type MetricSeries = {
   key: string;
   data: Metric[];
   mapValue?: (value: number) => number | boolean;
+  inferMissingAsZero?: boolean;
 };
 
 type MetricRow = {
   name: string;
   values: Record<string, number | boolean | undefined>;
+  inferred?: string[];
 };
 
 /** Builds one chart row per timestamp from independently reported series. */
 export function mergeMetricRows(
   series: MetricSeries[],
   granularity: string,
+  rangeStart: string,
+  rangeEnd: string,
 ) {
   const byBucket = new Map<number, MetricRow>();
 
@@ -30,6 +36,28 @@ export function mergeMetricRows(
     }
   }
 
+  const amount = Number.parseInt(granularity, 10);
+  const bucketWidth = amount * (granularity.endsWith('h') ? 60 : 1) * 60_000;
+
+  for (const { key, data, inferMissingAsZero } of series) {
+    if (!inferMissingAsZero) continue;
+
+    for (const timestamp of findSustainedMissingBuckets(
+      data,
+      bucketWidth,
+      rangeStart,
+      rangeEnd,
+    )) {
+      const metric = byBucket.get(timestamp) ?? {
+        name: new Date(timestamp).toISOString(),
+        values: {},
+      };
+      metric.values[key] = 0;
+      metric.inferred = [...(metric.inferred ?? []), key];
+      byBucket.set(timestamp, metric);
+    }
+  }
+
   const observed = Array.from(byBucket.values()).sort((a, b) =>
     a.name.localeCompare(b.name),
   );
@@ -37,8 +65,6 @@ export function mergeMetricRows(
     return observed;
   }
 
-  const amount = Number.parseInt(granularity, 10);
-  const bucketWidth = amount * (granularity.endsWith('h') ? 60 : 1) * 60_000;
   const firstBucket = new Date(observed[0].name).getTime();
   const lastBucket = new Date(observed.at(-1)!.name).getTime();
   const metrics: MetricRow[] = [];

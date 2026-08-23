@@ -69,7 +69,18 @@ export default function StepBacklogChart({
     data?.environment.function?.scheduled.granularity ??
     data?.environment.function?.sleeping.granularity ??
     '1m';
-  const metrics = mergeBacklogMetrics(scheduled, sleeping, granularity);
+  // Both responses cover the same requested range, so use either one for the bounds.
+  const rangeStart =
+    data?.environment.function?.scheduled.from ?? startTime;
+  const rangeEnd =
+    data?.environment.function?.scheduled.to ?? endTime;
+  const metrics = mergeBacklogMetrics(
+    scheduled,
+    sleeping,
+    granularity,
+    rangeStart,
+    rangeEnd,
+  );
 
   return (
     <SimpleLineChart
