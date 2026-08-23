@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { isValidDate } from '@inngest/components/utils/date';
 
 import type { InsightsFetchResult } from '../../InsightsStateMachineContext/types';
 
@@ -65,7 +66,7 @@ function escapeCSVValue(value: string): string {
  * @param data - The Insights query results containing columns and rows
  * @returns A CSV-formatted string with headers and data rows
  */
-function convertToCSV(data: InsightsFetchResult): string {
+export function convertToCSV(data: InsightsFetchResult): string {
   const { columns, rows } = data;
 
   // Create header row
@@ -84,7 +85,7 @@ function convertToCSV(data: InsightsFetchResult): string {
 
       // Handle dates
       if (value instanceof Date) {
-        return value.toISOString();
+        return isValidDate(value) ? value.toISOString() : '';
       }
 
       // Handle strings that need quoting per RFC 4180
