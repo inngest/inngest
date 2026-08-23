@@ -3,7 +3,7 @@ import { RiFileCopyLine, RiTimeLine, RiUserSmileLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { cn } from './utils/classNames';
-import { format, formatInTimeZone, relativeTime, toMaybeDate } from './utils/date';
+import { format, formatInTimeZone, isValidDate, relativeTime, toMaybeDate } from './utils/date';
 
 /**
  * Use this component instead of the builtin <time> element. Since server-side
@@ -34,7 +34,7 @@ export function Time({ className, format, value, copyable = true }: Props) {
 
   const date = value instanceof Date ? value : toMaybeDate(value);
 
-  if (!(date instanceof Date) || isNaN(date.getTime())) {
+  if (!isValidDate(date)) {
     return <span>Invalid date</span>;
   }
 

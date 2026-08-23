@@ -172,6 +172,10 @@ export function toMaybeDate<T extends string | null | undefined>(value: T): Date
   return new Date(value);
 }
 
+export function isValidDate(value: unknown): value is Date {
+  return value instanceof Date && isValid(value);
+}
+
 export function maxDateString<T extends string | null | undefined>(
   date1: T,
   date2: T | null | undefined

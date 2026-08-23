@@ -5,7 +5,11 @@ import {
   RiFileCopyLine,
 } from '@remixicon/react';
 import { toast } from 'sonner';
-import { format, formatInTimeZone } from '@inngest/components/utils/date';
+import {
+  format,
+  formatInTimeZone,
+  isValidDate,
+} from '@inngest/components/utils/date';
 import { NewCodeBlock } from '@inngest/components/NewCodeBlock/NewCodeBlock';
 
 import { useCellDetailContext } from '@/components/Insights/CellDetailContext';
@@ -96,7 +100,7 @@ function CellValueDisplay({
 function DateDisplay({ value }: { value: string | number | Date }) {
   const date = value instanceof Date ? value : new Date(value);
 
-  if (!(date instanceof Date) || isNaN(date.getTime())) {
+  if (!isValidDate(date)) {
     return <span className="text-muted text-sm">Invalid date</span>;
   }
 
