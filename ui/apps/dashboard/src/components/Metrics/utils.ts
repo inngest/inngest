@@ -11,7 +11,7 @@ import {
 } from '@inngest/components/utils/date';
 import { isDark } from '@inngest/components/utils/theme';
 
-import type { MetricsData, MetricsResponse, ScopedMetric } from '@/gql/graphql';
+import type { MetricsData, ScopedMetric } from '@/gql/graphql';
 import {
   backgroundColor,
   colors,
@@ -34,7 +34,7 @@ export type LineChartData = {
     data?: string[];
   };
   series: Array<{
-    data: number[];
+    data: Array<number | null>;
     name?: string;
     itemStyle: { color: string };
   }>;
@@ -67,8 +67,8 @@ export const dateFormat = (dateString: string, diff: number) => {
   return d < 6000 // a minute
     ? lightFormat(date, 'HH:mm:ss:SSS')
     : d <= 8.64e7 // a day
-    ? lightFormat(date, 'HH:mm')
-    : lightFormat(date, 'MM/dd:HH');
+      ? lightFormat(date, 'HH:mm')
+      : lightFormat(date, 'MM/dd:HH');
 };
 
 export const timeDiff = (start?: string, end?: string) =>
@@ -124,10 +124,14 @@ export const formatDimension = (param: any) => {
 };
 
 const tooltipFormatter = (params: any) => {
-  return Array.isArray(params) && params[0]
+  const observed = Array.isArray(params)
+    ? params.filter((param: any) => typeof param.value === 'number')
+    : [];
+
+  return observed[0]
     ? `<div class="my-1"><div class="mb-1 mx-2 text-sm">${
-        params[0].axisValue
-      }</div>${params
+        observed[0].axisValue
+      }</div>${observed
         .sort((a: any, b: any) => b.value - a.value)
         .map((p: any) => formatDimension(p))
         .join('')}</div>`
@@ -194,23 +198,10 @@ export const getLineChartOptions = (
   };
 };
 
-type MetricWithBuckets = {
-  data: Array<Pick<MetricsData, 'bucket'>>;
-};
-
 export const getXAxis = (
-  metrics: MetricWithBuckets[] | Pick<MetricsResponse, 'data'> | undefined,
+  series: Array<Pick<MetricsData, 'bucket'>> | undefined,
 ) => {
   const dark = isDark();
-
-  let series: Array<Pick<MetricsData, 'bucket'>> | undefined;
-  if (Array.isArray(metrics)) {
-    if (metrics[0]?.data) {
-      series = metrics[0].data;
-    }
-  } else if (metrics) {
-    series = metrics.data;
-  }
 
   const diff = timeDiff(series?.[0]?.bucket, series?.at(-1)?.bucket);
   const dataLength = series?.length || 30;
@@ -249,9 +240,20 @@ export const getXAxis = (
 export const mapEntityLines = (
   metrics: ScopedMetric[],
   entities: EntityLookup,
-  areaStyle?: { opacity: number },
+  {
+    areaStyle,
+    connectNulls = false,
+  }: {
+    areaStyle?: { opacity: number };
+    connectNulls?: boolean;
+  } = {},
 ) => {
   const dark = isDark();
+  const buckets = Array.from(
+    new Set(
+      metrics.flatMap((metric) => metric.data.map(({ bucket }) => bucket)),
+    ),
+  ).sort();
 
   // Create series with names first
   const seriesWithNames = metrics.map((f, index) => {
@@ -270,10 +272,15 @@ export const mapEntityLines = (
 
   // Create series with sorted color assignment
   const series = seriesWithNames.map((item, i) => {
+    const valuesByBucket = new Map(
+      item.metric.data.map(({ bucket, value }) => [bucket, value]),
+    );
+
     return {
       ...seriesOptions,
       name: item.name,
-      data: item.metric.data.map(({ value }) => value),
+      data: buckets.map((bucket) => valuesByBucket.get(bucket) ?? null),
+      connectNulls,
       itemStyle: {
         color: resolveColor(
           lineColors[i % lineColors.length][0],
@@ -289,7 +296,9 @@ export const mapEntityLines = (
   const legendData = series.map((s) => s.name);
 
   return {
-    xAxis: getXAxis(metrics),
+    xAxis: getXAxis(
+      buckets.length > 0 ? buckets.map((bucket) => ({ bucket })) : undefined,
+    ),
     series,
     legendData,
   };

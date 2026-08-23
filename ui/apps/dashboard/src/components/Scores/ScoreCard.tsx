@@ -13,7 +13,7 @@ import {
   seriesOptions,
 } from '@/components/Metrics/utils';
 import { borderColor } from '@/utils/tailwind';
-import { ScoreKind, type MetricsResponse } from '@/gql/graphql';
+import { ScoreKind } from '@/gql/graphql';
 import type { ScoreSeries } from './types';
 
 const AGGREGATIONS = [
@@ -53,11 +53,9 @@ export const ScoreCard = ({ name, series, isLoading, color, error }: Props) => {
         lineColors[0]?.[1],
       );
 
-    // getXAxis only reads bucket timestamps, so the score buckets can stand
-    // in for a metrics response.
-    const xAxis = getXAxis({
-      data: buckets.map((b) => ({ bucket: b.bucketStart, value: 0 })),
-    } as MetricsResponse);
+    const xAxis = getXAxis(
+      buckets.map(({ bucketStart }) => ({ bucket: bucketStart })),
+    );
 
     const numericData = buckets.map((b) => b[aggregation]);
     const nonNullCount = numericData.filter((v) => v != null).length;
