@@ -15,6 +15,7 @@ import {
 import { useEnvironments } from '@/queries/environments';
 import { EnvironmentType } from '@/utils/environments';
 import { apiKeyErrorMessage } from './errorMessage';
+import { permissionResourceCopy } from './permissionResourceCopy';
 import { RevealKeyCard } from './RevealKeyCard';
 import { validateAPIKeyName } from './validation';
 
@@ -38,8 +39,6 @@ const Mutation = graphql(`
 
 type PermissionGroup = {
   resource: string;
-  label: string;
-  description: string | null;
   read: string[];
   write: string[];
 };
@@ -110,8 +109,6 @@ const PermissionCatalogQuery: TypedDocumentNode<
   query APIKeyPermissionCatalog {
     apiKeyPermissionCatalog {
       resource
-      label
-      description
       read
       write
     }
@@ -579,6 +576,7 @@ export function CreateAPIKeyForm({
         const level = permissionLevels[group.resource] ?? 'none';
         const readDisabled = group.read.length === 0;
         const writeDisabled = group.write.length === 0;
+        const copy = permissionResourceCopy(group.resource);
 
         return (
           <div
@@ -587,11 +585,11 @@ export function CreateAPIKeyForm({
           >
             <div className="flex min-w-0 flex-col">
               <span className="text-basis truncate text-sm font-medium">
-                {group.label}
+                {copy.label}
               </span>
-              {group.description && (
+              {copy.description && (
                 <span className="text-subtle truncate text-xs">
-                  {group.description}
+                  {copy.description}
                 </span>
               )}
             </div>

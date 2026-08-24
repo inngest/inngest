@@ -6,6 +6,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { gql, useQuery, type TypedDocumentNode } from 'urql';
 
 import LoadingIcon from '@/components/Icons/LoadingIcon';
+import { permissionResourceCopy } from '@/components/APIKeys/permissionResourceCopy';
 import {
   ApiKeyCredentialSource,
   ApiKeyResourceBoundaryMode,
@@ -24,8 +25,6 @@ type APIKeyScope = {
 
 type APIKeyPermissionGroup = {
   resource: string;
-  label: string;
-  description: string | null;
   read: string[];
   write: string[];
 };
@@ -82,8 +81,6 @@ const Query: TypedDocumentNode<APIKeyDetailResult, APIKeyDetailVariables> = gql`
     }
     apiKeyPermissionCatalog {
       resource
-      label
-      description
       read
       write
     }
@@ -296,6 +293,7 @@ function APIKeyPage() {
     permissionsTable = (
       <div className="border-subtle rounded border">
         {grantedPermissionGroups.map(({ group, level }) => {
+          const copy = permissionResourceCopy(group.resource);
           return (
             <div
               key={group.resource}
@@ -303,11 +301,11 @@ function APIKeyPage() {
             >
               <div className="flex min-w-0 flex-col">
                 <span className="text-basis truncate text-sm font-medium">
-                  {group.label}
+                  {copy.label}
                 </span>
-                {group.description && (
+                {copy.description && (
                   <span className="text-subtle truncate text-xs">
-                    {group.description}
+                    {copy.description}
                   </span>
                 )}
               </div>
