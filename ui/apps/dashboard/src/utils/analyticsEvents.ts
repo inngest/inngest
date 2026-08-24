@@ -55,6 +55,7 @@ import type { ScoreKind } from '@inngest/components/Experiments';
 
 // Alphabetical — this list is the only place a valid feature name is defined.
 export type AnalyticsFeature =
+  | 'account-concurrency'
   | 'ai-overview'
   | 'experiments'
   | 'sandboxes'
@@ -64,6 +65,9 @@ export type AnalyticsFeature =
 // Alphabetical — this list is the only place a valid event name is defined.
 // Feature names never appear here; `feature` carries that instead.
 type AnalyticsEventName =
+  | 'Banner CTA Clicked'
+  | 'Banner Dismissed'
+  | 'Banner Viewed'
   | 'Detail Viewed'
   | 'Docs Link Opened'
   | 'Empty State Docs Link Opened'
@@ -92,6 +96,67 @@ function track(
     ),
   );
   analytics.track(event, compactProperties);
+}
+
+// Banner events are intentionally generic so any warning/info banner can reuse
+// them; `feature` and `bannerId` say which one fired. `Banner Viewed` is the
+// denominator — without it the click and dismiss counts have no rate to sit on,
+// so callers should emit it whenever a banner actually renders.
+type BannerViewedArgs = {
+  feature: AnalyticsFeature;
+  bannerId: string;
+  scope?: string;
+  minutesWithHits?: number;
+  windowMinutes?: number;
+};
+
+export function trackBannerViewed({
+  feature,
+  bannerId,
+  scope,
+  minutesWithHits,
+  windowMinutes,
+}: BannerViewedArgs) {
+  track('Banner Viewed', feature, {
+    banner_id: bannerId,
+    scope,
+    minutes_with_hits: minutesWithHits,
+    window_minutes: windowMinutes,
+  });
+}
+
+type BannerDismissedArgs = {
+  feature: AnalyticsFeature;
+  bannerId: string;
+  scope?: string;
+};
+
+export function trackBannerDismissed({
+  feature,
+  bannerId,
+  scope,
+}: BannerDismissedArgs) {
+  track('Banner Dismissed', feature, {
+    banner_id: bannerId,
+    scope,
+  });
+}
+
+type BannerCTAClickedArgs = {
+  feature: AnalyticsFeature;
+  bannerId: string;
+  scope?: string;
+};
+
+export function trackBannerCTAClicked({
+  feature,
+  bannerId,
+  scope,
+}: BannerCTAClickedArgs) {
+  track('Banner CTA Clicked', feature, {
+    banner_id: bannerId,
+    scope,
+  });
 }
 
 type EmptyStateViewedArgs = { feature: AnalyticsFeature };
