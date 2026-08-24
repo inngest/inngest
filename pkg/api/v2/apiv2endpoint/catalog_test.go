@@ -42,5 +42,5 @@ func TestDiscover(t *testing.T) {
 	require.Equal(t, "send_event", byMethod["SendEvent"].ToolName)
 	require.Equal(t, http.MethodPost, byMethod["SendEvent"].HTTPMethod)
 	require.Equal(t, "/events", byMethod["SendEvent"].Path)
-	require.Empty(t, byMethod["SendEvent"].AuthzPermission)
+	require.Equal(t, "events:write:send", byMethod["SendEvent"].AuthzPermission)
 }

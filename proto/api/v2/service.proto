@@ -1653,6 +1653,10 @@ service V2 {
       post: "/events",
       body: "*"
     };
+    option (authz) = {
+      require_authz: true
+      permission: "events:write:send"
+    };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Send event"
       description: "Sends one event for testing and debugging. The request accepts the name, data, user, id, and ts fields; send batches and other Event API fields through an Inngest SDK or the Event API. This endpoint uses REST API rate limits and is not intended for high-volume ingestion. Use the returned event ID with the event runs endpoint to inspect any function runs triggered by the event."

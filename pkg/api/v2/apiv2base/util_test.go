@@ -317,7 +317,7 @@ func TestBuildAuthzPermissionPathMap(t *testing.T) {
 	assert.Equal(t, "experiments:read:list", pathMap["/experiments"])
 	assert.Equal(t, "experiments:read:list", pathMap["/apps/{app_id}/functions/{function_id}/experiments"])
 	assert.Equal(t, "sandboxes:write:exec", pathMap["/sandboxes/{sandbox_id}/exec"])
-	assert.NotContains(t, pathMap, "/events")
+	assert.Equal(t, "events:write:send", pathMap["/events"])
 }
 
 // Base instance tests - testing utils through the base instance
