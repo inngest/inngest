@@ -112,6 +112,12 @@ func Command() *cli.Command {
 				Usage:    "Directory for where to write SQLite database.",
 				Hidden:   true,
 			},
+			&cli.BoolFlag{
+				Category: "Advanced",
+				Name:     "duckdb",
+				Usage:    "Enable the experimental DuckDB dual-write POC (docs/plans/006-duckdb-poc-subprocess-dual-write.md)",
+				Value:    false,
+			},
 			&cli.StringFlag{
 				Category: "Persistence",
 				Name:     "postgres-uri",

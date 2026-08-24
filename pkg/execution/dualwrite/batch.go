@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"sync"
@@ -92,6 +93,7 @@ func (b *batcher) run(ctx context.Context) {
 			buf = buf[:0]
 			return
 		}
+		log.Println("dualwrite: flushing batch", "table", b.table, "rows", len(buf))
 		if err := b.insert(ctx, buf); err != nil {
 			// duckdb.ErrDisabled is terminal: the subprocess is gone for
 			// good, so every future flush would fail identically. Record it

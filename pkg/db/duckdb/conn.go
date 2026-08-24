@@ -3,7 +3,11 @@ package duckdb
 import (
 	"context"
 	"database/sql/driver"
+	"encoding/json"
 	"errors"
+
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
 )
 
 // sqlExecer abstracts over what runs a SQL statement and collects its JSON
@@ -56,4 +60,23 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		return nil, err
 	}
 	return newMapRows(rows), nil
+}
+
+func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
+	switch v := nv.Value.(type) {
+	case []json.RawMessage:
+		data, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		nv.Value = string(data)
+		return nil
+	case enums.RunStatus:
+		nv.Value = v.String()
+		return nil
+	case ulid.ULID:
+		nv.Value = v.String()
+	}
+
+	return driver.ErrSkip
 }

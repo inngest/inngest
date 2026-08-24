@@ -13,11 +13,14 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -85,99 +88,86 @@ func (l *listener) sendEvent(row map[string]any) {
 	}
 }
 
-// runPartitionFields returns the account_id/workspace_id/year/month columns
-// shared by every runs_staging and run_spans_staging row. year/month are
-// derived from the run's own ID ULID timestamp (matching the existing
-// RunStartedAt derivation convention in pkg/devserver/lifecycle.go), computed
-// here in Go rather than by DuckDB: plain DuckDB's `COPY ... PARTITION_BY`
-// clause (used by the compactor) partitions by columns present in the query
-// result, not by expressions computed inline from a timestamp.
-func runPartitionFields(md sv2.Metadata) map[string]any {
+// TODO: use this instead of the map[string]anys in the listener hooks, and have the batcher
+type Run struct {
+	AccountID  uuid.UUID         `json:"account_id"`
+	EnvID      uuid.UUID         `json:"env_id"`
+	AppID      uuid.UUID         `json:"app_id"`
+	FunctionID uuid.UUID         `json:"function_id"`
+	RunID      ulid.ULID         `json:"run_id"`
+	QueuedAt   time.Time         `json:"queued_at"`
+	StartedAt  time.Time         `json:"started_at"`
+	EndedAt    time.Time         `json:"ended_at"`
+	Status     enums.RunStatus   `json:"status"`
+	Inputs     []json.RawMessage `json:"inputs"`
+	Output     json.RawMessage   `json:"output"`
+}
+
+func runCommonFields(md sv2.Metadata, evts []json.RawMessage) map[string]any {
 	ts := ulid.Time(md.ID.RunID.Time())
 	return map[string]any{
-		"account_id":   md.ID.Tenant.AccountID.String(),
-		"workspace_id": md.ID.Tenant.EnvID.String(),
-		"year":         ts.Year(),
-		"month":        int(ts.Month()),
+		"account_id":  md.ID.Tenant.AccountID,
+		"env_id":      md.ID.Tenant.EnvID,
+		"run_id":      md.ID.RunID,
+		"queued_at":   ts,
+		"function_id": md.ID.FunctionID,
+		"app_id":      md.ID.Tenant.AppID,
+		"inputs":      evts,
 	}
 }
 
-// eventPartitionFields is the events_staging equivalent of
-// runPartitionFields, deriving year/month from the event's own internal ID
-// ULID timestamp instead of a run ID.
-func eventPartitionFields(evt event.TrackedEvent) map[string]any {
-	ts := ulid.Time(evt.GetInternalID().Time())
+func runTraceSpanCommonFields(md sv2.Metadata) map[string]any {
+	ts := ulid.Time(md.ID.RunID.Time())
 	return map[string]any{
-		"account_id":   evt.GetAccountID().String(),
-		"workspace_id": evt.GetWorkspaceID().String(),
-		"year":         ts.Year(),
-		"month":        int(ts.Month()),
+		"account_id":    md.ID.Tenant.AccountID,
+		"env_id":        md.ID.Tenant.EnvID,
+		"run_id":        md.ID.RunID,
+		"run_queued_at": ts,
+		"function_id":   md.ID.FunctionID,
+		"app_id":        md.ID.Tenant.AppID,
 	}
 }
 
-func (l *listener) OnFunctionScheduled(_ context.Context, md sv2.Metadata, _ queue.Item, _ []event.TrackedEvent) {
-	row := map[string]any{
-		"run_id":      md.ID.RunID.String(),
-		"function_id": md.ID.FunctionID.String(),
-		"event_type":  "function_scheduled",
-		"created_at":  time.Now().UTC(),
-	}
-	for k, v := range runPartitionFields(md) {
-		row[k] = v
-	}
+func (l *listener) OnFunctionScheduled(_ context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage) {
+	run := runCommonFields(md, evts)
+	run["status"] = enums.RunStatusScheduled // TODO: queued here maybe?
+
+	l.sendRun(run)
+
+	span := spanRow(md, "function_scheduled")
+	l.sendSpan(span)
+
+	// TODO: span here too maybe?
+}
+
+func (l *listener) OnFunctionStarted(_ context.Context, md sv2.Metadata, _ queue.Item, evts []json.RawMessage) {
+	row := runCommonFields(md, evts)
+	row["status"] = enums.RunStatusRunning
+	row["started_at"] = md.Config.StartedAt
 	l.sendRun(row)
 }
 
-func (l *listener) OnFunctionStarted(_ context.Context, md sv2.Metadata, _ queue.Item, _ []json.RawMessage) {
-	row := map[string]any{
-		"run_id":      md.ID.RunID.String(),
-		"function_id": md.ID.FunctionID.String(),
-		"event_type":  "function_started",
-		"created_at":  time.Now().UTC(),
-	}
-	for k, v := range runPartitionFields(md) {
-		row[k] = v
-	}
+func (l *listener) OnFunctionFinished(_ context.Context, md sv2.Metadata, _ queue.Item, evts []json.RawMessage, resp statev1.DriverResponse) {
+	row := runCommonFields(md, evts)
+	row["status"] = enums.RunStatusCompleted // TODO: error handling
+	row["output"] = resp.Output
+	row["started_at"] = md.Config.StartedAt
+	row["ended_at"] = time.Now()
+	// TODO: real started_at/ended_at
 	l.sendRun(row)
+
+	log.Println("dualwrite: OnFunctionFinished resp:", resp)
+
+	// TODO: span here too
 }
 
-func (l *listener) OnFunctionFinished(_ context.Context, md sv2.Metadata, _ queue.Item, _ []json.RawMessage, resp statev1.DriverResponse) {
-	status := "completed"
-	if resp.Err != nil {
-		status = "failed"
-	}
-	row := map[string]any{
-		"run_id":      md.ID.RunID.String(),
-		"function_id": md.ID.FunctionID.String(),
-		"event_type":  "function_finished",
-		"status":      status,
-		"created_at":  time.Now().UTC(),
-	}
-	for k, v := range runPartitionFields(md) {
-		row[k] = v
-	}
+func (l *listener) OnFunctionCancelled(_ context.Context, md sv2.Metadata, _ execution.CancelRequest, evts []json.RawMessage) {
+	row := runCommonFields(md, evts)
+	row["status"] = enums.RunStatusCancelled
+	// TODO: started_at/ended_at
 	l.sendRun(row)
-}
 
-func (l *listener) OnFunctionCancelled(_ context.Context, md sv2.Metadata, _ execution.CancelRequest, _ []json.RawMessage) {
-	row := map[string]any{
-		"run_id":      md.ID.RunID.String(),
-		"function_id": md.ID.FunctionID.String(),
-		"event_type":  "function_cancelled",
-		"created_at":  time.Now().UTC(),
-	}
-	for k, v := range runPartitionFields(md) {
-		row[k] = v
-	}
-	l.sendRun(row)
-}
-
-func (l *listener) OnStepScheduled(_ context.Context, md sv2.Metadata, _ queue.Item, stepName *string) {
-	row := spanRow(md, "step_scheduled")
-	if stepName != nil {
-		row["step_name"] = *stepName
-	}
-	l.sendSpan(row)
+	// TODO: span here too
 }
 
 func (l *listener) OnStepStarted(_ context.Context, md sv2.Metadata, _ queue.Item, _ inngest.Edge, _ string) {
@@ -199,14 +189,7 @@ func (l *listener) OnStepFinished(_ context.Context, md sv2.Metadata, _ queue.It
 // unions the keys across a batch, so a row omitting one still writes NULL for
 // it (see batch.go).
 func spanRow(md sv2.Metadata, eventType string) map[string]any {
-	row := map[string]any{
-		"run_id":     md.ID.RunID.String(),
-		"event_type": eventType,
-		"created_at": time.Now().UTC(),
-	}
-	for k, v := range runPartitionFields(md) {
-		row[k] = v
-	}
+	row := runTraceSpanCommonFields(md)
 	return row
 }
 
@@ -291,14 +274,40 @@ func (l *listener) OnStepGatewayRequestFinished(_ context.Context, md sv2.Metada
 }
 
 func (l *listener) OnEventReceived(_ context.Context, evt event.TrackedEvent) {
+	event := evt.GetEvent()
+	eventDataBytes, err := json.Marshal(event.Data)
+	if err != nil {
+		log.Printf("dualwrite: failed to marshal event data for event %s: %v", event.Name, err)
+		return
+	}
+
+	eventMetaBytes, err := json.Marshal(event.Meta)
+	if err != nil {
+		log.Printf("dualwrite: failed to marshal event meta for event %s: %v", event.Name, err)
+		return
+	}
+
+	internalID := evt.GetInternalID()
+	// TODO: verify that a minor semantics change like this is safe.
+	// Afaict the internal id & received_at timestamp are created at the same time but not using the same
+	// literal timestamp value.
+	receivedAt := internalID.Timestamp()
+
 	row := map[string]any{
-		"event_id":    evt.GetInternalID().String(),
-		"event_name":  evt.GetEvent().Name,
-		"occurred_at": time.Now().UTC(),
+		"account_id":  evt.GetAccountID(),
+		"env_id":      evt.GetWorkspaceID(),
+		"internal_id": internalID,
+		"received_at": receivedAt,
+		// TODO: source/source_id?
+		"source":     "",
+		"event_id":   event.ID,
+		"event_name": event.Name,
+		"event_ts":   time.UnixMilli(event.Timestamp),
+		"event_data": string(eventDataBytes),
+		"event_v":    event.Version,
+		"event_meta": string(eventMetaBytes),
 	}
-	for k, v := range eventPartitionFields(evt) {
-		row[k] = v
-	}
+
 	l.sendEvent(row)
 }
 
@@ -353,9 +362,9 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 	l.db = db
 
 	tables := map[string]chan map[string]any{
-		"runs_staging":      l.runs,
-		"run_spans_staging": l.spans,
-		"events_staging":    l.events,
+		"inngest.runs":            l.runs,
+		"inngest.run_trace_spans": l.spans,
+		"inngest.events":          l.events,
 	}
 	// One shared disabledState across all three batchers, so the driver's
 	// terminal duckdb.ErrDisabled state stops the whole dual-write path and

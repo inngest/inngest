@@ -129,6 +129,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		ConnectGatewayPort:      connectGatewayPort,
 		EventKeys:               eventKeys,
 		NoUI:                    localconfig.GetBoolValue(cmd, "no-ui", false),
+		EnableDuckDB:            localconfig.GetBoolValue(cmd, "duckdb", false),
 		Persist:                 true,
 		PollInterval:            localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
 		PostgresConnMaxIdleTime: localconfig.GetIntValue(cmd, "postgres-conn-max-idle-time", 5),

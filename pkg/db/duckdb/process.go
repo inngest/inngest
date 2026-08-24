@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -53,7 +54,8 @@ type process struct {
 	// duckLake is nil unless the caller opted into DuckLake (Options.DuckLake).
 	// When set, every freshly spawned subprocess is re-bootstrapped from it —
 	// see bootstrapDuckLakeLocked for why that has to happen per spawn.
-	duckLake *DuckLakeOptions
+	duckLake  *DuckLakeOptions
+	quackAddr *string
 
 	procCtx    context.Context
 	procCancel context.CancelFunc
@@ -75,17 +77,18 @@ type process struct {
 // bounds the health check; the subprocess's own OS lifetime is governed by
 // the process-owned procCtx (see the process doc comment), not this ctx.
 func startProcess(ctx context.Context, binaryPath, dbFile string) (*process, error) {
-	return startProcessWithDuckLake(ctx, binaryPath, dbFile, nil)
+	return startProcessWithDuckLake(ctx, binaryPath, dbFile, nil, nil)
 }
 
 // startProcessWithDuckLake is startProcess with the opt-in DuckLake bootstrap.
 // duckLake may be nil, which is exactly the pre-DuckLake behaviour.
-func startProcessWithDuckLake(ctx context.Context, binaryPath, dbFile string, duckLake *DuckLakeOptions) (*process, error) {
+func startProcessWithDuckLake(ctx context.Context, binaryPath, dbFile string, duckLake *DuckLakeOptions, quackAddr *string) (*process, error) {
 	procCtx, procCancel := context.WithCancel(context.Background())
 	p := &process{
 		binaryPath: binaryPath,
 		dbFile:     dbFile,
 		duckLake:   duckLake,
+		quackAddr:  quackAddr,
 		procCtx:    procCtx,
 		procCancel: procCancel,
 	}
@@ -208,7 +211,48 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 	if err := p.healthCheckLocked(ctx); err != nil {
 		return err
 	}
-	return p.bootstrapDuckLakeLocked(ctx)
+
+	if err := p.bootstrapDuckLakeLocked(ctx); err != nil {
+		return err
+	}
+
+	if err := p.startQuackLocked(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// XXX: only kinda functional (quack ATTACH has some issues)
+func (p *process) startQuackLocked(ctx context.Context) error {
+	if p.quackAddr == nil {
+		return nil
+	}
+
+	quackAddr, err := encodeLiteral("quack:" + *p.quackAddr)
+	if err != nil {
+		return fmt.Errorf("duckdb: encoding quack address: %w", err)
+	}
+
+	log.Println("STARTING")
+
+	stmts := []string{
+		"INSTALL ui;",
+		"CALL start_ui_server();", // TODO: move this
+		"INSTALL quack;",
+		fmt.Sprintf("CALL quack_serve(%s, token = 'localdev');", quackAddr),
+	}
+
+	for _, stmt := range stmts {
+		if _, err := p.sess.exec(ctx, stmt); err != nil {
+			return fmt.Errorf("duckdb: quack bootstrap failed on %q: %w", stmt, err)
+		}
+	}
+
+	// TODO: better logging
+	log.Println("duckdb: quack listener started on", *p.quackAddr)
+
+	return nil
 }
 
 // bootstrapDuckLakeLocked assumes mu is already held. It is a no-op unless the
@@ -409,9 +453,9 @@ func (p *process) close(ctx context.Context) error {
 }
 
 // DuckLakeAlias is the catalog name the DuckLake bootstrap attaches under, so
-// callers address DuckLake-backed tables as lake.<table>. It is fixed for this
+// callers address DuckLake-backed tables as inngest.<table>. It is fixed for this
 // POC; making it configurable is future work.
-const DuckLakeAlias = "lake"
+const DuckLakeAlias = "inngest"
 
 // DuckLakeOptions opts a process into DuckLake. It is exploratory groundwork:
 // nothing in the existing Migrate / dual-write path sets it yet.
@@ -446,6 +490,11 @@ type Options struct {
 	// Leave nil (the zero value) to disable DuckLake entirely; that path is
 	// byte-for-byte the previous behaviour.
 	DuckLake *DuckLakeOptions
+
+	// QuackAddr, when non-nil, starts a quack listener on the given address
+	// after every successful health check of a freshly spawned subprocess.
+	// Leave nil (the zero value) to disable quack entirely.
+	QuackAddr *string
 }
 
 // Connector implements database/sql/driver.Connector over one supervised
@@ -468,7 +517,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 			}
 			binPath = resolved
 		}
-		p, err := startProcessWithDuckLake(ctx, binPath, c.opts.DBFile, c.opts.DuckLake)
+		p, err := startProcessWithDuckLake(ctx, binPath, c.opts.DBFile, c.opts.DuckLake, c.opts.QuackAddr)
 		if err != nil {
 			return nil, err
 		}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -153,6 +154,12 @@ type StartOpts struct {
 
 	// SQLiteDir specifies where SQLite files should be stored
 	SQLiteDir string `json:"sqlite_dir"`
+
+	// EnableDuckDB opts into the experimental DuckDB dual-write POC
+	// (docs/plans/006-duckdb-poc-subprocess-dual-write.md), gated behind the
+	// `--duckdb` flag (or INNGEST_DUCKDB env var) on both `inngest dev` and
+	// `inngest start`. Off by default.
+	EnableDuckDB bool `json:"enable_duckdb"`
 
 	// Debug API
 	DebugAPIPort int `json:"debugAPIPort"`
@@ -502,15 +509,17 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// Opt-in, best-effort DuckDB dual-write
 	// (docs/plans/006-duckdb-poc-subprocess-dual-write.md): nil unless
-	// INNGEST_DUCKDB_DUALWRITE is set truthy, and nil on any failure
+	// opts.EnableDuckDB is true (the `--duckdb` flag / INNGEST_DUCKDB env
+	// var), and nil on any failure
 	// (missing binary, failed spawn, failed migration),
 	// in which case the rest of devserver startup proceeds unaffected. When
 	// non-nil, stopDualWrite tears down its background goroutines and the
 	// duckdb subprocess when start() returns (i.e. once service.StartAll
 	// below has finished shutting every other service down).
-	var dualWriteListeners []execution.SyncLifecycleListener
-	if dw := setupDualWrite(ctx, "duckdb", opts.SQLiteDir); dw != nil {
-		dualWriteListeners = append(dualWriteListeners, dw)
+	var syncListeners []execution.SyncLifecycleListener
+	if dw := setupDualWrite(ctx, opts.EnableDuckDB, "duckdb", opts.SQLiteDir); dw != nil {
+		log.Println("dual-write enabled: syncing executions to DuckDB subprocess")
+		syncListeners = append(syncListeners, dw)
 		defer func() {
 			// Bounded like every other service.Service's Stop (see
 			// pkg/service's defaultTimeout/stopTimeout, 30s) -- Close must
@@ -556,7 +565,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			}, metrics.NewLifecycleListeners()...)...,
 		),
 		executor.WithEventLifecycleListeners(execution.NoopEventLifecycleListener{}),
-		executor.WithSyncLifecycleListeners(dualWriteListeners...),
+		executor.WithSyncLifecycleListeners(syncListeners...),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
 				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
@@ -630,7 +639,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithCronManager(croner),
 		runner.WithPublisher(pb),
 		runner.WithLogger(l),
-		runner.WithSyncLifecycleListeners(dualWriteListeners...),
+		runner.WithSyncLifecycleListeners(syncListeners...),
 	)
 
 	// The devserver embeds the event API.

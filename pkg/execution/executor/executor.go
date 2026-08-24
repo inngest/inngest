@@ -1720,7 +1720,7 @@ func (e *executor) schedule(
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
 		for _, sl := range e.syncLifecycles {
-			sl.OnFunctionScheduled(ctx, metadata, item, req.Events)
+			sl.OnFunctionScheduled(ctx, metadata, item, evts)
 		}
 		metadataSnapshot := cloneMetadata(metadata)
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
@@ -1831,7 +1831,7 @@ func (e *executor) schedule(
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
 	for _, sl := range e.syncLifecycles {
-		sl.OnFunctionScheduled(ctx, metadata, item, req.Events)
+		sl.OnFunctionScheduled(ctx, metadata, item, evts)
 	}
 	metadataSnapshot := cloneMetadata(metadata)
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {

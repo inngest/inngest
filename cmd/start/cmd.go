@@ -146,6 +146,12 @@ func Command() *cli.Command {
 				Name:     "no-ui",
 				Usage:    "Disable the web UI and GraphQL API endpoint",
 			},
+			&cli.BoolFlag{
+				Category: "Advanced",
+				Name:     "duckdb",
+				Usage:    "Enable the experimental DuckDB dual-write POC (docs/plans/006-duckdb-poc-subprocess-dual-write.md)",
+				Value:    false,
+			},
 		},
 	}
 

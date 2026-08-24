@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/execution"
@@ -13,25 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 )
-
-// dualWriteEnvVar gates the entire DuckDB dual-write POC. The spec
-// (docs/plans/006-duckdb-poc-subprocess-dual-write.md) scopes this feature to
-// `inngest dev`, but pkg/devserver.start() also backs `inngest start`
-// (production self-hosted), so the feature must never turn itself on
-// implicitly in either. It is opt-in, off by default, for both.
-const dualWriteEnvVar = "INNGEST_DUCKDB_DUALWRITE"
-
-// dualWriteEnabled reports whether the DuckDB dual-write POC has been
-// explicitly opted into via INNGEST_DUCKDB_DUALWRITE. Off by default; set to
-// "1", "true", "yes", or any other truthy value to enable. Mirrors the
-// truthiness convention of metrics.ExperimentalPromMetricsEnabled.
-func dualWriteEnabled() bool {
-	v := strings.TrimSpace(os.Getenv(dualWriteEnvVar))
-	if v == "" || v == "0" || strings.EqualFold(v, "false") || strings.EqualFold(v, "no") {
-		return false
-	}
-	return true
-}
 
 // syncLifecycleCloser is satisfied by dual-write listeners that own
 // background goroutines/resources needing explicit shutdown — in practice,
@@ -54,17 +34,21 @@ type syncLifecycleCloser interface {
 // point this at a nonexistent path to exercise the failure path without
 // needing to fake PATH resolution).
 //
-// Dual-write is opt-in: unless INNGEST_DUCKDB_DUALWRITE is set truthy, this
-// returns nil immediately without spawning a subprocess, running migrations,
-// or registering anything (see dualWriteEnabled).
+// Dual-write is opt-in: unless enabled is true, this returns nil immediately
+// without spawning a subprocess, running migrations, or registering
+// anything. The spec scopes this feature to `inngest dev`, but
+// pkg/devserver.start() also backs `inngest start` (production
+// self-hosted), so callers must never pass true implicitly in either — enabled
+// should come from an explicit user opt-in (the `--duckdb` flag /
+// INNGEST_DUCKDB env var, resolved by the caller).
 //
 // stateDir is the raw --sqlite-dir option value ("" meaning "the default");
 // it is resolved the same way pkg/db/sqlite resolves it, so the catalog lands
 // in <state-dir>/duckdb/ rather than relative to the process's cwd.
-func setupDualWrite(ctx context.Context, binaryPath, stateDir string) execution.SyncLifecycleListener {
+func setupDualWrite(ctx context.Context, enabled bool, binaryPath, stateDir string) execution.SyncLifecycleListener {
 	l := logger.StdlibLogger(ctx)
 
-	if !dualWriteEnabled() {
+	if !enabled {
 		return nil
 	}
 
@@ -85,8 +69,19 @@ func setupDualWrite(ctx context.Context, binaryPath, stateDir string) execution.
 		return nil
 	}
 
-	dbFile := filepath.Join(duckdbDir, "catalog.duckdb")
-	db, err := duckdb.Open(ctx, duckdb.Options{BinaryPath: binaryPath, DBFile: dbFile})
+	dbFile := filepath.Join(duckdbDir, "main.duckdb")
+	catalogFile := filepath.Join(duckdbDir, "catalog.duckdb")
+	dataDir := filepath.Join(duckdbDir, "data")
+	quackAddr := "localhost"
+	db, err := duckdb.Open(ctx, duckdb.Options{
+		BinaryPath: binaryPath,
+		DBFile:     dbFile,
+		DuckLake: &duckdb.DuckLakeOptions{
+			CatalogPath: catalogFile,
+			DataPath:    dataDir,
+		},
+		QuackAddr: &quackAddr,
+	})
 	if err != nil {
 		l.Warn("failed to start duckdb subprocess; dual-write disabled", "error", err)
 		return nil
