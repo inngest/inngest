@@ -59,6 +59,55 @@ function escapeCSVValue(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
+type DownloadData = {
+  headers: string[];
+  rows: Array<Record<string, string | number | null>>;
+};
+
+function transformDownloadData(data: InsightsFetchResult): DownloadData {
+  const headers = data.columns.map((column) => column.name);
+  const rows = data.rows.map((row) =>
+    Object.fromEntries(
+      headers.map((header) => {
+        const value = row.values[header];
+
+        if (value == null) return [header, null];
+        if (value instanceof Date) {
+          return [header, isValidDate(value) ? value.toISOString() : null];
+        }
+
+        return [header, value];
+      }),
+    ),
+  );
+
+  return { headers, rows };
+}
+
+function presentCSV({ headers, rows }: DownloadData): string {
+  const csvRows = [headers.join(',')];
+
+  rows.forEach((row) => {
+    const values = headers.map((header) => {
+      const value = row[header];
+      if (value === null || value === undefined) return '';
+
+      const stringValue = String(value);
+      return needsCSVQuoting(stringValue)
+        ? escapeCSVValue(stringValue)
+        : stringValue;
+    });
+
+    csvRows.push(values.join(','));
+  });
+
+  return csvRows.join('\n');
+}
+
+function presentJSON({ rows }: DownloadData): string {
+  return JSON.stringify(rows, null, 2);
+}
+
 /**
  * Converts Insights query results to CSV format.
  * Handles null values, dates (converted to ISO 8601), and special characters.
@@ -67,41 +116,7 @@ function escapeCSVValue(value: string): string {
  * @returns A CSV-formatted string with headers and data rows
  */
 export function convertToCSV(data: InsightsFetchResult): string {
-  const { columns, rows } = data;
-
-  // Create header row
-  const headers = columns.map((col) => col.name);
-  const csvRows = [headers.join(',')];
-
-  // Add data rows
-  rows.forEach((row) => {
-    const values = headers.map((header) => {
-      const value = row.values[header];
-
-      // Handle null/undefined
-      if (value === null || value === undefined) {
-        return '';
-      }
-
-      // Handle dates
-      if (value instanceof Date) {
-        return isValidDate(value) ? value.toISOString() : '';
-      }
-
-      // Handle strings that need quoting per RFC 4180
-      const stringValue = String(value);
-
-      if (needsCSVQuoting(stringValue)) {
-        return escapeCSVValue(stringValue);
-      }
-
-      return stringValue;
-    });
-
-    csvRows.push(values.join(','));
-  });
-
-  return csvRows.join('\n');
+  return presentCSV(transformDownloadData(data));
 }
 
 /**
@@ -111,19 +126,8 @@ export function convertToCSV(data: InsightsFetchResult): string {
  * @param data - The Insights query results containing columns and rows
  * @returns A pretty-printed JSON string (2-space indentation) containing an array of objects
  */
-function convertToJSON(data: InsightsFetchResult): string {
-  const { rows } = data;
-
-  // Extract just the values from each row, converting Dates to ISO strings
-  const jsonData = rows.map((row) => row.values);
-
-  // JSON.stringify handles Date objects automatically, but we use a replacer
-  // to ensure consistent ISO string formatting
-  return JSON.stringify(
-    jsonData,
-    (_key, value) => (value instanceof Date ? value.toISOString() : value),
-    2,
-  );
+export function convertToJSON(data: InsightsFetchResult): string {
+  return presentJSON(transformDownloadData(data));
 }
 
 /**
