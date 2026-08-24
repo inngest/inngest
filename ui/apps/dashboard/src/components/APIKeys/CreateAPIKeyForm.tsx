@@ -570,9 +570,12 @@ export function CreateAPIKeyForm({
     );
   }
 
+  const permissionGroups = [...(catalogRes.data?.apiKeyPermissionCatalog ?? [])].sort((a, b) => {
+    return a.resource.localeCompare(b.resource)
+  })
   let permissionsContent = (
     <div className="border-subtle rounded border">
-      {(catalogRes.data?.apiKeyPermissionCatalog ?? []).map((group) => {
+      {permissionGroups.map((group) => {
         const level = permissionLevels[group.resource] ?? 'none';
         const readDisabled = group.read.length === 0;
         const writeDisabled = group.write.length === 0;

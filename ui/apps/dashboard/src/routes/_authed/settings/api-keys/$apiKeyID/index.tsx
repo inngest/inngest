@@ -270,7 +270,7 @@ function APIKeyPage() {
     permissionGrantNames.add(grant);
   }
 
-  const grantedPermissionGroups: {
+  let grantedPermissionGroups: {
     group: APIKeyPermissionGroup;
     level: PermissionLevel;
   }[] = [];
@@ -281,6 +281,10 @@ function APIKeyPage() {
     }
     grantedPermissionGroups.push({ group, level });
   }
+  grantedPermissionGroups = [...grantedPermissionGroups].sort((a, b) => {
+    return a.group.resource.localeCompare(b.group.resource)
+  })
+
   const recognizedScopeNames = catalogScopeNames(data.apiKeyPermissionCatalog);
   const additionalGrants = unrecognizedPermissionGrants(
     apiKey.permissionGrants,
