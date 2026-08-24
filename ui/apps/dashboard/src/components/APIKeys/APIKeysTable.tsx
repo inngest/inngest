@@ -1,8 +1,7 @@
 import { Button } from '@inngest/components/Button';
 import { Table } from '@inngest/components/Table';
 import { Time } from '@inngest/components/Time';
-import { RiDeleteBin6Line, RiPencilLine } from '@remixicon/react';
-import { Link } from '@tanstack/react-router';
+import { RiDeleteBin6Line, RiEyeLine, RiPencilLine } from '@remixicon/react';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { ApiKeyOwnershipType } from '@/gql/graphql';
@@ -20,13 +19,20 @@ export type APIKeyRow = {
 type Props = {
   keys: APIKeyRow[];
   canManage: boolean;
+  onView: (key: APIKeyRow) => void;
   onRename: (key: APIKeyRow) => void;
   onDelete: (key: APIKeyRow) => void;
 };
 
 const columnHelper = createColumnHelper<APIKeyRow>();
 
-export function APIKeysTable({ keys, canManage, onRename, onDelete }: Props) {
+export function APIKeysTable({
+  keys,
+  canManage,
+  onView,
+  onRename,
+  onDelete,
+}: Props) {
   const columns = [
     columnHelper.accessor('name', {
       header: 'Key',
@@ -34,13 +40,7 @@ export function APIKeysTable({ keys, canManage, onRename, onDelete }: Props) {
         const row = info.row.original;
         return (
           <div className="flex flex-col">
-            <Link
-              className="text-basis hover:text-primary-moderate text-sm"
-              to="/settings/api-keys/$apiKeyID"
-              params={{ apiKeyID: row.id }}
-            >
-              {row.name}
-            </Link>
+            <span className="text-basis text-sm">{row.name}</span>
             <span className="text-light font-mono text-xs">
               {row.maskedKey}
             </span>
@@ -69,26 +69,41 @@ export function APIKeysTable({ keys, canManage, onRename, onDelete }: Props) {
       id: 'actions',
       header: () => <span className="sr-only">Actions</span>,
       cell: (info) => {
-        if (!canManage) return null;
         const row = info.row.original;
+        let manageActions = null;
+        if (canManage) {
+          manageActions = (
+            <>
+              <Button
+                appearance="outlined"
+                kind="secondary"
+                size="small"
+                icon={<RiPencilLine />}
+                label="Rename"
+                onClick={() => onRename(row)}
+              />
+              <Button
+                appearance="outlined"
+                kind="danger"
+                size="small"
+                icon={<RiDeleteBin6Line />}
+                onClick={() => onDelete(row)}
+                aria-label="Delete"
+              />
+            </>
+          );
+        }
         return (
           <div className="flex justify-end gap-2">
             <Button
               appearance="outlined"
               kind="secondary"
               size="small"
-              icon={<RiPencilLine />}
-              label="Rename"
-              onClick={() => onRename(row)}
+              icon={<RiEyeLine />}
+              label="View"
+              onClick={() => onView(row)}
             />
-            <Button
-              appearance="outlined"
-              kind="danger"
-              size="small"
-              icon={<RiDeleteBin6Line />}
-              onClick={() => onDelete(row)}
-              aria-label="Delete"
-            />
+            {manageActions}
           </div>
         );
       },

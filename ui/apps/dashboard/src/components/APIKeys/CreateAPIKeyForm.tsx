@@ -3,12 +3,6 @@ import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
 import { Select, type Option } from '@inngest/components/Select/Select';
-import {
-  RiRobot2Line,
-  RiShieldUserLine,
-  RiTimeLine,
-  RiUserForbidLine,
-} from '@remixicon/react';
 import { gql, useMutation, useQuery, type TypedDocumentNode } from 'urql';
 
 import { graphql } from '@/gql';
@@ -211,49 +205,6 @@ function expiresAtForOption(optionID: ExpirationOptionID) {
   return null;
 }
 
-function UserKeyGuidance() {
-  return (
-    <div className="border-subtle bg-canvasSubtle rounded border p-3">
-      <div className="flex items-start gap-2">
-        <RiShieldUserLine className="text-subtle mt-0.5 h-4 w-4 shrink-0" />
-        <div className="flex flex-col">
-          <span className="text-basis text-sm font-medium">
-            Delegated human credential
-          </span>
-          <span className="text-subtle text-xs">
-            User keys are owned by a person and authorize from stored grants
-            capped by that owner's current permissions. They must expire and are
-            tied to the owner's lifecycle: if the owner leaves the organization
-            or loses permissions, the key loses access too.
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ServiceKeyGuidance() {
-  return (
-    <div className="border-subtle bg-canvasSubtle rounded border p-3">
-      <div className="flex items-start gap-2">
-        <RiRobot2Line className="text-subtle mt-0.5 h-4 w-4 shrink-0" />
-        <div className="flex flex-col">
-          <span className="text-basis text-sm font-medium">
-            Static automation credential
-          </span>
-          <span className="text-subtle text-xs">
-            Service keys are owned by the organization and authorize from stored
-            grants after creation. They are not tied to the creator's lifecycle:
-            if the creator leaves the organization or their permissions change,
-            the key is unaffected. Use them for backend integrations, set narrow
-            permissions, and rotate them deliberately.
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 type Props = {
   createUserAPIKey: boolean;
   canCreateServiceKeys: boolean;
@@ -416,11 +367,11 @@ export function CreateAPIKeyForm({
       ownershipType === ApiKeyOwnershipType.Service &&
       !canCreateServiceKeys
     ) {
-      setError('You do not have permission to create Service API keys.');
+      setError('You do not have permission to create API keys.');
       return;
     }
     if (ownershipType === ApiKeyOwnershipType.User && !createUserAPIKey) {
-      setError('User API keys cannot be created from this page.');
+      setError('API keys cannot be created from this page.');
       return;
     }
     if (boundaryOption === 'single_environment' && !selectedEnv) {
@@ -442,7 +393,7 @@ export function CreateAPIKeyForm({
       ownershipType === ApiKeyOwnershipType.User &&
       expirationOption === 'never'
     ) {
-      setError('User API keys must expire.');
+      setError('API keys must expire.');
       return;
     }
 
@@ -504,17 +455,6 @@ export function CreateAPIKeyForm({
         </div>
       </div>
     );
-  }
-
-  let keyTypeGuidance = <ServiceKeyGuidance />;
-  let keyTypeTitle = 'Service API key';
-  let keyTypeDescription =
-    'Use a Service key for durable automation owned by the organization.';
-  if (ownershipType === ApiKeyOwnershipType.User) {
-    keyTypeGuidance = <UserKeyGuidance />;
-    keyTypeTitle = 'User API key';
-    keyTypeDescription =
-      'Use a User key for delegated tasks that should follow a person and their current permissions.';
   }
 
   let nameInputClassName = '';
@@ -703,14 +643,6 @@ export function CreateAPIKeyForm({
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-basis text-lg font-medium">{keyTypeTitle}</h2>
-          <p className="text-subtle text-sm">{keyTypeDescription}</p>
-        </div>
-        {keyTypeGuidance}
-      </section>
-
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div className={nameInputClassName}>
           <Input

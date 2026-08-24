@@ -8,7 +8,6 @@ import { gql, useQuery, type TypedDocumentNode } from 'urql';
 import LoadingIcon from '@/components/Icons/LoadingIcon';
 import {
   ApiKeyCredentialSource,
-  ApiKeyOwnershipType,
   ApiKeyResourceBoundaryMode,
   EnvironmentType,
 } from '@/gql/graphql';
@@ -35,7 +34,6 @@ type APIKeyDetail = {
   id: string;
   name: string;
   createdAt: string;
-  ownershipType: ApiKeyOwnershipType;
   resourceBoundaryMode: ApiKeyResourceBoundaryMode;
   expiresAt: string | null;
   credentialSource: ApiKeyCredentialSource;
@@ -65,7 +63,6 @@ const Query: TypedDocumentNode<APIKeyDetailResult, APIKeyDetailVariables> = gql`
         id
         name
         createdAt
-        ownershipType
         resourceBoundaryMode
         expiresAt
         credentialSource
@@ -107,15 +104,6 @@ function permissionLevelClass(level: PermissionLevel) {
     classes.push('bg-canvasSubtle border-muted text-basis border');
   }
   return classes.join(' ');
-}
-
-function ownershipTypeName(ownershipType: ApiKeyOwnershipType) {
-  switch (ownershipType) {
-    case ApiKeyOwnershipType.Service:
-      return 'Service';
-    case ApiKeyOwnershipType.User:
-      return 'User';
-  }
 }
 
 function isAllBranchEnvironmentsBoundary(key: APIKeyDetail) {
@@ -443,15 +431,6 @@ function APIKeyPage() {
               API key name
             </label>
             <div className={readonlyFieldClass()}>{apiKey.name}</div>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-basis text-sm font-medium">
-              API key type
-            </label>
-            <div className={readonlyFieldClass()}>
-              {ownershipTypeName(apiKey.ownershipType)}
-            </div>
           </div>
 
           <div className="flex flex-col gap-1">

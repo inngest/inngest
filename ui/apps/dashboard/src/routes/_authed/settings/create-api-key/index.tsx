@@ -38,10 +38,6 @@ function CreateAPIKeyPage() {
     organizationRole: membership?.role,
   });
   const createUserAPIKey = search.type === 'user';
-  let pageTitle = 'Create Service API key';
-  if (createUserAPIKey) {
-    pageTitle = 'Create User API key';
-  }
 
   const backToList = () => navigate({ to: '/settings/api-keys' });
 
@@ -73,7 +69,7 @@ function CreateAPIKeyPage() {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 py-8">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-basis text-2xl">{pageTitle}</h1>
+          <h1 className="text-basis text-2xl">Create API key</h1>
         </div>
         <Button
           appearance="outlined"

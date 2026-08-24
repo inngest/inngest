@@ -32,75 +32,12 @@ export const Route = createFileRoute('/_authed/settings/api-keys/')({
 
 const ADMIN_TOOLTIP = 'Only organization admins can manage API keys.';
 const authedRoute = getRouteApi('/_authed');
-type APIKeyListTab = 'my' | 'other';
 
-function keyMatchesTab(
-  key: APIKeyRow,
-  tab: APIKeyListTab,
-  currentUserID: string | null,
-) {
-  if (tab === 'my') {
-    if (key.ownershipType !== ApiKeyOwnershipType.User) {
-      return false;
-    }
-    if (!currentUserID) {
-      return false;
-    }
-    return key.ownerUserID === currentUserID;
-  }
+function isServiceAPIKey(key: APIKeyRow) {
   if (key.ownershipType === ApiKeyOwnershipType.Service) {
     return true;
   }
-  if (!currentUserID) {
-    return true;
-  }
-  return key.ownerUserID !== currentUserID;
-}
-
-function hasKeysForTab(
-  keys: APIKeyRow[],
-  tab: APIKeyListTab,
-  currentUserID: string | null,
-) {
-  for (const key of keys) {
-    if (keyMatchesTab(key, tab, currentUserID)) {
-      return true;
-    }
-  }
   return false;
-}
-
-function defaultTabForKeys(keys: APIKeyRow[], currentUserID: string | null) {
-  if (hasKeysForTab(keys, 'my', currentUserID)) {
-    return 'my';
-  }
-  return 'other';
-}
-
-function tabButtonClass(isActive: boolean) {
-  const classes = [
-    'border-subtle h-8 rounded border px-3 text-sm transition-colors',
-  ];
-  if (isActive) {
-    classes.push('bg-canvasSubtle text-basis border-contrast');
-  } else {
-    classes.push('bg-canvasBase text-subtle hover:text-basis');
-  }
-  return classes.join(' ');
-}
-
-function emptyTabTitle(tab: APIKeyListTab) {
-  if (tab === 'my') {
-    return 'No API keys owned by you';
-  }
-  return 'No other API keys';
-}
-
-function emptyTabDescription(tab: APIKeyListTab) {
-  if (tab === 'my') {
-    return 'Your User API keys are delegated credentials that expire and follow your membership.';
-  }
-  return 'Other API keys include organization-owned Service keys and User keys owned by other users.';
 }
 
 function APIKeysPage() {
@@ -115,7 +52,6 @@ function APIKeysPage() {
 
   const [renameTarget, setRenameTarget] = useState<APIKeyRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<APIKeyRow | null>(null);
-  const [selectedTab, setSelectedTab] = useState<APIKeyListTab | null>(null);
 
   if (res.error) {
     throw res.error;
@@ -143,14 +79,13 @@ function APIKeysPage() {
       env,
     };
   });
-  const currentUserID = res.data?.session?.user.id ?? null;
-  let activeTab = selectedTab;
-  if (activeTab === null) {
-    activeTab = defaultTabForKeys(keys, currentUserID);
-  }
-  const selectedKeys = keys.filter((key) =>
-    keyMatchesTab(key, activeTab, currentUserID),
-  );
+  const serviceKeys = keys.filter(isServiceAPIKey);
+  const viewKey = (key: APIKeyRow) => {
+    navigate({
+      to: '/settings/api-keys/$apiKeyID',
+      params: { apiKeyID: key.id },
+    });
+  };
 
   const createButton = (
     <Button
@@ -179,7 +114,7 @@ function APIKeysPage() {
   }
 
   let keysContent = null;
-  if (keys.length === 0) {
+  if (serviceKeys.length === 0) {
     keysContent = (
       <APIKeysEmptyState
         onCreate={() =>
@@ -193,44 +128,13 @@ function APIKeysPage() {
     );
   } else {
     keysContent = (
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={tabButtonClass(activeTab === 'my')}
-            onClick={() => setSelectedTab('my')}
-          >
-            My API keys
-          </button>
-          <button
-            type="button"
-            className={tabButtonClass(activeTab === 'other')}
-            onClick={() => setSelectedTab('other')}
-          >
-            Other API keys
-          </button>
-        </div>
-
-        {selectedKeys.length > 0 && (
-          <APIKeysTable
-            keys={selectedKeys}
-            canManage={canManage}
-            onRename={setRenameTarget}
-            onDelete={setDeleteTarget}
-          />
-        )}
-
-        {selectedKeys.length === 0 && (
-          <div className="border-subtle bg-canvasSubtle flex flex-col gap-1 rounded border px-4 py-6">
-            <span className="text-basis text-sm font-medium">
-              {emptyTabTitle(activeTab)}
-            </span>
-            <span className="text-subtle text-sm">
-              {emptyTabDescription(activeTab)}
-            </span>
-          </div>
-        )}
-      </div>
+      <APIKeysTable
+        keys={serviceKeys}
+        canManage={canManage}
+        onView={viewKey}
+        onRename={setRenameTarget}
+        onDelete={setDeleteTarget}
+      />
     );
   }
 
