@@ -1384,15 +1384,25 @@ func marshalSDKResponse(t *testing.T, res testingResources, requestID string) []
 
 type replyFailingExecutor struct {
 	connect.UnimplementedConnectExecutorServer
-	port          int
-	replyReceived chan *connect.ReplyRequest
+	port               int
+	replyReceived      chan *connect.ReplyRequest
+	blockUntilCanceled bool
 }
 
 func startReplyFailingExecutor(t *testing.T) *replyFailingExecutor {
+	return startTestReplyExecutor(t, false)
+}
+
+func startReplyBlockingExecutor(t *testing.T) *replyFailingExecutor {
+	return startTestReplyExecutor(t, true)
+}
+
+func startTestReplyExecutor(t *testing.T, blockUntilCanceled bool) *replyFailingExecutor {
 	t.Helper()
 
 	executor := &replyFailingExecutor{
-		replyReceived: make(chan *connect.ReplyRequest, 1),
+		replyReceived:      make(chan *connect.ReplyRequest, 1),
+		blockUntilCanceled: blockUntilCanceled,
 	}
 	grpcServer := grpc.NewServer()
 	connect.RegisterConnectExecutorServer(grpcServer, executor)
@@ -1411,8 +1421,12 @@ func (s *replyFailingExecutor) Ping(_ context.Context, _ *connect.PingRequest) (
 	return &connect.PingResponse{Message: "ok"}, nil
 }
 
-func (s *replyFailingExecutor) Reply(_ context.Context, req *connect.ReplyRequest) (*connect.ReplyResponse, error) {
+func (s *replyFailingExecutor) Reply(ctx context.Context, req *connect.ReplyRequest) (*connect.ReplyResponse, error) {
 	s.replyReceived <- req
+	if s.blockUntilCanceled {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	return nil, status.Error(codes.Unavailable, "transient reply failure")
 }
 
@@ -1527,6 +1541,38 @@ func TestHandleSdkReplyGRPCReplyFailureAfterSaveResponseIsNonFatal(t *testing.T)
 	require.NoError(t, err)
 	require.Equal(t, requestID, savedResponse.RequestId)
 
+	exchangeHeartbeat(t, res.ws, 2*time.Second)
+}
+
+func TestHandleSdkReplyBlockedGRPCReplyDoesNotDelayWorkerAck(t *testing.T) {
+	ctx := context.Background()
+	res := createTestingGateway(t, testingParameters{silent: true})
+	handshake(t, res)
+
+	executor := startReplyBlockingExecutor(t)
+	res.svc.grpcConfig.Executor.Port = executor.port
+
+	requestID := "test-grpc-reply-blocked"
+	_, err := res.svc.stateManager.LeaseRequest(ctx, res.envID, requestID, 5*time.Second, testExecutorIP)
+	require.NoError(t, err)
+
+	err = wsproto.Write(ctx, res.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REPLY,
+		Payload: marshalSDKResponse(t, res, requestID),
+	})
+	require.NoError(t, err)
+
+	ackMsg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REPLY_ACK, ackMsg.Kind)
+
+	select {
+	case req := <-executor.replyReceived:
+		require.Equal(t, requestID, req.Data.RequestId)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for blocked grpc reply attempt")
+	}
+
+	// The blocked fast path must not occupy a worker-message handler.
 	exchangeHeartbeat(t, res.ws, 2*time.Second)
 }
 
