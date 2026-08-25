@@ -2,6 +2,7 @@ package connectdriver
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"testing"
 
@@ -18,10 +19,14 @@ import (
 
 type captureForwarder struct {
 	opts connectgrpc.ProxyOpts
+	err  error
 }
 
 func (c *captureForwarder) Proxy(ctx, traceCtx context.Context, opts connectgrpc.ProxyOpts) (*connectpb.SDKResponse, error) {
 	c.opts = opts
+	if c.err != nil {
+		return nil, c.err
+	}
 	return &connectpb.SDKResponse{
 		RequestId:      opts.Data.RequestId,
 		Status:         connectpb.SDKResponseStatus_DONE,
@@ -65,4 +70,37 @@ func TestProxyRequestUsesRequestIDAndJobID(t *testing.T) {
 	require.NotNil(t, forwarder.opts.Data)
 	require.Equal(t, requestID, forwarder.opts.Data.RequestId)
 	require.Equal(t, jobID, forwarder.opts.Data.JobId)
+}
+
+func TestProxyRequestAlwaysRetriesInfrastructureErrors(t *testing.T) {
+	proxyErr := errors.New("connect routing unavailable")
+	forwarder := &captureForwarder{err: proxyErr}
+	u, err := url.Parse("https://example.com/inngest?fnId=test-fn")
+	require.NoError(t, err)
+
+	_, err = ProxyRequest(
+		context.Background(),
+		context.Background(),
+		forwarder,
+		sv2.ID{
+			RunID:      ulid.Make(),
+			FunctionID: uuid.New(),
+			Tenant: sv2.Tenant{
+				AccountID: uuid.New(),
+				EnvID:     uuid.New(),
+				AppID:     uuid.New(),
+			},
+		},
+		queue.Item{},
+		httpdriver.Request{
+			RequestID: "request-id",
+			JobID:     "job-id",
+			URL:       *u,
+			Step:      inngest.Step{ID: "step"},
+			Edge:      inngest.Edge{Incoming: "step"},
+		},
+	)
+	require.Error(t, err)
+	require.ErrorIs(t, err, proxyErr)
+	require.True(t, queue.IsAlwaysRetryable(err))
 }
