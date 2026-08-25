@@ -1313,6 +1313,18 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 	// Persist response in buffer, which is polled by executor.
 	err := c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, data.RequestId, data)
+	bufferOutcome := "success"
+	if errors.Is(err, state.ErrResponseAlreadyBuffered) {
+		bufferOutcome = "duplicate"
+	} else if err != nil {
+		bufferOutcome = "error"
+	}
+	bufferTags := c.svc.metricsTags()
+	bufferTags["outcome"] = bufferOutcome
+	metrics.IncrConnectGatewayResponseBufferWriteCounter(ctx, 1, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    bufferTags,
+	})
 	if err != nil && !errors.Is(err, state.ErrResponseAlreadyBuffered) {
 		return fmt.Errorf("could not save response: %w", err)
 	}

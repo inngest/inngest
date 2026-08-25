@@ -367,6 +367,24 @@ func IncrConnectGatewayGRPCExecutorReplyFailureCounter(ctx context.Context, valu
 	})
 }
 
+func IncrConnectGatewayResponseBufferWriteCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.response_buffer.write_total",
+		Description: "Total number of connect gateway response buffer writes",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectProxyResponseBufferReadCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_proxy.response_buffer.read_total",
+		Description: "Total number of connect proxy response buffer hits and read errors",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectGatewayGRPCClientFailureCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,

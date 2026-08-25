@@ -221,6 +221,15 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 
 	// Reliable path: Buffer the response to be picked up by the executor
 	err = cr.ConnectRequestStateManager.SaveResponse(ctx, res.EnvID, reqBody.RequestId, reqBody)
+	bufferOutcome := "success"
+	if errors.Is(err, state.ErrResponseAlreadyBuffered) {
+		bufferOutcome = "duplicate"
+	} else if err != nil {
+		bufferOutcome = "error"
+	}
+	metrics.IncrConnectGatewayResponseBufferWriteCounter(ctx, 1, metrics.CounterOpt{
+		Tags: map[string]any{"outcome": bufferOutcome},
+	})
 	if err != nil && !errors.Is(err, state.ErrResponseAlreadyBuffered) {
 		l.Error("could not buffer response", "err", err)
 		span.RecordError(err)
