@@ -164,12 +164,20 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		// to have already sent a response and completed the request.
 		resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, opts.Data.RequestId)
 		if err != nil {
+			metrics.IncrConnectProxyResponseBufferReadCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"outcome": "error"},
+			})
 			span.RecordError(err)
 			l.ReportError(err, "could not check for buffered response")
 			return nil, fmt.Errorf("could not check for buffered response: %w", err)
 		}
 
 		if resp != nil {
+			metrics.IncrConnectProxyResponseBufferReadCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"outcome": "hit"},
+			})
 			// We have a response already, return it
 			l.Debug("found buffered response")
 
@@ -239,12 +247,20 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 			resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, opts.Data.RequestId)
 			if err != nil {
+				metrics.IncrConnectProxyResponseBufferReadCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"outcome": "error"},
+				})
 				span.RecordError(err)
 				l.ReportError(err, "could not check for response")
 				continue
 			}
 
 			if resp != nil {
+				metrics.IncrConnectProxyResponseBufferReadCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    map[string]any{"outcome": "hit"},
+				})
 				span.AddEvent("ReplyReceivedPoll")
 
 				l.Debug("received response via polling")

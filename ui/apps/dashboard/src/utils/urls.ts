@@ -1,3 +1,5 @@
+import { defaultStringifySearch } from '@tanstack/react-router';
+
 export const WEBSITE_PRICING_URL = 'https://www.inngest.com/pricing';
 export const WEBSITE_CONTACT_URL = 'https://www.inngest.com/contact';
 export const DISCORD_URL = 'https://www.inngest.com/discord';
@@ -141,8 +143,34 @@ export const pathCreator = {
   envs() {
     return '/env';
   },
-  functions({ envSlug }: { envSlug: string }) {
-    return `/env/${envSlug}/functions`;
+  functions({
+    envSlug,
+    appIDs,
+    archived,
+  }: {
+    envSlug: string;
+    appIDs?: string[];
+    archived?: boolean;
+  }) {
+    const path = `/env/${envSlug}/functions`;
+    const search: Record<string, string> = {};
+    if (appIDs?.length) {
+      // The functions table reads its app filter from a JSON-encoded array of
+      // app IDs, matching `useStringArraySearchParam('filterApp')`.
+      search.filterApp = JSON.stringify(appIDs);
+    }
+    // The table defaults to active functions, so archived functions are only
+    // visible when the status filter is explicitly set.
+    if (archived) {
+      search.archived = 'true';
+    }
+
+    // Both filters read their params as strings. The router's serializer
+    // double-encodes JSON-looking strings so they survive parsing as strings,
+    // so build the query with it rather than by hand: URLSearchParams would
+    // emit `filterApp=["id"]`, which the router parses into an array and the
+    // filter hooks then discard.
+    return `${path}${defaultStringifySearch(search)}`;
   },
   function({
     envSlug,
@@ -211,6 +239,9 @@ export const pathCreator = {
   },
   integrations() {
     return `/settings/integrations`;
+  },
+  metrics({ envSlug, ref }: { envSlug: string; ref?: string }) {
+    return `/env/${envSlug}/metrics${ref ? `?ref=${ref}` : ''}`;
   },
   keys({ envSlug }: { envSlug: string }) {
     return `/env/${envSlug}/manage/keys`;

@@ -15,6 +15,7 @@ package expressions
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -266,11 +267,11 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 	}
 
 	if len(e.liftedVars) > 0 {
-		// Clone the data to remove concurrent writes.
-		data = data.Clone()
-		data.Add(map[string]any{
-			"vars": e.liftedVars,
-		})
+		// Keep evaluator-specific vars isolated while sharing immutable nested event data.
+		withVars := make(map[string]any, len(data.data)+1)
+		maps.Copy(withVars, data.data)
+		withVars["vars"] = e.liftedVars
+		data = &Data{data: withVars}
 	}
 
 	act, err := data.partialWithPatterns(ctx, e.fullPaths, e.patterns)

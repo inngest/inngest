@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/codes"
@@ -220,6 +221,15 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 
 	// Reliable path: Buffer the response to be picked up by the executor
 	err = cr.ConnectRequestStateManager.SaveResponse(ctx, res.EnvID, reqBody.RequestId, reqBody)
+	bufferOutcome := "success"
+	if errors.Is(err, state.ErrResponseAlreadyBuffered) {
+		bufferOutcome = "duplicate"
+	} else if err != nil {
+		bufferOutcome = "error"
+	}
+	metrics.IncrConnectGatewayResponseBufferWriteCounter(ctx, 1, metrics.CounterOpt{
+		Tags: map[string]any{"outcome": bufferOutcome},
+	})
 	if err != nil && !errors.Is(err, state.ErrResponseAlreadyBuffered) {
 		l.Error("could not buffer response", "err", err)
 		span.RecordError(err)
@@ -243,10 +253,20 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 			grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", cr.Opts.ConnectGRPCConfig.Executor.Port))
 			grpcClient, err := cr.grpcClientManager.GetOrCreateClient(notifyCtx, executorIP, grpcURL)
 			if err != nil {
+				metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(notifyCtx, 1, metrics.CounterOpt{
+					Tags: map[string]any{"reason": "client_creation"},
+				})
 				l.Error("could not create grpc client", "url", grpcURL, "err", err)
 			} else {
 				result, err := grpcClient.Reply(notifyCtx, &connectpb.ReplyRequest{Data: reqBody})
-				if err != nil || !result.Success {
+				if err != nil || result == nil || !result.Success {
+					reason := "reply_rejected"
+					if err != nil {
+						reason = "reply_error"
+					}
+					metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(notifyCtx, 1, metrics.CounterOpt{
+						Tags: map[string]any{"reason": reason},
+					})
 					l.Error("could not notify executor to flush connect message", "err", err)
 				}
 			}

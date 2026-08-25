@@ -48,6 +48,11 @@ func (k Kind) Validate() error {
 // to prevent spoofing of internal metadata. The score kind is the bare
 // constant inngest.score; the user-supplied score name is a key in the values
 // map, not a kind suffix.
+//
+// Synthetic read-time kinds (inngest.usage, inngest.ai.summary) stay off the
+// allowlist so no stored entry of either kind can exist: the AI summary read
+// path attaches its computed entry without stripping stored ones first and
+// relies on this rejection to stay the only entry of its kind.
 var allowedInngestKinds = map[Kind]bool{
 	"inngest.ai":               true,
 	"inngest.http":             true,

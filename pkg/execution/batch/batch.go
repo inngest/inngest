@@ -87,6 +87,15 @@ type BatchManager interface {
 	Close() error
 }
 
+// BatchMetricRecorder observes batch storage operations. Implementations own
+// metric naming, tagging, and rollout policy; batch managers only report the
+// operation results needed to record them.
+type BatchMetricRecorder interface {
+	AccountScopedTags(ctx context.Context, accountID, workspaceID uuid.UUID) map[string]any
+	RecordCommit(ctx context.Context, tags map[string]any, committedBytes int64)
+	RecordDelete(ctx context.Context, residencyDuration time.Duration)
+}
+
 // BatchInfo contains information about a batch for debugging purposes.
 type BatchInfo struct {
 	// BatchID is the current batch ULID if one exists.

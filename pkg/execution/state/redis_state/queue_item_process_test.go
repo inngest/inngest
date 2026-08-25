@@ -239,6 +239,105 @@ func TestQueueItemProcessWithConstraintChecks(t *testing.T) {
 		require.Equal(t, len(cmLifecycles.ReleaseCalls), 1)
 	})
 
+	t.Run("stops processing when capacity lease expires before renewal", func(t *testing.T) {
+		reset()
+
+		q, shard := newQueue(
+			t, rc,
+			osqueue.WithClock(clock),
+			osqueue.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID, envID, fnID uuid.UUID) bool {
+				return true
+			}),
+			osqueue.WithAcquireCapacityLeaseOnBacklogRefill(true),
+			osqueue.WithCapacityManager(cm),
+			osqueue.WithCapacityLeaseExtendInterval(10*time.Second),
+			osqueue.WithLogger(l),
+		)
+
+		qi, err := shard.EnqueueItem(ctx, item, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		queueLeaseID, err := shard.Lease(ctx, qi, osqueue.QueueLeaseDuration, clock.Now())
+		require.NoError(t, err)
+		qi.LeaseID = queueLeaseID
+
+		resp, err := cm.Acquire(ctx, &constraintapi.CapacityAcquireRequest{
+			AccountID:            accountID,
+			EnvID:                envID,
+			IdempotencyKey:       qi.ID,
+			FunctionID:           fnID,
+			LeaseIdempotencyKeys: []string{qi.ID},
+			Amount:               1,
+			Configuration: constraintapi.ConstraintConfig{
+				FunctionVersion: 1,
+				Concurrency: constraintapi.ConcurrencyConfig{
+					FunctionConcurrency: 1,
+				},
+			},
+			Constraints: []constraintapi.ConstraintItem{{
+				Kind: constraintapi.ConstraintKindConcurrency,
+				Concurrency: &constraintapi.ConcurrencyConstraint{
+					Scope: enums.ConcurrencyScopeFn,
+				},
+			}},
+			CurrentTime:     clock.Now(),
+			Duration:        5 * time.Second,
+			MaximumLifetime: time.Minute,
+			Source: constraintapi.LeaseSource{
+				Service:           constraintapi.ServiceExecutor,
+				Location:          constraintapi.CallerLocationItemLease,
+				RunProcessingMode: constraintapi.RunProcessingModeBackground,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Leases, 1)
+
+		started := make(chan struct{})
+		cancelled := make(chan struct{})
+		done := make(chan error, 1)
+		go func() {
+			_, err := q.ProcessItem(ctx, osqueue.ProcessItem{
+				I: qi,
+				CapacityLease: &osqueue.CapacityLease{
+					LeaseID:    resp.Leases[0].LeaseID,
+					IssuedAtMS: clock.Now().UnixMilli(),
+				},
+			}, func(ctx context.Context, _ osqueue.RunInfo, _ osqueue.Item) (osqueue.RunResult, error) {
+				close(started)
+				<-ctx.Done()
+				close(cancelled)
+				return osqueue.RunResult{}, nil
+			})
+			done <- err
+		}()
+
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for item processing to start")
+		}
+
+		clock.Advance(6 * time.Second)
+		r.SetTime(clock.Now())
+
+		select {
+		case err := <-done:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			t.Fatal("item continued processing after its capacity lease expired")
+		}
+		select {
+		case <-cancelled:
+		default:
+			t.Fatal("item context was not cancelled when its capacity lease expired")
+		}
+
+		service.Wait()
+		require.Empty(t, cmLifecycles.ExtendCalls)
+		loaded, err := shard.LoadQueueItem(ctx, qi.ID)
+		require.NoError(t, err)
+		require.Nil(t, loaded.LeaseID)
+	})
+
 	t.Run("with matching lease extension intervals", func(t *testing.T) {
 		reset()
 
