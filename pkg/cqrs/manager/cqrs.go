@@ -34,6 +34,7 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
+	"github.com/inngest/inngest/pkg/tracing/metadata/extractors"
 	"github.com/inngest/inngest/pkg/util"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -280,6 +281,11 @@ type spanRollupInfo struct {
 	// This is needed because parent_span_id in the DB is an OTEL span ID,
 	// but the span tree is keyed by dynamic_span_id.
 	otelToDynamic map[string]string
+	// aiEntries collects each rolled-up inngest.ai metadata entry, including
+	// entries whose parent span is missing from the tree. Rolled-up values are
+	// summed — never raw fragments — because the AI merge opcode makes a later
+	// emission a per-key update of the same entry, not a new call.
+	aiEntries []*cqrs.SpanMetadata
 }
 
 // fragmentAttributesJSON returns the attributes field of a span fragment as
@@ -492,12 +498,17 @@ fragmentLoop:
 		}
 	}
 
-	if info != nil && isMetadata && parentSpanIDPtr != nil {
-		metadata, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
+	if info != nil && isMetadata {
+		rolled, err := rollupSpanMetadataFromFragments(ctx, fragments, parsedEndTime)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error rolling up metadata span", "error", err)
 		} else {
-			info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], metadata)
+			if rolled.Kind == extractors.KindInngestAI {
+				info.aiEntries = append(info.aiEntries, rolled)
+			}
+			if parentSpanIDPtr != nil {
+				info.metadataByParent[*parentSpanIDPtr] = append(info.metadataByParent[*parentSpanIDPtr], rolled)
+			}
 		}
 	}
 
@@ -581,12 +592,13 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 	var runID ulid.ULID
 	var err error
 
+	info := spanRollupInfo{
+		dynamicRefs:      dynamicRefs,
+		metadataByParent: metadataByParent,
+		otelToDynamic:    otelToDynamic,
+	}
+
 	for _, span := range spans {
-		info := spanRollupInfo{
-			dynamicRefs:      dynamicRefs,
-			metadataByParent: metadataByParent,
-			otelToDynamic:    otelToDynamic,
-		}
 		newSpan, err := mapSpanFromRow(ctx, span, &info)
 		if err != nil {
 			return nil, err
@@ -811,8 +823,29 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		return nil, fmt.Errorf("no root span found for run %s", runID.String())
 	}
 
+	// Fold order doesn't matter: the builder rounds the summed cost to
+	// extractors.RoundCost's granularity, absorbing float addition's order
+	// sensitivity, and every other field is order-independent.
+	aiUsage := extractors.NewAISummaryBuilder()
+	hasStepAI := slices.ContainsFunc(info.aiEntries, func(md *cqrs.SpanMetadata) bool {
+		return extractors.AIUsageStepScoped(md.Scope)
+	})
+	for _, md := range info.aiEntries {
+		if !extractors.AIUsageEntryCounted(md.Scope, hasStepAI) {
+			continue
+		}
+		if err := aiUsage.AddCall(md.Values); err != nil {
+			logger.StdlibLogger(ctx).Warn(
+				"skipping malformed inngest.ai metadata entry",
+				"run_id", root.RunID.String(),
+				"error", err,
+			)
+		}
+	}
+
 	sorter(root)
 	computeAndAttachUsageMetadata(root)
+	computeAndAttachAISummaryMetadata(ctx, root, aiUsage)
 
 	return root, nil
 }
@@ -935,6 +968,42 @@ func walkMetadataSize(span *cqrs.OtelSpan, total *int) {
 	for _, child := range span.Children {
 		walkMetadataSize(child, total)
 	}
+}
+
+// computeAndAttachAISummaryMetadata attaches a synthetic run-scoped
+// "inngest.ai.summary" entry to the root span from a builder already seeded
+// with every counted inngest.ai entry in the run. Like inngest.usage, the
+// summary is recomputed on every read and never persisted. Unlike
+// inngest.usage there is no strip-before-attach pass: the kind allowlist
+// rejects writes of this kind, so no stored entry can exist to conflict.
+//
+// The builder is seeded flat rather than by walking the tree so that usage
+// whose parent span is missing, dropped, or excluded from the tree still
+// counts.
+//
+// The summary covers only this run. Usage from invoked child runs is never
+// folded in, and a run with no in-run usage gets no summary at all.
+func computeAndAttachAISummaryMetadata(ctx context.Context, root *cqrs.OtelSpan, builder *extractors.AISummaryBuilder) {
+	if builder.Empty() {
+		return
+	}
+	values, err := builder.Summary().Serialize()
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error serializing AI summary metadata", "error", err)
+		return
+	}
+
+	ts := root.EndTime
+	if ts.IsZero() {
+		ts = root.StartTime
+	}
+
+	root.Metadata = append(root.Metadata, &cqrs.SpanMetadata{
+		Scope:     enums.MetadataScopeRun,
+		Kind:      extractors.KindInngestAISummary,
+		Values:    values,
+		UpdatedAt: ts,
+	})
 }
 
 // extendedTraceKey is the map key used when indexing and reparenting orphaned
