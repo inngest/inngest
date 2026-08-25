@@ -18,7 +18,7 @@ type recordingSyncLifecycle struct {
 	finishedCalls int
 }
 
-func (r *recordingSyncLifecycle) OnFunctionFinished(context.Context, sv2.Metadata, queue.Item, []json.RawMessage, statev1.DriverResponse) {
+func (r *recordingSyncLifecycle) OnFunctionFinished(context.Context, sv2.Metadata, queue.Item, []json.RawMessage, statev1.DriverResponse, time.Time) {
 	r.finishedCalls++
 }
 

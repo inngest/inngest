@@ -24,7 +24,7 @@ func TestDuckLakeBootstrapAttachesOnStart(t *testing.T) {
 	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", &DuckLakeOptions{
 		CatalogPath: catalog,
 		DataPath:    dataPath,
-	})
+	}, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
@@ -32,13 +32,13 @@ func TestDuckLakeBootstrapAttachesOnStart(t *testing.T) {
 	require.NoError(t, err, "bootstrap must create the DuckLake data directory")
 	require.True(t, info.IsDir())
 
-	_, err = p.exec(t.Context(), "CREATE TABLE lake.dl_t (id INTEGER);")
+	_, err = p.exec(t.Context(), "CREATE TABLE inngest.dl_t (id INTEGER);")
 	require.NoError(t, err)
 
-	_, err = p.exec(t.Context(), "INSERT INTO lake.dl_t VALUES (1);")
+	_, err = p.exec(t.Context(), "INSERT INTO inngest.dl_t VALUES (1);")
 	require.NoError(t, err)
 
-	rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM lake.dl_t;")
+	rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.dl_t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, float64(1), rows[0]["c"])
@@ -64,13 +64,13 @@ func TestDuckLakeReattachesAfterCrash(t *testing.T) {
 	p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", &DuckLakeOptions{
 		CatalogPath: filepath.Join(dir, "catalog.ducklake"),
 		DataPath:    filepath.Join(dir, "data"),
-	})
+	}, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, err = p.exec(t.Context(), "CREATE TABLE lake.crash_t (id INTEGER);")
+	_, err = p.exec(t.Context(), "CREATE TABLE inngest.crash_t (id INTEGER);")
 	require.NoError(t, err)
-	_, err = p.exec(t.Context(), "INSERT INTO lake.crash_t VALUES (42);")
+	_, err = p.exec(t.Context(), "INSERT INTO inngest.crash_t VALUES (42);")
 	require.NoError(t, err)
 
 	pidBefore := p.cmd.Process.Pid
@@ -82,7 +82,7 @@ func TestDuckLakeReattachesAfterCrash(t *testing.T) {
 
 	// Goes through the production path: dead session detected -> restart ->
 	// health check -> DuckLake bootstrap -> retry the statement.
-	rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM lake.crash_t;")
+	rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.crash_t;")
 	require.NoError(t, err, "the restart must re-attach the DuckLake catalog")
 	require.Len(t, rows, 1)
 	require.Equal(t, float64(1), rows[0]["c"],
@@ -97,9 +97,9 @@ func TestDuckLakeReattachesAfterCrash(t *testing.T) {
 
 	// The re-attached session must keep working for writes too, not just the
 	// one retried read.
-	_, err = p.exec(t.Context(), "INSERT INTO lake.crash_t VALUES (43);")
+	_, err = p.exec(t.Context(), "INSERT INTO inngest.crash_t VALUES (43);")
 	require.NoError(t, err)
-	rows, err = p.exec(t.Context(), "SELECT count(*) AS c FROM lake.crash_t;")
+	rows, err = p.exec(t.Context(), "SELECT count(*) AS c FROM inngest.crash_t;")
 	require.NoError(t, err)
 	require.Equal(t, float64(2), rows[0]["c"])
 }
@@ -120,13 +120,13 @@ func TestOpenWithDuckLake(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE lake.open_t (id INTEGER);")
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE inngest.open_t (id INTEGER);")
 	require.NoError(t, err)
-	_, err = db.ExecContext(t.Context(), "INSERT INTO lake.open_t VALUES (7);")
+	_, err = db.ExecContext(t.Context(), "INSERT INTO inngest.open_t VALUES (7);")
 	require.NoError(t, err)
 
 	var count int
-	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) AS c FROM lake.open_t;").Scan(&count))
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT count(*) AS c FROM inngest.open_t;").Scan(&count))
 	require.Equal(t, 1, count)
 }
 
@@ -140,7 +140,7 @@ func TestOpenWithoutDuckLakeHasNoLakeCatalog(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	_, err = db.ExecContext(t.Context(), "CREATE TABLE lake.nope (id INTEGER);")
+	_, err = db.ExecContext(t.Context(), "CREATE TABLE inngest.nope (id INTEGER);")
 	require.Error(t, err, "no DuckLake catalog should be attached when DuckLake is not configured")
 }
 
@@ -155,7 +155,7 @@ func TestDuckLakeOptionsValidation(t *testing.T) {
 	t.Run("missing catalog path", func(t *testing.T) {
 		p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", &DuckLakeOptions{
 			DataPath: filepath.Join(dir, "data"),
-		})
+		}, nil)
 		require.Error(t, err)
 		require.Nil(t, p)
 	})
@@ -163,7 +163,7 @@ func TestDuckLakeOptionsValidation(t *testing.T) {
 	t.Run("missing data path", func(t *testing.T) {
 		p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", &DuckLakeOptions{
 			CatalogPath: filepath.Join(dir, "catalog.ducklake"),
-		})
+		}, nil)
 		require.Error(t, err)
 		require.Nil(t, p)
 	})
@@ -178,7 +178,7 @@ func TestDuckLakeOptionsValidation(t *testing.T) {
 		p, err := startProcessWithDuckLake(t.Context(), binPath, ":memory:", &DuckLakeOptions{
 			CatalogPath: filepath.Join(dir, "catalog2.ducklake"),
 			DataPath:    filepath.Join(blocker, "data"),
-		})
+		}, nil)
 		require.Error(t, err)
 		require.Nil(t, p)
 	})

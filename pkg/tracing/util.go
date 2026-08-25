@@ -581,7 +581,11 @@ func DeferSpanRef(parentRunID ulid.ULID, hashedID string) *meta.SpanReference {
 	}
 }
 
-func spanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {
+// SpanContextFromMetadata builds a trace.SpanContext from a SpanReference's
+// W3C traceparent/tracestate. Exported for pkg/tracing/v3, a second
+// TracerProvider implementation that can't reach this package's other
+// unexported helpers — see its doc comment.
+func SpanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {
 	if m == nil {
 		return trace.SpanContext{}
 	}

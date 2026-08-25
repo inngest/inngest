@@ -7,13 +7,18 @@
 // and flush batches into DuckDB staging tables. Compaction of staged rows out
 // to Hive-partitioned Parquet is deliberately out of scope for this POC and
 // is not implemented here.
+//
+// run_spans (inngest.run_trace_spans) are written differently from
+// runs/events: the per-step hooks below create real spans through this
+// listener's own private tracingv3.TracerProvider (see tracing.go) instead of
+// building rows by hand.
 package dualwrite
 
 import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
+	"errors"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -26,7 +31,13 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
+	tracingv3 "github.com/inngest/inngest/pkg/tracing/v3"
+	"github.com/inngest/inngest/pkg/util/interval"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -39,12 +50,17 @@ type listener struct {
 	execution.NoopSyncLifecycleListener
 
 	runs   chan map[string]any
-	spans  chan map[string]any
 	events chan map[string]any
 
 	droppedRuns   atomic.Int64
-	droppedSpans  atomic.Int64
 	droppedEvents atomic.Int64
+
+	// spanExporter/tp back every per-step hook's span creation — see
+	// tracing.go's doc comments. tp is what hooks actually call
+	// (l.createSpan(...)); spanExporter is the sdktrace.SpanExporter tp
+	// is wired to, kept here only so Close can shut it down.
+	spanExporter *SpanExporter
+	tp           tracingv3.TracerProvider
 
 	// db and batchers/wg back Close (below) — the shutdown path that stops
 	// the background batcher goroutines this listener starts and closes the
@@ -56,10 +72,9 @@ type listener struct {
 	wg       sync.WaitGroup
 }
 
-func newListenerWithChannels(runsCap, spansCap, eventsCap int) *listener {
+func newListenerWithChannels(runsCap, eventsCap int) *listener {
 	return &listener{
 		runs:   make(chan map[string]any, runsCap),
-		spans:  make(chan map[string]any, spansCap),
 		events: make(chan map[string]any, eventsCap),
 	}
 }
@@ -69,14 +84,6 @@ func (l *listener) sendRun(row map[string]any) {
 	case l.runs <- row:
 	default:
 		l.droppedRuns.Add(1)
-	}
-}
-
-func (l *listener) sendSpan(row map[string]any) {
-	select {
-	case l.spans <- row:
-	default:
-		l.droppedSpans.Add(1)
 	}
 }
 
@@ -90,207 +97,286 @@ func (l *listener) sendEvent(row map[string]any) {
 
 // TODO: use this instead of the map[string]anys in the listener hooks, and have the batcher
 type Run struct {
-	AccountID  uuid.UUID         `json:"account_id"`
-	EnvID      uuid.UUID         `json:"env_id"`
-	AppID      uuid.UUID         `json:"app_id"`
-	FunctionID uuid.UUID         `json:"function_id"`
-	RunID      ulid.ULID         `json:"run_id"`
-	QueuedAt   time.Time         `json:"queued_at"`
-	StartedAt  time.Time         `json:"started_at"`
-	EndedAt    time.Time         `json:"ended_at"`
-	Status     enums.RunStatus   `json:"status"`
-	Inputs     []json.RawMessage `json:"inputs"`
-	Output     json.RawMessage   `json:"output"`
+	AccountID   uuid.UUID         `json:"account_id"`
+	EnvID       uuid.UUID         `json:"env_id"`
+	AppID       uuid.UUID         `json:"app_id"`
+	FunctionID  uuid.UUID         `json:"function_id"`
+	RunID       ulid.ULID         `json:"run_id"`
+	QueuedAt    time.Time         `json:"queued_at"`
+	ScheduledAt time.Time         `json:"scheduled_at"`
+	StartedAt   time.Time         `json:"started_at"`
+	EndedAt     time.Time         `json:"ended_at"`
+	Status      enums.StepStatus  `json:"status"`
+	Inputs      []json.RawMessage `json:"inputs"`
+	Output      json.RawMessage   `json:"output"`
 }
 
-func runCommonFields(md sv2.Metadata, evts []json.RawMessage) map[string]any {
+// runCommonFields' scheduledAt follows the same max(item.At, queuedAt) rule
+// opcodeTiming uses (see stepTiming's doc comment) — a job scheduled to run
+// immediately has item.At == the queue enqueue time, which can land
+// fractionally before queuedAt (the run ID's own embedded timestamp),
+// so scheduledAt is never allowed to precede it.
+func runCommonFields(md sv2.Metadata, item queue.Item, evts []json.RawMessage) map[string]any {
 	ts := ulid.Time(md.ID.RunID.Time())
+	scheduledAt := item.At
+	if scheduledAt.Before(ts) {
+		scheduledAt = ts
+	}
 	return map[string]any{
-		"account_id":  md.ID.Tenant.AccountID,
-		"env_id":      md.ID.Tenant.EnvID,
-		"run_id":      md.ID.RunID,
-		"queued_at":   ts,
-		"function_id": md.ID.FunctionID,
-		"app_id":      md.ID.Tenant.AppID,
-		"inputs":      evts,
+		"account_id": md.ID.Tenant.AccountID,
+		"env_id":     md.ID.Tenant.EnvID,
+		"run_id":     md.ID.RunID,
+		"queued_at":  ts,
+		// TODO: make this consistent between the various run status update rows. Maybe store in the state store
+		// like StartedAt?
+		"scheduled_at": scheduledAt,
+		"function_id":  md.ID.FunctionID,
+		"app_id":       md.ID.Tenant.AppID,
+		"inputs":       evts,
 	}
 }
 
-func runTraceSpanCommonFields(md sv2.Metadata) map[string]any {
-	ts := ulid.Time(md.ID.RunID.Time())
-	return map[string]any{
-		"account_id":    md.ID.Tenant.AccountID,
-		"env_id":        md.ID.Tenant.EnvID,
-		"run_id":        md.ID.RunID,
-		"run_queued_at": ts,
-		"function_id":   md.ID.FunctionID,
-		"app_id":        md.ID.Tenant.AppID,
+// addEventsInputAttr sets meta.Attrs.EventsInput to evts marshaled as a
+// single JSON array, the same way executor.Schedule's own runSpanOpts does
+// (strEvts) for the real run span — so the run.queued/started/ended spans'
+// `input` column (see spanExportRow) carries the triggering events, the
+// same shape a real reader of EventsInput already expects.
+func addEventsInputAttr(ctx context.Context, attrs *meta.SerializableAttrs, evts []json.RawMessage) {
+	byt, err := json.Marshal(evts)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("dualwrite: failed to marshal events for EventsInput attribute", "error", err)
+		return
 	}
+	str := string(byt)
+	meta.AddAttr(attrs, meta.Attrs.EventsInput, &str)
 }
 
-func (l *listener) OnFunctionScheduled(_ context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage) {
-	run := runCommonFields(md, evts)
-	run["status"] = enums.RunStatusScheduled // TODO: queued here maybe?
+// createSpan is nil-safe: l.tp is a tracingv3.TracerProvider interface
+// value, nil on a *listener built via newListenerWithChannels directly (see
+// listener_test.go) rather than NewListener. Unlike a nil pointer receiver,
+// calling a method on a nil interface value panics unconditionally — there
+// is no concrete type to dispatch to — so every hook below must go through
+// this rather than l.tp.CreateSpan directly; this package's hooks must
+// never crash the executor's critical path over that.
+func (l *listener) createSpan(ctx context.Context, name string, opts *tracing.CreateSpanOptions) (*meta.SpanReference, error) {
+	if l.tp == nil {
+		return nil, nil
+	}
+	if opts.Attributes == nil {
+		opts.Attributes = meta.NewAttrSet()
+	}
+	addTenantAndDebugAttrs(opts.Attributes, opts.Metadata)
+	ref, err := l.tp.CreateSpan(ctx, name, opts)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("dualwrite: failed to create span", "error", err, "name", name)
+	}
+	return ref, err
+}
 
+func (l *listener) OnFunctionScheduled(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage) {
+	run := runCommonFields(md, item, evts)
+	run["status"] = enums.StepStatusQueued
 	l.sendRun(run)
 
-	span := spanRow(md, "function_scheduled")
-	l.sendSpan(span)
+	// A point span: physical start and end both pinned to queuedAt (the
+	// same timestamp the QueuedAt attribute below carries).
+	queuedAt := ulid.Time(md.ID.RunID.Time())
+	attrs := meta.NewAttrSet()
+	meta.AddAttr(attrs, meta.Attrs.QueuedAt, &queuedAt)
+	addEventsInputAttr(ctx, attrs, evts)
 
-	// TODO: span here too maybe?
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameRunQueued, &tracing.CreateSpanOptions{
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		Attributes: attrs,
+		StartTime:  queuedAt,
+		EndTime:    queuedAt,
+	})
 }
 
-func (l *listener) OnFunctionStarted(_ context.Context, md sv2.Metadata, _ queue.Item, evts []json.RawMessage) {
-	row := runCommonFields(md, evts)
-	row["status"] = enums.RunStatusRunning
+func (l *listener) OnFunctionStarted(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage) {
+	row := runCommonFields(md, item, evts)
+	row["status"] = enums.StepStatusRunning
 	row["started_at"] = md.Config.StartedAt
 	l.sendRun(row)
+
+	// Not a point span: physical start is queuedAt, physical end is
+	// md.Config.StartedAt, so the span's own duration reflects the time
+	// this run actually spent queued before it started.
+	queuedAt := ulid.Time(md.ID.RunID.Time())
+	attrs := meta.NewAttrSet()
+	if !md.Config.StartedAt.IsZero() {
+		meta.AddAttr(attrs, meta.Attrs.StartedAt, &md.Config.StartedAt)
+	}
+	addEventsInputAttr(ctx, attrs, evts)
+
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameRunStarted, &tracing.CreateSpanOptions{
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		Attributes: attrs,
+		StartTime:  queuedAt,
+		EndTime:    md.Config.StartedAt,
+	})
 }
 
-func (l *listener) OnFunctionFinished(_ context.Context, md sv2.Metadata, _ queue.Item, evts []json.RawMessage, resp statev1.DriverResponse) {
-	row := runCommonFields(md, evts)
-	row["status"] = enums.RunStatusCompleted // TODO: error handling
-	row["output"] = resp.Output
+// runFinishedStatus derives the run's finished status from resp, the same
+// way the real system's non-step completion span does
+// (executor.emitNonStepSpan's callers in executor.HandleResponse): by the
+// time OnFunctionFinished fires, a retryable resp.Err has already looped
+// back through OnStepScheduled instead of reaching here, so the only two
+// outcomes left to distinguish are these.
+func runFinishedStatus(resp statev1.DriverResponse) enums.StepStatus {
+	if resp.Err != nil {
+		return enums.StepStatusFailed
+	}
+	return enums.StepStatusCompleted
+}
+
+func (l *listener) OnFunctionFinished(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage, resp statev1.DriverResponse, now time.Time) {
+	stepStatus := runFinishedStatus(resp)
+
+	fnOutput, err := resp.GetTraceFunctionOutput()
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("dualwrite: OnFunctionFinished failed to get function output", "error", err)
+	}
+
+	queuedAt := ulid.Time(md.ID.RunID.Time())
+	start := md.Config.StartedAt
+	if start.IsZero() {
+		start = queuedAt
+	}
+	end := now
+	mdPtr := safeMetadata(md)
+
+	// Two spans, matching the real production topology: a stable root
+	// "executor.run" (created once per run, Seed=md.ID.RunID[:] — the same
+	// identity tracing.RunSpanRefFromMetadata already computes and every
+	// other hook in this file already parents its own spans under, but
+	// which nothing had actually inserted a row for until now), and a
+	// child nonstep span for the function's own output event — see
+	// emitOnFunctionFinishedNonStepSpan below.
+	runAttrs := meta.NewAttrSet()
+	meta.AddAttr(runAttrs, meta.Attrs.DynamicStatus, &stepStatus)
+	addEventsInputAttr(ctx, runAttrs, evts)
+	tracing.AddTimingAttrs(runAttrs, item.EnqueuedAt, item.At, start, end)
+	addRunSpanAttrs(runAttrs, mdPtr)
+	_, _ = l.createSpan(ctx, meta.SpanNameRun, &tracing.CreateSpanOptions{
+		Seed:       md.ID.RunID[:],
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		StartTime:  queuedAt,
+		EndTime:    end,
+		Attributes: runAttrs,
+	})
+
+	// Create the nonstep span before the run list entry below, so nothing
+	// reading inngest.runs ever observes a finished run before its
+	// corresponding trace data exists.
+	l.emitOnFunctionFinishedNonStepSpan(ctx, mdPtr, item, resp, stepStatus, start, end)
+
+	// status/output derived the same way as the spans above, from the same
+	// stepStatus/fnOutput — see runFinishedStatus.
+	row := runCommonFields(md, item, evts)
+	row["status"] = stepStatus
+	if fnOutput != "" {
+		row["output"] = fnOutput
+	}
 	row["started_at"] = md.Config.StartedAt
-	row["ended_at"] = time.Now()
-	// TODO: real started_at/ended_at
+	row["ended_at"] = end
 	l.sendRun(row)
-
-	log.Println("dualwrite: OnFunctionFinished resp:", resp)
-
-	// TODO: span here too
 }
 
-func (l *listener) OnFunctionCancelled(_ context.Context, md sv2.Metadata, _ execution.CancelRequest, evts []json.RawMessage) {
-	row := runCommonFields(md, evts)
-	row["status"] = enums.RunStatusCancelled
-	// TODO: started_at/ended_at
+// emitOnFunctionFinishedNonStepSpan creates the span for the function's own
+// output event, a child of the root "executor.run" span (see
+// OnFunctionFinished above) — the same role executor.emitNonStepSpan's span
+// plays in the real production pipeline, and the same Seed
+// (tracing.NonStepDynamicSeed(item)) it uses, so a reader can correlate the
+// two by identity. tracingv3.SpanNameError/SpanNameFinal split by outcome,
+// rather than the real system's single meta.SpanNameNonStep name for both
+// (kept as-is for executor.emitNonStepSpan itself).
+func (l *listener) emitOnFunctionFinishedNonStepSpan(ctx context.Context, mdPtr *sv2.Metadata, item queue.Item, resp statev1.DriverResponse, status enums.StepStatus, start, end time.Time) {
+	// tracing.DriverResponseOutputAttrs is the exact same builder
+	// executor.emitNonStepSpan uses (IsFunctionOutput/StepOutput/Retryable/
+	// ResponseOutputSize) — this span was never dynamic, same as the real
+	// one, so its attribute set should match exactly.
+	attrs := tracing.DriverResponseOutputAttrs(&resp)
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, &status)
+	if resp.Err != nil {
+		attrs.AddErr(errors.New(*resp.Err))
+	}
+	tracing.AddTimingAttrs(attrs, item.EnqueuedAt, item.At, start, end)
+
+	spanName := tracingv3.SpanNameFinal
+	if status == enums.StepStatusFailed || status == enums.StepStatusErrored {
+		spanName = tracingv3.SpanNameError
+	}
+
+	_, _ = l.createSpan(ctx, spanName, &tracing.CreateSpanOptions{
+		Seed:       tracing.NonStepDynamicSeed(item),
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		StartTime:  start,
+		EndTime:    end,
+		Attributes: attrs,
+	})
+}
+
+func (l *listener) OnFunctionCancelled(_ context.Context, md sv2.Metadata, _ execution.CancelRequest, evts []json.RawMessage, now time.Time) {
+	row := runCommonFields(md, queue.Item{}, evts)
+	row["status"] = enums.StepStatusCancelled
+	if !md.Config.StartedAt.IsZero() {
+		row["started_at"] = md.Config.StartedAt
+	}
+	row["ended_at"] = now
 	l.sendRun(row)
-
-	// TODO: span here too
 }
 
-func (l *listener) OnStepStarted(_ context.Context, md sv2.Metadata, _ queue.Item, _ inngest.Edge, _ string) {
-	l.sendSpan(spanRow(md, "step_started"))
-}
-
-func (l *listener) OnStepFinished(_ context.Context, md sv2.Metadata, _ queue.Item, _ inngest.Edge, _ *statev1.DriverResponse, stepErr error) {
-	row := spanRow(md, "step_finished")
-	if stepErr != nil {
-		row["error"] = stepErr.Error()
+// OnStepScheduled creates a point-in-time marker span (tracingv3.SpanNameStepPlanned)
+// for the moment a step is scheduled/planned — a distinct span kind from the
+// real "executor.step" span, with its own random span_id rather than
+// FinalizedStepDynamicSeed(gen.ID): this hook receives no GeneratorOpcode to
+// derive that seed from (only a step name), and even if it did, reusing the
+// eventual finished step span's identity here would collide with it once
+// that real span is inserted — this package only ever inserts, never
+// updates in place (see SpanExporter's doc comment).
+func (l *listener) OnStepScheduled(ctx context.Context, md sv2.Metadata, item queue.Item, stepName *string, now time.Time) {
+	attrs := meta.NewAttrSet()
+	if stepName != nil {
+		meta.AddAttr(attrs, meta.Attrs.StepName, stepName)
 	}
-	l.sendSpan(row)
+
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameStepPlanned, &tracing.CreateSpanOptions{
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		Attributes: attrs,
+		StartTime:  now,
+		EndTime:    now,
+	})
 }
 
-// spanRow is the shared shape every run_spans_staging row uses: the run it
-// belongs to, what happened, when, and the partition columns. Optional
-// columns (step_name, error) are only added when there is a value for them,
-// exactly as OnStepScheduled/OnStepFinished already do — batcher.insert
-// unions the keys across a batch, so a row omitting one still writes NULL for
-// it (see batch.go).
-func spanRow(md sv2.Metadata, eventType string) map[string]any {
-	row := runTraceSpanCommonFields(md)
-	return row
-}
-
-// The generator-opcode hooks below cover the sleep/wait/invoke half of the
-// spec's run_spans hook coverage. Like the step hooks above, each produces one
-// append-only row from a single hook call's own data — no correlation between
-// a wait and its resume is done in memory; a reader reconstructs the pairing
-// from run_id + step_name + created_at at query time.
-
-func (l *listener) OnSleep(_ context.Context, md sv2.Metadata, _ queue.Item, gen statev1.GeneratorOpcode, until time.Time) {
-	row := spanRow(md, "sleep")
-	if gen.Name != "" {
-		row["step_name"] = gen.Name
-	}
-	l.sendSpan(row)
-}
-
-func (l *listener) OnWaitForEvent(_ context.Context, md sv2.Metadata, _ queue.Item, gen statev1.GeneratorOpcode, _ statev1.Pause) {
-	row := spanRow(md, "wait_for_event")
-	if gen.Name != "" {
-		row["step_name"] = gen.Name
-	}
-	l.sendSpan(row)
-}
-
-func (l *listener) OnWaitForEventResumed(_ context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
-	l.sendSpan(resumeRow(md, "wait_for_event_resumed", pause, r))
-}
-
-func (l *listener) OnWaitForSignal(_ context.Context, md sv2.Metadata, _ queue.Item, gen statev1.GeneratorOpcode, _ statev1.Pause) {
-	row := spanRow(md, "wait_for_signal")
-	if gen.Name != "" {
-		row["step_name"] = gen.Name
-	}
-	l.sendSpan(row)
-}
-
-func (l *listener) OnWaitForSignalResumed(_ context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
-	l.sendSpan(resumeRow(md, "wait_for_signal_resumed", pause, r))
-}
-
-func (l *listener) OnInvokeFunction(_ context.Context, md sv2.Metadata, _ queue.Item, gen statev1.GeneratorOpcode, _ event.Event) {
-	row := spanRow(md, "invoke_function")
-	if gen.Name != "" {
-		row["step_name"] = gen.Name
-	}
-	l.sendSpan(row)
-}
-
-func (l *listener) OnInvokeFunctionResumed(_ context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
-	l.sendSpan(resumeRow(md, "invoke_function_resumed", pause, r))
-}
-
-// resumeRow is shared by the three *Resumed hooks, whose signatures and
-// available data are identical. A resume carries its step name on either the
-// ResumeRequest or the pause, and a timed-out resume is recorded through the
-// error column rather than a dedicated event_type, keeping the resume rows
-// uniform.
-func resumeRow(md sv2.Metadata, eventType string, pause statev1.Pause, r execution.ResumeRequest) map[string]any {
-	row := spanRow(md, eventType)
-	switch {
-	case r.StepName != "":
-		row["step_name"] = r.StepName
-	case pause.StepName != "":
-		row["step_name"] = pause.StepName
-	}
-	if r.IsTimeout {
-		row["error"] = "timeout"
-	}
-	return row
-}
-
-func (l *listener) OnStepGatewayRequestFinished(_ context.Context, md sv2.Metadata, _ queue.Item, _ inngest.Edge, gen statev1.GeneratorOpcode, _ *http.Response, userErr *statev1.UserError) {
-	row := spanRow(md, "step_gateway_request_finished")
-	if gen.Name != "" {
-		row["step_name"] = gen.Name
-	}
-	if userErr != nil {
-		row["error"] = userErr.Message
-	}
-	l.sendSpan(row)
-}
-
-func (l *listener) OnEventReceived(_ context.Context, evt event.TrackedEvent) {
+func (l *listener) OnEventReceived(ctx context.Context, evt event.TrackedEvent) {
 	event := evt.GetEvent()
 	eventDataBytes, err := json.Marshal(event.Data)
 	if err != nil {
-		log.Printf("dualwrite: failed to marshal event data for event %s: %v", event.Name, err)
+		logger.StdlibLogger(ctx).Error("dualwrite: failed to marshal event data", "event", event.Name, "error", err)
 		return
 	}
 
 	eventMetaBytes, err := json.Marshal(event.Meta)
 	if err != nil {
-		log.Printf("dualwrite: failed to marshal event meta for event %s: %v", event.Name, err)
+		logger.StdlibLogger(ctx).Error("dualwrite: failed to marshal event meta", "event", event.Name, "error", err)
 		return
 	}
 
 	internalID := evt.GetInternalID()
-	// TODO: verify that a minor semantics change like this is safe.
-	// Afaict the internal id & received_at timestamp are created at the same time but not using the same
-	// literal timestamp value.
+	// NOTE: Use internalID.Timestamp() instead of time.Now() for ordering simplicity in queries
 	receivedAt := internalID.Timestamp()
 
 	row := map[string]any{
@@ -309,6 +395,356 @@ func (l *listener) OnEventReceived(_ context.Context, evt event.TrackedEvent) {
 	}
 
 	l.sendEvent(row)
+}
+
+// The per-step hooks below create real spans through l.tp (this listener's
+// private tracingv3.TracerProvider — see tracing.go), using the same Seed
+// values the real system's own CreateSpan calls use for that step
+// (executor.emitStepSpan/OnSleep) — not a fabricated or random identity —
+// so a span here can line up with the real one by span_id/trace_id.
+//
+// The three pause-backed opcodes (wait-for-event, wait-for-signal, invoke)
+// each create two separate spans rather than one: a point-in-time marker
+// with a random span_id when the pause begins, and a second span
+// encompassing the pause's full duration (both dated from the pause's own
+// CreatedAt — the first through to itself, the second through to resume),
+// with the deterministic span_id.
+//
+// OnStepFinished's real counterpart (tracingv3.SpanNameExecution, created in
+// executor.Execute's CreateSpan call with no Seed at all) is a genuinely
+// random, per-attempt span with no deterministic identity to reconstruct
+// from a hook's arguments — and OnStepFinished itself fires once per SDK
+// request, which may cover several opcodes (or none) rather than one step,
+// so there's no single step identity to key off of either. Its span (see
+// OnStepFinished below) therefore gets the same real name
+// (tracingv3.SpanNameExecution) but a random span_id, the same as the
+// OnFunctionScheduled/OnFunctionStarted markers above.
+//
+// OnStepStarted is still NOT implemented: it carries even less than
+// OnStepFinished (no GeneratorOpcode, no DriverResponse — just a URL
+// string), so there's nothing meaningful to put on a span at all.
+// execution.NoopSyncLifecycleListener covers it as a no-op.
+
+// genOpcodeAttrs builds the meta.Attrs plumbing shared by every hook below
+// that receives a GeneratorOpcode directly: StepName and StepOp, the same
+// two attributes executor.emitStepSpan always sets before layering on
+// anything opcode-specific.
+func genOpcodeAttrs(gen statev1.GeneratorOpcode) *meta.SerializableAttrs {
+	attrs := meta.NewAttrSet()
+	if gen.Name != "" {
+		meta.AddAttr(attrs, meta.Attrs.StepName, &gen.Name)
+	}
+	meta.AddAttr(attrs, meta.Attrs.StepOp, &gen.Op)
+	return attrs
+}
+
+// stepTiming replicates executor.opcodeTiming's fallback logic (see
+// executor.go): gen.Timing is only populated by newer SDKs that report
+// per-opcode timing, so gen.Timing.Start()/End() can come back zero (or,
+// for a replayed/backfilled opcode, before the step was even queued) —
+// opcodeTiming falls back to runCtx.StartTime()/e.now() in that case; this
+// package has no RunContext, so it falls back to the run's own
+// md.Config.StartedAt/now instead, the closest equivalents it has access
+// to. now is always the caller's own timestamp (see the SyncLifecycleListener
+// hooks' own doc comments) — this package never calls time.Now() itself.
+func stepTiming(item queue.Item, md sv2.Metadata, gen *statev1.GeneratorOpcode, now time.Time) (queuedAt, scheduledAt, startedAt, endedAt time.Time) {
+	queuedAt = item.EnqueuedAt
+	scheduledAt = item.At
+	if scheduledAt.Before(queuedAt) {
+		scheduledAt = queuedAt
+	}
+
+	// interval.Interval{}.Start() decodes an unset Timing as the Unix
+	// epoch, not time.Time's own zero value, so an explicit zero-value
+	// check here (rather than relying on startedAt.IsZero() below) is
+	// required to actually detect "this SDK never sent Timing" — otherwise
+	// the fallback below never triggers and every untimed opcode gets a
+	// span pinned to 1970.
+	if gen != nil && gen.Timing != (interval.Interval{}) {
+		startedAt = gen.Timing.Start()
+		endedAt = gen.Timing.End()
+	}
+
+	if startedAt.IsZero() || startedAt.Before(queuedAt) {
+		startedAt = md.Config.StartedAt
+	}
+	if endedAt.IsZero() || endedAt.Before(startedAt) {
+		endedAt = now
+	}
+
+	return queuedAt, scheduledAt, startedAt, endedAt
+}
+
+// stepAttrs builds the attribute set for a real "executor.step" span
+// (OnSleep/OnStepRunFinished/OnStepGatewayRequestFinished — never dynamic,
+// same as the real spans they mirror, so their attribute set should match
+// exactly): tracing.GeneratorAttrs(gen) is the exact same builder
+// executor.emitStepSpan/handleGeneratorSleep use (covering StepID/StepOp/
+// StepName/StepInput/StepOutput/opcode-specific fields — see
+// pkg/tracing/util.go's generatorAttrs), plus the same timing attrs
+// tracing.AddTimingAttrs adds there. Tenant attrs need no separate call:
+// pkg/tracing's executionProcessor.OnStart adds those automatically for
+// any span with Metadata set, which every span this package creates has.
+// Returns startedAt/endedAt too, so callers can use the exact same
+// timestamps for the span's own physical start/end.
+func stepAttrs(gen *statev1.GeneratorOpcode, item queue.Item, md sv2.Metadata, now time.Time) (attrs *meta.SerializableAttrs, startedAt, endedAt time.Time) {
+	attrs = tracing.GeneratorAttrs(gen)
+	queuedAt, scheduledAt, startedAt, endedAt := stepTiming(item, md, gen, now)
+	tracing.AddTimingAttrs(attrs, queuedAt, scheduledAt, startedAt, endedAt)
+	return attrs, startedAt, endedAt
+}
+
+func (l *listener) OnSleep(ctx context.Context, md sv2.Metadata, item queue.Item, gen statev1.GeneratorOpcode, _ time.Time, now time.Time) {
+	// tracing.GeneratorAttrs is the exact same attribute builder
+	// executor.emitStepSpan/handleGeneratorSleep use — it already sets
+	// StepSleepDuration from the step's actual configured duration
+	// (op.SleepDuration()), which is more accurate than anything derivable
+	// from this hook's own "until" argument, so there's nothing to add on
+	// top of it here.
+	attrs, startedAt, endedAt := stepAttrs(&gen, item, md, now)
+
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameStep, &tracing.CreateSpanOptions{
+		Seed:       tracing.SleepStepDynamicSeed(gen.ID),
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		Attributes: attrs,
+		StartTime:  startedAt,
+		EndTime:    endedAt,
+	})
+}
+
+func (l *listener) OnWaitForEvent(ctx context.Context, md sv2.Metadata, item queue.Item, gen statev1.GeneratorOpcode, pause statev1.Pause) {
+	l.createPauseStartedSpan(ctx, md, item, genOpcodeAttrs(gen), pause)
+}
+
+func (l *listener) OnWaitForEventResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
+	l.createPauseSpan(ctx, md, pause, r)
+}
+
+func (l *listener) OnWaitForSignal(ctx context.Context, md sv2.Metadata, item queue.Item, gen statev1.GeneratorOpcode, pause statev1.Pause) {
+	l.createPauseStartedSpan(ctx, md, item, genOpcodeAttrs(gen), pause)
+}
+
+func (l *listener) OnWaitForSignalResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
+	l.createPauseSpan(ctx, md, pause, r)
+}
+
+func (l *listener) OnInvokeFunction(ctx context.Context, md sv2.Metadata, item queue.Item, gen statev1.GeneratorOpcode, _ event.Event) {
+	l.createPauseStartedSpan(ctx, md, item, genOpcodeAttrs(gen), statev1.Pause{})
+}
+
+func (l *listener) OnInvokeFunctionResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
+	l.createPauseSpan(ctx, md, pause, r)
+}
+
+// createPauseStartedSpan creates the point-in-time marker span for the
+// moment a pause begins — see the doc comment above OnSleep. Dated to the
+// pause's own CreatedAt rather than "now" at hook-call time, the same
+// timestamp createPauseSpan uses as its start. OnInvokeFunction doesn't
+// receive a Pause at all, so it passes a zero value; a zero CreatedAt
+// (also possible on a real Pause — see its doc comment) leaves StartTime
+// zero too, which CreateSpanOptions already defaults to "now".
+func (l *listener) createPauseStartedSpan(ctx context.Context, md sv2.Metadata, item queue.Item, attrs *meta.SerializableAttrs, pause statev1.Pause) {
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameStepPauseStarted, &tracing.CreateSpanOptions{
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		Attributes: attrs,
+		StartTime:  pause.CreatedAt,
+	})
+}
+
+// createPauseSpan creates the span encompassing a pause's full duration —
+// called at resume time, once both boundaries are known: pause.CreatedAt
+// (since these hooks never see the original call that created the pause)
+// through to now, the resume time (CreateSpan always ends a span "now",
+// when called). Its Seed is the same tracing.FinalizedStepDynamicSeed the
+// step's eventual real finished span would also use, so a reader can
+// correlate this span to that one by identity even though this one was
+// never updated in place the way the real system's is — see
+// SpanExporter's doc comment on this package only ever inserting.
+func (l *listener) createPauseSpan(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
+	attrs := resumeAttrs(pause, r)
+	// A timeout is an expected outcome (e.g. a wait-for-event's timeout
+	// branch), not a failure — StepStatusTimedOut says so directly, the
+	// same way emitStepSpan's own DynamicStatus does for every other step
+	// span, rather than layering an "error" attribute onto a Completed
+	// status that would otherwise default to implying success.
+	status := enums.StepStatusCompleted
+	if r.IsTimeout {
+		status = enums.StepStatusTimedOut
+	}
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, &status)
+
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameStep, &tracing.CreateSpanOptions{
+		Seed:       tracing.FinalizedStepDynamicSeed(pause.Outgoing),
+		Metadata:   mdPtr,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		StartTime:  pause.CreatedAt,
+		Attributes: attrs,
+	})
+}
+
+// resumeAttrs is shared by the three *Resumed hooks above, whose signatures
+// and available data are identical: a resume carries its step name on
+// either the ResumeRequest or the pause, but never a GeneratorOpcode, so
+// there's no StepOp to set here (unlike genOpcodeAttrs).
+func resumeAttrs(pause statev1.Pause, r execution.ResumeRequest) *meta.SerializableAttrs {
+	attrs := meta.NewAttrSet()
+	name := r.StepName
+	if name == "" {
+		name = pause.StepName
+	}
+	if name != "" {
+		meta.AddAttr(attrs, meta.Attrs.StepName, &name)
+	}
+	return attrs
+}
+
+func (l *listener) OnStepGatewayRequestFinished(ctx context.Context, md sv2.Metadata, item queue.Item, _ inngest.Edge, gen statev1.GeneratorOpcode, _ *http.Response, userErr *statev1.UserError, now time.Time) {
+	attrs, startedAt, endedAt := stepAttrs(&gen, item, md, now)
+	// Approximates emitStepSpan's real switch (Errored if retryable, else
+	// Failed) as a simple two-way split: retryability isn't derivable from
+	// this hook's arguments alone (no runCtx/attempt count), only whether
+	// the gateway request itself errored.
+	status := enums.StepStatusCompleted
+	if userErr != nil {
+		status = enums.StepStatusFailed
+		attrs.AddErr(errors.New(userErr.Message))
+	}
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, &status)
+
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameStep, &tracing.CreateSpanOptions{
+		Seed:       tracing.FinalizedStepDynamicSeed(gen.ID),
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		Attributes: attrs,
+		StartTime:  startedAt,
+		EndTime:    endedAt,
+	})
+}
+
+// OnStepRunFinished creates a span for a plain step.run step
+// (enums.OpcodeStep/OpcodeStepRun) completing — see
+// executor.handleGeneratorStep, which calls this alongside its own
+// e.emitStepSpan using the exact same seed
+// (tracing.FinalizedStepDynamicSeed(gen.ID)), so this span's identity
+// matches that real one.
+func (l *listener) OnStepRunFinished(ctx context.Context, md sv2.Metadata, item queue.Item, _ inngest.Edge, gen statev1.GeneratorOpcode, now time.Time) {
+	// tracing.GeneratorAttrs already sets StepOutput (via op.Output(), same
+	// as gen.Output() below) for OpcodeStep/OpcodeStepRun, so stepAttrs
+	// covers it — only DynamicStatus needs setting on top, matching
+	// emitStepSpan's default-case status for these two opcodes.
+	attrs, startedAt, endedAt := stepAttrs(&gen, item, md, now)
+	status := enums.StepStatusCompleted
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, &status)
+
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameStep, &tracing.CreateSpanOptions{
+		Seed:       tracing.FinalizedStepDynamicSeed(gen.ID),
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		Attributes: attrs,
+		StartTime:  startedAt,
+		EndTime:    endedAt,
+	})
+}
+
+// OnStepFinished creates a span for tracingv3.SpanNameExecution — see the doc
+// comment above OnSleep for why this gets a random span_id rather than a
+// deterministic one, the same as OnFunctionScheduled/OnFunctionStarted's
+// markers. resp may be nil (a request-level failure before any response
+// was parsed — see executor.go's ExecutePost, which calls OnStepFinished
+// with resp == nil and err != nil in that case).
+func (l *listener) OnStepFinished(ctx context.Context, md sv2.Metadata, item queue.Item, _ inngest.Edge, resp *statev1.DriverResponse, stepErr error, reqStart time.Time, now time.Time) {
+	// This span covers the whole SDK request, which may span several steps
+	// (or none) — see the doc comment above OnSleep — so no step-specific
+	// attributes (name, attempt, etc.) belong here, matching the real
+	// execution span's own attrs (tracing.FunctionAttrs + DriverResponseAttrs,
+	// neither of which set anything step-scoped).
+	attrs := meta.NewAttrSet()
+
+	status := enums.StepStatusCompleted
+	switch {
+	case stepErr != nil:
+		status = enums.StepStatusFailed
+		attrs.AddErr(stepErr)
+	case resp != nil && resp.Err != nil:
+		status = enums.StepStatusFailed
+		attrs.AddErr(errors.New(*resp.Err))
+	case resp != nil && resp.UserError != nil:
+		status = enums.StepStatusFailed
+		attrs.AddErr(errors.New(resp.UserError.Message))
+	}
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, &status)
+
+	// end is "now", when the SDK request has finished and this hook fires;
+	// start is reqStart, captured by the caller immediately before the
+	// request was sent (see runInstance.reqStart's doc comment) — the real
+	// boundary, rather than approximating it by subtracting resp.Duration
+	// from end.
+	end := now
+	start := reqStart
+	if start.IsZero() {
+		start = end
+	}
+	if resp != nil {
+		fnOutput, err := resp.GetTraceFunctionOutput()
+		if err == nil && fnOutput != "" {
+			meta.AddAttr(attrs, meta.Attrs.StepOutput, &fnOutput)
+		}
+		// Same redaction/compaction tracing.DriverResponseAttrs applies for
+		// the real execution span's own ResponseHeaders attribute.
+		redactedHeaders := headers.Compact(headers.Redact(resp.Header))
+		meta.AddAttr(attrs, meta.Attrs.ResponseHeaders, &redactedHeaders)
+
+		// Same fallback tracing.DriverResponseAttrs uses: resp.OutputSize is
+		// the driver-reported payload size, but falls back to the extracted
+		// function output's own length when the driver didn't report one.
+		size := resp.OutputSize
+		if size == 0 && fnOutput != "" {
+			size = len(fnOutput)
+		}
+		meta.AddAttr(attrs, meta.Attrs.ResponseOutputSize, &size)
+		meta.AddAttr(attrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
+
+		// Every opcode the SDK reported in this response, the same debugging
+		// attribute tracing.DriverResponseAttrs always adds regardless of
+		// how many ops the response carries.
+		steps := make(meta.ResponseOps, len(resp.Generator))
+		for i, s := range resp.Generator {
+			steps[i] = meta.ResponseOp{Op: s.Op, ID: s.ID, Name: s.Name}
+		}
+		meta.AddAttr(attrs, meta.Attrs.ResponseSteps, &steps)
+	}
+
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameExecution, &tracing.CreateSpanOptions{
+		Metadata:   mdPtr,
+		QueueItem:  &item,
+		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
+		Attributes: attrs,
+		StartTime:  start,
+		EndTime:    end,
+	})
+
+	// A transient (retryable) failure never reaches OnFunctionFinished — the
+	// executor loops back through OnStepScheduled to retry instead (see
+	// runFinishedStatus's doc comment) — so this is the only place that
+	// hook's own nonstep span (see emitOnFunctionFinishedNonStepSpan) would
+	// otherwise be missed for this one outcome, matching
+	// executor.go's own emitNonStepSpan(..., StepStatusErrored) call for a
+	// retryable resp.Err.
+	if resp != nil && resp.Err != nil && resp.Retryable() {
+		l.emitOnFunctionFinishedNonStepSpan(ctx, mdPtr, item, *resp, enums.StepStatusErrored, start, end)
+	}
 }
 
 // Option configures NewListener.
@@ -344,13 +780,15 @@ type Closer interface {
 }
 
 // NewListener returns an execution.SyncLifecycleListener that dual-writes
-// runs/run_spans/events into db, and starts its own background batching
-// goroutines (batch.go) that drain the listener's channels and flush into
-// the runs_staging/run_spans_staging/events_staging tables. The batching
-// goroutines run for the lifetime of the process (context.Background())
-// unless the caller stops them via Close (the returned value always
-// implements Closer). Compaction of staged rows out to Parquet is out of
-// scope for this POC's minimal wiring (descoped by the coordinator; see
+// runs/events into db, and starts its own background batching goroutines
+// (batch.go) that drain the listener's channels and flush into the
+// runs_staging/events_staging tables. It also starts a standalone
+// SpanExporter (tracing.go) backing this listener's own private
+// tracingv3.TracerProvider, sharing db. The batching goroutines run for the
+// lifetime of the process (context.Background()) unless the caller stops
+// them via Close (the returned value always implements Closer). Compaction
+// of staged rows out to Parquet is out of scope for this POC's minimal
+// wiring (descoped by the coordinator; see
 // docs/plans/006-duckdb-poc-subprocess-dual-write.md).
 func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 	o := defaultSetupOpts()
@@ -358,17 +796,17 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 		apply(&o)
 	}
 
-	l := newListenerWithChannels(o.runsCap, o.spansCap, o.eventsCap)
+	l := newListenerWithChannels(o.runsCap, o.eventsCap)
 	l.db = db
 
 	tables := map[string]chan map[string]any{
-		"inngest.runs":            l.runs,
-		"inngest.run_trace_spans": l.spans,
-		"inngest.events":          l.events,
+		"inngest.runs":   l.runs,
+		"inngest.events": l.events,
 	}
-	// One shared disabledState across all three batchers, so the driver's
-	// terminal duckdb.ErrDisabled state stops the whole dual-write path and
-	// is logged exactly once rather than once per table.
+	// One shared disabledState across every batcher (runs/events here, plus
+	// the span exporter's own below), so the driver's terminal
+	// duckdb.ErrDisabled state stops the whole dual-write path and is logged
+	// exactly once rather than once per table.
 	disabled := &disabledState{}
 	for table, ch := range tables {
 		b := newBatcher(db, table, ch, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: disabled})
@@ -379,6 +817,9 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 			b.run(context.Background())
 		}()
 	}
+
+	l.spanExporter = newSpanExporter(db, o.spansCap, batcherOpts{maxSize: o.batchMaxSize, flushInterval: o.batchInterval, disabled: disabled})
+	l.tp = newListenerTracerProvider(l.spanExporter, o.batchInterval)
 
 	return l
 }
@@ -402,6 +843,12 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 func (l *listener) Close(ctx context.Context) error {
 	for _, b := range l.batchers {
 		b.stop()
+	}
+	// Stop the span exporter's own batcher/goroutine too, before db is
+	// closed below — SpanExporter.Shutdown never touches db itself, since
+	// this listener owns that lifecycle.
+	if l.spanExporter != nil {
+		_ = l.spanExporter.Shutdown(ctx)
 	}
 
 	done := make(chan struct{})

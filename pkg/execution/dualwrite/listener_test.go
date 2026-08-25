@@ -9,17 +9,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
 func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
-	l := newListenerWithChannels(1, 1, 1) // capacity 1 for each of runs/spans/events
+	l := newListenerWithChannels(1, 1) // capacity 1 for each of runs/events
 
 	evt := event.NewBaseTrackedEvent(event.Event{Name: "test"}, nil)
 
@@ -44,7 +42,7 @@ func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
 }
 
 func TestListenerOnFunctionScheduledEnqueuesRunRow(t *testing.T) {
-	l := newListenerWithChannels(10, 10, 10)
+	l := newListenerWithChannels(10, 10)
 
 	l.OnFunctionScheduled(context.Background(), sv2.Metadata{}, queue.Item{}, nil)
 
@@ -159,7 +157,7 @@ func TestNewListenerEndToEndRunFlow(t *testing.T) {
 	ctx := context.Background()
 	l.OnFunctionScheduled(ctx, md, queue.Item{}, nil)
 	l.OnFunctionStarted(ctx, md, queue.Item{}, nil)
-	l.OnFunctionFinished(ctx, md, queue.Item{}, nil, statev1.DriverResponse{})
+	l.OnFunctionFinished(ctx, md, queue.Item{}, nil, statev1.DriverResponse{}, time.Now())
 
 	require.Eventually(t, func() bool {
 		var count int
@@ -186,63 +184,4 @@ func TestNewListenerEndToEndRunFlow(t *testing.T) {
 	// OnFunctionFinished is the only runs hook that populates status.
 	require.Equal(t, "completed", rowByEventType(t, rows, "function_finished")["status"])
 	require.Nil(t, rowByEventType(t, rows, "function_scheduled")["status"])
-}
-
-// TestNewListenerEndToEndGeneratorOpcodeHooks covers the sleep/wait/invoke
-// hooks added to execution.SyncLifecycleListener, proving their rows satisfy
-// run_spans_staging's real schema — including the optional step_name and error
-// columns, which arrive on only some of the rows in a single batch.
-func TestNewListenerEndToEndGeneratorOpcodeHooks(t *testing.T) {
-	db, cleanup := newTestDuckDB(t)
-	defer cleanup()
-
-	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
-
-	md := testMetadata(t)
-	ctx := context.Background()
-
-	l.OnSleep(ctx, md, queue.Item{}, statev1.GeneratorOpcode{Name: "my-sleep"}, time.Now().Add(time.Minute))
-	l.OnWaitForEvent(ctx, md, queue.Item{}, statev1.GeneratorOpcode{Name: "my-wait"}, statev1.Pause{})
-	l.OnWaitForEventResumed(ctx, md, statev1.Pause{StepName: "my-wait"}, execution.ResumeRequest{IsTimeout: true})
-	l.OnWaitForSignal(ctx, md, queue.Item{}, statev1.GeneratorOpcode{Name: "my-signal"}, statev1.Pause{})
-	l.OnWaitForSignalResumed(ctx, md, statev1.Pause{}, execution.ResumeRequest{StepName: "my-signal"})
-	l.OnInvokeFunction(ctx, md, queue.Item{}, statev1.GeneratorOpcode{Name: "my-invoke"}, event.Event{Name: "inngest/function.invoked"})
-	l.OnInvokeFunctionResumed(ctx, md, statev1.Pause{StepName: "my-invoke"}, execution.ResumeRequest{})
-	l.OnStepGatewayRequestFinished(ctx, md, queue.Item{}, inngest.Edge{}, statev1.GeneratorOpcode{Name: "my-gateway"}, nil, &statev1.UserError{Message: "boom"})
-
-	wantStepNames := map[string]string{
-		"sleep":                         "my-sleep",
-		"wait_for_event":                "my-wait",
-		"wait_for_event_resumed":        "my-wait",
-		"wait_for_signal":               "my-signal",
-		"wait_for_signal_resumed":       "my-signal",
-		"invoke_function":               "my-invoke",
-		"invoke_function_resumed":       "my-invoke",
-		"step_gateway_request_finished": "my-gateway",
-	}
-
-	require.Eventually(t, func() bool {
-		var count int
-		row := db.QueryRowContext(ctx, "SELECT count(*) FROM run_spans_staging;")
-		_ = row.Scan(&count)
-		return count == len(wantStepNames)
-	}, 5*time.Second, 20*time.Millisecond, "every generator-opcode hook should stage a run_spans row")
-
-	rows := selectRows(t, db, "SELECT event_type, step_name, error, run_id, year, month FROM run_spans_staging;")
-	require.Len(t, rows, len(wantStepNames))
-
-	ts := ulid.Time(md.ID.RunID.Time())
-	for eventType, wantStep := range wantStepNames {
-		row := rowByEventType(t, rows, eventType)
-		require.Equal(t, md.ID.RunID.String(), row["run_id"], eventType)
-		require.Equal(t, wantStep, row["step_name"], eventType)
-		require.EqualValues(t, ts.Year(), row["year"], eventType)
-		require.EqualValues(t, int(ts.Month()), row["month"], eventType)
-	}
-
-	// A timed-out resume records the timeout in the error column; a normal
-	// resume leaves it NULL.
-	require.Equal(t, "timeout", rowByEventType(t, rows, "wait_for_event_resumed")["error"])
-	require.Nil(t, rowByEventType(t, rows, "invoke_function_resumed")["error"])
-	require.Equal(t, "boom", rowByEventType(t, rows, "step_gateway_request_finished")["error"])
 }

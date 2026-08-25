@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
 	env_id UUID NOT NULL,
 	run_id VARCHAR NOT NULL,
   queued_at TIMESTAMP_MS NOT NULL,
+  scheduled_at TIMESTAMP_MS NULL,
   started_at TIMESTAMP_MS NULL,
   ended_at TIMESTAMP_MS NULL,
   app_id UUID NOT NULL,
@@ -35,6 +36,12 @@ ALTER TABLE inngest.runs
 --   output
 -- FROM read_parquet(getvariable('DATA_PATH') || '/runs/*/*/*/*.parquet', hive_partitioning = true);
 
+-- Column set mirrors pkg/db/sqlite's `spans` table (see
+-- pkg/execution/dualwrite/span_exporter.go's doc comment), minus the
+-- dynamic-span rollup columns (dynamic_span_id, status, event_ids,
+-- is_deferred) — this table only ever holds flat, non-dynamic spans, so
+-- those values live in `attributes` like any other span attribute instead
+-- of getting a dedicated column.
 CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
 	account_id UUID NOT NULL,
 	env_id UUID NOT NULL,
@@ -42,12 +49,16 @@ CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
   run_queued_at TIMESTAMP_MS NOT NULL,
   app_id UUID NOT NULL,
 	function_id UUID NOT NULL,
+  name VARCHAR NOT NULL,
   start_time TIMESTAMP_MS NOT NULL,
   end_time TIMESTAMP_MS NOT NULL,
   trace_id VARCHAR NOT NULL,
   span_id VARCHAR NOT NULL,
   parent_span_id VARCHAR,
   attributes JSON NOT NULL,
+  links JSON,
+  output JSON,
+  input JSON,
 );
 ALTER TABLE inngest.run_trace_spans
   SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, start_time, end_time);

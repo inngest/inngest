@@ -40,29 +40,40 @@ type SyncLifecycleListener interface {
 	)
 
 	// OnFunctionFinished is called synchronously when a function finishes,
-	// successfully or with a permanent failure.
+	// successfully or with a permanent failure. now is the caller's own
+	// "this just happened" timestamp (e.g. the executor's own clock), so
+	// implementations never need to call time.Now() themselves and every
+	// timestamp an implementation derives from this call is consistent with
+	// the caller's.
 	OnFunctionFinished(
-		context.Context,
-		statev2.Metadata,
-		queue.Item,
-		[]json.RawMessage,
-		statev1.DriverResponse,
+		ctx context.Context,
+		md statev2.Metadata,
+		item queue.Item,
+		fnEvents []json.RawMessage,
+		resp statev1.DriverResponse,
+		now time.Time,
 	)
 
-	// OnFunctionCancelled is called synchronously when a function is cancelled.
+	// OnFunctionCancelled is called synchronously when a function is
+	// cancelled. now is the caller's own "this just happened" timestamp —
+	// see OnFunctionFinished.
 	OnFunctionCancelled(
 		ctx context.Context,
 		md statev2.Metadata,
 		cr CancelRequest,
 		fnEvents []json.RawMessage,
+		now time.Time,
 	)
 
 	// OnStepScheduled is called synchronously when a new step is scheduled.
+	// now is the caller's own "this just happened" timestamp — see
+	// OnFunctionFinished.
 	OnStepScheduled(
-		context.Context,
-		statev2.Metadata,
-		queue.Item,
-		*string,
+		ctx context.Context,
+		md statev2.Metadata,
+		item queue.Item,
+		stepName *string,
+		now time.Time,
 	)
 
 	// OnStepStarted is called synchronously when a step begins executing.
@@ -75,36 +86,62 @@ type SyncLifecycleListener interface {
 	)
 
 	// OnStepFinished is called synchronously when a step finishes (success,
-	// temporary error, or failure).
+	// temporary error, or failure). now is the caller's own "this just
+	// happened" timestamp — see OnFunctionFinished. reqStart is when the
+	// request was sent, captured before dispatch — the real boundary for
+	// how long this request took, rather than an implementation deriving it
+	// by subtracting resp.Duration from now.
 	OnStepFinished(
-		context.Context,
-		statev2.Metadata,
-		queue.Item,
-		inngest.Edge,
-		*statev1.DriverResponse,
-		error,
+		ctx context.Context,
+		md statev2.Metadata,
+		item queue.Item,
+		edge inngest.Edge,
+		resp *statev1.DriverResponse,
+		stepErr error,
+		reqStart time.Time,
+		now time.Time,
+	)
+
+	// OnStepRunFinished is called synchronously when a plain step.run step
+	// (enums.OpcodeStep/OpcodeStepRun) finishes successfully — the
+	// GeneratorOpcode carries the step's own output. Unlike OnStepFinished
+	// (called once per SDK request, which may cover several opcodes at
+	// once, or none), this fires once per individual step. now is the
+	// caller's own "this just happened" timestamp — see OnFunctionFinished.
+	OnStepRunFinished(
+		ctx context.Context,
+		md statev2.Metadata,
+		item queue.Item,
+		edge inngest.Edge,
+		gen statev1.GeneratorOpcode,
+		now time.Time,
 	)
 
 	// OnStepGatewayRequestFinished is called synchronously when a step's
-	// offloaded request finishes, successfully or not.
+	// offloaded request finishes, successfully or not. now is the caller's
+	// own "this just happened" timestamp — see OnFunctionFinished.
 	OnStepGatewayRequestFinished(
-		context.Context,
-		statev2.Metadata,
-		queue.Item,
-		inngest.Edge,
-		statev1.GeneratorOpcode,
-		*http.Response,
-		*statev1.UserError,
+		ctx context.Context,
+		md statev2.Metadata,
+		item queue.Item,
+		edge inngest.Edge,
+		gen statev1.GeneratorOpcode,
+		resp *http.Response,
+		userErr *statev1.UserError,
+		now time.Time,
 	)
 
 	// OnSleep is called synchronously when a sleep step is scheduled. The
-	// statev1.GeneratorOpcode contains the sleep details.
+	// statev1.GeneratorOpcode contains the sleep details. now is the
+	// caller's own "this just happened" timestamp — see OnFunctionFinished
+	// — distinct from until, the time the step is sleeping to.
 	OnSleep(
-		context.Context,
-		statev2.Metadata,
-		queue.Item,
-		statev1.GeneratorOpcode,
-		time.Time, // Sleeping until this time.
+		ctx context.Context,
+		md statev2.Metadata,
+		item queue.Item,
+		gen statev1.GeneratorOpcode,
+		until time.Time, // Sleeping until this time.
+		now time.Time,
 	)
 
 	// OnWaitForEvent is called synchronously when a wait for event step is
@@ -184,25 +221,28 @@ func (NoopSyncLifecycleListener) OnFunctionScheduled(context.Context, statev2.Me
 func (NoopSyncLifecycleListener) OnFunctionStarted(context.Context, statev2.Metadata, queue.Item, []json.RawMessage) {
 }
 
-func (NoopSyncLifecycleListener) OnFunctionFinished(context.Context, statev2.Metadata, queue.Item, []json.RawMessage, statev1.DriverResponse) {
+func (NoopSyncLifecycleListener) OnFunctionFinished(context.Context, statev2.Metadata, queue.Item, []json.RawMessage, statev1.DriverResponse, time.Time) {
 }
 
-func (NoopSyncLifecycleListener) OnFunctionCancelled(context.Context, statev2.Metadata, CancelRequest, []json.RawMessage) {
+func (NoopSyncLifecycleListener) OnFunctionCancelled(context.Context, statev2.Metadata, CancelRequest, []json.RawMessage, time.Time) {
 }
 
-func (NoopSyncLifecycleListener) OnStepScheduled(context.Context, statev2.Metadata, queue.Item, *string) {
+func (NoopSyncLifecycleListener) OnStepScheduled(context.Context, statev2.Metadata, queue.Item, *string, time.Time) {
 }
 
 func (NoopSyncLifecycleListener) OnStepStarted(context.Context, statev2.Metadata, queue.Item, inngest.Edge, string) {
 }
 
-func (NoopSyncLifecycleListener) OnStepFinished(context.Context, statev2.Metadata, queue.Item, inngest.Edge, *statev1.DriverResponse, error) {
+func (NoopSyncLifecycleListener) OnStepFinished(context.Context, statev2.Metadata, queue.Item, inngest.Edge, *statev1.DriverResponse, error, time.Time, time.Time) {
 }
 
-func (NoopSyncLifecycleListener) OnStepGatewayRequestFinished(context.Context, statev2.Metadata, queue.Item, inngest.Edge, statev1.GeneratorOpcode, *http.Response, *statev1.UserError) {
+func (NoopSyncLifecycleListener) OnStepRunFinished(context.Context, statev2.Metadata, queue.Item, inngest.Edge, statev1.GeneratorOpcode, time.Time) {
 }
 
-func (NoopSyncLifecycleListener) OnSleep(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, time.Time) {
+func (NoopSyncLifecycleListener) OnStepGatewayRequestFinished(context.Context, statev2.Metadata, queue.Item, inngest.Edge, statev1.GeneratorOpcode, *http.Response, *statev1.UserError, time.Time) {
+}
+
+func (NoopSyncLifecycleListener) OnSleep(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, time.Time, time.Time) {
 }
 
 func (NoopSyncLifecycleListener) OnWaitForEvent(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, statev1.Pause) {

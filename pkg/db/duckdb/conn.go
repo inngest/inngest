@@ -74,6 +74,9 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 	case enums.RunStatus:
 		nv.Value = v.String()
 		return nil
+	case enums.StepStatus:
+		nv.Value = v.String()
+		return nil
 	case ulid.ULID:
 		nv.Value = v.String()
 	}
