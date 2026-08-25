@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   app_id UUID NOT NULL,
 	function_id UUID NOT NULL,
   status VARCHAR NOT NULL,
-  inputs JSON[] NOT NULL, -- TODO: maybe just plain JSON as duckdb supports top level JSON arrays
+  inputs JSON NOT NULL,
   output JSON,
   inserted_at TIMESTAMP_MS NOT NULL DEFAULT current_timestamp
 );
@@ -18,23 +18,6 @@ ALTER TABLE inngest.runs
   SET SORTED BY (year(queued_at), month(queued_at), account_id, env_id, run_id, queued_at);
 ALTER TABLE inngest.runs
   SET PARTITIONED BY (year(queued_at), month(queued_at), account_id);
-
--- NOTE: janky plain parquet globbed view. Can't be created until we have at least some data
--- (not duckinngest compatible)
--- CREATE VIEW runs AS
--- SELECT
---   account_id,
---   env_id,
---   run_id,
---   queued_at,
---   started_at,
---   ended_at,
---   app_id,
---   function_id,
---   status,
---   inputs,
---   output
--- FROM read_parquet(getvariable('DATA_PATH') || '/runs/*/*/*/*.parquet', hive_partitioning = true);
 
 -- Column set mirrors pkg/db/sqlite's `spans` table (see
 -- pkg/execution/dualwrite/span_exporter.go's doc comment), minus the
