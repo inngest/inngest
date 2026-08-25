@@ -11,12 +11,8 @@ import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
-import {
-  compactSandboxID,
-  formatMemory,
-  formatTimeout,
-  sandboxStatus,
-} from './utils';
+import { compactSandboxID, formatTimeout, sandboxStatus } from './utils';
+import { SandboxMetrics } from './SandboxMetrics';
 
 const SandboxDetailDocument = graphql(`
   query SandboxDetail($envSlug: String!, $sandboxID: UUID!) {
@@ -102,13 +98,11 @@ export function SandboxDetail({ sandboxID }: { sandboxID: string }) {
               </div>
             </div>
 
-            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <ResourceCard label="vCPU" value={`${sandbox.vcpu} vCPU`} />
-              <ResourceCard
-                label="RAM"
-                value={formatMemory(sandbox.memoryMB)}
-              />
-            </div>
+            <SandboxMetrics
+              sandboxID={sandbox.id}
+              vcpu={sandbox.vcpu}
+              memoryMB={sandbox.memoryMB}
+            />
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
               <section>
@@ -196,16 +190,6 @@ export function SandboxDetail({ sandboxID }: { sandboxID: string }) {
           </div>
         </main>
       ) : null}
-    </div>
-  );
-}
-
-function ResourceCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="border-subtle bg-canvasBase rounded-md border p-4">
-      <div className="text-muted text-sm">{label}</div>
-      <div className="text-basis mt-1 text-2xl font-medium">{value}</div>
-      <div className="text-light mt-1 text-xs">Provisioned</div>
     </div>
   );
 }
