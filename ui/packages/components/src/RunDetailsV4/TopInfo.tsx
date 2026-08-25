@@ -23,13 +23,13 @@ import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { getCronTriggerMetadata } from '../utils/cronTrigger';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
-import { AIMetadataNudge, traceHasAIMetadata } from './AIMetadata';
+import { AIMetadataNudge, AISummaryAttrs, traceHasAIMetadata } from './AIMetadata';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { LinkedRuns } from './LinkedRuns';
 import { MetadataAttrs } from './MetadataAttrs';
 import { Tabs } from './Tabs';
-import { isScoreMetadata, type Trace } from './types';
+import { isAISummaryMetadata, isScoreMetadata, type Trace } from './types';
 
 type TopInfoProps = {
   slug?: string;
@@ -125,10 +125,12 @@ export const TopInfo = ({
   });
 
   const scoreMetadata = useMemo(() => collectScoreMetadata(trace), [trace]);
-  const nonScoreMetadata = trace?.metadata?.filter((md) => !isScoreMetadata(md)) ?? [];
+  const aiSummaryMetadata = trace?.metadata?.find(isAISummaryMetadata);
+  const nonScoreMetadata =
+    trace?.metadata?.filter((md) => !isScoreMetadata(md) && !isAISummaryMetadata(md)) ?? [];
   const hasAIMetadata = useMemo(() => traceHasAIMetadata(trace), [trace]);
   const showNudge = Boolean(trace?.endedAt) && !hasAIMetadata;
-  const hasMetadataTab = nonScoreMetadata.length > 0 || showNudge;
+  const hasMetadataTab = nonScoreMetadata.length > 0 || Boolean(aiSummaryMetadata) || showNudge;
 
   const prettyPayload = useMemo(() => {
     try {
@@ -372,7 +374,13 @@ export const TopInfo = ({
                     node: (
                       <MetadataAttrs
                         metadata={nonScoreMetadata}
-                        footer={showNudge ? <AIMetadataNudge /> : null}
+                        footer={
+                          aiSummaryMetadata ? (
+                            <AISummaryAttrs metadata={aiSummaryMetadata} />
+                          ) : showNudge ? (
+                            <AIMetadataNudge />
+                          ) : null
+                        }
                       />
                     ),
                   },
