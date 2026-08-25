@@ -14,7 +14,9 @@ import (
 	"regexp"
 	"strconv"
 	"testing"
+	"time"
 
+	cliauth "github.com/inngest/inngest/cmd/internal/auth"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/stretchr/testify/require"
@@ -862,6 +864,51 @@ func TestCommandPrefersAPIKeyOverSigningKeyEnv(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "Bearer sk-inn-api-test", gotAuth)
+}
+
+func TestCommandUsesStoredOAuthForMatchingResource(t *testing.T) {
+	t.Setenv("INNGEST_API_KEY", "")
+	t.Setenv("INNGEST_SIGNING_KEY", "")
+	t.Setenv("INNGEST_CONFIG_DIR", t.TempDir())
+
+	var gotAuth string
+	var gotEnv string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotEnv = r.Header.Get("X-Inngest-Env")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{},"metadata":{}}`))
+	}))
+	defer server.Close()
+
+	store, err := cliauth.NewStore()
+	require.NoError(t, err)
+	require.NoError(t, store.Save(cliauth.Metadata{
+		Issuer:               server.URL,
+		Resource:             server.URL + "/v2",
+		ClientID:             cliauth.ClientID,
+		SessionID:            "session-id",
+		SessionExpiresAt:     time.Now().Add(time.Hour),
+		AccountID:            "account-id",
+		ResourceBoundaryMode: "all_envs",
+	}, cliauth.Credential{
+		AccessToken:  "inngest_at_stored",
+		RefreshToken: "inngest_rt_stored",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(time.Hour),
+	}, true))
+
+	cmd := Command()
+	cmd.Writer = &bytes.Buffer{}
+	err = cmd.Run(context.Background(), []string{
+		"api",
+		"health",
+		"--api-host", server.URL,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "Bearer inngest_at_stored", gotAuth)
+	require.Equal(t, "production", gotEnv)
 }
 
 func TestNormalizeAPIURL(t *testing.T) {

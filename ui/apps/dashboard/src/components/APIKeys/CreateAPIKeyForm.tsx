@@ -15,7 +15,11 @@ import {
 import { useEnvironments } from '@/queries/environments';
 import { EnvironmentType } from '@/utils/environments';
 import { apiKeyErrorMessage } from './errorMessage';
-import { permissionResourceCopy } from './permissionResourceCopy';
+import {
+  PermissionPicker,
+  type PermissionGroup,
+  type PermissionLevel,
+} from './PermissionPicker';
 import { RevealKeyCard } from './RevealKeyCard';
 import { validateAPIKeyName } from './validation';
 
@@ -37,17 +41,10 @@ const Mutation = graphql(`
   }
 `);
 
-type PermissionGroup = {
-  resource: string;
-  read: string[];
-  write: string[];
-};
-
 type PermissionCatalogResult = {
   apiKeyPermissionCatalog: PermissionGroup[];
 };
 
-type PermissionLevel = 'none' | 'read' | 'write';
 type EnvOptionGroup = {
   label: string;
   opts: Option[];
@@ -114,21 +111,6 @@ const PermissionCatalogQuery: TypedDocumentNode<
     }
   }
 `;
-
-function permissionLevelButtonClass(isActive: boolean) {
-  const classes = [
-    'h-7 min-w-16 rounded-full px-3 text-sm outline-none transition-colors',
-    'disabled:text-disabled disabled:cursor-not-allowed',
-  ];
-  if (isActive) {
-    classes.push('bg-canvasBase border-muted text-basis border');
-  } else {
-    classes.push(
-      'text-muted hover:bg-canvasSubtle hover:text-basis border border-transparent',
-    );
-  }
-  return classes.join(' ');
-}
 
 function boundaryOptionName(optionID: BoundaryOptionID) {
   switch (optionID) {
@@ -570,63 +552,14 @@ export function CreateAPIKeyForm({
     );
   }
 
-  const permissionGroups = [...(catalogRes.data?.apiKeyPermissionCatalog ?? [])].sort((a, b) => {
-    return a.resource.localeCompare(b.resource)
-  })
+  const permissionGroups = catalogRes.data?.apiKeyPermissionCatalog ?? [];
   let permissionsContent = (
-    <div className="border-subtle rounded border">
-      {permissionGroups.map((group) => {
-        const level = permissionLevels[group.resource] ?? 'none';
-        const readDisabled = group.read.length === 0;
-        const writeDisabled = group.write.length === 0;
-        const copy = permissionResourceCopy(group.resource);
-
-        return (
-          <div
-            key={group.resource}
-            className="border-subtle grid grid-cols-1 gap-3 border-b p-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-          >
-            <div className="flex min-w-0 flex-col">
-              <span className="text-basis truncate text-sm font-medium">
-                {copy.label}
-              </span>
-              {copy.description && (
-                <span className="text-subtle truncate text-xs">
-                  {copy.description}
-                </span>
-              )}
-            </div>
-
-            <div className="bg-canvasMuted grid h-8 grid-cols-3 rounded-full p-0.5">
-              <button
-                type="button"
-                className={permissionLevelButtonClass(level === 'none')}
-                onClick={() => setPermissionLevel(group.resource, 'none')}
-                disabled={isSubmitting}
-              >
-                None
-              </button>
-              <button
-                type="button"
-                className={permissionLevelButtonClass(level === 'read')}
-                onClick={() => setPermissionLevel(group.resource, 'read')}
-                disabled={isSubmitting || readDisabled}
-              >
-                Read
-              </button>
-              <button
-                type="button"
-                className={permissionLevelButtonClass(level === 'write')}
-                onClick={() => setPermissionLevel(group.resource, 'write')}
-                disabled={isSubmitting || writeDisabled}
-              >
-                Write
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
+    <PermissionPicker
+      groups={permissionGroups}
+      levels={permissionLevels}
+      disabled={isSubmitting}
+      onChange={setPermissionLevel}
+    />
   );
   if (catalogRes.fetching && !catalogRes.data) {
     permissionsContent = (
