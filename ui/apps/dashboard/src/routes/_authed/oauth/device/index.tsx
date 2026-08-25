@@ -20,6 +20,9 @@ type Search = {
 
 type AuthorizationDetails = {
   client_name: string;
+  flow: 'device' | 'authorization_code';
+  redirect_host?: string;
+  default_session_name: string;
   account_id: string;
   account_name: string;
   requested_scopes: string[];
@@ -29,18 +32,39 @@ type AuthorizationDetails = {
 type Boundary = 'single_env' | 'all_envs';
 
 export const Route = createFileRoute('/_authed/oauth/device/')({
-  component: DeviceAuthorizationPage,
+  component: DeviceAuthorizationRoute,
   validateSearch: (search: Record<string, unknown>): Search => ({
     request: typeof search.request === 'string' ? search.request : undefined,
   }),
 });
 
-function DeviceAuthorizationPage() {
+function DeviceAuthorizationRoute() {
   const search = Route.useSearch();
   const navigate = useNavigate();
+
+  return (
+    <OAuthAuthorizationPage
+      initialRequest={search.request}
+      allowCodeEntry
+      onResolve={(request) =>
+        navigate({ to: '/oauth/device', search: { request } })
+      }
+    />
+  );
+}
+
+export function OAuthAuthorizationPage({
+  initialRequest,
+  allowCodeEntry = false,
+  onResolve,
+}: {
+  initialRequest?: string;
+  allowCodeEntry?: boolean;
+  onResolve?: (request: string) => Promise<unknown>;
+}) {
   const { getToken } = useAuth();
   const [{ data: environments }] = useEnvironments();
-  const [request, setRequest] = useState(search.request ?? '');
+  const [request, setRequest] = useState(initialRequest ?? '');
   const [userCode, setUserCode] = useState('');
   const [details, setDetails] = useState<AuthorizationDetails | null>(null);
   const [permissionLevels, setPermissionLevels] = useState<
@@ -49,8 +73,8 @@ function DeviceAuthorizationPage() {
   const [boundary, setBoundary] = useState<Boundary | null>(null);
   const [workspace, setWorkspace] = useState<Option | null>(null);
   const [durationDays, setDurationDays] = useState(30);
-  const [sessionName, setSessionName] = useState('Inngest CLI');
-  const [loading, setLoading] = useState(Boolean(search.request));
+  const [sessionName, setSessionName] = useState('Inngest');
+  const [loading, setLoading] = useState(Boolean(initialRequest));
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<'approved' | 'denied' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,18 +104,17 @@ function DeviceAuthorizationPage() {
   }, [details?.permission_groups, permissionLevels]);
 
   useEffect(() => {
-    if (!search.request) return;
-    setRequest(search.request);
+    if (!initialRequest) return;
+    setRequest(initialRequest);
     setLoading(true);
     setError(null);
     void apiRequest<AuthorizationDetails>(
       getToken,
-      `/oauth/device/authorization?request=${encodeURIComponent(
-        search.request,
-      )}`,
+      `/oauth/authorization?request=${encodeURIComponent(initialRequest)}`,
     )
       .then((response) => {
         setDetails(response);
+        setSessionName(response.default_session_name);
         const requested = new Set(response.requested_scopes);
         const levels: Record<string, PermissionLevel> = {};
         for (const group of response.permission_groups) {
@@ -105,7 +128,7 @@ function DeviceAuthorizationPage() {
       })
       .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
-  }, [getToken, search.request]);
+  }, [getToken, initialRequest]);
 
   async function resolveCode() {
     setSubmitting(true);
@@ -116,10 +139,7 @@ function DeviceAuthorizationPage() {
         '/oauth/device/authorization/resolve',
         { user_code: userCode },
       );
-      await navigate({
-        to: '/oauth/device',
-        search: { request: response.request },
-      });
+      await onResolve?.(response.request);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -143,14 +163,22 @@ function DeviceAuthorizationPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiRequest(getToken, '/oauth/device/authorization', {
-        request,
-        permission_grants: selectedPermissions,
-        resource_boundary_mode: boundary,
-        workspace_id: boundary === 'single_env' ? workspace?.id : null,
-        session_name: sessionName,
-        session_duration_days: durationDays,
-      });
+      const response = await apiRequest<{ redirect_uri?: string }>(
+        getToken,
+        '/oauth/authorization',
+        {
+          request,
+          permission_grants: selectedPermissions,
+          resource_boundary_mode: boundary,
+          workspace_id: boundary === 'single_env' ? workspace?.id : null,
+          session_name: sessionName,
+          session_duration_days: durationDays,
+        },
+      );
+      if (response.redirect_uri) {
+        window.location.replace(response.redirect_uri);
+        return;
+      }
       setDone('approved');
     } catch (err) {
       setError(errorMessage(err));
@@ -163,9 +191,15 @@ function DeviceAuthorizationPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiRequest(getToken, '/oauth/device/authorization/deny', {
-        request,
-      });
+      const response = await apiRequest<{ redirect_uri?: string }>(
+        getToken,
+        '/oauth/authorization/deny',
+        { request },
+      );
+      if (response.redirect_uri) {
+        window.location.replace(response.redirect_uri);
+        return;
+      }
       setDone('denied');
     } catch (err) {
       setError(errorMessage(err));
@@ -187,7 +221,7 @@ function DeviceAuthorizationPage() {
     );
   }
 
-  if (!request) {
+  if (!request && allowCodeEntry) {
     return (
       <Page>
         <h1 className="text-basis text-2xl">Connect the Inngest CLI</h1>
@@ -210,6 +244,14 @@ function DeviceAuthorizationPage() {
             disabled={submitting || userCode.trim() === ''}
           />
         </div>
+      </Page>
+    );
+  }
+
+  if (!request) {
+    return (
+      <Page>
+        <h1 className="text-basis text-2xl">This request is not available</h1>
       </Page>
     );
   }
@@ -239,6 +281,11 @@ function DeviceAuthorizationPage() {
           Grant access to {details.account_name}. You can revoke this session
           later.
         </p>
+        {details.redirect_host && (
+          <p className="text-subtle">
+            You will return to {details.redirect_host}.
+          </p>
+        )}
       </div>
 
       <Input
