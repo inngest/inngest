@@ -613,7 +613,7 @@ function ScoreBadge({ scores }: { scores: ScoreBadgeData[] }) {
           <RiPercentLine className="h-3 w-3" />
         </span>
       </HoverCardTrigger>
-      <HoverCardContent side="top" align="start" className="border-muted max-w-none border">
+      <HoverCardContent side="top" align="start" className="border-muted max-w-xs border">
         <ScoreHoverCardContent scores={scores} />
       </HoverCardContent>
     </HoverCardRoot>
@@ -627,7 +627,6 @@ function ScoreBadge({ scores }: { scores: ScoreBadgeData[] }) {
 function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
   return (
     <div className="whitespace-nowrap px-1 py-0.5 text-xs">
-      <p className="text-light mb-0.5">Scores</p>
       <div className="border-subtle flex justify-between gap-6 border-b pb-1">
         <span className="text-light">Score</span>
         <span className="text-light">Value</span>
@@ -637,8 +636,12 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
           key={score.name}
           className="border-subtle flex items-center justify-between gap-6 border-b py-1 last:border-b-0"
         >
-          <span className="text-basis font-medium">{score.name}</span>
-          <span className="text-basis font-mono tabular-nums">{formatScoreValue(score.value)}</span>
+          <span className="text-basis min-w-0 truncate font-medium" title={score.name}>
+            {score.name}
+          </span>
+          <span className="text-basis shrink-0 font-mono tabular-nums">
+            {formatScoreValue(score.value)}
+          </span>
         </div>
       ))}
     </div>
