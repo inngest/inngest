@@ -172,10 +172,7 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder
 
 	resp, err := do(ctx, traceCtx, forwarder, opts)
 	if err != nil {
-		// Proxy errors are Connect infrastructure failures; SDK/user errors are
-		// represented by a successful SDKResponse. Retrying infrastructure errors
-		// must not consume the function's configured attempts.
-		return nil, queue.AlwaysRetryError(err)
+		return nil, err
 	}
 
 	return httpdriver.HandleHttpResponse(ctx, r, resp)

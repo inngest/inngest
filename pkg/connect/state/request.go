@@ -26,8 +26,6 @@ var (
 	ErrExecutorNotFound        = fmt.Errorf("executor not found")
 )
 
-const bufferedResponseTTL = 10 * time.Minute
-
 type Lease struct {
 	LeaseID          ulid.ULID  `json:"leaseID"`
 	PreviousLeaseID  *ulid.ULID `json:"prevLeaseID,omitempty"`
@@ -254,16 +252,15 @@ func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uu
 		return fmt.Errorf("could not marshal response: %w", err)
 	}
 
-	// Forward can wait for a two-minute worker lease plus grace period on each
-	// of three routing attempts. Keep responses long enough for a recovering
-	// executor to poll them after that entire retry window.
+	responseExpiry := 1 * time.Minute
+
 	cmd := r.client.
 		B().
 		Set().
 		Key(r.keyBufferedResponse(envID, requestID)).
 		Value(string(marshaled)).
 		Nx().
-		Ex(bufferedResponseTTL).
+		Ex(responseExpiry).
 		Build()
 
 	set, err := r.client.Do(ctx, cmd).AsBool()

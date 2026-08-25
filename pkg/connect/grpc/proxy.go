@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	mathRand "math/rand"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -228,17 +229,16 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		opts.Data.UserTraceCtx = marshaled
 	}
 
-	// Await the first SDK response received through either the reliable buffer
-	// or the best-effort gRPC fast path.
-	responseCh := make(chan *connectpb.SDKResponse, 1)
+	// Await SDK response forwarded by gateway.
+	reply := &connectpb.SDKResponse{}
 	waitForResponseCtx, cancelWaitForResponseCtx := context.WithCancel(ctx)
 	defer cancelWaitForResponseCtx()
+	var publishResponseOnce sync.Once
 	publishResponse := func(resp *connectpb.SDKResponse) {
-		select {
-		case responseCh <- resp:
+		publishResponseOnce.Do(func() {
+			reply = resp
 			cancelWaitForResponseCtx()
-		default:
-		}
+		})
 	}
 	go func() {
 		for {
@@ -379,7 +379,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	// Forward message to the gateway if the request wasn't already running
 	var (
 		routedInstanceID string
-		reply            *connectpb.SDKResponse
+		responseReceived bool
 	)
 	if leaseID != nil {
 		// Determine the most suitable connection
@@ -455,18 +455,19 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			select {
 			case err = <-forwardErrCh:
 				cancelForward()
-				// Prefer a response which raced with a failed worker ACK. Once the
-				// worker has replied, re-routing can only duplicate work.
+				// Prefer a response which raced with a failed worker ACK.
 				select {
-				case reply = <-responseCh:
+				case <-waitForResponseCtx.Done():
+					responseReceived = true
 					err = nil
 				default:
 				}
-			case reply = <-responseCh:
+			case <-waitForResponseCtx.Done():
 				cancelForward()
+				responseReceived = true
 				err = nil
 			}
-			if reply != nil {
+			if responseReceived {
 				break
 			}
 			if err == nil {
@@ -494,7 +495,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			}
 		}
 
-		if err != nil && reply == nil {
+		if err != nil {
 			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
@@ -509,7 +510,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
 
-		if reply == nil {
+		if !responseReceived {
 			span.AddEvent("WorkerAck")
 			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 				PkgName: pkgName,
@@ -528,69 +529,85 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		}
 	}
 
-	if reply == nil {
-		select {
-		case <-ctx.Done():
-			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
-				l, "could not delete worker lease on context cancellation")
+	select {
+	case <-ctx.Done():
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease on context cancellation")
 
-			return nil, fmt.Errorf("parent context was closed unexpectedly")
-		case <-time.After(consts.MaxFunctionTimeout):
-			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
-				l, "could not delete worker lease on timeout")
+		return nil, fmt.Errorf("parent context was closed unexpectedly")
+	// Handle maximum function timeout
+	case <-time.After(consts.MaxFunctionTimeout):
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease on timeout")
 
+		return nil, syscode.Error{
+			Code:    syscode.CodeRequestTooLong,
+			Message: "The worker took longer than the maximum request duration to respond to the request.",
+		}
+	// Await SDK response forwarded by gateway
+	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
+	case <-waitForResponseCtx.Done():
+		// Stop checking for lease
+		cancelLeaseCtx()
+
+		// The lease has a short TTL so it will be cleaned up, but we should try
+		// to garbage-collect unused state as quickly as possible
+		err = i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId)
+		if err != nil {
+			span.RecordError(err)
+			l.ReportError(err, "could not delete lease")
+		}
+
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease after context finished")
+
+		if reply.RequestId == "" {
+			span.SetStatus(codes.Error, "missing response")
+
+			return nil, fmt.Errorf("did not receive worker response")
+		}
+
+		// The response has a short TTL so it will be cleaned up, but we should try
+		// to garbage-collect unused state as quickly as possible
+		err := i.stateManager.DeleteResponse(ctx, opts.EnvID, opts.Data.RequestId)
+		if err != nil {
+			span.RecordError(err)
+			l.ReportError(err, "could not delete response")
+		}
+
+		l.Trace("returning reply", "status", reply.Status)
+		return reply, nil
+	// If the worker terminates or otherwise fails to continue extending the lease,
+	// we must retry the step as soon as possible.
+	case <-leaseCtx.Done():
+		span.SetStatus(codes.Error, "lease expired")
+
+		// Track expired lease
+		metrics.IncrConnectProxyLeaseExpiredCount(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+		})
+
+		// in the case of instance contention for concurrency, the executor gets multiple leases
+		// however workers have reached capacity and there's no routedInstanceID
+		if routedInstanceID == "" {
 			return nil, syscode.Error{
-				Code:    syscode.CodeRequestTooLong,
-				Message: "The worker took longer than the maximum request duration to respond to the request.",
-			}
-		case reply = <-responseCh:
-		case <-leaseCtx.Done():
-			span.SetStatus(codes.Error, "lease expired")
-			metrics.IncrConnectProxyLeaseExpiredCount(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-			})
-
-			// In the case of instance contention for concurrency, workers may have
-			// reached capacity before a worker was assigned.
-			if routedInstanceID == "" {
-				return nil, syscode.Error{
-					Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
-					Message: "All workers reached capacity before assignment",
-				}
-			}
-
-			cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
-				l, "could not delete worker lease on lease expiry")
-
-			return nil, syscode.Error{
-				Code:    syscode.CodeConnectWorkerStoppedResponding,
-				Message: "The worker stopped responding to the request.",
+				Code:    syscode.CodeConnectRequestAssignWorkerReachedCapacity,
+				Message: "All workers reached capacity before assignment",
 			}
 		}
-	}
 
-	// Stop checking for lease and garbage-collect the durable response and
-	// worker-capacity state after either response path succeeds.
-	cancelLeaseCtx()
-	if err = i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId); err != nil {
-		span.RecordError(err)
-		l.ReportError(err, "could not delete lease")
-	}
-	cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
-		l, "could not delete worker lease after context finished")
+		// Clean up worker lease for capacity tracking
+		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+			l, "could not delete worker lease on lease expiry")
 
-	if reply == nil || reply.RequestId == "" {
-		span.SetStatus(codes.Error, "missing response")
-		return nil, fmt.Errorf("did not receive worker response")
+		return nil, syscode.Error{
+			Code:    syscode.CodeConnectWorkerStoppedResponding,
+			Message: "The worker stopped responding to the request.",
+		}
 	}
-
-	if err := i.stateManager.DeleteResponse(ctx, opts.EnvID, opts.Data.RequestId); err != nil {
-		span.RecordError(err)
-		l.ReportError(err, "could not delete response")
-	}
-
-	l.Trace("returning reply", "status", reply.Status)
-	return reply, nil
 }
 
 // cleanupWorkerRequestOrLogError cleans up the worker request and logs an error if it fails
