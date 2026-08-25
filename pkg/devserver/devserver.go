@@ -163,6 +163,18 @@ type StartOpts struct {
 
 	// Debug API
 	DebugAPIPort int `json:"debugAPIPort"`
+
+	// DuckDBClosed, if non-nil, is closed once the DuckDB dual-write
+	// subprocess (see EnableDuckDB) has been fully torn down as part of
+	// start()'s shutdown sequence -- i.e. after service.StartAll has already
+	// stopped every other service, since that call is synchronous and this
+	// signal only fires from start()'s deferred cleanup once it returns. It
+	// is closed immediately, with nothing to wait for, if dual-write was
+	// never enabled or never started successfully. Callers (e.g. cmd/devserver's
+	// signal-triggered exit) can block on this to guarantee they never
+	// terminate the process before dual-write has flushed and closed its
+	// subprocess.
+	DuckDBClosed chan struct{} `json:"-"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -528,7 +540,14 @@ func start(ctx context.Context, opts StartOpts) error {
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			stopDualWrite(shutdownCtx, dw)
+			if opts.DuckDBClosed != nil {
+				close(opts.DuckDBClosed)
+			}
 		}()
+	} else if opts.DuckDBClosed != nil {
+		// Dual-write was never enabled or never started; nothing for a
+		// caller waiting on DuckDBClosed to wait for.
+		close(opts.DuckDBClosed)
 	}
 
 	executorOpts := []executor.ExecutorOpt{

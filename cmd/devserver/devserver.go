@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
@@ -19,6 +21,33 @@ import (
 )
 
 func action(ctx context.Context, cmd *cli.Command) error {
+	// duckDBClosed is closed by pkg/devserver's start() only once the DuckDB
+	// dual-write subprocess (if any) has been fully torn down -- which, since
+	// start() calls service.StartAll synchronously before its shutdown
+	// defers run, is necessarily after every other service has already
+	// finished its own graceful stop too. The watchdog below is a backstop
+	// exit for a shutdown that otherwise hangs (e.g. a wedged SDK
+	// connection); gating it on this channel rather than firing immediately
+	// on signal is what keeps it from reintroducing the dual-write data-loss
+	// bug the naive version of this handler used to cause (see git history
+	// on this file / pkg/execution/dualwrite for that incident) -- it can
+	// only fire once dual-write has already flushed and the subprocess is
+	// gone.
+	duckDBClosed := make(chan struct{})
+	go func() {
+		sigCtx, cleanup := signal.NotifyContext(
+			context.Background(),
+			os.Interrupt,
+			syscall.SIGTERM,
+			syscall.SIGINT,
+			syscall.SIGQUIT,
+		)
+		defer cleanup()
+		<-sigCtx.Done()
+		<-duckDBClosed
+		os.Exit(0)
+	}()
+
 	conf, err := config.Dev(ctx)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -97,6 +126,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		PostgresConnMaxIdleTime: postgresConnMaxIdleTime,
 		PostgresConnMaxLifetime: postgresConnMaxLifetime,
 		DebugAPIPort:            debugAPIPort,
+		DuckDBClosed:            duckDBClosed,
 	}
 
 	l := logger.StdlibLogger(ctx)

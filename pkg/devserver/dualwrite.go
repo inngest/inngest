@@ -2,6 +2,8 @@ package devserver
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -72,7 +74,11 @@ func setupDualWrite(ctx context.Context, enabled bool, binaryPath, stateDir stri
 	dbFile := filepath.Join(duckdbDir, "main.duckdb")
 	catalogFile := filepath.Join(duckdbDir, "catalog.duckdb")
 	dataDir := filepath.Join(duckdbDir, "data")
-	quackAddr := "localhost"
+	quackAddr, err := freeLocalQuackAddr()
+	if err != nil {
+		l.Warn("failed to allocate a local port for the quack listener; dual-write disabled", "error", err)
+		return nil
+	}
 	db, err := duckdb.Open(ctx, duckdb.Options{
 		BinaryPath: binaryPath,
 		DBFile:     dbFile,
@@ -94,6 +100,29 @@ func setupDualWrite(ctx context.Context, enabled bool, binaryPath, stateDir stri
 	}
 
 	return dualwrite.NewListener(db)
+}
+
+// freeLocalQuackAddr resolves an ephemeral loopback port and returns it as a
+// "127.0.0.1:<port>" address for duckdb.Options.QuackAddr. A fixed address
+// (quack's own default port, 9494) would make a second `inngest dev
+// --duckdb` on the same machine either fail to bind or — worse, observed
+// empirically — silently hand its client the first instance's already-bound
+// listener, causing an auth failure instead of a clear bind error. Closing
+// the listener immediately before duckdb binds it is a small TOCTOU race,
+// acceptable here since a launch racing another process for the same port in
+// that window is exceedingly unlikely and, if it happens, surfaces as an
+// ordinary failed-to-start warning rather than the cross-connection bug
+// above.
+func freeLocalQuackAddr() (string, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", err
+	}
+	addr := l.Addr().(*net.TCPAddr)
+	if err := l.Close(); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("127.0.0.1:%d", addr.Port), nil
 }
 
 // stopDualWrite stops the background batcher goroutines started by

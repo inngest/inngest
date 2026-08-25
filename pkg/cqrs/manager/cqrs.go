@@ -3674,7 +3674,7 @@ func (w wrapper) getSpanRunsPushdown(ctx context.Context, opt cqrs.GetTraceRunOp
 		return nil, err
 	}
 
-	// l.Debug("GetRuns root-page query", "sql", sqlQuery, "args", args)
+	l.Debug("GetRuns root-page query", "sql", sqlQuery, "args", args)
 
 	rows, err := w.adapter.Conn().QueryContext(ctx, sqlQuery, args...)
 	if err != nil {

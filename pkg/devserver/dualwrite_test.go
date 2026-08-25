@@ -192,3 +192,24 @@ func TestStopDualWriteStopsBatcherGoroutines(t *testing.T) {
 		t.Fatal("stopDualWrite did not return; batcher goroutines likely did not stop")
 	}
 }
+
+// TestSetupDualWriteTwoInstancesDoNotCollideOnQuackPort simulates two
+// `inngest dev --duckdb` processes running on the same machine at once (a
+// realistic scenario, e.g. two projects/worktrees). Each must get its own
+// quack listener; a fixed address would make the second setupDualWrite fail
+// to bind the port the first one already holds.
+func TestSetupDualWriteTwoInstancesDoNotCollideOnQuackPort(t *testing.T) {
+	binPath, err := exec.LookPath("duckdb")
+	if err != nil {
+		t.Skip("duckdb binary not found on PATH; skipping")
+	}
+	ctx := t.Context()
+
+	l1 := setupDualWrite(ctx, true, binPath, t.TempDir())
+	require.NotNil(t, l1, "first instance should start dual-write successfully")
+	t.Cleanup(func() { stopDualWrite(context.Background(), l1) })
+
+	l2 := setupDualWrite(ctx, true, binPath, t.TempDir())
+	require.NotNil(t, l2, "second instance must not fail to start dual-write just because the first is already running")
+	t.Cleanup(func() { stopDualWrite(context.Background(), l2) })
+}

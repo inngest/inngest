@@ -2,17 +2,20 @@ package duckdb
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"database/sql/driver"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 // ErrDisabled is returned once a process has been permanently disabled after
@@ -60,9 +63,16 @@ type process struct {
 	procCtx    context.Context
 	procCancel context.CancelFunc
 
-	mu    sync.Mutex
-	cmd   *exec.Cmd
-	sess  *session
+	mu  sync.Mutex
+	cmd *exec.Cmd
+	// sess is the currently active sqlExecer: the jsonlines session
+	// (rows.go) spawnLocked always creates first, or — once
+	// startQuackLocked's bootstrap succeeds, when quackAddr is set — the
+	// quackSession it swaps in. Every exec/healthCheck call after that swap
+	// goes over quack instead; the jsonlines pipe stays open (never
+	// written to again) purely so the CLI doesn't exit, since closing stdin
+	// would kill the quack listener along with the rest of the process.
+	sess  sqlExecer
 	stdin io.WriteCloser
 	// out is the read end of the subprocess's merged stdout+stderr pipe —
 	// see spawnLocked for why they are merged.
@@ -223,36 +233,106 @@ func (p *process) initSessionLocked(ctx context.Context) error {
 	return nil
 }
 
-// XXX: only kinda functional (quack ATTACH has some issues)
+// startQuackLocked bootstraps a quack listener inside the freshly spawned
+// subprocess over the jsonlines control channel (p.sess, still the jsonlines
+// session at this point — see spawnLocked), then swaps p.sess to a
+// quackSession pointed at the listener so every subsequent exec/healthCheck
+// call goes over quack instead. It is a no-op unless the caller opted into
+// quack (Options.QuackAddr).
+//
+// Note this changes what QuackAddr means from earlier exploration: it used
+// to start a quack listener purely as a side channel while jsonlines stayed
+// the real transport (and ATTACH against it didn't work reliably). This
+// drives quack directly over HTTP instead of via ATTACH, which sidesteps
+// that issue — quack becomes the actual data-plane transport once
+// bootstrapped, not just an additional listener.
 func (p *process) startQuackLocked(ctx context.Context) error {
 	if p.quackAddr == nil {
 		return nil
 	}
+	l := logger.StdlibLogger(ctx)
 
-	quackAddr, err := encodeLiteral("quack:" + *p.quackAddr)
+	p.startUILocked(ctx)
+
+	quackAddrLiteral, err := encodeLiteral("quack:" + *p.quackAddr)
 	if err != nil {
 		return fmt.Errorf("duckdb: encoding quack address: %w", err)
 	}
-
-	log.Println("STARTING")
-
-	stmts := []string{
-		"INSTALL ui;",
-		"CALL start_ui_server();", // TODO: move this
-		"INSTALL quack;",
-		fmt.Sprintf("CALL quack_serve(%s, token = 'localdev');", quackAddr),
+	token, err := generateQuackToken()
+	if err != nil {
+		return fmt.Errorf("duckdb: generating quack auth token: %w", err)
+	}
+	tokenLiteral, err := encodeLiteral(token)
+	if err != nil {
+		return fmt.Errorf("duckdb: encoding quack token: %w", err)
 	}
 
-	for _, stmt := range stmts {
+	bootstrapStmts := []string{"INSTALL quack;", "LOAD quack;"}
+	for _, stmt := range bootstrapStmts {
 		if _, err := p.sess.exec(ctx, stmt); err != nil {
 			return fmt.Errorf("duckdb: quack bootstrap failed on %q: %w", stmt, err)
 		}
 	}
 
-	// TODO: better logging
-	log.Println("duckdb: quack listener started on", *p.quackAddr)
+	serveStmt := fmt.Sprintf("CALL quack_serve(%s, token = %s);", quackAddrLiteral, tokenLiteral)
+	rows, err := p.sess.exec(ctx, serveStmt)
+	if err != nil {
+		return fmt.Errorf("duckdb: quack bootstrap failed on %q: %w", serveStmt, err)
+	}
+	if len(rows) != 1 {
+		return fmt.Errorf("duckdb: quack_serve returned %d rows, expected 1", len(rows))
+	}
+	listenURL, ok := rows[0]["listen_url"].(string)
+	if !ok || listenURL == "" {
+		return fmt.Errorf("duckdb: quack_serve response missing listen_url (row: %v)", rows[0])
+	}
 
+	quackSess, err := newQuackSession(ctx, listenURL, token)
+	if err != nil {
+		return fmt.Errorf("duckdb: connecting to quack listener at %s: %w", listenURL, err)
+	}
+	p.sess = quackSess
+
+	l.Info("duckdb: quack transport active", "listen_url", listenURL)
 	return nil
+}
+
+// startUILocked starts DuckDB's optional web UI (the "ui" extension's
+// start_ui_server()) as a best-effort convenience alongside quack. Unlike
+// quack itself, the UI has no bearing on dual-write correctness, so a
+// failure here (most likely no network access to install the extension) is
+// logged and ignored rather than treated as a reason to fail quack bootstrap
+// — and, transitively, disable dual-write entirely.
+//
+// start_ui_server() takes no parameters, so unlike quack_serve there is no
+// way to give it its own port. That's safe here, though: verified
+// empirically, a second instance calling it while another already holds the
+// UI's fixed default port (localhost:4213) gets back an informational
+// "UI already running in a different DuckDB instance" row rather than an
+// error, so no port-collision handling is needed the way quack's address
+// did (see freeLocalQuackAddr in pkg/devserver/dualwrite.go).
+func (p *process) startUILocked(ctx context.Context) {
+	l := logger.StdlibLogger(ctx)
+	for _, stmt := range []string{"INSTALL ui;", "LOAD ui;", "CALL start_ui_server();"} {
+		if _, err := p.sess.exec(ctx, stmt); err != nil {
+			l.Warn("duckdb: failed to start optional web UI; continuing without it", "statement", stmt, "error", err)
+			return
+		}
+	}
+	l.Info("duckdb: web UI available", "url", "http://localhost:4213/")
+}
+
+// generateQuackToken returns a random hex auth token for one quack_serve
+// bootstrap. Generated fresh per spawn (initial start and every
+// crash-triggered restart alike) rather than a fixed shared secret, since
+// the listener is bound to loopback but any local process could otherwise
+// guess a hardcoded value.
+func generateQuackToken() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
 }
 
 // bootstrapDuckLakeLocked assumes mu is already held. It is a no-op unless the
@@ -419,10 +499,13 @@ func (p *process) closeLocked(ctx context.Context) error {
 	}
 	p.started = false
 
-	// Retire the session's reader goroutine first so it can never block
-	// handing a line to an exec that will never run again.
-	if p.sess != nil {
-		p.sess.close()
+	// Retire the jsonlines session's reader goroutine first so it can never
+	// block handing a line to an exec that will never run again. A
+	// quackSession (see startQuackLocked) has no such goroutine — it's a
+	// plain HTTP client — so this is a no-op once the transport has been
+	// swapped.
+	if closer, ok := p.sess.(interface{ close() }); ok {
+		closer.close()
 	}
 
 	_ = p.stdin.Close()
