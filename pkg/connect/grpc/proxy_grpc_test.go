@@ -981,7 +981,12 @@ func TestProxyGRPCContextCancellation(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
-	mockForwarder := &mockGatewayGRPCManager{}
+	mockForwarder := &mockGatewayGRPCManager{
+		forwardFn: func(ctx context.Context) error {
+			<-ctx.Done()
+			return ctx.Err()
+		},
+	}
 
 	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),

@@ -231,12 +231,14 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 	// Await SDK response forwarded by gateway.
 	reply := &connectpb.SDKResponse{}
+	responseReceived := make(chan struct{})
 	waitForResponseCtx, cancelWaitForResponseCtx := context.WithCancel(ctx)
 	defer cancelWaitForResponseCtx()
 	var publishResponseOnce sync.Once
 	publishResponse := func(resp *connectpb.SDKResponse) {
 		publishResponseOnce.Do(func() {
 			reply = resp
+			close(responseReceived)
 			cancelWaitForResponseCtx()
 		})
 	}
@@ -359,7 +361,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 				// Grace period to wait for the worker to send the response
 				select {
-				case <-waitForResponseCtx.Done():
+				case <-responseReceived:
 					l.Debug("response arrived during lease expiry grace period")
 					return
 				case <-time.After(consts.ConnectWorkerRequestGracePeriod):
@@ -378,8 +380,8 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 
 	// Forward message to the gateway if the request wasn't already running
 	var (
-		routedInstanceID string
-		responseReceived bool
+		routedInstanceID  string
+		responseBeforeAck bool
 	)
 	if leaseID != nil {
 		// Determine the most suitable connection
@@ -457,17 +459,20 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				cancelForward()
 				// Prefer a response which raced with a failed worker ACK.
 				select {
-				case <-waitForResponseCtx.Done():
-					responseReceived = true
+				case <-responseReceived:
+					responseBeforeAck = true
 					err = nil
 				default:
 				}
-			case <-waitForResponseCtx.Done():
+			case <-responseReceived:
 				cancelForward()
-				responseReceived = true
+				responseBeforeAck = true
 				err = nil
 			}
-			if responseReceived {
+			if ctx.Err() != nil && !responseBeforeAck {
+				return nil, fmt.Errorf("parent context was closed unexpectedly")
+			}
+			if responseBeforeAck {
 				break
 			}
 			if err == nil {
@@ -510,7 +515,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
 
-		if !responseReceived {
+		if !responseBeforeAck {
 			span.AddEvent("WorkerAck")
 			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 				PkgName: pkgName,
@@ -548,7 +553,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 		}
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-	case <-waitForResponseCtx.Done():
+	case <-responseReceived:
 		// Stop checking for lease
 		cancelLeaseCtx()
 
