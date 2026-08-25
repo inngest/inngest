@@ -32,6 +32,7 @@ import (
 type mockGatewayGRPCManager struct {
 	forwardCalls  []mockForwardCall
 	subscriptions map[string]chan *connectpb.SDKResponse
+	forwardFn     func(context.Context) error
 	mu            sync.Mutex
 }
 
@@ -43,12 +44,16 @@ type mockForwardCall struct {
 
 func (m *mockGatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.forwardCalls = append(m.forwardCalls, mockForwardCall{
 		gatewayID:    gatewayID,
 		connectionID: connectionID,
 		data:         data,
 	})
+	forwardFn := m.forwardFn
+	m.mu.Unlock()
+	if forwardFn != nil {
+		return forwardFn(ctx)
+	}
 	return nil
 }
 
@@ -294,6 +299,74 @@ func TestProxyGRPCPath(t *testing.T) {
 		require.Equal(t, connectpb.SDKResponseStatus_DONE, r.Status)
 	case <-time.After(3 * time.Second):
 		require.Fail(t, "no response received")
+	}
+
+	// A worker response must win even if Forward is still waiting for the
+	// worker's request ACK. This is the recovery path when ACK handling stalls.
+	blockedReqID := "reqid-response-before-ack"
+	forwardStarted := make(chan struct{})
+	forwardCanceled := make(chan struct{})
+	mockForwarder.mu.Lock()
+	mockForwarder.forwardFn = func(ctx context.Context) error {
+		close(forwardStarted)
+		<-ctx.Done()
+		close(forwardCanceled)
+		return ctx.Err()
+	}
+	mockForwarder.mu.Unlock()
+
+	type proxyResult struct {
+		resp *connectpb.SDKResponse
+		err  error
+	}
+	resultCh := make(chan proxyResult, 1)
+	go func() {
+		resp, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
+			AccountID: accID,
+			EnvID:     envID,
+			AppID:     appID,
+			Data: &connectpb.GatewayExecutorRequestData{
+				RequestId:      blockedReqID,
+				AccountId:      accID.String(),
+				EnvId:          envID.String(),
+				AppId:          appID.String(),
+				AppName:        appName,
+				FunctionId:     fnID.String(),
+				FunctionSlug:   fnSlug,
+				RequestPayload: []byte("request payload"),
+				RunId:          runID.String(),
+			},
+			logger: l,
+		})
+		resultCh <- proxyResult{resp: resp, err: err}
+	}()
+
+	select {
+	case <-forwardStarted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for blocked Forward call")
+	}
+
+	expected := &connectpb.SDKResponse{
+		RequestId:      blockedReqID,
+		Status:         connectpb.SDKResponseStatus_DONE,
+		SdkVersion:     "test-version",
+		RequestVersion: 1,
+		RunId:          runID.String(),
+	}
+	mockForwarder.sendResponse(blockedReqID, expected)
+
+	select {
+	case result := <-resultCh:
+		require.NoError(t, result.err)
+		require.Equal(t, expected, result.resp)
+	case <-time.After(3 * time.Second):
+		t.Fatal("response did not interrupt blocked Forward call")
+	}
+	select {
+	case <-forwardCanceled:
+	case <-time.After(3 * time.Second):
+		t.Fatal("blocked Forward context was not canceled")
 	}
 }
 
@@ -754,7 +827,7 @@ func TestProxyGRPCForwardError(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
-	
+
 	// Mock forwarder that always returns an error
 	mockForwarder := &mockFailingGatewayGRPCManager{}
 
@@ -1128,7 +1201,7 @@ func TestProxyGRPCBufferedResponse(t *testing.T) {
 }
 
 // mockFailingGatewayGRPCManager is a mock that always fails forwards
-type mockFailingGatewayGRPCManager struct {}
+type mockFailingGatewayGRPCManager struct{}
 
 func (m *mockFailingGatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
 	return fmt.Errorf("mock forward error")

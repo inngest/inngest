@@ -845,6 +845,7 @@ func TestBufferResponse(t *testing.T) {
 
 	err = requestStateManager.SaveResponse(ctx, envID, requestID, expectedResp)
 	require.NoError(t, err)
+	require.Equal(t, bufferedResponseTTL, r.TTL(connManager.keyBufferedResponse(envID, requestID)))
 
 	resp, err = requestStateManager.GetResponse(ctx, envID, requestID)
 	require.NoError(t, err)
