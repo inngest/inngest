@@ -1313,6 +1313,18 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 	// Persist response in buffer, which is polled by executor.
 	err := c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, data.RequestId, data)
+	bufferOutcome := "success"
+	if errors.Is(err, state.ErrResponseAlreadyBuffered) {
+		bufferOutcome = "duplicate"
+	} else if err != nil {
+		bufferOutcome = "error"
+	}
+	bufferTags := c.svc.metricsTags()
+	bufferTags["outcome"] = bufferOutcome
+	metrics.IncrConnectGatewayResponseBufferWriteCounter(ctx, 1, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags:    bufferTags,
+	})
 	if err != nil && !errors.Is(err, state.ErrResponseAlreadyBuffered) {
 		return fmt.Errorf("could not save response: %w", err)
 	}
@@ -1324,12 +1336,32 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 		switch {
 		case err == nil:
-			if _, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data}); err != nil {
+			result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
+			if err != nil {
+				tags := c.svc.metricsTags()
+				tags["reason"] = "reply_error"
+				metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
 				l.Warn("could not fast-track response through grpc, executor will poll buffered response", "err", err)
+			} else if result == nil || !result.Success {
+				tags := c.svc.metricsTags()
+				tags["reason"] = "reply_rejected"
+				metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags:    tags,
+				})
 			}
 		case errors.Is(err, state.ErrExecutorNotFound):
 			l.Debug("executor not found in lease, reply was likely picked up by polling")
 		default:
+			tags := c.svc.metricsTags()
+			tags["reason"] = "client_creation"
+			metrics.IncrConnectGatewayGRPCExecutorReplyFailureCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    tags,
+			})
 			l.Warn("could not create grpc client for sdk reply, executor will poll buffered response", "err", err)
 		}
 	}
