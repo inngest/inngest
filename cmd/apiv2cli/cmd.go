@@ -19,6 +19,7 @@ import (
 	"time"
 	"unicode"
 
+	cliauth "github.com/inngest/inngest/cmd/internal/auth"
 	localconfig "github.com/inngest/inngest/cmd/internal/config"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/tel"
@@ -155,7 +156,7 @@ func commonFlags() []cli.Flag {
 		&cli.StringFlag{
 			Category: "Auth",
 			Name:     "env",
-			Usage:    "Environment name sent as X-Inngest-Env",
+			Usage:    "Environment name sent as X-Inngest-Env; defaults to production",
 			Sources:  cli.EnvVars("INNGEST_ENV"),
 		},
 		&cli.DurationFlag{
@@ -481,15 +482,17 @@ func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Req
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "inngest-cli/"+version.Version)
 
-	if token, err := authToken(cmd); err != nil {
+	if token, err := authToken(ctx, cmd, baseURL); err != nil {
 		return nil, err
 	} else if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	if env := cmd.String("env"); env != "" {
-		req.Header.Set("X-Inngest-Env", env)
+	env := cmd.String("env")
+	if env == "" {
+		env = "production"
 	}
+	req.Header.Set("X-Inngest-Env", env)
 
 	if err := guardPlaintextAuth(req); err != nil {
 		return nil, err
@@ -890,11 +893,22 @@ func parseTimestamp(value string) (string, error) {
 	return value, nil
 }
 
-func authToken(cmd *cli.Command) (string, error) {
+func authToken(ctx context.Context, cmd *cli.Command, resource string) (string, error) {
 	if apiKey := cmd.String("api-key"); apiKey != "" {
 		return apiKey, nil
 	}
-	return cmd.String("signing-key"), nil
+	if signingKey := cmd.String("signing-key"); signingKey != "" {
+		return signingKey, nil
+	}
+	manager, err := cliauth.NewManager()
+	if err != nil {
+		return "", err
+	}
+	token, _, err := manager.AccessToken(ctx, resource)
+	if errors.Is(err, cliauth.ErrNotLoggedIn) {
+		return "", nil
+	}
+	return token, err
 }
 
 func addQueryValue(values url.Values, key string, value any) {
