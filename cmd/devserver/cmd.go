@@ -115,7 +115,7 @@ func Command() *cli.Command {
 			&cli.BoolFlag{
 				Category: "Advanced",
 				Name:     "duckdb",
-				Usage:    "Enable the experimental DuckDB dual-write POC (docs/plans/006-duckdb-poc-subprocess-dual-write.md)",
+				Usage:    "Enable the experimental DuckDB dual-write POC",
 				Value:    false,
 			},
 			&cli.StringFlag{
