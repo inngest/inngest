@@ -35,7 +35,7 @@ end
 
 -- start execution
 local batchID = get_or_create_batch_key(batchPointerKey)
-local resp = { status = "append", batchID = batchID, batchPointerKey = batchPointerKey }
+local resp = { status = "append", batchID = batchID, batchPointerKey = batchPointerKey, committed = 0, duplicates = 0, committedBytes = 0 }
 
 -- NOTE: these need to be identical to the ones in the queue key generator
 --   * Batch
@@ -58,19 +58,21 @@ if not newEvent then newEvent = false end
 if not newEvent then
   local size = redis.call("LLEN", batchKey)
   if size == 1 then
-    resp = { status = "new", batchID = batchID, batchPointerKey = batchPointerKey }
+    resp = { status = "new", batchID = batchID, batchPointerKey = batchPointerKey, committed = 0, duplicates = 1, committedBytes = 0 }
   else
-    resp = { status = "itemexists", batchID = batchID, batchPointerKey = batchPointerKey }
+    resp = { status = "itemexists", batchID = batchID, batchPointerKey = batchPointerKey, committed = 0, duplicates = 1, committedBytes = 0 }
   end
   return cjson.encode(resp)
 end
 
 -- append event to batch
 local len = redis.call("RPUSH", batchKey, event)
+resp.committed = 1
+resp.committedBytes = string.len(event)
 
 if len == 1 then
     -- newly started batch
-    resp = { status = "new", batchID = batchID, batchPointerKey = batchPointerKey }
+    resp.status = "new"
 end
 
 local size = redis.call("MEMORY", "USAGE", batchKey)
@@ -90,7 +92,7 @@ if len >= batchLimit or size >= batchSizeLimit then
     status = "maxsize"
   end
 
-  resp = { status = status, batchID = batchID, batchPointerKey = batchPointerKey }
+  resp.status = status
 end
 
 return cjson.encode(resp)

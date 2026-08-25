@@ -1141,6 +1141,7 @@ func TestBufferedByteSize(t *testing.T) {
 
 		// Should have flushed quickly via byte-size, not waited 5s for timer
 		require.Less(t, elapsed, 500*time.Millisecond, "should flush on byte size, not wait for timer")
+		require.Zero(t, buffered.(*redisBatchManager).buffer.totalPendingBytes.Load())
 	})
 
 	t.Run("byte size resets after flush", func(t *testing.T) {
@@ -1210,5 +1211,6 @@ func TestBufferedByteSize(t *testing.T) {
 
 		// If byte size wasn't reset, second batch would wait for the 5s timer
 		require.Less(t, elapsed, 500*time.Millisecond, "second batch should flush on byte size too")
+		require.Zero(t, buffered.(*redisBatchManager).buffer.totalPendingBytes.Load())
 	})
 }
