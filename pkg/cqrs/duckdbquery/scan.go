@@ -35,6 +35,26 @@ func stringField(row map[string]any, key string) (string, error) {
 	return v, nil
 }
 
+// mapField requires the column's already-decoded JSON value (the driver
+// auto-decodes JSON-typed columns into Go values) to be a JSON object, or
+// SQL/JSON null — used for columns like events.event_data. A SQL NULL, or
+// json.Marshal(nil) having written the literal JSON "null" (e.g. an event
+// with no Data payload at all — see OnEventReceived), both decode to a Go
+// nil here and mean "no data", so they map to an empty object rather than
+// erroring; any other non-object shape (an array, a string, a number)
+// indicates real data corruption worth surfacing rather than silently
+// masking.
+func mapField(row map[string]any, key string) (map[string]any, error) {
+	if row[key] == nil {
+		return map[string]any{}, nil
+	}
+	v, ok := row[key].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("duckdbquery: expected object for column %q, got %T (%v)", key, row[key], row[key])
+	}
+	return v, nil
+}
+
 func uuidField(row map[string]any, key string) (uuid.UUID, error) {
 	s, err := stringField(row, key)
 	if err != nil {

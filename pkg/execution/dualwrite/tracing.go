@@ -77,10 +77,12 @@ func addQueueItemAttrs(attrs *meta.SerializableAttrs, item *queue.Item) {
 // addRunSpanAttrs replicates executionProcessor.OnStart's meta.SpanNameRun
 // case (see execution_processor.go) for OnFunctionFinished's span, the only
 // hook in this package that uses that name: FunctionVersion, EventIDs,
-// CronSchedule, BatchID/BatchTimestamp, and QueuedAt falling back to the
-// run ID's own embedded timestamp if nothing set it already (OnFunctionFinished
-// sets QueuedAt from item.EnqueuedAt via tracing.AddTimingAttrs before
-// calling this, so the fallback here only matters when that was zero).
+// CronSchedule, BatchID/BatchTimestamp, and QueuedAt falling back to the run
+// ID's own embedded timestamp if nothing set it already — a no-op in
+// practice today, since OnFunctionFinished's own tracing.AddTimingAttrs
+// call already sets QueuedAt to this exact value before calling this
+// function, but kept as a defensive fallback for any future caller that
+// doesn't.
 func addRunSpanAttrs(attrs *meta.SerializableAttrs, md *sv2.Metadata) {
 	if md == nil {
 		return
@@ -260,7 +262,16 @@ func spanExportRow(ctx context.Context, span sdktrace.ReadOnlySpan) (row map[str
 		l.Error("dualwrite: failed to marshal span attributes", "span_id", spanID, "trace_id", traceID, "error", err)
 		return nil, false
 	}
-	linksByt, err := json.Marshal(span.Links())
+	// span.Links() returns nil, not an empty slice, when a span has no
+	// links (the common case — nothing in this package sets any yet) —
+	// json.Marshal(nil slice) writes the JSON literal null, not [], so
+	// substitute an empty slice first to keep the column's shape consistent
+	// (always a JSON array) regardless of link count.
+	links := span.Links()
+	if links == nil {
+		links = []sdktrace.Link{}
+	}
+	linksByt, err := json.Marshal(links)
 	if err != nil {
 		l.Error("dualwrite: failed to marshal span links", "span_id", spanID, "trace_id", traceID, "error", err)
 		return nil, false

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"strconv"
 	"testing"
 	"time"
 
@@ -292,7 +293,7 @@ func TestListenerOmitsGroupIDOnSpansWithoutQueueItem(t *testing.T) {
 	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
 
 	md := testMetadata(t)
-	l.OnWaitForEventResumed(context.Background(), md, statev1.Pause{}, execution.ResumeRequest{})
+	l.OnWaitForEventResumed(context.Background(), md, statev1.Pause{}, execution.ResumeRequest{}, time.Now())
 
 	require.Eventually(t, func() bool {
 		var count int
@@ -307,4 +308,397 @@ func TestListenerOmitsGroupIDOnSpansWithoutQueueItem(t *testing.T) {
 	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
 	_, hasGroupID := attrs[meta.Attrs.GroupID.Key()]
 	require.False(t, hasGroupID, "a span with no queue.Item must not set GroupID")
+}
+
+// TestListenerEmitsEmptyArrayNotNullForSpansWithNoLinks proves
+// spanExportRow substitutes an empty slice for a nil span.Links() before
+// marshaling, so the links column is always a JSON array ([]) rather than
+// sometimes JSON null — no hook in this package ever sets span links today,
+// so every span exercises this path.
+func TestListenerEmitsEmptyArrayNotNullForSpansWithNoLinks(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	md := testMetadata(t)
+	stepName := "my-step"
+	l.OnStepScheduled(context.Background(), md, queue.Item{}, &stepName, time.Now())
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans;")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "span row should land in inngest.run_trace_spans after a batch flush")
+
+	rows := selectRows(t, db, "SELECT links FROM inngest.run_trace_spans;")
+	require.Len(t, rows, 1)
+	links, ok := rows[0]["links"].([]any)
+	require.True(t, ok, "links column should decode to a slice, got %T", rows[0]["links"])
+	require.Empty(t, links)
+}
+
+// singleSpanAttrs drives a hook expected to emit exactly one span through a
+// real subprocess and returns that span's decoded attributes map.
+func singleSpanAttrs(t *testing.T, db *sql.DB, fire func()) map[string]any {
+	t.Helper()
+	fire()
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans;")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "span row should land in inngest.run_trace_spans after a batch flush")
+
+	rows := selectRows(t, db, "SELECT attributes FROM inngest.run_trace_spans;")
+	require.Len(t, rows, 1)
+	attrs, ok := rows[0]["attributes"].(map[string]any)
+	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
+	return attrs
+}
+
+// TestListenerSetsWaitForEventAttrsOnPauseStartedSpan proves
+// OnWaitForEvent's pause-started marker span carries the opcode-specific
+// attributes convertFlatSpanToGQL's WaitForEventStepInfo reads
+// (step.wait_for_event.name/if, step.wait.expiry) — previously missing
+// entirely, since the hook built its span attrs via a bespoke StepName/
+// StepOp-only helper instead of tracing.GeneratorAttrs.
+func TestListenerSetsWaitForEventAttrsOnPauseStartedSpan(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	ifExpr := "true"
+	gen := statev1.GeneratorOpcode{
+		ID:   "step-1",
+		Name: "wait-step",
+		Op:   enums.OpcodeWaitForEvent,
+		Opts: &statev1.WaitForEventOpts{Event: "app/some.event", If: &ifExpr, Timeout: "1h"},
+	}
+
+	attrs := singleSpanAttrs(t, db, func() {
+		l.OnWaitForEvent(context.Background(), testMetadata(t), queue.Item{}, gen, statev1.Pause{})
+	})
+
+	require.Equal(t, "app/some.event", attrs[meta.Attrs.StepWaitForEventName.Key()])
+	require.Equal(t, "true", attrs[meta.Attrs.StepWaitForEventIf.Key()])
+	require.Equal(t, "step-1", attrs[meta.Attrs.StepID.Key()])
+	_, hasExpiry := attrs[meta.Attrs.StepWaitExpiry.Key()]
+	require.True(t, hasExpiry, "step.wait.expiry should be set from the opcode's own timeout")
+}
+
+// TestListenerSetsSignalAttrsOnPauseStartedSpan mirrors the WaitForEvent
+// test above for OnWaitForSignal's step.signal.name attribute.
+func TestListenerSetsSignalAttrsOnPauseStartedSpan(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	gen := statev1.GeneratorOpcode{
+		ID:   "step-1",
+		Name: "signal-step",
+		Op:   enums.OpcodeWaitForSignal,
+		Opts: &statev1.SignalOpts{Signal: "my-signal", Timeout: "1h"},
+	}
+
+	attrs := singleSpanAttrs(t, db, func() {
+		l.OnWaitForSignal(context.Background(), testMetadata(t), queue.Item{}, gen, statev1.Pause{})
+	})
+
+	require.Equal(t, "my-signal", attrs[meta.Attrs.StepSignalName.Key()])
+}
+
+// TestListenerSetsInvokeAttrsOnPauseStartedSpan mirrors the WaitForEvent
+// test above for OnInvokeFunction's step.invoke.function.id and
+// step.invoke.trigger.event.id attributes — the latter read from the
+// opcode's own invocation-event payload (opts.Payload.ID), the same field
+// pkg/tracing/util.go's generatorAttrs nil-guards (see the OnInvokeFunction
+// nil-pointer fix this test would otherwise have caught).
+func TestListenerSetsInvokeAttrsOnPauseStartedSpan(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	triggerEventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	gen := statev1.GeneratorOpcode{
+		ID:   "step-1",
+		Name: "invoke-step",
+		Op:   enums.OpcodeInvokeFunction,
+		Opts: &statev1.InvokeFunctionOpts{
+			FunctionID: "my-app-my-fn",
+			Timeout:    "1h",
+			Payload:    &event.Event{ID: triggerEventID.String()},
+		},
+	}
+
+	attrs := singleSpanAttrs(t, db, func() {
+		l.OnInvokeFunction(context.Background(), testMetadata(t), queue.Item{}, gen, event.Event{})
+	})
+
+	require.Equal(t, "my-app-my-fn", attrs[meta.Attrs.StepInvokeFunctionID.Key()])
+	require.Equal(t, triggerEventID.String(), attrs[meta.Attrs.StepInvokeTriggerEventID.Key()])
+}
+
+// TestListenerOnInvokeFunctionDoesNotPanicWithNilPayload proves the
+// pkg/tracing/util.go nil-pointer fix: InvokeFunctionOpts.Validate()
+// explicitly treats a nil Payload as valid, so generatorAttrs must not
+// crash dereferencing opts.Payload.ID when it's nil — it just gets no
+// step.invoke.trigger.event.id attribute.
+func TestListenerOnInvokeFunctionDoesNotPanicWithNilPayload(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	gen := statev1.GeneratorOpcode{
+		ID:   "step-1",
+		Name: "invoke-step",
+		Op:   enums.OpcodeInvokeFunction,
+		Opts: &statev1.InvokeFunctionOpts{FunctionID: "my-app-my-fn", Timeout: "1h"},
+	}
+
+	attrs := singleSpanAttrs(t, db, func() {
+		l.OnInvokeFunction(context.Background(), testMetadata(t), queue.Item{}, gen, event.Event{})
+	})
+
+	require.Equal(t, "my-app-my-fn", attrs[meta.Attrs.StepInvokeFunctionID.Key()])
+	_, hasTriggerEventID := attrs[meta.Attrs.StepInvokeTriggerEventID.Key()]
+	require.False(t, hasTriggerEventID)
+}
+
+// TestListenerSetsWaitForEventAttrsOnResumedSpan proves resumeAttrs — shared
+// by the three *Resumed hooks — pulls the same opcode-specific fields
+// directly off statev1.Pause/execution.ResumeRequest (no GeneratorOpcode is
+// available at resume time), including step.wait_for_event.matched_id
+// (r.EventID) — a field the flat model must set explicitly at resume time
+// since, unlike the rollup model, there is no fragment merge to inherit it
+// from the pause-started span.
+func TestListenerSetsWaitForEventAttrsOnResumedSpan(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	waitForEvent := enums.OpcodeWaitForEvent.String()
+	evtName := "app/some.event"
+	ifExpr := "true"
+	createdAt := time.Now().Add(-time.Minute).Round(0)
+	expires := statev1.Time(time.Now().Add(time.Hour))
+	pause := statev1.Pause{
+		Outgoing:   "step-1",
+		Opcode:     &waitForEvent,
+		Event:      &evtName,
+		Expression: &ifExpr,
+		Expires:    expires,
+		CreatedAt:  createdAt,
+	}
+	matchedID := ulid.MustNew(ulid.Now(), rand.Reader)
+	resumedAt := time.Now().Round(0)
+
+	attrs := singleSpanAttrs(t, db, func() {
+		l.OnWaitForEventResumed(context.Background(), testMetadata(t), pause, execution.ResumeRequest{EventID: &matchedID}, resumedAt)
+	})
+
+	require.Equal(t, "step-1", attrs[meta.Attrs.StepID.Key()], "step.id should be set from pause.Outgoing")
+	require.Equal(t, enums.OpcodeWaitForEvent.String(), attrs[meta.Attrs.StepOp.Key()])
+	require.Equal(t, evtName, attrs[meta.Attrs.StepWaitForEventName.Key()])
+	require.Equal(t, "true", attrs[meta.Attrs.StepWaitForEventIf.Key()])
+	require.Equal(t, matchedID.String(), attrs[meta.Attrs.StepWaitForEventMatchedID.Key()])
+	require.Equal(t, false, attrs[meta.Attrs.StepWaitExpired.Key()])
+	_, hasExpiry := attrs[meta.Attrs.StepWaitExpiry.Key()]
+	require.True(t, hasExpiry, "step.wait.expiry should be set from pause.Expires")
+
+	// The resumed span's timing attributes: QueuedAt/ScheduledAt fall back
+	// to pause.CreatedAt (the only timestamp these hooks otherwise have —
+	// see createPauseSpan's own doc comment), and EndedAt is the caller's
+	// own resume-time timestamp threaded through the SyncLifecycleListener
+	// interface, not a fresh time.Now() read inside this package.
+	requireTimeAttrEqual(t, createdAt, attrs[meta.Attrs.QueuedAt.Key()])
+	requireTimeAttrEqual(t, createdAt, attrs[meta.Attrs.ScheduledAt.Key()])
+	requireTimeAttrEqual(t, resumedAt, attrs[meta.Attrs.EndedAt.Key()])
+}
+
+// requireTimeAttrEqual compares a meta.TimeAttr-backed attribute (see
+// pkg/tracing/meta/serializers.go's TimeAttr — serialized as an
+// attribute.String of the Unix-milliseconds epoch, so it decodes here as a
+// plain digit string, not RFC3339) against an expected time.Time to
+// millisecond precision.
+func requireTimeAttrEqual(t *testing.T, want time.Time, got any) {
+	t.Helper()
+	gotStr, ok := got.(string)
+	require.True(t, ok, "expected a string-encoded timestamp, got %T (%v)", got, got)
+	millis, err := strconv.ParseInt(gotStr, 10, 64)
+	require.NoError(t, err, "parsing attribute timestamp %q", gotStr)
+	require.WithinDuration(t, want, time.UnixMilli(millis), time.Millisecond)
+}
+
+// TestListenerSetsInvokeAttrsOnResumedSpan proves resumeAttrs' invoke branch:
+// StepInvokeFunctionID/StepInvokeTriggerEventID from the pause itself (the
+// latter despite Pause.TriggeringEventID's generic doc comment — see
+// resumeAttrs' own comment on why it holds the invocation event's ID for an
+// invoke pause specifically), and StepInvokeFinishEventID/StepInvokeRunID
+// from the resume request.
+func TestListenerSetsInvokeAttrsOnResumedSpan(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	invoke := enums.OpcodeInvokeFunction.String()
+	fnID := "my-app-my-fn"
+	triggerEventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	triggerEventIDStr := triggerEventID.String()
+	pause := statev1.Pause{
+		Outgoing:          "step-1",
+		Opcode:            &invoke,
+		InvokeTargetFnID:  &fnID,
+		TriggeringEventID: &triggerEventIDStr,
+	}
+	finishEventID := ulid.MustNew(ulid.Now(), rand.Reader)
+	invokedRunID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	attrs := singleSpanAttrs(t, db, func() {
+		l.OnInvokeFunctionResumed(context.Background(), testMetadata(t), pause, execution.ResumeRequest{
+			EventID: &finishEventID,
+			RunID:   &invokedRunID,
+		}, time.Now())
+	})
+
+	require.Equal(t, "step-1", attrs[meta.Attrs.StepID.Key()])
+	require.Equal(t, enums.OpcodeInvokeFunction.String(), attrs[meta.Attrs.StepOp.Key()])
+	require.Equal(t, fnID, attrs[meta.Attrs.StepInvokeFunctionID.Key()])
+	require.Equal(t, triggerEventID.String(), attrs[meta.Attrs.StepInvokeTriggerEventID.Key()])
+	require.Equal(t, finishEventID.String(), attrs[meta.Attrs.StepInvokeFinishEventID.Key()])
+	require.Equal(t, invokedRunID.String(), attrs[meta.Attrs.StepInvokeRunID.Key()])
+}
+
+// TestListenerSetsSignalAttrsOnResumedSpan mirrors the WaitForEvent/Invoke
+// tests above for OnWaitForSignalResumed's step.signal.name attribute.
+func TestListenerSetsSignalAttrsOnResumedSpan(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	signal := enums.OpcodeWaitForSignal.String()
+	signalName := "my-signal"
+	pause := statev1.Pause{Outgoing: "step-1", Opcode: &signal, SignalID: &signalName}
+
+	attrs := singleSpanAttrs(t, db, func() {
+		l.OnWaitForSignalResumed(context.Background(), testMetadata(t), pause, execution.ResumeRequest{}, time.Now())
+	})
+
+	require.Equal(t, "step-1", attrs[meta.Attrs.StepID.Key()])
+	require.Equal(t, enums.OpcodeWaitForSignal.String(), attrs[meta.Attrs.StepOp.Key()])
+	require.Equal(t, signalName, attrs[meta.Attrs.StepSignalName.Key()])
+}
+
+// TestListenerDoesNotLeakInvokeInternalFieldsIntoWaitForEventAttrsOnResume
+// proves resumeAttrs' opcode gating: an invoke pause's Event/Expression
+// fields hold its own internal function-finished-matching plumbing (see
+// handleGeneratorInvokeFunction), not a user-facing wait condition, so they
+// must never surface as step.wait_for_event.name/if on an invoke resume.
+func TestListenerDoesNotLeakInvokeInternalFieldsIntoWaitForEventAttrsOnResume(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	invoke := enums.OpcodeInvokeFunction.String()
+	internalEventName := "inngest/function.finished"
+	internalExpr := "async.data.correlation_id == \"...\""
+	pause := statev1.Pause{
+		Outgoing:   "step-1",
+		Opcode:     &invoke,
+		Event:      &internalEventName,
+		Expression: &internalExpr,
+	}
+
+	attrs := singleSpanAttrs(t, db, func() {
+		l.OnInvokeFunctionResumed(context.Background(), testMetadata(t), pause, execution.ResumeRequest{}, time.Now())
+	})
+
+	_, hasName := attrs[meta.Attrs.StepWaitForEventName.Key()]
+	_, hasIf := attrs[meta.Attrs.StepWaitForEventIf.Key()]
+	require.False(t, hasName, "an invoke pause's internal Event field must not leak as step.wait_for_event.name")
+	require.False(t, hasIf, "an invoke pause's internal Expression field must not leak as step.wait_for_event.if")
+}
+
+// TestListenerRunSpanUsesRunIDTimestampNotItemEnqueuedAt proves
+// OnFunctionFinished's "executor.run" span sets QueuedAt from the run's own
+// canonical queued_at (md.ID.RunID's embedded timestamp — the same value
+// runCommonFields/OnFunctionScheduled/OnFunctionStarted all treat as
+// queued_at), not item.EnqueuedAt: item here is whichever queue.Item
+// happened to trigger this specific finish call, which for a multi-step
+// function is a later step's item, not the run's original enqueue, and can
+// disagree with the run's actual queued_at by any amount. ScheduledAt is
+// omitted entirely for the same reason — item.At is that same later step's
+// time, not the run's real scheduled_at, which isn't plumbed through the
+// state store to this hook (see OnFunctionFinished's own TODO comment).
+func TestListenerRunSpanUsesRunIDTimestampNotItemEnqueuedAt(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	md := testMetadata(t)
+	runQueuedAt := ulid.Time(md.ID.RunID.Time())
+	// A later step's queue.Item — its own EnqueuedAt/At land long after the
+	// run was originally queued, simulating a multi-step function's final
+	// finish call.
+	laterItemTime := runQueuedAt.Add(time.Hour).Round(0)
+	item := queue.Item{EnqueuedAt: laterItemTime, At: laterItemTime}
+
+	l.OnFunctionFinished(context.Background(), md, item, nil, statev1.DriverResponse{}, time.Now())
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans WHERE name = 'executor.run';")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "executor.run span should land after a batch flush")
+
+	rows := selectRows(t, db, "SELECT attributes FROM inngest.run_trace_spans WHERE name = 'executor.run';")
+	require.Len(t, rows, 1)
+	attrs, ok := rows[0]["attributes"].(map[string]any)
+	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
+
+	requireTimeAttrEqual(t, runQueuedAt, attrs[meta.Attrs.QueuedAt.Key()])
+	_, hasScheduledAt := attrs[meta.Attrs.ScheduledAt.Key()]
+	require.False(t, hasScheduledAt, "scheduled_at should be omitted, not set from the wrong item's time")
+}
+
+// TestListenerOnFunctionScheduledOmitsStartedAndEndedAt proves the
+// executor.run.queued span never carries StartedAt/EndedAt attributes: the
+// run has only been queued at this point, not started or ended, even
+// though the physical span's own start_time/end_time columns are both
+// pinned to queuedAt (needed for GetSpansByRunID's tree-building — see
+// OnFunctionScheduled's own comment). Without the explicit nil-attr
+// suppression, tracingv3.CreateSpan would auto-populate both from
+// CreateSpanOptions.StartTime/EndTime.
+func TestListenerOnFunctionScheduledOmitsStartedAndEndedAt(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	md := testMetadata(t)
+	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans WHERE name = 'executor.run.queued';")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "executor.run.queued span should land after a batch flush")
+
+	rows := selectRows(t, db, "SELECT attributes, start_time, end_time FROM inngest.run_trace_spans WHERE name = 'executor.run.queued';")
+	require.Len(t, rows, 1)
+	attrs, ok := rows[0]["attributes"].(map[string]any)
+	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
+
+	_, hasStartedAt := attrs[meta.Attrs.StartedAt.Key()]
+	_, hasEndedAt := attrs[meta.Attrs.EndedAt.Key()]
+	require.False(t, hasStartedAt, "started_at should be omitted — the run has only been queued, not started")
+	require.False(t, hasEndedAt, "ended_at should be omitted — the run has only been queued, not ended")
+
+	// The physical span row itself must still have real, non-NULL
+	// start_time/end_time (both pinned to queuedAt) — only the semantic
+	// StartedAt/EndedAt *attributes* are suppressed.
+	require.NotNil(t, rows[0]["start_time"])
+	require.NotNil(t, rows[0]["end_time"])
 }

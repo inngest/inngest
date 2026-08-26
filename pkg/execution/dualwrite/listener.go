@@ -193,11 +193,26 @@ func (l *listener) OnFunctionScheduled(ctx context.Context, md sv2.Metadata, ite
 	run["status"] = enums.StepStatusQueued
 	l.sendRun(run)
 
-	// A point span: physical start and end both pinned to queuedAt (the
-	// same timestamp the QueuedAt attribute below carries).
+	// A point span: physical start and end both pinned to queuedAt (needed
+	// for GetSpansByRunID's ORDER BY start_time ASC and this span's own
+	// deterministic point-in-time identity) — but StartedAt/EndedAt must
+	// NOT be derived from that: the run has only been queued at this point,
+	// not started or ended. tracingv3.CreateSpan would otherwise
+	// auto-populate both from CreateSpanOptions.StartTime/EndTime (via its
+	// own meta.AddAttrIfUnset calls), so they're explicitly suppressed here
+	// first. meta.AddAttr with a nil *time.Time serializes as
+	// meta.BlankAttr (an empty-key, empty-value attribute — a pre-existing
+	// "explicitly absent" pattern already built into pkg/tracing/meta's
+	// TimeAttr, not a new hack), which is enough to make AddAttrIfUnset see
+	// the key as already set and skip its own assignment; confirmed against
+	// a real subprocess that the resulting blank key never actually reaches
+	// the exported span attributes (the OTel SDK drops it), so there's no
+	// stray "" key in the stored attributes JSON.
 	queuedAt := ulid.Time(md.ID.RunID.Time())
 	attrs := meta.NewAttrSet()
 	meta.AddAttr(attrs, meta.Attrs.QueuedAt, &queuedAt)
+	meta.AddAttr(attrs, meta.Attrs.StartedAt, (*time.Time)(nil))
+	meta.AddAttr(attrs, meta.Attrs.EndedAt, (*time.Time)(nil))
 	addEventsInputAttr(ctx, attrs, evts)
 
 	mdPtr := safeMetadata(md)
@@ -274,10 +289,25 @@ func (l *listener) OnFunctionFinished(ctx context.Context, md sv2.Metadata, item
 	// which nothing had actually inserted a row for until now), and a
 	// child nonstep span for the function's own output event — see
 	// emitOnFunctionFinishedNonStepSpan below.
+	// QueuedAt is the run's own canonical queued_at (the ULID-embedded
+	// timestamp every other hook in this file uses — runCommonFields,
+	// OnFunctionScheduled, OnFunctionStarted), not item.EnqueuedAt: item
+	// here is whichever queue.Item happened to trigger this specific finish
+	// call, which for a multi-step function is a later step's item, not the
+	// run's original enqueue.
+	//
+	// ScheduledAt is deliberately omitted (not derived from item.At): item
+	// is that same later step's queue item here, not the run's original
+	// scheduling item, so item.At is simply the wrong value, not just one
+	// needing a clamp — the run's real scheduled_at is never plumbed
+	// through the state store to this hook. TODO: thread the run's actual
+	// scheduled_at through sv2.Metadata (or similar) so it's available here
+	// and at OnFunctionScheduled without relying on whichever item happens
+	// to be in scope.
 	runAttrs := meta.NewAttrSet()
 	meta.AddAttr(runAttrs, meta.Attrs.DynamicStatus, &stepStatus)
 	addEventsInputAttr(ctx, runAttrs, evts)
-	tracing.AddTimingAttrs(runAttrs, item.EnqueuedAt, item.At, start, end)
+	tracing.AddTimingAttrs(runAttrs, queuedAt, time.Time{}, start, end)
 	addRunSpanAttrs(runAttrs, mdPtr)
 	_, _ = l.createSpan(ctx, meta.SpanNameRun, &tracing.CreateSpanOptions{
 		Seed:       md.ID.RunID[:],
@@ -440,19 +470,6 @@ func (l *listener) OnEventReceived(ctx context.Context, evt event.TrackedEvent) 
 // string), so there's nothing meaningful to put on a span at all.
 // execution.NoopSyncLifecycleListener covers it as a no-op.
 
-// genOpcodeAttrs builds the meta.Attrs plumbing shared by every hook below
-// that receives a GeneratorOpcode directly: StepName and StepOp, the same
-// two attributes executor.emitStepSpan always sets before layering on
-// anything opcode-specific.
-func genOpcodeAttrs(gen statev1.GeneratorOpcode) *meta.SerializableAttrs {
-	attrs := meta.NewAttrSet()
-	if gen.Name != "" {
-		meta.AddAttr(attrs, meta.Attrs.StepName, &gen.Name)
-	}
-	meta.AddAttr(attrs, meta.Attrs.StepOp, &gen.Op)
-	return attrs
-}
-
 // stepTiming replicates executor.opcodeTiming's fallback logic (see
 // executor.go): gen.Timing is only populated by newer SDKs that report
 // per-opcode timing, so gen.Timing.Start()/End() can come back zero (or,
@@ -531,27 +548,33 @@ func (l *listener) OnSleep(ctx context.Context, md sv2.Metadata, item queue.Item
 }
 
 func (l *listener) OnWaitForEvent(ctx context.Context, md sv2.Metadata, item queue.Item, gen statev1.GeneratorOpcode, pause statev1.Pause) {
-	l.createPauseStartedSpan(ctx, md, item, genOpcodeAttrs(gen), pause)
+	// tracing.GeneratorAttrs (not a bespoke StepName/StepOp-only builder) —
+	// it's the exact same opcode-specific attribute builder OnSleep uses via
+	// stepAttrs, and OpcodeWaitForEvent is one of the cases it already
+	// handles (StepWaitForEventName/If, StepWaitExpiry), so this pause's own
+	// GeneratorOpcode already carries everything needed for
+	// convertFlatSpanToGQL's WaitForEventStepInfo to render correctly.
+	l.createPauseStartedSpan(ctx, md, item, tracing.GeneratorAttrs(&gen), pause)
 }
 
-func (l *listener) OnWaitForEventResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
-	l.createPauseSpan(ctx, md, pause, r)
+func (l *listener) OnWaitForEventResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest, now time.Time) {
+	l.createPauseSpan(ctx, md, pause, r, now)
 }
 
 func (l *listener) OnWaitForSignal(ctx context.Context, md sv2.Metadata, item queue.Item, gen statev1.GeneratorOpcode, pause statev1.Pause) {
-	l.createPauseStartedSpan(ctx, md, item, genOpcodeAttrs(gen), pause)
+	l.createPauseStartedSpan(ctx, md, item, tracing.GeneratorAttrs(&gen), pause)
 }
 
-func (l *listener) OnWaitForSignalResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
-	l.createPauseSpan(ctx, md, pause, r)
+func (l *listener) OnWaitForSignalResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest, now time.Time) {
+	l.createPauseSpan(ctx, md, pause, r, now)
 }
 
 func (l *listener) OnInvokeFunction(ctx context.Context, md sv2.Metadata, item queue.Item, gen statev1.GeneratorOpcode, _ event.Event) {
-	l.createPauseStartedSpan(ctx, md, item, genOpcodeAttrs(gen), statev1.Pause{})
+	l.createPauseStartedSpan(ctx, md, item, tracing.GeneratorAttrs(&gen), statev1.Pause{})
 }
 
-func (l *listener) OnInvokeFunctionResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
-	l.createPauseSpan(ctx, md, pause, r)
+func (l *listener) OnInvokeFunctionResumed(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest, now time.Time) {
+	l.createPauseSpan(ctx, md, pause, r, now)
 }
 
 // createPauseStartedSpan creates the point-in-time marker span for the
@@ -562,6 +585,19 @@ func (l *listener) OnInvokeFunctionResumed(ctx context.Context, md sv2.Metadata,
 // (also possible on a real Pause — see its doc comment) leaves StartTime
 // zero too, which CreateSpanOptions already defaults to "now".
 func (l *listener) createPauseStartedSpan(ctx context.Context, md sv2.Metadata, item queue.Item, attrs *meta.SerializableAttrs, pause statev1.Pause) {
+	// ScheduledAt follows the same max(item.At, pinned-timestamp) rule
+	// runCommonFields/stepTiming use elsewhere in this file — a job
+	// scheduled to run immediately can have item.At land fractionally
+	// before the pause's own CreatedAt, so scheduledAt is never allowed to
+	// precede it.
+	scheduledAt := item.At
+	if scheduledAt.Before(pause.CreatedAt) {
+		scheduledAt = pause.CreatedAt
+	}
+	if !scheduledAt.IsZero() {
+		meta.AddAttr(attrs, meta.Attrs.ScheduledAt, &scheduledAt)
+	}
+
 	mdPtr := safeMetadata(md)
 	_, _ = l.createSpan(ctx, tracingv3.SpanNameStepPauseStarted, &tracing.CreateSpanOptions{
 		Metadata:   mdPtr,
@@ -581,7 +617,7 @@ func (l *listener) createPauseStartedSpan(ctx context.Context, md sv2.Metadata, 
 // correlate this span to that one by identity even though this one was
 // never updated in place the way the real system's is — see
 // SpanExporter's doc comment on this package only ever inserting.
-func (l *listener) createPauseSpan(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest) {
+func (l *listener) createPauseSpan(ctx context.Context, md sv2.Metadata, pause statev1.Pause, r execution.ResumeRequest, now time.Time) {
 	attrs := resumeAttrs(pause, r)
 	// A timeout is an expected outcome (e.g. a wait-for-event's timeout
 	// branch), not a failure — StepStatusTimedOut says so directly, the
@@ -594,20 +630,64 @@ func (l *listener) createPauseSpan(ctx context.Context, md sv2.Metadata, pause s
 	}
 	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, &status)
 
+	// QueuedAt/ScheduledAt: these hooks receive no queue.Item (unlike
+	// createPauseStartedSpan), so pause.CreatedAt — the only timestamp
+	// otherwise available — is the closest equivalent to "when this step
+	// was queued/scheduled", the same "closest available timestamp"
+	// fallback stepTiming/OnFunctionScheduled use elsewhere in this file.
+	// StartedAt is deliberately left zero here (AddTimingAttrs skips zero
+	// values): CreateSpanOptions.StartTime below already gets it set
+	// automatically (see tracingv3's CreateSpan), so setting it again would
+	// be redundant. now is the caller's own resume-time timestamp — the
+	// same instant executor.Resume/ResumePauseTimeout use for their own
+	// UpdateSpan(EndTime: ...) call on the real (non-dualwrite) span, kept
+	// consistent by threading it through the SyncLifecycleListener
+	// interface rather than this package reading a fresh time.Now() of its
+	// own — and must also be passed as CreateSpanOptions.EndTime: that is
+	// what makes the tracer add the EndedAt attribute, not merely end the
+	// physical span at that instant.
+	tracing.AddTimingAttrs(attrs, pause.CreatedAt, pause.CreatedAt, time.Time{}, now)
+
 	mdPtr := safeMetadata(md)
 	_, _ = l.createSpan(ctx, tracingv3.SpanNameStep, &tracing.CreateSpanOptions{
 		Seed:       tracing.FinalizedStepDynamicSeed(pause.Outgoing),
 		Metadata:   mdPtr,
 		Parent:     tracing.RunSpanRefFromMetadata(mdPtr),
 		StartTime:  pause.CreatedAt,
+		EndTime:    now,
 		Attributes: attrs,
 	})
 }
 
 // resumeAttrs is shared by the three *Resumed hooks above, whose signatures
-// and available data are identical: a resume carries its step name on
-// either the ResumeRequest or the pause, but never a GeneratorOpcode, so
-// there's no StepOp to set here (unlike genOpcodeAttrs).
+// and available data are identical: a resume never receives a
+// GeneratorOpcode the way createPauseStartedSpan's tracing.GeneratorAttrs
+// call does, but StepID/StepOp are still fully recoverable from pause alone
+// — StepID from pause.Outgoing (the step's own ID), StepOp from whichever
+// of pause.IsWaitForEvent()/IsInvoke()/IsSignal() matches (the exact opcode
+// the pause was created for, not merely inferred).
+//
+// The real system's own resume-time attribute builder, tracing.ResumeAttrs,
+// deliberately does NOT re-set StepWaitForEventName/If/StepSignalName/
+// StepInvokeFunctionID/StepInvokeTriggerEventID here — its rollup/
+// fragment-merge model inherits those from the pause-started span's own
+// fragment when the two get merged into one logical span at read time (see
+// pkg/cqrs/manager's dynamic-span-id merge). This package's flat model has
+// no merge step at all — createPauseStartedSpan and createPauseSpan are two
+// permanently separate physical rows — so every opcode-specific field a
+// reader might need has to be set explicitly here too, derived straight
+// from pause's own fields.
+//
+// pause.Event/Expression/TriggeringEventID are reused across pause types
+// with different meanings depending on which opcode created the pause (an
+// invoke pause's Event/Expression hold its own internal
+// function-finished-matching plumbing, not a user-facing wait condition;
+// see handleGeneratorInvokeFunction in pkg/execution/executor/executor.go),
+// so each field below is gated by the specific opcode that gives it its
+// documented meaning — mirroring tracing.ResumeAttrs' own
+// pause.IsInvoke()/IsWaitForEvent() gating for the fields it does set
+// (StepInvokeFinishEventID/StepInvokeRunID/StepWaitForEventMatchedID from
+// ResumeRequest.EventID/RunID, reused verbatim below).
 func resumeAttrs(pause statev1.Pause, r execution.ResumeRequest) *meta.SerializableAttrs {
 	attrs := meta.NewAttrSet()
 	name := r.StepName
@@ -617,6 +697,72 @@ func resumeAttrs(pause statev1.Pause, r execution.ResumeRequest) *meta.Serializa
 	if name != "" {
 		meta.AddAttr(attrs, meta.Attrs.StepName, &name)
 	}
+	// pause.Outgoing is the step's own ID — the same value
+	// tracing.FinalizedStepDynamicSeed(pause.Outgoing) below derives this
+	// span's deterministic identity from, and the same field
+	// tracing.GeneratorAttrs sets from gen.ID at pause-started time (see
+	// createPauseStartedSpan) — set unconditionally, unlike the
+	// opcode-specific fields below, since every pause type carries it.
+	// pause.Outgoing is the step's own ID — the same value
+	// tracing.FinalizedStepDynamicSeed(pause.Outgoing) below derives this
+	// span's deterministic identity from, and the same field
+	// tracing.GeneratorAttrs sets from gen.ID at pause-started time (see
+	// createPauseStartedSpan) — set unconditionally, unlike the
+	// opcode-specific fields below, since every pause type carries it.
+	if pause.Outgoing != "" {
+		meta.AddAttr(attrs, meta.Attrs.StepID, &pause.Outgoing)
+	}
+
+	switch {
+	case pause.IsWaitForEvent():
+		op := enums.OpcodeWaitForEvent
+		meta.AddAttr(attrs, meta.Attrs.StepOp, &op)
+		if pause.Event != nil {
+			meta.AddAttr(attrs, meta.Attrs.StepWaitForEventName, pause.Event)
+		}
+		if pause.Expression != nil {
+			meta.AddAttr(attrs, meta.Attrs.StepWaitForEventIf, pause.Expression)
+		}
+		if r.EventID != nil {
+			meta.AddAttr(attrs, meta.Attrs.StepWaitForEventMatchedID, r.EventID)
+		}
+	case pause.IsInvoke():
+		op := enums.OpcodeInvokeFunction
+		meta.AddAttr(attrs, meta.Attrs.StepOp, &op)
+		if pause.InvokeTargetFnID != nil {
+			meta.AddAttr(attrs, meta.Attrs.StepInvokeFunctionID, pause.InvokeTargetFnID)
+		}
+		// TriggeringEventID, despite its generic doc comment ("the event
+		// that triggered the original run"), is set to the invocation
+		// event's own ID for an invoke pause specifically — see
+		// handleGeneratorInvokeFunction's `TriggeringEventID: &evt.Event.ID`
+		// (evt being the synthetic invocation event created to trigger the
+		// target function), the same event tracing.GeneratorAttrs' Invoke
+		// case reads via opts.Payload.ID at pause-started time.
+		if pause.TriggeringEventID != nil {
+			if id, err := ulid.Parse(*pause.TriggeringEventID); err == nil {
+				meta.AddAttr(attrs, meta.Attrs.StepInvokeTriggerEventID, &id)
+			}
+		}
+		if r.EventID != nil {
+			meta.AddAttr(attrs, meta.Attrs.StepInvokeFinishEventID, r.EventID)
+		}
+		if r.RunID != nil {
+			meta.AddAttr(attrs, meta.Attrs.StepInvokeRunID, r.RunID)
+		}
+	case pause.IsSignal():
+		op := enums.OpcodeWaitForSignal
+		meta.AddAttr(attrs, meta.Attrs.StepOp, &op)
+		if pause.SignalID != nil {
+			meta.AddAttr(attrs, meta.Attrs.StepSignalName, pause.SignalID)
+		}
+	}
+
+	if expiry := time.Time(pause.Expires); !expiry.IsZero() {
+		meta.AddAttr(attrs, meta.Attrs.StepWaitExpiry, &expiry)
+	}
+	meta.AddAttr(attrs, meta.Attrs.StepWaitExpired, &r.IsTimeout)
+
 	return attrs
 }
 

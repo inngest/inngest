@@ -3,6 +3,7 @@ package duckdbquery
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -153,6 +154,211 @@ func TestGetTraceRunsFiltersByStatusAndTimeRange(t *testing.T) {
 	require.Equal(t, run1.String(), runs[0].RunID)
 }
 
+// TestGetTraceRunsFiltersByAppName proves resolveAppAndFunctionFilters
+// resolves filter.AppName to a real AppID via the embedded manager's
+// GetAppByName (inngest.runs has no app name column to filter on directly)
+// and that the resolved AppID actually narrows the result set.
+func TestGetTraceRunsFiltersByAppName(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+
+	accountID, envID := uuid.New(), uuid.New()
+	matchAppID, otherAppID, functionID := uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+
+	fake := &fakeManager{apps: map[string]*cqrs.App{
+		"my-app": {ID: matchAppID, Name: "my-app"},
+	}}
+	m := Wrap(fake, db).(*Manager)
+
+	completed := enums.StepStatusCompleted
+	matchRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, matchAppID, functionID, matchRun, now, &completed, nil, nil, nil)
+	otherRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, otherAppID, functionID, otherRun, now, &completed, nil, nil, nil)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			AppName:   []string{"my-app"},
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, matchRun.String(), runs[0].RunID)
+}
+
+// TestGetTraceRunsAppNameWithNoMatchReturnsEmpty proves a filter.AppName
+// that resolves to no real app returns zero runs, not every run — a naive
+// merge into an empty AppID list would otherwise silently behave as "no
+// filter" instead of "match nothing".
+func TestGetTraceRunsAppNameWithNoMatchReturnsEmpty(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+
+	fake := &fakeManager{apps: map[string]*cqrs.App{}}
+	m := Wrap(fake, db).(*Manager)
+
+	completed := enums.StepStatusCompleted
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, ulid.MustNew(ulid.Timestamp(now), rand.Reader), now, &completed, nil, nil, nil)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			AppName:   []string{"no-such-app"},
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Empty(t, runs)
+}
+
+// TestGetTraceRunsFiltersByFunctionSlug proves filter.FunctionSlug resolves
+// via the embedded manager's GetFunctions and narrows the result set, the
+// same way AppName does.
+func TestGetTraceRunsFiltersByFunctionSlug(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+
+	accountID, envID, appID := uuid.New(), uuid.New(), uuid.New()
+	matchFnID, otherFnID := uuid.New(), uuid.New()
+	now := time.Now().UTC()
+
+	fake := &fakeManager{functions: []*cqrs.Function{
+		{ID: matchFnID, Slug: "my-fn"},
+		{ID: otherFnID, Slug: "other-fn"},
+	}}
+	m := Wrap(fake, db).(*Manager)
+
+	completed := enums.StepStatusCompleted
+	matchRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, matchFnID, matchRun, now, &completed, nil, nil, nil)
+	otherRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, otherFnID, otherRun, now, &completed, nil, nil, nil)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField:    enums.TraceRunTimeQueuedAt,
+			FunctionSlug: []string{"my-fn"},
+			From:         now.Add(-time.Hour), Until: now.Add(time.Hour),
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, matchRun.String(), runs[0].RunID)
+}
+
+// TestGetTraceRunsFunctionSlugWithNoMatchReturnsEmpty mirrors
+// TestGetTraceRunsAppNameWithNoMatchReturnsEmpty for FunctionSlug.
+func TestGetTraceRunsFunctionSlugWithNoMatchReturnsEmpty(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+
+	fake := &fakeManager{functions: []*cqrs.Function{{ID: uuid.New(), Slug: "other-fn"}}}
+	m := Wrap(fake, db).(*Manager)
+
+	completed := enums.StepStatusCompleted
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, ulid.MustNew(ulid.Timestamp(now), rand.Reader), now, &completed, nil, nil, nil)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField:    enums.TraceRunTimeQueuedAt,
+			FunctionSlug: []string{"no-such-fn"},
+			From:         now.Add(-time.Hour), Until: now.Add(time.Hour),
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Empty(t, runs)
+}
+
+// TestGetTraceRunsPropagatesAppNameResolutionError proves a real (non-
+// "not found") error from the embedded manager surfaces to the caller
+// rather than being swallowed the same way an unresolvable name is.
+func TestGetTraceRunsPropagatesAppNameResolutionError(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+
+	fake := &fakeManager{appErr: errors.New("boom")}
+	m := Wrap(fake, db).(*Manager)
+
+	_, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: uuid.New(), WorkspaceID: uuid.New(),
+			TimeField: enums.TraceRunTimeQueuedAt,
+			AppName:   []string{"my-app"},
+			From:      time.Now().Add(-time.Hour), Until: time.Now().Add(time.Hour),
+		},
+		Items: 40,
+	})
+	require.ErrorContains(t, err, "boom")
+}
+
+// TestGetTraceRunsFiltersByEventID proves filter.EventID matches a run
+// whose event_ids array contains ANY of the given IDs — event_ids is a real
+// VARCHAR[] column (see the earlier VARCHAR[] migration work), so this is a
+// direct list_contains match, no name/slug resolution involved.
+func TestGetTraceRunsFiltersByEventID(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	evt1, evt2, unrelatedEvt := ulid.MustNew(ulid.Now(), rand.Reader), ulid.MustNew(ulid.Now(), rand.Reader), ulid.MustNew(ulid.Now(), rand.Reader)
+
+	matchRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	_, err := m.db.ExecContext(ctx,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, function_id, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		accountID.String(), envID.String(), matchRun.String(), now, now, appID.String(), functionID.String(),
+		enums.StepStatusCompleted.String(), []string{evt1.String()},
+	)
+	require.NoError(t, err)
+
+	otherRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	_, err = m.db.ExecContext(ctx,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, function_id, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		accountID.String(), envID.String(), otherRun.String(), now, now, appID.String(), functionID.String(),
+		enums.StepStatusCompleted.String(), []string{unrelatedEvt.String()},
+	)
+	require.NoError(t, err)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			EventID:   []ulid.ULID{evt1, evt2},
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, matchRun.String(), runs[0].RunID)
+}
+
 func TestGetTraceRunsAppliesOutputCELFilter(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
@@ -267,4 +473,46 @@ func TestGetTraceRunsCountCollapsesToOnePerRun(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, 1, count, "3 lifecycle rows for one run must count as 1 run, not 3")
+}
+
+// TestGetTraceRunsCountRespectsAppNameFilter proves GetTraceRunsCount shares
+// GetTraceRuns' resolveAppAndFunctionFilters call, including the
+// no-match-means-zero behavior — not just the CTE/postWhere building it
+// otherwise shares.
+func TestGetTraceRunsCountRespectsAppNameFilter(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+
+	accountID, envID, matchAppID, otherAppID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+
+	fake := &fakeManager{apps: map[string]*cqrs.App{"my-app": {ID: matchAppID, Name: "my-app"}}}
+	m := Wrap(fake, db).(*Manager)
+
+	completed := enums.StepStatusCompleted
+	seedRunRow(t, ctx, m, accountID, envID, matchAppID, functionID, ulid.MustNew(ulid.Timestamp(now), rand.Reader), now, &completed, nil, nil, nil)
+	seedRunRow(t, ctx, m, accountID, envID, otherAppID, functionID, ulid.MustNew(ulid.Timestamp(now), rand.Reader), now, &completed, nil, nil, nil)
+
+	count, err := m.GetTraceRunsCount(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			AppName:   []string{"my-app"},
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	count, err = m.GetTraceRunsCount(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			AppName:   []string{"no-such-app"},
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 0, count)
 }

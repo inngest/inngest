@@ -7,6 +7,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db/duckdb"
+	tracingv3 "github.com/inngest/inngest/pkg/tracing/v3"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -55,7 +56,7 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 		}
 	}
 
-	var root *cqrs.OtelSpan
+	var candidates []rootCandidate
 	for _, id := range order {
 		span := byID[id]
 		if parentID, ok := parentOf[id]; ok {
@@ -63,15 +64,68 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 				parent.Children = append(parent.Children, span)
 				continue
 			}
+			// Orphaned, not rootless: parent_span_id is set but that row
+			// hasn't landed — e.g. a still-running function's
+			// executor.run.queued/executor.run.started span, whose true
+			// parent (executor.run) isn't written until OnFunctionFinished
+			// (see listener.go). Kept as a fallback root candidate, not
+			// promoted outright: a genuinely rootless span always wins.
+			candidates = append(candidates, rootCandidate{span: span})
+			continue
 		}
-		if root == nil {
-			root = span
-		}
+		candidates = append(candidates, rootCandidate{span: span, genuineRoot: true})
 	}
+
+	root := selectRootSpan(candidates)
 	if root == nil {
 		return nil, fmt.Errorf("duckdbquery: no root span found for run %s", runID)
 	}
 	return root, nil
+}
+
+type rootCandidate struct {
+	span *cqrs.OtelSpan
+	// genuineRoot is true when the span's own parent_span_id was empty
+	// outright (e.g. "executor.run", the run's real root, written once at
+	// OnFunctionFinished) rather than merely unresolved.
+	genuineRoot bool
+}
+
+// selectRootSpan picks the run's root from every span with no resolvable
+// parent. A genuinely rootless span always wins when present. Before a run
+// finishes, none exists yet, so without this the tree would be mis-rooted by
+// whichever orphaned executor.run.queued/executor.run.started span the query
+// happened to return first — both point-in-time-tie on start_time (queuedAt)
+// while queued, so scan order there is otherwise arbitrary. Deterministically
+// prefer executor.run.started (the more advanced, more representative point
+// in a still-running function's lifecycle) over executor.run.queued.
+func selectRootSpan(candidates []rootCandidate) *cqrs.OtelSpan {
+	var started, queued, first *cqrs.OtelSpan
+	for _, c := range candidates {
+		if c.genuineRoot {
+			return c.span
+		}
+		if first == nil {
+			first = c.span
+		}
+		switch c.span.Name {
+		case tracingv3.SpanNameRunStarted:
+			if started == nil {
+				started = c.span
+			}
+		case tracingv3.SpanNameRunQueued:
+			if queued == nil {
+				queued = c.span
+			}
+		}
+	}
+	if started != nil {
+		return started
+	}
+	if queued != nil {
+		return queued
+	}
+	return first
 }
 
 // GetSpanOutput backs Query.RunTraceSpanOutputByID's preview path

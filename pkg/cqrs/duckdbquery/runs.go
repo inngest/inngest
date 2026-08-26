@@ -2,10 +2,13 @@ package duckdbquery
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/enums"
@@ -64,6 +67,20 @@ func latestRunsCTE(filter cqrs.GetTraceRunFilter) (string, []any) {
 		}
 		where = append(where, fmt.Sprintf("function_id IN (%s)", strings.Join(placeholders, ", ")))
 	}
+	if len(filter.EventID) > 0 {
+		// event_ids never varies across a run's lifecycle rows either, so
+		// this is safe to filter pre-collapse alongside app_id/function_id.
+		// Matches if the run's event_ids array contains ANY of the given
+		// event IDs (an OR across list_contains calls, one per ID) — DuckDB
+		// has no single "array intersects" operator for a VARCHAR[] column
+		// against a runtime list of scalar args bound this way.
+		ors := make([]string, len(filter.EventID))
+		for i, id := range filter.EventID {
+			ors[i] = "list_contains(event_ids, ?)"
+			args = append(args, id.String())
+		}
+		where = append(where, "("+strings.Join(ors, " OR ")+")")
+	}
 
 	// Tiebreak by COALESCE(ended_at, started_at, queued_at) DESC, not
 	// inserted_at: the batcher flushes a whole batch of lifecycle rows in
@@ -85,6 +102,60 @@ func latestRunsCTE(filter cqrs.GetTraceRunFilter) (string, []any) {
 		duckdb.DuckLakeAlias, strings.Join(where, " AND "),
 	)
 	return query, args
+}
+
+// resolveAppAndFunctionFilters resolves filter.AppName/FunctionSlug into
+// concrete AppID/FunctionID values via the embedded primary manager — the
+// source of truth for app/function metadata (inngest.runs only ever stores
+// app_id/function_id, never names/slugs, so there's nothing to join against
+// inside DuckDB itself). Returns the filter with AppID/FunctionID extended
+// by whatever resolved, or noMatch=true when a name- or slug-based filter
+// was requested but resolved to nothing at all: an AppName/FunctionSlug
+// filter with zero matches must return zero runs, not silently fall back to
+// "no filter" just because the merged ID list ends up empty.
+func (m *Manager) resolveAppAndFunctionFilters(ctx context.Context, filter cqrs.GetTraceRunFilter) (resolved cqrs.GetTraceRunFilter, noMatch bool, err error) {
+	resolved = filter
+
+	if len(filter.AppName) > 0 {
+		var ids []uuid.UUID
+		for _, name := range filter.AppName {
+			app, aerr := m.GetAppByName(ctx, filter.WorkspaceID, name)
+			if aerr != nil {
+				if errors.Is(aerr, sql.ErrNoRows) {
+					continue
+				}
+				return cqrs.GetTraceRunFilter{}, false, fmt.Errorf("duckdbquery: resolving app name %q: %w", name, aerr)
+			}
+			ids = append(ids, app.ID)
+		}
+		if len(ids) == 0 {
+			return cqrs.GetTraceRunFilter{}, true, nil
+		}
+		resolved.AppID = append(append([]uuid.UUID{}, filter.AppID...), ids...)
+	}
+
+	if len(filter.FunctionSlug) > 0 {
+		fns, ferr := m.GetFunctions(ctx)
+		if ferr != nil {
+			return cqrs.GetTraceRunFilter{}, false, fmt.Errorf("duckdbquery: resolving function slugs: %w", ferr)
+		}
+		want := make(map[string]struct{}, len(filter.FunctionSlug))
+		for _, slug := range filter.FunctionSlug {
+			want[slug] = struct{}{}
+		}
+		var ids []uuid.UUID
+		for _, fn := range fns {
+			if _, ok := want[fn.Slug]; ok {
+				ids = append(ids, fn.ID)
+			}
+		}
+		if len(ids) == 0 {
+			return cqrs.GetTraceRunFilter{}, true, nil
+		}
+		resolved.FunctionID = append(append([]uuid.UUID{}, resolved.FunctionID...), ids...)
+	}
+
+	return resolved, false, nil
 }
 
 // postCollapseFilter builds the status/time-range WHERE clause applied
@@ -210,6 +281,15 @@ func (m *Manager) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (
 // run's triggering event via TraceRun.TriggerIDs, which is empty for
 // DuckDB-backed runs — there is nothing to fetch and match against.
 func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	resolvedFilter, noMatch, err := m.resolveAppAndFunctionFilters(ctx, opt.Filter)
+	if err != nil {
+		return nil, err
+	}
+	if noMatch {
+		return []*cqrs.TraceRun{}, nil
+	}
+	opt.Filter = resolvedFilter
+
 	expHandler, err := run.NewExpressionHandler(ctx, run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"))
 	if err != nil {
 		return nil, fmt.Errorf("duckdbquery: parsing CEL filter: %w", err)
@@ -295,6 +375,15 @@ func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]
 }
 
 func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt) (int, error) {
+	resolvedFilter, noMatch, err := m.resolveAppAndFunctionFilters(ctx, opt.Filter)
+	if err != nil {
+		return 0, err
+	}
+	if noMatch {
+		return 0, nil
+	}
+	opt.Filter = resolvedFilter
+
 	cte, cteArgs := latestRunsCTE(opt.Filter)
 	postWhere, postArgs := postCollapseFilter(opt.Filter)
 

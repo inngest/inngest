@@ -156,12 +156,14 @@ type SyncLifecycleListener interface {
 	)
 
 	// OnWaitForEventResumed is called synchronously when a function is
-	// resumed from waiting for an event.
+	// resumed from waiting for an event. now is the caller's own "this just
+	// happened" timestamp — see OnFunctionFinished.
 	OnWaitForEventResumed(
 		context.Context,
 		statev2.Metadata,
 		statev1.Pause,
 		ResumeRequest,
+		time.Time,
 	)
 
 	// OnWaitForSignal is called synchronously when a wait for signal step is
@@ -176,12 +178,14 @@ type SyncLifecycleListener interface {
 	)
 
 	// OnWaitForSignalResumed is called synchronously when a function is
-	// resumed from waiting for a signal.
+	// resumed from waiting for a signal. now is the caller's own "this just
+	// happened" timestamp — see OnFunctionFinished.
 	OnWaitForSignalResumed(
 		context.Context,
 		statev2.Metadata,
 		statev1.Pause,
 		ResumeRequest,
+		time.Time,
 	)
 
 	// OnInvokeFunction is called synchronously when a function is invoked
@@ -196,12 +200,15 @@ type SyncLifecycleListener interface {
 
 	// OnInvokeFunctionResumed is called synchronously when a function is
 	// resumed from an invoke function step, either because the invoked
-	// function completed or because the step timed out while waiting.
+	// function completed or because the step timed out while waiting. now
+	// is the caller's own "this just happened" timestamp — see
+	// OnFunctionFinished.
 	OnInvokeFunctionResumed(
 		context.Context,
 		statev2.Metadata,
 		statev1.Pause,
 		ResumeRequest,
+		time.Time,
 	)
 
 	// OnEventReceived is called synchronously at the point an event is
@@ -248,19 +255,19 @@ func (NoopSyncLifecycleListener) OnSleep(context.Context, statev2.Metadata, queu
 func (NoopSyncLifecycleListener) OnWaitForEvent(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, statev1.Pause) {
 }
 
-func (NoopSyncLifecycleListener) OnWaitForEventResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest) {
+func (NoopSyncLifecycleListener) OnWaitForEventResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest, time.Time) {
 }
 
 func (NoopSyncLifecycleListener) OnWaitForSignal(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, statev1.Pause) {
 }
 
-func (NoopSyncLifecycleListener) OnWaitForSignalResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest) {
+func (NoopSyncLifecycleListener) OnWaitForSignalResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest, time.Time) {
 }
 
 func (NoopSyncLifecycleListener) OnInvokeFunction(context.Context, statev2.Metadata, queue.Item, statev1.GeneratorOpcode, event.Event) {
 }
 
-func (NoopSyncLifecycleListener) OnInvokeFunctionResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest) {
+func (NoopSyncLifecycleListener) OnInvokeFunctionResumed(context.Context, statev2.Metadata, statev1.Pause, ResumeRequest, time.Time) {
 }
 
 func (NoopSyncLifecycleListener) OnEventReceived(context.Context, event.TrackedEvent) {}

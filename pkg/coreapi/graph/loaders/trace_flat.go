@@ -46,6 +46,21 @@ func convertFlatSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.Run
 		SpanTypeName:   span.Name,
 	}
 
+	// Duration is nil ("still running", per the schema's own doc comment)
+	// until the span has actually ended. Unlike convertRunSpanToGQL, the
+	// flat model has no "IsUserland" concept and no fragment-merge quirk
+	// where a not-yet-ended span carries a stale EndedAt (see that
+	// function's else-branch comment) — a flat span's own EndedAt is
+	// already correct for its status, so no clearing is needed here.
+	if models.RunTraceEnded(gqlSpan.Status) {
+		startedAt := span.GetStartedAtTime()
+		endedAt := span.GetEndedAtTime()
+		if startedAt != nil && endedAt != nil {
+			dur := int(endedAt.Sub(*startedAt).Milliseconds())
+			gqlSpan.Duration = &dur
+		}
+	}
+
 	if span.Attributes.SkipReason != nil {
 		reason := span.Attributes.SkipReason.String()
 		gqlSpan.SkipReason = &reason
@@ -64,6 +79,16 @@ func convertFlatSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.Run
 	}
 	if span.Attributes.StepOp != nil {
 		gqlSpan.StepOp = (&traceReader{}).opcodeToGQL(span.Attributes.StepOp)
+	}
+
+	// convertRunSpanToGQL's equivalent has a third, first-checked branch for
+	// gqlSpan.Name == FinalizationSpanName — a name only that rollup-era
+	// converter itself ever synthesizes (see its own doc comment), never a
+	// real span name, so it can't occur here and is deliberately omitted.
+	if span.Attributes.StepRunType != nil {
+		gqlSpan.StepType = *span.Attributes.StepRunType
+	} else if gqlSpan.StepOp != nil {
+		gqlSpan.StepType = gqlSpan.StepOp.String()
 	}
 
 	if gqlSpan.StepOp != nil {

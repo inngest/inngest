@@ -244,8 +244,14 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 			if opts, err := op.InvokeFunctionOpts(); err == nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepInvokeFunctionID, &opts.FunctionID)
 
-				if id, err := ulid.Parse(opts.Payload.ID); err == nil {
-					meta.AddAttr(rawAttrs, meta.Attrs.StepInvokeTriggerEventID, &id)
+				// opts.Payload is explicitly allowed to be nil —
+				// InvokeFunctionOpts.Validate() treats a nil Payload as
+				// valid, not an error — so it must be nil-checked before
+				// dereferencing .ID.
+				if opts.Payload != nil {
+					if id, err := ulid.Parse(opts.Payload.ID); err == nil {
+						meta.AddAttr(rawAttrs, meta.Attrs.StepInvokeTriggerEventID, &id)
+					}
 				}
 
 				if expiry, err := opts.Expires(); err == nil {

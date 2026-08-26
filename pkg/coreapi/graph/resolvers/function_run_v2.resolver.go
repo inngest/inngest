@@ -166,15 +166,21 @@ func (r *runDeferredFromResolver) Run(ctx context.Context, df *models.RunDeferre
 	return models.MakeFunctionRunV2(run)
 }
 
+// Trace ignores preview entirely — RunTraceLoader is the current, general
+// path: it reads through cqrs.TraceReader.GetSpansByRunID, which every
+// backing store (the primary SQLite/Postgres manager and, when dual-write is
+// active, duckdbquery.Manager) implements, and NewLoaders already selects
+// the matching converter (convertFlatSpanToGQL vs convertRunSpanToGQL) based
+// on whether that store is DuckDB-backed. So it's correct unconditionally,
+// with no need to gate on a caller-supplied flag: LegacyRunTraceLoader (the
+// old GetTraceSpansByRun/run.NewRunTree code path this used to fall back to
+// when preview was omitted/false) never used DuckDB data even when
+// available, and preview's true/false split was a remnant of the old
+// behavior — not a distinction any caller needs to make.
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error) {
-	targetLoader := loader.FromCtx(ctx).LegacyRunTraceLoader
-	if preview != nil && *preview {
-		targetLoader = loader.FromCtx(ctx).RunTraceLoader
-	}
-
 	return loader.LoadOne[models.RunTraceSpan](
 		ctx,
-		targetLoader,
+		loader.FromCtx(ctx).RunTraceLoader,
 		&loader.TraceRequestKey{
 			TraceRunIdentifier: &cqrs.TraceRunIdentifier{
 				AppID:      fn.AppID,

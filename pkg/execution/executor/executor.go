@@ -3452,9 +3452,10 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return err
 	}
 
+	now := e.now()
 	pauseSpan := tracing.SpanRefFromPause(&pause)
 	_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-		EndTime:    e.now(),
+		EndTime:    now,
 		Debug:      &tracing.SpanDebugData{Location: "executor.ResumePauseTimeout"},
 		Status:     enums.StepStatusTimedOut,
 		TargetSpan: pauseSpan,
@@ -3540,21 +3541,21 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
 		for _, sl := range e.syncLifecycles {
-			sl.OnInvokeFunctionResumed(ctx, md, pause, r)
+			sl.OnInvokeFunctionResumed(ctx, md, pause, r, now)
 		}
 	case enums.OpcodeWaitForSignal:
 		for _, e := range e.lifecycles {
 			go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
 		for _, sl := range e.syncLifecycles {
-			sl.OnWaitForSignalResumed(ctx, md, pause, r)
+			sl.OnWaitForSignalResumed(ctx, md, pause, r, now)
 		}
 	case enums.OpcodeWaitForEvent:
 		for _, e := range e.lifecycles {
 			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 		}
 		for _, sl := range e.syncLifecycles {
-			sl.OnWaitForEventResumed(ctx, md, pause, r)
+			sl.OnWaitForEventResumed(ctx, md, pause, r, now)
 		}
 	}
 	e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
@@ -3639,9 +3640,10 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if r.IsTimeout {
 			status = enums.StepStatusTimedOut
 		}
+		now := e.now()
 		pauseSpan := tracing.SpanRefFromPause(&pause)
 		_ = e.tracerProvider.UpdateSpan(ctx, &tracing.UpdateSpanOptions{
-			EndTime:    e.now(),
+			EndTime:    now,
 			Debug:      &tracing.SpanDebugData{Location: "executor.Resume"},
 			Status:     status,
 			TargetSpan: pauseSpan,
@@ -3739,21 +3741,21 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
 			for _, sl := range e.syncLifecycles {
-				sl.OnInvokeFunctionResumed(ctx, md, pause, r)
+				sl.OnInvokeFunctionResumed(ctx, md, pause, r, now)
 			}
 		case enums.OpcodeWaitForSignal:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
 			for _, sl := range e.syncLifecycles {
-				sl.OnWaitForSignalResumed(ctx, md, pause, r)
+				sl.OnWaitForSignalResumed(ctx, md, pause, r, now)
 			}
 		case enums.OpcodeWaitForEvent:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
 			for _, sl := range e.syncLifecycles {
-				sl.OnWaitForEventResumed(ctx, md, pause, r)
+				sl.OnWaitForEventResumed(ctx, md, pause, r, now)
 			}
 		}
 		e.runEventLifecycles(ctx, func(ctx context.Context, l execution.EventLifecycleListener) {
