@@ -149,8 +149,9 @@ function RouteComponent() {
           {/* Trailing copy, tightest-to-loosest. The certification sits hard
               against the button it qualifies; the sign-in action and the legal
               fine print each get their own breathing room below it. */}
-          <p className="text-basis mt-3 text-center font-mono text-[11px] uppercase tracking-wider">
-            SOC 2 Type II certified &middot; Free tier, no card required
+          <p className="text-muted mt-3 text-center font-mono text-[11px] uppercase tracking-wider">
+            SOC 2 Type II certified &middot;{' '}
+            <span className="text-basis">Free tier, no card required</span>
           </p>
 
           {isStartStep && (
@@ -166,7 +167,7 @@ function RouteComponent() {
             </p>
           )}
 
-          <p className="text-subtle mt-5 max-w-xs text-center text-xs">
+          <p className="text-subtle mt-12 max-w-xs text-center text-xs">
             By signing up, you agree to our{' '}
             <a
               className="text-link hover:underline"
