@@ -12,24 +12,14 @@ import (
 // duckdbStore is a hand-written goose database.Store for DuckDB.
 //
 // This doesn't use database.NewStoreFromQuerier (goose's usual, much
-// shorter path for a new dialect) because of two independent
-// incompatibilities discovered empirically against the real duckdb binary:
-//
-//  1. goose's closest built-in dialect, DialectSQLite3, generates
-//     version-table DDL using "INTEGER PRIMARY KEY AUTOINCREMENT", which
-//     DuckDB's parser rejects outright ("Parser Error: syntax error at or
-//     near AUTOINCREMENT"). That alone rules out DialectSQLite3 and any
-//     Querier reusing its DDL shape.
-//  2. This POC's driver.Rows (rows.go, an earlier task, intentionally left
-//     unmodified here) builds its Columns() list by iterating a Go map
-//     (`for k := range rows[0]`), so the reported column order is not
-//     guaranteed to match the SELECT list and can vary between calls.
-//     goose's generic NewStoreFromQuerier-backed store scans multi-column
-//     results (ListMigrations, GetMigration) positionally, trusting
-//     Columns() order — which silently scans values into the wrong struct
-//     field under this driver. Every multi-column query below is instead
-//     scanned generically and its fields picked out by column NAME (see
-//     ScanRowByName), which is immune to that reordering.
+// shorter path for a new dialect) because goose's closest built-in dialect,
+// DialectSQLite3, generates version-table DDL using "INTEGER PRIMARY KEY
+// AUTOINCREMENT", which DuckDB's parser rejects outright ("Parser Error:
+// syntax error at or near AUTOINCREMENT", confirmed against the real duckdb
+// binary). That rules out DialectSQLite3 and any Querier reusing its DDL
+// shape, so every query below is instead hand-written and scanned
+// positionally in the query's own column order (see pkg/db/duckdb/rows.go
+// and quack_protocol.go, which guarantee Columns() matches that order).
 type duckdbStore struct {
 	tableName string
 }
@@ -93,16 +83,12 @@ func (s *duckdbStore) GetMigration(
 		}
 		return nil, fmt.Errorf("%w: %d", database.ErrVersionNotFound, version)
 	}
-	row, err := ScanRowByName(rows)
-	if err != nil {
-		return nil, err
+	var rawTstamp any
+	var applied bool
+	if err := rows.Scan(&rawTstamp, &applied); err != nil {
+		return nil, fmt.Errorf("duckdb: scan migration row: %w", err)
 	}
-
-	applied, ok := row["is_applied"].(bool)
-	if !ok {
-		return nil, fmt.Errorf("duckdb: unexpected is_applied type %T", row["is_applied"])
-	}
-	ts, err := AsTimestamp(row["tstamp"])
+	ts, err := AsTimestamp(rawTstamp)
 	if err != nil {
 		return nil, err
 	}
@@ -134,17 +120,14 @@ func (s *duckdbStore) ListMigrations(
 
 	var out []*database.ListMigrationsResult
 	for rows.Next() {
-		row, err := ScanRowByName(rows)
+		var rawVersion any
+		var applied bool
+		if err := rows.Scan(&rawVersion, &applied); err != nil {
+			return nil, fmt.Errorf("duckdb: scan migration list row: %w", err)
+		}
+		version, err := AsInt64(rawVersion)
 		if err != nil {
 			return nil, err
-		}
-		version, err := AsInt64(row["version_id"])
-		if err != nil {
-			return nil, err
-		}
-		applied, ok := row["is_applied"].(bool)
-		if !ok {
-			return nil, fmt.Errorf("duckdb: unexpected is_applied type %T", row["is_applied"])
 		}
 		out = append(out, &database.ListMigrationsResult{Version: version, IsApplied: applied})
 	}
@@ -172,11 +155,9 @@ func (s *duckdbStore) TableExists(ctx context.Context, db database.DBTxConn) (bo
 }
 
 // ScanRowByName scans the current row of rows generically and returns its
-// values keyed by column name. This driver's Rows.Columns() order isn't
-// guaranteed to match the query's SELECT list (see the duckdbStore doc
-// comment above), so every multi-column caller in this file — and every
-// caller in pkg/cqrs/duckdbquery — looks values up by name rather than by
-// position.
+// values keyed by column name, for callers that want name-keyed access to a
+// query result (e.g. one whose column list isn't fixed at the call site)
+// instead of writing out positional destinations.
 func ScanRowByName(rows *sql.Rows) (map[string]any, error) {
 	cols, err := rows.Columns()
 	if err != nil {

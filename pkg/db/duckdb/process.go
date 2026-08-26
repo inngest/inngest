@@ -72,8 +72,14 @@ type process struct {
 	// goes over quack instead; the jsonlines pipe stays open (never
 	// written to again) purely so the CLI doesn't exit, since closing stdin
 	// would kill the quack listener along with the rest of the process.
-	sess  sqlExecer
-	stdin io.WriteCloser
+	sess sqlExecer
+	// quackListenURL/quackToken are set by startQuackLocked once the quack
+	// listener is up, and read by openQuackConn to hand out additional,
+	// independent quackSession connections beyond the primary one in sess —
+	// see Options.QuackConns.
+	quackListenURL string
+	quackToken     string
+	stdin          io.WriteCloser
 	// out is the read end of the subprocess's merged stdout+stderr pipe —
 	// see spawnLocked for why they are merged.
 	out      *os.File
@@ -184,7 +190,7 @@ func (p *process) spawnLocked() error {
 
 // healthCheckLocked assumes mu is already held.
 func (p *process) healthCheckLocked(ctx context.Context) error {
-	rows, err := p.sess.exec(ctx, "SELECT 1 AS ok;")
+	_, rows, err := p.sess.exec(ctx, "SELECT 1 AS ok;")
 	if err != nil {
 		return fmt.Errorf("duckdb: health check failed: %w", err)
 	}
@@ -269,13 +275,13 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 
 	bootstrapStmts := []string{"INSTALL quack;", "LOAD quack;"}
 	for _, stmt := range bootstrapStmts {
-		if _, err := p.sess.exec(ctx, stmt); err != nil {
+		if _, _, err := p.sess.exec(ctx, stmt); err != nil {
 			return fmt.Errorf("duckdb: quack bootstrap failed on %q: %w", stmt, err)
 		}
 	}
 
 	serveStmt := fmt.Sprintf("CALL quack_serve(%s, token = %s);", quackAddrLiteral, tokenLiteral)
-	rows, err := p.sess.exec(ctx, serveStmt)
+	_, rows, err := p.sess.exec(ctx, serveStmt)
 	if err != nil {
 		return fmt.Errorf("duckdb: quack bootstrap failed on %q: %w", serveStmt, err)
 	}
@@ -292,9 +298,50 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 		return fmt.Errorf("duckdb: connecting to quack listener at %s: %w", listenURL, err)
 	}
 	p.sess = quackSess
+	p.quackListenURL = listenURL
+	p.quackToken = token
 
 	l.Info("duckdb: quack transport active", "listen_url", listenURL)
 	return nil
+}
+
+// openQuackConn hands out a new, independent quackSession against the same
+// already-running quack listener p.sess (the primary connection) uses —
+// unlike every call through p.exec, this bypasses p.mu entirely, so it can
+// genuinely execute concurrently with the primary connection and with other
+// openQuackConn-returned sessions. Used only when Options.QuackConns > 1
+// (see Connector.Connect); the primary connection keeps its usual
+// restart-on-crash handling via p.exec, but a session returned here does
+// not — a crash invalidates it outright, which database/sql surfaces as a
+// query error on that connection rather than a transparent retry. Acceptable
+// for cmd/duckdbseed's short-lived, opt-in use; not used by dual-write.
+func (p *process) openQuackConn(ctx context.Context) (sqlExecer, error) {
+	p.mu.Lock()
+	url, token := p.quackListenURL, p.quackToken
+	p.mu.Unlock()
+
+	if url == "" {
+		return nil, fmt.Errorf("duckdb: quack listener not bootstrapped; QuackAddr must be set to use QuackConns")
+	}
+	return newQuackSession(ctx, url, token)
+}
+
+// currentQuackSession returns the primary connection's current transport if
+// it's quack, for callers (quack_append.go's NewQuackAppender) that need the
+// real *quackSession rather than the sqlExecer interface — AppendRequest has
+// no jsonlines equivalent, so there's nothing to abstract over. Like
+// openQuackConn, this bypasses p.exec's restart-on-crash handling: a crash
+// mid-append surfaces as a plain error, not a transparent retry. Returns an
+// error if the primary connection is still jsonlines (Options.QuackAddr
+// unset, or the quack bootstrap hasn't swapped p.sess yet).
+func (p *process) currentQuackSession() (*quackSession, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	sess, ok := p.sess.(*quackSession)
+	if !ok {
+		return nil, fmt.Errorf("duckdb: quack appender requires a quack-transport connection (Options.QuackAddr)")
+	}
+	return sess, nil
 }
 
 // startUILocked starts DuckDB's optional web UI (the "ui" extension's
@@ -314,7 +361,7 @@ func (p *process) startQuackLocked(ctx context.Context) error {
 func (p *process) startUILocked(ctx context.Context) {
 	l := logger.StdlibLogger(ctx)
 	for _, stmt := range []string{"INSTALL ui;", "LOAD ui;", "CALL start_ui_server();"} {
-		if _, err := p.sess.exec(ctx, stmt); err != nil {
+		if _, _, err := p.sess.exec(ctx, stmt); err != nil {
 			l.Warn("duckdb: failed to start optional web UI; continuing without it", "statement", stmt, "error", err)
 			return
 		}
@@ -349,7 +396,7 @@ func generateQuackToken() (string, error) {
 //
 //	INSTALL ducklake;                            -- no-op once cached
 //	LOAD ducklake;
-//	ATTACH IF NOT EXISTS 'ducklake:<catalog>' AS lake (DATA_PATH '<data>/');
+//	ATTACH IF NOT EXISTS 'ducklake:<catalog>' AS lake (DATA_PATH '<data>/', DATA_INLINING_ROW_LIMIT 1000);
 //
 // None of the three produce any output on the merged stdout+stderr stream when
 // they succeed (verified against duckdb v1.5.5 over this exact transport), so
@@ -391,13 +438,22 @@ func (p *process) bootstrapDuckLakeLocked(ctx context.Context) error {
 		return fmt.Errorf("duckdb: encoding DuckLake data path: %w", err)
 	}
 
+	rowLimit := opts.DataInliningRowLimit
+	if rowLimit <= 0 {
+		rowLimit = DefaultDataInliningRowLimit
+	}
+
 	stmts := []string{
 		"INSTALL ducklake;",
 		"LOAD ducklake;",
-		fmt.Sprintf("ATTACH IF NOT EXISTS %s AS %s (DATA_PATH %s);", catalogLiteral, DuckLakeAlias, dataLiteral),
+		// DATA_INLINING_ROW_LIMIT keeps small writes (dual-write's batched
+		// flushes, cmd/duckdbseed's batched inserts) stored directly in the
+		// catalog instead of each becoming its own tiny Parquet file — see
+		// DuckLakeOptions.DataInliningRowLimit's doc comment.
+		fmt.Sprintf("ATTACH IF NOT EXISTS %s AS %s (DATA_PATH %s, DATA_INLINING_ROW_LIMIT %d);", catalogLiteral, DuckLakeAlias, dataLiteral, rowLimit),
 	}
 	for _, stmt := range stmts {
-		if _, err := p.sess.exec(ctx, stmt); err != nil {
+		if _, _, err := p.sess.exec(ctx, stmt); err != nil {
 			return fmt.Errorf("duckdb: DuckLake bootstrap failed on %q: %w", stmt, err)
 		}
 	}
@@ -448,30 +504,36 @@ func (p *process) restart(ctx context.Context) error {
 // under mu so a concurrent Close (e.g. via database/sql tearing down the pool
 // while this call is in flight) can never observe or produce a half-restarted
 // process.
-func (p *process) exec(ctx context.Context, sqlText string) ([]map[string]any, error) {
+func (p *process) exec(ctx context.Context, sqlText string) (cols []string, rows []map[string]any, err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if p.disabled {
-		return nil, ErrDisabled
+		return nil, nil, ErrDisabled
 	}
 
-	rows, err := p.sess.exec(ctx, sqlText)
+	cols, rows, err = p.sess.exec(ctx, sqlText)
 	if err == nil {
-		return rows, nil
+		return cols, rows, nil
 	}
 
 	// A statement DuckDB itself rejected is not a transport failure: the
 	// subprocess is healthy and an identical retry would fail identically,
 	// so surface it to the caller untouched.
 	if errors.Is(err, errStatementFailed) {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Everything else means the pipe broke, the subprocess died, or the
 	// caller's ctx was cancelled mid-statement (leaving the session
 	// protocol-desynced). All three are only recoverable by respawning.
-	//
+	l := logger.StdlibLogger(ctx)
+	if errors.Is(err, errSessionDesynced) {
+		l.Warn("duckdb: session desynced by a cancelled context; respawning subprocess to resync", "error", err)
+	} else {
+		l.Warn("duckdb: subprocess crashed; attempting one restart", "error", err)
+	}
+
 	// The restart's own health check runs under a context detached from ctx:
 	// in the cancelled-mid-statement case ctx is already dead, and a health
 	// check failing purely because of that would wrongly disable dual-write
@@ -480,13 +542,15 @@ func (p *process) exec(ctx context.Context, sqlText string) ([]map[string]any, e
 	defer cancel()
 	if restartErr := p.restartLocked(rctx); restartErr != nil {
 		p.disabled = true
-		return nil, fmt.Errorf("%w (exec error: %v; restart error: %v)", ErrDisabled, err, restartErr)
+		l.Error("duckdb: subprocess restart failed; permanently disabling dual-write for this process", "exec_error", err, "restart_error", restartErr)
+		return nil, nil, fmt.Errorf("%w (exec error: %v; restart error: %v)", ErrDisabled, err, restartErr)
 	}
+	l.Info("duckdb: subprocess restarted successfully after a crash")
 
 	if ctx.Err() != nil {
 		// The restart resynced the session, but retrying under a context
 		// that is already done cannot succeed.
-		return nil, err
+		return nil, nil, err
 	}
 
 	return p.sess.exec(ctx, sqlText)
@@ -557,7 +621,20 @@ type DuckLakeOptions struct {
 	// requires it to exist. A trailing separator is added if absent, since
 	// DuckLake only treats DATA_PATH as a directory when it ends in one.
 	DataPath string
+	// DataInliningRowLimit sets DuckLake's DATA_INLINING_ROW_LIMIT: writes
+	// at or below this many rows stay stored directly in the catalog
+	// instead of each becoming its own Parquet file — verified empirically
+	// (ducklake_test.go's TestDuckLakeInlinesSmallInsertsUpToRowLimit):
+	// without any limit, five separate 200-row inserts produce five Parquet
+	// files; with it set high enough, the same rows stay fully inlined.
+	// Leave at the zero value to use DefaultDataInliningRowLimit.
+	DataInliningRowLimit int
 }
+
+// DefaultDataInliningRowLimit is the DATA_INLINING_ROW_LIMIT
+// bootstrapDuckLakeLocked uses when DuckLakeOptions.DataInliningRowLimit is
+// left at its zero value.
+const DefaultDataInliningRowLimit = 1000
 
 // Options configures Open.
 type Options struct {
@@ -578,6 +655,16 @@ type Options struct {
 	// after every successful health check of a freshly spawned subprocess.
 	// Leave nil (the zero value) to disable quack entirely.
 	QuackAddr *string
+
+	// QuackConns, when greater than 1, allows Open's *sql.DB to hand out up
+	// to that many concurrent connections instead of the default single
+	// serialized session — each one beyond the first an independent
+	// quackSession opened via process.openQuackConn, genuinely concurrent
+	// against the quack HTTP listener rather than serialized through
+	// process.exec's mutex. Requires QuackAddr to be set; Open returns an
+	// error otherwise. Leave at the zero value (0 or 1) for the original
+	// single-connection behavior — dual-write's own Options never sets this.
+	QuackConns int
 }
 
 // Connector implements database/sql/driver.Connector over one supervised
@@ -605,7 +692,22 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 			return nil, err
 		}
 		c.proc = p
+		return &conn{sess: c.proc}, nil
 	}
+
+	// A second and later connection when QuackConns opts into concurrency:
+	// a fresh, independent quackSession instead of the shared c.proc, so
+	// this connection can genuinely run alongside others rather than
+	// queueing behind process.exec's mutex. See openQuackConn's doc comment
+	// for what this trades away (no crash-restart handling).
+	if c.opts.QuackConns > 1 {
+		sess, err := c.proc.openQuackConn(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &conn{sess: sess}, nil
+	}
+
 	return &conn{sess: c.proc}, nil
 }
 
@@ -634,12 +736,39 @@ func (c *Connector) Close() error {
 // The returned *sql.DB's Close method terminates the subprocess (Connector
 // implements io.Closer); the subprocess is health-checked before Open
 // returns (startProcess).
+//
+// If opts.QuackConns > 1, that constraint is relaxed instead:
+// SetMaxOpenConns(opts.QuackConns) allows database/sql's pool to open that
+// many connections, each beyond the first served by its own quackSession
+// (see Connector.Connect and process.openQuackConn) — opts.QuackAddr must
+// be set in that case, or Open returns an error before spawning anything.
 func Open(ctx context.Context, opts Options) (*sql.DB, error) {
+	_, db, err := OpenConnector(ctx, opts)
+	return db, err
+}
+
+// OpenConnector is Open, but also returns the *Connector Open normally
+// keeps to itself. A caller that needs more connections than *sql.DB's own
+// pool semantics would hand out — one dedicated, held-for-its-lifetime
+// connection per parallel worker, say, rather than one checked out and
+// returned per statement — can call Connector.Connect directly for each
+// one, bypassing the pool entirely (each call, beyond the first, opens an
+// independent quackSession — see Connector.Connect and
+// process.openQuackConn — so this is only useful once opts.QuackConns > 1).
+func OpenConnector(ctx context.Context, opts Options) (*Connector, *sql.DB, error) {
+	if opts.QuackConns > 1 && opts.QuackAddr == nil {
+		return nil, nil, fmt.Errorf("duckdb: QuackConns > 1 requires QuackAddr to be set")
+	}
+
 	c := &Connector{opts: opts}
 	if _, err := c.Connect(ctx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	db := sql.OpenDB(c)
-	db.SetMaxOpenConns(1)
-	return db, nil
+	if opts.QuackConns > 1 {
+		db.SetMaxOpenConns(opts.QuackConns)
+	} else {
+		db.SetMaxOpenConns(1)
+	}
+	return c, db, nil
 }

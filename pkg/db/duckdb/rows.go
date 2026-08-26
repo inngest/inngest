@@ -2,6 +2,7 @@ package duckdb
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"database/sql/driver"
 	"encoding/json"
@@ -109,7 +110,12 @@ func (s *session) readLoop(out io.Reader) {
 }
 
 // exec sends sql (which must end in a semicolon) followed by a canary query,
-// and returns every JSON row read before the canary's marker line.
+// and returns every JSON row read before the canary's marker line, alongside
+// cols: the result's column names in the query's own left-to-right order, as
+// found on the first data row's own key order. Because -jsonlines mode prints
+// nothing for a zero-row result besides the marker, cols is nil whenever sql
+// produced no rows — this transport has no other way to learn the column
+// list.
 //
 // Lines that are not parseable as JSON are the subprocess's stderr output,
 // merged into the same stream (process.spawnLocked) precisely so they can be
@@ -121,55 +127,95 @@ func (s *session) readLoop(out io.Reader) {
 // queued, which desyncs the protocol permanently, so the session marks itself
 // unusable; process.exec responds by respawning the subprocess with a fresh
 // session.
-func (s *session) exec(ctx context.Context, sql string) ([]map[string]any, error) {
+func (s *session) exec(ctx context.Context, sql string) (cols []string, rows []map[string]any, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.desynced {
-		return nil, errSessionDesynced
+		return nil, nil, errSessionDesynced
 	}
 
 	combined := fmt.Sprintf("%s\nSELECT '%s' AS __marker__;\n", sql, eofMarker)
 	if _, err := io.WriteString(s.stdin, combined); err != nil {
-		return nil, fmt.Errorf("writing to duckdb subprocess: %w", err)
+		return nil, nil, fmt.Errorf("writing to duckdb subprocess: %w", err)
 	}
 
-	var (
-		rows  []map[string]any
-		diags []string
-	)
+	var diags []string
 	for {
 		select {
 		case line, ok := <-s.lines:
 			if !ok {
 				if s.scanErr != nil {
-					return nil, fmt.Errorf("reading duckdb subprocess output: %w", s.scanErr)
+					return nil, nil, fmt.Errorf("reading duckdb subprocess output: %w", s.scanErr)
 				}
-				return nil, io.ErrUnexpectedEOF
+				return nil, nil, io.ErrUnexpectedEOF
 			}
 			if len(line) == 0 {
 				continue
 			}
 
-			var row map[string]any
-			if err := json.Unmarshal(line, &row); err != nil {
+			rowCols, row, derr := decodeOrderedRow(line)
+			if derr != nil {
 				diags = append(diags, string(line))
 				continue
 			}
 
 			if marker, ok := row["__marker__"].(string); ok && marker == eofMarker {
 				if err := reportDiagnostics(ctx, diags); err != nil {
-					return nil, err
+					return nil, nil, err
 				}
-				return rows, nil
+				return cols, rows, nil
 			}
 
+			if cols == nil {
+				cols = rowCols
+			}
 			rows = append(rows, row)
 		case <-ctx.Done():
 			s.desynced = true
-			return nil, fmt.Errorf("%w: %w", errSessionDesynced, ctx.Err())
+			return nil, nil, fmt.Errorf("%w: %w", errSessionDesynced, ctx.Err())
 		}
 	}
+}
+
+// decodeOrderedRow parses one -jsonlines output line into both a row map (for
+// value lookup) and cols: its top-level keys in on-the-wire order.
+// encoding/json's map-decoding path loses key order, so this walks the token
+// stream instead — the JSON text itself still has the query's column order,
+// since that's how the DuckDB CLI writes each row.
+func decodeOrderedRow(line []byte) (cols []string, row map[string]any, err error) {
+	dec := json.NewDecoder(bytes.NewReader(line))
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, nil, err
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != '{' {
+		return nil, nil, fmt.Errorf("duckdb: expected a JSON object, got %v", tok)
+	}
+
+	row = make(map[string]any)
+	for dec.More() {
+		keyTok, kerr := dec.Token()
+		if kerr != nil {
+			return nil, nil, kerr
+		}
+		key, ok := keyTok.(string)
+		if !ok {
+			return nil, nil, fmt.Errorf("duckdb: expected a string object key, got %v", keyTok)
+		}
+
+		var val any
+		if verr := dec.Decode(&val); verr != nil {
+			return nil, nil, verr
+		}
+
+		cols = append(cols, key)
+		row[key] = val
+	}
+	if _, err := dec.Token(); err != nil { // closing '}'
+		return nil, nil, err
+	}
+	return cols, row, nil
 }
 
 // reportDiagnostics logs every non-JSON line the subprocess emitted while the
@@ -214,13 +260,7 @@ type mapRows struct {
 	pos  int
 }
 
-func newMapRows(rows []map[string]any) *mapRows {
-	var cols []string
-	if len(rows) > 0 {
-		for k := range rows[0] {
-			cols = append(cols, k)
-		}
-	}
+func newMapRows(cols []string, rows []map[string]any) *mapRows {
 	return &mapRows{cols: cols, rows: rows}
 }
 

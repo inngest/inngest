@@ -7,16 +7,28 @@ import (
 	"time"
 )
 
-// Quack message types. Mirrors duckdb_quack::MessageType
-// (src/include/quack_message.hpp in duckdb/duckdb-quack v1.5-variegata),
-// via the quack-net client's documented port.
+// Quack message types. Mirrors duckdb_quack::MessageType (src/include/quack_message.hpp
+// in duckdb/duckdb-quack, branch v1.5-variegata — the exact branch matching
+// the duckdb v1.5.5 binary this client targets, confirmed against the real
+// source: https://github.com/duckdb/duckdb-quack/blob/v1.5-variegata/src/include/quack_message.hpp).
+// FETCH_REQUEST/FETCH_RESPONSE remain unimplemented (see quack_session.go's
+// exec doc comment); APPEND_REQUEST is implemented in quack_append.go.
 const (
 	quackMsgConnectionRequest  byte = 1
 	quackMsgConnectionResponse byte = 2
 	quackMsgPrepareRequest     byte = 3
 	quackMsgPrepareResponse    byte = 4
+	quackMsgAppendRequest      byte = 9
+	quackMsgSuccessResponse    byte = 10
 	quackMsgErrorResponse      byte = 100
 )
+
+// decodeQuackSuccessResponseBody consumes an empty SuccessResponse body
+// (SuccessResponse::Serialize writes no properties — see
+// serialize_quack_message.cpp) — just the object terminator.
+func decodeQuackSuccessResponseBody(r *quackReader) error {
+	return r.endObject()
+}
 
 // Every quack message is two top-level objects back to back: a MessageHeader
 // (field1 type, field2 connection_id default-omit, field3 client_query_id —
@@ -170,65 +182,67 @@ func encodeQuackPrepareRequest(connectionID, sql string) []byte {
 
 // decodeQuackPrepareResponseBody reads a PrepareResponse body and returns
 // rows keyed by result column name, built from every inline DataChunk the
-// server returned. needsMoreFetch signals the query has more rows than fit
-// in this response; this client does not implement FetchRequest (see
-// quack_session.go), so a caller seeing needsMoreFetch=true should treat it
-// as an error rather than silently returning a truncated result.
-func decodeQuackPrepareResponseBody(r *quackReader) (rows []map[string]any, needsMoreFetch bool, err error) {
-	var names []string
+// server returned, alongside names (result_names, field2) in the query's own
+// left-to-right order — the only place that order survives once namedRows
+// folds a chunk's columns into a map. needsMoreFetch signals the query has
+// more rows than fit in this response; this client does not implement
+// FetchRequest (see quack_session.go), so a caller seeing needsMoreFetch=true
+// should treat it as an error rather than silently returning a truncated
+// result.
+func decodeQuackPrepareResponseBody(r *quackReader) (names []string, rows []map[string]any, needsMoreFetch bool, err error) {
 	if ok, terr := r.tryBeginProperty(1); terr != nil {
-		return nil, false, terr
+		return nil, nil, false, terr
 	} else if ok {
 		n, terr := r.beginList()
 		if terr != nil {
-			return nil, false, terr
+			return nil, nil, false, terr
 		}
 		for i := uint64(0); i < n; i++ {
 			// LogicalType object: consumed here only to stay positioned
 			// correctly on the wire; decodeQuackDataChunk re-reads each
 			// chunk's own (equivalent) per-column types independently.
 			if _, terr := decodeQuackLogicalType(r); terr != nil {
-				return nil, false, terr
+				return nil, nil, false, terr
 			}
 		}
 	}
 
 	if ok, terr := r.tryBeginProperty(2); terr != nil {
-		return nil, false, terr
+		return nil, nil, false, terr
 	} else if ok {
 		n, terr := r.beginList()
 		if terr != nil {
-			return nil, false, terr
+			return nil, nil, false, terr
 		}
 		names = make([]string, n)
 		for i := range names {
 			names[i], terr = r.readString()
 			if terr != nil {
-				return nil, false, terr
+				return nil, nil, false, terr
 			}
 		}
 	}
 
 	if ok, terr := r.tryBeginProperty(3); terr != nil {
-		return nil, false, terr
+		return nil, nil, false, terr
 	} else if ok {
 		needsMoreFetch, terr = r.readBool()
 		if terr != nil {
-			return nil, false, terr
+			return nil, nil, false, terr
 		}
 	}
 
 	if ok, terr := r.tryBeginProperty(4); terr != nil {
-		return nil, false, terr
+		return nil, nil, false, terr
 	} else if ok {
 		n, terr := r.beginList()
 		if terr != nil {
-			return nil, false, terr
+			return nil, nil, false, terr
 		}
 		for i := uint64(0); i < n; i++ {
 			present, terr := r.beginNullable()
 			if terr != nil {
-				return nil, false, terr
+				return nil, nil, false, terr
 			}
 			if !present {
 				continue
@@ -239,18 +253,18 @@ func decodeQuackPrepareResponseBody(r *quackReader) (rows []map[string]any, need
 			// endObject is still needed here for the wrapper's terminator.
 			r.beginObject()
 			if terr := r.beginProperty(300); terr != nil {
-				return nil, false, terr
+				return nil, nil, false, terr
 			}
 			chunk, terr := decodeQuackDataChunk(r)
 			if terr != nil {
-				return nil, false, terr
+				return nil, nil, false, terr
 			}
 			if terr := r.endObject(); terr != nil {
-				return nil, false, terr
+				return nil, nil, false, terr
 			}
 			chunkRows, terr := chunk.namedRows(names)
 			if terr != nil {
-				return nil, false, terr
+				return nil, nil, false, terr
 			}
 			rows = append(rows, chunkRows...)
 		}
@@ -261,19 +275,19 @@ func decodeQuackPrepareResponseBody(r *quackReader) (rows []map[string]any, need
 	// follow-up Fetch against it since NeedsMoreFetch is treated as an
 	// error, not a "call Fetch" signal.
 	if err := r.beginProperty(5); err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	if _, err := r.readSignedLeb128(); err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 	if _, err := r.readUnsignedLeb128(); err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
 
 	if err := r.endObject(); err != nil {
-		return nil, false, err
+		return nil, nil, false, err
 	}
-	return rows, needsMoreFetch, nil
+	return names, rows, needsMoreFetch, nil
 }
 
 // ---------- LogicalType ----------

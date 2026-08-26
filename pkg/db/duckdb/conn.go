@@ -17,8 +17,13 @@ import (
 // one-restart-then-permanently-disable recovery, and locking around the real
 // subprocess. conn is deliberately transport-agnostic so both keep working
 // unchanged.
+//
+// cols is the result's column names in the query's own left-to-right order —
+// carried separately from rows because a map can't preserve it. It may be
+// nil for a statement that returns no columns (DDL) or, for *session
+// specifically, no rows (see rows.go's session.exec).
 type sqlExecer interface {
-	exec(ctx context.Context, sqlText string) ([]map[string]any, error)
+	exec(ctx context.Context, sqlText string) (cols []string, rows []map[string]any, err error)
 }
 
 // conn implements database/sql/driver.Conn, ExecerContext, and QueryerContext
@@ -44,7 +49,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if err != nil {
 		return nil, err
 	}
-	if _, err := c.sess.exec(ctx, sql); err != nil {
+	if _, _, err := c.sess.exec(ctx, sql); err != nil {
 		return nil, err
 	}
 	return driver.RowsAffected(0), nil
@@ -55,11 +60,11 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if err != nil {
 		return nil, err
 	}
-	rows, err := c.sess.exec(ctx, sql)
+	cols, rows, err := c.sess.exec(ctx, sql)
 	if err != nil {
 		return nil, err
 	}
-	return newMapRows(rows), nil
+	return newMapRows(cols, rows), nil
 }
 
 func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {

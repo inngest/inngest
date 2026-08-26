@@ -310,8 +310,9 @@ func TestQuackDecodePrepareResponseBuildsNamedRows(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, byte(quackMsgPrepareResponse), hdr.Type)
 
-	rows, _, err := decodeQuackPrepareResponseBody(r)
+	names, rows, _, err := decodeQuackPrepareResponseBody(r)
 	require.NoError(t, err)
+	require.Equal(t, []string{"ok"}, names)
 	require.Len(t, rows, 1)
 	require.Equal(t, int64(7), rows[0]["ok"])
 }

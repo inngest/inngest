@@ -23,19 +23,19 @@ type recordingExecer struct {
 	respondWith  map[string][]map[string]any
 }
 
-func (f *recordingExecer) exec(ctx context.Context, sqlText string) ([]map[string]any, error) {
+func (f *recordingExecer) exec(ctx context.Context, sqlText string) ([]string, []map[string]any, error) {
 	f.calls = append(f.calls, sqlText)
 	for prefix, err := range f.failPrefixes {
 		if strings.HasPrefix(sqlText, prefix) {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	for prefix, rows := range f.respondWith {
 		if strings.HasPrefix(sqlText, prefix) {
-			return rows, nil
+			return nil, rows, nil
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (f *recordingExecer) calledWithPrefix(prefix string) bool {
@@ -73,12 +73,12 @@ func TestStartProcessWithQuackTransport(t *testing.T) {
 
 	require.NoError(t, p.healthCheck(t.Context()))
 
-	_, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
+	_, _, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
 	require.NoError(t, err)
-	_, err = p.exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
+	_, _, err = p.exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
 	require.NoError(t, err)
 
-	rows, err := p.exec(t.Context(), "SELECT id, name FROM t;")
+	_, rows, err := p.exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, int64(1), rows[0]["id"])
@@ -94,9 +94,9 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER);")
+	_, _, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER);")
 	require.NoError(t, err)
-	_, err = p.exec(t.Context(), "INSERT INTO t VALUES (1);")
+	_, _, err = p.exec(t.Context(), "INSERT INTO t VALUES (1);")
 	require.NoError(t, err)
 
 	pidBefore := p.cmd.Process.Pid
@@ -108,11 +108,11 @@ func TestQuackTransportSurvivesRestart(t *testing.T) {
 	// gone. What this proves is that the restart's fresh spawn+bootstrap
 	// stands up a *new* quack listener and the process keeps working over
 	// it, rather than hanging or falling back to some other transport.
-	_, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER);")
+	_, _, err = p.exec(t.Context(), "CREATE TABLE t (id INTEGER);")
 	require.NoError(t, err, "restart must re-bootstrap the quack transport, not just the jsonlines control channel")
-	_, err = p.exec(t.Context(), "INSERT INTO t VALUES (1);")
+	_, _, err = p.exec(t.Context(), "INSERT INTO t VALUES (1);")
 	require.NoError(t, err)
-	rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM t;")
+	_, rows, err := p.exec(t.Context(), "SELECT count(*) AS c FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, int64(1), rows[0]["c"])

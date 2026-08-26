@@ -22,7 +22,7 @@ func TestSessionExecReadsUntilEOFMarker(t *testing.T) {
 
 	s := newSession(&written, fakeStdout)
 
-	rows, err := s.exec(t.Context(), "SELECT id, name FROM t;")
+	_, rows, err := s.exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	require.Equal(t, float64(1), rows[0]["id"])
@@ -32,24 +32,44 @@ func TestSessionExecReadsUntilEOFMarker(t *testing.T) {
 	require.Contains(t, written.String(), eofMarker)
 }
 
+// TestSessionExecPreservesColumnOrder pins jsonlines' column order to the
+// query's own left-to-right order, not the incidental (random) order Go map
+// iteration would otherwise produce. "zebra" before "apple" would sort the
+// wrong way alphabetically, so this fails if cols is ever derived by ranging
+// over the decoded row map instead of the JSON object's own key order.
+func TestSessionExecPreservesColumnOrder(t *testing.T) {
+	var written bytes.Buffer
+	fakeStdout := strings.NewReader(
+		`{"zebra":1,"apple":2}` + "\n" +
+			`{"__marker__":"` + eofMarker + `"}` + "\n",
+	)
+
+	s := newSession(&written, fakeStdout)
+
+	cols, rows, err := s.exec(t.Context(), "SELECT zebra, apple FROM t;")
+	require.NoError(t, err)
+	require.Equal(t, []string{"zebra", "apple"}, cols)
+	require.Len(t, rows, 1)
+}
+
 func TestSessionExecReturnsEmptyForNoRows(t *testing.T) {
 	var written bytes.Buffer
 	fakeStdout := strings.NewReader(`{"__marker__":"` + eofMarker + `"}` + "\n")
 
 	s := newSession(&written, fakeStdout)
 
-	rows, err := s.exec(t.Context(), "CREATE TABLE t (id INTEGER);")
+	_, rows, err := s.exec(t.Context(), "CREATE TABLE t (id INTEGER);")
 	require.NoError(t, err)
 	require.Empty(t, rows)
 }
 
 func TestMapRowsColumns(t *testing.T) {
-	r := newMapRows([]map[string]any{{"id": float64(1)}})
+	r := newMapRows([]string{"id"}, []map[string]any{{"id": float64(1)}})
 	require.Equal(t, []string{"id"}, r.Columns())
 }
 
 func TestMapRowsNextIteratesAllRowsThenEOF(t *testing.T) {
-	r := newMapRows([]map[string]any{
+	r := newMapRows([]string{"id"}, []map[string]any{
 		{"id": float64(1)},
 		{"id": float64(2)},
 		{"id": float64(3)},
@@ -73,7 +93,7 @@ func TestMapRowsNextIteratesAllRowsThenEOF(t *testing.T) {
 }
 
 func TestMapRowsNextOnEmptyResultReturnsEOFImmediately(t *testing.T) {
-	r := newMapRows(nil)
+	r := newMapRows(nil, nil)
 	require.Empty(t, r.Columns())
 
 	dest := make([]driver.Value, 0)
@@ -94,7 +114,7 @@ func TestSessionExecReportsErrorDiagnosticBeforeMarker(t *testing.T) {
 
 	s := newSession(&written, fakeOut)
 
-	rows, err := s.exec(t.Context(), "INSERT INTO t VALUES (NULL);")
+	_, rows, err := s.exec(t.Context(), "INSERT INTO t VALUES (NULL);")
 	require.ErrorIs(t, err, errStatementFailed)
 	require.Contains(t, err.Error(), "NOT NULL constraint failed")
 	require.Nil(t, rows)
@@ -113,7 +133,7 @@ func TestSessionExecIgnoresNonErrorDiagnostics(t *testing.T) {
 
 	s := newSession(&written, fakeOut)
 
-	rows, err := s.exec(t.Context(), "SELECT id FROM t;")
+	_, rows, err := s.exec(t.Context(), "SELECT id FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 }
@@ -137,7 +157,7 @@ func TestSessionExecReturnsWhenContextCancelled(t *testing.T) {
 	}()
 
 	done := make(chan error, 1)
-	go func() { _, err := s.exec(ctx, "SELECT 1;"); done <- err }()
+	go func() { _, _, err := s.exec(ctx, "SELECT 1;"); done <- err }()
 
 	select {
 	case err := <-done:
@@ -147,6 +167,6 @@ func TestSessionExecReturnsWhenContextCancelled(t *testing.T) {
 		t.Fatal("exec ignored its context and blocked on the read")
 	}
 
-	_, err := s.exec(t.Context(), "SELECT 1;")
+	_, _, err := s.exec(t.Context(), "SELECT 1;")
 	require.ErrorIs(t, err, errSessionDesynced, "a desynced session must refuse further statements")
 }

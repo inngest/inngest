@@ -1,6 +1,7 @@
 package duckdb
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"os/exec"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,13 +39,13 @@ func TestStartProcessExecAndQuery(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = p.close(t.Context()) })
 
-	_, err = p.sess.exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
+	_, _, err = p.sess.exec(t.Context(), "CREATE TABLE t (id INTEGER, name VARCHAR);")
 	require.NoError(t, err)
 
-	_, err = p.sess.exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
+	_, _, err = p.sess.exec(t.Context(), "INSERT INTO t VALUES (1, 'a');")
 	require.NoError(t, err)
 
-	rows, err := p.sess.exec(t.Context(), "SELECT id, name FROM t;")
+	_, rows, err := p.sess.exec(t.Context(), "SELECT id, name FROM t;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, float64(1), rows[0]["id"])
@@ -211,6 +213,81 @@ func TestExecPermanentlyDisablesAfterFailedRestart(t *testing.T) {
 	require.ErrorIs(t, err, ErrDisabled)
 }
 
+// TestExecLogsWhenSubprocessCrashesAndRestartSucceeds proves a crash isn't
+// silent: exec must log a warning identifying the crash before attempting
+// the restart, and an info line confirming the restart succeeded — a caller
+// watching logs (not just return values) needs to see this without having
+// to instrument every call site itself.
+func TestExecLogsWhenSubprocessCrashesAndRestartSucceeds(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	c := &Connector{opts: Options{BinaryPath: binPath, DBFile: ":memory:"}}
+	db := sql.OpenDB(c)
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err := db.ExecContext(t.Context(), "SELECT 1;")
+	require.NoError(t, err)
+	require.NotNil(t, c.proc)
+
+	require.NoError(t, c.proc.cmd.Process.Kill())
+	_, _ = c.proc.cmd.Process.Wait()
+
+	var buf bytes.Buffer
+	loggedCtx := logger.WithStdlib(context.Background(), logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.JSONHandler),
+		logger.WithLoggerLevel(logger.LevelInfo),
+		logger.WithLoggerWriter(&buf),
+	))
+
+	_, err = db.ExecContext(loggedCtx, "SELECT 1;")
+	require.NoError(t, err)
+
+	output := buf.String()
+	require.Contains(t, output, "subprocess crashed", "must log a warning identifying the crash")
+	require.Contains(t, output, "restarted successfully", "must log confirmation once the restart succeeds")
+}
+
+// TestExecLogsWhenRestartFails mirrors
+// TestExecPermanentlyDisablesAfterFailedRestart's setup but asserts on the
+// log output instead of just the returned error: a failed restart is the
+// terminal, "dual-write is now off" state, so it must be loud, not just an
+// error value a caller might swallow.
+func TestExecLogsWhenRestartFails(t *testing.T) {
+	binPath := requireDuckDBBinary(t)
+
+	c := &Connector{opts: Options{BinaryPath: binPath, DBFile: ":memory:"}}
+	db := sql.OpenDB(c)
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err := db.ExecContext(t.Context(), "SELECT 1;")
+	require.NoError(t, err)
+	require.NotNil(t, c.proc)
+
+	c.proc.mu.Lock()
+	c.proc.binaryPath = "/nonexistent/path/to/duckdb"
+	c.proc.mu.Unlock()
+
+	require.NoError(t, c.proc.cmd.Process.Kill())
+	_, _ = c.proc.cmd.Process.Wait()
+
+	var buf bytes.Buffer
+	loggedCtx := logger.WithStdlib(context.Background(), logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.JSONHandler),
+		logger.WithLoggerLevel(logger.LevelInfo),
+		logger.WithLoggerWriter(&buf),
+	))
+
+	_, err = db.ExecContext(loggedCtx, "SELECT 1;")
+	require.Error(t, err)
+
+	output := buf.String()
+	require.Contains(t, output, "subprocess crashed", "must log a warning identifying the crash")
+	require.Contains(t, output, "restart failed", "must log that the restart itself failed")
+	require.Contains(t, output, "permanently disabling", "must make the terminal disabled state loud")
+}
+
 // TestProcessHealthCheckAndRestartAreRaceFree covers review finding #4
 // directly: healthCheck only *reads* p.sess, so a healthCheck-vs-exec test
 // with no induced crashes never actually writes p.sess/p.cmd concurrently
@@ -286,7 +363,7 @@ func TestRestartSurvivesTriggeringContextCancellation(t *testing.T) {
 	// Trigger the restart through a short-lived context, mirroring a single
 	// dualwrite batch-flush/hook-call context.
 	shortCtx, cancel := context.WithCancel(t.Context())
-	_, err = p.exec(shortCtx, "SELECT 1;")
+	_, _, err = p.exec(shortCtx, "SELECT 1;")
 	require.NoError(t, err, "exec should transparently restart and succeed")
 
 	// End the triggering context shortly after the call returns, as a real
@@ -437,20 +514,20 @@ func TestSessionExecCancelMidStatementDesyncsAndProcessResyncs(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	_, err = p.sess.exec(ctx, "SELECT 42 AS answer;")
+	_, _, err = p.sess.exec(ctx, "SELECT 42 AS answer;")
 	require.ErrorIs(t, err, errSessionDesynced)
 	require.ErrorIs(t, err, context.Canceled)
 
 	// A desynced session refuses further work outright, so the abandoned
 	// statement's queued output can never be misread as another statement's
 	// result.
-	_, err = p.sess.exec(t.Context(), "SELECT 1 AS ok;")
+	_, _, err = p.sess.exec(t.Context(), "SELECT 1 AS ok;")
 	require.ErrorIs(t, err, errSessionDesynced)
 
 	// process.exec recognises the desync as recoverable-by-respawn and does
 	// so, using a context detached from the (dead) caller ctx for the health
 	// check.
-	rows, err := p.exec(t.Context(), "SELECT 7 AS seven;")
+	_, rows, err := p.exec(t.Context(), "SELECT 7 AS seven;")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, float64(7), rows[0]["seven"])
