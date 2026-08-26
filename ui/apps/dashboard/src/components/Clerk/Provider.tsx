@@ -103,6 +103,11 @@ export const InngestClerkProvider = ({ children }: React.PropsWithChildren) => {
           formattedDate__tableCell: 'text-sm',
           formInputGroup: 'shadow-none',
           socialButtons: 'flex flex-col gap-4',
+          // Clerk draws this 1px rule as `background-color: rgb(0 0 0 / 0.07)`
+          // from its own light theme, which is invisible on any dark surface --
+          // the auth pages are pinned dark, and app surfaces follow the
+          // viewer's theme. Repoint it at the border token so it tracks both.
+          dividerLine: '!bg-[rgb(var(--color-border-subtle))]',
           organizationProfileMembersSearchInput: 'pl-8',
           organizationPreviewMainIdentifier__organizationList:
             'text-basis hover:text-basis',
