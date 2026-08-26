@@ -31,6 +31,7 @@ type SimpleLineChartProps = {
     values: {
       [key: string]: number | boolean | undefined;
     };
+    inferred?: string[];
   }[];
   legend: {
     dataKey: string;
@@ -101,7 +102,7 @@ export default function SimpleLineChart({
   const flattenData = useMemo(() => {
     return data.map((d) => {
       const values = omit(d.values, referenceAreaKeys);
-      return { ...values, name: d.name };
+      return { ...values, name: d.name, inferred: d.inferred };
     });
   }, [data, referenceAreaKeys]);
 
@@ -224,6 +225,9 @@ export default function SimpleLineChart({
                       ) : (
                         metricPayload.map((p, idx) => {
                           const l = legend.find((l) => l.dataKey == p.name);
+                          const inferred =
+                            Array.isArray(p.payload?.inferred) &&
+                            p.payload.inferred.includes(p.name);
                           return (
                             <div
                               key={idx}
@@ -233,7 +237,12 @@ export default function SimpleLineChart({
                                 className="mr-2 inline-flex h-3 w-3 rounded"
                                 style={{ backgroundColor: l?.color || p.color }}
                               ></span>
-                              {p.value == null ? (
+                              {inferred ? (
+                                <>
+                                  {l?.name || p.name}: No data recorded —
+                                  displayed as 0
+                                </>
+                              ) : p.value == null ? (
                                 <>{l?.name || p.name}: No data recorded</>
                               ) : (
                                 <>
