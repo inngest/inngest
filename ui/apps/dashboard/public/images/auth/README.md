@@ -1,30 +1,24 @@
 # Sign-up trust panel — product screenshot
 
-Drop **PNG only**. AVIF variants are generated from these; do not hand-author them.
+Drop **one dark PNG** named `product-dark.png`. The `.avif` beside it is
+generated, not hand-authored.
 
-## Files expected
-
-| Filename            | Theme | Notes                               |
-| ------------------- | ----- | ----------------------------------- |
-| `product-light.png` | Light | Shown when the app is in light mode |
-| `product-dark.png`  | Dark  | Shown when the app is in dark mode  |
-
-Both are required. The panel picks one via the `dark:` class on `<html>`,
-matching the existing `Lt-`/`Dk-` pairing in
-`src/components/NavigationV2/Announcements/announcements.ts`.
+Only a dark export is needed: the auth routes are pinned to a dark theme in
+`src/routes/__root.tsx`, so a light variant would never render.
 
 ## Export spec
 
-- **Width:** >= 1440px (2x for a ~720px display width — the panel is 50vw on `md+`)
-- **Aspect:** anywhere from 4:3 to 3:2. Content is top-anchored, so extra
-  height crops from the bottom rather than the middle.
-- **Format:** PNG, 8-bit. No transparency needed; the panel sits on the
-  mesh gradient and the screenshot is inset with its own rounded corners.
-- **Content:** runs list + trace timeline, per the approved mockup.
+- **Width:** >= 1920px. The panel is 50vw and the image is rendered at 150% of
+  that, so it is displayed wider than the panel and clipped.
+- **Aspect:** flexible. The image is anchored left and bleeds off the right
+  edge, so a wide screenshot loses its right portion rather than letterboxing.
+  The current export is 1.94:1 and shows roughly its left two thirds.
+- **Format:** PNG. Alpha is fine; it gets flattened during encoding.
 
 ## Before you export
 
-Scrub anything real from the screenshot — this page is public and unauthenticated:
+Scrub anything real from the screenshot — this page is public and
+unauthenticated:
 
 - No real customer account names, org names, or user emails
 - No real run IDs, event IDs, or signing keys that map to a live account
@@ -32,8 +26,24 @@ Scrub anything real from the screenshot — this page is public and unauthentica
 
 Synthetic data is fine and preferred.
 
-## What happens after you drop them
+## Regenerating the derived files
 
-AVIF variants are generated with `sips` and committed alongside the PNGs.
-The panel renders a `<picture>` with an AVIF `<source>` and a PNG fallback,
-gated on `(min-width: 640px)` so phones never download it.
+Use `sharp` from the pnpm store, **not** `sips`. `sips -s format avif` silently
+zeroes the alpha channel on an RGBA source and writes a fully transparent file
+that still reports correct dimensions — it looks like a working image until you
+sample its pixels.
+
+```sh
+SHARP=ui/node_modules/.pnpm/sharp@0.34.5/node_modules/sharp
+node -e "
+const sharp=require('./$SHARP');
+const A='ui/apps/dashboard/public/images/auth/';
+sharp(A+'product-dark.png').resize(1920).removeAlpha().avif({quality:68,effort:6}).toFile(A+'product-dark.avif');
+"
+```
+
+`removeAlpha()` is what keeps the transparency bug from reappearing.
+
+The panel serves the AVIF first and falls back to the PNG for browsers without
+AVIF decode (Safari below 16.4). Both are `media`-gated to `min-width: 640px`
+so phones, where the panel is `display: none`, download neither.
