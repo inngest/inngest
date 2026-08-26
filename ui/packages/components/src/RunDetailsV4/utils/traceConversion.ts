@@ -6,6 +6,7 @@
 import { maxDateString, toMaybeDate } from '@inngest/components/utils/date';
 import { max, min } from 'date-fns';
 
+import { scoreRows } from '../../RunDetails/ScoresAttrs';
 import { KindInngestExperiment } from '../../generated';
 import type {
   BarStyleKey,
@@ -218,18 +219,10 @@ function getHTTPTimingFromMetadata(metadata?: SpanMetadata[]): HTTPTimingBreakdo
  * not walked: the timeline already renders them as their own bars.
  */
 function getScores(metadata?: SpanMetadata[]): ScoreBadgeData[] | undefined {
-  const scores =
-    metadata
-      ?.filter(isScoreMetadata)
-      .flatMap((md) =>
-        Object.entries(md.values).flatMap(([name, raw]) => {
-          const value = raw?.value;
-          return typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))
-            ? [{ name, value }]
-            : [];
-        })
-      )
-      .sort((a, b) => a.name.localeCompare(b.name)) ?? [];
+  const scores = scoreRows(metadata?.filter(isScoreMetadata) ?? []).map(({ name, value }) => ({
+    name,
+    value,
+  }));
 
   return scores.length > 0 ? scores : undefined;
 }
