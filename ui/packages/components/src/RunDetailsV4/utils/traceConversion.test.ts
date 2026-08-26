@@ -732,6 +732,42 @@ describe('traceConversion', () => {
       expect(result.bars[0]?.children?.[0]?.children?.[0]?.name).toBe('child');
     });
 
+    it('attaches each span its own scores without walking children', () => {
+      const trace = createTrace({
+        isRoot: true,
+        metadata: [
+          {
+            scope: 'run',
+            kind: 'inngest.score',
+            updatedAt: '2024-01-01T00:00:05Z',
+            values: { relevance: { value: 0.98765 } },
+          },
+        ],
+        childrenSpans: [
+          createTrace({
+            spanID: 'scored-step',
+            metadata: [
+              {
+                scope: 'step',
+                kind: 'inngest.score',
+                updatedAt: '2024-01-01T00:00:06Z',
+                values: { passed: { value: true }, accuracy: { value: 3 } },
+              },
+            ],
+          }),
+          createTrace({ spanID: 'unscored-step', stepID: 'step-2' }),
+        ],
+      });
+      const result = traceToTimelineData(trace, { runID: 'run-1' });
+
+      expect(result.bars[0]?.scores).toEqual([{ name: 'relevance', value: 0.98765 }]);
+      expect(result.bars[0]?.children?.[0]?.scores).toEqual([
+        { name: 'accuracy', value: 3 },
+        { name: 'passed', value: true },
+      ]);
+      expect(result.bars[0]?.children?.[1]?.scores).toBeUndefined();
+    });
+
     it('preserves spanID as bar id', () => {
       const trace = createTrace({
         isRoot: true,
