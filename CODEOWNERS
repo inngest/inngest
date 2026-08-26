@@ -2,8 +2,7 @@
 /ui @amh4r @djfarrelly @jacobheric
 
 # Execution
-/pkg/execution @tonyhb @BrunoScheufler @KiKoS0 @jpwilliams @lkasinathan
+/pkg/execution @tonyhb @BrunoScheufler @KiKoS0 @lkasinathan
 /pkg/constraintapi @BrunoScheufler @lkasinathan
 /pkg/execution/state @tonyhb @BrunoScheufler @KiKoS0 @lkasinathan
 /pkg/telemetry @BrunoScheufler
-/pkg/run @jpwilliams
