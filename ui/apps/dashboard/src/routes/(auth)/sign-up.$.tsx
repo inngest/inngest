@@ -4,7 +4,7 @@ import TrustPanel from '@/components/SignIn/TrustPanel';
 import { canonicalLink } from '@/utils/urls';
 import { SignUp } from '@clerk/tanstack-react-start';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
-import { createFileRoute } from '@tanstack/react-router';
+import { Link, createFileRoute, useLocation } from '@tanstack/react-router';
 
 const getAnonymousId = () => {
   if (typeof document === 'undefined') {
@@ -27,6 +27,15 @@ export const Route = createFileRoute('/(auth)/sign-up/$')({
 
 function RouteComponent() {
   const anonymousId = getAnonymousId();
+  const { pathname } = useLocation();
+
+  // Clerk renders its "Already have an account?" action inside the card, which
+  // puts it above our trust and legal copy. On the first step we hide that
+  // footer and re-render the link below them instead, so the reading order is
+  // CTA -> certification -> terms -> sign in. Later steps of the flow (email
+  // verification and friends) live on deeper paths and keep Clerk's own
+  // footer, which carries their back and alternate-method actions.
+  const isStartStep = pathname === '/sign-up' || pathname === '/sign-up/';
 
   return (
     <SplitView panel={<TrustPanel />}>
@@ -35,7 +44,7 @@ function RouteComponent() {
           {/* Rendered here rather than through Clerk's `logoImageUrl` so the
               mark comes from the SVG component, which inherits `currentColor`
               and needs no dark-mode filter. */}
-          <InngestLogo className="text-basis mb-8" width={132} />
+          <InngestLogo className="text-basis mb-6" width={132} />
 
           <SignUp
             unsafeMetadata={{
@@ -43,15 +52,19 @@ function RouteComponent() {
             }}
             appearance={{
               elements: {
-                footer: 'bg-none',
+                footer: isStartStep ? 'hidden' : 'bg-none',
                 logoBox: 'hidden',
+                // `!` because the provider sets `my-9` on the same descriptor;
+                // Tailwind utilities share specificity, so source order rather
+                // than class order would otherwise decide the winner.
+                header: '!mb-6 !mt-0',
               },
             }}
           />
 
           {/* Sentence case + `uppercase` rather than literal capitals, so
               screen readers do not spell the line out letter by letter. */}
-          <p className="text-subtle mt-6 text-center font-mono text-[11px] uppercase tracking-wider">
+          <p className="text-muted mt-6 text-center font-mono text-[11px] uppercase tracking-wider">
             SOC 2 Type II certified &middot; Free tier, no card required
           </p>
 
@@ -76,6 +89,19 @@ function RouteComponent() {
             </a>
             .
           </p>
+
+          {isStartStep && (
+            <p className="text-basis mt-8 text-center text-sm">
+              Already have an account?{' '}
+              <Link
+                to="/sign-in/$"
+                params={{ _splat: '' }}
+                className="text-link hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          )}
         </div>
 
         {/* The trust panel is hidden below `sm`, so the logo wall is repeated
