@@ -68,7 +68,7 @@ export default function TrustPanel() {
           <h2 className="font-mono text-xs uppercase tracking-widest opacity-60">
             Trusted by engineering teams at
           </h2>
-          <LogoWall className="max-w-xl" />
+          <LogoWall className="max-w-2xl" />
         </div>
       )}
     </div>

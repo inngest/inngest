@@ -1,55 +1,58 @@
 # Sign-up trust panel — customer logos
 
-Drop **single-color SVGs** here. These are imported as React components via
-`vite-plugin-svgr` (`import Replit from './logos/replit.svg?react'`), which is
-the same pattern used by `src/components/Icons/*.svg?react`.
+Drop **white-mode single-colour SVGs** here, then register them in `index.ts`.
+They are imported as React components via `vite-plugin-svgr`
+(`import Replit from './replit.svg?react'`), the same pattern as
+`src/components/Icons/*.svg?react`.
 
-## Files expected
+## Naming
 
-One per logo, lowercase kebab-case, matching the approved mockup:
+Lowercase, kebab-case, no spaces or `=`: `replit.svg`, `elevenlabs.svg`,
+`soundcloud.svg`. Figma exports arrive as `Customer=Name, Mode=White.svg` and
+must be renamed — the original names are not importable.
 
-```
-replit.svg
-cubic.svg
-elevenlabs.svg
-cohere.svg
-soundcloud.svg
-gitbook.svg
-resend.svg
-avoca.svg
-```
+## Why white-mode, not `currentColor`
 
-Order in the wall is set in code, not by filename — drop them in any order.
-Fewer than eight is fine; the grid reflows. If a logo gets pulled for
-permissions reasons, delete the file and remove its import.
+The auth routes are pinned to a dark theme in `src/routes/__root.tsx`, so both
+the gray panel and the form column behind these logos are dark at every
+breakpoint. White fills are correct everywhere and no light variant is needed.
 
-## Why single-color
+Do **not** bulk-replace `fill="white"` with `fill="currentColor"`. Some exports
+use white fills _inside_ `<mask>` elements, where white means "reveal"; a
+theme-dependent colour there would hide the artwork instead of colouring it.
 
-The wall renders on the dark mesh gradient on desktop **and** on
-`canvasBase` in the left column on mobile — which is near-white in light mode.
-One `currentColor` SVG recolors for both. Two-tone or full-color brand
-lockups would need four files each and still look wrong on one of the two
-backgrounds.
+## Two things every export needs fixed
 
-## SVG requirements
+Figma's output has caused a real bug on both counts, so check them:
 
-- **`viewBox` present.** Required — it's what makes the logo scale.
-- **No hardcoded `width`/`height`** on the root `<svg>`, or they'll fight the
-  CSS sizing. Strip them if your export tool adds them.
-- **`fill="currentColor"`** on paths, or no `fill` attribute at all. Do **not**
-  leave a hardcoded `fill="#000"` / `fill="#fff"` — it defeats the recoloring
-  and the logo will vanish against one of the two backgrounds.
-- **Flatten text to paths.** Wordmarks must not depend on a font being loaded.
-- **No `<style>` blocks, no CSS classes.** svgr inlines these into the page
-  and the class names collide across files.
-- **No embedded raster** (`<image>` with a base64 payload) — it won't recolor
-  and it defeats the point of using SVG.
+**1. Strip `width` and `height` from the root `<svg>`.** Keep only `viewBox`.
+The registry sets a per-logo height and the wall uses `w-auto`; a leftover
+`width` attribute wins over the aspect ratio and renders the logo horizontally
+squashed. This is silent — the logo still appears, just wrong.
 
-Trimming the canvas to the artwork bounds helps; uneven padding inside the
-viewBox makes optical alignment across eight logos much harder.
+**2. Flatten "solid path painted through a mask".** Figma sometimes emits the
+letterforms as paths inside a `mask-type:alpha` mask and then paints one solid
+path through it. That indirection does not survive inlining as JSX: the mask
+stops applying and the solid path renders as a filled bar. `soundcloud.svg` had
+this and was flattened to the letterform paths painted directly. A full-bounds
+`mask-type:luminance` wrapper over real paths, as in `gitbook.svg`, is harmless
+and can stay.
+
+Also confirm: no `<style>` blocks or `class` attributes (svgr inlines them and
+the names collide across files), no `<image>` payloads, and no duplicate `id`
+values between files — svgr puts every logo in one document, so a shared
+`clip0`/`mask0` id would let one logo clip another. Figma's `_49_xxx` suffixes
+are usually unique enough.
+
+## Sizing
+
+Heights live per logo in `index.ts`, not as a shared class. These wordmarks
+range from about 3:1 to 9.4:1, so a single height makes the widest read as
+roughly twice the size of the narrowest; the values there balance them by
+optical weight instead.
 
 ## Permissions
 
-Sanjana confirmed these eight are cleared for use as endorsement. If that
-changes for any single logo, deleting the file and its import is the whole
-revert — nothing else references them.
+The eight in the approved set are cleared for use as endorsement. If that
+changes for one, delete its file, its import, and its registry entry — nothing
+else references them, and the wall reflows.
