@@ -76,15 +76,23 @@ function ProductScreenshot() {
 
 export default function TrustPanel() {
   return (
-    <div className="text-basis flex h-full flex-col items-center justify-center gap-14 overflow-hidden py-12">
-      {/* Inset on the left only; the right side is the bleed. */}
-      <div className="w-full pl-16">
+    <div className="text-basis flex h-full flex-col gap-14 overflow-hidden py-12">
+      {/* Absorbs whatever height is left over and clips vertically, so the
+          screenshot is the only thing that gives way on a short viewport.
+          Its height scales with the panel's width -- it is rendered at 162% of
+          it -- so on a wide, short panel it outgrows the available height. When
+          it did that from a centred container, the excess spilled equally top
+          and bottom and consumed the padding declared here, pushing the
+          screenshot and the logo wall flush against the panel edges.
+
+          Inset on the left only; the right side is the bleed. */}
+      <div className="min-h-0 w-full flex-1 overflow-hidden pl-16">
         <ProductScreenshot />
       </div>
 
       {/* Gated together: the heading is meaningless without logos under it. */}
       {customerLogos.length > 0 && (
-        <div className="flex flex-col items-center gap-6 px-8">
+        <div className="flex shrink-0 flex-col items-center gap-6 px-8">
           <h2 className="font-mono text-xs uppercase tracking-widest opacity-60">
             Trusted by engineering teams at
           </h2>
