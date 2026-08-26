@@ -27,6 +27,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 type mockGatewayGRPCManager struct {
@@ -367,6 +368,70 @@ func TestProxyGRPCPath(t *testing.T) {
 	case <-forwardCanceled:
 	case <-time.After(3 * time.Second):
 		t.Fatal("blocked Forward context was not canceled")
+	}
+
+	// The reliable Redis polling path must have the same behavior as the gRPC
+	// response path when Forward is still waiting for a worker ACK.
+	bufferedReqID := "reqid-buffered-response-before-ack"
+	bufferedForwardStarted := make(chan struct{})
+	bufferedForwardCanceled := make(chan struct{})
+	mockForwarder.mu.Lock()
+	mockForwarder.forwardFn = func(ctx context.Context) error {
+		close(bufferedForwardStarted)
+		<-ctx.Done()
+		close(bufferedForwardCanceled)
+		return ctx.Err()
+	}
+	mockForwarder.mu.Unlock()
+
+	bufferedResultCh := make(chan proxyResult, 1)
+	go func() {
+		resp, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
+			AccountID: accID,
+			EnvID:     envID,
+			AppID:     appID,
+			Data: &connectpb.GatewayExecutorRequestData{
+				RequestId:      bufferedReqID,
+				AccountId:      accID.String(),
+				EnvId:          envID.String(),
+				AppId:          appID.String(),
+				AppName:        appName,
+				FunctionId:     fnID.String(),
+				FunctionSlug:   fnSlug,
+				RequestPayload: []byte("request payload"),
+				RunId:          runID.String(),
+			},
+			logger: l,
+		})
+		bufferedResultCh <- proxyResult{resp: resp, err: err}
+	}()
+
+	select {
+	case <-bufferedForwardStarted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for blocked Forward call")
+	}
+
+	bufferedResponse := &connectpb.SDKResponse{
+		RequestId:      bufferedReqID,
+		Status:         connectpb.SDKResponseStatus_DONE,
+		SdkVersion:     "test-version",
+		RequestVersion: 1,
+		RunId:          runID.String(),
+	}
+	require.NoError(t, sm.SaveResponse(ctx, envID, bufferedReqID, bufferedResponse))
+
+	select {
+	case result := <-bufferedResultCh:
+		require.NoError(t, result.err)
+		require.True(t, proto.Equal(bufferedResponse, result.resp))
+	case <-time.After(7 * time.Second):
+		t.Fatal("buffered response did not interrupt blocked Forward call")
+	}
+	select {
+	case <-bufferedForwardCanceled:
+	case <-time.After(3 * time.Second):
+		t.Fatal("buffered response did not cancel Forward context")
 	}
 }
 
@@ -981,8 +1046,10 @@ func TestProxyGRPCContextCancellation(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
+	forwardStarted := make(chan struct{})
 	mockForwarder := &mockGatewayGRPCManager{
 		forwardFn: func(ctx context.Context) error {
+			close(forwardStarted)
 			<-ctx.Done()
 			return ctx.Err()
 		},
@@ -1092,35 +1159,57 @@ func TestProxyGRPCContextCancellation(t *testing.T) {
 		IPAddress:         net.ParseIP("127.0.0.1"),
 	})
 	require.NoError(t, err)
+	require.NoError(t, sm.SetWorkerTotalCapacity(ctx, envID, reqData.InstanceId, 5))
 
-	// Create a short-lived context that will be cancelled quickly
-	shortCtx, shortCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer shortCancel()
+	proxyCtx, cancelProxy := context.WithCancel(context.Background())
+	type cancellationResult struct {
+		resp *connectpb.SDKResponse
+		err  error
+	}
+	resultCh := make(chan cancellationResult, 1)
+	go func() {
+		resp, err := connector.Proxy(proxyCtx, context.Background(), ProxyOpts{
+			AccountID: accID,
+			EnvID:     envID,
+			AppID:     appID,
+			Data: &connectpb.GatewayExecutorRequestData{
+				RequestId:      reqID,
+				AccountId:      accID.String(),
+				EnvId:          envID.String(),
+				AppId:          appID.String(),
+				AppName:        "test-app",
+				FunctionId:     fnID.String(),
+				FunctionSlug:   "test-app-test-fn",
+				RequestPayload: []byte("request payload"),
+				RunId:          runID.String(),
+			},
+			logger: l,
+		})
+		resultCh <- cancellationResult{resp: resp, err: err}
+	}()
 
-	resp, err := connector.Proxy(shortCtx, context.Background(), ProxyOpts{
-		AccountID: accID,
-		EnvID:     envID,
-		AppID:     appID,
-		Data: &connectpb.GatewayExecutorRequestData{
-			RequestId:      reqID,
-			AccountId:      accID.String(),
-			EnvId:          envID.String(),
-			AppId:          appID.String(),
-			AppName:        "test-app",
-			FunctionId:     fnID.String(),
-			FunctionSlug:   "test-app-test-fn",
-			StepId:         nil,
-			RequestPayload: []byte("request payload"),
-			SystemTraceCtx: nil,
-			UserTraceCtx:   nil,
-			RunId:          runID.String(),
-		},
-		logger: l,
-	})
+	select {
+	case <-forwardStarted:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for blocked Forward call")
+	}
+	assignedWorker, err := sm.GetAssignedWorkerID(context.Background(), envID, reqID)
+	require.NoError(t, err)
+	require.Equal(t, reqData.InstanceId, assignedWorker)
 
-	require.Nil(t, resp)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "parent context was closed unexpectedly")
+	cancelProxy()
+	select {
+	case result := <-resultCh:
+		require.Nil(t, result.resp)
+		require.Error(t, result.err)
+		require.Contains(t, result.err.Error(), "parent context was closed unexpectedly")
+	case <-time.After(3 * time.Second):
+		t.Fatal("proxy did not return after cancellation")
+	}
+
+	assignedWorker, err = sm.GetAssignedWorkerID(context.Background(), envID, reqID)
+	require.NoError(t, err)
+	require.Empty(t, assignedWorker, "cancellation must release worker capacity")
 }
 
 // TestProxyGRPCBufferedResponse tests when response is already buffered

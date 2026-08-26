@@ -470,6 +470,8 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 				err = nil
 			}
 			if ctx.Err() != nil && !responseBeforeAck {
+				cleanupWorkerRequestAfterCancellation(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+					l, "could not delete worker lease on context cancellation")
 				return nil, fmt.Errorf("parent context was closed unexpectedly")
 			}
 			if responseBeforeAck {
@@ -537,7 +539,7 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 	select {
 	case <-ctx.Done():
 		// Clean up worker lease for capacity tracking
-		cleanupWorkerRequestOrLogError(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
+		cleanupWorkerRequestAfterCancellation(ctx, i.stateManager, opts.EnvID, routedInstanceID, opts.Data.RequestId,
 			l, "could not delete worker lease on context cancellation")
 
 		return nil, fmt.Errorf("parent context was closed unexpectedly")
@@ -613,6 +615,12 @@ func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*c
 			Message: "The worker stopped responding to the request.",
 		}
 	}
+}
+
+func cleanupWorkerRequestAfterCancellation(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, instanceID, requestID string, l logger.Logger, message string) {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	cleanupWorkerRequestOrLogError(cleanupCtx, stateManager, envID, instanceID, requestID, l, message)
 }
 
 // cleanupWorkerRequestOrLogError cleans up the worker request and logs an error if it fails

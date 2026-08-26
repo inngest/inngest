@@ -941,6 +941,7 @@ type testingParameters struct {
 	disallowConnection           bool
 	shouldUseGRPC                bool
 	extraLifecycles              []ConnectGatewayLifecycleListener
+	wrapStateManager             func(state.StateManager) state.StateManager
 
 	noConnect bool
 	silent    bool
@@ -979,7 +980,10 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		rc.Close()
 	})
 
-	connManager := state.NewRedisConnectionStateManager(rc)
+	connManager := state.StateManager(state.NewRedisConnectionStateManager(rc))
+	if len(params) > 0 && params[0].wrapStateManager != nil {
+		connManager = params[0].wrapStateManager(connManager)
+	}
 
 	var fakeApiBaseUrl string
 	{
@@ -1386,6 +1390,7 @@ type replyFailingExecutor struct {
 	connect.UnimplementedConnectExecutorServer
 	port               int
 	replyReceived      chan *connect.ReplyRequest
+	replyCanceled      chan struct{}
 	blockUntilCanceled bool
 }
 
@@ -1402,6 +1407,7 @@ func startTestReplyExecutor(t *testing.T, blockUntilCanceled bool) *replyFailing
 
 	executor := &replyFailingExecutor{
 		replyReceived:      make(chan *connect.ReplyRequest, 1),
+		replyCanceled:      make(chan struct{}, 1),
 		blockUntilCanceled: blockUntilCanceled,
 	}
 	grpcServer := grpc.NewServer()
@@ -1425,9 +1431,26 @@ func (s *replyFailingExecutor) Reply(ctx context.Context, req *connect.ReplyRequ
 	s.replyReceived <- req
 	if s.blockUntilCanceled {
 		<-ctx.Done()
+		s.replyCanceled <- struct{}{}
 		return nil, ctx.Err()
 	}
 	return nil, status.Error(codes.Unavailable, "transient reply failure")
+}
+
+type blockingResponseStateManager struct {
+	state.StateManager
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (s *blockingResponseStateManager) SaveResponse(ctx context.Context, envID uuid.UUID, requestID string, response *connect.SDKResponse) error {
+	s.entered <- struct{}{}
+	select {
+	case <-s.release:
+		return s.StateManager.SaveResponse(ctx, envID, requestID, response)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func sendWorkerExtendLeaseMessage(t *testing.T, res testingResources, payload *connect.WorkerRequestExtendLeaseData) {
@@ -1574,6 +1597,101 @@ func TestHandleSdkReplyBlockedGRPCReplyDoesNotDelayWorkerAck(t *testing.T) {
 
 	// The blocked fast path must not occupy a worker-message handler.
 	exchangeHeartbeat(t, res.ws, 2*time.Second)
+
+	select {
+	case <-executor.replyCanceled:
+	case <-time.After(6 * time.Second):
+		t.Fatal("blocked grpc reply did not honor the five-second deadline")
+	}
+}
+
+func TestProtocolMessagesAreIsolatedFromBlockedDataHandlers(t *testing.T) {
+	blockedState := &blockingResponseStateManager{
+		entered: make(chan struct{}, 5),
+		release: make(chan struct{}),
+	}
+	res := createTestingGateway(t, testingParameters{
+		silent: true,
+		wrapStateManager: func(sm state.StateManager) state.StateManager {
+			blockedState.StateManager = sm
+			return blockedState
+		},
+	})
+	handshake(t, res)
+	defer close(blockedState.release)
+
+	// Occupy every data handler with a response buffer write. Request ACKs must
+	// still be consumed by the separate protocol handler pool.
+	for idx := range 5 {
+		err := wsproto.Write(context.Background(), res.ws, &connect.ConnectMessage{
+			Kind:    connect.GatewayMessageType_WORKER_REPLY,
+			Payload: marshalSDKResponse(t, res, fmt.Sprintf("blocked-reply-%d", idx)),
+		})
+		require.NoError(t, err)
+	}
+	for range 5 {
+		select {
+		case <-blockedState.entered:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out saturating data handlers")
+		}
+	}
+
+	requestID := "protocol-pool-request"
+	forwardResult := make(chan error, 1)
+	go func() {
+		response, err := res.svc.Forward(context.Background(), &connect.ForwardRequest{
+			ConnectionID: res.connID.String(),
+			Data: &connect.GatewayExecutorRequestData{
+				RequestId: requestID,
+				RunId:     res.runID.String(),
+			},
+		})
+		if err == nil && (response == nil || !response.Success) {
+			err = fmt.Errorf("forward was not successful")
+		}
+		forwardResult <- err
+	}()
+
+	request := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, request.Kind)
+
+	ackPayload, err := proto.Marshal(&connect.WorkerRequestAckData{
+		RequestId: requestID,
+		RunId:     res.runID.String(),
+	})
+	require.NoError(t, err)
+	require.NoError(t, wsproto.Write(context.Background(), res.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REQUEST_ACK,
+		Payload: ackPayload,
+	}))
+
+	select {
+	case err := <-forwardResult:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("request ACK was blocked behind saturated data handlers")
+	}
+
+	leaseRequestID := "protocol-pool-lease"
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, leaseRequestID, 5*time.Second, testExecutorIP)
+	require.NoError(t, err)
+	sendWorkerExtendLeaseMessage(t, res, &connect.WorkerRequestExtendLeaseData{
+		RequestId:    leaseRequestID,
+		AccountId:    res.accountID.String(),
+		EnvId:        res.envID.String(),
+		AppId:        res.appID.String(),
+		FunctionSlug: res.fnSlug,
+		RunId:        res.runID.String(),
+		LeaseId:      leaseID.String(),
+	})
+
+	leaseAck := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK, leaseAck.Kind)
+	leaseAckData := &connect.WorkerRequestExtendLeaseAckData{}
+	require.NoError(t, proto.Unmarshal(leaseAck.Payload, leaseAckData))
+	require.Equal(t, leaseRequestID, leaseAckData.RequestId)
+	require.NotNil(t, leaseAckData.NewLeaseId)
 }
 
 // TestEstablishConnectionInvalidConnectMessage tests invalid connect messages
