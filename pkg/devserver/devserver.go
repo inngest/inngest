@@ -37,6 +37,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/cqrs/duckdbquery"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	dbpkg "github.com/inngest/inngest/pkg/db"
@@ -528,10 +529,21 @@ func start(ctx context.Context, opts StartOpts) error {
 	// non-nil, stopDualWrite tears down its background goroutines and the
 	// duckdb subprocess when start() returns (i.e. once service.StartAll
 	// below has finished shutting every other service down).
-	var syncListeners []execution.SyncLifecycleListener
+	var (
+		syncListeners []execution.SyncLifecycleListener
+		// gqlData is the GQL resolver's data source. It stays the primary
+		// (SQLite/Postgres-backed) manager unless dual-write starts
+		// successfully, in which case it's wrapped to also read
+		// runs/events/run-trace data from DuckDB — see
+		// docs/plans/007-duckdb-gql-resolvers.md. Only the GQL Data field
+		// (below) uses this; the executor, runner, queue, and REST all keep
+		// using dbcqrs/ds.Data directly.
+		gqlData = dbcqrs
+	)
 	if dw := setupDualWrite(ctx, opts.EnableDuckDB, "duckdb", opts.SQLiteDir); dw != nil {
 		log.Println("dual-write enabled: syncing executions to DuckDB subprocess")
-		syncListeners = append(syncListeners, dw)
+		syncListeners = append(syncListeners, dw.Listener)
+		gqlData = duckdbquery.Wrap(dbcqrs, dw.DB)
 		defer func() {
 			// Bounded like every other service.Service's Stop (see
 			// pkg/service's defaultTimeout/stopTimeout, 30s) -- Close must
@@ -539,7 +551,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			// wedges on an unresponsive subprocess.
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			stopDualWrite(shutdownCtx, dw)
+			stopDualWrite(shutdownCtx, dw.Listener)
 			if opts.DuckDBClosed != nil {
 				close(opts.DuckDBClosed)
 			}
@@ -674,7 +686,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
-		Data:           ds.Data,
+		Data:           gqlData,
 		Config:         ds.Opts.Config,
 		Logger:         l,
 		Runner:         ds.Runner,

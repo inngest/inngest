@@ -29,7 +29,7 @@ import (
 //     Columns() order — which silently scans values into the wrong struct
 //     field under this driver. Every multi-column query below is instead
 //     scanned generically and its fields picked out by column NAME (see
-//     scanRowByName), which is immune to that reordering.
+//     ScanRowByName), which is immune to that reordering.
 type duckdbStore struct {
 	tableName string
 }
@@ -93,7 +93,7 @@ func (s *duckdbStore) GetMigration(
 		}
 		return nil, fmt.Errorf("%w: %d", database.ErrVersionNotFound, version)
 	}
-	row, err := scanRowByName(rows)
+	row, err := ScanRowByName(rows)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (s *duckdbStore) GetMigration(
 	if !ok {
 		return nil, fmt.Errorf("duckdb: unexpected is_applied type %T", row["is_applied"])
 	}
-	ts, err := asTimestamp(row["tstamp"])
+	ts, err := AsTimestamp(row["tstamp"])
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +134,11 @@ func (s *duckdbStore) ListMigrations(
 
 	var out []*database.ListMigrationsResult
 	for rows.Next() {
-		row, err := scanRowByName(rows)
+		row, err := ScanRowByName(rows)
 		if err != nil {
 			return nil, err
 		}
-		version, err := asInt64(row["version_id"])
+		version, err := AsInt64(row["version_id"])
 		if err != nil {
 			return nil, err
 		}
@@ -171,12 +171,13 @@ func (s *duckdbStore) TableExists(ctx context.Context, db database.DBTxConn) (bo
 	return exists, nil
 }
 
-// scanRowByName scans the current row of rows generically and returns its
+// ScanRowByName scans the current row of rows generically and returns its
 // values keyed by column name. This driver's Rows.Columns() order isn't
 // guaranteed to match the query's SELECT list (see the duckdbStore doc
-// comment above), so every multi-column caller in this file looks values up
-// by name rather than by position.
-func scanRowByName(rows *sql.Rows) (map[string]any, error) {
+// comment above), so every multi-column caller in this file — and every
+// caller in pkg/cqrs/duckdbquery — looks values up by name rather than by
+// position.
+func ScanRowByName(rows *sql.Rows) (map[string]any, error) {
 	cols, err := rows.Columns()
 	if err != nil {
 		return nil, err
@@ -196,9 +197,9 @@ func scanRowByName(rows *sql.Rows) (map[string]any, error) {
 	return out, nil
 }
 
-// asInt64 converts a value read back from this driver into an int64.
+// AsInt64 converts a value read back from this driver into an int64.
 // DuckDB's -jsonlines transport surfaces JSON numbers as float64.
-func asInt64(v any) (int64, error) {
+func AsInt64(v any) (int64, error) {
 	switch n := v.(type) {
 	case int64:
 		return n, nil
@@ -209,11 +210,11 @@ func asInt64(v any) (int64, error) {
 	}
 }
 
-// asTimestamp converts a value read back from this driver into a time.Time.
+// AsTimestamp converts a value read back from this driver into a time.Time.
 // This driver has no read-side TIMESTAMP-to-time.Time conversion (see
 // literal.go, which only handles the write side), so DuckDB's -jsonlines
 // TIMESTAMP output arrives here as a plain string.
-func asTimestamp(v any) (time.Time, error) {
+func AsTimestamp(v any) (time.Time, error) {
 	switch t := v.(type) {
 	case time.Time:
 		return t, nil

@@ -95,7 +95,7 @@ func (l *listener) sendEvent(row map[string]any) {
 	}
 }
 
-// TODO: use this instead of the map[string]anys in the listener hooks, and have the batcher
+// TODO: use this instead of the map[string]anys in the listener hooks
 type Run struct {
 	AccountID   uuid.UUID         `json:"account_id"`
 	EnvID       uuid.UUID         `json:"env_id"`
@@ -122,7 +122,7 @@ func runCommonFields(md sv2.Metadata, item queue.Item, evts []json.RawMessage) m
 	if scheduledAt.Before(ts) {
 		scheduledAt = ts
 	}
-	return map[string]any{
+	row := map[string]any{
 		"account_id": md.ID.Tenant.AccountID,
 		"env_id":     md.ID.Tenant.EnvID,
 		"run_id":     md.ID.RunID,
@@ -134,6 +134,20 @@ func runCommonFields(md sv2.Metadata, item queue.Item, evts []json.RawMessage) m
 		"app_id":       md.ID.Tenant.AppID,
 		"inputs":       evts,
 	}
+	// md.Config.EventIDs is the run's own persisted trigger event ID list
+	// (set once at Schedule time, round-tripped through state on every
+	// subsequent load — see pkg/execution/executor/executor.go's Schedule
+	// and pkg/execution/state/v2's Config.EventIDs). Omitted entirely for
+	// cron-only runs, which have no triggering event at all.
+	// TODO: validate that omitting this for crons is valid
+	if len(md.Config.EventIDs) > 0 {
+		ids := make([]string, len(md.Config.EventIDs))
+		for i, id := range md.Config.EventIDs {
+			ids[i] = id.String()
+		}
+		row["event_ids"] = ids
+	}
+	return row
 }
 
 // addEventsInputAttr sets meta.Attrs.EventsInput to evts marshaled as a
@@ -166,6 +180,7 @@ func (l *listener) createSpan(ctx context.Context, name string, opts *tracing.Cr
 		opts.Attributes = meta.NewAttrSet()
 	}
 	addTenantAndDebugAttrs(opts.Attributes, opts.Metadata)
+	addQueueItemAttrs(opts.Attributes, opts.QueueItem)
 	ref, err := l.tp.CreateSpan(ctx, name, opts)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("dualwrite: failed to create span", "error", err, "name", name)

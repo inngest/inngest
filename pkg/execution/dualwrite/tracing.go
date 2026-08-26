@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/inngest/inngest/pkg/execution/queue"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
@@ -56,6 +57,21 @@ func addTenantAndDebugAttrs(attrs *meta.SerializableAttrs, md *sv2.Metadata) {
 	tracing.AddMetadataTenantAttrs(attrs, md.ID)
 	meta.AddAttr(attrs, meta.Attrs.DebugRunID, md.Config.DebugRunID())
 	meta.AddAttr(attrs, meta.Attrs.DebugSessionID, md.Config.DebugSessionID())
+}
+
+// addQueueItemAttrs sets GroupID from a queue.Item on every span that has
+// one available. pkg/tracing's executionProcessor gets this for free from
+// ambient ExecutionContext (populated from item.GroupID at
+// pkg/execution/executor/executor.go's Execute) since this package's
+// TracerProvider is built WithoutExecutionProcessor — see
+// addTenantAndDebugAttrs' doc comment for why every such attribute must be
+// set explicitly here instead. Called from createSpan for every hook that
+// sets CreateSpanOptions.QueueItem, so no per-hook wiring is needed.
+func addQueueItemAttrs(attrs *meta.SerializableAttrs, item *queue.Item) {
+	if item == nil || item.GroupID == "" {
+		return
+	}
+	meta.AddAttr(attrs, meta.Attrs.GroupID, &item.GroupID)
 }
 
 // addRunSpanAttrs replicates executionProcessor.OnStart's meta.SpanNameRun

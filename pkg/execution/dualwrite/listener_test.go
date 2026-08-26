@@ -8,10 +8,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -43,12 +46,57 @@ func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
 
 func TestListenerOnFunctionScheduledEnqueuesRunRow(t *testing.T) {
 	l := newListenerWithChannels(10, 10)
+	md := testMetadata(t)
 
-	l.OnFunctionScheduled(context.Background(), sv2.Metadata{}, queue.Item{}, nil)
+	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
 
 	select {
 	case row := <-l.runs:
-		require.Equal(t, "function_scheduled", row["event_type"])
+		require.Equal(t, md.ID.RunID, row["run_id"])
+		require.Equal(t, md.ID.FunctionID, row["function_id"])
+		require.Equal(t, enums.StepStatusQueued, row["status"])
+	default:
+		t.Fatal("expected a row on the runs channel")
+	}
+}
+
+// TestListenerOnFunctionScheduledSetsEventIDsFromMetadataConfig proves
+// runCommonFields sources event_ids from md.Config.EventIDs — the run's own
+// persisted trigger event ID list (set once at Schedule time in
+// pkg/execution/executor/executor.go, round-tripped through state on every
+// subsequent load) — as a real []string, stored as a DuckDB VARCHAR[] (see
+// pkg/db/duckdb/literal.go's []string encoding).
+func TestListenerOnFunctionScheduledSetsEventIDsFromMetadataConfig(t *testing.T) {
+	l := newListenerWithChannels(10, 10)
+	md := testMetadata(t)
+	evt1, evt2 := ulid.MustNew(ulid.Now(), rand.Reader), ulid.MustNew(ulid.Now(), rand.Reader)
+	md.Config.EventIDs = []ulid.ULID{evt1, evt2}
+
+	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
+
+	select {
+	case row := <-l.runs:
+		require.Equal(t, []string{evt1.String(), evt2.String()}, row["event_ids"])
+	default:
+		t.Fatal("expected a row on the runs channel")
+	}
+}
+
+// TestListenerOnFunctionScheduledOmitsEventIDsForCronRuns proves a
+// cron-triggered run (no triggering event, so md.Config.EventIDs is empty)
+// never sets event_ids at all, rather than an empty string — matching how
+// "status" is handled for the same "column not applicable to this hook"
+// reasoning elsewhere in this file.
+func TestListenerOnFunctionScheduledOmitsEventIDsForCronRuns(t *testing.T) {
+	l := newListenerWithChannels(10, 10)
+	md := testMetadata(t) // Config.EventIDs left empty, as a cron run would have it
+
+	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
+
+	select {
+	case row := <-l.runs:
+		_, hasEventIDs := row["event_ids"]
+		require.False(t, hasEventIDs, "a cron-triggered run must not set event_ids")
 	default:
 		t.Fatal("expected a row on the runs channel")
 	}
@@ -56,10 +104,9 @@ func TestListenerOnFunctionScheduledEnqueuesRunRow(t *testing.T) {
 
 // TestNewListenerEndToEndEventFlow proves a row makes it from a hook call,
 // through the non-blocking channel send, through a real batcher flush,
-// into the events_staging table via a real duckdb subprocess. Compaction
+// into the inngest.events table via a real duckdb subprocess. Compaction
 // (rolling staged rows to Parquet) is out of scope for this task — see
-// listener.go's NewListener doc comment — so this test stops at the
-// staging-table insert.
+// listener.go's NewListener doc comment — so this test stops at the insert.
 func TestNewListenerEndToEndEventFlow(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
@@ -71,10 +118,10 @@ func TestNewListenerEndToEndEventFlow(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		var count int
-		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM events_staging;")
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.events;")
 		_ = row.Scan(&count)
 		return count == 1
-	}, 2*time.Second, 20*time.Millisecond, "row should land in staging after a batch flush")
+	}, 2*time.Second, 20*time.Millisecond, "row should land in inngest.events after a batch flush")
 }
 
 // testMetadata builds metadata with real IDs so the row's partition columns
@@ -130,23 +177,31 @@ func selectRows(t *testing.T, db *sql.DB, query string) []map[string]any {
 	return out
 }
 
-func rowByEventType(t *testing.T, rows []map[string]any, eventType string) map[string]any {
+// rowByStatus finds the one row in rows whose "status" column equals want.
+// inngest.runs has no per-hook discriminator column — each of
+// OnFunctionScheduled/Started/Finished/Cancelled inserts its own row for the
+// same run_id, every one carrying a status (Queued/Running/Completed/...:
+// see enums.StepStatus), so status doubles as the discriminator here.
+func rowByStatus(t *testing.T, rows []map[string]any, want string) map[string]any {
 	t.Helper()
 	for _, row := range rows {
-		if row["event_type"] == eventType {
+		status, _ := row["status"].(string)
+		if status == want {
 			return row
 		}
 	}
-	t.Fatalf("no row with event_type %q in %v", eventType, rows)
+	t.Fatalf("no row with status %q in %v", want, rows)
 	return nil
 }
 
-// TestNewListenerEndToEndRunFlow is the runs_staging counterpart to
-// TestNewListenerEndToEndEventFlow: runs_staging had no end-to-end coverage
+// TestNewListenerEndToEndRunFlow is the inngest.runs counterpart to
+// TestNewListenerEndToEndEventFlow: inngest.runs had no end-to-end coverage
 // against the real migrated schema at all, so nothing proved the rows the
 // hooks build actually satisfy the table's columns and NOT NULL constraints.
 // This drives the real OnFunctionScheduled/Started/Finished hooks through a
-// real duckdb subprocess and asserts every column lands.
+// real duckdb subprocess and asserts every column lands. Each hook inserts
+// its own row (append-only, not an update-in-place — see listener.go), so
+// three rows for the same run_id is the correct, expected outcome.
 func TestNewListenerEndToEndRunFlow(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
@@ -161,27 +216,95 @@ func TestNewListenerEndToEndRunFlow(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		var count int
-		row := db.QueryRowContext(ctx, "SELECT count(*) FROM runs_staging;")
+		row := db.QueryRowContext(ctx, "SELECT count(*) FROM inngest.runs;")
 		_ = row.Scan(&count)
 		return count == 3
-	}, 5*time.Second, 20*time.Millisecond, "rows should land in runs_staging after a batch flush")
+	}, 5*time.Second, 20*time.Millisecond, "rows should land in inngest.runs after a batch flush")
 
 	rows := selectRows(t, db,
-		"SELECT run_id, function_id, account_id, workspace_id, event_type, status, year, month FROM runs_staging;")
+		"SELECT run_id, function_id, account_id, env_id, status, started_at, ended_at FROM inngest.runs;")
 	require.Len(t, rows, 3)
 
-	ts := ulid.Time(md.ID.RunID.Time())
-	for _, eventType := range []string{"function_scheduled", "function_started", "function_finished"} {
-		row := rowByEventType(t, rows, eventType)
-		require.Equal(t, md.ID.RunID.String(), row["run_id"], eventType)
-		require.Equal(t, md.ID.FunctionID.String(), row["function_id"], eventType)
-		require.Equal(t, md.ID.Tenant.AccountID.String(), row["account_id"], eventType)
-		require.Equal(t, md.ID.Tenant.EnvID.String(), row["workspace_id"], eventType)
-		require.EqualValues(t, ts.Year(), row["year"], eventType)
-		require.EqualValues(t, int(ts.Month()), row["month"], eventType)
+	for _, row := range rows {
+		require.Equal(t, md.ID.RunID.String(), row["run_id"])
+		require.Equal(t, md.ID.FunctionID.String(), row["function_id"])
+		require.Equal(t, md.ID.Tenant.AccountID.String(), row["account_id"])
+		require.Equal(t, md.ID.Tenant.EnvID.String(), row["env_id"])
 	}
 
-	// OnFunctionFinished is the only runs hook that populates status.
-	require.Equal(t, "completed", rowByEventType(t, rows, "function_finished")["status"])
-	require.Nil(t, rowByEventType(t, rows, "function_scheduled")["status"])
+	scheduled := rowByStatus(t, rows, enums.StepStatusQueued.String())
+	require.Nil(t, scheduled["started_at"])
+	require.Nil(t, scheduled["ended_at"])
+
+	started := rowByStatus(t, rows, enums.StepStatusRunning.String())
+	require.NotNil(t, started["started_at"])
+	require.Nil(t, started["ended_at"])
+
+	finished := rowByStatus(t, rows, enums.StepStatusCompleted.String())
+	require.NotNil(t, finished["started_at"])
+	require.NotNil(t, finished["ended_at"])
+}
+
+// TestListenerEmitsGroupIDOnSpansWithQueueItem proves createSpan sets
+// meta.Attrs.GroupID (job.group.id) from queue.Item.GroupID on every span
+// built with a QueueItem — see tracing.go's addQueueItemAttrs doc comment
+// for why this package must set it explicitly rather than getting it for
+// free from pkg/tracing's ambient ExecutionContext the way the real
+// executionProcessor does.
+func TestListenerEmitsGroupIDOnSpansWithQueueItem(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	md := testMetadata(t)
+	item := queue.Item{GroupID: "group-abc-123"}
+	stepName := "my-step"
+	l.OnStepScheduled(context.Background(), md, item, &stepName, time.Now())
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans;")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "span row should land in inngest.run_trace_spans after a batch flush")
+
+	rows := selectRows(t, db, "SELECT attributes FROM inngest.run_trace_spans;")
+	require.Len(t, rows, 1)
+	// The attributes column is JSON-typed, so the stdio transport's
+	// -jsonlines output already embeds it as a native decoded value (a
+	// map[string]any), not a string requiring a second json.Unmarshal.
+	attrs, ok := rows[0]["attributes"].(map[string]any)
+	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
+	require.Equal(t, item.GroupID, attrs[meta.Attrs.GroupID.Key()])
+}
+
+// TestListenerOmitsGroupIDOnSpansWithoutQueueItem proves addQueueItemAttrs
+// is a no-op (not a panic, not a bogus empty-string attribute) for the one
+// span-building path in this package that never has a queue.Item to draw
+// from: createPauseSpan, used only by the *Resumed hooks (OnWaitForEvent
+// Resumed/OnWaitForSignalResumed/OnInvokeFunctionResumed), which receive a
+// pause/result, not a queue.Item.
+func TestListenerOmitsGroupIDOnSpansWithoutQueueItem(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	md := testMetadata(t)
+	l.OnWaitForEventResumed(context.Background(), md, statev1.Pause{}, execution.ResumeRequest{})
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans;")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "span row should land in inngest.run_trace_spans after a batch flush")
+
+	rows := selectRows(t, db, "SELECT attributes FROM inngest.run_trace_spans;")
+	require.Len(t, rows, 1)
+	attrs, ok := rows[0]["attributes"].(map[string]any)
+	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
+	_, hasGroupID := attrs[meta.Attrs.GroupID.Key()]
+	require.False(t, hasGroupID, "a span with no queue.Item must not set GroupID")
 }

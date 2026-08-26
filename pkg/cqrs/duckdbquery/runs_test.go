@@ -1,0 +1,270 @@
+package duckdbquery
+
+import (
+	"context"
+	"crypto/rand"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/oklog/ulid/v2"
+	"github.com/stretchr/testify/require"
+)
+
+// seedRunRow inserts one lifecycle row into inngest.runs, mirroring the
+// columns pkg/execution/dualwrite/listener.go's runCommonFields plus a
+// specific hook sets.
+func seedRunRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID, appID, functionID uuid.UUID, runID ulid.ULID, queuedAt time.Time, status *enums.StepStatus, startedAt, endedAt *time.Time, output *string) {
+	t.Helper()
+	cols := []string{"account_id", "env_id", "run_id", "queued_at", "scheduled_at", "app_id", "function_id", "inputs"}
+	args := []any{accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), functionID.String(), "[]"}
+	if status != nil {
+		cols = append(cols, "status")
+		args = append(args, status.String())
+	}
+	if startedAt != nil {
+		cols = append(cols, "started_at")
+		args = append(args, *startedAt)
+	}
+	if endedAt != nil {
+		cols = append(cols, "ended_at")
+		args = append(args, *endedAt)
+	}
+	if output != nil {
+		cols = append(cols, "output")
+		args = append(args, *output)
+	}
+	placeholders := make([]string, len(cols))
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+	q := "INSERT INTO inngest.runs (" + strings.Join(cols, ", ") + ") VALUES (" + strings.Join(placeholders, ", ") + ");"
+	_, err := m.db.ExecContext(ctx, q, args...)
+	require.NoError(t, err)
+}
+
+func TestGetTraceRunReturnsLatestRowForRun(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	queuedAt := time.Now().UTC().Add(-time.Minute)
+	startedAt := queuedAt.Add(time.Second)
+	endedAt := startedAt.Add(time.Second)
+
+	queued := enums.StepStatusQueued
+	running := enums.StepStatusRunning
+	completed := enums.StepStatusCompleted
+	out := `{"data":"done"}`
+
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, queuedAt, &queued, nil, nil, nil)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, queuedAt, &running, &startedAt, nil, nil)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, queuedAt, &completed, &startedAt, &endedAt, &out)
+
+	run, err := m.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+	require.NoError(t, err)
+	require.Equal(t, enums.RunStatusCompleted, run.Status)
+	require.WithinDuration(t, endedAt, run.EndedAt, time.Millisecond)
+	// TraceRun.Output is the raw column content, unwrapped-envelope-free —
+	// no data/error unwrap happens at the run level (only GetSpanOutput does
+	// that, for per-span output).
+	require.JSONEq(t, out, string(run.Output))
+}
+
+func TestGetTraceRunParsesEventIDsArray(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	evt1 := ulid.MustNew(ulid.Now(), rand.Reader)
+	evt2 := ulid.MustNew(ulid.Now(), rand.Reader)
+	queuedAt := time.Now().UTC()
+
+	_, err := m.db.ExecContext(ctx,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, function_id, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), functionID.String(),
+		enums.StepStatusQueued.String(), []string{evt1.String(), evt2.String()},
+	)
+	require.NoError(t, err)
+
+	run, err := m.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+	require.NoError(t, err)
+	require.Equal(t, []string{evt1.String(), evt2.String()}, run.TriggerIDs)
+}
+
+func TestGetTraceRunHasNilTriggerIDsForCronRuns(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	queuedAt := time.Now().UTC()
+	queued := enums.StepStatusQueued
+
+	// A cron-triggered run never sets event_ids — no triggering event exists.
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, queuedAt, &queued, nil, nil, nil)
+
+	run, err := m.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+	require.NoError(t, err)
+	require.Nil(t, run.TriggerIDs)
+}
+
+func TestGetTraceRunsFiltersByStatusAndTimeRange(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+
+	completed := enums.StepStatusCompleted
+	failed := enums.StepStatusFailed
+
+	run1 := ulid.MustNew(ulid.Timestamp(now.Add(-time.Hour)), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, run1, now.Add(-time.Hour), &completed, nil, nil, nil)
+
+	run2 := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, run2, now, &failed, nil, nil, nil)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			Status:    []enums.RunStatus{enums.RunStatusCompleted},
+			From:      now.Add(-2 * time.Hour), Until: now.Add(time.Hour),
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, run1.String(), runs[0].RunID)
+}
+
+func TestGetTraceRunsAppliesOutputCELFilter(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	completed := enums.StepStatusCompleted
+
+	// inngest.runs.output stores the raw function result directly (see
+	// OnFunctionFinished's resp.GetTraceFunctionOutput()) — unlike
+	// run_trace_spans.output, this is not wrapped in a {"data":...}/
+	// {"error":...} envelope, and run.MatchOutputExpressions evaluates CEL
+	// directly against it (data := map[string]any{"output": <this value>}).
+	matchOut := `{"ok":true}`
+	run1 := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, run1, now, &completed, nil, nil, &matchOut)
+
+	noMatchOut := `{"ok":false}`
+	run2 := ulid.MustNew(ulid.Timestamp(now.Add(time.Millisecond)), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, run2, now, &completed, nil, nil, &noMatchOut)
+
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+			CEL: "output.ok == true",
+		},
+		Items: 40,
+	})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, run1.String(), runs[0].RunID)
+}
+
+// TestGetTraceRunsPaginatesWithCursor is a regression test for a real bug
+// found after implementation: GetTraceRuns never decoded or applied
+// opt.Cursor at all (every "next page" request just re-ran the same
+// unfiltered query), and the response cursor it set (trun.Cursor =
+// trun.RunID) wasn't even the encoded cqrs.TracePageCursor shape the next
+// request's opt.Cursor needs to decode. This walks three pages of five
+// runs (page size 2) via the real cursor round-trip and asserts every run
+// is seen exactly once, in the expected (queued_at DESC) order.
+func TestGetTraceRunsPaginatesWithCursor(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	completed := enums.StepStatusCompleted
+
+	runIDs := make([]ulid.ULID, 5)
+	for i := range runIDs {
+		// Well-separated (whole seconds apart) so TIMESTAMP_MS truncation
+		// never ties two runs' queued_at.
+		ts := now.Add(time.Duration(i) * time.Second)
+		runIDs[i] = ulid.MustNew(ulid.Timestamp(ts), rand.Reader)
+		seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runIDs[i], ts, &completed, nil, nil, nil)
+	}
+	// Expected order is queued_at DESC (the default), i.e. reverse insertion order.
+	want := []string{runIDs[4].String(), runIDs[3].String(), runIDs[2].String(), runIDs[1].String(), runIDs[0].String()}
+
+	filter := cqrs.GetTraceRunFilter{
+		AccountID: accountID, WorkspaceID: envID,
+		TimeField: enums.TraceRunTimeQueuedAt,
+		From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+	}
+
+	var got []string
+	cursor := ""
+	for page := 0; page < 10; page++ { // bounded loop; a real bug here would otherwise hang forever
+		runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{Filter: filter, Items: 2, Cursor: cursor})
+		require.NoError(t, err)
+		if len(runs) == 0 {
+			break
+		}
+		for _, r := range runs {
+			got = append(got, r.RunID)
+		}
+		cursor = runs[len(runs)-1].Cursor
+		require.NotEmpty(t, cursor, "GetTraceRuns must set a real cursor on each returned run")
+	}
+
+	require.Equal(t, want, got, "pagination must visit every run exactly once, in order, across pages")
+}
+
+func TestGetTraceRunsCountCollapsesToOnePerRun(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	queued, running, completed := enums.StepStatusQueued, enums.StepStatusRunning, enums.StepStatusCompleted
+
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, now, &queued, nil, nil, nil)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, now, &running, nil, nil, nil)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, now, &completed, nil, nil, nil)
+
+	count, err := m.GetTraceRunsCount(ctx, cqrs.GetTraceRunOpt{
+		Filter: cqrs.GetTraceRunFilter{
+			AccountID: accountID, WorkspaceID: envID,
+			TimeField: enums.TraceRunTimeQueuedAt,
+			From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "3 lifecycle rows for one run must count as 1 run, not 3")
+}

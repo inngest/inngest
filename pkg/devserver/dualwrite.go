@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net"
 	"os"
@@ -26,6 +27,18 @@ type syncLifecycleCloser interface {
 	Close(ctx context.Context) error
 }
 
+// dualWriteResult bundles setupDualWrite's two products: the listener
+// devserver.go registers with the executor/runner, and the same *sql.DB
+// handle dual-write writes through — needed so devserver.go can also wrap
+// it as the GQL resolver's DuckDB-backed data source (duckdbquery.Wrap; see
+// docs/plans/007-duckdb-gql-resolvers.md). Both fields are set together or
+// not at all — setupDualWrite returns nil (not a struct with a nil DB) on
+// any failure, exactly as before.
+type dualWriteResult struct {
+	Listener execution.SyncLifecycleListener
+	DB       *sql.DB
+}
+
 // setupDualWrite starts the duckdb subprocess, runs migrations, and returns
 // the dual-write listener — or nil if any step fails, in which case the
 // caller must proceed without dual-write. This is additive, best-effort
@@ -47,7 +60,7 @@ type syncLifecycleCloser interface {
 // stateDir is the raw --sqlite-dir option value ("" meaning "the default");
 // it is resolved the same way pkg/db/sqlite resolves it, so the catalog lands
 // in <state-dir>/duckdb/ rather than relative to the process's cwd.
-func setupDualWrite(ctx context.Context, enabled bool, binaryPath, stateDir string) execution.SyncLifecycleListener {
+func setupDualWrite(ctx context.Context, enabled bool, binaryPath, stateDir string) *dualWriteResult {
 	l := logger.StdlibLogger(ctx)
 
 	if !enabled {
@@ -99,7 +112,7 @@ func setupDualWrite(ctx context.Context, enabled bool, binaryPath, stateDir stri
 		return nil
 	}
 
-	return dualwrite.NewListener(db)
+	return &dualWriteResult{Listener: dualwrite.NewListener(db), DB: db}
 }
 
 // freeLocalQuackAddr resolves an ephemeral loopback port and returns it as a

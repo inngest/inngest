@@ -17,7 +17,7 @@ import (
 // orderable. DuckDB's TIMESTAMP type is microsecond-precision and round-trips
 // this layout exactly (verified against the real binary); it renders a
 // zero-fraction timestamp back without the fractional part, which the
-// read-side layout list in store.go's asTimestamp already handles.
+// read-side layout list in store.go's AsTimestamp already handles.
 const timestampLayout = "2006-01-02 15:04:05.000000"
 
 // encodeLiteral converts a bound driver.Value into DuckDB SQL literal text.
@@ -65,6 +65,23 @@ func encodeLiteral(v driver.Value) (string, error) {
 		return sb.String(), nil
 	case time.Time:
 		return "TIMESTAMP '" + val.UTC().Format(timestampLayout) + "'", nil
+	case []string:
+		// DuckDB's array literal syntax (['a', 'b']) — no cast needed; the
+		// target column's declared type (e.g. VARCHAR[]) is enough for
+		// DuckDB to accept it, confirmed against a real subprocess over both
+		// the stdio and quack transports.
+		var sb strings.Builder
+		sb.WriteString("[")
+		for i, s := range val {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteByte('\'')
+			sb.WriteString(strings.ReplaceAll(s, "'", "''"))
+			sb.WriteByte('\'')
+		}
+		sb.WriteString("]")
+		return sb.String(), nil
 	default:
 		return "", fmt.Errorf("duckdb: unsupported literal type %T", v)
 	}

@@ -12,6 +12,13 @@ CREATE TABLE IF NOT EXISTS inngest.runs (
   status VARCHAR NOT NULL,
   inputs JSON NOT NULL,
   output JSON,
+  -- event_ids holds the run's triggering event(s) internal ULID(s) — see
+  -- pkg/execution/dualwrite/listener.go's runCommonFields, which sources it
+  -- from sv2.Metadata.Config.EventIDs (the same persisted field
+  -- pkg/run/trace_lifecycle.go's OTel "sys.event.ids" span attribute is
+  -- derived from for the SQLite/Postgres path). NULL for cron-only runs,
+  -- which have no triggering event at all.
+  event_ids VARCHAR[],
   inserted_at TIMESTAMP_MS NOT NULL DEFAULT current_timestamp
 );
 ALTER TABLE inngest.runs

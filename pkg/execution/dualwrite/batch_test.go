@@ -6,28 +6,41 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"maps"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/stretchr/testify/require"
 )
 
-// eventRow builds a row shaped exactly like the listener's OnEventReceived
-// output (see eventPartitionFields in listener.go): every real row includes
-// account_id/workspace_id/year/month unconditionally, and events_staging's
-// year/month columns are NOT NULL, so a test row omitting them would trip a
-// real constraint violation against the actual duckdb subprocess.
+var (
+	batchTestAccountID  = uuid.New()
+	batchTestEnvID      = uuid.New()
+	batchTestAppID      = uuid.New()
+	batchTestFunctionID = uuid.New()
+)
+
+// eventRow builds a row shaped like the listener's OnEventReceived output
+// (see inngest.events in pkg/db/duckdb/migrations/000001_baseline.sql):
+// account_id/env_id/internal_id/received_at/source/event_id/event_name/
+// event_data/event_v/event_ts are all NOT NULL, so a test row omitting any
+// of them would trip a real constraint violation against the actual duckdb
+// subprocess.
 func eventRow(id, name string) map[string]any {
 	return map[string]any{
-		"event_id":     id,
-		"event_name":   name,
-		"account_id":   "acct-1",
-		"workspace_id": "ws-1",
-		"year":         2026,
-		"month":        8,
-		"occurred_at":  time.Now().UTC(),
+		"account_id":  batchTestAccountID.String(),
+		"env_id":      batchTestEnvID.String(),
+		"internal_id": id,
+		"received_at": time.Now().UTC(),
+		"source":      "test",
+		"event_id":    id,
+		"event_name":  name,
+		"event_data":  "{}",
+		"event_v":     "1",
+		"event_ts":    time.Now().UTC(),
 	}
 }
 
@@ -36,7 +49,7 @@ func TestBatcherFlushesOnSize(t *testing.T) {
 	defer cleanup()
 
 	ch := make(chan map[string]any, 10)
-	b := newBatcher(db, "events_staging", ch, batcherOpts{maxSize: 2, flushInterval: time.Hour})
+	b := newBatcher(db, "inngest.events", ch, batcherOpts{maxSize: 2, flushInterval: time.Hour})
 	go b.run(t.Context())
 	defer b.stop()
 
@@ -45,7 +58,7 @@ func TestBatcherFlushesOnSize(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		var count int
-		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM events_staging;")
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.events;")
 		if err := row.Scan(&count); err != nil {
 			return false
 		}
@@ -58,7 +71,7 @@ func TestBatcherFlushesOnTimeout(t *testing.T) {
 	defer cleanup()
 
 	ch := make(chan map[string]any, 10)
-	b := newBatcher(db, "events_staging", ch, batcherOpts{maxSize: 100, flushInterval: 50 * time.Millisecond})
+	b := newBatcher(db, "inngest.events", ch, batcherOpts{maxSize: 100, flushInterval: 50 * time.Millisecond})
 	go b.run(t.Context())
 	defer b.stop()
 
@@ -66,7 +79,7 @@ func TestBatcherFlushesOnTimeout(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		var count int
-		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM events_staging;")
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.events;")
 		if err := row.Scan(&count); err != nil {
 			return false
 		}
@@ -76,60 +89,63 @@ func TestBatcherFlushesOnTimeout(t *testing.T) {
 
 // TestBatcherHandlesMixedColumnsAcrossRowsInABatch is a regression test for
 // a real bug found while fixing this batcher: insert() used to build its
-// column list from rows[0]'s keys alone. Several listener hooks only add an
-// optional key conditionally (OnStepScheduled's step_name, OnStepFinished's
-// error), so a run_spans_staging batch can freely mix rows with different
-// key sets. With the old rows[0]-only logic, a step_started row (no
-// step_name key) landing first in the batch would silently drop step_name
-// from the INSERT for every row in the batch — including a later
-// step_scheduled row that *did* have a step_name value. This proves the
-// fixed union-of-keys column list preserves every row's data regardless of
-// its position in the batch.
+// column list from rows[0]'s keys alone. inngest.run_trace_spans' "output"
+// column is optional — spanExportRow (tracing.go) only sets it when the span
+// actually carries a StepOutput attribute — so a real batch can freely mix
+// rows with different key sets. With the old rows[0]-only logic, a row with
+// no output landing first in the batch would silently drop the "output"
+// column from the INSERT for every row in the batch — including a later row
+// that *did* have output data. This proves the fixed union-of-keys column
+// list preserves every row's data regardless of its position in the batch.
 func TestBatcherHandlesMixedColumnsAcrossRowsInABatch(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()
 
 	ch := make(chan map[string]any, 10)
-	b := newBatcher(db, "run_spans_staging", ch, batcherOpts{maxSize: 2, flushInterval: time.Hour})
+	b := newBatcher(db, "inngest.run_trace_spans", ch, batcherOpts{maxSize: 2, flushInterval: time.Hour})
 	go b.run(t.Context())
 	defer b.stop()
 
-	// step_started row first, deliberately without a step_name key, so a
-	// rows[0]-only column list would omit step_name from the whole batch.
-	ch <- map[string]any{
-		"run_id":     "run-1",
-		"event_type": "step_started",
-		"account_id": "acct-1", "workspace_id": "ws-1", "year": 2026, "month": 8,
-		"created_at": time.Now().UTC(),
+	base := map[string]any{
+		"account_id": batchTestAccountID.String(), "env_id": batchTestEnvID.String(),
+		"run_id": "run-1", "run_queued_at": time.Now().UTC(),
+		"app_id": batchTestAppID.String(), "function_id": batchTestFunctionID.String(),
+		"name": "executor.step", "start_time": time.Now().UTC(), "end_time": time.Now().UTC(),
+		"trace_id": "trace-1", "attributes": "{}",
 	}
-	ch <- map[string]any{
-		"run_id":     "run-1",
-		"event_type": "step_scheduled",
-		"step_name":  "my-step",
-		"account_id": "acct-1", "workspace_id": "ws-1", "year": 2026, "month": 8,
-		"created_at": time.Now().UTC(),
-	}
+
+	// span-without-output first, deliberately without an "output" key, so a
+	// rows[0]-only column list would omit "output" from the whole batch.
+	withoutOutput := map[string]any{"span_id": "span-without-output"}
+	maps.Copy(withoutOutput, base)
+	withOutput := map[string]any{"span_id": "span-with-output", "output": `{"data":"my-output"}`}
+	maps.Copy(withOutput, base)
+	ch <- withoutOutput
+	ch <- withOutput
 
 	require.Eventually(t, func() bool {
 		var count int
-		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM run_spans_staging;")
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans;")
 		if err := row.Scan(&count); err != nil {
 			return false
 		}
 		return count == 2
 	}, 2*time.Second, 50*time.Millisecond)
 
-	var stepName sql.NullString
+	// "output" is a JSON column, so the driver decodes it straight into a Go
+	// map rather than handing back the raw string that was inserted (see
+	// pkg/db/duckdb/rows.go) — scan into `any` rather than sql.NullString.
+	var output any
 	require.NoError(t, db.QueryRowContext(context.Background(),
-		"SELECT step_name FROM run_spans_staging WHERE event_type = 'step_scheduled';",
-	).Scan(&stepName))
-	require.True(t, stepName.Valid, "step_scheduled row's step_name should not have been dropped")
-	require.Equal(t, "my-step", stepName.String)
+		"SELECT output FROM inngest.run_trace_spans WHERE span_id = 'span-with-output';",
+	).Scan(&output))
+	require.Equal(t, map[string]any{"data": "my-output"}, output,
+		"span-with-output row's output should not have been dropped")
 
 	require.NoError(t, db.QueryRowContext(context.Background(),
-		"SELECT step_name FROM run_spans_staging WHERE event_type = 'step_started';",
-	).Scan(&stepName))
-	require.False(t, stepName.Valid, "step_started row never had a step_name")
+		"SELECT output FROM inngest.run_trace_spans WHERE span_id = 'span-without-output';",
+	).Scan(&output))
+	require.Nil(t, output, "span-without-output row never had output")
 }
 
 // TestBatcherDrainsChannelOnStopBeforeExiting is a regression test for a
@@ -154,7 +170,7 @@ func TestBatcherDrainsChannelOnStopBeforeExiting(t *testing.T) {
 
 	const n = 50
 	ch := make(chan map[string]any, n)
-	b := newBatcher(db, "events_staging", ch, batcherOpts{maxSize: n * 10, flushInterval: time.Hour})
+	b := newBatcher(db, "inngest.events", ch, batcherOpts{maxSize: n * 10, flushInterval: time.Hour})
 
 	for i := 0; i < n; i++ {
 		ch <- eventRow(fmt.Sprintf("id-%d", i), "burst")
@@ -174,7 +190,7 @@ func TestBatcherDrainsChannelOnStopBeforeExiting(t *testing.T) {
 	}
 
 	var count int
-	require.NoError(t, db.QueryRowContext(context.Background(), "SELECT count(*) FROM events_staging;").Scan(&count))
+	require.NoError(t, db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.events;").Scan(&count))
 	require.Equal(t, n, count, "every row buffered before stop() must be flushed, not dropped")
 }
 
@@ -213,7 +229,7 @@ func TestBatcherStopsFlushingOnceDriverDisabled(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 
 	ch := make(chan map[string]any, 100)
-	b := newBatcher(db, "events_staging", ch, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond})
+	b := newBatcher(db, "inngest.events", ch, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond})
 
 	done := make(chan struct{})
 	go func() {
@@ -262,8 +278,8 @@ func TestDisabledStateSharedAcrossBatchersLogsOnce(t *testing.T) {
 	discoverer := make(chan map[string]any, 10)
 	bystander := make(chan map[string]any, 10)
 
-	b1 := newBatcher(db, "events_staging", discoverer, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
-	b2 := newBatcher(db, "runs_staging", bystander, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
+	b1 := newBatcher(db, "inngest.events", discoverer, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
+	b2 := newBatcher(db, "inngest.runs", bystander, batcherOpts{maxSize: 1, flushInterval: 10 * time.Millisecond, disabled: shared})
 
 	done1, done2 := make(chan struct{}), make(chan struct{})
 	go func() { b1.run(context.Background()); close(done1) }()

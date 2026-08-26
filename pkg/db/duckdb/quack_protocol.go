@@ -1,6 +1,7 @@
 package duckdb
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"time"
@@ -280,9 +281,10 @@ func decodeQuackPrepareResponseBody(r *quackReader) (rows []map[string]any, need
 // quackLogicalTypeInteger and friends are DuckDB's LogicalTypeId values
 // (src/include/duckdb/common/types.hpp in duckdb/duckdb) for the subset this
 // client supports decoding: what's actually exercised by this phase's health
-// check, goose's version table, and DDL/INSERT result rows. Anything else
-// (JSON, UUID, structs, ...) is a read-side concern deferred to the
-// query-layer spec — see decodeQuackDataChunk's default case.
+// check, goose's version table, DDL/INSERT result rows, and the query-layer's
+// runs/events/spans reads (see pkg/cqrs/duckdbquery). Anything else (UUID,
+// structs, ...) is a read-side concern deferred to whenever a caller actually
+// needs it — see decodeQuackDataChunk's default case.
 const (
 	quackLogicalTypeBoolean      byte = 10
 	quackLogicalTypeSmallInt     byte = 12
@@ -294,83 +296,208 @@ const (
 	quackLogicalTypeTimestampNs  byte = 20
 	quackLogicalTypeDouble       byte = 23
 	quackLogicalTypeVarchar      byte = 25
+	quackLogicalTypeUUID         byte = 54
+	quackLogicalTypeList         byte = 101
 )
 
+// quackAliasJSON is the LogicalType alias DuckDB's JSON type carries: it's
+// physically a VARCHAR (LogicalType::JSON() is
+// `LogicalType(LogicalTypeId::VARCHAR)` with `SetAlias("JSON")` — no
+// structural difference from plain VARCHAR on the wire), distinguished only
+// by this alias in its ExtraTypeInfo. Confirmed against a real duckdb
+// subprocess: a JSON column's LogicalType serializes as id=25 (VARCHAR) with
+// type_info = {100: extraTypeInfoKind (byte, value 1 observed), 101: "JSON"}.
+const quackAliasJSON = "JSON"
+
+// quackLogicalType is a decoded LogicalType: the base id, its alias if any
+// ("" when untagged — e.g. "JSON" for DuckDB's JSON type), and, for LIST
+// (id == quackLogicalTypeList), the element type nested at type_info's
+// field200.
+type quackLogicalType struct {
+	id    byte
+	alias string
+	child *quackLogicalType
+}
+
 // decodeQuackLogicalType reads a LogicalType object (field100 id, optional
-// field101 type_info). It errors if type_info is present since none of this
-// client's supported types carry one.
-func decodeQuackLogicalType(r *quackReader) (byte, error) {
+// field101 type_info). type_info, when present, is ExtraTypeInfo's own
+// object — {100: extraTypeInfoKind byte, 101: alias string, 200: nested
+// child LogicalType (LIST only), optionally more structured fields for
+// types like DECIMAL/ENUM this client doesn't understand}. Only this shape
+// (verified empirically for DuckDB's JSON and LIST types) is decoded;
+// anything with additional fields beyond that — surfaced as an unexpected
+// field id where the terminator was expected — still errors, exactly as
+// before, since this client has no way to interpret those types' extra
+// structure.
+func decodeQuackLogicalType(r *quackReader) (quackLogicalType, error) {
 	r.beginObject()
 	if err := r.beginProperty(100); err != nil {
-		return 0, err
+		return quackLogicalType{}, err
 	}
 	id, err := r.readByte()
 	if err != nil {
-		return 0, err
+		return quackLogicalType{}, err
 	}
+	lt := quackLogicalType{id: id}
 	if ok, err := r.tryBeginProperty(101); err != nil {
-		return 0, err
+		return quackLogicalType{}, err
 	} else if ok {
 		present, err := r.beginNullable()
 		if err != nil {
-			return 0, err
+			return quackLogicalType{}, err
 		}
 		if present {
-			return 0, fmt.Errorf("duckdb: quack LogicalType id %d has extended type_info, which this client does not support", id)
+			r.beginObject()
+			if err := r.beginProperty(100); err != nil {
+				return quackLogicalType{}, fmt.Errorf("duckdb: quack LogicalType id %d has unsupported extended type_info: %w", id, err)
+			}
+			if _, err := r.readByte(); err != nil { // extraTypeInfoKind; only used to stay positioned on the wire
+				return quackLogicalType{}, err
+			}
+			if ok, err := r.tryBeginProperty(101); err != nil {
+				return quackLogicalType{}, err
+			} else if ok {
+				lt.alias, err = r.readString()
+				if err != nil {
+					return quackLogicalType{}, err
+				}
+			}
+			if ok, err := r.tryBeginProperty(200); err != nil {
+				return quackLogicalType{}, err
+			} else if ok {
+				child, cerr := decodeQuackLogicalType(r)
+				if cerr != nil {
+					return quackLogicalType{}, cerr
+				}
+				lt.child = &child
+			}
+			if err := r.endObject(); err != nil {
+				return quackLogicalType{}, fmt.Errorf("duckdb: quack LogicalType id %d has extended type_info this client does not support: %w", id, err)
+			}
 		}
 	}
 	if err := r.endObject(); err != nil {
-		return 0, err
+		return quackLogicalType{}, err
 	}
-	return id, nil
+	return lt, nil
 }
 
 // ---------- DataChunk / Vector ----------
 
 type quackColumn struct {
 	typeID byte
+	// alias is the LogicalType's ExtraTypeInfo alias, if any ("" for a plain
+	// unaliased type) — e.g. "JSON" for DuckDB's JSON type, which is
+	// otherwise a physically ordinary VARCHAR (see quackAliasJSON).
+	alias string
+	// validity is nil when the column has no NULLs (DuckDB omits the mask
+	// entirely in that case — see decodeFlatVector); otherwise one entry per
+	// row, true = valid, false = SQL NULL.
+	validity []bool
 	// Exactly one of these is populated, chosen by typeID's physical shape.
+	// DuckDB still writes a real (unspecified/garbage) entry at a NULL row's
+	// position in both, so indexing is always safe — values() just discards
+	// whatever's there and substitutes nil when validity says so.
 	fixedData []byte // constant-size types, column-major, no per-row length
 	varchar   [][]byte
-	rowCount  int
+	// list holds one entry per row for a LIST column: nil for a SQL NULL
+	// row, otherwise a []any of the row's decoded child values (empty, not
+	// nil, for a zero-length list). Populated directly by
+	// decodeQuackListVector rather than derived in values(), since building
+	// it requires the list_entry_t offsets/lengths that aren't otherwise
+	// kept on quackColumn.
+	list     []any
+	rowCount int
+}
+
+// isNull reports whether row i is a SQL NULL.
+func (c quackColumn) isNull(i int) bool {
+	return c.validity != nil && !c.validity[i]
 }
 
 // values decodes the column's raw bytes into canonical driver.Value-shaped Go
-// types: bool, int64, float64, string, or time.Time. NULLs are not handled —
-// this client's supported statements (health check, goose's version table,
-// DDL/INSERT result rows) never produce one; see decodeFlatVector.
+// types: nil (for a NULL row), bool, int64, float64, string, time.Time, or —
+// for a VARCHAR aliased as JSON — the value's own json.Unmarshal result
+// (map[string]any, []any, a scalar, or nil), matching the shape the
+// stdio/-jsonlines transport already produces for the same column type (that
+// transport's own JSON-lines encoding round-trips a JSON-typed column's
+// value as nested JSON automatically; quack has no equivalent for free, so
+// this replicates it explicitly).
 func (c quackColumn) values() ([]any, error) {
 	out := make([]any, c.rowCount)
 	switch c.typeID {
 	case quackLogicalTypeBoolean:
 		for i := range out {
+			if c.isNull(i) {
+				continue
+			}
 			out[i] = c.fixedData[i] != 0
 		}
 	case quackLogicalTypeSmallInt:
 		for i := range out {
+			if c.isNull(i) {
+				continue
+			}
 			out[i] = int64(int16(le16(c.fixedData[i*2:])))
 		}
 	case quackLogicalTypeInteger:
 		for i := range out {
+			if c.isNull(i) {
+				continue
+			}
 			out[i] = int64(int32(le32(c.fixedData[i*4:])))
 		}
 	case quackLogicalTypeBigInt:
 		for i := range out {
+			if c.isNull(i) {
+				continue
+			}
 			out[i] = int64(le64(c.fixedData[i*8:]))
 		}
 	case quackLogicalTypeDouble:
 		for i := range out {
+			if c.isNull(i) {
+				continue
+			}
 			out[i] = le64ToFloat64(le64(c.fixedData[i*8:]))
 		}
 	case quackLogicalTypeVarchar:
+		if c.alias == quackAliasJSON {
+			for i := range out {
+				if c.isNull(i) {
+					continue
+				}
+				var v any
+				if err := json.Unmarshal(c.varchar[i], &v); err != nil {
+					return nil, fmt.Errorf("duckdb: quack column decode: unmarshaling JSON column value: %w", err)
+				}
+				out[i] = v
+			}
+			return out, nil
+		}
 		for i := range out {
+			if c.isNull(i) {
+				continue
+			}
 			out[i] = string(c.varchar[i])
 		}
 	case quackLogicalTypeTimestamp, quackLogicalTypeTimestampMs, quackLogicalTypeTimestampSec, quackLogicalTypeTimestampNs:
 		for i := range out {
+			if c.isNull(i) {
+				continue
+			}
 			raw := int64(le64(c.fixedData[i*8:]))
 			out[i] = quackTimestampToTime(c.typeID, raw)
 		}
+	case quackLogicalTypeUUID:
+		for i := range out {
+			if c.isNull(i) {
+				continue
+			}
+			out[i] = quackUUIDToString(c.fixedData[i*16 : i*16+16])
+		}
+	case quackLogicalTypeList:
+		copy(out, c.list)
 	default:
 		return nil, fmt.Errorf("duckdb: quack column decode: unsupported LogicalTypeId %d", c.typeID)
 	}
@@ -388,6 +515,24 @@ func quackTimestampToTime(typeID byte, raw int64) time.Time {
 	default: // microseconds (Timestamp)
 		return time.UnixMicro(raw).UTC()
 	}
+}
+
+// quackUUIDToString decodes a UUID column's 16-byte wire representation into
+// standard "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" text. DuckDB stores a UUID
+// internally as a signed hugeint (so it can reuse hugeint comparison for
+// ordering) built from the UUID's 16 bytes with the sign bit of the first
+// byte flipped, then serializes that hugeint little-endian — which, from the
+// wire's perspective, is the UUID's bytes in *reverse* order with the *last*
+// wire byte's top bit flipped instead. Confirmed against a real duckdb
+// subprocess by round-tripping a known UUID: reversing b and then XORing
+// byte 0 with 0x80 reconstructs the original UUID bytes exactly.
+func quackUUIDToString(b []byte) string {
+	var u [16]byte
+	for i := range u {
+		u[i] = b[15-i]
+	}
+	u[0] ^= 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", u[0:4], u[4:6], u[6:8], u[8:10], u[10:16])
 }
 
 func le16(b []byte) uint16 { return uint16(b[0]) | uint16(b[1])<<8 }
@@ -455,9 +600,9 @@ func decodeQuackDataChunk(r *quackReader) (quackDataChunk, error) {
 	if err != nil {
 		return quackDataChunk{}, err
 	}
-	typeIDs := make([]byte, typesCount)
-	for i := range typeIDs {
-		typeIDs[i], err = decodeQuackLogicalType(r)
+	types := make([]quackLogicalType, typesCount)
+	for i := range types {
+		types[i], err = decodeQuackLogicalType(r)
 		if err != nil {
 			return quackDataChunk{}, err
 		}
@@ -480,7 +625,7 @@ func decodeQuackDataChunk(r *quackReader) (quackDataChunk, error) {
 			// a column's Vector is done by the DataChunk's own columns
 			// loop, not by Vector::Deserialize itself.
 			r.beginObject()
-			col, terr := decodeQuackVector(r, typeIDs[i], int(rowCount))
+			col, terr := decodeQuackVector(r, types[i], int(rowCount))
 			if terr != nil {
 				return quackDataChunk{}, terr
 			}
@@ -502,7 +647,7 @@ func decodeQuackDataChunk(r *quackReader) (quackDataChunk, error) {
 // scope; Constant/Sequence/Dictionary vectors are a future-work decode
 // concern once this client needs to support arbitrary SELECT results rather
 // than just DDL/INSERT result rows and simple health-check queries.
-func decodeQuackVector(r *quackReader, typeID byte, count int) (quackColumn, error) {
+func decodeQuackVector(r *quackReader, lt quackLogicalType, count int) (quackColumn, error) {
 	if ok, err := r.tryBeginProperty(90); err != nil {
 		return quackColumn{}, err
 	} else if ok {
@@ -514,10 +659,37 @@ func decodeQuackVector(r *quackReader, typeID byte, count int) (quackColumn, err
 			return quackColumn{}, fmt.Errorf("duckdb: quack vector type %d is not supported by this client (flat only)", vectorType)
 		}
 	}
-	return decodeFlatVector(r, typeID, count)
+	if lt.id == quackLogicalTypeList {
+		return decodeQuackListVector(r, lt, count)
+	}
+	return decodeFlatVector(r, lt.id, lt.alias, count)
 }
 
-func decodeFlatVector(r *quackReader, typeID byte, count int) (quackColumn, error) {
+// decodeQuackListVector reads a LIST Vector object. Confirmed against a real
+// duckdb subprocess (INTEGER[] and VARCHAR[] columns, with rows covering a
+// NULL list, an empty list, and multi-element lists) by cross-referencing
+// decoded offsets/lengths and child values against the known input:
+//
+//   - field100: hasValidity (for the list_entry_t data — whether a given
+//     row's whole list is itself SQL NULL), same convention as
+//     decodeFlatVector.
+//   - field101: validity mask, present only when hasValidity is true — same
+//     shape as decodeFlatVector's.
+//   - field104: the flattened child vector's total element count
+//     (DuckDB's ListVector::GetListSize()), a plain ULEB128.
+//   - field105: a list (ULEB128 count, expected to equal count) of
+//     list_entry_t objects, each {100: offset ULEB128, 101: length
+//     ULEB128}. A NULL row's entry is still present with an
+//     unspecified/garbage-but-typically-zero offset/length, exactly like a
+//     NULL fixed-size row's data — validity governs it, not the entry.
+//   - field106: the flattened child vector itself, wrapped in its own
+//     object exactly like DataChunk's own per-column wrapping, decoded
+//     recursively via decodeQuackVector so a LIST of LIST would also work.
+func decodeQuackListVector(r *quackReader, lt quackLogicalType, count int) (quackColumn, error) {
+	if lt.child == nil {
+		return quackColumn{}, fmt.Errorf("duckdb: quack LIST LogicalType is missing its child type")
+	}
+
 	if err := r.beginProperty(100); err != nil {
 		return quackColumn{}, err
 	}
@@ -525,12 +697,113 @@ func decodeFlatVector(r *quackReader, typeID byte, count int) (quackColumn, erro
 	if err != nil {
 		return quackColumn{}, err
 	}
+	var validity []bool
 	if hasValidity {
-		// This client's supported statements never produce NULL columns
-		// (see quackColumn.values), so a present validity mask is
-		// unexpected data this client can't interpret correctly rather than
-		// something safe to silently ignore.
-		return quackColumn{}, fmt.Errorf("duckdb: quack column has a validity mask (nullable result), which this client does not support decoding")
+		if err := r.beginProperty(101); err != nil {
+			return quackColumn{}, err
+		}
+		maskBytes, err := r.readData()
+		if err != nil {
+			return quackColumn{}, err
+		}
+		validity = decodeQuackValidityMask(maskBytes, count)
+	}
+
+	if err := r.beginProperty(104); err != nil {
+		return quackColumn{}, err
+	}
+	childCount, err := r.readUnsignedLeb128()
+	if err != nil {
+		return quackColumn{}, err
+	}
+
+	if err := r.beginProperty(105); err != nil {
+		return quackColumn{}, err
+	}
+	entryCount, err := r.beginList()
+	if err != nil {
+		return quackColumn{}, err
+	}
+	if int(entryCount) != count {
+		return quackColumn{}, fmt.Errorf("duckdb: quack LIST vector has %d list_entry_t entries, expected %d", entryCount, count)
+	}
+	type listEntry struct{ offset, length uint64 }
+	entries := make([]listEntry, count)
+	for i := range entries {
+		r.beginObject()
+		if err := r.beginProperty(100); err != nil {
+			return quackColumn{}, err
+		}
+		entries[i].offset, err = r.readUnsignedLeb128()
+		if err != nil {
+			return quackColumn{}, err
+		}
+		if err := r.beginProperty(101); err != nil {
+			return quackColumn{}, err
+		}
+		entries[i].length, err = r.readUnsignedLeb128()
+		if err != nil {
+			return quackColumn{}, err
+		}
+		if err := r.endObject(); err != nil {
+			return quackColumn{}, err
+		}
+	}
+
+	if err := r.beginProperty(106); err != nil {
+		return quackColumn{}, err
+	}
+	r.beginObject()
+	child, err := decodeQuackVector(r, *lt.child, int(childCount))
+	if err != nil {
+		return quackColumn{}, err
+	}
+	if err := r.endObject(); err != nil {
+		return quackColumn{}, err
+	}
+
+	childValues, err := child.values()
+	if err != nil {
+		return quackColumn{}, err
+	}
+	lists := make([]any, count)
+	for i, e := range entries {
+		if validity != nil && !validity[i] {
+			continue
+		}
+		lists[i] = append([]any{}, childValues[e.offset:e.offset+e.length]...)
+	}
+	return quackColumn{typeID: quackLogicalTypeList, list: lists, rowCount: count}, nil
+}
+
+func decodeFlatVector(r *quackReader, typeID byte, alias string, count int) (quackColumn, error) {
+	if err := r.beginProperty(100); err != nil {
+		return quackColumn{}, err
+	}
+	hasValidity, err := r.readBool()
+	if err != nil {
+		return quackColumn{}, err
+	}
+	// field101 (validity mask), present only when hasValidity is true, is a
+	// packed-bit mask covering count rows, one bit per row, LSB-first within
+	// each byte, 1=valid/0=null (confirmed against a real duckdb subprocess:
+	// a 2-row column with only its second row NULL produced mask byte 0xFD =
+	// 0b11111101 — bit 0 set, bit 1 clear). field102 (the column's data) is
+	// always present regardless, at the same physical width/shape as an
+	// all-valid column — DuckDB still writes a (unspecified/garbage) entry
+	// for a null row rather than omitting it, so decoding proceeds exactly
+	// as before and values() alone is responsible for substituting nil at
+	// invalid positions.
+	var validity []bool
+	if hasValidity {
+		if err := r.beginProperty(101); err != nil {
+			return quackColumn{}, err
+		}
+		maskBytes, err := r.readData()
+		if err != nil {
+			return quackColumn{}, err
+		}
+		validity = decodeQuackValidityMask(maskBytes, count)
 	}
 
 	if typeID == quackLogicalTypeVarchar {
@@ -551,7 +824,7 @@ func decodeFlatVector(r *quackReader, typeID byte, count int) (quackColumn, erro
 				return quackColumn{}, err
 			}
 		}
-		return quackColumn{typeID: typeID, varchar: values, rowCount: count}, nil
+		return quackColumn{typeID: typeID, alias: alias, validity: validity, varchar: values, rowCount: count}, nil
 	}
 
 	if err := r.beginProperty(102); err != nil {
@@ -561,5 +834,23 @@ func decodeFlatVector(r *quackReader, typeID byte, count int) (quackColumn, erro
 	if err != nil {
 		return quackColumn{}, err
 	}
-	return quackColumn{typeID: typeID, fixedData: data, rowCount: count}, nil
+	return quackColumn{typeID: typeID, alias: alias, validity: validity, fixedData: data, rowCount: count}, nil
+}
+
+// decodeQuackValidityMask unpacks a DuckDB ValidityMask's packed-bit wire
+// representation into one bool per row (true = valid, false = SQL NULL).
+// mask may be shorter than ceil(count/8) bytes — DuckDB only grows a
+// validity mask's backing storage to cover bits it has actually cleared, so
+// any row past the mask's end is implicitly valid.
+func decodeQuackValidityMask(mask []byte, count int) []bool {
+	valid := make([]bool, count)
+	for i := range valid {
+		byteIdx, bitIdx := i/8, uint(i%8)
+		if byteIdx >= len(mask) {
+			valid[i] = true
+			continue
+		}
+		valid[i] = mask[byteIdx]&(1<<bitIdx) != 0
+	}
+	return valid
 }

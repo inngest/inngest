@@ -37,6 +37,9 @@ func TestEncodeLiteral(t *testing.T) {
 			time.Date(2026, 1, 2, 3, 4, 5, 123456000, time.UTC),
 			"TIMESTAMP '2026-01-02 03:04:05.123456'",
 		},
+		{"string slice", []string{"a", "b"}, "['a', 'b']"},
+		{"string slice with single quote", []string{"O'Brien"}, "['O''Brien']"},
+		{"empty string slice", []string{}, "[]"},
 	}
 
 	for _, tc := range cases {
