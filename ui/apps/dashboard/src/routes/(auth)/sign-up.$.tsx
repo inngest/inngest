@@ -4,6 +4,7 @@ import TrustPanel from '@/components/SignIn/TrustPanel';
 import { absoluteUrl, canonicalLink } from '@/utils/urls';
 import { ClerkLoaded, ClerkLoading, SignUp } from '@clerk/tanstack-react-start';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
+import { cn } from '@inngest/components/utils/classNames';
 import { Link, createFileRoute, useLocation } from '@tanstack/react-router';
 
 /**
@@ -70,10 +71,19 @@ export const Route = createFileRoute('/(auth)/sign-up/$')({
  * when the form mounts client-side. Measured against the production field set
  * (email + password); an instance that also collects names renders ~83px taller
  * and will still grow past this, since `min-height` sets a floor, not a cap.
+ *
+ * Applied to the start step only. Deeper steps of the flow -- verification and
+ * friends, which are reachable directly from an emailed link -- have their own
+ * shapes and heights, and reserving this one for them would trade the shift it
+ * removes here for a mismatch there.
  */
 const FORM_MIN_HEIGHT = 'min-h-[508px]';
 
-/** Stand-in for Clerk's form while it mounts, so the reserved space is not a void. */
+/**
+ * Stand-in for Clerk's form while it mounts, so the reserved space is not a void.
+ * Shaped after the start step (social buttons, divider, fields, submit), so it is
+ * only rendered there.
+ */
 function FormSkeleton() {
   return (
     <div
@@ -114,12 +124,16 @@ function RouteComponent() {
               and needs no dark-mode filter. */}
           <InngestLogo className="text-basis mb-6" width={132} />
 
+          {/* The wrapper stays in the tree on every step so that `SignUp` keeps
+              its position and is not remounted when the step changes mid-flow;
+              only the reservation and the placeholder are gated. */}
           <div
-            className={`flex w-full flex-col items-center ${FORM_MIN_HEIGHT}`}
+            className={cn(
+              'flex w-full flex-col items-center',
+              isStartStep && FORM_MIN_HEIGHT,
+            )}
           >
-            <ClerkLoading>
-              <FormSkeleton />
-            </ClerkLoading>
+            <ClerkLoading>{isStartStep ? <FormSkeleton /> : null}</ClerkLoading>
             <ClerkLoaded>
               <SignUp
                 unsafeMetadata={{
