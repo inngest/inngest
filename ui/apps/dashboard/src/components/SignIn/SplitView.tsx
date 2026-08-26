@@ -16,7 +16,7 @@ export default function SplitView({
       <div className="bg-canvasBase flex h-full w-full flex-col items-center overflow-y-auto py-4 sm:w-2/3 sm:p-6 md:w-1/2">
         {children}
       </div>
-      <div className="mesh-gradient hidden h-full w-1/3 sm:block md:w-1/2">
+      <div className="bg-canvasMuted hidden h-full w-1/3 sm:block md:w-1/2">
         {panel}
       </div>
     </div>
