@@ -72,6 +72,12 @@ function RouteComponent() {
                 footer: isStartStep ? 'hidden' : 'bg-none',
                 logoBox: 'hidden',
                 formButtonPrimary: MARKETING_CTA,
+                // Clerk's card carries 32px of bottom padding, which the
+                // trailing copy's own margin stacked on top of -- the
+                // certification line sat 44px below the button instead of the
+                // 12px intended. Dropped on the first step only; later steps
+                // still render Clerk's footer inside the card and need it.
+                card: isStartStep ? '!pb-0' : '',
                 // `!` because the provider sets `my-9` on the same descriptor;
                 // Tailwind utilities share specificity, so source order rather
                 // than class order would otherwise decide the winner.
@@ -80,13 +86,27 @@ function RouteComponent() {
             }}
           />
 
-          {/* Sentence case + `uppercase` rather than literal capitals, so
-              screen readers do not spell the line out letter by letter. */}
-          <p className="text-muted mt-6 text-center font-mono text-[11px] uppercase tracking-wider">
+          {/* Trailing copy, tightest-to-loosest. The certification sits hard
+              against the button it qualifies; the sign-in action and the legal
+              fine print each get their own breathing room below it. */}
+          <p className="text-basis mt-3 text-center font-mono text-[11px] uppercase tracking-wider">
             SOC 2 Type II certified &middot; Free tier, no card required
           </p>
 
-          <p className="text-subtle mt-4 max-w-xs text-center text-xs">
+          {isStartStep && (
+            <p className="text-basis mt-10 text-center text-sm">
+              Already have an account?{' '}
+              <Link
+                to="/sign-in/$"
+                params={{ _splat: '' }}
+                className="text-link hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          )}
+
+          <p className="text-subtle mt-5 max-w-xs text-center text-xs">
             By signing up, you agree to our{' '}
             <a
               className="text-link hover:underline"
@@ -107,19 +127,6 @@ function RouteComponent() {
             </a>
             .
           </p>
-
-          {isStartStep && (
-            <p className="text-basis mt-8 text-center text-sm">
-              Already have an account?{' '}
-              <Link
-                to="/sign-in/$"
-                params={{ _splat: '' }}
-                className="text-link hover:underline"
-              >
-                Sign in
-              </Link>
-            </p>
-          )}
         </div>
 
         {/* The trust panel is hidden below `sm`, so the logo wall is repeated

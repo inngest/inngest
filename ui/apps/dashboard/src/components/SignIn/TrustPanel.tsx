@@ -24,6 +24,17 @@ const SCREENSHOT_HEIGHT = 989;
  * Only a dark export exists, and only one is needed: the auth routes are
  * pinned to a dark theme in `__root.tsx`, so a light variant would never
  * render.
+ *
+ * To regenerate the AVIF from a new `product-dark.png`, use `sharp` from the
+ * pnpm store -- not `sips`, which silently zeroes the alpha channel on an RGBA
+ * source and writes a fully transparent file that still reports the right
+ * dimensions:
+ *
+ *   node -e "require('<repo>/ui/node_modules/.pnpm/sharp@0.34.5/node_modules/sharp')\
+ *     ('product-dark.png').resize(1920).removeAlpha()\
+ *     .avif({quality:68,effort:6}).toFile('product-dark.avif')"
+ *
+ * `removeAlpha()` is what keeps that bug from reappearing.
  */
 function ProductScreenshot() {
   return (
@@ -48,7 +59,16 @@ function ProductScreenshot() {
         // dashboard is meant to be visible. `max-w-none` is required to beat
         // the `max-width: 100%` the base stylesheet puts on images, and the
         // panel clips the overflow.
-        className="border-subtle h-auto w-[150%] max-w-none rounded-lg border shadow-2xl"
+        //
+        // The multiplier sets where the crop lands, and is not arbitrary: the
+        // visible fraction is its reciprocal, so 162% shows the leftmost ~62%
+        // of the image. That falls on the panel divider just after the
+        // Rerun/Cancel row, cutting before the event detail section rather
+        // than through it. Widen it to crop earlier, narrow it to show more.
+        // The left inset below only slides the image across; it cannot change
+        // the crop, because the width is a percentage of the padded box and
+        // both edges move together.
+        className="border-subtle h-auto w-[162%] max-w-none rounded-lg border shadow-2xl"
       />
     </picture>
   );
@@ -58,7 +78,7 @@ export default function TrustPanel() {
   return (
     <div className="text-basis flex h-full flex-col items-center justify-center gap-14 overflow-hidden py-12">
       {/* Inset on the left only; the right side is the bleed. */}
-      <div className="w-full pl-12">
+      <div className="w-full pl-16">
         <ProductScreenshot />
       </div>
 
