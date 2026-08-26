@@ -46,12 +46,19 @@ function RouteComponent() {
           }}
         />
 
-        <p className="text-subtle mt-6 max-w-xs text-center text-xs">
+        {/* Sentence case + `uppercase` rather than literal capitals, so
+            screen readers do not spell the line out letter by letter. */}
+        <p className="text-subtle mt-6 text-center font-mono text-[11px] uppercase tracking-wider">
+          SOC 2 Type II certified &middot; Free tier, no card required
+        </p>
+
+        <p className="text-subtle mt-4 max-w-xs text-center text-xs">
           By signing up, you agree to our{' '}
           <a
             className="text-link hover:underline"
             href="https://inngest.com/terms"
             target="_blank"
+            rel="noopener noreferrer"
           >
             Terms of Service
           </a>{' '}
@@ -60,6 +67,7 @@ function RouteComponent() {
             className="text-link hover:underline"
             href="https://inngest.com/privacy"
             target="_blank"
+            rel="noopener noreferrer"
           >
             Privacy Policy
           </a>

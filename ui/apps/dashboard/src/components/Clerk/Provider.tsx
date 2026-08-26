@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
+
 import { ClerkProvider } from '@clerk/tanstack-react-start';
 import { getButtonColors } from '@inngest/components/Button/buttonStyles';
 import { cn } from '@inngest/components/utils/classNames';
+import { useLocation } from '@tanstack/react-router';
 
 const primarySolidButton =
   'data-[color=primary]:data-[variant=solid]:bg-btnPrimary data-[color=primary]:data-[variant=solid]:focus:bg-btnPrimaryPressed data-[color=primary]:data-[variant=solid]:hover:bg-btnPrimaryHover data-[color=primary]:data-[variant=solid]:active:bg-btnPrimaryPressed data-[color=primary]:data-[variant=solid]:disabled:bg-btnPrimaryDisabled data-[color=primary]:data-[variant=solid]:text-alwaysWhite';
@@ -17,9 +20,38 @@ const dangerGhostButton =
   'data-[color=danger]:data-[variant=ghost]:text-btnDanger data-[color=danger]:data-[variant=ghost]:focus:bg-canvasSubtle data-[color=danger]:data-[variant=ghost]:hover:bg-canvasSubtle data-[color=danger]:data-[variant=ghost]:active:bg-canvasMuted data-[color=danger]:data-[variant=ghost]:disabled:bg-disabled data-[color=danger]:data-[variant=ghost]:disabled:text-btnDangerDisabled';
 
 export const InngestClerkProvider = ({ children }: React.PropsWithChildren) => {
+  const { pathname } = useLocation();
+
+  // `formButtonPrimary` is a root-level Clerk localization key and `SignUpProps`
+  // accepts no `localization` of its own, so scoping by route is the only
+  // supported way to relabel the sign-up CTA without also renaming the submit
+  // button on sign-in and on every profile form.
+  const isSignUp = pathname.startsWith('/sign-up');
+
+  const localization = useMemo(
+    () => ({
+      signUp: {
+        start: {
+          // Clerk uses the `Combined` variants when the instance has combined
+          // sign-up enabled, so both pairs are set to the same copy.
+          title: 'Create a free account',
+          titleCombined: 'Create a free account',
+          subtitle: 'Durable workflows, zero extra infra.',
+          subtitleCombined: 'Durable workflows, zero extra infra.',
+        },
+      },
+      // Clerk's default is "Continue with {{provider}}". The bare provider name
+      // reads correctly on both sign-in and sign-up.
+      socialButtonsBlockButton: '{{provider|titleize}}',
+      ...(isSignUp && { formButtonPrimary: 'Create account' }),
+    }),
+    [isSignUp],
+  );
+
   return (
     <ClerkProvider
       publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
+      localization={localization}
       appearance={{
         layout: {
           logoPlacement: 'outside' as const,
