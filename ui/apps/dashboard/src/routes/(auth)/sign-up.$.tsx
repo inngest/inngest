@@ -1,8 +1,8 @@
 import SplitView from '@/components/SignIn/SplitView';
 import { canonicalLink } from '@/utils/urls';
 import { SignUp } from '@clerk/tanstack-react-start';
+import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { createFileRoute } from '@tanstack/react-router';
-import logoImageUrl from '@inngest/components/icons/logos/inngest-logo-black.png';
 
 const getAnonymousId = () => {
   if (typeof document === 'undefined') {
@@ -28,42 +28,44 @@ function RouteComponent() {
 
   return (
     <SplitView>
-      <div className="mx-auto my-8 mt-auto text-center">
+      <div className="my-auto flex w-full flex-col items-center">
+        {/* Rendered here rather than through Clerk's `logoImageUrl` so the
+            mark comes from the SVG component, which inherits `currentColor`
+            and needs no dark-mode filter. */}
+        <InngestLogo className="text-basis mb-8" width={132} />
+
         <SignUp
           unsafeMetadata={{
             ...(anonymousId && { anonymousID: anonymousId }),
           }}
           appearance={{
-            layout: {
-              logoImageUrl,
-            },
             elements: {
               footer: 'bg-none',
-              logoBox: 'flex m-0 justify-center',
-              logoImage: 'max-h-16 w-auto object-contain dark:invert',
+              logoBox: 'hidden',
             },
           }}
         />
+
+        <p className="text-subtle mt-6 max-w-xs text-center text-xs">
+          By signing up, you agree to our{' '}
+          <a
+            className="text-link hover:underline"
+            href="https://inngest.com/terms"
+            target="_blank"
+          >
+            Terms of Service
+          </a>{' '}
+          and{' '}
+          <a
+            className="text-link hover:underline"
+            href="https://inngest.com/privacy"
+            target="_blank"
+          >
+            Privacy Policy
+          </a>
+          .
+        </p>
       </div>
-      <p className="text-subtle mt-auto text-center text-xs">
-        By signing up, you agree to our{' '}
-        <a
-          className="text-link hover:underline"
-          href="https://inngest.com/terms"
-          target="_blank"
-        >
-          Terms of Service
-        </a>{' '}
-        and{' '}
-        <a
-          className="text-link hover:underline"
-          href="https://inngest.com/privacy"
-          target="_blank"
-        >
-          Privacy Policy
-        </a>
-        .
-      </p>
     </SplitView>
   );
 }
