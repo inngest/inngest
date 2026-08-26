@@ -6,6 +6,23 @@ import { SignUp } from '@clerk/tanstack-react-start';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
 import { Link, createFileRoute, useLocation } from '@tanstack/react-router';
 
+/**
+ * Provisional marketing accent for the sign-up CTA, and only that button.
+ *
+ * This deliberately departs from `btnPrimary` (matcha green), which remains
+ * the design system's primary button everywhere else. Marketing asked for the
+ * inngest.com accent on this one surface while the colour's permanent role is
+ * undecided, so it is scoped here rather than added to the shared token set --
+ * deleting this constant and the `formButtonPrimary` override below reverts it
+ * completely, with nothing to unpick from `globals.css`.
+ *
+ * `!` throughout because the provider styles the same button through the
+ * `button` descriptor; Tailwind utilities share specificity, so source order
+ * rather than class order would otherwise decide the winner.
+ */
+const MARKETING_CTA =
+  '!bg-[#F65C4F] hover:!bg-[#DD5347] focus:!bg-[#DD5347] active:!bg-[#C54A3F]';
+
 const getAnonymousId = () => {
   if (typeof document === 'undefined') {
     return null;
@@ -54,6 +71,7 @@ function RouteComponent() {
               elements: {
                 footer: isStartStep ? 'hidden' : 'bg-none',
                 logoBox: 'hidden',
+                formButtonPrimary: MARKETING_CTA,
                 // `!` because the provider sets `my-9` on the same descriptor;
                 // Tailwind utilities share specificity, so source order rather
                 // than class order would otherwise decide the winner.
