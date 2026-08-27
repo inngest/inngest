@@ -86,7 +86,7 @@ func (tp *otelTracerProvider) getTracer() trace.Tracer {
 // CreateSpan creates a span and immediately ends it — see this package's
 // doc comment on why there's no droppable/deferred-end variant.
 func (tp *otelTracerProvider) CreateSpan(
-	ctx context.Context,
+	_ context.Context,
 	name string,
 	opts *tracing.CreateSpanOptions,
 ) (*meta.SpanReference, error) {
@@ -102,6 +102,7 @@ func (tp *otelTracerProvider) CreateSpan(
 		meta.AddAttrIfUnset(attrs, meta.Attrs.StartedAt, &st)
 	}
 
+	var ctx context.Context
 	if opts.Parent != nil {
 		carrier := propagation.MapCarrier{
 			"traceparent": opts.Parent.TraceParent,
@@ -238,7 +239,7 @@ func (tp *otelTracerProvider) CreateSpan(
 // Returns nothing, as the span is only extended and no further context is
 // given.
 func (tp *otelTracerProvider) UpdateSpan(
-	ctx context.Context,
+	_ context.Context,
 	opts *tracing.UpdateSpanOptions,
 ) error {
 	ts := opts.EndTime
@@ -276,7 +277,7 @@ func (tp *otelTracerProvider) UpdateSpan(
 	}
 	// See CreateSpan's comment on why there's no ExecutionContext mixed into
 	// this extracted context.
-	ctx = propagator.Extract(context.Background(), carrier)
+	ctx := propagator.Extract(context.Background(), carrier)
 
 	if opts.Status.IsEnded() {
 		meta.AddAttr(attrs, meta.Attrs.EndedAt, &ts)
