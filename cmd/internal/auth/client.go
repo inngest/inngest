@@ -10,28 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/inngest/inngest/pkg/api/v2/apiv2oauth"
 	"golang.org/x/oauth2"
 )
-
-var defaultScopes = []string{
-	"accounts:read:*",
-	"apps:read:*",
-	"apps:write:*",
-	"environments:read:*",
-	"environments:write:*",
-	"events:write:*",
-	"experiments:read:*",
-	"functions:read:*",
-	"functions:write:*",
-	"insights:read:*",
-	"runs:read:*",
-	"runs:write:*",
-	"sandboxes:read:*",
-	"sandboxes:write:*",
-	"sessions:read:*",
-	"webhooks:read:*",
-	"webhooks:write:*",
-}
 
 const (
 	ClientID      = "inngest-cli"
@@ -109,7 +90,7 @@ func Resource(issuer string) string {
 }
 
 func DefaultScopes() []string {
-	return append([]string(nil), defaultScopes...)
+	return apiv2oauth.CLIScopes()
 }
 
 func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Metadata, error) {

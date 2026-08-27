@@ -9,30 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/api/v2/apiv2oauth"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 )
 
 func TestDefaultScopes(t *testing.T) {
-	require.Equal(t, []string{
-		"accounts:read:*",
-		"apps:read:*",
-		"apps:write:*",
-		"environments:read:*",
-		"environments:write:*",
-		"events:write:*",
-		"experiments:read:*",
-		"functions:read:*",
-		"functions:write:*",
-		"insights:read:*",
-		"runs:read:*",
-		"runs:write:*",
-		"sandboxes:read:*",
-		"sandboxes:write:*",
-		"sessions:read:*",
-		"webhooks:read:*",
-		"webhooks:write:*",
-	}, DefaultScopes())
+	require.Equal(t, apiv2oauth.CLIScopes(), DefaultScopes())
 }
 
 func TestIssuer(t *testing.T) {
