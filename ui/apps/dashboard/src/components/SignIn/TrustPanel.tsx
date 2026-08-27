@@ -76,9 +76,11 @@ function ProductScreenshot() {
 
 export default function TrustPanel() {
   return (
-    <div className="text-basis flex h-full flex-col gap-14 overflow-hidden py-12">
-      {/* Absorbs whatever height is left over and clips vertically, so the
-          screenshot is the only thing that gives way on a short viewport.
+    <div className="text-basis flex h-full flex-col justify-center gap-14 overflow-hidden py-12">
+      {/* Takes its natural height and shrinks -- rather than growing -- so the
+          screenshot is the only thing that gives way on a short panel while the
+          group still centres on a tall one. Growing it instead pinned the image
+          to the top and the logos to the bottom, leaving a gap between them.
           Its height scales with the panel's width -- it is rendered at 162% of
           it -- so on a wide, short panel it outgrows the available height. When
           it did that from a centred container, the excess spilled equally top
@@ -86,7 +88,7 @@ export default function TrustPanel() {
           screenshot and the logo wall flush against the panel edges.
 
           Inset on the left only; the right side is the bleed. */}
-      <div className="relative min-h-0 w-full flex-1 overflow-hidden pl-16">
+      <div className="relative min-h-0 w-full overflow-hidden pl-16">
         <ProductScreenshot />
         {/* Softens the bottom edge so the vertical clip reads as the screenshot
             receding into the panel rather than a hard slice through the UI --
