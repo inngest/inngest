@@ -98,6 +98,7 @@ func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Meta
 	if err != nil {
 		return "", nil, err
 	}
+	// never use a token with a different api host
 	if canonicalResource(target) != canonicalResource(metadata.Resource) {
 		return "", nil, errors.New("OAuth session is for a different API host; run `inngest login --force`")
 	}
@@ -138,6 +139,7 @@ func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Meta
 		Expiry:       refreshed.Expiry,
 	}
 	updateMetadataFromToken(metadata, refreshed)
+	// refresh tokens rotate so save every refresh
 	if err := m.store.Save(*metadata, *credential, metadata.Storage == storageFile); err != nil {
 		return "", metadata, err
 	}
@@ -162,6 +164,7 @@ func (m *Manager) Validate(ctx context.Context, metadata *Metadata, accessToken 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return errors.New("OAuth session is no longer valid; run `inngest login`")
 	}
+	// a 403 still proves the token is valid
 	if resp.StatusCode == http.StatusForbidden {
 		return nil
 	}

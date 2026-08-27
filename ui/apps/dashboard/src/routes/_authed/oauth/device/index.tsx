@@ -31,6 +31,26 @@ type AuthorizationDetails = {
 
 type Boundary = 'single_env' | 'all_envs';
 
+function requestedPermissionLevels({
+  groups,
+  scopes,
+}: {
+  groups: PermissionGroup[];
+  scopes: string[];
+}): Record<string, PermissionLevel> {
+  const requested = new Set(scopes);
+
+  return groups.reduce<Record<string, PermissionLevel>>((levels, group) => {
+    const level = group.write.some((scope) => requested.has(scope))
+      ? 'write'
+      : group.read.some((scope) => requested.has(scope))
+        ? 'read'
+        : null;
+
+    return level ? { ...levels, [group.resource]: level } : levels;
+  }, {});
+}
+
 export const Route = createFileRoute('/_authed/oauth/device/')({
   component: DeviceAuthorizationPage,
   validateSearch: (search: Record<string, unknown>): Search => ({
@@ -80,6 +100,7 @@ function DeviceAuthorizationPage() {
       if (level === 'read' || level === 'write') {
         group.read.forEach((permission) => selected.add(permission));
       }
+      // write access includes read access
       if (level === 'write') {
         group.write.forEach((permission) => selected.add(permission));
       }
@@ -93,27 +114,30 @@ function DeviceAuthorizationPage() {
     setLoading(true);
     setError(null);
     setCodeConfirmed(false);
-    void apiRequest<AuthorizationDetails>(
-      getToken,
-      `/oauth/device/authorization?request=${encodeURIComponent(
-        search.request,
-      )}&user_code=${encodeURIComponent(search.user_code)}`,
-    )
-      .then((response) => {
+    const loadAuthorization = async () => {
+      try {
+        const response = await apiRequest<AuthorizationDetails>(
+          getToken,
+          `/oauth/device/authorization?request=${encodeURIComponent(
+            search.request,
+          )}&user_code=${encodeURIComponent(search.user_code)}`,
+        );
         setDetails(response);
-        const requested = new Set(response.requested_scopes);
-        const levels: Record<string, PermissionLevel> = {};
-        for (const group of response.permission_groups) {
-          if (group.write.some((scope) => requested.has(scope))) {
-            levels[group.resource] = 'write';
-          } else if (group.read.some((scope) => requested.has(scope))) {
-            levels[group.resource] = 'read';
-          }
-        }
-        setPermissionLevels(levels);
-      })
-      .catch((err: unknown) => setError(errorMessage(err)))
-      .finally(() => setLoading(false));
+        // start with the client's requested access selected
+        setPermissionLevels(
+          requestedPermissionLevels({
+            groups: response.permission_groups,
+            scopes: response.requested_scopes,
+          }),
+        );
+      } catch (err) {
+        setError(errorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadAuthorization();
   }, [getToken, search.request, search.user_code]);
 
   async function resolveCode() {

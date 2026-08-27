@@ -1,3 +1,5 @@
+import { cn } from '@inngest/components/utils/classNames';
+
 import { permissionResourceCopy } from './permissionResourceCopy';
 
 export type PermissionGroup = {
@@ -85,22 +87,18 @@ function PermissionButton({
   label: string;
   onClick: () => void;
 }) {
-  const classes = [
+  const classes = cn(
     'h-7 min-w-16 rounded-full px-3 text-sm outline-none transition-colors',
     'disabled:text-disabled disabled:cursor-not-allowed',
-  ];
-  if (active) {
-    classes.push('bg-canvasBase border-muted text-basis border');
-  } else {
-    classes.push(
-      'text-muted hover:bg-canvasSubtle hover:text-basis border border-transparent',
-    );
-  }
+    active
+      ? 'bg-canvasBase border-muted text-basis border'
+      : 'text-muted hover:bg-canvasSubtle hover:text-basis border border-transparent',
+  );
 
   return (
     <button
       type="button"
-      className={classes.join(' ')}
+      className={classes}
       onClick={onClick}
       disabled={disabled}
     >

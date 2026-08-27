@@ -108,7 +108,9 @@ func login(ctx context.Context, cmd *cli.Command) error {
 	if cmd.Bool("insecure-storage") && !cmd.Bool("json") {
 		_, _ = fmt.Fprintln(writer(cmd), "Warning: storing credentials in a plaintext user-only file. Use this only on a trusted machine or ephemeral environment.")
 	}
+	// save the new login before revoking the old one
 	if err := manager.Store().Save(*metadata, *credential, cmd.Bool("insecure-storage")); err != nil {
+		// do not leave an unusable server session behind
 		_ = manager.Revoke(ctx, metadata, credential)
 		if !cmd.Bool("insecure-storage") {
 			return fmt.Errorf("%w; retry with --insecure-storage only on a trusted machine", err)
@@ -149,6 +151,7 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 	revokeErr := manager.Revoke(ctx, metadata, credential)
+	// local logout must work when the server is unavailable
 	if err := manager.Store().Delete(metadata); err != nil {
 		return errors.Join(revokeErr, err)
 	}
@@ -261,6 +264,7 @@ func writer(cmd *cli.Command) io.Writer {
 	return os.Stdout
 }
 
+// stops the cli from printing an error twice
 type ReportedError struct{}
 
 func (*ReportedError) Error() string {

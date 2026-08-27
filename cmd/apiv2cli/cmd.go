@@ -501,7 +501,7 @@ func buildRequest(ctx context.Context, cmd *cli.Command, ep endpoint) (*http.Req
 	return req, nil
 }
 
-// don't ship credentials to a non-local host over http
+// never send credentials over remote http
 func guardPlaintextAuth(req *http.Request) error {
 	if req.Header.Get("Authorization") == "" {
 		return nil

@@ -94,6 +94,7 @@ func (s *Store) Save(metadata Metadata, credential Credential, insecure bool) er
 	if err != nil {
 		return fmt.Errorf("encode OAuth credential: %w", err)
 	}
+	// save the secret before metadata points to it
 	metadata.Storage = storageKeyring
 	if insecure {
 		metadata.Storage = storageFile
@@ -194,6 +195,7 @@ func keyringUser(metadata *Metadata) string {
 }
 
 func credentialID(metadata *Metadata) string {
+	// keep sessions for different api hosts separate
 	hash := sha256.Sum256([]byte(metadata.Resource + "\x00" + metadata.SessionID))
 	return hex.EncodeToString(hash[:8])
 }
@@ -254,6 +256,7 @@ func writeJSONFile(path string, value any, mode fs.FileMode) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
+	// rename keeps readers from seeing a partial file
 	return os.Rename(tmpPath, path)
 }
 

@@ -7,7 +7,7 @@ import (
 	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 )
 
-// OAuth sessions cannot delegate key material.
+// event and signing keys are not available through oauth
 var cliExcludedResources = map[string]struct{}{
 	"event_keys":   {},
 	"signing_keys": {},
