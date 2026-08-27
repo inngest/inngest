@@ -109,8 +109,10 @@ function DeviceAuthorizationPage() {
   }, [details?.permission_groups, permissionLevels]);
 
   useEffect(() => {
-    if (!search.request || !search.user_code) return;
-    setRequest(search.request);
+    const requestID = search.request;
+    const submittedUserCode = search.user_code;
+    if (!requestID || !submittedUserCode) return;
+    setRequest(requestID);
     setLoading(true);
     setError(null);
     setCodeConfirmed(false);
@@ -119,8 +121,8 @@ function DeviceAuthorizationPage() {
         const response = await apiRequest<AuthorizationDetails>(
           getToken,
           `/oauth/device/authorization?request=${encodeURIComponent(
-            search.request,
-          )}&user_code=${encodeURIComponent(search.user_code)}`,
+            requestID,
+          )}&user_code=${encodeURIComponent(submittedUserCode)}`,
         );
         setDetails(response);
         // start with the client's requested access selected
