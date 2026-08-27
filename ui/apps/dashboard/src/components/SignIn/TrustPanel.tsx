@@ -86,8 +86,19 @@ export default function TrustPanel() {
           screenshot and the logo wall flush against the panel edges.
 
           Inset on the left only; the right side is the bleed. */}
-      <div className="min-h-0 w-full flex-1 overflow-hidden pl-16">
+      <div className="relative min-h-0 w-full flex-1 overflow-hidden pl-16">
         <ProductScreenshot />
+        {/* Softens the bottom edge so the vertical clip reads as the screenshot
+            receding into the panel rather than a hard slice through the UI --
+            it otherwise lands mid-row and cuts text in half.
+            Painted in the panel's own colour, so it resolves itself: where the
+            screenshot stops short of the bottom there is nothing under it but
+            panel, and it disappears. Kept at 64px so it clears the slack on a
+            1920x1080 panel, where the screenshot fits with ~75px to spare. */}
+        <div
+          aria-hidden
+          className="from-canvasMuted pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t to-transparent"
+        />
       </div>
 
       {/* Gated together: the heading is meaningless without logos under it. */}
