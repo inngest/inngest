@@ -1,19 +1,3 @@
-// Command duckdbbench benchmarks INSERT throughput into inngest.run_trace_spans
-// (pkg/db/duckdb/migrations/000001_baseline.sql) across three DuckDB access
-// paths: the -jsonlines subprocess transport, the quack HTTP transport (both
-// in pkg/db/duckdb), and the official github.com/duckdb/duckdb-go/v2 cgo
-// bindings driving an embedded, in-process DuckDB with no subprocess at all.
-//
-// This is a separate Go module, not part of the root github.com/inngest/inngest
-// module, specifically so duckdb-go/v2's per-platform static-library
-// dependencies never enter the root module's committed vendor/ directory —
-// see docs/plans/006-duckdb-poc-subprocess-dual-write.md's "Alternatives
-// Considered" section on why a cgo DuckDB dependency was kept out of the main
-// binary. `replace` points back at the repo root so this module can still use
-// pkg/db/duckdb's exported API (Open, Migrate, Options, DuckLakeOptions,
-// DuckLakeAlias) directly, without vendoring or publishing anything.
-//
-// Run with: cd cmd/duckdbbench && go test -bench=. -run='^$' ./...
 module github.com/inngest/inngest/cmd/duckdbbench
 
 go 1.26.4
