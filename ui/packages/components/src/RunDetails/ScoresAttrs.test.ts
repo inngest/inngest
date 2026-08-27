@@ -29,6 +29,23 @@ describe('scoreRows', () => {
 
     expect(rows.map((r) => r.name)).toEqual(['ok']);
   });
+
+  it('keeps only the latest write when a score name is recorded more than once', () => {
+    const rows = scoreRows([
+      {
+        kind: 'inngest.score',
+        updatedAt: '2026-06-23T00:00:09Z',
+        values: { relevance: { value: 0.9 } },
+      },
+      {
+        kind: 'inngest.score',
+        updatedAt: '2026-06-23T00:00:05Z',
+        values: { relevance: { value: 0.5 } },
+      },
+    ]);
+
+    expect(rows).toEqual([{ name: 'relevance', value: 0.9, updatedAt: '2026-06-23T00:00:09Z' }]);
+  });
 });
 
 describe('collectScoreMetadata', () => {

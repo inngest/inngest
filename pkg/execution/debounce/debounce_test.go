@@ -47,6 +47,50 @@ func requireDebounce(t *testing.T, debouncer Debouncer, ctx context.Context, di 
 	return debounceID
 }
 
+func TestStartExecutionWithRemovedDebounceConfig(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.New()
+	shard := &startExecutionQueueShard{name: "debounce"}
+	registry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	manager := debouncer{
+		shards:           registry,
+		primaryShardName: shard.name,
+		shouldMigrate:    func(context.Context, uuid.UUID) bool { return false },
+	}
+	item := DebounceItem{
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		FunctionID:  functionID,
+	}
+	fn := inngest.Function{ID: functionID}
+
+	require.NoError(t, manager.StartExecution(ctx, item, fn, ulid.Make()))
+	require.Equal(t, functionID.String(), shard.debounceKey)
+}
+
+type startExecutionQueueShard struct {
+	queue.QueueShard
+
+	name        string
+	debounceKey string
+}
+
+func (s *startExecutionQueueShard) Name() string {
+	return s.name
+}
+
+func (s *startExecutionQueueShard) DebounceStartExecution(
+	_ context.Context,
+	_ queue.Scope,
+	key string,
+	_, _ ulid.ULID,
+) (queue.DebounceStartStatus, error) {
+	s.debounceKey = key
+	return queue.DebounceStartStarted, nil
+}
+
 type setPointerFailingShard struct {
 	queue.QueueShard
 	err                  error

@@ -33,25 +33,37 @@ export function collectScoreMetadata(trace?: ScoreTrace): ScoreMetadata[] {
 
 // Trim floating-point noise and excess precision from non-integer scores;
 // integers and booleans render as-is.
-function formatScoreValue(value: number | boolean): string {
+export function formatScoreValue(value: number | boolean): string {
   if (typeof value === 'number' && !Number.isInteger(value)) {
     return String(Number(value.toPrecision(4)));
   }
   return String(value);
 }
 
+function isScoreValue(raw: unknown): raw is { value: number | boolean } {
+  if (typeof raw !== 'object' || raw === null || !('value' in raw)) {
+    return false;
+  }
+  const { value } = raw;
+  return typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value));
+}
+
 export function scoreRows(metadata: ScoreMetadata[]): ScoreRow[] {
-  return metadata
-    .flatMap((md) =>
-      Object.entries(md.values).flatMap(([name, raw]) => {
-        const value = (raw as { value?: unknown } | null)?.value;
-        if (typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
-          return [{ name, value, updatedAt: md.updatedAt }];
-        }
-        return [];
-      })
-    )
-    .sort((a, b) => a.name.localeCompare(b.name) || a.updatedAt.localeCompare(b.updatedAt));
+  const latest = new Map<string, ScoreRow>();
+
+  for (const md of metadata) {
+    for (const [name, raw] of Object.entries(md.values)) {
+      if (!isScoreValue(raw)) {
+        continue;
+      }
+      const prev = latest.get(name);
+      if (!prev || md.updatedAt >= prev.updatedAt) {
+        latest.set(name, { name, value: raw.value, updatedAt: md.updatedAt });
+      }
+    }
+  }
+
+  return [...latest.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
@@ -72,9 +84,9 @@ export const ScoresAttrs = ({ metadata }: { metadata: ScoreMetadata[] }) => {
         <div>Value</div>
         <div>Updated at</div>
       </div>
-      {rows.map((row, index) => (
+      {rows.map((row) => (
         <div
-          key={`score-${row.name}-${row.updatedAt}-${index}`}
+          key={row.name}
           className="border-muted grid grid-cols-[minmax(10rem,1fr)_8rem_12rem] gap-4 border-b px-4 py-3 text-sm last:border-b-0"
         >
           <div className="text-basis min-w-0 font-medium [overflow-wrap:anywhere]">{row.name}</div>
