@@ -138,7 +138,7 @@ func TestGetSpansByRunIDPrefersGenuineRootOverOrphanedRunSpans(t *testing.T) {
 	require.Equal(t, "run-started", root.Children[0].SpanID)
 }
 
-// TestGetSpansByRunIDSetsOutputIDWhenSpanHasOutputOrInput proves spanFromRow
+// TestGetSpansByRunIDSetsOutputIDWhenSpanHasOutputOrInput proves scanSpan
 // mirrors pkg/cqrs/manager/cqrs.go's own rule ("if this span has finished,
 // set a preliminary output ID") for the flat-span model, where a span's own
 // row already carries its output/input directly — no separate output-span

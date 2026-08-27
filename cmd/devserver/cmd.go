@@ -118,6 +118,12 @@ func Command() *cli.Command {
 				Usage:    "Enable the experimental DuckDB dual-write POC",
 				Value:    false,
 			},
+			&cli.BoolFlag{
+				Category: "Advanced",
+				Name:     "duckdb-reads",
+				Usage:    "Serve the GQL API and REST trace/run endpoints from DuckDB (requires --duckdb)",
+				Value:    false,
+			},
 			&cli.StringFlag{
 				Category: "Persistence",
 				Name:     "postgres-uri",

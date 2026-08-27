@@ -2,6 +2,7 @@ package duckdbquery
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -32,28 +33,26 @@ func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.O
 	}
 	defer rows.Close()
 
-	named, err := scanNamedRows(rows)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: scanning span rows: %w", err)
-	}
-	if len(named) == 0 {
-		return nil, fmt.Errorf("duckdbquery: no spans found for run %s", runID)
-	}
+	byID := make(map[string]*cqrs.OtelSpan)
+	parentOf := make(map[string]string)
+	var order []string
 
-	byID := make(map[string]*cqrs.OtelSpan, len(named))
-	parentOf := make(map[string]string, len(named))
-	order := make([]string, 0, len(named))
-
-	for _, row := range named {
-		span, parentSpanID, err := spanFromRow(ctx, row)
+	for rows.Next() {
+		span, parentSpanID, err := scanSpan(ctx, rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("duckdbquery: scanning span row: %w", err)
 		}
 		byID[span.SpanID] = span
 		order = append(order, span.SpanID)
 		if parentSpanID != "" {
 			parentOf[span.SpanID] = parentSpanID
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("duckdbquery: reading span rows: %w", err)
+	}
+	if len(order) == 0 {
+		return nil, fmt.Errorf("duckdbquery: no spans found for run %s", runID)
 	}
 
 	var candidates []rootCandidate
@@ -163,18 +162,17 @@ func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*c
 	}
 	defer rows.Close()
 
-	named, err := scanNamedRows(rows)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: scanning span output rows: %w", err)
-	}
-
 	so := &cqrs.SpanOutput{}
-	for _, row := range named {
-		output, err := jsonField(row, "output")
+	for rows.Next() {
+		var rawOutput, rawInput any
+		if err := rows.Scan(&rawOutput, &rawInput); err != nil {
+			return nil, fmt.Errorf("duckdbquery: scanning span output row: %w", err)
+		}
+		output, err := asJSON(rawOutput, "output")
 		if err != nil {
 			return nil, err
 		}
-		input, err := jsonField(row, "input")
+		input, err := asJSON(rawInput, "input")
 		if err != nil {
 			return nil, err
 		}
@@ -182,49 +180,58 @@ func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*c
 			break
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("duckdbquery: reading span output rows: %w", err)
+	}
 	return so, nil
 }
 
-func spanFromRow(ctx context.Context, row map[string]any) (span *cqrs.OtelSpan, parentSpanID string, err error) {
-	spanID, err := stringField(row, "span_id")
+// scanSpan scans one row of a spanColumns-shaped SELECT into a *cqrs.OtelSpan.
+// Destination order must match spanColumns exactly.
+func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentSpanID string, err error) {
+	var (
+		spanID, traceID                   string
+		rawParentSpanID                   any
+		rawStartTime, rawEndTime          any
+		name                              string
+		rawAttributes                     any
+		rawRunID, rawAppID, rawFunctionID any
+		rawOutput, rawInput               any
+	)
+	if err := rows.Scan(
+		&spanID, &traceID, &rawParentSpanID, &rawStartTime, &rawEndTime, &name,
+		&rawAttributes, &rawRunID, &rawAppID, &rawFunctionID, &rawOutput, &rawInput,
+	); err != nil {
+		return nil, "", err
+	}
+
+	startTime, err := asTimestamp(rawStartTime, "start_time")
 	if err != nil {
 		return nil, "", err
 	}
-	traceID, err := stringField(row, "trace_id")
+	endTime, err := asTimestamp(rawEndTime, "end_time")
 	if err != nil {
 		return nil, "", err
 	}
-	name, err := stringField(row, "name")
+	runID, err := ulidColumn(rawRunID, "run_id")
 	if err != nil {
 		return nil, "", err
 	}
-	startTime, err := timeField(row, "start_time")
+	appID, err := uuidColumn(rawAppID, "app_id")
 	if err != nil {
 		return nil, "", err
 	}
-	endTime, err := timeField(row, "end_time")
-	if err != nil {
-		return nil, "", err
-	}
-	runID, err := ulidField(row, "run_id")
-	if err != nil {
-		return nil, "", err
-	}
-	appID, err := uuidField(row, "app_id")
-	if err != nil {
-		return nil, "", err
-	}
-	functionID, err := uuidField(row, "function_id")
+	functionID, err := uuidColumn(rawFunctionID, "function_id")
 	if err != nil {
 		return nil, "", err
 	}
 
-	attrs, _ := row["attributes"].(map[string]any)
+	attrs, _ := rawAttributes.(map[string]any)
 	if attrs == nil {
 		attrs = map[string]any{}
 	}
 
-	if s, ok := row["parent_span_id"].(string); ok {
+	if s, ok := rawParentSpanID.(string); ok {
 		parentSpanID = s
 	}
 
@@ -255,11 +262,11 @@ func spanFromRow(ctx context.Context, row map[string]any) (span *cqrs.OtelSpan, 
 	// pkg/cqrs/manager/cqrs.go's own rule ("if this span has finished, set a
 	// preliminary output ID") applied to the span's own ID for both output
 	// and input: set OutputID whenever either column is non-NULL.
-	output, err := jsonField(row, "output")
+	output, err := asJSON(rawOutput, "output")
 	if err != nil {
 		return nil, "", err
 	}
-	input, err := jsonField(row, "input")
+	input, err := asJSON(rawInput, "input")
 	if err != nil {
 		return nil, "", err
 	}

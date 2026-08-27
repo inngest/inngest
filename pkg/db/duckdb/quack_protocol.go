@@ -11,17 +11,30 @@ import (
 // in duckdb/duckdb-quack, branch v1.5-variegata — the exact branch matching
 // the duckdb v1.5.5 binary this client targets, confirmed against the real
 // source: https://github.com/duckdb/duckdb-quack/blob/v1.5-variegata/src/include/quack_message.hpp).
-// FETCH_REQUEST/FETCH_RESPONSE remain unimplemented (see quack_session.go's
-// exec doc comment); APPEND_REQUEST is implemented in quack_append.go.
+// APPEND_REQUEST is implemented in quack_append.go.
 const (
 	quackMsgConnectionRequest  byte = 1
 	quackMsgConnectionResponse byte = 2
 	quackMsgPrepareRequest     byte = 3
 	quackMsgPrepareResponse    byte = 4
+	quackMsgFetchRequest       byte = 7
+	quackMsgFetchResponse      byte = 8
 	quackMsgAppendRequest      byte = 9
 	quackMsgSuccessResponse    byte = 10
 	quackMsgErrorResponse      byte = 100
 )
+
+// quackHugeint is DuckDB's hugeint_t as this client reads/writes it on the
+// wire: a signed-LEB128 upper half followed by an unsigned-LEB128 lower half
+// (see decodeQuackPrepareResponseBody's result_uuid field and
+// PrepareResponseMessage::Serialize in duckdb-quack's serialize_quack_message.cpp).
+// The client only ever treats it as an opaque correlation token — passed back
+// verbatim in a FetchRequest to keep pulling more of the same result — never
+// interpreted as a number.
+type quackHugeint struct {
+	hi int64
+	lo uint64
+}
 
 // decodeQuackSuccessResponseBody consumes an empty SuccessResponse body
 // (SuccessResponse::Serialize writes no properties — see
@@ -185,64 +198,63 @@ func encodeQuackPrepareRequest(connectionID, sql string) []byte {
 // server returned, alongside names (result_names, field2) in the query's own
 // left-to-right order — the only place that order survives once namedRows
 // folds a chunk's columns into a map. needsMoreFetch signals the query has
-// more rows than fit in this response; this client does not implement
-// FetchRequest (see quack_session.go), so a caller seeing needsMoreFetch=true
-// should treat it as an error rather than silently returning a truncated
-// result.
-func decodeQuackPrepareResponseBody(r *quackReader) (names []string, rows []map[string]any, needsMoreFetch bool, err error) {
+// more rows than fit in this response; resultUUID (field5) is the
+// correlation token a caller must pass back on a FetchRequest to pull the
+// rest (see quackSession.exec).
+func decodeQuackPrepareResponseBody(r *quackReader) (names []string, rows []map[string]any, needsMoreFetch bool, resultUUID quackHugeint, err error) {
 	if ok, terr := r.tryBeginProperty(1); terr != nil {
-		return nil, nil, false, terr
+		return nil, nil, false, quackHugeint{}, terr
 	} else if ok {
 		n, terr := r.beginList()
 		if terr != nil {
-			return nil, nil, false, terr
+			return nil, nil, false, quackHugeint{}, terr
 		}
 		for i := uint64(0); i < n; i++ {
 			// LogicalType object: consumed here only to stay positioned
 			// correctly on the wire; decodeQuackDataChunk re-reads each
 			// chunk's own (equivalent) per-column types independently.
 			if _, terr := decodeQuackLogicalType(r); terr != nil {
-				return nil, nil, false, terr
+				return nil, nil, false, quackHugeint{}, terr
 			}
 		}
 	}
 
 	if ok, terr := r.tryBeginProperty(2); terr != nil {
-		return nil, nil, false, terr
+		return nil, nil, false, quackHugeint{}, terr
 	} else if ok {
 		n, terr := r.beginList()
 		if terr != nil {
-			return nil, nil, false, terr
+			return nil, nil, false, quackHugeint{}, terr
 		}
 		names = make([]string, n)
 		for i := range names {
 			names[i], terr = r.readString()
 			if terr != nil {
-				return nil, nil, false, terr
+				return nil, nil, false, quackHugeint{}, terr
 			}
 		}
 	}
 
 	if ok, terr := r.tryBeginProperty(3); terr != nil {
-		return nil, nil, false, terr
+		return nil, nil, false, quackHugeint{}, terr
 	} else if ok {
 		needsMoreFetch, terr = r.readBool()
 		if terr != nil {
-			return nil, nil, false, terr
+			return nil, nil, false, quackHugeint{}, terr
 		}
 	}
 
 	if ok, terr := r.tryBeginProperty(4); terr != nil {
-		return nil, nil, false, terr
+		return nil, nil, false, quackHugeint{}, terr
 	} else if ok {
 		n, terr := r.beginList()
 		if terr != nil {
-			return nil, nil, false, terr
+			return nil, nil, false, quackHugeint{}, terr
 		}
 		for i := uint64(0); i < n; i++ {
 			present, terr := r.beginNullable()
 			if terr != nil {
-				return nil, nil, false, terr
+				return nil, nil, false, quackHugeint{}, terr
 			}
 			if !present {
 				continue
@@ -253,41 +265,117 @@ func decodeQuackPrepareResponseBody(r *quackReader) (names []string, rows []map[
 			// endObject is still needed here for the wrapper's terminator.
 			r.beginObject()
 			if terr := r.beginProperty(300); terr != nil {
-				return nil, nil, false, terr
+				return nil, nil, false, quackHugeint{}, terr
 			}
 			chunk, terr := decodeQuackDataChunk(r)
 			if terr != nil {
-				return nil, nil, false, terr
+				return nil, nil, false, quackHugeint{}, terr
 			}
 			if terr := r.endObject(); terr != nil {
-				return nil, nil, false, terr
+				return nil, nil, false, quackHugeint{}, terr
 			}
 			chunkRows, terr := chunk.namedRows(names)
 			if terr != nil {
-				return nil, nil, false, terr
+				return nil, nil, false, quackHugeint{}, terr
 			}
 			rows = append(rows, chunkRows...)
 		}
 	}
 
 	// field5 result_uuid: hugeint (signed-leb128 upper, unsigned-leb128
-	// lower). Unused by this client — Exec never needs to correlate a
-	// follow-up Fetch against it since NeedsMoreFetch is treated as an
-	// error, not a "call Fetch" signal.
+	// lower) — the token a follow-up FetchRequest must echo back.
 	if err := r.beginProperty(5); err != nil {
-		return nil, nil, false, err
+		return nil, nil, false, quackHugeint{}, err
 	}
-	if _, err := r.readSignedLeb128(); err != nil {
-		return nil, nil, false, err
+	hi, err := r.readSignedLeb128()
+	if err != nil {
+		return nil, nil, false, quackHugeint{}, err
 	}
-	if _, err := r.readUnsignedLeb128(); err != nil {
-		return nil, nil, false, err
+	lo, err := r.readUnsignedLeb128()
+	if err != nil {
+		return nil, nil, false, quackHugeint{}, err
+	}
+	resultUUID = quackHugeint{hi: hi, lo: lo}
+
+	if err := r.endObject(); err != nil {
+		return nil, nil, false, quackHugeint{}, err
+	}
+	return names, rows, needsMoreFetch, resultUUID, nil
+}
+
+// ---------- FetchRequest / FetchResponse ----------
+
+// encodeQuackFetchRequest builds a FetchRequest asking the server for the
+// next batch of an already-prepared result (uuid, from the PrepareResponse
+// or a prior FetchResponse's result_uuid).
+func encodeQuackFetchRequest(connectionID string, uuid quackHugeint) []byte {
+	return encodeQuackMessage(quackMsgFetchRequest, connectionID, func(w *quackWriter) {
+		w.writeHugeint(1, uuid)
+	})
+}
+
+// decodeQuackFetchResponseBody reads a FetchResponse body and returns rows
+// decoded from every inline DataChunk it carries, keyed against names (the
+// PrepareResponse's own result_names — a FetchResponse repeats the same
+// columns, so it carries no names of its own). chunkCount is the number of
+// DataChunks this response actually contained: the server signals "no more
+// rows" not with an explicit flag (FetchResponseMessage has none on the
+// wire — see FetchResponseMessage::Serialize in duckdb-quack) but by
+// eventually returning a response with zero chunks, once its query_result
+// is exhausted — see quackSession.exec's fetch loop, which keeps calling
+// FetchRequest until chunkCount is 0.
+func decodeQuackFetchResponseBody(r *quackReader, names []string) (rows []map[string]any, chunkCount int, err error) {
+	if ok, terr := r.tryBeginProperty(1); terr != nil {
+		return nil, 0, terr
+	} else if ok {
+		n, terr := r.beginList()
+		if terr != nil {
+			return nil, 0, terr
+		}
+		for i := uint64(0); i < n; i++ {
+			present, terr := r.beginNullable()
+			if terr != nil {
+				return nil, 0, terr
+			}
+			if !present {
+				continue
+			}
+			r.beginObject()
+			if terr := r.beginProperty(300); terr != nil {
+				return nil, 0, terr
+			}
+			chunk, terr := decodeQuackDataChunk(r)
+			if terr != nil {
+				return nil, 0, terr
+			}
+			if terr := r.endObject(); terr != nil {
+				return nil, 0, terr
+			}
+			chunkRows, terr := chunk.namedRows(names)
+			if terr != nil {
+				return nil, 0, terr
+			}
+			rows = append(rows, chunkRows...)
+			chunkCount++
+		}
+	}
+
+	// field2 batch_index: optional_idx, always present on the wire (not
+	// default-omit — see MessageHeader's client_query_id for the same
+	// convention). This client has no use for it: it doesn't retry a
+	// specific batch, so nothing needs to correlate a response back to the
+	// request that produced it.
+	if err := r.beginProperty(2); err != nil {
+		return nil, 0, err
+	}
+	if _, err := r.readUInt64(); err != nil {
+		return nil, 0, err
 	}
 
 	if err := r.endObject(); err != nil {
-		return nil, nil, false, err
+		return nil, 0, err
 	}
-	return names, rows, needsMoreFetch, nil
+	return rows, chunkCount, nil
 }
 
 // ---------- LogicalType ----------

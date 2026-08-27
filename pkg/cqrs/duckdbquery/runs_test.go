@@ -122,6 +122,113 @@ func TestGetTraceRunHasNilTriggerIDsForCronRuns(t *testing.T) {
 	require.Nil(t, run.TriggerIDs)
 }
 
+func TestGetTraceRunsByTriggerIDReturnsMatchingRuns(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	trigger := ulid.MustNew(ulid.Now(), rand.Reader)
+	other := ulid.MustNew(ulid.Now(), rand.Reader)
+	now := time.Now().UTC()
+
+	matchRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	_, err := m.db.ExecContext(ctx,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, function_id, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		accountID.String(), envID.String(), matchRun.String(), now, now, appID.String(), functionID.String(),
+		enums.StepStatusQueued.String(), []string{trigger.String()},
+	)
+	require.NoError(t, err)
+
+	// A run triggered by a different event must not match.
+	otherRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	_, err = m.db.ExecContext(ctx,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, function_id, inputs, status, event_ids)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		accountID.String(), envID.String(), otherRun.String(), now, now, appID.String(), functionID.String(),
+		enums.StepStatusQueued.String(), []string{other.String()},
+	)
+	require.NoError(t, err)
+
+	// A cron-only run (nil event_ids) must not match either.
+	cronQueued := enums.StepStatusQueued
+	cronRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, cronRun, now, &cronQueued, nil, nil, nil)
+
+	runs, err := m.GetTraceRunsByTriggerID(ctx, trigger)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, matchRun.String(), runs[0].RunID)
+	require.Equal(t, []string{trigger.String()}, runs[0].TriggerIDs)
+}
+
+// TestGetTraceRunsByTriggerIDCollapsesToLatestRow proves a run with
+// multiple lifecycle rows (inngest.runs is append-only) surfaces once, at
+// its latest status — matching GetTraceRuns' own collapse behavior.
+func TestGetTraceRunsByTriggerIDCollapsesToLatestRow(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	trigger := ulid.MustNew(ulid.Now(), rand.Reader)
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	queuedAt := time.Now().UTC().Add(-time.Minute)
+	startedAt := queuedAt.Add(time.Second)
+	endedAt := startedAt.Add(time.Second)
+
+	for _, row := range []struct {
+		status             enums.StepStatus
+		startedAt, endedAt *time.Time
+	}{
+		{enums.StepStatusQueued, nil, nil},
+		{enums.StepStatusRunning, &startedAt, nil},
+		{enums.StepStatusCompleted, &startedAt, &endedAt},
+	} {
+		cols := []string{"account_id", "env_id", "run_id", "queued_at", "scheduled_at", "app_id", "function_id", "inputs", "status", "event_ids"}
+		args := []any{accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), functionID.String(), "[]", row.status.String(), []string{trigger.String()}}
+		if row.startedAt != nil {
+			cols = append(cols, "started_at")
+			args = append(args, *row.startedAt)
+		}
+		if row.endedAt != nil {
+			cols = append(cols, "ended_at")
+			args = append(args, *row.endedAt)
+		}
+		placeholders := make([]string, len(cols))
+		for i := range placeholders {
+			placeholders[i] = "?"
+		}
+		q := "INSERT INTO inngest.runs (" + strings.Join(cols, ", ") + ") VALUES (" + strings.Join(placeholders, ", ") + ");"
+		_, err := m.db.ExecContext(ctx, q, args...)
+		require.NoError(t, err)
+	}
+
+	runs, err := m.GetTraceRunsByTriggerID(ctx, trigger)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, enums.RunStatusCompleted, runs[0].Status)
+	require.WithinDuration(t, endedAt, runs[0].EndedAt, time.Millisecond)
+}
+
+// TestGetTraceRunsByTriggerIDNoMatchReturnsEmptySlice proves a trigger ID
+// with no matching runs returns an empty, non-nil slice — the GQL resolver
+// (EventV2.Runs) ranges over the result directly without a nil check.
+func TestGetTraceRunsByTriggerIDNoMatchReturnsEmptySlice(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	runs, err := m.GetTraceRunsByTriggerID(ctx, ulid.MustNew(ulid.Now(), rand.Reader))
+	require.NoError(t, err)
+	require.NotNil(t, runs)
+	require.Empty(t, runs)
+}
+
 func TestGetTraceRunsFiltersByStatusAndTimeRange(t *testing.T) {
 	db, cleanup := newTestDuckDB(t)
 	defer cleanup()

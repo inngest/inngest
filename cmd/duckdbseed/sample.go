@@ -53,10 +53,6 @@ func BuildTemplates(ctx context.Context, db *sql.DB, limit int) (tmpl Templates,
 // tuples, statuses, names, and JSON payload shapes observed — a template
 // GenerateRuns samples from to produce data that looks like it. Returns a
 // zero-value Templates (no error) when the source tables are empty.
-//
-// Rows are scanned by column name (duckdb.ScanRowByName), not position:
-// pkg/db/duckdb's driver builds each row from a Go map, so the column order
-// it reports is not guaranteed to match the SELECT list.
 func SampleTemplates(ctx context.Context, db *sql.DB, limit int) (Templates, error) {
 	var tmpl Templates
 
@@ -82,7 +78,12 @@ func SampleTemplates(ctx context.Context, db *sql.DB, limit int) (Templates, err
 }
 
 func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, statuses, inputs, outputs []string, err error) {
-	query := fmt.Sprintf("SELECT account_id, env_id, app_id, function_id, status, inputs, output FROM %s.runs LIMIT ?;", duckdb.DuckLakeAlias)
+	query := fmt.Sprintf(`
+	SELECT account_id, env_id, app_id, function_id, status, inputs, output FROM %s.runs
+	QUALIFY
+  	row_number() OVER (PARTITION BY run_id ORDER BY ended_at DESC NULLS LAST, started_at DESC NULLS LAST) = 1
+	LIMIT ?
+	;`, duckdb.DuckLakeAlias)
 	rows, err := db.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("duckdbseed: sampling runs: %w", err)
@@ -91,12 +92,16 @@ func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, s
 
 	seenTenants := map[Tenant]bool{}
 	for rows.Next() {
-		row, err := duckdb.ScanRowByName(rows)
-		if err != nil {
+		var (
+			rawAccountID, rawEnvID, rawAppID, rawFunctionID any
+			status                                          any
+			rawInputs, rawOutput                            any
+		)
+		if err := rows.Scan(&rawAccountID, &rawEnvID, &rawAppID, &rawFunctionID, &status, &rawInputs, &rawOutput); err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("duckdbseed: scanning sampled run: %w", err)
 		}
 
-		tenant, err := tenantFromRow(row)
+		tenant, err := tenantFromValues(rawAccountID, rawEnvID, rawAppID, rawFunctionID)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -105,11 +110,11 @@ func sampleRuns(ctx context.Context, db *sql.DB, limit int) (tenants []Tenant, s
 			tenants = append(tenants, tenant)
 		}
 
-		statuses = append(statuses, fmt.Sprint(row["status"]))
-		if v := jsonText(row["inputs"]); v != "" {
+		statuses = append(statuses, fmt.Sprint(status))
+		if v := jsonText(rawInputs); v != "" {
 			inputs = append(inputs, v)
 		}
-		if v := jsonText(row["output"]); v != "" {
+		if v := jsonText(rawOutput); v != "" {
 			outputs = append(outputs, v)
 		}
 	}
@@ -125,12 +130,13 @@ func sampleSpans(ctx context.Context, db *sql.DB, limit int) (names, attributes 
 	defer rows.Close()
 
 	for rows.Next() {
-		row, err := duckdb.ScanRowByName(rows)
-		if err != nil {
+		var name any
+		var rawAttributes any
+		if err := rows.Scan(&name, &rawAttributes); err != nil {
 			return nil, nil, fmt.Errorf("duckdbseed: scanning sampled span: %w", err)
 		}
-		names = append(names, fmt.Sprint(row["name"]))
-		if v := jsonText(row["attributes"]); v != "" {
+		names = append(names, fmt.Sprint(name))
+		if v := jsonText(rawAttributes); v != "" {
 			attributes = append(attributes, v)
 		}
 	}
@@ -146,49 +152,50 @@ func sampleEvents(ctx context.Context, db *sql.DB, limit int) (names, data []str
 	defer rows.Close()
 
 	for rows.Next() {
-		row, err := duckdb.ScanRowByName(rows)
-		if err != nil {
+		var eventName any
+		var rawEventData any
+		if err := rows.Scan(&eventName, &rawEventData); err != nil {
 			return nil, nil, fmt.Errorf("duckdbseed: scanning sampled event: %w", err)
 		}
-		names = append(names, fmt.Sprint(row["event_name"]))
-		if v := jsonText(row["event_data"]); v != "" {
+		names = append(names, fmt.Sprint(eventName))
+		if v := jsonText(rawEventData); v != "" {
 			data = append(data, v)
 		}
 	}
 	return names, data, rows.Err()
 }
 
-func tenantFromRow(row map[string]any) (Tenant, error) {
-	accountID, err := uuidField(row, "account_id")
+func tenantFromValues(rawAccountID, rawEnvID, rawAppID, rawFunctionID any) (Tenant, error) {
+	accountID, err := uuidValue(rawAccountID, "account_id")
 	if err != nil {
 		return Tenant{}, err
 	}
-	envID, err := uuidField(row, "env_id")
+	envID, err := uuidValue(rawEnvID, "env_id")
 	if err != nil {
 		return Tenant{}, err
 	}
-	appID, err := uuidField(row, "app_id")
+	appID, err := uuidValue(rawAppID, "app_id")
 	if err != nil {
 		return Tenant{}, err
 	}
-	functionID, err := uuidField(row, "function_id")
+	functionID, err := uuidValue(rawFunctionID, "function_id")
 	if err != nil {
 		return Tenant{}, err
 	}
 	return Tenant{AccountID: accountID, EnvID: envID, AppID: appID, FunctionID: functionID}, nil
 }
 
-// uuidField parses a UUID column's value — pkg/db/duckdb's driver (both the
-// jsonlines and quack transports) renders a UUID column as its canonical
-// string form, not raw bytes.
-func uuidField(row map[string]any, key string) (uuid.UUID, error) {
-	s, ok := row[key].(string)
+// uuidValue parses a UUID column's scanned value — pkg/db/duckdb's driver
+// (both the jsonlines and quack transports) renders a UUID column as its
+// canonical string form, not raw bytes.
+func uuidValue(v any, col string) (uuid.UUID, error) {
+	s, ok := v.(string)
 	if !ok {
-		return uuid.UUID{}, fmt.Errorf("duckdbseed: expected string for column %q, got %T", key, row[key])
+		return uuid.UUID{}, fmt.Errorf("duckdbseed: expected string for column %q, got %T", col, v)
 	}
 	id, err := uuid.Parse(s)
 	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("duckdbseed: parsing column %q as UUID: %w", key, err)
+		return uuid.UUID{}, fmt.Errorf("duckdbseed: parsing column %q as UUID: %w", col, err)
 	}
 	return id, nil
 }

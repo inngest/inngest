@@ -49,7 +49,7 @@ func TestGetEventsByInternalIDs(t *testing.T) {
 }
 
 // TestGetEventsByInternalIDsErrorsWhenEventDataIsNotAnObject proves
-// eventFromRow surfaces a real error on a malformed event_data column
+// scanEvent surfaces a real error on a malformed event_data column
 // (declared JSON NOT NULL, always a marshaled object on the write path)
 // rather than silently masking it as an empty object — a non-object
 // event_data indicates real data corruption worth surfacing, not a

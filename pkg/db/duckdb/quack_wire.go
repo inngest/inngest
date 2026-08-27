@@ -85,6 +85,17 @@ func (w *quackWriter) writeUint64(id uint16, v uint64) {
 	w.writeUnsignedLeb128(v)
 }
 
+// writeHugeint writes a hugeint_t field: sign-extending LEB128 for the upper
+// 64 bits followed by standard LEB128 for the lower 64 bits — the same
+// layout decodeQuackPrepareResponseBody reads for result_uuid. Always
+// present on the wire (not default-omit), matching DuckDB's plain
+// WriteProperty<hugeint_t> (as opposed to WritePropertyWithDefault).
+func (w *quackWriter) writeHugeint(id uint16, v quackHugeint) {
+	w.writeFieldID(id)
+	w.writeSignedLeb128(v.hi)
+	w.writeUnsignedLeb128(v.lo)
+}
+
 func (w *quackWriter) writeUint64Default(id uint16, v uint64) {
 	if v == 0 {
 		return

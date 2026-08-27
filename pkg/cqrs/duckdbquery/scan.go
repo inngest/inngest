@@ -11,31 +11,58 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// scanNamedRows drains rows into a slice of column-name-keyed maps, using
-// duckdb.ScanRowByName for every row — required because this driver's
-// reported column order is not guaranteed to match the SELECT list (see
-// pkg/db/duckdb/store.go's ScanRowByName doc comment).
-func scanNamedRows(rows *sql.Rows) ([]map[string]any, error) {
-	var out []map[string]any
-	for rows.Next() {
-		row, err := duckdb.ScanRowByName(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, row)
-	}
-	return out, rows.Err()
-}
-
-func stringField(row map[string]any, key string) (string, error) {
-	v, ok := row[key].(string)
+// asString type-asserts a scanned column value as a string — used by
+// uuidColumn/ulidColumn, whose columns always come back that way (both the
+// jsonlines and quack transports render UUID/ULID columns as their
+// canonical string form — see pkg/db/duckdb/rows.go and quack_protocol.go).
+func asString(v any, col string) (string, error) {
+	s, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("duckdbquery: expected string for column %q, got %T (%v)", key, row[key], row[key])
+		return "", fmt.Errorf("duckdbquery: expected string for column %q, got %T (%v)", col, v, v)
 	}
-	return v, nil
+	return s, nil
 }
 
-// mapField requires the column's already-decoded JSON value (the driver
+// uuidColumn parses a mandatory UUID column's scanned value.
+func uuidColumn(v any, col string) (uuid.UUID, error) {
+	s, err := asString(v, col)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("duckdbquery: parsing column %q as UUID: %w", col, err)
+	}
+	return id, nil
+}
+
+// nullableUUIDColumn returns nil, rather than erroring, for a SQL NULL
+// column — used for optional columns like events.source_id.
+func nullableUUIDColumn(v any, col string) (*uuid.UUID, error) {
+	if v == nil {
+		return nil, nil
+	}
+	id, err := uuidColumn(v, col)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
+}
+
+// ulidColumn parses a mandatory ULID column's scanned value.
+func ulidColumn(v any, col string) (ulid.ULID, error) {
+	s, err := asString(v, col)
+	if err != nil {
+		return ulid.ULID{}, err
+	}
+	id, err := ulid.Parse(s)
+	if err != nil {
+		return ulid.ULID{}, fmt.Errorf("duckdbquery: parsing column %q as ULID: %w", col, err)
+	}
+	return id, nil
+}
+
+// asMap requires the column's already-decoded JSON value (the driver
 // auto-decodes JSON-typed columns into Go values) to be a JSON object, or
 // SQL/JSON null — used for columns like events.event_data. A SQL NULL, or
 // json.Marshal(nil) having written the literal JSON "null" (e.g. an event
@@ -44,82 +71,58 @@ func stringField(row map[string]any, key string) (string, error) {
 // erroring; any other non-object shape (an array, a string, a number)
 // indicates real data corruption worth surfacing rather than silently
 // masking.
-func mapField(row map[string]any, key string) (map[string]any, error) {
-	if row[key] == nil {
+func asMap(v any, col string) (map[string]any, error) {
+	if v == nil {
 		return map[string]any{}, nil
 	}
-	v, ok := row[key].(map[string]any)
+	m, ok := v.(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("duckdbquery: expected object for column %q, got %T (%v)", key, row[key], row[key])
+		return nil, fmt.Errorf("duckdbquery: expected object for column %q, got %T (%v)", col, v, v)
 	}
-	return v, nil
+	return m, nil
 }
 
-func uuidField(row map[string]any, key string) (uuid.UUID, error) {
-	s, err := stringField(row, key)
-	if err != nil {
-		return uuid.UUID{}, err
-	}
-	id, err := uuid.Parse(s)
-	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("duckdbquery: parsing column %q as UUID: %w", key, err)
-	}
-	return id, nil
-}
-
-func ulidField(row map[string]any, key string) (ulid.ULID, error) {
-	s, err := stringField(row, key)
-	if err != nil {
-		return ulid.ULID{}, err
-	}
-	id, err := ulid.Parse(s)
-	if err != nil {
-		return ulid.ULID{}, fmt.Errorf("duckdbquery: parsing column %q as ULID: %w", key, err)
-	}
-	return id, nil
-}
-
-// nullableUUIDField returns nil when the column is SQL NULL rather than
-// erroring — used for optional columns like events.source_id.
-func nullableUUIDField(row map[string]any, key string) (*uuid.UUID, error) {
-	if row[key] == nil {
-		return nil, nil
-	}
-	id, err := uuidField(row, key)
-	if err != nil {
-		return nil, err
-	}
-	return &id, nil
-}
-
-func timeField(row map[string]any, key string) (time.Time, error) {
-	return duckdb.AsTimestamp(row[key])
-}
-
-// nullableTimeField returns the zero time.Time (not an error) when the
-// column is SQL NULL — matching cqrs.TraceRun's convention of a zero-value
-// StartedAt/EndedAt meaning "not yet set" (see runs_v2.go's
-// `if r.StartedAt.UnixMilli() > 0`).
-func nullableTimeField(row map[string]any, key string) (time.Time, error) {
-	if row[key] == nil {
-		return time.Time{}, nil
-	}
-	return duckdb.AsTimestamp(row[key])
-}
-
-// jsonField re-marshals a JSON column's already-decoded Go value (the
-// driver auto-decodes JSON-typed columns into map[string]any/[]any/etc.)
-// back into raw bytes, so callers can treat it exactly like a TEXT/BLOB
-// column read from any other backend. Returns nil, nil for a SQL NULL
-// column.
-func jsonField(row map[string]any, key string) ([]byte, error) {
-	v := row[key]
+// asJSON re-marshals a JSON column's already-decoded Go value (the driver
+// auto-decodes JSON-typed columns into map[string]any/[]any/etc.) back into
+// raw bytes, so callers can treat it exactly like a TEXT/BLOB column read
+// from any other backend. Returns nil, nil for a SQL NULL column.
+func asJSON(v any, col string) ([]byte, error) {
 	if v == nil {
 		return nil, nil
 	}
 	b, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: re-marshaling column %q: %w", key, err)
+		return nil, fmt.Errorf("duckdbquery: re-marshaling column %q: %w", col, err)
 	}
 	return b, nil
+}
+
+// asTimestamp converts a scanned column value into a time.Time, deferring
+// the actual transport-specific conversion to duckdb.AsTimestamp.
+func asTimestamp(v any, col string) (time.Time, error) {
+	ts, err := duckdb.AsTimestamp(v)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("duckdbquery: parsing column %q: %w", col, err)
+	}
+	return ts, nil
+}
+
+// asNullableTimestamp returns the zero time.Time (not an error) when the
+// column is SQL NULL — matching cqrs.TraceRun's convention of a zero-value
+// StartedAt/EndedAt meaning "not yet set" (see runs_v2.go's
+// `if r.StartedAt.UnixMilli() > 0`).
+func asNullableTimestamp(v any, col string) (time.Time, error) {
+	if v == nil {
+		return time.Time{}, nil
+	}
+	return asTimestamp(v, col)
+}
+
+// scanCount scans a COUNT(*) AS c-shaped single-row, single-column result.
+func scanCount(row *sql.Row) (int64, error) {
+	var raw any
+	if err := row.Scan(&raw); err != nil {
+		return 0, fmt.Errorf("duckdbquery: scanning count: %w", err)
+	}
+	return duckdb.AsInt64(raw)
 }

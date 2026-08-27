@@ -32,10 +32,10 @@ func newQuackHTTPClient() *http.Client {
 // protocol instead of the stdio/JSON-lines transport in rows.go. It holds one
 // server-assigned connection id for its lifetime; process.go's restart-on-
 // failure handling (not this type) is what recovers from a lost session, by
-// discarding it and re-handshaking against a freshly bootstrapped subprocess
-// — see quack_protocol.go's decodeQuackPrepareResponseBody doc comment for
-// why FetchRequest/reconnect logic (which a longer-lived client would need)
-// isn't implemented here.
+// discarding it and re-handshaking against a freshly bootstrapped subprocess.
+// exec pages a large result via FetchRequest/FetchResponse internally, but
+// that's within one exec call — it doesn't survive across a lost/discarded
+// session, since a fresh session has no result_uuid to resume against.
 type quackSession struct {
 	httpClient   *http.Client
 	endpoint     string
@@ -85,15 +85,19 @@ func newQuackSession(ctx context.Context, listenURL, token string) (*quackSessio
 }
 
 // exec implements sqlExecer. A statement DuckDB itself rejected (bad SQL, a
-// missing table, a constraint violation), and a result too large for this
-// client to fetch in one response (needsMoreFetch — see below), both come
-// back wrapped in errStatementFailed, matching rows.go's session.exec so
-// process.exec's restart-vs-surface classification (see process.go) works
-// identically regardless of which transport is in use: neither case means
-// the subprocess is unhealthy, and an identical retry fails identically
-// either way. Any other error (HTTP failure, malformed response) is left
-// unwrapped, which process.exec treats as a dead subprocess warranting a
-// restart.
+// missing table, a constraint violation) comes back wrapped in
+// errStatementFailed, matching rows.go's session.exec so process.exec's
+// restart-vs-surface classification (see process.go) works identically
+// regardless of which transport is in use: that's not a sign the subprocess
+// is unhealthy, and an identical retry fails identically either way. Any
+// other error (HTTP failure, malformed response) is left unwrapped, which
+// process.exec treats as a dead subprocess warranting a restart.
+//
+// A result too large for one inline PrepareResponse (needsMoreFetch) is
+// paged in via a FetchRequest/FetchResponse loop, keyed off the
+// PrepareResponse's own result_uuid, until a response comes back with zero
+// chunks — see decodeQuackFetchResponseBody's doc comment for why that's the
+// only "done" signal the wire format gives.
 //
 // cols is the PrepareResponse's own result_names, in the query's own
 // left-to-right order — unlike rows.go's session.exec, this is populated even
@@ -106,32 +110,49 @@ func (s *quackSession) exec(ctx context.Context, sqlText string) (cols []string,
 	}
 
 	if hdr.Type == quackMsgErrorResponse {
-		msg, derr := decodeQuackErrorResponseBody(r)
-		if derr != nil {
-			return nil, nil, fmt.Errorf("duckdb: quack: server returned an error this client could not parse: %w", derr)
-		}
-		return nil, nil, fmt.Errorf("%w: %s", errStatementFailed, msg)
+		return nil, nil, decodeQuackStatementError(r)
 	}
 	if hdr.Type != quackMsgPrepareResponse {
 		return nil, nil, fmt.Errorf("duckdb: quack: unexpected response message type %d", hdr.Type)
 	}
 
-	cols, rows, needsMoreFetch, err := decodeQuackPrepareResponseBody(r)
+	cols, rows, needsMoreFetch, resultUUID, err := decodeQuackPrepareResponseBody(r)
 	if err != nil {
 		return nil, nil, fmt.Errorf("duckdb: quack: decoding prepare response: %w", err)
 	}
-	if needsMoreFetch {
-		// Not a transport or subprocess failure — the server responded
-		// successfully — and this client's lack of a FetchRequest
-		// implementation means an identical retry fails identically every
-		// time, exactly like a rejected statement. Wrapped in
-		// errStatementFailed (rather than left unwrapped) so process.exec
-		// surfaces it directly instead of burning a restart attempt that
-		// cannot possibly fix it — see
-		// TestQuackSessionResultTooLargeMapsToErrStatementFailed.
-		return nil, nil, fmt.Errorf("%w: quack: result exceeded one inline response and requires FetchRequest, which this client does not implement", errStatementFailed)
+
+	for needsMoreFetch {
+		hdr, r, err := s.send(ctx, encodeQuackFetchRequest(s.connectionID, resultUUID))
+		if err != nil {
+			return nil, nil, err
+		}
+		if hdr.Type == quackMsgErrorResponse {
+			return nil, nil, decodeQuackStatementError(r)
+		}
+		if hdr.Type != quackMsgFetchResponse {
+			return nil, nil, fmt.Errorf("duckdb: quack: unexpected response message type %d", hdr.Type)
+		}
+
+		fetchedRows, chunkCount, ferr := decodeQuackFetchResponseBody(r, cols)
+		if ferr != nil {
+			return nil, nil, fmt.Errorf("duckdb: quack: decoding fetch response: %w", ferr)
+		}
+		rows = append(rows, fetchedRows...)
+		needsMoreFetch = chunkCount > 0
 	}
 	return cols, rows, nil
+}
+
+// decodeQuackStatementError decodes an ErrorResponse body into an error
+// wrapped in errStatementFailed — the server responded successfully, just
+// with a rejection (bad SQL, a closed/expired result on a stale Fetch), not
+// a transport or subprocess failure.
+func decodeQuackStatementError(r *quackReader) error {
+	msg, derr := decodeQuackErrorResponseBody(r)
+	if derr != nil {
+		return fmt.Errorf("duckdb: quack: server returned an error this client could not parse: %w", derr)
+	}
+	return fmt.Errorf("%w: %s", errStatementFailed, msg)
 }
 
 // send POSTs one quack message and returns the decoded response header, with

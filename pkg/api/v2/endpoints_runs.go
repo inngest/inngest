@@ -631,7 +631,7 @@ func optionalString(value string) *string {
 }
 
 func toFunctionTrace(ctx context.Context, reader FunctionTraceReader, root *cqrs.OtelSpan, includeOutput bool) (*apiv2.FunctionTrace, error) {
-	span, err := loader.ConvertRunSpan(ctx, root)
+	span, err := loader.ConvertRunSpanFor(ctx, reader, root)
 	if err != nil {
 		return nil, err
 	}

@@ -152,6 +152,12 @@ func Command() *cli.Command {
 				Usage:    "Enable the experimental DuckDB dual-write POC (docs/plans/006-duckdb-poc-subprocess-dual-write.md)",
 				Value:    false,
 			},
+			&cli.BoolFlag{
+				Category: "Advanced",
+				Name:     "duckdb-reads",
+				Usage:    "Serve the GQL API and REST trace/run endpoints from DuckDB (requires --duckdb)",
+				Value:    false,
+			},
 		},
 	}
 

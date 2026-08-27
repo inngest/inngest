@@ -81,6 +81,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	persist := localconfig.GetBoolValue(cmd, "persist", false)
 	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
 	enableDuckDB := localconfig.GetBoolValue(cmd, "duckdb", false)
+	enableDuckDBReads := localconfig.GetBoolValue(cmd, "duckdb-reads", false)
 
 	debugAPIPort := localconfig.GetIntValue(cmd, "debug-api-port", devserver.DefaultDebugAPIPort)
 
@@ -120,6 +121,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		Persist:                 persist,
 		SQLiteDir:               sqliteDir,
 		EnableDuckDB:            enableDuckDB,
+		EnableDuckDBReads:       enableDuckDBReads,
 		PostgresURI:             postgresURI,
 		PostgresMaxIdleConns:    postgresMaxIdleConns,
 		PostgresMaxOpenConns:    postgresMaxOpenConns,

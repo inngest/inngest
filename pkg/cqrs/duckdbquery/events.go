@@ -2,6 +2,7 @@ package duckdbquery
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -96,20 +97,7 @@ func (m *Manager) GetEventsCount(ctx context.Context, accountID, workspaceID uui
 	}
 	query += ";"
 
-	rows, err := m.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return 0, fmt.Errorf("duckdbquery: querying events count: %w", err)
-	}
-	defer rows.Close()
-
-	named, err := scanNamedRows(rows)
-	if err != nil {
-		return 0, fmt.Errorf("duckdbquery: scanning events count: %w", err)
-	}
-	if len(named) == 0 {
-		return 0, nil
-	}
-	return duckdb.AsInt64(named[0]["c"])
+	return scanCount(m.db.QueryRowContext(ctx, query, args...))
 }
 
 func (m *Manager) queryEvents(ctx context.Context, query string, args ...any) ([]*cqrs.Event, error) {
@@ -119,65 +107,61 @@ func (m *Manager) queryEvents(ctx context.Context, query string, args ...any) ([
 	}
 	defer rows.Close()
 
-	named, err := scanNamedRows(rows)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: scanning event rows: %w", err)
-	}
-
-	out := make([]*cqrs.Event, 0, len(named))
-	for _, row := range named {
-		evt, err := eventFromRow(row)
+	var out []*cqrs.Event
+	for rows.Next() {
+		evt, err := scanEvent(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("duckdbquery: scanning event row: %w", err)
 		}
 		out = append(out, evt)
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
-func eventFromRow(row map[string]any) (*cqrs.Event, error) {
-	accountID, err := uuidField(row, "account_id")
-	if err != nil {
-		return nil, err
-	}
-	workspaceID, err := uuidField(row, "env_id")
-	if err != nil {
-		return nil, err
-	}
-	internalID, err := ulidField(row, "internal_id")
-	if err != nil {
-		return nil, err
-	}
-	receivedAt, err := timeField(row, "received_at")
-	if err != nil {
-		return nil, err
-	}
-	source, err := stringField(row, "source")
-	if err != nil {
-		return nil, err
-	}
-	sourceID, err := nullableUUIDField(row, "source_id")
-	if err != nil {
-		return nil, err
-	}
-	eventID, err := stringField(row, "event_id")
-	if err != nil {
-		return nil, err
-	}
-	eventName, err := stringField(row, "event_name")
-	if err != nil {
-		return nil, err
-	}
-	eventV, err := stringField(row, "event_v")
-	if err != nil {
-		return nil, err
-	}
-	eventTS, err := timeField(row, "event_ts")
-	if err != nil {
+// scanEvent scans one row of an eventColumns-shaped SELECT into a
+// *cqrs.Event. Destination order must match eventColumns exactly.
+func scanEvent(rows *sql.Rows) (*cqrs.Event, error) {
+	var (
+		rawAccountID, rawWorkspaceID, rawInternalID, rawReceivedAt any
+		source                                                     string
+		rawSourceID                                                any
+		eventID, eventName                                         string
+		rawEventData                                               any
+		eventV                                                     string
+		rawEventTS                                                 any
+	)
+	if err := rows.Scan(
+		&rawAccountID, &rawWorkspaceID, &rawInternalID, &rawReceivedAt,
+		&source, &rawSourceID, &eventID, &eventName, &rawEventData, &eventV, &rawEventTS,
+	); err != nil {
 		return nil, err
 	}
 
-	data, err := mapField(row, "event_data")
+	accountID, err := uuidColumn(rawAccountID, "account_id")
+	if err != nil {
+		return nil, err
+	}
+	workspaceID, err := uuidColumn(rawWorkspaceID, "env_id")
+	if err != nil {
+		return nil, err
+	}
+	internalID, err := ulidColumn(rawInternalID, "internal_id")
+	if err != nil {
+		return nil, err
+	}
+	receivedAt, err := asTimestamp(rawReceivedAt, "received_at")
+	if err != nil {
+		return nil, err
+	}
+	sourceID, err := nullableUUIDColumn(rawSourceID, "source_id")
+	if err != nil {
+		return nil, err
+	}
+	data, err := asMap(rawEventData, "event_data")
+	if err != nil {
+		return nil, err
+	}
+	eventTS, err := asTimestamp(rawEventTS, "event_ts")
 	if err != nil {
 		return nil, err
 	}

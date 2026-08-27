@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -49,6 +50,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if err != nil {
 		return nil, err
 	}
+	logger.StdlibLogger(ctx).Debug("duckdb: exec", "sql", sql)
 	if _, _, err := c.sess.exec(ctx, sql); err != nil {
 		return nil, err
 	}
@@ -60,6 +62,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if err != nil {
 		return nil, err
 	}
+	logger.StdlibLogger(ctx).Debug("duckdb: query", "sql", sql)
 	cols, rows, err := c.sess.exec(ctx, sql)
 	if err != nil {
 		return nil, err

@@ -13,6 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/db/duckdb"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/oklog/ulid/v2"
 )
 
 const runColumns = "account_id, env_id, app_id, function_id, run_id, queued_at, started_at, ended_at, status, output, event_ids"
@@ -252,14 +253,53 @@ func (m *Manager) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (
 	}
 	defer rows.Close()
 
-	named, err := scanNamedRows(rows)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
-	}
-	if len(named) == 0 {
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
+		}
 		return nil, fmt.Errorf("run not found: %s", id.RunID)
 	}
-	return traceRunFromRow(named[0])
+	return scanTraceRun(rows)
+}
+
+// GetTraceRunsByTriggerID returns every run triggered by the given event's
+// internal ULID, collapsed to each run's latest lifecycle row exactly like
+// GetTraceRuns — inngest.runs is append-only, so a run with multiple
+// lifecycle rows must not surface more than once here. event_ids is a real
+// VARCHAR[] column populated from the same sv2.Metadata.Config.EventIDs
+// field the SQLite/Postgres path serializes into trace_runs.trigger_ids
+// (see pkg/db/duckdb/migrations/000001_baseline.sql), so list_contains
+// gives an exact membership match — no substring matching required.
+func (m *Manager) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
+	query := fmt.Sprintf(
+		`WITH latest AS (
+			SELECT *, ROW_NUMBER() OVER (
+				PARTITION BY run_id ORDER BY COALESCE(ended_at, started_at, queued_at) DESC
+			 ) AS rn
+			 FROM %s.runs WHERE list_contains(event_ids, ?)
+		 )
+		 SELECT %s FROM latest WHERE rn = 1 ORDER BY queued_at ASC;`,
+		duckdb.DuckLakeAlias, runColumns,
+	)
+
+	rows, err := m.db.QueryContext(ctx, query, triggerID.String())
+	if err != nil {
+		return nil, fmt.Errorf("duckdbquery: querying trace runs by trigger id: %w", err)
+	}
+	defer rows.Close()
+
+	out := []*cqrs.TraceRun{}
+	for rows.Next() {
+		trun, err := scanTraceRun(rows)
+		if err != nil {
+			return nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
+		}
+		out = append(out, trun)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("duckdbquery: reading trace run rows: %w", err)
+	}
+	return out, nil
 }
 
 // GetTraceRuns' CEL handling deliberately does not push filter.CEL into the
@@ -340,16 +380,11 @@ func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]
 	}
 	defer rows.Close()
 
-	named, err := scanNamedRows(rows)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: scanning trace run rows: %w", err)
-	}
-
-	out := make([]*cqrs.TraceRun, 0, len(named))
-	for _, row := range named {
-		trun, err := traceRunFromRow(row)
+	var out []*cqrs.TraceRun
+	for rows.Next() {
+		trun, err := scanTraceRun(rows)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("duckdbquery: scanning trace run row: %w", err)
 		}
 
 		if expHandler.HasOutputFilters() {
@@ -371,6 +406,9 @@ func (m *Manager) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]
 			break
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("duckdbquery: reading trace run rows: %w", err)
+	}
 	return out, nil
 }
 
@@ -390,68 +428,63 @@ func (m *Manager) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt
 	query := fmt.Sprintf("WITH latest AS (%s) SELECT COUNT(*) AS c FROM latest WHERE %s;", cte, postWhere)
 	args := append(cteArgs, postArgs...)
 
-	rows, err := m.db.QueryContext(ctx, query, args...)
+	n, err := scanCount(m.db.QueryRowContext(ctx, query, args...))
 	if err != nil {
 		return 0, fmt.Errorf("duckdbquery: querying trace run count: %w", err)
-	}
-	defer rows.Close()
-
-	named, err := scanNamedRows(rows)
-	if err != nil {
-		return 0, fmt.Errorf("duckdbquery: scanning trace run count: %w", err)
-	}
-	if len(named) == 0 {
-		return 0, nil
-	}
-	n, err := duckdb.AsInt64(named[0]["c"])
-	if err != nil {
-		return 0, err
 	}
 	return int(n), nil
 }
 
-func traceRunFromRow(row map[string]any) (*cqrs.TraceRun, error) {
-	accountID, err := uuidField(row, "account_id")
+// scanTraceRun scans one row of a runColumns-shaped SELECT into a
+// *cqrs.TraceRun. Destination order must match runColumns exactly.
+func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
+	var (
+		rawAccountID, rawEnvID, rawAppID, rawFunctionID any
+		runID                                           string
+		rawQueuedAt, rawStartedAt, rawEndedAt           any
+		status                                          string
+		rawOutput, rawEventIDs                          any
+	)
+	if err := rows.Scan(
+		&rawAccountID, &rawEnvID, &rawAppID, &rawFunctionID, &runID,
+		&rawQueuedAt, &rawStartedAt, &rawEndedAt, &status, &rawOutput, &rawEventIDs,
+	); err != nil {
+		return nil, err
+	}
+
+	accountID, err := uuidColumn(rawAccountID, "account_id")
 	if err != nil {
 		return nil, err
 	}
-	envID, err := uuidField(row, "env_id")
+	envID, err := uuidColumn(rawEnvID, "env_id")
 	if err != nil {
 		return nil, err
 	}
-	appID, err := uuidField(row, "app_id")
+	appID, err := uuidColumn(rawAppID, "app_id")
 	if err != nil {
 		return nil, err
 	}
-	functionID, err := uuidField(row, "function_id")
+	functionID, err := uuidColumn(rawFunctionID, "function_id")
 	if err != nil {
 		return nil, err
 	}
-	runID, err := stringField(row, "run_id")
+	queuedAt, err := asTimestamp(rawQueuedAt, "queued_at")
 	if err != nil {
 		return nil, err
 	}
-	queuedAt, err := timeField(row, "queued_at")
+	startedAt, err := asNullableTimestamp(rawStartedAt, "started_at")
 	if err != nil {
 		return nil, err
 	}
-	startedAt, err := nullableTimeField(row, "started_at")
+	endedAt, err := asNullableTimestamp(rawEndedAt, "ended_at")
 	if err != nil {
 		return nil, err
 	}
-	endedAt, err := nullableTimeField(row, "ended_at")
+	stepStatus, err := enums.StepStatusString(status)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("duckdbquery: parsing run status %q: %w", status, err)
 	}
-	statusStr, err := stringField(row, "status")
-	if err != nil {
-		return nil, err
-	}
-	stepStatus, err := enums.StepStatusString(statusStr)
-	if err != nil {
-		return nil, fmt.Errorf("duckdbquery: parsing run status %q: %w", statusStr, err)
-	}
-	output, err := jsonField(row, "output")
+	output, err := asJSON(rawOutput, "output")
 	if err != nil {
 		return nil, err
 	}
@@ -461,10 +494,10 @@ func traceRunFromRow(row map[string]any) (*cqrs.TraceRun, error) {
 	// regardless of transport (see pkg/db/duckdb/quack_protocol.go's LIST
 	// decoding and the stdio transport's own JSON-lines auto-decoding).
 	var triggerIDs []string
-	if raw, ok := row["event_ids"]; ok && raw != nil {
-		items, ok := raw.([]any)
+	if rawEventIDs != nil {
+		items, ok := rawEventIDs.([]any)
 		if !ok {
-			return nil, fmt.Errorf("duckdbquery: event_ids has unexpected type %T", raw)
+			return nil, fmt.Errorf("duckdbquery: event_ids has unexpected type %T", rawEventIDs)
 		}
 		triggerIDs = make([]string, len(items))
 		for i, item := range items {

@@ -83,23 +83,57 @@ func TestQuackSessionStatementErrorMapsToErrStatementFailed(t *testing.T) {
 	require.True(t, errors.Is(err, errStatementFailed), "got: %v", err)
 }
 
-// TestQuackSessionResultTooLargeMapsToErrStatementFailed pins a real
-// misclassification observed in practice: a result too large for one inline
-// quack response (needsMoreFetch=true — this client doesn't implement the
-// FetchRequest continuation protocol) is a client-side limitation, not a
-// dead subprocess. Retrying the identical query fails identically every
-// time, exactly like a rejected statement — so process.exec must surface it
-// directly (via errStatementFailed) instead of burning a restart attempt
-// that cannot possibly fix it.
-func TestQuackSessionResultTooLargeMapsToErrStatementFailed(t *testing.T) {
+// TestQuackSessionFetchesAllRowsWhenResultExceedsOneInlineResponse pins the
+// fix for a real failure observed in practice: a result too large for one
+// inline quack response (needsMoreFetch=true) used to come back as
+// errStatementFailed because this client didn't implement the FetchRequest
+// continuation protocol. exec now pages through FetchRequest/FetchResponse
+// internally and returns every row. quack_fetch_batch_chunks is forced down
+// to 1 DataChunk per response (default 12) so a modest 5,000-row query — one
+// DuckDB vector is 2048 rows — still needs several Fetch round trips instead
+// of requiring an unwieldy row count to reproduce.
+func TestQuackSessionFetchesAllRowsWhenResultExceedsOneInlineResponse(t *testing.T) {
 	listenURL, cleanup := startQuackServerForTest(t, "test-token")
 	defer cleanup()
 
 	sess, err := newQuackSession(context.Background(), listenURL, "test-token")
 	require.NoError(t, err)
 
-	_, _, err = sess.exec(context.Background(), "SELECT range AS n, repeat('x', 1000) AS pad FROM range(100000);")
-	require.Error(t, err)
+	_, _, err = sess.exec(context.Background(), "SET quack_fetch_batch_chunks = 1;")
+	require.NoError(t, err)
+
+	const wantRows = 5000
+	cols, rows, err := sess.exec(context.Background(), fmt.Sprintf("SELECT range AS n FROM range(%d) ORDER BY n;", wantRows))
+	require.NoError(t, err)
+	require.Equal(t, []string{"n"}, cols)
+	require.Len(t, rows, wantRows)
+	require.Equal(t, int64(0), rows[0]["n"])
+	require.Equal(t, int64(wantRows-1), rows[wantRows-1]["n"])
+}
+
+// TestQuackSessionFetchAfterResultClosedMapsToErrStatementFailed exercises
+// the FETCH_REQUEST error path directly: fetching against a result_uuid the
+// server no longer recognizes (a fresh PREPARE on the same connection
+// discards the previous one — see quack_server.cpp's PREPARE_REQUEST
+// handler) is a rejected request, not a dead subprocess, exactly like
+// TestQuackSessionStatementErrorMapsToErrStatementFailed's PREPARE_REQUEST
+// case.
+func TestQuackSessionFetchAfterResultClosedMapsToErrStatementFailed(t *testing.T) {
+	listenURL, cleanup := startQuackServerForTest(t, "test-token")
+	defer cleanup()
+
+	sess, err := newQuackSession(context.Background(), listenURL, "test-token")
+	require.NoError(t, err)
+
+	_, _, err = sess.exec(context.Background(), "SET quack_fetch_batch_chunks = 1;")
+	require.NoError(t, err)
+
+	staleUUID := quackHugeint{}
+	hdr, r, err := sess.send(context.Background(), encodeQuackFetchRequest(sess.connectionID, staleUUID))
+	require.NoError(t, err)
+	require.Equal(t, byte(quackMsgErrorResponse), hdr.Type)
+
+	err = decodeQuackStatementError(r)
 	require.True(t, errors.Is(err, errStatementFailed), "got: %v", err)
 }
 

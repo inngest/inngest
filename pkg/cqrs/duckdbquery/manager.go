@@ -5,9 +5,9 @@
 //
 // Manager embeds the real cqrs.Manager (SQLite/Postgres-backed) and
 // overrides only the methods this package can answer from DuckDB; every
-// other method — including GetTraceRunsByTriggerID and LegacyGetSpanOutput,
-// which the current DuckDB schema fundamentally cannot answer — falls
-// through to the embedded manager unchanged.
+// other method — including LegacyGetSpanOutput, which the current DuckDB
+// schema fundamentally cannot answer — falls through to the embedded
+// manager unchanged.
 package duckdbquery
 
 import (
