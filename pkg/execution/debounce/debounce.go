@@ -1043,7 +1043,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 }
 
 func (d debouncer) debounceKey(ctx context.Context, evt event.TrackedEvent, fn inngest.Function) (string, error) {
-	if fn.Debounce.Key == nil {
+	if fn.Debounce == nil || fn.Debounce.Key == nil {
 		return fn.ID.String(), nil
 	}
 

@@ -6,17 +6,20 @@
 import { maxDateString, toMaybeDate } from '@inngest/components/utils/date';
 import { max, min } from 'date-fns';
 
+import { scoreRows } from '../../RunDetails/ScoresAttrs';
 import { KindInngestExperiment } from '../../generated';
 import type {
   BarStyleKey,
   HTTPTimingBreakdownData,
   InngestBreakdownData,
+  ScoreBadgeData,
   TimelineBarData,
   TimelineData,
 } from '../TimelineBar.types';
 import { traceWalk } from '../runDetailsUtils';
 import {
   isExperimentMetadata,
+  isScoreMetadata,
   isStepInfoRun,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
@@ -212,6 +215,19 @@ function getHTTPTimingFromMetadata(metadata?: SpanMetadata[]): HTTPTimingBreakdo
 }
 
 /**
+ * Extract scores recorded directly on this span. Child spans are deliberately
+ * not walked: the timeline already renders them as their own bars.
+ */
+function getScores(metadata?: SpanMetadata[]): ScoreBadgeData[] | undefined {
+  const scores = scoreRows(metadata?.filter(isScoreMetadata) ?? []).map(({ name, value }) => ({
+    name,
+    value,
+  }));
+
+  return scores.length > 0 ? scores : undefined;
+}
+
+/**
  * Convert a single Trace to TimelineBarData
  */
 function traceToBarData(
@@ -288,6 +304,7 @@ function traceToBarData(
     delayMs,
     hasExperiment,
     experimentMetadata,
+    scores: getScores(trace.metadata),
   };
 }
 
