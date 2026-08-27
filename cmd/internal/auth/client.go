@@ -7,13 +7,31 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
-	"github.com/inngest/inngest/pkg/api/v2/apiv2endpoint"
 	"golang.org/x/oauth2"
 )
+
+var defaultScopes = []string{
+	"accounts:read:*",
+	"apps:read:*",
+	"apps:write:*",
+	"environments:read:*",
+	"environments:write:*",
+	"events:write:*",
+	"experiments:read:*",
+	"functions:read:*",
+	"functions:write:*",
+	"insights:read:*",
+	"runs:read:*",
+	"runs:write:*",
+	"sandboxes:read:*",
+	"sandboxes:write:*",
+	"sessions:read:*",
+	"webhooks:read:*",
+	"webhooks:write:*",
+}
 
 const (
 	ClientID      = "inngest-cli"
@@ -70,6 +88,9 @@ func Issuer() (string, error) {
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return "", errors.New("INNGEST_API_HOST must include a scheme and host")
 	}
+	if err := validateOAuthURL(parsed); err != nil {
+		return "", fmt.Errorf("invalid INNGEST_API_HOST: %w", err)
+	}
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 	path := strings.TrimRight(parsed.Path, "/")
@@ -88,29 +109,7 @@ func Resource(issuer string) string {
 }
 
 func DefaultScopes() []string {
-	excluded := map[string]struct{}{
-		"api_keys":     {},
-		"event_keys":   {},
-		"partners":     {},
-		"signing_keys": {},
-	}
-	set := map[string]struct{}{}
-	for _, endpoint := range apiv2endpoint.Discover() {
-		parts := strings.Split(endpoint.AuthzPermission, ":")
-		if len(parts) != 3 || (parts[1] != "read" && parts[1] != "write") {
-			continue
-		}
-		if _, ok := excluded[parts[0]]; ok {
-			continue
-		}
-		set[parts[0]+":"+parts[1]+":*"] = struct{}{}
-	}
-	result := make([]string, 0, len(set))
-	for scope := range set {
-		result = append(result, scope)
-	}
-	slices.Sort(result)
-	return result
+	return append([]string(nil), defaultScopes...)
 }
 
 func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Metadata, error) {
@@ -119,7 +118,13 @@ func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Meta
 		return "", nil, err
 	}
 	if canonicalResource(target) != canonicalResource(metadata.Resource) {
-		return "", nil, ErrNotLoggedIn
+		return "", nil, errors.New("OAuth session is for a different API host; run `inngest login --force`")
+	}
+	if err := validateOAuthURLString(metadata.Issuer); err != nil {
+		return "", metadata, fmt.Errorf("stored OAuth issuer is invalid: %w", err)
+	}
+	if err := validateOAuthURLString(metadata.Resource); err != nil {
+		return "", metadata, fmt.Errorf("stored OAuth resource is invalid: %w", err)
 	}
 	_, credential, err := m.store.Load()
 	if err != nil {
@@ -135,11 +140,15 @@ func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Meta
 		AccessToken:  credential.AccessToken,
 		TokenType:    credential.TokenType,
 		RefreshToken: credential.RefreshToken,
-		Expiry:       credential.Expiry,
+		Expiry:       m.now(),
 	}
 	refreshed, err := OAuthConfig(metadata.Issuer).TokenSource(m.Context(ctx), token).Token()
 	if err != nil {
 		return "", metadata, fmt.Errorf("refresh OAuth session: %w", err)
+	}
+	returnedResource := stringExtra(refreshed, "resource")
+	if returnedResource != "" && canonicalResource(returnedResource) != canonicalResource(metadata.Resource) {
+		return "", metadata, errors.New("authorization server returned a token for a different resource")
 	}
 	credential = &Credential{
 		AccessToken:  refreshed.AccessToken,
@@ -155,6 +164,9 @@ func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Meta
 }
 
 func (m *Manager) Validate(ctx context.Context, metadata *Metadata, accessToken string) error {
+	if err := validateOAuthURLString(metadata.Resource); err != nil {
+		return fmt.Errorf("stored OAuth resource is invalid: %w", err)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(metadata.Resource, "/")+"/account", nil)
 	if err != nil {
 		return err
@@ -179,6 +191,9 @@ func (m *Manager) Validate(ctx context.Context, metadata *Metadata, accessToken 
 }
 
 func (m *Manager) Revoke(ctx context.Context, metadata *Metadata, credential *Credential) error {
+	if err := validateOAuthURLString(metadata.Issuer); err != nil {
+		return fmt.Errorf("stored OAuth issuer is invalid: %w", err)
+	}
 	values := url.Values{
 		"client_id":       {metadata.ClientID},
 		"token":           {credential.RefreshToken},
@@ -205,10 +220,17 @@ func (m *Manager) Revoke(ctx context.Context, metadata *Metadata, credential *Cr
 	return nil
 }
 
-func MetadataFromToken(issuer string, token *oauth2.Token) (*Metadata, *Credential, error) {
+func MetadataFromToken(issuer, resource string, token *oauth2.Token) (*Metadata, *Credential, error) {
+	if err := validateOAuthURLString(issuer); err != nil {
+		return nil, nil, fmt.Errorf("OAuth issuer is invalid: %w", err)
+	}
+	returnedResource := stringExtra(token, "resource")
+	if canonicalResource(returnedResource) != canonicalResource(resource) {
+		return nil, nil, errors.New("authorization server returned a token for a different resource")
+	}
 	metadata := &Metadata{
 		Issuer:   issuer,
-		Resource: stringExtra(token, "resource"),
+		Resource: resource,
 		ClientID: ClientID,
 		Scopes:   strings.Fields(stringExtra(token, "scope")),
 	}
@@ -251,9 +273,6 @@ func updateMetadataFromToken(metadata *Metadata, token *oauth2.Token) {
 	}
 	if value := stringExtra(token, "scope"); value != "" {
 		metadata.Scopes = strings.Fields(value)
-	}
-	if value := stringExtra(token, "resource"); value != "" {
-		metadata.Resource = value
 	}
 }
 

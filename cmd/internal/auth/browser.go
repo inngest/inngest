@@ -6,15 +6,18 @@ import (
 	"runtime"
 )
 
-func OpenBrowser(url string) error {
+func OpenBrowser(rawURL string) error {
+	if err := validateOAuthURLString(rawURL); err != nil {
+		return err
+	}
 	var command *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		command = exec.Command("open", url)
+		command = exec.Command("open", rawURL)
 	case "windows":
-		command = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		command = exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL)
 	default:
-		command = exec.Command("xdg-open", url)
+		command = exec.Command("xdg-open", rawURL)
 	}
 	if err := command.Start(); err != nil {
 		return err

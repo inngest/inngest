@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { LabeledCheckbox } from '@inngest/components/Checkbox/Checkbox';
 import { Input } from '@inngest/components/Forms/Input';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import { useAuth } from '@clerk/tanstack-react-start';
@@ -16,10 +17,12 @@ import { EnvironmentType } from '@/utils/environments';
 
 type Search = {
   request?: string;
+  user_code?: string;
 };
 
 type AuthorizationDetails = {
   client_name: string;
+  user_code: string;
   account_id: string;
   account_name: string;
   requested_scopes: string[];
@@ -32,6 +35,8 @@ export const Route = createFileRoute('/_authed/oauth/device/')({
   component: DeviceAuthorizationPage,
   validateSearch: (search: Record<string, unknown>): Search => ({
     request: typeof search.request === 'string' ? search.request : undefined,
+    user_code:
+      typeof search.user_code === 'string' ? search.user_code : undefined,
   }),
 });
 
@@ -43,6 +48,7 @@ function DeviceAuthorizationPage() {
   const [request, setRequest] = useState(search.request ?? '');
   const [userCode, setUserCode] = useState('');
   const [details, setDetails] = useState<AuthorizationDetails | null>(null);
+  const [codeConfirmed, setCodeConfirmed] = useState(false);
   const [permissionLevels, setPermissionLevels] = useState<
     Record<string, PermissionLevel>
   >({});
@@ -50,7 +56,9 @@ function DeviceAuthorizationPage() {
   const [workspace, setWorkspace] = useState<Option | null>(null);
   const [durationDays, setDurationDays] = useState(30);
   const [sessionName, setSessionName] = useState('Inngest CLI');
-  const [loading, setLoading] = useState(Boolean(search.request));
+  const [loading, setLoading] = useState(
+    Boolean(search.request && search.user_code),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<'approved' | 'denied' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,15 +88,16 @@ function DeviceAuthorizationPage() {
   }, [details?.permission_groups, permissionLevels]);
 
   useEffect(() => {
-    if (!search.request) return;
+    if (!search.request || !search.user_code) return;
     setRequest(search.request);
     setLoading(true);
     setError(null);
+    setCodeConfirmed(false);
     void apiRequest<AuthorizationDetails>(
       getToken,
       `/oauth/device/authorization?request=${encodeURIComponent(
         search.request,
-      )}`,
+      )}&user_code=${encodeURIComponent(search.user_code)}`,
     )
       .then((response) => {
         setDetails(response);
@@ -105,20 +114,24 @@ function DeviceAuthorizationPage() {
       })
       .catch((err: unknown) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
-  }, [getToken, search.request]);
+  }, [getToken, search.request, search.user_code]);
 
   async function resolveCode() {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await apiRequest<{ request: string }>(
-        getToken,
-        '/oauth/device/authorization/resolve',
-        { user_code: userCode },
-      );
+      const response = await apiRequest<{
+        request: string;
+        user_code: string;
+      }>(getToken, '/oauth/device/authorization/resolve', {
+        user_code: userCode,
+      });
       await navigate({
         to: '/oauth/device',
-        search: { request: response.request },
+        search: {
+          request: response.request,
+          user_code: response.user_code,
+        },
       });
     } catch (err) {
       setError(errorMessage(err));
@@ -128,6 +141,10 @@ function DeviceAuthorizationPage() {
   }
 
   async function approve() {
+    if (!codeConfirmed) {
+      setError('Confirm that the code matches your CLI.');
+      return;
+    }
     if (!boundary) {
       setError('Select an environment boundary.');
       return;
@@ -249,6 +266,22 @@ function DeviceAuthorizationPage() {
         disabled={submitting}
       />
 
+      <div className="border-muted bg-canvasSubtle flex flex-col gap-3 rounded-md border p-4">
+        <p className="text-subtle text-sm">
+          Confirm this code matches the code shown by your CLI.
+        </p>
+        <code className="text-basis text-2xl font-semibold tracking-widest">
+          {details.user_code}
+        </code>
+        <LabeledCheckbox
+          id="confirm-device-code"
+          label="The codes match"
+          checked={codeConfirmed}
+          onCheckedChange={(checked) => setCodeConfirmed(checked === true)}
+          disabled={submitting}
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Select
           label="Environment access"
@@ -353,7 +386,7 @@ function DeviceAuthorizationPage() {
           label="Approve"
           onClick={approve}
           loading={submitting}
-          disabled={submitting}
+          disabled={submitting || !codeConfirmed}
         />
       </div>
     </Page>

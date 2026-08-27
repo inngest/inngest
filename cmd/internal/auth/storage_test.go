@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -112,6 +113,30 @@ func TestStoreRequiresCompleteSession(t *testing.T) {
 
 	err := store.Save(metadata, credential, false)
 	require.ErrorContains(t, err, "incomplete")
+}
+
+func TestStoreKeepsRotatedCredentialWhenMetadataWriteFails(t *testing.T) {
+	store := newStore(t.TempDir(), newMemoryKeyring())
+	metadata, credential := testSession("session-1")
+	require.NoError(t, store.Save(metadata, credential, false))
+
+	rotated := credential
+	rotated.AccessToken = "inngest_at_rotated"
+	rotated.RefreshToken = "inngest_rt_rotated"
+	writeFile := store.writeFile
+	store.writeFile = func(path string, value any, mode os.FileMode) error {
+		if filepath.Base(path) == metadataFile {
+			return errors.New("metadata write failed")
+		}
+		return writeFile(path, value, mode)
+	}
+
+	err := store.Save(metadata, rotated, false)
+
+	require.ErrorContains(t, err, "metadata write failed")
+	_, stored, err := store.Load()
+	require.NoError(t, err)
+	require.Equal(t, rotated, *stored)
 }
 
 func testSession(sessionID string) (Metadata, Credential) {

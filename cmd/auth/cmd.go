@@ -101,7 +101,7 @@ func login(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return fmt.Errorf("complete device login: %w", err)
 	}
-	metadata, credential, err := cliauth.MetadataFromToken(issuer, token)
+	metadata, credential, err := cliauth.MetadataFromToken(issuer, resource, token)
 	if err != nil {
 		return err
 	}
@@ -109,6 +109,7 @@ func login(ctx context.Context, cmd *cli.Command) error {
 		_, _ = fmt.Fprintln(writer(cmd), "Warning: storing credentials in a plaintext user-only file. Use this only on a trusted machine or ephemeral environment.")
 	}
 	if err := manager.Store().Save(*metadata, *credential, cmd.Bool("insecure-storage")); err != nil {
+		_ = manager.Revoke(ctx, metadata, credential)
 		if !cmd.Bool("insecure-storage") {
 			return fmt.Errorf("%w; retry with --insecure-storage only on a trusted machine", err)
 		}
@@ -147,14 +148,20 @@ func logout(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
-	if err := manager.Revoke(ctx, metadata, credential); err != nil {
-		return err
-	}
+	revokeErr := manager.Revoke(ctx, metadata, credential)
 	if err := manager.Store().Delete(metadata); err != nil {
-		return err
+		return errors.Join(revokeErr, err)
 	}
 	if cmd.Bool("json") {
-		return writeJSONLine(cmd, map[string]any{"type": "logout", "revoked": true})
+		return writeJSONLine(cmd, map[string]any{
+			"type":                      "logout",
+			"revoked":                   revokeErr == nil,
+			"local_credentials_removed": true,
+		})
+	}
+	if revokeErr != nil {
+		_, err = fmt.Fprintln(writer(cmd), "Logged out locally. The remote session could not be revoked; revoke it in the Dashboard.")
+		return err
 	}
 	_, err = fmt.Fprintln(writer(cmd), "Logged out.")
 	return err

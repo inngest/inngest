@@ -68,8 +68,9 @@ func (systemKeyring) Delete(service, user string) error {
 }
 
 type Store struct {
-	dir     string
-	keyring keyringStore
+	dir       string
+	keyring   keyringStore
+	writeFile func(string, any, fs.FileMode) error
 }
 
 func NewStore() (*Store, error) {
@@ -77,11 +78,11 @@ func NewStore() (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Store{dir: dir, keyring: systemKeyring{}}, nil
+	return &Store{dir: dir, keyring: systemKeyring{}, writeFile: writeJSONFile}, nil
 }
 
 func newStore(dir string, keyring keyringStore) *Store {
-	return &Store{dir: dir, keyring: keyring}
+	return &Store{dir: dir, keyring: keyring, writeFile: writeJSONFile}
 }
 
 func (s *Store) Save(metadata Metadata, credential Credential, insecure bool) error {
@@ -96,15 +97,17 @@ func (s *Store) Save(metadata Metadata, credential Credential, insecure bool) er
 	metadata.Storage = storageKeyring
 	if insecure {
 		metadata.Storage = storageFile
-		if err := writeJSONFile(s.credentialPath(&metadata), credential, 0o600); err != nil {
+		if err := s.writeFile(s.credentialPath(&metadata), credential, 0o600); err != nil {
 			return fmt.Errorf("write OAuth credential: %w", err)
 		}
 	} else if err := s.keyring.Set(keyringService, keyringUser(&metadata), string(secret)); err != nil {
 		return fmt.Errorf("store OAuth credential in the OS credential store: %w", err)
 	}
 	metadata.UpdatedAt = time.Now().UTC()
-	if err := writeJSONFile(filepath.Join(s.dir, metadataFile), metadata, 0o600); err != nil {
-		_ = s.deleteCredential(&metadata)
+	if err := s.writeFile(filepath.Join(s.dir, metadataFile), metadata, 0o600); err != nil {
+		if previous == nil || credentialLocation(previous) != credentialLocation(&metadata) {
+			_ = s.deleteCredential(&metadata)
+		}
 		return fmt.Errorf("write OAuth session metadata: %w", err)
 	}
 	if previous != nil && credentialLocation(previous) != credentialLocation(&metadata) {
