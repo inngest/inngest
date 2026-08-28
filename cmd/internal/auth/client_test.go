@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -65,7 +66,7 @@ func TestAccessTokenChecksResourceBeforeCredentialStore(t *testing.T) {
 	manager := &Manager{store: store, now: time.Now}
 
 	_, _, err := manager.AccessToken(context.Background(), "https://example.com/v2")
-	require.ErrorContains(t, err, "different API host")
+	require.ErrorIs(t, err, ErrNotLoggedIn)
 }
 
 func TestAccessTokenRefreshesWithinLeeway(t *testing.T) {
@@ -104,6 +105,74 @@ func TestAccessTokenRefreshesWithinLeeway(t *testing.T) {
 	_, stored, err := store.Load()
 	require.NoError(t, err)
 	require.Equal(t, "new-refresh", stored.RefreshToken)
+}
+
+func TestAccessTokenSerializesRefreshAcrossManagers(t *testing.T) {
+	now := time.Now().UTC()
+	refreshStarted := make(chan struct{})
+	releaseRefresh := make(chan struct{})
+	secondRefresh := make(chan struct{}, 1)
+	var refreshes atomic.Int32
+
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if refreshes.Add(1) == 1 {
+			close(refreshStarted)
+			<-releaseRefresh
+		} else {
+			secondRefresh <- struct{}{}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "new-access",
+			"refresh_token": "new-refresh",
+			"token_type":    "Bearer",
+			"expires_in":    3600,
+			"resource":      server.URL + "/v2",
+		}))
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	metadata, credential := testSession("session-1")
+	metadata.Issuer = server.URL
+	metadata.Resource = server.URL + "/v2"
+	metadata.SessionExpiresAt = now.Add(time.Hour)
+	credential.Expiry = now.Add(20 * time.Second)
+	store := newStore(dir, newMemoryKeyring())
+	require.NoError(t, store.Save(metadata, credential, true))
+
+	newManager := func() *Manager {
+		return &Manager{
+			store:      newStore(dir, newMemoryKeyring()),
+			httpClient: server.Client(),
+			now:        func() time.Time { return now },
+		}
+	}
+	tokens := make(chan string, 2)
+	errs := make(chan error, 2)
+	accessToken := func(manager *Manager) {
+		token, _, err := manager.AccessToken(context.Background(), metadata.Resource)
+		tokens <- token
+		errs <- err
+	}
+
+	go accessToken(newManager())
+	<-refreshStarted
+	go accessToken(newManager())
+
+	select {
+	case <-secondRefresh:
+		t.Fatal("concurrent refresh reached the token endpoint")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(releaseRefresh)
+
+	for range 2 {
+		require.NoError(t, <-errs)
+		require.Equal(t, "new-access", <-tokens)
+	}
+	require.Equal(t, int32(1), refreshes.Load())
 }
 
 func TestMetadataFromTokenRejectsDifferentResource(t *testing.T) {

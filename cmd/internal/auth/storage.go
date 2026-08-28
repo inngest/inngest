@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	keyringService = "inngest-cli"
-	metadataFile   = "auth.json"
-	storageKeyring = "keyring"
-	storageFile    = "file"
+	keyringService  = "inngest-cli"
+	metadataFile    = "auth.json"
+	refreshLockFile = "auth-refresh.lock"
+	storageKeyring  = "keyring"
+	storageFile     = "file"
 )
 
 var ErrNotLoggedIn = errors.New("not logged in")
@@ -132,32 +133,40 @@ func (s *Store) Load() (*Metadata, *Credential, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	credential, err := s.loadCredential(metadata)
+	if err != nil {
+		return nil, nil, err
+	}
+	return metadata, credential, nil
+}
+
+func (s *Store) loadCredential(metadata *Metadata) (*Credential, error) {
 	credential := &Credential{}
 	switch metadata.Storage {
 	case storageKeyring:
 		secret, err := s.keyring.Get(keyringService, keyringUser(metadata))
 		if errors.Is(err, keyring.ErrNotFound) {
-			return nil, nil, ErrNotLoggedIn
+			return nil, ErrNotLoggedIn
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("read OAuth credential from the OS credential store: %w", err)
+			return nil, fmt.Errorf("read OAuth credential from the OS credential store: %w", err)
 		}
 		if err := json.Unmarshal([]byte(secret), credential); err != nil {
-			return nil, nil, errors.New("stored OAuth credential is invalid")
+			return nil, errors.New("stored OAuth credential is invalid")
 		}
 	case storageFile:
 		if err := readJSONFile(s.credentialPath(metadata), credential, true); errors.Is(err, fs.ErrNotExist) {
-			return nil, nil, ErrNotLoggedIn
+			return nil, ErrNotLoggedIn
 		} else if err != nil {
-			return nil, nil, fmt.Errorf("read OAuth credential file: %w", err)
+			return nil, fmt.Errorf("read OAuth credential file: %w", err)
 		}
 	default:
-		return nil, nil, errors.New("stored OAuth credential has an unknown storage type")
+		return nil, errors.New("stored OAuth credential has an unknown storage type")
 	}
 	if credential.AccessToken == "" || credential.RefreshToken == "" {
-		return nil, nil, errors.New("stored OAuth credential is incomplete")
+		return nil, errors.New("stored OAuth credential is incomplete")
 	}
-	return metadata, credential, nil
+	return credential, nil
 }
 
 func (s *Store) Delete(metadata *Metadata) error {
@@ -206,6 +215,10 @@ func credentialLocation(metadata *Metadata) string {
 
 func (s *Store) credentialPath(metadata *Metadata) string {
 	return filepath.Join(s.dir, "oauth-credentials-"+credentialID(metadata)+".json")
+}
+
+func (s *Store) refreshLockPath() string {
+	return filepath.Join(s.dir, refreshLockFile)
 }
 
 func (s *Store) deleteCredential(metadata *Metadata) error {

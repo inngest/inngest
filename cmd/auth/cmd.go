@@ -64,10 +64,15 @@ func login(ctx context.Context, cmd *cli.Command) error {
 	if err != nil {
 		return err
 	}
+	issuer, err := cliauth.Issuer()
+	if err != nil {
+		return err
+	}
+	resource := cliauth.Resource(issuer)
 	previousMetadata, previousCredential, loadErr := manager.Store().Load()
 	if !cmd.Bool("force") {
 		if loadErr == nil {
-			accessToken, metadata, tokenErr := manager.AccessToken(ctx, previousMetadata.Resource)
+			accessToken, metadata, tokenErr := manager.AccessToken(ctx, resource)
 			if tokenErr == nil && manager.Validate(ctx, metadata, accessToken) == nil {
 				return writeStatus(cmd, metadata, true, "already_authenticated")
 			}
@@ -76,11 +81,6 @@ func login(ctx context.Context, cmd *cli.Command) error {
 		}
 	}
 
-	issuer, err := cliauth.Issuer()
-	if err != nil {
-		return err
-	}
-	resource := cliauth.Resource(issuer)
 	oauthConfig := cliauth.OAuthConfig(issuer)
 	ctx = manager.Context(ctx)
 	device, err := oauthConfig.DeviceAuth(ctx, oauth2.SetAuthURLParam("resource", resource))

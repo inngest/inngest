@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofrs/flock"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2oauth"
 	"golang.org/x/oauth2"
 )
@@ -94,30 +95,33 @@ func DefaultScopes() []string {
 }
 
 func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Metadata, error) {
-	metadata, err := m.store.Metadata()
-	if err != nil {
-		return "", nil, err
-	}
-	// never use a token with a different api host
-	if canonicalResource(target) != canonicalResource(metadata.Resource) {
-		return "", nil, errors.New("OAuth session is for a different API host; run `inngest login --force`")
-	}
-	if err := validateOAuthURLString(metadata.Issuer); err != nil {
-		return "", metadata, fmt.Errorf("stored OAuth issuer is invalid: %w", err)
-	}
-	if err := validateOAuthURLString(metadata.Resource); err != nil {
-		return "", metadata, fmt.Errorf("stored OAuth resource is invalid: %w", err)
-	}
-	_, credential, err := m.store.Load()
+	metadata, credential, err := m.loadToken(target)
 	if err != nil {
 		return "", metadata, err
-	}
-	if !metadata.SessionExpiresAt.After(m.now()) {
-		return "", metadata, errors.New("OAuth session has expired; run `inngest login`")
 	}
 	if credential.Expiry.After(m.now().Add(refreshLeeway)) {
 		return credential.AccessToken, metadata, nil
 	}
+
+	refreshLock := flock.New(m.store.refreshLockPath())
+	locked, err := refreshLock.TryLockContext(ctx, 50*time.Millisecond)
+	if err != nil {
+		return "", metadata, fmt.Errorf("lock OAuth refresh: %w", err)
+	}
+	if !locked {
+		return "", metadata, errors.New("lock OAuth refresh")
+	}
+	defer func() { _ = refreshLock.Unlock() }()
+
+	// another cli may have refreshed while this one waited
+	metadata, credential, err = m.loadToken(target)
+	if err != nil {
+		return "", metadata, err
+	}
+	if credential.Expiry.After(m.now().Add(refreshLeeway)) {
+		return credential.AccessToken, metadata, nil
+	}
+
 	token := &oauth2.Token{
 		AccessToken:  credential.AccessToken,
 		TokenType:    credential.TokenType,
@@ -144,6 +148,31 @@ func (m *Manager) AccessToken(ctx context.Context, target string) (string, *Meta
 		return "", metadata, err
 	}
 	return credential.AccessToken, metadata, nil
+}
+
+func (m *Manager) loadToken(target string) (*Metadata, *Credential, error) {
+	metadata, err := m.store.Metadata()
+	if err != nil {
+		return nil, nil, err
+	}
+	// never use a token with a different api host
+	if canonicalResource(target) != canonicalResource(metadata.Resource) {
+		return nil, nil, ErrNotLoggedIn
+	}
+	if err := validateOAuthURLString(metadata.Issuer); err != nil {
+		return metadata, nil, fmt.Errorf("stored OAuth issuer is invalid: %w", err)
+	}
+	if err := validateOAuthURLString(metadata.Resource); err != nil {
+		return metadata, nil, fmt.Errorf("stored OAuth resource is invalid: %w", err)
+	}
+	credential, err := m.store.loadCredential(metadata)
+	if err != nil {
+		return metadata, nil, err
+	}
+	if !metadata.SessionExpiresAt.After(m.now()) {
+		return metadata, nil, errors.New("OAuth session has expired; run `inngest login`")
+	}
+	return metadata, credential, nil
 }
 
 func (m *Manager) Validate(ctx context.Context, metadata *Metadata, accessToken string) error {

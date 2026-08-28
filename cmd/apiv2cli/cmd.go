@@ -151,7 +151,6 @@ func commonFlags() []cli.Flag {
 			Category: "Auth",
 			Name:     "signing-key",
 			Usage:    "Signing key sent as a Bearer token",
-			Sources:  cli.EnvVars("INNGEST_SIGNING_KEY"),
 		},
 		&cli.StringFlag{
 			Category: "Auth",
@@ -897,6 +896,7 @@ func authToken(ctx context.Context, cmd *cli.Command, resource string) (string, 
 	if apiKey := cmd.String("api-key"); apiKey != "" {
 		return apiKey, nil
 	}
+	// an explicit key overrides the stored login
 	if signingKey := cmd.String("signing-key"); signingKey != "" {
 		return signingKey, nil
 	}
@@ -906,7 +906,7 @@ func authToken(ctx context.Context, cmd *cli.Command, resource string) (string, 
 	}
 	token, _, err := manager.AccessToken(ctx, resource)
 	if errors.Is(err, cliauth.ErrNotLoggedIn) {
-		return "", nil
+		return os.Getenv("INNGEST_SIGNING_KEY"), nil
 	}
 	return token, err
 }

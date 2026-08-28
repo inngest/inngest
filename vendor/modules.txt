@@ -623,6 +623,9 @@ github.com/go-viper/mapstructure/v2/internal/errors
 # github.com/godbus/dbus/v5 v5.2.2
 ## explicit; go 1.20
 github.com/godbus/dbus/v5
+# github.com/gofrs/flock v0.12.1
+## explicit; go 1.21.0
+github.com/gofrs/flock
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/gogoproto
