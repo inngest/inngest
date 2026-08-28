@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { LabeledCheckbox } from '@inngest/components/Checkbox/Checkbox';
 import { Input } from '@inngest/components/Forms/Input';
 import { Select, type Option } from '@inngest/components/Select/Select';
 import { useAuth } from '@clerk/tanstack-react-start';
@@ -74,7 +73,6 @@ function DeviceAuthorizationPage() {
   const [details, setDetails] = useState<LoadedAuthorizationDetails | null>(
     null,
   );
-  const [codeConfirmed, setCodeConfirmed] = useState(false);
   const [permissionLevels, setPermissionLevels] = useState<
     Record<string, PermissionLevel>
   >({});
@@ -127,7 +125,6 @@ function DeviceAuthorizationPage() {
     setLoading(true);
     setError(null);
     setDetails(null);
-    setCodeConfirmed(false);
     setPermissionLevels({});
     setBoundary(null);
     setWorkspace(null);
@@ -192,10 +189,6 @@ function DeviceAuthorizationPage() {
 
   async function approve() {
     if (!details) return;
-    if (!codeConfirmed) {
-      setError('Confirm that the code matches your CLI.');
-      return;
-    }
     if (!boundary) {
       setError('Select an environment boundary.');
       return;
@@ -305,8 +298,9 @@ function DeviceAuthorizationPage() {
       <div className="flex flex-col gap-1">
         <h1 className="text-basis text-2xl">Connect {details.client_name}</h1>
         <p className="text-subtle">
-          Grant access to {details.account_name}. You can revoke this session
-          later.
+          Grant access to{' '}
+          {details.account_name.trim() || 'your Inngest account'}. You can
+          revoke this session later.
         </p>
       </div>
 
@@ -320,18 +314,11 @@ function DeviceAuthorizationPage() {
 
       <div className="border-muted bg-canvasSubtle flex flex-col gap-3 rounded-md border p-4">
         <p className="text-subtle text-sm">
-          Confirm this code matches the code shown by your CLI.
+          Make sure this code matches the code shown by your CLI.
         </p>
         <code className="text-basis text-2xl font-semibold tracking-widest">
           {details.user_code}
         </code>
-        <LabeledCheckbox
-          id="confirm-device-code"
-          label="The codes match"
-          checked={codeConfirmed}
-          onCheckedChange={(checked) => setCodeConfirmed(checked === true)}
-          disabled={submitting}
-        />
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -438,7 +425,7 @@ function DeviceAuthorizationPage() {
           label="Approve"
           onClick={approve}
           loading={submitting}
-          disabled={submitting || !codeConfirmed}
+          disabled={submitting}
         />
       </div>
     </Page>

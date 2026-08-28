@@ -211,7 +211,7 @@ func writeVerification(cmd *cli.Command, device *oauth2.DeviceAuthResponse) erro
 	}
 	_, err := fmt.Fprintf(
 		writer(cmd),
-		"Open %s and enter code %s.\n",
+		"Authorize at %s with code %s.\n",
 		device.VerificationURI,
 		device.UserCode,
 	)
