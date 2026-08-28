@@ -29,6 +29,10 @@ type AuthorizationDetails = {
   permission_groups: PermissionGroup[];
 };
 
+type LoadedAuthorizationDetails = AuthorizationDetails & {
+  request: string;
+};
+
 type Boundary = 'single_env' | 'all_envs';
 
 function requestedPermissionLevels({
@@ -65,9 +69,11 @@ function DeviceAuthorizationPage() {
   const navigate = useNavigate();
   const { getToken } = useAuth();
   const [{ data: environments }] = useEnvironments();
-  const [request, setRequest] = useState(search.request ?? '');
+  const request = search.request ?? '';
   const [userCode, setUserCode] = useState('');
-  const [details, setDetails] = useState<AuthorizationDetails | null>(null);
+  const [details, setDetails] = useState<LoadedAuthorizationDetails | null>(
+    null,
+  );
   const [codeConfirmed, setCodeConfirmed] = useState(false);
   const [permissionLevels, setPermissionLevels] = useState<
     Record<string, PermissionLevel>
@@ -111,11 +117,21 @@ function DeviceAuthorizationPage() {
   useEffect(() => {
     const requestID = search.request;
     const submittedUserCode = search.user_code;
-    if (!requestID || !submittedUserCode) return;
-    setRequest(requestID);
+    if (!requestID || !submittedUserCode) {
+      setDetails(null);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
+    setDetails(null);
     setCodeConfirmed(false);
+    setPermissionLevels({});
+    setBoundary(null);
+    setWorkspace(null);
+    setDone(null);
     const loadAuthorization = async () => {
       try {
         const response = await apiRequest<AuthorizationDetails>(
@@ -123,8 +139,10 @@ function DeviceAuthorizationPage() {
           `/oauth/device/authorization?request=${encodeURIComponent(
             requestID,
           )}&user_code=${encodeURIComponent(submittedUserCode)}`,
+          undefined,
+          controller.signal,
         );
-        setDetails(response);
+        setDetails({ ...response, request: requestID });
         // start with the client's requested access selected
         setPermissionLevels(
           requestedPermissionLevels({
@@ -133,13 +151,19 @@ function DeviceAuthorizationPage() {
           }),
         );
       } catch (err) {
-        setError(errorMessage(err));
+        if (!controller.signal.aborted) {
+          setError(errorMessage(err));
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     void loadAuthorization();
+
+    return () => controller.abort();
   }, [getToken, search.request, search.user_code]);
 
   async function resolveCode() {
@@ -167,6 +191,7 @@ function DeviceAuthorizationPage() {
   }
 
   async function approve() {
+    if (!details) return;
     if (!codeConfirmed) {
       setError('Confirm that the code matches your CLI.');
       return;
@@ -187,7 +212,7 @@ function DeviceAuthorizationPage() {
     setError(null);
     try {
       await apiRequest(getToken, '/oauth/device/authorization', {
-        request,
+        request: details.request,
         permission_grants: selectedPermissions,
         resource_boundary_mode: boundary,
         workspace_id: boundary === 'single_env' ? workspace?.id : null,
@@ -203,11 +228,12 @@ function DeviceAuthorizationPage() {
   }
 
   async function deny() {
+    if (!details) return;
     setSubmitting(true);
     setError(null);
     try {
       await apiRequest(getToken, '/oauth/device/authorization/deny', {
-        request,
+        request: details.request,
       });
       setDone('denied');
     } catch (err) {
@@ -431,6 +457,7 @@ async function apiRequest<T = unknown>(
   getToken: () => Promise<string | null>,
   path: string,
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   const token = await getToken();
   const response = await fetch(new URL(path, import.meta.env.VITE_API_URL), {
@@ -442,6 +469,7 @@ async function apiRequest<T = unknown>(
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
   });
   const payload = (await response.json()) as T & {
     error?: string;
