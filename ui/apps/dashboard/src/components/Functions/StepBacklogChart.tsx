@@ -4,6 +4,7 @@ import { useQuery } from 'urql';
 import SimpleLineChart from '@/components/Charts/SimpleLineChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
+import { mergeBacklogMetrics } from './mergeBacklogMetrics';
 
 const GetStepBacklogDocument = graphql(`
   query GetStepBacklogMetrics(
@@ -64,16 +65,22 @@ export default function StepBacklogChart({
 
   const scheduled = data?.environment.function?.scheduled.data ?? [];
   const sleeping = data?.environment.function?.sleeping.data ?? [];
-
-  const maxLength = Math.max(scheduled.length, sleeping.length);
-
-  const metrics = Array.from({ length: maxLength }).map((_, idx) => ({
-    name: scheduled[idx]?.bucket || sleeping[idx]?.bucket || '',
-    values: {
-      scheduled: scheduled[idx]?.value ?? 0,
-      sleeping: sleeping[idx]?.value ?? 0,
-    },
-  }));
+  const granularity =
+    data?.environment.function?.scheduled.granularity ??
+    data?.environment.function?.sleeping.granularity ??
+    '1m';
+  // Both responses cover the same requested range, so use either one for the bounds.
+  const rangeStart =
+    data?.environment.function?.scheduled.from ?? startTime;
+  const rangeEnd =
+    data?.environment.function?.scheduled.to ?? endTime;
+  const metrics = mergeBacklogMetrics(
+    scheduled,
+    sleeping,
+    granularity,
+    rangeStart,
+    rangeEnd,
+  );
 
   return (
     <SimpleLineChart
@@ -84,6 +91,7 @@ export default function StepBacklogChart({
         { name: 'Queued', dataKey: 'scheduled', color: colors.slate['500'] },
         { name: 'Sleeping', dataKey: 'sleeping', color: colors.teal['500'] },
       ]}
+      connectNulls
       isLoading={isFetchingMetrics}
       error={metricsError}
     />
