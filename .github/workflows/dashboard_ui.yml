@@ -32,6 +32,8 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
         working-directory: ui/apps/dashboard
+      - name: Install ImageMagick
+        run: sudo apt-get install --yes imagemagick
       - name: Visual tests
         run: pnpm test:visual
         working-directory: ui/apps/dashboard

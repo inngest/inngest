@@ -23,4 +23,7 @@ pnpm test:visual:update
 
 Playwright captures individual fixed-width chart containers with a UTC
 timezone, light theme, 1× device scale, and animations disabled. Failed CI
-runs upload the expected, actual, and diff images as an artifact.
+runs upload the expected, actual, and diff images as an artifact. Each failed
+comparison also includes a labeled `*-blink.gif` that alternates between the
+expected and actual screenshots. Creating the GIF locally requires
+ImageMagick (`magick` or `convert`) on `PATH`.
