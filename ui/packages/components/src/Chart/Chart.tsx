@@ -24,6 +24,7 @@ export interface ChartProps {
   option: EChartsOption;
   settings?: SetOptionOpts;
   theme?: 'light' | 'dark';
+  animation?: boolean;
   className?: string;
   group?: string;
   loading?: boolean;
@@ -33,6 +34,7 @@ export const Chart = ({
   option,
   settings = { notMerge: true },
   theme = 'light',
+  animation,
   className,
   group,
   loading = false,
@@ -75,7 +77,8 @@ export const Chart = ({
   useEffect(() => {
     if (chartRef.current !== null) {
       const chart = getInstanceByDom(chartRef.current);
-      chart?.setOption(option, settings);
+      const renderedOption = animation === undefined ? option : { ...option, animation };
+      chart?.setOption(renderedOption, settings);
 
       if (chart) {
         if (loading) {
@@ -91,7 +94,7 @@ export const Chart = ({
         } else {
           chart.hideLoading();
           if (option) {
-            chart.setOption(option, settings); // Update chart with new data
+            chart.setOption(renderedOption, settings); // Update chart with new data
           }
         }
 
@@ -101,7 +104,7 @@ export const Chart = ({
         }
       }
     }
-  }, [option, settings, loading]);
+  }, [option, settings, loading, animation]);
 
   return (
     <div

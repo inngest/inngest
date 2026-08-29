@@ -12,9 +12,11 @@ export type RunsThroughputMetricsType =
 export const RunsThrougput = ({
   workspace,
   entities,
+  animation,
 }: {
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
+  animation?: boolean;
 }) => {
   const metrics =
     workspace && mapEntityLines(workspace.runsThroughput.metrics, entities);
@@ -40,6 +42,7 @@ export const RunsThrougput = ({
       </div>
       <div className="flex h-full flex-row items-center overflow-visible">
         <Chart
+          animation={animation}
           option={metrics ? getLineChartOptions(metrics) : {}}
           className="relative h-full w-full overflow-visible"
           group="metricsDashboard"

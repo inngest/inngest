@@ -24,6 +24,7 @@ import LoadingIcon from '@/components/Icons/LoadingIcon';
 type SimpleLineChartProps = {
   className?: string;
   height?: number;
+  animation?: boolean;
   title: string | React.ReactNode;
   desc?: string;
   data?: {
@@ -86,6 +87,7 @@ function omit(obj: Record<string, any>, props: string[]) {
 export default function SimpleLineChart({
   className = '',
   height = 200,
+  animation = true,
   title,
   desc,
   data = [],
@@ -267,6 +269,7 @@ export default function SimpleLineChart({
               />
               {legend.map((l) => (
                 <Line
+                  isAnimationActive={animation}
                   connectNulls={connectNulls}
                   dot={false}
                   key={l.name}

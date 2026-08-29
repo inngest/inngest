@@ -65,10 +65,12 @@ export const Concurrency = ({
   metrics,
   entities,
   isMarketplace = false,
+  animation,
 }: {
   metrics?: ConcurrencyMetric[];
   entities: EntityLookup;
   isMarketplace: boolean;
+  animation?: boolean;
 }) => {
   const chartOptions = metrics && mapConcurrency(metrics, entities);
 
@@ -103,6 +105,7 @@ export const Concurrency = ({
       </div>
       <div className="flex h-full flex-row items-center">
         <Chart
+          animation={animation}
           option={chartOptions ? chartOptions : {}}
           className="h-full w-full"
           group="metricsDashboard"

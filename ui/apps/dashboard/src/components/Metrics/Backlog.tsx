@@ -12,9 +12,11 @@ export type BacklogMetricsType =
 export const Backlog = ({
   workspace,
   entities,
+  animation,
 }: {
   workspace?: VolumeMetricsQuery['workspace'];
   entities: EntityLookup;
+  animation?: boolean;
 }) => {
   const metrics =
     workspace &&
@@ -41,6 +43,7 @@ export const Backlog = ({
       </div>
       <div className="flex h-full flex-row items-center">
         <Chart
+          animation={animation}
           option={metrics ? getLineChartOptions(metrics) : {}}
           className="h-full w-full"
           group="metricsDashboard"

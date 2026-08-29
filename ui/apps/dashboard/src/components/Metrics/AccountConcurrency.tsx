@@ -16,12 +16,14 @@ type Props = {
   accountConcurrency: AccountConcurrencyData | undefined;
   limit?: number;
   isMarketplace: boolean;
+  animation?: boolean;
 };
 
 export function AccountConcurrency({
   accountConcurrency,
   limit,
   isMarketplace = false,
+  animation,
 }: Props) {
   let option = {};
   if (accountConcurrency) {
@@ -59,6 +61,7 @@ export function AccountConcurrency({
       </div>
       <div className="flex h-full flex-row items-center">
         <Chart
+          animation={animation}
           className="h-full w-full"
           group="metricsDashboard"
           option={option}
