@@ -1,0 +1,29 @@
+html {
+  color-scheme: light;
+  background: #f6f6f6;
+}
+
+body {
+  margin: 0;
+  background: #f6f6f6;
+  font-family: Arial, sans-serif;
+}
+
+main {
+  display: flex;
+  width: 760px;
+  flex-direction: column;
+  gap: 32px;
+  padding: 24px;
+}
+
+.visual-case {
+  width: 760px;
+  background: rgb(var(--color-background-canvas-base));
+}
+
+*,
+*::before,
+*::after {
+  caret-color: transparent !important;
+}

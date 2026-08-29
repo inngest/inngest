@@ -27,6 +27,8 @@
     "format": "prettier --write src",
     "lint": "eslint src --report-unused-disable-directives --max-warnings 0",
     "test": "vitest run",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
     "type-check": "tsc --noEmit",
     "preinstall": "npx only-allow pnpm"
   },
@@ -94,6 +96,7 @@
     "@eslint/js": "^9.31.0",
     "@graphql-codegen/cli": "^6.0.2",
     "@graphql-codegen/client-preset": "^5.1.3",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/container-queries": "^0.1.1",
     "@types/mustache": "^4.2.6",
     "@types/node": "^24.0.14",
