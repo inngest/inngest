@@ -67,8 +67,8 @@ export const dateFormat = (dateString: string, diff: number) => {
   return d < 6000 // a minute
     ? lightFormat(date, 'HH:mm:ss:SSS')
     : d <= 8.64e7 // a day
-      ? lightFormat(date, 'HH:mm')
-      : lightFormat(date, 'MM/dd:HH');
+    ? lightFormat(date, 'HH:mm')
+    : lightFormat(date, 'MM/dd:HH');
 };
 
 export const timeDiff = (start?: string, end?: string) =>
@@ -93,7 +93,7 @@ export const convertLookup = (entities?: EntityType[]): EntityLookup | {} =>
     : {};
 
 export const sum = (data?: MetricsData[]) =>
-  data ? data.reduce((acc, { value }) => acc + value, 0) : 0;
+  data ? data.reduce((acc, { value }) => acc + (value ?? 0), 0) : 0;
 
 export const formatNumber = (number?: number | bigint) =>
   (number || 0).toLocaleString(undefined);

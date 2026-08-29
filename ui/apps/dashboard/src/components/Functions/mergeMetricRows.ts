@@ -2,7 +2,7 @@ import { findSustainedMissingBuckets } from './findSustainedMissingBuckets';
 
 export type Metric = {
   bucket: string;
-  value: number;
+  value: number | null;
 };
 
 export type MetricSeries = {
@@ -14,7 +14,7 @@ export type MetricSeries = {
 
 type MetricRow = {
   name: string;
-  values: Record<string, number | boolean | undefined>;
+  values: Record<string, number | boolean | null>;
   inferred?: string[];
 };
 
@@ -31,7 +31,10 @@ export function mergeMetricRows(
     for (const { bucket, value } of data) {
       const timestamp = new Date(bucket).getTime();
       const metric = byBucket.get(timestamp) ?? { name: bucket, values: {} };
-      metric.values[key] = mapValue ? mapValue(value) : value;
+
+      // Preserve null as a chart gap and don't pass it to mappers; for example,
+      // Boolean(null) would conflate absence with a reported false value.
+      metric.values[key] = value === null ? null : (mapValue?.(value) ?? value);
       byBucket.set(timestamp, metric);
     }
   }

@@ -20,7 +20,7 @@ const sum = (metrics: ScopedMetric[]) =>
   metrics.reduce(
     (acc, metric: ScopedMetric) =>
       metric.data.map((item, index) => ({
-        value: (acc[index]?.value || 0) + item.value,
+        value: (acc[index]?.value ?? 0) + (item.value ?? 0),
         bucket: item.bucket,
       })),
     accumulator,

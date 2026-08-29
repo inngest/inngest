@@ -29,7 +29,7 @@ type SimpleLineChartProps = {
   data?: {
     name: string;
     values: {
-      [key: string]: number | boolean | undefined;
+      [key: string]: number | boolean | null;
     };
     inferred?: string[];
   }[];
