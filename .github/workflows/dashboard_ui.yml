@@ -29,3 +29,16 @@ jobs:
       - name: Type check
         run: pnpm type-check
         working-directory: ui/apps/dashboard
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: ui/apps/dashboard
+      - name: Visual tests
+        run: pnpm test:visual
+        working-directory: ui/apps/dashboard
+      - name: Upload visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metric-chart-visual-diffs
+          path: ui/apps/dashboard/test-results/visual
+          if-no-files-found: ignore
