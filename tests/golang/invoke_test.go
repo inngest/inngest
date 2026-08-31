@@ -501,7 +501,7 @@ func TestInvokeInProgressRunID(t *testing.T) {
 	var observedRunID string
 	invokeOp := models.StepOpInvoke.String()
 	require.EventuallyWithT(t, func(ct *assert.CollectT) {
-		run, err := c.RunTraces(ctx, mainRunID, true)
+		run, err := c.RunTraces(ctx, mainRunID)
 		require.NoError(ct, err)
 		require.NotNil(ct, run)
 		require.NotNil(ct, run.Trace)

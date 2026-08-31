@@ -17,12 +17,10 @@ type UseRunsPaginationParams = {
     celQuery: string | undefined;
     isDeferred: boolean | null;
   };
-  tracePreviewEnabled: boolean;
 };
 
 export function useRunsPagination({
   commonQueryVars,
-  tracePreviewEnabled,
 }: UseRunsPaginationParams) {
   const [cursor, setCursor] = useState<string | null>(null);
   const [allRuns, setAllRuns] = useState<Run[]>([]);
@@ -33,7 +31,6 @@ export function useRunsPagination({
     variables: {
       ...commonQueryVars,
       functionRunCursor: cursor,
-      preview: tracePreviewEnabled,
     },
   });
 

@@ -508,7 +508,7 @@ type FunctionRunV2 {
 
   output: Bytes
 
-  trace(preview: Boolean): RunTraceSpan
+  trace: RunTraceSpan
   hasAI: Boolean!
   defers: [RunDefer!]!
   siblingDefers: [RunDefer!]!
@@ -519,7 +519,7 @@ type FunctionRunV2 {
 type RunsV2Connection {
   edges: [FunctionRunV2Edge!]!
   pageInfo: PageInfo!
-  totalCount(preview: Boolean): Int!
+  totalCount: Int!
 }
 
 type FunctionRunV2Edge {

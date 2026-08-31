@@ -168,13 +168,11 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
 export const StepInfo = ({
   selectedStep,
   pollInterval: initialPollInterval,
-  tracesPreviewEnabled,
   debug = false,
   isDurableEndpoint,
 }: {
   selectedStep: StepInfoType;
   pollInterval?: number;
-  tracesPreviewEnabled?: boolean;
   debug?: boolean;
   isDurableEndpoint?: boolean;
 }) => {
@@ -185,7 +183,6 @@ export const StepInfo = ({
   const { loading, data: result } = useGetTraceResult({
     traceID: trace.outputID,
     refetchInterval: pollInterval ? pollInterval : undefined,
-    preview: tracesPreviewEnabled,
   });
 
   const metadataIsEnabled = true;

@@ -300,7 +300,6 @@ export const GET_RUNS = gql`
     $timeField: RunsV2OrderByField!
     $functionRunCursor: String = null
     $celQuery: String = null
-    $preview: Boolean = false
     $isDeferred: Boolean = null
   ) {
     runs(
@@ -314,7 +313,6 @@ export const GET_RUNS = gql`
       }
       orderBy: [{ field: $timeField, direction: DESC }]
       after: $functionRunCursor
-      preview: $preview
     ) {
       edges {
         node {
@@ -360,7 +358,6 @@ export const COUNT_RUNS = gql`
     $startTime: Time!
     $status: [FunctionRunStatus!]
     $timeField: RunsV2OrderByField!
-    $preview: Boolean = false
     $isDeferred: Boolean = null
   ) {
     runs(
@@ -371,9 +368,8 @@ export const COUNT_RUNS = gql`
         isDeferred: $isDeferred
       }
       orderBy: [{ field: $timeField, direction: DESC }]
-      preview: $preview
     ) {
-      totalCount(preview: $preview)
+      totalCount
     }
   }
 `;
@@ -449,7 +445,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
 `;
 
 export const GET_RUN = gql`
-  query GetRun($runID: String!, $preview: Boolean) {
+  query GetRun($runID: String!) {
     run(runID: $runID) {
       function {
         app {
@@ -461,7 +457,7 @@ export const GET_RUN = gql`
         slug
       }
       status
-      trace(preview: $preview) {
+      trace {
         ...TraceDetails
         childrenSpans {
           ...TraceDetails
@@ -717,7 +713,7 @@ export const GET_EVENT_RUNS = gql`
           name
           slug
         }
-        trace(preview: true) {
+        trace {
           skipReason
           skipExistingRunID
         }

@@ -94,8 +94,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 			first: $first,
 			after: %s,
 			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query, functionIDs: $ids },
-			orderBy: %s,
-			preview: true
+			orderBy: %s
 		) {
 			edges {
 				cursor
@@ -113,7 +112,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 				endCursor
 				hasNextPage
 			}
-			totalCount(preview: true)
+			totalCount
 		}
 	}`,
 		cursor,
@@ -320,7 +319,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 			return
 		}
 
-		run, err := c.RunTraces(ctx, *runID, opts.NewTraces)
+		run, err := c.RunTraces(ctx, *runID)
 		if !a.NoError(err) {
 			return
 		}
@@ -351,15 +350,14 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 }
 
 type WaitForRunTracesOptions struct {
-	Status    models.FunctionStatus
-	Timeout   time.Duration
-	Interval  time.Duration
-	NewTraces bool
+	Status   models.FunctionStatus
+	Timeout  time.Duration
+	Interval time.Duration
 
 	ChildSpanCount int
 }
 
-func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*RunV2, error) {
+func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	c.Helper()
 
 	if runID == "" {
@@ -367,7 +365,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*
 	}
 
 	query := `
-	  query GetTraceRun($runID: String!, $preview: Boolean) {
+	  query GetTraceRun($runID: String!) {
 	  	run(runID: $runID) {
 				status
 				traceID
@@ -376,7 +374,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*
 				cronSchedule
         endedAt
 
-				trace(preview: $preview) {
+				trace {
 					...TraceDetails
 					childrenSpans {
 						...TraceDetails
@@ -430,8 +428,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*
 	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
-			"runID":   runID,
-			"preview": newTraces,
+			"runID": runID,
 		},
 	})
 	if err != nil {

@@ -154,7 +154,7 @@ func TestStreaming(t *testing.T) {
 				return
 			}
 
-			run, err := c.RunTraces(ctx, *runID, false)
+			run, err := c.RunTraces(ctx, *runID)
 			a.NoError(err)
 			if err != nil {
 				return

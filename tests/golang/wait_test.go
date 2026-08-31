@@ -237,7 +237,7 @@ func TestWaitGroup(t *testing.T) {
 		// Wait for the WaitForEvent to appear in history
 		r.EventuallyWithT(func(ct *assert.CollectT) {
 			a := assert.New(ct)
-			run, err := c.RunTraces(ctx, runID, false)
+			run, err := c.RunTraces(ctx, runID)
 			a.NoError(err)
 			a.Len(run.Trace.ChildSpans, 1)
 
