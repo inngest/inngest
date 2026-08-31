@@ -307,8 +307,10 @@ func runListItemFromCQRS(row *cqrs.TraceRun, includeOutput bool) *apiv2.RunListI
 		Cursor:       row.Cursor,
 		RunStartedAt: row.StartedAt,
 		FunctionID:   row.FunctionID.String(),
+		FunctionSlug: row.FunctionSlug,
 		AppID:        row.AppID.String(),
 		Status:       row.Status,
+		IsDeferred:   &row.IsDeferred,
 	}
 	if len(row.TriggerIDs) > 0 {
 		run.EventID, _ = ulid.Parse(row.TriggerIDs[0])
