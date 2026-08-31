@@ -23,7 +23,7 @@ import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
 import { AppFilterDocument, CountRunsDocument } from './queries';
-import { getRestAppIDs, RunsAPIError } from './restRuns';
+import { decodeRunsFrontier, getRestAppIDs, RunsAPIError } from './restRuns';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
 
@@ -238,6 +238,10 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
         progressiveSearch
           ? {
               ...progressiveSearch,
+              searchedThrough: decodeRunsFrontier(
+                progressiveSearch.cursor,
+                timeField,
+              )?.toLocaleString(),
             }
           : undefined
       }

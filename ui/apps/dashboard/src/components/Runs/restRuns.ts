@@ -200,3 +200,25 @@ async function fetchRunsPageAttempt(
     },
   } as RestRunsPage;
 }
+
+// TODO: Expose the scan frontier as response metadata. For implementation
+// expediency, this display-only helper violates cursor opacity by decoding the
+// Cloud metrics cursor. Pagination still passes the cursor through unchanged;
+// decoding failures only omit the progress label.
+export function decodeRunsFrontier(
+  cursor: string | undefined,
+  timeField: string,
+): Date | undefined {
+  if (!cursor) return;
+  try {
+    const normalized = cursor.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = JSON.parse(atob(normalized));
+    const field = timeField.toLowerCase();
+    const value = decoded?.c?.[field]?.v;
+    if (typeof value !== 'number') return;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  } catch {
+    return;
+  }
+}

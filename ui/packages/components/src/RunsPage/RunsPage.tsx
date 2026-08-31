@@ -64,6 +64,7 @@ type Props = {
   error?: Error | null;
   progressiveSearch?: {
     phase: 'searching' | 'paused' | 'cancelled' | 'complete' | 'error';
+    searchedThrough?: string;
     cancel: () => void;
     resume: () => void;
   };
@@ -407,6 +408,9 @@ export function RunsPage({
                   {new Intl.NumberFormat().format(data.length)}{' '}
                   {data.length === 1 ? 'match' : 'matches'}
                   {` · ${progressiveSearchStatus}`}
+                  {progressiveSearch.searchedThrough
+                    ? ` · through ${progressiveSearch.searchedThrough}`
+                    : ''}
                 </span>
                 <Tooltip>
                   <TooltipTrigger aria-label="About progressive run search">
@@ -475,6 +479,9 @@ export function RunsPage({
             <p className="text-muted text-center text-xs">
               {progressiveSearchStatus}
               {` · ${data.length} ${data.length === 1 ? 'match' : 'matches'}`}
+              {progressiveSearch.searchedThrough
+                ? ` · searched through ${progressiveSearch.searchedThrough}`
+                : ''}
             </p>
             <div className="flex items-center gap-2">
               {progressiveSearch.phase === 'searching' ? (
