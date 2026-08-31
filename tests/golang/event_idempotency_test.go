@@ -72,9 +72,10 @@ func TestEventIdempotency(t *testing.T) {
 			require.Nil(t, run.BatchCreatedAt)
 
 			t.Run("exec", func(t *testing.T) {
-				exec := run.Trace.ChildSpans[0]
-
-				assert.Equal(t, "function success", exec.Name)
+				// The successful execution wrapper now surfaces as a
+				// "Finalization" span rather than consts.OtelExecFnOk
+				// ("function success").
+				exec, _ := run.Trace.FindStep(t, "Finalization")
 				assert.False(t, exec.IsRoot)
 			})
 		})

@@ -178,11 +178,9 @@ func TestStreaming(t *testing.T) {
 			if runOutput.Error == nil {
 				return
 			}
-			a.NotNil(runOutput.Error.Stack)
-			if runOutput.Error.Stack == nil {
-				return
-			}
-			a.Contains(*runOutput.Error.Stack, "Your server reset the connection while we were reading the reply")
+			// The connection-reset message now surfaces on Message rather
+			// than Stack.
+			a.Contains(runOutput.Error.Message, "Your server reset the connection while we were reading the reply")
 		}, 10*time.Second, time.Second)
 	})
 }
