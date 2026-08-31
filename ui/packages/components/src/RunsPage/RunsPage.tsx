@@ -67,6 +67,7 @@ type Props = {
     searchedThrough?: string;
     cancel: () => void;
     resume: () => void;
+    insightsHref: string;
   };
   infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
   // Rendered above the filter row, inside the sticky header so it stays put
@@ -481,6 +482,13 @@ export function RunsPage({
                   onClick={progressiveSearch.resume}
                 />
               ) : null}
+              <Button
+                appearance="outlined"
+                kind="secondary"
+                label="Use Insights"
+                size="small"
+                href={progressiveSearch.insightsHref}
+              />
             </div>
           </div>
         )}
