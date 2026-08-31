@@ -43,6 +43,24 @@ describe('mergeBacklogMetrics', () => {
     ]);
   });
 
+  test('preserves null values as chart gaps', () => {
+    expect(
+      mergeBacklogMetrics(
+        [
+          { bucket: '2026-08-23T03:16:00Z', value: null },
+          { bucket: '2026-08-23T03:17:00Z', value: 2 },
+        ],
+        [],
+        '1m',
+        '2026-08-23T03:16:00Z',
+        '2026-08-23T03:18:00Z',
+      ),
+    ).toEqual([
+      { name: '2026-08-23T03:16:00Z', values: { scheduled: null } },
+      { name: '2026-08-23T03:17:00Z', values: { scheduled: 2 } },
+    ]);
+  });
+
   test('shows gaps lasting at least three minutes as inferred zeroes', () => {
     expect(
       mergeBacklogMetrics(
