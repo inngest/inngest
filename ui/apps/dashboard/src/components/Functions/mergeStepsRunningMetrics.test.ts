@@ -3,41 +3,52 @@ import { describe, expect, test } from 'vitest';
 import { mergeStepsRunningMetrics } from './mergeStepsRunningMetrics';
 
 describe('mergeStepsRunningMetrics', () => {
-  test('shows running gaps lasting at least three minutes as inferred zeroes', () => {
+  test('infers sustained running nulls without mapping absent limits to false', () => {
+    const buckets = [
+      '2026-08-23T03:16:00Z',
+      '2026-08-23T03:17:00Z',
+      '2026-08-23T03:18:00Z',
+      '2026-08-23T03:19:00Z',
+      '2026-08-23T03:20:00Z',
+    ];
+    const series = (values: Array<number | null>) => {
+      return buckets.map((bucket, index) => ({
+        bucket,
+        value: values[index]!,
+      }));
+    };
+
     expect(
       mergeStepsRunningMetrics(
-        [
-          { bucket: '2026-08-23T03:16:00Z', value: 12 },
-          { bucket: '2026-08-23T03:20:00Z', value: 10 },
-        ],
-        [{ bucket: '2026-08-23T03:18:00Z', value: 1 }],
+        series([12, null, null, null, 10]),
+        series([null, null, 1, null, null]),
         '1m',
-        '2026-08-23T03:16:00Z',
+        buckets[0]!,
         '2026-08-23T03:21:00Z',
       ),
     ).toEqual([
       {
-        name: '2026-08-23T03:16:00Z',
-        values: { running: 12 },
+        name: buckets[0],
+        values: { running: 12, concurrencyLimit: null },
       },
       {
-        name: '2026-08-23T03:17:00.000Z',
-        values: { running: 0 },
+        name: buckets[1],
+        values: { running: 0, concurrencyLimit: null },
         inferred: ['running'],
       },
       {
-        name: '2026-08-23T03:18:00Z',
-        values: { concurrencyLimit: true, running: 0 },
+        name: buckets[2],
+        values: { running: 0, concurrencyLimit: true },
         inferred: ['running'],
       },
       {
-        name: '2026-08-23T03:19:00.000Z',
-        values: { running: 0 },
+        name: buckets[3],
+        values: { running: 0, concurrencyLimit: null },
         inferred: ['running'],
       },
       {
-        name: '2026-08-23T03:20:00Z',
-        values: { running: 10 },
+        name: buckets[4],
+        values: { running: 10, concurrencyLimit: null },
       },
     ]);
   });
