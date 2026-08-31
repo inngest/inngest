@@ -23,7 +23,7 @@ import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
 import { AppFilterDocument, CountRunsDocument } from './queries';
-import { getRestAppIDs } from './restRuns';
+import { getRestAppIDs, RunsAPIError } from './restRuns';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
 
@@ -48,6 +48,12 @@ type Props = FnProps | EnvProps;
 const parseCelSearchError = (error: CombinedError | Error | undefined) => {
   // REST returns Error subclasses while URQL returns CombinedError. Check each
   // shape before reading transport-specific fields.
+  if (
+    error instanceof RunsAPIError &&
+    (error.code === 'expression_invalid' || error.code === 'query_too_long')
+  ) {
+    return error;
+  }
   if (!(error instanceof CombinedError)) return;
   return error.graphQLErrors.find(
     (item) => item.extensions.code === 'expression_invalid',
@@ -147,7 +153,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const shouldUseREST =
     restRunsEnabled &&
-    !search &&
     restAppIDs !== undefined &&
     (scope === 'env' || commonQueryVars.functionAppID !== null);
 
@@ -160,6 +165,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     loadMore,
     reset,
     error: paginationError,
+    progressiveSearch,
   } = useRunsPagination({
     commonQueryVars,
     tracePreviewEnabled,
@@ -167,6 +173,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   });
 
   const [countRes, countRefetch] = useQuery({
+    pause: shouldUseREST && Boolean(search),
     query: CountRunsDocument,
     requestPolicy: 'network-only',
     variables: commonQueryVars,
@@ -191,9 +198,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const onRefresh = useCallback(() => {
     reset();
-    countRefetch();
+    if (!(shouldUseREST && search)) countRefetch();
     setRefreshNonce((n) => n + 1);
-  }, [countRefetch, reset]);
+  }, [countRefetch, reset, search, shouldUseREST]);
 
   useImperativeHandle(ref, () => ({
     refresh: () => {
@@ -227,6 +234,13 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       totalCount={totalCount}
       searchError={searchError}
       error={paginationError}
+      progressiveSearch={
+        progressiveSearch
+          ? {
+              ...progressiveSearch,
+            }
+          : undefined
+      }
       pollInterval={DEFAULT_POLL_INTERVAL}
       infiniteScrollTrigger={(containerRef) => (
         <InfiniteScrollTrigger
