@@ -908,7 +908,7 @@ func TestCommandUsesStoredOAuthForMatchingResource(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, "Bearer inngest_at_stored", gotAuth)
-	require.Equal(t, "production", gotEnv)
+	require.Empty(t, gotEnv)
 }
 
 func TestCommandIgnoresStoredOAuthForDifferentResource(t *testing.T) {

@@ -76,7 +76,7 @@ function DeviceAuthorizationPage() {
   const [permissionLevels, setPermissionLevels] = useState<
     Record<string, PermissionLevel>
   >({});
-  const [boundary, setBoundary] = useState<Boundary | null>(null);
+  const [boundary, setBoundary] = useState<Boundary>('single_env');
   const [workspace, setWorkspace] = useState<Option | null>(null);
   const [durationDays, setDurationDays] = useState(30);
   const [sessionName, setSessionName] = useState('Inngest CLI');
@@ -126,7 +126,7 @@ function DeviceAuthorizationPage() {
     setError(null);
     setDetails(null);
     setPermissionLevels({});
-    setBoundary(null);
+    setBoundary('single_env');
     setWorkspace(null);
     setDone(null);
     const loadAuthorization = async () => {
@@ -189,10 +189,6 @@ function DeviceAuthorizationPage() {
 
   async function approve() {
     if (!details) return;
-    if (!boundary) {
-      setError('Select an environment boundary.');
-      return;
-    }
     if (boundary === 'single_env' && !workspace) {
       setError('Select an environment.');
       return;
