@@ -86,8 +86,17 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
 });
 
-/** Auth surfaces that are always dark, regardless of the viewer's app theme. */
-const FORCED_DARK_ROUTES = /^\/(sign-in|sign-up)(\/|$)/;
+/**
+ * Sign-up is always dark, regardless of the viewer's app theme: it is a
+ * marketing surface with a fixed treatment, and most visitors arrive with no
+ * stored preference anyway.
+ *
+ * Sign-in is deliberately NOT included. It is a returning-user surface, so
+ * forcing it dark would flash every light-mode user on the way in and flash
+ * them again when the app loads in their actual theme. The two live on separate
+ * URLs, so they can differ.
+ */
+const FORCED_DARK_ROUTES = /^\/sign-up(\/|$)/;
 
 function RootComponent() {
   const { pathname } = useLocation();
