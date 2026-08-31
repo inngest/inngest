@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/usage"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -146,37 +145,6 @@ func (c GetRunsOpts) Validate() error {
 	}
 	if c.Limit < 0 {
 		return errors.New("limit must be positive")
-	}
-
-	return nil
-}
-
-type GetUsageOpts struct {
-	AccountID   uuid.UUID
-	WorkspaceID uuid.UUID
-	WorkflowID  uuid.UUID
-	LowerTime   time.Time
-	UpperTime   time.Time
-	Period      enums.Period // deprecated, no longer used
-	Granularity time.Duration
-	Statuses    []enums.RunStatus
-}
-
-func (o GetUsageOpts) Validate() error {
-	if o.AccountID == uuid.Nil {
-		return errors.New("account ID must be set")
-	}
-	if o.WorkspaceID == uuid.Nil {
-		return errors.New("workspace ID must be set")
-	}
-	if o.WorkflowID == uuid.Nil {
-		return errors.New("workflow ID must be set")
-	}
-	if o.LowerTime.IsZero() {
-		return errors.New("lower time must be set")
-	}
-	if o.UpperTime.IsZero() {
-		return errors.New("upper time must be set")
 	}
 
 	return nil
@@ -456,5 +424,3 @@ func (c CountActiveRunsOpts) Validate() error {
 
 	return nil
 }
-
-type HistoryUsage = usage.UsageSlot
