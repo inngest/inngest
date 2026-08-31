@@ -6,6 +6,7 @@ import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   FunctionRunTimeField,
@@ -15,7 +16,12 @@ import {
 } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
+import {
+  RiArrowRightUpLine,
+  RiInformationLine,
+  RiRefreshLine,
+  RiSearchLine,
+} from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import useLocalStorage from 'react-use/lib/useLocalStorage';
 
@@ -56,6 +62,11 @@ type Props = {
   totalCount: number | undefined;
   searchError?: Error;
   error?: Error | null;
+  progressiveSearch?: {
+    phase: 'searching' | 'paused' | 'cancelled' | 'complete' | 'error';
+    cancel: () => void;
+    resume: () => void;
+  };
   infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
   // Rendered above the filter row, inside the sticky header so it stays put
   // while the run list scrolls. Cloud passes an account-level banner here; the
@@ -87,6 +98,7 @@ export function RunsPage({
   totalCount,
   searchError,
   error,
+  progressiveSearch,
   infiniteScrollTrigger,
   searchLimit,
   banner,
@@ -377,7 +389,26 @@ export function RunsPage({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <TotalCount totalCount={totalCount} />
+            {progressiveSearch ? (
+              <div className="text-muted flex items-center gap-1 text-xs">
+                <span>
+                  {new Intl.NumberFormat().format(data.length)}{' '}
+                  {data.length === 1 ? 'match' : 'matches'} found so far
+                </span>
+                <Tooltip>
+                  <TooltipTrigger aria-label="About progressive run search">
+                    <RiInformationLine className="h-4 w-4" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs whitespace-normal text-left">
+                    For performance, CEL search scans runs incrementally. The total remains partial
+                    until the entire time range is scanned, which may be impractical for large data
+                    sets. Use Insights when you need exact counts.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            ) : (
+              <TotalCount totalCount={totalCount} />
+            )}
             <TableFilter
               columnVisibility={columnVisibility}
               setColumnVisibility={setColumnVisibility}
@@ -412,6 +443,43 @@ export function RunsPage({
             />
           </>
         )}
+        {progressiveSearch && (
+          <div className="border-subtle flex min-h-10 items-center justify-between border-t px-4 py-2">
+            <p className="text-muted text-xs">
+              {progressiveSearch.phase === 'searching'
+                ? 'Searching runs…'
+                : progressiveSearch.phase === 'complete'
+                ? 'Search complete'
+                : progressiveSearch.phase === 'error'
+                ? 'Search paused after an error'
+                : progressiveSearch.phase === 'cancelled'
+                ? 'Search cancelled'
+                : 'Automatic search paused'}
+              {` · ${data.length} ${data.length === 1 ? 'match' : 'matches'}`}
+            </p>
+            <div className="flex items-center gap-2">
+              {progressiveSearch.phase === 'searching' ? (
+                <Button
+                  appearance="outlined"
+                  kind="secondary"
+                  label="Cancel search"
+                  size="small"
+                  onClick={progressiveSearch.cancel}
+                />
+              ) : progressiveSearch.phase !== 'complete' ? (
+                <Button
+                  appearance="outlined"
+                  kind="secondary"
+                  label={
+                    progressiveSearch.phase === 'paused' ? 'Continue searching' : 'Resume search'
+                  }
+                  size="small"
+                  onClick={progressiveSearch.resume}
+                />
+              ) : null}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
@@ -426,7 +494,7 @@ export function RunsPage({
           scope={scope}
         />
         {infiniteScrollTrigger?.(containerRef.current)}
-        {!hasMore && data.length > 1 && (
+        {!progressiveSearch && !hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>
             <Button
