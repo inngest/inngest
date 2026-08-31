@@ -108,6 +108,11 @@ type BannerViewedArgs = {
   scope?: string;
   minutesWithHits?: number;
   windowMinutes?: number;
+  // Which CTAs the impression actually offered. A banner can vary its CTAs by
+  // account, so without these the clicks on a CTA only some viewers saw get
+  // divided by every impression, and the rate means nothing.
+  cta?: string;
+  secondaryCta?: string;
 };
 
 export function trackBannerViewed({
@@ -116,12 +121,16 @@ export function trackBannerViewed({
   scope,
   minutesWithHits,
   windowMinutes,
+  cta,
+  secondaryCta,
 }: BannerViewedArgs) {
   track('Banner Viewed', feature, {
     banner_id: bannerId,
     scope,
     minutes_with_hits: minutesWithHits,
     window_minutes: windowMinutes,
+    cta,
+    secondary_cta: secondaryCta,
   });
 }
 
@@ -146,16 +155,23 @@ type BannerCTAClickedArgs = {
   feature: AnalyticsFeature;
   bannerId: string;
   scope?: string;
+  // Which CTA was clicked, for banners offering more than one. Deliberately a
+  // property rather than a per-CTA event name: total click-through stays a
+  // single number that shares the `Banner Viewed` denominator, and per-CTA
+  // rates are a breakdown of it.
+  cta: string;
 };
 
 export function trackBannerCTAClicked({
   feature,
   bannerId,
   scope,
+  cta,
 }: BannerCTAClickedArgs) {
   track('Banner CTA Clicked', feature, {
     banner_id: bannerId,
     scope,
+    cta,
   });
 }
 
