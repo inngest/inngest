@@ -7,7 +7,6 @@ import { gql, useMutation, useQuery, type TypedDocumentNode } from 'urql';
 
 import { graphql } from '@/gql';
 import {
-  ApiKeyCredentialSource,
   ApiKeyOwnershipType,
   ApiKeyResourceBoundaryMode,
   type CreateApiKeyInput,
@@ -406,9 +405,7 @@ export function CreateAPIKeyForm({
     }
 
     const input: CreateApiKeyInput = {
-      credentialSource: ApiKeyCredentialSource.DashboardUi,
       name: name.trim(),
-      ownershipType,
       permissions: selectedPermissions,
       resourceBoundaryMode,
       workspaceID,

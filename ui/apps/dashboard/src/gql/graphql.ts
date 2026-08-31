@@ -596,10 +596,8 @@ export type ConnectV1WorkerMetricsFilter = {
 };
 
 export type CreateApiKeyInput = {
-  credentialSource?: InputMaybe<ApiKeyCredentialSource>;
   expiresAt?: InputMaybe<Scalars['Time']['input']>;
   name: Scalars['String']['input'];
-  ownershipType?: InputMaybe<ApiKeyOwnershipType>;
   permissions?: InputMaybe<Array<Scalars['String']['input']>>;
   resourceBoundaryMode?: InputMaybe<ApiKeyResourceBoundaryMode>;
   workspaceID?: InputMaybe<Scalars['UUID']['input']>;
