@@ -76,7 +76,7 @@ func inputSchema(endpoint apiv2endpoint.Endpoint, includeEnv bool) map[string]an
 	if includeEnv {
 		properties["env"] = map[string]any{
 			"type":        "string",
-			"description": "Environment slug. Defaults to the production environment for account-scoped credentials.",
+			"description": "Environment slug. Required for environment-specific tools when the credential can access all environments.",
 		}
 	}
 	required := []string{}
