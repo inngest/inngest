@@ -56,7 +56,9 @@ export const mapSdkThroughput = ({
     scopedMetric(ended, sum(sdkThroughputEnded.metrics)),
   ];
 
-  return mapEntityLines(metrics, entityLookup, { opacity: 0.1 });
+  return mapEntityLines(metrics, entityLookup, {
+    areaStyle: { opacity: 0.1 },
+  });
 };
 
 export const SdkThroughput = ({

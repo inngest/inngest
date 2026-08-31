@@ -21,7 +21,6 @@ type (
 	GetRunOpts                      = cqrs.GetRunOpts
 	GetRunsByEventIDOpts            = cqrs.GetRunsByEventIDOpts
 	GetRunsOpts                     = cqrs.GetRunsOpts
-	GetUsageOpts                    = cqrs.GetUsageOpts
 	Run                             = cqrs.Run
 	SkippedRun                      = cqrs.SkippedRun
 	ReplayRun                       = cqrs.ReplayRun
@@ -148,7 +147,6 @@ type Reader interface {
 	GetRunHistoryItemOutput(ctx context.Context, historyID ulid.ULID, opts GetHistoryOutputOpts) (*string, error)
 	GetRunsByEventID(ctx context.Context, eventID ulid.ULID, opts GetRunsByEventIDOpts) ([]Run, error)
 	GetSkippedRunsByEventID(ctx context.Context, eventID ulid.ULID, opts GetRunsByEventIDOpts) ([]SkippedRun, error)
-	GetUsage(ctx context.Context, opts GetUsageOpts) ([]cqrs.HistoryUsage, error)
 	GetActiveRunIDs(ctx context.Context, opts GetActiveRunIDsOpts) ([]ulid.ULID, error)
 	CountActiveRuns(ctx context.Context, opts CountActiveRunsOpts) (int, error)
 	cqrs.APIV1FunctionRunReader

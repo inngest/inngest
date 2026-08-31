@@ -29,8 +29,9 @@ type SimpleLineChartProps = {
   data?: {
     name: string;
     values: {
-      [key: string]: number | boolean;
+      [key: string]: number | boolean | undefined;
     };
+    inferred?: string[];
   }[];
   legend: {
     dataKey: string;
@@ -39,6 +40,7 @@ type SimpleLineChartProps = {
     default?: boolean;
     referenceArea?: boolean;
   }[];
+  connectNulls?: boolean;
   isLoading: boolean;
   error?: Error;
 };
@@ -88,6 +90,7 @@ export default function SimpleLineChart({
   desc,
   data = [],
   legend = [],
+  connectNulls = false,
   isLoading,
   error,
 }: SimpleLineChartProps) {
@@ -99,7 +102,7 @@ export default function SimpleLineChart({
   const flattenData = useMemo(() => {
     return data.map((d) => {
       const values = omit(d.values, referenceAreaKeys);
-      return { ...values, name: d.name };
+      return { ...values, name: d.name, inferred: d.inferred };
     });
   }, [data, referenceAreaKeys]);
 
@@ -198,36 +201,64 @@ export default function SimpleLineChart({
                 }),
               )}
               <ChartTooltip
+                filterNull={false}
                 content={(props) => {
                   const { label, payload } = props;
+                  const metricPayload =
+                    payload?.filter((item) => {
+                      return !legend.find(
+                        (entry) => entry.dataKey === item.name,
+                      )?.referenceArea;
+                    }) ?? [];
+                  const hasReportedData = metricPayload.some(
+                    (item) => item.value != null,
+                  );
                   return (
                     <div className="shadow-tooltip bg-canvasBase rounded-md px-3 pb-2 pt-1 text-sm shadow-md">
                       <div className="text-muted pb-2">
                         {new Date(label).toLocaleString()}
                       </div>
-                      {payload?.map((p, idx) => {
-                        // @ts-ignore
-                        if (p.value === false) return;
-                        const l = legend.find((l) => l.dataKey == p.name);
-                        return (
-                          <div
-                            key={idx}
-                            className="text-muted flex items-center text-sm font-medium"
-                          >
-                            <span
-                              className="mr-2 inline-flex h-3 w-3 rounded"
-                              style={{ backgroundColor: l?.color || p.color }}
-                            ></span>
-                            {typeof p.value === 'number'
-                              ? p.value.toLocaleString(undefined, {
-                                  notation: 'compact',
-                                  compactDisplay: 'short',
-                                })
-                              : ''}{' '}
-                            {l?.name || p.name}
-                          </div>
-                        );
-                      }) || ''}
+                      {!hasReportedData ? (
+                        <div className="text-muted text-sm font-medium">
+                          No data recorded
+                        </div>
+                      ) : (
+                        metricPayload.map((p, idx) => {
+                          const l = legend.find((l) => l.dataKey == p.name);
+                          const inferred =
+                            Array.isArray(p.payload?.inferred) &&
+                            p.payload.inferred.includes(p.name);
+                          return (
+                            <div
+                              key={idx}
+                              className="text-muted flex items-center text-sm font-medium"
+                            >
+                              <span
+                                className="mr-2 inline-flex h-3 w-3 rounded"
+                                style={{ backgroundColor: l?.color || p.color }}
+                              ></span>
+                              {inferred ? (
+                                <>
+                                  {l?.name || p.name}: No data recorded —
+                                  displayed as 0
+                                </>
+                              ) : p.value == null ? (
+                                <>{l?.name || p.name}: No data recorded</>
+                              ) : (
+                                <>
+                                  {typeof p.value === 'number'
+                                    ? p.value.toLocaleString(undefined, {
+                                        notation: 'compact',
+                                        compactDisplay: 'short',
+                                      })
+                                    : ''}{' '}
+                                  {l?.name || p.name}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   );
                 }}
@@ -236,6 +267,7 @@ export default function SimpleLineChart({
               />
               {legend.map((l) => (
                 <Line
+                  connectNulls={connectNulls}
                   dot={false}
                   key={l.name}
                   type="monotone"

@@ -38,7 +38,6 @@ type HistoryReader interface {
 	GetRunHistoryItemOutput(ctx context.Context, historyID ulid.ULID, opts GetHistoryOutputOpts) (*string, error)
 	GetRunsByEventID(ctx context.Context, eventID ulid.ULID, opts GetRunsByEventIDOpts) ([]Run, error)
 	GetSkippedRunsByEventID(ctx context.Context, eventID ulid.ULID, opts GetRunsByEventIDOpts) ([]SkippedRun, error)
-	GetUsage(ctx context.Context, opts GetUsageOpts) ([]HistoryUsage, error)
 	GetActiveRunIDs(ctx context.Context, opts GetActiveRunIDsOpts) ([]ulid.ULID, error)
 	CountActiveRuns(ctx context.Context, opts CountActiveRunsOpts) (int, error)
 	APIV1FunctionRunReader
