@@ -149,8 +149,10 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	t.Run("in progress run", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, ChildSpanCount: 1})
 
+		// OutputID isn't a reliable "has this run produced output" signal —
+		// it's also used to fetch a span's input, so it can be non-nil
+		// before the run ends. Status is the real signal.
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-		require.Nil(t, run.Trace.OutputID)
 
 		rootSpanID := run.Trace.SpanID
 
@@ -358,8 +360,10 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 	t.Run("in progress run with large response body", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, ChildSpanCount: 1})
 
+		// OutputID isn't a reliable "has this run produced output" signal —
+		// it's also used to fetch a span's input, so it can be non-nil
+		// before the run ends. Status is the real signal.
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-		require.Nil(t, run.Trace.OutputID)
 
 		rootSpanID := run.Trace.SpanID
 

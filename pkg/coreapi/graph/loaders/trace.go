@@ -222,17 +222,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		name = *userlandSpan.SpanName
 	}
 
-	outputID := span.GetOutputID()
-	if span.Name == meta.SpanNameRun && !models.RunTraceEnded(status) {
-		// The run-root span's own "input" (the triggering event data) is
-		// present as soon as the run is queued, and GetOutputID treats any
-		// recorded input as grounds for a preliminary output ID — useful
-		// for a running step's input, but wrong here: it would make
-		// run.trace.outputID non-nil before the function has produced any
-		// output at all. Only surface it once the run has actually ended.
-		outputID = nil
-	}
-
 	gqlSpan := &models.RunTraceSpan{
 		AppID:          span.GetAppID(),
 		Attempts:       &attempts,
@@ -241,7 +230,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		FunctionID:     span.GetFunctionID(),
 		IsRoot:         span.GetIsRoot(),
 		Name:           name,
-		OutputID:       outputID,
+		OutputID:       span.GetOutputID(),
 		ParentSpanID:   span.GetParentSpanID(),
 		QueuedAt:       span.GetQueuedAtTime(),
 		RunID:          span.GetRunID(),

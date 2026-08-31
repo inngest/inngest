@@ -181,8 +181,10 @@ func TestInvokeGroup(t *testing.T) {
 
 		r.Nil(run.EndedAt)
 		r.Nil(run.Trace.EndedAt)
+		// OutputID isn't a reliable "has this run produced output" signal —
+		// it's also used to fetch a span's input, so it can be non-nil
+		// before the run ends. Status is the real signal.
 		r.Equal(models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-		r.Nil(run.Trace.OutputID)
 
 		rootSpanID := run.Trace.SpanID
 

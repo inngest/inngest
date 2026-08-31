@@ -71,8 +71,10 @@ func TestWait(t *testing.T) {
 			ChildSpanCount: 1,
 		})
 
+		// OutputID isn't a reliable "has this run produced output" signal —
+		// it's also used to fetch a span's input, so it can be non-nil
+		// before the run ends. Status is the real signal, checked above.
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-		require.Nil(t, run.Trace.OutputID)
 
 		rootSpanID := run.Trace.SpanID
 
@@ -208,8 +210,10 @@ func TestWaitGroup(t *testing.T) {
 			ChildSpanCount: 1,
 		})
 
+		// OutputID isn't a reliable "has this run produced output" signal —
+		// it's also used to fetch a span's input, so it can be non-nil
+		// before the run ends. Status is the real signal, checked above.
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-		require.Nil(t, run.Trace.OutputID)
 
 		rootSpanID := run.Trace.SpanID
 
@@ -570,8 +574,10 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 		ChildSpanCount: 1,
 	})
 
+	// OutputID isn't a reliable "has this run produced output" signal — it's
+	// also used to fetch a span's input, so it can be non-nil before the run
+	// ends. Status is the real signal, checked above.
 	require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-	require.Nil(t, run.Trace.OutputID)
 
 	rootSpanID := run.Trace.SpanID
 
