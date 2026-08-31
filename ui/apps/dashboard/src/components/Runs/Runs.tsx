@@ -23,6 +23,7 @@ import { useFunction } from '@/queries/functions';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 import { AccountConcurrencyBanner } from './AccountConcurrencyBanner';
 import { AppFilterDocument, CountRunsDocument } from './queries';
+import { decodeRunsFrontier, RunsAPIError } from './restRuns';
 import { useRunsPagination } from './useRunsPagination';
 import { toRunStatuses, toTimeField } from './utils';
 
@@ -44,9 +45,18 @@ type EnvProps = {
 
 type Props = FnProps | EnvProps;
 
-const parseCelSearchError = (combinedError: CombinedError | Error | undefined) => {
+const parseCelSearchError = (
+  combinedError: CombinedError | Error | undefined,
+) => {
+  if (
+    combinedError instanceof RunsAPIError &&
+    (combinedError.code === 'expression_invalid' ||
+      combinedError.code === 'query_too_long')
+  ) {
+    return combinedError;
+  }
   if (!(combinedError instanceof CombinedError)) return;
-  return combinedError.graphQLErrors.find(
+  return combinedError?.graphQLErrors.find(
     (error) => error.extensions.code == 'expression_invalid',
   );
 };
@@ -141,7 +151,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     ) ?? true;
   const useREST =
     restRunsEnabled &&
-    !search &&
     restStatusesSupported &&
     (scope === 'env' || commonQueryVars.functionAppID !== null);
 
@@ -154,6 +163,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     loadMore,
     reset,
     error: paginationError,
+    progressiveSearch,
   } = useRunsPagination({
     commonQueryVars,
     tracePreviewEnabled,
@@ -161,6 +171,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   });
 
   const [countRes, countRefetch] = useQuery({
+    pause: useREST && Boolean(search),
     query: CountRunsDocument,
     requestPolicy: 'network-only',
     variables: commonQueryVars,
@@ -185,9 +196,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const onRefresh = useCallback(() => {
     reset();
-    countRefetch();
+    if (!(useREST && search)) countRefetch();
     setRefreshNonce((n) => n + 1);
-  }, [reset]);
+  }, [countRefetch, reset, search, useREST]);
 
   useImperativeHandle(ref, () => ({
     refresh: () => {
@@ -221,6 +232,18 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       totalCount={totalCount}
       searchError={searchError}
       error={paginationError}
+      progressiveSearch={
+        progressiveSearch
+          ? {
+              ...progressiveSearch,
+              searchedThrough: decodeRunsFrontier(
+                progressiveSearch.cursor,
+                timeField,
+              )?.toLocaleString(),
+              insightsHref: runsInsightsHref(environment.slug, commonQueryVars),
+            }
+          : undefined
+      }
       pollInterval={DEFAULT_POLL_INTERVAL}
       infiniteScrollTrigger={(containerRef) => (
         <InfiniteScrollTrigger
@@ -233,3 +256,21 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     />
   );
 });
+
+function runsInsightsHref(
+  envSlug: string,
+  vars: {
+    celQuery?: string;
+    startTime: string;
+    endTime: string | null;
+    appIDs: string[] | null;
+    functionSlug: string | null;
+  },
+) {
+  const params = new URLSearchParams({ from: vars.startTime });
+  if (vars.endTime) params.set('until', vars.endTime);
+  if (vars.celQuery) params.set('cel', vars.celQuery);
+  if (vars.functionSlug) params.set('function', vars.functionSlug);
+  for (const appID of vars.appIDs ?? []) params.append('app', appID);
+  return `/env/${encodeURIComponent(envSlug)}/insights?${params.toString()}`;
+}

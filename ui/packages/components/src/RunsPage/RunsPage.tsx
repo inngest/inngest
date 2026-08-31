@@ -6,6 +6,7 @@ import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   FunctionRunTimeField,
@@ -15,7 +16,12 @@ import {
 } from '@inngest/components/types/functionRun';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
-import { RiArrowRightUpLine, RiRefreshLine, RiSearchLine } from '@remixicon/react';
+import {
+  RiArrowRightUpLine,
+  RiInformationLine,
+  RiRefreshLine,
+  RiSearchLine,
+} from '@remixicon/react';
 import { type VisibilityState } from '@tanstack/react-table';
 import useLocalStorage from 'react-use/lib/useLocalStorage';
 
@@ -56,6 +62,13 @@ type Props = {
   totalCount: number | undefined;
   searchError?: Error;
   error?: Error | null;
+  progressiveSearch?: {
+    phase: 'searching' | 'paused' | 'cancelled' | 'complete' | 'error';
+    searchedThrough?: string;
+    cancel: () => void;
+    resume: () => void;
+    insightsHref: string;
+  };
   infiniteScrollTrigger?: (containerRef: HTMLDivElement | null) => React.ReactNode;
   // Rendered above the filter row, inside the sticky header so it stays put
   // while the run list scrolls. Cloud passes an account-level banner here; the
@@ -87,6 +100,7 @@ export function RunsPage({
   totalCount,
   searchError,
   error,
+  progressiveSearch,
   infiniteScrollTrigger,
   searchLimit,
   banner,
@@ -119,7 +133,7 @@ export function RunsPage({
 
   const [columnVisibility, setColumnVisibility] = useLocalStorage<VisibilityState>(
     `VisibleRunsColumns-${scope}`,
-    displayAllColumns
+    displayAllColumns,
   );
 
   const [filteredStatus = [], setFilteredStatus, removeFilteredStatus] =
@@ -133,7 +147,7 @@ export function RunsPage({
 
   const [timeField = FunctionRunTimeField.QueuedAt, setTimeField] = useValidatedSearchParam(
     'timeField',
-    isFunctionTimeField
+    isFunctionTimeField,
   );
 
   const [excludeDeferred = false, setExcludeDeferred, removeExcludeDeferred] =
@@ -156,7 +170,7 @@ export function RunsPage({
         onScrollToTop();
       }
     },
-    [containerRef.current, onScrollToTop]
+    [containerRef.current, onScrollToTop],
   );
 
   const onStatusFilterChange = useCallback(
@@ -168,7 +182,7 @@ export function RunsPage({
         removeFilteredStatus();
       }
     },
-    [removeFilteredStatus, scrollToTop, setFilteredStatus]
+    [removeFilteredStatus, scrollToTop, setFilteredStatus],
   );
 
   const onAppFilterChange = useCallback(
@@ -180,7 +194,7 @@ export function RunsPage({
         removeFilteredApp();
       }
     },
-    [removeFilteredApp, scrollToTop, setFilteredApp]
+    [removeFilteredApp, scrollToTop, setFilteredApp],
   );
 
   const onFunctionFilterChange = useCallback(
@@ -192,7 +206,7 @@ export function RunsPage({
         removeFilteredFunction();
       }
     },
-    [removeFilteredFunction, scrollToTop, setFilteredFunction]
+    [removeFilteredFunction, scrollToTop, setFilteredFunction],
   );
 
   const onTimeFieldChange = useCallback(
@@ -200,7 +214,7 @@ export function RunsPage({
       scrollToTop();
       setTimeField(value);
     },
-    [scrollToTop, setTimeField]
+    [scrollToTop, setTimeField],
   );
 
   const onExcludeDeferredChange = useCallback(
@@ -212,7 +226,7 @@ export function RunsPage({
         removeExcludeDeferred();
       }
     },
-    [removeExcludeDeferred, scrollToTop, setExcludeDeferred]
+    [removeExcludeDeferred, scrollToTop, setExcludeDeferred],
   );
 
   const onDaysChange = useCallback(
@@ -232,7 +246,7 @@ export function RunsPage({
         });
       }
     },
-    [batchUpdate, scrollToTop]
+    [batchUpdate, scrollToTop],
   );
 
   const onSearchChange = useCallback(
@@ -244,7 +258,7 @@ export function RunsPage({
         removeSearch();
       }
     },
-    [scrollToTop, setSearch]
+    [scrollToTop, setSearch],
   );
 
   const renderSubComponent = useCallback(
@@ -261,7 +275,7 @@ export function RunsPage({
         </div>
       );
     },
-    [getTrigger, pollInterval, features.tracesPreview]
+    [getTrigger, pollInterval, features.tracesPreview],
   );
 
   const options = useMemo(() => {
@@ -316,7 +330,7 @@ export function RunsPage({
                   search
                     ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
                     : '',
-                  'h-[26px] w-[103px] rounded'
+                  'h-[26px] w-[103px] rounded',
                 )}
               />
             </OptionalTooltip>
@@ -336,15 +350,15 @@ export function RunsPage({
                         duration: parseDuration(lastDays),
                       }
                     : startTime && endTime
-                    ? {
-                        type: 'absolute',
-                        start: new Date(startTime),
-                        end: new Date(endTime),
-                      }
-                    : {
-                        type: 'relative',
-                        duration: parseDuration(DEFAULT_TIME),
-                      }
+                      ? {
+                          type: 'absolute',
+                          start: new Date(startTime),
+                          end: new Date(endTime),
+                        }
+                      : {
+                          type: 'relative',
+                          duration: parseDuration(DEFAULT_TIME),
+                        }
                 }
               />
             </SelectGroup>
@@ -377,7 +391,25 @@ export function RunsPage({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <TotalCount totalCount={totalCount} />
+            {progressiveSearch ? (
+              <div className="text-muted flex items-center gap-1 text-xs">
+                <span>
+                  {new Intl.NumberFormat().format(data.length)}{' '}
+                  {data.length === 1 ? 'match' : 'matches'} found so far
+                </span>
+                <Tooltip>
+                  <TooltipTrigger aria-label="About progressive run search">
+                    <RiInformationLine className="h-4 w-4" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs whitespace-normal text-left">
+                    CEL search scans runs incrementally. An exact total is unavailable until the
+                    requested range is completely scanned; no separate count query is run.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            ) : (
+              <TotalCount totalCount={totalCount} />
+            )}
             <TableFilter
               columnVisibility={columnVisibility}
               setColumnVisibility={setColumnVisibility}
@@ -412,6 +444,53 @@ export function RunsPage({
             />
           </>
         )}
+        {progressiveSearch && (
+          <div className="border-subtle flex min-h-10 items-center justify-between border-t px-4 py-2">
+            <p className="text-muted text-xs">
+              {progressiveSearch.phase === 'searching'
+                ? 'Searching runs…'
+                : progressiveSearch.phase === 'complete'
+                  ? 'Search complete'
+                  : progressiveSearch.phase === 'error'
+                    ? 'Search paused after an error'
+                    : progressiveSearch.phase === 'cancelled'
+                      ? 'Search cancelled'
+                      : 'Automatic search paused'}
+              {` · ${data.length} ${data.length === 1 ? 'match' : 'matches'}`}
+              {progressiveSearch.searchedThrough
+                ? ` · searched through ${progressiveSearch.searchedThrough}`
+                : ''}
+            </p>
+            <div className="flex items-center gap-2">
+              {progressiveSearch.phase === 'searching' ? (
+                <Button
+                  appearance="outlined"
+                  kind="secondary"
+                  label="Cancel search"
+                  size="small"
+                  onClick={progressiveSearch.cancel}
+                />
+              ) : progressiveSearch.phase !== 'complete' ? (
+                <Button
+                  appearance="outlined"
+                  kind="secondary"
+                  label={
+                    progressiveSearch.phase === 'paused' ? 'Continue searching' : 'Resume search'
+                  }
+                  size="small"
+                  onClick={progressiveSearch.resume}
+                />
+              ) : null}
+              <Button
+                appearance="outlined"
+                kind="secondary"
+                label="Use Insights"
+                size="small"
+                href={progressiveSearch.insightsHref}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto pb-2" ref={containerRef}>
@@ -426,7 +505,7 @@ export function RunsPage({
           scope={scope}
         />
         {infiniteScrollTrigger?.(containerRef.current)}
-        {!hasMore && data.length > 1 && (
+        {!progressiveSearch && !hasMore && data.length > 1 && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional runs found.</p>
             <Button
