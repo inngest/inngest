@@ -38,9 +38,6 @@ type Query {
   runTrigger(runID: String!): RunTraceTrigger!
   runTrace(runID: String!): RunTraceSpan!
 
-  debugRun(query: DebugRunQuery!): DebugRun
-  debugSession(query: DebugSessionQuery!): DebugSession
-
   workerConnections(
     first: Int! = 100
     after: String
@@ -69,20 +66,6 @@ input EventsQuery {
 input FunctionQuery {
   workspaceId: ID! = "local"
   functionSlug: String!
-}
-
-input DebugRunQuery {
-  workspaceId: ID! = "local"
-  functionSlug: String!
-  debugRunID: String
-  runID: String
-}
-
-input DebugSessionQuery {
-  workspaceId: ID! = "local"
-  functionSlug: String!
-  debugSessionID: String
-  runID: String
 }
 
 input FunctionRunQuery {

@@ -122,8 +122,6 @@ func LoadManyWithString[T interface{}](
 type Loaders struct {
 	RunTraceLoader        *dataloader.Loader
 	EventLoader           *dataloader.Loader
-	DebugRunLoader        *dataloader.Loader
-	DebugSessionLoader    *dataloader.Loader
 	RunDefersLoader       *dataloader.Loader
 	RunDeferredFromLoader *dataloader.Loader
 }
@@ -136,8 +134,6 @@ func NewLoaders(params LoaderParams) *Loaders {
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
 	loaders.EventLoader = dataloader.NewBatchedLoader(er.GetEvents)
-	loaders.DebugRunLoader = dataloader.NewBatchedLoader(tr.GetDebugRunTrace)
-	loaders.DebugSessionLoader = dataloader.NewBatchedLoader(tr.GetDebugSessionTrace)
 	loaders.RunDefersLoader = dataloader.NewBatchedLoader(dr.GetRunDefers)
 	loaders.RunDeferredFromLoader = dataloader.NewBatchedLoader(dr.GetRunDeferredFrom)
 

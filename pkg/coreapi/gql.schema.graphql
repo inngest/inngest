@@ -703,26 +703,6 @@ type RunTraceTrigger {
   cron: String # The cron expression if available
 }
 
-# debug types
-
-type DebugRun {
-  debugTraces: [RunTraceSpan!]
-}
-
-type DebugSessionRun {
-  status: RunTraceSpanStatus!
-  queuedAt: Time!
-  startedAt: Time
-  endedAt: Time
-  debugRunID: ULID
-  tags: [String!]
-  versions: [String!]
-}
-
-type DebugSession {
-  debugRuns: [DebugSessionRun!]
-}
-
 type RunStep {
   stepID: String!
   name: String!

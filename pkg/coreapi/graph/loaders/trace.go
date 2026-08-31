@@ -12,7 +12,6 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/meta"
-	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -39,30 +38,6 @@ func (k *TraceRequestKey) Raw() any {
 
 func (k *TraceRequestKey) String() string {
 	return fmt.Sprintf("%s:%s", k.TraceID, k.RunID)
-}
-
-type DebugRunRequestKey struct {
-	DebugRunID ulid.ULID
-}
-
-func (k *DebugRunRequestKey) Raw() any {
-	return k
-}
-
-func (k *DebugRunRequestKey) String() string {
-	return k.DebugRunID.String()
-}
-
-type DebugSessionRequestKey struct {
-	DebugSessionID ulid.ULID
-}
-
-func (k *DebugSessionRequestKey) Raw() any {
-	return k
-}
-
-func (k *DebugSessionRequestKey) String() string {
-	return k.DebugSessionID.String()
 }
 
 type traceReader struct {

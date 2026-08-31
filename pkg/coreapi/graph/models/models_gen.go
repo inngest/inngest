@@ -101,52 +101,9 @@ type CreateAppInput struct {
 	URL string `json:"url"`
 }
 
-type CreateDebugSessionInput struct {
-	WorkspaceID  string  `json:"workspaceId"`
-	FunctionSlug string  `json:"functionSlug"`
-	RunID        *string `json:"runID,omitempty"`
-}
-
-type CreateDebugSessionResponse struct {
-	DebugSessionID ulid.ULID `json:"debugSessionID"`
-	DebugRunID     ulid.ULID `json:"debugRunID"`
-}
-
 type DebounceConfiguration struct {
 	Period string  `json:"period"`
 	Key    *string `json:"key,omitempty"`
-}
-
-type DebugRun struct {
-	DebugTraces []*RunTraceSpan `json:"debugTraces,omitempty"`
-}
-
-type DebugRunQuery struct {
-	WorkspaceID  string  `json:"workspaceId"`
-	FunctionSlug string  `json:"functionSlug"`
-	DebugRunID   *string `json:"debugRunID,omitempty"`
-	RunID        *string `json:"runID,omitempty"`
-}
-
-type DebugSession struct {
-	DebugRuns []*DebugSessionRun `json:"debugRuns,omitempty"`
-}
-
-type DebugSessionQuery struct {
-	WorkspaceID    string  `json:"workspaceId"`
-	FunctionSlug   string  `json:"functionSlug"`
-	DebugSessionID *string `json:"debugSessionID,omitempty"`
-	RunID          *string `json:"runID,omitempty"`
-}
-
-type DebugSessionRun struct {
-	Status     RunTraceSpanStatus `json:"status"`
-	QueuedAt   time.Time          `json:"queuedAt"`
-	StartedAt  *time.Time         `json:"startedAt,omitempty"`
-	EndedAt    *time.Time         `json:"endedAt,omitempty"`
-	DebugRunID *ulid.ULID         `json:"debugRunID,omitempty"`
-	Tags       []string           `json:"tags,omitempty"`
-	Versions   []string           `json:"versions,omitempty"`
 }
 
 type Event struct {

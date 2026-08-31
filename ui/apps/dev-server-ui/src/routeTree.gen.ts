@@ -20,7 +20,6 @@ import { Route as DashboardAppsIndexRouteImport } from './routes/_dashboard/apps
 import { Route as DashboardAppsOnboardingRouteRouteImport } from './routes/_dashboard/apps/_onboarding/route'
 import { Route as DashboardMcpSetupIndexRouteImport } from './routes/_dashboard/mcp/setup/index'
 import { Route as DashboardFunctionsConfigIndexRouteImport } from './routes/_dashboard/functions/config/index'
-import { Route as DashboardDebuggerFunctionIndexRouteImport } from './routes/_dashboard/debugger/function/index'
 import { Route as DashboardAppsAppIndexRouteImport } from './routes/_dashboard/apps/app/index'
 import { Route as DashboardAiScoresIndexRouteImport } from './routes/_dashboard/ai/scores/index'
 import { Route as DashboardAiExperimentsIndexRouteImport } from './routes/_dashboard/ai/experiments/index'
@@ -83,12 +82,6 @@ const DashboardFunctionsConfigIndexRoute =
     path: '/config/',
     getParentRoute: () => DashboardFunctionsRouteRoute,
   } as any)
-const DashboardDebuggerFunctionIndexRoute =
-  DashboardDebuggerFunctionIndexRouteImport.update({
-    id: '/debugger/function/',
-    path: '/debugger/function/',
-    getParentRoute: () => DashboardRoute,
-  } as any)
 const DashboardAppsAppIndexRoute = DashboardAppsAppIndexRouteImport.update({
   id: '/apps/app/',
   path: '/apps/app/',
@@ -132,7 +125,6 @@ export interface FileRoutesByFullPath {
   '/ai/experiments/': typeof DashboardAiExperimentsIndexRoute
   '/ai/scores/': typeof DashboardAiScoresIndexRoute
   '/apps/app/': typeof DashboardAppsAppIndexRoute
-  '/debugger/function/': typeof DashboardDebuggerFunctionIndexRoute
   '/functions/config/': typeof DashboardFunctionsConfigIndexRoute
   '/mcp/setup/': typeof DashboardMcpSetupIndexRoute
 }
@@ -149,7 +141,6 @@ export interface FileRoutesByTo {
   '/ai/experiments': typeof DashboardAiExperimentsIndexRoute
   '/ai/scores': typeof DashboardAiScoresIndexRoute
   '/apps/app': typeof DashboardAppsAppIndexRoute
-  '/debugger/function': typeof DashboardDebuggerFunctionIndexRoute
   '/functions/config': typeof DashboardFunctionsConfigIndexRoute
   '/mcp/setup': typeof DashboardMcpSetupIndexRoute
 }
@@ -169,7 +160,6 @@ export interface FileRoutesById {
   '/_dashboard/ai/experiments/': typeof DashboardAiExperimentsIndexRoute
   '/_dashboard/ai/scores/': typeof DashboardAiScoresIndexRoute
   '/_dashboard/apps/app/': typeof DashboardAppsAppIndexRoute
-  '/_dashboard/debugger/function/': typeof DashboardDebuggerFunctionIndexRoute
   '/_dashboard/functions/config/': typeof DashboardFunctionsConfigIndexRoute
   '/_dashboard/mcp/setup/': typeof DashboardMcpSetupIndexRoute
 }
@@ -189,7 +179,6 @@ export interface FileRouteTypes {
     | '/ai/experiments/'
     | '/ai/scores/'
     | '/apps/app/'
-    | '/debugger/function/'
     | '/functions/config/'
     | '/mcp/setup/'
   fileRoutesByTo: FileRoutesByTo
@@ -206,7 +195,6 @@ export interface FileRouteTypes {
     | '/ai/experiments'
     | '/ai/scores'
     | '/apps/app'
-    | '/debugger/function'
     | '/functions/config'
     | '/mcp/setup'
   id:
@@ -225,7 +213,6 @@ export interface FileRouteTypes {
     | '/_dashboard/ai/experiments/'
     | '/_dashboard/ai/scores/'
     | '/_dashboard/apps/app/'
-    | '/_dashboard/debugger/function/'
     | '/_dashboard/functions/config/'
     | '/_dashboard/mcp/setup/'
   fileRoutesById: FileRoutesById
@@ -314,13 +301,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardFunctionsConfigIndexRouteImport
       parentRoute: typeof DashboardFunctionsRouteRoute
     }
-    '/_dashboard/debugger/function/': {
-      id: '/_dashboard/debugger/function/'
-      path: '/debugger/function'
-      fullPath: '/debugger/function/'
-      preLoaderRoute: typeof DashboardDebuggerFunctionIndexRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/_dashboard/apps/app/': {
       id: '/_dashboard/apps/app/'
       path: '/apps/app'
@@ -402,7 +382,6 @@ interface DashboardRouteChildren {
   DashboardAiExperimentsIndexRoute: typeof DashboardAiExperimentsIndexRoute
   DashboardAiScoresIndexRoute: typeof DashboardAiScoresIndexRoute
   DashboardAppsAppIndexRoute: typeof DashboardAppsAppIndexRoute
-  DashboardDebuggerFunctionIndexRoute: typeof DashboardDebuggerFunctionIndexRoute
   DashboardMcpSetupIndexRoute: typeof DashboardMcpSetupIndexRoute
 }
 
@@ -418,7 +397,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAiExperimentsIndexRoute: DashboardAiExperimentsIndexRoute,
   DashboardAiScoresIndexRoute: DashboardAiScoresIndexRoute,
   DashboardAppsAppIndexRoute: DashboardAppsAppIndexRoute,
-  DashboardDebuggerFunctionIndexRoute: DashboardDebuggerFunctionIndexRoute,
   DashboardMcpSetupIndexRoute: DashboardMcpSetupIndexRoute,
 }
 
