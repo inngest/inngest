@@ -233,6 +233,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
                 progressiveSearch.cursor,
                 timeField,
               )?.toLocaleString(),
+              insightsHref: runsInsightsHref(environment.slug, commonQueryVars),
             }
           : undefined
       }
@@ -248,3 +249,21 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     />
   );
 });
+
+function runsInsightsHref(
+  envSlug: string,
+  vars: {
+    celQuery?: string;
+    startTime: string;
+    endTime: string | null;
+    appIDs: string[] | null;
+    functionSlug: string | null;
+  },
+) {
+  const params = new URLSearchParams({ from: vars.startTime });
+  if (vars.endTime) params.set('until', vars.endTime);
+  if (vars.celQuery) params.set('cel', vars.celQuery);
+  if (vars.functionSlug) params.set('function', vars.functionSlug);
+  for (const appID of vars.appIDs ?? []) params.append('app', appID);
+  return `/env/${encodeURIComponent(envSlug)}/insights?${params.toString()}`;
+}
