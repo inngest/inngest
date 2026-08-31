@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Run } from '@inngest/components/RunsPage/types';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useQuery } from 'urql';
 
 import { GetRunsDocument } from './queries';
+import { scanProgressivePages } from './progressiveRuns';
 import {
   fetchRunsPage,
   restFunctionRunToTableRun,
+  RUNS_CEL_MAX_BYTES,
+  RunsAPIError,
   type RestRunsPage,
 } from './restRuns';
 import { parseRunsData } from './utils';
@@ -29,11 +32,24 @@ type UseRunsPaginationParams = {
   useREST: boolean;
 };
 
+export type ProgressiveSearchState = {
+  phase: 'searching' | 'paused' | 'cancelled' | 'complete' | 'error';
+  cursor?: string;
+  error?: Error;
+  cancel: () => void;
+  resume: () => void;
+};
+
 export function useRunsPagination({
   commonQueryVars,
   tracePreviewEnabled,
   useREST,
 }: UseRunsPaginationParams) {
+  const progressive = useProgressiveRuns({
+    enabled: useREST && Boolean(commonQueryVars.celQuery),
+    vars: commonQueryVars,
+  });
+  const useProgressive = useREST && Boolean(commonQueryVars.celQuery);
   const [cursor, setCursor] = useState<string | null>(null);
   const [allRuns, setAllRuns] = useState<Run[]>([]);
 
@@ -49,7 +65,7 @@ export function useRunsPagination({
   });
 
   const restQuery = useInfiniteQuery({
-    enabled: useREST,
+    enabled: useREST && !useProgressive,
     queryKey: ['runs-rest-v2', commonQueryVars],
     initialPageParam: undefined as string | undefined,
     queryFn: ({ pageParam, signal }) =>
@@ -134,6 +150,10 @@ export function useRunsPagination({
   ]);
 
   const reset = useCallback(() => {
+    if (useProgressive) {
+      progressive.reset();
+      return;
+    }
     if (useREST) {
       void restQuery.refetch();
       return;
@@ -141,7 +161,24 @@ export function useRunsPagination({
     setCursor(null);
     setAllRuns([]);
     refetch();
-  }, [refetch, restQuery.refetch, useREST]);
+  }, [refetch, progressive, restQuery.refetch, useProgressive, useREST]);
+
+  if (useProgressive) {
+    return {
+      runs: progressive.runs,
+      isLoading: progressive.state.phase === 'searching',
+      isLoadingInitial:
+        progressive.state.phase === 'searching' &&
+        progressive.runs.length === 0,
+      isLoadingMore:
+        progressive.state.phase === 'searching' && progressive.runs.length > 0,
+      hasNextPage: false,
+      loadMore: () => {},
+      reset,
+      error: progressive.state.error,
+      progressiveSearch: progressive.state,
+    };
+  }
 
   if (useREST) {
     return {
@@ -153,6 +190,7 @@ export function useRunsPagination({
       loadMore,
       reset,
       error: restQuery.error,
+      progressiveSearch: undefined,
     };
   }
 
@@ -165,16 +203,28 @@ export function useRunsPagination({
     loadMore,
     reset,
     error: queryRes.error,
+    progressiveSearch: undefined,
   };
 }
 
 const REST_PAGE_SIZE = 40;
+const PROGRESSIVE_MAX_PASSES = 10;
+const PROGRESSIVE_MAX_MS = 10_000;
+const PROGRESSIVE_MIN_PASS_INTERVAL_MS = 250;
 
 function fetchRestRuns(
   vars: UseRunsPaginationParams['commonQueryVars'],
   cursor: string | undefined,
   signal: AbortSignal,
 ): Promise<RestRunsPage> {
+  if (
+    vars.celQuery &&
+    new TextEncoder().encode(vars.celQuery).byteLength > RUNS_CEL_MAX_BYTES
+  ) {
+    return Promise.reject(
+      new RunsAPIError('Query cannot exceed 2048 bytes', 'query_too_long', 422),
+    );
+  }
   const pathname =
     vars.functionSlug && vars.functionAppID
       ? `/v2/apps/${encodeURIComponent(vars.functionAppID)}/functions/${encodeURIComponent(vars.functionSlug)}/runs`
@@ -188,11 +238,131 @@ function fetchRestRuns(
   if (vars.endTime) params.set('until', vars.endTime);
   if (cursor) params.set('cursor', cursor);
   if (vars.celQuery) params.set('query', vars.celQuery);
-  if (vars.isDeferred !== null)
+  if (vars.isDeferred !== null) {
     params.set('isDeferred', String(vars.isDeferred));
+  }
   for (const status of vars.status ?? []) params.append('status', status);
   if (!vars.functionSlug) {
     for (const appID of vars.appIDs ?? []) params.append('appId', appID);
   }
+
   return fetchRunsPage(pathname, params, vars.environmentSlug, signal);
+}
+
+function useProgressiveRuns({
+  enabled,
+  vars,
+}: {
+  enabled: boolean;
+  vars: UseRunsPaginationParams['commonQueryVars'];
+}) {
+  const inputKey = JSON.stringify(vars);
+  const frozenVars = useMemo(() => vars, [inputKey]);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [cursor, setCursor] = useState<string>();
+  const [hasMore, setHasMore] = useState(true);
+  const [phase, setPhase] =
+    useState<ProgressiveSearchState['phase']>('searching');
+  const [error, setError] = useState<Error>();
+  const [attempt, setAttempt] = useState(0);
+  const abortRef = useRef<AbortController>();
+
+  useEffect(() => {
+    setRuns([]);
+    setCursor(undefined);
+    setHasMore(true);
+    setError(undefined);
+    setPhase('searching');
+    setAttempt((value) => value + 1);
+  }, [enabled, inputKey]);
+
+  useEffect(() => {
+    if (!enabled || phase !== 'searching' || !hasMore) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let disposed = false;
+
+    void (async () => {
+      try {
+        const reason = await scanProgressivePages({
+          initialCursor: cursor,
+          initialItems: runs,
+          fetchPage: async (nextCursor) => {
+            const passStartedAt = Date.now();
+            const page = await fetchRestRuns(
+              frozenVars,
+              nextCursor,
+              controller.signal,
+            );
+            const delay =
+              PROGRESSIVE_MIN_PASS_INTERVAL_MS -
+              (Date.now() - passStartedAt);
+            if (page.page.hasMore && delay > 0) {
+              await new Promise((resolve) => setTimeout(resolve, delay));
+              controller.signal.throwIfAborted();
+            }
+            return {
+              items: page.data.map(restFunctionRunToTableRun),
+              cursor: page.page.cursor,
+              hasMore: page.page.hasMore,
+            };
+          },
+          onCommit: (items, nextCursor, more) => {
+            if (disposed || controller.signal.aborted) return;
+            setRuns(items);
+            setCursor(nextCursor);
+            setHasMore(more);
+          },
+          signal: controller.signal,
+          displayTarget: REST_PAGE_SIZE,
+          maxPasses: PROGRESSIVE_MAX_PASSES,
+          maxMilliseconds: PROGRESSIVE_MAX_MS,
+        });
+        if (!disposed) setPhase(reason === 'complete' ? 'complete' : 'paused');
+      } catch (err) {
+        if (controller.signal.aborted || disposed) return;
+        setError(
+          err instanceof Error ? err : new Error('Unable to search runs'),
+        );
+        setPhase('error');
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      controller.abort();
+    };
+  }, [attempt, enabled, frozenVars, hasMore, phase]);
+
+  const resume = useCallback(() => {
+    if (!hasMore) return;
+    setError(undefined);
+    setPhase('searching');
+    setAttempt((value) => value + 1);
+  }, [hasMore]);
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    setPhase('cancelled');
+  }, []);
+  const reset = useCallback(() => {
+    abortRef.current?.abort();
+    setRuns([]);
+    setCursor(undefined);
+    setHasMore(true);
+    setError(undefined);
+    setPhase('searching');
+    setAttempt((value) => value + 1);
+  }, []);
+
+  return {
+    runs,
+    state: {
+      phase,
+      cursor,
+      error,
+      cancel,
+      resume,
+    } satisfies ProgressiveSearchState,
+    reset,
+  };
 }
