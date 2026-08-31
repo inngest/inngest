@@ -227,16 +227,19 @@ const GetFunctionDocument = graphql(`
 
 type UseFunctionParams = {
   functionSlug: string;
+  pause?: boolean;
 };
 
 export const useFunction = ({
   functionSlug,
+  pause,
 }: UseFunctionParams): UseQueryResponse<
   GetFunctionQuery,
   { environmentID: string; slug: string }
 > => {
   const environment = useEnvironment();
   const [result, refetch] = useQuery({
+    pause,
     query: GetFunctionDocument,
     variables: {
       environmentID: environment.id,
