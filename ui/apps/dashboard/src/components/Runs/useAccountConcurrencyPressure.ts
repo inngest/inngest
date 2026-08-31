@@ -13,6 +13,11 @@ import {
 type AccountIdentityQuery = {
   account: {
     id: string;
+    // Non-null for accounts billed through a provider (Vercel, AWS, ...).
+    marketplace: string | null;
+    // Null on accounts without a resolved plan; the banner treats that the
+    // same as "not yet known" and withholds the billing CTA.
+    plan: { isFree: boolean } | null;
   };
 };
 
@@ -20,6 +25,9 @@ type AccountIdentityQuery = {
 // ClickHouse) and always runs, because the dismissal key needs the account ID
 // even while the expensive query is skipped. urql shares it with the other
 // `account` queries on the page.
+//
+// Only `plan.isFree` is selected, not the whole plan: the wider GetCurrentPlan
+// document also pulls entitlements, which reads the usage table.
 const AccountIdentityDocument: TypedDocumentNode<
   AccountIdentityQuery,
   Record<string, never>
@@ -27,6 +35,10 @@ const AccountIdentityDocument: TypedDocumentNode<
   query AccountConcurrencyIdentity {
     account {
       id
+      marketplace
+      plan {
+        isFree
+      }
     }
   }
 `;
@@ -69,6 +81,13 @@ type AccountConcurrencyPressure = {
   // Undefined until the identity query resolves. The banner can't key its
   // dismissal — or render at all — before this is known.
   accountID: string | undefined;
+  // Whether the account is billed through a marketplace provider. Assumed
+  // false until the identity query resolves; the banner only uses it to
+  // suppress a CTA, and the CTA is withheld while the plan is unknown anyway.
+  isMarketplace: boolean;
+  // Undefined until the identity query resolves, or when the account has no
+  // plan attached.
+  isFreePlan: boolean | undefined;
 };
 
 /**
@@ -122,6 +141,8 @@ export function useAccountConcurrencyPressure({
 
   return {
     accountID,
+    isFreePlan: identity?.account.plan?.isFree,
+    isMarketplace: Boolean(identity?.account.marketplace),
     isPressured: isConcurrencyPressured(data?.concurrencyLimitHits.data),
     minutesWithHits: countMinutesWithHits(data?.concurrencyLimitHits.data),
   };
