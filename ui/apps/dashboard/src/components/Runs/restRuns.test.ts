@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { InngestAPIFetch } from '@/queries/useInngestAPIFetch';
 
 import {
+  decodeRunsFrontier,
   fetchRunsPage,
   restFunctionRunToTableRun,
   restRunsRefetchInterval,
@@ -90,6 +91,17 @@ describe('restRunsRefetchInterval', () => {
   ])('$name', ({ hasCEL, pages, want }) => {
     expect(restRunsRefetchInterval(hasCEL, pages)).toBe(want);
   });
+});
+
+it('decodes the selected cursor frontier', () => {
+  const cursor = btoa(
+    JSON.stringify({
+      c: { started_at: { f: 'started_at', v: 1788170400000 } },
+    }),
+  );
+  expect(decodeRunsFrontier(cursor, 'STARTED_AT')?.toISOString()).toBe(
+    '2026-08-31T10:00:00.000Z',
+  );
 });
 
 it('normalizes omitted protobuf defaults on empty terminal pages', async () => {
