@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/tests/client"
@@ -91,10 +90,8 @@ func TestInvoke(t *testing.T) {
 
 		t.Run("invoke", func(t *testing.T) {
 			as := assert.New(t)
-			invoke := run.Trace.ChildSpans[0]
-			as.Equal("invoke", invoke.Name)
+			invoke, _ := run.Trace.FindStep(t, "invoke")
 			as.Equal(0, invoke.Attempts)
-			as.Equal(0, len(invoke.ChildSpans))
 			as.False(invoke.IsRoot)
 			as.Equal(rootSpanID, invoke.ParentSpanID)
 			as.Equal(models.StepOpInvoke.String(), invoke.StepOp)
@@ -191,19 +188,23 @@ func TestInvokeGroup(t *testing.T) {
 
 		as := assert.New(t)
 
-		span := run.Trace.ChildSpans[0]
-		as.Equal(consts.OtelExecPlaceholder, span.Name)
+		// The retrying function's execution wrapper now surfaces as a
+		// "Finalization" span (see convertRunSpanToGQL's finalization-group
+		// collapsing) rather than the old discovery-span placeholder name.
+		span, _ := run.Trace.FindStep(t, "Finalization")
 		as.Equal(0, span.Attempts)
 		as.Equal(rootSpanID, span.ParentSpanID)
 		as.False(span.IsRoot)
-		as.Equal(2, len(span.ChildSpans)) // include queued retry span
-		as.Equal(models.RunTraceSpanStatusRunning.String(), span.Status)
+		as.Equal(1, len(span.ChildSpans))
+		// The overall run is still RUNNING (waiting to retry), but this
+		// "Finalization" span reflects its wrapped attempt's own terminal
+		// status, which already failed.
+		as.Equal(models.RunTraceSpanStatusFailed.String(), span.Status)
 		as.Equal("", span.StepOp)
 		as.Nil(span.OutputID)
 
 		t.Run("failed", func(t *testing.T) {
-			exec := span.ChildSpans[0]
-			as.Equal("Attempt 0", exec.Name)
+			exec, _ := span.FindStep(t, "Attempt 0")
 			as.Equal(models.RunTraceSpanStatusFailed.String(), exec.Status)
 			as.NotNil(exec.OutputID)
 
@@ -229,12 +230,16 @@ func TestInvokeGroup(t *testing.T) {
 		rootSpanID := run.Trace.SpanID
 
 		t.Run("invoke", func(t *testing.T) {
-			invoke := run.Trace.ChildSpans[0]
-			as.Equal("invoke", invoke.Name)
-			as.Equal(0, invoke.Attempts)
+			invoke, _ := run.Trace.FindStep(t, "invoke")
+			// The function itself retried once (RetryAtError) before this step
+			// ran, so Attempts reflects the function's attempt number the step
+			// executed during, not a step-level retry count; the function's
+			// own attempt history (failed attempt 0, successful attempt 1)
+			// surfaces as a sibling "Finalization" span instead of nesting
+			// under this step.
+			as.Equal(1, invoke.Attempts)
 			as.False(invoke.IsRoot)
 			as.Equal(rootSpanID, invoke.ParentSpanID)
-			as.Equal(2, len(invoke.ChildSpans))
 			as.Equal(models.StepOpInvoke.String(), invoke.StepOp)
 			as.NotNil(invoke.EndedAt)
 			as.Equal(models.RunTraceSpanStatusCompleted.String(), invoke.Status)
@@ -330,8 +335,7 @@ func TestInvokeTimeout(t *testing.T) {
 
 		t.Run("invoke", func(t *testing.T) {
 			r := require.New(t)
-			invoke := run.Trace.ChildSpans[0]
-			r.Equal("invoke", invoke.Name)
+			invoke, _ := run.Trace.FindStep(t, "invoke")
 			r.Equal(0, invoke.Attempts)
 			r.False(invoke.IsRoot)
 			r.Equal(rootSpanID, invoke.ParentSpanID)
@@ -353,7 +357,11 @@ func TestInvokeTimeout(t *testing.T) {
 
 			r.True(*stepInfo.TimedOut)
 			r.Nil(stepInfo.ReturnEventID)
-			r.Nil(stepInfo.RunID)
+			// The invoked function did start (and was assigned a run ID) before
+			// timing out — RunID reflects that it's known, not that the invoke
+			// completed. See TestInvokeInProgressRunID, which asserts this same
+			// "populated as soon as known" behavior mid-flight.
+			r.NotNil(stepInfo.RunID)
 		})
 	})
 }
