@@ -64,6 +64,7 @@ type Props = {
   error?: Error | null;
   progressiveSearch?: {
     phase: 'searching' | 'paused' | 'cancelled' | 'complete' | 'error';
+    searchedThrough?: string;
     cancel: () => void;
     resume: () => void;
   };
@@ -456,6 +457,9 @@ export function RunsPage({
                 ? 'Search cancelled'
                 : 'Automatic search paused'}
               {` · ${data.length} ${data.length === 1 ? 'match' : 'matches'}`}
+              {progressiveSearch.searchedThrough
+                ? ` · searched through ${progressiveSearch.searchedThrough}`
+                : ''}
             </p>
             <div className="flex items-center gap-2">
               {progressiveSearch.phase === 'searching' ? (
