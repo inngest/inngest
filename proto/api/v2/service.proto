@@ -2217,6 +2217,7 @@ message FunctionRef {
   string id = 1;
   string name = 2;
   AppRef app = 3;
+  optional string slug = 4;
 }
 
 message AppRef {
@@ -2353,6 +2354,8 @@ message FunctionRun {
   optional uint64 duration_ms = 8;
   RunTrigger trigger = 9;
   optional google.protobuf.Struct output = 10;
+  optional bool is_deferred = 11;
+  optional bool has_ai = 12;
 }
 
 message GetFunctionRunRequest {

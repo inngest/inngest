@@ -571,6 +571,14 @@ func toAPIRunListItem(run *RunListItem) *apiv2.FunctionRun {
 			EventIds: []string{run.EventID.String()},
 			IsBatch:  run.BatchID != nil,
 		},
+		IsDeferred: run.IsDeferred,
+		HasAi:      run.HasAI,
+	}
+	if run.FunctionSlug != "" {
+		result.Function.Slug = optionalString(run.FunctionSlug)
+	}
+	if run.EventName != "" {
+		result.Trigger.EventName = optionalString(run.EventName)
 	}
 
 	if run.BatchID != nil {

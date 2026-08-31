@@ -133,7 +133,11 @@ type RunListItem struct {
 
 	FunctionID   string
 	FunctionName string
+	FunctionSlug string
 	AppID        string
+	EventName    string
+	IsDeferred   *bool
+	HasAI        *bool
 }
 
 type GetRunsResult struct {
