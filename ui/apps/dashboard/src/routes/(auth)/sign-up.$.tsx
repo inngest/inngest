@@ -116,7 +116,7 @@ function RouteComponent() {
   const isStartStep = pathname === '/sign-up' || pathname === '/sign-up/';
 
   return (
-    <SplitView panel={<TrustPanel />}>
+    <SplitView panel={<TrustPanel />} panelBackground="neutral">
       <div className="my-auto flex w-full flex-col items-center gap-10">
         <div className="flex w-full flex-col items-center">
           {/* Rendered here rather than through Clerk's `logoImageUrl` so the

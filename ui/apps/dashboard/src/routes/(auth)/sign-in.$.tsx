@@ -44,16 +44,12 @@ function RouteComponent() {
             {/* Matches sign-up: the mark is rendered here rather than through
                 Clerk's `logoImageUrl`, so it inherits `currentColor` instead
                 of relying on a dark-mode filter over a PNG. */}
-            <InngestLogo className="text-basis mb-6" width={132} />
+            <InngestLogo className="text-basis mb-8" width={132} />
             <SignIn
               appearance={{
                 elements: {
                   footer: 'bg-none',
                   logoBox: 'hidden',
-                  // Matches sign-up. `!` because the provider sets `my-9` on
-                  // the same descriptor and Tailwind utilities share
-                  // specificity.
-                  header: '!mb-6 !mt-0',
                 },
               }}
             />
