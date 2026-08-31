@@ -232,19 +232,19 @@ func TestFunctionSteps(t *testing.T) {
 			assert.InDelta(t, expectedDur, thr.Duration, 200)
 		})
 
-		// forth
+		// fourth
 		t.Run("wait step", func(t *testing.T) {
-			forth, _ := run.Trace.FindStepAfter(t, "wait1", thrIdx)
-			assert.Equal(t, 0, forth.Attempts)
-			assert.False(t, forth.IsRoot)
-			assert.Equal(t, rootSpanID, forth.ParentSpanID)
-			assert.Equal(t, models.StepOpWaitForEvent.String(), forth.StepOp)
-			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), forth.Status)
-			assert.NotNil(t, forth.StartedAt)
-			assert.NotNil(t, forth.EndedAt)
+			fourth, _ := run.Trace.FindStepAfter(t, "wait1", thrIdx)
+			assert.Equal(t, 0, fourth.Attempts)
+			assert.False(t, fourth.IsRoot)
+			assert.Equal(t, rootSpanID, fourth.ParentSpanID)
+			assert.Equal(t, models.StepOpWaitForEvent.String(), fourth.StepOp)
+			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), fourth.Status)
+			assert.NotNil(t, fourth.StartedAt)
+			assert.NotNil(t, fourth.EndedAt)
 
 			var stepInfo models.WaitForEventStepInfo
-			byt, err := json.Marshal(forth.StepInfo)
+			byt, err := json.Marshal(fourth.StepInfo)
 			assert.NoError(t, err)
 			assert.NoError(t, json.Unmarshal(byt, &stepInfo))
 
@@ -252,8 +252,8 @@ func TestFunctionSteps(t *testing.T) {
 			assert.NotNil(t, stepInfo.FoundEventID)
 
 			// output test
-			assert.NotNil(t, forth.OutputID)
-			forthOutput := c.RunSpanOutput(ctx, *forth.OutputID)
+			assert.NotNil(t, fourth.OutputID)
+			forthOutput := c.RunSpanOutput(ctx, *fourth.OutputID)
 			c.ExpectSpanOutput(t, "api/new.event", forthOutput)
 		})
 
