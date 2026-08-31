@@ -76,17 +76,26 @@ func TestFunctionFailure(t *testing.T) {
 		rootSpanID := run.Trace.SpanID
 
 		t.Run("failed run", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-			require.Equal(t, consts.OtelExecFnErr, span.Name)
+			// The failed execution wrapper now surfaces as a "Finalization"
+			// span rather than consts.OtelExecFnErr, and no longer carries
+			// its own output (the run root's output, checked above, already
+			// covers the final error).
+			span, _ := run.Trace.FindStep(t, "Finalization")
 			require.False(t, span.IsRoot)
 			require.Equal(t, rootSpanID, span.ParentSpanID)
 			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-			require.NotNil(t, span.OutputID)
+			require.Nil(t, span.OutputID)
 
-			// output test
-			output := c.RunSpanOutput(ctx, *span.OutputID)
-			require.NotNil(t, output)
-			c.ExpectSpanErrorOutput(t, "nope!", "", output)
+			t.Run("attempt 0", func(t *testing.T) {
+				one, _ := span.FindStep(t, "Attempt 0")
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), one.Status)
+				require.NotNil(t, one.OutputID)
+
+				// output test
+				output := c.RunSpanOutput(ctx, *one.OutputID)
+				require.NotNil(t, output)
+				c.ExpectSpanErrorOutput(t, "nope!", "", output)
+			})
 		})
 	})
 }
@@ -281,28 +290,29 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 		require.NotEmpty(t, rootSpanID)
 
 		t.Run("attempt 1", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-
-			require.Equal(t, "function error", span.Name)
+			// The execution wrapper now surfaces as a "Finalization" span
+			// rather than consts.OtelExecFnErr ("function error"), and no
+			// longer carries its own output.
+			span, _ := run.Trace.FindStep(t, "Finalization")
 			require.False(t, span.IsRoot)
 			require.GreaterOrEqual(t, len(span.ChildSpans), 1)
 			require.Equal(t, rootSpanID, span.ParentSpanID)
 			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-			require.NotNil(t, span.OutputID)
+			require.Nil(t, span.OutputID)
 
 			t.Run("failed", func(t *testing.T) {
-				failed := span.ChildSpans[0]
-
-				require.Equal(t, "Attempt 0", failed.Name)
+				failed, _ := span.FindStep(t, "Attempt 0")
 				require.False(t, span.IsRoot)
 				require.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
 				require.NotNil(t, failed.OutputID)
 				output := c.RunSpanOutput(ctx, *failed.OutputID)
 				require.NotNil(t, output)
-				require.NoError(t, err)
-				quoted := fmt.Sprintf("%q", syscode.CodeOutputTooLarge)
-				c.ExpectSpanErrorOutput(t, "", quoted, output)
+				require.NotNil(t, output.Error)
+				// The syscode now surfaces on the error's Name field rather
+				// than embedded in Stack.
+				require.NotNil(t, output.Error.Name)
+				require.Equal(t, syscode.CodeOutputTooLarge, *output.Error.Name)
 			})
 		})
 

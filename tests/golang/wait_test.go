@@ -213,19 +213,22 @@ func TestWaitGroup(t *testing.T) {
 
 		rootSpanID := run.Trace.SpanID
 
-		span := run.Trace.ChildSpans[0]
-		assert.Equal(t, consts.OtelExecPlaceholder, span.Name)
+		// The in-progress execution wrapper now surfaces as a "Finalization"
+		// span rather than the old discovery-span placeholder name
+		// ("execute" / consts.OtelExecPlaceholder), and its own status
+		// reflects the wrapped attempt's terminal outcome (FAILED), not the
+		// overall run's RUNNING state.
+		span, _ := run.Trace.FindStep(t, "Finalization")
 		assert.Equal(t, 0, span.Attempts)
 		assert.Equal(t, rootSpanID, span.ParentSpanID)
 		assert.False(t, span.IsRoot)
-		assert.Equal(t, 2, len(span.ChildSpans)) // include queued retry span
-		assert.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
+		assert.Equal(t, 1, len(span.ChildSpans))
+		assert.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
 		assert.Equal(t, "", span.StepOp)
 		assert.Nil(t, span.OutputID)
 
 		t.Run("failed", func(t *testing.T) {
-			exec := span.ChildSpans[0]
-			assert.Equal(t, "Attempt 0", exec.Name)
+			exec, _ := span.FindStep(t, "Attempt 0")
 			assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
 			assert.NotNil(t, exec.OutputID)
 
@@ -234,15 +237,15 @@ func TestWaitGroup(t *testing.T) {
 			c.ExpectSpanErrorOutput(t, "initial error", "", execOutput)
 		})
 
-		// Wait for the WaitForEvent to appear in history
-		r.EventuallyWithT(func(ct *assert.CollectT) {
+		// Wait for the WaitForEvent to appear in history. It now surfaces as
+		// a top-level sibling rather than nested under the first child.
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
 			a := assert.New(ct)
 			run, err := c.RunTraces(ctx, runID)
 			a.NoError(err)
-			a.Len(run.Trace.ChildSpans, 1)
 
 			isWaiting := false
-			for _, s := range run.Trace.ChildSpans[0].ChildSpans {
+			for _, s := range run.Trace.ChildSpans {
 				if s.StepOp == models.StepOpWaitForEvent.String() {
 					isWaiting = true
 					break
@@ -275,12 +278,14 @@ func TestWaitGroup(t *testing.T) {
 		rootSpanID := run.Trace.SpanID
 
 		t.Run("wait step", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-			assert.Equal(t, "dummy", span.Name)
-			assert.Equal(t, 0, span.Attempts)
+			span, _ := run.Trace.FindStep(t, "dummy")
+			// Attempts reflects the function-execution attempt the step ran
+			// during (the function retried once before reaching this step),
+			// not a step-level retry count; it's now a clean, childless span.
+			assert.Equal(t, 1, span.Attempts)
 			assert.Equal(t, rootSpanID, span.ParentSpanID)
 			assert.False(t, span.IsRoot)
-			assert.Equal(t, 2, len(span.ChildSpans))
+			assert.Equal(t, 0, len(span.ChildSpans))
 			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), span.Status)
 			assert.Equal(t, models.StepOpWaitForEvent.String(), span.StepOp)
 
