@@ -69,7 +69,7 @@ const traceDetailsFragment = graphql(`
 `);
 
 const query = graphql(`
-  query GetRunTrace($envID: ID!, $runID: String!) {
+  query GetRunTrace($envID: ID!, $runID: String!, $preview: Boolean) {
     workspace(id: $envID) {
       run(runID: $runID) {
         function {
@@ -82,7 +82,7 @@ const query = graphql(`
           slug
         }
         status
-        trace(preview: true) {
+        trace(preview: $preview) {
           ...TraceDetails
           childrenSpans {
             ...TraceDetails
@@ -108,9 +108,13 @@ export function useGetRun() {
   const client = useClient();
 
   return useCallback(
-    async ({ runID }: GetRunPayload): Promise<GetRunResult> => {
+    async ({ runID, preview }: GetRunPayload): Promise<GetRunResult> => {
       const result = await client
-        .query(query, { envID, runID }, { requestPolicy: 'network-only' })
+        .query(
+          query,
+          { envID, runID, preview: preview ?? false },
+          { requestPolicy: 'network-only' },
+        )
         .toPromise();
 
       if (result.error) {

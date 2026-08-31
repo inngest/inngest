@@ -11,6 +11,7 @@ import { Switch } from '../Switch';
 
 export type RunsActionMenuProps = {
   setAutoRefresh: () => void;
+  setPreview: () => void;
   autoRefresh?: boolean;
   intervalSeconds?: number;
 };
@@ -18,6 +19,7 @@ export type RunsActionMenuProps = {
 export const RunsActionMenu = ({
   autoRefresh,
   setAutoRefresh,
+  setPreview,
   intervalSeconds = 5,
 }: RunsActionMenuProps) => {
   return (

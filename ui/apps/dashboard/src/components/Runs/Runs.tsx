@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { InfiniteScrollTrigger } from '@inngest/components/InfiniteScrollTrigger/InfiniteScrollTrigger';
 import { RunsPage } from '@inngest/components/RunsPage/RunsPage';
+import { useBooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useCalculatedStartTime } from '@inngest/components/hooks/useCalculatedStartTime';
 import {
   useBooleanSearchParam,
@@ -69,6 +70,13 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     variables: { envSlug: env.slug },
   });
 
+  const { booleanFlag } = useBooleanFlag();
+
+  const { value: tracePreviewEnabled } = booleanFlag(
+    'traces-preview',
+    true,
+    true,
+  );
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
   const [rawTimeField = RunsOrderByField.QueuedAt] =
@@ -129,6 +137,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     error: paginationError,
   } = useRunsPagination({
     commonQueryVars,
+    tracePreviewEnabled,
   });
 
   const [countRes, countRefetch] = useQuery({
@@ -178,6 +187,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       data={runs}
       features={{
         history: features.data?.history ?? 7,
+        tracesPreview: tracePreviewEnabled,
         isDeferred: true,
       }}
       hasMore={hasNextPage}

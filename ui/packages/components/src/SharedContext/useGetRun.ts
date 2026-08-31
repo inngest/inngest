@@ -6,6 +6,11 @@ import { useShared } from './SharedContext';
 
 export type GetRunPayload = {
   runID: string;
+
+  /**
+   * If `true`, traces will be fetched using the incoming tracing data.
+   */
+  preview?: boolean;
 };
 
 export type GetRunData = {
@@ -33,26 +38,32 @@ export type GetRunResult = {
 
 type UseGetRunOptions = {
   runID?: string;
+  preview?: boolean;
   refetchInterval?: number;
   enabled?: boolean;
 };
 
-export const useGetRun = ({ runID, refetchInterval, enabled = true }: UseGetRunOptions) => {
+export const useGetRun = ({
+  runID,
+  preview,
+  refetchInterval,
+  enabled = true,
+}: UseGetRunOptions) => {
   const shared = useShared();
 
   const queryResult = useQuery({
-    queryKey: ['run', runID],
+    queryKey: ['run', runID, { preview }],
     queryFn: useCallback(async () => {
       if (!runID) {
         console.info('no runID provided, skipping getRun');
         return undefined;
       }
-      const result = await shared.getRun({ runID });
+      const result = await shared.getRun({ runID, preview });
       if (result.error) {
         throw result.error;
       }
       return result.data;
-    }, [shared.getRun, runID]),
+    }, [shared.getRun, runID, preview]),
     refetchInterval,
     enabled,
   });

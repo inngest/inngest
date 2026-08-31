@@ -125,6 +125,7 @@ export const RunDetailsV4 = ({
     'polling-disabled',
     false
   );
+  const { value: tracesPreviewEnabled } = booleanFlag('traces-preview', true, true);
   const { updateDynamicRunData } = useDynamicRunData({ runID });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -214,6 +215,7 @@ export const RunDetailsV4 = ({
     refetch: refetchRun,
   } = useGetRun({
     runID,
+    preview: tracesPreviewEnabled,
     refetchInterval: pollInterval,
   });
 
@@ -226,6 +228,7 @@ export const RunDetailsV4 = ({
     refetch: refetchResult,
   } = useGetTraceResult({
     traceID: outputID,
+    preview: tracesPreviewEnabled,
     refetchInterval: pollInterval,
     enabled: Boolean(outputID),
   });
@@ -358,6 +361,7 @@ export const RunDetailsV4 = ({
             <StepInfo
               selectedStep={selectedStep}
               pollInterval={pollInterval}
+              tracesPreviewEnabled={tracesPreviewEnabled}
               isDurableEndpoint={runData?.isDurableEndpoint}
             />
           ) : (

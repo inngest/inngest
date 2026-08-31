@@ -11,6 +11,7 @@ export const GetRunsDocument = graphql(`
     $functionSlug: String
     $functionRunCursor: String = null
     $celQuery: String = null
+    $preview: Boolean = false
     $isDeferred: Boolean = null
   ) {
     environment: workspace(id: $environmentID) {
@@ -27,7 +28,7 @@ export const GetRunsDocument = graphql(`
         }
         orderBy: [{ field: $timeField, direction: DESC }]
         after: $functionRunCursor
-        preview: true
+        preview: $preview
       ) {
         edges {
           node {

@@ -259,7 +259,12 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
             <History functionSlug={functionSlug} debugSessionID={debugSessionID} runID={runID} />
             <div className="border-muted flex min-h-screen w-full flex-col justify-start">
               {selectedStep && (
-                <StepInfo selectedStep={selectedStep} pollInterval={1000} debug={true} />
+                <StepInfo
+                  selectedStep={selectedStep}
+                  pollInterval={1000}
+                  tracesPreviewEnabled={true}
+                  debug={true}
+                />
               )}
             </div>
           </div>

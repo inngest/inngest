@@ -218,6 +218,7 @@ function RunsComponent() {
             />
             <RunsActionMenu
               setAutoRefresh={() => setAutoRefresh((v) => !v)}
+              setPreview={() => {}}
               autoRefresh={autoRefresh}
               intervalSeconds={pollInterval / 1000}
             />

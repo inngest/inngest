@@ -5,6 +5,7 @@ import { useShared } from './SharedContext';
 
 export type GetTraceResultPayload = {
   traceID: string;
+  preview?: boolean;
 };
 
 export type TraceResult = {
@@ -20,12 +21,14 @@ export type TraceResult = {
 
 type UseGetTraceResultOptions = {
   traceID?: string | null;
+  preview?: boolean;
   refetchInterval?: number;
   enabled?: boolean;
 };
 
 export const useGetTraceResult = ({
   traceID,
+  preview,
   refetchInterval,
   enabled = true,
 }: UseGetTraceResultOptions) => {
@@ -34,14 +37,14 @@ export const useGetTraceResult = ({
   const isQueryEnabled = enabled && Boolean(traceID);
 
   const queryResult = useQuery({
-    queryKey: ['trace-result', traceID],
+    queryKey: ['trace-result', traceID, { preview }],
     queryFn: useCallback(async () => {
       if (!traceID) {
         console.info('no traceID provided, skipping getTraceResult');
         return undefined;
       }
-      return await shared.getTraceResult({ traceID });
-    }, [shared.getTraceResult, traceID]),
+      return await shared.getTraceResult({ traceID, preview });
+    }, [shared.getTraceResult, traceID, preview]),
     refetchInterval,
     enabled: isQueryEnabled,
   });

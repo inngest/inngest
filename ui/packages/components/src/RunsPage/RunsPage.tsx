@@ -41,7 +41,7 @@ import type { Run, ViewScope } from './types';
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history' | 'isDeferred'>;
+  features: Pick<Features, 'history' | 'tracesPreview' | 'isDeferred'>;
   getTrigger: React.ComponentProps<typeof RunDetailsV4>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -261,7 +261,7 @@ export function RunsPage({
         </div>
       );
     },
-    [getTrigger, pollInterval]
+    [getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {
