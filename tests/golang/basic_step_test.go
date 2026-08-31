@@ -185,9 +185,11 @@ func TestFunctionSteps(t *testing.T) {
 
 		rootSpanID := run.Trace.SpanID
 
+		var oneIdx, secIdx, thrIdx int
+
 		t.Run("step 1", func(t *testing.T) {
-			one := run.Trace.ChildSpans[0]
-			assert.Equal(t, "1", one.Name)
+			one, idx := run.Trace.FindStepAfter(t, "1", -1)
+			oneIdx = idx
 			assert.Equal(t, 0, one.Attempts)
 			assert.False(t, one.IsRoot)
 			assert.Equal(t, rootSpanID, one.ParentSpanID)
@@ -200,8 +202,8 @@ func TestFunctionSteps(t *testing.T) {
 		})
 
 		t.Run("step 2", func(t *testing.T) {
-			sec := run.Trace.ChildSpans[1]
-			assert.Equal(t, "2", sec.Name)
+			sec, idx := run.Trace.FindStepAfter(t, "2", oneIdx)
+			secIdx = idx
 			assert.Equal(t, 0, sec.Attempts)
 			assert.False(t, sec.IsRoot)
 			assert.Equal(t, rootSpanID, sec.ParentSpanID)
@@ -215,8 +217,8 @@ func TestFunctionSteps(t *testing.T) {
 
 		// third step
 		t.Run("step sleep", func(t *testing.T) {
-			thr := run.Trace.ChildSpans[2]
-			assert.Equal(t, "delay", thr.Name)
+			thr, idx := run.Trace.FindStepAfter(t, "delay", secIdx)
+			thrIdx = idx
 			assert.Equal(t, 0, thr.Attempts)
 			assert.False(t, thr.IsRoot)
 			assert.Equal(t, rootSpanID, thr.ParentSpanID)
@@ -232,8 +234,7 @@ func TestFunctionSteps(t *testing.T) {
 
 		// forth
 		t.Run("wait step", func(t *testing.T) {
-			forth := run.Trace.ChildSpans[3]
-			assert.Equal(t, "wait1", forth.Name)
+			forth, _ := run.Trace.FindStepAfter(t, "wait1", thrIdx)
 			assert.Equal(t, 0, forth.Attempts)
 			assert.False(t, forth.IsRoot)
 			assert.Equal(t, rootSpanID, forth.ParentSpanID)

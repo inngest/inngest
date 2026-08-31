@@ -475,6 +475,51 @@ type runTraceSpan struct {
 	StepInfo     any            `json:"stepInfo,omitempty"`
 }
 
+// FindStep returns the first direct child span with the given name and its
+// position within ChildSpans, halting the test immediately if no such child
+// exists.
+//
+// Child span ordering/shape isn't a fixed-size, one-entry-per-step array
+// (e.g. a step can surface as more than one sibling span), so callers
+// should look children up by name and, when order matters, use
+// FindStepAfter to compare positions rather than assuming fixed indices.
+func (s runTraceSpan) FindStep(t *testing.T, name string) (runTraceSpan, int) {
+	t.Helper()
+
+	for i, cs := range s.ChildSpans {
+		if cs.Name == name {
+			return cs, i
+		}
+	}
+
+	require.Failf(t, "child span not found", "no child span named %q found (children: %v)", name, spanNames(s.ChildSpans))
+	return runTraceSpan{}, -1
+}
+
+// FindStepAfter is FindStep plus a relative-order check: it additionally
+// requires the found span's position to come after `after` (typically the
+// index returned by the previous FindStepAfter call in a sequence of
+// steps). Pass -1 for `after` to check only that the span exists.
+//
+// Halts the test immediately if the span isn't found, or is found at or
+// before `after`.
+func (s runTraceSpan) FindStepAfter(t *testing.T, name string, after int) (runTraceSpan, int) {
+	t.Helper()
+
+	span, idx := s.FindStep(t, name)
+	require.Greater(t, idx, after, "expected span %q to come after the previously located step", name)
+
+	return span, idx
+}
+
+func spanNames(spans []runTraceSpan) []string {
+	names := make([]string, len(spans))
+	for i, s := range spans {
+		names[i] = s.Name
+	}
+	return names
+}
+
 func (c *Client) RunSpanOutput(ctx context.Context, outputID string) *models.RunTraceSpanOutput {
 	c.Helper()
 
