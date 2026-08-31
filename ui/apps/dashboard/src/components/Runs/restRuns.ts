@@ -1,7 +1,4 @@
-import {
-  isFunctionRunStatus,
-  type FunctionRunStatus,
-} from '@inngest/components/types/functionRun';
+import { isFunctionRunStatus } from '@inngest/components/types/functionRun';
 import type { Run } from '@inngest/components/RunsPage/types';
 
 export const RUNS_CEL_MAX_BYTES = 2048;
@@ -58,7 +55,7 @@ export function restFunctionRunToTableRun(run: RestFunctionRun): Run {
       name: run.function.name,
       slug: run.function.slug || run.function.id,
     },
-    status: run.status as FunctionRunStatus,
+    status: run.status,
     queuedAt: run.queuedAt,
     startedAt: run.startedAt ?? null,
     endedAt: run.endedAt ?? null,
