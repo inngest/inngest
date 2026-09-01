@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   buildConcurrencyWindow,
   CONCURRENCY_END_OFFSET_MS,
+  CONCURRENCY_WINDOW_MINUTES,
   countMinutesWithHits,
   dismissalStorageKey,
   DISMISSAL_LIFETIME_MS,
   isConcurrencyPressured,
   isDismissalActive,
+  nextImpression,
   resolveBillingCTA,
-  viewTrackedStorageKey,
 } from './accountConcurrency';
 
 const bucket = (value: number) => ({ value });
@@ -121,34 +122,6 @@ describe('countMinutesWithHits', () => {
   });
 });
 
-describe('viewTrackedStorageKey', () => {
-  const accountA = '5d258962-2c37-4a5d-b875-ebe72792c47f';
-  const accountB = 'e8ea18c4-dbb4-4e98-a6a4-8ff8b3801765';
-
-  it('gives different accounts different keys', () => {
-    expect(viewTrackedStorageKey(accountA)).not.toBe(
-      viewTrackedStorageKey(accountB),
-    );
-  });
-
-  // Click/dismiss events carry the scope they fired from, so impressions have
-  // to be counted per scope too — otherwise the second scope visited in a
-  // session records reactions with no matching view.
-  it('gives different scopes different keys', () => {
-    expect(viewTrackedStorageKey(accountA, 'env')).not.toBe(
-      viewTrackedStorageKey(accountA, 'fn'),
-    );
-  });
-
-  // Distinct namespaces: dismissal is durable and per-account, the view marker
-  // is session-scoped. Sharing a key would make dismissing suppress impressions.
-  it('does not collide with the dismissal key', () => {
-    expect(viewTrackedStorageKey(accountA)).not.toBe(
-      dismissalStorageKey(accountA),
-    );
-  });
-});
-
 describe('dismissalStorageKey', () => {
   const accountA = '5d258962-2c37-4a5d-b875-ebe72792c47f';
   const accountB = 'e8ea18c4-dbb4-4e98-a6a4-8ff8b3801765';
@@ -234,5 +207,115 @@ describe('resolveBillingCTA', () => {
     expect(
       resolveBillingCTA({ isFreePlan: undefined, isMarketplace: false }),
     ).toBe(null);
+  });
+});
+
+describe('nextImpression', () => {
+  const visible = {
+    isVisible: true,
+    accountID: 'acct-1',
+    scope: 'env',
+    minutesWithHits: 4,
+    cta: 'view-usage',
+    billingCTA: 'upgrade' as const,
+  };
+
+  // Deterministic ids, so a test can assert "a new one" without matching ULIDs.
+  function counter() {
+    let n = 0;
+    return () => `imp-${++n}`;
+  }
+
+  it('has no impression while the banner is hidden', () => {
+    expect(
+      nextImpression(null, { ...visible, isVisible: false }, counter()),
+    ).toBe(null);
+  });
+
+  // The dismissal key and every event need it, so an impression without one
+  // would be unattributable.
+  it('has no impression before the account resolves', () => {
+    expect(
+      nextImpression(null, { ...visible, accountID: undefined }, counter()),
+    ).toBe(null);
+  });
+
+  it('mints one when the banner becomes visible', () => {
+    const impression = nextImpression(null, visible, counter());
+
+    expect(impression).toMatchObject({
+      id: 'imp-1',
+      accountID: 'acct-1',
+      scope: 'env',
+      minutesWithHits: 4,
+      cta: 'view-usage',
+      billingCTA: 'upgrade',
+    });
+  });
+
+  it('records the window the signal was measured over', () => {
+    expect(nextImpression(null, visible, counter())?.windowMinutes).toBe(
+      CONCURRENCY_WINDOW_MINUTES,
+    );
+  });
+
+  // Identity, not just equality: the caller's tracking effect keys on the
+  // impression object, so a fresh object would re-fire the view event.
+  it('keeps the same impression across re-renders', () => {
+    const first = nextImpression(null, visible, counter());
+
+    expect(nextImpression(first, visible, counter())).toBe(first);
+  });
+
+  // A Refresh can refetch under a banner that never left the screen. That's a
+  // new reading, not a new appearance, and the snapshot stays frozen so a later
+  // click reports the same numbers as the view it belongs to.
+  it('does not re-mint when the pressure reading changes underneath it', () => {
+    const first = nextImpression(null, visible, counter());
+    const next = nextImpression(
+      first,
+      { ...visible, minutesWithHits: 9 },
+      counter(),
+    );
+
+    expect(next).toBe(first);
+    expect(next?.minutesWithHits).toBe(4);
+  });
+
+  // The case the old session-scoped dedup silently dropped: pressure clears and
+  // returns, or a dismissal lapses, without the tab ever reloading.
+  it('mints a new impression when the banner reappears', () => {
+    const mint = counter();
+    const first = nextImpression(null, visible, mint);
+    const hidden = nextImpression(
+      first,
+      { ...visible, isVisible: false },
+      mint,
+    );
+    const second = nextImpression(hidden, visible, mint);
+
+    expect(hidden).toBe(null);
+    expect(second?.id).toBe('imp-2');
+  });
+
+  it('mints a new impression when the scope changes', () => {
+    const mint = counter();
+    const first = nextImpression(null, visible, mint);
+    const second = nextImpression(first, { ...visible, scope: 'fn' }, mint);
+
+    expect(second?.id).toBe('imp-2');
+    expect(second?.scope).toBe('fn');
+  });
+
+  it('mints a new impression when the account changes', () => {
+    const mint = counter();
+    const first = nextImpression(null, visible, mint);
+    const second = nextImpression(
+      first,
+      { ...visible, accountID: 'acct-2' },
+      mint,
+    );
+
+    expect(second?.id).toBe('imp-2');
   });
 });
