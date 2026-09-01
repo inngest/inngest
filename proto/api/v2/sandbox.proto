@@ -148,7 +148,7 @@ message WriteSandboxFileRequest {
 
 message WriteSandboxFileData {
   string path = 1;
-  uint64 bytes_written = 2;
+  uint32 bytes_written = 2;
 }
 
 message WriteSandboxFileResponse {

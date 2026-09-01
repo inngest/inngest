@@ -1332,7 +1332,7 @@ func (x *WriteSandboxFileRequest) GetBody() *httpbody.HttpBody {
 type WriteSandboxFileData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	BytesWritten  uint64                 `protobuf:"varint,2,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
+	BytesWritten  uint32                 `protobuf:"varint,2,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1374,7 +1374,7 @@ func (x *WriteSandboxFileData) GetPath() string {
 	return ""
 }
 
-func (x *WriteSandboxFileData) GetBytesWritten() uint64 {
+func (x *WriteSandboxFileData) GetBytesWritten() uint32 {
 	if x != nil {
 		return x.BytesWritten
 	}
@@ -2520,7 +2520,7 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x05_mode\"O\n" +
 	"\x14WriteSandboxFileData\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12#\n" +
-	"\rbytes_written\x18\x02 \x01(\x04R\fbytesWritten\"\x89\x01\n" +
+	"\rbytes_written\x18\x02 \x01(\rR\fbytesWritten\"\x89\x01\n" +
 	"\x18WriteSandboxFileResponse\x120\n" +
 	"\x04data\x18\x01 \x01(\v2\x1c.api.v2.WriteSandboxFileDataR\x04data\x12;\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"K\n" +
