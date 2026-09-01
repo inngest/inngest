@@ -9,8 +9,9 @@
 // 1-minute buckets, so this window is 10 buckets wide.
 export const CONCURRENCY_WINDOW_MS = 10 * 60 * 1000;
 
-// The banner copy names this window, so derive it rather than hardcoding the
-// number in the string — otherwise tuning the window silently makes the copy lie.
+// Reported on the banner's view event so reactions can be read against the
+// window the signal was measured over. Derived rather than hardcoded so tuning
+// the window can't silently desync the two.
 export const CONCURRENCY_WINDOW_MINUTES = CONCURRENCY_WINDOW_MS / 60_000;
 
 // How far behind "now" the window ends. The newest bucket is the least
@@ -94,6 +95,35 @@ export function countMinutesWithHits(buckets: Bucket[] | undefined): number {
  */
 export function isConcurrencyPressured(buckets: Bucket[] | undefined): boolean {
   return countMinutesWithHits(buckets) >= CONCURRENCY_HIT_MINUTES_THRESHOLD;
+}
+
+/**
+ * Which billing CTA the banner offers alongside "View usage", or null for no
+ * second CTA at all.
+ *
+ * Marketplace accounts (Vercel, AWS, DigitalOcean, partner) are billed by the
+ * provider, and every billing route but /billing/usage redirects them away
+ * (see MarketplaceAccessControl) — so any in-app upgrade CTA is a dead end.
+ * We have no installation-level URL to send them to instead, so they get none.
+ *
+ * Otherwise the label tracks what the user is actually buying: a free account
+ * changes tier ("Upgrade"), while a paid one is topping up a single
+ * entitlement, not moving tiers ("Increase concurrency").
+ */
+export type ConcurrencyBillingCTA = 'increase-concurrency' | 'upgrade';
+
+export function resolveBillingCTA({
+  isFreePlan,
+  isMarketplace,
+}: {
+  // Undefined until the account query resolves. Withholding the CTA until then
+  // is what keeps the wrong label from flashing on a paid account.
+  isFreePlan: boolean | undefined;
+  isMarketplace: boolean;
+}): ConcurrencyBillingCTA | null {
+  if (isMarketplace || isFreePlan === undefined) return null;
+
+  return isFreePlan ? 'upgrade' : 'increase-concurrency';
 }
 
 const VIEW_TRACKED_STORAGE_KEY_PREFIX = 'viewedAccountConcurrencyBanner';

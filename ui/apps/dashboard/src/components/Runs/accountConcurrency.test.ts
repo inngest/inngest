@@ -8,6 +8,7 @@ import {
   DISMISSAL_LIFETIME_MS,
   isConcurrencyPressured,
   isDismissalActive,
+  resolveBillingCTA,
   viewTrackedStorageKey,
 } from './accountConcurrency';
 
@@ -200,5 +201,38 @@ describe('isDismissalActive', () => {
 
   it('treats a malformed stamp as expired', () => {
     expect(isDismissalActive(NaN, now)).toBe(false);
+  });
+});
+
+describe('resolveBillingCTA', () => {
+  it('offers a tier change on a free plan', () => {
+    expect(resolveBillingCTA({ isFreePlan: true, isMarketplace: false })).toBe(
+      'upgrade',
+    );
+  });
+
+  it('offers an entitlement top-up on a paid plan', () => {
+    expect(resolveBillingCTA({ isFreePlan: false, isMarketplace: false })).toBe(
+      'increase-concurrency',
+    );
+  });
+
+  // Every billing route but /billing/usage redirects marketplace accounts
+  // away, so a billing CTA could only dead-end them.
+  it('offers nothing to a marketplace account, whatever its plan', () => {
+    expect(resolveBillingCTA({ isFreePlan: true, isMarketplace: true })).toBe(
+      null,
+    );
+    expect(resolveBillingCTA({ isFreePlan: false, isMarketplace: true })).toBe(
+      null,
+    );
+  });
+
+  // Withheld rather than guessed: a default would flash the wrong label on
+  // whichever plan it guessed against.
+  it('offers nothing until the plan is known', () => {
+    expect(
+      resolveBillingCTA({ isFreePlan: undefined, isMarketplace: false }),
+    ).toBe(null);
   });
 });
