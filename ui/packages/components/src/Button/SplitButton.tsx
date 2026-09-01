@@ -2,9 +2,11 @@ import React from 'react';
 
 import { cn } from '../utils/classNames';
 
+type ClassNameProps = { className?: string };
+
 type SplitButtonProps = {
-  left: React.ReactElement;
-  right: React.ReactElement;
+  left: React.ReactElement<ClassNameProps>;
+  right: React.ReactElement<ClassNameProps>;
 };
 
 export const SplitButton = ({ left, right }: SplitButtonProps) => {

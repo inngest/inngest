@@ -38,8 +38,8 @@ type SegmentedButtonProps = {
 
 const Button = forwardRef<HTMLButtonElement, React.PropsWithChildren<SegmentedButtonProps>>(
   ({ children, value, isActive, icon, iconSide, onClick, ...props }, ref) => {
-    const iconElement = isValidElement(icon)
-      ? cloneElement(icon as React.ReactElement, {
+    const iconElement = isValidElement<{ className?: string }>(icon)
+      ? cloneElement(icon, {
           className: cn('h-4 w-4 ', children ? 'mx-0' : 'mx-[5px]', icon.props.className),
         })
       : null;
