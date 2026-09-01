@@ -225,6 +225,22 @@ func (o QueueOptions) PausedRequeueExtension() time.Duration {
 	return o.pausedRequeueExtension
 }
 
+// WithSemaphoreRequeueExtension overrides how far into the future a partition
+// is requeued when only the local semaphore limit is reached. When not set (or
+// non-positive), PartitionSemaphoreLimitRequeueExtension is used.
+func WithSemaphoreRequeueExtension(d time.Duration) QueueOpt {
+	return func(q *QueueOptions) {
+		q.semaphoreRequeueExtension = d
+	}
+}
+
+func (o QueueOptions) SemaphoreRequeueExtension() time.Duration {
+	if o.semaphoreRequeueExtension <= 0 {
+		return PartitionSemaphoreLimitRequeueExtension
+	}
+	return o.semaphoreRequeueExtension
+}
+
 func WithPeekConcurrencyMultiplier(m int64) QueueOpt {
 	return func(q *QueueOptions) {
 		q.peekCurrMultiplier = m
@@ -529,6 +545,10 @@ type QueueOptions struct {
 	// requeued when it is confirmed paused in the database. Falls back to
 	// PartitionPausedRequeueExtension when unset.
 	pausedRequeueExtension time.Duration
+	// semaphoreRequeueExtension is how far into the future a partition is
+	// requeued when only the local semaphore limit is reached. Falls back to
+	// PartitionSemaphoreLimitRequeueExtension when unset.
+	semaphoreRequeueExtension time.Duration
 
 	NormalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	RefreshItemThrottle                       RefreshItemThrottleFn
