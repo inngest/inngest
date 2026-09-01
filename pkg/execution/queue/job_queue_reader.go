@@ -75,15 +75,6 @@ func (r *shardBackedReaders) BacklogByID(ctx context.Context, shard QueueShard, 
 	return reader.BacklogByID(ctx, backlogID)
 }
 
-// BacklogsByPartition implements QueueBacklogReader.
-func (r *shardBackedReaders) BacklogsByPartition(ctx context.Context, shard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
-	reader, err := backlogOperations(shard)
-	if err != nil {
-		return nil, err
-	}
-	return reader.BacklogsByPartition(ctx, partitionID, from, until, opts...)
-}
-
 // ItemExists implements QueueItemReader.
 func (r *shardBackedReaders) ItemExists(ctx context.Context, shard QueueShard, scope Scope, jobID string) (bool, error) {
 	return shard.ItemExists(ctx, scope, jobID)
