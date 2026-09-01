@@ -126,45 +126,76 @@ export function resolveBillingCTA({
   return isFreePlan ? 'upgrade' : 'increase-concurrency';
 }
 
-const VIEW_TRACKED_STORAGE_KEY_PREFIX = 'viewedAccountConcurrencyBanner';
+/**
+ * One appearance of the banner, minted when it becomes visible and carried on
+ * every event that appearance produces.
+ *
+ * The `id` is what lets a click or a dismissal be attributed to the exact
+ * impression it came from, so click and dismiss rates share a denominator
+ * counted in the same unit they are. Everything else is a snapshot taken at
+ * mint time rather than read live at click time: a Refresh can refetch while
+ * the banner sits on screen, and without the snapshot a click would report a
+ * different signal strength than the view it belongs to.
+ *
+ * The snapshot is also what the banner renders from, so the CTAs a viewer saw
+ * and the CTAs reported on the view event cannot disagree.
+ */
+export type BannerImpression = {
+  id: string;
+  // Held to detect an org switch as a new appearance. Not reported — Segment
+  // already carries the account on every event via identify().
+  accountID: string;
+  minutesWithHits: number;
+  windowMinutes: number;
+  scope: string | undefined;
+  cta: string;
+  billingCTA: ConcurrencyBillingCTA | null;
+};
+
+type ImpressionInput = {
+  isVisible: boolean;
+  accountID: string | undefined;
+  scope: string | undefined;
+  minutesWithHits: number;
+  cta: string;
+  billingCTA: ConcurrencyBillingCTA | null;
+};
 
 /**
- * Session-scoped so the view event fires at most once per account per browser
- * session. The banner re-resolves on every mount and every Refresh, so without
- * this the impression count inflates and the click/dismiss rates it exists to
- * anchor come out too low.
+ * The impression that should be current, given the one that already is.
  *
- * Keyed by scope as well as account: the banner renders on both the
- * environment-wide and per-function runs lists, and click/dismiss events carry
- * the scope they fired from. An account-only key would let a view on one scope
- * suppress the impression for the other, leaving those events without a
- * matching denominator.
+ * Returns `prev` by identity whenever the banner is still the same appearance,
+ * so the caller's tracking effect stays a no-op. A new impression is minted
+ * only on a genuine new appearance: the banner becoming visible, or the
+ * account or scope changing underneath it. Notably `minutesWithHits` changing
+ * does NOT mint one — the pressure reading moved, the appearance did not.
+ *
+ * `mintID` is injected so tests get deterministic ids without mocking ulid.
  */
-export function viewTrackedStorageKey(
-  accountID: string,
-  scope?: string,
-): string {
-  return `${VIEW_TRACKED_STORAGE_KEY_PREFIX}:${accountID}:${scope ?? 'none'}`;
-}
+export function nextImpression(
+  prev: BannerImpression | null,
+  input: ImpressionInput,
+  mintID: () => string,
+): BannerImpression | null {
+  if (!input.isVisible || !input.accountID) return null;
 
-export function hasTrackedView(accountID: string, scope?: string): boolean {
-  try {
-    const key = viewTrackedStorageKey(accountID, scope);
-    return window.sessionStorage.getItem(key) !== null;
-  } catch (error) {
-    // Treat an unreadable store as "already tracked" so a failure here can
-    // only ever under-count, never spam duplicate impressions.
-    console.warn('error reading sessionStorage for banner view:', error);
-    return true;
+  if (
+    prev &&
+    prev.accountID === input.accountID &&
+    prev.scope === input.scope
+  ) {
+    return prev;
   }
-}
 
-export function markViewTracked(accountID: string, scope?: string): void {
-  try {
-    window.sessionStorage.setItem(viewTrackedStorageKey(accountID, scope), '1');
-  } catch (error) {
-    console.warn('error writing sessionStorage for banner view:', error);
-  }
+  return {
+    id: mintID(),
+    accountID: input.accountID,
+    minutesWithHits: input.minutesWithHits,
+    windowMinutes: CONCURRENCY_WINDOW_MINUTES,
+    scope: input.scope,
+    cta: input.cta,
+    billingCTA: input.billingCTA,
+  };
 }
 
 /**
