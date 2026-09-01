@@ -118,6 +118,7 @@ export function AccountConcurrencyBanner({ refreshNonce, scope }: Props) {
     trackBannerViewed({
       feature: ANALYTICS_FEATURE,
       bannerId: BANNER_ID,
+      accountId: impression.accountID,
       impressionId: impression.id,
       scope: impression.scope,
       minutesWithHits: impression.minutesWithHits,
@@ -149,6 +150,7 @@ export function AccountConcurrencyBanner({ refreshNonce, scope }: Props) {
     trackBannerDismissed({
       feature: ANALYTICS_FEATURE,
       bannerId: BANNER_ID,
+      accountId: impression?.accountID ?? accountID,
       impressionId: impression?.id,
       scope: impression?.scope ?? scope,
       minutesWithHits: impression?.minutesWithHits,
@@ -165,6 +167,7 @@ export function AccountConcurrencyBanner({ refreshNonce, scope }: Props) {
       trackBannerCTAClicked({
         feature: ANALYTICS_FEATURE,
         bannerId: BANNER_ID,
+        accountId: impression?.accountID ?? accountID,
         impressionId: impression?.id,
         scope: impression?.scope ?? scope,
         minutesWithHits: impression?.minutesWithHits,
@@ -172,7 +175,7 @@ export function AccountConcurrencyBanner({ refreshNonce, scope }: Props) {
         cta,
       });
     },
-    [scope, impression],
+    [accountID, scope, impression],
   );
 
   // Rendering off the impression rather than `isVisible` is what guarantees the

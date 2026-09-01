@@ -142,8 +142,9 @@ export function resolveBillingCTA({
  */
 export type BannerImpression = {
   id: string;
-  // Held to detect an org switch as a new appearance. Not reported — Segment
-  // already carries the account on every event via identify().
+  // Held to detect an org switch as a new appearance, and reported on every
+  // event: the warehouse's event rows carry only a user id, and a user in two
+  // accounts can't be attributed from membership alone.
   accountID: string;
   minutesWithHits: number;
   windowMinutes: number;
