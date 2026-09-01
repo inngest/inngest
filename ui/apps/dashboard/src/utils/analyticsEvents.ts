@@ -118,6 +118,14 @@ function track(
 type BannerViewedArgs = {
   feature: AnalyticsFeature;
   bannerId: string;
+  // The account the banner was shown to. Segment's identify() associates the
+  // user with an account, but that lives in Segment's identity graph, not on
+  // the event rows the warehouse materializes — those carry only `user_id`. So
+  // every query that compares banner exposure against an account-level outcome
+  // has to reconstruct the account from membership, and for a user who belongs
+  // to more than one account it can't be reconstructed at all. Reporting it
+  // here makes that join exact instead of inferred.
+  accountId?: string;
   // Identifies this appearance of the banner. The click and dismiss events for
   // the same appearance carry it too, which is what joins them to this view.
   impressionId?: string;
@@ -134,6 +142,7 @@ type BannerViewedArgs = {
 export function trackBannerViewed({
   feature,
   bannerId,
+  accountId,
   impressionId,
   scope,
   minutesWithHits,
@@ -143,6 +152,7 @@ export function trackBannerViewed({
 }: BannerViewedArgs) {
   track('Banner Viewed', feature, {
     banner_id: bannerId,
+    account_id: accountId,
     impression_id: impressionId,
     scope,
     minutes_with_hits: minutesWithHits,
@@ -155,6 +165,9 @@ export function trackBannerViewed({
 type BannerDismissedArgs = {
   feature: AnalyticsFeature;
   bannerId: string;
+  // See BannerViewedArgs — the outcome side of the join needs it on the
+  // reaction too, not just the impression.
+  accountId?: string;
   impressionId?: string;
   scope?: string;
   // The impression's own snapshot, repeated here so a dismiss rate can be cut
@@ -166,6 +179,7 @@ type BannerDismissedArgs = {
 export function trackBannerDismissed({
   feature,
   bannerId,
+  accountId,
   impressionId,
   scope,
   minutesWithHits,
@@ -173,6 +187,7 @@ export function trackBannerDismissed({
 }: BannerDismissedArgs) {
   track('Banner Dismissed', feature, {
     banner_id: bannerId,
+    account_id: accountId,
     impression_id: impressionId,
     scope,
     minutes_with_hits: minutesWithHits,
@@ -183,6 +198,8 @@ export function trackBannerDismissed({
 type BannerCTAClickedArgs = {
   feature: AnalyticsFeature;
   bannerId: string;
+  // See BannerViewedArgs.
+  accountId?: string;
   impressionId?: string;
   scope?: string;
   // The impression's own snapshot — see BannerDismissedArgs.
@@ -198,6 +215,7 @@ type BannerCTAClickedArgs = {
 export function trackBannerCTAClicked({
   feature,
   bannerId,
+  accountId,
   impressionId,
   scope,
   minutesWithHits,
@@ -206,6 +224,7 @@ export function trackBannerCTAClicked({
 }: BannerCTAClickedArgs) {
   track('Banner CTA Clicked', feature, {
     banner_id: bannerId,
+    account_id: accountId,
     impression_id: impressionId,
     scope,
     minutes_with_hits: minutesWithHits,
