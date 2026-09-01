@@ -51,10 +51,7 @@ type EnvOptionGroup = {
   label: string;
   opts: Option[];
 };
-type BoundaryOptionID =
-  | 'single_environment'
-  | 'all_branch_environments'
-  | 'all_environments';
+type BoundaryOptionID = 'single_environment' | 'all_environments';
 type ExpirationOptionID =
   | 'seven_days'
   | 'thirty_days'
@@ -130,22 +127,15 @@ function permissionLevelButtonClass(isActive: boolean) {
 }
 
 function boundaryOptionName(optionID: BoundaryOptionID) {
-  switch (optionID) {
-    case 'single_environment':
-      return 'Single environment';
-    case 'all_branch_environments':
-      return 'All branch environments';
-    case 'all_environments':
-      return 'All environments';
+  if (optionID === 'all_environments') {
+    return 'All environments';
   }
+  return 'Single environment';
 }
 
 function boundaryOptionIDFromOption(opt: Option): BoundaryOptionID {
-  switch (opt.id) {
-    case 'all_branch_environments':
-      return 'all_branch_environments';
-    case 'all_environments':
-      return 'all_environments';
+  if (opt.id === 'all_environments') {
+    return 'all_environments';
   }
   return 'single_environment';
 }
@@ -246,15 +236,14 @@ export function CreateAPIKeyForm({
   const envGroups = useMemo(() => {
     const production: Option[] = [];
     const test: Option[] = [];
-    let branchParent: Option | null = null;
     for (const e of envs ?? []) {
       if (e.isArchived || e.type === EnvironmentType.BranchChild) continue;
       const opt = { id: e.id, name: e.name };
       if (e.type === EnvironmentType.Production) production.push(opt);
-      else if (e.type === EnvironmentType.BranchParent) branchParent = opt;
+      else if (e.type === EnvironmentType.BranchParent) continue;
       else test.push(opt);
     }
-    return { production, test, branchParent };
+    return { production, test };
   }, [envs]);
 
   const envOptionGroups: EnvOptionGroup[] = [
@@ -287,6 +276,7 @@ export function CreateAPIKeyForm({
   useEffect(() => {
     const nextOwnershipType = getDefaultOwnershipType(createUserAPIKey);
     setOwnershipType(nextOwnershipType);
+    setBoundaryOption('single_environment');
     setExpirationOption(getDefaultExpirationOption(nextOwnershipType));
   }, [createUserAPIKey]);
 
@@ -374,13 +364,6 @@ export function CreateAPIKeyForm({
       setError('Select an environment.');
       return;
     }
-    if (
-      boundaryOption === 'all_branch_environments' &&
-      !envGroups.branchParent
-    ) {
-      setError('Branch environments are not available for this account.');
-      return;
-    }
     if (selectedPermissions.length === 0) {
       setError('Select at least one permission.');
       return;
@@ -394,21 +377,14 @@ export function CreateAPIKeyForm({
     }
 
     const expiresAt = expiresAtForOption(expirationOption);
-    let resourceBoundaryMode = ApiKeyResourceBoundaryMode.SingleEnv;
-    let workspaceID = selectedEnv?.id ?? null;
-    if (boundaryOption === 'all_environments') {
-      resourceBoundaryMode = ApiKeyResourceBoundaryMode.AllEnvs;
-      workspaceID = null;
-    }
-    if (boundaryOption === 'all_branch_environments') {
-      workspaceID = envGroups.branchParent?.id ?? null;
-    }
-
+    const allEnvironments = boundaryOption === 'all_environments';
     const input: CreateApiKeyInput = {
       name: name.trim(),
       permissions: selectedPermissions,
-      resourceBoundaryMode,
-      workspaceID,
+      resourceBoundaryMode: allEnvironments
+        ? ApiKeyResourceBoundaryMode.AllEnvs
+        : ApiKeyResourceBoundaryMode.SingleEnv,
+      workspaceID: allEnvironments ? null : selectedEnv?.id,
     };
     if (expiresAt) {
       input.expiresAt = expiresAt;
@@ -504,72 +480,53 @@ export function CreateAPIKeyForm({
     );
   }
 
-  let environmentField = null;
-  let boundaryCallout = null;
-  if (boundaryOption === 'single_environment') {
-    let environmentLabelClassName = 'text-disabled';
-    if (selectedEnv) {
-      environmentLabelClassName = 'text-basis';
-    }
-
-    environmentField = (
-      <div className="flex flex-col gap-1">
-        <label className="text-basis text-sm font-medium">Environment</label>
-        <Select
-          className="h-8"
-          label="Environment"
-          isLabelVisible={false}
-          value={selectedEnv}
-          onChange={(opt) => setSelectedEnv(opt)}
-        >
-          <Select.Button className="h-[30px] py-0">
-            <span className={environmentLabelClassName}>
-              {selectedEnv?.name ?? 'Select an environment'}
-            </span>
-          </Select.Button>
-          <Select.Options>
-            {envOptionGroups.map(({ label, opts }, idx) => {
-              if (opts.length === 0) {
-                return null;
-              }
-              return (
-                <div key={label}>
-                  {idx > 0 && <hr className="border-subtle my-1" />}
-                  <div className="text-light px-4 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide">
-                    {label}
-                  </div>
-                  {opts.map((opt) => (
-                    <Select.Option key={opt.id} option={opt}>
-                      {opt.name}
-                    </Select.Option>
-                  ))}
+  const environmentLabelClassName = selectedEnv
+    ? 'text-basis'
+    : 'text-disabled';
+  const environmentField = boundaryOption === 'single_environment' && (
+    <div className="flex flex-col gap-1">
+      <label className="text-basis text-sm font-medium">Environment</label>
+      <Select
+        className="h-8"
+        label="Environment"
+        isLabelVisible={false}
+        value={selectedEnv}
+        onChange={(opt) => setSelectedEnv(opt)}
+      >
+        <Select.Button className="h-[30px] py-0">
+          <span className={environmentLabelClassName}>
+            {selectedEnv?.name ?? 'Select an environment'}
+          </span>
+        </Select.Button>
+        <Select.Options>
+          {envOptionGroups.map(({ label, opts }, idx) => {
+            if (opts.length === 0) {
+              return null;
+            }
+            return (
+              <div key={label}>
+                {idx > 0 && <hr className="border-subtle my-1" />}
+                <div className="text-light px-4 pb-1 pt-1.5 text-xs font-medium uppercase tracking-wide">
+                  {label}
                 </div>
-              );
-            })}
-          </Select.Options>
-        </Select>
-      </div>
-    );
-  }
-  if (boundaryOption === 'all_branch_environments') {
-    boundaryCallout = (
-      <div className="bg-canvasSubtle border-subtle text-subtle rounded border px-3 py-2 text-sm sm:col-span-2">
-        This key applies to every current and future branch environment. API
-        requests made with this key must specify the branch environment name.
-      </div>
-    );
-  }
-  if (boundaryOption === 'all_environments') {
-    boundaryCallout = (
-      <div className="bg-canvasSubtle border-subtle text-subtle rounded border px-3 py-2 text-sm sm:col-span-2">
-        API requests made with this key must specify the environment name.
-      </div>
-    );
-  }
+                {opts.map((opt) => (
+                  <Select.Option key={opt.id} option={opt}>
+                    {opt.name}
+                  </Select.Option>
+                ))}
+              </div>
+            );
+          })}
+        </Select.Options>
+      </Select>
+    </div>
+  );
 
-  const permissionGroups = [...(catalogRes.data?.apiKeyPermissionCatalog ?? [])].sort((a, b) => {
-    return a.resource.localeCompare(b.resource)
-  })
+  const permissionGroups = [
+    ...(catalogRes.data?.apiKeyPermissionCatalog ?? []),
+  ].sort((a, b) => {
+    return a.resource.localeCompare(b.resource);
+  });
   let permissionsContent = (
     <div className="border-subtle rounded border">
       {permissionGroups.map((group) => {
@@ -685,16 +642,6 @@ export function CreateAPIKeyForm({
                   >
                     Single environment
                   </Select.Option>
-                  {envGroups.branchParent && (
-                    <Select.Option
-                      option={{
-                        id: 'all_branch_environments',
-                        name: boundaryOptionName('all_branch_environments'),
-                      }}
-                    >
-                      All branch environments
-                    </Select.Option>
-                  )}
                   <Select.Option
                     option={{
                       id: 'all_environments',
@@ -708,7 +655,12 @@ export function CreateAPIKeyForm({
             </div>
 
             {environmentField}
-            {boundaryCallout}
+            {boundaryOption === 'all_environments' && (
+              <div className="bg-canvasSubtle border-subtle text-subtle rounded border px-3 py-2 text-sm sm:col-span-2">
+                API requests made with this key must specify the environment
+                name.
+              </div>
+            )}
           </div>
         </div>
       </div>
