@@ -81,6 +81,7 @@ message CreateSandboxRequest {
   uint32 vcpu = 2;
   uint32 memory_mb = 3;
   map<string, string> environment = 4;
+  optional string snapshot_id = 5;
 }
 
 message ListSandboxesRequest {
