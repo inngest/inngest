@@ -10,12 +10,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -207,10 +209,10 @@ func testMetadata(t *testing.T) sv2.Metadata {
 // multi-column read is unreliable. Reads are explicitly out of scope for this
 // phase of the POC (the query-layer spec owns them), so these tests work by
 // name instead of expanding scope here.
-func selectRows(t *testing.T, db *sql.DB, query string) []map[string]any {
+func selectRows(t *testing.T, db *sql.DB, query string, args ...any) []map[string]any {
 	t.Helper()
 
-	rows, err := db.QueryContext(context.Background(), query)
+	rows, err := db.QueryContext(context.Background(), query, args...)
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -758,4 +760,230 @@ func TestListenerOnFunctionScheduledOmitsStartedAndEndedAt(t *testing.T) {
 	// StartedAt/EndedAt *attributes* are suppressed.
 	require.NotNil(t, rows[0]["start_time"])
 	require.NotNil(t, rows[0]["end_time"])
+}
+
+func TestListenerOnDeferAddWritesDeferSpan(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	md := testMetadata(t)
+	d := sv2.Defer{FnSlug: "deferred-fn", HashedID: "hash-1", ScheduleStatus: enums.DeferStatusAfterRun}
+	l.OnDeferAdd(context.Background(), md, d, "userland-1", time.Now())
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans WHERE name = ?;", meta.SpanNameDefer)
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "executor.defer span should land after a batch flush")
+
+	rows := selectRows(t, db, "SELECT run_id, span_id, attributes FROM inngest.run_trace_spans WHERE name = ?;", meta.SpanNameDefer)
+	require.Len(t, rows, 1)
+	require.Equal(t, md.ID.RunID.String(), rows[0]["run_id"])
+
+	attrs, ok := rows[0]["attributes"].(map[string]any)
+	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
+	require.Equal(t, d.HashedID, attrs[meta.Attrs.DeferHashedID.Key()])
+	require.Equal(t, "userland-1", attrs[meta.Attrs.DeferUserlandID.Key()])
+	require.Equal(t, d.FnSlug, attrs[meta.Attrs.DeferFnSlug.Key()])
+	require.Equal(t, enums.DeferStatusAfterRun.String(), attrs[meta.Attrs.DeferStatus.Key()])
+
+	// The span_id must be the real, deterministic identity — the same one
+	// tracing.DeferSpanRef computes for the real system's own span — so
+	// later writes to the same defer (abort, schedule-link) land on the
+	// same row group.
+	wantSpanID := tracing.DeferSpanRef(md.ID.RunID, d.HashedID).DynamicSpanID
+	require.Equal(t, wantSpanID, rows[0]["span_id"])
+}
+
+// TestListenerOnDeferAbortReusesSameSpanID proves OnDeferAbort's write
+// lands on the exact same (run_id, span_id) as OnDeferAdd's — the
+// precondition for duckdbquery's read-side collapse to treat them as one
+// logical defer rather than two unrelated spans.
+func TestListenerOnDeferAbortReusesSameSpanID(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	md := testMetadata(t)
+	d := sv2.Defer{FnSlug: "deferred-fn", HashedID: "hash-2", ScheduleStatus: enums.DeferStatusAfterRun}
+	l.OnDeferAdd(context.Background(), md, d, "userland-2", time.Now())
+	l.OnDeferAbort(context.Background(), md, d.HashedID, time.Now())
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans WHERE name = ?;", meta.SpanNameDefer)
+		_ = row.Scan(&count)
+		return count == 2
+	}, 2*time.Second, 20*time.Millisecond, "both the add and abort span rows should land after a batch flush")
+
+	rows := selectRows(t, db, "SELECT span_id, attributes FROM inngest.run_trace_spans WHERE name = ?;", meta.SpanNameDefer)
+	require.Len(t, rows, 2)
+	require.Equal(t, rows[0]["span_id"], rows[1]["span_id"], "add and abort rows must share the same deterministic span_id")
+
+	var sawAborted bool
+	for _, row := range rows {
+		attrs, ok := row["attributes"].(map[string]any)
+		require.True(t, ok)
+		if attrs[meta.Attrs.DeferStatus.Key()] == enums.DeferStatusAborted.String() {
+			sawAborted = true
+			require.Equal(t, d.HashedID, attrs[meta.Attrs.DeferHashedID.Key()])
+			// fn_slug/userland_id aren't known at abort time — see
+			// OnDeferAbort's own doc comment.
+			_, hasFnSlug := attrs[meta.Attrs.DeferFnSlug.Key()]
+			require.False(t, hasFnSlug)
+		}
+	}
+	require.True(t, sawAborted, "one of the two rows should carry status=Aborted")
+}
+
+// deferScheduleEventJSON builds the raw JSON of an inngest/deferred.schedule
+// event, matching what pkg/execution/executor/finalize.go actually
+// publishes (minus fields this package's OnFunctionScheduled doesn't read).
+func deferScheduleEventJSON(t *testing.T, m event.DeferredScheduleMetadata) json.RawMessage {
+	t.Helper()
+	evt := event.Event{
+		ID:   ulid.MustNew(ulid.Now(), rand.Reader).String(),
+		Name: consts.FnDeferScheduleName,
+		Data: map[string]any{
+			consts.InngestEventDataPrefix: m,
+		},
+	}
+	raw, err := json.Marshal(evt)
+	require.NoError(t, err)
+	return raw
+}
+
+// TestListenerOnFunctionScheduledLinksDeferredChild proves a run scheduled
+// via defer() gets is_deferred=true on its own inngest.runs row, its own
+// DeferParentRunIDs/DeferParentFnSlug attrs, AND updates the PARENT's
+// executor.defer span (a different run_id entirely) with DeferChildRunID —
+// the three things GetTraceRunFilter.IsDeferred and GetRunDefers/
+// GetRunDeferredFrom need to work on DuckDB.
+func TestListenerOnFunctionScheduledLinksDeferredChild(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	childMD := testMetadata(t)
+	parentRunID := ulid.MustNew(ulid.Now(), rand.Reader)
+	parentFnID := uuid.New()
+	parentAppID := uuid.New()
+	hashedID := "hash-3"
+
+	deferMeta := event.DeferredScheduleMetadata{
+		FnSlug:          "deferred-fn",
+		ParentAppID:     parentAppID,
+		ParentDeferSpan: tracing.DeferSpanRef(parentRunID, hashedID),
+		ParentFnID:      parentFnID,
+		ParentFnSlug:    "parent-fn",
+		ParentRunID:     parentRunID,
+		HashedID:        hashedID,
+	}
+	raw := deferScheduleEventJSON(t, deferMeta)
+
+	l.OnFunctionScheduled(context.Background(), childMD, queue.Item{}, []json.RawMessage{raw})
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(),
+			"SELECT count(*) FROM inngest.run_trace_spans WHERE name = ? AND run_id = ?;",
+			meta.SpanNameDefer, parentRunID.String())
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "parent defer span update should land after a batch flush")
+
+	// 1. is_deferred on the child's own run row.
+	runRows := selectRows(t, db, "SELECT is_deferred FROM inngest.runs WHERE run_id = ?;", childMD.ID.RunID.String())
+	require.Len(t, runRows, 1)
+	require.Equal(t, true, runRows[0]["is_deferred"])
+
+	// 2. DeferParentRunIDs/DeferParentFnSlug on the child's own queued span.
+	childSpanRows := selectRows(t, db,
+		"SELECT attributes FROM inngest.run_trace_spans WHERE name = 'executor.run.queued' AND run_id = ?;",
+		childMD.ID.RunID.String())
+	require.Len(t, childSpanRows, 1)
+	childAttrs, ok := childSpanRows[0]["attributes"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "parent-fn", childAttrs[meta.Attrs.DeferParentFnSlug.Key()])
+	parentIDs, ok := childAttrs[meta.Attrs.DeferParentRunIDs.Key()].([]any)
+	require.True(t, ok)
+	require.Equal(t, []any{parentRunID.String()}, parentIDs)
+
+	// 3. DeferChildRunID stamped onto the PARENT's own defer span row.
+	parentSpanRows := selectRows(t, db,
+		"SELECT span_id, attributes FROM inngest.run_trace_spans WHERE name = ? AND run_id = ?;",
+		meta.SpanNameDefer, parentRunID.String())
+	require.Len(t, parentSpanRows, 1)
+	parentAttrs, ok := parentSpanRows[0]["attributes"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, hashedID, parentAttrs[meta.Attrs.DeferHashedID.Key()])
+	require.Equal(t, "deferred-fn", parentAttrs[meta.Attrs.DeferFnSlug.Key()])
+	require.Equal(t, childMD.ID.RunID.String(), parentAttrs[meta.Attrs.DeferChildRunID.Key()])
+	require.Equal(t, tracing.DeferSpanRef(parentRunID, hashedID).DynamicSpanID, parentSpanRows[0]["span_id"])
+}
+
+// TestListenerOnFunctionScheduledSkipsParentLinkWithoutHashedID proves a
+// deferred.schedule event missing HashedID (an older/pre-existing event —
+// see DeferredScheduleMetadata's own doc comment) is skipped for the
+// parent-span update, rather than writing a wrongly-seeded orphan row, while
+// the child's own DeferParentRunIDs/DeferParentFnSlug attrs (which don't
+// depend on HashedID) still get set.
+func TestListenerOnFunctionScheduledSkipsParentLinkWithoutHashedID(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	childMD := testMetadata(t)
+	parentRunID := ulid.MustNew(ulid.Now(), rand.Reader)
+	deferMeta := event.DeferredScheduleMetadata{
+		FnSlug:      "deferred-fn",
+		ParentAppID: uuid.New(),
+		// A real ParentDeferSpan is required to pass Validate(), even
+		// though HashedID (the field this test omits) is what
+		// updateParentDeferSpans actually needs.
+		ParentDeferSpan: tracing.DeferSpanRef(parentRunID, "unused-in-this-test"),
+		ParentFnID:      uuid.New(),
+		ParentFnSlug:    "parent-fn",
+		ParentRunID:     parentRunID,
+		// HashedID intentionally omitted.
+	}
+	raw := deferScheduleEventJSON(t, deferMeta)
+
+	l.OnFunctionScheduled(context.Background(), childMD, queue.Item{}, []json.RawMessage{raw})
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans WHERE name = 'executor.run.queued';")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "child's own queued span should still land")
+
+	var count int
+	row := db.QueryRowContext(context.Background(),
+		"SELECT count(*) FROM inngest.run_trace_spans WHERE name = ? AND run_id = ?;",
+		meta.SpanNameDefer, parentRunID.String())
+	require.NoError(t, row.Scan(&count))
+	require.Equal(t, 0, count, "no parent defer span row should be written without a hashed ID")
+}
+
+func TestListenerOnFunctionScheduledOmitsIsDeferredForNormalRuns(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	md := testMetadata(t)
+	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.runs;")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "run row should land after a batch flush")
+
+	rows := selectRows(t, db, "SELECT is_deferred FROM inngest.runs WHERE run_id = ?;", md.ID.RunID.String())
+	require.Len(t, rows, 1)
+	require.Nil(t, rows[0]["is_deferred"], "a normal (non-deferred) run must leave is_deferred NULL")
 }

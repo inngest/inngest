@@ -216,6 +216,22 @@ type SyncLifecycleListener interface {
 	// a function. There is no equivalent hook on EventLifecycleListener,
 	// whose hooks describe per-match scheduling decisions instead.
 	OnEventReceived(context.Context, event.TrackedEvent)
+
+	// OnDeferAdd is called synchronously when a run's OpcodeDeferAdd is
+	// accepted (d.ScheduleStatus == enums.DeferStatusAfterRun) or
+	// soft-rejected with its rejection persisted (d.ScheduleStatus ==
+	// enums.DeferStatusRejected) -- never for a per_run_count rejection,
+	// which persists nothing (see pkg/execution/defers.SaveFromOp).
+	// userlandID is the user-typed defer ID from the opcode, not part of
+	// statev2.Defer itself. now is the caller's own "this just happened"
+	// timestamp -- see OnFunctionFinished.
+	OnDeferAdd(ctx context.Context, md statev2.Metadata, d statev2.Defer, userlandID string, now time.Time)
+
+	// OnDeferAbort is called synchronously when a run's OpcodeDeferAbort
+	// flips a previously-accepted defer to enums.DeferStatusAborted (see
+	// pkg/execution/defers.AbortFromOp). now is the caller's own "this just
+	// happened" timestamp -- see OnFunctionFinished.
+	OnDeferAbort(ctx context.Context, md statev2.Metadata, hashedID string, now time.Time)
 }
 
 // NoopSyncLifecycleListener does nothing. Embed this into a custom
@@ -271,3 +287,9 @@ func (NoopSyncLifecycleListener) OnInvokeFunctionResumed(context.Context, statev
 }
 
 func (NoopSyncLifecycleListener) OnEventReceived(context.Context, event.TrackedEvent) {}
+
+func (NoopSyncLifecycleListener) OnDeferAdd(context.Context, statev2.Metadata, statev2.Defer, string, time.Time) {
+}
+
+func (NoopSyncLifecycleListener) OnDeferAbort(context.Context, statev2.Metadata, string, time.Time) {
+}

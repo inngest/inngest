@@ -16,7 +16,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-const runColumns = "account_id, env_id, app_id, function_id, run_id, queued_at, started_at, ended_at, status, output, event_ids"
+const runColumns = "account_id, env_id, app_id, function_id, run_id, queued_at, started_at, ended_at, status, output, event_ids, is_deferred"
 
 // runStatusToStepStatusString maps a cqrs.TraceRun filter's RunStatus back
 // to the single StepStatus string inngest.runs.status actually stores for
@@ -189,6 +189,18 @@ func postCollapseFilter(filter cqrs.GetTraceRunFilter) (string, []any) {
 		until = time.Now()
 	}
 	args = append(args, filter.From, until)
+
+	// is_deferred is a nullable boolean (TRUE/NULL only, never explicit
+	// FALSE — see its migration's doc comment), so "not deferred" means
+	// NULL, not "= FALSE", matching pkg/cqrs/manager's own
+	// spans.is_deferred.IsNull() branch for the same filter.
+	if filter.IsDeferred != nil {
+		if *filter.IsDeferred {
+			where = append(where, "is_deferred = TRUE")
+		} else {
+			where = append(where, "is_deferred IS NULL")
+		}
+	}
 
 	return strings.Join(where, " AND "), args
 }
@@ -443,11 +455,11 @@ func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
 		runID                                           string
 		rawQueuedAt, rawStartedAt, rawEndedAt           any
 		status                                          string
-		rawOutput, rawEventIDs                          any
+		rawOutput, rawEventIDs, rawIsDeferred           any
 	)
 	if err := rows.Scan(
 		&rawAccountID, &rawEnvID, &rawAppID, &rawFunctionID, &runID,
-		&rawQueuedAt, &rawStartedAt, &rawEndedAt, &status, &rawOutput, &rawEventIDs,
+		&rawQueuedAt, &rawStartedAt, &rawEndedAt, &status, &rawOutput, &rawEventIDs, &rawIsDeferred,
 	); err != nil {
 		return nil, err
 	}
@@ -509,6 +521,11 @@ func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
 		}
 	}
 
+	isDeferred, err := asNullableBool(rawIsDeferred, "is_deferred")
+	if err != nil {
+		return nil, err
+	}
+
 	return &cqrs.TraceRun{
 		AccountID:   accountID,
 		WorkspaceID: envID,
@@ -521,5 +538,6 @@ func scanTraceRun(rows *sql.Rows) (*cqrs.TraceRun, error) {
 		Output:      output,
 		Status:      enums.StepStatusToRunStatus(stepStatus),
 		TriggerIDs:  triggerIDs,
+		IsDeferred:  isDeferred,
 	}, nil
 }

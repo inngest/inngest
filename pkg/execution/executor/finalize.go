@@ -371,6 +371,7 @@ func (e *executor) buildDeferEvents(
 			ParentFnID:      opts.Metadata.ID.FunctionID,
 			ParentFnSlug:    fnSlug,
 			ParentRunID:     opts.Metadata.ID.RunID,
+			HashedID:        d.HashedID,
 		}
 		if err := deferredMeta.Validate(); err != nil {
 			l.Error(

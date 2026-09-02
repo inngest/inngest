@@ -409,7 +409,11 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			)
 
 		case enums.OpcodeDeferAdd:
-			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, l, input.Metadata, op); err != nil {
+			// nil sync listeners: dual-write is wired only via
+			// executor.WithSyncLifecycleListeners/runner.WithSyncLifecycleListeners
+			// (pkg/devserver), and the checkpoint path never receives it —
+			// consistent with every other hook here, none of which dual-write.
+			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, nil, l, input.Metadata, op); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
@@ -422,7 +426,8 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			}
 
 		case enums.OpcodeDeferAbort:
-			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, l, input.Metadata, op); err != nil {
+			// nil sync listeners: see the OpcodeDeferAdd case above.
+			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, nil, l, input.Metadata, op); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
@@ -626,7 +631,8 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 
 		case enums.OpcodeDeferAdd:
-			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, l, &md, op); err != nil {
+			// nil sync listeners: see checkpoint's other OpcodeDeferAdd case.
+			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, nil, l, &md, op); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
@@ -639,7 +645,8 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 			}
 
 		case enums.OpcodeDeferAbort:
-			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, l, &md, op); err != nil {
+			// nil sync listeners: see checkpoint's other OpcodeDeferAdd case.
+			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, nil, l, &md, op); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
