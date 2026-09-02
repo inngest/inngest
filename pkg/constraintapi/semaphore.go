@@ -19,6 +19,16 @@ const (
 	SemaphoreReleaseManual SemaphoreReleaseMode = 1
 )
 
+type SemaphoreKind int
+
+const (
+	SemaphoreKindUnknown  SemaphoreKind = 0
+	SemaphoreKindAccount  SemaphoreKind = 1
+	SemaphoreKindApp      SemaphoreKind = 2
+	SemaphoreKindFunction SemaphoreKind = 3
+	SemaphoreKindFnKey    SemaphoreKind = 4
+)
+
 // SemaphoreIDApp returns the semaphore ID for worker concurrency (per-app).
 func SemaphoreIDApp(appID uuid.UUID) string {
 	return fmt.Sprintf("app:%s", appID)
@@ -33,6 +43,20 @@ func SemaphoreIDFn(functionID uuid.UUID) string {
 // The ID is a hash of the function ID + the raw (unevaluated) expression.
 func SemaphoreIDFnKey(functionID uuid.UUID, expression string) string {
 	return fmt.Sprintf("fnkey:%s", util.XXHash(functionID.String()+expression))
+}
+
+func semaphoreKind(id string) SemaphoreKind {
+	if len(id) > 3 {
+		switch id[0:3] {
+		case "app":
+			return SemaphoreKindApp
+		case "fn:":
+			return SemaphoreKindFunction
+		case "fnk":
+			return SemaphoreKindFnKey
+		}
+	}
+	return SemaphoreKindUnknown
 }
 
 // SemaphoreConstraint represents a semaphore-based capacity constraint.
@@ -54,6 +78,10 @@ type SemaphoreConstraint struct {
 
 	// Release controls when the semaphore counter is decremented.
 	Release SemaphoreReleaseMode
+}
+
+func (s SemaphoreConstraint) Kind() SemaphoreKind {
+	return semaphoreKind(s.ID)
 }
 
 func (s *SemaphoreConstraint) UsageKey(accountID uuid.UUID) string {

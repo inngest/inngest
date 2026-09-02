@@ -369,14 +369,33 @@ func (q *queueProcessor) LeaseItem(ctx context.Context, req LeaseItemRequest, di
 		}
 		return LeaseItemResult{Status: LeaseItemStatusCustomConcurrencyLimited, RetryAfter: limitedRetryAfter}, nil
 	case errors.Is(cause, ErrSemaphoreLimit):
-		// Semaphore capacity exhausted for this specific item (e.g., start job with fn concurrency).
-		// Skip this item and continue scanning; other items without semaphores (step 2, etc.)
-		// can still be processed.
+		result := LeaseItemResult{
+			Status:              LeaseItemStatusSemaphoreLimited,
+			RetryAfter:          limitedRetryAfter,
+			ExhaustedSemaphores: constraintRes.ExhaustedSemaphores,
+		}
+		appLimited := hasAppSemaphore(constraintRes.ExhaustedSemaphores)
+
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": q.Shard().Name(), "constraint_source": "constraintapi"},
+			Tags: map[string]any{
+				"status":            "semaphore_limit",
+				"queue_shard":       q.Shard().Name(),
+				"constraint_source": "constraintapi",
+				"app_semaphore":     appLimited,
+			},
 		})
-		return LeaseItemResult{Status: LeaseItemStatusSemaphoreLimited, RetryAfter: limitedRetryAfter}, nil
+
+		if appLimited {
+			// a partition is one function and a function belongs to one app, so every
+			// remaining item carries this exhausted app semaphore.  stop the iterator
+			// the same way fn concurrency does instead of checking each item.
+			return result, fmt.Errorf("semaphore hit: %w", ErrProcessNoUserConstraintCapacity)
+		}
+
+		// fn and fnkey semaphores are only on start items.  later steps of runs that
+		// already hold the semaphore carry none, so keep scanning.
+		return result, nil
 	case errors.Is(cause, ErrQueueItemNotFound):
 		// This is an okay error.  Move to the next job item.
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{

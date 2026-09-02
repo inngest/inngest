@@ -22,6 +22,10 @@ type Semaphore struct {
 	Release SemaphoreReleaseMode `json:"r"`
 }
 
+func (s Semaphore) Kind() SemaphoreKind {
+	return semaphoreKind(s.ID)
+}
+
 // AutoReleaseSemaphores returns only auto-release semaphores from a slice.
 // Used to add worker concurrency semaphores to every queue item (not just start).
 func AutoReleaseSemaphores(sems []Semaphore) []Semaphore {
