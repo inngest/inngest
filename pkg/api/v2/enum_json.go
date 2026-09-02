@@ -10,6 +10,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -37,7 +38,9 @@ func newResponseEnumMarshaler() runtime.Marshaler {
 }
 
 func NewResponseEnumMarshaler() runtime.Marshaler {
-	return responseEnumMarshaler{JSONPb: &runtime.JSONPb{}}
+	return responseEnumMarshaler{JSONPb: &runtime.JSONPb{
+		UnmarshalOptions: protojson.UnmarshalOptions{DiscardUnknown: false},
+	}}
 }
 
 func (responseEnumMarshaler) StreamContentType(any) string {
