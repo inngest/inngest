@@ -80,6 +80,11 @@ export function useRunsPagination({
       fetchRestRuns(apiFetch, commonQueryVars, pageParam, signal),
     getNextPageParam: (lastPage) =>
       lastPage.page.hasMore ? lastPage.page.cursor : undefined,
+    // fetchRunsPage already performs bounded 429 backoff. Do not let the query
+    // client repeat that retry cycle after it is exhausted.
+    retry: (failureCount, error) =>
+      !(error instanceof RunsAPIError && error.status === 429) &&
+      failureCount < 3,
     // Refetching an infinite query polls every cached page. Stop polling after
     // pagination begins so request volume does not grow with the result set.
     refetchInterval: (query) =>
