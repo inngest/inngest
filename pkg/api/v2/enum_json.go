@@ -3,12 +3,17 @@ package apiv2
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"google.golang.org/protobuf/proto"
 )
+
+var unknownProtoJSONFieldRegexp = regexp.MustCompile(`unknown field "([^"]+)"`)
 
 var responseEnumPrefixes = []string{
 	"APP_METHOD_",
@@ -75,6 +80,40 @@ func (m responseEnumMarshaler) NewEncoder(w io.Writer) runtime.Encoder {
 		_, err = w.Write(m.Delimiter())
 		return err
 	})
+}
+
+// NewDecoder preserves grpc-gateway's default protobuf JSON decoding while
+// translating unknown-field errors into REST v2's structured error format.
+func (m responseEnumMarshaler) NewDecoder(r io.Reader) runtime.Decoder {
+	return requestBodyDecoder{Decoder: m.JSONPb.NewDecoder(r)}
+}
+
+type requestBodyDecoder struct {
+	runtime.Decoder
+}
+
+func (d requestBodyDecoder) Decode(v any) error {
+	err := d.Decoder.Decode(v)
+	if err == nil {
+		return nil
+	}
+	if match := unknownProtoJSONFieldRegexp.FindStringSubmatch(err.Error()); len(match) == 2 {
+		return unexpectedRequestBodyFieldError{field: match[1]}
+	}
+	return err
+}
+
+type unexpectedRequestBodyFieldError struct {
+	field string
+}
+
+func (e unexpectedRequestBodyFieldError) Error() string {
+	response := apiv2base.ErrorResponse{Errors: []apiv2base.ErrorItem{{
+		Code:    apiv2base.ErrorInvalidRequest,
+		Message: fmt.Sprintf("Unexpected request body field %q", e.field),
+	}}}
+	data, _ := json.Marshal(response)
+	return string(data)
 }
 
 func shortenResponseEnumNames(data []byte) ([]byte, error) {
