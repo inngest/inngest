@@ -499,7 +499,7 @@ func (s runTraceSpan) FindStep(t *testing.T, name string) (runTraceSpan, int) {
 // FindStepAfter is FindStep plus a relative-order check: it additionally
 // requires the found span's position to come after `after` (typically the
 // index returned by the previous FindStepAfter call in a sequence of
-// steps). Pass -1 for `after` to check only that the span exists.
+// steps).
 //
 // Halts the test immediately if the span isn't found, or is found at or
 // before `after`.
