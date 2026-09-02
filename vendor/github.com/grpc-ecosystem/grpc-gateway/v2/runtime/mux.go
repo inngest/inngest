@@ -412,6 +412,9 @@ func (s *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.errorHandler(ctx, s, outboundMarshaler, w, r, sterr)
 			return
 		}
+		if strings.EqualFold(override, http.MethodGet) {
+			r = r.WithContext(withHTTPPathLengthFallback(r.Context()))
+		}
 		r.Method = strings.ToUpper(override)
 	}
 
@@ -523,6 +526,7 @@ func (s *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					s.errorHandler(ctx, s, outboundMarshaler, w, r, sterr)
 					return
 				}
+				r = r.WithContext(withHTTPPathLengthFallback(r.Context()))
 				s.handleHandler(h, w, r, pathParams)
 				return
 			}
