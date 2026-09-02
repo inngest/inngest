@@ -94,8 +94,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 			first: $first,
 			after: %s,
 			filter: { from: $startTime, until: $endTime, status: $status, timeField: $timeField, query: $query, functionIDs: $ids },
-			orderBy: %s,
-			preview: true
+			orderBy: %s
 		) {
 			edges {
 				cursor
@@ -113,7 +112,7 @@ func (c *Client) FunctionRuns(ctx context.Context, opts FunctionRunOpt) ([]FnRun
 				endCursor
 				hasNextPage
 			}
-			totalCount(preview: true)
+			totalCount
 		}
 	}`,
 		cursor,
@@ -320,7 +319,7 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 			return
 		}
 
-		run, err := c.RunTraces(ctx, *runID, opts.NewTraces)
+		run, err := c.RunTraces(ctx, *runID)
 		if !a.NoError(err) {
 			return
 		}
@@ -351,15 +350,14 @@ func (c *Client) WaitForRunTraces(ctx context.Context, t *testing.T, runID *stri
 }
 
 type WaitForRunTracesOptions struct {
-	Status    models.FunctionStatus
-	Timeout   time.Duration
-	Interval  time.Duration
-	NewTraces bool
+	Status   models.FunctionStatus
+	Timeout  time.Duration
+	Interval time.Duration
 
 	ChildSpanCount int
 }
 
-func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*RunV2, error) {
+func (c *Client) RunTraces(ctx context.Context, runID string) (*RunV2, error) {
 	c.Helper()
 
 	if runID == "" {
@@ -367,7 +365,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*
 	}
 
 	query := `
-	  query GetTraceRun($runID: String!, $preview: Boolean) {
+	  query GetTraceRun($runID: String!) {
 	  	run(runID: $runID) {
 				status
 				traceID
@@ -376,7 +374,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*
 				cronSchedule
         endedAt
 
-				trace(preview: $preview) {
+				trace {
 					...TraceDetails
 					childrenSpans {
 						...TraceDetails
@@ -430,8 +428,7 @@ func (c *Client) RunTraces(ctx context.Context, runID string, newTraces bool) (*
 	resp, err := c.DoGQL(ctx, graphql.RawParams{
 		Query: query,
 		Variables: map[string]any{
-			"runID":   runID,
-			"preview": newTraces,
+			"runID": runID,
 		},
 	})
 	if err != nil {
@@ -476,6 +473,51 @@ type runTraceSpan struct {
 	OutputID     *string        `json:"outputID,omitempty"`
 	StepOp       string         `json:"stepOp"`
 	StepInfo     any            `json:"stepInfo,omitempty"`
+}
+
+// FindStep returns the first direct child span with the given name and its
+// position within ChildSpans, halting the test immediately if no such child
+// exists.
+//
+// Child span ordering/shape isn't a fixed-size, one-entry-per-step array
+// (e.g. a step can surface as more than one sibling span), so callers
+// should look children up by name and, when order matters, use
+// FindStepAfter to compare positions rather than assuming fixed indices.
+func (s runTraceSpan) FindStep(t *testing.T, name string) (runTraceSpan, int) {
+	t.Helper()
+
+	for i, cs := range s.ChildSpans {
+		if cs.Name == name {
+			return cs, i
+		}
+	}
+
+	require.Failf(t, "child span not found", "no child span named %q found (children: %v)", name, spanNames(s.ChildSpans))
+	return runTraceSpan{}, -1
+}
+
+// FindStepAfter is FindStep plus a relative-order check: it additionally
+// requires the found span's position to come after `after` (typically the
+// index returned by the previous FindStepAfter call in a sequence of
+// steps).
+//
+// Halts the test immediately if the span isn't found, or is found at or
+// before `after`.
+func (s runTraceSpan) FindStepAfter(t *testing.T, name string, after int) (runTraceSpan, int) {
+	t.Helper()
+
+	span, idx := s.FindStep(t, name)
+	require.Greater(t, idx, after, "expected span %q to come after the previously located step", name)
+
+	return span, idx
+}
+
+func spanNames(spans []runTraceSpan) []string {
+	names := make([]string, len(spans))
+	for i, s := range spans {
+		names[i] = s.Name
+	}
+	return names
 }
 
 func (c *Client) RunSpanOutput(ctx context.Context, outputID string) *models.RunTraceSpanOutput {

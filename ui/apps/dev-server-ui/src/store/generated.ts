@@ -426,11 +426,6 @@ export type FunctionRunV2 = {
   triggerIDs: Array<Scalars['ULID']>;
 };
 
-
-export type FunctionRunV2TraceArgs = {
-  preview: InputMaybe<Scalars['Boolean']>;
-};
-
 export type FunctionRunV2Edge = {
   __typename?: 'FunctionRunV2Edge';
   cursor: Scalars['String'];
@@ -679,7 +674,6 @@ export type QueryRunsArgs = {
   filter: RunsFilterV2;
   first?: Scalars['Int'];
   orderBy: Array<RunsV2OrderBy>;
-  preview: InputMaybe<Scalars['Boolean']>;
 };
 
 
@@ -917,11 +911,6 @@ export type RunsV2Connection = {
   edges: Array<FunctionRunV2Edge>;
   pageInfo: PageInfo;
   totalCount: Scalars['Int'];
-};
-
-
-export type RunsV2ConnectionTotalCountArgs = {
-  preview: InputMaybe<Scalars['Boolean']>;
 };
 
 export type RunsV2OrderBy = {
@@ -1184,7 +1173,6 @@ export type GetRunsQueryVariables = Exact<{
   timeField: RunsV2OrderByField;
   functionRunCursor?: InputMaybe<Scalars['String']>;
   celQuery?: InputMaybe<Scalars['String']>;
-  preview?: InputMaybe<Scalars['Boolean']>;
   isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
 
@@ -1195,7 +1183,6 @@ export type CountRunsQueryVariables = Exact<{
   startTime: Scalars['Time'];
   status: InputMaybe<Array<FunctionRunStatus> | FunctionRunStatus>;
   timeField: RunsV2OrderByField;
-  preview?: InputMaybe<Scalars['Boolean']>;
   isDeferred?: InputMaybe<Scalars['Boolean']>;
 }>;
 
@@ -1206,7 +1193,6 @@ export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, 
 
 export type GetRunQueryVariables = Exact<{
   runID: Scalars['String'];
-  preview: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
@@ -1645,12 +1631,11 @@ export const RerunFromStepDocument = `
 }
     `;
 export const GetRunsDocument = `
-    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null, $preview: Boolean = false, $isDeferred: Boolean = null) {
+    query GetRuns($appIDs: [UUID!], $startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $functionRunCursor: String = null, $celQuery: String = null, $isDeferred: Boolean = null) {
   runs(
     filter: {appIDs: $appIDs, from: $startTime, status: $status, timeField: $timeField, query: $celQuery, isDeferred: $isDeferred}
     orderBy: [{field: $timeField, direction: DESC}]
     after: $functionRunCursor
-    preview: $preview
   ) {
     edges {
       node {
@@ -1691,18 +1676,17 @@ export const GetRunsDocument = `
 }
     `;
 export const CountRunsDocument = `
-    query CountRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $preview: Boolean = false, $isDeferred: Boolean = null) {
+    query CountRuns($startTime: Time!, $status: [FunctionRunStatus!], $timeField: RunsV2OrderByField!, $isDeferred: Boolean = null) {
   runs(
     filter: {from: $startTime, status: $status, timeField: $timeField, isDeferred: $isDeferred}
     orderBy: [{field: $timeField, direction: DESC}]
-    preview: $preview
   ) {
-    totalCount(preview: $preview)
+    totalCount
   }
 }
     `;
 export const GetRunDocument = `
-    query GetRun($runID: String!, $preview: Boolean) {
+    query GetRun($runID: String!) {
   run(runID: $runID) {
     function {
       app {
@@ -1714,7 +1698,7 @@ export const GetRunDocument = `
       slug
     }
     status
-    trace(preview: $preview) {
+    trace {
       ...TraceDetails
       childrenSpans {
         ...TraceDetails
@@ -1926,7 +1910,7 @@ export const GetEventV2RunsDocument = `
         name
         slug
       }
-      trace(preview: true) {
+      trace {
         skipReason
         skipExistingRunID
       }

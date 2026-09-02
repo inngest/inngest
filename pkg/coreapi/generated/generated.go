@@ -296,7 +296,7 @@ type ComplexityRoot struct {
 		SourceID       func(childComplexity int) int
 		StartedAt      func(childComplexity int) int
 		Status         func(childComplexity int) int
-		Trace          func(childComplexity int, preview *bool) int
+		Trace          func(childComplexity int) int
 		TraceID        func(childComplexity int) int
 		TriggerIDs     func(childComplexity int) int
 	}
@@ -365,7 +365,7 @@ type ComplexityRoot struct {
 		RunTrace               func(childComplexity int, runID string) int
 		RunTraceSpanOutputByID func(childComplexity int, outputID string) int
 		RunTrigger             func(childComplexity int, runID string) int
-		Runs                   func(childComplexity int, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2, preview *bool) int
+		Runs                   func(childComplexity int, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2) int
 		Stream                 func(childComplexity int, query models.StreamQuery) int
 		WorkerConnection       func(childComplexity int, connectionID ulid.ULID) int
 		WorkerConnections      func(childComplexity int, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) int
@@ -531,7 +531,7 @@ type ComplexityRoot struct {
 	RunsV2Connection struct {
 		Edges      func(childComplexity int) int
 		PageInfo   func(childComplexity int) int
-		TotalCount func(childComplexity int, preview *bool) int
+		TotalCount func(childComplexity int) int
 	}
 
 	SDKFeatureReadiness struct {
@@ -689,7 +689,7 @@ type FunctionRunV2Resolver interface {
 
 	Function(ctx context.Context, obj *models.FunctionRunV2) (*models.Function, error)
 
-	Trace(ctx context.Context, obj *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error)
+	Trace(ctx context.Context, obj *models.FunctionRunV2) (*models.RunTraceSpan, error)
 
 	Defers(ctx context.Context, obj *models.FunctionRunV2) ([]*models.RunDefer, error)
 	SiblingDefers(ctx context.Context, obj *models.FunctionRunV2) ([]*models.RunDefer, error)
@@ -716,7 +716,7 @@ type QueryResolver interface {
 	FunctionBySlug(ctx context.Context, query models.FunctionQuery) (*models.Function, error)
 	Functions(ctx context.Context) ([]*models.Function, error)
 	FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error)
-	Runs(ctx context.Context, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2, preview *bool) (*models.RunsV2Connection, error)
+	Runs(ctx context.Context, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error)
 	Run(ctx context.Context, runID string) (*models.FunctionRunV2, error)
 	RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error)
 	RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error)
@@ -736,7 +736,7 @@ type RunDeferredFromResolver interface {
 	Run(ctx context.Context, obj *models.RunDeferredFrom) (*models.FunctionRunV2, error)
 }
 type RunsV2ConnectionResolver interface {
-	TotalCount(ctx context.Context, obj *models.RunsV2Connection, preview *bool) (int, error)
+	TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error)
 }
 type StreamItemResolver interface {
 	InBatch(ctx context.Context, obj *models.StreamItem) (bool, error)
@@ -1901,12 +1901,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_FunctionRunV2_trace_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.FunctionRunV2.Trace(childComplexity, args["preview"].(*bool)), true
+		return e.complexity.FunctionRunV2.Trace(childComplexity), true
 
 	case "FunctionRunV2.traceID":
 		if e.complexity.FunctionRunV2.TraceID == nil {
@@ -2357,7 +2352,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Runs(childComplexity, args["first"].(int), args["after"].(*string), args["orderBy"].([]*models.RunsV2OrderBy), args["filter"].(models.RunsFilterV2), args["preview"].(*bool)), true
+		return e.complexity.Query.Runs(childComplexity, args["first"].(int), args["after"].(*string), args["orderBy"].([]*models.RunsV2OrderBy), args["filter"].(models.RunsFilterV2)), true
 
 	case "Query.stream":
 		if e.complexity.Query.Stream == nil {
@@ -3135,12 +3130,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		args, err := ec.field_RunsV2Connection_totalCount_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.RunsV2Connection.TotalCount(childComplexity, args["preview"].(*bool)), true
+		return e.complexity.RunsV2Connection.TotalCount(childComplexity), true
 
 	case "SDKFeatureReadiness.aiMetadataExtraction":
 		if e.complexity.SDKFeatureReadiness.AiMetadataExtraction == nil {
@@ -3681,7 +3671,6 @@ type CreateDebugSessionResponse {
     after: String
     orderBy: [RunsV2OrderBy!]!
     filter: RunsFilterV2!
-    preview: Boolean
   ): RunsV2Connection!
   # runsMetrics(filter: RunsFilterV2!): MetricsResponse!
   run(runID: String!): FunctionRunV2
@@ -4278,7 +4267,7 @@ type FunctionRunV2 {
 
   output: Bytes
 
-  trace(preview: Boolean): RunTraceSpan
+  trace: RunTraceSpan
   hasAI: Boolean!
   defers: [RunDefer!]!
   siblingDefers: [RunDefer!]!
@@ -4289,7 +4278,7 @@ type FunctionRunV2 {
 type RunsV2Connection {
   edges: [FunctionRunV2Edge!]!
   pageInfo: PageInfo!
-  totalCount(preview: Boolean): Int!
+  totalCount: Int!
 }
 
 type FunctionRunV2Edge {
@@ -4597,21 +4586,6 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
-
-func (ec *executionContext) field_FunctionRunV2_trace_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 *bool
-	if tmp, ok := rawArgs["preview"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preview"))
-		arg0, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["preview"] = arg0
-	return args, nil
-}
 
 func (ec *executionContext) field_FunctionRun_historyItemOutput_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -5102,15 +5076,6 @@ func (ec *executionContext) field_Query_runs_args(ctx context.Context, rawArgs m
 		}
 	}
 	args["filter"] = arg3
-	var arg4 *bool
-	if tmp, ok := rawArgs["preview"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preview"))
-		arg4, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["preview"] = arg4
 	return args, nil
 }
 
@@ -5183,21 +5148,6 @@ func (ec *executionContext) field_Query_workerConnections_args(ctx context.Conte
 		}
 	}
 	args["filter"] = arg3
-	return args, nil
-}
-
-func (ec *executionContext) field_RunsV2Connection_totalCount_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 *bool
-	if tmp, ok := rawArgs["preview"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preview"))
-		arg0, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["preview"] = arg0
 	return args, nil
 }
 
@@ -12759,7 +12709,7 @@ func (ec *executionContext) _FunctionRunV2_trace(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRunV2().Trace(rctx, obj, fc.Args["preview"].(*bool))
+		return ec.resolvers.FunctionRunV2().Trace(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -12850,17 +12800,6 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_FunctionRunV2_trace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
 	}
 	return fc, nil
 }
@@ -15451,7 +15390,7 @@ func (ec *executionContext) _Query_runs(ctx context.Context, field graphql.Colle
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Runs(rctx, fc.Args["first"].(int), fc.Args["after"].(*string), fc.Args["orderBy"].([]*models.RunsV2OrderBy), fc.Args["filter"].(models.RunsFilterV2), fc.Args["preview"].(*bool))
+		return ec.resolvers.Query().Runs(rctx, fc.Args["first"].(int), fc.Args["after"].(*string), fc.Args["orderBy"].([]*models.RunsV2OrderBy), fc.Args["filter"].(models.RunsFilterV2))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -21174,7 +21113,7 @@ func (ec *executionContext) _RunsV2Connection_totalCount(ctx context.Context, fi
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.RunsV2Connection().TotalCount(rctx, obj, fc.Args["preview"].(*bool))
+		return ec.resolvers.RunsV2Connection().TotalCount(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -21200,17 +21139,6 @@ func (ec *executionContext) fieldContext_RunsV2Connection_totalCount(ctx context
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_RunsV2Connection_totalCount_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return
 	}
 	return fc, nil
 }
