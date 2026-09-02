@@ -47,9 +47,10 @@ var malformedHTTPHeaders = map[string]struct{}{
 }
 
 type (
-	rpcMethodKey       struct{}
-	httpPathPatternKey struct{}
-	httpPatternKey     struct{}
+	rpcMethodKey              struct{}
+	httpPathPatternKey        struct{}
+	httpPatternKey            struct{}
+	httpPathLengthFallbackKey struct{}
 
 	AnnotateContextOption func(ctx context.Context) context.Context
 )
@@ -414,4 +415,15 @@ func HTTPPattern(ctx context.Context) (Pattern, bool) {
 
 func withHTTPPattern(ctx context.Context, httpPattern Pattern) context.Context {
 	return context.WithValue(ctx, httpPatternKey{}, httpPattern)
+}
+
+// HTTPPathLengthFallback reports whether the ServeMux routed a URL-encoded
+// POST request to a GET binding using path length fallback.
+func HTTPPathLengthFallback(ctx context.Context) bool {
+	fallback, _ := ctx.Value(httpPathLengthFallbackKey{}).(bool)
+	return fallback
+}
+
+func withHTTPPathLengthFallback(ctx context.Context) context.Context {
+	return context.WithValue(ctx, httpPathLengthFallbackKey{}, true)
 }

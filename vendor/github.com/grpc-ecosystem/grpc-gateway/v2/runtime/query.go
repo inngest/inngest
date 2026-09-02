@@ -41,19 +41,28 @@ func PopulateQueryParameters(msg proto.Message, values url.Values, filter *utili
 // query parameters parsing behavior.
 //
 // See https://github.com/grpc-ecosystem/grpc-gateway/issues/2632 for more context.
-type DefaultQueryParser struct{}
+type DefaultQueryParser struct {
+	// RejectUnknownFields returns an error when a query parameter does not match
+	// any field in the request message. The default behavior is to ignore unknown
+	// query parameters.
+	RejectUnknownFields bool
+}
 
 // Parse populates "values" into "msg".
 // A value is ignored if its key starts with one of the elements in "filter".
-func (*DefaultQueryParser) Parse(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error {
+func (p *DefaultQueryParser) Parse(msg proto.Message, values url.Values, filter *utilities.DoubleArray) error {
 	for key, values := range values {
+		parameterName := key
 		if match := valuesKeyRegexp.FindStringSubmatch(key); len(match) == 3 {
 			key = match[1]
 			values = append([]string{match[2]}, values...)
 		}
 
 		msgValue := msg.ProtoReflect()
-		fieldPath := normalizeFieldPath(msgValue, strings.Split(key, "."))
+		fieldPath, hasUnknownField := normalizeFieldPath(msgValue, strings.Split(key, "."))
+		if p.RejectUnknownFields && hasUnknownField {
+			return fmt.Errorf("unknown query parameter %q", parameterName)
+		}
 		if filter.HasCommonPrefix(fieldPath) {
 			continue
 		}
@@ -70,8 +79,8 @@ func PopulateFieldFromPath(msg proto.Message, fieldPathString string, value stri
 	return populateFieldValueFromPath(msg.ProtoReflect(), fieldPath, []string{value})
 }
 
-func normalizeFieldPath(msgValue protoreflect.Message, fieldPath []string) []string {
-	newFieldPath := make([]string, 0, len(fieldPath))
+func normalizeFieldPath(msgValue protoreflect.Message, fieldPath []string) (normalizedFieldPath []string, hasUnknownField bool) {
+	normalizedFieldPath = make([]string, 0, len(fieldPath))
 	for i, fieldName := range fieldPath {
 		fields := msgValue.Descriptor().Fields()
 		fieldDesc := fields.ByTextName(fieldName)
@@ -79,11 +88,10 @@ func normalizeFieldPath(msgValue protoreflect.Message, fieldPath []string) []str
 			fieldDesc = fields.ByJSONName(fieldName)
 		}
 		if fieldDesc == nil {
-			// return initial field path values if no matching  message field was found
-			return fieldPath
+			return fieldPath, true
 		}
 
-		newFieldPath = append(newFieldPath, string(fieldDesc.Name()))
+		normalizedFieldPath = append(normalizedFieldPath, string(fieldDesc.Name()))
 
 		// If this is the last element, we're done
 		if i == len(fieldPath)-1 {
@@ -92,14 +100,14 @@ func normalizeFieldPath(msgValue protoreflect.Message, fieldPath []string) []str
 
 		// Only singular message fields are allowed
 		if fieldDesc.Message() == nil || fieldDesc.Cardinality() == protoreflect.Repeated {
-			return fieldPath
+			return fieldPath, false
 		}
 
 		// Get the nested message
 		msgValue = msgValue.Get(fieldDesc).Message()
 	}
 
-	return newFieldPath
+	return normalizedFieldPath, false
 }
 
 func populateFieldValueFromPath(msgValue protoreflect.Message, fieldPath []string, values []string) error {
