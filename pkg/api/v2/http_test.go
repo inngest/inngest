@@ -12,12 +12,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/inngest"
-	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -100,25 +98,6 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
-type waitSandboxProcessTestServer struct {
-	apiv2.UnimplementedV2Server
-}
-
-func (waitSandboxProcessTestServer) WaitSandboxProcess(context.Context, *apiv2.WaitSandboxProcessRequest) (*apiv2.WaitSandboxProcessResponse, error) {
-	return &apiv2.WaitSandboxProcessResponse{}, nil
-}
-
-func newWaitSandboxProcessTestHandler(t *testing.T) http.Handler {
-	t.Helper()
-	base := apiv2base.NewBase()
-	mux := runtime.NewServeMux(
-		runtime.WithMarshalerOption(runtime.MIMEWildcard, newResponseEnumMarshaler()),
-		runtime.WithErrorHandler(base.CustomErrorHandler()),
-	)
-	require.NoError(t, apiv2.RegisterV2HandlerServer(context.Background(), mux, waitSandboxProcessTestServer{}))
-	return apiv2base.JSONTypeValidationMiddleware()(mux)
-}
-
 func TestHTTPGateway_UnknownRequestFields(t *testing.T) {
 	apps := &mockAppProvider{}
 	apps.On("GetApps", mock.Anything, mock.Anything).Return(&GetAppsResult{}, nil).Once()
@@ -134,7 +113,6 @@ func TestHTTPGateway_UnknownRequestFields(t *testing.T) {
 		path       string
 		body       string
 		wantStatus int
-		handler    http.Handler
 	}{
 		{
 			name:       "endpoint with query parameters rejects an unknown query parameter",
@@ -148,13 +126,15 @@ func TestHTTPGateway_UnknownRequestFields(t *testing.T) {
 			path:       "/api/v2/health?unknown=value",
 			wantStatus: http.StatusBadRequest,
 		},
+		// WaitSandboxProcess is the only POST endpoint without a body mapping.
+		// The gateway currently ignores this body and reaches the service, which
+		// returns 501 instead of the desired 400 because it is not implemented in OSS.
 		{
 			name:       "endpoint without a body rejects an unknown body field",
 			method:     http.MethodPost,
-			path:       "/sandboxes/sandbox-id/processes/process-id/wait",
+			path:       "/api/v2/sandboxes/sandbox-id/processes/process-id/wait",
 			body:       `{"unknown":"value"}`,
 			wantStatus: http.StatusBadRequest,
-			handler:    newWaitSandboxProcessTestHandler(t),
 		},
 		{
 			name:       "endpoint with a body rejects an unknown body field",
@@ -173,11 +153,7 @@ func TestHTTPGateway_UnknownRequestFields(t *testing.T) {
 			}
 			response := httptest.NewRecorder()
 
-			testHandler := handler
-			if tt.handler != nil {
-				testHandler = tt.handler
-			}
-			testHandler.ServeHTTP(response, request)
+			handler.ServeHTTP(response, request)
 
 			require.Equal(t, tt.wantStatus, response.Code, response.Body.String())
 		})
