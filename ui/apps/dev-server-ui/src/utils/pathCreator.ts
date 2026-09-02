@@ -13,23 +13,4 @@ export const pathCreator = {
   runPopout({ runID }: { runID: string }): string {
     return `/run?runID=${runID}`;
   },
-  debugger({
-    functionSlug,
-    runID,
-    debugRunID,
-    debugSessionID,
-  }: {
-    functionSlug: string;
-    runID?: string;
-    debugRunID?: string | null;
-    debugSessionID?: string | null;
-  }): string {
-    const params = new URLSearchParams();
-    params.set('function', functionSlug);
-    runID && params.set('runID', runID);
-    debugRunID && params.set('debugRunID', debugRunID);
-    debugSessionID && params.set('debugSessionID', debugSessionID);
-
-    return `/debugger/function?${params.toString()}`;
-  },
 };

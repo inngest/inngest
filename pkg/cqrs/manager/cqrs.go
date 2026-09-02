@@ -147,51 +147,6 @@ func (w wrapper) GetSpansByRunIDsAndName(
 	return out, nil
 }
 
-func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
-	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
-		return nil, err
-	}
-
-	if len(spans) == 0 {
-		return nil, nil
-	}
-
-	return buildDebugRunSpan(ctx, spans)
-}
-
-func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*cqrs.OtelSpan, error) {
-	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
-		return nil, err
-	}
-
-	if len(spans) == 0 {
-		return nil, nil
-	}
-
-	spansByDebugSession := make(map[string][]*dbpkg.SpanRow)
-	for _, span := range spans {
-		if span.DebugRunID.Valid {
-			spansByDebugSession[span.DebugRunID.String] = append(spansByDebugSession[span.DebugRunID.String], span)
-		}
-	}
-
-	var allDebugRuns [][]*cqrs.OtelSpan
-
-	for _, runSpans := range spansByDebugSession {
-		debugRunSpans, err := buildDebugRunSpan(ctx, runSpans)
-		if err != nil {
-			return nil, err
-		}
-		allDebugRuns = append(allDebugRuns, debugRunSpans)
-	}
-
-	return allDebugRuns, nil
-}
-
 var _ normalizedSpan = (*dbpkg.SpanRow)(nil)
 
 func (w wrapper) GetRunSpanByRunID(ctx context.Context, runID ulid.ULID, accountID, workspaceID uuid.UUID) (*cqrs.OtelSpan, error) {
@@ -1037,36 +992,6 @@ func encodeSpanOutputID(runID string, outputSpanID *string, inputSpanID *string)
 	}
 
 	return &encoded, nil
-}
-
-// group by run id, sort by started at, let the frontend handle overlay.
-func buildDebugRunSpan[T normalizedSpan](ctx context.Context, spans []T) ([]*cqrs.OtelSpan, error) {
-	if len(spans) == 0 {
-		return nil, nil
-	}
-
-	spansByRunID := make(map[string][]T)
-	for _, span := range spans {
-		runID := span.GetRunID()
-		spansByRunID[runID] = append(spansByRunID[runID], span)
-	}
-
-	runSpans := make([]*cqrs.OtelSpan, 0, len(spansByRunID))
-	for _, runSpansGroup := range spansByRunID {
-		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup)
-		if err != nil {
-			return nil, err
-		}
-		if runSpan != nil {
-			runSpans = append(runSpans, runSpan)
-		}
-	}
-
-	if len(runSpans) == 0 {
-		return nil, nil
-	}
-
-	return runSpans, nil
 }
 
 func sorter(span *cqrs.OtelSpan) {

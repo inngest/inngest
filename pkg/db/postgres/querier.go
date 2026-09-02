@@ -601,42 +601,6 @@ func (pq *pgQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []strin
 	return out, nil
 }
 
-func (pq *pgQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*db.SpanRow, error) {
-	// Postgres sqlc expects string for this query.
-	rows, err := pq.q.GetSpansByDebugRunID(ctx, debugRunID.String)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*db.SpanRow, len(rows))
-	for i, r := range rows {
-		out[i] = &db.SpanRow{
-			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
-			SpanFragments: r.SpanFragments,
-			DebugRunID:    debugRunID, DebugSessionID: r.DebugSessionID,
-		}
-	}
-	return out, nil
-}
-
-func (pq *pgQuerier) GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*db.SpanRow, error) {
-	// Postgres sqlc expects string for this query.
-	rows, err := pq.q.GetSpansByDebugSessionID(ctx, debugSessionID.String)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*db.SpanRow, len(rows))
-	for i, r := range rows {
-		out[i] = &db.SpanRow{
-			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
-			SpanFragments: r.SpanFragments,
-			DebugRunID:    r.DebugRunID, DebugSessionID: debugSessionID,
-		}
-	}
-	return out, nil
-}
-
 func (pq *pgQuerier) GetRunSpanByRunID(ctx context.Context, arg db.GetRunSpanByRunIDParams) (*db.SpanRow, error) {
 	r, err := pq.q.GetRunSpanByRunID(ctx, sqlc.GetRunSpanByRunIDParams{RunID: arg.RunID, AccountID: arg.AccountID})
 	if err != nil {

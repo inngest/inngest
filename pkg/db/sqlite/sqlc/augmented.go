@@ -87,22 +87,6 @@ func (r *GetSpansByRunIDRow) GetStartTime() interface{}        { return r.StartT
 func (r *GetSpansByRunIDRow) GetEndTime() interface{}          { return r.EndTime }
 func (r *GetSpansByRunIDRow) GetSpanFragments() any            { return r.SpanFragments }
 
-func (r *GetSpansByDebugRunIDRow) GetTraceID() string               { return r.TraceID }
-func (r *GetSpansByDebugRunIDRow) GetRunID() string                 { return r.RunID }
-func (r *GetSpansByDebugRunIDRow) GetDynamicSpanID() sql.NullString { return r.DynamicSpanID }
-func (r *GetSpansByDebugRunIDRow) GetParentSpanID() sql.NullString  { return r.ParentSpanID }
-func (r *GetSpansByDebugRunIDRow) GetStartTime() interface{}        { return r.StartTime }
-func (r *GetSpansByDebugRunIDRow) GetEndTime() interface{}          { return r.EndTime }
-func (r *GetSpansByDebugRunIDRow) GetSpanFragments() any            { return r.SpanFragments }
-
-func (r *GetSpansByDebugSessionIDRow) GetTraceID() string               { return r.TraceID }
-func (r *GetSpansByDebugSessionIDRow) GetRunID() string                 { return r.RunID }
-func (r *GetSpansByDebugSessionIDRow) GetDynamicSpanID() sql.NullString { return r.DynamicSpanID }
-func (r *GetSpansByDebugSessionIDRow) GetParentSpanID() sql.NullString  { return r.ParentSpanID }
-func (r *GetSpansByDebugSessionIDRow) GetStartTime() interface{}        { return r.StartTime }
-func (r *GetSpansByDebugSessionIDRow) GetEndTime() interface{}          { return r.EndTime }
-func (r *GetSpansByDebugSessionIDRow) GetSpanFragments() any            { return r.SpanFragments }
-
 func (r *GetRunSpanByRunIDRow) GetTraceID() string               { return r.TraceID }
 func (r *GetRunSpanByRunIDRow) GetRunID() string                 { return r.RunID }
 func (r *GetRunSpanByRunIDRow) GetDynamicSpanID() sql.NullString { return r.DynamicSpanID }

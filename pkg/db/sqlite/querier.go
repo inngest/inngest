@@ -519,40 +519,6 @@ func (sq *sqliteQuerier) GetSpansByRunIDsAndName(ctx context.Context, runIDs []s
 	return out, nil
 }
 
-func (sq *sqliteQuerier) GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*db.SpanRow, error) {
-	rows, err := sq.q.GetSpansByDebugRunID(ctx, debugRunID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*db.SpanRow, len(rows))
-	for i, r := range rows {
-		out[i] = &db.SpanRow{
-			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
-			SpanFragments: toBytes(r.SpanFragments), DebugSessionID: r.DebugSessionID,
-			DebugRunID: debugRunID,
-		}
-	}
-	return out, nil
-}
-
-func (sq *sqliteQuerier) GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*db.SpanRow, error) {
-	rows, err := sq.q.GetSpansByDebugSessionID(ctx, debugSessionID)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]*db.SpanRow, len(rows))
-	for i, r := range rows {
-		out[i] = &db.SpanRow{
-			RunID: r.RunID, TraceID: r.TraceID, DynamicSpanID: r.DynamicSpanID,
-			StartTime: toTime(r.StartTime), EndTime: toTime(r.EndTime), ParentSpanID: r.ParentSpanID,
-			SpanFragments: toBytes(r.SpanFragments), DebugRunID: r.DebugRunID,
-			DebugSessionID: debugSessionID,
-		}
-	}
-	return out, nil
-}
-
 func (sq *sqliteQuerier) GetRunSpanByRunID(ctx context.Context, arg db.GetRunSpanByRunIDParams) (*db.SpanRow, error) {
 	r, err := sq.q.GetRunSpanByRunID(ctx, sqlc.GetRunSpanByRunIDParams{RunID: arg.RunID, AccountID: arg.AccountID})
 	if err != nil {
