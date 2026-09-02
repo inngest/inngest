@@ -3,16 +3,25 @@ package duckdbquery
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/db/duckdb"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracingv3 "github.com/inngest/inngest/pkg/tracing/v3"
 	"github.com/oklog/ulid/v2"
 )
 
 const spanColumns = "span_id, trace_id, parent_span_id, start_time, end_time, name, attributes, run_id, app_id, function_id, output, input"
+
+// spanColumnsPrefixed is spanColumns with each column prefixed "s." for use
+// inside GetSpansByRunID's latest_metadata CTE, which joins run_trace_spans
+// (aliased s) against run_metadata (aliased m) and needs the two
+// disambiguated.
+const spanColumnsPrefixed = "s.span_id, s.trace_id, s.parent_span_id, s.start_time, s.end_time, s.name, s.attributes, s.run_id, s.app_id, s.function_id, s.output, s.input"
 
 // GetSpansByRunID builds the run's span tree from inngest.run_trace_spans.
 // Unlike pkg/cqrs/manager's dynamic/fragment-merged model, this table is
@@ -22,10 +31,39 @@ const spanColumns = "span_id, trace_id, parent_span_id, start_time, end_time, na
 // passes (build every span first, then link) so a child's parent — however
 // it happens to be ordered by start_time, which can tie for point-in-time
 // spans — is always already present in the lookup map before it's needed.
+//
+// Metadata (inngest.run_metadata) is aggregated in SQL rather than scanned
+// as a second round trip or a row-multiplying join: the latest_metadata CTE
+// LEFT JOINs it on (account_id, env_id, run_id, span_id) and collapses
+// multiple emissions of the same (span_id, kind) to the latest by
+// created_at via QUALIFY — see execution.MetadataEntry's doc comment on why
+// "op" isn't stored, so there's no per-key fragment folding to replay, only
+// a last-write-wins pick — then the outer query GROUPs BY every span column
+// and aggregates the (already-collapsed) metadata rows into one
+// LIST(STRUCT(scope, kind, values, created_at)) column per span, so this
+// function still gets exactly one result row per span.
 func (m *Manager) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	query := fmt.Sprintf(
-		"SELECT %s FROM %s.run_trace_spans WHERE run_id = ? ORDER BY start_time ASC;",
-		spanColumns, duckdb.DuckLakeAlias,
+		`WITH latest_metadata AS (
+		   SELECT %s, m.scope, m.kind, m.values, m.created_at
+		   FROM %s.run_trace_spans s
+		   LEFT JOIN %s.run_metadata m
+		     ON m.account_id = s.account_id AND m.env_id = s.env_id
+		     AND m.run_id = s.run_id AND m.span_id = s.span_id
+		   WHERE s.run_id = ?
+		   QUALIFY m.kind IS NULL OR ROW_NUMBER() OVER (
+		     PARTITION BY m.span_id, m.kind ORDER BY m.created_at DESC
+		   ) = 1
+		 )
+		 SELECT
+		   %s,
+		   list({'scope': scope, 'kind': kind, 'values': values, 'created_at': created_at})
+		     FILTER (WHERE kind IS NOT NULL) AS metadata
+		 FROM latest_metadata
+		 GROUP BY %s
+		 ORDER BY start_time ASC;`,
+		spanColumnsPrefixed, duckdb.DuckLakeAlias, duckdb.DuckLakeAlias,
+		spanColumns, spanColumns,
 	)
 	rows, err := m.db.QueryContext(ctx, query, runID.String())
 	if err != nil {
@@ -186,8 +224,9 @@ func (m *Manager) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*c
 	return so, nil
 }
 
-// scanSpan scans one row of a spanColumns-shaped SELECT into a *cqrs.OtelSpan.
-// Destination order must match spanColumns exactly.
+// scanSpan scans one row of a spanColumns-plus-metadata-shaped SELECT (see
+// GetSpansByRunID's query) into a *cqrs.OtelSpan. Destination order must
+// match spanColumns exactly, followed by the aggregated metadata column.
 func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentSpanID string, err error) {
 	var (
 		spanID, traceID                   string
@@ -197,10 +236,12 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 		rawAttributes                     any
 		rawRunID, rawAppID, rawFunctionID any
 		rawOutput, rawInput               any
+		rawMetadata                       any
 	)
 	if err := rows.Scan(
 		&spanID, &traceID, &rawParentSpanID, &rawStartTime, &rawEndTime, &name,
 		&rawAttributes, &rawRunID, &rawAppID, &rawFunctionID, &rawOutput, &rawInput,
+		&rawMetadata,
 	); err != nil {
 		return nil, "", err
 	}
@@ -280,5 +321,62 @@ func scanSpan(ctx context.Context, rows *sql.Rows) (span *cqrs.OtelSpan, parentS
 		newSpan.OutputID = &encoded
 	}
 
+	newSpan.Metadata, err = scanSpanMetadata(rawMetadata)
+	if err != nil {
+		return nil, "", err
+	}
+
 	return newSpan, parentSpanID, nil
+}
+
+// scanSpanMetadata decodes GetSpansByRunID's aggregated
+// LIST(STRUCT(scope, kind, values, created_at)) metadata column -- raw is
+// nil for a span with no metadata at all (an empty list also decodes to a
+// zero-length, non-nil slice; both are treated as "no metadata").
+func scanSpanMetadata(raw any) ([]*cqrs.SpanMetadata, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, fmt.Errorf("duckdbquery: expected list for metadata column, got %T", raw)
+	}
+
+	out := make([]*cqrs.SpanMetadata, 0, len(items))
+	for _, item := range items {
+		fields, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("duckdbquery: expected struct for metadata list element, got %T", item)
+		}
+
+		kindStr, _ := fields["kind"].(string)
+		scopeStr, _ := fields["scope"].(string)
+		scope, err := enums.MetadataScopeString(scopeStr)
+		if err != nil {
+			return nil, fmt.Errorf("duckdbquery: parsing metadata scope %q: %w", scopeStr, err)
+		}
+		createdAt, err := asTimestamp(fields["created_at"], "created_at")
+		if err != nil {
+			return nil, err
+		}
+
+		var values metadata.Values
+		if v, ok := fields["values"].(map[string]any); ok {
+			valuesByt, err := json.Marshal(v)
+			if err != nil {
+				return nil, fmt.Errorf("duckdbquery: re-marshaling metadata values: %w", err)
+			}
+			if err := json.Unmarshal(valuesByt, &values); err != nil {
+				return nil, fmt.Errorf("duckdbquery: unmarshaling metadata values: %w", err)
+			}
+		}
+
+		out = append(out, &cqrs.SpanMetadata{
+			Scope:     scope,
+			Kind:      metadata.Kind(kindStr),
+			Values:    values,
+			UpdatedAt: createdAt,
+		})
+	}
+	return out, nil
 }

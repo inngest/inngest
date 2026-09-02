@@ -3,10 +3,13 @@
 // convertRunSpanToGQL (trace.go), it carries no logic for the old
 // dynamic/fragment-merged
 // model: no discovery-step hiding, no SDK "inngest.execution" wrapper
-// collapsing, no userland-span reparenting, no metadata-span rollup — none
-// of those cases can occur in a flat tree, so there are no guard clauses
-// for them here. opcodeToGQL/stepStatusToGQL are shared with the other
-// converter since they're pure enum mappers with no rollup assumptions.
+// collapsing, no userland-span reparenting — none of those cases can occur
+// in a flat tree, so there are no guard clauses for them here.
+// opcodeToGQL/stepStatusToGQL are shared with the other converter since
+// they're pure enum mappers with no rollup assumptions. Metadata is a
+// straight copy, not a rollup: pkg/cqrs/duckdbquery's GetSpansByRunID
+// (attachMetadata) already collapsed inngest.run_metadata to the latest row
+// per (span_id, kind) before this function ever sees span.Metadata.
 package loader
 
 import (
@@ -140,6 +143,15 @@ func convertFlatSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.Run
 			}
 			gqlSpan.StepInfo = si
 		}
+	}
+
+	for _, md := range span.Metadata {
+		gqlSpan.Metadata = append(gqlSpan.Metadata, &models.SpanMetadata{
+			Kind:      md.Kind,
+			Scope:     md.Scope,
+			Values:    md.Values,
+			UpdatedAt: md.UpdatedAt,
+		})
 	}
 
 	gqlSpan.ChildrenSpans = make([]*models.RunTraceSpan, 0, len(span.Children))

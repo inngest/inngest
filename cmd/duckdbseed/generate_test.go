@@ -63,6 +63,16 @@ func testTemplates() Templates {
 		EventProfiles: [][]EventTemplate{
 			{{Name: "app/test.event", Data: `{"k":"v"}`, Offset: -200 * time.Millisecond}},
 		},
+		MetadataProfiles: []MetadataProfile{
+			{
+				Items: []MetadataTemplateItem{
+					{SpanID: "root", Scope: "run", Kind: "inngest.experiment", IsUser: false, Values: `{"variant":"a"}`, Offset: 50 * time.Millisecond},
+					{SpanID: "step-1", Scope: "step", StepID: strPtr("step-1"), StepIndex: intPtr(0), StepAttempt: intPtr(1), Kind: "user.custom", IsUser: true, Values: `{"n":1}`, Offset: 150 * time.Millisecond},
+					{SpanID: "step-2", Scope: "step", StepID: strPtr("step-2"), StepIndex: intPtr(1), StepAttempt: intPtr(1), Kind: "user.custom", IsUser: true, Values: `{"n":2}`, Offset: 450 * time.Millisecond},
+					{SpanID: "step-2", Scope: "step", StepID: strPtr("step-2"), StepIndex: intPtr(1), StepAttempt: intPtr(1), Kind: "inngest.ai", IsUser: false, Values: `{"tokens":10}`, Offset: 460 * time.Millisecond},
+				},
+			},
+		},
 	}
 }
 
@@ -172,6 +182,14 @@ func TestGenerateRunsBuildsASpanTreeWithARootAndChildSpans(t *testing.T) {
 // three levels deep from the root) and step-2 does not; the replayed
 // spans must keep that exact shape with freshly generated IDs, not chain
 // everything to the root.
+// TestGenerateSpanTreePreservesRealNestingNotJustRootChildren proves the
+// fix for a real bug: a nested span (e.g. a userland/extended-trace span
+// nested under another userland span, not directly under the run root)
+// was being reparented to the root on replay, flattening the sampled
+// run's real tree shape. Here step-1 has its own child ("extended-trace",
+// three levels deep from the root) and step-2 does not; the replayed
+// spans must keep that exact shape with freshly generated IDs, not chain
+// everything to the root.
 func TestGenerateSpanTreePreservesRealNestingNotJustRootChildren(t *testing.T) {
 	trace := TraceTemplate{
 		TraceID: "trace-1",
@@ -258,4 +276,77 @@ func TestGenerateRunsLinksEventsToTheRunsEventIDs(t *testing.T) {
 		require.Equal(t, run.AccountID, e.AccountID)
 		require.Equal(t, run.EnvID, e.EnvID)
 	}
+}
+
+// TestGenerateRunsReplaysAMetadataProfileOntoTheSpanTree proves
+// generateMetadata's contract: it replays one whole MetadataProfile from
+// tmpl.MetadataProfiles verbatim, item by item, attaching each to whichever
+// replayed span shares its exact (unregenerated) SpanID -- rather than
+// choosing kinds/counts independently per span, so a run's metadata shape
+// is reproducible from a single sampled template, mirroring
+// pkg/execution/dualwrite/listener.go's OnMetadataEntry for each row's own
+// shape.
+func TestGenerateRunsReplaysAMetadataProfileOntoTheSpanTree(t *testing.T) {
+	tmpl := testTemplates()
+	require.Len(t, tmpl.MetadataProfiles, 1, "test assumes a single profile so the replay is deterministic")
+	profile := tmpl.MetadataProfiles[0]
+	rng := rand.New(rand.NewSource(11))
+
+	generated, err := GenerateRuns(rng, tmpl, testConfig(1))
+	require.NoError(t, err)
+
+	run := generated[0].Run
+	metadata := generated[0].Metadata
+	require.Len(t, metadata, len(profile.Items))
+
+	for i, m := range metadata {
+		item := profile.Items[i]
+		require.Equal(t, run.AccountID, m.AccountID)
+		require.Equal(t, run.EnvID, m.EnvID)
+		require.Equal(t, run.RunID, m.RunID)
+		require.Equal(t, item.SpanID, m.SpanID)
+		require.Equal(t, item.Scope, m.Scope)
+		require.Equal(t, item.StepID, m.StepID)
+		require.Equal(t, item.StepIndex, m.StepIndex)
+		require.Equal(t, item.StepAttempt, m.StepAttempt)
+		require.Equal(t, item.Kind, m.Kind)
+		require.Equal(t, item.IsUser, m.IsUser)
+		require.Equal(t, item.Values, m.Values)
+		require.Equal(t, run.QueuedAt.Add(item.Offset), m.CreatedAt)
+	}
+}
+
+// TestGenerateMetadataSkipsItemsWithNoMatchingSpan proves generateMetadata
+// drops a metadata item whose SpanID isn't one of the replayed span tree's
+// own SpanIDs, rather than writing a dangling row -- the only way this can
+// happen is when the trace and metadata profile picked for one generated
+// run were sampled from two different source runs (see Templates' own doc
+// comment on independently-sampled pools).
+func TestGenerateMetadataSkipsItemsWithNoMatchingSpan(t *testing.T) {
+	tmpl := testTemplates()
+	tmpl.MetadataProfiles[0].Items = append(tmpl.MetadataProfiles[0].Items,
+		MetadataTemplateItem{SpanID: "span-from-a-different-run", Scope: "step", Kind: "orphan.kind", Values: "{}"})
+	rng := rand.New(rand.NewSource(11))
+
+	generated, err := GenerateRuns(rng, tmpl, testConfig(1))
+	require.NoError(t, err)
+
+	for _, m := range generated[0].Metadata {
+		require.NotEqual(t, "orphan.kind", m.Kind, "an item whose span doesn't exist in this run must be skipped")
+	}
+}
+
+// TestGenerateRunsWithNoMetadataProfilesGeneratesNoMetadata proves a source
+// with runs but genuinely no metadata (an empty tmpl.MetadataProfiles) is
+// faithfully replicated as zero metadata rows, not silently backfilled with
+// unrelated defaults.
+func TestGenerateRunsWithNoMetadataProfilesGeneratesNoMetadata(t *testing.T) {
+	tmpl := testTemplates()
+	tmpl.MetadataProfiles = nil
+	rng := rand.New(rand.NewSource(11))
+
+	generated, err := GenerateRuns(rng, tmpl, testConfig(1))
+	require.NoError(t, err)
+
+	require.Empty(t, generated[0].Metadata)
 }

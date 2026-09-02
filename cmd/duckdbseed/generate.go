@@ -69,8 +69,9 @@ func generateRun(rng *rand.Rand, tmpl Templates, cfg GenerateConfig) GeneratedRu
 	}
 
 	spans := generateSpanTree(trace, run)
+	metadata := generateMetadata(rng, tmpl, run, spans)
 
-	return GeneratedRun{Run: run, Spans: spans, Events: events}
+	return GeneratedRun{Run: run, Spans: spans, Events: events, Metadata: metadata}
 }
 
 // defaultTraceTemplate is replayed when tmpl has no sampled traces to draw
@@ -122,6 +123,73 @@ func generateSpanTree(trace TraceTemplate, run RunRow) []SpanRow {
 		}
 	}
 	return spans
+}
+
+// generateMetadata replays one randomly picked MetadataProfile from
+// tmpl.MetadataProfiles verbatim: each item's Scope/StepID/StepIndex/
+// StepAttempt/Kind/IsUser/Values are copied unchanged, and it attaches to
+// whichever of spans shares its exact SpanID (see MetadataTemplateItem's
+// doc comment for why that match works without recomputing any
+// root/step position here) -- skipping any item whose SpanID isn't one of
+// spans' own, which only happens when the trace and metadata profile
+// picked for this run were sampled from two different source runs (see
+// Templates' doc comment). Returns nil when tmpl has no profiles to draw
+// from (a source with runs but no metadata at all is a real, faithfully
+// replicated shape, not an error).
+func generateMetadata(rng *rand.Rand, tmpl Templates, run RunRow, spans []SpanRow) []MetadataRow {
+	if len(tmpl.MetadataProfiles) == 0 {
+		return nil
+	}
+	profile := tmpl.MetadataProfiles[rng.Intn(len(tmpl.MetadataProfiles))]
+	if len(profile.Items) == 0 {
+		return nil
+	}
+
+	rows := make([]MetadataRow, 0, len(profile.Items))
+	for _, item := range profile.Items {
+		if !hasSpanID(spans, item.SpanID) {
+			continue
+		}
+		values := item.Values
+		if values == "" {
+			values = "{}"
+		}
+		rows = append(rows, MetadataRow{
+			AccountID:   run.AccountID,
+			EnvID:       run.EnvID,
+			RunID:       run.RunID,
+			RunQueuedAt: run.QueuedAt,
+			AppID:       run.AppID,
+			FunctionID:  run.FunctionID,
+			SpanID:      item.SpanID,
+			CreatedAt:   run.QueuedAt.Add(item.Offset),
+			Scope:       item.Scope,
+			StepID:      item.StepID,
+			StepIndex:   item.StepIndex,
+			StepAttempt: item.StepAttempt,
+			Kind:        item.Kind,
+			IsUser:      item.IsUser,
+			Values:      values,
+		})
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return rows
+}
+
+// hasSpanID reports whether spanID matches one of spans' own SpanIDs. A
+// plain linear scan rather than a map: a run's span tree is typically tiny
+// (single digits to a few dozen), where building a map fresh on every
+// single generated run costs more -- a heap allocation per run, purely to
+// avoid string comparisons on that same handful of spans -- than it saves.
+func hasSpanID(spans []SpanRow, spanID string) bool {
+	for _, s := range spans {
+		if s.SpanID == spanID {
+			return true
+		}
+	}
+	return false
 }
 
 // defaultEventProfile is replayed when tmpl has no sampled event profiles

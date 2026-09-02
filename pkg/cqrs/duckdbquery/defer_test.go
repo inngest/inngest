@@ -45,7 +45,7 @@ func TestGetRunDefersReturnsSingleAfterRunDefer(t *testing.T) {
 		meta.Attrs.DeferFnSlug.Key():     "deferred-fn",
 		meta.Attrs.DeferStatus.Key():     enums.DeferStatusAfterRun.String(),
 	})
-	seedSpanRow(t, ctx, m, appID, functionID, runID, spanID, "", meta.SpanNameDefer, now, now, attrs)
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, spanID, "", meta.SpanNameDefer, now, now, attrs)
 
 	out, err := m.GetRunDefers(ctx, []ulid.ULID{runID})
 	require.NoError(t, err)
@@ -87,8 +87,8 @@ func TestGetRunDefersMergesAbortOverAfterRun(t *testing.T) {
 		meta.Attrs.DeferHashedID.Key(): "hash-2",
 		meta.Attrs.DeferStatus.Key():   enums.DeferStatusAborted.String(),
 	})
-	seedSpanRow(t, ctx, m, appID, functionID, runID, spanID, "", meta.SpanNameDefer, now, now, addAttrs)
-	seedSpanRow(t, ctx, m, appID, functionID, runID, spanID, "", meta.SpanNameDefer, now.Add(time.Second), now.Add(time.Second), abortAttrs)
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, spanID, "", meta.SpanNameDefer, now, now, addAttrs)
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, spanID, "", meta.SpanNameDefer, now.Add(time.Second), now.Add(time.Second), abortAttrs)
 
 	out, err := m.GetRunDefers(ctx, []ulid.ULID{runID})
 	require.NoError(t, err)
@@ -131,8 +131,8 @@ func TestGetRunDefersMergesScheduleLinkOverAfterRun(t *testing.T) {
 		meta.Attrs.DeferStatus.Key():     enums.DeferStatusAfterRun.String(),
 		meta.Attrs.DeferChildRunID.Key(): childRunID.String(),
 	})
-	seedSpanRow(t, ctx, m, appID, functionID, runID, spanID, "", meta.SpanNameDefer, now, now, addAttrs)
-	seedSpanRow(t, ctx, m, appID, functionID, runID, spanID, "", meta.SpanNameDefer, now.Add(time.Second), now.Add(time.Second), linkAttrs)
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, spanID, "", meta.SpanNameDefer, now, now, addAttrs)
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, spanID, "", meta.SpanNameDefer, now.Add(time.Second), now.Add(time.Second), linkAttrs)
 
 	out, err := m.GetRunDefers(ctx, []ulid.ULID{runID})
 	require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestGetRunDeferredFromReadsParentLinkage(t *testing.T) {
 		meta.Attrs.DeferParentRunIDs.Key(): []string{parentRunID.String()},
 		meta.Attrs.DeferParentFnSlug.Key(): "parent-fn",
 	})
-	seedSpanRow(t, ctx, m, appID, functionID, childRunID, "child-queued-span", "", tracingv3.SpanNameRunQueued, now, now, attrs)
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, childRunID, "child-queued-span", "", tracingv3.SpanNameRunQueued, now, now, attrs)
 
 	out, err := m.GetRunDeferredFrom(ctx, []ulid.ULID{childRunID})
 	require.NoError(t, err)
@@ -191,7 +191,7 @@ func TestGetRunDeferredFromReturnsEmptyForNormalRun(t *testing.T) {
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	now := time.Now().UTC()
 
-	seedSpanRow(t, ctx, m, appID, functionID, runID, "queued-span", "", tracingv3.SpanNameRunQueued, now, now, "{}")
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, "queued-span", "", tracingv3.SpanNameRunQueued, now, now, "{}")
 
 	out, err := m.GetRunDeferredFrom(ctx, []ulid.ULID{runID})
 	require.NoError(t, err)

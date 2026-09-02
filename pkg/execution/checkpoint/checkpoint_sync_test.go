@@ -583,6 +583,72 @@ func TestSyncStepMetadata(t *testing.T) {
 		require.True(hasMetadata, "Expected a metadata span")
 	})
 
+	t.Run("notifies sync lifecycle listeners of opcode-attached metadata", func(t *testing.T) {
+		// Opcode-attached metadata (op.Metadata) must reach any configured
+		// SyncLifecycleListeners the same way every other metadata span
+		// creation site in the codebase does (see
+		// tracing.WithMetadataSyncListeners callers in pkg/api/apiv1 and
+		// pkg/execution/executor) -- otherwise DuckDB dual-write never
+		// receives it.
+		ctx := context.Background()
+		require := require.New(t)
+
+		now := time.Now()
+		ops := []state.GeneratorOpcode{
+			{
+				ID:     "step-1",
+				Op:     enums.OpcodeStepRun,
+				Data:   json.RawMessage(`{"result": "step 1 output"}`),
+				Name:   "Step 1",
+				Timing: interval.New(now, now.Add(100*time.Millisecond)),
+				Metadata: []metadata.ScopedUpdate{
+					{
+						Scope: enums.MetadataScopeRun,
+						Update: metadata.Update{
+							RawUpdate: metadata.RawUpdate{
+								Kind:   "userland.test",
+								Op:     enums.MetadataOpcodeMerge,
+								Values: metadata.Values{"key": json.RawMessage(`"value"`)},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		mocks, testData := setupSyncCheckpointTest(t, ops...)
+
+		listener := &recordingMetadataListener{}
+		testData.checkpointer = New(Opts{
+			State:           mocks.state,
+			TracerProvider:  mocks.tracer,
+			Queue:           mocks.queue,
+			MetricsProvider: mocks.metrics,
+			Executor:        mocks.executor,
+			FnReader:        mocks.fnReader,
+			AllowStepMetadata: executor.AllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			SyncLifecycleListeners: []execution.SyncLifecycleListener{listener},
+		})
+
+		expectedData := map[string]any{"data": json.RawMessage(`{"result": "step 1 output"}`)}
+		expectedOutputBytes, _ := json.Marshal(expectedData)
+		mocks.state.On("SaveStep", ctx, testData.metadata.ID, "step-1", expectedOutputBytes).Return(false, nil)
+
+		mocks.tracer.
+			On("CreateSpan", mock.Anything, mock.Anything, mock.AnythingOfType("*tracing.CreateSpanOptions")).
+			Return(&meta.SpanReference{}, nil)
+
+		mocks.metrics.On("OnStepFinished", ctx, mock.AnythingOfType("checkpoint.MetricCardinality"), enums.StepStatusCompleted)
+
+		err := testData.checkpointer.CheckpointSyncSteps(ctx, testData.syncCheckpoint)
+		require.NoError(err)
+
+		require.Len(listener.entries, 1, "Expected the metadata listener to be notified once")
+		require.Equal(metadata.Kind("userland.test"), listener.entries[0].Kind)
+	})
+
 	t.Run("creates spans on step error", func(t *testing.T) {
 		// A sync step error with metadata entries creates both the step
 		// span and metadata spans.
@@ -1036,6 +1102,18 @@ func setupSyncCheckpointTest(t *testing.T, ops ...state.GeneratorOpcode) (*testS
 }
 
 // Additional mock implementations for sync tests
+
+// recordingMetadataListener implements execution.SyncLifecycleListener,
+// recording every OnMetadataEntry call for assertions -- mirrors
+// pkg/tracing's own recordingMetadataListener test helper.
+type recordingMetadataListener struct {
+	execution.NoopSyncLifecycleListener
+	entries []execution.MetadataEntry
+}
+
+func (r *recordingMetadataListener) OnMetadataEntry(ctx context.Context, entry execution.MetadataEntry) {
+	r.entries = append(r.entries, entry)
+}
 
 type testSyncMocks struct {
 	state    *mockRunService

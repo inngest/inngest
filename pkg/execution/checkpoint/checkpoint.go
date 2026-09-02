@@ -99,6 +99,14 @@ type Opts struct {
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
 	// AllowAsyncDispatchValidation gates the dispatch validator per account.
 	AllowAsyncDispatchValidation AllowAsyncDispatchValidation
+	// SyncLifecycleListeners are notified synchronously (see
+	// execution.SyncLifecycleListener and pkg/tracing.WithMetadataSyncListeners)
+	// of opcode-attached metadata and defer spans emitted while checkpointing,
+	// the same listeners pkg/api/apiv1's other span-creating endpoints use --
+	// wiring this through is what lets DuckDB dual-write (pkg/execution/dualwrite)
+	// observe checkpoint-originated metadata/defers, not just the executor's
+	// own in-process path.
+	SyncLifecycleListeners []execution.SyncLifecycleListener
 }
 
 // CheckpointQueue is the reduced queue surface used by checkpointing.
@@ -413,7 +421,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 			// executor.WithSyncLifecycleListeners/runner.WithSyncLifecycleListeners
 			// (pkg/devserver), and the checkpoint path never receives it —
 			// consistent with every other hook here, none of which dual-write.
-			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, nil, l, input.Metadata, op); err != nil {
+			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, c.SyncLifecycleListeners, l, input.Metadata, op); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
@@ -427,7 +435,7 @@ func (c checkpointer) CheckpointSyncSteps(ctx context.Context, input SyncCheckpo
 
 		case enums.OpcodeDeferAbort:
 			// nil sync listeners: see the OpcodeDeferAdd case above.
-			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, nil, l, input.Metadata, op); err != nil {
+			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, c.SyncLifecycleListeners, l, input.Metadata, op); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
@@ -632,7 +640,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 
 		case enums.OpcodeDeferAdd:
 			// nil sync listeners: see checkpoint's other OpcodeDeferAdd case.
-			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, nil, l, &md, op); err != nil {
+			if err := defers.SaveFromOp(ctx, c.State, c.TracerProvider, c.SyncLifecycleListeners, l, &md, op); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
@@ -646,7 +654,7 @@ func (c checkpointer) checkpointAsyncSteps(ctx context.Context, input AsyncCheck
 
 		case enums.OpcodeDeferAbort:
 			// nil sync listeners: see checkpoint's other OpcodeDeferAdd case.
-			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, nil, l, &md, op); err != nil {
+			if err := defers.AbortFromOp(ctx, c.State, c.TracerProvider, c.SyncLifecycleListeners, l, &md, op); err != nil {
 				// Log without returning the error: a bad defer must
 				// never fail its parent run. We may rethink this as
 				// the Defer feature matures.
@@ -920,6 +928,7 @@ func (c checkpointer) processMetadata(
 			spanMd.Op(),
 			values,
 			spanMd.Scope,
+			tracing.WithMetadataSyncListeners(c.SyncLifecycleListeners...),
 		)
 		if err != nil {
 			l.Warn("error creating metadata span in checkpoint",

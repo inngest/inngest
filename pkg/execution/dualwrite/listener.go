@@ -51,11 +51,13 @@ import (
 type listener struct {
 	execution.NoopSyncLifecycleListener
 
-	runs   chan map[string]any
-	events chan map[string]any
+	runs     chan map[string]any
+	events   chan map[string]any
+	metadata chan map[string]any
 
-	droppedRuns   atomic.Int64
-	droppedEvents atomic.Int64
+	droppedRuns     atomic.Int64
+	droppedEvents   atomic.Int64
+	droppedMetadata atomic.Int64
 
 	// spanExporter/tp back every per-step hook's span creation — see
 	// tracing.go's doc comments. tp is what hooks actually call
@@ -74,10 +76,11 @@ type listener struct {
 	wg       sync.WaitGroup
 }
 
-func newListenerWithChannels(runsCap, eventsCap int) *listener {
+func newListenerWithChannels(runsCap, eventsCap, metadataCap int) *listener {
 	return &listener{
-		runs:   make(chan map[string]any, runsCap),
-		events: make(chan map[string]any, eventsCap),
+		runs:     make(chan map[string]any, runsCap),
+		events:   make(chan map[string]any, eventsCap),
+		metadata: make(chan map[string]any, metadataCap),
 	}
 }
 
@@ -94,6 +97,14 @@ func (l *listener) sendEvent(row map[string]any) {
 	case l.events <- row:
 	default:
 		l.droppedEvents.Add(1)
+	}
+}
+
+func (l *listener) sendMetadata(row map[string]any) {
+	select {
+	case l.metadata <- row:
+	default:
+		l.droppedMetadata.Add(1)
 	}
 }
 
@@ -647,6 +658,52 @@ func (l *listener) OnExtendedTraceSpan(ctx context.Context, span execution.Exten
 	})
 }
 
+// OnMetadataEntry writes one metadata emission directly into
+// inngest.run_metadata -- a standalone table, not a row in
+// inngest.run_trace_spans, so (unlike OnExtendedTraceSpan) this builds a row
+// by hand and sends it straight to its own batcher rather than creating a
+// span through l.tp. span_id identifies the run/step/request span this
+// metadata annotates (entry.Parent's own identity, recovered the same way
+// the real TracerProvider would), not a new span of its own -- the join key
+// a reader uses to correlate this row back to inngest.run_trace_spans. op
+// (merge/set/delete/add) is intentionally not stored: see
+// execution.MetadataEntry's doc comment.
+func (l *listener) OnMetadataEntry(ctx context.Context, entry execution.MetadataEntry) {
+	valuesByt, err := json.Marshal(entry.Values)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("dualwrite: failed to marshal metadata values", "kind", entry.Kind.String(), "error", err)
+		return
+	}
+
+	spanID := tracing.SpanContextFromMetadata(entry.Parent).SpanID().String()
+
+	row := map[string]any{
+		"account_id":    entry.AccountID.String(),
+		"env_id":        entry.EnvID.String(),
+		"run_id":        entry.RunID.String(),
+		"run_queued_at": ulid.Time(entry.RunID.Time()),
+		"app_id":        entry.AppID.String(),
+		"function_id":   entry.FunctionID.String(),
+		"span_id":       spanID,
+		"scope":         entry.Scope.String(),
+		"kind":          entry.Kind.String(),
+		"is_user":       entry.Kind.IsUser(),
+		"values":        string(valuesByt),
+		"created_at":    entry.CreatedAt,
+	}
+	if entry.StepID != "" {
+		row["step_id"] = entry.StepID
+	}
+	if entry.StepIndex != nil {
+		row["step_index"] = *entry.StepIndex
+	}
+	if entry.StepAttempt != nil {
+		row["step_attempt"] = *entry.StepAttempt
+	}
+
+	l.sendMetadata(row)
+}
+
 // OnDeferAdd writes the run's own executor.defer span (a new row, seeded
 // deterministically from (run_id, hashedID) via tracing.DeferSpanSeed --
 // see pkg/execution/defers.createDeferSpan, which does the same for the
@@ -1162,9 +1219,9 @@ func (l *listener) OnStepFinished(ctx context.Context, md sv2.Metadata, item que
 type Option func(*setupOpts)
 
 type setupOpts struct {
-	runsCap, spansCap, eventsCap int
-	batchMaxSize                 int
-	batchInterval                time.Duration
+	runsCap, spansCap, eventsCap, metadataCap int
+	batchMaxSize                              int
+	batchInterval                             time.Duration
 }
 
 func defaultSetupOpts() setupOpts {
@@ -1172,6 +1229,7 @@ func defaultSetupOpts() setupOpts {
 		runsCap:       10_000,
 		spansCap:      10_000,
 		eventsCap:     10_000,
+		metadataCap:   10_000,
 		batchMaxSize:  10_000,
 		batchInterval: 200 * time.Millisecond,
 	}
@@ -1206,12 +1264,13 @@ func NewListener(db *sql.DB, opts ...Option) execution.SyncLifecycleListener {
 		apply(&o)
 	}
 
-	l := newListenerWithChannels(o.runsCap, o.eventsCap)
+	l := newListenerWithChannels(o.runsCap, o.eventsCap, o.metadataCap)
 	l.db = db
 
 	tables := map[string]chan map[string]any{
-		"inngest.runs":   l.runs,
-		"inngest.events": l.events,
+		"inngest.runs":         l.runs,
+		"inngest.events":       l.events,
+		"inngest.run_metadata": l.metadata,
 	}
 	// One shared disabledState across every batcher (runs/events here, plus
 	// the span exporter's own below), so the driver's terminal

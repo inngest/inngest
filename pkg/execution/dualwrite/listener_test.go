@@ -19,6 +19,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	tracingv3 "github.com/inngest/inngest/pkg/tracing/v3"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -27,7 +28,7 @@ import (
 )
 
 func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
-	l := newListenerWithChannels(1, 1) // capacity 1 for each of runs/events
+	l := newListenerWithChannels(1, 1, 1) // capacity 1 for each of runs/events/metadata
 
 	evt := event.NewBaseTrackedEvent(event.Event{Name: "test"}, nil)
 
@@ -52,7 +53,7 @@ func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
 }
 
 func TestListenerOnFunctionScheduledEnqueuesRunRow(t *testing.T) {
-	l := newListenerWithChannels(10, 10)
+	l := newListenerWithChannels(10, 10, 10)
 	md := testMetadata(t)
 
 	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
@@ -74,7 +75,7 @@ func TestListenerOnFunctionScheduledEnqueuesRunRow(t *testing.T) {
 // subsequent load) — as a real []string, stored as a DuckDB VARCHAR[] (see
 // pkg/db/duckdb/literal.go's []string encoding).
 func TestListenerOnFunctionScheduledSetsEventIDsFromMetadataConfig(t *testing.T) {
-	l := newListenerWithChannels(10, 10)
+	l := newListenerWithChannels(10, 10, 10)
 	md := testMetadata(t)
 	evt1, evt2 := ulid.MustNew(ulid.Now(), rand.Reader), ulid.MustNew(ulid.Now(), rand.Reader)
 	md.Config.EventIDs = []ulid.ULID{evt1, evt2}
@@ -95,7 +96,7 @@ func TestListenerOnFunctionScheduledSetsEventIDsFromMetadataConfig(t *testing.T)
 // "status" is handled for the same "column not applicable to this hook"
 // reasoning elsewhere in this file.
 func TestListenerOnFunctionScheduledOmitsEventIDsForCronRuns(t *testing.T) {
-	l := newListenerWithChannels(10, 10)
+	l := newListenerWithChannels(10, 10, 10)
 	md := testMetadata(t) // Config.EventIDs left empty, as a cron run would have it
 
 	l.OnFunctionScheduled(context.Background(), md, queue.Item{}, nil)
@@ -117,7 +118,7 @@ func TestListenerOnFunctionScheduledOmitsEventIDsForCronRuns(t *testing.T) {
 // normalizeRunSessions, which builds the same shape for the real run
 // span's "event.sessions" attribute.
 func TestListenerOnFunctionScheduledSetsSessionsFromTriggeringEvents(t *testing.T) {
-	l := newListenerWithChannels(10, 10)
+	l := newListenerWithChannels(10, 10, 10)
 	md := testMetadata(t)
 
 	evt1, err := json.Marshal(event.Event{Name: "test", Meta: event.EventMeta{
@@ -148,7 +149,7 @@ func TestListenerOnFunctionScheduledSetsSessionsFromTriggeringEvents(t *testing.
 // triggering event (or none at all) must never set "sessions", not set it
 // to an empty value.
 func TestListenerOnFunctionScheduledOmitsSessionsWhenNoTriggeringEventHasOne(t *testing.T) {
-	l := newListenerWithChannels(10, 10)
+	l := newListenerWithChannels(10, 10, 10)
 	md := testMetadata(t)
 
 	evt, err := json.Marshal(event.Event{Name: "test"})
@@ -892,6 +893,115 @@ func TestListenerOnExtendedTraceSpanWritesSpan(t *testing.T) {
 	attrs, ok := rows[0]["attributes"].(map[string]any)
 	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
 	require.Equal(t, "hello", attrs["custom.attr"])
+}
+
+// TestListenerOnMetadataEntryWritesRow proves OnMetadataEntry writes a
+// standalone row into inngest.run_metadata (not inngest.run_trace_spans),
+// carrying the full, already-resolved value set and no "op" column -- see
+// execution.MetadataEntry's doc comment on why op is dropped -- joined onto
+// the annotated span via span_id, derived from Parent's own identity.
+func TestListenerOnMetadataEntryWritesRow(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
+	md := sv2.Metadata{ID: sv2.ID{
+		RunID:      runID,
+		FunctionID: functionID,
+		Tenant:     sv2.Tenant{AccountID: accountID, EnvID: envID, AppID: appID},
+	}}
+	sv2.InitConfig(&md.Config)
+	parent := tracing.RunSpanRefFromMetadata(&md)
+
+	entry := execution.MetadataEntry{
+		AccountID:  accountID,
+		EnvID:      envID,
+		AppID:      appID,
+		FunctionID: functionID,
+		RunID:      runID,
+		Parent:     parent,
+		Kind:       metadata.Kind("test.kind"),
+		Scope:      enums.MetadataScopeRun,
+		Values:     metadata.Values{"foo": json.RawMessage(`"bar"`)},
+		CreatedAt:  time.Now(),
+	}
+	l.OnMetadataEntry(context.Background(), entry)
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_metadata;")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "metadata row should land after a batch flush")
+
+	rows := selectRows(t, db, "SELECT run_id, span_id, kind, scope, is_user, values, step_id, step_index, step_attempt FROM inngest.run_metadata;")
+	require.Len(t, rows, 1)
+	require.Equal(t, runID.String(), rows[0]["run_id"])
+	require.Equal(t, tracing.SpanContextFromMetadata(parent).SpanID().String(), rows[0]["span_id"])
+	require.Equal(t, "test.kind", rows[0]["kind"])
+	require.Equal(t, enums.MetadataScopeRun.String(), rows[0]["scope"])
+	require.Equal(t, false, rows[0]["is_user"])
+	require.Nil(t, rows[0]["step_id"], "run-scoped metadata should have no step_id")
+	require.Nil(t, rows[0]["step_index"])
+	require.Nil(t, rows[0]["step_attempt"])
+
+	values, ok := rows[0]["values"].(map[string]any)
+	require.True(t, ok, "values column should decode to a map, got %T", rows[0]["values"])
+	require.Equal(t, "bar", values["foo"])
+}
+
+// TestListenerOnMetadataEntryWritesStepLevelRow proves step-scoped metadata
+// carries its step_id/step_index/step_attempt columns, matching the
+// reference metadata insights table's own step-level support.
+func TestListenerOnMetadataEntryWritesStepLevelRow(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
+	md := sv2.Metadata{ID: sv2.ID{
+		RunID:      runID,
+		FunctionID: functionID,
+		Tenant:     sv2.Tenant{AccountID: accountID, EnvID: envID, AppID: appID},
+	}}
+	sv2.InitConfig(&md.Config)
+	parent := tracing.FinalizedStepSpanRefFromMetadataAndStepID(&md, "step-hash-1")
+
+	stepIndex := 2
+	stepAttempt := 1
+	entry := execution.MetadataEntry{
+		AccountID:   accountID,
+		EnvID:       envID,
+		AppID:       appID,
+		FunctionID:  functionID,
+		RunID:       runID,
+		Parent:      parent,
+		Kind:        metadata.Kind("test.kind"),
+		Scope:       enums.MetadataScopeStep,
+		Values:      metadata.Values{"foo": json.RawMessage(`"bar"`)},
+		CreatedAt:   time.Now(),
+		StepID:      "step-hash-1",
+		StepIndex:   &stepIndex,
+		StepAttempt: &stepAttempt,
+	}
+	l.OnMetadataEntry(context.Background(), entry)
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_metadata;")
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "metadata row should land after a batch flush")
+
+	rows := selectRows(t, db, "SELECT scope, step_id, step_index, step_attempt FROM inngest.run_metadata;")
+	require.Len(t, rows, 1)
+	require.Equal(t, enums.MetadataScopeStep.String(), rows[0]["scope"])
+	require.Equal(t, "step-hash-1", rows[0]["step_id"])
+	require.EqualValues(t, 2, rows[0]["step_index"])
+	require.EqualValues(t, 1, rows[0]["step_attempt"])
 }
 
 // deferScheduleEventJSON builds the raw JSON of an inngest/deferred.schedule

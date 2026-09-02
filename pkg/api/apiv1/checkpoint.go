@@ -118,6 +118,7 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		BackoffFunc:                  o.CheckpointOpts.BackoffFunc,
 		EnforceStepSizeLimits:        o.CheckpointOpts.EnforceStepSizeLimits,
 		AllowAsyncDispatchValidation: o.CheckpointOpts.AllowAsyncDispatchValidation,
+		SyncLifecycleListeners:       o.SyncLifecycleListeners,
 	})
 
 	api := checkpointAPI{

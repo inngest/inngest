@@ -58,6 +58,14 @@ func DefaultTemplates() Templates {
 		EventProfiles: [][]EventTemplate{
 			{{Name: "app/seeded.event", Data: `{}`, Offset: -200 * time.Millisecond}},
 		},
+		MetadataProfiles: []MetadataProfile{
+			{
+				Items: []MetadataTemplateItem{
+					{SpanID: "seeded-root", Scope: "run", Kind: "inngest.experiment", IsUser: false, Values: `{"seeded":true}`},
+					{SpanID: "seeded-step-1", Scope: "step", StepID: strPtr("seeded-step-1"), StepIndex: intPtr(0), StepAttempt: intPtr(1), Kind: "user.custom", IsUser: true, Values: `{"seeded":true}`},
+				},
+			},
+		},
 	}
 }
 
@@ -77,12 +85,13 @@ func BuildTemplates(ctx context.Context, db *sql.DB, limit int) (tmpl Templates,
 }
 
 // SampleTemplates samples up to limit distinct runs from each of
-// inngest.runs/run_trace_spans/events and returns the distinct tenant
-// tuples, statuses, and whole per-run shapes observed — a template
-// GenerateRuns samples from to produce data that looks like it. Returns a
-// zero-value Templates (no error) when the source tables are empty.
-// sampleRuns/sampleTraces/sampleEventProfiles each pick their own bounded
-// set of run_ids independently, so the pools aren't guaranteed to be the
+// inngest.runs/run_trace_spans/events/run_metadata and returns the
+// distinct tenant tuples, statuses, and whole per-run shapes observed — a
+// template GenerateRuns samples from to produce data that looks like it.
+// Returns a zero-value Templates (no error) when the source tables are
+// empty. Each of sampleRuns/sampleTraces/sampleEventProfiles/
+// sampleMetadata picks its own bounded set of run_ids independently (see
+// their own doc comments), so the four pools aren't guaranteed to be the
 // same runs -- consistent with Templates' existing "independently sampled
 // pools, mixed at generation time" design.
 func SampleTemplates(ctx context.Context, db *sql.DB, limit int) (Templates, error) {
@@ -105,6 +114,12 @@ func SampleTemplates(ctx context.Context, db *sql.DB, limit int) (Templates, err
 		return Templates{}, err
 	}
 	tmpl.EventProfiles = eventProfiles
+
+	profiles, err := sampleMetadata(ctx, db, limit)
+	if err != nil {
+		return Templates{}, err
+	}
+	tmpl.MetadataProfiles = profiles
 
 	return tmpl, nil
 }
@@ -374,10 +389,142 @@ func durationPtr(d time.Duration) *time.Duration {
 	return &d
 }
 
-// strPtr returns a pointer to s, for SpanTemplate's optional string
-// fields.
+// sampleMetadata reads every inngest.run_metadata row belonging to up to
+// limit distinct sampled runs, joined only onto its own run's queued_at,
+// and groups them into whole per-run metadata profiles (see
+// MetadataProfile) -- each row's SpanID/Scope/StepID/StepIndex/
+// StepAttempt reused completely verbatim, the same way SpanTemplate
+// reuses SpanID/ParentSpanID (see its own doc comment), so no join against
+// run_trace_spans is needed here at all: generateMetadata attaches an
+// item to whichever replayed span happens to share its exact SpanID.
+// Offset is each row's created_at relative to that run's own queued_at.
+//
+// limit bounds the number of distinct RUNS sampled, not rows: run_ids are
+// picked up front (a cheap scan) before the timing join runs, so a source
+// with a long history doesn't pay for more than a handful of runs' worth
+// of metadata regardless of how much it has accumulated overall.
+func sampleMetadata(ctx context.Context, db *sql.DB, limit int) ([]MetadataProfile, error) {
+	query := fmt.Sprintf(`
+	WITH sampled_runs AS (
+		SELECT DISTINCT run_id FROM %s.run_metadata LIMIT ?
+	),
+	run_timing AS (
+		SELECT run_id, queued_at
+		FROM %s.runs
+		WHERE run_id IN (SELECT run_id FROM sampled_runs)
+		QUALIFY row_number() OVER (PARTITION BY run_id ORDER BY ended_at DESC NULLS LAST, started_at DESC NULLS LAST) = 1
+	)
+	SELECT m.run_id, rt.queued_at, m.span_id, m.scope, m.step_id, m.step_index, m.step_attempt, m.kind, m.is_user, m.values, m.created_at
+	FROM %s.run_metadata m
+	JOIN run_timing rt ON rt.run_id = m.run_id;`, duckdb.DuckLakeAlias, duckdb.DuckLakeAlias, duckdb.DuckLakeAlias)
+	rows, err := db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("duckdbseed: sampling metadata: %w", err)
+	}
+	defer rows.Close()
+
+	byRun := map[string]*MetadataProfile{}
+	var order []string
+	for rows.Next() {
+		var rawRunID, rawQueuedAt any
+		var spanID, scope string
+		var rawStepID, rawStepIndex, rawStepAttempt any
+		var kind string
+		var rawIsUser, rawValues, rawCreatedAt any
+		if err := rows.Scan(&rawRunID, &rawQueuedAt, &spanID, &scope, &rawStepID, &rawStepIndex, &rawStepAttempt, &kind, &rawIsUser, &rawValues, &rawCreatedAt); err != nil {
+			return nil, fmt.Errorf("duckdbseed: scanning sampled metadata: %w", err)
+		}
+
+		queuedAt, err := duckdb.AsTimestamp(rawQueuedAt)
+		if err != nil {
+			return nil, fmt.Errorf("duckdbseed: parsing sampled run queued_at: %w", err)
+		}
+		createdAt, err := duckdb.AsTimestamp(rawCreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("duckdbseed: parsing sampled metadata created_at: %w", err)
+		}
+
+		runID := fmt.Sprint(rawRunID)
+		profile, ok := byRun[runID]
+		if !ok {
+			profile = &MetadataProfile{}
+			byRun[runID] = profile
+			order = append(order, runID)
+		}
+
+		var stepID *string
+		if s, ok := rawStepID.(string); ok {
+			stepID = &s
+		}
+		var stepIndex *int
+		if rawStepIndex != nil {
+			v := int(int64Value(rawStepIndex))
+			stepIndex = &v
+		}
+		var stepAttempt *int
+		if rawStepAttempt != nil {
+			v := int(int64Value(rawStepAttempt))
+			stepAttempt = &v
+		}
+
+		profile.Items = append(profile.Items, MetadataTemplateItem{
+			SpanID:      spanID,
+			Scope:       scope,
+			StepID:      stepID,
+			StepIndex:   stepIndex,
+			StepAttempt: stepAttempt,
+			Kind:        kind,
+			IsUser:      boolValue(rawIsUser),
+			Values:      jsonText(rawValues),
+			Offset:      createdAt.Sub(queuedAt),
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("duckdbseed: reading sampled metadata: %w", err)
+	}
+
+	profiles := make([]MetadataProfile, len(order))
+	for i, runID := range order {
+		profiles[i] = *byRun[runID]
+	}
+	return profiles, nil
+}
+
+// strPtr returns a pointer to s, for SpanTemplate/MetadataTemplateItem's
+// optional string fields.
 func strPtr(s string) *string {
 	return &s
+}
+
+// intPtr returns a pointer to i, for MetadataTemplateItem's optional int
+// fields.
+func intPtr(i int) *int {
+	return &i
+}
+
+// boolValue type-asserts a scanned BOOLEAN column's value, defaulting to
+// false for a NULL or unexpected type rather than erroring — used only for
+// is_root (computed by this file's own query, never NULL) and is_user
+// (NOT NULL in the schema), so this is a defensive fallback, not an
+// expected path.
+func boolValue(v any) bool {
+	b, _ := v.(bool)
+	return b
+}
+
+// int64Value type-asserts a scanned integer column's value, tolerating
+// both int64 (the quack transport's shape for BIGINT) and float64 (the
+// jsonlines transport decodes numbers via encoding/json) — mirroring
+// pkg/db/duckdb.AsInt64's same dual handling for the same reason.
+func int64Value(v any) int64 {
+	switch n := v.(type) {
+	case int64:
+		return n
+	case float64:
+		return int64(n)
+	default:
+		return 0
+	}
 }
 
 func tenantFromValues(rawAccountID, rawEnvID, rawAppID, rawFunctionID any) (Tenant, error) {

@@ -71,6 +71,25 @@ func TestSortEventsMatchesTheEventsTableSortKey(t *testing.T) {
 		"internal_id must outrank received_at within the same year/month/tenant")
 }
 
+// TestSortMetadataMatchesTheMetadataTableSortKey pins run_metadata's key:
+// SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id,
+// run_id, scope, step_id, step_index, step_attempt, span_id, kind).
+func TestSortMetadataMatchesTheMetadataTableSortKey(t *testing.T) {
+	sameMonth := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	runID := uuid.New().String()
+	accountID, envID := uuid.New(), uuid.New()
+
+	rows := []MetadataRow{
+		{RunID: runID, AccountID: accountID, EnvID: envID, RunQueuedAt: sameMonth, Scope: "step", SpanID: "b-span"},
+		{RunID: runID, AccountID: accountID, EnvID: envID, RunQueuedAt: sameMonth, Scope: "run", SpanID: "a-span"},
+	}
+
+	sortMetadata(rows)
+
+	require.Equal(t, []string{"a-span", "b-span"}, []string{rows[0].SpanID, rows[1].SpanID},
+		"scope must outrank span_id (\"run\" sorts before \"step\")")
+}
+
 func TestInsertGeneratedRunsWritesRunsSpansAndEvents(t *testing.T) {
 	connector, db := newTestDB(t, 1)
 	ctx := t.Context()
@@ -84,13 +103,16 @@ func TestInsertGeneratedRunsWritesRunsSpansAndEvents(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 3, summary.Runs)
 
-	wantSpans, wantEvents := 0, 0
+	wantSpans, wantEvents, wantMetadata := 0, 0, 0
 	for _, g := range generated {
 		wantSpans += len(g.Spans)
 		wantEvents += len(g.Events)
+		wantMetadata += len(g.Metadata)
 	}
 	require.Equal(t, wantSpans, summary.Spans)
 	require.Equal(t, wantEvents, summary.Events)
+	require.Equal(t, wantMetadata, summary.Metadata)
+	require.Greater(t, wantMetadata, 0, "testTemplates' MetadataProfiles should produce some metadata across 3 runs")
 
 	var runCount int
 	row := db.QueryRowContext(ctx, "SELECT count(*) FROM "+duckdb.DuckLakeAlias+".runs;")
@@ -106,6 +128,11 @@ func TestInsertGeneratedRunsWritesRunsSpansAndEvents(t *testing.T) {
 	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+duckdb.DuckLakeAlias+".events;")
 	require.NoError(t, row.Scan(&eventCount))
 	require.Equal(t, wantEvents, eventCount)
+
+	var metadataCount int
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM "+duckdb.DuckLakeAlias+".run_metadata;")
+	require.NoError(t, row.Scan(&metadataCount))
+	require.Equal(t, wantMetadata, metadataCount)
 }
 
 func TestInsertGeneratedRunsWithNoRunsIsANoop(t *testing.T) {

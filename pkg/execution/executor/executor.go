@@ -2324,6 +2324,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				httpTimingMd,
 				enums.MetadataScopeRequest,
 				instance.execSpan,
+				instance.edge.Incoming,
+				nil,
 			)
 			if err != nil {
 				l.Warn("error creating HTTP timing metadata span", "error", err)
@@ -2339,6 +2341,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				timingMd,
 				enums.MetadataScopeRequest,
 				instance.execSpan,
+				instance.edge.Incoming,
+				nil,
 			)
 			if err != nil {
 				l.Warn("error creating timing metadata span", "error", err)
@@ -6214,6 +6218,8 @@ func (e *executor) emitExperimentMetadataFromOpts(ctx context.Context, runCtx ex
 
 func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope, op *state.GeneratorOpcode) (*meta.SpanReference, error) {
 	var parent *meta.SpanReference
+	var stepID string
+	var stepAttempt *int
 
 	runMD := runCtx.Metadata()
 
@@ -6221,8 +6227,11 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 	case enums.MetadataScopeRun:
 		parent = tracing.RunSpanRefFromMetadata(runMD)
 	case enums.MetadataScopeStep, enums.MetadataScopeStepAttempt:
+		stepID = op.ID
 		if op.Op == enums.OpcodeStepError && IsStepRetryable(op, runCtx) {
-			parent = tracing.RetryStepSpanRefFromMetadataAndStepID(runMD, op.ID, runCtx.AttemptCount())
+			attempt := runCtx.AttemptCount()
+			stepAttempt = &attempt
+			parent = tracing.RetryStepSpanRefFromMetadataAndStepID(runMD, op.ID, attempt)
 		} else {
 			parent = tracing.FinalizedStepSpanRefFromMetadataAndStepID(runMD, op.ID)
 		}
@@ -6232,10 +6241,29 @@ func (e *executor) createMetadataSpan(ctx context.Context, runCtx execution.RunC
 		return nil, fmt.Errorf("unknown metadata scope: %s", sanitizeLogValue(scope.String()))
 	}
 
-	return e.createMetadataSpanOnParent(ctx, runCtx, location, md, scope, parent)
+	return e.createMetadataSpanOnParent(ctx, runCtx, location, md, scope, parent, stepID, stepAttempt)
 }
 
-func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope, parent *meta.SpanReference) (*meta.SpanReference, error) {
+// createMetadataSpanOnParent creates the metadata span itself. stepID and
+// stepAttempt (both optional -- empty/nil for run-scoped metadata) identify
+// the step this metadata belongs to for dual-write's inngest.run_metadata
+// table (see execution.MetadataEntry), independently of parent, which
+// identifies the span this metadata is attached to (a step's finalized span,
+// its retry span, or a request's execution span) -- the two usually
+// coincide but aren't the same concept: a request-scoped metadata span's
+// parent is the execution span, not the step span, yet it still belongs to
+// a specific step.
+func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execution.RunContext, location string, md metadata.Structured, scope metadata.Scope, parent *meta.SpanReference, stepID string, stepAttempt *int) (*meta.SpanReference, error) {
+	opts := []tracing.MetadataSpanAttrOpts{tracing.WithMetadataSyncListeners(e.syncLifecycles...)}
+	if stepID != "" {
+		opts = append(opts, func(cfg *tracing.MetadataSpanConfig) {
+			meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &stepID)
+			if stepAttempt != nil {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, stepAttempt)
+			}
+		})
+	}
+
 	ref, err := tracing.CreateMetadataSpan(
 		ctx,
 		e.tracerProvider,
@@ -6245,6 +6273,7 @@ func (e *executor) createMetadataSpanOnParent(ctx context.Context, runCtx execut
 		runCtx.Metadata(),
 		md,
 		scope,
+		opts...,
 	)
 	if err != nil {
 		if errors.Is(err, metadata.ErrMetadataSpanTooLarge) {
