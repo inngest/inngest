@@ -3,10 +3,13 @@ package queue
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -58,6 +61,49 @@ type ProcessorIterator struct {
 	// When true, we use a shorter partition requeue delay since semaphore-blocked items stay in
 	// the ready queue and can be picked up quickly once capacity is freed.
 	IsSemaphoreLimitOnly atomic.Bool
+
+	// exhaustedSemaphores holds the semaphores seen exhausted in this pass, keyed by
+	// id and evaluated key hash.  later items that have one of them are limited
+	// without another constraint API call, speeding up iteration
+	exhaustedSemaphores   map[string]struct{}
+	exhaustedSemaphoresMu sync.Mutex
+}
+
+func semaphoreMemoKey(id, evaluatedKeyHash string) string {
+	return id + ":" + evaluatedKeyHash
+}
+
+func (p *ProcessorIterator) rememberExhaustedSemaphores(sems []constraintapi.SemaphoreConstraint) {
+	if len(sems) == 0 {
+		return
+	}
+	p.exhaustedSemaphoresMu.Lock()
+	defer p.exhaustedSemaphoresMu.Unlock()
+	if p.exhaustedSemaphores == nil {
+		p.exhaustedSemaphores = make(map[string]struct{}, len(sems))
+	}
+	for _, s := range sems {
+		p.exhaustedSemaphores[semaphoreMemoKey(s.ID, s.EvaluatedKeyHash)] = struct{}{}
+	}
+}
+
+// semaphoreExhausted reports whether the item carries a semaphore that was already
+// seen exhausted in this pass.
+func (p *ProcessorIterator) semaphoreExhausted(item *QueueItem) bool {
+	if len(item.Data.Semaphores) == 0 {
+		return false
+	}
+	p.exhaustedSemaphoresMu.Lock()
+	defer p.exhaustedSemaphoresMu.Unlock()
+	if len(p.exhaustedSemaphores) == 0 {
+		return false
+	}
+	for _, s := range item.Data.Semaphores {
+		if _, ok := p.exhaustedSemaphores[semaphoreMemoKey(s.ID, s.EvaluatedKeyHash)]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *ProcessorIterator) Iterate(ctx context.Context) error {
@@ -186,6 +232,19 @@ func (p *ProcessorIterator) LeaseItem(ctx context.Context, item *QueueItem) erro
 		}
 	}
 
+	if p.semaphoreExhausted(item) {
+		shardName := ""
+		if shard := p.Queue.Shard(); shard != nil {
+			shardName = shard.Name()
+		}
+		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"status": "semaphore_limit", "queue_shard": shardName, "constraint_source": "memo"},
+		})
+		p.applyLeaseItemResult(LeaseItemResult{Status: LeaseItemStatusSemaphoreLimited})
+		return nil
+	}
+
 	priority := uint(0)
 	if opts := p.Queue.Options(); opts != nil {
 		priority = opts.PartitionPriorityFinder(ctx, *p.Partition)
@@ -203,6 +262,7 @@ func (p *ProcessorIterator) LeaseItem(ctx context.Context, item *QueueItem) erro
 		EarliestPeekTimeFallbackMS: earliestPeekTimeFallbackMS,
 		StaticTime:                 p.StaticTime,
 	}, p.Dispatch)
+	p.rememberExhaustedSemaphores(result.ExhaustedSemaphores)
 	p.applyLeaseItemResult(result)
 	return err
 }

@@ -353,6 +353,13 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 			requeue = q.SemaphoreRequeueExtension()
 		}
 
+		if iter.CtrSuccess.Load() == 0 {
+			// nothing was dispatched, so no completion will re-add this partition as
+			// a continuation.  drop any existing continuation, otherwise the next tick
+			// re-processes the partition and ignores the forced requeue below.
+			q.removeContinue(ctx, p, false)
+		}
+
 		// Requeue this partition as we hit concurrency limits.
 		metrics.IncrQueuePartitionConcurrencyLimitCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name()}})
 		err = shard.PartitionRequeue(ctx, p, q.Clock().Now().Truncate(time.Second).Add(requeue), true)
