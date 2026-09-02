@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -404,6 +405,8 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 		return fmt.Errorf("failed to create span: %w", err)
 	}
 
+	a.emitUserlandSpan(ctx, runID, functionID, fn.AppID, auth, parent, s, attrs)
+
 	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
 		cfg.Attrs = cfg.Attrs.Merge(tenantAttrs)
 	}
@@ -438,6 +441,36 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 	}
 
 	return nil
+}
+
+// emitUserlandSpan fans a committed userland (extended-trace) span out to
+// every registered execution.SyncLifecycleListener -- currently only DuckDB
+// dual-write (pkg/execution/dualwrite), which creates its own equivalent
+// span through its private TracerProvider rather than reusing this one
+// (this endpoint's span is created through the real, SQLite-backed
+// TracerProvider).
+func (a router) emitUserlandSpan(ctx context.Context, runID ulid.ULID, functionID, appID uuid.UUID, auth apiv1auth.V1Auth, parent *meta.SpanReference, s *tracev1.Span, attrs []attribute.KeyValue) {
+	if len(a.opts.SyncLifecycleListeners) == 0 {
+		return
+	}
+
+	span := execution.ExtendedTraceSpan{
+		AccountID:  auth.AccountID(),
+		EnvID:      auth.WorkspaceID(),
+		AppID:      appID,
+		FunctionID: functionID,
+		RunID:      runID,
+		Parent:     parent,
+		SpanID:     trace.SpanID(s.SpanId),
+		Name:       s.Name,
+		StartTime:  time.Unix(0, int64(s.StartTimeUnixNano)),
+		EndTime:    time.Unix(0, int64(s.EndTimeUnixNano)),
+		Attributes: attrs,
+	}
+
+	for _, l := range a.opts.SyncLifecycleListeners {
+		l.OnExtendedTraceSpan(ctx, span)
+	}
 }
 
 func getInngestTraceRef(s *tracev1.Span) (*meta.SpanReference, error) {

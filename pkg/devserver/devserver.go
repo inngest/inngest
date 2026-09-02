@@ -37,8 +37,8 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/cqrs/duckdbquery"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	"github.com/inngest/inngest/pkg/cqrs/duckdbquery"
 	cqrsmanager "github.com/inngest/inngest/pkg/cqrs/manager"
 	dbpkg "github.com/inngest/inngest/pkg/db"
 	"github.com/inngest/inngest/pkg/db/driverhelp"
@@ -743,12 +743,13 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:       broadcaster,
 			TraceReader:       gqlData,
 
-			AppCreator:        dbcqrs,
-			FunctionCreator:   dbcqrs,
-			EventPublisher:    runner,
-			TracerProvider:    tp,
-			State:             smv2,
-			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
+			AppCreator:             dbcqrs,
+			FunctionCreator:        dbcqrs,
+			EventPublisher:         runner,
+			TracerProvider:         tp,
+			SyncLifecycleListeners: syncListeners,
+			State:                  smv2,
+			RealtimeJWTSecret:      consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
 				RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), gqlData, gqlData),

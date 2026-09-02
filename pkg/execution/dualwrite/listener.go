@@ -41,6 +41,7 @@ import (
 	tracingv3 "github.com/inngest/inngest/pkg/tracing/v3"
 	"github.com/inngest/inngest/pkg/util/interval"
 	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // listener implements execution.SyncLifecycleListener. Every hook body does
@@ -614,6 +615,36 @@ func (l *listener) OnEventReceived(ctx context.Context, evt event.TrackedEvent) 
 	}
 
 	l.sendEvent(row)
+}
+
+// OnExtendedTraceSpan creates the userland (extended-trace) span through
+// this listener's own private tracingv3.TracerProvider, the same as every
+// other span-producing hook in this file (see createSpan/spanExporter) --
+// so the resulting inngest.run_trace_spans row is built by the same
+// spanExportRow conversion those hooks already rely on, rather than a
+// second, hand-rolled row-building path. Tenant/run identity is set
+// explicitly from span's own typed fields (like every other hook does via
+// addTenantAndDebugAttrs, which is a no-op here since there's no
+// statev2.Metadata) rather than relying on span.Attributes already
+// containing it -- spanExportRow reads these back off the created span's
+// attributes regardless of source.
+func (l *listener) OnExtendedTraceSpan(ctx context.Context, span execution.ExtendedTraceSpan) {
+	attrs := meta.NewAttrSet()
+	meta.AddAttr(attrs, meta.Attrs.AccountID, &span.AccountID)
+	meta.AddAttr(attrs, meta.Attrs.EnvID, &span.EnvID)
+	meta.AddAttr(attrs, meta.Attrs.AppID, &span.AppID)
+	meta.AddAttr(attrs, meta.Attrs.FunctionID, &span.FunctionID)
+	meta.AddAttr(attrs, meta.Attrs.RunID, &span.RunID)
+
+	_, _ = l.createSpan(ctx, tracingv3.SpanNameExtendedTrace, &tracing.CreateSpanOptions{
+		Debug:              &tracing.SpanDebugData{Location: "dualwrite.listener.OnExtendedTraceSpan"},
+		Attributes:         attrs,
+		StartTime:          span.StartTime,
+		EndTime:            span.EndTime,
+		Parent:             span.Parent,
+		RawOtelSpanOptions: []trace.SpanStartOption{trace.WithAttributes(span.Attributes...)},
+		SpanID:             span.SpanID,
+	})
 }
 
 // OnDeferAdd writes the run's own executor.defer span (a new row, seeded

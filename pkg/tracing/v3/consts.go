@@ -44,4 +44,9 @@ const (
 	// ever inserts and reusing the eventual finished step span's identity
 	// here would collide with it once that real span is inserted.
 	SpanNameStepPlanned = "executor.step.planned"
+
+	// SpanNameExtendedTrace marks a userland (extended-trace) span written by
+	// OnExtendedTraceSpan (pkg/api/apiv1/traces.go's commitSpan, via OTLP
+	// ingestion).
+	SpanNameExtendedTrace = "sdk.extended_trace"
 )
