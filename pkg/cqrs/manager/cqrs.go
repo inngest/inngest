@@ -2620,7 +2620,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 	reqcursor := &cqrs.TracePageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			l.Error("error decoding function run cursor", "error", err, "cursor", opt.Cursor)
+			l.Error("error decoding function run cursor", "error", err, "cursor", util.SanitizeLogField(opt.Cursor))
 		}
 	}
 
@@ -3178,7 +3178,7 @@ func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerCon
 	reqcursor := &cqrs.WorkerConnectionPageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			l.Error("error decoding worker connection history cursor", "error", err, "cursor", opt.Cursor)
+			l.Error("error decoding worker connection history cursor", "error", err, "cursor", util.SanitizeLogField(opt.Cursor))
 		}
 	}
 
