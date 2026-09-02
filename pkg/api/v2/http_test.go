@@ -115,23 +115,23 @@ func TestHTTPGateway_UnknownRequestFields(t *testing.T) {
 		wantStatus int
 	}{
 		{
-			name:       "endpoint with query parameters ignores an unknown query parameter",
+			name:       "endpoint with query parameters rejects an unknown query parameter",
 			method:     http.MethodGet,
 			path:       "/api/v2/apps?limit=10&unknown=value",
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusBadRequest,
 		},
 		{
-			name:       "endpoint without query parameters ignores an unknown query parameter",
+			name:       "endpoint without query parameters rejects an unknown query parameter",
 			method:     http.MethodGet,
 			path:       "/api/v2/health?unknown=value",
-			wantStatus: http.StatusOK,
+			wantStatus: http.StatusBadRequest,
 		},
 		{
-			name:       "endpoint without a body ignores an unknown body field",
+			name:       "endpoint without a body rejects an unknown body field",
 			method:     http.MethodPost,
 			path:       "/api/v2/sandboxes/sandbox-id/processes/process-id/wait",
 			body:       `{"unknown":"value"}`,
-			wantStatus: http.StatusNotImplemented,
+			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "endpoint with a body rejects an unknown body field",
