@@ -79,8 +79,6 @@ type CheckpointAPIOpts struct {
 	RunJWTSecret []byte
 	// BackoffFunc computes retry timing. If nil, uses the default backoff table.
 	BackoffFunc backoff.BackoffFunc
-	// AllowStepMetadata controls whether step metadata is allowed for a given account.
-	AllowStepMetadata executor.AllowStepMetadata
 	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
 	// The default is to always enforce the limits.
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
@@ -118,7 +116,6 @@ func NewCheckpointAPI(o Opts) CheckpointAPI {
 		},
 		MetricsProvider:              o.CheckpointOpts.CheckpointMetrics,
 		BackoffFunc:                  o.CheckpointOpts.BackoffFunc,
-		AllowStepMetadata:            o.CheckpointOpts.AllowStepMetadata,
 		EnforceStepSizeLimits:        o.CheckpointOpts.EnforceStepSizeLimits,
 		AllowAsyncDispatchValidation: o.CheckpointOpts.AllowAsyncDispatchValidation,
 	})
