@@ -98,6 +98,42 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_RejectsUnexpectedQueryParameters(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		path        string
+		serviceOpts ServiceOptions
+	}{
+		{
+			name:        "request with query fields",
+			path:        "/api/v2/runs?unexpected=secret-value",
+			serviceOpts: ServiceOptions{Runs: &mockRunProvider{}},
+		},
+		{
+			name: "request without query fields",
+			path: "/api/v2/health?unexpected=secret-value",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := newTestHTTPHandler(t.Context(), test.serviceOpts, HTTPHandlerOptions{})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodGet, test.path, nil)
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			var body errorResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			require.Equal(t, []errorItem{{
+				Code:    apiv2base.ErrorInvalidRequest,
+				Message: `Unexpected query parameter "unexpected"`,
+			}}, body.Errors)
+			require.NotContains(t, rec.Body.String(), "secret-value")
+		})
+	}
+}
+
 func TestHTTPGateway_RejectsUnexpectedRequestBodyFields(t *testing.T) {
 	for _, test := range []struct {
 		name string
@@ -139,6 +175,56 @@ func TestHTTPGateway_RejectsUnexpectedRequestBodyFields(t *testing.T) {
 			require.NotContains(t, rec.Body.String(), "secret-value")
 		})
 	}
+}
+
+func TestHTTPGateway_RejectsRequestBodyWhenNoneDefined(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{
+			name:   "POST endpoint",
+			method: http.MethodPost,
+			path:   "/api/v2/sandboxes/sandbox-id/processes/process-id/wait",
+		},
+		{
+			name:   "DELETE endpoint",
+			method: http.MethodDelete,
+			path:   "/api/v2/sandboxes/sandbox-id",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(test.method, test.path, strings.NewReader(`{"unexpected":"secret-value"}`))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			var body errorResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			require.Equal(t, []errorItem{{
+				Code:    apiv2base.ErrorInvalidRequest,
+				Message: "Request body is not supported for this endpoint",
+			}}, body.Errors)
+			require.NotContains(t, rec.Body.String(), "secret-value")
+		})
+	}
+}
+
+func TestHTTPGateway_DoesNotRejectGETRequestBody(t *testing.T) {
+	handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v2/health", strings.NewReader(`{"unexpected":"value"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
 }
 
 func TestHTTPGateway_SandboxesNotImplementedInDevServer(t *testing.T) {
@@ -282,6 +368,31 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	})
 
+	t.Run("binds proto-name filters", func(t *testing.T) {
+		isDeferred := false
+		runs := &mockRunProvider{}
+		runs.On("GetRuns", mock.Anything, GetRunsOpts{
+			Limit:         defaultRunsLimit,
+			IncludeOutput: true,
+			TimeField:     RunTimeFieldQueuedAt,
+			Status:        []enums.RunStatus{},
+			AppIDs:        []string{"my-app"},
+			FunctionIDs:   []string{"test-fn"},
+			IsDeferred:    &isDeferred,
+			Order:         OrderDirectionDesc,
+		}).Return(&GetRunsResult{}, nil).Once()
+
+		handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{Runs: runs}, HTTPHandlerOptions{})
+		require.NoError(t, err)
+		t.Cleanup(func() { runs.AssertExpectations(t) })
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/runs?include_output=true&app_id=my-app&function_id=test-fn&is_deferred=false", nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	})
+
 	t.Run("binds function path", func(t *testing.T) {
 		runs := &mockRunProvider{}
 		runs.On("GetRuns", mock.Anything, GetRunsOpts{
@@ -297,7 +408,7 @@ func TestHTTPGateway_RunListRoutes(t *testing.T) {
 		require.NoError(t, err)
 		t.Cleanup(func() { runs.AssertExpectations(t) })
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v2/apps/my-app/functions/test-fn/runs?app_id=ignored&function_id=ignored", nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 

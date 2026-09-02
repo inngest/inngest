@@ -156,6 +156,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 	if err := apiv2.RegisterV2HandlerServer(ctx, gwmux, service); err != nil {
 		return nil, fmt.Errorf("failed to register v2 gateway handler: %w", err)
 	}
+	gatewayHandler := enforceEndpointContracts(base)(gwmux)
 
 	// Build map of paths that require authorization
 	authzPaths := base.BuildAuthzPathMap()
@@ -187,7 +188,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 			authzHandler := httpOpts.AuthzMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Add JSON validation after authorization for protected paths
 				validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					gwmux.ServeHTTP(w, r)
+					gatewayHandler.ServeHTTP(w, r)
 				}))
 				validationHandler.ServeHTTP(w, r)
 			}))
@@ -195,7 +196,7 @@ func NewHTTPHandler(ctx context.Context, serviceOpts ServiceOptions, httpOpts HT
 		} else {
 			// Add JSON validation for unprotected paths
 			validationHandler := base.JSONTypeValidationMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				gwmux.ServeHTTP(w, r)
+				gatewayHandler.ServeHTTP(w, r)
 			}))
 			validationHandler.ServeHTTP(w, req)
 		}
