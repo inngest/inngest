@@ -46,9 +46,39 @@ export class RunsAPIError extends Error {
     message: string,
     readonly code?: string,
     readonly status?: number,
+    readonly retryAfter?: string | null,
   ) {
     super(message);
   }
+}
+
+const RUNS_RATE_LIMIT_MAX_RETRIES = 3;
+
+async function waitForRetry(milliseconds: number, signal?: AbortSignal) {
+  if (signal?.aborted) throw signal.reason;
+
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(signal?.reason);
+    };
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, milliseconds);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function rateLimitDelay(error: RunsAPIError, attempt: number) {
+  if (error.retryAfter) {
+    const seconds = Number(error.retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+
+    const date = Date.parse(error.retryAfter);
+    if (!Number.isNaN(date)) return Math.max(0, date - Date.now());
+  }
+  return 1000 * 2 ** attempt;
 }
 
 // Adapt protobuf JSON to the GraphQL-shaped model currently consumed by the
@@ -102,6 +132,28 @@ export async function fetchRunsPage(
   params: URLSearchParams,
   signal?: AbortSignal,
 ): Promise<RestRunsPage> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await fetchRunsPageAttempt(apiFetch, pathname, params, signal);
+    } catch (error) {
+      if (
+        !(error instanceof RunsAPIError) ||
+        error.status !== 429 ||
+        attempt >= RUNS_RATE_LIMIT_MAX_RETRIES
+      ) {
+        throw error;
+      }
+      await waitForRetry(rateLimitDelay(error, attempt), signal);
+    }
+  }
+}
+
+async function fetchRunsPageAttempt(
+  apiFetch: InngestAPIFetch,
+  pathname: string,
+  params: URLSearchParams,
+  signal?: AbortSignal,
+): Promise<RestRunsPage> {
   const query = params.toString();
   const response = await apiFetch(query ? `${pathname}?${query}` : pathname, {
     signal,
@@ -113,6 +165,7 @@ export async function fetchRunsPage(
       item?.message || response.statusText || 'Unable to fetch runs',
       item?.code,
       response.status,
+      response.headers.get('Retry-After'),
     );
   }
   if (!body?.page || (body.data !== undefined && !Array.isArray(body.data))) {
