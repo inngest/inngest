@@ -575,10 +575,6 @@ func (f *fakeTraceReader) LegacyGetSpanOutput(ctx context.Context, id cqrs.SpanI
 	return nil, nil
 }
 
-func (f *fakeTraceReader) GetSpanStack(ctx context.Context, id cqrs.SpanIdentifier) ([]string, error) {
-	return nil, nil
-}
-
 func (f *fakeTraceReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	f.runID = runID
 	return f.root, nil

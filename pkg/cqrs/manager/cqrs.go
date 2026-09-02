@@ -2527,41 +2527,6 @@ func (w wrapper) LegacyGetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifi
 	return nil, fmt.Errorf("no output found")
 }
 
-func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]string, error) {
-	if opts.TraceID == "" {
-		return nil, fmt.Errorf("traceID is required to retrieve stack")
-	}
-	if opts.SpanID == "" {
-		return nil, fmt.Errorf("spanID is required to retrieve stack")
-	}
-
-	// query spans in descending order
-	spans, err := w.q.GetTraceSpanOutput(ctx, dbpkg.GetTraceSpanOutputParams{
-		TraceID: opts.TraceID,
-		SpanID:  opts.SpanID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving spans for stack: %w", err)
-	}
-
-	for _, s := range spans {
-		var evts []cqrs.SpanEvent
-		err := json.Unmarshal(s.Events, &evts)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing span outputs: %w", err)
-		}
-
-		for _, evt := range evts {
-			if _, isStackEvt := evt.Attributes[consts.OtelSysStepStack]; isStackEvt {
-				// Data is kept in the `Name` field
-				return strings.Split(evt.Name, ","), nil
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("no stack found")
-}
-
 type runsQueryBuilder struct {
 	filter       []sq.Expression
 	order        []sqexp.OrderedExpression
