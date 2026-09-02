@@ -72,6 +72,11 @@ export function useRunsPagination({
       fetchRestRuns(commonQueryVars, pageParam, signal),
     getNextPageParam: (lastPage) =>
       lastPage.page.hasMore ? lastPage.page.cursor : undefined,
+    // fetchRunsPage already performs bounded 429 backoff. Do not let the query
+    // client repeat that retry cycle after it is exhausted.
+    retry: (failureCount, error) =>
+      !(error instanceof RunsAPIError && error.status === 429) &&
+      failureCount < 3,
     refetchInterval: commonQueryVars.celQuery ? false : 1000,
   });
 
