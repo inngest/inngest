@@ -6,7 +6,10 @@ import {
   restFunctionRunToTableRun,
 } from './restRuns';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe('restFunctionRunToTableRun', () => {
   it('maps complete and optional run fields', () => {
@@ -96,4 +99,110 @@ it('normalizes omitted protobuf defaults on empty terminal pages', async () => {
     data: [],
     page: { cursor: 'frontier', hasMore: false, limit: 40 },
   });
+});
+
+it('backs off and retries rate-limited page requests', async () => {
+  vi.useFakeTimers();
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ errors: [{ message: 'slow down' }] }), {
+        status: 429,
+        headers: { 'Retry-After': '2' },
+      }),
+    )
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: [],
+          page: { cursor: 'next', hasMore: false, limit: 40 },
+        }),
+        { status: 200 },
+      ),
+    );
+  vi.stubGlobal('fetch', fetch);
+
+  const result = fetchRunsPage('/v2/runs', new URLSearchParams(), 'production');
+  await vi.advanceTimersByTimeAsync(1999);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  await expect(result).resolves.toMatchObject({
+    page: { cursor: 'next', hasMore: false },
+  });
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it('stops retrying after three rate-limit retries', async () => {
+  vi.useFakeTimers();
+  const fetch = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ errors: [{ message: 'slow down' }] }), {
+      status: 429,
+      headers: { 'Retry-After': '1' },
+    }),
+  );
+  vi.stubGlobal('fetch', fetch);
+
+  const result = fetchRunsPage('/v2/runs', new URLSearchParams(), 'production');
+  const rejection = expect(result).rejects.toMatchObject({ status: 429 });
+  await vi.advanceTimersByTimeAsync(3000);
+  await rejection;
+  expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+it('uses exponential backoff without a Retry-After header', async () => {
+  vi.useFakeTimers();
+  const rateLimited = () =>
+    new Response(JSON.stringify({ errors: [{ message: 'slow down' }] }), {
+      status: 429,
+    });
+  const fetch = vi
+    .fn()
+    .mockResolvedValueOnce(rateLimited())
+    .mockResolvedValueOnce(rateLimited())
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: [],
+          page: { cursor: 'next', hasMore: false, limit: 40 },
+        }),
+        { status: 200 },
+      ),
+    );
+  vi.stubGlobal('fetch', fetch);
+
+  const result = fetchRunsPage('/v2/runs', new URLSearchParams(), 'production');
+  await vi.advanceTimersByTimeAsync(999);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(1999);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(1);
+  await expect(result).resolves.toMatchObject({ page: { cursor: 'next' } });
+  expect(fetch).toHaveBeenCalledTimes(3);
+});
+
+it('cancels during rate-limit backoff', async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ errors: [{ message: 'slow down' }] }), {
+        status: 429,
+        headers: { 'Retry-After': '60' },
+      }),
+    ),
+  );
+  const controller = new AbortController();
+
+  const result = fetchRunsPage(
+    '/v2/runs',
+    new URLSearchParams(),
+    'production',
+    controller.signal,
+  );
+  await vi.advanceTimersByTimeAsync(0);
+  controller.abort();
+
+  await expect(result).rejects.toMatchObject({ name: 'AbortError' });
 });
