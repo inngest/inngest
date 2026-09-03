@@ -13,7 +13,7 @@ import (
 	"os"
 	"reflect"
 	"runtime/debug"
-	"strings"
+	"strconv"
 	"sync"
 	"time"
 
@@ -50,10 +50,6 @@ var (
 		TrustProbe: types.TrustProbeV1,
 		Connect:    types.ConnectV1,
 	}
-)
-
-const (
-	envKeyAllowInBandSync = "INNGEST_ALLOW_IN_BAND_SYNC"
 )
 
 type handlerOpts struct {
@@ -111,9 +107,10 @@ type handlerOpts struct {
 	// differs from true streaming in that we don't support server-sent events.
 	UseStreaming bool
 
-	// AllowInBandSync allows in-band syncs to occur. If nil, in-band syncs are
-	// disallowed.
-	AllowInBandSync *bool
+	// EnableUnauthedSync allows unsigned sync requests in cloud mode.  Dev mode
+	// always allows unsigned sync requests because the Dev Server does not sign
+	// them.
+	EnableUnauthedSync *bool
 
 	Dev *bool
 }
@@ -225,25 +222,23 @@ func (h handlerOpts) GetRegisterURL() string {
 	return *h.RegisterURL
 }
 
-func (h handlerOpts) IsInBandSyncAllowed() bool {
-	if h.AllowInBandSync != nil {
-		return *h.AllowInBandSync
-	}
-
-	// TODO: Default to true once in-band syncing is stable
-	if isTrue(os.Getenv(envKeyAllowInBandSync)) {
-		return true
-	}
-
-	return false
-}
-
 func (h handlerOpts) isDev() bool {
 	if h.Dev != nil {
 		return *h.Dev
 	}
 
 	return env.IsDev()
+}
+
+func (h handlerOpts) isUnauthedSyncEnabled() bool {
+	if h.isDev() {
+		return true
+	}
+	if h.EnableUnauthedSync != nil {
+		return *h.EnableUnauthedSync
+	}
+	enabled, _ := strconv.ParseBool(os.Getenv("INNGEST_ENABLE_UNAUTHED_SYNC"))
+	return enabled
 }
 
 // newHandler returns a new Handler for serving Inngest functions.
@@ -347,6 +342,11 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if probe == "trust" {
 			err := h.trust(r.Context(), w, r)
 			if err != nil {
+				if errors.Is(err, errUnauthorized) {
+					writeUnauthorizedResponse(w)
+					return
+				}
+
 				var perr publicerr.Error
 				if !errors.As(err, &perr) {
 					perr = publicerr.Error{
@@ -375,7 +375,8 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			} else if errors.Is(err, errBadRequest) {
 				status = http.StatusBadRequest
 			} else if errors.Is(err, errUnauthorized) {
-				status = http.StatusUnauthorized
+				writeUnauthorizedResponse(w)
+				return
 			}
 			w.WriteHeader(status)
 			w.Header().Set("content-type", "application/json")
@@ -387,6 +388,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		if err := h.register(w, r); err != nil {
 			h.Logger.Error("error registering functions", "error", err.Error())
+			if errors.Is(err, errUnauthorized) {
+				writeUnauthorizedResponse(w)
+				return
+			}
 
 			code := syscode.CodeUnknown
 			status := http.StatusInternalServerError
@@ -406,7 +411,31 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 		return
+	default:
+		writeMethodNotAllowedResponse(w)
+		return
 	}
+}
+
+func writeUnauthorizedResponse(w http.ResponseWriter) {
+	w.Header().Del(HeaderKeyReqVersion)
+	w.Header().Del(HeaderKeySDK)
+	w.Header().Del(HeaderKeyUserAgent)
+	w.Header().Set(HeaderKeyContentType, "application/json")
+	w.Header().Set(HeaderKeySDKHandled, "true")
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"message": "Unauthorized",
+	})
+}
+
+func writeMethodNotAllowedResponse(w http.ResponseWriter) {
+	w.Header().Del(HeaderKeyContentType)
+	w.Header().Del(HeaderKeyReqVersion)
+	w.Header().Del(HeaderKeySDK)
+	w.Header().Del(HeaderKeyUserAgent)
+	w.Header().Set(HeaderKeySDKHandled, "true")
+	w.WriteHeader(http.StatusMethodNotAllowed)
 }
 
 // register self-registers the handler's functions with Inngest.  This upserts
@@ -415,12 +444,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *handler) register(w http.ResponseWriter, r *http.Request) error {
 	var syncKind string
 	var err error
-	if r.Header.Get(HeaderKeySyncKind) == SyncKindInBand && h.IsInBandSyncAllowed() {
+	// Signed registration requests carry the in-band sync payload. Validate the
+	// signature inside inBandSync after reading the body.
+	if r.Header.Get(HeaderKeySignature) != "" {
 		syncKind = SyncKindInBand
 		err = h.inBandSync(w, r)
 	} else {
 		syncKind = SyncKindOutOfBand
-		err = h.outOfBandSync(w, r)
+		if !h.isUnauthedSyncEnabled() {
+			err = errUnauthorized
+		} else {
+			err = h.outOfBandSync(w, r)
+		}
 	}
 
 	if err != nil {
@@ -466,17 +501,9 @@ func (h *handler) inBandSync(
 		_ = r.Body.Close()
 	}()
 
-	var sig string
-	if !h.isDev() {
-		if sig = r.Header.Get(HeaderKeySignature); sig == "" {
-			return publicerr.Error{
-				Err: syscode.Error{
-					Code:    syscode.CodeHTTPMissingHeader,
-					Message: fmt.Sprintf("missing %s header", HeaderKeySignature),
-				},
-				Status: 401,
-			}
-		}
+	sig := r.Header.Get(HeaderKeySignature)
+	if sig == "" {
+		return errUnauthorized
 	}
 
 	max := h.MaxBodySize
@@ -497,25 +524,13 @@ func (h *handler) inBandSync(
 		h.GetSigningKey(),
 		h.GetSigningKeyFallback(),
 		reqByt,
-		h.isDev(),
+		false,
 	)
 	if err != nil {
-		return publicerr.Error{
-			Err: syscode.Error{
-				Code:    syscode.CodeSigVerificationFailed,
-				Message: "error validating signature",
-			},
-			Status: 401,
-		}
+		return errUnauthorized
 	}
 	if !valid {
-		return publicerr.Error{
-			Err: syscode.Error{
-				Code:    syscode.CodeSigVerificationFailed,
-				Message: "invalid signature",
-			},
-			Status: 401,
-		}
+		return errUnauthorized
 	}
 
 	var reqBody inBandSynchronizeRequest
@@ -792,12 +807,24 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	request.CallCtx.RequestID = r.Header.Get(HeaderKeyRequestID)
 	request.CallCtx.JobID = r.Header.Get(HeaderKeyJobID)
 
-	if request.UseAPI {
-		// TODO: implement this
-		// retrieve data from API
-		// request.Steps =
-		// request.Events =
-		_ = 0 // no-op to avoid linter error
+	if request.UsesAPI() {
+		authToken, err := hashSigningKeyForAuth(h.GetSigningKey())
+		if err != nil {
+			return fmt.Errorf("error hashing signing key for API request: %w", err)
+		}
+		authTokenFallback, err := hashSigningKeyForAuth(h.GetSigningKeyFallback())
+		if err != nil {
+			return fmt.Errorf("error hashing fallback signing key for API request: %w", err)
+		}
+
+		if err := sdkrequest.LoadFromAPI(r.Context(), request, sdkrequest.LoadFromAPIOpts{
+			APIBaseURL:        h.GetAPIBaseURL(),
+			AuthToken:         authToken,
+			AuthTokenFallback: authTokenFallback,
+			HTTPClient:        cImpl.HTTPClient,
+		}); err != nil {
+			return fmt.Errorf("error loading function state from API: %w", err)
+		}
 	}
 
 	h.l.RLock()
@@ -972,6 +999,18 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	return json.NewEncoder(w).Encode(resp)
 }
 
+func hashSigningKeyForAuth(signingKey string) (string, error) {
+	if signingKey == "" {
+		return "", nil
+	}
+
+	hashed, err := hashedSigningKey([]byte(signingKey))
+	if err != nil {
+		return "", err
+	}
+	return string(hashed), nil
+}
+
 type insecureInspection struct {
 	SchemaVersion string `json:"schema_version"`
 
@@ -1110,6 +1149,10 @@ func (h *handler) inspect(w http.ResponseWriter, r *http.Request) error {
 			return json.NewEncoder(w).Encode(inspection)
 		}
 	}
+	if !h.isDev() {
+		writeUnauthorizedResponse(w)
+		return nil
+	}
 
 	var authenticationSucceeded *bool
 	if sig != "" {
@@ -1143,10 +1186,7 @@ func (h *handler) trust(
 	w.Header().Add("Content-Type", "application/json")
 	sig := r.Header.Get(HeaderKeySignature)
 	if sig == "" {
-		return publicerr.Error{
-			Message: fmt.Sprintf("missing %s header", HeaderKeySignature),
-			Status:  401,
-		}
+		return errUnauthorized
 	}
 
 	max := h.MaxBodySize
@@ -1171,16 +1211,10 @@ func (h *handler) trust(
 		h.isDev(),
 	)
 	if err != nil {
-		return publicerr.Error{
-			Message: fmt.Sprintf("error validating signature: %s", err),
-			Status:  401,
-		}
+		return errUnauthorized
 	}
 	if !valid {
-		return publicerr.Error{
-			Message: "invalid signature",
-			Status:  401,
-		}
+		return errUnauthorized
 	}
 
 	byt, err = json.Marshal(trustProbeResponse{})
@@ -1497,12 +1531,4 @@ func updateInput(
 	}
 
 	return nil
-}
-
-func isTrue(val string) bool {
-	val = strings.ToLower(val)
-	if val == "true" || val == "1" {
-		return true
-	}
-	return false
 }

@@ -21,6 +21,8 @@ type Opts struct {
 	// QueueItemRef represents the queue item ref that's currently leased while
 	// executing the SDK.
 	QueueItemRef string
+	// Environment is the name of the environment containing the run.
+	Environment string
 	// SigningKey is the signing key used to checkpoint.
 	SigningKey string
 	// SigningKeyFallback is the fallback signing key.
@@ -35,9 +37,12 @@ type Opts struct {
 
 // New returns a new checkpointer for a specific run.
 func New(o Opts) Checkpointer {
+	client := NewClient(o.APIBaseURL, o.SigningKey, o.SigningKeyFallback)
+	client.environment = o.Environment
+
 	return &checkpointer{
 		opts:       o,
-		client:     NewClient(o.APIBaseURL, o.SigningKey, o.SigningKeyFallback),
+		client:     client,
 		buffer:     []opcode.Step{},
 		lock:       sync.Mutex{},
 		totalSteps: atomic.Int32{},

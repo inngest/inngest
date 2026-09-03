@@ -17,6 +17,7 @@ const (
 	HeaderKeyReqVersion         = "x-inngest-req-version"
 	HeaderKeyRetryAfter         = "Retry-After"
 	HeaderKeySDK                = "X-Inngest-SDK"
+	HeaderKeySDKHandled         = "X-Inngest-SDK-Handled"
 	HeaderKeyServerKind         = "X-Inngest-Server-Kind"
 	HeaderKeySignature          = "X-Inngest-Signature"
 	HeaderKeySyncKind           = "x-inngest-sync-kind"
@@ -37,5 +38,6 @@ func SetBasicResponseHeaders(w http.ResponseWriter) {
 	w.Header().Set(HeaderKeyContentType, "application/json")
 	w.Header().Set(HeaderKeyReqVersion, executionVersionV2)
 	w.Header().Set(HeaderKeySDK, HeaderValueSDK)
+	w.Header().Set(HeaderKeySDKHandled, "true")
 	w.Header().Set(HeaderKeyUserAgent, HeaderValueSDK)
 }

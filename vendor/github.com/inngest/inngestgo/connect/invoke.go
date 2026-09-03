@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -12,7 +14,6 @@ import (
 	sdkerrors "github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"google.golang.org/protobuf/proto"
-	"time"
 )
 
 const (
@@ -126,14 +127,6 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	// TODO Should we wait for a gateway response before starting to process? What if the gateway fails acking and we start too early?
 	// This should not happen but could lead to double processing of the same message
 
-	if request.UseAPI {
-		// TODO: implement this
-		// retrieve data from API
-		// request.Steps =
-		// request.Events =
-		_ = 0 // no-op to avoid linter error
-	}
-
 	var stepId *string
 	if body.StepId != nil && *body.StepId != "step" {
 		stepId = body.StepId
@@ -206,8 +199,29 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		}
 	}()
 
-	// Invoke function, always complete regardless of
-	resp, ops, err := invoker.InvokeFunction(context.Background(), body.FunctionSlug, stepId, request)
+	// Invoke function, always complete regardless of connection cancellation once
+	// the request has been acknowledged.
+	var (
+		resp any
+		ops  []sdkrequest.GeneratorOpcode
+	)
+	if request.UsesAPI() {
+		loadOpts := sdkrequest.LoadFromAPIOpts{
+			APIBaseURL:        h.opts.APIBaseURL,
+			AuthToken:         string(h.opts.HashedSigningKey),
+			AuthTokenFallback: string(h.opts.HashedSigningKeyFallback),
+		}
+		if h.apiClient != nil {
+			loadOpts.HTTPClient = &h.apiClient.client
+		}
+		err = sdkrequest.LoadFromAPI(context.Background(), &request, loadOpts)
+		if err != nil {
+			err = fmt.Errorf("error loading function state from API: %w", err)
+		}
+	}
+	if err == nil {
+		resp, ops, err = invoker.InvokeFunction(context.Background(), body.FunctionSlug, stepId, request)
+	}
 
 	// NOTE: When triggering step errors, we should have an OpcodeStepError
 	// within ops alongside an error.  We can safely ignore that error, as it's
