@@ -72,10 +72,13 @@ func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.Capacity
 		m.stats.foreign("extend")
 		return res
 	}
+	rs := sl.req.Load()
+	if rs == nil || rs.set.accountID != req.AccountID {
+		return res
+	}
 	if !sl.take() {
 		return res
 	}
-	rs := sl.req.Load()
 
 	newSeq, _ := m.slab.alloc(nowMS, leaseExpiryMS, rs)
 	m.expiry.add(leaseExpiryMS, newSeq)

@@ -251,6 +251,9 @@ func cellKeyOf(kind byte, accountID uuid.UUID, p1, p2 string) cellKey {
 // hashes, the same identity the Redis key carries.  concurrency mode is not
 // part of it, as in Redis.
 func scopedKey(kind byte, accountID uuid.UUID, scope int, entity uuid.UUID, exprHash, evaluatedHash string) cellKey {
+	if exprHash == "" {
+		evaluatedHash = ""
+	}
 	var arr [128]byte
 	b := arr[:0]
 	b = append(b, kind)

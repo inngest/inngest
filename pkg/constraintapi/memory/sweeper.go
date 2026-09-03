@@ -60,6 +60,9 @@ func (m *Manager) Scavenge(ctx context.Context) (int, error) {
 			reclaim(seq)
 		}
 	})
+	if m.sweepInterval <= 0 {
+		m.housekeep(nowMS)
+	}
 
 	constraintapi.ScavengeResult{
 		TotalExpiredLeasesCount: expired,

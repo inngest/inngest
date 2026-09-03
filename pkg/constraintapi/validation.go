@@ -198,16 +198,25 @@ func (r *CapacityAcquireRequest) Valid() error {
 func (ci ConstraintItem) Valid() error {
 	switch ci.Kind {
 	case ConstraintKindConcurrency:
+		if ci.Concurrency == nil {
+			return fmt.Errorf("concurrency constraint must include concurrency data")
+		}
 		// TODO: Implement run level concurrency and remove this validation
-		if ci.Concurrency != nil && ci.Concurrency.Mode == enums.ConcurrencyModeRun {
+		if ci.Concurrency.Mode == enums.ConcurrencyModeRun {
 			return fmt.Errorf("run level concurrency is not implemented yet")
 		}
 	case ConstraintKindThrottle:
-		if ci.Throttle != nil && ci.Throttle.EvaluatedKeyHash == "" {
+		if ci.Throttle == nil {
+			return fmt.Errorf("throttle constraint must include throttle data")
+		}
+		if ci.Throttle.EvaluatedKeyHash == "" {
 			return fmt.Errorf("throttle constraint must include EvaluatedKeyHash")
 		}
 	case ConstraintKindRateLimit:
-		if ci.RateLimit != nil && ci.RateLimit.EvaluatedKeyHash == "" {
+		if ci.RateLimit == nil {
+			return fmt.Errorf("rate limit constraint must include rate limit data")
+		}
+		if ci.RateLimit.EvaluatedKeyHash == "" {
 			return fmt.Errorf("rate limit constraint must include EvaluatedKeyHash")
 		}
 	case ConstraintKindSemaphore:

@@ -74,10 +74,13 @@ func (m *Manager) release(nowMS int64, req *constraintapi.CapacityReleaseRequest
 		m.stats.foreign("release")
 		return res, false
 	}
+	rs := sl.req.Load()
+	if rs == nil || rs.set.accountID != req.AccountID {
+		return res, false
+	}
 	if !sl.take() {
 		return res, false
 	}
-	rs := sl.req.Load()
 	set := rs.set
 
 	// the sweeper reclaims a lease whose holder is gone, so a manual release

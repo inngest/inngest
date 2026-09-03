@@ -639,6 +639,33 @@ func TestSemaphoreForeignLeaseID(t *testing.T) {
 	require.Equal(t, int64(1), usageOf(t, m, id.account, sem))
 }
 
+func TestLeaseAccountIsolation(t *testing.T) {
+	clock := clockwork.NewFakeClockAt(testStart)
+	m := newMemoryManager(t, clock)
+	id := newIDs()
+	otherAccountID := uuid.New()
+
+	sem := constraintapi.SemaphoreConstraint{ID: "app:" + uuid.NewString(), Weight: 1, Release: constraintapi.SemaphoreReleaseAuto}
+	config := semaphoreConfig(sem)
+	constraints := []constraintapi.ConstraintItem{semaphoreItem(&sem)}
+	setCapacity(t, m, id.account, sem.ID, 2)
+
+	first := acquire(t, m, acquireRequest(id, clock, config, constraints, "account-extend"))
+	second := acquire(t, m, acquireRequest(id, clock, config, constraints, "account-release"))
+	require.Equal(t, int64(2), usageOf(t, m, id.account, sem))
+
+	ext := extend(t, m, otherAccountID, first.Leases[0].LeaseID, "wrong-account-extend", 5*time.Second)
+	require.Nil(t, ext.LeaseID)
+	require.Equal(t, uuid.Nil, ext.EnvID)
+	rel := release(t, m, otherAccountID, second.Leases[0].LeaseID, "wrong-account-release")
+	require.Equal(t, uuid.Nil, rel.EnvID)
+	require.Equal(t, int64(2), usageOf(t, m, id.account, sem))
+
+	release(t, m, id.account, first.Leases[0].LeaseID, "right-account-release-first")
+	release(t, m, id.account, second.Leases[0].LeaseID, "right-account-release-second")
+	require.Equal(t, int64(0), usageOf(t, m, id.account, sem))
+}
+
 // TestLeaseIDWithWrongExpiryIsUnknown covers a lease from another manager
 // that shares this manager's nonce and names a live seq here.  the expiry in
 // the ID does not match the slot's, so it is refused and nothing is released.

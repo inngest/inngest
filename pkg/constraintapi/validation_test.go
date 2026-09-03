@@ -1525,28 +1525,31 @@ func TestConstraintItemValid(t *testing.T) {
 			expectedMsg: "rate limit constraint must include EvaluatedKeyHash",
 		},
 		{
-			name: "concurrency constraint with nil struct is valid",
+			name: "concurrency constraint with nil struct is invalid",
 			constraint: ConstraintItem{
 				Kind:        ConstraintKindConcurrency,
-				Concurrency: nil, // nil constraint object
+				Concurrency: nil,
 			},
-			wantErr: false,
+			wantErr:     true,
+			expectedMsg: "concurrency constraint must include concurrency data",
 		},
 		{
-			name: "throttle constraint with nil struct is valid",
+			name: "throttle constraint with nil struct is invalid",
 			constraint: ConstraintItem{
 				Kind:     ConstraintKindThrottle,
-				Throttle: nil, // nil constraint object
+				Throttle: nil,
 			},
-			wantErr: false,
+			wantErr:     true,
+			expectedMsg: "throttle constraint must include throttle data",
 		},
 		{
-			name: "rate limit constraint with nil struct is valid",
+			name: "rate limit constraint with nil struct is invalid",
 			constraint: ConstraintItem{
 				Kind:      ConstraintKindRateLimit,
-				RateLimit: nil, // nil constraint object
+				RateLimit: nil,
 			},
-			wantErr: false,
+			wantErr:     true,
+			expectedMsg: "rate limit constraint must include rate limit data",
 		},
 		{
 			name: "concurrency constraint without keys is valid",
@@ -2550,7 +2553,7 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid - constraint with nil concurrency object (bypass function level check)",
+			name: "invalid - constraint with nil concurrency object",
 			request: CapacityCheckRequest{
 				AccountID:  accountID,
 				EnvID:      envID,
@@ -2561,14 +2564,15 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind:        ConstraintKindConcurrency,
-						Concurrency: nil, // Nil constraint - should not trigger function level check
+						Concurrency: nil,
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsgs: []string{"concurrency constraint must include concurrency data"},
 		},
 		{
-			name: "valid - constraint with nil throttle object (bypass function level check)",
+			name: "invalid - constraint with nil throttle object",
 			request: CapacityCheckRequest{
 				AccountID:  accountID,
 				EnvID:      envID,
@@ -2579,14 +2583,15 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind:     ConstraintKindThrottle,
-						Throttle: nil, // Nil constraint - should not trigger function level check
+						Throttle: nil,
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsgs: []string{"throttle constraint must include throttle data"},
 		},
 		{
-			name: "valid - constraint with nil rate limit object (bypass function level check)",
+			name: "invalid - constraint with nil rate limit object",
 			request: CapacityCheckRequest{
 				AccountID:  accountID,
 				EnvID:      envID,
@@ -2597,11 +2602,12 @@ func TestCapacityCheckRequestValidFunctionLevelConstraints(t *testing.T) {
 				Constraints: []ConstraintItem{
 					{
 						Kind:      ConstraintKindRateLimit,
-						RateLimit: nil, // Nil constraint - should not trigger function level check
+						RateLimit: nil,
 					},
 				},
 			},
-			wantErr: false,
+			wantErr: true,
+			errMsgs: []string{"rate limit constraint must include rate limit data"},
 		},
 	}
 

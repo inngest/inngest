@@ -93,7 +93,9 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	require.NoError(t, err)
 	clock.Advance(constraintapi.SemaphoreIdempotencyTTL + time.Second)
 
-	m.housekeep(m.nowMS())
+	reclaimed, err = m.Scavenge(ctx)
+	require.NoError(t, err)
+	require.Zero(t, reclaimed)
 
 	require.Zero(t, m.acqIdem.len())
 	require.Zero(t, m.relIdem.len())
@@ -105,9 +107,7 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	require.Zero(t, syncMapLen(&m.gcra), "an expired TAT cell is dropped")
 	require.LessOrEqual(t, m.slab.pageCount(), slabShards, "only the shards' current allocation pages stay")
 
-	require.Equal(t, 1, syncMapLen(&m.sets), "the set was used since the last round")
-	m.housekeep(m.nowMS())
-	require.Zero(t, syncMapLen(&m.sets), "an unused set is dropped on the next round")
+	require.Zero(t, syncMapLen(&m.sets), "manual scavenging drops an unused set")
 
 	// a dropped cell is recreated on use
 	_, err = m.SetCapacity(ctx, accountID, sem.ID, "setcap-2", 1)
