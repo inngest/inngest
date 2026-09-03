@@ -18,18 +18,57 @@ const SandboxMetricsDocument = graphql(`
     $sandboxID: UUID!
     $from: Time!
     $until: Time!
-    $granularitySeconds: Int!
   ) {
     envBySlug(slug: $envSlug) {
-      sandboxMetrics(
-        id: $sandboxID
-        from: $from
-        until: $until
-        granularitySeconds: $granularitySeconds
+      cpuUserTime: sandboxMetrics(
+        filter: {
+          id: $sandboxID
+          name: "sandbox_cpu_user_time"
+          from: $from
+          until: $until
+        }
       ) {
-        metric
         data {
-          time
+          bucket
+          value
+        }
+      }
+      cpuSystemTime: sandboxMetrics(
+        filter: {
+          id: $sandboxID
+          name: "sandbox_cpu_system_time"
+          from: $from
+          until: $until
+        }
+      ) {
+        data {
+          bucket
+          value
+        }
+      }
+      memoryCurrent: sandboxMetrics(
+        filter: {
+          id: $sandboxID
+          name: "sandbox_memory_current"
+          from: $from
+          until: $until
+        }
+      ) {
+        data {
+          bucket
+          value
+        }
+      }
+      memoryPeak: sandboxMetrics(
+        filter: {
+          id: $sandboxID
+          name: "sandbox_memory_peak"
+          from: $from
+          until: $until
+        }
+      ) {
+        data {
+          bucket
           value
         }
       }
@@ -63,11 +102,10 @@ export function SandboxMetrics({
       sandboxID,
       from: from.toISOString(),
       until: until.toISOString(),
-      granularitySeconds: 10,
     },
   });
   const stats = sandboxMetricStats(
-    data?.envBySlug?.sandboxMetrics ?? [],
+    data?.envBySlug ?? {},
     vcpu,
     memoryMB * 1024 * 1024,
   );

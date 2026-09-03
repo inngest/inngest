@@ -1,17 +1,21 @@
-import { SandboxMetric } from '@/gql/graphql';
-
 type MetricPoint = {
-  time: string;
+  bucket: string;
   value?: number | null;
 };
 
-type SandboxMetricSeries = {
-  metric: SandboxMetric;
+type MetricSeries = {
   data: MetricPoint[];
 };
 
+export type SandboxMetricSeries = {
+  cpuUserTime?: MetricSeries | null;
+  cpuSystemTime?: MetricSeries | null;
+  memoryCurrent?: MetricSeries | null;
+  memoryPeak?: MetricSeries | null;
+};
+
 export function sandboxMetricStats(
-  series: SandboxMetricSeries[],
+  series: SandboxMetricSeries,
   vcpu: number,
   memoryBytes: number,
 ): {
@@ -23,18 +27,15 @@ export function sandboxMetricStats(
     peakPercent: number | null;
   } | null;
 } {
-  const byMetric = new Map(series.map((item) => [item.metric, item.data]));
   const cpuRate = latestCounterRate(
     sumMatchingCounters(
-      byMetric.get(SandboxMetric.CpuUserTime) ?? [],
-      byMetric.get(SandboxMetric.CpuSystemTime) ?? [],
+      series.cpuUserTime?.data ?? [],
+      series.cpuSystemTime?.data ?? [],
     ),
     1 / 1_000_000,
   );
-  const memoryCurrent = latestValue(
-    byMetric.get(SandboxMetric.MemoryCurrent) ?? [],
-  );
-  const memoryPeak = latestValue(byMetric.get(SandboxMetric.MemoryPeak) ?? []);
+  const memoryCurrent = latestValue(series.memoryCurrent?.data ?? []);
+  const memoryPeak = latestValue(series.memoryPeak?.data ?? []);
 
   return {
     cpu:
@@ -61,14 +62,14 @@ function sumMatchingCounters(
   left: MetricPoint[],
   right: MetricPoint[],
 ): MetricPoint[] {
-  const rightByTime = new Map(
-    right.filter(hasMetricValue).map((point) => [point.time, point.value]),
+  const rightByBucket = new Map(
+    right.filter(hasMetricValue).map((point) => [point.bucket, point.value]),
   );
 
   return left.flatMap((point) => {
-    const rightValue = rightByTime.get(point.time);
+    const rightValue = rightByBucket.get(point.bucket);
     if (!hasMetricValue(point) || rightValue === undefined) return [];
-    return [{ time: point.time, value: point.value + rightValue }];
+    return [{ bucket: point.bucket, value: point.value + rightValue }];
   });
 }
 
@@ -78,14 +79,14 @@ function latestCounterRate(
 ): number | null {
   const points = source
     .filter(hasMetricValue)
-    .sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+    .sort((a, b) => Date.parse(a.bucket) - Date.parse(b.bucket));
   let latest: number | null = null;
 
   for (let i = 1; i < points.length; i++) {
     const previous = points[i - 1];
     const current = points[i];
     const elapsedSeconds =
-      (Date.parse(current.time) - Date.parse(previous.time)) / 1000;
+      (Date.parse(current.bucket) - Date.parse(previous.bucket)) / 1000;
     if (elapsedSeconds <= 0 || current.value < previous.value) continue;
     latest = ((current.value - previous.value) / elapsedSeconds) * scale;
   }
@@ -96,7 +97,9 @@ function latestCounterRate(
 function latestValue(points: MetricPoint[]): number | null {
   const latest = points
     .filter(hasMetricValue)
-    .sort((left, right) => Date.parse(right.time) - Date.parse(left.time))[0];
+    .sort(
+      (left, right) => Date.parse(right.bucket) - Date.parse(left.bucket),
+    )[0];
   return latest?.value ?? null;
 }
 
