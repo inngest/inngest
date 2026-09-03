@@ -2,8 +2,6 @@ module github.com/inngest/inngest
 
 go 1.26.4
 
-replace github.com/tencentcloud/tencentcloud-sdk-go v3.0.82+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.191
-
 require (
 	connectrpc.com/connect v1.16.1
 	cuelang.org/go v0.4.2
