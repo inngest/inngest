@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { Button as NewButton } from '@inngest/components/Button';
 import { Button } from '@inngest/components/Button/Button';
 import { RiArrowRightSLine } from '@remixicon/react';

@@ -1,3 +1,4 @@
+import type { JSX } from 'react';
 import { Pill } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';

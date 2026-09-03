@@ -8,7 +8,7 @@ type TableProps<T> = {
   options: TableOptions<T>;
   blankState: React.ReactNode;
   customRowProps?: (row: Row<T>) => void;
-  tableContainerRef: React.RefObject<HTMLDivElement>;
+  tableContainerRef: React.RefObject<HTMLDivElement | null>;
 };
 
 /**
