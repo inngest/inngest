@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -2057,74 +2056,6 @@ func traceRunStatusDBValues(status enums.RunStatus) []int64 {
 type traceRunCursorFilter struct {
 	ID    string
 	Value int64
-}
-
-func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
-	spans, err := w.q.GetTraceSpans(ctx, dbpkg.GetTraceSpansParams{
-		TraceID: id.TraceID,
-		RunID:   id.RunID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	res := []*cqrs.Span{}
-	seen := map[string]bool{}
-	for _, s := range spans {
-		// identifier to used for checking if this span is seen already
-		m := map[string]any{
-			"ts":  s.Timestamp.UnixMilli(),
-			"tid": s.TraceID,
-			"sid": s.SpanID,
-		}
-		byt, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-		ident := base64.StdEncoding.EncodeToString(byt)
-		if _, ok := seen[ident]; ok {
-			// already seen, so continue
-			continue
-		}
-
-		span := &cqrs.Span{
-			Timestamp:    s.Timestamp,
-			TraceID:      string(s.TraceID),
-			SpanID:       string(s.SpanID),
-			SpanName:     s.SpanName,
-			SpanKind:     s.SpanKind,
-			ServiceName:  s.ServiceName,
-			ScopeName:    s.ScopeName,
-			ScopeVersion: s.ScopeVersion,
-			Duration:     time.Duration(s.Duration * int64(time.Millisecond)),
-			StatusCode:   s.StatusCode,
-			RunID:        &s.RunID,
-		}
-
-		if s.StatusMessage.Valid {
-			span.StatusMessage = &s.StatusMessage.String
-		}
-
-		if s.ParentSpanID.Valid {
-			span.ParentSpanID = &s.ParentSpanID.String
-		}
-		if s.TraceState.Valid {
-			span.TraceState = &s.TraceState.String
-		}
-
-		var resourceAttr, spanAttr map[string]string
-		if err := json.Unmarshal(s.ResourceAttributes, &resourceAttr); err == nil {
-			span.ResourceAttributes = resourceAttr
-		}
-		if err := json.Unmarshal(s.SpanAttributes, &spanAttr); err == nil {
-			span.SpanAttributes = spanAttr
-		}
-
-		res = append(res, span)
-		seen[ident] = true
-	}
-
-	return res, nil
 }
 
 func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {

@@ -424,8 +424,6 @@ type TraceReader interface {
 	GetTraceRunsCount(ctx context.Context, opt GetTraceRunOpt) (int, error)
 	// GetTraceRun retrieve the specified run
 	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
-	// GetTraceSpansByRun retrieves all the spans related to the trace
-	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
 	// LegacyGetSpanOutput retrieves the output for the specified span
 	LegacyGetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// GetSpansByRunID retrieves all spans related to the specified run
