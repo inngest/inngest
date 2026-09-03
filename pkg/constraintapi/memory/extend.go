@@ -1,0 +1,91 @@
+package memory
+
+import (
+	"context"
+
+	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/util/errs"
+)
+
+type flightExtend struct {
+	res      *constraintapi.CapacityExtendLeaseResponse
+	replayed bool
+}
+
+// ExtendLease implements constraintapi.CapacityManager.  the old slot is
+// taken and a new one allocated, so a release with the old ID finds nothing.
+func (m *Manager) ExtendLease(ctx context.Context, req *constraintapi.CapacityExtendLeaseRequest) (*constraintapi.CapacityExtendLeaseResponse, errs.InternalError) {
+	if err := req.Valid(); err != nil {
+		return nil, errs.Wrap(0, false, "invalid request: %w", err)
+	}
+
+	now := m.clock.Now()
+	nowMS := now.UnixMilli()
+	leaseExpiryMS := now.Add(req.Duration).UnixMilli()
+	extKey := hashKey(req.AccountID, "ext", req.IdempotencyKey)
+
+	executed := false
+	v, _, _ := m.flight.Do(flightKey('e', extKey), func() (any, error) {
+		executed = true
+		if r, ok := m.extIdem.get(nowMS, extKey); ok {
+			return flightExtend{res: r, replayed: true}, nil
+		}
+		return flightExtend{res: m.extend(nowMS, leaseExpiryMS, req, extKey)}, nil
+	})
+	fe := v.(flightExtend)
+
+	res := *fe.res
+	res.OperationIdempotencyHit = fe.replayed || !executed
+
+	if res.LeaseID != nil {
+		for _, hook := range m.lifecycles {
+			err := hook.OnCapacityLeaseExtended(ctx, constraintapi.OnCapacityLeaseExtendedData{
+				AccountID:               req.AccountID,
+				EnvID:                   res.EnvID,
+				AppID:                   res.AppID,
+				FunctionID:              res.FunctionID,
+				Duration:                req.Duration,
+				OldLeaseID:              req.LeaseID,
+				NewLeaseID:              *res.LeaseID,
+				Usage:                   res.Usage,
+				OperationIdempotencyHit: res.OperationIdempotencyHit,
+			})
+			if err != nil {
+				return nil, errs.Wrap(0, false, "extend lifecycle failed: %w", err)
+			}
+		}
+	}
+
+	return &res, nil
+}
+
+// extend is the body of one ExtendLease.  it runs once per idempotency key.
+// an expired lease ID is rejected before any lookup, like extend.lua.
+func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.CapacityExtendLeaseRequest, extKey uint64) *constraintapi.CapacityExtendLeaseResponse {
+	res := &constraintapi.CapacityExtendLeaseResponse{AccountID: req.AccountID}
+
+	expiresAtMS, seq, nonce := decodeLeaseID(req.LeaseID)
+	if expiresAtMS < nowMS || nonce != m.nonce {
+		return res
+	}
+	sl := m.slab.get(seq)
+	if sl == nil || !sl.take() {
+		return res
+	}
+	rs := sl.req
+
+	newSeq, _ := m.slab.alloc(nowMS, leaseExpiryMS, rs)
+	m.expiry.add(leaseExpiryMS, newSeq)
+	if p := m.slab.page(seq); p != nil {
+		p.live.Add(-1)
+	}
+
+	newID := encodeLeaseID(leaseExpiryMS, newSeq, m.nonce)
+	res.LeaseID = &newID
+	res.EnvID = rs.envID
+	res.FunctionID = rs.functionID
+	res.AppID = rs.appID
+
+	m.extIdem.set(extKey, res, idemExpiry(nowMS, m.operationIdempotencyTTL))
+	return res
+}

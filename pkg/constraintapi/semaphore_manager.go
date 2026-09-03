@@ -11,7 +11,10 @@ import (
 )
 
 const (
-	semaphoreIdempotencyTTL = 60 * time.Second
+	// SemaphoreIdempotencyTTL is how long SetCapacity, AdjustCapacity and
+	// ReleaseSemaphore remember an idempotency key.  a replay inside this
+	// window returns the first result and changes nothing.
+	SemaphoreIdempotencyTTL = 60 * time.Second
 )
 
 // SetResult describes the outcome of SetCapacity. Applied is false when the
@@ -84,7 +87,7 @@ func (m *redisSemaphoreManager) SetCapacity(ctx context.Context, accountID uuid.
 	}
 	args := []string{
 		fmt.Sprintf("%d", capacity),
-		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
+		fmt.Sprintf("%d", int(SemaphoreIdempotencyTTL.Seconds())),
 	}
 
 	res, err := parseCapacityScriptResult(scripts["semaphore_set_capacity"].Exec(ctx, m.client, keys, args))
@@ -106,7 +109,7 @@ func (m *redisSemaphoreManager) AdjustCapacity(ctx context.Context, accountID uu
 	}
 	args := []string{
 		fmt.Sprintf("%d", delta),
-		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
+		fmt.Sprintf("%d", int(SemaphoreIdempotencyTTL.Seconds())),
 	}
 
 	res, err := parseCapacityScriptResult(scripts["semaphore_adjust_capacity"].Exec(ctx, m.client, keys, args))
@@ -176,7 +179,7 @@ func (m *redisSemaphoreManager) ReleaseSemaphore(ctx context.Context, accountID 
 	}
 	args := []string{
 		fmt.Sprintf("%d", weight),
-		fmt.Sprintf("%d", int(semaphoreIdempotencyTTL.Seconds())),
+		fmt.Sprintf("%d", int(SemaphoreIdempotencyTTL.Seconds())),
 	}
 
 	err := scripts["semaphore_release"].Exec(ctx, m.client, keys, args).Error()

@@ -257,6 +257,82 @@ type SerializedRateLimitConstraint struct {
 	Key string `json:"k,omitempty"`
 }
 
+// ConstraintLimits holds the configured limit for one constraint.  Period is
+// in nanoseconds for rate limits and milliseconds for throttles, the units the
+// GCRA arithmetic runs in.  every field is zero when the config has no entry
+// for the constraint, and zero for semaphores, whose capacity is not in the
+// config.
+type ConstraintLimits struct {
+	Limit  int
+	Burst  int
+	Period int
+}
+
+// ResolveLimits looks up the configured limit for the constraint.  every
+// backend must admit the same request under the same config, so this is the
+// only place a limit is read from a ConstraintConfig.
+func (ci ConstraintItem) ResolveLimits(config ConstraintConfig) ConstraintLimits {
+	var limits ConstraintLimits
+
+	switch ci.Kind {
+	case ConstraintKindRateLimit:
+		if ci.RateLimit == nil {
+			return limits
+		}
+		for _, rlConfig := range config.RateLimit {
+			if rlConfig.Scope == ci.RateLimit.Scope && rlConfig.KeyExpressionHash == ci.RateLimit.KeyExpressionHash {
+				limits.Limit = rlConfig.Limit
+				limits.Burst = int(rlConfig.Limit / 10)
+				limits.Period = int((time.Duration(rlConfig.Period) * time.Second).Nanoseconds())
+				break
+			}
+		}
+	case ConstraintKindConcurrency:
+		if ci.Concurrency == nil {
+			return limits
+		}
+		if ci.Concurrency.KeyExpressionHash != "" {
+			for _, customLimit := range config.Concurrency.CustomConcurrencyKeys {
+				if customLimit.Mode == ci.Concurrency.Mode &&
+					customLimit.Scope == ci.Concurrency.Scope &&
+					customLimit.KeyExpressionHash == ci.Concurrency.KeyExpressionHash {
+					limits.Limit = customLimit.Limit
+					break
+				}
+			}
+			return limits
+		}
+		switch ci.Concurrency.Scope {
+		case enums.ConcurrencyScopeFn:
+			if ci.Concurrency.Mode == enums.ConcurrencyModeStep {
+				limits.Limit = config.Concurrency.FunctionConcurrency
+			} else {
+				limits.Limit = config.Concurrency.FunctionRunConcurrency
+			}
+		case enums.ConcurrencyScopeAccount:
+			if ci.Concurrency.Mode == enums.ConcurrencyModeStep {
+				limits.Limit = config.Concurrency.AccountConcurrency
+			} else {
+				limits.Limit = config.Concurrency.AccountRunConcurrency
+			}
+		}
+	case ConstraintKindThrottle:
+		if ci.Throttle == nil {
+			return limits
+		}
+		for _, tConfig := range config.Throttle {
+			if tConfig.Scope == ci.Throttle.Scope && tConfig.KeyExpressionHash == ci.Throttle.KeyExpressionHash {
+				limits.Limit = tConfig.Limit
+				limits.Burst = tConfig.Burst
+				limits.Period = tConfig.Period * 1000
+				break
+			}
+		}
+	}
+
+	return limits
+}
+
 // ToSerializedConstraintItem converts a ConstraintItem to a SerializedConstraintItem
 // for efficient storage in Redis and easy consumption in Lua scripts.
 // The config parameter is used to embed matching configuration limits directly into the constraint.
@@ -280,16 +356,10 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				Key:               ci.RateLimit.StateKey(accountID, envID, functionID),
 			}
 
-			// Find matching rate limit config
-			for _, rlConfig := range config.RateLimit {
-				if rlConfig.Scope == ci.RateLimit.Scope && rlConfig.KeyExpressionHash == ci.RateLimit.KeyExpressionHash {
-					rateLimitConstraint.Limit = rlConfig.Limit
-					rateLimitConstraint.Burst = int(rlConfig.Limit / 10)
-					// Ensure rate limiting period is encoded as nanoseconds
-					rateLimitConstraint.Period = int((time.Duration(rlConfig.Period) * time.Second).Nanoseconds())
-					break
-				}
-			}
+			limits := ci.ResolveLimits(config)
+			rateLimitConstraint.Limit = limits.Limit
+			rateLimitConstraint.Burst = limits.Burst
+			rateLimitConstraint.Period = limits.Period
 
 			serialized.RateLimit = rateLimitConstraint
 		}
@@ -305,34 +375,7 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				RetryAfterMS:       int(ci.Concurrency.RetryAfter().Milliseconds()),
 			}
 
-			// Embed appropriate limit based on scope and mode
-			if ci.Concurrency.KeyExpressionHash != "" {
-				// Custom concurrency key - find matching custom limit
-				for _, customLimit := range config.Concurrency.CustomConcurrencyKeys {
-					if customLimit.Mode == ci.Concurrency.Mode &&
-						customLimit.Scope == ci.Concurrency.Scope &&
-						customLimit.KeyExpressionHash == ci.Concurrency.KeyExpressionHash {
-						concurrencyConstraint.Limit = customLimit.Limit
-						break
-					}
-				}
-			} else {
-				// Standard concurrency limits based on scope and mode
-				switch ci.Concurrency.Scope {
-				case 0: // Function scope
-					if ci.Concurrency.Mode == 0 { // Step mode
-						concurrencyConstraint.Limit = config.Concurrency.FunctionConcurrency
-					} else { // Run mode
-						concurrencyConstraint.Limit = config.Concurrency.FunctionRunConcurrency
-					}
-				case 2: // Account scope
-					if ci.Concurrency.Mode == 0 { // Step mode
-						concurrencyConstraint.Limit = config.Concurrency.AccountConcurrency
-					} else { // Run mode
-						concurrencyConstraint.Limit = config.Concurrency.AccountRunConcurrency
-					}
-				}
-			}
+			concurrencyConstraint.Limit = ci.ResolveLimits(config).Limit
 
 			serialized.Concurrency = concurrencyConstraint
 		}
@@ -346,15 +389,10 @@ func (ci ConstraintItem) ToSerializedConstraintItem(
 				Key:               ci.Throttle.StateKey(accountID, envID, functionID),
 			}
 
-			// Find matching throttle config
-			for _, tConfig := range config.Throttle {
-				if tConfig.Scope == ci.Throttle.Scope && tConfig.KeyExpressionHash == ci.Throttle.KeyExpressionHash {
-					throttleConstraint.Limit = tConfig.Limit
-					throttleConstraint.Burst = tConfig.Burst
-					throttleConstraint.Period = tConfig.Period * 1000 // Convert seconds to milliseconds
-					break
-				}
-			}
+			limits := ci.ResolveLimits(config)
+			throttleConstraint.Limit = limits.Limit
+			throttleConstraint.Burst = limits.Burst
+			throttleConstraint.Period = limits.Period
 
 			serialized.Throttle = throttleConstraint
 		}

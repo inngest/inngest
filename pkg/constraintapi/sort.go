@@ -6,6 +6,13 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 )
 
+// SortConstraints sorts constraints in place into the order every backend
+// evaluates them.  limiting and exhausted constraint indices in responses
+// refer to this order.
+func SortConstraints(constraints []ConstraintItem) {
+	sortConstraints(constraints)
+}
+
 // sortConstraints applies a stable in-place sort to the given constraint slice.
 // Sorting order:
 // 1. By constraint kind: Rate limit < Throttle < Concurrency 
