@@ -41,6 +41,8 @@ const (
 	ErrorFunctionDebounced = "function_debounced"
 	ErrorFunctionSkipped   = "function_skipped"
 	ErrorAppSyncFailed     = "app_sync_failed"
+	ErrorExpressionInvalid = "expression_invalid"
+	ErrorQueryTooLong      = "query_too_long"
 
 	// 404 Not Found errors
 	// ErrorNotFound is the generic not found error code used across multiple APIs.
