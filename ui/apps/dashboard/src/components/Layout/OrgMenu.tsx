@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +20,9 @@ import {
 } from '@remixicon/react';
 
 import type { FileRouteTypes } from '@/routeTree.gen';
+import { GetCurrentPlanDocument } from '@/gql/graphql';
 import type { ProfileDisplayType } from '@/queries/server/profile';
+import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { pathCreator } from '@/utils/urls';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
 import OrgAvatar from './OrgAvatar';
@@ -35,13 +39,23 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
   const { nextStep, lastCompletedStep } = useOnboardingStep();
   const orgName = profile.orgName ?? '';
 
+  // The top bar renders on every page, so hold the plan query until the menu is
+  // actually opened.
+  const [open, setOpen] = useState(false);
+  const { data, isLoading } = useSkippableGraphQLQuery({
+    query: GetCurrentPlanDocument,
+    variables: {},
+    skip: !open,
+  });
+  const planName = data?.account.plan?.name;
+
   const onboardingTo = pathCreator.onboardingSteps({
     step: nextStep ? nextStep.name : lastCompletedStep?.name,
     ref: 'app-org-menu-onboarding',
   });
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger className="text-basis hover:bg-canvasMuted flex h-8 cursor-pointer items-center gap-2 rounded px-2 text-sm leading-none ring-0">
         {children}
       </DropdownMenuTrigger>
@@ -49,12 +63,23 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
       <DropdownMenuContent className="w-[212px]">
         <DropdownMenuLabel className="flex items-center gap-2.5 p-2">
           <OrgAvatar profile={profile} size="lg" />
-          <span
-            className="text-basis min-w-0 truncate text-sm font-medium"
-            title={orgName}
-          >
-            {orgName}
-          </span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span
+              className="text-basis truncate text-sm font-medium"
+              title={orgName}
+            >
+              {orgName}
+            </span>
+            {isLoading ? (
+              <Skeleton className="h-3 w-16" />
+            ) : (
+              planName && (
+                <span className="text-muted truncate text-xs" title={planName}>
+                  {planName}
+                </span>
+              )
+            )}
+          </div>
         </DropdownMenuLabel>
 
         <DropdownMenuItem
