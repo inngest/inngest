@@ -9,7 +9,9 @@ package memory
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -18,7 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jonboulle/clockwork"
-	"golang.org/x/sync/singleflight"
+	"github.com/oklog/ulid/v2"
 )
 
 const (
@@ -31,6 +33,11 @@ const (
 	// housekeepEvery is the number of sweeps between idempotency map sweeps,
 	// page frees and cell deletes.
 	housekeepEvery = 50
+
+	// stripeCount is the number of operation locks.  two operations with the
+	// same idempotency key share a lock, so a retry sees the first result.
+	// unrelated keys share a lock one time in stripeCount.
+	stripeCount = 1024
 )
 
 var (
@@ -55,8 +62,8 @@ type Manager struct {
 
 	// sems maps a usage or capacity key to its counter.  gcra maps a rate
 	// limit or throttle state key to its TAT cell.
-	sems sync.Map
-	gcra sync.Map
+	sems sync.Map // cellKey -> *semaphoreCell
+	gcra sync.Map // cellKey -> *gcraCell
 
 	slab   slab
 	expiry *expiryIndex
@@ -67,10 +74,12 @@ type Manager struct {
 	checkIdem *ttlMap[struct{}]
 	semIdem   *ttlMap[int64]
 
-	flight singleflight.Group
+	locks [stripeCount]sync.Mutex
+	stats *stats
 
 	stop      chan struct{}
 	done      chan struct{}
+	wg        sync.WaitGroup
 	closeOnce sync.Once
 }
 
@@ -124,7 +133,7 @@ func WithSweepInterval(d time.Duration) Option {
 	return func(m *Manager) { m.sweepInterval = d }
 }
 
-// NewManager builds a Manager and starts its sweeper.
+// NewManager builds a Manager and starts its sweeper and metrics goroutines.
 func NewManager(opts ...Option) (*Manager, error) {
 	m := &Manager{
 		operationIdempotencyTTL:       constraintapi.OperationIdempotencyTTL,
@@ -155,18 +164,27 @@ func NewManager(opts ...Option) (*Manager, error) {
 	}
 	m.nonce = nonce
 	m.expiry = newExpiryIndex(m.nowMS())
+	m.stats = newStats(m.shardName)
 
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		m.stats.run(m.stop)
+	}()
 	if m.sweepInterval > 0 {
+		m.wg.Add(1)
 		go m.run()
-	} else {
-		close(m.done)
 	}
+	go func() {
+		m.wg.Wait()
+		close(m.done)
+	}()
 
 	return m, nil
 }
 
-// Close stops the sweeper and waits for it.  leases and counters stay in
-// memory until the Manager is garbage collected.
+// Close stops the sweeper and the metrics goroutine and waits for them.
+// leases and counters stay in memory until the Manager is garbage collected.
 func (m *Manager) Close() error {
 	m.closeOnce.Do(func() { close(m.stop) })
 	<-m.done
@@ -181,9 +199,62 @@ func (m *Manager) log(ctx context.Context) logger.Logger {
 	return logger.StdlibLogger(ctx).With("shard", m.shardName)
 }
 
+// lock takes the operation lock for a hashed idempotency key.
+func (m *Manager) lock(key uint64) *sync.Mutex {
+	mu := &m.locks[key%stripeCount]
+	mu.Lock()
+	return mu
+}
+
+// newRequestID is a fresh ULID at now.  request IDs identify a call in logs
+// and need no unpredictability, so the entropy comes from math/rand.
+func (m *Manager) newRequestID(now time.Time) ulid.ULID {
+	var id ulid.ULID
+	_ = id.SetTime(ulid.Timestamp(now))
+	binary.BigEndian.PutUint64(id[6:14], rand.Uint64())
+	binary.BigEndian.PutUint16(id[14:16], uint16(rand.Uint32()))
+	return id
+}
+
+// cellKey identifies one counter.  it is the 128 bit hash of the counter's
+// identity tuple, which is the same information the Redis key strings carry.
+// two hashes with different seeds make a collision between two live keys
+// practically impossible.
+type cellKey struct {
+	a, b uint64
+}
+
+const cellSeed = 0x9E3779B97F4A7C15
+
+func writeCellKey(d *xxhash.Digest, kind byte, accountID uuid.UUID, p1, p2 string) {
+	var n [8]byte
+	_, _ = d.Write([]byte{kind})
+	_, _ = d.Write(accountID[:])
+	binary.LittleEndian.PutUint64(n[:], uint64(len(p1)))
+	_, _ = d.Write(n[:])
+	_, _ = d.WriteString(p1)
+	_, _ = d.WriteString(p2)
+}
+
+func cellKeyOf(kind byte, accountID uuid.UUID, p1, p2 string) cellKey {
+	var d xxhash.Digest
+	d.Reset()
+	writeCellKey(&d, kind, accountID, p1, p2)
+	a := d.Sum64()
+	d.ResetWithSeed(cellSeed)
+	writeCellKey(&d, kind, accountID, p1, p2)
+	return cellKey{a: a, b: d.Sum64()}
+}
+
+// semaphoreCells returns the usage and capacity keys of one semaphore.
+// capacity is shared by every evaluated key of the semaphore, usage is not.
+func semaphoreCells(accountID uuid.UUID, id, evaluatedKeyHash string) (usage, capacity cellKey) {
+	return cellKeyOf('u', accountID, id, evaluatedKeyHash), cellKeyOf('c', accountID, id, "")
+}
+
 // sem returns the live counter for key, creating it on first use.  a dead
 // counter left behind by housekeeping is dropped and replaced.
-func (m *Manager) sem(key string) *semaphoreCell {
+func (m *Manager) sem(key cellKey) *semaphoreCell {
 	for {
 		v, ok := m.sems.Load(key)
 		if !ok {
@@ -198,7 +269,7 @@ func (m *Manager) sem(key string) *semaphoreCell {
 }
 
 // peekSem reads a counter without creating it.  unknown reads as zero.
-func (m *Manager) peekSem(key string) int64 {
+func (m *Manager) peekSem(key cellKey) int64 {
 	v, ok := m.sems.Load(key)
 	if !ok {
 		return 0
@@ -207,29 +278,55 @@ func (m *Manager) peekSem(key string) int64 {
 	return val
 }
 
-// hashKey is the idempotency map key for one operation.  the account ID is
-// part of the hash, so two accounts using the same key never collide, the
-// way Redis keys embed the account scope.
-func hashKey(accountID uuid.UUID, op string, parts ...string) uint64 {
-	var d xxhash.Digest
-	d.Reset()
-	_, _ = d.Write(accountID[:])
-	_, _ = d.WriteString(op)
-	for _, p := range parts {
-		_, _ = d.WriteString("\x00")
-		_, _ = d.WriteString(p)
-	}
-	return d.Sum64()
+// hasher builds an idempotency or fingerprint hash field by field.  every
+// variable length field is length prefixed so two field lists never hash the
+// same by lining up differently.
+type hasher struct {
+	d xxhash.Digest
 }
 
-// flightKey is the singleflight key for a hashed operation key.
-func flightKey(op byte, h uint64) string {
-	var b [9]byte
-	b[0] = op
-	for i := 0; i < 8; i++ {
-		b[1+i] = byte(h >> (8 * i))
-	}
-	return string(b[:])
+func (h *hasher) reset() {
+	h.d.Reset()
+}
+
+func (h *hasher) u64(v uint64) {
+	var b [8]byte
+	binary.LittleEndian.PutUint64(b[:], v)
+	_, _ = h.d.Write(b[:])
+}
+
+func (h *hasher) int(v int) {
+	h.u64(uint64(v))
+}
+
+func (h *hasher) str(s string) {
+	h.u64(uint64(len(s)))
+	_, _ = h.d.WriteString(s)
+}
+
+func (h *hasher) bytes(b []byte) {
+	h.u64(uint64(len(b)))
+	_, _ = h.d.Write(b)
+}
+
+func (h *hasher) uuid(u uuid.UUID) {
+	_, _ = h.d.Write(u[:])
+}
+
+func (h *hasher) sum() uint64 {
+	return h.d.Sum64()
+}
+
+// opKey is the idempotency map key for one operation.  the account ID is
+// part of the hash, so two accounts using the same key never collide, the
+// way Redis keys embed the account scope.
+func opKey(accountID uuid.UUID, op, key string) uint64 {
+	var h hasher
+	h.reset()
+	h.uuid(accountID)
+	h.str(op)
+	h.str(key)
+	return h.sum()
 }
 
 // idemExpiry is when an idempotency record set at nowMS with ttl is gone.

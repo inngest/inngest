@@ -19,6 +19,9 @@ func SortConstraints(constraints []ConstraintItem) {
 // 2. By scope: Account < Environment < Function
 // 3. By key expression hash: empty hash comes first
 func sortConstraints(constraints []ConstraintItem) {
+	if len(constraints) < 2 {
+		return
+	}
 	sort.SliceStable(constraints, func(i, j int) bool {
 		a, b := constraints[i], constraints[j]
 		

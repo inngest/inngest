@@ -5,8 +5,11 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/constraintapi"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 )
+
+// pageFreeGrace is how long a slab page must stay without live slots before
+// housekeeping frees it.
+const pageFreeGrace = 5 * time.Second
 
 // Scavenge releases every expired lease through Release with the scavenger
 // lease source, so hooks, metrics and forced semaphore release behave as they
@@ -22,14 +25,16 @@ func (m *Manager) Scavenge(ctx context.Context) (int, error) {
 		if sl == nil {
 			return
 		}
+		rs := sl.req.Load()
+		if rs == nil {
+			// taken by a release between get and here
+			return
+		}
 		expired++
 		leaseID := encodeLeaseID(sl.expiresAtMS, seq, m.nonce)
-		accountID := sl.req.accountID
+		accountID := rs.accountID
 
-		metrics.HistogramConstraintAPIScavengerLeaseAge(ctx, now.Sub(time.UnixMilli(sl.expiresAtMS)), metrics.HistogramOpt{
-			PkgName: pkgName,
-			Tags:    map[string]any{"shard": m.shardName},
-		})
+		m.stats.record(metricEvent{kind: histLeaseAge, value: now.Sub(time.UnixMilli(sl.expiresAtMS))})
 
 		_, released, err := m.doRelease(ctx, &constraintapi.CapacityReleaseRequest{
 			IdempotencyKey: leaseID.String(),
@@ -77,7 +82,7 @@ func (m *Manager) housekeep(nowMS int64) {
 	m.checkIdem.sweep(nowMS)
 	m.semIdem.sweep(nowMS)
 
-	m.slab.freePages(nowMS, constraintapi.MaximumLeaseLifetime.Milliseconds())
+	m.slab.freePages(nowMS, pageFreeGrace.Milliseconds())
 
 	m.sems.Range(func(k, v any) bool {
 		if v.(*semaphoreCell).kill() {
@@ -96,7 +101,7 @@ func (m *Manager) housekeep(nowMS int64) {
 // run is the sweeper goroutine.  every tick reclaims expired leases and
 // every housekeepEvery ticks it also runs housekeep.
 func (m *Manager) run() {
-	defer close(m.done)
+	defer m.wg.Done()
 	ticker := m.clock.NewTicker(m.sweepInterval)
 	defer ticker.Stop()
 

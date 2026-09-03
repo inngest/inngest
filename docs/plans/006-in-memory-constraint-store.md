@@ -401,13 +401,59 @@ lookup, CAS, atomics; no hashing).  A benchmark with `-cpu 16` on one hot key as
 below 50µs as a regression guard.  Reference: today's Lua acquire is 50–200µs plus a
 network hop, serialized on one Valkey thread.
 
+### Measured (semaphore acquire, Valkey 8 in Docker vs memory, Apple Silicon)
+
+`go test ./pkg/constraintapi/memory/ -run '^$' -bench 'Acquire.*/semaphore/' -benchmem -cpu 1,8`
+with `CONSTRAINT_BENCH_REDIS_ADDR` pointing at Valkey:
+
+| | Valkey 1 CPU | memory 1 CPU | Valkey 8 CPUs | memory 8 CPUs |
+|---|---|---|---|---|
+| mean per op | 169µs | 2.4µs | 53µs | 0.52µs |
+| p50 | 166µs | 1.0µs | 419µs | 2.1µs |
+| p99 | 231µs | 4.3µs | 695µs | 25µs |
+| allocs per op | 290 / 21 KB | 15 / 2 KB | 290 / 21 KB | 13 / 2 KB |
+
+`BenchmarkBatch` (`-benchtime=1x -cpu 8`): one goroutine per request, all released at once.
+
+| batch | Valkey wall | memory wall | Valkey req/s | memory req/s | Valkey p99 | memory p99 |
+|---|---|---|---|---|---|---|
+| 10,000 | 293ms | 6.2ms | 34k | 1.6M | 289ms | 1.1ms |
+| 100,000 | 3.46s | 60ms | 29k | 1.7M | 3.06s | 17ms |
+
+What got the hot path there, in order of payoff:
+
+1. **Metrics off the hot path** (`stats.go`).  Every metrics call built a tag map, reflected
+   over it, sorted an attribute set and formatted the metric name: half the allocated bytes
+   and a fifth of CPU.  Counters are now atomics flushed once a second as one call per
+   series.  Histogram observations are appended to one of 16 mutex protected buffers and
+   recorded by one goroutine every 100ms through `metrics.PreparedHistogram`, a small
+   addition to `pkg/telemetry/metrics` that binds an instrument to one attribute set so
+   recording allocates nothing.  Values are exact, at most a second late; a full buffer
+   drops and logs the count.
+2. **Cells keyed by a 128 bit hash** of the identity tuple instead of the `Sprintf` key
+   strings, two xxhash passes with different seeds.  No key strings are built anywhere.
+3. **Fingerprint hashed field by field** into xxhash, no JSON, no
+   `ToSerializedConstraintItem`.
+4. **Striped mutexes per idempotency key** instead of `singleflight`.  A retry waits for the
+   first call and replays its record.  This also matches Redis for rejected requests, which
+   `singleflight` shared but Redis recomputes.
+5. **Slot owners clear `req`** and **pages are freed once empty for 5s** (two housekeeping
+   sightings) instead of 3h after creation, with 8k slot pages.  Before, a taken slot pinned
+   its request state for the life of the page, so the live heap and every GC cycle grew
+   with the allocation rate.
+6. Request IDs from `math/rand/v2`, no closures or per call slices in the acquire body.
+
+Remaining cost is allocation: ~1 KB per acquire is structural (response, request state,
+resolved constraints, result, leases) and the rest is idempotency map growth.  Interning
+constraint sets (below) is the next step down.
+
 Memory per lease (3-constraint request, `Amount = 1`):
 
 | Structure | Bytes | Lifetime |
 |---|---|---|
-| slab slot | 24 | lease |
+| slab slot | 24 | lease, the page is freed 5s after its last slot is taken |
 | expiry bucket entry | 8 | until the bucket's second passes |
-| `requestState` (shared by the request's leases) | ~1,000 | until all its leases release; `[]ConstraintItem` and the three ~100 B usage key strings dominate |
+| `requestState` (shared by the request's leases) | ~450 | until all its leases release; `[]resolvedConstraint` dominates, keys are 16 B hashes |
 | `checkIdem` entries (1 + Amount) | 2 × ~40 | 5 min |
 | `opIdem` entry (full response) | ~500 | 5 s |
 | constraint cells | ~200 per distinct key | until zero |
@@ -492,8 +538,9 @@ tests in place and red.
    `concurrency_race_test.go:338`), hooks fired once per reclaimed lease; a test drives
    time past all TTLs and asserts pages, cells, buckets and maps return to empty.
 - [ ] 9. `memory/check.go`.  Conformance for rate limit/throttle/concurrency `Check`.
-- [ ] 10. `memory/race_test.go` (`-race`) (written and green for semaphores; benchmark written,
-    p99 guard behind `CONSTRAINT_BENCH_GUARD`, real Valkey via `CONSTRAINT_BENCH_REDIS_ADDR`): N goroutines across M accounts and K shared keys
+- [ ] 10. `memory/race_test.go` (`-race`) (written and green for semaphores; `BenchmarkAcquire`,
+    `BenchmarkAcquireRelease` and `BenchmarkBatch` written and measured, p99 guard behind
+    `CONSTRAINT_BENCH_GUARD`, real Valkey via `CONSTRAINT_BENCH_REDIS_ADDR`): N goroutines across M accounts and K shared keys
     acquiring, extending, releasing with the sweeper running; invariants: usage == live
     lease count after a final scavenge, no negative counters, atomic high-water mark never
     exceeds the limit, concurrent identical idempotent requests receive identical leases

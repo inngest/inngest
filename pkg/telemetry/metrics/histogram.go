@@ -432,15 +432,25 @@ func HistogramConstraintAPIScavengerShardProcessDuration(ctx context.Context, du
 	})
 }
 
-func HistogramConstraintAPIScavengerLeaseAge(ctx context.Context, age time.Duration, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, age.Milliseconds(), HistogramOpt{
+func histogramConstraintAPIScavengerLeaseAgeOpts(opts HistogramOpt) HistogramOpt {
+	return HistogramOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_scavenger_shard_lease_age",
 		Description: "Distribution of scavenger expired lease age",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  DefaultBoundaries,
-	})
+	}
+}
+
+func HistogramConstraintAPIScavengerLeaseAge(ctx context.Context, age time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, age.Milliseconds(), histogramConstraintAPIScavengerLeaseAgeOpts(opts))
+}
+
+// PrepareConstraintAPIScavengerLeaseAge binds the histogram to opts.Tags once.  see
+// PreparedHistogram.
+func PrepareConstraintAPIScavengerLeaseAge(ctx context.Context, opts HistogramOpt) (*PreparedHistogram, error) {
+	return PrepareHistogram(ctx, histogramConstraintAPIScavengerLeaseAgeOpts(opts))
 }
 
 func HistogramCheckpointStartLatency(ctx context.Context, age time.Duration, typ string, opts HistogramOpt) {
@@ -565,26 +575,46 @@ func HistogramConstraintAPILuaScriptDuration(ctx context.Context, duration time.
 	})
 }
 
-func HistogramConstraintAPIRequestLatency(ctx context.Context, latency time.Duration, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, latency.Milliseconds(), HistogramOpt{
+func histogramConstraintAPIRequestLatencyOpts(opts HistogramOpt) HistogramOpt {
+	return HistogramOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_request_latency",
 		Description: "Distribution of request latency",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  ConstraintAPIDurationBoundaries,
-	})
+	}
 }
 
-func HistogramConstraintAPIRetryAfterDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+func HistogramConstraintAPIRequestLatency(ctx context.Context, latency time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, latency.Milliseconds(), histogramConstraintAPIRequestLatencyOpts(opts))
+}
+
+// PrepareConstraintAPIRequestLatency binds the histogram to opts.Tags once.  see
+// PreparedHistogram.
+func PrepareConstraintAPIRequestLatency(ctx context.Context, opts HistogramOpt) (*PreparedHistogram, error) {
+	return PrepareHistogram(ctx, histogramConstraintAPIRequestLatencyOpts(opts))
+}
+
+func histogramConstraintAPIRetryAfterDurationOpts(opts HistogramOpt) HistogramOpt {
+	return HistogramOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_retry_after_duration",
 		Description: "Distribution of retry after values",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  ConstraintAPIDurationBoundaries,
-	})
+	}
+}
+
+func HistogramConstraintAPIRetryAfterDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), histogramConstraintAPIRetryAfterDurationOpts(opts))
+}
+
+// PrepareConstraintAPIRetryAfterDuration binds the histogram to opts.Tags once.  see
+// PreparedHistogram.
+func PrepareConstraintAPIRetryAfterDuration(ctx context.Context, opts HistogramOpt) (*PreparedHistogram, error) {
+	return PrepareHistogram(ctx, histogramConstraintAPIRetryAfterDurationOpts(opts))
 }
 
 func HistogramConstraintAPILimitingConstraintCacheTTL(ctx context.Context, ttl time.Duration, opts HistogramOpt) {
@@ -666,15 +696,25 @@ func HistogramStateWrittenCounter(ctx context.Context, bytes int64, opts Histogr
 	})
 }
 
-func HistogramConstraintAPISemaphoreDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, dur.Milliseconds(), HistogramOpt{
+func histogramConstraintAPISemaphoreDurationOpts(opts HistogramOpt) HistogramOpt {
+	return HistogramOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "constraintapi_semaphore_duration",
 		Description: "Distribution of semaphore manager operation duration",
 		Tags:        opts.Tags,
 		Unit:        "ms",
 		Boundaries:  ConstraintAPIDurationBoundaries,
-	})
+	}
+}
+
+func HistogramConstraintAPISemaphoreDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur.Milliseconds(), histogramConstraintAPISemaphoreDurationOpts(opts))
+}
+
+// PrepareConstraintAPISemaphoreDuration binds the histogram to opts.Tags once.  see
+// PreparedHistogram.
+func PrepareConstraintAPISemaphoreDuration(ctx context.Context, opts HistogramOpt) (*PreparedHistogram, error) {
+	return PrepareHistogram(ctx, histogramConstraintAPISemaphoreDurationOpts(opts))
 }
 
 func HistogramDefersLoadDuration(ctx context.Context, dur time.Duration, opts HistogramOpt) {

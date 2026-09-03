@@ -82,6 +82,9 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	require.NoError(t, err)
 	clock.Advance(constraintapi.SemaphoreIdempotencyTTL + time.Second)
 
+	// the first round stamps empty pages, the second frees them
+	m.housekeep(m.nowMS())
+	clock.Advance(pageFreeGrace + time.Second)
 	m.housekeep(m.nowMS())
 
 	require.Zero(t, m.acqIdem.len())

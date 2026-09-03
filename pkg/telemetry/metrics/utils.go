@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"go.opentelemetry.io/otel"
@@ -240,6 +241,38 @@ func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOp
 		attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
 	}
 	h.Record(ctx, value, metric.WithAttributes(attrs...))
+}
+
+// PreparedHistogram is a histogram bound to one attribute set.  a hot path
+// records through it without building a metric name, tags or attributes on
+// every call.  build one per distinct tag set and keep it.
+type PreparedHistogram struct {
+	h   metric.Int64Histogram
+	opt metric.RecordOption
+}
+
+// PrepareHistogram resolves the instrument and the attribute set for opts.
+func PrepareHistogram(ctx context.Context, opts HistogramOpt) (*PreparedHistogram, error) {
+	h, err := registry.getHistogram(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	attrs := []attribute.KeyValue{}
+	if opts.Tags != nil {
+		attrs = parseAttributes(ctx, opts.Tags)
+	}
+	return &PreparedHistogram{h: h, opt: metric.WithAttributeSet(attribute.NewSet(attrs...))}, nil
+}
+
+// Record records one observation.
+func (p *PreparedHistogram) Record(ctx context.Context, value int64) {
+	p.h.Record(ctx, value, p.opt)
+}
+
+// RecordDuration records a duration in milliseconds, the unit every duration
+// histogram in this package uses.
+func (p *PreparedHistogram) RecordDuration(ctx context.Context, d time.Duration) {
+	p.Record(ctx, d.Milliseconds())
 }
 
 // ========================

@@ -16,7 +16,7 @@ func TestSlabAllocAndGet(t *testing.T) {
 	require.Equal(t, uint64(1), seq1, "seq starts at one so a zero ULID never matches")
 	require.NotNil(t, sl1)
 	require.Equal(t, int64(5_000), sl1.expiresAtMS)
-	require.Same(t, rs, sl1.req)
+	require.Same(t, rs, sl1.req.Load())
 
 	seq2, _ := s.alloc(10, 6_000, rs)
 	require.Equal(t, uint64(2), seq2)
@@ -56,7 +56,7 @@ func TestSlotTakeExactlyOnce(t *testing.T) {
 
 func TestSlabFreePages(t *testing.T) {
 	var s slab
-	const maxLifetime = int64(3 * 60 * 60 * 1_000)
+	const grace = int64(5_000)
 
 	first, firstSlot := s.alloc(0, 1_000, &requestState{})
 	// fill the rest of page zero and step into page one
@@ -69,21 +69,29 @@ func TestSlabFreePages(t *testing.T) {
 	require.Equal(t, uint64(pageSize+1), current)
 	require.Equal(t, 2, s.pageCount())
 
-	require.Equal(t, 0, s.freePages(maxLifetime+1, maxLifetime), "page zero still has a live slot")
+	require.Equal(t, 0, s.freePages(10_000, grace), "page zero still has a live slot")
 	require.NotNil(t, s.get(first))
 
 	require.True(t, firstSlot.take())
 	s.page(first).live.Add(-1)
-	require.Equal(t, 0, s.freePages(maxLifetime, maxLifetime), "not old enough yet")
-	require.Equal(t, 1, s.freePages(maxLifetime+1, maxLifetime))
+	require.Equal(t, 0, s.freePages(20_000, grace), "the first empty sighting only stamps the page")
+	require.Equal(t, 0, s.freePages(20_000+grace, grace), "not empty for long enough yet")
+
+	// a slot going live again resets the stamp
+	s.page(first).live.Add(1)
+	require.Equal(t, 0, s.freePages(20_000+grace+1, grace))
+	s.page(first).live.Add(-1)
+	require.Equal(t, 0, s.freePages(30_000, grace), "stamped again")
+	require.Equal(t, 1, s.freePages(30_000+grace+1, grace))
 	require.Equal(t, 1, s.pageCount())
 	require.Nil(t, s.page(first))
 	require.Nil(t, s.get(first), "a freed page reads as no lease")
 
-	// the current allocation page is never freed, even when idle and old
+	// the current allocation page is never freed, even when idle and empty
 	cur := s.page(current)
 	require.True(t, s.get(current).take())
 	cur.live.Add(-1)
-	require.Equal(t, 0, s.freePages(10*maxLifetime, maxLifetime))
+	require.Equal(t, 0, s.freePages(1<<40, grace))
+	require.Equal(t, 0, s.freePages(1<<41, grace))
 	require.Equal(t, 1, s.pageCount())
 }

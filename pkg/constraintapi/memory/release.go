@@ -7,14 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/util/errs"
 )
 
-type flightRelease struct {
-	res      *constraintapi.CapacityReleaseResponse
-	replayed bool
-	// released is true when this flight took the slot and gave its counters
-	// back.  a replay or a no-op leaves it false.
-	released bool
-}
-
 // Release implements constraintapi.CapacityManager.  it is idempotent by
 // lease ID and never errors for an unknown lease.
 func (m *Manager) Release(ctx context.Context, req *constraintapi.CapacityReleaseRequest) (*constraintapi.CapacityReleaseResponse, errs.InternalError) {
@@ -30,21 +22,18 @@ func (m *Manager) doRelease(ctx context.Context, req *constraintapi.CapacityRele
 	}
 
 	nowMS := m.nowMS()
-	relKey := hashKey(req.AccountID, "rel", req.IdempotencyKey)
+	relKey := opKey(req.AccountID, "rel", req.IdempotencyKey)
 
-	executed := false
-	v, _, _ := m.flight.Do(flightKey('r', relKey), func() (any, error) {
-		executed = true
-		if r, ok := m.relIdem.get(nowMS, relKey); ok {
-			return flightRelease{res: r, replayed: true}, nil
-		}
-		res, released := m.release(nowMS, req, relKey)
-		return flightRelease{res: res, released: released}, nil
-	})
-	fr := v.(flightRelease)
+	mu := m.lock(relKey)
+	cached, hit := m.relIdem.get(nowMS, relKey)
+	var released bool
+	if !hit {
+		cached, released = m.release(nowMS, req, relKey)
+	}
+	mu.Unlock()
 
-	res := *fr.res
-	res.OperationIdempotencyHit = fr.replayed || !executed
+	res := *cached
+	res.OperationIdempotencyHit = hit
 
 	for _, hook := range m.lifecycles {
 		err := hook.OnCapacityLeaseReleased(ctx, constraintapi.OnCapacityLeaseReleasedData{
@@ -61,7 +50,7 @@ func (m *Manager) doRelease(ctx context.Context, req *constraintapi.CapacityRele
 		}
 	}
 
-	return &res, fr.released && executed, nil
+	return &res, released, nil
 }
 
 // release is the body of one Release.  it runs once per idempotency key.
@@ -78,14 +67,15 @@ func (m *Manager) release(nowMS int64, req *constraintapi.CapacityReleaseRequest
 	if sl == nil || !sl.take() {
 		return res, false
 	}
-	rs := sl.req
+	rs := sl.req.Load()
 
 	// the sweeper reclaims a lease whose holder is gone, so a manual release
 	// semaphore is given back too.  holding it would block every later run.
 	force := req.Source.Location == constraintapi.CallerLocationLeaseScavenge
 
 	var usage []constraintapi.ConstraintUsage
-	for _, rc := range rs.constraints {
+	for i := range rs.constraints {
+		rc := &rs.constraints[i]
 		switch rc.item.Kind {
 		case constraintapi.ConstraintKindSemaphore:
 			if rc.release == constraintapi.SemaphoreReleaseAuto || force {
@@ -95,6 +85,7 @@ func (m *Manager) release(nowMS int64, req *constraintapi.CapacityReleaseRequest
 	}
 
 	rs.active.Add(-1)
+	sl.req.Store(nil)
 	if p := m.slab.page(seq); p != nil {
 		p.live.Add(-1)
 	}

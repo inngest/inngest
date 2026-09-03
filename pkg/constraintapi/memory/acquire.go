@@ -2,18 +2,13 @@ package memory
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/json"
-	"strconv"
+	"sort"
 	"sync/atomic"
 	"time"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util/errs"
-	"github.com/oklog/ulid/v2"
 )
 
 // requestState is shared by every lease one Acquire granted.  slots point at
@@ -27,7 +22,7 @@ type requestState struct {
 
 	// constraints is the request's constraint list in evaluation order, with
 	// the counter for each already resolved.
-	constraints []*resolvedConstraint
+	constraints []resolvedConstraint
 
 	configVersion   int
 	requestedAmount int
@@ -48,11 +43,11 @@ type resolvedConstraint struct {
 	limits constraintapi.ConstraintLimits
 
 	// usage is the in progress counter for concurrency and semaphores.
-	usageKey string
+	usageKey cellKey
 	usage    atomic.Pointer[semaphoreCell]
 
 	// capacity is the semaphore capacity counter.  unset for other kinds.
-	capacityKey string
+	capacityKey cellKey
 	capacity    atomic.Pointer[semaphoreCell]
 
 	// weight is the semaphore weight, at least 1.
@@ -62,7 +57,7 @@ type resolvedConstraint struct {
 }
 
 // acquireResult is the immutable outcome one Acquire computed.  every caller
-// sharing the flight or replaying it builds its own response from this.
+// replaying it builds its own response from this.
 type acquireResult struct {
 	status               int
 	requested            int
@@ -74,30 +69,11 @@ type acquireResult struct {
 	retryAtMS            int64
 }
 
-type flightAcquire struct {
-	res      *acquireResult
-	replayed bool
-}
-
-// fingerprint is hashed into the acquire idempotency key so a retry with a
-// different configuration or constraint set is a new request.
-type fingerprint struct {
-	IdempotencyKey string                                   `json:"k"`
-	EnvID          uuid.UUID                                `json:"e"`
-	FunctionID     uuid.UUID                                `json:"f"`
-	AppID          uuid.UUID                                `json:"ai"`
-	Constraints    []constraintapi.SerializedConstraintItem `json:"s"`
-	ConfigVersion  int                                      `json:"cv"`
-	Requested      int                                      `json:"r"`
-	MaxLifetimeMS  int64                                    `json:"l"`
-	LeaseKeys      []string                                 `json:"lik"`
-	RunIDs         map[string]ulid.ULID                     `json:"lri,omitempty"`
-	Source         constraintapi.LeaseSource                `json:"m"`
-}
-
 // resolve sorts the request's constraints in place, looks up their counters
-// and limits, and hashes the request fingerprint.
-func (m *Manager) resolve(req *constraintapi.CapacityAcquireRequest) (*requestState, string, errs.InternalError) {
+// and limits, and returns the acquire idempotency key.  the key covers the
+// request fingerprint, so a retry with a different configuration or
+// constraint set is a new request.
+func (m *Manager) resolve(req *constraintapi.CapacityAcquireRequest) (*requestState, uint64, errs.InternalError) {
 	constraintapi.SortConstraints(req.Constraints)
 
 	rs := &requestState{
@@ -105,32 +81,64 @@ func (m *Manager) resolve(req *constraintapi.CapacityAcquireRequest) (*requestSt
 		envID:           req.EnvID,
 		functionID:      req.FunctionID,
 		appID:           req.AppID,
-		constraints:     make([]*resolvedConstraint, 0, len(req.Constraints)),
+		constraints:     make([]resolvedConstraint, len(req.Constraints)),
 		configVersion:   req.Configuration.FunctionVersion,
 		requestedAmount: req.Amount,
 		maximumLifetime: req.MaximumLifetime,
 		source:          req.Source,
 	}
-	fp := fingerprint{
-		IdempotencyKey: req.IdempotencyKey,
-		EnvID:          req.EnvID,
-		FunctionID:     req.FunctionID,
-		AppID:          req.AppID,
-		Constraints:    make([]constraintapi.SerializedConstraintItem, 0, len(req.Constraints)),
-		ConfigVersion:  req.Configuration.FunctionVersion,
-		Requested:      req.Amount,
-		MaxLifetimeMS:  req.MaximumLifetime.Milliseconds(),
-		LeaseKeys:      req.LeaseIdempotencyKeys,
-		RunIDs:         req.LeaseRunIDs,
-		Source:         req.Source,
+
+	var h hasher
+	h.reset()
+	h.uuid(req.AccountID)
+	h.str("acq")
+	h.str(req.IdempotencyKey)
+	h.uuid(req.EnvID)
+	h.uuid(req.FunctionID)
+	h.uuid(req.AppID)
+	h.int(req.Configuration.FunctionVersion)
+	h.int(req.Amount)
+	h.u64(uint64(req.MaximumLifetime.Milliseconds()))
+	h.int(int(req.Source.Service))
+	h.int(int(req.Source.Location))
+	h.int(int(req.Source.RunProcessingMode))
+	h.int(len(req.LeaseIdempotencyKeys))
+	for _, k := range req.LeaseIdempotencyKeys {
+		h.str(k)
+	}
+	h.int(len(req.LeaseRunIDs))
+	switch len(req.LeaseRunIDs) {
+	case 0:
+	case 1:
+		for k, v := range req.LeaseRunIDs {
+			h.str(k)
+			h.bytes(v[:])
+		}
+	default:
+		keys := make([]string, 0, len(req.LeaseRunIDs))
+		for k := range req.LeaseRunIDs {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := req.LeaseRunIDs[k]
+			h.str(k)
+			h.bytes(v[:])
+		}
 	}
 
-	for _, ci := range req.Constraints {
-		rc := &resolvedConstraint{item: ci, limits: ci.ResolveLimits(req.Configuration)}
+	for i, ci := range req.Constraints {
+		rc := &rs.constraints[i]
+		rc.item = ci
+		rc.limits = ci.ResolveLimits(req.Configuration)
+		h.str(string(ci.Kind))
+		h.int(rc.limits.Limit)
+		h.int(rc.limits.Burst)
+		h.int(rc.limits.Period)
+
 		switch ci.Kind {
 		case constraintapi.ConstraintKindSemaphore:
-			rc.usageKey = ci.Semaphore.UsageKey(req.AccountID)
-			rc.capacityKey = ci.Semaphore.CapacityKey(req.AccountID)
+			rc.usageKey, rc.capacityKey = semaphoreCells(req.AccountID, ci.Semaphore.ID, ci.Semaphore.EvaluatedKeyHash)
 			rc.weight = ci.Semaphore.Weight
 			if rc.weight <= 0 {
 				rc.weight = 1
@@ -138,65 +146,46 @@ func (m *Manager) resolve(req *constraintapi.CapacityAcquireRequest) (*requestSt
 			rc.release = ci.Semaphore.Release
 			rc.usage.Store(m.sem(rc.usageKey))
 			rc.capacity.Store(m.sem(rc.capacityKey))
+			h.str(ci.Semaphore.ID)
+			h.str(ci.Semaphore.EvaluatedKeyHash)
+			h.u64(uint64(rc.weight))
+			h.int(int(rc.release))
 		default:
-			return nil, "", errs.Wrap(0, false, "constraint kind %q is not implemented in the memory store", ci.Kind)
+			return nil, 0, errs.Wrap(0, false, "constraint kind %q is not implemented in the memory store", ci.Kind)
 		}
-		rs.constraints = append(rs.constraints, rc)
-		fp.Constraints = append(fp.Constraints, ci.ToSerializedConstraintItem(req.Configuration, req.AccountID, req.EnvID, req.FunctionID))
 	}
 
-	b, err := json.Marshal(fp)
-	if err != nil {
-		return nil, "", errs.Wrap(0, false, "could not fingerprint request: %w", err)
-	}
-	return rs, strconv.FormatUint(xxhash.Sum64(b), 16), nil
+	return rs, h.sum(), nil
 }
 
 // Acquire implements constraintapi.CapacityManager.
 func (m *Manager) Acquire(ctx context.Context, req *constraintapi.CapacityAcquireRequest) (*constraintapi.CapacityAcquireResponse, errs.InternalError) {
-	requestID, err := ulid.New(ulid.Timestamp(m.clock.Now()), rand.Reader)
-	if err != nil {
-		return nil, errs.Wrap(0, false, "could not generate request ID: %w", err)
-	}
 	if err := req.Valid(); err != nil {
 		return nil, errs.Wrap(0, false, "invalid request: %w", err)
 	}
 
 	now := m.clock.Now()
 	nowMS := now.UnixMilli()
+	requestID := m.newRequestID(now)
 
-	metrics.HistogramConstraintAPIRequestLatency(ctx, now.Sub(req.CurrentTime), metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"operation": "acquire",
-			"attempt":   req.RequestAttempt,
-			"shard":     m.shardName,
-		},
-	})
+	m.stats.record(metricEvent{kind: histRequestLatency, value: now.Sub(req.CurrentTime), attempt: req.RequestAttempt})
 
-	highCardinality := m.enableHighCardinalityInstrumentation != nil && m.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID)
 	leaseExpiryMS := now.Add(req.Duration).UnixMilli()
 
-	rs, fp, ierr := m.resolve(req)
+	rs, acqKey, ierr := m.resolve(req)
 	if ierr != nil {
 		return nil, ierr
 	}
-	acqKey := hashKey(req.AccountID, "acq", req.IdempotencyKey, fp)
 
-	// only the caller whose closure runs performed the operation.  every
-	// other caller in the flight, and every replay, reports an idempotency hit
-	// the way a second Lua call does.
-	executed := false
-	v, _, _ := m.flight.Do(flightKey('a', acqKey), func() (any, error) {
-		executed = true
-		if r, ok := m.acqIdem.get(nowMS, acqKey); ok {
-			return flightAcquire{res: r, replayed: true}, nil
-		}
-		return flightAcquire{res: m.acquire(nowMS, leaseExpiryMS, req, rs, acqKey)}, nil
-	})
-	fa := v.(flightAcquire)
-	res := fa.res
-	hit := fa.replayed || !executed
+	// the lock serializes callers with the same idempotency key.  the first
+	// one performs the acquire and every later one replays its result, the
+	// way a second Lua call finds the first call's record.
+	mu := m.lock(acqKey)
+	res, hit := m.acqIdem.get(nowMS, acqKey)
+	if !hit {
+		res = m.acquire(nowMS, leaseExpiryMS, req, rs, acqKey)
+	}
+	mu.Unlock()
 
 	leases := make([]constraintapi.CapacityLease, len(res.leases))
 	copy(leases, res.leases)
@@ -205,11 +194,7 @@ func (m *Manager) Acquire(ctx context.Context, req *constraintapi.CapacityAcquir
 	if retryAfter.Before(now) {
 		retryAfter = time.Time{}
 	}
-
-	metrics.HistogramConstraintAPIRetryAfterDuration(ctx, max(retryAfter.Sub(now), 0), metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags:    m.sourceTags(req.Source),
-	})
+	m.stats.record(metricEvent{kind: histRetryAfter, value: max(retryAfter.Sub(now), 0), source: req.Source})
 
 	for _, hook := range m.lifecycles {
 		err := hook.OnCapacityLeaseAcquired(ctx, constraintapi.OnCapacityLeaseAcquiredData{
@@ -234,29 +219,11 @@ func (m *Manager) Acquire(ctx context.Context, req *constraintapi.CapacityAcquir
 		}
 	}
 
-	tags := map[string]any{"shard": m.shardName}
-	if highCardinality {
-		tags["function_id"] = req.FunctionID
+	fn := uuid.Nil
+	if m.enableHighCardinalityInstrumentation != nil && m.enableHighCardinalityInstrumentation(ctx, req.AccountID, req.EnvID, req.FunctionID) {
+		fn = req.FunctionID
 	}
-	metrics.IncrConstraintAPILeasesRequestedCounter(ctx, int64(res.requested), metrics.CounterOpt{PkgName: "constraintapi", Tags: tags})
-	metrics.IncrConstraintAPILeasesGrantedCounter(ctx, int64(res.granted), metrics.CounterOpt{PkgName: "constraintapi", Tags: tags})
-	for _, constraint := range res.limitingConstraints {
-		tags["limiting_constraint"] = constraint.MetricsIdentifier()
-		metrics.IncrConstraintAPILimitingConstraintsCounter(ctx, metrics.CounterOpt{PkgName: "constraintapi", Tags: tags})
-	}
-	delete(tags, "limiting_constraint")
-	for _, constraint := range res.exhaustedConstraints {
-		tags["constraint"] = constraint.MetricsIdentifier()
-		metrics.IncrConstraintAPIExhaustedConstraintsCounter(ctx, metrics.CounterOpt{PkgName: "constraintapi", Tags: tags})
-	}
-	delete(tags, "constraint")
-
-	if res.status == 3 {
-		metrics.IncrConstraintAPIIssuedLeaseCounter(ctx, int64(len(leases)), metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags:    m.sourceTags(req.Source),
-		})
-	}
+	m.stats.acquired(fn, res, req.Source)
 
 	return &constraintapi.CapacityAcquireResponse{
 		RequestID:               requestID,
@@ -269,12 +236,34 @@ func (m *Manager) Acquire(ctx context.Context, req *constraintapi.CapacityAcquir
 	}, nil
 }
 
-func (m *Manager) sourceTags(source constraintapi.LeaseSource) map[string]any {
-	return map[string]any{
-		"location":            source.Location.String(),
-		"service":             source.Service.String(),
-		"run_processing_mode": source.RunProcessingMode.String(),
-		"shard":               m.shardName,
+// acquireState collects the limiting and exhausted indices of one acquire.
+// requests hold at most constraintapi.MaxConstraints constraints, which
+// Valid enforces, so fixed arrays are enough.
+type acquireState struct {
+	limiting     [constraintapi.MaxConstraints]int
+	exhausted    [constraintapi.MaxConstraints]int
+	nl, ne       int
+	limitingSet  [constraintapi.MaxConstraints]bool
+	exhaustedSet [constraintapi.MaxConstraints]bool
+	retryAt      int64
+}
+
+func (st *acquireState) limit(i int) {
+	if !st.limitingSet[i] {
+		st.limitingSet[i] = true
+		st.limiting[st.nl] = i
+		st.nl++
+	}
+}
+
+func (st *acquireState) exhaust(i int, retryAt int64) {
+	if !st.exhaustedSet[i] {
+		st.exhaustedSet[i] = true
+		st.exhausted[st.ne] = i
+		st.ne++
+	}
+	if retryAt > st.retryAt {
+		st.retryAt = retryAt
 	}
 }
 
@@ -287,89 +276,51 @@ func (m *Manager) sourceTags(source constraintapi.LeaseSource) map[string]any {
 // three passes see the same values and the result matches the Lua.
 func (m *Manager) acquire(nowMS, leaseExpiryMS int64, req *constraintapi.CapacityAcquireRequest, rs *requestState, acqKey uint64) *acquireResult {
 	n := len(rs.constraints)
-	requested := req.Amount
+	var st acquireState
+	usage := make([]constraintapi.ConstraintUsage, n)
 
-	var limiting, exhausted []int
-	limitingSet := make([]bool, n)
-	exhaustedSet := make([]bool, n)
-	var retryAt int64
-	usage := make([]constraintapi.ConstraintUsage, 0, n)
-
-	markExhausted := func(i int, at int64) {
-		if !exhaustedSet[i] {
-			exhaustedSet[i] = true
-			exhausted = append(exhausted, i)
-		}
-		if at > retryAt {
-			retryAt = at
-		}
-	}
-	markLimiting := func(i int) {
-		if !limitingSet[i] {
-			limitingSet[i] = true
-			limiting = append(limiting, i)
-		}
-	}
-	report := func() {
-		retryAt = 0
-		usage = usage[:0]
-		for i, rc := range rs.constraints {
-			capacity, at, u := m.snapshot(rc)
-			usage = append(usage, u)
-			if capacity <= 0 {
-				markExhausted(i, at)
-			}
-		}
-	}
-	result := func(status, granted int, leases []constraintapi.CapacityLease) *acquireResult {
-		return &acquireResult{
-			status:               status,
-			requested:            requested,
-			granted:              granted,
-			leases:               leases,
-			limitingConstraints:  m.items(rs, limiting),
-			exhaustedConstraints: m.items(rs, exhausted),
-			usage:                usage,
-			retryAtMS:            retryAt,
-		}
-	}
-
-	available := requested
-	for i, rc := range rs.constraints {
-		capacity, at, u := m.snapshot(rc)
-		usage = append(usage, u)
+	available := req.Amount
+	for i := range rs.constraints {
+		capacity, at, u := m.snapshot(&rs.constraints[i])
+		usage[i] = u
 		if capacity <= 0 {
-			markExhausted(i, at)
+			st.exhaust(i, at)
 		}
 		if capacity < available {
 			available = capacity
-			markLimiting(i)
+			st.limit(i)
 		}
 	}
 	if available <= 0 {
-		return result(2, 0, nil)
+		return m.result(rs, &st, req.Amount, 0, nil, usage)
 	}
 
 	granted := available
-	taken := make([]int, n)
-	for i, rc := range rs.constraints {
-		fit := m.commit(rc, granted)
+	var taken [constraintapi.MaxConstraints]int
+	for i := range rs.constraints {
+		fit := m.commit(&rs.constraints[i], granted)
 		taken[i] = fit
 		if fit < granted {
 			for j := 0; j < i; j++ {
-				m.rollback(rs.constraints[j], taken[j]-fit)
+				m.rollback(&rs.constraints[j], taken[j]-fit)
 				taken[j] = fit
 			}
 			granted = fit
-			markLimiting(i)
+			st.limit(i)
+		}
+	}
+
+	st.retryAt = 0
+	for i := range rs.constraints {
+		capacity, at, u := m.snapshot(&rs.constraints[i])
+		usage[i] = u
+		if capacity <= 0 {
+			st.exhaust(i, at)
 		}
 	}
 	if granted == 0 {
-		report()
-		return result(2, 0, nil)
+		return m.result(rs, &st, req.Amount, 0, nil, usage)
 	}
-
-	report()
 
 	leases := make([]constraintapi.CapacityLease, granted)
 	ccExpiry := idemExpiry(nowMS, m.constraintCheckIdempotencyTTL)
@@ -381,15 +332,30 @@ func (m *Manager) acquire(nowMS, leaseExpiryMS int64, req *constraintapi.Capacit
 			LeaseID:        encodeLeaseID(leaseExpiryMS, seq, m.nonce),
 			IdempotencyKey: key,
 		}
-		m.checkIdem.set(hashKey(req.AccountID, "cc", key), struct{}{}, ccExpiry)
+		m.checkIdem.set(opKey(req.AccountID, "cc", key), struct{}{}, ccExpiry)
 	}
-	m.checkIdem.set(hashKey(req.AccountID, "cc", req.IdempotencyKey), struct{}{}, ccExpiry)
+	m.checkIdem.set(opKey(req.AccountID, "cc", req.IdempotencyKey), struct{}{}, ccExpiry)
 	rs.grantedAmount = granted
 	rs.active.Store(int64(granted))
 
-	res := result(3, granted, leases)
+	res := m.result(rs, &st, req.Amount, granted, leases, usage)
+	res.status = 3
 	m.acqIdem.set(acqKey, res, idemExpiry(nowMS, min(m.operationIdempotencyTTL, req.Duration)))
 	return res
+}
+
+// result builds a status 2 result.  the caller raises the status on a grant.
+func (m *Manager) result(rs *requestState, st *acquireState, requested, granted int, leases []constraintapi.CapacityLease, usage []constraintapi.ConstraintUsage) *acquireResult {
+	return &acquireResult{
+		status:               2,
+		requested:            requested,
+		granted:              granted,
+		leases:               leases,
+		limitingConstraints:  m.items(rs, st.limiting[:st.nl]),
+		exhaustedConstraints: m.items(rs, st.exhausted[:st.ne]),
+		usage:                usage,
+		retryAtMS:            st.retryAt,
+	}
 }
 
 // items maps sorted constraint indices to the constraints.  nil when empty,
@@ -449,7 +415,7 @@ func (m *Manager) rollback(rc *resolvedConstraint, units int) {
 
 // loadCell reads a counter through its pointer, replacing the pointer when
 // housekeeping dropped the counter.
-func (m *Manager) loadCell(p *atomic.Pointer[semaphoreCell], key string) int64 {
+func (m *Manager) loadCell(p *atomic.Pointer[semaphoreCell], key cellKey) int64 {
 	for {
 		if v, ok := p.Load().load(); ok {
 			return v
@@ -460,7 +426,7 @@ func (m *Manager) loadCell(p *atomic.Pointer[semaphoreCell], key string) int64 {
 
 // giveCell subtracts w from a counter through its pointer, replacing the
 // pointer when housekeeping dropped the counter.
-func (m *Manager) giveCell(p *atomic.Pointer[semaphoreCell], key string, w int64) int64 {
+func (m *Manager) giveCell(p *atomic.Pointer[semaphoreCell], key cellKey, w int64) int64 {
 	for {
 		if v, ok := p.Load().give(w); ok {
 			return v
