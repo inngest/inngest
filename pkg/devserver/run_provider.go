@@ -111,6 +111,7 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 			From:         from,
 			Until:        until,
 			Status:       opts.Status,
+			CEL:          opts.CEL,
 			IsDeferred:   opts.IsDeferred,
 		},
 		Order: []cqrs.GetTraceRunOrder{{
@@ -122,6 +123,9 @@ func (p *runProvider) GetRuns(ctx context.Context, opts apiv2.GetRunsOpts) (*api
 		IncludeOutput: opts.IncludeOutput,
 	})
 	if err != nil {
+		if errors.Is(err, cqrs.ErrInvalidRunExpression) {
+			return nil, fmt.Errorf("%w: %v", apiv2.ErrExpressionInvalid, err)
+		}
 		return nil, err
 	}
 
