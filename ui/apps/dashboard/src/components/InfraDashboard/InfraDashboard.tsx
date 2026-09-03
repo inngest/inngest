@@ -483,7 +483,7 @@ function InfraPlanDropdown({
                 return (
                   <button
                     className={cn(
-                      'border-subtle text-basis grid w-full grid-cols-[4.25rem_1fr_1fr_6.75rem] items-center gap-x-3 border-t px-3 py-2.5 text-left text-xs disabled:cursor-default disabled:opacity-100',
+                      'border-subtle text-basis grid w-full grid-cols-[4.25rem_1fr_6.75rem] items-center gap-x-3 border-t px-3 py-2.5 text-left text-xs disabled:cursor-default disabled:opacity-100',
                       isCurrent && 'bg-canvasSubtle',
                       isActionable &&
                         'hover:bg-canvasSubtle focus:bg-canvasSubtle focus:outline-none',
