@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { useNavigate } from '@tanstack/react-router';
+import { gql, type TypedDocumentNode } from 'urql';
 import {
   RiArrowLeftRightLine,
   RiBillLine,
@@ -21,7 +22,6 @@ import {
 } from '@remixicon/react';
 
 import type { FileRouteTypes } from '@/routeTree.gen';
-import { GetCurrentPlanDocument } from '@/gql/graphql';
 import type { ProfileDisplayType } from '@/queries/server/profile';
 import { useSkippableGraphQLQuery } from '@/utils/useGraphQLQuery';
 import { pathCreator } from '@/utils/urls';
@@ -35,6 +35,28 @@ type Props = React.PropsWithChildren<{
 
 const iconClassName = 'text-muted h-4 w-4';
 
+type OrgMenuPlanQuery = {
+  account: {
+    // Null on accounts without a resolved plan; the header then shows nothing.
+    plan: { name: string } | null;
+  };
+};
+
+// Only `plan.name` is selected, not the whole plan: the wider GetCurrentPlan
+// document also pulls entitlements, which reads the usage table.
+const OrgMenuPlanDocument: TypedDocumentNode<
+  OrgMenuPlanQuery,
+  Record<string, never>
+> = gql`
+  query OrgMenuPlan {
+    account {
+      plan {
+        name
+      }
+    }
+  }
+`;
+
 export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
   const navigate = useNavigate();
   const { nextStep, lastCompletedStep } = useOnboardingStep();
@@ -44,7 +66,7 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
   // actually opened.
   const [open, setOpen] = useState(false);
   const { data, isLoading } = useSkippableGraphQLQuery({
-    query: GetCurrentPlanDocument,
+    query: OrgMenuPlanDocument,
     variables: {},
     skip: !open,
   });
