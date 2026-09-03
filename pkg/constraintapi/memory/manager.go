@@ -68,14 +68,16 @@ type Manager struct {
 	sweepInterval                 time.Duration
 
 	// sems maps a usage or capacity key to its counter.  gcra maps a rate
-	// limit or throttle state key to its TAT cell.
+	// limit or throttle state key to its TAT cell.  sets maps a request shape
+	// to its interned constraint set.
 	sems sync.Map // cellKey -> *semaphoreCell
 	gcra sync.Map // cellKey -> *gcraCell
+	sets sync.Map // cellKey -> *constraintSet
 
 	slab   slab
 	expiry *expiryIndex
 
-	acqIdem   *ttlMap[*acquireResult]
+	acqIdem   *ttlMap[*acquireRecord]
 	extIdem   *ttlMap[*constraintapi.CapacityExtendLeaseResponse]
 	relIdem   *ttlMap[*constraintapi.CapacityReleaseResponse]
 	checkIdem *ttlMap[struct{}]
@@ -147,7 +149,7 @@ func NewManager(opts ...Option) (*Manager, error) {
 		constraintCheckIdempotencyTTL: constraintapi.ConstraintCheckIdempotencyTTL,
 		checkIdempotencyTTL:           constraintapi.CheckIdempotencyTTL,
 		sweepInterval:                 DefaultSweepInterval,
-		acqIdem:                       newTTLMap[*acquireResult](),
+		acqIdem:                       newTTLMap[*acquireRecord](),
 		extIdem:                       newTTLMap[*constraintapi.CapacityExtendLeaseResponse](),
 		relIdem:                       newTTLMap[*constraintapi.CapacityReleaseResponse](),
 		checkIdem:                     newTTLMap[struct{}](),

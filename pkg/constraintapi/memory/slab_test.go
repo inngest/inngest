@@ -26,14 +26,15 @@ func TestSlabAllocAndGet(t *testing.T) {
 	require.Same(t, sl3, s.get(seq3))
 	require.Equal(t, 2, s.pageCount(), "each shard fills its own pages")
 
-	seq4, sl4 := s.alloc(0, 8_000, rs)
-	require.NotZero(t, seq4)
-	require.Same(t, sl4, s.get(seq4))
-
 	require.Same(t, sl1, s.get(seq1))
 	require.Nil(t, s.get(0))
 	require.Nil(t, s.get(3), "not yet allocated")
 	require.Nil(t, s.get(1<<40), "no page")
+
+	// alloc picks a shard at random
+	seq4, sl4 := s.alloc(0, 8_000, rs)
+	require.NotZero(t, seq4)
+	require.Same(t, sl4, s.get(seq4))
 }
 
 func TestSlotTakeExactlyOnce(t *testing.T) {

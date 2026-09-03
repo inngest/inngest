@@ -93,6 +93,10 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	require.Zero(t, syncMapLen(&m.sems), "zero valued cells are dropped")
 	require.LessOrEqual(t, m.slab.pageCount(), slabShards, "only the shards' current allocation pages stay")
 
+	require.Equal(t, 1, syncMapLen(&m.sets), "the set was used since the last round")
+	m.housekeep(m.nowMS())
+	require.Zero(t, syncMapLen(&m.sets), "an unused set is dropped on the next round")
+
 	// a dropped cell is recreated on use
 	_, err = m.SetCapacity(ctx, accountID, sem.ID, "setcap-2", 1)
 	require.NoError(t, err)

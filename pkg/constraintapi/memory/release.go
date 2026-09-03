@@ -68,14 +68,15 @@ func (m *Manager) release(nowMS int64, req *constraintapi.CapacityReleaseRequest
 		return res, false
 	}
 	rs := sl.req.Load()
+	set := rs.set
 
 	// the sweeper reclaims a lease whose holder is gone, so a manual release
 	// semaphore is given back too.  holding it would block every later run.
 	force := req.Source.Location == constraintapi.CallerLocationLeaseScavenge
 
 	var usage []constraintapi.ConstraintUsage
-	for i := range rs.constraints {
-		rc := &rs.constraints[i]
+	for i := range set.constraints {
+		rc := &set.constraints[i]
 		switch rc.item.Kind {
 		case constraintapi.ConstraintKindSemaphore:
 			if rc.release == constraintapi.SemaphoreReleaseAuto || force {
@@ -87,9 +88,9 @@ func (m *Manager) release(nowMS int64, req *constraintapi.CapacityReleaseRequest
 	rs.active.Add(-1)
 	sl.req.Store(nil)
 
-	res.EnvID = rs.envID
-	res.FunctionID = rs.functionID
-	res.AppID = rs.appID
+	res.EnvID = set.envID
+	res.FunctionID = set.functionID
+	res.AppID = set.appID
 	res.CreationSource = rs.source
 	res.Usage = usage
 

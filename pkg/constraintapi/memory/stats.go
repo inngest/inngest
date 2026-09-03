@@ -153,25 +153,25 @@ func inIssuedTable(src constraintapi.LeaseSource) bool {
 }
 
 // acquired records the counters one Acquire produces.
-func (s *stats) acquired(fn uuid.UUID, res *acquireResult, source constraintapi.LeaseSource) {
+func (s *stats) acquired(fn uuid.UUID, status, requested, granted int, limiting, exhausted []constraintapi.ConstraintItem, issued int, source constraintapi.LeaseSource) {
 	if fn == uuid.Nil {
-		s.requested.Add(int64(res.requested))
-		s.granted.Add(int64(res.granted))
+		s.requested.Add(int64(requested))
+		s.granted.Add(int64(granted))
 	} else {
-		s.counter(counterKey{name: ctrRequested, fn: fn}).Add(int64(res.requested))
-		s.counter(counterKey{name: ctrGranted, fn: fn}).Add(int64(res.granted))
+		s.counter(counterKey{name: ctrRequested, fn: fn}).Add(int64(requested))
+		s.counter(counterKey{name: ctrGranted, fn: fn}).Add(int64(granted))
 	}
-	for _, c := range res.limitingConstraints {
+	for _, c := range limiting {
 		s.counter(counterKey{name: ctrLimiting, fn: fn, tag: c.MetricsIdentifier()}).Add(1)
 	}
-	for _, c := range res.exhaustedConstraints {
+	for _, c := range exhausted {
 		s.counter(counterKey{name: ctrExhausted, fn: fn, tag: c.MetricsIdentifier()}).Add(1)
 	}
-	if res.status == 3 {
+	if status == 3 {
 		if inIssuedTable(source) {
-			s.issued[source.Service][source.Location][source.RunProcessingMode].Add(int64(len(res.leases)))
+			s.issued[source.Service][source.Location][source.RunProcessingMode].Add(int64(issued))
 		} else {
-			s.counter(counterKey{name: ctrIssued, source: source}).Add(int64(len(res.leases)))
+			s.counter(counterKey{name: ctrIssued, source: source}).Add(int64(issued))
 		}
 	}
 }

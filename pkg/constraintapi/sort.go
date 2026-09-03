@@ -15,7 +15,7 @@ func SortConstraints(constraints []ConstraintItem) {
 
 // sortConstraints applies a stable in-place sort to the given constraint slice.
 // Sorting order:
-// 1. By constraint kind: Rate limit < Throttle < Concurrency 
+// 1. By constraint kind: Rate limit < Throttle < Concurrency
 // 2. By scope: Account < Environment < Function
 // 3. By key expression hash: empty hash comes first
 func sortConstraints(constraints []ConstraintItem) {
@@ -23,37 +23,42 @@ func sortConstraints(constraints []ConstraintItem) {
 		return
 	}
 	sort.SliceStable(constraints, func(i, j int) bool {
-		a, b := constraints[i], constraints[j]
-		
-		// Primary sort: by constraint kind priority
-		kindPriorityA := getConstraintKindPriority(a.Kind)
-		kindPriorityB := getConstraintKindPriority(b.Kind)
-		if kindPriorityA != kindPriorityB {
-			return kindPriorityA < kindPriorityB
-		}
-		
-		// Secondary sort: by scope priority
-		scopePriorityA := getConstraintScopePriority(a)
-		scopePriorityB := getConstraintScopePriority(b)
-		if scopePriorityA != scopePriorityB {
-			return scopePriorityA < scopePriorityB
-		}
-		
-		// Tertiary sort: by key expression hash (empty comes first)
-		hashA := getConstraintKeyExpressionHash(a)
-		hashB := getConstraintKeyExpressionHash(b)
-		
-		// Empty hash comes first
-		if hashA == "" && hashB != "" {
-			return true
-		}
-		if hashA != "" && hashB == "" {
-			return false
-		}
-		
-		// Both are empty or both are non-empty, compare lexicographically
-		return hashA < hashB
+		return ConstraintLess(constraints[i], constraints[j])
 	})
+}
+
+// ConstraintLess reports whether a is evaluated before b.  it is the order
+// SortConstraints applies, exposed so a backend can sort an index permutation
+// without copying the constraints.
+func ConstraintLess(a, b ConstraintItem) bool {
+	// Primary sort: by constraint kind priority
+	kindPriorityA := getConstraintKindPriority(a.Kind)
+	kindPriorityB := getConstraintKindPriority(b.Kind)
+	if kindPriorityA != kindPriorityB {
+		return kindPriorityA < kindPriorityB
+	}
+
+	// Secondary sort: by scope priority
+	scopePriorityA := getConstraintScopePriority(a)
+	scopePriorityB := getConstraintScopePriority(b)
+	if scopePriorityA != scopePriorityB {
+		return scopePriorityA < scopePriorityB
+	}
+
+	// Tertiary sort: by key expression hash (empty comes first)
+	hashA := getConstraintKeyExpressionHash(a)
+	hashB := getConstraintKeyExpressionHash(b)
+
+	// Empty hash comes first
+	if hashA == "" && hashB != "" {
+		return true
+	}
+	if hashA != "" && hashB == "" {
+		return false
+	}
+
+	// Both are empty or both are non-empty, compare lexicographically
+	return hashA < hashB
 }
 
 // getConstraintKindPriority returns the priority for sorting constraint kinds.

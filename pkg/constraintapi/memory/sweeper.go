@@ -28,7 +28,7 @@ func (m *Manager) Scavenge(ctx context.Context) (int, error) {
 		}
 		expired++
 		leaseID := encodeLeaseID(sl.expiresAtMS, seq, m.nonce)
-		accountID := rs.accountID
+		accountID := rs.set.accountID
 
 		m.stats.record(metricEvent{kind: histLeaseAge, value: now.Sub(time.UnixMilli(sl.expiresAtMS))})
 
@@ -69,8 +69,8 @@ func (m *Manager) Scavenge(ctx context.Context) (int, error) {
 	return reclaimed, firstErr
 }
 
-// housekeep sweeps the idempotency maps, frees slab pages and drops counters
-// that read zero or expired.
+// housekeep sweeps the idempotency maps, frees slab pages, drops counters
+// that read zero or expired, and drops constraint sets nobody used.
 func (m *Manager) housekeep(nowMS int64) {
 	m.acqIdem.sweep(nowMS)
 	m.extIdem.sweep(nowMS)
@@ -83,6 +83,14 @@ func (m *Manager) housekeep(nowMS int64) {
 	m.sems.Range(func(k, v any) bool {
 		if v.(*semaphoreCell).kill() {
 			m.sems.CompareAndDelete(k, v)
+		}
+		return true
+	})
+	// a set nobody used since the last round is dropped.  a request that
+	// loaded it meanwhile keeps working on it, and the next request rebuilds.
+	m.sets.Range(func(k, v any) bool {
+		if !v.(*constraintSet).used.Swap(false) {
+			m.sets.CompareAndDelete(k, v)
 		}
 		return true
 	})

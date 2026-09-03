@@ -72,9 +72,9 @@ func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.Capacity
 
 	newID := encodeLeaseID(leaseExpiryMS, newSeq, m.nonce)
 	res.LeaseID = &newID
-	res.EnvID = rs.envID
-	res.FunctionID = rs.functionID
-	res.AppID = rs.appID
+	res.EnvID = rs.set.envID
+	res.FunctionID = rs.set.functionID
+	res.AppID = rs.set.appID
 
 	m.extIdem.set(extKey, res, idemExpiry(nowMS, m.operationIdempotencyTTL))
 	return res

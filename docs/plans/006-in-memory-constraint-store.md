@@ -216,9 +216,9 @@ The slot does not store the lease ID (derivable from expiry, seq, nonce), the ac
 
 Seqs never repeat, so a slot is written once and taken at most once: no ABA, no locks.
 `Release`, `ExtendLease` and the sweeper all go through `take`, which is what makes them
-safe against each other.  A page is freed by the sweeper when it is not the current
-allocation page, `live == 0`, and `createdAtMS + MaximumLeaseLifetime < now`; a late
-`Release` for a freed page finds no page → status 1, same as Redis after cleanup.
+safe against each other.  A page is freed by housekeeping when it is not its shard's
+allocation page and every slot in it reads taken; a late `Release` for a freed page finds no
+page → status 1, same as Redis after cleanup.
 
 ```go
 type requestState struct {                      // referenced by pointer from each slot
@@ -394,12 +394,14 @@ Documented in `README.md` and pinned in the conformance suite as memory-only exp
 
 ## Performance and memory targets
 
-Uncontended `Acquire` with 3 constraints: ~5–10µs, dominated by the JSON + xxhash
-fingerprint, then three `sync.Map` lookups, a handful of atomics, one slab slot write, one
-bucket append, three map writes.  `Release`/`ExtendLease`: ~100–300ns (ULID decode, page
-lookup, CAS, atomics; no hashing).  A benchmark with `-cpu 16` on one hot key asserts p99
-below 50µs as a regression guard.  Reference: today's Lua acquire is 50–200µs plus a
-network hop, serialized on one Valkey thread.
+The original estimate was 5–10µs per uncontended `Acquire`, dominated by a JSON fingerprint,
+against 50–200µs plus a network hop for the Lua acquire serialized on one Valkey thread.  The
+measured hot path is now one hash over the request, one `sync.Map` lookup for the interned
+constraint set, two loads and one RMW per constraint, one slab slot write, one bucket append
+and three idempotency map writes: 0.8µs median single threaded, 0.45µs per op across 8 CPUs.
+`Release`/`ExtendLease` decode the ULID, look up the page, CAS the slot and give the counters
+back, no hashing beyond the idempotency key.  The p99 guard in `acquire_bench_test.go` runs
+behind `CONSTRAINT_BENCH_GUARD`.
 
 ### Measured (semaphore acquire, Valkey 8 in Docker vs memory, Apple Silicon)
 
@@ -408,17 +410,25 @@ with `CONSTRAINT_BENCH_REDIS_ADDR` pointing at Valkey:
 
 | | Valkey 1 CPU | memory 1 CPU | Valkey 8 CPUs | memory 8 CPUs |
 |---|---|---|---|---|
-| mean per op | 169µs | 2.4µs | 53µs | 0.52µs |
-| p50 | 166µs | 1.0µs | 419µs | 2.1µs |
-| p99 | 231µs | 4.3µs | 695µs | 25µs |
-| allocs per op | 290 / 21 KB | 15 / 2 KB | 290 / 21 KB | 13 / 2 KB |
+| mean per op | 172µs | 2.0µs | 55µs | 0.45µs |
+| p50 | 170µs | 0.79µs | 433µs | 1.7µs |
+| p99 | 239µs | 3.3µs | 742µs | 9.0µs |
+| allocs per op | 290 / 21 KB | 15 / 1.7 KB | 290 / 21 KB | 14 / 1.6 KB |
 
-`BenchmarkBatch` (`-benchtime=1x -cpu 8`): one goroutine per request, all released at once.
+`BenchmarkBatch` (`-benchtime=1x -cpu 8`) runs one batch through 8 workers per CPU that pull
+requests from a shared counter, so it measures the manager.  An earlier driver that started
+one goroutine per request measured the Go scheduler instead: the 100k batch took 53ms that
+way against 27ms through the pool, and was removed.
 
 | batch | Valkey wall | memory wall | Valkey req/s | memory req/s | Valkey p99 | memory p99 |
 |---|---|---|---|---|---|---|
-| 10,000 | 293ms | 6.2ms | 34k | 1.6M | 289ms | 1.1ms |
-| 100,000 | 3.46s | 60ms | 29k | 1.7M | 3.06s | 17ms |
+| 10,000 | 371ms | 4.4ms | 27k | 2.26M | 3.9ms | 0.9ms |
+| 100,000 | 3.88s | 27ms | 26k | 3.66M | 4.7ms | 0.18ms |
+
+History at 8 CPUs, memory side: 0.52µs mean and 25µs p99 after the metrics pass, 0.47µs and
+15µs after the contention pass (items 7 to 9), 0.45µs and 9µs after interning and compact
+records (items 10 and 11).  The 10k batch is short enough that page and map growth and the
+first GC cycle dominate it.
 
 What got the hot path there, in order of payoff:
 
@@ -442,55 +452,105 @@ What got the hot path there, in order of payoff:
    its request state for the life of the page, so the live heap and every GC cycle grew
    with the allocation rate.
 6. Request IDs from `math/rand/v2`, no closures or per call slices in the acquire body.
+7. **One hash per key.**  Key bytes are appended into a caller's stack array and hashed once
+   with `Sum64`, instead of a `Digest.Write` per field.  The buffer must not be a struct
+   that slices its own array, or escape analysis moves it to the heap.
+8. **No reload after `take`.**  `take` returns the counter value with the grant accounted,
+   and the report pass recomputes from that and the capacity read in pass one.  Two loads
+   and one RMW per constraint on the hot cell instead of five loads and one RMW.
+9. **No single points of contention.**  Expiry buckets hold 16 padded slices chosen by seq.
+   Sequence numbers come from 16 padded counters, the shard in the top byte of the seq, so
+   each shard fills its own pages.  `page.live` is gone; housekeeping frees a page when
+   every slot reads taken, which also needs no grace period.  Operation locks are 4096
+   padded mutexes and the idempotency maps 256 padded stripes with plain mutexes.
 
-Remaining cost is allocation: ~1 KB per acquire is structural (response, request state,
-resolved constraints, result, leases) and the rest is idempotency map growth.  Interning
-constraint sets (below) is the next step down.
+10. **Interned constraint sets** (`constraintSet`).  One set per request shape, keyed by a
+    128 bit hash of the IDs and of every constraint's identity and resolved limits in
+    request order.  The key covers the limits rather than the config version, so a request
+    carrying different limits under the same version gets its own set, the way Redis stores
+    limits per request.  A request does one hash, one `sync.Map` lookup and atomics.  Sort,
+    `ResolveLimits` for the set, and the cell lookups run only when a set is built, and the
+    caller's constraint slice is no longer sorted in place.  Request state is ~64 B.
+    Housekeeping drops a set no request used since its last round.
+11. **Compact acquire records.**  The idempotency map holds seqs, indices and usage pairs
+    (~150 B), and the response is rebuilt from the record and the replaying request.  The
+    constraints in a response come from the request's own list, positioned by the set's
+    evaluation order.
+
+### Where the time goes now
+
+At 8 CPUs about half of CPU is the garbage collector and the runtime scavenger's `madvise`,
+driven by ~1.6 KB allocated per acquire: ~1.1 KB is the manager's (the 352 B
+`CapacityAcquireResponse` is a third of it, then the acquire record, request state, leases and
+usage slices) and the rest is idempotency map growth and the benchmark's own request.  The
+gap between the 0.8µs median and the 2.0µs mean single threaded is GC assist charged to the
+allocating goroutine.  The one contended RMW per request on a hot semaphore cell costs 50 to
+100ns, which caps a single key near 10 to 20M req/s; nothing below changes that.
+
+### Remaining optimizations
+
+Ordered by expected payoff.  None changes the `CapacityManager` API unless stated.
+
+- [ ] **Request state in an arena.**  Slots hold a `uint32` index into a slab of
+  `requestState` instead of a pointer, so pages hold no pointers and the GC never scans them.
+  The arena frees an entry when `active` reaches zero.  Removes one allocation per acquire and
+  the scan cost of every live page.  Same design as the slot slab, one more free list.
+- [ ] **Lossy or absent check idempotency.**  The two `checkIdem` inserts per acquire only let a
+  retry skip GCRA.  Either time bucketed Bloom filters at ~2.5 B per entry, or plan item 10
+  below (pass the prior lease ID on the item lease acquire) so no map is needed.  Removes two
+  map writes and the largest map from the hot path.  The Bloom variant admits a false skip
+  with the filter's error rate, which only means a retry is not throttled once.
+- [ ] **Pool the usage slice.**  `Usage` is rebuilt per response from the record; a
+  `sync.Pool` of `[]ConstraintUsage` capped at `MaxConstraints` avoids one allocation.  The
+  response struct itself is the API's and cannot be pooled without a release call.
+- [ ] **Soft memory limit.**  `GOMEMLIMIT` or `debug.SetGCPercent` where the manager runs.  A
+  heap allowed to grow between cycles halves GC frequency and stops the scavenger returning
+  and refaulting memory that shows as `madvise`.  Deployment configuration, not code.
+- [ ] **Shard the manager by account.**  N independent managers selected by account hash,
+  each with its own maps, slab, expiry index and stats.  Every cross account structure stops
+  contending; the single hot key case is unchanged.  Lease IDs need the shard in the nonce.
+- [ ] **Spread benchmark.**  Many keys and accounts.  The single key benchmark is the worst
+  case for cache lines and the best case for map locality, so it hides map and GC costs a
+  fleet pays.
+- [ ] **Batch acquire for backlog refill.**  One lock, one hash prefix and one set lookup for
+  up to `MaximumAmount` leases.  API addition on both backends.
+- [ ] **Coalesce zero observations.**  `RequestLatency` is always 0ms in process and
+  `RetryAfter` is 0 for every grant.  Counting them and recording n zeros in the drain cuts the
+  observation buffers' work to the few non zero values.
 
 Memory per lease (3-constraint request, `Amount = 1`):
 
 | Structure | Bytes | Lifetime |
 |---|---|---|
-| slab slot | 24 | lease, the page is freed 5s after its last slot is taken |
+| slab slot | 24 | lease; the page is freed once every slot in it is taken |
 | expiry bucket entry | 8 | until the bucket's second passes |
-| `requestState` (shared by the request's leases) | ~450 | until all its leases release; `[]resolvedConstraint` dominates, keys are 16 B hashes |
+| `requestState` (shared by the request's leases) | ~64 | until all its leases release |
+| `constraintSet` (shared by every request of one shape) | ~450 | while requests use it |
 | `checkIdem` entries (1 + Amount) | 2 × ~40 | 5 min |
-| `opIdem` entry (full response) | ~500 | 5 s |
-| constraint cells | ~200 per distinct key | until zero |
+| `acqIdem` record (seqs, indices, usage pairs) | ~150 | 5 s |
+| constraint cells | ~80 per distinct key | until zero |
 
-About 1.1 KB per lease, versus roughly 2–3 KB of Redis keys today (`ld:*` hash, `rs:*`
+About 350 B per lease, versus roughly 2–3 KB of Redis keys today (`ld:*` hash, `rs:*`
 JSON, ZSET members, `ik:*` strings).
 
 ## Room to improve (not in this work)
 
-Each is local to one file and needs no API change unless stated.
+Performance items live under "Remaining optimizations" above.  Items 1 to 4 of the original
+list (interned sets, direct fingerprint hashing, compact idempotency values, hashed cell
+keys) are done.  The rest, each local to one file and needing no API change unless stated:
 
-1. **Intern constraint sets** (`acquire.go`): share one `*constraintSet` (sorted
-   constraints, limits, usage keys, IDs, resolved cell pointers) across every request for
-   the same function version, keyed by xxhash.  `requestState` drops to ~48 B; per lease
-   ≈ 100 B; the hot path becomes one `uint64` lookup and atomics.  Needs a refcount on
-   cells so the sweeper never deletes one a live set points at.
-2. **Hash the fingerprint directly** (`acquire.go`): write fields into xxhash64 instead of
-   `json.Marshal`.  Makes `Acquire` ≈ 300–600 ns.
-3. **Compact `opIdem` values**: store `{req, leaseSeqs, limiting, exhausted, usage,
-   retryAt}` (~120 B) and rebuild the response on replay.
-4. **Key cell maps by `uint64` hash** (`cells.go`): ~80 B instead of ~200 B per distinct
-   key; matters for user-keyed throttles with millions of keys.
-5. **Denser `checkIdem`** (`ttlmap.go`): closed time buckets as sorted `[]uint64` with a
-   Bloom prefilter (~9 B/entry, exact) or bucketed Bloom filters (~2.5 B/entry, lossy).
-   Roaring does not help: the keys are uniform hashes with no locality.
-6. **Roaring expiry buckets** (`expiry.go`): seqs per second compress to ~2 B/entry if
+1. **Roaring expiry buckets** (`expiry.go`): seqs per second compress to ~2 B/entry if
    the index ever matters; adds `github.com/RoaringBitmap/roaring/v2`.
-7. **Millisecond reclaim** (`expiry.go`): a bounded drain of the current second's bucket
+2. **Millisecond reclaim** (`expiry.go`): a bounded drain of the current second's bucket
    on each operation would restore `ZCOUNT`'s exact expiry semantics.
-8. **`CapacityLeaseScavenger`**: implementing it needs `scavengerOpt`/`scavengerOptions`
+3. **`CapacityLeaseScavenger`**: implementing it needs `scavengerOpt`/`scavengerOptions`
    exported in `constraintapi`; then `NewLeaseScavengerService` can drive the memory
    manager like the Redis one.
-9. **Differential GCRA test**: load `lua/test/*.lua` into miniredis from the memory package
+4. **Differential GCRA test**: load `lua/test/*.lua` into miniredis from the memory package
    and compare against the Go port on fuzzed inputs.
-10. **Dense `checkIdem` via seq** (API addition on both backends): pass the prior lease ID
-    on the ItemLease `Acquire` so the constraint-check idempotency set can be a bitmap of
-    seqs.
+5. **Dense `checkIdem` via seq** (API addition on both backends): pass the prior lease ID
+   on the ItemLease `Acquire` so the constraint-check idempotency set can be a bitmap of
+   seqs, or be dropped.
 
 ## Implementation order (one commit each, tests green after every step)
 
