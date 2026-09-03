@@ -109,19 +109,30 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
             button would be a dead end for them. */}
         {!profile.isMarketplace && (
           <div className="px-1.5 pb-1">
-            <Button
-              kind="secondary"
-              appearance="outlined"
-              label="Upgrade"
-              className="w-full"
-              onClick={() => {
-                setOpen(false);
+            {/* Rendered through DropdownMenuItem so it joins Radix's
+                roving-focus group - a bare button is skipped by arrow keys.
+                Radix's Slot appends the item's classes after the child's, and
+                Button merges them last, so p-0 and text-basis are needed here
+                to stop the menu-row padding and muted text from overriding the
+                button's own. */}
+            <DropdownMenuItem
+              asChild
+              className="text-basis p-0"
+              onSelect={() =>
                 navigate({
                   to: '/billing/plans' as FileRouteTypes['to'],
                   search: { ref: 'app-org-menu-upgrade' },
-                });
-              }}
-            />
+                })
+              }
+            >
+              <Button
+                raw
+                kind="secondary"
+                appearance="outlined"
+                label="Upgrade"
+                className="w-full"
+              />
+            </DropdownMenuItem>
           </div>
         )}
 
