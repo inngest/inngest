@@ -1,4 +1,11 @@
-import { Listbox } from '@headlessui/react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu';
 import { useNavigate } from '@tanstack/react-router';
 import {
   RiArrowLeftRightLine,
@@ -14,14 +21,14 @@ import type { FileRouteTypes } from '@/routeTree.gen';
 import type { ProfileDisplayType } from '@/queries/server/profile';
 import { pathCreator } from '@/utils/urls';
 import useOnboardingStep from '../Onboarding/useOnboardingStep';
+import OrgAvatar from './OrgAvatar';
 
 type Props = React.PropsWithChildren<{
   profile: ProfileDisplayType;
   showOnboardingWidget: () => void;
 }>;
 
-const itemClassName =
-  'text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]';
+const iconClassName = 'text-muted h-4 w-4';
 
 export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
   const navigate = useNavigate();
@@ -34,101 +41,88 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
   });
 
   return (
-    <Listbox>
-      <div className="relative flex h-8 items-center">
-        <Listbox.Button className="text-basis hover:bg-canvasMuted flex h-8 cursor-pointer items-center gap-2 rounded px-2 text-sm leading-none ring-0">
-          {children}
-        </Listbox.Button>
-        <Listbox.Options className="bg-canvasBase border-muted shadow-primary absolute left-0 top-full z-50 mt-2 w-[240px] rounded border ring-0 focus:outline-none">
-          <div
-            className="text-basis px-3 pt-3 pb-2 text-sm font-medium"
+    <DropdownMenu>
+      <DropdownMenuTrigger className="text-basis hover:bg-canvasMuted flex h-8 cursor-pointer items-center gap-2 rounded px-2 text-sm leading-none ring-0">
+        {children}
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent className="w-[212px]">
+        <DropdownMenuLabel className="flex items-center gap-2.5 p-2">
+          <OrgAvatar profile={profile} size="lg" />
+          <span
+            className="text-basis min-w-0 truncate text-sm font-medium"
             title={orgName}
           >
             {orgName}
-          </div>
-          <hr className="border-subtle" />
+          </span>
+        </DropdownMenuLabel>
 
-          <Listbox.Option
-            className={itemClassName}
-            value="settings"
-            onClick={() =>
-              navigate({ to: '/settings/organization' as FileRouteTypes['to'] })
-            }
-          >
-            <RiEqualizerLine className="text-muted mr-2 h-4 w-4" />
-            <div>Settings</div>
-          </Listbox.Option>
+        <DropdownMenuItem
+          onSelect={() =>
+            navigate({ to: '/settings/organization' as FileRouteTypes['to'] })
+          }
+        >
+          <RiEqualizerLine className={iconClassName} />
+          Settings
+        </DropdownMenuItem>
 
-          <Listbox.Option
-            className={itemClassName}
-            value="members"
-            onClick={() =>
-              navigate({
-                to: '/settings/organization/organization-members' as FileRouteTypes['to'],
-              })
-            }
-          >
-            <RiGroupLine className="text-muted mr-2 h-4 w-4" />
-            <div>Members</div>
-          </Listbox.Option>
+        <DropdownMenuItem
+          onSelect={() =>
+            navigate({
+              to: '/settings/organization/organization-members' as FileRouteTypes['to'],
+            })
+          }
+        >
+          <RiGroupLine className={iconClassName} />
+          Members
+        </DropdownMenuItem>
 
-          <Listbox.Option
-            className={itemClassName}
-            value="billing"
-            onClick={() => navigate({ to: pathCreator.billing() })}
-          >
-            <RiBillLine className="text-muted mr-2 h-4 w-4" />
-            <div>Billing</div>
-          </Listbox.Option>
+        <DropdownMenuItem
+          onSelect={() => navigate({ to: pathCreator.billing() })}
+        >
+          <RiBillLine className={iconClassName} />
+          Billing
+        </DropdownMenuItem>
 
-          <Listbox.Option
-            className={itemClassName}
-            value="integrations"
-            onClick={() =>
-              navigate({ to: '/settings/integrations' as FileRouteTypes['to'] })
-            }
-          >
-            <RiPlugLine className="text-muted mr-2 h-4 w-4" />
-            <div>Integrations</div>
-          </Listbox.Option>
+        <DropdownMenuItem
+          onSelect={() =>
+            navigate({ to: '/settings/integrations' as FileRouteTypes['to'] })
+          }
+        >
+          <RiPlugLine className={iconClassName} />
+          Integrations
+        </DropdownMenuItem>
 
-          <Listbox.Option
-            className={itemClassName}
-            value="apiKeys"
-            onClick={() =>
-              navigate({ to: '/settings/api-keys' as FileRouteTypes['to'] })
-            }
-          >
-            <RiKey2Line className="text-muted mr-2 h-4 w-4" />
-            <div>API keys</div>
-          </Listbox.Option>
+        <DropdownMenuItem
+          onSelect={() =>
+            navigate({ to: '/settings/api-keys' as FileRouteTypes['to'] })
+          }
+        >
+          <RiKey2Line className={iconClassName} />
+          API keys
+        </DropdownMenuItem>
 
-          <Listbox.Option
-            className={itemClassName}
-            value="onboardingGuide"
-            onClick={() => {
-              showOnboardingWidget();
-              navigate({ to: onboardingTo });
-            }}
-          >
-            <RiBookReadLine className="text-muted mr-2 h-4 w-4" />
-            <div>Onboarding guide</div>
-          </Listbox.Option>
+        <DropdownMenuItem
+          onSelect={() => {
+            showOnboardingWidget();
+            navigate({ to: onboardingTo });
+          }}
+        >
+          <RiBookReadLine className={iconClassName} />
+          Onboarding guide
+        </DropdownMenuItem>
 
-          <hr className="border-subtle mt-2" />
+        <DropdownMenuSeparator />
 
-          <Listbox.Option
-            className={`${itemClassName} mb-2`}
-            value="switchOrg"
-            onClick={() =>
-              navigate({ to: '/organization-list' as FileRouteTypes['to'] })
-            }
-          >
-            <RiArrowLeftRightLine className="text-muted mr-2 h-4 w-4" />
-            <div>Switch organisations</div>
-          </Listbox.Option>
-        </Listbox.Options>
-      </div>
-    </Listbox>
+        <DropdownMenuItem
+          onSelect={() =>
+            navigate({ to: '/organization-list' as FileRouteTypes['to'] })
+          }
+        >
+          <RiArrowLeftRightLine className={iconClassName} />
+          Switch organisations
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

@@ -63,3 +63,18 @@ export const DropdownMenuItem = forwardRef<
     </DropdownMenuPrimitive.Item>
   );
 });
+
+export const DropdownMenuSeparator = forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Separator>
+>((props, forwardedRef) => {
+  return (
+    <DropdownMenuPrimitive.Separator
+      {...props}
+      ref={forwardedRef}
+      // The negative inline margin cancels the content's p-0.5 so the rule
+      // spans the full width of the panel.
+      className={cn('border-subtle -mx-0.5 my-1 border-t', props.className)}
+    />
+  );
+});
