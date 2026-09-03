@@ -202,9 +202,14 @@ restrictive direction.
 
 ### Lease IDs and the slab (`leaseid.go`, `slab.go`)
 
-ULID layout (16 bytes): `[0:6]` expiry ms (unchanged, the consumer contract),
-`[6:14]` `uint64` seq big endian, `[14:16]` manager nonce (random at `NewManager`).
-`decode(id) (expiresAtMS int64, seq uint64, nonce uint16)`.  A foreign nonce → unknown lease.
+ULID layout (16 bytes): `[0:6]` expiry ms (unchanged, the consumer contract), `[6:12]` seq,
+48 bits big endian (4 bits shard, 44 bits counter), `[12:16]` `uint32` manager nonce (random
+at `NewManager`).  `decode(id) (expiresAtMS int64, seq uint64, nonce uint32)`.  A foreign
+nonce → unknown lease.  Constraint services run as a fleet, so lease IDs do reach a manager
+other than the issuer; two managers share a nonce one time in four billion, and even then a
+lease is honoured only when the slot the seq names has the very expiry millisecond the ID
+carries, which release and extend check.  Refused foreign leases are counted in
+`constraintapi_foreign_lease_total`.
 
 ```go
 const pageBits = 16                           // 65536 slots per page, 1.5 MB
@@ -555,7 +560,7 @@ JSON, ZSET members, `ik:*` strings).
 
 Performance items live under "Remaining optimizations" above.  Items 1 to 4 of the original
 list (interned sets, direct fingerprint hashing, compact idempotency values, hashed cell
-keys) are done.  The rest, each local to one file and needing no API change unless stated:
+keys) are done, and so is the differential GCRA test, `FuzzGCRA` in `constraintapi`.  The rest, each local to one file and needing no API change unless stated:
 
 1. **Roaring expiry buckets** (`expiry.go`): seqs per second compress to ~2 B/entry if
    the index ever matters; adds `github.com/RoaringBitmap/roaring/v2`.
@@ -564,9 +569,7 @@ keys) are done.  The rest, each local to one file and needing no API change unle
 3. **`CapacityLeaseScavenger`**: implementing it needs `scavengerOpt`/`scavengerOptions`
    exported in `constraintapi`; then `NewLeaseScavengerService` can drive the memory
    manager like the Redis one.
-4. **Differential GCRA test**: load `lua/test/*.lua` into miniredis from the memory package
-   and compare against the Go port on fuzzed inputs.
-5. **Dense `checkIdem` via seq** (API addition on both backends): pass the prior lease ID
+4. **Dense `checkIdem` via seq** (API addition on both backends): pass the prior lease ID
    on the ItemLease `Acquire` so the constraint-check idempotency set can be a bitmap of
    seqs, or be dropped.
 
@@ -615,9 +618,11 @@ tests in place and red.
    time past all TTLs and asserts pages, cells, buckets and maps return to empty.
 - [x] 9. `memory/check.go` (conformant with `check.lua` for rate limit, throttle and
    concurrency; semaphores are read like any counter; the write-only `chk` record is not kept).
-- [x] 10. `memory/race_test.go` (`-race`) (green; `BenchmarkAcquire`, `BenchmarkAcquireRelease`
-    and `BenchmarkBatch` measured on every shape, p99 guard behind `CONSTRAINT_BENCH_GUARD`,
-    real Valkey via `CONSTRAINT_BENCH_REDIS_ADDR`): N goroutines across M accounts and K shared keys
+- [x] 10. `memory/race_test.go` (`-race`) (green, including a throttle hammer that must admit
+    exactly limit plus burst and a mixed shape where the throttle refuses after the semaphore
+    and rate limit took, so both roll back; `BenchmarkAcquire`, `BenchmarkAcquireRelease` and
+    `BenchmarkBatch` measured on every shape, p99 guard behind `CONSTRAINT_BENCH_GUARD`, real
+    Valkey via `CONSTRAINT_BENCH_REDIS_ADDR`): N goroutines across M accounts and K shared keys
     acquiring, extending, releasing with the sweeper running; invariants: usage == live
     lease count after a final scavenge, no negative counters, atomic high-water mark never
     exceeds the limit, concurrent identical idempotent requests receive identical leases

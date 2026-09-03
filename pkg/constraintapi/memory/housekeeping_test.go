@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -31,8 +32,17 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	ctx := context.Background()
 	accountID, envID, fnID := uuid.New(), uuid.New(), uuid.New()
 	sem := constraintapi.SemaphoreConstraint{ID: "app:worker", Weight: 1, Release: constraintapi.SemaphoreReleaseAuto}
-	config := constraintapi.ConstraintConfig{FunctionVersion: 1, Semaphores: []constraintapi.Semaphore{{ID: sem.ID, Weight: 1}}}
-	constraints := []constraintapi.ConstraintItem{{Kind: constraintapi.ConstraintKindSemaphore, Semaphore: &sem}}
+	config := constraintapi.ConstraintConfig{
+		FunctionVersion: 1,
+		Semaphores:      []constraintapi.Semaphore{{ID: sem.ID, Weight: 1}},
+		Concurrency:     constraintapi.ConcurrencyConfig{FunctionConcurrency: 10},
+		Throttle:        []constraintapi.ThrottleConfig{{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "t", Limit: 100, Burst: 0, Period: 60}},
+	}
+	constraints := []constraintapi.ConstraintItem{
+		{Kind: constraintapi.ConstraintKindSemaphore, Semaphore: &sem},
+		{Kind: constraintapi.ConstraintKindConcurrency, Concurrency: &constraintapi.ConcurrencyConstraint{Mode: enums.ConcurrencyModeStep, Scope: enums.ConcurrencyScopeFn}},
+		{Kind: constraintapi.ConstraintKindThrottle, Throttle: &constraintapi.ThrottleConstraint{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "t", EvaluatedKeyHash: "v"}},
+	}
 
 	_, err = m.SetCapacity(ctx, accountID, sem.ID, "setcap", 10)
 	require.NoError(t, err)
@@ -67,6 +77,7 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	require.NotZero(t, m.semIdem.len())
 	require.NotZero(t, m.expiry.bucketCount())
 	require.NotZero(t, syncMapLen(&m.sems))
+	require.Equal(t, 1, syncMapLen(&m.gcra), "the throttle has a TAT cell")
 
 	clock.Advance(constraintapi.MaximumLeaseLifetime + time.Minute)
 	reclaimed, err := m.Scavenge(ctx)
@@ -90,7 +101,8 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	require.Zero(t, m.checkIdem.len())
 	require.Zero(t, m.semIdem.len())
 	require.Zero(t, m.expiry.bucketCount())
-	require.Zero(t, syncMapLen(&m.sems), "zero valued cells are dropped")
+	require.Zero(t, syncMapLen(&m.sems), "zero valued semaphore and concurrency cells are dropped")
+	require.Zero(t, syncMapLen(&m.gcra), "an expired TAT cell is dropped")
 	require.LessOrEqual(t, m.slab.pageCount(), slabShards, "only the shards' current allocation pages stay")
 
 	require.Equal(t, 1, syncMapLen(&m.sets), "the set was used since the last round")

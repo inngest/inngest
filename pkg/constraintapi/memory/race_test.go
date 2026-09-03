@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/constraintapi/memory"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -248,4 +249,115 @@ func TestRaceAcquireDuringScavenge(t *testing.T) {
 	require.Equal(t, int64(len(granted)), usageOf(t, m, id.account, sem), "usage equals the live lease count")
 
 	require.Equal(t, uuid.Nil, uuid.Nil)
+}
+
+// TestRaceThrottleAdmitsExactlyTheCapacity hammers one throttle key from many
+// goroutines with mixed amounts.  the TAT moves by CAS and a refused take
+// retries with what fits now, so the total admitted must be exactly what one
+// caller alone would get: limit plus burst from empty, one more per emission
+// interval, and the limit again after a period.
+func TestRaceThrottleAdmitsExactlyTheCapacity(t *testing.T) {
+	clock := clockwork.NewFakeClockAt(testStart)
+	m := newMemoryManager(t, clock)
+	id := newIDs()
+	config := constraintapi.ConstraintConfig{FunctionVersion: 1, Throttle: []constraintapi.ThrottleConfig{{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "t", Limit: 50, Burst: 10, Period: 60}}}
+	constraints := []constraintapi.ConstraintItem{throttleItem("t", "v")}
+
+	hammer := func(round int) int {
+		var admitted atomic.Int64
+		var wg sync.WaitGroup
+		for g := 0; g < 32; g++ {
+			wg.Add(1)
+			go func(g int) {
+				defer wg.Done()
+				for i := 0; i < 20; i++ {
+					req := withAmount(acquireRequest(id, clock, config, constraints, fmt.Sprintf("r%d-g%d-i%d", round, g, i)), 1+(g+i)%3)
+					resp, err := m.Acquire(context.Background(), req)
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					admitted.Add(int64(len(resp.Leases)))
+				}
+			}(g)
+		}
+		wg.Wait()
+		return int(admitted.Load())
+	}
+
+	require.Equal(t, 60, hammer(0), "limit plus burst fit from empty")
+	check := checkThrottle(t, m, id, config, constraints)
+	require.Equal(t, 0, check.AvailableCapacity)
+	require.Equal(t, 50, check.Usage[0].Used)
+
+	// emission is 1.2s, so one more unit fits after one interval
+	clock.Advance(1200 * time.Millisecond)
+	require.Equal(t, 1, hammer(1))
+
+	// a period later the TAT is 12s ahead, which leaves the limit
+	clock.Advance(time.Minute)
+	require.Equal(t, 50, hammer(2))
+	require.Equal(t, 0, checkThrottle(t, m, id, config, constraints).AvailableCapacity)
+}
+
+func checkThrottle(t *testing.T, m *memory.Manager, id ids, config constraintapi.ConstraintConfig, constraints []constraintapi.ConstraintItem) *constraintapi.CapacityCheckResponse {
+	t.Helper()
+	resp, uerr, ierr := m.Check(context.Background(), &constraintapi.CapacityCheckRequest{AccountID: id.account, EnvID: id.env, FunctionID: id.fn, Configuration: config, Constraints: constraints})
+	require.NoError(t, uerr)
+	require.NoError(t, ierr)
+	return resp
+}
+
+// TestRaceMixedRollsBackWhenTheThrottleShrinksTheGrant runs a semaphore, a
+// rate limit and a throttle together.  commit order is counters, then rate
+// limit, then throttle.  the throttle is the bottleneck, so under contention
+// it refuses after the semaphore and the rate limit already took, and both
+// must be rolled back to exactly what the throttle admitted.
+func TestRaceMixedRollsBackWhenTheThrottleShrinksTheGrant(t *testing.T) {
+	clock := clockwork.NewFakeClockAt(testStart)
+	m := newMemoryManager(t, clock)
+	id := newIDs()
+
+	sem := constraintapi.SemaphoreConstraint{ID: "app:worker", Weight: 1, Release: constraintapi.SemaphoreReleaseAuto}
+	config := semaphoreConfig(sem)
+	config.RateLimit = []constraintapi.RateLimitConfig{{Scope: enums.RateLimitScopeFn, KeyExpressionHash: "r", Limit: 1000, Period: 60}}
+	config.Throttle = []constraintapi.ThrottleConfig{{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "t", Limit: 20, Burst: 0, Period: 60}}
+	constraints := []constraintapi.ConstraintItem{semaphoreItem(&sem), rateLimitItem("r", "v"), throttleItem("t", "v")}
+	setCapacity(t, m, id.account, sem.ID, 30)
+
+	var mu sync.Mutex
+	var leases []ulid.ULID
+	var wg sync.WaitGroup
+	for g := 0; g < 32; g++ {
+		wg.Add(1)
+		go func(g int) {
+			defer wg.Done()
+			for i := 0; i < 10; i++ {
+				resp, err := m.Acquire(context.Background(), withAmount(acquireRequest(id, clock, config, constraints, fmt.Sprintf("g%d-i%d", g, i)), 3))
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				mu.Lock()
+				for _, l := range resp.Leases {
+					leases = append(leases, l.LeaseID)
+				}
+				mu.Unlock()
+			}
+		}(g)
+	}
+	wg.Wait()
+
+	require.Len(t, leases, 20, "the throttle admits exactly its limit")
+	require.Equal(t, int64(20), usageOf(t, m, id.account, sem), "semaphore takes beyond the throttle were rolled back")
+
+	// the rate limit TAT holds exactly the admitted units.  the count comes
+	// from a ceiling over a sum of doubles, so one unit of slack is allowed.
+	rl := checkThrottle(t, m, id, config, []constraintapi.ConstraintItem{rateLimitItem("r", "v")})
+	require.InDelta(t, 20, rl.Usage[0].Used, 1, "rate limit takes beyond the throttle were rolled back")
+
+	for i, l := range leases {
+		release(t, m, id.account, l, fmt.Sprintf("rel-%d", i))
+	}
+	require.Equal(t, int64(0), usageOf(t, m, id.account, sem))
 }

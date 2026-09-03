@@ -57,7 +57,7 @@ var (
 type Manager struct {
 	shardName string
 	clock     clockwork.Clock
-	nonce     uint16
+	nonce     uint32
 
 	lifecycles                           []constraintapi.ConstraintAPILifecycleHooks
 	enableHighCardinalityInstrumentation constraintapi.EnableHighCardinalityInstrumentation

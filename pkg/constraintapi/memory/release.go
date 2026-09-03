@@ -59,12 +59,22 @@ func (m *Manager) doRelease(ctx context.Context, req *constraintapi.CapacityRele
 func (m *Manager) release(nowMS int64, req *constraintapi.CapacityReleaseRequest, relKey uint64) (*constraintapi.CapacityReleaseResponse, bool) {
 	res := &constraintapi.CapacityReleaseResponse{AccountID: req.AccountID}
 
-	_, seq, nonce := decodeLeaseID(req.LeaseID)
+	expiresAtMS, seq, nonce := decodeLeaseID(req.LeaseID)
 	if nonce != m.nonce {
+		m.stats.foreign("release")
 		return res, false
 	}
 	sl := m.slab.get(seq)
-	if sl == nil || !sl.take() {
+	if sl == nil {
+		return res, false
+	}
+	if sl.expiresAtMS != expiresAtMS {
+		// the seq names a live slot but the ID was not issued for it: a lease
+		// from another manager that happens to share the nonce
+		m.stats.foreign("release")
+		return res, false
+	}
+	if !sl.take() {
 		return res, false
 	}
 	rs := sl.req.Load()

@@ -94,6 +94,7 @@ const (
 	ctrExhausted
 	ctrIssued
 	ctrSemaphoreOp
+	ctrForeignLease
 )
 
 // counterKey identifies one counter series.  fn is set only when high
@@ -174,6 +175,12 @@ func (s *stats) acquired(fn uuid.UUID, status, requested, granted int, limiting,
 			s.counter(counterKey{name: ctrIssued, source: source}).Add(int64(issued))
 		}
 	}
+}
+
+// foreign records a release or extend that carried a lease ID this manager
+// did not issue.  a steady count means lease IDs cross processes.
+func (s *stats) foreign(op string) {
+	s.counter(counterKey{name: ctrForeignLease, tag: op}).Add(1)
 }
 
 // semaphoreOp records one SemaphoreManager call.
@@ -351,6 +358,13 @@ func (s *stats) flush(ctx context.Context) {
 				MetricName:  "constraintapi_semaphore_total",
 				Description: "Total semaphore manager operations",
 				Tags:        map[string]any{"operation": key.tag, "status": "success"},
+			})
+		case ctrForeignLease:
+			metrics.RecordCounterMetric(ctx, n, metrics.CounterOpt{
+				PkgName:     pkgName,
+				MetricName:  "constraintapi_foreign_lease_total",
+				Description: "Total lease IDs issued by another constraint manager and refused",
+				Tags:        map[string]any{"operation": key.tag, "shard": s.shard},
 			})
 		}
 	}

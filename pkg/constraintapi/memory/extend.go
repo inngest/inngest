@@ -57,11 +57,22 @@ func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.Capacity
 	res := &constraintapi.CapacityExtendLeaseResponse{AccountID: req.AccountID}
 
 	expiresAtMS, seq, nonce := decodeLeaseID(req.LeaseID)
-	if expiresAtMS < nowMS || nonce != m.nonce {
+	if expiresAtMS < nowMS {
+		return res
+	}
+	if nonce != m.nonce {
+		m.stats.foreign("extend")
 		return res
 	}
 	sl := m.slab.get(seq)
-	if sl == nil || !sl.take() {
+	if sl == nil {
+		return res
+	}
+	if sl.expiresAtMS != expiresAtMS {
+		m.stats.foreign("extend")
+		return res
+	}
+	if !sl.take() {
 		return res
 	}
 	rs := sl.req.Load()

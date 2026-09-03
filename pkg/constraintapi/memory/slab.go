@@ -14,10 +14,11 @@ const (
 
 	// slabShards is the number of independent sequence counters.  an alloc
 	// picks one at random, so cores rarely contend on the same counter.  the
-	// shard sits in the top byte of the seq, so each shard fills its own
-	// pages.
+	// shard sits in the top 4 of the seq's 48 bits, so each shard fills its
+	// own pages.  a shard's 44 bit counter wraps after 1.7e13 leases, 5 years
+	// at 100k leases per second on that shard alone.
 	slabShards = 16
-	shardShift = 56
+	shardShift = 44
 
 	slotEmpty uint32 = 0
 	slotLive  uint32 = 1
