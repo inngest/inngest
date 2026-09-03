@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@inngest/components/Button';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import {
   DropdownMenu,
@@ -81,6 +82,26 @@ export const OrgMenu = ({ children, profile, showOnboardingWidget }: Props) => {
             )}
           </div>
         </DropdownMenuLabel>
+
+        {/* Marketplace accounts are redirected off the plans tab, so the
+            button would be a dead end for them. */}
+        {!profile.isMarketplace && (
+          <div className="px-1.5 pb-1">
+            <Button
+              kind="secondary"
+              appearance="outlined"
+              label="Upgrade"
+              className="w-full"
+              onClick={() => {
+                setOpen(false);
+                navigate({
+                  to: '/billing/plans' as FileRouteTypes['to'],
+                  search: { ref: 'app-org-menu-upgrade' },
+                });
+              }}
+            />
+          </div>
+        )}
 
         <DropdownMenuItem
           onSelect={() =>
