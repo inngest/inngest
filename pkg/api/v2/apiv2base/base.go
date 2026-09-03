@@ -55,10 +55,6 @@ func (b *Base) BuildAuthzPathMap() map[string]bool {
 	return BuildAuthzPathMap()
 }
 
-func (b *Base) BuildAuthzPermissionPathMap() map[string]string {
-	return BuildAuthzPermissionPathMap()
-}
-
 func (b *Base) GetInngestEnvHeader(ctx context.Context) string {
 	return GetInngestEnvHeader(ctx)
 }

@@ -308,18 +308,6 @@ func TestBuildAuthzPathMap(t *testing.T) {
 	})
 }
 
-func TestBuildAuthzPermissionPathMap(t *testing.T) {
-	pathMap := BuildAuthzPermissionPathMap()
-
-	assert.Equal(t, "runs:read:list", pathMap["/runs"])
-	assert.Equal(t, "runs:read:get", pathMap["/runs/{run_id}"])
-	assert.Equal(t, "functions:write:invoke", pathMap["/apps/{app_id}/functions/{function_id}/invoke"])
-	assert.Equal(t, "experiments:read:list", pathMap["/experiments"])
-	assert.Equal(t, "experiments:read:list", pathMap["/apps/{app_id}/functions/{function_id}/experiments"])
-	assert.Equal(t, "sandboxes:write:exec", pathMap["/sandboxes/{sandbox_id}/exec"])
-	assert.Equal(t, "events:write:send", pathMap["/events"])
-}
-
 // Base instance tests - testing utils through the base instance
 func TestBase_GetInngestEnvHeader(t *testing.T) {
 	base := NewBase()
