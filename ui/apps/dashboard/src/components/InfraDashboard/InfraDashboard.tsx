@@ -454,7 +454,7 @@ function InfraPlanDropdown({
 
           <div className="overflow-x-auto">
             <div className="min-w-[360px]">
-              <div className="bg-canvasSubtle text-muted grid grid-cols-[4.25rem_1fr_1fr_6.75rem] gap-x-3 px-3 py-2 text-left text-[11px] font-medium uppercase">
+              <div className="bg-canvasSubtle text-muted grid grid-cols-[4.25rem_1fr_6.75rem] gap-x-3 px-3 py-2 text-left text-[11px] font-medium uppercase">
                 <span>SKU</span>
                 <span>Concurrency</span>
                 <span className="text-right">Price / mo</span>
