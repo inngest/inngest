@@ -94,8 +94,6 @@ type Opts struct {
 	// BackoffFunc computes the retry time for a given attempt number.
 	// If nil, defaults to backoff.DefaultBackoff.
 	BackoffFunc backoff.BackoffFunc
-	// AllowStepMetadata controls whether step metadata is allowed for a given account.
-	AllowStepMetadata executor.AllowStepMetadata
 	// EnforceStepSizeLimits controls whether step output size limits are enforced for a given account.
 	// The default is to always enforce the limits.
 	EnforceStepSizeLimits func(ctx context.Context, accountID uuid.UUID) bool
@@ -818,10 +816,6 @@ func (c checkpointer) processMetadata(
 	op state.GeneratorOpcode,
 	location string,
 ) {
-	if !c.AllowStepMetadata.Enabled(ctx, accountID) {
-		return
-	}
-
 	// Extract experiment metadata from opts and merge into the list of
 	// metadata entries to process. The SDK spreads group.experiment()
 	// variant context onto a sub-step's opts; emitting the metadata span

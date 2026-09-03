@@ -37,7 +37,7 @@ const (
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
 	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
-	PartitionSemaphoreLimitRequeueExtension   = 1 * time.Second
+	PartitionSemaphoreLimitRequeueExtension   = 3 * time.Second
 	PartitionThrottleLimitRequeueExtension    = 1 * time.Second
 	PartitionPausedRequeueExtension           = 5 * time.Minute
 	PartitionDeletedAccountRequeueExtension   = 7 * 24 * time.Hour

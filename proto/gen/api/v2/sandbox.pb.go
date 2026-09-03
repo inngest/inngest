@@ -631,6 +631,7 @@ type CreateSandboxRequest struct {
 	Vcpu          uint32                 `protobuf:"varint,2,opt,name=vcpu,proto3" json:"vcpu,omitempty"`
 	MemoryMb      uint32                 `protobuf:"varint,3,opt,name=memory_mb,json=memoryMb,proto3" json:"memory_mb,omitempty"`
 	Environment   map[string]string      `protobuf:"bytes,4,rep,name=environment,proto3" json:"environment,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	SnapshotId    *string                `protobuf:"bytes,5,opt,name=snapshot_id,json=snapshotId,proto3,oneof" json:"snapshot_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -691,6 +692,13 @@ func (x *CreateSandboxRequest) GetEnvironment() map[string]string {
 		return x.Environment
 	}
 	return nil
+}
+
+func (x *CreateSandboxRequest) GetSnapshotId() string {
+	if x != nil && x.SnapshotId != nil {
+		return *x.SnapshotId
+	}
+	return ""
 }
 
 type ListSandboxesRequest struct {
@@ -1324,7 +1332,7 @@ func (x *WriteSandboxFileRequest) GetBody() *httpbody.HttpBody {
 type WriteSandboxFileData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
-	BytesWritten  uint64                 `protobuf:"varint,2,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
+	BytesWritten  uint32                 `protobuf:"varint,2,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1366,7 +1374,7 @@ func (x *WriteSandboxFileData) GetPath() string {
 	return ""
 }
 
-func (x *WriteSandboxFileData) GetBytesWritten() uint64 {
+func (x *WriteSandboxFileData) GetBytesWritten() uint32 {
 	if x != nil {
 		return x.BytesWritten
 	}
@@ -2440,15 +2448,18 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x01(\v2\x0f.api.v2.SandboxH\x00R\x04data\x88\x01\x01\x12@\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataH\x01R\bmetadata\x88\x01\x01B\a\n" +
 	"\x05_dataB\v\n" +
-	"\t_metadata\"\xec\x01\n" +
+	"\t_metadata\"\xa2\x02\n" +
 	"\x14CreateSandboxRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04vcpu\x18\x02 \x01(\rR\x04vcpu\x12\x1b\n" +
 	"\tmemory_mb\x18\x03 \x01(\rR\bmemoryMb\x12O\n" +
-	"\venvironment\x18\x04 \x03(\v2-.api.v2.CreateSandboxRequest.EnvironmentEntryR\venvironment\x1a>\n" +
+	"\venvironment\x18\x04 \x03(\v2-.api.v2.CreateSandboxRequest.EnvironmentEntryR\venvironment\x12$\n" +
+	"\vsnapshot_id\x18\x05 \x01(\tH\x00R\n" +
+	"snapshotId\x88\x01\x01\x1a>\n" +
 	"\x10EnvironmentEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"c\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
+	"\f_snapshot_id\"c\n" +
 	"\x14ListSandboxesRequest\x12\x1b\n" +
 	"\x06cursor\x18\x01 \x01(\tH\x00R\x06cursor\x88\x01\x01\x12\x19\n" +
 	"\x05limit\x18\x02 \x01(\x05H\x01R\x05limit\x88\x01\x01B\t\n" +
@@ -2509,7 +2520,7 @@ const file_api_v2_sandbox_proto_rawDesc = "" +
 	"\x05_mode\"O\n" +
 	"\x14WriteSandboxFileData\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12#\n" +
-	"\rbytes_written\x18\x02 \x01(\x04R\fbytesWritten\"\x89\x01\n" +
+	"\rbytes_written\x18\x02 \x01(\rR\fbytesWritten\"\x89\x01\n" +
 	"\x18WriteSandboxFileResponse\x120\n" +
 	"\x04data\x18\x01 \x01(\v2\x1c.api.v2.WriteSandboxFileDataR\x04data\x12;\n" +
 	"\bmetadata\x18\x02 \x01(\v2\x1f.api.v2.SandboxResponseMetadataR\bmetadata\"K\n" +
@@ -2750,6 +2761,7 @@ func file_api_v2_sandbox_proto_init() {
 	file_api_v2_sandbox_proto_msgTypes[2].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[3].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[6].OneofWrappers = []any{}
+	file_api_v2_sandbox_proto_msgTypes[7].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[8].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[12].OneofWrappers = []any{}
 	file_api_v2_sandbox_proto_msgTypes[13].OneofWrappers = []any{}

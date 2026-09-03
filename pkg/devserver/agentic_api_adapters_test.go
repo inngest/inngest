@@ -575,21 +575,9 @@ func (f *fakeTraceReader) LegacyGetSpanOutput(ctx context.Context, id cqrs.SpanI
 	return nil, nil
 }
 
-func (f *fakeTraceReader) GetSpanStack(ctx context.Context, id cqrs.SpanIdentifier) ([]string, error) {
-	return nil, nil
-}
-
 func (f *fakeTraceReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	f.runID = runID
 	return f.root, nil
-}
-
-func (f *fakeTraceReader) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
-	return nil, nil
-}
-
-func (f *fakeTraceReader) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*cqrs.OtelSpan, error) {
-	return nil, nil
 }
 
 func (f *fakeTraceReader) GetSpanOutput(ctx context.Context, id cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {

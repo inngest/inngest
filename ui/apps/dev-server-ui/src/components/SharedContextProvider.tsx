@@ -5,9 +5,6 @@ import {
 
 import { useBooleanFlag } from '@/hooks/useBooleanFlag';
 import { useCancelRun } from '@/hooks/useCancelRun';
-import { useCreateDebugSession } from '@/hooks/useCreateDebugSession';
-import { useGetDebugRun } from '@/hooks/useGetDebugRun';
-import { useGetDebugSession } from '@/hooks/useGetDebugSession';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetRunLinkage } from '@/hooks/useGetRunLinkage';
 import { useGetRunTrace } from '@/hooks/useGetRunTrace';
@@ -30,9 +27,6 @@ export const SharedContextProvider = ({
   const getRunLinkage = useGetRunLinkage();
   const getRunTrace = useGetRunTrace();
   const getTraceResult = useGetTraceResult();
-  const createDebugSession = useCreateDebugSession();
-  const getDebugRun = useGetDebugRun();
-  const getDebugSession = useGetDebugSession();
 
   const handlers: Partial<SharedHandlers> = {
     invokeRun,
@@ -47,9 +41,6 @@ export const SharedContextProvider = ({
     getRunTrace,
     inngestStatus: null,
     getTraceResult,
-    getDebugRun,
-    getDebugSession,
-    createDebugSession,
   };
 
   return <SharedProvider handlers={handlers}>{children}</SharedProvider>;

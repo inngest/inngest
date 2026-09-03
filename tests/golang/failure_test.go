@@ -76,17 +76,26 @@ func TestFunctionFailure(t *testing.T) {
 		rootSpanID := run.Trace.SpanID
 
 		t.Run("failed run", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-			require.Equal(t, consts.OtelExecFnErr, span.Name)
+			// The failed execution wrapper now surfaces as a "Finalization"
+			// span rather than consts.OtelExecFnErr, and no longer carries
+			// its own output (the run root's output, checked above, already
+			// covers the final error).
+			span, _ := run.Trace.FindStep(t, "Finalization")
 			require.False(t, span.IsRoot)
 			require.Equal(t, rootSpanID, span.ParentSpanID)
 			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-			require.NotNil(t, span.OutputID)
+			require.Nil(t, span.OutputID)
 
-			// output test
-			output := c.RunSpanOutput(ctx, *span.OutputID)
-			require.NotNil(t, output)
-			c.ExpectSpanErrorOutput(t, "nope!", "", output)
+			t.Run("attempt 0", func(t *testing.T) {
+				one, _ := span.FindStep(t, "Attempt 0")
+				require.Equal(t, models.RunTraceSpanStatusFailed.String(), one.Status)
+				require.NotNil(t, one.OutputID)
+
+				// output test
+				output := c.RunSpanOutput(ctx, *one.OutputID)
+				require.NotNil(t, output)
+				c.ExpectSpanErrorOutput(t, "nope!", "", output)
+			})
 		})
 	})
 }
@@ -140,24 +149,27 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 	t.Run("in progress run", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, ChildSpanCount: 1})
 
+		// OutputID isn't a reliable "has this run produced output" signal —
+		// it's also used to fetch a span's input, so it can be non-nil
+		// before the run ends. Status is the real signal.
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-		require.Nil(t, run.Trace.OutputID)
 
 		rootSpanID := run.Trace.SpanID
 
 		// test first attempt
 		t.Run("attempt 1", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-			require.Equal(t, "execute", span.Name)
+			// The in-progress execution wrapper now surfaces as a
+			// "Finalization" span rather than the old discovery-span
+			// placeholder name ("execute" / consts.OtelExecPlaceholder).
+			span, _ := run.Trace.FindStep(t, "Finalization")
 			require.False(t, span.IsRoot)
 			require.GreaterOrEqual(t, len(span.ChildSpans), 1)
 			require.Equal(t, rootSpanID, span.ParentSpanID)
-			require.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
+			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
 			require.Nil(t, span.OutputID)
 
 			t.Run("failed", func(t *testing.T) {
-				failed := span.ChildSpans[0]
-				require.Equal(t, "Attempt 0", failed.Name)
+				failed, _ := span.FindStep(t, "Attempt 0")
 				require.False(t, span.IsRoot)
 				require.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
@@ -183,25 +195,26 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 
 		// first attempt
 		t.Run("failed run", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-			require.Equal(t, consts.OtelExecPlaceholder, span.Name)
+			// The retrying function's execution wrapper now surfaces as a
+			// "Finalization" span (see convertRunSpanToGQL's finalization-group
+			// collapsing) rather than the old discovery-span placeholder name
+			// (consts.OtelExecPlaceholder). It groups the attempts but no
+			// longer carries its own output — that now lives on each attempt
+			// (and the sibling executor.nonstep spans), and the run root
+			// already covers the final error (checked above).
+			span, _ := run.Trace.FindStep(t, "Finalization")
 			require.False(t, span.IsRoot)
 			require.Equal(t, rootSpanID, span.ParentSpanID)
 			require.Equal(t, 2, len(span.ChildSpans))
-			require.Equal(t, 2, span.Attempts)
+			require.Equal(t, 1, span.Attempts) // max attempt index across children (0 and 1)
 			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-			require.NotNil(t, span.OutputID)
-
-			// output test
-			output := c.RunSpanOutput(ctx, *span.OutputID)
-			require.NotNil(t, output)
-			c.ExpectSpanErrorOutput(t, "nope!", "", output)
+			require.Nil(t, span.OutputID)
 
 			t.Run("attempt 0", func(t *testing.T) {
-				one := span.ChildSpans[0]
-				require.Equal(t, "Attempt 0", one.Name)
+				one, _ := span.FindStep(t, "Attempt 0")
 				require.False(t, one.IsRoot)
-				require.Equal(t, rootSpanID, one.ParentSpanID)
+				// Nested under the Finalization wrapper, not the run root.
+				require.Equal(t, span.SpanID, one.ParentSpanID)
 				require.Equal(t, 0, one.Attempts)
 				require.Equal(t, models.RunTraceSpanStatusFailed.String(), one.Status)
 				require.NotNil(t, one.OutputID)
@@ -213,10 +226,9 @@ func TestFunctionFailureWithRetries(t *testing.T) {
 
 			// second attempt
 			t.Run("attempt 1", func(t *testing.T) {
-				two := span.ChildSpans[1]
-				require.Equal(t, "Attempt 1", two.Name)
+				two, _ := span.FindStep(t, "Attempt 1")
 				require.False(t, two.IsRoot)
-				require.Equal(t, rootSpanID, two.ParentSpanID)
+				require.Equal(t, span.SpanID, two.ParentSpanID)
 				require.Equal(t, 1, two.Attempts)
 				require.Equal(t, models.RunTraceSpanStatusFailed.String(), two.Status)
 				require.NotNil(t, two.OutputID)
@@ -280,28 +292,29 @@ func TestFunctionResponseTooLargeFailure(t *testing.T) {
 		require.NotEmpty(t, rootSpanID)
 
 		t.Run("attempt 1", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-
-			require.Equal(t, "function error", span.Name)
+			// The execution wrapper now surfaces as a "Finalization" span
+			// rather than consts.OtelExecFnErr ("function error"), and no
+			// longer carries its own output.
+			span, _ := run.Trace.FindStep(t, "Finalization")
 			require.False(t, span.IsRoot)
 			require.GreaterOrEqual(t, len(span.ChildSpans), 1)
 			require.Equal(t, rootSpanID, span.ParentSpanID)
 			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
-			require.NotNil(t, span.OutputID)
+			require.Nil(t, span.OutputID)
 
 			t.Run("failed", func(t *testing.T) {
-				failed := span.ChildSpans[0]
-
-				require.Equal(t, "Attempt 0", failed.Name)
+				failed, _ := span.FindStep(t, "Attempt 0")
 				require.False(t, span.IsRoot)
 				require.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
 				require.NotNil(t, failed.OutputID)
 				output := c.RunSpanOutput(ctx, *failed.OutputID)
 				require.NotNil(t, output)
-				require.NoError(t, err)
-				quoted := fmt.Sprintf("%q", syscode.CodeOutputTooLarge)
-				c.ExpectSpanErrorOutput(t, "", quoted, output)
+				require.NotNil(t, output.Error)
+				// The syscode now surfaces on the error's Name field rather
+				// than embedded in Stack.
+				require.NotNil(t, output.Error.Name)
+				require.Equal(t, syscode.CodeOutputTooLarge, *output.Error.Name)
 			})
 		})
 
@@ -347,24 +360,27 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 	t.Run("in progress run with large response body", func(t *testing.T) {
 		run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{Status: models.FunctionStatusRunning, ChildSpanCount: 1})
 
+		// OutputID isn't a reliable "has this run produced output" signal —
+		// it's also used to fetch a span's input, so it can be non-nil
+		// before the run ends. Status is the real signal.
 		require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
-		require.Nil(t, run.Trace.OutputID)
 
 		rootSpanID := run.Trace.SpanID
 
 		// test first attempt
 		t.Run("attempt 1", func(t *testing.T) {
-			span := run.Trace.ChildSpans[0]
-			require.Equal(t, "execute", span.Name)
+			// The in-progress execution wrapper now surfaces as a
+			// "Finalization" span rather than the old discovery-span
+			// placeholder name ("execute" / consts.OtelExecPlaceholder).
+			span, _ := run.Trace.FindStep(t, "Finalization")
 			require.False(t, span.IsRoot)
 			require.GreaterOrEqual(t, len(span.ChildSpans), 1)
 			require.Equal(t, rootSpanID, span.ParentSpanID)
-			require.Equal(t, models.RunTraceSpanStatusRunning.String(), span.Status)
+			require.Equal(t, models.RunTraceSpanStatusFailed.String(), span.Status)
 			require.Nil(t, span.OutputID)
 
 			t.Run("failed with output too large error", func(t *testing.T) {
-				failed := span.ChildSpans[0]
-				require.Equal(t, "Attempt 0", failed.Name)
+				failed, _ := span.FindStep(t, "Attempt 0")
 				require.False(t, span.IsRoot)
 				require.Equal(t, models.RunTraceSpanStatusFailed.String(), failed.Status)
 
@@ -372,8 +388,11 @@ func TestFunctionResponseTooLargeFailureWithRetry(t *testing.T) {
 				require.NotNil(t, failed.OutputID)
 				output := c.RunSpanOutput(ctx, *failed.OutputID)
 				require.NotNil(t, output)
-				quoted := fmt.Sprintf("%q", syscode.CodeOutputTooLarge)
-				c.ExpectSpanErrorOutput(t, "", quoted, output)
+				require.NotNil(t, output.Error)
+				// The syscode now surfaces on the error's Name field rather
+				// than embedded in Stack.
+				require.NotNil(t, output.Error.Name)
+				require.Equal(t, syscode.CodeOutputTooLarge, *output.Error.Name)
 			})
 		})
 	})

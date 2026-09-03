@@ -111,10 +111,13 @@ func TestSleep(t *testing.T) {
 		c.ExpectSpanOutput(t, "true", output)
 
 		t.Run("sleep", func(t *testing.T) {
-			sleep := run.Trace.ChildSpans[0]
+			// The initial fn-level error happened before the function ever
+			// reached step.Sleep, so it no longer nests under "nap" — that
+			// attempt history now lives on the top-level "Finalization"
+			// wrapper that groups the run's own retries (see below). "nap"
+			// itself only ran once and is now a clean, childless span.
+			sleep, _ := run.Trace.FindStep(t, "nap")
 			assert.Equal(t, models.RunTraceSpanStatusCompleted.String(), sleep.Status)
-			assert.Equal(t, 2, len(sleep.ChildSpans))
-			assert.Equal(t, "nap", sleep.Name)
 			assert.Equal(t, models.StepOpSleep.String(), sleep.StepOp)
 			assert.Nil(t, sleep.OutputID)
 
@@ -128,9 +131,9 @@ func TestSleep(t *testing.T) {
 
 			// first is the failed attempt
 			t.Run("failed execution", func(t *testing.T) {
-				exec := sleep.ChildSpans[0]
+				finalization, _ := run.Trace.FindStep(t, "Finalization")
+				exec, _ := finalization.FindStep(t, "Attempt 0")
 				assert.Equal(t, models.RunTraceSpanStatusFailed.String(), exec.Status)
-				assert.Equal(t, "Attempt 0", exec.Name)
 				assert.NotNil(t, exec.OutputID)
 
 				execOutput := c.RunSpanOutput(ctx, *exec.OutputID)

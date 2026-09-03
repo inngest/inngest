@@ -88,9 +88,9 @@ export default function SDKRequestThroughputChart({
     metrics = queued.data.map((d, idx) => ({
       name: d.bucket,
       values: {
-        queued: d.value,
-        started: started.data[idx]?.value || 0,
-        ended: ended.data[idx]?.value || 0,
+        queued: d.value ?? 0,
+        started: started.data[idx]?.value ?? 0,
+        ended: ended.data[idx]?.value ?? 0,
       },
     }));
   }
