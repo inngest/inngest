@@ -357,6 +357,29 @@ func TestRunProviderGetRunsSkipsUnknownPublicFilter(t *testing.T) {
 	assert.Equal(t, []string{"unknown-app"}, data.listOpts.Filter.AppName)
 }
 
+func TestRunProviderGetRunsPassesCEL(t *testing.T) {
+	data := &stubRunProviderDataReader{}
+	provider := &runProvider{data: data}
+
+	_, err := provider.GetRuns(t.Context(), apiv2.GetRunsOpts{
+		Limit: 20,
+		CEL:   `event.data.userId == "123"`,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, `event.data.userId == "123"`, data.listOpts.Filter.CEL)
+}
+
+func TestRunProviderGetRunsMapsInvalidCEL(t *testing.T) {
+	data := &stubRunProviderDataReader{listErr: cqrs.ErrInvalidRunExpression}
+	provider := &runProvider{data: data}
+
+	result, err := provider.GetRuns(t.Context(), apiv2.GetRunsOpts{Limit: 20, CEL: "not valid"})
+
+	require.Nil(t, result)
+	require.ErrorIs(t, err, apiv2.ErrExpressionInvalid)
+}
+
 func TestCQRSRunTimeField(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -388,12 +411,13 @@ type stubRunProviderDataReader struct {
 	evt        *cqrs.Event
 	evtErr     error
 	listedRuns []*cqrs.TraceRun
+	listErr    error
 	listOpts   *cqrs.GetTraceRunOpt
 }
 
 func (s *stubRunProviderDataReader) GetRuns(ctx context.Context, opts cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	s.listOpts = &opts
-	return s.listedRuns, nil
+	return s.listedRuns, s.listErr
 }
 
 func (s *stubRunProviderDataReader) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {

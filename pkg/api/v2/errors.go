@@ -15,6 +15,7 @@ var (
 	ErrRerunStepAmbiguous    = errors.New("rerun step name is ambiguous")
 	ErrRunAlreadyCancelled   = errors.New("run is already cancelled")
 	ErrRunEnded              = errors.New("run has already ended")
+	ErrExpressionInvalid     = errors.New("expression is invalid")
 
 	// ErrScoresNotEnabled is returned by ScoreProvider implementations when
 	// score submission is not enabled for the authenticated account.

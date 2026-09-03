@@ -26,7 +26,12 @@ const (
 	maxEventRunsLimit     = 40
 	defaultRunsLimit      = 20
 	maxRunsLimit          = 100
+	// This is an intentionally arbitrary, conservative URL compatibility limit,
+	// not a constraint imposed by CEL or the run storage backend.
+	maxRunsCELBytes       = 2048
 )
+
+var runsCELTooLongMessage = fmt.Sprintf("Query cannot exceed %d bytes", maxRunsCELBytes)
 
 func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunRequest) (*apiv2.GetFunctionRunResponse, error) {
 	if req.RunId == "" {
@@ -67,6 +72,10 @@ func (s *Service) GetFunctionRun(ctx context.Context, req *apiv2.GetFunctionRunR
 }
 
 func (s *Service) ListRuns(ctx context.Context, req *apiv2.ListRunsRequest) (*apiv2.ListRunsResponse, error) {
+	if len(req.GetQuery()) > maxRunsCELBytes {
+		return nil, s.base.NewError(http.StatusUnprocessableEntity, apiv2base.ErrorQueryTooLong, runsCELTooLongMessage)
+	}
+
 	if result := s.rateLimiter.CheckRateLimit(ctx, apiv2.V2_ListRuns_FullMethodName); result.Limited {
 		return nil, s.base.NewError(http.StatusTooManyRequests, apiv2base.ErrorRateLimited,
 			"API rate limit exceeded. The request was rejected and no runs were fetched.")
@@ -85,6 +94,10 @@ func (s *Service) ListRuns(ctx context.Context, req *apiv2.ListRunsRequest) (*ap
 }
 
 func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionRunsRequest) (*apiv2.ListFunctionRunsResponse, error) {
+	if len(req.GetQuery()) > maxRunsCELBytes {
+		return nil, s.base.NewError(http.StatusUnprocessableEntity, apiv2base.ErrorQueryTooLong, runsCELTooLongMessage)
+	}
+
 	if req.AppId == "" || req.FunctionId == "" {
 		return nil, s.base.NewError(http.StatusBadRequest, apiv2base.ErrorMissingField, "App ID and function ID are required")
 	}
@@ -130,6 +143,9 @@ func (s *Service) ListFunctionRuns(ctx context.Context, req *apiv2.ListFunctionR
 func (s *Service) listRuns(ctx context.Context, opts GetRunsOpts) (*apiv2.ListRunsResponse, error) {
 	result, err := s.runs.GetRuns(ctx, opts)
 	if err != nil {
+		if errors.Is(err, ErrExpressionInvalid) {
+			return nil, s.base.NewError(http.StatusUnprocessableEntity, apiv2base.ErrorExpressionInvalid, "Query expression is invalid")
+		}
 		return nil, s.base.NewError(http.StatusInternalServerError, apiv2base.ErrorInternalError, "Unable to fetch runs")
 	}
 	if result == nil {
@@ -140,11 +156,17 @@ func (s *Service) listRuns(ctx context.Context, opts GetRunsOpts) (*apiv2.ListRu
 	for _, run := range result.Runs {
 		data = append(data, toAPIRunListItem(run))
 	}
+	page := runsPage(result.Runs, opts.Limit, result.HasMore)
+	// Cloud's RunProvider.GetRuns may return a scan cursor that does not
+	// correspond to a returned run. Pass it through even when the page is empty.
+	if result.Cursor != "" {
+		page.Cursor = &result.Cursor
+	}
 
 	return &apiv2.ListRunsResponse{
 		Data:     data,
 		Metadata: runsResponseMetadata(opts.From, opts.Until),
-		Page:     runsPage(result.Runs, opts.Limit, result.HasMore),
+		Page:     page,
 	}, nil
 }
 
@@ -382,6 +404,7 @@ func runsPage(runs []*RunListItem, limit int, hasMore bool) *apiv2.Page {
 		Limit:   int32(limit),
 	}
 	if hasMore && len(runs) > 0 {
+		// OSS pagination continues from the last returned matching run.
 		nextCursor := runs[len(runs)-1].Cursor
 		page.Cursor = &nextCursor
 	}

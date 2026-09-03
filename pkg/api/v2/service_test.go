@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/api/v2/apiv2base"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -1096,7 +1098,7 @@ func TestService_ListRuns(t *testing.T) {
 			IsDeferred:    &isDeferred,
 			Order:         OrderDirectionAsc,
 			CEL:           `event.data.userId == "123"`,
-		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, HasMore: true}, nil).Once()
+		}).Return(&GetRunsResult{Runs: []*RunListItem{run}, Cursor: pageCursor, HasMore: true}, nil).Once()
 		t.Cleanup(func() {
 			reader.AssertExpectations(t)
 		})
@@ -1127,7 +1129,7 @@ func TestService_ListRuns(t *testing.T) {
 		require.Equal(t, from, resp.Metadata.TimeRange.From.AsTime())
 		require.Equal(t, until, resp.Metadata.TimeRange.Until.AsTime())
 		require.True(t, resp.Page.HasMore)
-		require.Equal(t, "opaque-cursor", resp.Page.GetCursor())
+		require.Equal(t, pageCursor, resp.Page.GetCursor())
 		require.Equal(t, int32(1), resp.Page.Limit)
 	})
 
@@ -1170,6 +1172,44 @@ func TestService_ListRuns(t *testing.T) {
 
 		require.Nil(t, resp)
 		require.ErrorContains(t, err, "Cursor is invalid")
+	})
+
+	t.Run("uses a provider cursor for an empty continuing page", func(t *testing.T) {
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, mock.Anything).Return(&GetRunsResult{
+			Cursor:  "provider-cursor",
+			HasMore: true,
+		}, nil).Once()
+
+		resp, err := NewService(ServiceOptions{Runs: reader}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Query: strPtr(`event.name == "app/test"`),
+		})
+
+		require.NoError(t, err)
+		require.Empty(t, resp.Data)
+		require.True(t, resp.Page.HasMore)
+		require.Equal(t, "provider-cursor", resp.Page.GetCursor())
+	})
+
+	t.Run("maps expression errors", func(t *testing.T) {
+		reader := &mockRunProvider{}
+		reader.On("GetRuns", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("compile CEL: %w", ErrExpressionInvalid)).Once()
+
+		resp, err := NewService(ServiceOptions{Runs: reader}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Query: strPtr("not valid"),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, apiv2base.ErrorExpressionInvalid)
+	})
+
+	t.Run("rejects queries over 2048 bytes", func(t *testing.T) {
+		resp, err := NewService(ServiceOptions{Runs: &mockRunProvider{}}).ListRuns(t.Context(), &apiv2.ListRunsRequest{
+			Query: strPtr(strings.Repeat("é", maxRunsCELBytes/2+1)),
+		})
+
+		require.Nil(t, resp)
+		require.ErrorContains(t, err, apiv2base.ErrorQueryTooLong)
 	})
 }
 
