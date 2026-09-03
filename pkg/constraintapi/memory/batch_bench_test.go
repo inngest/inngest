@@ -42,7 +42,11 @@ func BenchmarkBatch(b *testing.B) {
 		require.NoError(b, err)
 		workers = n
 	}
-	shape := benchShapes()[0]
+	shapeName := "semaphore"
+	if v := os.Getenv("CONSTRAINT_BENCH_SHAPE"); v != "" {
+		shapeName = v
+	}
+	shape := benchShapeNamed(b, shapeName)
 
 	for _, n := range sizes {
 		b.Run(fmt.Sprintf("%d/redis", n), func(b *testing.B) {

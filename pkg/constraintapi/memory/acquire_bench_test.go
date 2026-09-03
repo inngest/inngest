@@ -70,7 +70,7 @@ func TestAcquireP99Guard(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = m.Close() })
 
-	shape := benchShapes()[2]
+	shape := benchShapeNamed(t, "semaphore")
 	id := newIDs()
 	shape.setup(t, m, id)
 
@@ -118,6 +118,11 @@ func benchShapes() []benchShape {
 	mixedConfig := semaphoreConfig(sem)
 	mixedConfig.Concurrency = concConfig.Concurrency
 
+	throttleConfig := constraintapi.ConstraintConfig{FunctionVersion: 1, Throttle: []constraintapi.ThrottleConfig{{Scope: enums.ThrottleScopeFn, KeyExpressionHash: "t", Limit: huge, Burst: 0, Period: 60}}}
+	rateLimitConfig := constraintapi.ConstraintConfig{FunctionVersion: 1, RateLimit: []constraintapi.RateLimitConfig{{Scope: enums.RateLimitScopeFn, KeyExpressionHash: "r", Limit: huge, Period: 60}}}
+	semThrottleConfig := semaphoreConfig(sem)
+	semThrottleConfig.Throttle = throttleConfig.Throttle
+
 	base := func(id ids, key string, config constraintapi.ConstraintConfig, constraints []constraintapi.ConstraintItem) *constraintapi.CapacityAcquireRequest {
 		return &constraintapi.CapacityAcquireRequest{
 			AccountID: id.account, EnvID: id.env, FunctionID: id.fn, AppID: id.app,
@@ -139,6 +144,28 @@ func benchShapes() []benchShape {
 			request: func(id ids, key string) *constraintapi.CapacityAcquireRequest {
 				s := sem
 				return base(id, key, semConfig, []constraintapi.ConstraintItem{semaphoreItem(&s)})
+			},
+		},
+		{
+			name:  "throttle",
+			setup: func(testing.TB, constraintapi.SemaphoreManager, ids) {},
+			request: func(id ids, key string) *constraintapi.CapacityAcquireRequest {
+				return base(id, key, throttleConfig, []constraintapi.ConstraintItem{throttleItem("t", "v")})
+			},
+		},
+		{
+			name:  "ratelimit",
+			setup: func(testing.TB, constraintapi.SemaphoreManager, ids) {},
+			request: func(id ids, key string) *constraintapi.CapacityAcquireRequest {
+				return base(id, key, rateLimitConfig, []constraintapi.ConstraintItem{rateLimitItem("r", "v")})
+			},
+		},
+		{
+			name:  "semaphore+throttle",
+			setup: setSem,
+			request: func(id ids, key string) *constraintapi.CapacityAcquireRequest {
+				s := sem
+				return base(id, key, semThrottleConfig, []constraintapi.ConstraintItem{semaphoreItem(&s), throttleItem("t", "v")})
 			},
 		},
 		{
@@ -166,6 +193,17 @@ func benchShapes() []benchShape {
 	}
 }
 
+// benchShapeNamed returns the shape with the given name.
+func benchShapeNamed(tb testing.TB, name string) benchShape {
+	for _, s := range benchShapes() {
+		if s.name == name {
+			return s
+		}
+	}
+	tb.Fatalf("unknown benchmark shape %q", name)
+	return benchShape{}
+}
+
 func benchRedis(b *testing.B) (constraintapi.CapacityManager, constraintapi.SemaphoreManager) {
 	var rc rueidis.Client
 	if addr := os.Getenv("CONSTRAINT_BENCH_REDIS_ADDR"); addr != "" {
@@ -185,9 +223,19 @@ func benchRedis(b *testing.B) (constraintapi.CapacityManager, constraintapi.Sema
 	return cm, constraintapi.NewRedisSemaphoreManager(rc)
 }
 
+// skipUnsupported skips the benchmark when the backend rejects the shape, so a
+// constraint kind the memory manager has not implemented yet reads as skipped
+// rather than failed.
+func skipUnsupported(b *testing.B, cm constraintapi.CapacityManager, shape benchShape, id ids) {
+	if _, err := cm.Acquire(context.Background(), shape.request(id, "probe-"+uuid.NewString())); err != nil {
+		b.Skipf("shape not supported: %v", err)
+	}
+}
+
 func benchAcquire(b *testing.B, cm constraintapi.CapacityManager, sm constraintapi.SemaphoreManager, shape benchShape) {
 	id := newIDs()
 	shape.setup(b, sm, id)
+	skipUnsupported(b, cm, shape, id)
 	lat := &latencies{}
 	var n atomic.Int64
 
@@ -217,6 +265,7 @@ func benchAcquire(b *testing.B, cm constraintapi.CapacityManager, sm constrainta
 func benchAcquireRelease(b *testing.B, cm constraintapi.CapacityManager, sm constraintapi.SemaphoreManager, shape benchShape) {
 	id := newIDs()
 	shape.setup(b, sm, id)
+	skipUnsupported(b, cm, shape, id)
 	var n atomic.Int64
 
 	b.ReportAllocs()

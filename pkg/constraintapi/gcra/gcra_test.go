@@ -78,10 +78,12 @@ func TestThrottle(t *testing.T) {
 		require.Equal(t, int64(8), ttl, "ttl is %%d of ttl/1000, which truncates 8.571")
 		require.Equal(t, now+emission, res.RetryAt)
 
-		// the fraction must survive a round trip through the stored TAT
+		// the fraction must survive a round trip through the stored TAT.  at
+		// millisecond magnitude a double resolves to about a microsecond, so
+		// now + emission - now is not exactly emission, in Lua or here.
 		res2, _, _, _ := Throttle(newTAT, true, now, minute, 7, 0, 0)
 		require.Equal(t, newTAT, res2.TAT)
-		require.Equal(t, emission, res2.ResetAfter)
+		require.InDelta(t, emission, res2.ResetAfter, 1e-3)
 	})
 
 	t.Run("tat in the past inflates remaining", func(t *testing.T) {

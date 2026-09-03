@@ -310,11 +310,15 @@ concurrent callers with the same key share one execution (the guarantee in
 4. `skipGCRA = checkIdem.get(xxhash(req.IdempotencyKey))`.
 5. **Snapshot pass**: atomic loads only, the exact `acquire.lua:225-302` arithmetic.
    `available <= 0` → status 2, no mutation, no cache, `RetryAfter` from the snapshot.
-6. **Commit pass** with `granted = available`, semaphores first (exact rollback), then the
+6. **Commit pass** with `granted = available`, counters first (exact rollback), then the
    ≤2 GCRA constraints: semaphore `fit = cell.take(capacity, w, granted)`, shrink and mark
-   limiting; GCRA `cell.update` with `quantity = granted`, on limited retry with
-   `quantity = result.Remaining`, 0 → exhausted; `skipGCRA` skips as `acquire.lua:347`.
-   Roll earlier constraints back by `taken_i - granted`.  `granted == 0` → status 2.
+   limiting; GCRA `cell.update` with `quantity = granted`.  When the helper refuses, the
+   refusal is one of two things: with the TAT in the past, pass one saw the inflated
+   remaining and `acquire.lua` grants without writing, which is kept; otherwise another
+   request moved the TAT between the passes and the take is retried with what fits now,
+   down to nothing.  `skipGCRA` skips as `acquire.lua:347`.  Roll earlier constraints back
+   by `taken_i - granted`; a GCRA rollback moves the TAT back by that many emission
+   intervals.  `granted == 0` → status 2.
 7. **Report pass**: atomic loads for `Usage`, exhausted set, `retryAt` as
    `acquire.lua:397-422`; indices in sorted order.
 8. Bookkeeping: `slab.alloc()` per granted lease (prefix of `LeaseIdempotencyKeys`), lease
@@ -562,8 +566,9 @@ tests in place and red.
    `constraintapi` exports: `SortConstraints`, `ResolveLimits` (+ table test asserting it
    matches serialized `Limit/Burst/Period` for every kind and scope),
    `SemaphoreIdempotencyTTL`.  Existing tests unchanged.
-- [ ] 2. `pkg/constraintapi/gcra` + `gcra_test.go` refactor (package and its own failing
-   table test exist; the port and the Lua runner refactor are next): `gcraRunner` with Lua and Go
+- [x] 2. `pkg/constraintapi/gcra` + `gcra_test.go` refactor (all 27 table cases run against
+   the Lua in miniredis and the Go port through `forEachGCRARunner`; the non-divisible and
+   past-TAT cases pin the Lua and pass on both): `gcraRunner` with Lua and Go
    implementations; tables per backend via `t.Run`; non-divisible and past-TAT cases.
 - [x] 3. `memory/cells.go`, `ttlmap.go` + unit tests: `take`/`give` under `-race` with 16
    goroutines (never exceeds capacity, never negative, exact rollback), `gcraCell.update`
@@ -576,8 +581,9 @@ tests in place and red.
    `TestSemaphoreGetCapacity`, `TestSemaphoreAdjustCapacityClampsToZero`
    (`semaphore_test.go:353-684`) using `SetCapacity` instead of `r.Set`.
 - [ ] 6. `memory/acquire.go` + `memory/conformance_test.go` harness (harness and every
-   scenario written; semaphore scenarios green on both backends; concurrency, throttle and
-   rate limit return "not implemented" from `Acquire` until steps 2 and 6 land):
+   scenario written; semaphore, throttle, rate limit and skip-GCRA scenarios green on both
+   backends; concurrency returns "not implemented" from `Acquire` until it lands, which also
+   blocks the mixed scenario):
    `backend{cm CapacityManager; sm SemaphoreManager; scavenge func(ctx); clock *clockwork.FakeClock; advance(d)}`
    with miniredis (`advance` also calls `r.FastForward`/`r.SetTime`; `scavenge` calls the
    Redis `Scavenge`) and memory.  Scenarios: account/fn/custom concurrency, throttle, rate
@@ -597,7 +603,9 @@ tests in place and red.
    `TestSemaphoreScavengeManualRelease`), acquire during scavenge (port
    `concurrency_race_test.go:338`), hooks fired once per reclaimed lease; a test drives
    time past all TTLs and asserts pages, cells, buckets and maps return to empty.
-- [ ] 9. `memory/check.go`.  Conformance for rate limit/throttle/concurrency `Check`.
+- [ ] 9. `memory/check.go` (done for rate limit, throttle and semaphores, conformant with
+   `check.lua` for the first two; the write-only `chk` record is not kept).  Conformance for
+   concurrency `Check` pending concurrency.
 - [ ] 10. `memory/race_test.go` (`-race`) (written and green for semaphores; `BenchmarkAcquire`,
     `BenchmarkAcquireRelease` and `BenchmarkBatch` written and measured, p99 guard behind
     `CONSTRAINT_BENCH_GUARD`, real Valkey via `CONSTRAINT_BENCH_REDIS_ADDR`): N goroutines across M accounts and K shared keys

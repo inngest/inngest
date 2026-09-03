@@ -145,6 +145,11 @@ func (c *gcraCell) load(nowMS int64) (tat float64, present bool) {
 	return st.tat, true
 }
 
+// alive is false once housekeeping dropped the cell.
+func (c *gcraCell) alive() bool {
+	return c.state.Load() != deadGCRA
+}
+
 // update runs f on the current TAT and stores the result with a CAS.  f is
 // pure and may run more than once under contention.  when f returns store
 // false nothing is written and update returns after one run.  ok is false

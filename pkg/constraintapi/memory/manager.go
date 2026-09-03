@@ -245,6 +245,21 @@ func cellKeyOf(kind byte, accountID uuid.UUID, p1, p2 string) cellKey {
 	return cellKey{a: xxhash.Sum64(b), b: sumSeeded(b, cellSeed)}
 }
 
+// gcraKey is the cell key of one rate limit or throttle state: the kind, the
+// account, the scope and the ID the scope points at, and the key expression
+// and evaluated key hashes, the same identity the Redis state key carries.
+func gcraKey(kind byte, accountID uuid.UUID, scope int, entity uuid.UUID, exprHash, evaluatedHash string) cellKey {
+	var arr [128]byte
+	b := arr[:0]
+	b = append(b, kind)
+	b = appendUUID(b, accountID)
+	b = appendInt(b, scope)
+	b = appendUUID(b, entity)
+	b = appendStr(b, exprHash)
+	b = appendStr(b, evaluatedHash)
+	return cellKey{a: xxhash.Sum64(b), b: sumSeeded(b, cellSeed)}
+}
+
 // semaphoreCells returns the usage and capacity keys of one semaphore.
 // capacity is shared by every evaluated key of the semaphore, usage is not.
 func semaphoreCells(accountID uuid.UUID, id, evaluatedKeyHash string) (usage, capacity cellKey) {
@@ -264,6 +279,22 @@ func (m *Manager) sem(key cellKey) *semaphoreCell {
 			return c
 		}
 		m.sems.CompareAndDelete(key, c)
+	}
+}
+
+// gcraCell returns the live TAT cell for key, creating it on first use.  a
+// dead cell left behind by housekeeping is dropped and replaced.
+func (m *Manager) gcraCell(key cellKey) *gcraCell {
+	for {
+		v, ok := m.gcra.Load(key)
+		if !ok {
+			v, _ = m.gcra.LoadOrStore(key, &gcraCell{})
+		}
+		c := v.(*gcraCell)
+		if c.alive() {
+			return c
+		}
+		m.gcra.CompareAndDelete(key, c)
 	}
 }
 
