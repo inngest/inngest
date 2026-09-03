@@ -723,7 +723,7 @@ github.com/gowebpki/jcs
 # github.com/graph-gophers/dataloader v5.0.0+incompatible
 ## explicit
 github.com/graph-gophers/dataloader
-# github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
+# github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 => github.com/inngest/grpc-gateway/v2 v2.0.0-20260902223327-d31bbe86cfb6
 ## explicit; go 1.24.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options
@@ -1844,3 +1844,4 @@ modernc.org/sqlite
 modernc.org/sqlite/lib
 modernc.org/sqlite/vtab
 # github.com/tencentcloud/tencentcloud-sdk-go v3.0.82+incompatible => github.com/tencentcloud/tencentcloud-sdk-go v1.0.191
+# github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/inngest/grpc-gateway/v2 v2.0.0-20260902223327-d31bbe86cfb6

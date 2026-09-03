@@ -297,3 +297,5 @@ require (
 )
 
 tool github.com/Songmu/gotesplit/cmd/gotesplit
+
+replace github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/inngest/grpc-gateway/v2 v2.0.0-20260902223327-d31bbe86cfb6
