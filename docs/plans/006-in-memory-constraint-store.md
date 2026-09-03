@@ -149,6 +149,20 @@ Not reused: `buildRequestState`; memory builds its fingerprint from
 `ToSerializedConstraintItem` (exported) with xxhash (fingerprints are per backend).
 Reused as is: `constraintapi.ScavengeResult` and its `Report` for scavenger metrics.
 
+### Concurrency as a semaphore
+
+A concurrency constraint is a `semaphoreCell` of weight 1 with auto release, keyed by the
+same identity as the Redis in-progress key (account, scope, the ID the scope points at, key
+expression hash, evaluated key hash; mode excluded as in Redis), whose capacity is the
+request's configured limit instead of a counter.  Acquire `take`s, release `give`s once by
+the slot CAS, extend moves the slot and leaves the counter, the sweeper releases through the
+normal path.  It keeps the Lua's `limit - usage` for its units, so a limit lowered below the
+usage reports negative `AvailableCapacity` from `Check` as Redis does; the semaphore formula
+floors at zero and divides by weight.  Two differences from the ZSET: usage drops on the
+sweep tick rather than the millisecond a lease expires, and a counter does not heal a lost
+decrement the way a ZSET recomputes from its members.  A recount of live slots per cell is
+possible as a repair job and is not in this work.
+
 ### Constraint cells (`cells.go`)
 
 ```go
@@ -580,10 +594,8 @@ tests in place and red.
    options, constructor, `SemaphoreManager`.  Port `TestSemaphoreManager`,
    `TestSemaphoreGetCapacity`, `TestSemaphoreAdjustCapacityClampsToZero`
    (`semaphore_test.go:353-684`) using `SetCapacity` instead of `r.Set`.
-- [ ] 6. `memory/acquire.go` + `memory/conformance_test.go` harness (harness and every
-   scenario written; semaphore, throttle, rate limit and skip-GCRA scenarios green on both
-   backends; concurrency returns "not implemented" from `Acquire` until it lands, which also
-   blocks the mixed scenario):
+- [x] 6. `memory/acquire.go` + `memory/conformance_test.go` harness (every scenario green on
+   both backends):
    `backend{cm CapacityManager; sm SemaphoreManager; scavenge func(ctx); clock *clockwork.FakeClock; advance(d)}`
    with miniredis (`advance` also calls `r.FastForward`/`r.SetTime`; `scavenge` calls the
    Redis `Scavenge`) and memory.  Scenarios: account/fn/custom concurrency, throttle, rate
@@ -592,23 +604,20 @@ tests in place and red.
    status 2 not cached, `skipGCRA`.  Compare `len(Leases)`, `LimitingConstraints`,
    `ExhaustedConstraints`, `Usage`, `RetryAfter` (±1ms), `OperationIdempotencyHit`, and
    `LeaseID.Time()` == expiry on both backends.
-- [ ] 7. `memory/release.go` + `memory/extend.go` (semaphore paths done and conformant;
-   concurrency `Usage` entries pending step 6).  Conformance: extend then release with the
+- [x] 7. `memory/release.go` + `memory/extend.go`.  Conformance: extend then release with the
    old ID (status 1, no double decrement), extend expired (nil lease ID, nil error),
    idempotent replays, no-op not cached, `Usage` concurrency-only with stored limit,
    foreign-nonce lease IDs.
-- [ ] 8. `memory/sweeper.go` `Scavenge` + housekeeping (done for semaphores, including the
-   return-to-empty test; concurrency scenario pending step 6).  Conformance: expired leases reclaimed
+- [x] 8. `memory/sweeper.go` `Scavenge` + housekeeping.  Conformance: expired leases reclaimed
    after `advance` + `scavenge` on both backends, manual semaphore force-release (port
    `TestSemaphoreScavengeManualRelease`), acquire during scavenge (port
    `concurrency_race_test.go:338`), hooks fired once per reclaimed lease; a test drives
    time past all TTLs and asserts pages, cells, buckets and maps return to empty.
-- [ ] 9. `memory/check.go` (done for rate limit, throttle and semaphores, conformant with
-   `check.lua` for the first two; the write-only `chk` record is not kept).  Conformance for
-   concurrency `Check` pending concurrency.
-- [ ] 10. `memory/race_test.go` (`-race`) (written and green for semaphores; `BenchmarkAcquire`,
-    `BenchmarkAcquireRelease` and `BenchmarkBatch` written and measured, p99 guard behind
-    `CONSTRAINT_BENCH_GUARD`, real Valkey via `CONSTRAINT_BENCH_REDIS_ADDR`): N goroutines across M accounts and K shared keys
+- [x] 9. `memory/check.go` (conformant with `check.lua` for rate limit, throttle and
+   concurrency; semaphores are read like any counter; the write-only `chk` record is not kept).
+- [x] 10. `memory/race_test.go` (`-race`) (green; `BenchmarkAcquire`, `BenchmarkAcquireRelease`
+    and `BenchmarkBatch` measured on every shape, p99 guard behind `CONSTRAINT_BENCH_GUARD`,
+    real Valkey via `CONSTRAINT_BENCH_REDIS_ADDR`): N goroutines across M accounts and K shared keys
     acquiring, extending, releasing with the sweeper running; invariants: usage == live
     lease count after a final scavenge, no negative counters, atomic high-water mark never
     exceeds the limit, concurrent identical idempotent requests receive identical leases

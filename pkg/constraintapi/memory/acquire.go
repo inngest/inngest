@@ -63,7 +63,9 @@ type resolvedConstraint struct {
 	item   constraintapi.ConstraintItem
 	limits constraintapi.ConstraintLimits
 
-	// usage is the in progress counter for concurrency and semaphores.
+	// usage is the in progress counter for concurrency and semaphores.  a
+	// concurrency constraint is a semaphore of weight 1 whose capacity is the
+	// request's configured limit instead of a counter.
 	usageKey cellKey
 	usage    atomic.Pointer[semaphoreCell]
 
@@ -71,9 +73,9 @@ type resolvedConstraint struct {
 	capacityKey cellKey
 	capacity    atomic.Pointer[semaphoreCell]
 
-	// weight is the semaphore weight, at least 1.
+	// weight is the semaphore weight, at least 1.  1 for concurrency.
 	weight int64
-	// release is the semaphore release mode.
+	// release is the semaphore release mode.  auto for concurrency.
 	release constraintapi.SemaphoreReleaseMode
 
 	// gcra is the TAT cell for rate limits and throttles.  period is in the
@@ -149,6 +151,11 @@ func appendSetIdentity(b []byte, accountID, envID, functionID, appID uuid.UUID, 
 			b = appendInt(b, int(ci.Throttle.Scope))
 			b = appendStr(b, ci.Throttle.KeyExpressionHash)
 			b = appendStr(b, ci.Throttle.EvaluatedKeyHash)
+		case constraintapi.ConstraintKindConcurrency:
+			b = appendInt(b, int(ci.Concurrency.Mode))
+			b = appendInt(b, int(ci.Concurrency.Scope))
+			b = appendStr(b, ci.Concurrency.KeyExpressionHash)
+			b = appendStr(b, ci.Concurrency.EvaluatedKeyHash)
 		default:
 			return nil, errs.Wrap(0, false, "constraint kind %q is not implemented in the memory store", ci.Kind)
 		}
@@ -256,6 +263,20 @@ func (m *Manager) buildSet(accountID, envID, functionID, appID uuid.UUID, config
 			rc.release = ci.Semaphore.Release
 			rc.usage.Store(m.sem(rc.usageKey))
 			rc.capacity.Store(m.sem(rc.capacityKey))
+		case constraintapi.ConstraintKindConcurrency:
+			var entity uuid.UUID
+			switch ci.Concurrency.Scope {
+			case enums.ConcurrencyScopeAccount:
+				entity = accountID
+			case enums.ConcurrencyScopeEnv:
+				entity = envID
+			case enums.ConcurrencyScopeFn:
+				entity = functionID
+			}
+			rc.usageKey = scopedKey('n', accountID, int(ci.Concurrency.Scope), entity, ci.Concurrency.KeyExpressionHash, ci.Concurrency.EvaluatedKeyHash)
+			rc.weight = 1
+			rc.release = constraintapi.SemaphoreReleaseAuto
+			rc.usage.Store(m.sem(rc.usageKey))
 		case constraintapi.ConstraintKindRateLimit:
 			var entity uuid.UUID
 			switch ci.RateLimit.Scope {
@@ -266,7 +287,7 @@ func (m *Manager) buildSet(accountID, envID, functionID, appID uuid.UUID, config
 			case enums.RateLimitScopeFn:
 				entity = functionID
 			}
-			rc.stateKey = gcraKey('r', accountID, int(ci.RateLimit.Scope), entity, ci.RateLimit.KeyExpressionHash, ci.RateLimit.EvaluatedKeyHash)
+			rc.stateKey = scopedKey('r', accountID, int(ci.RateLimit.Scope), entity, ci.RateLimit.KeyExpressionHash, ci.RateLimit.EvaluatedKeyHash)
 			rc.period = float64(rc.limits.Period)
 			rc.burst = rc.limits.Burst
 			rc.gcra.Store(m.gcraCell(rc.stateKey))
@@ -280,7 +301,7 @@ func (m *Manager) buildSet(accountID, envID, functionID, appID uuid.UUID, config
 			case enums.ThrottleScopeFn:
 				entity = functionID
 			}
-			rc.stateKey = gcraKey('t', accountID, int(ci.Throttle.Scope), entity, ci.Throttle.KeyExpressionHash, ci.Throttle.EvaluatedKeyHash)
+			rc.stateKey = scopedKey('t', accountID, int(ci.Throttle.Scope), entity, ci.Throttle.KeyExpressionHash, ci.Throttle.EvaluatedKeyHash)
 			rc.period = float64(rc.limits.Period)
 			rc.burst = rc.limits.Limit + rc.limits.Burst - 1
 			rc.gcra.Store(m.gcraCell(rc.stateKey))
@@ -603,10 +624,16 @@ func toInteger(v float64) int64 {
 	return int64(math.Floor(v + 0.5))
 }
 
-// recompute derives units and retryAt from used and limit for a counter
-// constraint.  GCRA views hold the helper's result and are left alone.
+// recompute derives units from used and limit for a counter constraint.
+// a concurrency constraint keeps the Lua's limit - usage, which goes negative
+// when a limit was lowered below the usage and Check reports it that way; a
+// semaphore floors at zero and divides by its weight.  retryAt for
+// concurrency is set once by snapshot.  GCRA views hold the helper's result
+// and are left alone.
 func recompute(rc *resolvedConstraint, v *view) {
 	switch rc.item.Kind {
+	case constraintapi.ConstraintKindConcurrency:
+		v.units = int(v.limit - v.used)
 	case constraintapi.ConstraintKindSemaphore:
 		v.units = 0
 		v.retryAt = 0
@@ -645,6 +672,12 @@ func (rc *resolvedConstraint) gcraView(res gcra.Result, v *view) {
 // the grant so far, which a skipped GCRA constraint passes through.
 func (m *Manager) snapshot(pc passCtx, rc *resolvedConstraint, v *view, available int) {
 	switch rc.item.Kind {
+	case constraintapi.ConstraintKindConcurrency:
+		v.used = m.loadCell(&rc.usage, rc.usageKey)
+		v.limit = int64(rc.limits.Limit)
+		v.retryAt = pc.nowMS + constraintapi.ConcurrencyLimitRetryAfter.Milliseconds()
+		v.has = true
+		recompute(rc, v)
 	case constraintapi.ConstraintKindSemaphore:
 		v.used = m.loadCell(&rc.usage, rc.usageKey)
 		v.limit = m.loadCell(&rc.capacity, rc.capacityKey)
@@ -665,7 +698,7 @@ func (m *Manager) snapshot(pc passCtx, rc *resolvedConstraint, v *view, availabl
 // left as the constraint reads after the take.
 func (m *Manager) commit(pc passCtx, rc *resolvedConstraint, q int, v *view) int {
 	switch rc.item.Kind {
-	case constraintapi.ConstraintKindSemaphore:
+	case constraintapi.ConstraintKindSemaphore, constraintapi.ConstraintKindConcurrency:
 		for {
 			if fit, after, ok := rc.usage.Load().take(v.limit, rc.weight, q); ok {
 				v.used = after
@@ -727,7 +760,7 @@ func (m *Manager) rollback(pc passCtx, rc *resolvedConstraint, units int, v *vie
 		return
 	}
 	switch rc.item.Kind {
-	case constraintapi.ConstraintKindSemaphore:
+	case constraintapi.ConstraintKindSemaphore, constraintapi.ConstraintKindConcurrency:
 		v.used = m.giveCell(&rc.usage, rc.usageKey, rc.weight*int64(units))
 	case constraintapi.ConstraintKindRateLimit, constraintapi.ConstraintKindThrottle:
 		if pc.skipGCRA {

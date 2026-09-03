@@ -76,6 +76,19 @@ func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.Capacity
 	res.FunctionID = rs.set.functionID
 	res.AppID = rs.set.appID
 
+	// usage reports concurrency only, with the limit stored at acquire time,
+	// like extend.lua.  the count does not change on extend.
+	for i := range rs.set.constraints {
+		rc := &rs.set.constraints[i]
+		if rc.item.Kind == constraintapi.ConstraintKindConcurrency {
+			res.Usage = append(res.Usage, constraintapi.ConstraintUsage{
+				Constraint: rc.item,
+				Used:       int(m.loadCell(&rc.usage, rc.usageKey)),
+				Limit:      rc.limits.Limit,
+			})
+		}
+	}
+
 	m.extIdem.set(extKey, res, idemExpiry(nowMS, m.operationIdempotencyTTL))
 	return res
 }

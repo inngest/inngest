@@ -74,10 +74,15 @@ func (m *Manager) release(nowMS int64, req *constraintapi.CapacityReleaseRequest
 	// semaphore is given back too.  holding it would block every later run.
 	force := req.Source.Location == constraintapi.CallerLocationLeaseScavenge
 
+	// usage reports concurrency only, with the limit stored at acquire time
+	// and the count after this release, like release.lua
 	var usage []constraintapi.ConstraintUsage
 	for i := range set.constraints {
 		rc := &set.constraints[i]
 		switch rc.item.Kind {
+		case constraintapi.ConstraintKindConcurrency:
+			after := m.giveCell(&rc.usage, rc.usageKey, 1)
+			usage = append(usage, constraintapi.ConstraintUsage{Constraint: rc.item, Used: int(after), Limit: rc.limits.Limit})
 		case constraintapi.ConstraintKindSemaphore:
 			if rc.release == constraintapi.SemaphoreReleaseAuto || force {
 				m.giveCell(&rc.usage, rc.usageKey, rc.weight)

@@ -245,10 +245,12 @@ func cellKeyOf(kind byte, accountID uuid.UUID, p1, p2 string) cellKey {
 	return cellKey{a: xxhash.Sum64(b), b: sumSeeded(b, cellSeed)}
 }
 
-// gcraKey is the cell key of one rate limit or throttle state: the kind, the
-// account, the scope and the ID the scope points at, and the key expression
-// and evaluated key hashes, the same identity the Redis state key carries.
-func gcraKey(kind byte, accountID uuid.UUID, scope int, entity uuid.UUID, exprHash, evaluatedHash string) cellKey {
+// scopedKey is the cell key of one scoped constraint state, a rate limit or
+// throttle TAT or a concurrency counter: the kind, the account, the scope and
+// the ID the scope points at, and the key expression and evaluated key
+// hashes, the same identity the Redis key carries.  concurrency mode is not
+// part of it, as in Redis.
+func scopedKey(kind byte, accountID uuid.UUID, scope int, entity uuid.UUID, exprHash, evaluatedHash string) cellKey {
 	var arr [128]byte
 	b := arr[:0]
 	b = append(b, kind)
