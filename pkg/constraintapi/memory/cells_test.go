@@ -23,7 +23,7 @@ func TestSemaphoreCellTakeNeverExceedsCapacity(t *testing.T) {
 			w := int64(g%3 + 1)
 			held := 0
 			for i := 0; i < 2000; i++ {
-				fit, ok := c.take(capacity, w, 4)
+				fit, _, ok := c.take(capacity, w, 4)
 				if !ok {
 					deadSeen.Add(1)
 					return
@@ -58,27 +58,31 @@ func TestSemaphoreCellTakeNeverExceedsCapacity(t *testing.T) {
 func TestSemaphoreCellTakeRollbackIsExact(t *testing.T) {
 	var c semaphoreCell
 
-	fit, ok := c.take(5, 2, 4)
+	fit, after, ok := c.take(5, 2, 4)
 	require.True(t, ok)
 	require.Equal(t, 2, fit, "two units of weight two fit under five")
+	require.Equal(t, int64(4), after, "after reports the value with the rollback applied")
 	v, _ := c.load()
 	require.Equal(t, int64(4), v)
 
-	fit, ok = c.take(5, 2, 1)
+	fit, after, ok = c.take(5, 2, 1)
 	require.True(t, ok)
 	require.Equal(t, 0, fit, "one unit left is below the weight")
+	require.Equal(t, int64(4), after)
 	v, _ = c.load()
 	require.Equal(t, int64(4), v, "a zero fit adds nothing")
 
-	fit, _ = c.take(5, 1, 3)
+	fit, after, _ = c.take(5, 1, 3)
 	require.Equal(t, 1, fit)
+	require.Equal(t, int64(5), after)
 	v, _ = c.load()
 	require.Equal(t, int64(5), v)
 
-	fit, _ = c.take(5, 1, 0)
+	fit, after, _ = c.take(5, 1, 0)
 	require.Equal(t, 0, fit)
+	require.Equal(t, int64(5), after)
 
-	fit, _ = c.take(3, 1, 1)
+	fit, _, _ = c.take(3, 1, 1)
 	require.Equal(t, 0, fit, "capacity below usage grants nothing")
 	v, _ = c.load()
 	require.Equal(t, int64(5), v)
@@ -140,7 +144,7 @@ func TestSemaphoreCellDead(t *testing.T) {
 
 	_, ok := c.load()
 	require.False(t, ok)
-	fit, ok := c.take(10, 1, 1)
+	fit, _, ok := c.take(10, 1, 1)
 	require.False(t, ok)
 	require.Zero(t, fit)
 	_, ok = c.give(1)

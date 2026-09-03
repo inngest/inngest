@@ -7,10 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/constraintapi"
 )
 
-// pageFreeGrace is how long a slab page must stay without live slots before
-// housekeeping frees it.
-const pageFreeGrace = 5 * time.Second
-
 // Scavenge releases every expired lease through Release with the scavenger
 // lease source, so hooks, metrics and forced semaphore release behave as they
 // do for the Redis scavenger.  it returns how many leases it reclaimed.
@@ -82,7 +78,7 @@ func (m *Manager) housekeep(nowMS int64) {
 	m.checkIdem.sweep(nowMS)
 	m.semIdem.sweep(nowMS)
 
-	m.slab.freePages(nowMS, pageFreeGrace.Milliseconds())
+	m.slab.freePages()
 
 	m.sems.Range(func(k, v any) bool {
 		if v.(*semaphoreCell).kill() {

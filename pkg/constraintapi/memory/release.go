@@ -86,9 +86,6 @@ func (m *Manager) release(nowMS int64, req *constraintapi.CapacityReleaseRequest
 
 	rs.active.Add(-1)
 	sl.req.Store(nil)
-	if p := m.slab.page(seq); p != nil {
-		p.live.Add(-1)
-	}
 
 	res.EnvID = rs.envID
 	res.FunctionID = rs.functionID

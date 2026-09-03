@@ -37,8 +37,15 @@ const (
 	// stripeCount is the number of operation locks.  two operations with the
 	// same idempotency key share a lock, so a retry sees the first result.
 	// unrelated keys share a lock one time in stripeCount.
-	stripeCount = 1024
+	stripeCount = 4096
 )
+
+// paddedMutex keeps neighbouring locks on separate cache lines so cores
+// taking different locks do not bounce the same line.
+type paddedMutex struct {
+	sync.Mutex
+	_ [56]byte
+}
 
 var (
 	_ constraintapi.CapacityManager  = (*Manager)(nil)
@@ -74,7 +81,7 @@ type Manager struct {
 	checkIdem *ttlMap[struct{}]
 	semIdem   *ttlMap[int64]
 
-	locks [stripeCount]sync.Mutex
+	locks [stripeCount]paddedMutex
 	stats *stats
 
 	stop      chan struct{}
@@ -201,7 +208,7 @@ func (m *Manager) log(ctx context.Context) logger.Logger {
 
 // lock takes the operation lock for a hashed idempotency key.
 func (m *Manager) lock(key uint64) *sync.Mutex {
-	mu := &m.locks[key%stripeCount]
+	mu := &m.locks[key%stripeCount].Mutex
 	mu.Lock()
 	return mu
 }
@@ -226,24 +233,14 @@ type cellKey struct {
 
 const cellSeed = 0x9E3779B97F4A7C15
 
-func writeCellKey(d *xxhash.Digest, kind byte, accountID uuid.UUID, p1, p2 string) {
-	var n [8]byte
-	_, _ = d.Write([]byte{kind})
-	_, _ = d.Write(accountID[:])
-	binary.LittleEndian.PutUint64(n[:], uint64(len(p1)))
-	_, _ = d.Write(n[:])
-	_, _ = d.WriteString(p1)
-	_, _ = d.WriteString(p2)
-}
-
 func cellKeyOf(kind byte, accountID uuid.UUID, p1, p2 string) cellKey {
-	var d xxhash.Digest
-	d.Reset()
-	writeCellKey(&d, kind, accountID, p1, p2)
-	a := d.Sum64()
-	d.ResetWithSeed(cellSeed)
-	writeCellKey(&d, kind, accountID, p1, p2)
-	return cellKey{a: a, b: d.Sum64()}
+	var arr [128]byte
+	b := arr[:0]
+	b = append(b, kind)
+	b = appendUUID(b, accountID)
+	b = appendStr(b, p1)
+	b = appendStr(b, p2)
+	return cellKey{a: xxhash.Sum64(b), b: sumSeeded(b, cellSeed)}
 }
 
 // semaphoreCells returns the usage and capacity keys of one semaphore.
@@ -278,55 +275,51 @@ func (m *Manager) peekSem(key cellKey) int64 {
 	return val
 }
 
-// hasher builds an idempotency or fingerprint hash field by field.  every
-// variable length field is length prefixed so two field lists never hash the
-// same by lining up differently.
-type hasher struct {
-	d xxhash.Digest
+// the append helpers build the bytes of one hash key in a caller's stack
+// array so the key is hashed once.  one Sum64 over the buffer costs a
+// fraction of a Write call per field.  every variable length field is length
+// prefixed so two field lists never hash the same by lining up differently.
+
+func appendU64(b []byte, v uint64) []byte {
+	return binary.LittleEndian.AppendUint64(b, v)
 }
 
-func (h *hasher) reset() {
-	h.d.Reset()
+func appendInt(b []byte, v int) []byte {
+	return appendU64(b, uint64(v))
 }
 
-func (h *hasher) u64(v uint64) {
-	var b [8]byte
-	binary.LittleEndian.PutUint64(b[:], v)
-	_, _ = h.d.Write(b[:])
+func appendStr(b []byte, s string) []byte {
+	b = appendU64(b, uint64(len(s)))
+	return append(b, s...)
 }
 
-func (h *hasher) int(v int) {
-	h.u64(uint64(v))
+func appendBytes(b []byte, p []byte) []byte {
+	b = appendU64(b, uint64(len(p)))
+	return append(b, p...)
 }
 
-func (h *hasher) str(s string) {
-	h.u64(uint64(len(s)))
-	_, _ = h.d.WriteString(s)
+func appendUUID(b []byte, u uuid.UUID) []byte {
+	return append(b, u[:]...)
 }
 
-func (h *hasher) bytes(b []byte) {
-	h.u64(uint64(len(b)))
-	_, _ = h.d.Write(b)
-}
-
-func (h *hasher) uuid(u uuid.UUID) {
-	_, _ = h.d.Write(u[:])
-}
-
-func (h *hasher) sum() uint64 {
-	return h.d.Sum64()
+// sumSeeded is the seeded second hash of a key buffer.
+func sumSeeded(b []byte, seed uint64) uint64 {
+	var d xxhash.Digest
+	d.ResetWithSeed(seed)
+	_, _ = d.Write(b)
+	return d.Sum64()
 }
 
 // opKey is the idempotency map key for one operation.  the account ID is
 // part of the hash, so two accounts using the same key never collide, the
 // way Redis keys embed the account scope.
 func opKey(accountID uuid.UUID, op, key string) uint64 {
-	var h hasher
-	h.reset()
-	h.uuid(accountID)
-	h.str(op)
-	h.str(key)
-	return h.sum()
+	var arr [128]byte
+	b := arr[:0]
+	b = appendUUID(b, accountID)
+	b = appendStr(b, op)
+	b = appendStr(b, key)
+	return xxhash.Sum64(b)
 }
 
 // idemExpiry is when an idempotency record set at nowMS with ttl is gone.

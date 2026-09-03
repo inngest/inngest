@@ -6,13 +6,25 @@ import (
 	"sync/atomic"
 )
 
+// expiryShards is the number of independent slices in one bucket.  every
+// lease granted in a second lands in the same bucket, so one lock there would
+// serialize every acquire.
+const expiryShards = 16
+
+// expiryShard is one padded slice of seqs.
+type expiryShard struct {
+	mu   sync.Mutex
+	seqs []uint64
+	_    [32]byte
+}
+
 // expiryBucket holds the seqs of every lease that expires within one second.
-// drained is set under mu when the sweeper has taken the bucket out of the
-// index, so a late add moves on to the next second instead of being lost.
+// drained is set when the sweeper has taken the bucket out of the index.  a
+// late add sees it under the shard lock and moves on to the next second, so
+// nothing is lost.
 type expiryBucket struct {
-	mu      sync.Mutex
-	seqs    []uint64
-	drained bool
+	shards  [expiryShards]expiryShard
+	drained atomic.Bool
 }
 
 // expiryIndex finds expired leases without scanning the slab.  buckets are
@@ -47,19 +59,15 @@ func (e *expiryIndex) add(expiresAtMS int64, seq uint64) {
 			sec = first
 		}
 		b := e.bucket(sec)
-		b.mu.Lock()
-		if b.drained || sec <= e.swept.Load() {
-			// the sweeper owns this second.  an empty bucket here was created
-			// after the sweeper removed the real one, so drop it.
-			if !b.drained && len(b.seqs) == 0 {
-				e.buckets.CompareAndDelete(sec, b)
-			}
-			b.mu.Unlock()
+		sh := &b.shards[seq%expiryShards]
+		sh.mu.Lock()
+		if b.drained.Load() {
+			sh.mu.Unlock()
 			sec++
 			continue
 		}
-		b.seqs = append(b.seqs, seq)
-		b.mu.Unlock()
+		sh.seqs = append(sh.seqs, seq)
+		sh.mu.Unlock()
 		return
 	}
 }
@@ -102,13 +110,16 @@ func (e *expiryIndex) drain(nowMS int64, fn func(seq uint64)) {
 			continue
 		}
 		b := v.(*expiryBucket)
-		b.mu.Lock()
-		b.drained = true
-		seqs := b.seqs
-		b.seqs = nil
-		b.mu.Unlock()
-		for _, seq := range seqs {
-			fn(seq)
+		b.drained.Store(true)
+		for i := range b.shards {
+			sh := &b.shards[i]
+			sh.mu.Lock()
+			seqs := sh.seqs
+			sh.seqs = nil
+			sh.mu.Unlock()
+			for _, seq := range seqs {
+				fn(seq)
+			}
 		}
 	}
 	e.advanceSwept(last)
@@ -122,11 +133,14 @@ func (e *expiryIndex) scan(nowMS int64, fn func(seq uint64)) {
 		return
 	}
 	b := v.(*expiryBucket)
-	b.mu.Lock()
-	seqs := append([]uint64(nil), b.seqs...)
-	b.mu.Unlock()
-	for _, seq := range seqs {
-		fn(seq)
+	for i := range b.shards {
+		sh := &b.shards[i]
+		sh.mu.Lock()
+		seqs := append([]uint64(nil), sh.seqs...)
+		sh.mu.Unlock()
+		for _, seq := range seqs {
+			fn(seq)
+		}
 	}
 }
 

@@ -82,9 +82,6 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	require.NoError(t, err)
 	clock.Advance(constraintapi.SemaphoreIdempotencyTTL + time.Second)
 
-	// the first round stamps empty pages, the second frees them
-	m.housekeep(m.nowMS())
-	clock.Advance(pageFreeGrace + time.Second)
 	m.housekeep(m.nowMS())
 
 	require.Zero(t, m.acqIdem.len())
@@ -94,7 +91,7 @@ func TestHousekeepingReturnsToEmpty(t *testing.T) {
 	require.Zero(t, m.semIdem.len())
 	require.Zero(t, m.expiry.bucketCount())
 	require.Zero(t, syncMapLen(&m.sems), "zero valued cells are dropped")
-	require.LessOrEqual(t, m.slab.pageCount(), 1, "only the current allocation page stays")
+	require.LessOrEqual(t, m.slab.pageCount(), slabShards, "only the shards' current allocation pages stay")
 
 	// a dropped cell is recreated on use
 	_, err = m.SetCapacity(ctx, accountID, sem.ID, "setcap-2", 1)

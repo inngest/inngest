@@ -34,19 +34,21 @@ func (c *semaphoreCell) load() (v int64, ok bool) {
 }
 
 // take adds w*q and returns how many of q fit under capacity, rolling the
-// rest back exactly.  the counter overshoots by the rolled back amount for a
-// few nanoseconds, which can make a concurrent take fit less, never more.
-// ok is false when the cell is dead and nothing was added.
-func (c *semaphoreCell) take(capacity, w int64, q int) (fit int, ok bool) {
+// rest back exactly, and the counter value once this take is accounted.  the
+// counter overshoots by the rolled back amount for a few nanoseconds, which
+// can make a concurrent take fit less, never more.  ok is false when the
+// cell is dead and nothing was added.
+func (c *semaphoreCell) take(capacity, w int64, q int) (fit int, after int64, ok bool) {
 	if q <= 0 {
-		return 0, !isDead(c.v.Load())
+		v := c.v.Load()
+		return 0, v, !isDead(v)
 	}
 	added := w * int64(q)
-	after := c.v.Add(added)
+	after = c.v.Add(added)
 	before := after - added
 	if isDead(before) {
 		c.v.Add(-added)
-		return 0, false
+		return 0, 0, false
 	}
 	if avail := capacity - before; avail >= w {
 		fit = int(avail / w)
@@ -56,8 +58,9 @@ func (c *semaphoreCell) take(capacity, w int64, q int) (fit int, ok bool) {
 	}
 	if fit < q {
 		c.v.Add(-w * int64(q-fit))
+		after = before + w*int64(fit)
 	}
-	return fit, true
+	return fit, after, true
 }
 
 // give subtracts w and clamps at zero.  a CAS loop, not Add and fix up,

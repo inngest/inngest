@@ -54,10 +54,11 @@ type eventShard struct {
 	mu  sync.Mutex
 	buf []metricEvent
 	alt []metricEvent
+	_   [8]byte
 }
 
 const (
-	statsShards     = 16
+	statsShards     = 64
 	statsShardCap   = 4096
 	statsDrainEvery = 100 * time.Millisecond
 	statsFlushEvery = time.Second

@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"math/rand/v2"
 	"sync"
 	"sync/atomic"
 )
@@ -10,6 +11,13 @@ const (
 	// every slot in it is taken, so smaller pages return memory sooner.
 	pageBits = 13
 	pageSize = 1 << pageBits
+
+	// slabShards is the number of independent sequence counters.  an alloc
+	// picks one at random, so cores rarely contend on the same counter.  the
+	// shard sits in the top byte of the seq, so each shard fills its own
+	// pages.
+	slabShards = 16
+	shardShift = 56
 
 	slotEmpty uint32 = 0
 	slotLive  uint32 = 1
@@ -33,41 +41,61 @@ func (s *slot) take() bool {
 	return s.state.CompareAndSwap(slotLive, slotTaken)
 }
 
-// page holds pageSize slots.  live counts slots in state live so the sweeper
-// can free a page nothing points at.  emptySinceMS is when housekeeping first
-// saw the page with no live slot, or 0.
+// page holds pageSize slots.
 type page struct {
-	createdAtMS  int64
-	live         atomic.Int64
-	emptySinceMS atomic.Int64
-	slots        [pageSize]slot
+	slots [pageSize]slot
+}
+
+// allTaken is true once every slot was allocated and taken.  a slot still
+// empty belongs to an alloc that has claimed its seq but not published yet,
+// so the page stays.
+func (p *page) allTaken() bool {
+	for i := range p.slots {
+		if p.slots[i].state.Load() != slotTaken {
+			return false
+		}
+	}
+	return true
+}
+
+// seqShard is one sequence counter on its own cache line.
+type seqShard struct {
+	next atomic.Uint64
+	_    [56]byte
 }
 
 // slab hands out lease records by sequence number.  pages are created on
 // first use and freed by housekeeping once every slot in them is taken.
 type slab struct {
-	// next is the last allocated seq.  seq 0 is never allocated.
-	next  atomic.Uint64
-	pages sync.Map // uint64 page index -> *page
+	shards [slabShards]seqShard
+	pages  sync.Map // uint64 page index -> *page
 }
 
-// alloc returns a live slot for a lease that expires at expiresAtMS.  live is
-// raised before the slot is published so a page never reads as empty while a
-// slot in it is about to go live.
+// alloc returns a live slot for a lease that expires at expiresAtMS.
 func (s *slab) alloc(nowMS, expiresAtMS int64, req *requestState) (seq uint64, sl *slot) {
-	seq = s.next.Add(1)
+	return s.allocIn(int(rand.Uint32()%slabShards), expiresAtMS, req)
+}
+
+// allocIn allocates from one shard.  every shard counts from 1, so seq 0 and
+// the first slot of each shard's first page are never handed out.  that slot
+// is marked taken when the page is created so the page can still be freed.
+func (s *slab) allocIn(shard int, expiresAtMS int64, req *requestState) (seq uint64, sl *slot) {
+	seq = uint64(shard)<<shardShift | s.shards[shard].next.Add(1)
 	idx := seq >> pageBits
 	var p *page
 	if v, ok := s.pages.Load(idx); ok {
 		p = v.(*page)
 	} else {
-		v, _ := s.pages.LoadOrStore(idx, &page{createdAtMS: nowMS})
+		np := &page{}
+		if idx == uint64(shard)<<(shardShift-pageBits) {
+			np.slots[0].state.Store(slotTaken)
+		}
+		v, _ := s.pages.LoadOrStore(idx, np)
 		p = v.(*page)
 	}
 	sl = &p.slots[seq&(pageSize-1)]
 	sl.expiresAtMS = expiresAtMS
 	sl.req.Store(req)
-	p.live.Add(1)
 	sl.state.Store(slotLive)
 	return seq, sl
 }
@@ -95,27 +123,19 @@ func (s *slab) page(seq uint64) *page {
 	return v.(*page)
 }
 
-// freePages drops every page that is not the current allocation page and has
-// had no live slot for graceMS across two calls.  the grace covers an alloc
-// that has taken a seq in the page but not yet raised live.  a late release
-// for a freed page finds no record, the same as for a taken slot.
-func (s *slab) freePages(nowMS, graceMS int64) (freed int) {
-	current := s.next.Load() >> pageBits
+// currentPage is the page index the shard allocates into.
+func (s *slab) currentPage(shard int) uint64 {
+	return (uint64(shard)<<shardShift | s.shards[shard].next.Load()) >> pageBits
+}
+
+// freePages drops every page that is not its shard's allocation page and has
+// every slot taken.  a late release for a freed page finds no record, the
+// same as for a taken slot.
+func (s *slab) freePages() (freed int) {
 	s.pages.Range(func(k, v any) bool {
 		idx, p := k.(uint64), v.(*page)
-		if idx >= current {
-			return true
-		}
-		if p.live.Load() != 0 {
-			p.emptySinceMS.Store(0)
-			return true
-		}
-		since := p.emptySinceMS.Load()
-		if since == 0 {
-			p.emptySinceMS.Store(nowMS)
-			return true
-		}
-		if nowMS <= since+graceMS {
+		shard := int(idx >> (shardShift - pageBits))
+		if idx == s.currentPage(shard) || !p.allTaken() {
 			return true
 		}
 		if s.pages.CompareAndDelete(k, v) {

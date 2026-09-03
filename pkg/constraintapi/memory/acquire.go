@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/inngest/inngest/pkg/util/errs"
@@ -88,31 +89,31 @@ func (m *Manager) resolve(req *constraintapi.CapacityAcquireRequest) (*requestSt
 		source:          req.Source,
 	}
 
-	var h hasher
-	h.reset()
-	h.uuid(req.AccountID)
-	h.str("acq")
-	h.str(req.IdempotencyKey)
-	h.uuid(req.EnvID)
-	h.uuid(req.FunctionID)
-	h.uuid(req.AppID)
-	h.int(req.Configuration.FunctionVersion)
-	h.int(req.Amount)
-	h.u64(uint64(req.MaximumLifetime.Milliseconds()))
-	h.int(int(req.Source.Service))
-	h.int(int(req.Source.Location))
-	h.int(int(req.Source.RunProcessingMode))
-	h.int(len(req.LeaseIdempotencyKeys))
+	var arr [256]byte
+	h := arr[:0]
+	h = appendUUID(h, req.AccountID)
+	h = appendStr(h, "acq")
+	h = appendStr(h, req.IdempotencyKey)
+	h = appendUUID(h, req.EnvID)
+	h = appendUUID(h, req.FunctionID)
+	h = appendUUID(h, req.AppID)
+	h = appendInt(h, req.Configuration.FunctionVersion)
+	h = appendInt(h, req.Amount)
+	h = appendU64(h, uint64(req.MaximumLifetime.Milliseconds()))
+	h = appendInt(h, int(req.Source.Service))
+	h = appendInt(h, int(req.Source.Location))
+	h = appendInt(h, int(req.Source.RunProcessingMode))
+	h = appendInt(h, len(req.LeaseIdempotencyKeys))
 	for _, k := range req.LeaseIdempotencyKeys {
-		h.str(k)
+		h = appendStr(h, k)
 	}
-	h.int(len(req.LeaseRunIDs))
+	h = appendInt(h, len(req.LeaseRunIDs))
 	switch len(req.LeaseRunIDs) {
 	case 0:
 	case 1:
 		for k, v := range req.LeaseRunIDs {
-			h.str(k)
-			h.bytes(v[:])
+			h = appendStr(h, k)
+			h = appendBytes(h, v[:])
 		}
 	default:
 		keys := make([]string, 0, len(req.LeaseRunIDs))
@@ -122,8 +123,8 @@ func (m *Manager) resolve(req *constraintapi.CapacityAcquireRequest) (*requestSt
 		sort.Strings(keys)
 		for _, k := range keys {
 			v := req.LeaseRunIDs[k]
-			h.str(k)
-			h.bytes(v[:])
+			h = appendStr(h, k)
+			h = appendBytes(h, v[:])
 		}
 	}
 
@@ -131,10 +132,10 @@ func (m *Manager) resolve(req *constraintapi.CapacityAcquireRequest) (*requestSt
 		rc := &rs.constraints[i]
 		rc.item = ci
 		rc.limits = ci.ResolveLimits(req.Configuration)
-		h.str(string(ci.Kind))
-		h.int(rc.limits.Limit)
-		h.int(rc.limits.Burst)
-		h.int(rc.limits.Period)
+		h = appendStr(h, string(ci.Kind))
+		h = appendInt(h, rc.limits.Limit)
+		h = appendInt(h, rc.limits.Burst)
+		h = appendInt(h, rc.limits.Period)
 
 		switch ci.Kind {
 		case constraintapi.ConstraintKindSemaphore:
@@ -146,16 +147,16 @@ func (m *Manager) resolve(req *constraintapi.CapacityAcquireRequest) (*requestSt
 			rc.release = ci.Semaphore.Release
 			rc.usage.Store(m.sem(rc.usageKey))
 			rc.capacity.Store(m.sem(rc.capacityKey))
-			h.str(ci.Semaphore.ID)
-			h.str(ci.Semaphore.EvaluatedKeyHash)
-			h.u64(uint64(rc.weight))
-			h.int(int(rc.release))
+			h = appendStr(h, ci.Semaphore.ID)
+			h = appendStr(h, ci.Semaphore.EvaluatedKeyHash)
+			h = appendU64(h, uint64(rc.weight))
+			h = appendInt(h, int(rc.release))
 		default:
 			return nil, 0, errs.Wrap(0, false, "constraint kind %q is not implemented in the memory store", ci.Kind)
 		}
 	}
 
-	return rs, h.sum(), nil
+	return rs, xxhash.Sum64(h), nil
 }
 
 // Acquire implements constraintapi.CapacityManager.
@@ -236,9 +237,10 @@ func (m *Manager) Acquire(ctx context.Context, req *constraintapi.CapacityAcquir
 	}, nil
 }
 
-// acquireState collects the limiting and exhausted indices of one acquire.
-// requests hold at most constraintapi.MaxConstraints constraints, which
-// Valid enforces, so fixed arrays are enough.
+// acquireState collects the limiting and exhausted indices of one acquire and
+// what each pass saw of every constraint.  requests hold at most
+// constraintapi.MaxConstraints constraints, which Valid enforces, so fixed
+// arrays are enough.
 type acquireState struct {
 	limiting     [constraintapi.MaxConstraints]int
 	exhausted    [constraintapi.MaxConstraints]int
@@ -246,6 +248,17 @@ type acquireState struct {
 	limitingSet  [constraintapi.MaxConstraints]bool
 	exhaustedSet [constraintapi.MaxConstraints]bool
 	retryAt      int64
+	views        [constraintapi.MaxConstraints]view
+}
+
+// view is what the passes saw of one constraint.  pass one fills it from
+// loads.  pass two updates used with the value take returned, so the report
+// needs no second load of a counter other cores are writing.
+type view struct {
+	units   int
+	retryAt int64
+	used    int64
+	limit   int64
 }
 
 func (st *acquireState) limit(i int) {
@@ -271,9 +284,10 @@ func (st *acquireState) exhaust(i int, retryAt int64) {
 //
 // pass one reads every counter and computes the grant the way acquire.lua
 // does.  pass two takes the grant from each counter and shrinks it when
-// another request got there first, rolling earlier counters back.  pass
-// three reads the counters again for the response.  under no contention the
-// three passes see the same values and the result matches the Lua.
+// another request got there first, rolling earlier counters back.  the
+// report recomputes each constraint from the values pass two left, which is
+// what acquire.lua reads back after its own increments.  under no contention
+// the result matches the Lua.
 func (m *Manager) acquire(nowMS, leaseExpiryMS int64, req *constraintapi.CapacityAcquireRequest, rs *requestState, acqKey uint64) *acquireResult {
 	n := len(rs.constraints)
 	var st acquireState
@@ -281,13 +295,14 @@ func (m *Manager) acquire(nowMS, leaseExpiryMS int64, req *constraintapi.Capacit
 
 	available := req.Amount
 	for i := range rs.constraints {
-		capacity, at, u := m.snapshot(&rs.constraints[i])
-		usage[i] = u
-		if capacity <= 0 {
-			st.exhaust(i, at)
+		rc, v := &rs.constraints[i], &st.views[i]
+		m.snapshot(rc, v)
+		usage[i] = usageOf(rc, v)
+		if v.units <= 0 {
+			st.exhaust(i, v.retryAt)
 		}
-		if capacity < available {
-			available = capacity
+		if v.units < available {
+			available = v.units
 			st.limit(i)
 		}
 	}
@@ -298,11 +313,11 @@ func (m *Manager) acquire(nowMS, leaseExpiryMS int64, req *constraintapi.Capacit
 	granted := available
 	var taken [constraintapi.MaxConstraints]int
 	for i := range rs.constraints {
-		fit := m.commit(&rs.constraints[i], granted)
+		fit := m.commit(&rs.constraints[i], granted, &st.views[i])
 		taken[i] = fit
 		if fit < granted {
 			for j := 0; j < i; j++ {
-				m.rollback(&rs.constraints[j], taken[j]-fit)
+				m.rollback(&rs.constraints[j], taken[j]-fit, &st.views[j])
 				taken[j] = fit
 			}
 			granted = fit
@@ -312,10 +327,11 @@ func (m *Manager) acquire(nowMS, leaseExpiryMS int64, req *constraintapi.Capacit
 
 	st.retryAt = 0
 	for i := range rs.constraints {
-		capacity, at, u := m.snapshot(&rs.constraints[i])
-		usage[i] = u
-		if capacity <= 0 {
-			st.exhaust(i, at)
+		rc, v := &rs.constraints[i], &st.views[i]
+		recompute(rc, v)
+		usage[i] = usageOf(rc, v)
+		if v.units <= 0 {
+			st.exhaust(i, v.retryAt)
 		}
 	}
 	if granted == 0 {
@@ -371,28 +387,42 @@ func (m *Manager) items(rs *requestState, idx []int) []constraintapi.ConstraintI
 	return out
 }
 
-// snapshot reads one constraint and returns how many units fit, its retry
-// time, and its usage entry.  nothing is written.
-func (m *Manager) snapshot(rc *resolvedConstraint) (capacity int, retryAtMS int64, usage constraintapi.ConstraintUsage) {
-	switch rc.item.Kind {
-	case constraintapi.ConstraintKindSemaphore:
-		u := m.loadCell(&rc.usage, rc.usageKey)
-		c := m.loadCell(&rc.capacity, rc.capacityKey)
-		if remaining := c - u; remaining >= rc.weight {
-			capacity = int(remaining / rc.weight)
-		}
-		return capacity, 0, constraintapi.ConstraintUsage{Constraint: rc.item, Limit: int(c), Used: int(max(u, 0))}
-	}
-	return 0, 0, constraintapi.ConstraintUsage{Constraint: rc.item}
+// usageOf is the usage entry for one constraint as the passes saw it.
+func usageOf(rc *resolvedConstraint, v *view) constraintapi.ConstraintUsage {
+	return constraintapi.ConstraintUsage{Constraint: rc.item, Limit: int(v.limit), Used: int(max(v.used, 0))}
 }
 
-// commit takes q units from one constraint and returns how many fit.
-func (m *Manager) commit(rc *resolvedConstraint, q int) int {
+// recompute derives units and retryAt from used and limit, the acquire.lua
+// formula for the kind.
+func recompute(rc *resolvedConstraint, v *view) {
+	v.units = 0
+	v.retryAt = 0
+	switch rc.item.Kind {
+	case constraintapi.ConstraintKindSemaphore:
+		if remaining := v.limit - v.used; remaining >= rc.weight {
+			v.units = int(remaining / rc.weight)
+		}
+	}
+}
+
+// snapshot reads one constraint into v.  nothing is written.
+func (m *Manager) snapshot(rc *resolvedConstraint, v *view) {
+	switch rc.item.Kind {
+	case constraintapi.ConstraintKindSemaphore:
+		v.used = m.loadCell(&rc.usage, rc.usageKey)
+		v.limit = m.loadCell(&rc.capacity, rc.capacityKey)
+	}
+	recompute(rc, v)
+}
+
+// commit takes q units from one constraint and returns how many fit.  v.used
+// becomes the counter value with this take accounted.
+func (m *Manager) commit(rc *resolvedConstraint, q int, v *view) int {
 	switch rc.item.Kind {
 	case constraintapi.ConstraintKindSemaphore:
 		for {
-			c := m.loadCell(&rc.capacity, rc.capacityKey)
-			if fit, ok := rc.usage.Load().take(c, rc.weight, q); ok {
+			if fit, after, ok := rc.usage.Load().take(v.limit, rc.weight, q); ok {
+				v.used = after
 				return fit
 			}
 			rc.usage.Store(m.sem(rc.usageKey))
@@ -403,13 +433,13 @@ func (m *Manager) commit(rc *resolvedConstraint, q int) int {
 
 // rollback gives units back to one constraint after a later constraint
 // shrank the grant.
-func (m *Manager) rollback(rc *resolvedConstraint, units int) {
+func (m *Manager) rollback(rc *resolvedConstraint, units int, v *view) {
 	if units <= 0 {
 		return
 	}
 	switch rc.item.Kind {
 	case constraintapi.ConstraintKindSemaphore:
-		m.giveCell(&rc.usage, rc.usageKey, rc.weight*int64(units))
+		v.used = m.giveCell(&rc.usage, rc.usageKey, rc.weight*int64(units))
 	}
 }
 

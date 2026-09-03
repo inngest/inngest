@@ -69,9 +69,6 @@ func (m *Manager) extend(nowMS, leaseExpiryMS int64, req *constraintapi.Capacity
 	newSeq, _ := m.slab.alloc(nowMS, leaseExpiryMS, rs)
 	m.expiry.add(leaseExpiryMS, newSeq)
 	sl.req.Store(nil)
-	if p := m.slab.page(seq); p != nil {
-		p.live.Add(-1)
-	}
 
 	newID := encodeLeaseID(leaseExpiryMS, newSeq, m.nonce)
 	res.LeaseID = &newID
