@@ -20,7 +20,7 @@ export default function TopBar({
 }) {
   return (
     <header className="bg-canvasSubtle relative z-[60] flex h-[48px] shrink-0 items-center justify-between gap-3 px-5">
-      <div className="flex h-8 items-center gap-1">
+      <div className="-ml-1 flex h-8 items-center gap-1">
         {profile && (
           <>
             <OrgMenu
