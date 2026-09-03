@@ -94,3 +94,10 @@ topo_order_commits = true
 sort_commits = "oldest"
 # Process submodules commits
 recurse_submodules = false
+
+# Keep 0.x releases aligned with npm-style pre-1.0 semver: features bump patch,
+# while breaking changes bump minor. Remove this section once the SDK reaches
+# v1.0.0 so git-cliff's default semver bump behavior applies.
+[bump]
+breaking_always_bump_major = false
+features_always_bump_minor = false
