@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -16,6 +17,8 @@ import (
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 )
+
+var ErrInvalidRunExpression = errors.New("invalid run expression")
 
 type SpanStatus int
 

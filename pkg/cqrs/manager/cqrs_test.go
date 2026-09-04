@@ -2358,6 +2358,29 @@ func TestCQRSGetSpanRunsCELJoinQualifiesTenantFilters(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
+func TestCQRSGetSpanRunsRejectsUnsupportedCELPredicates(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	for _, expression := range []string{
+		`foo.bar == 1`,
+		`event.data.tenant == "target" || foo.bar == 1`,
+	} {
+		t.Run(expression, func(t *testing.T) {
+			_, err := cm.GetTraceRuns(t.Context(), cqrs.GetTraceRunOpt{
+				Filter: cqrs.GetTraceRunFilter{
+					TimeField: enums.TraceRunTimeStartedAt,
+					From:      time.Now().Add(-time.Hour),
+					Until:     time.Now().Add(time.Hour),
+					CEL:       expression,
+				},
+				Preview: true,
+			})
+			require.ErrorIs(t, err, cqrs.ErrInvalidRunExpression)
+		})
+	}
+}
+
 // Root-page results must derive end_time/status from EXTEND spans.
 func TestCQRSGetSpanRunsEnrichmentFromExtendSpans(t *testing.T) {
 	ctx := context.Background()
