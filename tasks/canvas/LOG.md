@@ -577,10 +577,7 @@ collapsing**, across all four groups; and collapsing fires on only 8 of 43 fixtu
   Bars are now 12px so it survives, and the waiting/working distinction moved to *weight* (ghosted vs
   solid), which is height-independent — but the executing texture is still a 15%-opacity tint that is
   nearly invisible in light mode.
-- **Numbers that disagree with their own bar.** `blocked`'s `hold` reads **5.999s** against a bar
-  spanning 12.3s — the number is the executing slice, the bar is queued+executing, and the fixture's
-  entire point (6.3s blocked) appears as a number nowhere on screen. Same shape of problem on
-  `failure`. This is the most important thing left on the list.
+- ~~Numbers that disagree with their own bar.~~ **Fixed** — see below.
 - **The hover card is the best thing in the component** and nothing on the row signals it exists; its
   hover target is `minWidth: 4px`, so on the runs where you most need it, it is unreachable.
 - **`tall500`'s group bar** spans 1885ms for 500ms of work. Honest by its stated definition, and the
@@ -588,3 +585,35 @@ collapsing**, across all four groups; and collapsing fires on only 8 of 43 fixtu
 - Group nodes are drawn at fit zoom (0.745 on `wide`), where 10px meta text renders ~7.4px.
 - Dark mode: stacked-card `border-subtle` is louder than the green status border, inverting the
   hierarchy.
+
+### The bar/span mismatch — fixed, and it needed three sources to pin down
+
+Worth writing up because no single reviewer had it, and one of them was reporting on a fixture they
+had never looked at.
+
+- The **UX baseline review** saw the symptom: `blocked`'s `hold` row reads 5.999s against a bar
+  spanning most of the plot.
+- The **correctness agent** later objected that this was not its finding, checked the payload, and
+  reported that `hold` has *no queued phase at all* — 0ms queued, 5999ms executing — so nothing in
+  the span justifies a wider bar. It asked me to confirm which I was seeing before fixing.
+- **Measuring the live DOM** settled it: the bar rendered as two segments, 48.4% and 46.1%, under a
+  label saying 5.999s. Both reviewers were right about their half.
+
+The cause was in neither place. `hold` carries `inngest.timing` metadata with
+`queue_delay_ms: 6299` — the **run-level** concurrency hold, stamped onto the step that followed it.
+`getTimingFromMetadata` prefers metadata, so the breakdown totalled 12298ms against a 5999ms span
+and half the bar was drawn as waiting the step never did.
+
+**The rule now**: the bar is the span, and its segments partition it. Where metadata claims more than
+the span, timestamps win and the split is re-derived from the span. `hold` draws as one solid bar
+matching its label. The 6.3s hold is real and unchanged — it belongs to the run span, one row up,
+and item G's value line already reports it.
+
+Pre-existing rather than introduced, but the ghosted-waiting change **made it worse**: as a separate
+grey bar the mis-attribution read as platform overhead; as part of the step's own bar it claimed the
+step spent half its life waiting. A more honest encoding made a latent wrong number louder, which is
+worth remembering.
+
+`failure` was named alongside it in the original report and does **not** have this shape — the whole
+run is 653ms with no multi-second period to misplace. Not every fixture named in a review is
+implicated; that one was checked and cleared.
