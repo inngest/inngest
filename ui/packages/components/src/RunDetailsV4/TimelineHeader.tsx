@@ -8,12 +8,13 @@
  * - Timing markers at 0%, 25%, 50%, 75%, 100% with duration labels
  */
 
-import { useCallback, useLayoutEffect, useRef, type JSX } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, type JSX } from 'react';
 
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import { TimeBrush } from './TimeBrush';
 import { formatDuration } from './runDetailsUtils';
+import { scaleTicks, type TimeScale } from './utils/timeScale';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
 type Props = {
@@ -31,16 +32,15 @@ type Props = {
   selectionStart?: number;
   /** Current selection end as percentage (0-100), controlled by parent */
   selectionEnd?: number;
+  /**
+   * The elastic axis. When it is compressed, markers are no longer evenly
+   * spaced in *time* — only in width — so they have to be derived from it
+   * rather than assumed.
+   */
+  scale?: TimeScale;
 };
 
 const TIME_MARKERS = [0, 25, 50, 75, 100];
-
-/**
- * Calculate duration labels for the time markers.
- */
-function getMarkerDurations(totalMs: number): string[] {
-  return TIME_MARKERS.map((percent) => formatDuration(Math.floor((totalMs * percent) / 100)));
-}
 
 /**
  * Get the base CSS transform for a timestamp label at a given percentage.
@@ -63,9 +63,26 @@ export function TimelineHeader({
   status,
   selectionStart: selStart = 0,
   selectionEnd: selEnd = 100,
+  scale,
 }: Props): JSX.Element {
   const totalMs = maxTime.getTime() - minTime.getTime();
-  const durations = getMarkerDurations(totalMs);
+
+  // With a broken axis the markers sit at even *widths* but uneven times, and a
+  // marker landing inside an elided stretch is dropped — labelling a time from a
+  // stretch the axis is explicitly not drawing would be worse than no label.
+  const markers = useMemo(() => {
+    if (!scale?.compressed) {
+      return TIME_MARKERS.map((percent) => ({
+        percent,
+        label: formatDuration(Math.floor((totalMs * percent) / 100)),
+      }));
+    }
+    return scaleTicks(scale, TIME_MARKERS.length).map((tick) => ({
+      percent: tick.percent,
+      label: formatDuration(Math.max(0, tick.ms - minTime.getTime())),
+    }));
+  }, [scale, totalMs, minTime]);
+
   const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
   const isDefault = selStart === 0 && selEnd === 100;
@@ -143,23 +160,23 @@ export function TimelineHeader({
       <div ref={rightPanelRef} className="relative flex-1">
         {/* Time markers - positioned above the bar */}
         <div className="relative w-full">
-          {TIME_MARKERS.map((percent, i) => (
+          {markers.map((marker) => (
             <div
-              key={`marker-${percent}`}
+              key={`marker-${marker.percent}`}
               className="absolute bottom-0 flex flex-col items-center"
               style={{
-                left: `${percent}%`,
+                left: `${marker.percent}%`,
                 transform:
-                  percent === 0
+                  marker.percent === 0
                     ? 'translateX(0)'
-                    : percent === 100
+                    : marker.percent === 100
                     ? 'translateX(-100%)'
                     : 'translateX(-50%)',
               }}
             >
               {/* Duration label */}
               <span className="text-muted whitespace-nowrap text-xs tabular-nums">
-                {durations[i]}
+                {marker.label}
               </span>
             </div>
           ))}

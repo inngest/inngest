@@ -2,6 +2,7 @@
  * Timing calculation utilities for the TimelineBar component.
  * Feature: 001-composable-timeline-bar
  */
+import type { TimeScale } from './timeScale';
 
 /**
  * Layout constants for the TimelineBar component.
@@ -28,17 +29,25 @@ export const TIMELINE_CONSTANTS = {
 
 /**
  * Calculate bar position as percentages of timeline width.
+ *
+ * This is the ONLY function that learns about a compressed axis, and that is
+ * deliberate: `calculateDuration` below reports wall-clock time and takes no
+ * scale, so no amount of axis compression can change a number the user is
+ * shown. The invariant is structural rather than a rule someone has to remember.
+ *
  * @param startTime - Start time of the bar
  * @param endTime - End time of the bar (null if in progress)
  * @param minTime - Minimum time of the overall timeline
  * @param maxTime - Maximum time of the overall timeline
+ * @param scale - Optional elastic axis. Omit for an ordinary linear one.
  * @returns Object with startPercent and widthPercent
  */
 export function calculateBarPosition(
   startTime: Date,
   endTime: Date | null,
   minTime: Date,
-  maxTime: Date
+  maxTime: Date,
+  scale?: TimeScale
 ): { startPercent: number; widthPercent: number } {
   const totalMs = maxTime.getTime() - minTime.getTime();
 
@@ -46,8 +55,19 @@ export function calculateBarPosition(
     return { startPercent: 0, widthPercent: 100 };
   }
 
-  const startMs = startTime.getTime() - minTime.getTime();
-  const endMs = (endTime ?? new Date()).getTime() - minTime.getTime();
+  const start = startTime.getTime();
+  const end = (endTime ?? new Date()).getTime();
+
+  if (scale) {
+    const startPercent = scale.toPercent(start);
+    return {
+      startPercent,
+      widthPercent: Math.max(0.1, scale.toPercent(end) - startPercent),
+    };
+  }
+
+  const startMs = start - minTime.getTime();
+  const endMs = end - minTime.getTime();
 
   const startPercent = (startMs / totalMs) * 100;
   const widthPercent = Math.max(0.1, ((endMs - startMs) / totalMs) * 100); // Min 0.1%

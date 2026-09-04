@@ -26,7 +26,8 @@ import type {
 } from './TimelineBar.types';
 import { TimelineHeader } from './TimelineHeader';
 import { applyCollapseToBars, type CollapsePlan } from './canvas/collapse';
-import { useStepSelection } from './runDetailsUtils';
+import { formatDuration, useStepSelection } from './runDetailsUtils';
+import { buildTimeScale, type Interval, type TimeScale } from './utils/timeScale';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
 
 // ============================================================================
@@ -101,6 +102,16 @@ const INNGEST_PHASES: PhaseDefinition<InngestBreakdownData>[] = [
     getMs: (d) => d.systemLatencyMs,
   },
 ];
+
+/**
+ * Bars that represent the run being suspended rather than working.
+ *
+ * These are the stretches the elastic axis is allowed to elide: they cost
+ * nothing, and a nine-day sleep drawn to scale leaves no room for the five
+ * seconds that actually ran. `step.invoke` is deliberately absent — a child run
+ * is genuinely executing during one.
+ */
+const IDLE_STYLES = new Set<BarStyleKey>(['step.sleep', 'step.waitForEvent']);
 
 const RUN_INNGEST_PHASES: PhaseDefinition<RunInngestBreakdownData>[] = [
   {
@@ -481,6 +492,11 @@ type TimelineBarRendererProps = {
   actions?: ReactNode;
   /** Whether this bar is inside an experiment (inherited from parent) */
   insideExperiment?: boolean;
+  /**
+   * The elastic axis, when the run has idle stretches worth breaking. Affects
+   * only where a bar is drawn — never the duration it reports.
+   */
+  scale?: TimeScale;
 };
 
 /**
@@ -501,12 +517,14 @@ function TimelineBarRenderer({
   viewEndOffset = 100,
   actions,
   insideExperiment,
+  scale,
 }: TimelineBarRendererProps): JSX.Element {
   const { startPercent, widthPercent } = calculateBarPosition(
     bar.startTime,
     bar.endTime,
     minTime,
-    maxTime
+    maxTime,
+    scale
   );
 
   const duration = calculateDuration(bar.startTime, bar.endTime);
@@ -729,6 +747,7 @@ function TimelineBarRenderer({
                 viewStartOffset={viewStartOffset}
                 viewEndOffset={viewEndOffset}
                 insideExperiment={childInsideExperiment}
+                scale={scale}
               />
             ))}
         </TimelineBar>
@@ -845,6 +864,7 @@ function TimelineBarRenderer({
             viewStartOffset={viewStartOffset}
             viewEndOffset={viewEndOffset}
             insideExperiment={childInsideExperiment}
+            scale={scale}
           />
         ))}
     </TimelineBar>
@@ -971,6 +991,32 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
   // Get status from the first (root) bar for header coloring
   const rootStatus = bars.find((bar) => bar.isRoot)?.status ?? bars[0]?.status;
 
+  // Break the axis wherever the run was idle. A realistic run is days elapsed
+  // and seconds executing; drawn linearly every step is sub-pixel.
+  //
+  // Two rules decide what counts as "busy". Only leaf bars, because a parent
+  // spans its children and would fill every gap they left — nothing would ever
+  // look idle. And a sleep or a waitForEvent is NOT busy: it is precisely the
+  // suspended stretch costing nothing, which is the thing worth eliding. An
+  // invoke is left as busy, because a child run really is doing work in there.
+  const scale = useMemo(() => {
+    const busy: Interval[] = [];
+    const collect = (list: TimelineBarData[]) => {
+      for (const bar of list) {
+        if (bar.children?.length) {
+          collect(bar.children);
+        } else if (!bar.isRoot && !IDLE_STYLES.has(bar.style)) {
+          busy.push({
+            startMs: bar.startTime.getTime(),
+            endMs: (bar.endTime ?? bar.startTime).getTime(),
+          });
+        }
+      }
+    };
+    collect(bars);
+    return buildTimeScale(minTime.getTime(), maxTime.getTime(), busy);
+  }, [bars, minTime, maxTime]);
+
   return (
     <div className="w-full pb-4 pr-2" data-testid="timeline-container">
       {/* Run duration header with timing markers */}
@@ -982,27 +1028,63 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
         status={rootStatus}
         selectionStart={viewStartOffset}
         selectionEnd={viewEndOffset}
+        scale={scale}
       />
 
-      {/* Step bars */}
-      {bars.map((bar) => (
-        <TimelineBarRenderer
-          key={bar.id}
-          bar={bar}
-          depth={0}
-          minTime={minTime}
-          maxTime={maxTime}
-          leftWidth={leftWidth}
-          orgName={orgName}
-          expandedBars={expandedBars}
-          onToggleExpand={handleToggleExpand}
-          onSelectStep={handleSelectStep}
-          selectedStepId={selectedStepId}
-          viewStartOffset={viewStartOffset}
-          viewEndOffset={viewEndOffset}
-          actions={bar.isRoot ? expandCollapseActions : undefined}
-        />
-      ))}
+      {/* The rows, with the axis breaks drawn behind them. A break spans every
+          row because it is a property of the axis rather than of any one step —
+          and it is drawn at all because an axis that is not linear has to say
+          so. Elided time is a filled band bounded by dashed rules, with its real
+          duration set inside it: visibly a break, not a gap. */}
+      <div className="relative">
+        {scale.compressed && (
+          <div
+            className="pointer-events-none absolute inset-y-0 z-0"
+            style={{ left: `${leftWidth}%`, right: 0 }}
+          >
+            {scale.gaps.map((gap) => (
+              <div
+                key={gap.startMs}
+                data-testid="timeline-axis-break"
+                className="border-muted bg-canvasMuted absolute inset-y-0 flex items-center justify-center overflow-hidden border-x border-dashed"
+                style={{
+                  left: `${gap.startPercent}%`,
+                  width: `${gap.endPercent - gap.startPercent}%`,
+                }}
+              >
+                <span
+                  className="text-muted whitespace-nowrap text-[10px] tabular-nums"
+                  style={{ writingMode: 'vertical-rl' }}
+                >
+                  ⋯ {formatDuration(gap.durationMs)} ⋯
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="relative z-[1]">
+          {bars.map((bar) => (
+            <TimelineBarRenderer
+              key={bar.id}
+              bar={bar}
+              depth={0}
+              minTime={minTime}
+              maxTime={maxTime}
+              leftWidth={leftWidth}
+              orgName={orgName}
+              expandedBars={expandedBars}
+              onToggleExpand={handleToggleExpand}
+              onSelectStep={handleSelectStep}
+              selectedStepId={selectedStepId}
+              viewStartOffset={viewStartOffset}
+              viewEndOffset={viewEndOffset}
+              actions={bar.isRoot ? expandCollapseActions : undefined}
+              scale={scale}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
