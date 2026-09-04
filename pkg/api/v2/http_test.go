@@ -98,6 +98,49 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_RejectsUnexpectedRequestBodyFields(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		path string
+		body string
+	}{
+		{
+			name: "top-level field",
+			path: "/api/v2/envs",
+			body: `{"name":"test","unexpected":"secret-value"}`,
+		},
+		{
+			name: "nested field",
+			path: "/api/v2/runs/01hp1zx8m3ng9vp6qn0xk7j4cy/rerun",
+			body: `{"fromStep":{"stepId":"step-1","unexpected":"secret-value"}}`,
+		},
+		{
+			name: "field-specific body binding",
+			path: "/api/v2/runs/01hp1zx8m3ng9vp6qn0xk7j4cy/scores",
+			body: `[{"name":"accuracy","value":0.5,"unexpected":"secret-value"}]`,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			handler, err := newTestHTTPHandler(t.Context(), ServiceOptions{}, HTTPHandlerOptions{})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, test.path, strings.NewReader(test.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusBadRequest, rec.Code)
+			var body errorResponse
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+			require.Equal(t, []errorItem{{
+				Code:    apiv2base.ErrorInvalidRequest,
+				Message: `Unexpected request body field "unexpected"`,
+			}}, body.Errors)
+			require.NotContains(t, rec.Body.String(), "secret-value")
+		})
+	}
+}
+
 func TestHTTPGateway_SandboxesNotImplementedInDevServer(t *testing.T) {
 	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{}, HTTPHandlerOptions{})
 	require.NoError(t, err)
