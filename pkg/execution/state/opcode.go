@@ -696,6 +696,77 @@ func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
 
 // ParallelMode returns the parallel mode for the step. Defaults to
 // ParallelModeNone (including if there any errors)
+// DiscoveredAfter returns the IDs of the steps the continuation that discovered
+// this step was waiting on, as reported by the SDK.
+//
+// The SDK resumes memoised steps one at a time, draining microtasks between
+// each, so a step found during a given resumption was reached by code waiting
+// on it. Where that code was waiting on a promise combinator, the SDK reports
+// every member of the join rather than only the one that happened to finish
+// last. That makes this an observation of causality made where it is visible,
+// rather than something we infer downstream from report order — which cannot
+// distinguish two independent chains from a join that re-fans out.
+//
+// Empty when the step was found during the SDK's initial replay of the function
+// body (so it waits on the trigger only), or when the SDK does not report it.
+// Diagnostic only: nothing about execution depends on it.
+func (g *GeneratorOpcode) DiscoveredAfter() []string {
+	return g.lineageOpt("discoveredAfter")
+}
+
+// DiscoveredAfterAlternates returns the steps that could have unblocked this one
+// but did not — the losing side of a Promise.race or Promise.any.
+//
+// These are real orderings but not real dependencies: the step would have
+// started just the same had they never completed. Kept separate from
+// DiscoveredAfter so a visualisation can show a race as a race rather than as a
+// join that waited for everything.
+func (g *GeneratorOpcode) DiscoveredAfterAlternates() []string {
+	return g.lineageOpt("discoveredAfterAlternates")
+}
+
+// lineageOpt reads a step-lineage key from the free-form opts, tolerating both
+// a bare string and a list. Older SDKs reported a single ID.
+func (g *GeneratorOpcode) lineageOpt(key string) []string {
+	var optByt []byte
+	switch typ := g.Opts.(type) {
+	case []byte:
+		optByt = typ
+	default:
+		var err error
+		optByt, err = json.Marshal(g.Opts)
+		if err != nil {
+			return nil
+		}
+	}
+
+	var opts map[string]any
+	if err := json.Unmarshal(optByt, &opts); err != nil {
+		return nil
+	}
+
+	switch val := opts[key].(type) {
+	case string:
+		if val == "" {
+			return nil
+		}
+		return []string{val}
+	case []any:
+		ids := make([]string, 0, len(val))
+		for _, item := range val {
+			if id, ok := item.(string); ok && id != "" {
+				ids = append(ids, id)
+			}
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		return ids
+	}
+
+	return nil
+}
+
 func (g *GeneratorOpcode) ParallelMode() enums.ParallelMode {
 	var optByt []byte
 	switch typ := g.Opts.(type) {
