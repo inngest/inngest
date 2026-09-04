@@ -16,6 +16,7 @@ import { Route as DashboardRunsIndexRouteImport } from './routes/_dashboard/runs
 import { Route as DashboardRunIndexRouteImport } from './routes/_dashboard/run/index'
 import { Route as DashboardEventsIndexRouteImport } from './routes/_dashboard/events/index'
 import { Route as DashboardEventIndexRouteImport } from './routes/_dashboard/event/index'
+import { Route as DashboardCanvasGalleryIndexRouteImport } from './routes/_dashboard/canvas-gallery/index'
 import { Route as DashboardAppsIndexRouteImport } from './routes/_dashboard/apps/index'
 import { Route as DashboardAppsOnboardingRouteRouteImport } from './routes/_dashboard/apps/_onboarding/route'
 import { Route as DashboardMcpSetupIndexRouteImport } from './routes/_dashboard/mcp/setup/index'
@@ -60,6 +61,12 @@ const DashboardEventIndexRoute = DashboardEventIndexRouteImport.update({
   path: '/event/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCanvasGalleryIndexRoute =
+  DashboardCanvasGalleryIndexRouteImport.update({
+    id: '/canvas-gallery/',
+    path: '/canvas-gallery/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardAppsIndexRoute = DashboardAppsIndexRouteImport.update({
   id: '/apps/',
   path: '/apps/',
@@ -116,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/functions': typeof DashboardFunctionsRouteRouteWithChildren
   '/apps': typeof DashboardAppsOnboardingRouteRouteWithChildren
   '/apps/': typeof DashboardAppsIndexRoute
+  '/canvas-gallery/': typeof DashboardCanvasGalleryIndexRoute
   '/event/': typeof DashboardEventIndexRoute
   '/events/': typeof DashboardEventsIndexRoute
   '/run/': typeof DashboardRunIndexRoute
@@ -132,6 +140,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/functions': typeof DashboardFunctionsRouteRouteWithChildren
   '/apps': typeof DashboardAppsIndexRoute
+  '/canvas-gallery': typeof DashboardCanvasGalleryIndexRoute
   '/event': typeof DashboardEventIndexRoute
   '/events': typeof DashboardEventsIndexRoute
   '/run': typeof DashboardRunIndexRoute
@@ -151,6 +160,7 @@ export interface FileRoutesById {
   '/_dashboard/functions': typeof DashboardFunctionsRouteRouteWithChildren
   '/_dashboard/apps/_onboarding': typeof DashboardAppsOnboardingRouteRouteWithChildren
   '/_dashboard/apps/': typeof DashboardAppsIndexRoute
+  '/_dashboard/canvas-gallery/': typeof DashboardCanvasGalleryIndexRoute
   '/_dashboard/event/': typeof DashboardEventIndexRoute
   '/_dashboard/events/': typeof DashboardEventsIndexRoute
   '/_dashboard/run/': typeof DashboardRunIndexRoute
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/functions'
     | '/apps'
     | '/apps/'
+    | '/canvas-gallery/'
     | '/event/'
     | '/events/'
     | '/run/'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/'
     | '/functions'
     | '/apps'
+    | '/canvas-gallery'
     | '/event'
     | '/events'
     | '/run'
@@ -204,6 +216,7 @@ export interface FileRouteTypes {
     | '/_dashboard/functions'
     | '/_dashboard/apps/_onboarding'
     | '/_dashboard/apps/'
+    | '/_dashboard/canvas-gallery/'
     | '/_dashboard/event/'
     | '/_dashboard/events/'
     | '/_dashboard/run/'
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       path: '/event'
       fullPath: '/event/'
       preLoaderRoute: typeof DashboardEventIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/canvas-gallery/': {
+      id: '/_dashboard/canvas-gallery/'
+      path: '/canvas-gallery'
+      fullPath: '/canvas-gallery/'
+      preLoaderRoute: typeof DashboardCanvasGalleryIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/apps/': {
@@ -375,6 +395,7 @@ interface DashboardRouteChildren {
   DashboardFunctionsRouteRoute: typeof DashboardFunctionsRouteRouteWithChildren
   DashboardAppsOnboardingRouteRoute: typeof DashboardAppsOnboardingRouteRouteWithChildren
   DashboardAppsIndexRoute: typeof DashboardAppsIndexRoute
+  DashboardCanvasGalleryIndexRoute: typeof DashboardCanvasGalleryIndexRoute
   DashboardEventIndexRoute: typeof DashboardEventIndexRoute
   DashboardEventsIndexRoute: typeof DashboardEventsIndexRoute
   DashboardRunIndexRoute: typeof DashboardRunIndexRoute
@@ -390,6 +411,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAppsOnboardingRouteRoute:
     DashboardAppsOnboardingRouteRouteWithChildren,
   DashboardAppsIndexRoute: DashboardAppsIndexRoute,
+  DashboardCanvasGalleryIndexRoute: DashboardCanvasGalleryIndexRoute,
   DashboardEventIndexRoute: DashboardEventIndexRoute,
   DashboardEventsIndexRoute: DashboardEventsIndexRoute,
   DashboardRunIndexRoute: DashboardRunIndexRoute,
