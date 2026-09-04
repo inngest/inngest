@@ -236,6 +236,39 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 	}
 
+	// The executor records every opcode an SDK response returned on the span
+	// that handled that response. More than one means the SDK planned them
+	// together, which is the only authoritative statement of a parallel batch
+	// available anywhere: step spans are all parented flat to the run span, so
+	// clients otherwise have to infer fan-out from execution overlap.
+	if steps := span.Attributes.ResponseSteps; steps != nil && len(*steps) > 0 {
+		planned := make([]*models.RunStep, 0, len(*steps))
+		for _, op := range *steps {
+			step := &models.RunStep{
+				StepID: op.ID,
+				Name:   op.Name,
+			}
+			if stepOp := tr.opcodeToGQL(&op.Op); stepOp != nil {
+				step.StepOp = stepOp
+			}
+			planned = append(planned, step)
+		}
+		gqlSpan.PlannedSteps = planned
+	}
+
+	// The SDK disambiguates repeated step IDs with an auto-incremented index
+	// (step.run("work") twice becomes work:1 and work:2). Both the unhashed ID
+	// and that index are recorded on the span; neither was exposed, which is why
+	// two such steps are indistinguishable in the UI.
+	gqlSpan.UserlandStepID = span.Attributes.StepUserlandID
+	gqlSpan.UserlandStepIndex = span.Attributes.StepUserlandIndex
+	if span.Attributes.StepParentIDs != nil {
+		gqlSpan.ParentStepIDs = *span.Attributes.StepParentIDs
+	}
+	if span.Attributes.StepParentAlternateIDs != nil {
+		gqlSpan.ParentAlternateStepIDs = *span.Attributes.StepParentAlternateIDs
+	}
+
 	// If this was a discovery span, we may not want to show it.
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
@@ -329,6 +362,16 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		lastStepQueueTime := &gqlSpan.QueuedAt
 		isFirstChild := true
 		var omittedStepMetadata []*models.SpanMetadata
+		// Plans read off omitted discovery spans, keyed by each step the plan
+		// named, so they can be promoted onto the visible step spans below.
+		plansByStepID := map[string][]*models.RunStep{}
+		// The step a step continues is a property of the STEP, not of any one
+		// span: the executor stamps it on the span created when the step was
+		// planned, and a later span records the same step completing. Rollup
+		// keeps the latter, so collect the value across every span of the run
+		// and stamp it on all of them.
+		parentByStepID := map[string][]string{}
+		altsByStepID := map[string][]string{}
 		haveSetRunStartTime := span.Name != meta.SpanNameRun
 
 		// If there's a run start time on the overall parent, use that.  Sometimes this
@@ -349,6 +392,20 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				continue
 			}
 
+			// Collect before any skipping: the executor stamps the parent on
+			// the span created when the step was *planned*, and a later span
+			// records the same step *completing*. Clients roll spans up by step
+			// and keep the latter, so the value has to be gathered from every
+			// span and re-stamped below.
+			if child.StepID != nil {
+				if len(child.ParentStepIDs) > 0 {
+					parentByStepID[*child.StepID] = child.ParentStepIDs
+				}
+				if len(child.ParentAlternateStepIDs) > 0 {
+					altsByStepID[*child.StepID] = child.ParentAlternateStepIDs
+				}
+			}
+
 			if child.Omit {
 				// We're skipping this child, but we may still want to use
 				// its data for timings.
@@ -367,6 +424,24 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				// be promoted to the corresponding visible step span.
 				if len(child.Metadata) > 0 && child.SpanTypeName == meta.SpanNameStepDiscovery {
 					omittedStepMetadata = append(omittedStepMetadata, child.Metadata...)
+				}
+
+				// A discovery span's subtree is the only place that records
+				// which steps one SDK response planned together, and the whole
+				// subtree is omitted from the tree. The attribute sits on the
+				// execution span *under* the discovery span, so search the
+				// subtree rather than just the child. Promote the plan onto the
+				// step spans it named, so clients can tell a real parallel
+				// batch from steps that merely happened to overlap.
+				if child.SpanTypeName == meta.SpanNameStepDiscovery {
+					for _, plan := range collectPlannedSteps(child) {
+						if len(plan) < 2 {
+							continue
+						}
+						for _, planned := range plan {
+							plansByStepID[planned.StepID] = plan
+						}
+					}
 				}
 
 				continue
@@ -506,6 +581,12 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			if len(gqlSpan.ChildrenSpans) == 1 && !gqlSpan.ChildrenSpans[0].IsUserland && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
 				gqlSpan.Response = gqlSpan.ChildrenSpans[0].Response
 				gqlSpan.Metadata = append(gqlSpan.Metadata, gqlSpan.ChildrenSpans[0].Metadata...)
+				// The planned-step list lives on the execution span we are
+				// about to discard, so lift it the same way Response and
+				// Metadata are lifted.
+				if len(gqlSpan.PlannedSteps) == 0 {
+					gqlSpan.PlannedSteps = gqlSpan.ChildrenSpans[0].PlannedSteps
+				}
 				// However, we preserve any userland spans from the
 				// successful execution if we have any.
 				gqlSpan.ChildrenSpans = gqlSpan.ChildrenSpans[0].ChildrenSpans
@@ -537,6 +618,26 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		// Any remaining omittedStepMetadata at this point means
 		// there were trailing omitted discovery spans with no
 		// subsequent visible step child — intentionally discarded.
+
+		// Promote the plans collected from omitted discovery spans onto the
+		// visible step spans they named. Done after the loop because a plan
+		// covers several siblings, not just the next one.
+		if len(plansByStepID) > 0 || len(parentByStepID) > 0 {
+			for _, child := range gqlSpan.ChildrenSpans {
+				if child.StepID == nil {
+					continue
+				}
+				if plan, ok := plansByStepID[*child.StepID]; ok {
+					child.PlannedSteps = plan
+				}
+				if parents, ok := parentByStepID[*child.StepID]; ok && len(child.ParentStepIDs) == 0 {
+					child.ParentStepIDs = parents
+				}
+				if alts, ok := altsByStepID[*child.StepID]; ok && len(child.ParentAlternateStepIDs) == 0 {
+					child.ParentAlternateStepIDs = alts
+				}
+			}
+		}
 	}
 
 	if !showSpan {
@@ -580,3 +681,23 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	return gqlSpan, nil
 }
 
+
+// collectPlannedSteps gathers every planned-step list recorded anywhere in a
+// span subtree. The executor stamps `response.step.ops` on the execution span
+// that handled an SDK response, which for a discovery request sits one level
+// below the discovery span — and the whole discovery subtree is omitted from
+// the tree we return, so the lists have to be lifted out before it is dropped.
+func collectPlannedSteps(span *models.RunTraceSpan) [][]*models.RunStep {
+	if span == nil {
+		return nil
+	}
+
+	var plans [][]*models.RunStep
+	if len(span.PlannedSteps) > 0 {
+		plans = append(plans, span.PlannedSteps)
+	}
+	for _, child := range span.ChildrenSpans {
+		plans = append(plans, collectPlannedSteps(child)...)
+	}
+	return plans
+}

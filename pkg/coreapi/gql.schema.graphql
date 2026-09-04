@@ -656,6 +656,26 @@ type RunTraceSpan {
   skipExistingRunID: String
   metadata: [SpanMetadata!]!
   response: RunTraceSpanResponseInfo # Response status and headers
+  # Every step planned by the SDK response that produced this span. When more
+  # than one step is listed, the SDK planned them together, so they are a
+  # genuine parallel batch rather than one inferred from execution overlap.
+  # Sourced from the `response.step.ops` span attribute, which the executor has
+  # always recorded but which was previously not exposed.
+  plannedSteps: [RunStep!]
+  # The step ID the user actually wrote, before hashing, plus the index the SDK
+  # assigned when the same ID is used more than once in a run (two branches of a
+  # Promise.all both calling step.run("work")). Without the index those steps are
+  # indistinguishable to a reader.
+  userlandStepID: String
+  userlandStepIndex: Int
+  # The steps this one waited for: every member of the join it sits after, or
+  # the single step it follows in a chain. Reported by the SDK, which can see
+  # the promise combinator being built; never inferred server-side.
+  parentStepIDs: [String!]
+  # Steps that could have unblocked this one but did not — the losing side of a
+  # Promise.race or Promise.any. Ordering, not dependency, so draw them
+  # differently from parentStepIDs.
+  parentAlternateStepIDs: [String!]
 }
 
 type RunTraceSpanResponseInfo {

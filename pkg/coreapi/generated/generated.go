@@ -446,39 +446,44 @@ type ComplexityRoot struct {
 	}
 
 	RunTraceSpan struct {
-		AppID             func(childComplexity int) int
-		Attempts          func(childComplexity int) int
-		ChildrenSpans     func(childComplexity int) int
-		DebugPaused       func(childComplexity int) int
-		DebugRunID        func(childComplexity int) int
-		DebugSessionID    func(childComplexity int) int
-		Duration          func(childComplexity int) int
-		EndedAt           func(childComplexity int) int
-		FunctionID        func(childComplexity int) int
-		GroupID           func(childComplexity int) int
-		IsRoot            func(childComplexity int) int
-		IsUserland        func(childComplexity int) int
-		Metadata          func(childComplexity int) int
-		Name              func(childComplexity int) int
-		OutputID          func(childComplexity int) int
-		ParentSpan        func(childComplexity int) int
-		ParentSpanID      func(childComplexity int) int
-		QueuedAt          func(childComplexity int) int
-		Response          func(childComplexity int) int
-		Run               func(childComplexity int) int
-		RunID             func(childComplexity int) int
-		ScheduledAt       func(childComplexity int) int
-		SkipExistingRunID func(childComplexity int) int
-		SkipReason        func(childComplexity int) int
-		SpanID            func(childComplexity int) int
-		StartedAt         func(childComplexity int) int
-		Status            func(childComplexity int) int
-		StepID            func(childComplexity int) int
-		StepInfo          func(childComplexity int) int
-		StepOp            func(childComplexity int) int
-		StepType          func(childComplexity int) int
-		TraceID           func(childComplexity int) int
-		UserlandSpan      func(childComplexity int) int
+		AppID                  func(childComplexity int) int
+		Attempts               func(childComplexity int) int
+		ChildrenSpans          func(childComplexity int) int
+		DebugPaused            func(childComplexity int) int
+		DebugRunID             func(childComplexity int) int
+		DebugSessionID         func(childComplexity int) int
+		Duration               func(childComplexity int) int
+		EndedAt                func(childComplexity int) int
+		FunctionID             func(childComplexity int) int
+		GroupID                func(childComplexity int) int
+		IsRoot                 func(childComplexity int) int
+		IsUserland             func(childComplexity int) int
+		Metadata               func(childComplexity int) int
+		Name                   func(childComplexity int) int
+		OutputID               func(childComplexity int) int
+		ParentAlternateStepIDs func(childComplexity int) int
+		ParentSpan             func(childComplexity int) int
+		ParentSpanID           func(childComplexity int) int
+		ParentStepIDs          func(childComplexity int) int
+		PlannedSteps           func(childComplexity int) int
+		QueuedAt               func(childComplexity int) int
+		Response               func(childComplexity int) int
+		Run                    func(childComplexity int) int
+		RunID                  func(childComplexity int) int
+		ScheduledAt            func(childComplexity int) int
+		SkipExistingRunID      func(childComplexity int) int
+		SkipReason             func(childComplexity int) int
+		SpanID                 func(childComplexity int) int
+		StartedAt              func(childComplexity int) int
+		Status                 func(childComplexity int) int
+		StepID                 func(childComplexity int) int
+		StepInfo               func(childComplexity int) int
+		StepOp                 func(childComplexity int) int
+		StepType               func(childComplexity int) int
+		TraceID                func(childComplexity int) int
+		UserlandSpan           func(childComplexity int) int
+		UserlandStepID         func(childComplexity int) int
+		UserlandStepIndex      func(childComplexity int) int
 	}
 
 	RunTraceSpanOutput struct {
@@ -2759,6 +2764,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.OutputID(childComplexity), true
 
+	case "RunTraceSpan.parentAlternateStepIDs":
+		if e.complexity.RunTraceSpan.ParentAlternateStepIDs == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.ParentAlternateStepIDs(childComplexity), true
+
 	case "RunTraceSpan.parentSpan":
 		if e.complexity.RunTraceSpan.ParentSpan == nil {
 			break
@@ -2772,6 +2784,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpan.ParentSpanID(childComplexity), true
+
+	case "RunTraceSpan.parentStepIDs":
+		if e.complexity.RunTraceSpan.ParentStepIDs == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.ParentStepIDs(childComplexity), true
+
+	case "RunTraceSpan.plannedSteps":
+		if e.complexity.RunTraceSpan.PlannedSteps == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.PlannedSteps(childComplexity), true
 
 	case "RunTraceSpan.queuedAt":
 		if e.complexity.RunTraceSpan.QueuedAt == nil {
@@ -2884,6 +2910,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpan.UserlandSpan(childComplexity), true
+
+	case "RunTraceSpan.userlandStepID":
+		if e.complexity.RunTraceSpan.UserlandStepID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.UserlandStepID(childComplexity), true
+
+	case "RunTraceSpan.userlandStepIndex":
+		if e.complexity.RunTraceSpan.UserlandStepIndex == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.UserlandStepIndex(childComplexity), true
 
 	case "RunTraceSpanOutput.data":
 		if e.complexity.RunTraceSpanOutput.Data == nil {
@@ -4239,6 +4279,26 @@ type RunTraceSpan {
   skipExistingRunID: String
   metadata: [SpanMetadata!]!
   response: RunTraceSpanResponseInfo # Response status and headers
+  # Every step planned by the SDK response that produced this span. When more
+  # than one step is listed, the SDK planned them together, so they are a
+  # genuine parallel batch rather than one inferred from execution overlap.
+  # Sourced from the ` + "`" + `response.step.ops` + "`" + ` span attribute, which the executor has
+  # always recorded but which was previously not exposed.
+  plannedSteps: [RunStep!]
+  # The step ID the user actually wrote, before hashing, plus the index the SDK
+  # assigned when the same ID is used more than once in a run (two branches of a
+  # Promise.all both calling step.run("work")). Without the index those steps are
+  # indistinguishable to a reader.
+  userlandStepID: String
+  userlandStepIndex: Int
+  # The steps this one waited for: every member of the join it sits after, or
+  # the single step it follows in a chain. Reported by the SDK, which can see
+  # the promise combinator being built; never inferred server-side.
+  parentStepIDs: [String!]
+  # Steps that could have unblocked this one but did not — the losing side of a
+  # Promise.race or Promise.any. Ordering, not dependency, so draw them
+  # differently from parentStepIDs.
+  parentAlternateStepIDs: [String!]
 }
 
 type RunTraceSpanResponseInfo {
@@ -12009,6 +12069,16 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			case "response":
 				return ec.fieldContext_RunTraceSpan_response(ctx, field)
+			case "plannedSteps":
+				return ec.fieldContext_RunTraceSpan_plannedSteps(ctx, field)
+			case "userlandStepID":
+				return ec.fieldContext_RunTraceSpan_userlandStepID(ctx, field)
+			case "userlandStepIndex":
+				return ec.fieldContext_RunTraceSpan_userlandStepIndex(ctx, field)
+			case "parentStepIDs":
+				return ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
+			case "parentAlternateStepIDs":
+				return ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -14929,6 +14999,16 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			case "response":
 				return ec.fieldContext_RunTraceSpan_response(ctx, field)
+			case "plannedSteps":
+				return ec.fieldContext_RunTraceSpan_plannedSteps(ctx, field)
+			case "userlandStepID":
+				return ec.fieldContext_RunTraceSpan_userlandStepID(ctx, field)
+			case "userlandStepIndex":
+				return ec.fieldContext_RunTraceSpan_userlandStepIndex(ctx, field)
+			case "parentStepIDs":
+				return ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
+			case "parentAlternateStepIDs":
+				return ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -18736,6 +18816,16 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			case "response":
 				return ec.fieldContext_RunTraceSpan_response(ctx, field)
+			case "plannedSteps":
+				return ec.fieldContext_RunTraceSpan_plannedSteps(ctx, field)
+			case "userlandStepID":
+				return ec.fieldContext_RunTraceSpan_userlandStepID(ctx, field)
+			case "userlandStepIndex":
+				return ec.fieldContext_RunTraceSpan_userlandStepIndex(ctx, field)
+			case "parentStepIDs":
+				return ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
+			case "parentAlternateStepIDs":
+				return ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -19097,6 +19187,16 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_metadata(ctx, field)
 			case "response":
 				return ec.fieldContext_RunTraceSpan_response(ctx, field)
+			case "plannedSteps":
+				return ec.fieldContext_RunTraceSpan_plannedSteps(ctx, field)
+			case "userlandStepID":
+				return ec.fieldContext_RunTraceSpan_userlandStepID(ctx, field)
+			case "userlandStepIndex":
+				return ec.fieldContext_RunTraceSpan_userlandStepIndex(ctx, field)
+			case "parentStepIDs":
+				return ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
+			case "parentAlternateStepIDs":
+				return ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -19509,6 +19609,219 @@ func (ec *executionContext) fieldContext_RunTraceSpan_response(ctx context.Conte
 				return ec.fieldContext_RunTraceSpanResponseInfo_headers(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpanResponseInfo", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_plannedSteps(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_plannedSteps(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PlannedSteps, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*models.RunStep)
+	fc.Result = res
+	return ec.marshalORunStep2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunStepᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_plannedSteps(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "stepID":
+				return ec.fieldContext_RunStep_stepID(ctx, field)
+			case "name":
+				return ec.fieldContext_RunStep_name(ctx, field)
+			case "stepOp":
+				return ec.fieldContext_RunStep_stepOp(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunStep", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_userlandStepID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_userlandStepID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserlandStepID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_userlandStepID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_userlandStepIndex(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_userlandStepIndex(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserlandStepIndex, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_userlandStepIndex(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_parentStepIDs(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentStepIDs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_parentStepIDs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_parentAlternateStepIDs(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentAlternateStepIDs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -28360,6 +28673,26 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = ec._RunTraceSpan_response(ctx, field, obj)
 
+		case "plannedSteps":
+
+			out.Values[i] = ec._RunTraceSpan_plannedSteps(ctx, field, obj)
+
+		case "userlandStepID":
+
+			out.Values[i] = ec._RunTraceSpan_userlandStepID(ctx, field, obj)
+
+		case "userlandStepIndex":
+
+			out.Values[i] = ec._RunTraceSpan_userlandStepIndex(ctx, field, obj)
+
+		case "parentStepIDs":
+
+			out.Values[i] = ec._RunTraceSpan_parentStepIDs(ctx, field, obj)
+
+		case "parentAlternateStepIDs":
+
+			out.Values[i] = ec._RunTraceSpan_parentAlternateStepIDs(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -30511,6 +30844,16 @@ func (ec *executionContext) marshalNRunHistoryItem2ᚖgithubᚗcomᚋinngestᚋi
 	return ec._RunHistoryItem(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNRunStep2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunStep(ctx context.Context, sel ast.SelectionSet, v *models.RunStep) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RunStep(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNRunTraceSpan2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx context.Context, sel ast.SelectionSet, v models.RunTraceSpan) graphql.Marshaler {
 	return ec._RunTraceSpan(ctx, sel, &v)
 }
@@ -31904,6 +32247,53 @@ func (ec *executionContext) marshalORunHistoryWaitResult2ᚖgithubᚗcomᚋinnge
 		return graphql.Null
 	}
 	return ec._RunHistoryWaitResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalORunStep2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunStepᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.RunStep) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRunStep2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunStep(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalORunTraceSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpan(ctx context.Context, sel ast.SelectionSet, v *models.RunTraceSpan) graphql.Marshaler {
