@@ -1037,6 +1037,14 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
           so. Elided time is a filled band bounded by dashed rules, with its real
           duration set inside it: visibly a break, not a gap. */}
       <div className="relative">
+        {/* The one structural rule in the view: where the label column ends and
+            the plot begins. Drawn once, spanning every row, rather than as a
+            border on each — a rule per row separates nothing. */}
+        <div
+          className="bg-canvasMuted pointer-events-none absolute inset-y-0 z-0 w-px"
+          style={{ left: `${leftWidth}%` }}
+        />
+
         {scale.compressed && (
           <div
             className="pointer-events-none absolute inset-y-0 z-0"

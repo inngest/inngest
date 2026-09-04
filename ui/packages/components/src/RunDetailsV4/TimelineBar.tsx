@@ -68,15 +68,25 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     barColor: 'bg-status-completed',
     statusBased: true,
   },
+  //
+  // Waiting is a different SUBSTANCE from working, not a different hue of it.
+  // A sleep or an unsatisfied wait is suspended, holding nothing and costing
+  // nothing, so it is neutral and hollow — while executing is solid and
+  // coloured. Get this distinction right and the view explains itself; make it
+  // two shades of green and it explains nothing.
+  //
+  // `step.invoke` keeps its colour: a child run really is executing in there.
   'step.sleep': {
-    barColor: 'bg-status-completed',
+    barColor: 'bg-surfaceMuted',
     pattern: 'vertical-lines',
-    statusBased: true,
+    outlined: true,
+    statusBased: false,
   },
   'step.waitForEvent': {
-    barColor: 'bg-status-completed',
+    barColor: 'bg-surfaceMuted',
     pattern: 'vertical-lines',
-    statusBased: true,
+    outlined: true,
+    statusBased: false,
   },
   'step.invoke': {
     barColor: 'bg-status-completed',
@@ -648,7 +658,15 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
   );
 }
 
-const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = { thin: 'h-0.5', short: 'h-2', tall: 'h-4' };
+/**
+ * Bars are thin, with a near-square radius rather than a pill. At an 18px row
+ * a 16px-tall bar is the row; the bar should be a mark on the row, not fill it.
+ */
+const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = {
+  thin: 'h-px',
+  short: 'h-1',
+  tall: 'h-1.5',
+};
 
 /**
  * Renders the visual bar in the right panel.
@@ -746,7 +764,7 @@ const VisualBar = memo(function VisualBar({
             <div
               key={segment.id}
               className={cn(
-                'absolute top-1/2 -translate-y-1/2',
+                'absolute top-1/2 -translate-y-1/2 rounded-[1.5px]',
                 segmentHeightClass,
                 isOutlined ? 'bg-canvasBase' : segmentColor
               )}
@@ -771,7 +789,7 @@ const VisualBar = memo(function VisualBar({
     <div
       data-testid="timeline-bar-visual"
       className={cn(
-        'absolute top-1/2 -translate-y-1/2',
+        'absolute top-1/2 -translate-y-1/2 rounded-[1.5px]',
         heightClass,
         isOutlined ? 'bg-canvasBase' : barColor
       )}
@@ -868,7 +886,7 @@ export function TimelineBar({
       {/* Main row */}
       <div
         data-testid="timeline-bar-row"
-        className="relative isolate flex h-7 cursor-pointer items-center"
+        className="relative isolate flex cursor-pointer items-center"
         onClick={() => {
           onClick?.();
           if (expandable) {
@@ -921,8 +939,10 @@ export function TimelineBar({
             {/* Name */}
             <span
               className={cn(
-                'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-xs font-normal leading-tight',
-                barStyle.textColor ?? 'text-basis',
+                // The label column should recede — the bars are the content.
+                // Monospace, muted, truncating, and never bold.
+                'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] font-normal leading-tight',
+                barStyle.textColor ?? 'text-subtle',
                 !effectiveIcon && 'pl-1.5'
               )}
             >
@@ -951,11 +971,12 @@ export function TimelineBar({
             {actions}
           </div>
 
-          {/* Duration */}
+          {/* Duration. Tabular numerals so the column of digits aligns down the
+              run — the comparison between rows is the whole point of it. */}
           <span
             className={cn(
-              'shrink-0 text-xs font-medium tabular-nums',
-              barStyle.durationColor ?? barStyle.textColor ?? 'text-basis'
+              'shrink-0 font-mono text-[11px] tabular-nums',
+              barStyle.durationColor ?? barStyle.textColor ?? 'text-muted'
             )}
           >
             {formatDuration(duration)}
@@ -977,8 +998,10 @@ export function TimelineBar({
           onMouseEnter={showHoverCard ? () => setHoverCardOpen(true) : undefined}
           onMouseLeave={showHoverCard ? () => setHoverCardOpen(false) : undefined}
         >
-          {/* Center line */}
-          <div className="bg-canvasMuted absolute left-0 right-0 top-1/2 h-px -translate-y-1/2" />
+          {/* No centre line, and no grid. One structural rule only — the
+              vertical divider between the label column and the plot area, drawn
+              once by the container rather than once per row. Every horizontal
+              rule here was a divider that separated nothing. */}
 
           {/* Dotted background pattern for experiment steps and their children */}
           {showExperimentBackground && (

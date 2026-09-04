@@ -17,8 +17,15 @@ export const TIMELINE_CONSTANTS = {
   /** Base left padding for the left panel in pixels */
   BASE_LEFT_PADDING_PX: 4,
 
-  /** Row height in pixels */
-  ROW_HEIGHT_PX: 28,
+  /**
+   * Row height in pixels.
+   *
+   * The reference points for this view are `htop`, the Chrome network panel and
+   * a profiler — not a design-system card list. It should read denser than the
+   * rest of the product, because a 500-step run at 28px a row is 14,000px of
+   * scrolling. Vertical space tight, horizontal space generous.
+   */
+  ROW_HEIGHT_PX: 18,
 
   /** Transition duration for expand/collapse */
   TRANSITION_MS: 150,
