@@ -21,6 +21,13 @@ export type CanvasNodeKind =
   | 'invoke'
   /** Synthetic fan-out / fan-in point between two levels. */
   | 'join'
+  /**
+   * A stand-in for several repeated nodes — a loop body or a wide fan-out drawn
+   * once with a count. Never produced by `toCanvasGraph`: it only appears in the
+   * rewritten graph `applyCollapse` returns, and the group behind it travels
+   * separately. See `collapse.ts`.
+   */
+  | 'group'
   /** Synthetic end node: the run's result. Selects the run root. */
   | 'result';
 

@@ -19,6 +19,11 @@ import type {
   CanvasFixture,
   FixtureGroup,
 } from '@inngest/components/RunDetailsV4/canvas/__fixtures__/index';
+import {
+  applyCollapseToBars,
+  planCollapse,
+  shouldAggregate,
+} from '@inngest/components/RunDetailsV4/canvas/collapse';
 import { toCanvasGraph } from '@inngest/components/RunDetailsV4/canvas/graph';
 import type { TimelineBarData } from '@inngest/components/RunDetailsV4/TimelineBar.types';
 import type { Trace } from '@inngest/components/RunDetailsV4/types';
@@ -86,10 +91,15 @@ function countSpans(trace: Trace): number {
 }
 
 //
-// Every row the timeline can show, not just the top-level ones — the budget is
-// about what a person has to scroll past, and a nested row still costs that.
+// Rows the timeline actually shows before anyone expands anything, which is
+// what the budget is about. The Timeline seeds its expansion state with the
+// root bars only, so this descends into a root and stops there — counting a
+// collapsed group's 500 hidden members would contradict the screen.
 function countBars(bars: TimelineBarData[]): number {
-  return bars.reduce((n, bar) => n + 1 + countBars(bar.children ?? []), 0);
+  return bars.reduce(
+    (n, bar) => n + 1 + (bar.isRoot ? countBars(bar.children ?? []) : 0),
+    0,
+  );
 }
 
 function CanvasGalleryComponent() {
@@ -172,7 +182,16 @@ function FixtureView({ fixture }: { fixture: CanvasFixture }) {
   const workNodes = graph.nodes.filter(
     (n) => n.kind === 'step' || n.kind === 'wait' || n.kind === 'invoke',
   ).length;
-  const rows = countBars(timelineData.bars);
+  // What the two views actually draw, which is the number the budget is about —
+  // not the uncollapsed total, which would contradict what is on screen.
+  const plan = useMemo(() => planCollapse(graph), [graph]);
+  const aggregated = shouldAggregate(graph, plan);
+  const drawnNodes = aggregated ? plan.nodesAtRest : plan.nodesExpanded;
+  const rows = countBars(
+    aggregated
+      ? applyCollapseToBars(timelineData.bars, plan)
+      : timelineData.bars,
+  );
 
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -201,9 +220,17 @@ function FixtureView({ fixture }: { fixture: CanvasFixture }) {
         <Fact label="work nodes" value={workNodes} />
         <Fact
           label="nodes at rest"
-          value={`${graph.nodes.length} / ${NODE_BUDGET}`}
-          tone={graph.nodes.length > NODE_BUDGET ? 'over' : 'ok'}
+          value={`${drawnNodes} / ${NODE_BUDGET}`}
+          tone={drawnNodes > NODE_BUDGET ? 'over' : 'ok'}
         />
+        {plan.groups.length > 0 && (
+          <Fact
+            label="collapsed"
+            value={`${plan.groups.length} group${
+              plan.groups.length === 1 ? '' : 's'
+            }${aggregated ? '' : ' (off)'}`}
+          />
+        )}
         <Fact label="edges" value={graph.edges.length} />
         <Fact
           label="rows at rest"
@@ -225,7 +252,11 @@ function FixtureView({ fixture }: { fixture: CanvasFixture }) {
       <Canvas trace={rolledUp} runID={runID} />
 
       <div className="border-muted border-t pt-2">
-        <Timeline data={timelineData} runID={runID} />
+        <Timeline
+          data={timelineData}
+          runID={runID}
+          collapse={aggregated ? plan : undefined}
+        />
       </div>
     </div>
   );

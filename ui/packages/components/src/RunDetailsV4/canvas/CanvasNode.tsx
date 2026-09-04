@@ -15,6 +15,7 @@ import { useState } from 'react';
 import {
   RiCheckboxCircleFill,
   RiCloseCircleFill,
+  RiExpandDiagonalLine,
   RiFlashlightLine,
   RiFunctionLine,
   RiLoader4Line,
@@ -32,6 +33,7 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { getStatusBorderClass, getStatusTextClass } from '../../Status/statusClasses';
 import { cn } from '../../utils/classNames';
 import { formatDuration } from '../runDetailsUtils';
+import { groupTitle, type CanvasGroup, type CollapseException } from './collapse';
 import { LAYOUT, type CanvasNodeData } from './toFlowElements';
 
 /** One icon per step type, so the shape of a run is readable at a glance. */
@@ -300,7 +302,181 @@ export function CanvasJoinNode({ data, selected }: NodeProps<Node<CanvasNodeData
   );
 }
 
+/**
+ * A repeated shape drawn once.
+ *
+ * The hard part is not the count, it is not throwing away what differed. A
+ * 40-iteration agent loop where iteration 7 called a different tool is exactly
+ * the run someone opened the trace to understand, so this node carries:
+ *
+ *  - the variance, as "38 x search, 2 x write_file" when names actually differ,
+ *    and as a `first … last` range when they are only numbered;
+ *  - the exceptions, naming how many failed, retried or ran long;
+ *  - a sparkline of every member's duration, in run order, so a slowdown partway
+ *    through is visible without expanding anything;
+ *  - the group's worst status as its border, so a group holding a failure is
+ *    never drawn as a green one.
+ *
+ * And it expands. A collapsed thing you cannot open is worse than no collapsing.
+ */
+function Sparkline({ values, className }: { values: number[]; className?: string }) {
+  if (values.length < 2) return null;
+
+  const max = Math.max(...values);
+  if (max <= 0) return null;
+
+  // One point per member, even at 500 — the shape of the run over its iterations
+  // is the signal, and thinning it would flatten exactly the spike worth seeing.
+  const step = 100 / (values.length - 1);
+  const points = values.map((v, i) => `${i * step},${10 - (v / max) * 9}`).join(' ');
+
+  return (
+    <svg
+      className={cn('h-2.5 w-full', className)}
+      viewBox="0 0 100 10"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <polyline
+        points={points}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={0.8}
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+/** "2 failed, 1 slow" — plural-correct, most serious first. */
+function summariseExceptions(group: CanvasGroup): string | null {
+  const order: Array<[CollapseException['reason'], string]> = [
+    ['failed', 'failed'],
+    ['cancelled', 'cancelled'],
+    ['running', 'still running'],
+    ['retried', 'retried'],
+    ['slow', 'slow'],
+  ];
+  const counts = new Map<string, number>();
+  for (const e of group.exceptions) counts.set(e.reason, (counts.get(e.reason) ?? 0) + 1);
+
+  const parts = order
+    .filter(([reason]) => counts.has(reason))
+    .map(([reason, label]) => `${counts.get(reason)} ${label}`);
+
+  return parts.length ? parts.join(', ') : null;
+}
+
+export function CanvasGroupNode({ data, selected }: NodeProps<Node<CanvasNodeData>>) {
+  const group = data.group;
+  if (!group) return null;
+
+  const Icon = iconFor(data);
+  const typeKey = stepTypeKey(data);
+  const failing = group.status === 'FAILED';
+
+  // Numbered names carry no information beyond the index, so they read as a
+  // range. A genuine mix of names is the interesting case and gets the counts.
+  const title = groupTitle(group);
+
+  const variantLine =
+    group.variance === 'mixed'
+      ? group.variants
+          .slice(0, 3)
+          .map((v) => `${v.count} x ${v.label}`)
+          .join(', ')
+      : null;
+
+  const exceptions = summariseExceptions(group);
+  const elapsed = formatDuration(group.envelope.lastEndedAt - group.envelope.firstStartedAt);
+
+  return (
+    <div className="relative" style={{ width: LAYOUT.nodeWidth, height: LAYOUT.groupHeight }}>
+      {/* Stacked cards: the same idiom the batched-event node uses for "several
+          of these", so repetition reads the same way wherever it appears. */}
+      <div
+        className={cn(
+          'bg-canvasBase absolute inset-0 translate-x-1.5 translate-y-1.5 rounded-md border',
+          failing ? getStatusBorderClass('FAILED') : 'border-subtle'
+        )}
+      />
+      <div
+        className={cn(
+          'bg-canvasBase absolute inset-0 translate-x-[3px] translate-y-[3px] rounded-md border',
+          failing ? getStatusBorderClass('FAILED') : 'border-subtle'
+        )}
+      />
+
+      <div
+        className={cn(
+          'bg-canvasBase absolute inset-0 flex flex-col justify-center gap-1 rounded-md border px-3 py-1.5',
+          getStatusBorderClass(group.status),
+          selected && SELECTED_RING,
+          data.future && 'opacity-25'
+        )}
+      >
+        <Handle type="target" position={Position.Left} className={HANDLE} />
+
+        <div className="flex items-center gap-1.5">
+          <Icon className={cn('h-3.5 w-3.5 shrink-0', getStatusTextClass(group.status))} />
+          <span className="text-basis truncate text-xs font-medium" title={title}>
+            {title}
+          </span>
+          <span
+            className="text-basis bg-canvasMuted shrink-0 rounded px-1 font-mono text-[10px] tabular-nums leading-[14px]"
+            title={`${group.count} repetitions of this step`}
+          >
+            {group.count}×
+          </span>
+          {/* The expander. A collapsed node has to be openable, or it is just a
+              worse version of hiding the data. */}
+          <button
+            type="button"
+            aria-label={`Expand ${group.count} steps`}
+            title={`Expand ${group.count} steps`}
+            onClick={(event) => {
+              event.stopPropagation();
+              data.onExpandGroup?.(group.id);
+            }}
+            className="nodrag text-muted hover:text-basis shrink-0"
+          >
+            <RiExpandDiagonalLine className="h-3 w-3" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-hidden text-[10px] leading-none">
+          {typeKey && (
+            <span className="text-muted shrink-0 truncate font-mono">
+              {STEP_TYPE_LABEL[typeKey]}
+            </span>
+          )}
+          <span className="text-subtle shrink-0 font-mono">{elapsed}</span>
+          {exceptions && (
+            <span
+              className={cn('shrink-0 truncate', failing ? 'text-status-failedText' : 'text-muted')}
+              title={exceptions}
+            >
+              {exceptions}
+            </span>
+          )}
+        </div>
+
+        {variantLine ? (
+          <span className="text-muted truncate text-[10px] leading-none" title={variantLine}>
+            {variantLine}
+          </span>
+        ) : (
+          <Sparkline values={group.durationsMs} className={getStatusTextClass(group.status)} />
+        )}
+
+        <Handle type="source" position={Position.Right} className={HANDLE} />
+      </div>
+    </div>
+  );
+}
+
 export const CANVAS_NODE_TYPES = {
   canvasStep: CanvasStepNode,
   canvasJoin: CanvasJoinNode,
+  canvasGroup: CanvasGroupNode,
 };

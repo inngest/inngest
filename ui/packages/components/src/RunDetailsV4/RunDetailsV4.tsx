@@ -28,6 +28,7 @@ import { TimelineLegend } from './TimelineLegend';
 import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
 import { Canvas } from './canvas/Canvas';
+import { planCollapse, shouldAggregate } from './canvas/collapse';
 import { toCanvasGraph } from './canvas/graph';
 import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
 import type { Trace } from './types';
@@ -80,6 +81,7 @@ function TimelineV4Wrapper({
   functionSlug?: string;
 }) {
   const { selectStep } = useStepSelection({ runID });
+  const { cloud } = useShared();
 
   const rolledUpTrace = useMemo(
     // Roll up the trace to hide (new) request spans and group step attempts.
@@ -113,7 +115,24 @@ function TimelineV4Wrapper({
     [traceMap, selectStep, runID]
   );
 
-  return <Timeline data={timelineData} onSelectStep={handleSelectStep} runID={runID} />;
+  // Collapse the same repetition the canvas collapses, on the same terms, so
+  // the two views never disagree about how many steps there were. Gated with
+  // the canvas itself while this is Dev-Server-only.
+  const collapse = useMemo(() => {
+    if (cloud) return undefined;
+    const graph = toCanvasGraph(rolledUpTrace);
+    const plan = planCollapse(graph);
+    return shouldAggregate(graph, plan) ? plan : undefined;
+  }, [rolledUpTrace, cloud]);
+
+  return (
+    <Timeline
+      data={timelineData}
+      onSelectStep={handleSelectStep}
+      runID={runID}
+      collapse={collapse}
+    />
+  );
 }
 
 /**

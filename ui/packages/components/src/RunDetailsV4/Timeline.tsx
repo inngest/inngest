@@ -25,6 +25,7 @@ import type {
   TimingDetail,
 } from './TimelineBar.types';
 import { TimelineHeader } from './TimelineHeader';
+import { applyCollapseToBars, type CollapsePlan } from './canvas/collapse';
 import { useStepSelection } from './runDetailsUtils';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
 
@@ -42,6 +43,11 @@ type Props = {
    * made elsewhere in the same run (e.g. the canvas), not just clicks here.
    */
   runID?: string;
+  /**
+   * Collapses repeated steps into one row each. Omit to draw every row — the
+   * canvas and the timeline take the same plan, so the two stay in step.
+   */
+  collapse?: CollapsePlan;
 };
 
 // ============================================================================
@@ -859,8 +865,16 @@ function TimelineBarRenderer({
  * - Supports nested children (recursive rendering)
  * - Column resize handling (planned)
  */
-export function Timeline({ data, onSelectStep, runID }: Props): JSX.Element {
-  const { minTime, maxTime, bars, leftWidth, orgName } = data;
+export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.Element {
+  const { minTime, maxTime, leftWidth, orgName } = data;
+
+  // Repetition is detected once, in the model, and applied to both views. A
+  // group becomes one row whose children are its members, so opening it uses
+  // the expansion affordance that is already here rather than a second one.
+  const bars = useMemo(
+    () => (collapse ? applyCollapseToBars(data.bars, collapse) : data.bars),
+    [data.bars, collapse]
+  );
 
   const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
 

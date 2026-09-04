@@ -28,9 +28,12 @@ import type { Trace } from '../types';
 import { CanvasControls } from './CanvasControls';
 import { CanvasLegend } from './CanvasLegend';
 import { CANVAS_NODE_TYPES } from './CanvasNode';
+import { applyCollapse, planCollapse, shouldAggregate } from './collapse';
 import { toCanvasGraph } from './graph';
 import type { CanvasTrigger } from './graph.types';
 import { toFlowElements, type CanvasNodeData } from './toFlowElements';
+
+export type CanvasViewMode = 'aggregated' | 'expanded';
 
 type Props = {
   /** The rolled-up trace, as the timeline uses. */
@@ -119,9 +122,37 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
   const { selectedStep, selectStep } = useStepSelection({ runID });
   const selectedSpanID = selectedStep?.trace.spanID;
 
+  const plan = useMemo(() => planCollapse(graph), [graph]);
+
+  // Two modes rather than one cleverer layout, which is what everyone who has
+  // confronted this shipped. Aggregated only becomes the default when the run is
+  // actually too big to read; a small run has nothing to gain from it and would
+  // just be hiding itself for no reason.
+  const [mode, setMode] = useState<CanvasViewMode>(() =>
+    shouldAggregate(graph, plan) ? 'aggregated' : 'expanded'
+  );
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
+
+  const expandGroup = useCallback((groupID: string) => {
+    setOpenGroups((open) => new Set(open).add(groupID));
+  }, []);
+
+  const { graph: shown, groupByNodeID } = useMemo(
+    () =>
+      mode === 'expanded'
+        ? { graph, groupByNodeID: new Map() }
+        : applyCollapse(graph, plan, openGroups),
+    [graph, plan, mode, openGroups]
+  );
+
+  const collapse = useMemo(
+    () => ({ groupByNodeID, onExpandGroup: expandGroup }),
+    [groupByNodeID, expandGroup]
+  );
+
   const { nodes, edges } = useMemo(
-    () => toFlowElements(graph, selectedSpanID),
-    [graph, selectedSpanID]
+    () => toFlowElements(shown, selectedSpanID, collapse),
+    [shown, selectedSpanID, collapse]
   );
 
   const traceMap = useMemo(() => {
@@ -169,9 +200,14 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
           </Panel>
 
           <Panel position="top-right" className="!m-2">
-            <CanvasControls onExpand={expanded ? undefined : () => setShowExpanded(true)} />
+            <CanvasControls
+              onExpand={expanded ? undefined : () => setShowExpanded(true)}
+              mode={plan.groups.length ? mode : undefined}
+              onModeChange={setMode}
+              groupCount={plan.groups.length}
+            />
           </Panel>
-          <FitView graphKey={`${runID}:${graph.nodes.length}`} paneRef={paneRef} />
+          <FitView graphKey={`${runID}:${shown.nodes.length}`} paneRef={paneRef} />
         </ReactFlow>
       </div>
 
@@ -186,7 +222,7 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
 
       <div className="flex items-start justify-between gap-3 px-1">
         <ul className="text-subtle text-[11px] leading-relaxed">
-          {graph.warnings.map((w) => (
+          {shown.warnings.map((w) => (
             <li key={w}>· {w}</li>
           ))}
         </ul>

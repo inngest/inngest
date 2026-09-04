@@ -6,6 +6,7 @@
  */
 import type { Edge, Node } from '@xyflow/react';
 
+import type { CanvasGroup } from './collapse';
 import type { CanvasGraph, CanvasNode } from './graph.types';
 
 export const LAYOUT = {
@@ -27,14 +28,26 @@ export const LAYOUT = {
   laneGap: 80,
   nodeWidth: 186,
   nodeHeight: 52,
+  /** A group node carries a count, a variant line and a sparkline. */
+  groupHeight: 72,
   joinWidth: 22,
 } as const;
 
 export type CanvasNodeData = CanvasNode & {
   /** Set while the scrubber is behind this node's start (Phase 3). */
   future?: boolean;
+  /** Present on `kind: 'group'` nodes: the repetition this one stands in for. */
+  group?: CanvasGroup;
+  /** Opens this group, so its members are drawn individually. */
+  onExpandGroup?: (groupID: string) => void;
   [key: string]: unknown;
 };
+
+function heightOf(node: CanvasNode): number {
+  if (node.kind === 'join') return LAYOUT.joinWidth;
+  if (node.kind === 'group') return LAYOUT.groupHeight;
+  return LAYOUT.nodeHeight;
+}
 
 function position(node: CanvasNode, laneMid: number, xAt: (level: number) => number) {
   // Centre each level on the middle of its own lane range. Lanes are fractional
@@ -42,7 +55,7 @@ function position(node: CanvasNode, laneMid: number, xAt: (level: number) => num
   // cannot be derived from a simple count.
   const offset = laneMid * LAYOUT.laneGap;
   const width = node.kind === 'join' ? LAYOUT.joinWidth : LAYOUT.nodeWidth;
-  const height = node.kind === 'join' ? LAYOUT.joinWidth : LAYOUT.nodeHeight;
+  const height = heightOf(node);
   return {
     // Centre nodes of differing widths/heights on the level axis, so a join
     // circle sits on the same centre line as the wide nodes either side of it.
@@ -53,7 +66,11 @@ function position(node: CanvasNode, laneMid: number, xAt: (level: number) => num
 
 export function toFlowElements(
   graph: CanvasGraph,
-  selectedSpanID?: string
+  selectedSpanID?: string,
+  collapse?: {
+    groupByNodeID: ReadonlyMap<string, CanvasGroup>;
+    onExpandGroup: (groupID: string) => void;
+  }
 ): { nodes: Node<CanvasNodeData>[]; edges: Edge[] } {
   const byID = new Map(graph.nodes.map((n) => [n.id, n]));
   const laneMids = graph.levels.map((ids) => {
@@ -94,11 +111,12 @@ export function toFlowElements(
   const nodes: Node<CanvasNodeData>[] = steps.map((node) => {
     const pos = position(node, laneMids[node.level] ?? 0, xAt);
     placed.set(node.id, pos);
+    const group = collapse?.groupByNodeID.get(node.id);
     return {
       id: node.id,
-      type: 'canvasStep',
+      type: node.kind === 'group' ? 'canvasGroup' : 'canvasStep',
       position: pos,
-      data: { ...node },
+      data: group ? { ...node, group, onExpandGroup: collapse?.onExpandGroup } : { ...node },
       draggable: false,
       connectable: false,
       selectable: true,
@@ -109,7 +127,7 @@ export function toFlowElements(
       // Declared up front so the initial fitView has real dimensions to work
       // with; without these it fits against zero-sized nodes and overflows.
       width: LAYOUT.nodeWidth,
-      height: LAYOUT.nodeHeight,
+      height: heightOf(node),
     };
   });
 

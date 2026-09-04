@@ -93,3 +93,21 @@ The checkpoint path (`checkpoint.go`) was enqueuing step retries at `time.Now()`
 
 ### 15. Stop dev server before running SDK tests
 SDK unit tests use nock mocks. A running dev server on :8288 causes the SDK to auto-discover it and bypass mocks, failing all framework registration tests.
+
+### 16. Vite can serve a stale module to one importer and a fresh one to another
+Symptom: the fixture gallery's facts row reported `1 group, aggregated=true` from
+`planCollapse`, while the `Canvas` *rendered on the same page* drew all 502
+uncollapsed nodes. Same input, same function, two answers — which is impossible
+in the model, and the vitest suite agreed with the gallery.
+
+Cause: HMR had updated `Canvas.tsx` and the route module, but `collapse.ts` was
+being served from a stale transform to one of them. `pkill -f "vite dev"`,
+`rm -rf apps/dev-server-ui/node_modules/.vite`, restart — and the render matched
+the model immediately.
+
+**Detection signal**: the UI contradicts a passing unit test on the same input,
+or React Flow warns `Node type "X" not found` for a type you just added.
+**Prevention**: after adding a new *module* (not just editing one) that is
+imported from more than one place, restart Vite before debugging the logic.
+Screenshots are fresh browser instances, so they do not rule this out — the
+staleness is server-side, not in the page.
