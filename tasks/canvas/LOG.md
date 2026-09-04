@@ -477,16 +477,43 @@ so a recursive walk reported one recovery as three. Overclaiming, in the one fil
 
 ---
 
-## Item F — Invoke expands inline: NOT DONE
+## Item F — Invoke expands inline (timeline half)
 
-The only item on the list left unbuilt, and the reason is scope rather than difficulty. `childRunID`
-is already on the model and `invoke.json` / `child.json` are already captured as a pair, so the data
-is there. What is missing is a lazy fetch of another run's trace from inside a node, which means
-threading a run loader through `SharedContext` into the canvas and giving the node its own
-`ReactFlow` sub-graph with depth capping. That is a larger surface than any single item done so far,
-and doing it badly — fetching eagerly, or on every render — is the specific failure the brief warns
-about.
+**Done**: a `step.invoke` row can pull the run it started in beneath it, indented, on the same axis.
+Loaded **lazily** — nothing fetched until the row is actually expanded, which is the failure the
+brief names — with an in-flight guard against a double toggle and a cache so reopening costs nothing.
 
-Recommended next step: add `getRun` to the canvas's props the same way `getTrigger` already is, and
-render the child with the existing `Canvas` component inside a bordered region, collapsed by default,
-fetched on first expand only.
+The child grafts onto the existing bar tree, so it inherits expansion, selection, hover and tooltips
+rather than needing its own. The only new data is `childRunID` on a bar, lifted from the invoke's
+`stepInfo`, which the payload already carried. The gallery proves it with no server: `invoke` and
+`child` were captured as a pair for exactly this.
+
+**Not done**: the canvas does not render the child's graph *inside* the invoke node. That needs a
+nested React Flow with its own provider and depth capping — a larger surface than the rest of the
+item, and worth doing deliberately rather than at the end of a session. The data and the loader
+contract are both in place for it.
+
+**Not done, and needs app wiring either way**: real apps must supply the loader. In dev-server-ui and
+dashboard that means fetching another run's trace through `SharedContext`, the same way
+`getTrigger` is already supplied to the canvas.
+
+---
+
+## Where this leaves the list
+
+| item | state |
+| ---- | ----- |
+| A0 fixture gallery + missing shapes | done |
+| A collapse repetition | done |
+| B1 elastic axis | done |
+| B2 density and encoding | done, two follow-up rounds on the waiting bar |
+| C density strip | done; strip → canvas viewport not wired |
+| D hover sync | done; shared zoom not wired |
+| E lineage | verified and modelled; recursive UI not built |
+| F invoke inline | timeline half done; canvas half not |
+| G what Inngest did | done |
+
+**The three things I would do next, in order.** Wire the density strip's `onSelectRange` to the
+canvas viewport (item C's leftover, and small). Fix the `(interrupted)` lie on unfinished spans —
+`cancelled` still reports its open wait as 29m on a 35s run, which is the oldest known-wrong thing
+on this list. Then the canvas half of F.
