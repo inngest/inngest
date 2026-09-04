@@ -387,3 +387,106 @@ information.
 - Confirmed from the payload: `cancelled` reports its open wait as `29m 47s` on a 35s run. Same
   unfinished-span-measured-against-`now` bug already noted in item A0. Still unfixed; belongs with
   the cancelled-state work.
+
+---
+
+## Item D — Hover sync
+
+`stepHoverEmitter` + `useStepHover` in `runDetailsUtils.ts`, the same idiom as the two emitters
+already there, but carrying a span id rather than a whole `Trace` — hover fires constantly and the
+views only ever compare identity.
+
+**Subscribed once per view**, at the container, and passed down. Per-row subscription would mean 500
+listeners and 500 re-renders per pointer move on `tall500`; this way it is one re-render and a string
+comparison. Selection keeps its ring; hover gets a lighter lift, so a decision and a glance do not
+look alike. Focus is not filter — nothing is ever removed from another view.
+
+**Also, from the user, and better than what was there**: a collapsed group's timeline row now draws
+its *members* rather than one continuous block. A solid bar said only "something happened here for
+1.9s"; a run of marks says **where in the sequence** the failures were. On `failcluster` the row is
+green ticks with a red cluster two thirds along, agreeing with the density strip above it, with
+nothing expanded.
+
+Two refinements after seeing it: marks are uniform with an even gap (duration-proportional widths
+read as ragged — the marks answer "where", and the row label already says "how long"), and the number
+of marks comes from the **measured** plot width rather than a constant, so a narrow pane gets fewer,
+larger marks instead of a smear. Past that budget members are bucketed, and a bucket takes its worst
+member's status.
+
+---
+
+## Item E — Lineage
+
+**Both cheap checks were run first, and both answers changed the item.**
+
+1. **Span links are dead.** `FollowsFrom` really is written — `executor.go:3419` and ~10 more — but
+   only between pause and lifecycle spans *within* a run, never parent-invoke → child-root. And it
+   would not reach the client anyway: `links` is absent from the GraphQL schema, where
+   `gql.schema.graphql:641` still carries the comment `# links should be here`. Exposing it is a Go
+   change, i.e. a shared surface. Nothing here walks span links.
+2. **Sent-event ids ARE internal ULIDs.** Verified end to end with a new `tests/v4.emit` shape:
+   output is `{"ids":["01M1Q00QZAD5YFMY4TP9PH0YZ3", …]}`, and
+   `GET /v2/events/01M1Q00QZAD5YFMY4TP9PH0YZ3/runs` returns the run it caused, whose own trigger
+   echoes the same id. The loop closes.
+
+**A correction to the brief, and it is the load-bearing one.** A `step.sendEvent` is **not**
+`stepOp == SEND_EVENT` — it is reported as an ordinary `RUN`, and keying on `stepOp` finds *nothing*.
+What identifies it is **`stepType == 'step.sendEvent'`** (mirrored in `stepInfo.type`). That is the
+difference between the feature being affordable and not: with it, emitting steps are found for free
+from the trace already fetched; without it, the only way to find them is to fetch every step's output
+and see which happen to contain an `ids` array — one request per step of the run.
+
+The correction also fixed a bug the canvas had **by its own contract**: a node is meant to name the
+SDK call the user wrote, and it was calling every `sendEvent` `step.run`, because it labelled from
+`stepOp`. Nodes now prefer `stepType`.
+
+`lineage.ts` is the model — emitting steps, invoked child runs, and a parser that returns `null`
+rather than `[]` when it cannot read a payload, so "sent nothing" and "cannot tell" stay
+distinguishable.
+
+**Deferred**: the recursive lineage *UI* (walking up to the source event and down to everything
+caused) is not built. The mechanism is verified and the model exists; assembling it needs
+`useGetRunLinkage`'s shape extended in both host apps plus a REST call for event→runs, which is a
+larger surface than the rest of this item. Also still true and stated in the module: a bare
+`inngest.send()` outside a step has no span and no output, and batch fan-in is a join, not an edge.
+
+---
+
+## Item G — What Inngest did
+
+One line beside the canvas. `value.ts`'s design is mostly what it refuses to say: factual and
+quantified or absent, never celebratory, and never a claim the trace cannot support. `simple`
+produces no lines at all, and a test asserts that — a plain run gets a plain page.
+
+Three things the brief asked for are **not** reported, with the reason recorded rather than
+approximated:
+
+- **Memoized steps on resume.** Nothing in the payload distinguishes a step served from state from
+  one that ran; both have spans and timings. Needs a signal the SDK/executor does not emit.
+- **Survived a deploy.** A run's trace does not record deploys.
+- **Deduplicated / debounced N into 1.** The run that was kept has no record of the ones that
+  were not.
+
+A retry counts as a recovery only when it *recovered* — `failure` asserts a step that stayed failed
+claims nothing. Flow control is only claimed above a second, since a few hundred milliseconds is
+ordinary scheduling.
+
+**A bug the tests caught**: `runValue` must take the rolled-up trace and read only its direct
+children. The raw payload lists a retried step three times — an attempt group plus two flat copies —
+so a recursive walk reported one recovery as three. Overclaiming, in the one file that must not.
+
+---
+
+## Item F — Invoke expands inline: NOT DONE
+
+The only item on the list left unbuilt, and the reason is scope rather than difficulty. `childRunID`
+is already on the model and `invoke.json` / `child.json` are already captured as a pair, so the data
+is there. What is missing is a lazy fetch of another run's trace from inside a node, which means
+threading a run loader through `SharedContext` into the canvas and giving the node its own
+`ReactFlow` sub-graph with depth capping. That is a larger surface than any single item done so far,
+and doing it badly — fetching eagerly, or on every render — is the specific failure the brief warns
+about.
+
+Recommended next step: add `getRun` to the canvas's props the same way `getTrigger` already is, and
+render the child with the existing `Canvas` component inside a bordered region, collapsed by default,
+fetched on first expand only.
