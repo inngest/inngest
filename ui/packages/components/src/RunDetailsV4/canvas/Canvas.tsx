@@ -6,11 +6,11 @@
  * in the timeline highlights the matching node here. This component owns no
  * step state of its own.
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
-  Controls,
+  Panel,
   ReactFlow,
   ReactFlowProvider,
   useNodesInitialized,
@@ -21,8 +21,12 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useQuery } from '@tanstack/react-query';
 
+import { Modal } from '../../Modal/Modal';
+import { cn } from '../../utils/classNames';
 import { traceWalk, useStepSelection } from '../runDetailsUtils';
 import type { Trace } from '../types';
+import { CanvasControls } from './CanvasControls';
+import { CanvasLegend } from './CanvasLegend';
 import { CANVAS_NODE_TYPES } from './CanvasNode';
 import { toCanvasGraph } from './graph';
 import type { CanvasTrigger } from './graph.types';
@@ -34,6 +38,11 @@ type Props = {
   runID: string;
   /** Same loader the run header uses; supplies the triggering event(s). */
   getTrigger?: (runID: string) => Promise<CanvasTrigger>;
+  /**
+   * Set on the copy inside the expanded modal, which fills the viewport and has
+   * nothing left to expand into.
+   */
+  expanded?: boolean;
 };
 
 const FIT_OPTIONS = { padding: 0.14, maxZoom: 1.2 } as const;
@@ -76,8 +85,27 @@ export function Canvas(props: Props) {
   );
 }
 
-function CanvasInner({ trace, runID, getTrigger }: Props) {
+/**
+ * The same canvas, filling the window.
+ *
+ * A wide fan-out or a long agent loop fits into 300px only by zooming out until
+ * the nodes are unreadable, so the graph needs somewhere bigger to be read and
+ * clicked through. Selection is shared, so a step picked in here is still
+ * selected behind it.
+ */
+function ExpandedCanvas({ onClose, ...props }: Props & { onClose: () => void }) {
+  return (
+    <Modal isOpen onClose={onClose} className="h-[85vh] w-[92vw] max-w-none p-0">
+      <div className="h-full w-full p-3">
+        <Canvas {...props} expanded />
+      </div>
+    </Modal>
+  );
+}
+
+function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
   const paneRef = useRef<HTMLDivElement>(null);
+  const [showExpanded, setShowExpanded] = useState(false);
 
   const { data: trigger } = useQuery({
     queryKey: ['run-trigger', runID],
@@ -111,8 +139,14 @@ function CanvasInner({ trace, runID, getTrigger }: Props) {
   );
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div ref={paneRef} className="border-subtle bg-canvasSubtle h-[300px] w-full rounded border">
+    <div className={cn('flex flex-col gap-1.5', expanded && 'h-full')}>
+      <div
+        ref={paneRef}
+        className={cn(
+          'border-subtle bg-canvasSubtle w-full rounded border',
+          expanded ? 'min-h-0 flex-1' : 'h-[300px]'
+        )}
+      >
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -129,10 +163,26 @@ function CanvasInner({ trace, runID, getTrigger }: Props) {
           className="bg-canvasSubtle"
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1} className="opacity-40" />
-          <Controls showInteractive={false} orientation="horizontal" className="!shadow-none" />
+
+          <Panel position="top-left" className="!m-2">
+            <CanvasLegend />
+          </Panel>
+
+          <Panel position="top-right" className="!m-2">
+            <CanvasControls onExpand={expanded ? undefined : () => setShowExpanded(true)} />
+          </Panel>
           <FitView graphKey={`${runID}:${graph.nodes.length}`} paneRef={paneRef} />
         </ReactFlow>
       </div>
+
+      {showExpanded && (
+        <ExpandedCanvas
+          trace={trace}
+          runID={runID}
+          getTrigger={getTrigger}
+          onClose={() => setShowExpanded(false)}
+        />
+      )}
 
       <div className="flex items-start justify-between gap-3 px-1">
         <ul className="text-subtle text-[11px] leading-relaxed">
