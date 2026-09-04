@@ -283,9 +283,14 @@ function traceToBarData(
       }
     : undefined;
 
+  const invokeInfo = trace.stepInfo as { runID?: string | null } | null | undefined;
+
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
+    // Present on step.invoke, and the only thing needed to pull the child run
+    // in beneath this row.
+    childRunID: invokeInfo?.runID ?? undefined,
     startTime: new Date(trace.queuedAt),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),

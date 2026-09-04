@@ -12,7 +12,7 @@
  * a dynamic import guarded on the same constant, so Rollup drops the branch and
  * the ~4MB of JSON never reaches the binary the dev server ships.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Timeline } from '@inngest/components/RunDetailsV4/Timeline';
 import { Canvas } from '@inngest/components/RunDetailsV4/canvas/Canvas';
 import type {
@@ -162,13 +162,25 @@ function CanvasGalleryComponent() {
       </nav>
 
       <div className="min-w-0 flex-1 overflow-y-auto">
-        {selected ? <FixtureView key={selected.id} fixture={selected} /> : null}
+        {selected ? (
+          <FixtureView
+            key={selected.id}
+            fixture={selected}
+            fixtures={fixtures}
+          />
+        ) : null}
       </div>
     </div>
   );
 }
 
-function FixtureView({ fixture }: { fixture: CanvasFixture }) {
+function FixtureView({
+  fixture,
+  fixtures,
+}: {
+  fixture: CanvasFixture;
+  fixtures: CanvasFixture[];
+}) {
   const runID = `fixture:${fixture.id}`;
   const raw = fixture.data.run.trace as Trace;
 
@@ -187,6 +199,22 @@ function FixtureView({ fixture }: { fixture: CanvasFixture }) {
   const plan = useMemo(() => planCollapse(graph), [graph]);
   const aggregated = shouldAggregate(graph, plan);
   const drawnNodes = aggregated ? plan.nodesAtRest : plan.nodesExpanded;
+  // The gallery has no server, so a child run is resolved from the fixture set:
+  // `invoke` and `child` were captured as a pair for exactly this. Real apps
+  // supply a loader that fetches the run.
+  const loadChildRun = useCallback(
+    async (childRunID: string) => {
+      const candidate = fixtures.find(
+        (f) =>
+          (f.data.run.trace as Trace).spanID === childRunID || f.id === 'child',
+      );
+      if (!candidate) return null;
+      const rolled = traceRollup(candidate.data.run.trace as Trace);
+      return traceToTimelineData(rolled, { runID: childRunID }).bars;
+    },
+    [fixtures],
+  );
+
   const rows = countBars(
     aggregated
       ? applyCollapseToBars(timelineData.bars, plan)
@@ -253,6 +281,7 @@ function FixtureView({ fixture }: { fixture: CanvasFixture }) {
 
       <div className="border-muted border-t pt-2">
         <Timeline
+          loadChildRun={loadChildRun}
           data={timelineData}
           runID={runID}
           collapse={aggregated ? plan : undefined}

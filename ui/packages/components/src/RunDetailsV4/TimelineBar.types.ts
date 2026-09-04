@@ -324,6 +324,15 @@ export interface TimelineBarData {
   children?: TimelineBarData[];
 
   /**
+   * For a : the run it started.
+   *
+   * Present so the child can be pulled in beneath this row on demand. A deep
+   * tree must not fetch the world on first paint, so nothing is loaded until
+   * the row is actually expanded.
+   */
+  childRunID?: string;
+
+  /**
    * Pre-built segments, overriding the ones derived from timing breakdowns.
    *
    * Used by collapsed groups, whose row draws each member as its own small

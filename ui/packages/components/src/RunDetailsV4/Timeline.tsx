@@ -50,6 +50,14 @@ type Props = {
    * canvas and the timeline take the same plan, so the two stay in step.
    */
   collapse?: CollapsePlan;
+  /**
+   * Loads another run's timeline, so a `step.invoke` can show the run it started
+   * beneath it on the same axis rather than sending the user somewhere else.
+   *
+   * Called only when a row is actually expanded — a deep tree must not fetch the
+   * world on first paint — and its result is cached for the life of the view.
+   */
+  loadChildRun?: (runID: string) => Promise<TimelineBarData[] | null>;
 };
 
 // ============================================================================
@@ -484,7 +492,7 @@ type TimelineBarRendererProps = {
   leftWidth: number;
   orgName?: string;
   expandedBars: Set<string>;
-  onToggleExpand: (barId: string) => void;
+  onToggleExpand: (barId: string, childRunID?: string) => void;
   onSelectStep?: (stepId: string) => void;
   selectedStepId?: string;
   /** View offset - start position as percentage (0-100) for zooming */
@@ -543,7 +551,13 @@ function TimelineBarRenderer({
   const hasRunInngestBreakdown = !!bar.runInngestBreakdown;
   const hasInngestBreakdown = !!bar.inngestBreakdown;
   const isExpandable =
-    hasTimingBreakdown || hasInngestBreakdown || hasChildren || hasRunInngestBreakdown;
+    hasTimingBreakdown ||
+    hasInngestBreakdown ||
+    hasChildren ||
+    hasRunInngestBreakdown ||
+    // An invoke can be opened before its child has been fetched — that is the
+    // point of it being lazy.
+    Boolean(bar.childRunID);
   const isExpanded = bar.isRoot ? true : expandedBars.has(bar.id);
 
   // Children of experiment bars inherit the dotted background
@@ -632,7 +646,7 @@ function TimelineBarRenderer({
       // (no toggle UI). expandable=false ensures VisualBar keeps opacity 1.
       expandable={bar.isRoot ? false : isExpandable}
       expanded={isExpanded}
-      onToggle={bar.isRoot ? undefined : () => onToggleExpand(bar.id)}
+      onToggle={bar.isRoot ? undefined : () => onToggleExpand(bar.id, bar.childRunID)}
       onClick={() => onSelectStep?.(bar.id)}
       selected={selectedStepId === bar.id}
       hovered={hoveredStepId === bar.id}
@@ -902,7 +916,13 @@ function TimelineBarRenderer({
  * - Supports nested children (recursive rendering)
  * - Column resize handling (planned)
  */
-export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.Element {
+export function Timeline({
+  data,
+  onSelectStep,
+  runID,
+  collapse,
+  loadChildRun,
+}: Props): JSX.Element {
   const { minTime, maxTime, leftWidth, orgName } = data;
 
   // Repetition is detected once, in the model, and applied to both views. A
@@ -924,6 +944,12 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
     return () => observer.disconnect();
   }, []);
 
+  // Child runs pulled in beneath their invoke row, keyed by run id. Loaded on
+  // first expand and kept — a deep tree must not fetch the world on first
+  // paint, but it should not re-fetch on every toggle either.
+  const [childRuns, setChildRuns] = useState<Record<string, TimelineBarData[]>>({});
+  const loadingChildren = useRef(new Set<string>());
+
   const bars = useMemo(
     () =>
       collapse
@@ -938,6 +964,22 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
         : data.bars,
     [data.bars, collapse, plotWidth, leftWidth]
   );
+
+  // Graft any loaded child run beneath the invoke row that started it. Done
+  // here rather than in the conversion so the fetch stays lazy and the tree
+  // rebuilds only when something new has actually arrived.
+  const barsWithChildren = useMemo(() => {
+    if (!Object.keys(childRuns).length) return bars;
+    const graft = (list: TimelineBarData[]): TimelineBarData[] =>
+      list.map((bar) => {
+        const loaded = bar.childRunID ? childRuns[bar.childRunID] : undefined;
+        const children = bar.children ? graft(bar.children) : undefined;
+        return loaded
+          ? { ...bar, children: [...(children ?? []), ...loaded] }
+          : { ...bar, children };
+      });
+    return graft(bars);
+  }, [bars, childRuns]);
 
   const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
 
@@ -958,17 +1000,34 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
   const [viewStartOffset, setViewStartOffset] = useState(0);
   const [viewEndOffset, setViewEndOffset] = useState(100);
 
-  const handleToggleExpand = useCallback((barId: string) => {
-    setExpandedBars((prev) => {
-      const next = new Set(prev);
-      if (next.has(barId)) {
-        next.delete(barId);
-      } else {
-        next.add(barId);
-      }
-      return next;
-    });
-  }, []);
+  // Pull in a child run the first time its row is opened, and only then.
+  const ensureChildRun = useCallback(
+    (runID: string) => {
+      if (!loadChildRun) return;
+      if (childRuns[runID] || loadingChildren.current.has(runID)) return;
+      loadingChildren.current.add(runID);
+      void loadChildRun(runID).then((childBars) => {
+        if (childBars?.length) setChildRuns((prev) => ({ ...prev, [runID]: childBars }));
+      });
+    },
+    [loadChildRun, childRuns]
+  );
+
+  const handleToggleExpand = useCallback(
+    (barId: string, childRunID?: string) => {
+      setExpandedBars((prev) => {
+        const next = new Set(prev);
+        if (next.has(barId)) {
+          next.delete(barId);
+        } else {
+          next.add(barId);
+          if (childRunID) ensureChildRun(childRunID);
+        }
+        return next;
+      });
+    },
+    [ensureChildRun]
+  );
 
   const handleHoverStep = useCallback(
     (spanID: string | undefined) => {
@@ -1134,7 +1193,7 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
         )}
 
         <div className="relative z-[1]">
-          {bars.map((bar) => (
+          {barsWithChildren.map((bar) => (
             <TimelineBarRenderer
               key={bar.id}
               bar={bar}
