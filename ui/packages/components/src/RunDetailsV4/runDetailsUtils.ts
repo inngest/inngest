@@ -141,6 +141,69 @@ export const useStepSelection = ({ runID }: { runID?: string }) => {
   return { selectedStep, selectStep };
 };
 
+/**
+ * What the pointer is over, shared across the views of one run.
+ *
+ * Selection already syncs; hover is the cheaper half and is most of what makes
+ * several views feel like one instrument rather than three panels.
+ *
+ * Deliberately the same shape as `stepSelectionEmitter` above — a third emitter
+ * in the same idiom rather than a second idiom — but it carries a span id
+ * rather than a whole `Trace`, because hover fires constantly and the views
+ * only ever need to compare identity.
+ *
+ * FOCUS IS NOT FILTER. Hovering narrows attention; it must never remove data
+ * from another view.
+ */
+export type StepHover = { spanID: string; runID: string };
+
+type HoverListener = {
+  callback: (hover: StepHover | undefined) => void;
+  runID?: string;
+};
+
+const stepHoverEmitter = {
+  listeners: new Set<HoverListener>(),
+
+  subscribe(callback: (hover: StepHover | undefined) => void, runID?: string) {
+    const listener = { callback, runID };
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  },
+
+  emit(hover: StepHover | undefined) {
+    this.listeners.forEach((listener) => {
+      if (!listener.runID || !hover || listener.runID === hover.runID) {
+        listener.callback(hover);
+      }
+    });
+  },
+};
+
+/**
+ * Subscribe ONCE PER VIEW, at the container, and pass the id down.
+ *
+ * Not once per row: a 500-row timeline would otherwise register 500 listeners
+ * and re-render 500 components on every pointer move. One subscriber means one
+ * re-render of the list, and rows compare a string.
+ */
+export const useStepHover = ({ runID }: { runID?: string }) => {
+  const [hoveredStep, setHoveredStep] = useState<StepHover | undefined>(undefined);
+
+  useEffect(() => {
+    const cleanup = stepHoverEmitter.subscribe(setHoveredStep, runID);
+    return () => {
+      cleanup();
+    };
+  }, [runID]);
+
+  const hoverStep = useCallback((hover: StepHover | undefined) => {
+    stepHoverEmitter.emit(hover);
+  }, []);
+
+  return { hoveredSpanID: hoveredStep?.spanID, hoverStep };
+};
+
 export const formatDuration = (ms: number): string => {
   if (ms <= 0) return '0ms';
   if (ms < 1000) return `${Math.round(ms)}ms`;

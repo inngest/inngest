@@ -853,6 +853,8 @@ export function TimelineBar({
   onToggle,
   onClick,
   selected,
+  hovered,
+  onHoverChange,
   children,
   orgName,
   status,
@@ -904,6 +906,8 @@ export function TimelineBar({
       <div
         data-testid="timeline-bar-row"
         className="relative isolate flex cursor-pointer items-center"
+        onMouseEnter={() => onHoverChange?.(true)}
+        onMouseLeave={() => onHoverChange?.(false)}
         onClick={() => {
           onClick?.();
           if (expandable) {
@@ -913,7 +917,7 @@ export function TimelineBar({
         style={{ height: `${TIMELINE_CONSTANTS.ROW_HEIGHT_PX}px` }}
       >
         {/* Selection / hover highlight - extends from indent to full width */}
-        {(selected || hoverCardOpen) && (
+        {(selected || hovered || hoverCardOpen) && (
           <div
             className={cn(
               'pointer-events-none absolute inset-y-0 right-0 -z-10',

@@ -36,6 +36,8 @@ export const LAYOUT = {
 export type CanvasNodeData = CanvasNode & {
   /** Set while the scrubber is behind this node's start (Phase 3). */
   future?: boolean;
+  /** True while the pointer is over this step in any view. */
+  hovered?: boolean;
   /** Present on `kind: 'group'` nodes: the repetition this one stands in for. */
   group?: CanvasGroup;
   /** Opens this group, so its members are drawn individually. */
@@ -70,7 +72,9 @@ export function toFlowElements(
   collapse?: {
     groupByNodeID: ReadonlyMap<string, CanvasGroup>;
     onExpandGroup: (groupID: string) => void;
-  }
+  },
+  /** Span hovered anywhere in this run — here, or in a row below. */
+  hoveredSpanID?: string
 ): { nodes: Node<CanvasNodeData>[]; edges: Edge[] } {
   const byID = new Map(graph.nodes.map((n) => [n.id, n]));
   const laneMids = graph.levels.map((ids) => {
@@ -116,7 +120,11 @@ export function toFlowElements(
       id: node.id,
       type: node.kind === 'group' ? 'canvasGroup' : 'canvasStep',
       position: pos,
-      data: group ? { ...node, group, onExpandGroup: collapse?.onExpandGroup } : { ...node },
+      data: {
+        ...node,
+        hovered: hoveredSpanID !== undefined && node.spanID === hoveredSpanID,
+        ...(group ? { group, onExpandGroup: collapse?.onExpandGroup } : {}),
+      },
       draggable: false,
       connectable: false,
       selectable: true,

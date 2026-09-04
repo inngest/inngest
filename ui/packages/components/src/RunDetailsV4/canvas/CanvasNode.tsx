@@ -100,6 +100,13 @@ const SELECTED_RING =
 /** Grey. Used for timeouts and for work that has not run yet. */
 const NEUTRAL = { border: 'border-muted border', text: 'text-muted' };
 
+/**
+ * Hover is lighter than selection on purpose. Selection is a decision and gets
+ * a ring; hover is a glance and gets a lift. Focus is not filter, so neither
+ * ever removes anything from view.
+ */
+const HOVERED = 'shadow-md brightness-[1.02] ring-1 ring-[rgb(var(--color-border-muted))]';
+
 export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData>>) {
   const Icon = iconFor(data);
   const duration = durationOf(data);
@@ -156,6 +163,7 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
           data.kind === 'wait' && 'border-dashed',
           shell,
           selected && SELECTED_RING,
+          !selected && data.hovered && HOVERED,
           data.future && 'opacity-25'
         )}
       >
@@ -422,6 +430,7 @@ export function CanvasGroupNode({ data, selected }: NodeProps<Node<CanvasNodeDat
           'bg-canvasBase absolute inset-0 flex flex-col justify-center gap-1 rounded-md border px-3 py-1.5',
           getStatusBorderClass(group.status),
           selected && SELECTED_RING,
+          !selected && data.hovered && HOVERED,
           data.future && 'opacity-25'
         )}
       >

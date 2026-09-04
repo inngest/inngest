@@ -24,7 +24,7 @@
  * `think-0` and `think-39` are the same shape. That is an inference about what
  * a user meant by a name, so it is reported in `warnings` rather than assumed.
  */
-import type { TimelineBarData } from '../TimelineBar.types';
+import type { BarSegment, TimelineBarData } from '../TimelineBar.types';
 import type { CanvasEdge, CanvasGraph, CanvasNode, CanvasStatus } from './graph.types';
 
 /**
@@ -661,10 +661,77 @@ export function applyCollapse(
  * The row spans the envelope, first start to last end, so a fan-out's stagger is
  * still legible as a bar rather than being averaged into a point.
  */
+/**
+ * One segment per member, positioned within the group's envelope.
+ *
+ * Widths are real, so the picture is honest about where the time went, but each
+ * mark is floored at a visible width — 500 steps of 3ms across a 1.9s envelope
+ * would otherwise be invisible, and an invisible mark answers nothing. A small
+ * gap is left between marks so a run of them reads as *many* rather than as one
+ * continuous block.
+ */
+function memberSegments(
+  groupID: string,
+  rows: TimelineBarData[],
+  envelope: CollapseEnvelope,
+  maxMarks: number
+): BarSegment[] {
+  const span = envelope.lastEndedAt - envelope.firstStartedAt;
+  if (span <= 0) return [];
+
+  // Past this, marks are closer together than they can be drawn apart: at 500
+  // members in a few hundred pixels the pitch is about a pixel, so every mark
+  // floors to the same minimum width and the row renders as one solid block
+  // with ragged edges. The cap comes from the measured plot width, so a narrow
+  // pane gets fewer, larger marks rather than mush. Bucketed members take their
+  // worst member's status — the same rule the group node uses, so a bucket
+  // holding a failure is red.
+  const marks = Math.max(1, Math.min(rows.length, maxMarks));
+
+  // Every mark the same size with an even gap. Widths proportional to duration
+  // were tried and read as ragged: the marks say *where in the sequence*, and
+  // the row's own label already says how long the whole thing took.
+  const pitch = 100 / marks;
+  const width = pitch * 0.62;
+
+  const buckets: Array<{ status?: string; index: number }> = [];
+  for (let i = 0; i < marks; i++) buckets.push({ index: i });
+
+  rows.forEach((row, i) => {
+    const bucket = buckets[Math.min(marks - 1, Math.floor((i / rows.length) * marks))]!;
+    const severity = (s?: string) => SEVERITY[(s ?? 'UNKNOWN') as CanvasStatus] ?? 0;
+    if (severity(row.status) > severity(bucket.status)) bucket.status = row.status;
+  });
+
+  return buckets.map((bucket) => ({
+    id: `${groupID}-member-${bucket.index}`,
+    startPercent: bucket.index * pitch,
+    widthPercent: width,
+    style: 'step.run' as const,
+    status: bucket.status,
+  }));
+}
+
+/** Roughly the narrowest a mark plus its gap can be and still read as two. */
+const MARK_PITCH_PX = 7;
+
+/**
+ * How many marks a group row can usefully draw.
+ *
+ * Derived from the measured plot width rather than fixed, so a narrow pane gets
+ * fewer, larger marks instead of a smear. Falls back to a middling count when
+ * the width is not known yet (first paint, or a test with no layout).
+ */
+export function markBudget(plotWidthPx: number | undefined): number {
+  if (!plotWidthPx || plotWidthPx <= 0) return 40;
+  return Math.max(6, Math.floor(plotWidthPx / MARK_PITCH_PX));
+}
+
 export function applyCollapseToBars(
   bars: TimelineBarData[],
   plan: CollapsePlan,
-  expanded: ReadonlySet<string> = new Set()
+  expanded: ReadonlySet<string> = new Set(),
+  maxMarks = 40
 ): TimelineBarData[] {
   const active = plan.groups.filter((g) => !expanded.has(g.id));
   if (!active.length) return bars;
@@ -707,6 +774,12 @@ export function applyCollapseToBars(
         endTime: new Date(group.envelope.lastEndedAt),
         status: group.status,
         children: rows,
+        // Draw the members themselves rather than one continuous block, each
+        // coloured by its own status. A solid bar would say only "something
+        // happened here for 1.9s"; a run of small marks says *where in the
+        // sequence* the failures were, which is the question a collapsed row
+        // otherwise forces you to expand to answer.
+        segments: memberSegments(group.id, rows, group.envelope, maxMarks),
         // A group is a summary, not a span: the per-step phase breakdowns belong
         // to the members and are shown when it is expanded. Claiming one step's
         // discovery or HTTP timing as the group's would be a fabrication.

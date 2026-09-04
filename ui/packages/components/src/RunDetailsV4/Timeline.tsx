@@ -9,7 +9,7 @@
  * - Column resize handling
  */
 
-import { useCallback, useMemo, useState, type JSX, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react';
 import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
 import { Button } from '../Button';
@@ -25,8 +25,8 @@ import type {
   TimingDetail,
 } from './TimelineBar.types';
 import { TimelineHeader } from './TimelineHeader';
-import { applyCollapseToBars, type CollapsePlan } from './canvas/collapse';
-import { formatDuration, useStepSelection } from './runDetailsUtils';
+import { applyCollapseToBars, markBudget, type CollapsePlan } from './canvas/collapse';
+import { formatDuration, useStepHover, useStepSelection } from './runDetailsUtils';
 import { densityBuckets } from './utils/density';
 import { buildTimeScale, type Interval, type TimeScale } from './utils/timeScale';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
@@ -500,6 +500,10 @@ type TimelineBarRendererProps = {
    * only where a bar is drawn — never the duration it reports.
    */
   scale?: TimeScale;
+  /** Span id currently hovered anywhere in this run. */
+  hoveredStepId?: string;
+  /** Emits this row as hovered, for the other views. */
+  onHoverStep?: (spanID: string | undefined) => void;
 };
 
 /**
@@ -521,6 +525,8 @@ function TimelineBarRenderer({
   actions,
   insideExperiment,
   scale,
+  hoveredStepId,
+  onHoverStep,
 }: TimelineBarRendererProps): JSX.Element {
   const { startPercent, widthPercent } = calculateBarPosition(
     bar.startTime,
@@ -545,7 +551,9 @@ function TimelineBarRenderer({
 
   // Generate segments for compound bar visualization
   // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
-  const segments = generateBarSegments(bar) ?? generateDelaySegments(bar);
+  // A collapsed group brings its own segments — one per member — so the row
+  // shows where in the sequence things happened rather than one solid block.
+  const segments = bar.segments ?? generateBarSegments(bar) ?? generateDelaySegments(bar);
 
   // Pre-compute timing sub-bar positions from the parent bar's position.
   // This ensures sub-bars visually align with the parent's compound segments.
@@ -627,6 +635,8 @@ function TimelineBarRenderer({
       onToggle={bar.isRoot ? undefined : () => onToggleExpand(bar.id)}
       onClick={() => onSelectStep?.(bar.id)}
       selected={selectedStepId === bar.id}
+      hovered={hoveredStepId === bar.id}
+      onHoverChange={(on) => onHoverStep?.(on ? bar.id : undefined)}
       orgName={orgName}
       status={bar.status}
       viewStartOffset={viewStartOffset}
@@ -751,6 +761,8 @@ function TimelineBarRenderer({
                 viewEndOffset={viewEndOffset}
                 insideExperiment={childInsideExperiment}
                 scale={scale}
+                hoveredStepId={hoveredStepId}
+                onHoverStep={onHoverStep}
               />
             ))}
         </TimelineBar>
@@ -868,6 +880,8 @@ function TimelineBarRenderer({
             viewEndOffset={viewEndOffset}
             insideExperiment={childInsideExperiment}
             scale={scale}
+            hoveredStepId={hoveredStepId}
+            onHoverStep={onHoverStep}
           />
         ))}
     </TimelineBar>
@@ -894,9 +908,35 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
   // Repetition is detected once, in the model, and applied to both views. A
   // group becomes one row whose children are its members, so opening it uses
   // the expansion affordance that is already here rather than a second one.
+  // How wide the plot actually is, so a collapsed group draws as many marks as
+  // will fit and no more. A narrow pane gets fewer, larger marks rather than a
+  // smear; measuring beats guessing a constant.
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [plotWidth, setPlotWidth] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const el = plotRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setPlotWidth(entry.contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const bars = useMemo(
-    () => (collapse ? applyCollapseToBars(data.bars, collapse) : data.bars),
-    [data.bars, collapse]
+    () =>
+      collapse
+        ? applyCollapseToBars(
+            data.bars,
+            collapse,
+            undefined,
+            // Only the plot half of the row is available to marks; the label
+            // column takes the rest.
+            markBudget(plotWidth && (plotWidth * (100 - leftWidth)) / 100)
+          )
+        : data.bars,
+    [data.bars, collapse, plotWidth, leftWidth]
   );
 
   const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
@@ -909,6 +949,10 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
   // are the rolled-up span ids, which is exactly what the canvas emits.
   const { selectedStep } = useStepSelection({ runID });
   const selectedStepId = selectedStep?.trace.spanID;
+
+  // One subscriber for the whole list. Hovering a row here highlights the
+  // matching node on the canvas and vice versa; rows only compare a string.
+  const { hoveredSpanID, hoverStep } = useStepHover({ runID });
 
   // Timeline brush selection state (for zooming)
   const [viewStartOffset, setViewStartOffset] = useState(0);
@@ -925,6 +969,14 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
       return next;
     });
   }, []);
+
+  const handleHoverStep = useCallback(
+    (spanID: string | undefined) => {
+      if (!runID) return;
+      hoverStep(spanID ? { spanID, runID } : undefined);
+    },
+    [hoverStep, runID]
+  );
 
   const handleSelectStep = useCallback(
     (stepId: string) => {
@@ -1046,7 +1098,7 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
           and it is drawn at all because an axis that is not linear has to say
           so. Elided time is a filled band bounded by dashed rules, with its real
           duration set inside it: visibly a break, not a gap. */}
-      <div className="relative">
+      <div className="relative" ref={plotRef}>
         {/* The one structural rule in the view: where the label column ends and
             the plot begins. Drawn once, spanning every row, rather than as a
             border on each — a rule per row separates nothing. */}
@@ -1099,6 +1151,8 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
               viewEndOffset={viewEndOffset}
               actions={bar.isRoot ? expandCollapseActions : undefined}
               scale={scale}
+              hoveredStepId={hoveredSpanID}
+              onHoverStep={handleHoverStep}
             />
           ))}
         </div>

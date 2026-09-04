@@ -191,6 +191,15 @@ export interface TimelineBarProps {
   /** Whether this bar is currently selected */
   selected?: boolean;
 
+  /**
+   * Whether the pointer is over this step anywhere in the run — here, on the
+   * canvas, or on the density strip. Narrows attention; never filters.
+   */
+  hovered?: boolean;
+
+  /** Reports the pointer entering or leaving this row, for the other views. */
+  onHoverChange?: (hovered: boolean) => void;
+
   /** Child bars to render when expanded */
   children?: ReactNode;
 
@@ -313,6 +322,15 @@ export interface TimelineBarData {
 
   /** Nested child bars */
   children?: TimelineBarData[];
+
+  /**
+   * Pre-built segments, overriding the ones derived from timing breakdowns.
+   *
+   * Used by collapsed groups, whose row draws each member as its own small
+   * mark: a solid bar would say only "something happened here for 1.9s", while
+   * a run of marks says where in the sequence the failures were.
+   */
+  segments?: BarSegment[];
 
   /** Timing breakdown data (for expandable bars) */
   timingBreakdown?: TimingBreakdownData;

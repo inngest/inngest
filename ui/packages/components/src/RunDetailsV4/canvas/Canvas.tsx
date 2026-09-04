@@ -23,7 +23,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { Modal } from '../../Modal/Modal';
 import { cn } from '../../utils/classNames';
-import { traceWalk, useStepSelection } from '../runDetailsUtils';
+import { traceWalk, useStepHover, useStepSelection } from '../runDetailsUtils';
 import type { Trace } from '../types';
 import { CanvasControls } from './CanvasControls';
 import { CanvasLegend } from './CanvasLegend';
@@ -122,6 +122,10 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
   const { selectedStep, selectStep } = useStepSelection({ runID });
   const selectedSpanID = selectedStep?.trace.spanID;
 
+  // One subscriber for the whole canvas, matching the timeline. Hovering a node
+  // highlights the matching row below and vice versa.
+  const { hoveredSpanID, hoverStep } = useStepHover({ runID });
+
   const plan = useMemo(() => planCollapse(graph), [graph]);
 
   // Two modes rather than one cleverer layout, which is what everyone who has
@@ -170,8 +174,8 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
   );
 
   const { nodes, edges } = useMemo(
-    () => toFlowElements(shown, selectedSpanID, collapse),
-    [shown, selectedSpanID, collapse]
+    () => toFlowElements(shown, selectedSpanID, collapse, hoveredSpanID),
+    [shown, selectedSpanID, collapse, hoveredSpanID]
   );
 
   const traceMap = useMemo(() => {
@@ -179,6 +183,15 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
     traceWalk(trace, (t) => map.set(t.spanID, t));
     return map;
   }, [trace]);
+
+  const onNodeMouseEnter = useCallback(
+    (_: unknown, node: Node<CanvasNodeData>) => {
+      hoverStep({ spanID: node.data.spanID, runID });
+    },
+    [hoverStep, runID]
+  );
+
+  const onNodeMouseLeave = useCallback(() => hoverStep(undefined), [hoverStep]);
 
   const onNodeClick = useCallback(
     (_: unknown, node: Node<CanvasNodeData>) => {
@@ -202,6 +215,8 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
           edges={edges}
           nodeTypes={CANVAS_NODE_TYPES}
           onNodeClick={onNodeClick}
+          onNodeMouseEnter={onNodeMouseEnter}
+          onNodeMouseLeave={onNodeMouseLeave}
           fitView
           fitViewOptions={FIT_OPTIONS}
           // React Flow's default floor is 0.5, which is not far enough out for a
