@@ -9,6 +9,15 @@ import {
   type Warnings,
 } from '../generated/index';
 
+export type RunDiscovery = {
+  spanID: string;
+  status: string;
+  queuedAt: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  plannedStepIDs: string[];
+};
+
 export type Trace = {
   attempts: number | null;
   childrenSpans?: Trace[];
@@ -32,6 +41,40 @@ export type Trace = {
   debugSessionID?: string | null;
   metadata?: SpanMetadata[];
   response?: ResponseInfo;
+  /**
+   * Every step the SDK response that produced this span planned together. Only
+   * populated by SDKs on execution version 2+ (inngest-js v4 and later); older
+   * SDKs report one opcode per response, so there is nothing to report.
+   */
+  plannedSteps?: PlannedStep[] | null;
+  /** The step ID as the user wrote it, before hashing. */
+  userlandStepID?: string | null;
+  /**
+   * The index the SDK assigned when the same step ID is used more than once in
+   * a run — two Promise.all branches both calling `step.run("work")` become
+   * `work:1` and `work:2`. Without it those steps are indistinguishable.
+   */
+  userlandStepIndex?: number | null;
+  /**
+   * The step whose completion unblocked the continuation that discovered this
+   * one — which branch of a fan-out it belongs to. Best-effort: the executor
+   * cannot see batch boundaries, so this must be validated before it is trusted.
+   * See resolveBranches in canvas/graph.ts.
+   */
+  parentStepIDs?: string[] | null;
+  parentAlternateStepIDs?: string[] | null;
+  /**
+   * Every SDK discovery request in the run: where the executor asked what to do
+   * next and got back a set of opcodes. Only present on the root span — the
+   * spans themselves are not part of the trace tree, which is a tree of steps.
+   */
+  discoveries?: RunDiscovery[] | null;
+};
+
+export type PlannedStep = {
+  stepID: string;
+  name: string;
+  stepOp?: string | null;
 };
 
 export type ResponseInfo = {

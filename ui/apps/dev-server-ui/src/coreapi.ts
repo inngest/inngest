@@ -402,6 +402,15 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     }
     outputID
     groupID
+    plannedSteps {
+      stepID
+      name
+      stepOp
+    }
+    userlandStepID
+    userlandStepIndex
+    parentStepIDs
+    parentAlternateStepIDs
     debugRunID
     debugSessionID
     spanID
@@ -458,6 +467,14 @@ export const GET_RUN = gql`
       }
       status
       trace {
+        discoveries {
+          spanID
+          status
+          queuedAt
+          startedAt
+          endedAt
+          plannedStepIDs
+        }
         ...TraceDetails
         childrenSpans {
           ...TraceDetails
@@ -504,6 +521,14 @@ export const GET_RUN_LINKAGE = gql`
 export const GET_RUN_TRACE = gql`
   query GetRunTrace($runID: String!) {
     runTrace(runID: $runID) {
+      discoveries {
+        spanID
+        status
+        queuedAt
+        startedAt
+        endedAt
+        plannedStepIDs
+      }
       ...TraceDetails
       childrenSpans {
         ...TraceDetails

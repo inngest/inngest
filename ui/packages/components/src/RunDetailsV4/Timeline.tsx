@@ -25,6 +25,7 @@ import type {
   TimingDetail,
 } from './TimelineBar.types';
 import { TimelineHeader } from './TimelineHeader';
+import { useStepSelection } from './runDetailsUtils';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
 
 // ============================================================================
@@ -36,6 +37,11 @@ type Props = {
   data: TimelineData;
   /** Callback when a step is selected */
   onSelectStep?: (stepId: string) => void;
+  /**
+   * Scopes the shared step selection so the highlighted row follows selections
+   * made elsewhere in the same run (e.g. the canvas), not just clicks here.
+   */
+  runID?: string;
 };
 
 // ============================================================================
@@ -853,14 +859,19 @@ function TimelineBarRenderer({
  * - Supports nested children (recursive rendering)
  * - Column resize handling (planned)
  */
-export function Timeline({ data, onSelectStep }: Props): JSX.Element {
+export function Timeline({ data, onSelectStep, runID }: Props): JSX.Element {
   const { minTime, maxTime, bars, leftWidth, orgName } = data;
 
   const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
 
   // Initialize with root bars expanded by default
   const [expandedBars, setExpandedBars] = useState<Set<string>>(() => new Set(rootBarIds));
-  const [selectedStepId, setSelectedStepId] = useState<string | undefined>();
+
+  // Read the highlighted row from the shared selection rather than local state,
+  // so selecting a node on the canvas highlights the matching row here. Bar ids
+  // are the rolled-up span ids, which is exactly what the canvas emits.
+  const { selectedStep } = useStepSelection({ runID });
+  const selectedStepId = selectedStep?.trace.spanID;
 
   // Timeline brush selection state (for zooming)
   const [viewStartOffset, setViewStartOffset] = useState(0);
@@ -880,7 +891,8 @@ export function Timeline({ data, onSelectStep }: Props): JSX.Element {
 
   const handleSelectStep = useCallback(
     (stepId: string) => {
-      setSelectedStepId(stepId);
+      // The row highlight comes back through the shared selection, which
+      // `onSelectStep` drives — no local mirror to keep in sync.
       onSelectStep?.(stepId);
     },
     [onSelectStep]

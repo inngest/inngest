@@ -4,9 +4,12 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { RiArrowDownSLine, RiArrowRightSLine } from '@remixicon/react';
+import useLocalStorage from 'react-use/esm/useLocalStorage';
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetRunLinkage } from '../SharedContext/useGetRunLinkage';
@@ -24,6 +27,8 @@ import { Timeline } from './Timeline';
 import { TimelineLegend } from './TimelineLegend';
 import { TopInfo } from './TopInfo';
 import { Waiting } from './Waiting';
+import { Canvas } from './canvas/Canvas';
+import { toCanvasGraph } from './canvas/graph';
 import { traceWalk, useDynamicRunData, useStepSelection } from './runDetailsUtils';
 import type { Trace } from './types';
 import { traceRollup, traceToTimelineData } from './utils/traceConversion';
@@ -108,7 +113,65 @@ function TimelineV4Wrapper({
     [traceMap, selectStep, runID]
   );
 
-  return <Timeline data={timelineData} onSelectStep={handleSelectStep} />;
+  return <Timeline data={timelineData} onSelectStep={handleSelectStep} runID={runID} />;
+}
+
+/**
+ * Canvas over the same rolled-up trace the timeline uses. It sits above the
+ * trace rather than beside it in a tab: the graph is the orienting view and the
+ * trace is the detail, so both should be on screen at once. Collapsible for
+ * when the trace is all you want.
+ *
+ * Dev Server only for now; see the `!cloud` gate below.
+ */
+function CanvasSection({
+  runID,
+  trace,
+  getTrigger,
+}: {
+  runID: string;
+  trace: Trace;
+  getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
+}) {
+  const rolledUpTrace = useMemo(() => traceRollup(trace), [trace]);
+
+  // Cheap second derivation, without the trigger, purely to decide whether this
+  // run's SDK can tell us how it fanned out. Only `parallelismSource` is read.
+  const source = useMemo(() => toCanvasGraph(rolledUpTrace).parallelismSource, [rolledUpTrace]);
+  const guessing = source === 'inferred';
+
+  // Runs whose SDK reports its own parallel batches open expanded. Runs where
+  // we would be guessing start collapsed, so the canvas never quietly presents
+  // an inferred shape as fact.
+  const [stored, setStored] = useLocalStorage<boolean | undefined>('runCanvasOpen', undefined);
+  const open = stored ?? !guessing;
+
+  return (
+    <div className="border-muted flex flex-col gap-2 border-b px-4 pb-3">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setStored(!open)}
+          className="text-muted hover:text-basis flex items-center gap-1 text-sm leading-tight"
+          aria-expanded={open}
+        >
+          {open ? (
+            <RiArrowDownSLine className="h-4 w-4" />
+          ) : (
+            <RiArrowRightSLine className="h-4 w-4" />
+          )}
+          Canvas
+        </button>
+        {guessing && (
+          <span className="text-muted text-[11px] leading-tight">
+            Exact step grouping needs an SDK on execution version 2+ (inngest-js v4+). This
+            run&rsquo;s layout is inferred.
+          </span>
+        )}
+      </div>
+      {open && <Canvas trace={rolledUpTrace} runID={runID} getTrigger={getTrigger} />}
+    </div>
+  );
 }
 
 export const RunDetailsV4 = ({
@@ -120,6 +183,7 @@ export const RunDetailsV4 = ({
   orgName,
   readOnly,
 }: Props) => {
+  const { cloud } = useShared();
   const { booleanFlag } = useBooleanFlag();
   const { value: pollingDisabled, isReady: pollingFlagReady } = booleanFlag(
     'polling-disabled',
@@ -310,6 +374,14 @@ export const RunDetailsV4 = ({
               />
             )}
           </div>
+          {/* Dev Server only while this is a proof of concept. */}
+          {!cloud && !waiting && traceReady && (
+            <CanvasSection
+              runID={runID}
+              trace={runData.trace as unknown as Trace}
+              getTrigger={getTrigger}
+            />
+          )}
           <Tabs
             tabs={[
               {
