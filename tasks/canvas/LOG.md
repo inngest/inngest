@@ -517,3 +517,74 @@ dashboard that means fetching another run's trace through `SharedContext`, the s
 canvas viewport (item C's leftover, and small). Fix the `(interrupted)` lie on unfinished spans —
 `cancelled` still reports its open wait as 29m on a 35s run, which is the oldest known-wrong thing
 on this list. Then the canvas half of F.
+
+---
+
+## Review round — what the agents caught
+
+Three reviews landed after the items were built. Roughly half of what they found was already fixed;
+the rest was real and is now fixed. Recording the findings rather than just the fixes, because the
+*category* is the same in every case: **the view asserting something the run did not do.**
+
+### Overclaims, all now fixed
+
+- **"3 slow" named a trend as three anomalies.** `loop40`'s think durations are a smooth ramp —
+  …213, 299, 335, 370, 1675. A MAD threshold alone lands at ~335, so 299 was fine and 335 was
+  "slow": an 11% difference deciding it *inside* a continuous distribution. Only 1675 (12× median) is
+  a genuine outlier. A member must now also be ≥4× the median, so "slow" means anomalous, which is
+  what the word claims. `loop40` now says **1 slow**, and that is true.
+  *A monotonic ramp is a real and interesting thing that nothing currently describes — it is simply
+  no longer described wrongly.*
+- **Parallel branches fused into "one step that ran 24 times".** `v4branches-balanced` is six
+  branches of four steps (`br0-1` … `br5-4`); both digit runs normalise, so all 24 shared a shape.
+  An iteration repeats over *time*, so each repetition should own its level; several members of one
+  shape on a level ran in parallel. It now reads as **four fan-outs of six**, which is the run.
+- **A range that was not a range.** That group titled itself `br[0-1…5-4]`. Range labels now require
+  both ends to be purely numeric.
+- **Group rows began after their own children.** Ordinary bars start at `queuedAt`; the group row
+  used the envelope's first *start*, so expanding revealed children beginning before their parent —
+  88ms overhang on `wide`, ~7% of the run width — and silently dropped the queued phase every
+  sibling row includes.
+
+### Presentation, fixed
+
+- **The waste was horizontal, not vertical.** ~420px per row: a 35% (≈376px) label column for
+  two-to-six-character labels, plus a hard-coded 48px badge gutter that was empty on all eight
+  fixtures reviewed. Left column now 24%, and the badge gutter collapses when no row in the timeline
+  has a badge (decided once, so bars stay aligned).
+- **The gallery never rendered `TimelineLegend`** — it is mounted in `RunDetailsV4`, not `Timeline`.
+  The tool being used to judge the encoding omitted the key to it.
+- **The facts row mixed collapsed and uncollapsed numbers** — `edges 501` beside a picture with two
+  lines in it. Structural counts are now labelled `(full)`.
+
+### Already fixed before the reviews arrived
+
+One-way group expansion, sparkline normalisation, flat-sparkline suppression, the expander/fullscreen
+icon collision, the hard-clipping exceptions string, and the full-width centre line camouflaging
+small bars.
+
+### Confirmed correct, and worth keeping
+
+The correctness agent verified against the payloads, by set equality rather than eyeballing: 500
+members are exactly `s0`..`s499`; 80 are exactly `think-0..39` + `act-0..39` with a real period-2
+split; `wide` is 12 with `collect` correctly excluded; nothing invented or lost (500+0, 80+0, 12+1
+each equal the payload step count); **every member duration byte-identical before and after
+collapsing**, across all four groups; and collapsing fires on only 8 of 43 fixtures.
+
+### Still open from the reviews
+
+- **`barber-pole` is height-dependent.** A -45° gradient with an 8px period does not cross a 6px bar.
+  Bars are now 12px so it survives, and the waiting/working distinction moved to *weight* (ghosted vs
+  solid), which is height-independent — but the executing texture is still a 15%-opacity tint that is
+  nearly invisible in light mode.
+- **Numbers that disagree with their own bar.** `blocked`'s `hold` reads **5.999s** against a bar
+  spanning 12.3s — the number is the executing slice, the bar is queued+executing, and the fixture's
+  entire point (6.3s blocked) appears as a number nowhere on screen. Same shape of problem on
+  `failure`. This is the most important thing left on the list.
+- **The hover card is the best thing in the component** and nothing on the row signals it exists; its
+  hover target is `minWidth: 4px`, so on the runs where you most need it, it is unreachable.
+- **`tall500`'s group bar** spans 1885ms for 500ms of work. Honest by its stated definition, and the
+  per-member marks now show the gaps, but a big bar for a little work.
+- Group nodes are drawn at fit zoom (0.745 on `wide`), where 10px meta text renders ~7.4px.
+- Dark mode: stacked-card `border-subtle` is louder than the green status border, inverting the
+  hierarchy.
