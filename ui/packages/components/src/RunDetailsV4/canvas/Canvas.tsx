@@ -7,6 +7,7 @@
  * step state of its own.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RiShieldCheckLine } from '@remixicon/react';
 import {
   Background,
   BackgroundVariant,
@@ -25,6 +26,7 @@ import { Modal } from '../../Modal/Modal';
 import { cn } from '../../utils/classNames';
 import { traceWalk, useStepHover, useStepSelection } from '../runDetailsUtils';
 import type { Trace } from '../types';
+import { runValue, valueLines } from '../value';
 import { CanvasControls } from './CanvasControls';
 import { CanvasLegend } from './CanvasLegend';
 import { CANVAS_NODE_TYPES } from './CanvasNode';
@@ -127,6 +129,13 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
   const { hoveredSpanID, hoverStep } = useStepHover({ runID });
 
   const plan = useMemo(() => planCollapse(graph), [graph]);
+
+  // What the platform did for this run that the user would otherwise have built
+  // or lost. Factual and quantified, or absent — a plain run gets a plain page.
+  const value = useMemo(
+    () => valueLines(runValue(trace, trigger?.IDs?.length ?? 1)),
+    [trace, trigger]
+  );
 
   // Two modes rather than one cleverer layout, which is what everyone who has
   // confronted this shipped. Aggregated only becomes the default when the run is
@@ -253,6 +262,17 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
           getTrigger={getTrigger}
           onClose={() => setShowExpanded(false)}
         />
+      )}
+
+      {value.length > 0 && (
+        <ul className="text-subtle flex flex-wrap gap-x-3 px-1 text-[11px] leading-relaxed">
+          {value.map((line) => (
+            <li key={line} className="flex items-center gap-1">
+              <RiShieldCheckLine className="text-muted h-3 w-3 shrink-0" />
+              {line}
+            </li>
+          ))}
+        </ul>
       )}
 
       <div className="flex items-start justify-between gap-3 px-1">
