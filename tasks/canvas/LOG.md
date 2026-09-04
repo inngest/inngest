@@ -272,3 +272,57 @@ nothing asserted the old row height or the centre line, and no affordance was re
 - `blocked` eliding its 6.3s concurrency hold is arguably wrong for that one case — the queue delay
   is the thing you want to *see* there. It is marked rather than hidden, so it is not lost, but item
   G may want to treat flow-control holds differently from idle sleeps.
+
+### Idea parked during item C — a packed ("swimlane") timeline
+
+From the user: instead of one row per step, pack steps into as few rows as possible. Sequential work
+shares a single row laid out left to right; parallelism is what forces a second, third, fourth row.
+Greedy interval packing — a step goes in the first row whose previous bar has already ended.
+
+Why it is worth doing: **the row count becomes the concurrency profile**. A run that is 40 steps but
+never more than one at a time is one row, and a 12-wide fan-out is visibly twelve. That is a
+property the current view cannot show at all, and it collapses the tall case for free.
+
+The honest cost is the label column: with several steps per row there is nowhere to put per-row
+names. Mitigations, in order of preference: the label inline inside the bar when it is wide enough,
+an annotation immediately right of the bar when it is not (which item B2 deferred and wants anyway),
+and the existing hover card for the rest.
+
+Planned as a third view mode alongside the collapsed/expanded toggle, after item C.
+
+---
+
+## Item C — The density strip
+
+A thin full-width histogram sharing the timeline's axis, inside the existing `TimeBrush` rather than
+beside it — so dragging to set the viewport is the gesture that was already there. `TimeBrush` gained
+a `trackClassName` because at its `h-4` track the strip was a two-pixel line.
+
+**The acceptance test passes.** The brief states it as a sentence: a failure cluster two-thirds
+through a 500-step run should be a red smear visible in the first screenful with no interaction. It
+is. No captured run had such a cluster, so `failcluster.json` is generated from the real `tall500`
+capture with the status of a contiguous block rewritten — marked synthetic in `index.ts`, in the
+README and in orange on the page, same as `longgap`. A test asserts the checkable half (the red
+lands in the right third and stays contiguous); whether it is *visible* is for the eye.
+
+Two properties are load-bearing and easy to break later:
+
+- **It renders the whole run, always**, however much is collapsed below. Built from `data.bars`,
+  never the collapsed bars. The strip is the map; collapsing is a property of the territory.
+- **It shares the axis, breaks included**, so a column really does sit above the rows it describes.
+
+Fewer states than `CanvasStatus` on purpose — a five-pixel column read at a glance can only carry
+distinctions a reader can act on.
+
+**A bonus from item A**, visible on the same fixture: the collapsed group node draws **red** with
+"21 failed" on it. The worst-status rule means a group holding a failure cannot present itself as
+green, so the cluster is legible on the canvas too, without expanding anything.
+
+**`lessons.md` #16 recurred.** The strip rendered nothing while its own unit tests passed — Vite
+serving a stale copy of the two new modules. Restarting fixed it instantly, again. The rule is now
+firm: after adding a *new module* imported from more than one place, restart Vite before debugging
+anything.
+
+**Not done in this item**: dragging the strip currently sets the timeline viewport (inherited from
+the brush) but does not yet drive the canvas — the shared viewport belongs with item D's emitter.
+`onSelectRange` exists on the component and is not yet wired.
