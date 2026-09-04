@@ -326,3 +326,64 @@ anything.
 **Not done in this item**: dragging the strip currently sets the timeline viewport (inherited from
 the brush) but does not yet drive the canvas — the shared viewport belongs with item D's emitter.
 `onSelectRange` exists on the component and is not yet wired.
+
+---
+
+## Item B follow-up — the waiting encoding, twice
+
+Two rounds of user feedback on the same row, worth recording because the second overturned the first.
+
+**Round 1, the problem.** A step that queues for seconds and runs for milliseconds drew a long grey
+bar and a green speck about a pixel wide. The eye went to the waiting, which is the least interesting
+thing in the row, and a perfectly healthy run looked broken. Cause: waiting was a *different colour*,
+so it read as a separate object competing with the work rather than as part of the same step.
+
+**Round 1, the fix that was wrong.** Drew the waiting stretch hollow — the step's own status colour
+as a 1px inset ring. Correct as an encoding, and ugly: a thin ring reads as a border artefact rather
+than as a quantity.
+
+**Round 2, the fix that stands.** Same fill, a quarter of the weight. A row is now one continuous bar
+that is green because the step succeeded and simply becomes solid where the work is. `step.sleep` and
+`step.waitForEvent` are ghosted the same way rather than striped — **weight carries this better than
+texture**. Bars thickened twice on request: tall 6 → 10 → 12px, rows 18 → 20 → 22px.
+
+**The process lesson.** The UX review agent passed the original grey-slab row, because it was
+checking whether the encoding was *correct* and not whether it looked good. It now has an explicit
+"does it actually look good" criterion naming that row as the canonical failure — hollow outlines,
+bars too thin or too thick, and any element that dominates a row while carrying the least
+information.
+
+### What the UX review did catch (item A), all fixed
+
+- **The group expander was a one-way door.** Expanding a group on `loop40` dropped the fit to
+  `scale(0.087)` — the exact hairline collapsing exists to prevent — and `openGroups` was never
+  cleared, so the toolbar toggle could not undo it. Page reload was the only recovery. The control
+  now re-collapses open groups first and only switches mode once there is nothing left to close.
+- **The sparkline contradicted its own exception count.** Max-normalised against a zero baseline, so
+  `think`'s single 1.762s outlier squashed the ~160ms series into the bottom tenth of a 10px box: a
+  node reading "3 slow" drew one spike and looked like it was lying. The reviewer verified the
+  *threshold* was right (think-32 1.762s, think-25 433ms, think-29 409ms against a ~160ms median), so
+  the fix was the chart, not the statistic. Now min-max normalised, and suppressed entirely when the
+  spread is under 15% — on `tall500` it was rendering as a horizontal rule that read as an underline.
+- **The exceptions string hard-clipped.** `shrink-0` meant the span never gave ground, so
+  `text-overflow` never fired; a full-house string overflowed its box by 169px and the tail vanished
+  with nothing to signal it.
+- **Icon collision.** The group expander used `RiExpandDiagonalLine` — the canvas *fullscreen* glyph,
+  ~50px away in the toolbar — in a 12×12px hit target. Now a chevron at 20×20 with a hover state.
+
+### Still open from that review
+
+- The group node is drawn at fit zoom, which varies 0.745 (`wide`) to 1.20 (`tall500`), so on `wide`
+  the 10px meta row renders at ~7.4px and is genuinely not readable. A minimum legible zoom, or a
+  size that does not depend on fit, is the real fix.
+- A group's only cues are the count pill, the stack and the sparkline — the icon is the same one
+  ordinary step nodes use. `for 2s` gets a dashed border and its own icon; a group is at least as
+  different a kind of thing.
+- In dark mode the stacked cards' `border-subtle` renders brighter than the green status border,
+  inverting the hierarchy.
+- `variantLine` and `Sparkline` are mutually exclusive, so a mixed-name group — the most interesting
+  kind — loses its timing shape.
+- The `…` does double duty: range inside brackets, truncation everywhere else.
+- Confirmed from the payload: `cancelled` reports its open wait as `29m 47s` on a 35s run. Same
+  unfinished-span-measured-against-`now` bug already noted in item A0. Still unfixed; belongs with
+  the cancelled-state work.
