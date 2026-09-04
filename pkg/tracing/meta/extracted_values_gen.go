@@ -70,6 +70,8 @@ type ExtractedValues struct {
 	StepHasOutput *bool
 	StepUserlandID *string
 	StepUserlandIndex *int
+	StepParentIDs *[]string
+	StepParentAlternateIDs *[]string
 	StepRunType *string
 	ExperimentName *string
 	ExperimentStepID *string

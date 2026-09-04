@@ -201,6 +201,19 @@ func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 		meta.Attr(meta.Attrs.StepName, &stepName),
 	)
 
+	// Which steps this one waited for — the join it sits after, or the single
+	// step it follows — as reported by the SDK on the opcode itself. Stamped
+	// here rather than at each call site because opcodes reach the tracer from
+	// several places: the executor's five step handlers, finalization, and the
+	// checkpoint API, which is the path a lone inline-executed step takes.
+	if parents := op.DiscoveredAfter(); len(parents) > 0 {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepParentIDs, &parents)
+	}
+
+	if alts := op.DiscoveredAfterAlternates(); len(alts) > 0 {
+		meta.AddAttr(rawAttrs, meta.Attrs.StepParentAlternateIDs, &alts)
+	}
+
 	// Try get stack line
 	if stack, err := op.StackLine(); err == nil && stack != nil && *stack != "" {
 		meta.AddAttr(rawAttrs, meta.Attrs.StepCodeLocation, stack)
