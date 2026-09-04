@@ -615,6 +615,24 @@ type RunStepInfo {
   type: String
 }
 
+# One SDK discovery request: the executor asked the function what to do next and
+# it answered with a set of opcodes.
+#
+# This is where a run changes shape — one step becoming several, or several
+# converging back into one — so it is what a visualisation draws a junction for.
+# The spans themselves are not part of the trace tree, which is a tree of steps,
+# so they are reported alongside it.
+type RunDiscovery {
+  spanID: String!
+  status: RunTraceSpanStatus!
+  queuedAt: Time!
+  startedAt: Time
+  endedAt: Time
+  # The steps this response planned. One id for a single next step, several for
+  # a fan-out.
+  plannedStepIDs: [String!]!
+}
+
 type RunTraceSpan {
   appID: UUID!
   functionID: UUID!
@@ -676,6 +694,9 @@ type RunTraceSpan {
   # Promise.race or Promise.any. Ordering, not dependency, so draw them
   # differently from parentStepIDs.
   parentAlternateStepIDs: [String!]
+  # Every discovery request made during the run, in the order they happened.
+  # Only populated on the root span.
+  discoveries: [RunDiscovery!]
 }
 
 type RunTraceSpanResponseInfo {

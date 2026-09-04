@@ -64,6 +64,7 @@ type RunTraceSpan struct {
 	UserlandStepIndex      *int                      `json:"userlandStepIndex,omitempty"`
 	ParentStepIDs          []string                  `json:"parentStepIDs,omitempty"`
 	ParentAlternateStepIDs []string                  `json:"parentAlternateStepIDs,omitempty"`
+	Discoveries            []*RunDiscovery           `json:"discoveries,omitempty"`
 
 	// Internal fields not exposed over GraphQL.
 	SpanTypeName string

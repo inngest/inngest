@@ -372,6 +372,15 @@ type ComplexityRoot struct {
 		RunID    func(childComplexity int) int
 	}
 
+	RunDiscovery struct {
+		EndedAt        func(childComplexity int) int
+		PlannedStepIDs func(childComplexity int) int
+		QueuedAt       func(childComplexity int) int
+		SpanID         func(childComplexity int) int
+		StartedAt      func(childComplexity int) int
+		Status         func(childComplexity int) int
+	}
+
 	RunHistoryCancel struct {
 		EventID    func(childComplexity int) int
 		Expression func(childComplexity int) int
@@ -452,6 +461,7 @@ type ComplexityRoot struct {
 		DebugPaused            func(childComplexity int) int
 		DebugRunID             func(childComplexity int) int
 		DebugSessionID         func(childComplexity int) int
+		Discoveries            func(childComplexity int) int
 		Duration               func(childComplexity int) int
 		EndedAt                func(childComplexity int) int
 		FunctionID             func(childComplexity int) int
@@ -2358,6 +2368,48 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunDeferredFrom.RunID(childComplexity), true
 
+	case "RunDiscovery.endedAt":
+		if e.complexity.RunDiscovery.EndedAt == nil {
+			break
+		}
+
+		return e.complexity.RunDiscovery.EndedAt(childComplexity), true
+
+	case "RunDiscovery.plannedStepIDs":
+		if e.complexity.RunDiscovery.PlannedStepIDs == nil {
+			break
+		}
+
+		return e.complexity.RunDiscovery.PlannedStepIDs(childComplexity), true
+
+	case "RunDiscovery.queuedAt":
+		if e.complexity.RunDiscovery.QueuedAt == nil {
+			break
+		}
+
+		return e.complexity.RunDiscovery.QueuedAt(childComplexity), true
+
+	case "RunDiscovery.spanID":
+		if e.complexity.RunDiscovery.SpanID == nil {
+			break
+		}
+
+		return e.complexity.RunDiscovery.SpanID(childComplexity), true
+
+	case "RunDiscovery.startedAt":
+		if e.complexity.RunDiscovery.StartedAt == nil {
+			break
+		}
+
+		return e.complexity.RunDiscovery.StartedAt(childComplexity), true
+
+	case "RunDiscovery.status":
+		if e.complexity.RunDiscovery.Status == nil {
+			break
+		}
+
+		return e.complexity.RunDiscovery.Status(childComplexity), true
+
 	case "RunHistoryCancel.eventID":
 		if e.complexity.RunHistoryCancel.EventID == nil {
 			break
@@ -2700,6 +2752,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpan.DebugSessionID(childComplexity), true
+
+	case "RunTraceSpan.discoveries":
+		if e.complexity.RunTraceSpan.Discoveries == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.Discoveries(childComplexity), true
 
 	case "RunTraceSpan.duration":
 		if e.complexity.RunTraceSpan.Duration == nil {
@@ -4238,6 +4297,24 @@ type RunStepInfo {
   type: String
 }
 
+# One SDK discovery request: the executor asked the function what to do next and
+# it answered with a set of opcodes.
+#
+# This is where a run changes shape — one step becoming several, or several
+# converging back into one — so it is what a visualisation draws a junction for.
+# The spans themselves are not part of the trace tree, which is a tree of steps,
+# so they are reported alongside it.
+type RunDiscovery {
+  spanID: String!
+  status: RunTraceSpanStatus!
+  queuedAt: Time!
+  startedAt: Time
+  endedAt: Time
+  # The steps this response planned. One id for a single next step, several for
+  # a fan-out.
+  plannedStepIDs: [String!]!
+}
+
 type RunTraceSpan {
   appID: UUID!
   functionID: UUID!
@@ -4299,6 +4376,9 @@ type RunTraceSpan {
   # Promise.race or Promise.any. Ordering, not dependency, so draw them
   # differently from parentStepIDs.
   parentAlternateStepIDs: [String!]
+  # Every discovery request made during the run, in the order they happened.
+  # Only populated on the root span.
+  discoveries: [RunDiscovery!]
 }
 
 type RunTraceSpanResponseInfo {
@@ -12079,6 +12159,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
 			case "parentAlternateStepIDs":
 				return ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
+			case "discoveries":
+				return ec.fieldContext_RunTraceSpan_discoveries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -15009,6 +15091,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
 			case "parentAlternateStepIDs":
 				return ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
+			case "discoveries":
+				return ec.fieldContext_RunTraceSpan_discoveries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -16102,6 +16186,264 @@ func (ec *executionContext) fieldContext_RunDeferredFrom_run(ctx context.Context
 				return ec.fieldContext_FunctionRunV2_isDeferred(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionRunV2", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunDiscovery_spanID(ctx context.Context, field graphql.CollectedField, obj *models.RunDiscovery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunDiscovery_spanID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SpanID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunDiscovery_spanID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunDiscovery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunDiscovery_status(ctx context.Context, field graphql.CollectedField, obj *models.RunDiscovery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunDiscovery_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(models.RunTraceSpanStatus)
+	fc.Result = res
+	return ec.marshalNRunTraceSpanStatus2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunTraceSpanStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunDiscovery_status(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunDiscovery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type RunTraceSpanStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunDiscovery_queuedAt(ctx context.Context, field graphql.CollectedField, obj *models.RunDiscovery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunDiscovery_queuedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.QueuedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunDiscovery_queuedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunDiscovery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunDiscovery_startedAt(ctx context.Context, field graphql.CollectedField, obj *models.RunDiscovery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunDiscovery_startedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StartedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunDiscovery_startedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunDiscovery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunDiscovery_endedAt(ctx context.Context, field graphql.CollectedField, obj *models.RunDiscovery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunDiscovery_endedAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EndedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunDiscovery_endedAt(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunDiscovery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunDiscovery_plannedStepIDs(ctx context.Context, field graphql.CollectedField, obj *models.RunDiscovery) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunDiscovery_plannedStepIDs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PlannedStepIDs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunDiscovery_plannedStepIDs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunDiscovery",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -18826,6 +19168,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
 			case "parentAlternateStepIDs":
 				return ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
+			case "discoveries":
+				return ec.fieldContext_RunTraceSpan_discoveries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -19197,6 +19541,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_parentStepIDs(ctx, field)
 			case "parentAlternateStepIDs":
 				return ec.fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx, field)
+			case "discoveries":
+				return ec.fieldContext_RunTraceSpan_discoveries(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -19822,6 +20168,61 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentAlternateStepIDs(ctx
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_discoveries(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_discoveries(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Discoveries, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]*models.RunDiscovery)
+	fc.Result = res
+	return ec.marshalORunDiscovery2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDiscoveryᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_discoveries(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "spanID":
+				return ec.fieldContext_RunDiscovery_spanID(ctx, field)
+			case "status":
+				return ec.fieldContext_RunDiscovery_status(ctx, field)
+			case "queuedAt":
+				return ec.fieldContext_RunDiscovery_queuedAt(ctx, field)
+			case "startedAt":
+				return ec.fieldContext_RunDiscovery_startedAt(ctx, field)
+			case "endedAt":
+				return ec.fieldContext_RunDiscovery_endedAt(ctx, field)
+			case "plannedStepIDs":
+				return ec.fieldContext_RunDiscovery_plannedStepIDs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RunDiscovery", field.Name)
 		},
 	}
 	return fc, nil
@@ -28044,6 +28445,63 @@ func (ec *executionContext) _RunDeferredFrom(ctx context.Context, sel ast.Select
 	return out
 }
 
+var runDiscoveryImplementors = []string{"RunDiscovery"}
+
+func (ec *executionContext) _RunDiscovery(ctx context.Context, sel ast.SelectionSet, obj *models.RunDiscovery) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, runDiscoveryImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RunDiscovery")
+		case "spanID":
+
+			out.Values[i] = ec._RunDiscovery_spanID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "status":
+
+			out.Values[i] = ec._RunDiscovery_status(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "queuedAt":
+
+			out.Values[i] = ec._RunDiscovery_queuedAt(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "startedAt":
+
+			out.Values[i] = ec._RunDiscovery_startedAt(ctx, field, obj)
+
+		case "endedAt":
+
+			out.Values[i] = ec._RunDiscovery_endedAt(ctx, field, obj)
+
+		case "plannedStepIDs":
+
+			out.Values[i] = ec._RunDiscovery_plannedStepIDs(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var runHistoryCancelImplementors = []string{"RunHistoryCancel"}
 
 func (ec *executionContext) _RunHistoryCancel(ctx context.Context, sel ast.SelectionSet, obj *history_reader.RunHistoryCancel) graphql.Marshaler {
@@ -28692,6 +29150,10 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 		case "parentAlternateStepIDs":
 
 			out.Values[i] = ec._RunTraceSpan_parentAlternateStepIDs(ctx, field, obj)
+
+		case "discoveries":
+
+			out.Values[i] = ec._RunTraceSpan_discoveries(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -30790,6 +31252,16 @@ func (ec *executionContext) marshalNRunDeferredFrom2ᚖgithubᚗcomᚋinngestᚋ
 	return ec._RunDeferredFrom(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNRunDiscovery2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDiscovery(ctx context.Context, sel ast.SelectionSet, v *models.RunDiscovery) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RunDiscovery(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNRunHistoryItem2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*history_reader.RunHistory) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -31213,6 +31685,38 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v interface{}) ([]string, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v interface{}) (time.Time, error) {
@@ -32198,6 +32702,53 @@ func (ec *executionContext) unmarshalORerunFromStepInput2ᚖgithubᚗcomᚋinnge
 	}
 	res, err := ec.unmarshalInputRerunFromStepInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalORunDiscovery2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDiscoveryᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.RunDiscovery) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRunDiscovery2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunDiscovery(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalORunHistoryCancel2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryCancel(ctx context.Context, sel ast.SelectionSet, v *history_reader.RunHistoryCancel) graphql.Marshaler {

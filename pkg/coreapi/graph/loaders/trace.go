@@ -406,6 +406,16 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				}
 			}
 
+			// A discovery span is where the run changed shape. The tree drops
+			// them, since it is a tree of steps, so gather them onto the run
+			// itself before that happens — and carry up any a descendant found.
+			gqlSpan.Discoveries = append(gqlSpan.Discoveries, child.Discoveries...)
+			child.Discoveries = nil
+
+			if child.SpanTypeName == meta.SpanNameStepDiscovery {
+				gqlSpan.Discoveries = append(gqlSpan.Discoveries, discoveryOf(child))
+			}
+
 			if child.Omit {
 				// We're skipping this child, but we may still want to use
 				// its data for timings.
@@ -687,6 +697,27 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 // that handled an SDK response, which for a discovery request sits one level
 // below the discovery span — and the whole discovery subtree is omitted from
 // the tree we return, so the lists have to be lifted out before it is dropped.
+// discoveryOf summarises a discovery span for clients. The steps it planned sit
+// on the execution span *under* it, not on the discovery span itself, so they
+// are gathered from the whole subtree.
+func discoveryOf(span *models.RunTraceSpan) *models.RunDiscovery {
+	planned := []string{}
+	for _, plan := range collectPlannedSteps(span) {
+		for _, step := range plan {
+			planned = append(planned, step.StepID)
+		}
+	}
+
+	return &models.RunDiscovery{
+		SpanID:         span.SpanID,
+		Status:         span.Status,
+		QueuedAt:       span.QueuedAt,
+		StartedAt:      span.StartedAt,
+		EndedAt:        span.EndedAt,
+		PlannedStepIDs: planned,
+	}
+}
+
 func collectPlannedSteps(span *models.RunTraceSpan) [][]*models.RunStep {
 	if span == nil {
 		return nil

@@ -324,6 +324,15 @@ type RetryConfiguration struct {
 	IsDefault *bool `json:"isDefault,omitempty"`
 }
 
+type RunDiscovery struct {
+	SpanID         string             `json:"spanID"`
+	Status         RunTraceSpanStatus `json:"status"`
+	QueuedAt       time.Time          `json:"queuedAt"`
+	StartedAt      *time.Time         `json:"startedAt,omitempty"`
+	EndedAt        *time.Time         `json:"endedAt,omitempty"`
+	PlannedStepIDs []string           `json:"plannedStepIDs"`
+}
+
 type RunStep struct {
 	StepID string  `json:"stepID"`
 	Name   string  `json:"name"`
