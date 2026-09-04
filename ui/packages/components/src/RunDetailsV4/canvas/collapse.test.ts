@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Trace } from '../types';
-import { traceRollup } from '../utils/traceConversion';
+import { traceRollup, traceToTimelineData } from '../utils/traceConversion';
 import chains from './__fixtures__/chains.json';
 import failure from './__fixtures__/failure.json';
 import loop40 from './__fixtures__/loop40.json';
@@ -17,9 +17,18 @@ import retry from './__fixtures__/retry.json';
 import simple from './__fixtures__/simple.json';
 import step from './__fixtures__/step.json';
 import tall500 from './__fixtures__/tall500.json';
+import v4branchesBalanced from './__fixtures__/v4branches-balanced.json';
+import v4branchesRagged from './__fixtures__/v4branches-ragged.json';
 import v4pathological from './__fixtures__/v4pathological.json';
 import wide from './__fixtures__/wide.json';
-import { applyCollapse, groupTitle, planCollapse, shapeKey, shouldAggregate } from './collapse';
+import {
+  applyCollapse,
+  applyCollapseToBars,
+  groupTitle,
+  planCollapse,
+  shapeKey,
+  shouldAggregate,
+} from './collapse';
 import { toCanvasGraph } from './graph';
 import type { CanvasGraph, CanvasNode } from './graph.types';
 
@@ -424,5 +433,74 @@ describe('shouldAggregate', () => {
       const graph = build(fixture);
       expect(shouldAggregate(graph, planCollapse(graph))).toBe(false);
     }
+  });
+});
+
+describe('what the reviewers caught', () => {
+  it('calls a member slow only when it is anomalous, not merely the top of a ramp', () => {
+    // loop40's think durations are a smooth ramp — …213, 299, 335, 370, 1675.
+    // A MAD threshold alone lands at ~335, so 299 is fine and 335 is "slow": an
+    // 11% difference deciding it inside a continuous distribution, and the node
+    // then reported "3 slow" for one anomaly and a trend.
+    const think = planCollapse(build(loop40)).groups[0]!;
+    const slow = think.exceptions.filter((e) => e.reason === 'slow');
+    expect(slow).toHaveLength(1);
+
+    const flagged = think.memberNodeIDs.indexOf(slow[0]!.nodeID);
+    const sorted = [...think.durationsMs].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)]!;
+    expect(think.durationsMs[flagged]!).toBeGreaterThan(median * 4);
+  });
+
+  it('does not fuse parallel branches into a single "ran N times"', () => {
+    // v4branches-balanced is six parallel branches of four sequential steps,
+    // named br0-1 … br5-4. Both digit runs normalise, so all 24 shared a shape
+    // and collapsed into one node claiming one step ran 24 times. They are four
+    // fan-outs of six, and that is what it should say.
+    const plan = planCollapse(build(v4branchesBalanced));
+    expect(plan.groups).toHaveLength(4);
+    for (const group of plan.groups) {
+      expect(group.kind).toBe('siblings');
+      expect(group.count).toBe(6);
+    }
+  });
+
+  it('never labels a range that is not one', () => {
+    // `br[0-1…5-4]` reads as a range and is nothing of the sort.
+    for (const fixture of [loop40, tall500, wide, v4branchesBalanced, v4branchesRagged]) {
+      for (const group of planCollapse(build(fixture)).groups) {
+        const title = groupTitle(group);
+        const range = /\[([^\]…]*)…([^\]]*)\]/.exec(title);
+        if (range) {
+          expect(range[1], title).toMatch(/^\d+$/);
+          expect(range[2], title).toMatch(/^\d+$/);
+        }
+      }
+    }
+  });
+
+  it('starts a group row no later than its own first child', () => {
+    // Ordinary bars start at queuedAt; the group row used the envelope's first
+    // START, so expanding it revealed children beginning before their parent —
+    // an 88ms overhang on `wide` — and dropped the queued phase every sibling
+    // row includes.
+    const graph = build(wide);
+    const plan = planCollapse(graph);
+    const data = traceToTimelineData(traceRollup((wide as Fixture).run.trace as Trace), {
+      runID: 'test',
+    });
+    const rows = applyCollapseToBars(data.bars, plan);
+
+    const check = (bars: typeof rows) => {
+      for (const bar of bars) {
+        for (const child of bar.children ?? []) {
+          expect(child.startTime.getTime(), bar.name).toBeGreaterThanOrEqual(
+            bar.startTime.getTime()
+          );
+        }
+        check(bar.children ?? []);
+      }
+    };
+    check(rows);
   });
 });

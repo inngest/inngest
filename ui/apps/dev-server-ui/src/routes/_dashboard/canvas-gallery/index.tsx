@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Timeline } from '@inngest/components/RunDetailsV4/Timeline';
+import { TimelineLegend } from '@inngest/components/RunDetailsV4/TimelineLegend';
 import { Canvas } from '@inngest/components/RunDetailsV4/canvas/Canvas';
 import type {
   CanvasFixture,
@@ -244,8 +245,8 @@ function FixtureView({
       <dl className="text-subtle flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] tabular-nums">
         <Fact label="status" value={fixture.data.run.status} />
         <Fact label="spans" value={countSpans(raw)} />
-        <Fact label="levels" value={graph.levels.length} />
-        <Fact label="work nodes" value={workNodes} />
+        <Fact label="levels (full)" value={graph.levels.length} />
+        <Fact label="work nodes (full)" value={workNodes} />
         <Fact
           label="nodes at rest"
           value={`${drawnNodes} / ${NODE_BUDGET}`}
@@ -259,7 +260,7 @@ function FixtureView({
             }${aggregated ? '' : ' (off)'}`}
           />
         )}
-        <Fact label="edges" value={graph.edges.length} />
+        <Fact label="edges (full)" value={graph.edges.length} />
         <Fact
           label="rows at rest"
           value={`${rows} / ${NODE_BUDGET}`}
@@ -280,6 +281,9 @@ function FixtureView({
       <Canvas trace={rolledUp} runID={runID} />
 
       <div className="border-muted border-t pt-2">
+        <div className="flex justify-end pb-1">
+          <TimelineLegend />
+        </div>
         <Timeline
           loadChildRun={loadChildRun}
           data={timelineData}

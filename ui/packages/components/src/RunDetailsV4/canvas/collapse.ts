@@ -219,9 +219,25 @@ function slowMembers(nodes: CanvasNode[]): Set<string> {
   // threshold — and a floor keeps millisecond noise from reading as an outlier.
   const threshold = mad > 0 ? med + 3 * mad : Math.max(med * 3, med + 250);
 
+  // A MAD threshold on its own is not enough, and the failure is a real one.
+  // `loop40` simulates a loop that gets steadily slower: 171, 179, …, 213, 299,
+  // 335, 370, 1675. The threshold lands at ~335, so 299 is fine and 335 is
+  // "slow" — an 11% difference deciding it, inside a continuous ramp. The node
+  // then reported "3 slow", naming the top of a trend as if it were three
+  // anomalies, when there is one anomaly and a trend.
+  //
+  // So a member must ALSO be a large multiple of the median. That makes "slow"
+  // mean anomalous, which is what the word claims. On `loop40` it now flags
+  // only 1675 (12x the median) and says "1 slow", which is true.
+  //
+  // A monotonic ramp is a real and interesting thing that this does not
+  // describe at all — it is simply not described *wrongly* any more.
+  const ANOMALY_MULTIPLE = 4;
+
   const slow = new Set<string>();
   nodes.forEach((node, i) => {
-    if (durations[i]! > threshold && durations[i]! > 0) slow.add(node.id);
+    const d = durations[i]!;
+    if (d > 0 && d > threshold && d > med * ANOMALY_MULTIPLE) slow.add(node.id);
   });
   return slow;
 }
@@ -380,6 +396,24 @@ export function planCollapse(graph: CanvasGraph): CollapsePlan {
       }
       for (const [key, members] of membersByKey) {
         if (members.length < MIN_MEMBERS) continue;
+
+        // An iteration is a loop body repeating over TIME, so each repetition
+        // should be its own level. If a level holds several members of the same
+        // shape, they ran in parallel — they are branches, not iterations, and
+        // fusing them claims the run did one thing N times when it did N things
+        // once each.
+        //
+        // `v4branches-balanced` is the case: six parallel branches of four
+        // sequential steps, named `br0-1` … `br5-4`. Both digit runs normalise,
+        // so all 24 shared a shape and collapsed into a single node asserting
+        // "one step that ran 24 times". The sibling pass below handles each
+        // level properly instead.
+        const perLevel = new Map<number, number>();
+        for (const node of members) {
+          perLevel.set(node.level, (perLevel.get(node.level) ?? 0) + 1);
+        }
+        if ([...perLevel.values()].some((n) => n > 1)) continue;
+
         const group = buildGroup('iteration', key, members, groups.length);
         groups.push(group);
         for (const node of members) {
@@ -456,6 +490,10 @@ export function groupTitle(group: CanvasGroup): string {
     suffix++;
   }
 
+  // Only call it a range when what differs really is just a number. On
+  // `v4branches-balanced` — six branches of four steps, named `br0-1` …
+  // `br5-4` — two digit runs vary independently, and `br[0-1…5-4]` reads as a
+  // range while being nothing of the sort.
   const head = a.slice(0, prefix);
   const tail = suffix > 0 ? a.slice(a.length - suffix) : '';
   const from = a.slice(prefix, a.length - suffix);
@@ -464,6 +502,7 @@ export function groupTitle(group: CanvasGroup): string {
   // Nothing in common — fall back to naming the first member rather than
   // producing something that reads like a range but is not one.
   if (!from || !to) return group.label;
+  if (!/^\d+$/.test(from) || !/^\d+$/.test(to)) return group.label;
 
   return `${head}[${from}…${to}]${tail}`;
 }
@@ -770,7 +809,12 @@ export function applyCollapseToBars(
         ...first,
         id: group.id,
         name: `${groupTitle(group)} × ${group.count}`,
-        startTime: new Date(group.envelope.firstStartedAt),
+        // From the earliest member's queuedAt, not the envelope's first START.
+        // Every other row in the timeline begins at queuedAt, so an envelope
+        // start made the group row begin AFTER its own children — an 88ms
+        // overhang on `wide` — and silently dropped the queued phase that
+        // sibling rows all include.
+        startTime: new Date(Math.min(...rows.map((r) => r.startTime.getTime()))),
         endTime: new Date(group.envelope.lastEndedAt),
         status: group.status,
         children: rows,
