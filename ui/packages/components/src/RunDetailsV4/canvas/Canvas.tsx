@@ -137,6 +137,25 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
     setOpenGroups((open) => new Set(open).add(groupID));
   }, []);
 
+  // Expanding a group must be reversible. Without this, opening one on a
+  // 40-iteration loop drops the fit to a grey hairline — the exact state
+  // collapsing exists to prevent — with no way back but a page reload.
+  //
+  // So the toolbar control does the nearest useful thing rather than blindly
+  // flipping: with groups open it re-collapses them and stays aggregated, and
+  // only switches mode once there is nothing left to close.
+  const changeMode = useCallback(
+    (next: CanvasViewMode) => {
+      if (mode === 'aggregated' && openGroups.size > 0) {
+        setOpenGroups(new Set());
+        return;
+      }
+      setOpenGroups(new Set());
+      setMode(next);
+    },
+    [mode, openGroups]
+  );
+
   const { graph: shown, groupByNodeID } = useMemo(
     () =>
       mode === 'expanded'
@@ -203,7 +222,8 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
             <CanvasControls
               onExpand={expanded ? undefined : () => setShowExpanded(true)}
               mode={plan.groups.length ? mode : undefined}
-              onModeChange={setMode}
+              onModeChange={changeMode}
+              openGroupCount={openGroups.size}
               groupCount={plan.groups.length}
             />
           </Panel>

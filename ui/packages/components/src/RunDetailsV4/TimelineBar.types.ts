@@ -45,6 +45,18 @@ export type BarStyleKey =
   | 'step.waitForEvent'
   | 'step.invoke'
   // Timing categories
+  /**
+   * The part of a step's row where nothing was executing yet — queued, waiting
+   * for a slot, waiting on the platform.
+   *
+   * Drawn in the step's OWN status colour but hollow, so the row reads as one
+   * continuous bar that is green because the step succeeded, with the waiting
+   * part visibly hollow and the working part solid. The older treatment made it
+   * a separate grey bar, which meant a step that queued for 2s and ran for 8ms
+   * showed a long grey bar and a green speck — the eye went to the waiting,
+   * which is the least interesting thing in the row.
+   */
+  | 'timing.waiting'
   | 'timing.inngest' // Queue/delay time (short, gray)
   | 'timing.inngest.queue' // Run queue delay (short, solid gray)
   | 'timing.inngest.concurrency' // Concurrency delay (short, crosshatch gray)
@@ -87,6 +99,17 @@ export interface BarStyle {
 
   /** Whether this bar renders as outlined (transparent bg + 1px inset border) instead of solid fill */
   outlined?: boolean;
+
+  /**
+   * Renders as a tinted fill of the bar's own colour rather than a solid one.
+   *
+   * Used for time the step spent waiting rather than working. A hollow outline
+   * was tried first and looked cheap — a thin ring reads as a border artefact,
+   * not as a quantity. A ghosted fill keeps the bar continuous and the hue
+   * identical, and lets weight alone carry the distinction: same colour, less
+   * substance.
+   */
+  ghost?: boolean;
 
   /** Label format (for timing bars) */
   labelFormat?: 'uppercase' | 'titlecase' | 'default';

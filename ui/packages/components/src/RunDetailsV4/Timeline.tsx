@@ -263,7 +263,8 @@ function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
       id: `${bar.id}-seg-delay`,
       startPercent: currentPercent,
       widthPercent: inngestPercent,
-      style: 'timing.inngest',
+      style: 'timing.waiting',
+      status: bar.status,
     });
     currentPercent += inngestPercent;
   }
@@ -380,6 +381,7 @@ function generateRunInngestSegments(
 
 /** Human-readable labels for bar style keys shown in the hover tooltip. */
 const STYLE_LABELS: Partial<Record<BarStyleKey, string>> = {
+  'timing.waiting': 'Waiting to run',
   'step.run': 'step.run',
   'step.sleep': 'step.sleep',
   'step.waitForEvent': 'step.waitForEvent',

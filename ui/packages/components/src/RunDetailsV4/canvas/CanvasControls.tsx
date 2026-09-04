@@ -29,12 +29,15 @@ export function CanvasControls({
   mode,
   onModeChange,
   groupCount,
+  openGroupCount = 0,
 }: {
   onExpand?: () => void;
   /** Omitted when the run has nothing repeated, so the toggle is not offered. */
   mode?: CanvasViewMode;
   onModeChange?: (mode: CanvasViewMode) => void;
   groupCount?: number;
+  /** Groups the user has opened individually; the control offers to close them. */
+  openGroupCount?: number;
 }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
 
@@ -47,7 +50,9 @@ export function CanvasControls({
           className={cn(BUTTON, mode === 'aggregated' && 'text-basis bg-canvasMuted')}
           aria-pressed={mode === 'aggregated'}
           title={
-            mode === 'aggregated'
+            openGroupCount > 0
+              ? `Re-collapse ${openGroupCount} expanded group${openGroupCount === 1 ? '' : 's'}`
+              : mode === 'aggregated'
               ? `Showing ${groupCount} repeated step${
                   groupCount === 1 ? '' : 's'
                 } collapsed. Click to unroll every step.`

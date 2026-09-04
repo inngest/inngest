@@ -69,29 +69,35 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     statusBased: true,
   },
   //
-  // Waiting is a different SUBSTANCE from working, not a different hue of it.
-  // A sleep or an unsatisfied wait is suspended, holding nothing and costing
-  // nothing, so it is neutral and hollow — while executing is solid and
-  // coloured. Get this distinction right and the view explains itself; make it
-  // two shades of green and it explains nothing.
+  // Waiting is the same substance as working with less of it, not a different
+  // hue. A sleep or an unsatisfied wait is suspended, holding nothing and
+  // costing nothing, so it is ghosted — same fill, a quarter of the weight —
+  // while executing is solid. A hollow outline was tried first and read as a
+  // border artefact rather than as a quantity.
   //
-  // `step.invoke` keeps its colour: a child run really is executing in there.
+  // `step.invoke` keeps its full weight: a child run really is executing.
   'step.sleep': {
     barColor: 'bg-surfaceMuted',
-    pattern: 'vertical-lines',
-    outlined: true,
+    ghost: true,
     statusBased: false,
   },
   'step.waitForEvent': {
     barColor: 'bg-surfaceMuted',
-    pattern: 'vertical-lines',
-    outlined: true,
+    ghost: true,
     statusBased: false,
   },
   'step.invoke': {
     barColor: 'bg-status-completed',
     pattern: 'vertical-lines',
     statusBased: true,
+  },
+  'timing.waiting': {
+    barColor: 'bg-status-completed',
+    barHeight: 'tall',
+    ghost: true,
+    statusBased: true,
+    labelFormat: 'default',
+    textColor: 'text-light',
   },
   'timing.inngest': {
     barColor: 'bg-surfaceMuted',
@@ -663,9 +669,9 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
  * a 16px-tall bar is the row; the bar should be a mark on the row, not fill it.
  */
 const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = {
-  thin: 'h-px',
-  short: 'h-1',
-  tall: 'h-1.5',
+  thin: 'h-1',
+  short: 'h-2',
+  tall: 'h-3',
 };
 
 /**
@@ -760,6 +766,10 @@ const VisualBar = memo(function VisualBar({
           const segmentHeightClass = BAR_HEIGHT_CLASSES[segmentStyle.barHeight ?? 'tall'];
           const segmentColor = getBarColor(segment.style, segment.status);
           const isOutlined = segmentStyle.outlined;
+          // A ghosted segment is the same fill at a fraction of its weight, so
+          // a step that queued then ran reads as one continuous bar in one
+          // colour that simply gets more solid where the work is.
+          const isGhost = segmentStyle.ghost;
           return (
             <div
               key={segment.id}
@@ -774,6 +784,8 @@ const VisualBar = memo(function VisualBar({
                 minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
                 ...(isOutlined
                   ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
+                  : isGhost
+                  ? { opacity: 0.26 }
                   : segmentPattern),
               }}
             />
@@ -785,6 +797,7 @@ const VisualBar = memo(function VisualBar({
 
   // Render simple bar
   const isOutlined = barStyle.outlined;
+  const isGhost = barStyle.ghost;
   return (
     <div
       data-testid="timeline-bar-visual"
@@ -797,9 +810,13 @@ const VisualBar = memo(function VisualBar({
         left: `${startPercent}%`,
         width: `${widthPercent}%`,
         minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
-        opacity: expanded ? 0 : 1,
+        // A ghosted bar keeps its colour and loses its weight — waiting is the
+        // same substance as work, just less of it.
+        opacity: expanded ? 0 : isGhost ? 0.26 : 1,
         ...(isOutlined
           ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
+          : isGhost
+          ? undefined
           : pattern),
       }}
     />

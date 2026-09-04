@@ -25,7 +25,7 @@ export const TIMELINE_CONSTANTS = {
    * rest of the product, because a 500-step run at 28px a row is 14,000px of
    * scrolling. Vertical space tight, horizontal space generous.
    */
-  ROW_HEIGHT_PX: 18,
+  ROW_HEIGHT_PX: 22,
 
   /** Transition duration for expand/collapse */
   TRANSITION_MS: 150,

@@ -13,9 +13,9 @@
  */
 import { useState } from 'react';
 import {
+  RiArrowRightSLine,
   RiCheckboxCircleFill,
   RiCloseCircleFill,
-  RiExpandDiagonalLine,
   RiFlashlightLine,
   RiFunctionLine,
   RiLoader4Line,
@@ -323,12 +323,22 @@ function Sparkline({ values, className }: { values: number[]; className?: string
   if (values.length < 2) return null;
 
   const max = Math.max(...values);
+  const min = Math.min(...values);
   if (max <= 0) return null;
 
-  // One point per member, even at 500 — the shape of the run over its iterations
-  // is the signal, and thinning it would flatten exactly the spike worth seeing.
+  // Suppress a chart that has nothing to say. With 500 near-identical durations
+  // a zero-baselined polyline pins to the bottom and renders as a horizontal
+  // rule, which reads as an underline rather than as data.
+  if (max - min < max * 0.15) return null;
+
+  // Min-max rather than max-normalised. Against a zero baseline one 1.7s
+  // outlier squashes a ~160ms median series into the bottom tenth of a 10px
+  // box, so a node saying "3 slow" draws one spike and looks like it is lying.
+  // The interesting quantity is the variation, so that is what gets the height.
   const step = 100 / (values.length - 1);
-  const points = values.map((v, i) => `${i * step},${10 - (v / max) * 9}`).join(' ');
+  const points = values
+    .map((v, i) => `${i * step},${10 - ((v - min) / (max - min)) * 9}`)
+    .join(' ');
 
   return (
     <svg
@@ -430,17 +440,20 @@ export function CanvasGroupNode({ data, selected }: NodeProps<Node<CanvasNodeDat
           </span>
           {/* The expander. A collapsed node has to be openable, or it is just a
               worse version of hiding the data. */}
+          {/* Not RiExpandDiagonalLine: that is the canvas fullscreen glyph and
+              sits ~50px away in the toolbar, so the same icon here read as
+              "fullscreen this node". A chevron says "open this". */}
           <button
             type="button"
             aria-label={`Expand ${group.count} steps`}
-            title={`Expand ${group.count} steps`}
+            title={`Expand into ${group.count} separate steps`}
             onClick={(event) => {
               event.stopPropagation();
               data.onExpandGroup?.(group.id);
             }}
-            className="nodrag text-muted hover:text-basis shrink-0"
+            className="nodrag text-muted hover:text-basis hover:bg-canvasMuted -mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded"
           >
-            <RiExpandDiagonalLine className="h-3 w-3" />
+            <RiArrowRightSLine className="h-3.5 w-3.5" />
           </button>
         </div>
 
@@ -452,8 +465,12 @@ export function CanvasGroupNode({ data, selected }: NodeProps<Node<CanvasNodeDat
           )}
           <span className="text-subtle shrink-0 font-mono">{elapsed}</span>
           {exceptions && (
+            // `min-w-0` and no `shrink-0`: with shrink-0 the span never gives
+            // ground, so `text-overflow` never fires and the parent hard-clips
+            // instead — and it is the failures at the front that survive while
+            // the tail vanishes with nothing to signal it.
             <span
-              className={cn('shrink-0 truncate', failing ? 'text-status-failedText' : 'text-muted')}
+              className={cn('min-w-0 truncate', failing ? 'text-status-failedText' : 'text-muted')}
               title={exceptions}
             >
               {exceptions}
