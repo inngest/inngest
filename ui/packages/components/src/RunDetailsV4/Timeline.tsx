@@ -252,12 +252,35 @@ function generatePhaseSegments<T extends { totalMs: number }>(
 
 /**
  * Generate segments for a compound bar based on timing breakdown.
- * Uses gray delay bar for the queue portion (matching V3's visual distinction).
+ *
+ * THE BAR IS THE SPAN, AND SEGMENTS PARTITION IT. A breakdown that totals more
+ * than the span it decorates is describing something outside that span, and
+ * must not be used to size it — otherwise the bar and its own duration label
+ * disagree, which is the most direct way this view can lie.
+ *
+ * `blocked` is the case that found this. Its `hold` step ran for 5999ms and
+ * queued for none of it, but carries `inngest.timing` metadata with
+ * `queue_delay_ms: 6299` — the RUN-level concurrency hold, stamped onto the
+ * step. The bar was drawn from the 12298ms metadata total while the label came
+ * from the 5999ms span, so a 6s step rendered ~12s wide with half of it shown
+ * as waiting the step never did. The 6.3s hold is real, and belongs to the run
+ * span, which reports it correctly one row up.
  */
-function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
+export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
   if (!bar.timingBreakdown) return undefined;
 
-  const { inngestMs, executionMs, totalMs } = bar.timingBreakdown;
+  const { executionMs } = bar.timingBreakdown;
+  let { inngestMs, totalMs } = bar.timingBreakdown;
+
+  // The span's own extent, which is what the bar is actually drawn across.
+  const spanMs = bar.endTime ? bar.endTime.getTime() - bar.startTime.getTime() : null;
+
+  if (spanMs !== null && spanMs > 0 && totalMs > spanMs) {
+    // Trust the timestamps over the metadata and re-derive the split from the
+    // span: anything left over after execution is this step's own overhead.
+    inngestMs = Math.max(0, spanMs - executionMs);
+    totalMs = spanMs;
+  }
 
   if (totalMs <= 0) return undefined;
 
