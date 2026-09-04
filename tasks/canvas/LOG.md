@@ -215,3 +215,60 @@ instantly. Detection signal: **the UI contradicts a passing unit test on the sam
 
 **Verified**: 492 component tests pass (26 files, up from 440); eslint clean; dev-server-ui and
 dashboard both type-check; the four numbers in the table above read off the running gallery.
+
+---
+
+## Item B — Elastic time axis, then the restyle
+
+Two commits, because they are two different kinds of change: one is a model, one is presentation.
+
+### B1 — the axis
+
+`utils/timeScale.ts` maps time to width piecewise, giving each qualifying idle stretch a fixed
+narrow band instead of its true width. Elided time renders as a filled band bounded by dashed rules,
+with its real duration set vertically inside — visibly a break, not a gap.
+
+**The invariant is structural, not a convention.** `calculateBarPosition` is the only function that
+takes a scale; `calculateDuration` reports wall-clock and cannot see one. There is no path by which
+axis compression could change a number the user is shown, and a test asserts that rather than
+trusting it.
+
+**Deciding what counts as idle took two attempts.** The first counted every leaf bar as busy and
+produced no breaks at all on `longgap` — because the seven-day *sleep* was being counted as work.
+A sleep is precisely the suspended stretch worth eliding. `step.invoke` stays busy: a child run
+really is executing. Parent bars are excluded too, since a parent spans its children and would fill
+every gap they left.
+
+Two floors so a break earns itself: 5s absolute **and** 15% of the run. Across all 41 fixtures only
+two break — `longgap`, and `blocked` on its 6.3s concurrency hold, which is exactly the queued phase
+that fixture was captured for. `step` (2s sleep) and `waittimeout` (3s) stay linear, correctly.
+
+Axis markers now come from the scale. Under compression they are evenly spaced in width but not in
+time, and a marker landing inside an elided stretch is dropped: labelling a time from a stretch the
+axis is explicitly not drawing is worse than no label.
+
+### B2 — the presentation
+
+Rows 28px → 18px (and the stale duplicate `h-7` removed, so height has one source again). The
+per-row centre line and per-row vertical guide are gone; **one** vertical rule separates the label
+column from the plot, drawn once by the container. Label column recedes — mono, 11px, muted.
+Durations mono with tabular numerals. Bars thin with a 1.5px radius.
+
+**The encoding change is the one that matters.** Waiting is now a different *substance* from
+working: neutral and hollow, against solid colour for execution. Previously both were green and the
+distinction rode on a fill pattern nobody would read. On `step` the 2s sleep is now unmistakably not
+work. No new colour values — every class was already in the preset.
+
+All 502 tests passed throughout, which is the evidence this was presentation and not behaviour:
+nothing asserted the old row height or the centre line, and no affordance was removed.
+
+**Deferred, honestly**
+
+- The brief asks for annotations *immediately right of the bar* ("890ms — longest in the fan-out").
+  Durations still sit at the right edge of the label column, adjacent to the divider and so next to
+  the bars, but not inline with them. Moving them is a larger change to the row layout than the rest
+  of this pass and is not done.
+- The legend is still in the tab label rather than hairline-separated at the bottom.
+- `blocked` eliding its 6.3s concurrency hold is arguably wrong for that one case — the queue delay
+  is the thing you want to *see* there. It is marked rather than hidden, so it is not lost, but item
+  G may want to treat flow-control holds differently from idle sleeps.
