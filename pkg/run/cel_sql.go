@@ -92,7 +92,7 @@ func EventFieldConverter(ctx context.Context, n *expr.Node) ([]sq.Expression, er
 	if f != nil {
 		return []sq.Expression{f}, nil
 	}
-	return []sq.Expression{}, nil
+	return nil, fmt.Errorf("unsupported event field or operator: %s %s", n.Predicate.Ident, n.Predicate.Operator)
 }
 
 // dbDialect contains database-specific SQL generation settings for span+event queries.

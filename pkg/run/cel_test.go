@@ -265,6 +265,27 @@ func TestToSQLFiltersWithSQLiteConverter(t *testing.T) {
 	}
 }
 
+func TestSpanEventConverterRejectsUnsupportedPredicates(t *testing.T) {
+	tests := []string{
+		`event.unknown == 1`,
+		`event.name > "app/"`,
+	}
+
+	for _, expression := range tests {
+		t.Run(expression, func(t *testing.T) {
+			handler, err := NewExpressionHandler(t.Context(),
+				WithExpressionHandlerExpressions([]string{expression}),
+				WithExpressionSQLConverter(SpanEventSQLiteConverter),
+			)
+			require.NoError(t, err)
+
+			filters, err := handler.ToSQLFilters(t.Context())
+			require.Error(t, err)
+			require.Empty(t, filters)
+		})
+	}
+}
+
 func TestToSQLFiltersWithPostgresConverter(t *testing.T) {
 	ctx := context.Background()
 
