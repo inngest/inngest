@@ -27,6 +27,7 @@ import type {
 import { TimelineHeader } from './TimelineHeader';
 import { applyCollapseToBars, type CollapsePlan } from './canvas/collapse';
 import { formatDuration, useStepSelection } from './runDetailsUtils';
+import { densityBuckets } from './utils/density';
 import { buildTimeScale, type Interval, type TimeScale } from './utils/timeScale';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
 
@@ -1017,6 +1018,12 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
     return buildTimeScale(minTime.getTime(), maxTime.getTime(), busy);
   }, [bars, minTime, maxTime]);
 
+  // Deliberately over `data.bars`, not the collapsed `bars`. The strip is the
+  // map of the whole run and must not shrink because the rows below it did —
+  // otherwise the one view that is supposed to show you everything hides the
+  // same things as everything else.
+  const buckets = useMemo(() => densityBuckets(data.bars, scale), [data.bars, scale]);
+
   return (
     <div className="w-full pb-4 pr-2" data-testid="timeline-container">
       {/* Run duration header with timing markers */}
@@ -1029,6 +1036,7 @@ export function Timeline({ data, onSelectStep, runID, collapse }: Props): JSX.El
         selectionStart={viewStartOffset}
         selectionEnd={viewEndOffset}
         scale={scale}
+        buckets={buckets}
       />
 
       {/* The rows, with the axis breaks drawn behind them. A break spans every

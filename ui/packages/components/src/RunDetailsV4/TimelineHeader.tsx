@@ -12,8 +12,10 @@ import { useCallback, useLayoutEffect, useMemo, useRef, type JSX } from 'react';
 
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
+import { DensityStrip } from './DensityStrip';
 import { TimeBrush } from './TimeBrush';
 import { formatDuration } from './runDetailsUtils';
+import type { DensityBucket } from './utils/density';
 import { scaleTicks, type TimeScale } from './utils/timeScale';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
@@ -38,6 +40,11 @@ type Props = {
    * rather than assumed.
    */
   scale?: TimeScale;
+  /**
+   * Step activity across the whole run, for the density strip inside the brush.
+   * Always the whole run, however much the views below are collapsing.
+   */
+  buckets?: DensityBucket[];
 };
 
 const TIME_MARKERS = [0, 25, 50, 75, 100];
@@ -64,6 +71,7 @@ export function TimelineHeader({
   selectionStart: selStart = 0,
   selectionEnd: selEnd = 100,
   scale,
+  buckets,
 }: Props): JSX.Element {
   const totalMs = maxTime.getTime() - minTime.getTime();
 
@@ -83,6 +91,7 @@ export function TimelineHeader({
     }));
   }, [scale, totalMs, minTime]);
 
+  const hasStrip = Boolean(buckets && buckets.length);
   const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
   const isDefault = selStart === 0 && selEnd === 100;
@@ -212,14 +221,21 @@ export function TimelineHeader({
           </>
         )}
 
-        {/* Time brush */}
-        <TimeBrush onSelectionChange={handleSelectionChange} className="mt-1">
+        {/* Time brush. The density strip lives inside it rather than beside it,
+            so dragging to set the viewport is the same gesture that was already
+            here — the histogram is what the brush is over, not a new control. */}
+        <TimeBrush
+          onSelectionChange={handleSelectionChange}
+          className="mt-1"
+          trackClassName={hasStrip ? 'h-6' : 'h-4'}
+        >
+          {hasStrip && <DensityStrip buckets={buckets!} minMs={minTime.getTime()} height={24} />}
           {isDefault ? (
             <div
               data-testid="timeline-bar-default"
               className={cn(
                 'pointer-events-none absolute left-0 top-1/2 h-1 w-full -translate-y-1/2',
-                barColorClass
+                hasStrip ? 'opacity-0' : barColorClass
               )}
             />
           ) : (

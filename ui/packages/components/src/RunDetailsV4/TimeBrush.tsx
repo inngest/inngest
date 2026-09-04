@@ -35,6 +35,12 @@ export type TimeBrushProps = {
   children?: React.ReactNode;
   /** Additional class name for the container */
   className?: string;
+  /**
+   * Height of the track. Defaults to a hairline bar; a taller track is used
+   * when something substantial is rendered inside it, such as the density
+   * strip, so that dragging still covers the whole of what you can see.
+   */
+  trackClassName?: string;
 };
 
 type DragMode = 'none' | 'left-handle' | 'right-handle' | 'selection' | 'create-selection';
@@ -53,6 +59,7 @@ export function TimeBrush({
   cursorLineClassName = 'bg-slate-500',
   children,
   className,
+  trackClassName = 'h-4',
 }: TimeBrushProps): JSX.Element {
   // Selection state (0-100 percentages) — single object for atomic updates from raw DOM listeners
   const [selection, setSelection] = useState({ start: initialStart, end: initialEnd });
@@ -282,7 +289,7 @@ export function TimeBrush({
       )}
 
       {/* Track container */}
-      <div className="relative h-4">
+      <div className={cn('relative', trackClassName)}>
         {/* Background track (extended click target — overflows below the bar for easier interaction) */}
         <div
           data-testid="time-brush-track"
