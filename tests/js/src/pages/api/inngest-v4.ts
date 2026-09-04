@@ -21,6 +21,9 @@ import {
   v4NestedInBranch,
   v4Pathological,
   v4DeadEnd,
+  v4Cancel,
+  v4Tall,
+  v4Contended,
 } from "@/inngest/canvas_shapes_v4";
 
 export default serve({
@@ -43,5 +46,8 @@ export default serve({
     v4NestedInBranch,
     v4Pathological,
     v4DeadEnd,
+    v4Cancel,
+    v4Tall,
+    v4Contended,
   ],
 });

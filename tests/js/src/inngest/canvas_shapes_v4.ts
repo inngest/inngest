@@ -361,3 +361,66 @@ export const v4DeadEnd = inngestV4Fns.createFunction(
     return "done";
   }
 );
+
+// ---------------------------------------------------------------------------
+// Shapes the fixture set was missing. Each one exists because a view has to
+// cope with it and nothing captured so far exercises it.
+// ---------------------------------------------------------------------------
+
+// A run that stays alive long enough to be cancelled. Earlier attempts to
+// capture a cancelled run lost the race — the run finished before the cancel
+// landed — so this one parks on a wait it will never satisfy, leaving a
+// generous window. A step running when the run was cancelled is neither
+// succeeded nor failed, and colouring it as either is a lie.
+export const v4Cancel = inngestV4Fns.createFunction(
+  { id: "v4-cancel", triggers: [{ event: "tests/v4.cancel" }] },
+  async () => {
+    await step.run("before", async () => "before");
+
+    // Ten minutes, so cancelling by hand is unhurried.
+    await step.waitForEvent("never arrives", {
+      event: "tests/v4.cancel.never",
+      timeout: "10m",
+    });
+
+    await step.run("after", async () => "after");
+    return "done";
+  }
+);
+
+// ~500 sequential fast steps. `wide.json` is 12 across; nothing in the set was
+// tall, and tall is what makes the current view unreadable — one row each, all
+// of them 28px, none of them interesting on their own.
+export const v4Tall = inngestV4Fns.createFunction(
+  { id: "v4-tall", triggers: [{ event: "tests/v4.tall" }] },
+  async ({ event }) => {
+    const count = (event.data as { count?: number })?.count ?? 500;
+
+    // Deliberately sequential: each step is discovered only after the previous
+    // one returns, which is what produces one level per step.
+    for (let i = 0; i < count; i++) {
+      await step.run(`s${i}`, async () => i);
+    }
+
+    return { count };
+  }
+);
+
+// Two runs contending on a limit of one, so the second spends real time queued
+// rather than executing. Without this the queued phase is always ~0ms and the
+// bar states that distinguish waiting from working have no data behind them.
+export const v4Contended = inngestV4Fns.createFunction(
+  {
+    id: "v4-contended",
+    concurrency: { limit: 1 },
+    triggers: [{ event: "tests/v4.contended" }],
+  },
+  async () => {
+    await step.run("hold", async () => {
+      await new Promise((r) => setTimeout(r, 6000));
+      return "held";
+    });
+    await step.run("release", async () => "released");
+    return "done";
+  }
+);

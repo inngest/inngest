@@ -53,4 +53,13 @@ export default [
       'react-hooks/exhaustive-deps': 'off',
     },
   },
+
+  // Standalone `.mjs` scripts under src/ are run with `node`, not bundled — the
+  // fixture capture and generation tools. They get Node's globals rather than
+  // the browser's.
+  {
+    files: ['**/*.mjs'],
+    ignores: ['eslint.config.mjs'],
+    languageOptions: { globals: globals.node },
+  },
 ];
