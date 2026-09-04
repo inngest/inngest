@@ -23,6 +23,10 @@ func TestValidateExpressionHandler(t *testing.T) {
 			cel:  []string{`event.name == "test/hello"`, `output.success == true`},
 		},
 		{
+			name: "empty lines are ignored",
+			cel:  []string{`event.name == "test/hello"`, ""},
+		},
+		{
 			name:   "invalid AND",
 			cel:    []string{`event.name == "test/hello" and event.ts > 1727291508963`},
 			errStr: "mismatched input 'and'",
