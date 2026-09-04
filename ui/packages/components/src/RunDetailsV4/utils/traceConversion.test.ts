@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Trace } from '../types';
+import { TIMELINE_CONSTANTS } from './timing';
 import { traceRollup, traceToTimelineData } from './traceConversion';
 
 describe('traceConversion', () => {
@@ -39,7 +40,10 @@ describe('traceConversion', () => {
       expect(result.minTime).toEqual(new Date('2024-01-01T00:00:00Z'));
       expect(result.maxTime).toEqual(new Date('2024-01-01T00:00:10Z'));
       expect(result.bars).toHaveLength(1);
-      expect(result.leftWidth).toBe(35); // default
+      // Against the constant rather than a literal: this asserts "the default
+      // is used", which is the behaviour, and does not have to be edited every
+      // time the default is tuned.
+      expect(result.leftWidth).toBe(TIMELINE_CONSTANTS.DEFAULT_LEFT_WIDTH);
     });
 
     it('uses provided leftWidth option', () => {

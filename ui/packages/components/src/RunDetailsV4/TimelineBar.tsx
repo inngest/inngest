@@ -855,6 +855,7 @@ export function TimelineBar({
   selected,
   hovered,
   onHoverChange,
+  badgeGutter = true,
   children,
   orgName,
   status,
@@ -1006,7 +1007,15 @@ export function TimelineBar({
 
         {/* Experiment and score badges - centered between left panel and bars.
             Width is fixed so bars stay aligned across rows regardless of badges. */}
-        <span className="inline-flex w-12 shrink-0 items-center justify-center gap-1">
+        {/* Fixed-width so bars stay aligned across rows regardless of badges —
+            but only when some row in this timeline actually has one. It was
+            48px of dead space on every fixture otherwise. */}
+        <span
+          className={cn(
+            'inline-flex shrink-0 items-center justify-center gap-1',
+            badgeGutter ? 'w-12' : 'w-1'
+          )}
+        >
           {hasExperiment && <ExperimentBadge metadata={experimentMetadata} />}
           {scores && scores.length > 0 && <ScoreBadge scores={scores} />}
         </span>

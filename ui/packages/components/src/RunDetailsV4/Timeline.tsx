@@ -508,6 +508,8 @@ type TimelineBarRendererProps = {
    * only where a bar is drawn — never the duration it reports.
    */
   scale?: TimeScale;
+  /** Whether any row in this timeline has a badge; keeps bars aligned. */
+  badgeGutter?: boolean;
   /** Span id currently hovered anywhere in this run. */
   hoveredStepId?: string;
   /** Emits this row as hovered, for the other views. */
@@ -533,6 +535,7 @@ function TimelineBarRenderer({
   actions,
   insideExperiment,
   scale,
+  badgeGutter,
   hoveredStepId,
   onHoverStep,
 }: TimelineBarRendererProps): JSX.Element {
@@ -649,6 +652,7 @@ function TimelineBarRenderer({
       onToggle={bar.isRoot ? undefined : () => onToggleExpand(bar.id, bar.childRunID)}
       onClick={() => onSelectStep?.(bar.id)}
       selected={selectedStepId === bar.id}
+      badgeGutter={badgeGutter}
       hovered={hoveredStepId === bar.id}
       onHoverChange={(on) => onHoverStep?.(on ? bar.id : undefined)}
       orgName={orgName}
@@ -775,6 +779,7 @@ function TimelineBarRenderer({
                 viewEndOffset={viewEndOffset}
                 insideExperiment={childInsideExperiment}
                 scale={scale}
+                badgeGutter={badgeGutter}
                 hoveredStepId={hoveredStepId}
                 onHoverStep={onHoverStep}
               />
@@ -894,6 +899,7 @@ function TimelineBarRenderer({
             viewEndOffset={viewEndOffset}
             insideExperiment={childInsideExperiment}
             scale={scale}
+            badgeGutter={badgeGutter}
             hoveredStepId={hoveredStepId}
             onHoverStep={onHoverStep}
           />
@@ -980,6 +986,15 @@ export function Timeline({
       });
     return graft(bars);
   }, [bars, childRuns]);
+
+  // Decided once for the whole timeline so bars stay aligned across rows.
+  const badgeGutter = useMemo(() => {
+    const anyBadge = (list: TimelineBarData[]): boolean =>
+      list.some(
+        (bar) => bar.hasExperiment || (bar.scores?.length ?? 0) > 0 || anyBadge(bar.children ?? [])
+      );
+    return anyBadge(bars);
+  }, [bars]);
 
   const rootBarIds = useMemo(() => bars.filter((bar) => bar.isRoot).map((bar) => bar.id), [bars]);
 
@@ -1210,6 +1225,7 @@ export function Timeline({
               viewEndOffset={viewEndOffset}
               actions={bar.isRoot ? expandCollapseActions : undefined}
               scale={scale}
+              badgeGutter={badgeGutter}
               hoveredStepId={hoveredSpanID}
               onHoverStep={handleHoverStep}
             />

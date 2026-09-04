@@ -200,6 +200,13 @@ export interface TimelineBarProps {
   /** Reports the pointer entering or leaving this row, for the other views. */
   onHoverChange?: (hovered: boolean) => void;
 
+  /**
+   * Whether to reserve the badge column. Decided once for the whole timeline so
+   * bars stay aligned across rows; when no row has a badge it is 48px of dead
+   * space in the middle of every row.
+   */
+  badgeGutter?: boolean;
+
   /** Child bars to render when expanded */
   children?: ReactNode;
 

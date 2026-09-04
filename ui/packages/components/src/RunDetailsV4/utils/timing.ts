@@ -31,7 +31,14 @@ export const TIMELINE_CONSTANTS = {
   TRANSITION_MS: 150,
 
   /** Default left panel width percentage */
-  DEFAULT_LEFT_WIDTH: 35,
+  /**
+   * Default left panel width percentage.
+   *
+   * Was 35% — about 376px in a 1600px window, for labels that are typically two
+   * to six characters. Horizontal space belongs to the bars; the label column
+   * should be wide enough to read and no wider.
+   */
+  DEFAULT_LEFT_WIDTH: 24,
 } as const;
 
 /**
