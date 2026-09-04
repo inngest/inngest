@@ -55,11 +55,19 @@ end
 -- Check that the queue item is not leased (ie. this debounce is not in progress)
 local item = get_queue_item(keyQueueHash, queueJobID)
 if item == nil then
-	-- The queue item was not found. return not found but set the debounce in the hash map
-  -- for lookup
-  redis.call("SETEX", keyPtr, ttl, debounceID)
-  redis.call("HSET", keyDbc, debounceID, debounce)
-  return -3
+	-- The queue item was not found. Check if an existing debounce has a newer event
+	-- before overwriting, to prevent older-timestamp events from winning during the
+	-- race window between debounce creation and queue item enqueue.
+	local existing = redis.call("HGET", keyDbc, debounceID)
+	if existing ~= false then
+		local decoded = cjson.decode(existing)
+		if decoded ~= nil and decoded.e ~= nil and decoded.e.ts > eventTime then
+			return -2
+		end
+	end
+	redis.call("SETEX", keyPtr, ttl, debounceID)
+	redis.call("HSET", keyDbc, debounceID, debounce)
+	return -3
 end
 
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
