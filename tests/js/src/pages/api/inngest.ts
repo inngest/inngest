@@ -8,6 +8,16 @@ import { testRetry } from "@/inngest/sdk_retry_test";
 import { testNonRetriableError } from "@/inngest/non_retryable";
 import { testParallelism } from "@/inngest/sdk_parallel_test";
 import { testWaitForEvent } from "@/inngest/sdk_wait_for_event_test";
+import {
+  canvasChild,
+  canvasInvoke,
+  canvasFailure,
+  canvasWaitTimeout,
+  canvasLoop,
+  canvasWideFanout,
+  canvasParallelChains,
+  canvasSlow,
+} from "@/inngest/canvas_shapes";
 
 export default serve({
   client: inngest,
@@ -19,5 +29,13 @@ export default serve({
     testNonRetriableError,
     testParallelism,
     testWaitForEvent,
+    canvasChild,
+    canvasInvoke,
+    canvasFailure,
+    canvasWaitTimeout,
+    canvasLoop,
+    canvasWideFanout,
+    canvasParallelChains,
+    canvasSlow,
   ],
 });
