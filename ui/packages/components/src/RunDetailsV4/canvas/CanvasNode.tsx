@@ -67,6 +67,20 @@ const STATUS_ICON = {
   UNKNOWN: RiTimeLine,
 } as const;
 
+/**
+ * What the node calls itself.
+ *
+ * Prefers the platform's own `stepType` when it has one, because `stepOp`
+ * flattens `step.sendEvent` into `RUN` and the node would otherwise claim the
+ * user wrote something they did not.
+ */
+function callLabel(data: CanvasNodeData): string | null {
+  const declared = data.stepType;
+  if (typeof declared === 'string' && declared.startsWith('step.')) return declared;
+  const key = stepTypeKey(data);
+  return key ? STEP_TYPE_LABEL[key] : null;
+}
+
 function stepTypeKey(data: CanvasNodeData) {
   const op = (data.stepOp ?? '').toUpperCase();
   return op in STEP_TYPE_ICON ? (op as keyof typeof STEP_TYPE_ICON) : null;
@@ -113,7 +127,7 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
   const isEvent = data.kind === 'event';
   const isResult = data.kind === 'result';
   const timedOut = data.waitTimedOut === true;
-  const typeKey = stepTypeKey(data);
+  const call = callLabel(data);
 
   const filled = isResult && (data.status === 'COMPLETED' || data.status === 'FAILED');
   const onFill = filled ? 'text-alwaysWhite' : undefined;
@@ -201,11 +215,7 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
             duration && <span className={cn('font-mono', onFill ?? 'text-subtle')}>{duration}</span>
           ) : (
             <>
-              {typeKey && (
-                <span className="text-muted shrink-0 truncate font-mono">
-                  {STEP_TYPE_LABEL[typeKey]}
-                </span>
-              )}
+              {call && <span className="text-muted shrink-0 truncate font-mono">{call}</span>}
               {timedOut ? (
                 <span className={cn('shrink-0', NEUTRAL.text)}>timed out</span>
               ) : (
@@ -390,7 +400,7 @@ export function CanvasGroupNode({ data, selected }: NodeProps<Node<CanvasNodeDat
   if (!group) return null;
 
   const Icon = iconFor(data);
-  const typeKey = stepTypeKey(data);
+  const call = callLabel(data);
   const failing = group.status === 'FAILED';
 
   // Numbered names carry no information beyond the index, so they read as a
@@ -467,11 +477,7 @@ export function CanvasGroupNode({ data, selected }: NodeProps<Node<CanvasNodeDat
         </div>
 
         <div className="flex items-center gap-1.5 overflow-hidden text-[10px] leading-none">
-          {typeKey && (
-            <span className="text-muted shrink-0 truncate font-mono">
-              {STEP_TYPE_LABEL[typeKey]}
-            </span>
-          )}
+          {call && <span className="text-muted shrink-0 truncate font-mono">{call}</span>}
           <span className="text-subtle shrink-0 font-mono">{elapsed}</span>
           {exceptions && (
             // `min-w-0` and no `shrink-0`: with shrink-0 the span never gives

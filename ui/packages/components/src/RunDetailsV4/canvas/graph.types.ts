@@ -63,6 +63,14 @@ export type CanvasNode = {
   spanID: string;
   stepID: string | null;
   stepOp: string | null;
+  /**
+   * The SDK call the user actually wrote, when the platform reports one.
+   *
+   * Needed because `stepOp` does not always name it: a `step.sendEvent` is
+   * reported as an ordinary `RUN`, so a node labelled from `stepOp` alone calls
+   * it `step.run` — which is the one thing this view promises not to do.
+   */
+  stepType?: string | null;
   /** Highest attempt number observed; 0 means it succeeded first try. */
   attempts: number;
   queuedAt: number;

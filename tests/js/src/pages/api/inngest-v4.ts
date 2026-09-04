@@ -24,6 +24,8 @@ import {
   v4Cancel,
   v4Tall,
   v4Contended,
+  v4Emit,
+  v4Emitted,
 } from "@/inngest/canvas_shapes_v4";
 
 export default serve({
@@ -49,5 +51,7 @@ export default serve({
     v4Cancel,
     v4Tall,
     v4Contended,
+    v4Emit,
+    v4Emitted,
   ],
 });

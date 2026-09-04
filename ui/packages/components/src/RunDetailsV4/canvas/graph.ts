@@ -699,6 +699,7 @@ export function toCanvasGraph(root: Trace, trigger?: CanvasTrigger | null): Canv
         spanID: trace.spanID,
         stepID: trace.stepID ?? null,
         stepOp: trace.stepOp ?? null,
+        stepType: trace.stepType ?? null,
         attempts: trace.attempts ?? 0,
         userlandStepID: trace.userlandStepID ?? null,
         userlandStepIndex: trace.userlandStepIndex ?? null,

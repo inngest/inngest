@@ -406,6 +406,36 @@ export const v4Tall = inngestV4Fns.createFunction(
   }
 );
 
+// A run that emits events from inside a step, then a function triggered by
+// them. This is the only lineage the platform does not label: `step.sendEvent`
+// is an ordinary step whose *output* happens to contain the ids of the events
+// it sent, so tying an emitter to what it caused means parsing a payload rather
+// than reading a field. Captured so that claim can be checked rather than
+// assumed — in particular whether those ids are internal ULIDs.
+export const v4Emit = inngestV4Fns.createFunction(
+  { id: "v4-emit", triggers: [{ event: "tests/v4.emit" }] },
+  async () => {
+    await step.run("prepare", async () => "ready");
+
+    await step.sendEvent("fan-out", [
+      { name: "tests/v4.emitted", data: { n: 1 } },
+      { name: "tests/v4.emitted", data: { n: 2 } },
+    ]);
+
+    await step.run("after", async () => "done");
+    return "done";
+  }
+);
+
+// The child of `v4Emit`, so the emitted events actually lead somewhere.
+export const v4Emitted = inngestV4Fns.createFunction(
+  { id: "v4-emitted", triggers: [{ event: "tests/v4.emitted" }] },
+  async () => {
+    await step.run("handle", async () => "handled");
+    return "done";
+  }
+);
+
 // Two runs contending on a limit of one, so the second spends real time queued
 // rather than executing. Without this the queued phase is always ~0ms and the
 // bar states that distinguish waiting from working have no data behind them.

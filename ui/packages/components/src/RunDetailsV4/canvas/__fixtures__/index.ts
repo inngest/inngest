@@ -17,6 +17,7 @@ import blocked from './blocked.json';
 import cancelled from './cancelled.json';
 import chains from './chains.json';
 import child from './child.json';
+import emit from './emit.json';
 import failcluster from './failcluster.json';
 import failure from './failure.json';
 import gnarlyDupeNames from './gnarly-dupe-names.json';
@@ -124,6 +125,14 @@ export const FIXTURES: CanvasFixture[] = [
     sdk: 'v4',
     group: 'basics',
     data: asData(v4sequential),
+  },
+  {
+    id: 'emit',
+    title: 'Emits events from a step',
+    note: 'A step.sendEvent fanning out to two events, each of which started a run. The one piece of lineage the platform does not label: the step reports as an ordinary RUN and the ids of what it sent live inside its output payload.',
+    sdk: 'v4',
+    group: 'basics',
+    data: asData(emit),
   },
   {
     id: 'invoke',
