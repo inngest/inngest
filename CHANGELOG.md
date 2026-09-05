@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.45.0] - 2026-09-05
+
+### 🚀 Features
+
+- *(sandbox)* Accept snapshot ID when creating sandboxes (#4767)
+- *(traces)* Remove preview=false legacy trace path (#4799)
+
+### 🐛 Bug Fixes
+
+- *(debounce)* Handle removed config during execution (#4788)
+- *(cqrs)* Close query rows (#2680)
+- *(queue)* Reduce semaphore requeue churn (#4807)
+- *(api)* Serialize sandbox bytes written as a number (#4789)
+- *(semaphores)* Improve semaphore iteration, breaking early, etc (#4818)
+- *(deps)* Remove stale Tencent SDK replacement (#4829)
+- *(cel)* Improve certain classes of cel filter errors (#4832)
+
+### 🚜 Refactor
+
+- *(event-cel)* Remove unused package (#4792)
+- *(debug)* Remove unused/incomplete run debug feature (#4801)
+- *(metadata)* Remove span metadata feature flag (#4820)
+- *(cqrs)* Remove unused span stack reader (#4825)
+- *(cqrs)* Remove legacy trace spans reader (#4826)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(metrics)* Remove unused pkg/usage (#4793)
+
 ## [v1.44.0] - 2026-08-26
 
 ### 🚀 Features
@@ -29,6 +58,7 @@ All notable changes to this project will be documented in this file.
 
 - Update CODEOWNERS (#4771)
 - Remove former owners from CODEOWNERS (#4785)
+- *(release)* V1.44.0 (#4764)
 
 ## [v1.43.0] - 2026-08-20
 
