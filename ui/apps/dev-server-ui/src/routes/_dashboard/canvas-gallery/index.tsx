@@ -266,7 +266,17 @@ function FixtureView({
           value={`${rows} / ${NODE_BUDGET}`}
           tone={rows > NODE_BUDGET ? 'over' : 'ok'}
         />
-        <Fact label="grouping" value={graph.parallelismSource} />
+        {/* The same word the canvas itself uses. It said "exact" in its corner
+            while this strip said "sdk" — two labels for one thing on one
+            screen, and the reader has to work out they are the same. */}
+        <Fact
+          label="grouping"
+          value={
+            graph.parallelismSource === 'sdk'
+              ? 'exact'
+              : graph.parallelismSource
+          }
+        />
         <Fact label="branches resolved" value={graph.branchesResolved} />
       </dl>
 

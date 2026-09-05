@@ -276,9 +276,12 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
       )}
 
       <div className="flex items-start justify-between gap-3 px-1">
+        {/* Bulleted only when there is more than one thing to say. A single
+            line prefixed with a lone `·` reads as a stray character rather than
+            as a list, which is how `wide`'s one warning looked. */}
         <ul className="text-subtle text-[11px] leading-relaxed">
           {shown.warnings.map((w) => (
-            <li key={w}>· {w}</li>
+            <li key={w}>{shown.warnings.length > 1 ? `· ${w}` : w}</li>
           ))}
         </ul>
         {graph.parallelismSource !== 'none' && (

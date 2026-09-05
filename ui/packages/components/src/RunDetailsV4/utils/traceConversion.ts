@@ -746,45 +746,6 @@ export function traceToTimelineData(
 }
 
 /**
- * No step may be drawn as waiting before the run itself started.
- *
- * Spans record a step's `queuedAt` as the moment the *run* was queued, so on
- * `failure` the first step reports `queuedAt` at +1ms while the run did not
- * start until +156ms. Drawn literally, the step's bar began at the very left of
- * the plot and overlapped the run's own Inngest row, which covers exactly that
- * 156ms — the same delay counted twice, in two places, contradicting each other.
- * A reader sees a step apparently running before anything had started.
- *
- * That 156ms is real and belongs to the run, which reports it on its own row.
- * Before the run started, no individual step was waiting on anything: it had not
- * been discovered yet. So a step's bar begins no earlier than the run does.
- *
- * The root bar is left alone — the run's queue delay is precisely what it is
- * there to show.
- */
-/**
- * Discovery gets ONE row, with a mark per discovery.
- *
- * A discovery is Inngest asking the function what to do next. It is its own
- * request with its own timing, and — the part that makes every obvious shortcut
- * wrong — it can lead to MANY steps, one step, or none at all.
- *
- * The tempting version is to fold each discovery into the step it produced, as
- * that step's lead-in. That was tried and reverted: a fan-out's twelve steps all
- * trace back to one discovery, so the same request gets drawn twelve times and
- * the steps inflate to cover it. On `wide` it made a 144ms step claim 719ms.
- *
- * So: one row, marks along it, never merged into anything. One mark before three
- * steps reads as one request that planned three. A mark with nothing after it
- * reads as a request that planned nothing — a real outcome rather than a
- * rendering bug. And a 500-step run adds one row, not five hundred.
- *
- * Only 9 of the 43 captured fixtures carry this at all: the loader omits
- * discovery spans, so only the root's `discoveries` array survives. Where it is
- * absent no row appears, which is the honest result — we do not know, so we do
- * not draw.
- */
-/**
  * A step that never finished, in a run that did.
  *
  * `calculateDuration` measures an unfinished span against *now*, which is right
@@ -854,6 +815,28 @@ function collectStepSpans(
   return out;
 }
 
+/**
+ * Discovery gets ONE row, with a mark per discovery.
+ *
+ * A discovery is Inngest asking the function what to do next. It is its own
+ * request with its own timing, and — the part that makes every obvious shortcut
+ * wrong — it can lead to MANY steps, one step, or none at all.
+ *
+ * The tempting version is to fold each discovery into the step it produced, as
+ * that step's lead-in. That was tried and reverted: a fan-out's twelve steps all
+ * trace back to one discovery, so the same request gets drawn twelve times and
+ * the steps inflate to cover it. On `wide` it made a 144ms step claim 719ms.
+ *
+ * So: one row, marks along it, never merged into anything. One mark before three
+ * steps reads as one request that planned three. A mark with nothing after it
+ * reads as a request that planned nothing — a real outcome rather than a
+ * rendering bug. And a 500-step run adds one row, not five hundred.
+ *
+ * Only 9 of the 43 captured fixtures carry this at all: the loader omits
+ * discovery spans, so only the root's `discoveries` array survives. Where it is
+ * absent no row appears, which is the honest result — we do not know, so we do
+ * not draw.
+ */
 function withDiscoveryRow(
   bars: TimelineBarData[],
   discoveries: RunDiscovery[] | null,
@@ -1022,6 +1005,23 @@ function withWaitNotes(bars: TimelineBarData[]): TimelineBarData[] {
   return walk(bars);
 }
 
+/**
+ * No step may be drawn as waiting before the run itself started.
+ *
+ * Spans record a step's `queuedAt` as the moment the *run* was queued, so on
+ * `failure` the first step reports `queuedAt` at +1ms while the run did not
+ * start until +156ms. Drawn literally, the step's bar began at the very left of
+ * the plot and overlapped the run's own Inngest row, which covers exactly that
+ * 156ms — the same delay counted twice, in two places, contradicting each other.
+ * A reader sees a step apparently running before anything had started.
+ *
+ * That 156ms is real and belongs to the run, which reports it on its own row.
+ * Before the run started, no individual step was waiting on anything: it had not
+ * been discovered yet. So a step's bar begins no earlier than the run does.
+ *
+ * The root bar is left alone — the run's queue delay is precisely what it is
+ * there to show.
+ */
 function clampToRunStart(
   bars: TimelineBarData[],
   runStartedAt: Date | null,

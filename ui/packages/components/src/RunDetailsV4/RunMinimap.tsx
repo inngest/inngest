@@ -79,10 +79,22 @@ export function RunMinimap({ minimap, hoveredStepId }: Props): JSX.Element | nul
       className="pointer-events-none absolute inset-x-0 bottom-0"
       style={{ height: MINIMAP_HEIGHT_PX }}
       role="img"
-      aria-label={`Overview of the run: ${minimap.marks.length} steps across ${
-        minimap.rows
-      } concurrent ${minimap.rows === 1 ? 'lane' : 'lanes'}`}
+      aria-label={`Overview of the run: ${minimap.marks.length} ${
+        minimap.marks.length === 1 ? 'step' : 'steps'
+      } across ${minimap.rows} concurrent ${minimap.rows === 1 ? 'lane' : 'lanes'}`}
     >
+      {/* The run's own extent, under everything.
+       *
+       * Marks are steps only, so the stretch after the last one — finalization,
+       * and on `retry` more than half the run — held no mark at all and the map
+       * appeared to end at 42%. A map that stops short of its territory is worse
+       * than one with empty ground on it, and this is the cheapest way to say
+       * "the run continues to here" without drawing platform rows as steps. */}
+      <div
+        className="bg-canvasMuted absolute inset-x-0"
+        style={{ top: MINIMAP_HEIGHT_PX - 1, height: 1 }}
+      />
+
       {minimap.marks.map((mark) => (
         <div
           key={mark.id}
