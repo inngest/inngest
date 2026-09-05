@@ -4,10 +4,11 @@
  * Layout is a straight read of (level, lane) — no DAG layout pass, because the
  * derivation already levelled the graph.
  */
-import type { Edge, Node } from '@xyflow/react';
+import { MarkerType, type Edge, type Node } from '@xyflow/react';
 
+import { formatDuration } from '../runDetailsUtils';
 import type { CanvasGroup } from './collapse';
-import type { CanvasGraph, CanvasNode } from './graph.types';
+import type { CanvasEdge, CanvasGraph, CanvasNode } from './graph.types';
 
 export const LAYOUT = {
   /** Horizontal distance between level centres. */
@@ -176,6 +177,36 @@ export function toFlowElements(
     });
   }
 
+  /**
+   * What happened between two steps, and how long it took.
+   *
+   * A node says how long its own step ran. The time BETWEEN steps — discovery,
+   * queueing, system latency, a retry backoff — used to be nowhere on the
+   * canvas at all, which left the graph unable to explain its own gaps while
+   * the trace below showed them as blank space. It belongs on the edge: the
+   * edge is literally the interval between one step ending and the next
+   * starting.
+   *
+   * Only labelled when both ends are real work with real times, and when the
+   * gap is big enough to be worth a reader's attention — every hop has a
+   * millisecond or two of overhead and labelling all of them would be noise.
+   */
+  const MIN_LABELLED_GAP_MS = 20;
+  const gapLabel = (edge: CanvasEdge): string | undefined => {
+    const source = byID.get(edge.from);
+    const target = byID.get(edge.to);
+    if (!source || !target) return undefined;
+    if (source.endedAt === null || target.startedAt === null) return undefined;
+
+    // Synthetic nodes borrow the run's timings, so a gap measured against them
+    // is not a gap between steps.
+    const real = (n: CanvasNode) => n.kind === 'step' || n.kind === 'wait' || n.kind === 'invoke';
+    if (!real(source) || !real(target)) return undefined;
+
+    const gap = target.startedAt - source.endedAt;
+    return gap >= MIN_LABELLED_GAP_MS ? formatDuration(gap) : undefined;
+  };
+
   const edges: Edge[] = graph.edges.map((edge) => {
     const from = placed.get(edge.from);
     const to = placed.get(edge.to);
@@ -191,10 +222,19 @@ export function toFlowElements(
     const isAlternate = edge.kind === 'alternate';
     const isUnconfirmed = edge.kind === 'unconfirmed';
 
+    const label = gapLabel(edge);
+
     return {
       id: edge.id,
       source: edge.from,
       target: edge.to,
+      // An arrow, so the direction of the run is readable without inferring it
+      // from left-to-right convention.
+      markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14 },
+      label,
+      labelShowBg: Boolean(label),
+      labelBgPadding: [3, 1] as [number, number],
+      labelBgBorderRadius: 2,
       type: sameLane ? 'straight' : 'smoothstep',
       pathOptions: sameLane ? undefined : { borderRadius: 24 },
       // Both broken kinds are drawn a little heavier than a solid edge, not

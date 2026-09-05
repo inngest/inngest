@@ -681,6 +681,11 @@ function TimelineBarRenderer({
   const hasHTTPTiming = !!bar.httpTimingBreakdown;
   const hasChildren = bar.children && bar.children.length > 0;
   const hasRunInngestBreakdown = !!bar.runInngestBreakdown;
+  // When a row decomposes into attempts, THAT is its decomposition. Expanding it
+  // must unpack the bar the reader was just looking at — not replace it with a
+  // different one (Inngest / your server) whose parts line up with nothing on
+  // screen. Expansion splits a row into its own segments; nothing new appears.
+  const hasAttemptSegments = !!generateAttemptSegments(bar);
   const hasInngestBreakdown = !!bar.inngestBreakdown;
   const isExpandable =
     hasTimingBreakdown ||
@@ -801,7 +806,7 @@ function TimelineBarRenderer({
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}
-      {isExpanded && !bar.isRoot && timingPositions?.inngest && (
+      {isExpanded && !bar.isRoot && !hasAttemptSegments && timingPositions?.inngest && (
         <TimelineBar
           name="Inngest"
           duration={timingPositions.inngest.duration}
@@ -846,7 +851,7 @@ function TimelineBarRenderer({
 
       {/* Your server timing bar — positioned to match the execution segment of the parent.
           Only for non-root bars; the root renders step children directly. */}
-      {isExpanded && !bar.isRoot && timingPositions?.server && (
+      {isExpanded && !bar.isRoot && !hasAttemptSegments && timingPositions?.server && (
         <TimelineBar
           name={orgName ?? 'Your server'}
           duration={timingPositions.server.duration}
@@ -916,97 +921,15 @@ function TimelineBarRenderer({
         </TimelineBar>
       )}
 
-      {/* Run-level Inngest bar — shows run queue delay + finalization for root bars */}
-      {isExpanded && bar.isRoot && hasRunInngestBreakdown && (
-        <TimelineBar
-          name="Inngest"
-          duration={bar.runInngestBreakdown!.totalMs}
-          startPercent={startPercent}
-          widthPercent={widthPercent}
-          depth={depth + 1}
-          leftWidth={leftWidth}
-          style="timing.inngest"
-          styleLabel={STYLE_LABELS['timing.inngest']}
-          segments={runInngestBarSegments}
-          status={bar.status}
-          expandable={isRunInngestExpandable}
-          expanded={isRunInngestExpanded}
-          onToggle={isRunInngestExpandable ? () => onToggleExpand(runInngestBarId) : undefined}
-          onClick={() => onSelectStep?.(bar.id)}
-          viewStartOffset={viewStartOffset}
-          viewEndOffset={viewEndOffset}
-          startTime={bar.startTime}
-          endTime={bar.endTime}
-          minTime={minTime}
-        >
-          {/* Run-level Inngest sub-bars — positioned at their absolute timeline locations */}
-          {isRunInngestExpanded && (
-            <>
-              {/* Run queue delay: run.queuedAt → run.startedAt */}
-              {bar.runInngestBreakdown!.runQueueDelayMs > 0 && (
-                <TimelineBar
-                  key={`${bar.id}-run-inngest-run-queue`}
-                  name="Run queue delay"
-                  duration={bar.runInngestBreakdown!.runQueueDelayMs}
-                  startPercent={startPercent}
-                  widthPercent={
-                    (bar.runInngestBreakdown!.runQueueDelayMs /
-                      Math.max(1, (bar.endTime?.getTime() ?? 0) - bar.startTime.getTime())) *
-                    widthPercent
-                  }
-                  depth={depth + 2}
-                  leftWidth={leftWidth}
-                  style="timing.inngest.queue"
-                  styleLabel={STYLE_LABELS['timing.inngest.queue']}
-                  status={bar.status}
-                  onClick={() => onSelectStep?.(bar.id)}
-                  viewStartOffset={viewStartOffset}
-                  viewEndOffset={viewEndOffset}
-                  startTime={bar.startTime}
-                  endTime={
-                    new Date(bar.startTime.getTime() + bar.runInngestBreakdown!.runQueueDelayMs)
-                  }
-                  minTime={minTime}
-                />
-              )}
-              {/* Finalization: lastStep.endedAt → run.endedAt */}
-              {bar.runInngestBreakdown!.finalizationMs > 0 && bar.endTime && (
-                <TimelineBar
-                  key={`${bar.id}-run-inngest-finalization`}
-                  name="Finalization"
-                  duration={bar.runInngestBreakdown!.finalizationMs}
-                  startPercent={
-                    startPercent +
-                    ((bar.endTime.getTime() -
-                      bar.runInngestBreakdown!.finalizationMs -
-                      bar.startTime.getTime()) /
-                      Math.max(1, bar.endTime.getTime() - bar.startTime.getTime())) *
-                      widthPercent
-                  }
-                  widthPercent={
-                    (bar.runInngestBreakdown!.finalizationMs /
-                      Math.max(1, bar.endTime.getTime() - bar.startTime.getTime())) *
-                    widthPercent
-                  }
-                  depth={depth + 2}
-                  leftWidth={leftWidth}
-                  style="timing.inngest.finalization"
-                  styleLabel={STYLE_LABELS['timing.inngest.finalization']}
-                  status={bar.status}
-                  onClick={() => onSelectStep?.(bar.id)}
-                  viewStartOffset={viewStartOffset}
-                  viewEndOffset={viewEndOffset}
-                  startTime={
-                    new Date(bar.endTime.getTime() - bar.runInngestBreakdown!.finalizationMs)
-                  }
-                  endTime={bar.endTime}
-                  minTime={minTime}
-                />
-              )}
-            </>
-          )}
-        </TimelineBar>
-      )}
+      {/* The run-level "Inngest" row used to live here. It is gone deliberately.
+
+          It was named after the company rather than after anything the reader
+          wrote, it spanned the whole run while showing two disconnected
+          fragments inside it, and it did not line up with the Run bar directly
+          above it — two rows describing the same 156ms, drawn in different
+          places. Everything it carried is now somewhere better: the queue delay
+          is the Run bar's own ghosted lead-in, and finalization is already its
+          own real span row. */}
 
       {/* Child bars (for root bars, or non-root bars without timing breakdown) */}
       {isExpanded &&
