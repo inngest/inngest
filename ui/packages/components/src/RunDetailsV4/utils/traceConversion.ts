@@ -980,7 +980,18 @@ function withRunNote(
     bar.isRoot
       ? {
           ...bar,
-          note: `+${formatDuration(queueDelayMs)} queued`,
+          // The note says whether the queue is ON TOP of the number beside it
+          // or INSIDE it, because those are two different situations and it
+          // used to use one wording for both.
+          //
+          // When the delay is small it is reclaimed out of the plot, so the row
+          // reports execution and the queue is additional: `+120ms queued`.
+          // When it is large enough to draw, the axis contains it and so does
+          // the row's number, so saying `+6.299s queued` invited the reader to
+          // add 6.3s to a total that already held it.
+          note: clamped
+            ? `+${formatDuration(queueDelayMs)} queued`
+            : `incl. ${formatDuration(queueDelayMs)} queued`,
           // The clamp above may have shortened the bar so it fits the plot; the
           // reported number is the run's whole life either way, so the headline
           // means the same thing whether the queue was drawn or reclaimed.

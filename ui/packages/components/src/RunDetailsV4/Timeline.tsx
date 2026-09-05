@@ -681,20 +681,18 @@ function TimelineBarRenderer({
     scale
   );
 
-  // The Run row's number is the run's WHOLE LIFE, always.
+  // Every row's number is the width it occupies on the axis. No exceptions,
+  // including the Run row.
   //
-  // Its bar is clamped to the plot when the queue delay is reported as text
-  // instead of drawn, which is right — an unclamped bar reported more time than
-  // the axis covered. But the clamp also shortened the number, so the headline
-  // meant two different things depending on how long the run had queued: on
-  // `blocked` (6.299s, drawn) it read 12.348s INCLUDING the queue, and on
-  // `cancelled` (120ms, reclaimed) it read 35.244s EXCLUDING it, beside a note
-  // saying `+120ms queued`. The canvas terminal reports the whole life too, so
-  // this is also what makes the two headline numbers on the page agree.
-  const duration =
-    bar.isRoot && bar.runTotalMs !== undefined
-      ? bar.runTotalMs
-      : calculateDuration(bar.startTime, bar.endTime);
+  // Reporting the run's whole life here instead was a regression across 43 of
+  // 45 fixtures: the number moved and the plot did not, so `simple` drew a
+  // full-width bar labelled 165ms against a ruler reading 0ms → 32ms. A ruler
+  // that the largest bar on the page contradicts is worse than a number that
+  // needs its note to complete it.
+  //
+  // The queued part is carried by the note, whose wording says whether it is
+  // inside this number or on top of it.
+  const duration = calculateDuration(bar.startTime, bar.endTime);
   const hasTimingBreakdown = !!bar.timingBreakdown;
   const hasHTTPTiming = !!bar.httpTimingBreakdown;
   const hasChildren = bar.children && bar.children.length > 0;

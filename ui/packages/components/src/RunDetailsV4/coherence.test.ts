@@ -142,21 +142,49 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
     ).toEqual(canvasOrder);
   });
 
-  it('reports one run duration, on the Run row and on the canvas terminal', () => {
-    // The two most prominent numbers on the page. On `blocked` they read
-    // `Completed 6.049s` and `Run 12.348s` — differing by 2x, on the one
-    // fixture whose entire point is the 6.3s it spent queued. Both are now the
-    // run's whole life, queue included, however long that queue was.
+  it('labels the Run row with the width it actually occupies', () => {
+    // The ruler everything else is read against.
+    //
+    // This is the assertion that was missing, and its absence let a regression
+    // through on 43 of 45 fixtures: making the Run row report the run's whole
+    // life moved the NUMBER without moving the PLOT, so `simple` drew a
+    // full-width bar labelled 165ms against an axis reading 0ms → 32ms.
+    //
+    // The test above it compared the bar's own span to the axis and passed
+    // throughout, because the regression was in the rendered label rather than
+    // in the geometry — the same shape of miss as asserting a tooltip's model
+    // while it never reached the screen. So this one asserts what is printed.
+    const { data } = viewsOf(fixture);
+    const root = data.bars[0];
+    // A run still in flight measures both its bar and its axis against `now`,
+    // so they move together and there is nothing fixed to compare.
+    if (!root?.isRoot || !root.endTime) return;
+
+    const printed = root.endTime.getTime() - root.startTime.getTime();
+    const axis = data.maxTime.getTime() - data.minTime.getTime();
+
+    expect(
+      Math.abs(printed - axis),
+      `${id}: Run says ${printed}, axis covers ${axis}`
+    ).toBeLessThan(2);
+  });
+
+  it('lets the Run row and the canvas terminal be reconciled by the note', () => {
+    // They are deliberately different quantities: the row reports the width it
+    // occupies, the terminal reports the run's whole life. What must hold is
+    // that the note closes the gap exactly — otherwise `blocked` reads
+    // `Completed 6.049s` beside `Run 12.348s` with nothing to bridge them,
+    // which is where this started.
     const { graph, data } = viewsOf(fixture);
     const root = data.bars[0];
     const terminal = graph.nodes.find((n) => n.kind === 'result');
     if (!root?.isRoot || !terminal || terminal.endedAt === null) return;
 
-    const onRow =
+    const wholeLife =
       root.runTotalMs ?? (root.endTime ? root.endTime.getTime() - root.startTime.getTime() : 0);
     const onCanvas = terminal.endedAt - terminal.queuedAt;
 
-    expect(Math.abs(onRow - onCanvas), `${id}: ${onRow} vs ${onCanvas}`).toBeLessThan(2);
+    expect(Math.abs(wholeLife - onCanvas), `${id}: ${wholeLife} vs ${onCanvas}`).toBeLessThan(2);
   });
 
   it('lets a reader subtract the named wait and land on the canvas number', () => {
