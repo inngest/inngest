@@ -174,8 +174,12 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     textColor: 'text-light',
   },
   'timing.inngest.discovery': {
-    barColor: 'bg-surfaceMuted',
-    dim: 0.7,
+    // The one platform phase with a hue of its own, and it earns it: discovery
+    // is what the fan-out and coalesce lines attach to, so a reader following
+    // "which request produced these steps" needs to find it without hunting
+    // through four weights of the same grey. Faint enough to stay second class
+    // — it is still Inngest's time, not the user's code.
+    barColor: 'bg-secondary-3xSubtle',
     labelFormat: 'default',
     textColor: 'text-light',
   },
