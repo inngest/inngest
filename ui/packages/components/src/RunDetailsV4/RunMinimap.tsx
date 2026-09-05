@@ -102,8 +102,11 @@ export function RunMinimap({ minimap, hoveredStepId }: Props): JSX.Element | nul
             'absolute rounded-[1px]',
             STATE_CLASS[mark.state],
             // Succeeded work recedes; anything else keeps its full weight, so a
-            // failure is the only thing that draws the eye.
-            mark.state === 'completed' ? 'opacity-45' : 'opacity-95',
+            // failure is the only thing that draws the eye. A step that failed
+            // and recovered counts as "anything else" — its final status is
+            // COMPLETED, which on the fixture named `retry` made the overview
+            // one unbroken green bar with the failure nowhere on it.
+            mark.state === 'completed' && !mark.recovered ? 'opacity-45' : 'opacity-95',
             hoveredStepId === mark.id &&
               '!opacity-100 ring-1 ring-[rgb(var(--color-border-contrast))]'
           )}
@@ -113,7 +116,7 @@ export function RunMinimap({ minimap, hoveredStepId }: Props): JSX.Element | nul
             top: mark.row * (rowPx + gapPx),
             height: rowPx,
           }}
-          title={mark.name}
+          title={mark.recovered ? `${mark.name} — failed, then recovered` : mark.name}
         />
       ))}
     </div>

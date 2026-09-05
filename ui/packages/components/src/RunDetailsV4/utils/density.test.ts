@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import failcluster from '../canvas/__fixtures__/failcluster.json';
 import parallel from '../canvas/__fixtures__/parallel.json';
+import retry from '../canvas/__fixtures__/retry.json';
 import step from '../canvas/__fixtures__/step.json';
 import tall500 from '../canvas/__fixtures__/tall500.json';
 import wide from '../canvas/__fixtures__/wide.json';
@@ -60,6 +61,18 @@ describe('packMinimap', () => {
     // a property neither the trace nor the canvas shows.
     expect(minimapFor(wide).rows).toBeGreaterThan(5);
     expect(minimapFor(parallel).rows).toBeGreaterThan(1);
+  });
+
+  it('makes a step that failed and recovered findable', () => {
+    // The overview's job is finding trouble, and a recovered step's final
+    // status is COMPLETED — which hides it completely. On the fixture named
+    // `retry` the whole map was one unbroken, receded green bar.
+    const marks = minimapFor(retry).marks;
+    const recovered = marks.filter((m) => m.recovered);
+
+    expect(recovered.length).toBeGreaterThan(0);
+    // Still green, because the run did complete. It just stops receding.
+    for (const mark of recovered) expect(mark.state).toBe('completed');
   });
 
   it('never leaves a step too small to see', () => {

@@ -96,6 +96,15 @@ export type MinimapMark = {
   state: DensityState;
   /** For the tooltip, since a mark is too small to label. */
   name: string;
+  /**
+   * This step failed at least once and got there anyway.
+   *
+   * The minimap's job is making trouble findable, and a recovered step is
+   * trouble that a final status of COMPLETED hides completely: on the fixture
+   * named `retry`, the overview was one unbroken green bar. It keeps the
+   * completed colour, because the run did complete, and stops receding.
+   */
+  recovered: boolean;
 };
 
 export type Minimap = {
@@ -103,6 +112,12 @@ export type Minimap = {
   /** How many lanes were needed — the run's maximum concurrency. */
   rows: number;
 };
+
+/** A step drawn from more than one attempt is one that failed and came back. */
+function wasRetried(bar: TimelineBarData): boolean {
+  const attempts = bar.children?.filter((child) => /^Attempt \d+$/.test(child.name)) ?? [];
+  return attempts.length > 1;
+}
 
 export function packMinimap(bars: TimelineBarData[], scale: TimeScale): Minimap {
   const steps = leaves(bars)
@@ -135,6 +150,7 @@ export function packMinimap(bars: TimelineBarData[], scale: TimeScale): Minimap 
       widthPercent: Math.max(0.35, scale.toPercent(step.endMs) - startPercent),
       state: toState(step.bar.status),
       name: step.bar.name,
+      recovered: wasRetried(step.bar),
     });
   }
 
