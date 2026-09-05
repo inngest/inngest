@@ -437,10 +437,26 @@ function BarHoverCardContent({
   /** The part of the bar under the pointer, when it is over one. */
   segment?: BarSegment | null;
 }) {
-  const startTimestamp = format(startTime, 'yyyy-MM-dd HH:mm:ss.SSS');
-  const endTimestamp = endTime ? format(endTime, 'yyyy-MM-dd HH:mm:ss.SSS') : null;
+  // When the pointer is on a part of the bar, the card describes THAT PART.
+  //
+  // It used to lead with the segment's sentence and then report the row
+  // underneath, which produced four separate contradictions in one card:
+  // "Backed off 1.002s before attempt 2" above `DELAY -`; a 78ms discovery mark
+  // reporting the Planning row's 774ms; every segment of a retried step
+  // reporting the row's whole START/END; and `YOUR SERVER 1.015s` on a step
+  // that spent 1.000s of it backing off. The last one passed the arithmetic
+  // gate because it summed — the gate catches contradiction, not mislabelling.
+  const onSegment = Boolean(segment);
+  const segStart = segment?.startMs !== undefined ? new Date(segment.startMs) : null;
+  const segEnd = segment?.endMs !== undefined ? new Date(segment.endMs) : null;
 
-  const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
+  const shownStart = segStart ?? startTime;
+  const shownEnd = segStart ? segEnd : endTime;
+
+  const startTimestamp = format(shownStart, 'yyyy-MM-dd HH:mm:ss.SSS');
+  const endTimestamp = shownEnd ? format(shownEnd, 'yyyy-MM-dd HH:mm:ss.SSS') : null;
+
+  const durationMs = shownEnd ? shownEnd.getTime() - shownStart.getTime() : 0;
 
   // A breakdown is shown only when it is one.
   //
@@ -459,7 +475,9 @@ function BarHoverCardContent({
     durationMs > 0 &&
     detailSum <= durationMs * 1.02 + 1 &&
     (timingDetails ?? []).every((d) => d.durationMs <= durationMs);
-  const shownDetails = detailsAddUp ? timingDetails ?? [] : [];
+  // Suppressed entirely while a segment is hovered: those figures decompose the
+  // ROW, and the card is describing one part of it.
+  const shownDetails = detailsAddUp && !onSegment ? timingDetails ?? [] : [];
   const hasDetails = shownDetails.length > 0;
 
   return (
@@ -487,7 +505,7 @@ function BarHoverCardContent({
               {durationMs > 0 ? formatDuration(durationMs) : '-'}
             </span>
           </div>
-          {delayMs != null && (
+          {delayMs != null && !onSegment && (
             <div className="flex justify-between gap-6">
               <span className="text-light font-mono uppercase">Delay</span>
               <span className="text-basis tabular-nums">

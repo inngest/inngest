@@ -866,6 +866,7 @@ function withDiscoveryRow(
       startMs: Date.parse(d.startedAt ?? d.queuedAt),
       endMs: Date.parse(d.endedAt ?? d.startedAt ?? d.queuedAt),
       planned: d.plannedStepIDs?.length ?? 0,
+      plannedIDs: d.plannedStepIDs ?? [],
       status: d.status,
       spanID: d.spanID,
     }))
@@ -920,6 +921,20 @@ function withDiscoveryRow(
   // requests is unambiguous and is the thing this row is actually showing.
   const requests = `${timed.length} request${timed.length === 1 ? '' : 's'}`;
 
+  // Whether a request planned something NEW.
+  //
+  // Each per-step discovery re-plans what still follows it, so reading the marks
+  // left to right gave "Planned 2 steps" three times and "Planned 1 step" twice
+  // — eight steps planned in a five-step run. The row label solved this by
+  // counting requests instead; per-segment the temptation to add them up came
+  // straight back. Saying which were re-plans is the precise version.
+  const seen = new Set<string>();
+  const isFresh = timed.map((d) => {
+    const fresh = d.plannedIDs.some((stepID) => !seen.has(stepID));
+    for (const stepID of d.plannedIDs) seen.add(stepID);
+    return fresh;
+  });
+
   const row: TimelineBarData = {
     id: 'run-discovery',
     name: 'Planning',
@@ -937,9 +952,13 @@ function withDiscoveryRow(
       widthPercent: Math.max(0.4, ((d.endMs - Math.max(d.startMs, rowStart)) / spanMs) * 100),
       style: 'timing.inngest.discovery' as const,
       status: d.status,
+      startMs: d.startMs,
+      endMs: d.endMs,
       tooltip:
         d.planned > 0
-          ? `Planned ${d.planned} step${d.planned === 1 ? '' : 's'}`
+          ? `${isFresh[i] ? 'Planned' : 'Re-planned'} ${d.planned} step${
+              d.planned === 1 ? '' : 's'
+            }`
           : 'Planned nothing',
     })),
   };

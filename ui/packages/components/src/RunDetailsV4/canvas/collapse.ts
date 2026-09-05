@@ -835,6 +835,8 @@ function concurrentSegments(
       widthPercent: Math.max(1.2, ((endMs - startMs) / span) * 100),
       style: 'step.run' as const,
       status: row.status,
+      startMs,
+      endMs,
       tooltip: `${row.name}${row.status ? ` — ${row.status.toLowerCase()}` : ''}`,
     };
   });

@@ -139,6 +139,16 @@ export interface BarSegment {
 
   /** Optional tooltip content */
   tooltip?: string;
+  /**
+   * The segment's own window, when the generator knows it.
+   *
+   * Without these the hover card described the ROW while its top line described
+   * the SEGMENT, so hovering "Attempt 2 of 2 — completed after 6ms" reported
+   * START 04.179 / END 05.272 — the whole 1.093s row — and hovering a 78ms
+   * discovery mark reported the Planning row's 774ms extent.
+   */
+  startMs?: number;
+  endMs?: number;
 
   /** Run status for status-based coloring (e.g., COMPLETED, FAILED, CANCELLED) */
   status?: string;

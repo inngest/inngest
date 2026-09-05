@@ -315,6 +315,8 @@ function generateAttemptSegments(bar: TimelineBarData): BarSegment[] | undefined
         widthPercent: pct(started - previousEnd),
         style: 'timing.waiting',
         status: attempt.status,
+        startMs: previousEnd,
+        endMs: started,
         tooltip:
           i === 0
             ? `Queued ${formatDuration(started - previousEnd)} before the first attempt`
@@ -329,6 +331,8 @@ function generateAttemptSegments(bar: TimelineBarData): BarSegment[] | undefined
         widthPercent: pct(ended - started),
         style: 'step.run',
         status: attempt.status,
+        startMs: started,
+        endMs: ended,
         tooltip: `Attempt ${i + 1} of ${attempts.length} — ${(
           attempt.status ?? 'ran'
         ).toLowerCase()} after ${formatDuration(ended - started)}`,
@@ -382,6 +386,8 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
         widthPercent: waitPercent,
         style: 'timing.waiting',
         status: bar.status,
+        startMs: bar.startTime.getTime(),
+        endMs: bar.startTime.getTime() + bar.delayMs,
         tooltip: `Queued ${formatDuration(bar.delayMs)} before the run started`,
       },
       {
@@ -390,6 +396,8 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
         widthPercent: 100 - waitPercent,
         style: 'root',
         status: bar.status,
+        startMs: bar.startTime.getTime() + bar.delayMs,
+        endMs: bar.endTime.getTime(),
         tooltip: `Running ${formatDuration(spanMs - bar.delayMs)}`,
       },
     ];
@@ -432,6 +440,8 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
       widthPercent: inngestPercent,
       style: 'timing.waiting',
       status: bar.status,
+      startMs: bar.startTime.getTime(),
+      endMs: bar.startTime.getTime() + inngestMs,
       // The same number the row's `+72ms wait` label carries, from the same
       // derivation, so hovering a lead-in confirms the label rather than
       // offering the reader a third figure to reconcile.
@@ -449,6 +459,8 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
       widthPercent: execPercent,
       style: bar.isRoot ? 'root' : 'timing.server',
       status: bar.status,
+      startMs: bar.startTime.getTime() + inngestMs,
+      endMs: bar.startTime.getTime() + inngestMs + executionMs,
       // What the canvas node reports for this step, said in the trace too.
       tooltip: `Ran ${formatDuration(executionMs)} on your server`,
     });
