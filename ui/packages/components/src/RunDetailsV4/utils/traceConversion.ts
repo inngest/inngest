@@ -206,7 +206,23 @@ function tracesToBarData(
     bars.push(bar);
   }
 
-  return bars;
+  // Top to bottom is the order things started.
+  //
+  // The spans arrive in the order the SDK reported them, which §3.5 says is
+  // non-deterministic under parallelism: `t19-parallel` listed its three
+  // parallel steps b, c, a. A waterfall whose rows are not in time order is
+  // not a waterfall, and the canvas orders its lanes by start time for the
+  // same reason — the two disagreeing about where the same three steps go is
+  // the thing to avoid.
+  //
+  // A sequential run is already in this order, so this changes nothing there.
+  // The tiebreak on name keeps the layout stable between renders as well as
+  // between runs.
+  return bars.sort(
+    (a, b) =>
+      a.startTime.getTime() + (a.delayMs ?? 0) - (b.startTime.getTime() + (b.delayMs ?? 0)) ||
+      a.name.localeCompare(b.name)
+  );
 }
 
 /**
@@ -927,10 +943,22 @@ function withDiscoveryRow(
     })),
   };
 
-  // Beneath the run, above the steps it planned.
-  return bars.map((bar) =>
-    bar.isRoot ? { ...bar, children: [row, ...(bar.children ?? [])] } : bar
-  );
+  // In time order, like every other row.
+  //
+  // It was pinned to the top on the reasoning "beneath the run, above the steps
+  // it planned", which is not always true: on `invoke` the first surviving
+  // discovery starts after `before` has already begun, so pinning it made the
+  // one row out of order in a view whose whole claim is that top-to-bottom is
+  // when things happened.
+  const insert = (children: TimelineBarData[]): TimelineBarData[] => {
+    const at = children.findIndex(
+      (child) => child.startTime.getTime() + (child.delayMs ?? 0) > rowStart
+    );
+    if (at < 0) return [...children, row];
+    return [...children.slice(0, at), row, ...children.slice(at)];
+  };
+
+  return bars.map((bar) => (bar.isRoot ? { ...bar, children: insert(bar.children ?? []) } : bar));
 }
 
 /**

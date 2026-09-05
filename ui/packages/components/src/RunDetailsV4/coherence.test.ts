@@ -97,6 +97,51 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
     }
   });
 
+  it('puts its rows in the order the steps started', () => {
+    // The spans arrive in the order the SDK reported them, which §3.5 says is
+    // non-deterministic under parallelism: `t19-parallel` listed its three
+    // parallel steps b, c, a. A waterfall whose rows are not in time order is
+    // not a waterfall.
+    const { data } = viewsOf(fixture);
+
+    const walk = (bars: typeof data.bars) => {
+      let previous = -Infinity;
+      for (const bar of bars) {
+        const began = bar.startTime.getTime() + (bar.delayMs ?? 0);
+        expect(began, `${id}: ${bar.name} is out of order`).toBeGreaterThanOrEqual(previous);
+        previous = began;
+        walk(bar.children ?? []);
+      }
+    };
+    walk(data.bars[0]?.children ?? []);
+  });
+
+  it('agrees with the canvas about which order parallel steps go in', () => {
+    // Only where the SDK did not report branch membership. Where it DID, the
+    // canvas lays each branch beneath its own parent so a 1:1 branch draws
+    // straight, and that is worth more there than strict time order — the two
+    // views are then deliberately, defensibly different. This asserts the case
+    // the ordering rule was introduced for.
+    const { graph, data } = viewsOf(fixture);
+    if (graph.branchesResolved > 0) return;
+
+    const rows = (data.bars[0]?.children ?? [])
+      .filter((b) => !b.isPlatform && b.id !== 'run-discovery')
+      .map((b) => b.id);
+
+    const canvasOrder = graph.nodes
+      .filter((n) => n.kind === 'step' || n.kind === 'wait' || n.kind === 'invoke')
+      .slice()
+      .sort((a, z) => a.level - z.level || a.lane - z.lane)
+      .map((n) => n.spanID)
+      .filter((spanID) => rows.includes(spanID));
+
+    expect(
+      rows.filter((r) => canvasOrder.includes(r)),
+      `${id}: row vs node order`
+    ).toEqual(canvasOrder);
+  });
+
   it('splits a row into segments that fill it exactly', () => {
     // The segments of a bar are the bar. When they do not add up the reader is
     // given a row headlined 166ms whose parts claim 119ms of waiting and 17ms

@@ -680,9 +680,25 @@ export function toCanvasGraph(root: Trace, trigger?: CanvasTrigger | null): Canv
       return Math.min(...parents.map((p) => laneOfParent.get(p) ?? 0));
     };
 
+    // Lane order within a level, top to bottom.
+    //
+    // With branch membership known, it follows the parents, so a 1:1 branch
+    // draws straight. Without it, the SDK's own order is used — and that order
+    // is explicitly non-deterministic under parallelism, which is how
+    // `t19-parallel` came to draw its three parallel steps as b, c, a: no rule
+    // a reader could infer, and a different one on the next capture of the same
+    // function.
+    //
+    // Start time is a rule, it is true, and it matches how the trace below
+    // stacks the same steps. Ties fall back to the name so the layout is stable
+    // between renders of one run as well as between runs.
     const ordered: Entry[] = branches
       ? [...level].sort((a, b) => primaryLane(a) - primaryLane(b))
-      : level;
+      : [...level].sort(
+          (a, b) =>
+            (a.startedAt ?? a.queuedAt) - (b.startedAt ?? b.queuedAt) ||
+            a.trace.name.localeCompare(b.trace.name)
+        );
 
     const created: CanvasNode[] = ordered.map((entry: Entry, lane: number) => {
       const { trace } = entry;
