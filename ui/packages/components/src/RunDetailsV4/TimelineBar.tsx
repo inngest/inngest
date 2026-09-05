@@ -131,8 +131,11 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   // view whose value is that it does not invent should not start here. Drawn
   // hollow so it reads as an absence rather than as work.
   'timing.unaccounted': {
-    barColor: 'bg-surfaceMuted',
-    outlined: true,
+    // A colour, not a hollow outline. An outline reads as a border artefact
+    // rather than as a quantity — the same reason waits stopped being hollow —
+    // and this is real time the run spent, however little is known about it.
+    // Accent rather than a status hue: it is neither success nor failure.
+    barColor: 'bg-accent-subtle',
     statusBased: false,
     labelFormat: 'default',
     textColor: 'text-light',

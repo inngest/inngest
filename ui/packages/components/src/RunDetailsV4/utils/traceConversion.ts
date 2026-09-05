@@ -902,12 +902,20 @@ function withPlanning(
         return { ...bar, children };
       }
 
+      // The metadata usually names it. `inngest.timing` reports a
+      // `discoveryMs` per step, and on `t19-parallel` `d`'s is 135 — exactly
+      // the gap before it. So this is not unaccounted time at all: it is the
+      // discovery request, and the payload said so. Only where the two do not
+      // agree is it left as time nothing reported.
+      const reported = bar.inngestBreakdown?.discoveryMs ?? 0;
+      const isDiscovery = reported > 0 && Math.abs(reported - gapMs) <= 2;
+
       return {
         ...bar,
         children,
         startTime: new Date(from),
         reportedMs: bar.reportedMs ?? (bar.endTime ? bar.endTime.getTime() - start : undefined),
-        unaccounted: { startMs: from, endMs: start },
+        unaccounted: { startMs: from, endMs: start, kind: isDiscovery ? 'discovery' : 'unknown' },
       };
     });
   };

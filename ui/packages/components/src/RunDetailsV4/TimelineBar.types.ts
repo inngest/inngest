@@ -419,7 +419,7 @@ export interface TimelineBarData {
    */
   planning?: { startMs: number; endMs: number; steps: string[]; spanID: string };
   /** Time before this row that no span accounts for. */
-  unaccounted?: { startMs: number; endMs: number };
+  unaccounted?: { startMs: number; endMs: number; kind: 'discovery' | 'unknown' };
   /** The request that produced this step, whichever row actually draws it. */
   plannedBy?: string;
 

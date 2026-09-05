@@ -425,12 +425,20 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
         id: `${bar.id}-unaccounted`,
         startPercent: ((bar.unaccounted.startMs - barStart) / spanMs) * 100,
         widthPercent: (ms / spanMs) * 100,
-        style: 'timing.unaccounted',
+        // The metadata usually names it. `inngest.timing` reports a
+        // `discoveryMs` per step and on `t19-parallel` `d`'s is 135 — exactly
+        // the gap before it — so this is the discovery request, not a mystery.
+        // Only where the two disagree is it left as time nothing reported.
+        style:
+          bar.unaccounted.kind === 'discovery' ? 'timing.inngest.discovery' : 'timing.unaccounted',
         startMs: bar.unaccounted.startMs,
         endMs: bar.unaccounted.endMs,
-        tooltip: `${formatDuration(
-          ms
-        )} that no span accounts for — queueing, concurrency, latency or processing, but nothing reported which`,
+        tooltip:
+          bar.unaccounted.kind === 'discovery'
+            ? `Inngest spent ${formatDuration(ms)} working out what to run next`
+            : `${formatDuration(
+                ms
+              )} that no span accounts for — queueing, concurrency, latency or processing, but nothing reported which`,
       });
     }
   }
@@ -1412,6 +1420,48 @@ export function Timeline({
           d: `M ${fromX} ${fromY} L ${fromX} ${toY - turn} Q ${fromX} ${toY} ${
             fromX + 0.6
           } ${toY} L ${toX} ${toY}`,
+        });
+      }
+    }
+
+    // ...and the other half of the shape: several steps converging into one.
+    //
+    // The flow chart shows a, b and c coalescing into d and the trace could not
+    // say it at all — the rows simply stopped and another began later. The
+    // steps that converge are the ones that share a `plannedBy`: the fan-out
+    // request produced them together, so their completion together is what the
+    // next request was waiting for. Reported, not guessed.
+    for (const bar of byID.values()) {
+      if (!bar.unaccounted) continue;
+      const toY = rowTops.get(bar.id);
+      if (toY === undefined) continue;
+
+      const toX = xOf(bar.unaccounted.startMs);
+      const feeders = [...byID.values()].filter(
+        (other) =>
+          other.plannedBy &&
+          other.endTime &&
+          other.id !== bar.id &&
+          other.endTime.getTime() <= bar.unaccounted!.startMs &&
+          rowTops.has(other.id)
+      );
+
+      // Only the group that finished immediately before this began.
+      const latest = feeders.reduce((n, f) => Math.max(n, f.endTime!.getTime()), 0);
+      const group = feeders.filter(
+        (f) => f.plannedBy === feeders.find((x) => x.endTime!.getTime() === latest)?.plannedBy
+      );
+      if (group.length < 2) continue;
+
+      for (const feeder of group) {
+        const fromY = rowTops.get(feeder.id)!;
+        const fromX = xOf(feeder.endTime!.getTime());
+        const turn = Math.min(6, Math.abs(toY - fromY) / 2);
+        paths.push({
+          key: `join-${bar.id}-${feeder.id}`,
+          d: `M ${fromX} ${fromY} L ${toX - 0.6} ${fromY} Q ${toX} ${fromY} ${toX} ${
+            fromY + (toY > fromY ? turn : -turn)
+          } L ${toX} ${toY}`,
         });
       }
     }
