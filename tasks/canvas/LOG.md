@@ -617,3 +617,50 @@ worth remembering.
 `failure` was named alongside it in the original report and does **not** have this shape — the whole
 run is 653ms with no multi-second period to misplace. Not every fixture named in a review is
 implicated; that one was checked and cleared.
+
+---
+
+## Discovery: a wrong turn, reverted, and the design that replaces it
+
+**What I did, and why it was wrong.** Reclaiming the leading run delay made the remaining gaps in the
+trace conspicuous, so I extended each step's bar backwards over the gap that preceded it, drawing the
+interval as that step's ghosted lead-in. On a sequential run it looked right.
+
+It is a fabrication, and the user caught it: **a discovery is its own request, and one discovery can
+lead to many steps, one step, or none.** Extending every step back over the discovery that planned it
+draws one request N times. The damage was measurable on `wide`: the collapsed group went 262ms →
+322ms, and `collect` claimed **719ms** for a step that ran 144ms. Reverted in full.
+
+**The data says exactly this.** `t19-parallel`'s discoveries:
+
+```
+q=  1  s= 74  e= 87   planned 3      <- one request, three steps
+q= 88  s=229  e=265   planned 1
+q= 88  s=226  e=247   planned 1
+q= 88  s=227  e=264   planned 1
+q=267  s=372  e=393   planned 1
+```
+
+The first is 73ms queued plus 13ms running and produces `a`, `b` and `c`. Bundled into steps it would
+have been drawn three times.
+
+**The constraint that shapes the design.** Only **9 of 43** fixtures carry `discoveries` at all —
+`loaders/trace.go` sets `Omit` for `executor.step.discovery`, so discovery spans never reach the
+client and only the root's `discoveries` array survives, inconsistently. `wide`, the fixture that
+exposed the bug, has none. Fixing that properly is a Go change, i.e. a shared surface and a
+stop-and-ask.
+
+**The design.** A discovery is never part of a step. It gets **one row, with a mark per discovery**,
+each at its real interval and labelled with how many steps it planned:
+
+- 1→N is drawn correctly: one mark, then several steps begin after it.
+- 1→0 is drawn correctly: a mark with nothing following, which is a real and interesting case.
+- It scales: a 500-step run adds one row, not 500.
+- It never duplicates and never inflates a step.
+
+Rejected alternatives: a row *per* discovery (doubles the timeline on long runs); drawing it only on
+canvas edges (already done there, but leaves the trace's gaps blank); a vertical band like the axis
+break (reads as a structural break in the axis, which it is not).
+
+**Where the canvas already gets this right**: the junction node *is* the discovery, and the edge now
+carries the interval between two steps. That is the same fact, shown where it belongs.
