@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -120,6 +121,48 @@ func TestGetTraceRunHasNilTriggerIDsForCronRuns(t *testing.T) {
 	run, err := m.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
 	require.NoError(t, err)
 	require.Nil(t, run.TriggerIDs)
+}
+
+func TestGetTraceRunParsesIsDeferred(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	queuedAt := time.Now().UTC()
+
+	_, err := m.db.ExecContext(ctx,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, function_id, inputs, status, is_deferred)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		accountID.String(), envID.String(), runID.String(), queuedAt, queuedAt, appID.String(), functionID.String(),
+		enums.StepStatusQueued.String(), true,
+	)
+	require.NoError(t, err)
+
+	run, err := m.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+	require.NoError(t, err)
+	require.True(t, run.IsDeferred)
+}
+
+func TestGetTraceRunHasFalseIsDeferredForNormalRuns(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	queuedAt := time.Now().UTC()
+	queued := enums.StepStatusQueued
+
+	// is_deferred left NULL, matching a normal (non-deferred) run's row.
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, runID, queuedAt, &queued, nil, nil, nil)
+
+	run, err := m.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runID})
+	require.NoError(t, err)
+	require.False(t, run.IsDeferred)
 }
 
 func TestGetTraceRunsByTriggerIDReturnsMatchingRuns(t *testing.T) {
@@ -464,6 +507,54 @@ func TestGetTraceRunsFiltersByEventID(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, runs, 1)
 	require.Equal(t, matchRun.String(), runs[0].RunID)
+}
+
+// TestGetTraceRunsFiltersByIsDeferred proves the IsDeferred filter's
+// "false" branch matches NULL rows, not "= FALSE" — is_deferred is a
+// nullable boolean that's only ever written as TRUE or left NULL (see its
+// migration's own doc comment), matching pkg/cqrs/manager's own
+// spans.is_deferred.IsNull() branch for the same filter.
+func TestGetTraceRunsFiltersByIsDeferred(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	now := time.Now().UTC()
+
+	deferredRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	_, err := m.db.ExecContext(ctx,
+		`INSERT INTO inngest.runs (account_id, env_id, run_id, queued_at, scheduled_at, app_id, function_id, inputs, status, is_deferred)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?);`,
+		accountID.String(), envID.String(), deferredRun.String(), now, now, appID.String(), functionID.String(),
+		enums.StepStatusCompleted.String(), true,
+	)
+	require.NoError(t, err)
+
+	normalRun := ulid.MustNew(ulid.Timestamp(now), rand.Reader)
+	completed := enums.StepStatusCompleted
+	seedRunRow(t, ctx, m, accountID, envID, appID, functionID, normalRun, now, &completed, nil, nil, nil)
+
+	baseFilter := cqrs.GetTraceRunFilter{
+		AccountID: accountID, WorkspaceID: envID,
+		TimeField: enums.TraceRunTimeQueuedAt,
+		From:      now.Add(-time.Hour), Until: now.Add(time.Hour),
+	}
+
+	deferredOnly := baseFilter
+	deferredOnly.IsDeferred = util.ToPtr(true)
+	runs, err := m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{Filter: deferredOnly, Items: 40})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, deferredRun.String(), runs[0].RunID)
+
+	notDeferredOnly := baseFilter
+	notDeferredOnly.IsDeferred = util.ToPtr(false)
+	runs, err = m.GetTraceRuns(ctx, cqrs.GetTraceRunOpt{Filter: notDeferredOnly, Items: 40})
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, normalRun.String(), runs[0].RunID)
 }
 
 func TestGetTraceRunsAppliesOutputCELFilter(t *testing.T) {

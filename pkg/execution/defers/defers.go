@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
@@ -31,10 +32,13 @@ func SaveFromOp(
 	ctx context.Context,
 	rs statev2.RunService,
 	tp tracing.TracerProvider,
+	syncListeners []execution.SyncLifecycleListener,
 	log logger.Logger,
 	md *statev2.Metadata,
 	op state.GeneratorOpcode,
 ) error {
+	now := time.Now()
+
 	var (
 		// Why the defer was rejected.
 		rejectReason string
@@ -114,24 +118,32 @@ func SaveFromOp(
 	}
 
 	if rejectReason == "" {
-		// Create span for the defer that'll schedule after the parent run ends.
-		createDeferSpan(ctx, tp, log, md, statev2.Defer{
+		d := statev2.Defer{
 			FnSlug:         opts.FnSlug,
 			HashedID:       op.ID,
 			ScheduleStatus: enums.DeferStatusAfterRun,
-		}, userlandID)
+		}
+		// Create span for the defer that'll schedule after the parent run ends.
+		createDeferSpan(ctx, tp, log, md, d, userlandID)
+		for _, sl := range syncListeners {
+			sl.OnDeferAdd(ctx, *md, d, userlandID, now)
+		}
 	} else if rejectionPersisted {
 		fnSlug := ""
 		if opts != nil {
 			fnSlug = opts.FnSlug
 		}
 
-		// Create span for the rejected defer.
-		createDeferSpan(ctx, tp, log, md, statev2.Defer{
+		d := statev2.Defer{
 			FnSlug:         fnSlug,
 			HashedID:       op.ID,
 			ScheduleStatus: enums.DeferStatusRejected,
-		}, userlandID)
+		}
+		// Create span for the rejected defer.
+		createDeferSpan(ctx, tp, log, md, d, userlandID)
+		for _, sl := range syncListeners {
+			sl.OnDeferAdd(ctx, *md, d, userlandID, now)
+		}
 	}
 
 	return nil
@@ -147,6 +159,7 @@ func AbortFromOp(
 	ctx context.Context,
 	rs statev2.RunService,
 	tp tracing.TracerProvider,
+	syncListeners []execution.SyncLifecycleListener,
 	log logger.Logger,
 	md *statev2.Metadata,
 	op state.GeneratorOpcode,
@@ -162,7 +175,11 @@ func AbortFromOp(
 		return fmt.Errorf("error aborting defer: %w", err)
 	}
 
+	now := time.Now()
 	updateDeferSpanStatus(ctx, tp, log, md, opts.TargetHashedID, enums.DeferStatusAborted)
+	for _, sl := range syncListeners {
+		sl.OnDeferAbort(ctx, *md, opts.TargetHashedID, now)
+	}
 	return nil
 }
 

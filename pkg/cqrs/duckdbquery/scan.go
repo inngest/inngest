@@ -118,6 +118,22 @@ func asNullableTimestamp(v any, col string) (time.Time, error) {
 	return asTimestamp(v, col)
 }
 
+// asNullableBool returns false (not an error) for a SQL NULL column —
+// matching the nullable-boolean, TRUE/NULL-only convention used by
+// inngest.runs.is_deferred (see its migration's own doc comment): a
+// deferred run's row carries `is_deferred = TRUE`, everything else leaves
+// the column NULL rather than explicitly FALSE.
+func asNullableBool(v any, col string) (bool, error) {
+	if v == nil {
+		return false, nil
+	}
+	b, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("duckdbquery: expected bool for column %q, got %T (%v)", col, v, v)
+	}
+	return b, nil
+}
+
 // scanCount scans a COUNT(*) AS c-shaped single-row, single-column result.
 func scanCount(row *sql.Row) (int64, error) {
 	var raw any

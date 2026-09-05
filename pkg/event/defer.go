@@ -36,6 +36,18 @@ type DeferredScheduleMetadata struct {
 	ParentFnID   uuid.UUID `json:"parent_fn_id"`
 	ParentFnSlug string    `json:"parent_fn_slug"`
 	ParentRunID  ulid.ULID `json:"parent_run_id"`
+
+	// HashedID is the deferred defer's own HashedID (statev2.Defer.HashedID
+	// — the same value ParentDeferSpan's identity is seeded from via
+	// tracing.DeferSpanSeed). Not needed to target the parent's defer span
+	// (ParentDeferSpan already encodes that), but required by any consumer
+	// that re-derives the deterministic span ID independently rather than
+	// reading it off ParentDeferSpan — e.g. pkg/execution/dualwrite, which
+	// re-emits a full executor.defer row (including its hashed ID) rather
+	// than mutating the original in place. Optional for older events
+	// (omitempty) so a pre-existing event without it doesn't fail
+	// Validate().
+	HashedID string `json:"hashed_id,omitempty"`
 }
 
 func (m *DeferredScheduleMetadata) Validate() error {

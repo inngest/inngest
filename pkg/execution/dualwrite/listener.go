@@ -148,25 +148,40 @@ func runCommonFields(md sv2.Metadata, item queue.Item, evts []json.RawMessage) m
 		}
 		row["event_ids"] = ids
 	}
-	if sessions := runSessions(evts); len(sessions) > 0 {
+	sessions, isDeferred := scanTriggerEvents(evts)
+	if len(sessions) > 0 {
 		row["sessions"] = sessions
+	}
+	if isDeferred {
+		row["is_deferred"] = true
 	}
 	return row
 }
 
-// runSessions mirrors pkg/execution/executor's normalizeRunSessions:
-// collects every triggering event's Meta.Sessions into the run-level pair
-// list (the run-level form of event.EventMeta.Sessions, since a run
-// triggered by multiple events, e.g. a batch, can carry several session
-// pairs — see meta.EventSessions' own doc comment), dedupes, sorts by
-// (Key, then ID) for determinism across retries (event/batch iteration
-// order isn't stable), and caps at consts.MaxRunSessions. evts is already
-// this package's own json.Marshal(evt) output (see executor.go's Schedule
-// path), so an unmarshal failure here would indicate a bug elsewhere, not
-// bad external input — a malformed entry is skipped rather than failing
-// the whole row.
-func runSessions(evts []json.RawMessage) meta.EventSessions {
-	var sessions meta.EventSessions
+// scanTriggerEvents makes one pass over evts (each already this package's
+// own json.Marshal(evt) output — see executor.go's Schedule path) to derive
+// both of run_common_fields' event-derived columns at once, rather than
+// unmarshaling every trigger event twice:
+//
+//   - sessions mirrors pkg/execution/executor's normalizeRunSessions:
+//     collects every triggering event's Meta.Sessions into the run-level
+//     pair list (the run-level form of event.EventMeta.Sessions, since a
+//     run triggered by multiple events, e.g. a batch, can carry several
+//     session pairs — see meta.EventSessions' own doc comment), then
+//     dedupes, sorts by (Key, then ID) for determinism across retries
+//     (event/batch iteration order isn't stable), and caps at
+//     consts.MaxRunSessions.
+//   - isDeferred reports whether evts contains an inngest/deferred.schedule
+//     trigger event -- i.e. this run was scheduled via defer(), not a
+//     normal event/cron trigger. Only the event name is checked, not full
+//     DeferredScheduleMetadata validity: is_deferred is a coarse flag, not
+//     a source of parent-linkage data (that's deferredScheduleMetadata's
+//     job, used by OnFunctionScheduled alone).
+//
+// An unmarshal failure here would indicate a bug elsewhere, not bad
+// external input — a malformed entry is skipped rather than failing the
+// whole row.
+func scanTriggerEvents(evts []json.RawMessage) (sessions meta.EventSessions, isDeferred bool) {
 	for _, raw := range evts {
 		var evt event.Event
 		if err := json.Unmarshal(raw, &evt); err != nil {
@@ -175,9 +190,12 @@ func runSessions(evts []json.RawMessage) meta.EventSessions {
 		for name, id := range evt.Meta.Sessions {
 			sessions = append(sessions, meta.EventSession{Key: name, ID: id})
 		}
+		if evt.Name == consts.FnDeferScheduleName {
+			isDeferred = true
+		}
 	}
 	if len(sessions) == 0 {
-		return nil
+		return nil, isDeferred
 	}
 
 	slices.SortFunc(sessions, func(a, b meta.EventSession) int {
@@ -191,7 +209,7 @@ func runSessions(evts []json.RawMessage) meta.EventSessions {
 	if len(sessions) > consts.MaxRunSessions {
 		sessions = sessions[:consts.MaxRunSessions]
 	}
-	return sessions
+	return sessions, isDeferred
 }
 
 // addEventsInputAttr sets meta.Attrs.EventsInput to evts marshaled as a
@@ -252,12 +270,15 @@ func (l *listener) OnFunctionScheduled(ctx context.Context, md sv2.Metadata, ite
 	// a real subprocess that the resulting blank key never actually reaches
 	// the exported span attributes (the OTel SDK drops it), so there's no
 	// stray "" key in the stored attributes JSON.
+	deferLinks := deferredScheduleMetadata(ctx, evts)
+
 	queuedAt := ulid.Time(md.ID.RunID.Time())
 	attrs := meta.NewAttrSet()
 	meta.AddAttr(attrs, meta.Attrs.QueuedAt, &queuedAt)
 	meta.AddAttr(attrs, meta.Attrs.StartedAt, (*time.Time)(nil))
 	meta.AddAttr(attrs, meta.Attrs.EndedAt, (*time.Time)(nil))
 	addEventsInputAttr(ctx, attrs, evts)
+	addDeferParentAttrs(attrs, deferLinks)
 
 	mdPtr := safeMetadata(md)
 	_, _ = l.createSpan(ctx, tracingv3.SpanNameRunQueued, &tracing.CreateSpanOptions{
@@ -268,6 +289,115 @@ func (l *listener) OnFunctionScheduled(ctx context.Context, md sv2.Metadata, ite
 		StartTime:  queuedAt,
 		EndTime:    queuedAt,
 	})
+
+	l.updateParentDeferSpans(ctx, md, queuedAt, deferLinks)
+}
+
+// deferredScheduleMetadata extracts every valid inngest/deferred.schedule
+// trigger event's DeferredScheduleMetadata from evts, skipping (and
+// logging) any that fail to parse or validate -- mirrors
+// executor.updateDeferSpans' own tolerance for malformed/invalid entries, so
+// one bad entry never blocks scheduling the run itself.
+func deferredScheduleMetadata(ctx context.Context, evts []json.RawMessage) []*event.DeferredScheduleMetadata {
+	var out []*event.DeferredScheduleMetadata
+	for _, raw := range evts {
+		var evt event.Event
+		if err := json.Unmarshal(raw, &evt); err != nil {
+			continue
+		}
+		if evt.Name != consts.FnDeferScheduleName {
+			continue
+		}
+		m, err := evt.DeferredScheduleMetadata()
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("dualwrite: malformed deferred schedule metadata", "error", err)
+			continue
+		}
+		if err := m.Validate(); err != nil {
+			logger.StdlibLogger(ctx).Error("dualwrite: invalid deferred schedule metadata", "error", err)
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+// addDeferParentAttrs stamps the child run's own DeferParentRunIDs/
+// DeferParentFnSlug attrs, mirroring executor.updateDeferSpans' identical
+// (and identically odd -- see its own comment) "one fn slug for possibly
+// many parent run IDs" shape.
+func addDeferParentAttrs(attrs *meta.SerializableAttrs, links []*event.DeferredScheduleMetadata) {
+	if len(links) == 0 {
+		return
+	}
+	var parentRunIDs []string
+	var parentFnSlug string
+	for _, m := range links {
+		parentRunIDs = append(parentRunIDs, m.ParentRunID.String())
+		parentFnSlug = m.ParentFnSlug
+	}
+	meta.AddAttr(attrs, meta.Attrs.DeferParentRunIDs, &parentRunIDs)
+	meta.AddAttr(attrs, meta.Attrs.DeferParentFnSlug, &parentFnSlug)
+}
+
+// updateParentDeferSpans re-emits each linked defer's executor.defer span
+// row for the PARENT run, now with DeferChildRunID stamped onto it --
+// mirrors executor.updateDeferSpans' UpdateSpan call, which this package
+// can't reuse (run_trace_spans is append-only, see this file's own package
+// doc). Reuses the original's deterministic span_id
+// (tracing.DeferSpanSeed(parentRunID, hashedID)) rather than a fresh one, so
+// duckdbquery's read side can collapse both rows to one logical defer by
+// (run_id, span_id); it picks the most-advanced row, so this one need only
+// carry the fields known here, not everything the original DeferAdd row
+// had (e.g. UserlandID is never available past the original SDK request,
+// and is simply absent from this row -- a documented, bounded gap).
+// queuedAt is the child run's own queued time (this hook has no `now` of
+// its own -- see OnFunctionScheduled's caller-supplied-timestamp
+// convention on every hook that does).
+func (l *listener) updateParentDeferSpans(ctx context.Context, childMD sv2.Metadata, queuedAt time.Time, links []*event.DeferredScheduleMetadata) {
+	for _, m := range links {
+		if m.HashedID == "" {
+			// Pre-existing event from before HashedID was added to
+			// DeferredScheduleMetadata (see pkg/event/defer.go) -- without
+			// it, DeferSpanSeed here would compute a different span_id than
+			// the original DeferAdd row, landing as an orphan rather than
+			// collapsing with it. Narrow window (only events already
+			// in-flight across this exact deploy), not worth writing a
+			// wrong row over.
+			logger.StdlibLogger(ctx).Warn(
+				"dualwrite: deferred schedule metadata missing hashed ID, skipping parent defer span update",
+				"parent_run_id", m.ParentRunID.String(),
+			)
+			continue
+		}
+
+		parentMD := safeMetadata(sv2.Metadata{
+			ID: sv2.ID{
+				RunID:      m.ParentRunID,
+				FunctionID: m.ParentFnID,
+				Tenant: sv2.Tenant{
+					AccountID: childMD.ID.Tenant.AccountID,
+					EnvID:     childMD.ID.Tenant.EnvID,
+					AppID:     m.ParentAppID,
+				},
+			},
+		})
+		childRunID := childMD.ID.RunID
+		status := enums.DeferStatusAfterRun
+		_, _ = l.createSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
+			Metadata:  parentMD,
+			Parent:    tracing.RunSpanRefFromMetadata(parentMD),
+			Seed:      tracing.DeferSpanSeed(m.ParentRunID, m.HashedID),
+			StartTime: queuedAt,
+			EndTime:   queuedAt,
+			Attributes: meta.NewAttrSet(
+				meta.Attr(meta.Attrs.DeferHashedID, &m.HashedID),
+				meta.Attr(meta.Attrs.DeferFnSlug, &m.FnSlug),
+				meta.Attr(meta.Attrs.DeferStatus, &status),
+				meta.Attr(meta.Attrs.DeferChildRunID, &childRunID),
+			),
+		})
+	}
 }
 
 func (l *listener) OnFunctionStarted(ctx context.Context, md sv2.Metadata, item queue.Item, evts []json.RawMessage) {
@@ -484,6 +614,51 @@ func (l *listener) OnEventReceived(ctx context.Context, evt event.TrackedEvent) 
 	}
 
 	l.sendEvent(row)
+}
+
+// OnDeferAdd writes the run's own executor.defer span (a new row, seeded
+// deterministically from (run_id, hashedID) via tracing.DeferSpanSeed --
+// see pkg/execution/defers.createDeferSpan, which does the same for the
+// real system). now is d's own accept/reject moment, not necessarily
+// "now" by the time this fires -- see the interface doc comment.
+func (l *listener) OnDeferAdd(ctx context.Context, md sv2.Metadata, d sv2.Defer, userlandID string, now time.Time) {
+	mdPtr := safeMetadata(md)
+	_, _ = l.createSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
+		Metadata:  mdPtr,
+		Parent:    tracing.RunSpanRefFromMetadata(mdPtr),
+		Seed:      tracing.DeferSpanSeed(md.ID.RunID, d.HashedID),
+		StartTime: now,
+		EndTime:   now,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DeferHashedID, &d.HashedID),
+			meta.Attr(meta.Attrs.DeferUserlandID, &userlandID),
+			meta.Attr(meta.Attrs.DeferFnSlug, &d.FnSlug),
+			meta.Attr(meta.Attrs.DeferStatus, &d.ScheduleStatus),
+		),
+	})
+}
+
+// OnDeferAbort re-emits the defer's executor.defer span (same deterministic
+// span_id as OnDeferAdd's own write -- see its doc comment) with
+// status=Aborted. fn_slug/userland_id aren't known at abort time (see
+// pkg/execution/defers.AbortFromOp, which doesn't have them either) and are
+// simply absent from this row; duckdbquery's read side collapses to the
+// most-advanced row per (run_id, span_id), so this is the terminal state
+// for this defer regardless.
+func (l *listener) OnDeferAbort(ctx context.Context, md sv2.Metadata, hashedID string, now time.Time) {
+	mdPtr := safeMetadata(md)
+	status := enums.DeferStatusAborted
+	_, _ = l.createSpan(ctx, meta.SpanNameDefer, &tracing.CreateSpanOptions{
+		Metadata:  mdPtr,
+		Parent:    tracing.RunSpanRefFromMetadata(mdPtr),
+		Seed:      tracing.DeferSpanSeed(md.ID.RunID, hashedID),
+		StartTime: now,
+		EndTime:   now,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DeferHashedID, &hashedID),
+			meta.Attr(meta.Attrs.DeferStatus, &status),
+		),
+	})
 }
 
 // The per-step hooks below create real spans through l.tp (this listener's
