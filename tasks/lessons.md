@@ -138,20 +138,53 @@ second real bug on the first try — a fan-out whose members had all collapsed t
 0% because the segment positions were measured from `queuedAt` while the
 envelope used execution start.
 
-### 18. A scripted `.replace()` that finds nothing fails silently
-Symptom: applied four fixes in one scripted edit, verified the build and the
-tests, and shipped three. The fourth — the one the reviewer had specifically
-asked for — never landed, because prettier had re-wrapped the expression since
-I last read it and my `old` string no longer matched. `.replace()` with no match
-returns the input unchanged and says nothing.
+### 18. Check the rendered thing against something outside the change
+The general form of #17, and the rule that actually catches this class. Three
+times in one feature I shipped something that passed its own check and did not
+work, and the check passed each time for a *different* reason:
 
-It was caught only because I went to the browser to check the behaviour and
-found it unchanged, then read the file and found my code absent.
+1. **Tooltips invisible to every user.** They were in the file, wired correctly,
+   and asserted by a test over 44 fixtures — but shipped as `title=`, which the
+   row's HoverCard beat to the pointer. The model was right; the delivery had no
+   test and no manual check.
+2. **A rendered label wrong against its own ruler.** The Run row reported the
+   run's whole life while the axis still spanned execution only, on 43 of 45
+   fixtures. The coherence test compared the bar's *geometry* to the axis and
+   passed throughout, because the regression was in the printed label.
+3. **A fix whose code was not there.** A scripted `.replace()` whose target no
+   longer matched — a formatter had re-wrapped the expression — returns the
+   input unchanged and reports nothing. Build passed, tests passed, three of
+   four fixes shipped.
 
-**Detection signal**: a behavioural change that "didn't take" after a scripted
-edit, especially in a file that has been through a formatter since it was read.
-**Prevention**: after any scripted multi-edit, `grep -c` for a distinctive token
-from EACH replacement and check the counts before running anything else. One
-line, and it turns a silent no-op into an immediate failure. The `Edit` tool
-errors on a missed match; `.replace()` does not, so the cheap check is the price
-of using a script for several edits at once.
+No single narrower rule covers all three. A grep for each replacement's token
+catches only (3); (1) and (2) would both sail past it, because the code was
+present and correct-looking in each. What caught all three was the same act:
+**open the rendered artefact, read the number it shows, and compare it against
+something the change did not produce** — another view, the axis, the payload.
+
+**Prevention, in order of cost:**
+- After a scripted multi-edit, `grep -c` a distinctive token from each
+  replacement. Cheap pre-flight, catches (3) only. `Edit` errors on a missed
+  match; `.replace()` does not, so this is the price of batching.
+- For anything user-visible, read it back out of the DOM. `page.hover()` plus
+  the popper's `innerText` takes under a minute.
+- Assert the *printed* value, not the value that feeds it. The same number
+  computed twice is not a check; the number on screen against the number in
+  another view is.
+
+**Detection signal**: "the change didn't take", or a green suite for a change
+whose whole purpose is that someone can now see something.
+
+### 19. A defect that looks like a decision stops being questioned
+`wide`'s collapsed fan-out drew twelve steps as twelve evenly-pitched, equal
+ticks — perfectly regular, so it read as a deliberate design. It survived two
+full review rounds before anyone noticed the run was *concurrent* and the row
+was drawing it as a sequence, contradicting the minimap directly above it.
+
+Irregular output invites scrutiny; regular output gets taken for intent. When
+something looks designed, the question "what would this look like if it were
+wrong?" is the one that doesn't get asked.
+
+**Detection signal**: a rendering that is suspiciously uniform — equal widths,
+even spacing, identical rows — where the underlying data has no reason to be.
+Check it against a second view of the same data before accepting it.

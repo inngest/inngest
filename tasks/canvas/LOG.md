@@ -1170,3 +1170,26 @@ only by going to the browser and finding the behaviour unchanged. Recorded as le
 scripted multi-edit, `grep -c` a distinctive token from each replacement before doing anything else.
 
 1118 tests, 45 fixtures clean.
+
+## Closing note — what generalises
+
+The review agent's parting observations, recorded because they are the durable part:
+
+**The measurement that mattered was boring.** Read the DOM, compute the arithmetic, compare across
+views. Every serious finding came from that — the 86% ghost, `Planning` duplicating `Finalization`,
+the axis regression, the 1px `Run`, the 0px note. Screenshots confirmed things; they did not discover
+them. The impression a screenshot gives is not evidence.
+
+**The characteristic defect of this view is one interval drawn twice, in two places, under two
+names.** `Planning`/`Finalization`; the step ghosts against the Planning marks; the Run row's ghost
+against the row beneath it; the collapsed group's frame against its envelope. If anyone picks this up
+again, that is the first pattern to check.
+
+**A defect that looks like a decision stops being questioned.** `wide`'s twelve evenly-pitched ticks
+survived two rounds because perfect regularity reads as intent. Recorded as lesson 19.
+
+And the correction to my own lesson 18, which was narrower than the failure it described: grepping
+for each replacement's token catches only the case where the edit did not apply. The tooltips were
+genuinely in the file, and the axis label was genuinely computed — both would pass any grep. The rule
+that catches all three is **open the rendered artefact and check its number against something the
+change did not produce**, with the grep as one cheap instance of it rather than the rule itself.
