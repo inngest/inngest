@@ -504,3 +504,36 @@ describe('what the reviewers caught', () => {
     check(rows);
   });
 });
+
+describe('a collapsed row draws the shape that happened', () => {
+  it('draws a fan-out as concurrent, not as a sequence', () => {
+    // `wide`'s twelve steps all started within 14ms of each other. Drawn as
+    // evenly-pitched equal ticks with gaps between them they read as twelve
+    // sequential 8ms steps — the opposite of the truth, and in direct
+    // contradiction of the minimap one strip above, which drew them overlapping
+    // across twelve lanes.
+    const raw = (wide as { run: { trace: unknown } }).run.trace as Trace;
+    const rolled = traceRollup(raw);
+    const plan = planCollapse(toCanvasGraph(rolled));
+    const data = traceToTimelineData(rolled, { runID: 'wide' });
+    const bars = applyCollapseToBars(data.bars, plan);
+
+    const group = bars[0]?.children?.find((b) => b.name.includes('×'));
+    expect(group?.segments?.length).toBeGreaterThan(5);
+
+    const segments = group!.segments!;
+    // Members overlap: every one starts before the one before it has finished.
+    let overlapping = 0;
+    for (let i = 1; i < segments.length; i++) {
+      const previousEnd = segments[i - 1]!.startPercent + segments[i - 1]!.widthPercent;
+      if (segments[i]!.startPercent < previousEnd) overlapping += 1;
+    }
+    expect(overlapping, 'a fan-out drawn as a sequence').toBe(segments.length - 1);
+
+    // ...and they do not all sit on top of each other either: the stagger
+    // between their starts is the picture of the concurrency limit, and
+    // measuring from queuedAt rather than execution start flattened it to zero.
+    const starts = segments.map((s) => s.startPercent);
+    expect(Math.max(...starts) - Math.min(...starts)).toBeGreaterThan(0);
+  });
+});

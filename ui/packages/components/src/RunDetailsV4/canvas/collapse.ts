@@ -710,6 +710,7 @@ export function applyCollapse(
  * continuous block.
  */
 function memberSegments(
+  kind: CollapseKind,
   groupID: string,
   rows: TimelineBarData[],
   envelope: CollapseEnvelope,
@@ -725,6 +726,21 @@ function memberSegments(
   // pane gets fewer, larger marks rather than mush. Bucketed members take their
   // worst member's status — the same rule the group node uses, so a bucket
   // holding a failure is red.
+  // A FAN-OUT IS NOT A SEQUENCE.
+  //
+  // Evenly-pitched marks say "one, then the next, then the next", which is
+  // right for a loop body and a lie for a fan-out: `wide`'s twelve steps all
+  // started within 14ms of each other and were drawn as twelve equal ticks
+  // spread evenly across the row with white gaps between them, reading as
+  // twelve sequential 8ms steps. The minimap directly above drew the same
+  // twelve overlapping across twelve lanes — the two strips disagreed about
+  // the shape of the run, touching each other on screen.
+  //
+  // So a siblings group draws its members where they actually were. They
+  // overlap, they merge into a block, and that block IS the answer: these
+  // happened at once.
+  if (kind === 'siblings') return concurrentSegments(groupID, rows, envelope);
+
   const marks = Math.max(1, Math.min(rows.length, maxMarks));
 
   // Every mark the same size with an even gap. Widths proportional to duration
@@ -759,6 +775,43 @@ function memberSegments(
             bucket.names.length > 4 ? ', …' : ''
           }${bucket.status ? ` — worst: ${bucket.status.toLowerCase()}` : ''}`,
   }));
+}
+
+/**
+ * Members of a fan-out, each at its own real interval within the envelope.
+ *
+ * Overlap is the point rather than a problem to lay out around: steps that ran
+ * at the same time are drawn on top of each other, so the row reads as one
+ * solid stretch of concurrent work instead of a tidy sequence that never
+ * happened. Widths are floored so a 1ms member is still findable.
+ */
+function concurrentSegments(
+  groupID: string,
+  rows: TimelineBarData[],
+  envelope: CollapseEnvelope
+): BarSegment[] {
+  const span = envelope.lastEndedAt - envelope.firstStartedAt;
+  if (span <= 0) return [];
+
+  return rows.map((row, i) => {
+    // When it RAN, not when it was queued — the envelope is built from the same
+    // instant. Measuring from `startTime` put every member of `wide` at exactly
+    // 0%, because a fan-out queues all twelve together, and threw away the
+    // stagger between their starts. That stagger is a picture of the
+    // concurrency limit and is the one thing a collapsed fan-out has to keep.
+    const startMs = row.startTime.getTime() + (row.delayMs ?? 0);
+    const endMs = Math.max(startMs, (row.endTime ?? row.startTime).getTime());
+    const startPercent = ((startMs - envelope.firstStartedAt) / span) * 100;
+
+    return {
+      id: `${groupID}-member-${i}`,
+      startPercent: Math.max(0, Math.min(100, startPercent)),
+      widthPercent: Math.max(1.2, ((endMs - startMs) / span) * 100),
+      style: 'step.run' as const,
+      status: row.status,
+      tooltip: `${row.name}${row.status ? ` — ${row.status.toLowerCase()}` : ''}`,
+    };
+  });
 }
 
 /** Roughly the narrowest a mark plus its gap can be and still read as two. */
@@ -833,7 +886,7 @@ export function applyCollapseToBars(
         // happened here for 1.9s"; a run of small marks says *where in the
         // sequence* the failures were, which is the question a collapsed row
         // otherwise forces you to expand to answer.
-        segments: memberSegments(group.id, rows, group.envelope, maxMarks),
+        segments: memberSegments(group.kind, group.id, rows, group.envelope, maxMarks),
         // A group is a summary, not a span: the per-step phase breakdowns belong
         // to the members and are shown when it is expanded. Claiming one step's
         // discovery or HTTP timing as the group's would be a fabrication.
