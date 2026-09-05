@@ -44,6 +44,22 @@ export type RunValue = {
   batchedFrom: number;
   /** Events this run sent onward from inside a step. */
   emittedSteps: number;
+  /**
+   * Time actually spent executing on the user's own app.
+   *
+   * The sum of what each step ran for, and nothing else: not the queueing, not
+   * the discovery requests, not Inngest's latency, and emphatically not the
+   * sleeps and waits. This is the number a durable-execution platform exists to
+   * keep small, and the run's own wall-clock says nothing about it — a run can
+   * be seven days long and cost four seconds of compute.
+   *
+   * Summed rather than measured as elapsed, deliberately. Two steps running in
+   * parallel for 100ms each consume 200ms of the user's compute even though the
+   * run only spent 100ms doing it, and consumption is the question.
+   */
+  computeMs: number;
+  /** The run's wall-clock, so the two can be read against each other. */
+  elapsedMs: number;
 };
 
 /** A single factual sentence per thing that is true of this run. */
@@ -71,6 +87,15 @@ export function valueLines(value: RunValue): string[] {
 
   if (value.batchedFrom > 1) {
     lines.push(`Batched ${plural(value.batchedFrom, 'event')} into one run`);
+  }
+
+  // Only where the two numbers differ enough to be worth the comparison. On a
+  // run that was almost entirely execution this says nothing, and a line that
+  // says nothing is worse than no line.
+  if (value.computeMs > 0 && value.elapsedMs > value.computeMs * 1.5) {
+    lines.push(
+      `${duration(value.computeMs)} of compute across ${duration(value.elapsedMs)} elapsed`
+    );
   }
 
   return lines;
@@ -105,6 +130,7 @@ export function runValue(rolledUp: Trace, batchSize = 1): RunValue {
   let recoveredAttempts = 0;
   let suspendedMs = 0;
   let emittedSteps = 0;
+  let computeMs = 0;
 
   for (const span of rolledUp.childrenSpans ?? []) {
     // A retry only counts as a recovery when it actually recovered. A step that
@@ -119,6 +145,14 @@ export function runValue(rolledUp: Trace, batchSize = 1): RunValue {
       suspendedMs += Math.max(0, Date.parse(span.endedAt) - Date.parse(span.startedAt));
     }
 
+    // What the user's app actually ran for. A wait or a sleep is the run
+    // suspended, holding nothing — counting it as compute would invert the
+    // meaning of the line entirely.
+    const isWait = span.stepOp ? WAIT_OPS.has(span.stepOp) : false;
+    if (!isWait && span.startedAt && span.endedAt) {
+      computeMs += Math.max(0, Date.parse(span.endedAt) - Date.parse(span.startedAt));
+    }
+
     if (span.stepType === 'step.sendEvent') emittedSteps += 1;
   }
 
@@ -129,7 +163,12 @@ export function runValue(rolledUp: Trace, batchSize = 1): RunValue {
   const startedAt = rolledUp.startedAt ? Date.parse(rolledUp.startedAt) : null;
   const held = queuedAt !== null && startedAt !== null ? startedAt - queuedAt : 0;
 
+  const endedAt = rolledUp.endedAt ? Date.parse(rolledUp.endedAt) : null;
+  const elapsedMs = queuedAt !== null && endedAt !== null ? Math.max(0, endedAt - queuedAt) : 0;
+
   return {
+    computeMs,
+    elapsedMs,
     recoveredSteps,
     recoveredAttempts,
     suspendedMs,

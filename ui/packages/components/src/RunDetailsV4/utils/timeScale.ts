@@ -233,17 +233,36 @@ export function buildTimeScale(
  * stretch the axis is explicitly not drawing.
  */
 export function scaleTicks(scale: TimeScale, count = 5): Array<{ percent: number; ms: number }> {
-  const ticks: Array<{ percent: number; ms: number }> = [];
+  // On a BROKEN axis, ticks go on the breaks.
+  //
+  // Evenly spacing them by width is meaningless once the axis is piecewise:
+  // `cancelled` put four of its five ticks inside the first 26 milliseconds and
+  // the fifth 35 seconds later, because 88% of the width belongs to a stretch
+  // where almost nothing happened. Reading those four tells you nothing you did
+  // not already know, and the one number that matters — when the wait began —
+  // was not marked at all.
+  //
+  // Anchoring them to the segment boundaries instead labels the structure: the
+  // run's start, the moment each elided stretch begins and ends, and the run's
+  // end. Every tick then marks a real transition rather than an arbitrary
+  // fraction of a distorted ruler.
+  if (scale.compressed && scale.gaps.length) {
+    const at = new Set<number>([0, 100]);
+    for (const gap of scale.gaps) {
+      at.add(gap.startPercent);
+      at.add(gap.endPercent);
+    }
 
-  for (let i = 0; i < count; i++) {
-    const percent = (i / (count - 1)) * 100;
-    const ms = percentToMs(scale, percent);
-    const insideGap = scale.gaps.some(
-      (gap) => percent > gap.startPercent + 0.01 && percent < gap.endPercent - 0.01
-    );
-    if (!insideGap) ticks.push({ percent, ms });
+    return [...at]
+      .sort((a, b) => a - b)
+      .map((percent) => ({ percent, ms: percentToMs(scale, percent) }));
   }
 
+  const ticks: Array<{ percent: number; ms: number }> = [];
+  for (let i = 0; i < count; i++) {
+    const percent = (i / (count - 1)) * 100;
+    ticks.push({ percent, ms: percentToMs(scale, percent) });
+  }
   return ticks;
 }
 
