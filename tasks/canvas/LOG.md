@@ -996,3 +996,81 @@ node width cannot hold a horizontal graph legibly, and widening the node reflows
 so this stays until the node can be wider.
 
 1074 tests, 45 fixtures rendering clean.
+
+## Critic round 3 — the regression I caused, and the last of the arithmetic
+
+Round 3 confirmed all five of round 2's fixes on screen, and found that fix #5 had introduced a
+**systematic regression across 43 of 45 fixtures**.
+
+### Moving the number without moving the plot
+
+Making the Run row report the run's whole life left the axis spanning execution only, so the bar ran
+0%→100% of a ruler that ended one queue delay short of what the bar said it was. `simple` drew a
+full-width bar labelled **165ms against a ruler reading 0ms → 32ms**.
+
+The coherence test that exists for exactly this compared `bar.endTime − bar.startTime` against
+`maxTime − minTime` and passed throughout, because the regression was in the *rendered label* rather
+than in the geometry. **Same shape as the tooltip miss**: the model was consistent, the screen was
+not. There is now an assertion on what is printed.
+
+Neither of the critic's two options was quite right. Growing the axis to cover the queue would undo
+the reclaimed horizontal space, which was a deliberate choice and the whole point of that change.
+Reverting the number restores the older inconsistency. The actual root cause was underneath both:
+**the note meant two different things** — additional to the number on a reclaimed queue, inside it
+on a drawn one. It now says which: `+120ms queued` or `incl. 6.299s queued`, and the canvas terminal
+keeps reporting the whole life, which the note reconciles exactly (`simple`: 32ms + 133ms = 165ms).
+
+### The card was arguing with itself
+
+Four contradictions in one card, all from leading with the segment's sentence and then reporting the
+row underneath: `Backed off 1.002s before attempt 2` above `DELAY -`; a 78ms discovery mark
+reporting the Planning row's 774ms; every segment of a retried step reporting the row's whole
+START/END; and `YOUR SERVER 1.015s` on a step that spent 1.000s of it backing off. **The last one
+passed the arithmetic gate because it summed** — the gate catches contradiction, not mislabelling.
+Segments now carry their own window and the card reports that.
+
+The Planning marks also stopped inviting a sum. `chains` read "Planned 2 steps" ×3 and "Planned 1
+step" ×2 — eight steps in a five-step run — because each per-step discovery re-plans what follows.
+Comparing each request's `plannedStepIDs` against what earlier ones covered says which were
+re-plans.
+
+### Two frames for one row
+
+A collapsed group's row begins at the earliest member's `queuedAt` so it does not start after its own
+children, but its segments were placed against the **envelope**, which begins when the first member
+started *running*. `wide`'s block sat 42% into a bar whose first 42% was blank, and the row could not
+be reconciled with its own canvas node: 155 − 61 = 94 against 90. The note was inherited from one
+member rather than being the group's — the missing 4ms. Segments now use the row's own frame, the
+note is the group's own lead-in, and that lead-in is drawn as a ghost like every other row's.
+
+A `step.invoke` had no timing breakdown and fell through both measuring rules, so `call child`
+reported 520ms against 519ms. `leadInMs` falls back to `delayMs` — and that immediately broke the
+`wait` fixture, correctly: a sleep draws no lead-in at all, so reporting one would name something
+not drawn. `IDLE_STYLES` now lives beside `leadInMs` rather than in two places.
+
+### `loop40` and the invoked run
+
+`think` and `act` have near-identical envelopes, so evenly-pitched marks landed at the same x in both
+rows — forty ticks in exact vertical alignment, reading as forty concurrent pairs of a strictly
+sequential loop. Marks are placed by when their members ran, the same rule the fan-out change
+established. It also revealed what even pitch had erased: the iterations are dense at the start and
+spread out later, because they got slower.
+
+The invoke preview said 519ms outside, 271ms in its header and 16ms in its only row. A run is more
+than its steps, so the remainder is now stated as one figure — `255ms outside its steps`, and
+16 + 255 = 271.
+
+1118 tests, 45 fixtures rendering clean.
+
+### Still open, with reasons
+
+- The child preview reads top-to-bottom inside a left-to-right parent. 186px cannot hold a
+  horizontal graph legibly and widening the node reflows the canvas.
+- `cancelled`'s axis ticks and its `Planning` row's weight — correct consequences of the elastic
+  axis, and I have no fix I believe in.
+- `chains`' junction topology; the popover and legend state the uncertainty, the arrows still say
+  what they say.
+- `Function error` at 58% of `failure`; the label recedes, the bar does not.
+- `retry`'s backoff in the success colour — diagnosed (the segment takes the *upcoming* attempt's
+  status, so dead time caused by a failure is painted with the success that follows), not yet fixed.
+- `step`'s 72ms of blank trace, labelled on the canvas and not in the trace.
