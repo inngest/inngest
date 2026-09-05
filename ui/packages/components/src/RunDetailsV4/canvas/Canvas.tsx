@@ -61,6 +61,20 @@ type Props = {
   onOpenChildRun?: (childRunID: string) => void;
 };
 
+/**
+ * Deliberately no `minZoom`.
+ *
+ * A wide graph in a short pane fits only by zooming out, and on `chains` —
+ * seven levels in 950px — that lands at ~0.55, rendering `step.run 32ms` at
+ * about six pixels. A floor was tried and is worse: at 0.75 the Trigger and the
+ * run's outcome both fall off the ends, and a reader who cannot see how the run
+ * started or how it finished has lost more than one who has to squint.
+ *
+ * Nothing here recovers the empty top and bottom of the pane — the zoom is
+ * bound by width, so vertical space cannot help. The real answer for a
+ * wide-and-shallow run is more horizontal space, which is what the full-screen
+ * control is for.
+ */
 const FIT_OPTIONS = { padding: 0.14, maxZoom: 1.2 } as const;
 
 /**
