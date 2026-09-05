@@ -17,13 +17,22 @@ func (r *functionRunV2Resolver) App(
 	ctx context.Context,
 	run *models.FunctionRunV2,
 ) (*cqrs.App, error) {
-	return r.Data.GetAppByID(ctx, run.AppID)
+	// Routed through the per-request AppLoader so a list view that renders
+	// many runs sharing an app only fires GetAppByID once per unique app
+	// (see #4326). The dataloader's identity cache scopes to the request,
+	// matching the lifetime of the GraphQL request context.
+	return loader.LoadOneWithString[cqrs.App](ctx, loader.FromCtx(ctx).AppLoader, run.AppID.String())
 }
 
 func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.FunctionRunV2) (*models.Function, error) {
-	fun, err := r.Data.GetFunctionByInternalUUID(ctx, fn.FunctionID)
+	// Same dedup as App above: a list view of N runs across M distinct
+	// functions (M ≤ N) now fires M lookups instead of N.
+	fun, err := loader.LoadOneWithString[cqrs.Function](ctx, loader.FromCtx(ctx).FunctionByInternalUUIDLoader, fn.FunctionID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving function: %w", err)
+	}
+	if fun == nil {
+		return nil, fmt.Errorf("function %s not found", fn.FunctionID)
 	}
 
 	return models.MakeFunction(fun)
