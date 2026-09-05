@@ -749,19 +749,45 @@ function memberSegments(
   const pitch = 100 / marks;
   const width = pitch * 0.62;
 
-  const buckets: Array<{ status?: string; index: number; names: string[] }> = [];
-  for (let i = 0; i < marks; i++) buckets.push({ index: i, names: [] });
+  const buckets: Array<{
+    status?: string;
+    index: number;
+    names: string[];
+    startedAt: number | null;
+  }> = [];
+  for (let i = 0; i < marks; i++) buckets.push({ index: i, names: [], startedAt: null });
 
   rows.forEach((row, i) => {
     const bucket = buckets[Math.min(marks - 1, Math.floor((i / rows.length) * marks))]!;
     const severity = (s?: string) => SEVERITY[(s ?? 'UNKNOWN') as CanvasStatus] ?? 0;
     if (severity(row.status) > severity(bucket.status)) bucket.status = row.status;
     bucket.names.push(row.name);
+
+    const began = row.startTime.getTime() + (row.delayMs ?? 0);
+    if (bucket.startedAt === null || began < bucket.startedAt) bucket.startedAt = began;
   });
+
+  // Marks sit WHERE THE WORK WAS, not at an even pitch by index.
+  //
+  // Even pitch made two groups over the same stretch draw at identical x:
+  // `loop40`'s `think` and `act` have near-identical envelopes, so their forty
+  // ticks landed in exact vertical alignment and the two rows read as forty
+  // concurrent pairs — of a run the minimap correctly calls `80 steps across 1
+  // concurrent lane`. Placed in time they interleave, which is what a loop does.
+  //
+  // Widths stay uniform. Proportional widths were tried and read as ragged; the
+  // mark says *when*, and the row's label says how long the whole thing took.
+  const at = (bucket: { index: number; startedAt: number | null }) =>
+    bucket.startedAt === null
+      ? bucket.index * pitch
+      : Math.max(
+          0,
+          Math.min(100 - width, ((bucket.startedAt - envelope.firstStartedAt) / span) * 100)
+        );
 
   return buckets.map((bucket) => ({
     id: `${groupID}-member-${bucket.index}`,
-    startPercent: bucket.index * pitch,
+    startPercent: at(bucket),
     widthPercent: width,
     style: 'step.run' as const,
     status: bucket.status,
