@@ -1,0 +1,89 @@
+-- +goose Up
+CREATE TABLE IF NOT EXISTS inngest.runs (
+	account_id UUID NOT NULL,
+	env_id UUID NOT NULL,
+	run_id VARCHAR NOT NULL,
+  queued_at TIMESTAMP_MS NOT NULL,
+  scheduled_at TIMESTAMP_MS NULL,
+  started_at TIMESTAMP_MS NULL,
+  ended_at TIMESTAMP_MS NULL,
+  app_id UUID NOT NULL,
+	function_id UUID NOT NULL,
+  status VARCHAR NOT NULL,
+  inputs JSON NOT NULL,
+  output JSON,
+  -- event_ids holds the run's triggering event(s) internal ULID(s) — see
+  -- pkg/execution/dualwrite/listener.go's runCommonFields, which sources it
+  -- from sv2.Metadata.Config.EventIDs (the same persisted field
+  -- pkg/run/trace_lifecycle.go's OTel "sys.event.ids" span attribute is
+  -- derived from for the SQLite/Postgres path). NULL for cron-only runs,
+  -- which have no triggering event at all.
+  event_ids VARCHAR[],
+  -- sessions is the run-level form of pkg/tracing/meta.EventSessions (the
+  -- JSON "event.sessions" attribute on the real run span) — one (key, id)
+  -- pair per session a triggering event tagged this run with, sourced from
+  -- pkg/execution/dualwrite/listener.go's runCommonFields, sorted/deduped/
+  -- capped at consts.MaxRunSessions the same way
+  -- pkg/execution/executor/executor.go's normalizeRunSessions builds the
+  -- real span's attribute. NULL when no triggering event carried any
+  -- session tag.
+  sessions STRUCT(key VARCHAR, id VARCHAR)[],
+  inserted_at TIMESTAMP_MS NOT NULL DEFAULT current_timestamp
+);
+ALTER TABLE inngest.runs
+  SET SORTED BY (year(queued_at), month(queued_at), account_id, env_id, run_id, queued_at);
+ALTER TABLE inngest.runs
+  SET PARTITIONED BY (year(queued_at), month(queued_at), account_id);
+
+-- Column set mirrors pkg/db/sqlite's `spans` table (see
+-- pkg/execution/dualwrite/span_exporter.go's doc comment), minus the
+-- dynamic-span rollup columns (dynamic_span_id, status, event_ids,
+-- is_deferred) — this table only ever holds flat, non-dynamic spans, so
+-- those values live in `attributes` like any other span attribute instead
+-- of getting a dedicated column.
+CREATE TABLE IF NOT EXISTS inngest.run_trace_spans (
+	account_id UUID NOT NULL,
+	env_id UUID NOT NULL,
+	run_id VARCHAR NOT NULL,
+  run_queued_at TIMESTAMP_MS NOT NULL,
+  app_id UUID NOT NULL,
+	function_id UUID NOT NULL,
+  name VARCHAR NOT NULL,
+  start_time TIMESTAMP_MS NOT NULL,
+  end_time TIMESTAMP_MS NOT NULL,
+  trace_id VARCHAR NOT NULL,
+  span_id VARCHAR NOT NULL,
+  parent_span_id VARCHAR,
+  attributes JSON NOT NULL,
+  links JSON,
+  output JSON,
+  input JSON,
+);
+ALTER TABLE inngest.run_trace_spans
+  SET SORTED BY (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id, start_time, end_time);
+ALTER TABLE inngest.run_trace_spans
+  SET PARTITIONED BY (year(run_queued_at), month(run_queued_at), account_id);
+
+CREATE TABLE IF NOT EXISTS inngest.events (
+	account_id UUID NOT NULL,
+	env_id UUID NOT NULL,
+  internal_id VARCHAR NOT NULL,
+  received_at TIMESTAMP_MS NOT NULL,
+  source VARCHAR NOT NULL,
+  source_id VARCHAR NULL,
+	event_id VARCHAR NOT NULL,
+	event_name VARCHAR NOT NULL,
+  event_data JSON NOT NULL DEFAULT '{}',
+  event_v VARCHAR NOT NULL,
+  event_ts TIMESTAMP_MS NOT NULL,
+  event_meta JSON NOT NULL DEFAULT '{}',
+);
+ALTER TABLE inngest.events
+  SET SORTED BY (year(received_at), month(received_at), account_id, env_id, internal_id, received_at);
+ALTER TABLE inngest.events
+  SET PARTITIONED BY (year(received_at), month(received_at), account_id);
+
+-- +goose Down
+DROP TABLE IF EXISTS inngest.runs;
+DROP TABLE IF EXISTS inngest.run_trace_spans;
+DROP TABLE IF EXISTS inngest.events;

@@ -466,45 +466,8 @@ fragmentLoop:
 		}
 	}
 
-	newSpan.Attributes, err = meta.ExtractTypedValues(ctx, newSpan.RawOtelSpan.Attributes)
-	if err != nil {
-		return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
-	}
-
-	if newSpan.Attributes.DynamicStatus != nil {
-		newSpan.Status = *newSpan.Attributes.DynamicStatus
-	}
-
-	if newSpan.Attributes.AppID != nil {
-		newSpan.AppID = *newSpan.Attributes.AppID
-	}
-
-	if newSpan.Attributes.FunctionID != nil {
-		newSpan.FunctionID = *newSpan.Attributes.FunctionID
-	}
-
-	if newSpan.Attributes.RunID != nil {
-		newSpan.RunID = *newSpan.Attributes.RunID
-	}
-
-	if newSpan.Attributes.DebugRunID != nil {
-		newSpan.DebugRunID = *newSpan.Attributes.DebugRunID
-	}
-
-	if newSpan.Attributes.DebugSessionID != nil {
-		newSpan.DebugSessionID = *newSpan.Attributes.DebugSessionID
-	}
-
-	if newSpan.Attributes.StartedAt != nil {
-		newSpan.StartTime = *newSpan.Attributes.StartedAt
-	}
-
-	if newSpan.Attributes.EndedAt != nil {
-		newSpan.EndTime = *newSpan.Attributes.EndedAt
-	}
-
-	if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
-		newSpan.MarkedAsDropped = true
+	if err := cqrs.ApplyExtractedSpanAttributes(ctx, newSpan); err != nil {
+		return nil, err
 	}
 
 	// If this span has finished, set a preliminary output ID.
@@ -2278,39 +2241,11 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 	}
 
 	so := &cqrs.SpanOutput{}
-
 	for _, row := range rows {
-		if len(row.Input) > 0 {
-			so.Input = row.Input
-		}
-
-		if len(row.Output) > 0 {
-			var m map[string]any
-
-			so.Data = row.Output
-			if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
-				// NOTE: By default, we wrap errors and data.  However, unforutnately
-				// step.waitForEvent is _not_ wrapped, so we check to see if there's
-				// both "data" and "name";  if so, we return the data wholesale.
-				if isWaitForEventOutput(m) {
-					return so, nil
-				}
-
-				if errData, ok := m["error"]; ok {
-					so.IsError = true
-					so.Data, _ = json.Marshal(errData)
-				} else if successData, ok := m["data"]; ok {
-					so.Data, _ = json.Marshal(successData)
-				} else {
-					sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
-					sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
-
-					logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
-				}
-			}
+		if cqrs.UnwrapSpanOutputEnvelope(so, row.Output, row.Input) {
+			break
 		}
 	}
-
 	return so, nil
 }
 
@@ -4374,11 +4309,4 @@ func newSpanRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runs
 // needsEventJoin checks if CEL expression references event.* fields
 func needsEventJoin(cel string) bool {
 	return strings.Contains(cel, "event.")
-}
-
-func isWaitForEventOutput(o map[string]any) bool {
-	_, name := o["name"]
-	_, data := o["data"]
-	_, ts := o["ts"]
-	return name && data && ts
 }

@@ -156,16 +156,30 @@ type Serializer interface {
 	Key() string
 	SerializeValue(any) (attribute.KeyValue, bool)
 	DeserializeValue(any) (any, bool)
+
+	// Wrap wraps an attribute.Value into the appropriate type for the serializer.
+	// This is mostly used for JSON attributes, which are stored as strings but need to be wrapped into json.RawMessage
+	// for proper deserialization.
+	WrapValue(attribute.Value) any
 }
 
 type attr[T any] struct {
 	key         string
 	serialize   func(T) attribute.KeyValue
 	deserialize func(any) (T, bool)
+	wrap        func(attribute.Value) any
 }
 
 func (a attr[T]) Key() string {
 	return a.key
+}
+
+func (a attr[T]) WrapValue(Value attribute.Value) any {
+	if a.wrap != nil {
+		return a.wrap(Value)
+	}
+
+	return Value.AsInterface()
 }
 
 func (a attr[T]) SerializeValue(v any) (attribute.KeyValue, bool) {
@@ -577,6 +591,12 @@ func JsonAttr[T any](key string) attr[*T] {
 			}
 
 			return nil, false
+		},
+		wrap: func(val attribute.Value) any {
+			if val.Type() != attribute.STRING {
+				return nil
+			}
+			return json.RawMessage(val.AsString())
 		},
 	}
 }

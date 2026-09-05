@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	sv1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/inngest/inngest/pkg/util/interval"
@@ -1081,6 +1082,25 @@ func (m *mockExecutor) RunFunctionFinishedLifecycle(
 	for _, c := range m.ExpectedCalls {
 		if c.Method == "RunFunctionFinishedLifecycle" {
 			m.Called(ctx, md, item, evts, resp)
+			return
+		}
+	}
+}
+
+func (m *mockExecutor) RunStepRunFinishedLifecycle(
+	ctx context.Context,
+	md state.Metadata,
+	item queue.Item,
+	edge inngest.Edge,
+	gen state.GeneratorOpcode,
+	now time.Time,
+) {
+	// Same "only record if expected" shape as RunFunctionFinishedLifecycle
+	// above — every OpcodeStepRun/OpcodeStep test exercises this call now,
+	// and most don't care to assert on it.
+	for _, c := range m.ExpectedCalls {
+		if c.Method == "RunStepRunFinishedLifecycle" {
+			m.Called(ctx, md, item, edge, gen, now)
 			return
 		}
 	}

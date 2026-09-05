@@ -43,6 +43,12 @@ func (k *TraceRequestKey) String() string {
 type traceReader struct {
 	loaders *Loaders
 	reader  cqrs.TraceReader
+	// convert renders a *cqrs.OtelSpan tree as GQL. Defaults to
+	// convertRunSpanToGQL (the rollup-aware converter) when nil, so every
+	// existing construction site (debug.go's, public.go's) that doesn't
+	// set this field keeps its current behavior unchanged. NewLoaders sets
+	// it to convertFlatSpanToGQL when params.DB is a flatSpanSource.
+	convert func(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error)
 }
 
 // just run id
@@ -69,7 +75,11 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
+			convert := tr.convert
+			if convert == nil {
+				convert = tr.convertRunSpanToGQL
+			}
+			gqlRoot, err := convert(ctx, rootSpan)
 			if err != nil {
 				res.Error = fmt.Errorf("error converting run root to GQL: %w", err)
 				return
