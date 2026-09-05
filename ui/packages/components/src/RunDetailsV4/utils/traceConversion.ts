@@ -723,15 +723,17 @@ export function traceToTimelineData(
     maxTime,
     bars: markInterrupted(
       withDiscoveryRow(
-        withRunNote(
-          // When the queue delay is reported as text rather than drawn, the run
-          // bar has to start where the plot does too — otherwise it extends off
-          // the left edge and reports more time than the axis covers, which is
-          // how `simple` ended up with a Run bar longer than the run. Its
-          // duration then reads as time spent executing, and the note carries
-          // the queued part: 497ms + "+156ms queued" rather than a bare 653ms.
-          clampToRunStart(bars, drawQueueDelay ? null : minTime, !drawQueueDelay),
-          runQueueDelayMs
+        withWaitNotes(
+          withRunNote(
+            // When the queue delay is reported as text rather than drawn, the run
+            // bar has to start where the plot does too — otherwise it extends off
+            // the left edge and reports more time than the axis covers, which is
+            // how `simple` ended up with a Run bar longer than the run. Its
+            // duration then reads as time spent executing, and the note carries
+            // the queued part: 497ms + "+156ms queued" rather than a bare 653ms.
+            clampToRunStart(bars, drawQueueDelay ? null : minTime, !drawQueueDelay),
+            runQueueDelayMs
+          )
         ),
         trace.discoveries ?? null,
         minTime
@@ -960,6 +962,64 @@ function withRunNote(bars: TimelineBarData[], queueDelayMs: number): TimelineBar
   return bars.map((bar) =>
     bar.isRoot ? { ...bar, note: `+${formatDuration(queueDelayMs)} queued` } : bar
   );
+}
+
+/**
+ * How long a step sat before it ran — the pale lead-in on its bar.
+ *
+ * This is the ONLY definition of it. The bar and its label both come through
+ * here, because the two disagreeing is how the reader ends up with a row
+ * headlined 104ms next to a canvas node headlined 32ms and no way to tell which
+ * is lying.
+ *
+ * The timestamps beat the metadata: a step's own span is what the bar is drawn
+ * across, so whatever is left of it after execution is the wait, whatever the
+ * SDK reported.
+ */
+export function leadInMs(bar: TimelineBarData): number {
+  if (!bar.timingBreakdown || !bar.endTime) return 0;
+
+  const spanMs = bar.endTime.getTime() - bar.startTime.getTime();
+  const { executionMs, inngestMs } = bar.timingBreakdown;
+  if (spanMs <= 0) return Math.max(0, inngestMs);
+
+  return Math.max(0, Math.min(spanMs, spanMs - executionMs));
+}
+
+/**
+ * A lead-in wide enough to see gets a number, so no ghost on screen is
+ * anonymous. Below this it is a sliver the eye reads as an edge on the bar, and
+ * a note for it would be noise on every row in the run.
+ */
+const LEAD_IN_NOTE_FRACTION = 0.05;
+const LEAD_IN_NOTE_MIN_MS = 5;
+
+/**
+ * Name the lead-in on every step that draws a visible one.
+ *
+ * The canvas reports how long a step RAN and puts the delay on the edge into
+ * it, which is the decomposition asked for. The trace row reports the step's
+ * whole span. Both are true and they are different numbers, so the row now
+ * carries the third number that reconciles them: `+72ms wait · 104ms` says the
+ * 32ms the canvas shows is in here too, and says what the pale part is.
+ */
+function withWaitNotes(bars: TimelineBarData[]): TimelineBarData[] {
+  const walk = (list: TimelineBarData[]): TimelineBarData[] =>
+    list.map((bar) => {
+      const children = bar.children ? walk(bar.children) : undefined;
+      if (bar.isRoot || bar.note || !bar.endTime) return { ...bar, children };
+
+      const wait = leadInMs(bar);
+      const spanMs = bar.endTime.getTime() - bar.startTime.getTime();
+      const visible =
+        wait >= LEAD_IN_NOTE_MIN_MS && spanMs > 0 && wait / spanMs >= LEAD_IN_NOTE_FRACTION;
+
+      return visible
+        ? { ...bar, note: `+${formatDuration(wait)} wait`, children }
+        : { ...bar, children };
+    });
+
+  return walk(bars);
 }
 
 function clampToRunStart(

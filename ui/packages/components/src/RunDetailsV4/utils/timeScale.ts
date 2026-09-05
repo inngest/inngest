@@ -65,14 +65,22 @@ export type TimeScaleOptions = {
    * that took an hour is not what makes the view unreadable.
    */
   minGapFraction?: number;
-  /** Width each compressed gap is given, as a fraction of the plot. */
+  /**
+   * Width each compressed gap is given, as a fraction of the plot.
+   *
+   * Not as small as it can get away with. A break is frequently occupied — a
+   * sleep or a waitForEvent is a ROW, drawn across the very stretch being
+   * elided — and at 5% `cancelled`'s 35.2s wait, the whole point of that run,
+   * had 5% of the width to say so while its 26ms of work had the other 95%.
+   * A break must stay legible as somewhere the run spent time.
+   */
   gapWidthFraction?: number;
 };
 
 const DEFAULTS = {
   minGapMs: 5_000,
   minGapFraction: 0.15,
-  gapWidthFraction: 0.05,
+  gapWidthFraction: 0.12,
 } satisfies Required<TimeScaleOptions>;
 
 /** Merge overlapping or touching intervals into a sorted, disjoint list. */

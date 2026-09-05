@@ -51,7 +51,13 @@ describe('buildTimeScale', () => {
     const [gap] = scale.gaps;
     // The gap reports its real duration — it is only its *width* that shrinks.
     expect(gap!.durationMs).toBe(7 * DAY);
-    expect(gap!.endPercent - gap!.startPercent).toBeCloseTo(5, 1);
+
+    // Narrow, but not a sliver: a break is regularly occupied by a sleep or a
+    // waitForEvent drawn across it, and it has to stay legible as somewhere the
+    // run spent time. The bound is what matters here, not the exact fraction.
+    const width = gap!.endPercent - gap!.startPercent;
+    expect(width).toBeGreaterThan(5);
+    expect(width).toBeLessThan(25);
 
     // The two seconds of actual work now occupy most of the width, which is the
     // entire purpose. Linearly they would have had 0.0003% between them.

@@ -741,3 +741,78 @@ interval?" is the question to ask before drawing anything new.
 `canvas-fixture-critic` reviews one fixture at a time across all three views and treats unexplained
 gaps, views that disagree, and "would the author of this function recognise it" as explicit findings.
 It should have been running from the start rather than waiting for the user to point at things.
+
+## Critic round 1 — the same interval, drawn twice, three more times
+
+`canvas-fixture-critic` reviewed all eight primary fixtures over the gallery and found the Run row
+contradicting its own label on **six of eight**. Every finding below was verified against the model
+before anything was changed; two of them were regressions I had introduced myself in the previous
+two commits.
+
+### What was wrong
+
+**The Run row drew a "waiting" ghost that was not the queue delay it named.** The label read
+`+100ms queued` while the bar drew 86% of `chains`, 97% of `t19-parallel` and 99.997% of `cancelled`
+as waiting — directly above steps drawn as *executing* over the very same interval. The number being
+drawn was the synthesised "total minus what the children executed" figure I had removed from the
+breakdown path but not from the root's. Gating it was not enough: a clamped bar (delay reclaimed
+into the label, so `delayMs` is 0) and a still-running bar (no `endTime`) both fell straight through
+the guard. The root branch is now **exclusive** — it never reaches the breakdown, whatever it finds.
+The invariant is asserted on all 44 fixtures, and it caught `inflight` on the first run, which is
+how the still-running path came to light at all.
+
+**`Planning` and `Finalization` were the same span.** The run's trailing discovery *is* the
+finalization span, and marking Finalization as a platform row had quietly excluded it from the
+coverage check — `collectStepSpans` filtered on `isPlatform`, conflating two different questions.
+"Is this a step?" decides lanes and counts. "Does anything already account for this interval?"
+decides what not to draw twice, and platform rows occupy time on screen exactly like anything else.
+Matching on `spanID` as well is exact where the 70%-overlap test was a guess: `t19-parallel` 5
+requests → 2, `chains` 6 → 5, `wide` 14 → 13, and `failure`, `retry` and `step` lose the row
+entirely.
+
+**A `waitForEvent` was drawn as empty space.** `cancelled`'s 35.2s wait — the single most important
+fact in that run — was decomposed into "waiting, then working", came out ~100% pale lead-in, and sat
+underneath an opaque axis-break band. Waiting IS the substance of a sleep or a waitForEvent, so
+neither is decomposed now; each gets one solid bar in its own style. The break band lost its fill
+too (it was painting out its own content) and its width went 5% → 12%, because a break is regularly
+occupied by a row drawn across it and has to stay legible as somewhere the run spent time.
+
+**A drawn queue delay is no longer elidable.** A bar's segments are laid out as percentages *of the
+bar* while the bar is placed through the elastic scale, so a break falling inside a bar pushes its
+own segments off. On `blocked` the Run row was still drawn "queued" a third of the way past the
+point where `hold` below it was drawn executing. Keeping that interval busy removes the break
+entirely and the two rows now agree to the pixel.
+
+### The canvas and the trace disagreed on every step, and never said so
+
+Worst case `blocked`: terminal pill `Completed 6.049s` against `Run 12.348s`. The canvas reports how
+long a step **ran** and puts the delay on the edge into it — the decomposition asked for — while a
+trace row reports the step's whole **span**. Both are true and they are different numbers.
+
+The row now carries the third number that reconciles them, in the `note` slot the Run row already
+used: `right-1 · +72ms wait · 104ms`, and 104 − 72 = the 32ms on the canvas node. It appears wherever
+a lead-in is wide enough to see (≥5% of the span and ≥5ms), so no visible ghost on screen is
+anonymous. `leadInMs` in `traceConversion.ts` is the **only** definition of that quantity and both
+the bar and the label come through it — the two disagreeing is precisely how a reader ends up with a
+row headlined 104ms next to a node headlined 32ms and no way to tell which is lying.
+
+### Still open
+
+- **`Function error` on `failure` is 272ms of a 469ms run** — 58%, the widest bar after Run, and it
+  is platform machinery. Truthful, but someone debugging "why did this fail" clicks the biggest red
+  bar and finds finalization; the error is in `doomed step` (43ms). A hierarchy problem, not an
+  honesty one.
+- **`Planning` on `wide` is 13 requests over 77% of the run**, sitting above 12 user steps drawn as
+  ticks. Same shape of complaint.
+- **Every segment in a row shows the same tooltip**, so there is no way to ask what a ghost is, and
+  the per-mark `Planned 2 steps` tooltip built for the Planning row is never rendered. Some
+  breakdown figures also do not add up (`left-2`: `DURATION 166ms / DISCOVERY 229ms`, a component
+  larger than the whole).
+- **A row's internal segments are linear while the row is placed elastically.** Worked around for
+  the run's queue delay above; still latent anywhere else a break falls inside a bar.
+- `chains`' canvas draws one junction fanning `left-1` into `right-2`; `branches resolved 0` is the
+  honest admission in the facts strip, but the arrows say otherwise.
+- Minimap: no singular in the aria-label; every run's finalization tail is blank by construction now
+  that it draws only steps.
+- Facts strip says `grouping sdk` while the canvas corner says `grouping: exact` — two labels for
+  one thing on one screen.

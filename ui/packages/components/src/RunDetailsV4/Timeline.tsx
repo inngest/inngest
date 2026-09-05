@@ -30,6 +30,7 @@ import { formatDuration, useStepHover, useStepSelection } from './runDetailsUtil
 import { packMinimap } from './utils/density';
 import { buildTimeScale, type Interval, type TimeScale } from './utils/timeScale';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
+import { leadInMs } from './utils/traceConversion';
 
 // ============================================================================
 // Types
@@ -396,7 +397,9 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
   if (spanMs !== null && spanMs > 0 && totalMs > spanMs) {
     // Trust the timestamps over the metadata and re-derive the split from the
     // span: anything left over after execution is this step's own overhead.
-    inngestMs = Math.max(0, spanMs - executionMs);
+    // `leadInMs` is that same derivation, and the row's `+72ms wait` label comes
+    // through it — one definition, so the bar and its label cannot disagree.
+    inngestMs = leadInMs(bar);
     totalMs = spanMs;
   }
 
@@ -683,7 +686,16 @@ function TimelineBarRenderer({
   // Bars with timingBreakdown use queue+execution segments; others fall back to delay+execution
   // A collapsed group brings its own segments — one per member — so the row
   // shows where in the sequence things happened rather than one solid block.
-  const segments = bar.segments ?? generateBarSegments(bar) ?? generateDelaySegments(bar);
+  //
+  // A sleep or a waitForEvent is decomposed by neither generator. Waiting IS the
+  // substance of one, so splitting it into "waiting, then working" left a bar
+  // that was ~100% pale lead-in: on `cancelled` the 35.2s wait, which is the
+  // single most important fact in that run, drew as a 26%-opacity smudge
+  // underneath the axis break — which is to say as empty space. One solid bar in
+  // its own style says what happened.
+  const segments = IDLE_STYLES.has(bar.style)
+    ? undefined
+    : bar.segments ?? generateBarSegments(bar) ?? generateDelaySegments(bar);
 
   // Pre-compute timing sub-bar positions from the parent bar's position.
   // This ensures sub-bars visually align with the parent's compound segments.
@@ -1153,6 +1165,20 @@ export function Timeline({
     const busy: Interval[] = [];
     const collect = (list: TimelineBarData[]) => {
       for (const bar of list) {
+        // A drawn queue delay is not elidable, because the Run row draws a
+        // lead-in ACROSS it. A bar's segments are laid out as percentages of
+        // the bar while the bar itself is placed through the scale, so a break
+        // falling inside one pushes its own segments off: on `blocked` the Run
+        // row was still drawn "queued" a third of the way past the point where
+        // `hold` below it was drawn executing. Keeping the interval busy means
+        // the delay is drawn to scale, which is what that run is about anyway.
+        if (bar.isRoot && bar.delayMs && bar.delayMs > 0) {
+          busy.push({
+            startMs: bar.startTime.getTime(),
+            endMs: bar.startTime.getTime() + bar.delayMs,
+          });
+        }
+
         if (bar.children?.length) {
           collect(bar.children);
         } else if (!bar.isRoot && !IDLE_STYLES.has(bar.style)) {
@@ -1212,7 +1238,13 @@ export function Timeline({
               <div
                 key={gap.startMs}
                 data-testid="timeline-axis-break"
-                className="border-muted bg-canvasMuted absolute inset-y-0 flex items-center justify-center overflow-hidden border-x border-dashed"
+                // Unfilled on purpose. A break is regularly occupied — a sleep
+                // or a waitForEvent is a row drawn across the stretch being
+                // elided — and a filled band painted its own content out:
+                // `cancelled`'s 35.2s wait was drawn inside it and could not be
+                // seen. The dashed rules and the rotated duration are enough to
+                // read it as a break in the axis.
+                className="border-muted absolute inset-y-0 flex items-center justify-center overflow-hidden border-x border-dashed"
                 style={{
                   left: `${gap.startPercent}%`,
                   width: `${gap.endPercent - gap.startPercent}%`,
