@@ -904,3 +904,26 @@ endpoints, and every edge in a fan-out run passes through a junction. The gap th
 junction's own discovery, which its popover already reports. Left as is.
 
 984 tests.
+
+### One that looked like a duplication and is not
+
+`retry`'s `Finalization` row shows a failed attempt and a retry inside a run whose status is
+COMPLETED, and the critic read it as "the reader will conclude their function failed twice". Both it
+and `first step` report an Attempt 1 of exactly 1007ms, which looked exactly like this codebase's
+characteristic bug.
+
+It is not. Different spanIDs, and the two do not overlap — `first step` runs 04.179→05.272 and
+`Finalization` runs 05.272→06.392. The matching 1007ms is the one-second retry backoff appearing
+twice. The **finalization request genuinely failed once and was retried**, separately from the step.
+Two requests really did fail in that run.
+
+So the row stays. What was wrong about it was emphasis, not truth, and that is fixed by the platform
+label receding and by the segments now saying `Attempt 1 of 2 — failed after 113ms` when asked.
+
+Worth keeping as the counterexample: "the same interval drawn twice" is the right first suspicion in
+this view, and it still has to be checked against the spans before acting on it.
+
+**The minimap stops hiding a recovered step.** Its whole job is making trouble findable, and a
+recovered step's final status is COMPLETED, so on the fixture named `retry` the map was one
+unbroken, receded green bar. A mark drawn from more than one attempt keeps the completed colour —
+the run did complete — and stops receding.
