@@ -1,4 +1,7 @@
+import { UNTITLED_QUERY } from '@/components/Insights/InsightsTabManager/constants';
 import { analytics } from './segment';
+import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
+import type { InsightsQueryRunTrigger, Tab } from '@/components/Insights/types';
 import type { ScoreKind } from '@inngest/components/Experiments';
 
 /**
@@ -15,7 +18,9 @@ import type { ScoreKind } from '@inngest/components/Experiments';
  *   name strings. Feature names never appear inside an event name —
  *   `feature` is what tags an event with which feature fired it, which is
  *   what lets the same event name be shared and aggregated across
- *   features.
+ *   features. EXCEPTION: the five `Insights …` events predate this registry
+ *   and keep their prefix so the data already collected under those names
+ *   stays continuous. Don't add new prefixed names.
  * - The private `track()` function below is the only place that calls
  *   `analytics.track()`. It merges `feature` into the properties bag and
  *   drops undefined values.
@@ -31,6 +36,11 @@ import type { ScoreKind } from '@inngest/components/Experiments';
  *   never `experimentName`) — that's the required shape for Segment
  *   properties. The function's own argument keys can stay camelCase;
  *   convert to snake_case only inside the `track()` call.
+ * - Arguments are primitives and `track()` is the only private function here.
+ *   EXCEPTION: the `Insights …` events accept a `Tab` / `InsightsFetchResult`
+ *   and derive properties from them via the private helpers at the bottom of
+ *   this file. Spelling those counts out at each call site duplicated the
+ *   diagnostics filtering across three files.
  *
  * ADDING A NEW EVENT:
  * 1. Search this file for an event that already covers the action (e.g.
@@ -58,6 +68,7 @@ export type AnalyticsFeature =
   | 'account-concurrency'
   | 'ai-overview'
   | 'experiments'
+  | 'insights'
   | 'sandboxes'
   | 'scores'
   | 'sessions';
@@ -74,6 +85,11 @@ type AnalyticsEventName =
   | 'Empty State Example Copied'
   | 'Empty State Prompt Copied'
   | 'Empty State Viewed'
+  | 'Insights AI Message Sent'
+  | 'Insights Query Ran'
+  | 'Insights Query Saved'
+  | 'Insights Query Shared'
+  | 'Insights Results Downloaded'
   | 'List Viewed'
   | 'Opened In Insights'
   | 'Scoring Weight Updated'
@@ -356,5 +372,199 @@ export function trackWaitlistFormSubmitted({
   track('Waitlist Form Submitted', feature, {
     can_contact: canContact,
     message: message,
+  });
+}
+
+// Insights — the five events below keep the `Insights ` name prefix and are
+// the only ones here that accept a domain object rather than primitives. Read
+// the two EXCEPTION notes in the docblock above before copying this shape.
+
+function isQueryNameSet(queryName: string | undefined): boolean {
+  return (
+    queryName !== undefined &&
+    queryName.trim() !== '' &&
+    queryName !== UNTITLED_QUERY
+  );
+}
+
+function getQueryMetadata({
+  query,
+  queryName,
+  savedQueryId,
+  tabId,
+}: {
+  query: string;
+  queryName: string;
+  savedQueryId?: string;
+  tabId: string;
+}): AnalyticsEventProperties {
+  const trimmedQuery = query.trim();
+
+  return {
+    is_saved_query: savedQueryId !== undefined,
+    query_length: trimmedQuery.length,
+    query_line_count:
+      trimmedQuery === '' ? 0 : trimmedQuery.split(/\r?\n/).length,
+    query_name_set: isQueryNameSet(queryName),
+    saved_query_id: savedQueryId,
+    tab_id: tabId,
+  };
+}
+
+function getTabMetadata(tab: Tab): AnalyticsEventProperties {
+  return getQueryMetadata({
+    query: tab.query,
+    queryName: tab.name,
+    savedQueryId: tab.savedQueryId,
+    tabId: tab.id,
+  });
+}
+
+function getDiagnosticsMetadata(
+  data: InsightsFetchResult | undefined,
+): AnalyticsEventProperties {
+  if (!data) return {};
+
+  return {
+    diagnostic_error_count: data.diagnostics.filter(
+      (diagnostic) => diagnostic.severity === 'error',
+    ).length,
+    diagnostic_info_count: data.diagnostics.filter(
+      (diagnostic) => diagnostic.severity === 'info',
+    ).length,
+    diagnostic_warning_count: data.diagnostics.filter(
+      (diagnostic) => diagnostic.severity === 'warning',
+    ).length,
+  };
+}
+
+function getResultMetadata(
+  data: InsightsFetchResult | undefined,
+): AnalyticsEventProperties {
+  if (!data) return {};
+
+  return {
+    column_count: data.columns.length,
+    row_count: data.rows.length,
+    ...getDiagnosticsMetadata(data),
+  };
+}
+
+type InsightsQueryRanArgs = {
+  feature: AnalyticsFeature;
+  data?: InsightsFetchResult;
+  durationMs: number;
+  errorType?: 'diagnostic' | 'network';
+  query: string;
+  queryName: string;
+  result: 'failure' | 'success';
+  savedQueryId?: string;
+  tabId: string;
+  trigger: InsightsQueryRunTrigger;
+};
+
+export function trackInsightsQueryRan({
+  feature,
+  data,
+  durationMs,
+  errorType,
+  query,
+  queryName,
+  result,
+  savedQueryId,
+  tabId,
+  trigger,
+}: InsightsQueryRanArgs) {
+  track('Insights Query Ran', feature, {
+    ...getQueryMetadata({ query, queryName, savedQueryId, tabId }),
+    ...getResultMetadata(data),
+    duration_ms: durationMs,
+    error_type: errorType,
+    result,
+    trigger,
+  });
+}
+
+type InsightsQuerySavedArgs = {
+  feature: AnalyticsFeature;
+  queryId: string;
+  tab: Tab;
+};
+
+export function trackInsightsQuerySaved({
+  feature,
+  queryId,
+  tab,
+}: InsightsQuerySavedArgs) {
+  track('Insights Query Saved', feature, {
+    // Spread first: on a first save the tab has no savedQueryId yet, so the
+    // literals below intentionally override is_saved_query and saved_query_id.
+    ...getTabMetadata(tab),
+    is_saved_query: true,
+    query_id: queryId,
+    saved_query_id: queryId,
+  });
+}
+
+type InsightsQuerySharedArgs = {
+  feature: AnalyticsFeature;
+  queryId: string;
+};
+
+export function trackInsightsQueryShared({
+  feature,
+  queryId,
+}: InsightsQuerySharedArgs) {
+  track('Insights Query Shared', feature, {
+    query_id: queryId,
+  });
+}
+
+type InsightsResultsDownloadedArgs = {
+  feature: AnalyticsFeature;
+  data: InsightsFetchResult;
+  format: 'csv' | 'json';
+  queryName?: string;
+};
+
+export function trackInsightsResultsDownloaded({
+  feature,
+  data,
+  format,
+  queryName,
+}: InsightsResultsDownloadedArgs) {
+  track('Insights Results Downloaded', feature, {
+    ...getResultMetadata(data),
+    format,
+    query_name_set: isQueryNameSet(queryName),
+  });
+}
+
+type InsightsAIMessageSentArgs = {
+  feature: AnalyticsFeature;
+  content: string;
+  eventTypeCount: number;
+  hasCurrentQuery: boolean;
+  historyMessageCount: number;
+  schemaCount: number;
+  threadId: string;
+};
+
+export function trackInsightsAIMessageSent({
+  feature,
+  content,
+  eventTypeCount,
+  hasCurrentQuery,
+  historyMessageCount,
+  schemaCount,
+  threadId,
+}: InsightsAIMessageSentArgs) {
+  track('Insights AI Message Sent', feature, {
+    event_type_count: eventTypeCount,
+    has_current_query: hasCurrentQuery,
+    history_message_count: historyMessageCount,
+    message_length: content.trim().length,
+    schema_count: schemaCount,
+    thread_id: threadId,
   });
 }
