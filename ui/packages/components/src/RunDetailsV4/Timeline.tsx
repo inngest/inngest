@@ -1380,7 +1380,50 @@ export function Timeline({
    * leaves the request where it finished and arrives at each step where that
    * step's own bar begins.
    */
+  /**
+   * What one request produced, at rest, without a single crossing line.
+   *
+   * The rows a request produced are contiguous, so a bracket beside them says
+   * "these came from one request" structurally. It lives in its own column, so
+   * however complex the run gets it cannot overlap a span — which is the whole
+   * problem with drawing the relationship as lines across the plot.
+   */
+  const planningBrackets = useMemo(() => {
+    const rows = barsWithChildren[0]?.children ?? barsWithChildren;
+    const groups = new Map<string, number[]>();
+
+    for (const bar of rows) {
+      const y = rowTops.get(bar.id);
+      if (!bar.plannedBy || y === undefined) continue;
+      const list = groups.get(bar.plannedBy);
+      if (list) list.push(y);
+      else groups.set(bar.plannedBy, [y]);
+    }
+
+    return [...groups]
+      .filter(([, ys]) => ys.length > 1)
+      .map(([spanID, ys]) => ({
+        key: spanID,
+        topPx: Math.min(...ys),
+        heightPx: Math.max(...ys) - Math.min(...ys),
+      }));
+  }, [barsWithChildren, rowTops]);
+
   const planningFlows = useMemo(() => {
+    // Lines ONLY for the row under the pointer.
+    //
+    // Drawn at rest they were 1px, cramped, and — on anything with more than a
+    // few steps — crossing over other spans. That is not a tuning problem, it
+    // is what always-on dependency arrows do: Perfetto renders flow arrows only
+    // for the selected slice, Chrome DevTools reveals its initiator chain only
+    // on hover, and Gantt tools ship a switch to turn dependency arrows off
+    // because past ~20 tasks they are unreadable. None of them draw them at
+    // rest, and neither should this.
+    //
+    // What stays at rest is structural instead: a bracket in the gutter around
+    // the rows one request produced, which cannot cross anything because it
+    // spans contiguous rows in a column of its own.
+    if (!hoveredSpanID) return [];
     const byID = new Map<string, TimelineBarData>();
     const collect = (list: TimelineBarData[]) => {
       for (const bar of list) {
@@ -1415,6 +1458,7 @@ export function Timeline({
         // the two axes of this view are not the same kind of thing.
         const toX = xOf(other.startTime.getTime());
         const turn = Math.min(6, Math.abs(toY - fromY) / 2);
+        if (hoveredSpanID !== bar.id && hoveredSpanID !== other.id) continue;
         paths.push({
           key: `${bar.planning.spanID}-${other.id}`,
           d: `M ${fromX} ${fromY} L ${fromX} ${toY - turn} Q ${fromX} ${toY} ${
@@ -1457,6 +1501,7 @@ export function Timeline({
         const fromY = rowTops.get(feeder.id)!;
         const fromX = xOf(feeder.endTime!.getTime());
         const turn = Math.min(6, Math.abs(toY - fromY) / 2);
+        if (hoveredSpanID !== bar.id && hoveredSpanID !== feeder.id) continue;
         paths.push({
           key: `join-${bar.id}-${feeder.id}`,
           d: `M ${fromX} ${fromY} L ${toX - 0.6} ${fromY} Q ${toX} ${fromY} ${toX} ${
@@ -1466,7 +1511,7 @@ export function Timeline({
       }
     }
     return paths;
-  }, [barsWithChildren, rowTops, scale, leftWidth, plotWidth]);
+  }, [barsWithChildren, rowTops, scale, leftWidth, plotWidth, hoveredSpanID]);
 
   // Deliberately over `data.bars`, not the collapsed `bars`. The strip is the
   // map of the whole run and must not shrink because the rows below it did —
@@ -1536,6 +1581,21 @@ export function Timeline({
           </div>
         )}
 
+        {/* One request's steps, bracketed in the gutter. Always visible, never
+            crossing, because it occupies a column of its own. */}
+        {planningBrackets.map((bracket) => (
+          <div
+            key={bracket.key}
+            className="border-muted pointer-events-none absolute z-[2] rounded-l-sm border-y border-l"
+            style={{
+              left: 4,
+              top: bracket.topPx - 5,
+              height: bracket.heightPx + 10,
+              width: 4,
+            }}
+          />
+        ))}
+
         {planningFlows.length > 0 && (
           <svg
             className="pointer-events-none absolute inset-0 z-[2] h-full w-full"
@@ -1546,8 +1606,8 @@ export function Timeline({
                 key={flow.key}
                 d={flow.d}
                 fill="none"
-                stroke="rgb(var(--color-border-muted))"
-                strokeWidth={1}
+                stroke="rgb(var(--color-border-contrast))"
+                strokeWidth={1.5}
                 vectorEffect="non-scaling-stroke"
               />
             ))}
