@@ -98,6 +98,68 @@ func TestHTTPGateway_Health(t *testing.T) {
 	})
 }
 
+func TestHTTPGateway_UnknownRequestFields(t *testing.T) {
+	apps := &mockAppProvider{}
+	apps.On("GetApps", mock.Anything, mock.Anything).Return(&GetAppsResult{}, nil).Once()
+	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{Apps: apps}, HTTPHandlerOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		apps.AssertExpectations(t)
+	})
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		body       string
+		wantStatus int
+	}{
+		{
+			name:       "endpoint with query parameters rejects an unknown query parameter",
+			method:     http.MethodGet,
+			path:       "/api/v2/apps?limit=10&unknown=value",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "endpoint without query parameters rejects an unknown query parameter",
+			method:     http.MethodGet,
+			path:       "/api/v2/health?unknown=value",
+			wantStatus: http.StatusBadRequest,
+		},
+		// WaitSandboxProcess is the only POST endpoint without a body mapping.
+		// The gateway currently ignores this body and reaches the service, which
+		// returns 501 instead of the desired 400 because it is not implemented in OSS.
+		{
+			name:       "endpoint without a body rejects an unknown body field",
+			method:     http.MethodPost,
+			path:       "/api/v2/sandboxes/sandbox-id/processes/process-id/wait",
+			body:       `{"unknown":"value"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "endpoint with a body rejects an unknown body field",
+			method:     http.MethodPost,
+			path:       "/api/v2/events",
+			body:       `{"name":"test/event","unknown":"value"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(tt.method, tt.path, strings.NewReader(tt.body))
+			if tt.body != "" {
+				request.Header.Set("Content-Type", "application/json")
+			}
+			response := httptest.NewRecorder()
+
+			handler.ServeHTTP(response, request)
+
+			require.Equal(t, tt.wantStatus, response.Code, response.Body.String())
+		})
+	}
+}
+
 func TestHTTPGateway_SandboxesNotImplementedInDevServer(t *testing.T) {
 	handler, err := newTestHTTPHandler(context.Background(), ServiceOptions{}, HTTPHandlerOptions{})
 	require.NoError(t, err)
