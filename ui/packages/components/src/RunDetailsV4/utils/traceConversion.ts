@@ -38,6 +38,15 @@ import { TIMELINE_CONSTANTS } from './timing';
 const NOTEWORTHY_QUEUE_DELAY_MS = 1000;
 
 /**
+ * Rows that are the platform's own machinery rather than a step the reader
+ * wrote. They still earn their place — finalization genuinely takes time, and on
+ * `retry` it was itself retried — but they are not steps, so anything counting
+ * or laying out steps must skip them. The minimap was packing `Finalization`
+ * into a lane as though the function had written it.
+ */
+const PLATFORM_ROW_NAMES = new Set(['Finalization', 'Function error']);
+
+/**
  * Check if a trace represents a step.run span
  */
 function isStepRunSpan(trace: Trace): boolean {
@@ -297,6 +306,7 @@ function traceToBarData(
   return {
     id: trace.spanID,
     name: getSpanName(trace.name),
+    isPlatform: PLATFORM_ROW_NAMES.has(getSpanName(trace.name)),
     // Present on step.invoke, and the only thing needed to pull the child run
     // in beneath this row.
     childRunID: invokeInfo?.runID ?? undefined,

@@ -45,13 +45,28 @@ function toState(status: string | undefined): DensityState {
   }
 }
 
-/** Every real step in the run, however the views below are collapsing it. */
-function leaves(bars: TimelineBarData[], out: TimelineBarData[] = []): TimelineBarData[] {
+/**
+ * The steps of this run: the root's own children, and nothing deeper.
+ *
+ * Descending further finds attempts and invoked child runs, which are not steps
+ * *of this run*. A retried step is one step that was tried twice, and the
+ * minimap was drawing `retry` as "Attempt 0, Attempt 1, Attempt 0, Attempt 1"
+ * — four marks for one step and one finalization.
+ *
+ * Platform rows are skipped for the same reason: Planning and Finalization are
+ * machinery, and packing them into lanes made a strictly sequential run report
+ * concurrency it never had.
+ */
+function leaves(bars: TimelineBarData[]): TimelineBarData[] {
+  const out: TimelineBarData[] = [];
   for (const bar of bars) {
-    if (bar.children?.length) leaves(bar.children, out);
-    // Platform rows are not steps: counting the Planning row as one would make a
-    // strictly sequential run report two concurrent lanes.
-    else if (!bar.isRoot && !bar.isPlatform) out.push(bar);
+    if (bar.isRoot) {
+      for (const child of bar.children ?? []) {
+        if (!child.isPlatform) out.push(child);
+      }
+    } else if (!bar.isPlatform) {
+      out.push(bar);
+    }
   }
   return out;
 }
