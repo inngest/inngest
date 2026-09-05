@@ -521,7 +521,9 @@ describe('a collapsed row draws the shape that happened', () => {
     const group = bars[0]?.children?.find((b) => b.name.includes('×'));
     expect(group?.segments?.length).toBeGreaterThan(5);
 
-    const segments = group!.segments!;
+    // Members only. The row also carries the group's collective lead-in, which
+    // deliberately does not overlap the first member — it ends where it starts.
+    const segments = group!.segments!.filter((s) => s.id.includes('-member-'));
     // Members overlap: every one starts before the one before it has finished.
     let overlapping = 0;
     for (let i = 1; i < segments.length; i++) {

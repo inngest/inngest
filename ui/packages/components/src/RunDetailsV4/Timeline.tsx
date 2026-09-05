@@ -30,7 +30,12 @@ import { formatDuration, useStepHover, useStepSelection } from './runDetailsUtil
 import { packMinimap } from './utils/density';
 import { buildTimeScale, type Interval, type TimeScale } from './utils/timeScale';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
-import { leadInMs } from './utils/traceConversion';
+// IDLE_STYLES lives beside `leadInMs` because that function needs it too: two
+// copies would drift into a bar that draws a lead-in without naming one. These
+// are also the stretches the elastic axis may elide — they cost nothing, and a
+// nine-day sleep drawn to scale leaves no room for the five seconds that ran.
+// `step.invoke` is deliberately absent: a child run is genuinely executing.
+import { IDLE_STYLES, leadInMs } from './utils/traceConversion';
 
 // ============================================================================
 // Types
@@ -112,16 +117,6 @@ const INNGEST_PHASES: PhaseDefinition<InngestBreakdownData>[] = [
     getMs: (d) => d.systemLatencyMs,
   },
 ];
-
-/**
- * Bars that represent the run being suspended rather than working.
- *
- * These are the stretches the elastic axis is allowed to elide: they cost
- * nothing, and a nine-day sleep drawn to scale leaves no room for the five
- * seconds that actually ran. `step.invoke` is deliberately absent — a child run
- * is genuinely executing during one.
- */
-const IDLE_STYLES = new Set<BarStyleKey>(['step.sleep', 'step.waitForEvent']);
 
 const RUN_INNGEST_PHASES: PhaseDefinition<RunInngestBreakdownData>[] = [
   {

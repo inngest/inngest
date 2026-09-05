@@ -24,7 +24,9 @@
  * `think-0` and `think-39` are the same shape. That is an inference about what
  * a user meant by a name, so it is reported in `warnings` rather than assumed.
  */
+
 import type { BarSegment, TimelineBarData } from '../TimelineBar.types';
+import { formatDuration } from '../runDetailsUtils';
 import type { CanvasEdge, CanvasGraph, CanvasNode, CanvasStatus } from './graph.types';
 
 /**
@@ -714,7 +716,9 @@ function memberSegments(
   groupID: string,
   rows: TimelineBarData[],
   envelope: CollapseEnvelope,
-  maxMarks: number
+  maxMarks: number,
+  /** The bar the segments are drawn inside, which starts before the envelope. */
+  frame: { startMs: number; endMs: number }
 ): BarSegment[] {
   const span = envelope.lastEndedAt - envelope.firstStartedAt;
   if (span <= 0) return [];
@@ -739,7 +743,29 @@ function memberSegments(
   // So a siblings group draws its members where they actually were. They
   // overlap, they merge into a block, and that block IS the answer: these
   // happened at once.
-  if (kind === 'siblings') return concurrentSegments(groupID, rows, envelope);
+  // The group's collective lead-in, drawn the way every other row draws one.
+  // Without it the first 42% of `wide`'s row was simply blank, which reads as
+  // nothing having happened rather than as the run waiting.
+  const frameSpanMs = frame.endMs - frame.startMs;
+  const leadIn: BarSegment[] =
+    frameSpanMs > 0 && envelope.firstStartedAt > frame.startMs
+      ? [
+          {
+            id: `${groupID}-leadin`,
+            startPercent: 0,
+            widthPercent: ((envelope.firstStartedAt - frame.startMs) / frameSpanMs) * 100,
+            style: 'timing.waiting' as const,
+            status: 'COMPLETED',
+            startMs: frame.startMs,
+            endMs: envelope.firstStartedAt,
+            tooltip: `Waited ${formatDuration(
+              envelope.firstStartedAt - frame.startMs
+            )} before the first of ${rows.length} started`,
+          },
+        ]
+      : [];
+
+  if (kind === 'siblings') return [...leadIn, ...concurrentSegments(groupID, rows, frame)];
 
   const marks = Math.max(1, Math.min(rows.length, maxMarks));
 
@@ -785,22 +811,25 @@ function memberSegments(
           Math.min(100 - width, ((bucket.startedAt - envelope.firstStartedAt) / span) * 100)
         );
 
-  return buckets.map((bucket) => ({
-    id: `${groupID}-member-${bucket.index}`,
-    startPercent: at(bucket),
-    widthPercent: width,
-    style: 'step.run' as const,
-    status: bucket.status,
-    // Which members a mark stands for. When several are bucketed into one the
-    // mark takes the worst status of them, so saying only the status would hide
-    // that the red covers four steps of which one failed.
-    tooltip:
-      bucket.names.length === 1
-        ? `${bucket.names[0]}${bucket.status ? ` — ${bucket.status.toLowerCase()}` : ''}`
-        : `${bucket.names.length} steps: ${bucket.names.slice(0, 4).join(', ')}${
-            bucket.names.length > 4 ? ', …' : ''
-          }${bucket.status ? ` — worst: ${bucket.status.toLowerCase()}` : ''}`,
-  }));
+  return [
+    ...leadIn,
+    ...buckets.map((bucket) => ({
+      id: `${groupID}-member-${bucket.index}`,
+      startPercent: at(bucket),
+      widthPercent: width,
+      style: 'step.run' as const,
+      status: bucket.status,
+      // Which members a mark stands for. When several are bucketed into one the
+      // mark takes the worst status of them, so saying only the status would hide
+      // that the red covers four steps of which one failed.
+      tooltip:
+        bucket.names.length === 1
+          ? `${bucket.names[0]}${bucket.status ? ` — ${bucket.status.toLowerCase()}` : ''}`
+          : `${bucket.names.length} steps: ${bucket.names.slice(0, 4).join(', ')}${
+              bucket.names.length > 4 ? ', …' : ''
+            }${bucket.status ? ` — worst: ${bucket.status.toLowerCase()}` : ''}`,
+    })),
+  ];
 }
 
 /**
@@ -814,9 +843,9 @@ function memberSegments(
 function concurrentSegments(
   groupID: string,
   rows: TimelineBarData[],
-  envelope: CollapseEnvelope
+  frame: { startMs: number; endMs: number }
 ): BarSegment[] {
-  const span = envelope.lastEndedAt - envelope.firstStartedAt;
+  const span = frame.endMs - frame.startMs;
   if (span <= 0) return [];
 
   return rows.map((row, i) => {
@@ -827,7 +856,7 @@ function concurrentSegments(
     // concurrency limit and is the one thing a collapsed fan-out has to keep.
     const startMs = row.startTime.getTime() + (row.delayMs ?? 0);
     const endMs = Math.max(startMs, (row.endTime ?? row.startTime).getTime());
-    const startPercent = ((startMs - envelope.firstStartedAt) / span) * 100;
+    const startPercent = ((startMs - frame.startMs) / span) * 100;
 
     return {
       id: `${groupID}-member-${i}`,
@@ -896,6 +925,21 @@ export function applyCollapseToBars(
       const rows = members.get(groupID)!;
       const first = rows[0]!;
 
+      // The row's own frame, and the group's own lead-in.
+      //
+      // The row begins at the earliest member's queuedAt so it does not start
+      // after its own children, but its segments were placed against the
+      // ENVELOPE, which begins when the first member started RUNNING. The two
+      // frames differ by the group's collective wait, so on `wide` the block
+      // sat 61ms into a bar whose first 61ms was blank, and the row's numbers
+      // could not be reconciled with the canvas node: 155 − 61 = 94 against 90.
+      //
+      // The note it inherited from `first` was one member's wait, not the
+      // group's — which is where the missing 4ms was.
+      const frameStart = Math.min(...rows.map((r) => r.startTime.getTime()));
+      const frameEnd = group.envelope.lastEndedAt;
+      const leadIn = Math.max(0, group.envelope.firstStartedAt - frameStart);
+
       out[slot] = {
         ...first,
         id: group.id,
@@ -905,16 +949,22 @@ export function applyCollapseToBars(
         // start made the group row begin AFTER its own children — an 88ms
         // overhang on `wide` — and silently dropped the queued phase that
         // sibling rows all include.
-        startTime: new Date(Math.min(...rows.map((r) => r.startTime.getTime()))),
-        endTime: new Date(group.envelope.lastEndedAt),
+        startTime: new Date(frameStart),
+        endTime: new Date(frameEnd),
         status: group.status,
+        // The group's wait, so `total − wait` lands on what the canvas node
+        // reports for the same group.
+        note: leadIn > 0 ? `+${formatDuration(leadIn)} wait` : undefined,
         children: rows,
         // Draw the members themselves rather than one continuous block, each
         // coloured by its own status. A solid bar would say only "something
         // happened here for 1.9s"; a run of small marks says *where in the
         // sequence* the failures were, which is the question a collapsed row
         // otherwise forces you to expand to answer.
-        segments: memberSegments(group.kind, group.id, rows, group.envelope, maxMarks),
+        segments: memberSegments(group.kind, group.id, rows, group.envelope, maxMarks, {
+          startMs: frameStart,
+          endMs: frameEnd,
+        }),
         // A group is a summary, not a span: the per-step phase breakdowns belong
         // to the members and are shown when it is expanded. Claiming one step's
         // discovery or HTTP timing as the group's would be a fabrication.

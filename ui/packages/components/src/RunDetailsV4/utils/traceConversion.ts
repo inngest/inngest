@@ -38,6 +38,15 @@ import { TIMELINE_CONSTANTS } from './timing';
 const NOTEWORTHY_QUEUE_DELAY_MS = 1000;
 
 /**
+ * Bars that represent the run being suspended rather than working.
+ *
+ * Defined here rather than in `Timeline` because `leadInMs` needs it too, and
+ * two copies of this set would drift into a bar that draws a lead-in without
+ * naming one, or names one without drawing it.
+ */
+export const IDLE_STYLES = new Set<BarStyleKey>(['step.sleep', 'step.waitForEvent']);
+
+/**
  * Rows that are the platform's own machinery rather than a step the reader
  * wrote. They still earn their place — finalization genuinely takes time, and on
  * `retry` it was itself retried — but they are not steps, so anything counting
@@ -1038,7 +1047,19 @@ function withRunNote(
  * SDK reported.
  */
 export function leadInMs(bar: TimelineBarData): number {
-  if (!bar.timingBreakdown || !bar.endTime) return 0;
+  if (!bar.endTime) return 0;
+
+  // A sleep or a waitForEvent has NO lead-in, by construction: waiting is its
+  // whole substance, so it draws one solid bar and both views measure it from
+  // its queue. Reporting a lead-in for one would name a thing that is not
+  // drawn, which is the mismatch this function exists to prevent.
+  if (IDLE_STYLES.has(bar.style)) return 0;
+
+  // A step.invoke has no timing breakdown, so it fell through both rules: the
+  // canvas measured it from `startedAt` and the row from `queuedAt`, and
+  // `call child` reported 520ms against the canvas's 519ms with nothing naming
+  // the millisecond between them. Its own `delayMs` is exactly that wait.
+  if (!bar.timingBreakdown) return Math.max(0, bar.delayMs ?? 0);
 
   const spanMs = bar.endTime.getTime() - bar.startTime.getTime();
   const { executionMs, inngestMs } = bar.timingBreakdown;
