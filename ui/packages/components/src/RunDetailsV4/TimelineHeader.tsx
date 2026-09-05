@@ -12,7 +12,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, type JSX } from 'react';
 
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
-import { RunMinimap, minimapHeight } from './RunMinimap';
+import { MINIMAP_HEIGHT_PX, RunMinimap } from './RunMinimap';
 import { TimeBrush } from './TimeBrush';
 import { formatDuration } from './runDetailsUtils';
 import type { Minimap } from './utils/density';
@@ -95,7 +95,7 @@ export function TimelineHeader({
   }, [scale, totalMs, minTime]);
 
   const hasStrip = Boolean(minimap && minimap.marks.length);
-  const stripHeight = minimap ? minimapHeight(minimap.rows) : 0;
+
   const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
   const isDefault = selStart === 0 && selEnd === 100;
@@ -232,7 +232,7 @@ export function TimelineHeader({
           onSelectionChange={handleSelectionChange}
           className="mt-1"
           trackClassName={hasStrip ? undefined : 'h-4'}
-          trackStyle={hasStrip ? { height: Math.max(stripHeight, 8) } : undefined}
+          trackStyle={hasStrip ? { height: MINIMAP_HEIGHT_PX } : undefined}
         >
           {hasStrip && (
             <RunMinimap

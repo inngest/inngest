@@ -16,7 +16,7 @@ import type {
   TimelineBarData,
   TimelineData,
 } from '../TimelineBar.types';
-import { traceWalk } from '../runDetailsUtils';
+import { formatDuration, traceWalk } from '../runDetailsUtils';
 import {
   isExperimentMetadata,
   isScoreMetadata,
@@ -27,6 +27,14 @@ import {
   type Trace,
 } from '../types';
 import { TIMELINE_CONSTANTS } from './timing';
+
+/**
+ * Above this, a run's queue delay is drawn on the axis; below it, it is reported
+ * as text and the plot starts when the run did. A second is the same line item G
+ * uses before claiming flow control did something — under it, this is ordinary
+ * scheduling rather than an event.
+ */
+const NOTEWORTHY_QUEUE_DELAY_MS = 1000;
 
 /**
  * Check if a trace represents a step.run span
@@ -613,6 +621,22 @@ export function traceToTimelineData(
   // Run startedAt timestamp for computing per-step discovery time
   const runStartedAtMs = trace.startedAt ? new Date(trace.startedAt).getTime() : null;
 
+  // Every run starts with some platform delay before the first step. Drawn to
+  // scale it is dead space at the front of every single trace, spent on
+  // something that is the same on all of them and rarely what anyone came to
+  // look at — so below a threshold the plot simply starts when the run started
+  // and the delay is reported as text on the Run row instead.
+  //
+  // Above the threshold it stays on the axis, because then it is not background
+  // noise but the story: `blocked` waited 6.3s behind a concurrency limit, and
+  // that is the whole point of that run.
+  const runQueueDelayMs =
+    runStartedAtMs !== null ? Math.max(0, runStartedAtMs - minTime.getTime()) : 0;
+  const drawQueueDelay = runQueueDelayMs >= NOTEWORTHY_QUEUE_DELAY_MS;
+  if (!drawQueueDelay && runStartedAtMs !== null) {
+    minTime = new Date(runStartedAtMs);
+  }
+
   // Convert root trace (rename to "Run")
   // Ensure isRoot is set to true for the root bar so clicking it shows TopInfo
   // Pass root status so all bars share the same status-based coloring
@@ -686,7 +710,7 @@ export function traceToTimelineData(
   return {
     minTime,
     maxTime,
-    bars: clampToRunStart(bars, trace.startedAt ? new Date(trace.startedAt) : null),
+    bars: withRunNote(clampToRunStart(bars, drawQueueDelay ? null : minTime), runQueueDelayMs),
     leftWidth,
     orgName,
   };
@@ -709,6 +733,20 @@ export function traceToTimelineData(
  * The root bar is left alone — the run's queue delay is precisely what it is
  * there to show.
  */
+/**
+ * Report the run's queue delay in words on the Run row.
+ *
+ * Shown whether or not it is drawn: when it is small the plot no longer spends
+ * width on it, and the number is the only trace of it left; when it is large the
+ * bar shows it too and the number names it.
+ */
+function withRunNote(bars: TimelineBarData[], queueDelayMs: number): TimelineBarData[] {
+  if (queueDelayMs <= 0) return bars;
+  return bars.map((bar) =>
+    bar.isRoot ? { ...bar, note: `+${formatDuration(queueDelayMs)} queued` } : bar
+  );
+}
+
 function clampToRunStart(bars: TimelineBarData[], runStartedAt: Date | null): TimelineBarData[] {
   if (!runStartedAt) return bars;
   const floor = runStartedAt.getTime();

@@ -35,12 +35,31 @@ const STATE_CLASS: Record<DensityState, string> = {
   completed: 'bg-status-completed',
 };
 
-/** Thin enough that a mark cannot be mistaken for a bar in the trace. */
-const ROW_PX = 3;
-const ROW_GAP_PX = 1;
+/**
+ * The minimap is always the same height, whatever the run.
+ *
+ * A strip that grew with concurrency shoved the whole trace down the page on
+ * wide runs and made the header jump between fixtures — the overview is a fixed
+ * piece of furniture, so it gets a fixed size. Lanes get thinner to fit instead.
+ */
+export const MINIMAP_HEIGHT_PX = 16;
 
-export function minimapHeight(rows: number): number {
-  return rows * ROW_PX + Math.max(0, rows - 1) * ROW_GAP_PX;
+/** Thin enough that a mark cannot be mistaken for a bar in the trace. */
+const MAX_ROW_PX = 3;
+
+/**
+ * Lane geometry for a given number of lanes.
+ *
+ * Lanes never get CHUNKIER than 3px — a fat minimap starts to look like the
+ * trace again, which is the thing it exists not to look like — they only get
+ * thinner, down to a 1px hairline, and the gap between them is the first thing
+ * surrendered when space runs short.
+ */
+function laneGeometry(rows: number): { rowPx: number; gapPx: number } {
+  const gapPx = rows <= 8 ? 1 : 0;
+  const available = MINIMAP_HEIGHT_PX - Math.max(0, rows - 1) * gapPx;
+  const rowPx = Math.max(1, Math.min(MAX_ROW_PX, Math.floor(available / rows)));
+  return { rowPx, gapPx };
 }
 
 type Props = {
@@ -54,11 +73,13 @@ type Props = {
 export function RunMinimap({ minimap, minMs, hoveredStepId }: Props): JSX.Element | null {
   if (!minimap.marks.length) return null;
 
+  const { rowPx, gapPx } = laneGeometry(minimap.rows);
+
   return (
     <div
       data-testid="run-minimap"
       className="pointer-events-none absolute inset-x-0 bottom-0"
-      style={{ height: minimapHeight(minimap.rows) }}
+      style={{ height: MINIMAP_HEIGHT_PX }}
       role="img"
       aria-label={`Overview of the run: ${minimap.marks.length} steps across ${
         minimap.rows
@@ -79,8 +100,8 @@ export function RunMinimap({ minimap, minMs, hoveredStepId }: Props): JSX.Elemen
           style={{
             left: `${mark.startPercent}%`,
             width: `${mark.widthPercent}%`,
-            top: mark.row * (ROW_PX + ROW_GAP_PX),
-            height: ROW_PX,
+            top: mark.row * (rowPx + gapPx),
+            height: rowPx,
           }}
           title={mark.name}
         />

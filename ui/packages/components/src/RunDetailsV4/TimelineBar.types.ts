@@ -197,6 +197,9 @@ export interface TimelineBarProps {
    */
   hovered?: boolean;
 
+  /** A short faded aside next to the name. */
+  note?: string;
+
   /** Reports the pointer entering or leaving this row, for the other views. */
   onHoverChange?: (hovered: boolean) => void;
 
@@ -359,6 +362,12 @@ export interface TimelineBarData {
 
   /** Run-level Inngest overhead breakdown (run queue delay, finalization) */
   runInngestBreakdown?: RunInngestBreakdownData;
+
+  /**
+   * A short faded aside next to the name — e.g. the run queue delay, which is
+   * reported rather than drawn when it is too small to be worth the width.
+   */
+  note?: string;
 
   /** Whether this bar represents the root run (clicking shows TopInfo) */
   isRoot?: boolean;

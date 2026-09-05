@@ -862,6 +862,7 @@ export function TimelineBar({
   selected,
   hovered,
   onHoverChange,
+  note,
   badgeGutter = true,
   children,
   orgName,
@@ -995,6 +996,14 @@ export function TimelineBar({
                 </Tooltip>
               )}
             </span>
+
+            {/* A faded aside — the run's queue delay, when it was too small to
+                be worth spending plot width on. */}
+            {note && (
+              <span className="text-light ml-1.5 shrink-0 font-mono text-[10px] tabular-nums">
+                {note}
+              </span>
+            )}
 
             {/* Actions slot */}
             {actions}
