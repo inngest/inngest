@@ -1074,3 +1074,61 @@ than its steps, so the remainder is now stated as one figure — `255ms outside 
 - `retry`'s backoff in the success colour — diagnosed (the segment takes the *upcoming* attempt's
   status, so dead time caused by a failure is painted with the success that follows), not yet fixed.
 - `step`'s 72ms of blank trace, labelled on the canvas and not in the trace.
+
+## Critic round 4 — the axis fix holds, and a new squeeze
+
+The axis fix verified on all 45: **axis max == Run row everywhere**, and the note reconciles the row
+against the terminal pill on 43 exactly, with `blocked` the sole `incl.` case and `inflight`
+correctly n/a. The critic's read on the wording is that `+` and `incl.` carry their senses clearly,
+and the bar geometry backs each up — a drawn ghost or none — so there are two cues rather than one.
+
+`longgap` is the one that cannot reconcile on screen: `+134ms queued` beside `168h 0m`. The
+arithmetic is right and the display precision makes it unverifiable. Left alone.
+
+### The note was beating the row's name
+
+`blocked`'s Run row rendered its name at **one pixel** — not even the ellipsis fit — on the fixture
+that uses the longer wording this round introduced. `retry` lost `Finalization`'s last characters,
+and `loop40`'s `act-[0…39] × 40` lost the `× 40` that says it is a group while its neighbour kept it.
+
+A priority inversion: the note was `shrink-0` and the name `flex-1 min-w-0`, so the annotation never
+yielded and the identity absorbed all of the loss. **A huge shrink factor on the note did nothing**,
+which is worth knowing: `flex-1` sets `flex-basis: 0`, so the name had no base to shrink FROM and
+the note took its content width first whatever its factor. With `flex-auto` — a content base — the
+priority actually applies. Every name now renders in full and the note truncates.
+
+### The backoff: the critic was right and I was not
+
+I had moved it from success-green to failure-red. Red overshoots: `retry`'s only user row went 92%
+red on a run that succeeded, and the 6ms of green that makes it a *recovery* is about two pixels, so
+`retry` and `failure` read as the same kind of event at a glance.
+
+The diagnosis that settles it: **the colour was being asked to carry both whose fault it was and how
+it turned out, and it needs to carry neither.** During a backoff the run is suspended, holding
+nothing, costing nothing — which is exactly what `step.sleep` and `step.waitForEvent` already mean,
+and they are already neutral. Red attempt, neutral gap, green attempt reads as "failed, waited,
+succeeded" without blaming an interval in which nothing happened. The attempts carry the alarm,
+which is why `failcluster` reads loudly: its marks are red, not its gaps.
+
+Worth keeping as a pattern: when a channel is carrying two meanings badly, the answer is sometimes
+that it should carry neither, and that the meaning already exists elsewhere in the system.
+
+### Overlapping marks stopped hiding each other
+
+Concurrent requests overlap almost exactly — two of `chains`' five Planning marks sit on top of each
+other, 13 of `wide`'s stack in one band — so whichever lost the z-order could not be pointed at.
+Reordering by width helped and did not finish it: the loser is then only reachable in its exposed
+sliver. The card now lists **everything under the pointer**, each with its own duration, and
+suppresses its single-window summary when there is more than one rather than falling back to the
+row's 774ms — which would have reintroduced the contradiction the previous round removed.
+
+1118 tests, 45 fixtures clean.
+
+### Left alone, on the critic's advice as well as mine
+
+- `loop40`'s two rows still align vertically, but now because `think-N` and `act-N` are genuinely a
+  few ms apart at 27ms per pixel. The marks are honestly placed and the minimap says one lane; a
+  synthetic offset to fake the separation would be a step backwards.
+- `simple` draws `Run · 32ms` and `Finalization · 32ms` as two identical bars. Truthful — a run with
+  no steps *is* its finalization — and odd-looking. Noted, not changed.
+- `longgap`'s note precision, as above.
