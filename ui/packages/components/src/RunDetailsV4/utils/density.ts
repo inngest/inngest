@@ -46,32 +46,6 @@ function toState(status: string | undefined): DensityState {
 }
 
 /**
- * The steps of this run: the root's own children, and nothing deeper.
- *
- * Descending further finds attempts and invoked child runs, which are not steps
- * *of this run*. A retried step is one step that was tried twice, and the
- * minimap was drawing `retry` as "Attempt 0, Attempt 1, Attempt 0, Attempt 1"
- * — four marks for one step and one finalization.
- *
- * Platform rows are skipped for the same reason: Planning and Finalization are
- * machinery, and packing them into lanes made a strictly sequential run report
- * concurrency it never had.
- */
-function leaves(bars: TimelineBarData[]): TimelineBarData[] {
-  const out: TimelineBarData[] = [];
-  for (const bar of bars) {
-    if (bar.isRoot) {
-      for (const child of bar.children ?? []) {
-        if (!child.isPlatform) out.push(child);
-      }
-    } else if (!bar.isPlatform) {
-      out.push(bar);
-    }
-  }
-  return out;
-}
-
-/**
  * A minimap of the whole run, packed into as few rows as possible.
  *
  * The histogram this replaced was made of the same marks, in the same colours,
@@ -120,39 +94,37 @@ function wasRetried(bar: TimelineBarData): boolean {
 }
 
 export function packMinimap(bars: TimelineBarData[], scale: TimeScale): Minimap {
-  const steps = leaves(bars)
-    .map((bar) => ({
-      bar,
-      startMs: bar.startTime.getTime(),
-      endMs: (bar.endTime ?? bar.startTime).getTime(),
-    }))
-    .sort((a, b) => a.startMs - b.startMs);
+  // One mark per TRACE ROW, in the trace's own order.
+  //
+  // This used to pack steps into as few lanes as possible, so the row count was
+  // the run's concurrency profile — a genuinely useful property, and the wrong
+  // one to put here. It meant the strip above the trace had a different row
+  // layout from the trace, and two things that look alike while meaning
+  // different things is worse than either alone. A reader glancing up from a
+  // row could not find it.
+  //
+  // So it is a map of the thing it sits above: same rows, same order, same
+  // x positions, shrunk to a fixed height. Concurrency is still visible — it is
+  // rows overlapping in x, exactly as it is in the trace itself.
+  const rows = bars.flatMap((bar) => (bar.isRoot ? bar.children ?? [] : [bar]));
 
-  /** When each row last became free. */
-  const rowFreeAt: number[] = [];
-  const marks: MinimapMark[] = [];
+  const marks: MinimapMark[] = rows.map((bar, row) => {
+    const startMs = bar.startTime.getTime();
+    const endMs = (bar.endTime ?? bar.startTime).getTime();
+    const startPercent = scale.toPercent(startMs);
 
-  for (const step of steps) {
-    let row = rowFreeAt.findIndex((freeAt) => freeAt <= step.startMs);
-    if (row === -1) {
-      row = rowFreeAt.length;
-      rowFreeAt.push(0);
-    }
-    rowFreeAt[row] = step.endMs;
-
-    const startPercent = scale.toPercent(step.startMs);
-    marks.push({
-      id: step.bar.id,
+    return {
+      id: bar.id,
       row,
       startPercent,
       // A floor, so a 1ms step in a two-second run is still a mark rather than
       // nothing. The minimap is for finding things, not for measuring them.
-      widthPercent: Math.max(0.35, scale.toPercent(step.endMs) - startPercent),
-      state: toState(step.bar.status),
-      name: step.bar.name,
-      recovered: wasRetried(step.bar),
-    });
-  }
+      widthPercent: Math.max(0.35, scale.toPercent(endMs) - startPercent),
+      state: toState(bar.status),
+      name: bar.name,
+      recovered: wasRetried(bar),
+    };
+  });
 
-  return { marks, rows: Math.max(1, rowFreeAt.length) };
+  return { marks, rows: Math.max(1, rows.length) };
 }
