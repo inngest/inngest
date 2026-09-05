@@ -111,3 +111,29 @@ or React Flow warns `Node type "X" not found` for a type you just added.
 imported from more than one place, restart Vite before debugging the logic.
 Screenshots are fresh browser instances, so they do not rule this out — the
 staleness is server-side, not in the page.
+
+### 17. A passing assertion about a model is not evidence about a view
+Symptom: segment tooltips were written, populated by every generator, asserted
+by a test over all 44 fixtures, and **invisible to every user**. They shipped as
+a native `title=` attribute, and the row's Radix HoverCard opens on the same
+pointer move — immediately, and styled — so the browser tooltip never won.
+
+The test asserted `segment.tooltip` was truthy. That was true. The strings were
+correct. The reviewer found it by hovering.
+
+**Failure mode**: writing the test at the layer the change was easiest to test
+at, rather than at the layer the change was supposed to have an effect. The
+model was never the risky part; the delivery was, and the delivery had no test
+and no manual check either.
+
+**Detection signal**: a change whose whole purpose is "the user can now see X",
+verified only by a unit test. Ask "what would I look at to know a user sees
+this?" — if the answer is not a screenshot or a DOM read, the change is
+unverified however green the suite is.
+
+**Prevention**: for anything user-visible, read it back out of the DOM before
+committing. `page.hover()` + reading the popper's `innerText` took under a
+minute and would have caught it immediately. The same check later caught a
+second real bug on the first try — a fan-out whose members had all collapsed to
+0% because the segment positions were measured from `queuedAt` while the
+envelope used execution start.
