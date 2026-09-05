@@ -426,6 +426,7 @@ function BarHoverCardContent({
   delayMs,
   timingDetails,
   styleLabel,
+  segment,
 }: {
   name: string;
   startTime: Date;
@@ -433,17 +434,46 @@ function BarHoverCardContent({
   delayMs?: number;
   timingDetails?: TimingDetail[];
   styleLabel?: string;
+  /** The part of the bar under the pointer, when it is over one. */
+  segment?: BarSegment | null;
 }) {
   const startTimestamp = format(startTime, 'yyyy-MM-dd HH:mm:ss.SSS');
   const endTimestamp = endTime ? format(endTime, 'yyyy-MM-dd HH:mm:ss.SSS') : null;
 
   const durationMs = endTime ? endTime.getTime() - startTime.getTime() : 0;
-  const hasDetails = timingDetails && timingDetails.length > 0;
+
+  // A breakdown is shown only when it is one.
+  //
+  // These come from SDK metadata, and on several shapes they contradict the bar
+  // they describe: `chains`' `left-2` reported DISCOVERY 229ms inside a 166ms
+  // row — a component larger than the whole — and `retry`'s `first step`
+  // credited YOUR SERVER with the full 1.093s when 1.003s of it was retry
+  // backoff, giving INNGEST 98ms + YOUR SERVER 1.093s against a 1.093s total.
+  //
+  // Either the parts account for the whole or they are not a decomposition of
+  // it, and presenting them as one is worse than leaving them out. The bar
+  // itself is drawn from the timestamps, and the segment line below says what
+  // the pointer is actually over.
+  const detailSum = timingDetails?.reduce((n, d) => n + d.durationMs, 0) ?? 0;
+  const detailsAddUp =
+    durationMs > 0 &&
+    detailSum <= durationMs * 1.02 + 1 &&
+    (timingDetails ?? []).every((d) => d.durationMs <= durationMs);
+  const shownDetails = detailsAddUp ? timingDetails ?? [] : [];
+  const hasDetails = shownDetails.length > 0;
 
   return (
     <div className="whitespace-nowrap px-1 py-0.5 text-xs">
       <p className="text-basis mb-1.5 font-medium">{name}</p>
       {styleLabel && <p className="text-light mb-1.5 font-mono text-[11px]">{styleLabel}</p>}
+
+      {/* What the pointer is on. A row is several things — a wait, an attempt,
+          a backoff, one member of a collapsed group — and the summary below
+          describes all of them at once, which left a pale lead-in with no way
+          of being asked what it was. */}
+      {segment?.tooltip && (
+        <p className="text-basis border-subtle mb-1.5 border-b pb-1.5">{segment.tooltip}</p>
+      )}
       <div className="flex flex-col gap-1">
         <div
           className={cn(
@@ -469,7 +499,7 @@ function BarHoverCardContent({
 
         {hasDetails && (
           <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
-            {timingDetails.map((detail) => (
+            {shownDetails.map((detail) => (
               <div key={detail.label} className="flex justify-between gap-6">
                 <span className="text-light font-mono uppercase">{detail.label}</span>
                 <span className="text-basis tabular-nums">
@@ -689,6 +719,7 @@ const VisualBar = memo(function VisualBar({
   widthPercent,
   style,
   segments,
+  onSegmentHover,
   originalBarStart,
   originalBarWidth,
   viewStartOffset = 0,
@@ -700,6 +731,8 @@ const VisualBar = memo(function VisualBar({
   widthPercent: number;
   style: TimelineBarProps['style'];
   segments?: BarSegment[];
+  /** Reports which segment the pointer is over, so the card can speak for it. */
+  onSegmentHover?: (segment: BarSegment | null) => void;
   /** Original bar start before transform (for segment calculation) */
   originalBarStart?: number;
   /** Original bar width before transform (for segment calculation) */
@@ -778,11 +811,14 @@ const VisualBar = memo(function VisualBar({
           return (
             <div
               key={segment.id}
-              // Each segment answers for itself. Without this every part of a
-              // row returned the row's own hover card, so a pale lead-in — the
-              // one thing on screen with no label anywhere — had no way at all
-              // of being asked what it was.
-              title={segment.tooltip}
+              // Each segment answers for itself, through the SAME hover card the
+              // row uses. This shipped once as a native `title`, which was no
+              // delivery at all: the row's card opens immediately on the same
+              // pointer move, so the browser tooltip never won and the strings
+              // never reached anyone. Two tooltips for one pointer is worse than
+              // one, so there is only the card.
+              onMouseEnter={() => onSegmentHover?.(segment)}
+              onMouseLeave={() => onSegmentHover?.(null)}
               className={cn(
                 'absolute top-1/2 -translate-y-1/2',
                 segmentHeightClass,
@@ -917,6 +953,9 @@ export function TimelineBar({
   // Hover card state — controlled so hover target (full right panel) is separate from anchor (bar position)
   const showHoverCard = !!startTime;
   const [hoverCardOpen, setHoverCardOpen] = useState(false);
+  // Which part of the bar the pointer is over, so the card answers for that
+  // part rather than returning the row's summary for all of it.
+  const [hoveredSegment, setHoveredSegment] = useState<BarSegment | null>(null);
 
   return (
     <div data-testid="timeline-bar-container" className="relative">
@@ -1063,7 +1102,14 @@ export function TimelineBar({
           className="relative h-full flex-1"
           style={{ width: `${100 - leftWidth}%` }}
           onMouseEnter={showHoverCard ? () => setHoverCardOpen(true) : undefined}
-          onMouseLeave={showHoverCard ? () => setHoverCardOpen(false) : undefined}
+          onMouseLeave={
+            showHoverCard
+              ? () => {
+                  setHoverCardOpen(false);
+                  setHoveredSegment(null);
+                }
+              : undefined
+          }
         >
           {/* No centre line, and no grid. One structural rule only — the
               vertical divider between the label column and the plot area, drawn
@@ -1091,6 +1137,7 @@ export function TimelineBar({
                   widthPercent={transformed.widthPercent}
                   style={style}
                   segments={segments}
+                  onSegmentHover={setHoveredSegment}
                   originalBarStart={startPercent}
                   originalBarWidth={widthPercent}
                   viewStartOffset={viewStartOffset}
@@ -1118,6 +1165,7 @@ export function TimelineBar({
                         delayMs={delayMs}
                         timingDetails={timingDetails}
                         styleLabel={styleLabel}
+                        segment={hoveredSegment}
                       />
                     </HoverCardContent>
                   </HoverCardRoot>

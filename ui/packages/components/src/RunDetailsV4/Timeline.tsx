@@ -779,7 +779,10 @@ function TimelineBarRenderer({
       depth={depth}
       leftWidth={leftWidth}
       style={bar.style}
-      styleLabel={STYLE_LABELS[bar.style]}
+      // A platform row is not a call the reader made. `Finalization` typed
+      // itself `step.run`, which names a line of the user's code that does not
+      // exist — the whole point of the subtitle is that it says what they wrote.
+      styleLabel={bar.isPlatform ? 'Inngest' : STYLE_LABELS[bar.style]}
       segments={segments}
       // Root bar is always expanded (children always visible) but not expandable
       // (no toggle UI). expandable=false ensures VisualBar keeps opacity 1.

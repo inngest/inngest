@@ -97,7 +97,17 @@ function iconFor(data: CanvasNodeData) {
 
 function durationOf(data: CanvasNodeData): string | null {
   if (data.endedAt === null) return null;
-  return formatDuration(data.endedAt - (data.startedAt ?? data.queuedAt));
+
+  // A wait is measured from when it was QUEUED, not from when it started.
+  //
+  // For a step those differ by the time it sat before running, which the trace
+  // draws as a lead-in and names, so the two views reconcile. A wait has no
+  // lead-in — waiting is the whole substance of it, so the row draws one solid
+  // bar across the entire span — and measuring from `startedAt` had the canvas
+  // reporting 10.000s against the row's 10.012s with nothing accounting for the
+  // 12ms. The run was held for all of it.
+  const from = data.kind === 'wait' ? data.queuedAt : data.startedAt ?? data.queuedAt;
+  return formatDuration(data.endedAt - from);
 }
 
 const HANDLE = '!h-1 !w-1 !min-w-0 !border-0 !bg-transparent';

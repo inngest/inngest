@@ -12,7 +12,7 @@ import { toCanvasGraph } from './canvas/graph';
 import type { Trace } from './types';
 import { packMinimap } from './utils/density';
 import { linearScale } from './utils/timeScale';
-import { traceRollup, traceToTimelineData } from './utils/traceConversion';
+import { leadInMs, traceRollup, traceToTimelineData } from './utils/traceConversion';
 
 function viewsOf(fixture: (typeof FIXTURES)[number]) {
   const rolled = traceRollup(fixture.data.run.trace as Trace);
@@ -140,6 +140,35 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
       rows.filter((r) => canvasOrder.includes(r)),
       `${id}: row vs node order`
     ).toEqual(canvasOrder);
+  });
+
+  it('lets a reader subtract the named wait and land on the canvas number', () => {
+    // The bridge between the two views: a row headlined 104ms with `+72ms wait`
+    // has to leave the 32ms the canvas node reports. It held on 17 of 22 step
+    // pairs and failed on the rest because the note had a display threshold and
+    // the total did not — `step`'s `second step` drew a 2ms lead-in, counted it
+    // in its 7ms, and stayed silent about it.
+    const { graph, data } = viewsOf(fixture);
+    const nodes = new Map(graph.nodes.map((n) => [n.spanID, n]));
+
+    const walk = (bars: typeof data.bars) => {
+      for (const bar of bars) {
+        const node = nodes.get(bar.id);
+        if (node && bar.endTime && node.endedAt !== null && node.startedAt !== null) {
+          const total = bar.endTime.getTime() - bar.startTime.getTime();
+          const ran = total - leadInMs(bar);
+          // A wait is measured from its queue in both views, because waiting is
+          // its whole substance and the row draws no lead-in to name.
+          const onCanvas = node.endedAt - (node.kind === 'wait' ? node.queuedAt : node.startedAt);
+          // A millisecond of slack for the two clocks rounding differently.
+          expect(Math.abs(ran - onCanvas), `${id}: ${bar.name} ${ran} vs ${onCanvas}`).toBeLessThan(
+            2
+          );
+        }
+        walk(bar.children ?? []);
+      }
+    };
+    walk(data.bars[0]?.children ?? []);
   });
 
   it('splits a row into segments that fill it exactly', () => {

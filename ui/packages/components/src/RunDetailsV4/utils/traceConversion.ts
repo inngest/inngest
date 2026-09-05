@@ -998,12 +998,19 @@ export function leadInMs(bar: TimelineBarData): number {
 }
 
 /**
- * A lead-in wide enough to see gets a number, so no ghost on screen is
- * anonymous. Below this it is a sliver the eye reads as an edge on the bar, and
- * a note for it would be noise on every row in the run.
+ * Any lead-in that is DRAWN gets named. The two thresholds are the same one.
+ *
+ * They were not, and the gap between them put a hole in the arithmetic: the bar
+ * for `step`'s `second step` drew a 2ms ghost, the row's 7ms total included it,
+ * and the note stayed silent — so a reader subtracting the named wait from the
+ * total got 7ms against the canvas's 5ms, with nothing on screen accounting for
+ * the difference. `invoke`'s `call child` was the same at 1ms.
+ *
+ * A millisecond named on a few extra rows is a smaller cost than a number that
+ * does not reconcile, and it keeps the one rule this view is built on: nothing
+ * is drawn that cannot be asked what it is.
  */
-const LEAD_IN_NOTE_FRACTION = 0.05;
-const LEAD_IN_NOTE_MIN_MS = 5;
+const LEAD_IN_NOTE_MIN_MS = 1;
 
 /**
  * Name the lead-in on every step that draws a visible one.
@@ -1020,12 +1027,12 @@ function withWaitNotes(bars: TimelineBarData[]): TimelineBarData[] {
       const children = bar.children ? walk(bar.children) : undefined;
       if (bar.isRoot || bar.note || !bar.endTime) return { ...bar, children };
 
+      // Named exactly when it is drawn — `generateBarSegments` draws a lead-in
+      // for any non-zero `leadInMs`, so this is the same condition and not a
+      // second, looser one.
       const wait = leadInMs(bar);
-      const spanMs = bar.endTime.getTime() - bar.startTime.getTime();
-      const visible =
-        wait >= LEAD_IN_NOTE_MIN_MS && spanMs > 0 && wait / spanMs >= LEAD_IN_NOTE_FRACTION;
 
-      return visible
+      return wait >= LEAD_IN_NOTE_MIN_MS
         ? { ...bar, note: `+${formatDuration(wait)} wait`, children }
         : { ...bar, children };
     });
