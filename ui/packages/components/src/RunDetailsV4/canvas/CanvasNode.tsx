@@ -133,6 +133,49 @@ function durationOf(data: CanvasNodeData): string | null {
 const HANDLE = '!h-1 !w-1 !min-w-0 !border-0 !bg-transparent';
 
 /**
+ * Status rides a stripe down the card's left edge, not its border.
+ *
+ * From two references, which disagree in a useful way. One keeps colour to an
+ * icon chip and a status pill and makes its edges nearly invisible; the other
+ * carries colour on a left accent bar and draws its edges confidently. For a
+ * flow chart the edges ARE the content, so the lines follow the second — but
+ * both agree on the thing that matters: colour appears only where it carries
+ * meaning, and the card itself stays neutral.
+ *
+ * A stripe beats a coloured border at our size. It reads down a column of nodes
+ * at a glance, it costs 3px of a 186px card rather than tinting the whole
+ * outline, and it leaves the border free to mean selection instead.
+ */
+const STRIPE: Record<string, string> = {
+  COMPLETED: 'bg-status-completed',
+  FAILED: 'bg-status-failed',
+  CANCELLED: 'bg-status-cancelled',
+  RUNNING: 'bg-status-running',
+  QUEUED: 'bg-surfaceMuted',
+  WAITING: 'bg-surfaceMuted',
+  SKIPPED: 'bg-surfaceMuted',
+  UNKNOWN: 'bg-surfaceMuted',
+};
+
+/**
+ * Only states worth interrupting for.
+ *
+ * COMPLETED is the default outcome and saying so on every node is noise — the
+ * reference pills each mark something in flight or unusual, and a page of green
+ * ACTIVE badges would carry no information at all.
+ */
+const PILL_STATES = new Set(['FAILED', 'CANCELLED', 'RUNNING', 'QUEUED', 'WAITING']);
+
+/** Pill tints, same tokens as the stripe at a lower weight. */
+const PILL_TEXT: Record<string, string> = {
+  FAILED: 'text-status-failedText',
+  CANCELLED: 'text-status-cancelledText',
+  RUNNING: 'text-status-runningText',
+  QUEUED: 'text-muted',
+  WAITING: 'text-muted',
+};
+
+/**
  * Neutral, so selection never competes with a status colour — a selected failed
  * step should not show a red stroke and a green one at once.
  *
@@ -176,11 +219,10 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
           ? 'bg-status-failed'
           : 'bg-canvasBase'
       )
-    : cn(
-        'bg-canvasBase',
-        // A timeout is not a failure of the step, so it goes grey rather than red.
-        timedOut ? NEUTRAL.border : getStatusBorderClass(data.status)
-      );
+    : // Neutral. The card is structure, and structure does not carry status —
+      // the tinted chip and the pill do, which is what stops a page of nodes
+      // reading as a wall of colour.
+      'bg-canvasBase border-subtle border';
 
   const accent = filled
     ? 'text-alwaysWhite'
@@ -226,7 +268,20 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
       >
         <Handle type="target" position={Position.Left} className={HANDLE} />
 
-        <div className="flex items-center gap-1.5">
+        {/* The one spot of colour on an otherwise neutral card. */}
+        {!isEvent && !isResult && (
+          <span
+            aria-hidden
+            className={cn(
+              'absolute inset-y-0 left-0 w-[3px] rounded-l-md',
+              timedOut ? 'bg-surfaceMuted' : STRIPE[data.status] ?? 'bg-surfaceMuted'
+            )}
+          />
+        )}
+
+        <div className="flex items-center gap-2">
+          {/* The icon in a tinted chip, so the one spot of colour on the card
+              is the one that means something. */}
           <Icon
             className={cn(
               'h-3.5 w-3.5 shrink-0',
@@ -247,6 +302,20 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
               #{data.duplicateIndex}
             </span>
           ) : null}
+
+          {/* Only states worth interrupting for. COMPLETED is the default
+              outcome and a page of green badges saying so carries nothing. */}
+          {!isEvent && !isResult && PILL_STATES.has(data.status) && (
+            <span
+              className={cn(
+                'ml-auto shrink-0 rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide',
+                'bg-canvasSubtle',
+                PILL_TEXT[data.status] ?? 'text-muted'
+              )}
+            >
+              {timedOut ? 'timed out' : data.status.toLowerCase()}
+            </span>
+          )}
 
           {/* An invoke started another run, and that run is the answer to what
               the invoke did. Shown inside this node rather than only behind a

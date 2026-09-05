@@ -359,11 +359,16 @@ export function toFlowElements(
       // lighter: they carry the least obvious claim on the canvas and are the
       // easiest to lose against the dot grid. The dash lengths, not the weight,
       // are what separate them — long dashes for a race, short for unconfirmed.
+      //
+      // Solid edges are drawn confidently rather than as hairlines. On a flow
+      // chart the edges ARE the content — they are the only thing saying what
+      // led to what — and at 1px against a dot grid they were the faintest
+      // thing on a canvas whose whole purpose they carry.
       style: isAlternate
         ? { strokeDasharray: '7 4', strokeWidth: 1.5, opacity: 0.85 }
         : isUnconfirmed
         ? { strokeDasharray: '2 3', strokeWidth: 1.5, opacity: 0.8 }
-        : undefined,
+        : { strokeWidth: 1.5 },
       data: { canvas: edge },
     };
   });
