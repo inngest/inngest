@@ -192,6 +192,11 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	// extended-trace case still looks up the user-created span by its ID.
 	var parentSpanRef *meta.SpanReference
 	var scope metadata.Scope
+	// hashedStepID/stepAttempt feed addTenantIDs below (for dual-write's
+	// inngest.run_metadata step_id/step_attempt columns), populated only in
+	// the step-scoped case.
+	var hashedStepID string
+	var stepAttempt *int
 
 	switch {
 	case req.Target.StepID == nil:
@@ -201,7 +206,6 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 	case req.Target.StepAttempt == nil || req.Target.SpanID == nil:
 		scope = enums.MetadataScopeStep
 
-		var hashedStepID string
 		if req.Target.StepIndex == nil || *req.Target.StepIndex == 0 {
 			sum := sha1.Sum([]byte(*req.Target.StepID))
 			hashedStepID = hex.EncodeToString(sum[:])
@@ -213,6 +217,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		if req.Target.StepAttempt == nil || *req.Target.StepAttempt < 0 {
 			parentSpanRef = tracing.FinalizedStepSpanRefFromMetadataAndStepID(stateMetadata, hashedStepID)
 		} else {
+			stepAttempt = req.Target.StepAttempt
 			parentSpanRef = tracing.RetryStepSpanRefFromMetadataAndStepID(stateMetadata, hashedStepID, *req.Target.StepAttempt)
 		}
 
@@ -236,6 +241,15 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &stateMetadata.ID.FunctionID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &stateMetadata.ID.RunID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &stateMetadata.ID.Tenant.AppID)
+		if hashedStepID != "" {
+			meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &hashedStepID)
+			if req.Target.StepIndex != nil {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandIndex, req.Target.StepIndex)
+			}
+			if stepAttempt != nil {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, stepAttempt)
+			}
+		}
 	}
 
 	for _, md := range req.Metadata {
@@ -249,6 +263,7 @@ func (a router) AddRunMetadata(ctx context.Context, auth apiv1auth.V1Auth, runID
 			md,
 			scope,
 			addTenantIDs,
+			tracing.WithMetadataSyncListeners(a.opts.SyncLifecycleListeners...),
 		)
 		if err != nil {
 			return err
@@ -383,12 +398,36 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 		DynamicSpanTraceParent: fmt.Sprintf("00-%s-%s-00", parentSpan.TraceID, parentSpan.SpanID),
 	}
 
+	// hashedStepID mirrors AddRunMetadata's own derivation above -- this
+	// legacy path resolves parentSpanRef differently (a ClickHouse lookup
+	// rather than a deterministic computation), but req.Target carries the
+	// same step identifiers either way.
+	var hashedStepID string
+	if scope == enums.MetadataScopeStep && req.Target.StepID != nil {
+		if req.Target.StepIndex == nil || *req.Target.StepIndex == 0 {
+			sum := sha1.Sum([]byte(*req.Target.StepID))
+			hashedStepID = hex.EncodeToString(sum[:])
+		} else {
+			sum := sha1.Sum(fmt.Appendf(nil, "%s:%d", *req.Target.StepID, *req.Target.StepIndex))
+			hashedStepID = hex.EncodeToString(sum[:])
+		}
+	}
+
 	addTenantIDs := func(cfg *tracing.MetadataSpanConfig) {
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AccountID, util.ToPtr(auth.AccountID()))
 		meta.AddAttr(cfg.Attrs, meta.Attrs.EnvID, util.ToPtr(auth.WorkspaceID()))
 		meta.AddAttr(cfg.Attrs, meta.Attrs.FunctionID, &parentSpan.FunctionID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.RunID, &parentSpan.RunID)
 		meta.AddAttr(cfg.Attrs, meta.Attrs.AppID, &parentSpan.AppID)
+		if hashedStepID != "" {
+			meta.AddAttr(cfg.Attrs, meta.Attrs.StepID, &hashedStepID)
+			if req.Target.StepIndex != nil {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepUserlandIndex, req.Target.StepIndex)
+			}
+			if req.Target.StepAttempt != nil && *req.Target.StepAttempt >= 0 {
+				meta.AddAttr(cfg.Attrs, meta.Attrs.StepAttempt, req.Target.StepAttempt)
+			}
+		}
 	}
 
 	for _, md := range req.Metadata {
@@ -402,6 +441,7 @@ func (a router) addRunMetadataLegacy(ctx context.Context, auth apiv1auth.V1Auth,
 			md,
 			scope,
 			addTenantIDs,
+			tracing.WithMetadataSyncListeners(a.opts.SyncLifecycleListeners...),
 		)
 		if err != nil {
 			return err

@@ -13,6 +13,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/tracing/metadata"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -249,6 +250,54 @@ type SyncLifecycleListener interface {
 	// span is historical, reported after the fact via OTLP), so there's
 	// nothing here that would need the caller's clock read.
 	OnExtendedTraceSpan(ctx context.Context, span ExtendedTraceSpan)
+
+	// OnMetadataEntry is called synchronously after a metadata span is
+	// created -- from the executor (generator/experiment metadata) or the
+	// REST API (AddRunMetadata, userland span metadata extraction; see
+	// pkg/tracing.CreateMetadataSpanFromValues, the single chokepoint every
+	// caller funnels through). Like OnExtendedTraceSpan, there is no
+	// statev2.Metadata guaranteed at every call site (userland span metadata
+	// extraction has none), so identifiers are carried individually, and
+	// there is no "now" parameter since entry.CreatedAt already pins the
+	// moment.
+	OnMetadataEntry(ctx context.Context, entry MetadataEntry)
+}
+
+// MetadataEntry carries everything OnMetadataEntry needs to record one
+// metadata emission -- unlike ExtendedTraceSpan, it isn't itself a span:
+// dual-write never creates an OTel span for it (see
+// dualwrite.listener.OnMetadataEntry), only a row in a standalone table.
+// Parent is the run/step/request span this metadata annotates -- its own
+// span ID (recoverable via tracing.SpanContextFromMetadata, the same helper
+// the real TracerProvider uses) is the join key onto
+// inngest.run_trace_spans.span_id. Op (metadata.Opcode --
+// merge/set/delete/add) is deliberately not carried here: this dual-write
+// path stores each emission as a standalone row and leaves later readers to
+// collapse to the latest one per (run_id, span_id, kind), rather than
+// replicating the production pipeline's per-key, op-aware fragment folding.
+type MetadataEntry struct {
+	AccountID  uuid.UUID
+	EnvID      uuid.UUID
+	AppID      uuid.UUID
+	FunctionID uuid.UUID
+	RunID      ulid.ULID
+	Parent     *meta.SpanReference
+	Kind       metadata.Kind
+	Scope      metadata.Scope
+	Values     metadata.Values
+	CreatedAt  time.Time
+
+	// StepID/StepIndex/StepAttempt identify the step this metadata belongs
+	// to, independently of Parent (which identifies the span this metadata
+	// is attached to -- a request-scoped metadata span's Parent is the
+	// request's execution span, not the step span, but it still belongs to
+	// a step). All three are empty/nil for run-scoped metadata. StepID is
+	// the same hashed step ID used to compute a step's own deterministic
+	// span identity (see tracing.FinalizedStepSpanRefFromMetadataAndStepID),
+	// not the SDK-facing userland step ID.
+	StepID      string
+	StepIndex   *int
+	StepAttempt *int
 }
 
 // ExtendedTraceSpan carries everything OnExtendedTraceSpan needs to record a
@@ -338,3 +387,5 @@ func (NoopSyncLifecycleListener) OnDeferAbort(context.Context, statev2.Metadata,
 }
 
 func (NoopSyncLifecycleListener) OnExtendedTraceSpan(context.Context, ExtendedTraceSpan) {}
+
+func (NoopSyncLifecycleListener) OnMetadataEntry(context.Context, MetadataEntry) {}

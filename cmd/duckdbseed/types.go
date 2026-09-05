@@ -1,8 +1,9 @@
 // Command duckdbseed seeds a DuckDB dual-write database
-// (inngest.runs/run_trace_spans/events, per
-// pkg/db/duckdb/migrations/000001_baseline.sql) with synthetic test data
-// shaped after a real dev database, for exercising pkg/cqrs/duckdbquery and
-// the trace UI without running real workloads through `inngest dev`.
+// (inngest.runs/run_trace_spans/events/run_metadata, per
+// pkg/db/duckdb/migrations/000001_baseline.sql and
+// 000003_run_metadata.sql) with synthetic test data shaped after a real dev
+// database, for exercising pkg/cqrs/duckdbquery and the trace UI without
+// running real workloads through `inngest dev`.
 package main
 
 import (
@@ -24,12 +25,12 @@ type Tenant struct {
 // synthetic rows — either sampled from a real database (see sample.go) or
 // the built-in defaults (DefaultTemplates) when no real data is available.
 // JSON-valued fields hold raw JSON text, reused verbatim as payload shapes.
-// Traces/EventProfiles are deliberately not flat pools of independently-
-// chosen values the way Statuses/Inputs/Outputs are: a run's span tree
-// shape and its triggering events are each properties of one real sampled
-// run, replayed onto a new one intact (same names/attributes/payloads/
-// relative timing) rather than reassembled from unrelated pieces — see
-// each type's own doc comment.
+// Traces/EventProfiles/MetadataProfiles are deliberately not flat pools of
+// independently-chosen values the way Statuses/Inputs/Outputs are: a run's
+// span tree shape, its triggering events, and its metadata are each
+// properties of one real sampled run, replayed onto a new one intact (same
+// names/attributes/payloads/relative timing) rather than reassembled from
+// unrelated pieces — see each type's own doc comment.
 type Templates struct {
 	Tenants  []Tenant
 	Statuses []string
@@ -41,6 +42,9 @@ type Templates struct {
 	// EventTemplate) — usually one event, but a batch-triggered run can have
 	// several, all received close together.
 	EventProfiles [][]EventTemplate
+	// MetadataProfiles are whole sampled runs' worth of metadata shape (see
+	// MetadataProfile).
+	MetadataProfiles []MetadataProfile
 }
 
 // SpanTemplate is one sampled span, stripped of everything that ties it to
@@ -101,6 +105,39 @@ type EventTemplate struct {
 	Name   string
 	Data   string
 	Offset time.Duration
+}
+
+// MetadataTemplateItem is one sampled inngest.run_metadata row, stripped
+// only of its tenant/run identity (see MetadataProfile) so it can be
+// replayed onto a newly generated run. SpanID/Scope/StepID/StepIndex/
+// StepAttempt are reused completely verbatim from the sampled row, the
+// same way SpanTemplate reuses SpanID/ParentSpanID (see its doc comment)
+// -- generateMetadata attaches an item to whichever replayed span shares
+// its exact SpanID, rather than recomputing a root/step position itself.
+// Offset is this row's created_at relative to the sampled run's own
+// queued_at (see SpanTemplate's doc comment for why every offset in this
+// package shares that reference point).
+type MetadataTemplateItem struct {
+	SpanID      string
+	Scope       string
+	StepID      *string
+	StepIndex   *int
+	StepAttempt *int
+	Kind        string
+	IsUser      bool
+	Values      string
+	Offset      time.Duration
+}
+
+// MetadataProfile is one sampled run's entire metadata shape: every
+// inngest.run_metadata row it had, verbatim. generateMetadata replays a
+// whole profile onto a newly generated run's span tree, skipping any item
+// whose SpanID doesn't match one of that run's actual replayed spans (only
+// possible when the trace and metadata profile picked for one generated
+// run were sampled from two different source runs -- see Templates' own
+// doc comment) rather than writing a metadata row with no matching span.
+type MetadataProfile struct {
+	Items []MetadataTemplateItem
 }
 
 // GenerateConfig parameterizes GenerateRuns.
@@ -181,10 +218,34 @@ type EventRow struct {
 	EventMeta  string
 }
 
-// GeneratedRun bundles one synthetic run together with its span tree and
-// the events it was triggered by.
+// MetadataRow mirrors inngest.run_metadata's columns
+// (pkg/db/duckdb/migrations/000003_run_metadata.sql). StepID/StepIndex/
+// StepAttempt are nil for a run-scoped row (Scope == "run"), matching
+// pkg/execution/dualwrite/listener.go's OnMetadataEntry, which leaves them
+// unset the same way for run-scoped metadata.
+type MetadataRow struct {
+	AccountID   uuid.UUID
+	EnvID       uuid.UUID
+	RunID       string
+	RunQueuedAt time.Time
+	AppID       uuid.UUID
+	FunctionID  uuid.UUID
+	SpanID      string
+	Scope       string
+	StepID      *string
+	StepIndex   *int
+	StepAttempt *int
+	Kind        string
+	IsUser      bool
+	Values      string
+	CreatedAt   time.Time
+}
+
+// GeneratedRun bundles one synthetic run together with its span tree, the
+// events it was triggered by, and the metadata attached to its spans.
 type GeneratedRun struct {
-	Run    RunRow
-	Spans  []SpanRow
-	Events []EventRow
+	Run      RunRow
+	Spans    []SpanRow
+	Events   []EventRow
+	Metadata []MetadataRow
 }

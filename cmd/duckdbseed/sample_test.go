@@ -56,6 +56,14 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 'run', 'inngest.experiment', false, ?, ?);`,
+		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(),
+		"span-1", `{"variant":"a"}`, now,
+	)
+	require.NoError(t, err)
+
 	tmpl, err := SampleTemplates(ctx, db, 200)
 	require.NoError(t, err)
 
@@ -87,24 +95,31 @@ func TestSampleTemplatesReadsRealRowsAsTemplates(t *testing.T) {
 
 	require.Len(t, tmpl.EventProfiles, 1)
 	require.Equal(t, []EventTemplate{{Name: "app/one", Data: `{"k":"v"}`, Offset: receivedAt.Sub(now)}}, tmpl.EventProfiles[0])
+
+	require.Len(t, tmpl.MetadataProfiles, 1)
+	profile := tmpl.MetadataProfiles[0]
+	require.Equal(t, []MetadataTemplateItem{
+		{SpanID: "span-1", Scope: "run", Kind: "inngest.experiment", IsUser: false, Values: `{"variant":"a"}`, Offset: 0},
+	}, profile.Items)
 }
 
 // TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim proves the fix
 // for a real bug affecting every run sampled from an actual `inngest dev`
-// database: sampleTraces used to try to detect which span was "the root"
-// by checking parent_span_id IS NULL -- but a real root span
-// ("executor.run") is created with no OTel parent, and OTel's zero SpanID
-// stringifies to the literal "0000000000000000", never SQL NULL or "", so
-// that check never matched any real run's root at all, silently dropping
-// every sampled trace (falling back to the 2-span defaults). The fix
-// removes root detection entirely: SpanTemplate now carries each
-// span_id/parent_span_id completely unchanged, so the exact same
-// relationship (child's parent_span_id text matching root's span_id text)
-// still holds after replay without this package ever needing to resolve
-// it itself. This seeds a run shaped exactly like real dualwrite output:
-// the root's own parent_span_id is the literal OTel zero-SpanID sentinel,
-// and every other span's parent_span_id is the deterministic value that
-// equals the root's own span_id (mirroring pkg/tracing/util.go's
+// database: sampleTraces/sampleMetadata used to try to detect which span
+// was "the root" by checking parent_span_id IS NULL -- but a real root
+// span ("executor.run") is created with no OTel parent, and OTel's zero
+// SpanID stringifies to the literal "0000000000000000", never SQL NULL or
+// "", so that check never matched any real run's root at all, silently
+// dropping every sampled trace and metadata profile (falling back to the
+// 2-span/no-metadata defaults). The fix removes root detection entirely:
+// SpanTemplate/MetadataTemplateItem now carry each span_id/parent_span_id
+// completely unchanged, so the exact same relationship (child's
+// parent_span_id text matching root's span_id text) still holds after
+// replay without this package ever needing to resolve it itself. This
+// seeds a run shaped exactly like real dualwrite output: the root's own
+// parent_span_id is the literal OTel zero-SpanID sentinel, and every
+// other span's parent_span_id is the deterministic value that equals the
+// root's own span_id (mirroring pkg/tracing/util.go's
 // RunSpanRefFromMetadata).
 func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	_, db := newTestDB(t, 1)
@@ -141,6 +156,13 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	insertSpan("step-0", rootSpanID, now.Add(time.Second))
 	insertSpan("step-1", rootSpanID, now.Add(2*time.Second))
 
+	_, err = db.ExecContext(ctx,
+		`INSERT INTO inngest.run_metadata (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, step_id, step_index, step_attempt, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 'step', ?, 1, 1, 'user.custom', true, '{"n":2}', ?);`,
+		accountID.String(), envID.String(), runID, now, appID.String(), functionID.String(), "step-1", "step-1", now,
+	)
+	require.NoError(t, err)
+
 	tmpl, err := SampleTemplates(ctx, db, 200)
 	require.NoError(t, err)
 
@@ -159,6 +181,12 @@ func TestSampleTemplatesPreservesRealSpanIDsAndParentsVerbatim(t *testing.T) {
 	require.Equal(t, rootSpanID, *bySpanID["step-0"].ParentSpanID)
 	require.NotNil(t, bySpanID["step-1"].ParentSpanID)
 	require.Equal(t, rootSpanID, *bySpanID["step-1"].ParentSpanID)
+
+	require.Len(t, tmpl.MetadataProfiles, 1)
+	profile := tmpl.MetadataProfiles[0]
+	require.Equal(t, []MetadataTemplateItem{
+		{SpanID: "step-1", Scope: "step", StepID: strPtr("step-1"), StepIndex: intPtr(1), StepAttempt: intPtr(1), Kind: "user.custom", IsUser: true, Values: `{"n":2}`, Offset: 0},
+	}, profile.Items)
 
 	// Replaying the sampled trace must preserve the exact same
 	// relationship, purely because SpanID/ParentSpanID are copied

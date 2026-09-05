@@ -11,16 +11,76 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func seedSpanRow(t *testing.T, ctx context.Context, m *Manager, appID, functionID uuid.UUID, runIDULID ulid.ULID, spanID, parentSpanID, name string, start, end time.Time, attrs string) {
+func seedSpanRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID, appID, functionID uuid.UUID, runIDULID ulid.ULID, spanID, parentSpanID, name string, start, end time.Time, attrs string) {
 	t.Helper()
 	_, err := m.db.ExecContext(ctx,
 		`INSERT INTO inngest.run_trace_spans
 		 (account_id, env_id, run_id, run_queued_at, app_id, function_id, name, start_time, end_time, trace_id, span_id, parent_span_id, attributes)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-		uuid.New().String(), uuid.New().String(), runIDULID.String(), start, appID.String(), functionID.String(),
+		accountID.String(), envID.String(), runIDULID.String(), start, appID.String(), functionID.String(),
 		name, start, end, "trace-1", spanID, parentSpanID, attrs,
 	)
 	require.NoError(t, err)
+}
+
+func seedMetadataRow(t *testing.T, ctx context.Context, m *Manager, accountID, envID, appID, functionID uuid.UUID, runID ulid.ULID, spanID, scope, kind string, isUser bool, values string, createdAt time.Time) {
+	t.Helper()
+	_, err := m.db.ExecContext(ctx,
+		`INSERT INTO inngest.run_metadata
+		 (account_id, env_id, run_id, run_queued_at, app_id, function_id, span_id, scope, kind, is_user, values, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+		accountID.String(), envID.String(), runID.String(), createdAt, appID.String(), functionID.String(),
+		spanID, scope, kind, isUser, values, createdAt,
+	)
+	require.NoError(t, err)
+}
+
+// TestGetSpansByRunIDAttachesMetadataViaJoin proves the LEFT JOIN onto
+// inngest.run_metadata attaches each span's metadata without a second
+// query, and that multiple emissions of the same (span_id, kind) collapse
+// to only the latest by created_at -- see execution.MetadataEntry's doc
+// comment on why "op" isn't stored, so there's no fragment folding, only a
+// last-write-wins pick.
+func TestGetSpansByRunIDAttachesMetadataViaJoin(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	ctx := t.Context()
+	m := Wrap(nil, db).(*Manager)
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), nil)
+	now := time.Now().UTC()
+
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "root-span", "", "executor.run", now, now.Add(time.Second), "{}")
+	seedSpanRow(t, ctx, m, accountID, envID, appID, functionID, runID, "child-span", "root-span", "executor.step", now.Add(time.Millisecond), now.Add(500*time.Millisecond), "{}")
+
+	// Two emissions of the same kind on root-span: only the later one
+	// (by created_at) should survive.
+	seedMetadataRow(t, ctx, m, accountID, envID, appID, functionID, runID, "root-span", "run", "stale.kind", false, `{"v":1}`, now)
+	seedMetadataRow(t, ctx, m, accountID, envID, appID, functionID, runID, "root-span", "run", "stale.kind", false, `{"v":2}`, now.Add(time.Minute))
+	// A distinct kind, also on root-span.
+	seedMetadataRow(t, ctx, m, accountID, envID, appID, functionID, runID, "root-span", "run", "other.kind", true, `{"v":3}`, now)
+	// A kind on child-span -- must not leak onto root-span.
+	seedMetadataRow(t, ctx, m, accountID, envID, appID, functionID, runID, "child-span", "step", "step.kind", false, `{"v":4}`, now)
+
+	root, err := m.GetSpansByRunID(ctx, runID)
+	require.NoError(t, err)
+	require.Len(t, root.Metadata, 2)
+
+	byKind := map[string]*cqrs.SpanMetadata{}
+	for _, md := range root.Metadata {
+		byKind[string(md.Kind)] = md
+	}
+	require.Contains(t, byKind, "stale.kind")
+	require.JSONEq(t, `2`, string(byKind["stale.kind"].Values["v"]))
+	require.Contains(t, byKind, "other.kind")
+	require.JSONEq(t, `3`, string(byKind["other.kind"].Values["v"]))
+
+	require.Len(t, root.Children, 1)
+	child := root.Children[0]
+	require.Len(t, child.Metadata, 1)
+	require.Equal(t, "step.kind", string(child.Metadata[0].Kind))
+	require.JSONEq(t, `4`, string(child.Metadata[0].Values["v"]))
 }
 
 func TestGetSpansByRunIDBuildsTreeFromFlatRows(t *testing.T) {
@@ -34,9 +94,9 @@ func TestGetSpansByRunIDBuildsTreeFromFlatRows(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Root span: empty parent_span_id.
-	seedSpanRow(t, ctx, m, appID, functionID, runID, "root-span", "", "executor.run", now, now.Add(time.Second), "{}")
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, "root-span", "", "executor.run", now, now.Add(time.Second), "{}")
 	// Child span: parent is the root.
-	seedSpanRow(t, ctx, m, appID, functionID, runID, "child-span", "root-span", "executor.step", now.Add(time.Millisecond), now.Add(500*time.Millisecond), "{}")
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, "child-span", "root-span", "executor.step", now.Add(time.Millisecond), now.Add(500*time.Millisecond), "{}")
 
 	root, err := m.GetSpansByRunID(ctx, runID)
 	require.NoError(t, err)
@@ -77,7 +137,7 @@ func TestGetSpansByRunIDPromotesRunStartedOverQueuedForStillRunningFunction(t *t
 			}
 			for _, key := range order {
 				row := rows[key]
-				seedSpanRow(t, ctx, m, appID, functionID, runID, row.spanID, "run-root-not-yet-written", row.name, now, now, "{}")
+				seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, row.spanID, "run-root-not-yet-written", row.name, now, now, "{}")
 			}
 
 			root, err := m.GetSpansByRunID(ctx, runID)
@@ -102,7 +162,7 @@ func TestGetSpansByRunIDPromotesRunQueuedWhenNotYetStarted(t *testing.T) {
 	runID := ulid.MustNew(ulid.Now(), nil)
 	now := time.Now().UTC()
 
-	seedSpanRow(t, ctx, m, appID, functionID, runID, "run-queued", "run-root-not-yet-written", "executor.run.queued", now, now, "{}")
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, "run-queued", "run-root-not-yet-written", "executor.run.queued", now, now, "{}")
 
 	root, err := m.GetSpansByRunID(ctx, runID)
 	require.NoError(t, err)
@@ -127,8 +187,8 @@ func TestGetSpansByRunIDPrefersGenuineRootOverOrphanedRunSpans(t *testing.T) {
 
 	// The genuine root, inserted last (start_time is later) so scan order
 	// alone would otherwise favor the orphaned executor.run.started span.
-	seedSpanRow(t, ctx, m, appID, functionID, runID, "run-started", "run-root", "executor.run.started", now, now.Add(time.Second), "{}")
-	seedSpanRow(t, ctx, m, appID, functionID, runID, "run-root", "", "executor.run", now.Add(2*time.Second), now.Add(3*time.Second), "{}")
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, "run-started", "run-root", "executor.run.started", now, now.Add(time.Second), "{}")
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, "run-root", "", "executor.run", now.Add(2*time.Second), now.Add(3*time.Second), "{}")
 
 	root, err := m.GetSpansByRunID(ctx, runID)
 	require.NoError(t, err)
@@ -156,7 +216,7 @@ func TestGetSpansByRunIDSetsOutputIDWhenSpanHasOutputOrInput(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Root span: still running, no output/input recorded yet.
-	seedSpanRow(t, ctx, m, appID, functionID, runID, "root-span", "", "executor.run", now, now.Add(time.Second), "{}")
+	seedSpanRow(t, ctx, m, uuid.New(), uuid.New(), appID, functionID, runID, "root-span", "", "executor.run", now, now.Add(time.Second), "{}")
 	// Child span: finished, has output.
 	_, err := m.db.ExecContext(ctx,
 		`INSERT INTO inngest.run_trace_spans

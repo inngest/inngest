@@ -432,6 +432,7 @@ func (a router) commitSpan(ctx context.Context, l logger.Logger, auth apiv1auth.
 				m,
 				enums.MetadataScopeExtendedTrace,
 				addTenantIDs,
+				tracing.WithMetadataSyncListeners(a.opts.SyncLifecycleListeners...),
 			)
 			if err != nil {
 				l.Error("failed to create metadata span", "err", err)

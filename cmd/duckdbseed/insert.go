@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,9 +19,10 @@ import (
 
 // Summary reports how many rows were written per table.
 type Summary struct {
-	Runs   int
-	Spans  int
-	Events int
+	Runs     int
+	Spans    int
+	Events   int
+	Metadata int
 }
 
 // Timings reports how much time GenerateAndInsert's two stages actually
@@ -38,9 +40,10 @@ type Timings struct {
 }
 
 // Column kind lists mirror pkg/db/duckdb/migrations/000001_baseline.sql's
-// column order for each table exactly. duckdb.QuackAppender's wire protocol
-// carries no column names — a row's values are matched positionally against
-// the table's own full column list — so, unlike the earlier duckdb-go-based
+// (and, for runs, 000002_runs_is_deferred.sql's appended column) column
+// order for each table exactly. duckdb.QuackAppender's wire protocol carries
+// no column names — a row's values are matched positionally against the
+// table's own full column list — so, unlike the earlier duckdb-go-based
 // version of this tool, there is no way to scope the appender to a subset
 // of columns: inngest.runs' inserted_at (DEFAULT current_timestamp) must be
 // supplied explicitly too (see runRowValues), even though nothing else in
@@ -54,6 +57,7 @@ var (
 		duckdb.QuackColumnVarchar,     // event_ids — VARCHAR[] via array-literal text, see runRowValues' doc comment
 		duckdb.QuackColumnVarchar,     // sessions — STRUCT(key VARCHAR, id VARCHAR)[] via JSON-literal text, see sessionsLiteral's doc comment
 		duckdb.QuackColumnTimestampMS, // inserted_at
+		duckdb.QuackColumnVarchar,     // is_deferred (BOOLEAN, VARCHAR-cast) — this tool never generates deferred runs, so always NULL
 	}
 	spanColumns = []duckdb.QuackColumnKind{
 		duckdb.QuackColumnUUID, duckdb.QuackColumnUUID, duckdb.QuackColumnVarchar, duckdb.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
@@ -66,6 +70,20 @@ var (
 		duckdb.QuackColumnUUID, duckdb.QuackColumnUUID, duckdb.QuackColumnVarchar, duckdb.QuackColumnTimestampMS, // account_id, env_id, internal_id, received_at
 		duckdb.QuackColumnVarchar, duckdb.QuackColumnVarchar, duckdb.QuackColumnVarchar, duckdb.QuackColumnVarchar, // source, source_id, event_id, event_name
 		duckdb.QuackColumnJSON, duckdb.QuackColumnVarchar, duckdb.QuackColumnTimestampMS, duckdb.QuackColumnJSON, // event_data, event_v, event_ts, event_meta
+	}
+	// metadataColumns' step_index/step_attempt (INTEGER) and is_user
+	// (BOOLEAN) have no native duckdb.QuackColumnKind — see that type's own
+	// doc comment: only UUID/VARCHAR/JSON/TIMESTAMP_MS exist — so they're
+	// sent as QuackColumnVarchar text (see metadataRowValues) and rely on
+	// DuckDB's Appender doing implicit VARCHAR->INTEGER/BOOLEAN casting, the
+	// same mechanism already relied on (and verified against a real
+	// duckdb-quack server) for event_ids' VARCHAR->LIST casting above.
+	metadataColumns = []duckdb.QuackColumnKind{
+		duckdb.QuackColumnUUID, duckdb.QuackColumnUUID, duckdb.QuackColumnVarchar, duckdb.QuackColumnTimestampMS, // account_id, env_id, run_id, run_queued_at
+		duckdb.QuackColumnUUID, duckdb.QuackColumnUUID, duckdb.QuackColumnVarchar, duckdb.QuackColumnVarchar, // app_id, function_id, span_id, scope
+		duckdb.QuackColumnVarchar, duckdb.QuackColumnVarchar, duckdb.QuackColumnVarchar, // step_id, step_index, step_attempt
+		duckdb.QuackColumnVarchar, duckdb.QuackColumnVarchar, // kind, is_user
+		duckdb.QuackColumnJSON, duckdb.QuackColumnTimestampMS, // values, created_at
 	}
 )
 
@@ -85,10 +103,11 @@ type indexedBatch struct {
 // *sql.DB's pool — see duckdb.OpenConnector's doc comment for why) and its
 // own set.
 type appenderSet struct {
-	conn   driver.Conn
-	runs   *duckdb.QuackAppender
-	spans  *duckdb.QuackAppender
-	events *duckdb.QuackAppender
+	conn     driver.Conn
+	runs     *duckdb.QuackAppender
+	spans    *duckdb.QuackAppender
+	events   *duckdb.QuackAppender
+	metadata *duckdb.QuackAppender
 }
 
 func newAppenderSet(ctx context.Context, connector *duckdb.Connector) (*appenderSet, error) {
@@ -112,31 +131,34 @@ func newAppenderSet(ctx context.Context, connector *duckdb.Connector) (*appender
 		_ = conn.Close()
 		return nil, fmt.Errorf("duckdbseed: creating events appender: %w", err)
 	}
+	metadata, err := duckdb.NewQuackAppenderFromConn(ctx, conn, duckdb.DuckLakeAlias, "main", "run_metadata", metadataColumns)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("duckdbseed: creating run_metadata appender: %w", err)
+	}
 
-	return &appenderSet{conn: conn, runs: runs, spans: spans, events: events}, nil
+	return &appenderSet{conn: conn, runs: runs, spans: spans, events: events, metadata: metadata}, nil
 }
 
 func (a *appenderSet) close(ctx context.Context) error {
-	return errors.Join(a.runs.Close(ctx), a.spans.Close(ctx), a.events.Close(ctx), a.conn.Close())
+	return errors.Join(a.runs.Close(ctx), a.spans.Close(ctx), a.events.Close(ctx), a.metadata.Close(ctx), a.conn.Close())
 }
 
-// insertBatch flattens one chunk of generated runs into its three tables'
-// rows, sorts each table's rows to match that table's declared physical
-// sort key (see sortRuns/sortSpans/sortEvents), and appends them — in the
-// run/event/span order the tool has always used — flushing each appender
-// once the batch is fully appended.
+// insertBatch flattens one chunk of generated runs into its four tables'
+// rows and appends them — in the run/event/span/metadata order the tool
+// has always used (metadata appended last, after spans) — flushing each
+// appender once the batch is fully appended.
 func (a *appenderSet) insertBatch(ctx context.Context, batch []GeneratedRun) (Summary, error) {
 	var runs []RunRow
 	var spans []SpanRow
 	var events []EventRow
+	var metadataRows []MetadataRow
 	for _, g := range batch {
 		runs = append(runs, g.Run)
 		spans = append(spans, g.Spans...)
 		events = append(events, g.Events...)
+		metadataRows = append(metadataRows, g.Metadata...)
 	}
-	sortRuns(runs)
-	sortSpans(spans)
-	sortEvents(events)
 
 	now := time.Now().UTC()
 	for _, r := range runs {
@@ -154,6 +176,11 @@ func (a *appenderSet) insertBatch(ctx context.Context, batch []GeneratedRun) (Su
 			return Summary{}, fmt.Errorf("duckdbseed: appending span %s: %w", s.SpanID, err)
 		}
 	}
+	for _, md := range metadataRows {
+		if err := a.metadata.AppendRow(metadataRowValues(md)...); err != nil {
+			return Summary{}, fmt.Errorf("duckdbseed: appending metadata for span %s: %w", md.SpanID, err)
+		}
+	}
 
 	if err := a.runs.Flush(ctx); err != nil {
 		return Summary{}, fmt.Errorf("duckdbseed: flushing runs appender: %w", err)
@@ -164,8 +191,11 @@ func (a *appenderSet) insertBatch(ctx context.Context, batch []GeneratedRun) (Su
 	if err := a.spans.Flush(ctx); err != nil {
 		return Summary{}, fmt.Errorf("duckdbseed: flushing spans appender: %w", err)
 	}
+	if err := a.metadata.Flush(ctx); err != nil {
+		return Summary{}, fmt.Errorf("duckdbseed: flushing metadata appender: %w", err)
+	}
 
-	return Summary{Runs: len(runs), Spans: len(spans), Events: len(events)}, nil
+	return Summary{Runs: len(runs), Spans: len(spans), Events: len(events), Metadata: len(metadataRows)}, nil
 }
 
 // runRowValues matches runColumns' order exactly. event_ids (VARCHAR[]) is
@@ -185,6 +215,7 @@ func runRowValues(r RunRow, now time.Time) []any {
 		r.AppID, r.FunctionID, r.Status,
 		r.Inputs, r.Output, eventIDsLiteral(r.EventIDs), sessionsLiteral(r.Sessions),
 		now,
+		nil, // is_deferred — this tool never generates deferred runs
 	}
 }
 
@@ -197,6 +228,30 @@ func spanRowValues(s SpanRow) []any {
 		s.AccountID, s.EnvID, s.RunID, s.RunQueuedAt,
 		s.AppID, s.FunctionID, s.Name, s.StartTime, s.EndTime,
 		s.TraceID, s.SpanID, parent, s.Attributes, nil, nullableJSON(s.Output), nullableJSON(s.Input),
+	}
+}
+
+// metadataRowValues matches metadataColumns' order exactly. step_index/
+// step_attempt/is_user go through the same VARCHAR-text-plus-implicit-cast
+// trick as event_ids above (see metadataColumns' doc comment) since
+// duckdb.QuackColumnKind has no native INTEGER/BOOLEAN wire type.
+func metadataRowValues(m MetadataRow) []any {
+	var stepID, stepIndex, stepAttempt any
+	if m.StepID != nil {
+		stepID = *m.StepID
+	}
+	if m.StepIndex != nil {
+		stepIndex = strconv.Itoa(*m.StepIndex)
+	}
+	if m.StepAttempt != nil {
+		stepAttempt = strconv.Itoa(*m.StepAttempt)
+	}
+	return []any{
+		m.AccountID, m.EnvID, m.RunID, m.RunQueuedAt,
+		m.AppID, m.FunctionID, m.SpanID, m.Scope,
+		stepID, stepIndex, stepAttempt,
+		m.Kind, strconv.FormatBool(m.IsUser),
+		m.Values, m.CreatedAt,
 	}
 }
 
@@ -395,6 +450,7 @@ func drainAndInsert(ctx context.Context, connector *duckdb.Connector, work <-cha
 				summary.Runs += batchSummary.Runs
 				summary.Spans += batchSummary.Spans
 				summary.Events += batchSummary.Events
+				summary.Metadata += batchSummary.Metadata
 				if onProgress != nil {
 					onProgress(b.index, totalBatches, summary.Runs, total)
 				}
@@ -459,4 +515,30 @@ func sortEvents(rows []EventRow) {
 func eventSortKey(e EventRow) string {
 	return fmt.Sprintf("%04d-%02d-%s-%s-%s-%020d",
 		e.ReceivedAt.Year(), e.ReceivedAt.Month(), e.AccountID, e.EnvID, e.InternalID, e.ReceivedAt.UnixNano())
+}
+
+func sortMetadata(rows []MetadataRow) {
+	sort.Slice(rows, func(i, j int) bool { return metadataSortKey(rows[i]) < metadataSortKey(rows[j]) })
+}
+
+// metadataSortKey mirrors inngest.run_metadata's SORTED BY
+// (year(run_queued_at), month(run_queued_at), account_id, env_id, run_id,
+// scope, step_id, step_index, step_attempt, span_id, kind). step_index/
+// step_attempt sort as -1 when NULL (a run-scoped row) — only meant to keep
+// output deterministic, not to reproduce DuckDB's own NULL-ordering rules.
+func metadataSortKey(m MetadataRow) string {
+	var stepID string
+	if m.StepID != nil {
+		stepID = *m.StepID
+	}
+	stepIndex, stepAttempt := -1, -1
+	if m.StepIndex != nil {
+		stepIndex = *m.StepIndex
+	}
+	if m.StepAttempt != nil {
+		stepAttempt = *m.StepAttempt
+	}
+	return fmt.Sprintf("%04d-%02d-%s-%s-%s-%s-%s-%020d-%020d-%s-%s",
+		m.RunQueuedAt.Year(), m.RunQueuedAt.Month(), m.AccountID, m.EnvID, m.RunID,
+		m.Scope, stepID, stepIndex, stepAttempt, m.SpanID, m.Kind)
 }

@@ -1,8 +1,9 @@
 // Command duckdbseed seeds a DuckDB dual-write database
-// (inngest.runs/run_trace_spans/events, per
-// pkg/db/duckdb/migrations/000001_baseline.sql) with synthetic test data
-// shaped after a real dev database, for exercising pkg/cqrs/duckdbquery and
-// the trace UI without running real workloads through `inngest dev`.
+// (inngest.runs/run_trace_spans/events/run_metadata, per
+// pkg/db/duckdb/migrations/000001_baseline.sql and
+// 000003_run_metadata.sql) with synthetic test data shaped after a real dev
+// database, for exercising pkg/cqrs/duckdbquery and the trace UI without
+// running real workloads through `inngest dev`.
 //
 // It writes via pkg/db/duckdb's quack Appender (duckdb.QuackAppender) over
 // the same subprocess/HTTP transport dual-write itself uses — not
@@ -110,7 +111,7 @@ func main() {
 	if *dryRun {
 		verb = "would seed"
 	}
-	fmt.Printf("%s %d runs, %d spans, %d events into %s\n", verb, summary.Runs, summary.Spans, summary.Events, targetDir)
+	fmt.Printf("%s %d runs, %d spans, %d events, %d metadata rows into %s\n", verb, summary.Runs, summary.Spans, summary.Events, summary.Metadata, targetDir)
 }
 
 // formatRate renders count/d as a "%.0f" items-per-second figure for log
@@ -197,7 +198,7 @@ func run(ctx context.Context, cfg runConfig) (Summary, error) {
 	wallStart := time.Now()
 	summary, timings, err := GenerateAndInsert(ctx, targetConnector, rng, tmpl, genCfg, cfg.BatchSize, cfg.Parallelism, onProgress)
 	wall := time.Since(wallStart)
-	totalRows := summary.Runs + summary.Spans + summary.Events
+	totalRows := summary.Runs + summary.Spans + summary.Events + summary.Metadata
 	cfg.logf("sampling %s, generation %s (cumulative, %s runs/sec), insertion %s (cumulative, %s rows/sec), wall %s (%s runs/sec overall)",
 		sampleDur,
 		timings.Generate, formatRate(cfg.RunCount, timings.Generate),
@@ -214,6 +215,7 @@ func summarizeGeneratedRuns(generated []GeneratedRun) Summary {
 		summary.Runs++
 		summary.Spans += len(g.Spans)
 		summary.Events += len(g.Events)
+		summary.Metadata += len(g.Metadata)
 	}
 	return summary
 }
