@@ -21,6 +21,7 @@ import {
   isExperimentMetadata,
   isScoreMetadata,
   isStepInfoRun,
+  type RunDiscovery,
   type SpanMetadata,
   type SpanMetadataInngestHTTPTiming,
   type SpanMetadataInngestTiming,
@@ -710,7 +711,11 @@ export function traceToTimelineData(
   return {
     minTime,
     maxTime,
-    bars: withRunNote(clampToRunStart(bars, drawQueueDelay ? null : minTime), runQueueDelayMs),
+    bars: withDiscoveryRow(
+      withRunNote(clampToRunStart(bars, drawQueueDelay ? null : minTime), runQueueDelayMs),
+      trace.discoveries ?? null,
+      minTime
+    ),
     leftWidth,
     orgName,
   };
@@ -733,6 +738,89 @@ export function traceToTimelineData(
  * The root bar is left alone — the run's queue delay is precisely what it is
  * there to show.
  */
+/**
+ * Discovery gets ONE row, with a mark per discovery.
+ *
+ * A discovery is Inngest asking the function what to do next. It is its own
+ * request with its own timing, and — the part that makes every obvious shortcut
+ * wrong — it can lead to MANY steps, one step, or none at all.
+ *
+ * The tempting version is to fold each discovery into the step it produced, as
+ * that step's lead-in. That was tried and reverted: a fan-out's twelve steps all
+ * trace back to one discovery, so the same request gets drawn twelve times and
+ * the steps inflate to cover it. On `wide` it made a 144ms step claim 719ms.
+ *
+ * So: one row, marks along it, never merged into anything. One mark before three
+ * steps reads as one request that planned three. A mark with nothing after it
+ * reads as a request that planned nothing — a real outcome rather than a
+ * rendering bug. And a 500-step run adds one row, not five hundred.
+ *
+ * Only 9 of the 43 captured fixtures carry this at all: the loader omits
+ * discovery spans, so only the root's `discoveries` array survives. Where it is
+ * absent no row appears, which is the honest result — we do not know, so we do
+ * not draw.
+ */
+function withDiscoveryRow(
+  bars: TimelineBarData[],
+  discoveries: RunDiscovery[] | null,
+  minTime: Date
+): TimelineBarData[] {
+  if (!discoveries?.length) return bars;
+
+  const timed = discoveries
+    .map((d) => ({
+      startMs: Date.parse(d.startedAt ?? d.queuedAt),
+      endMs: Date.parse(d.endedAt ?? d.startedAt ?? d.queuedAt),
+      planned: d.plannedStepIDs?.length ?? 0,
+      status: d.status,
+      spanID: d.spanID,
+    }))
+    .filter((d) => Number.isFinite(d.startMs) && Number.isFinite(d.endMs))
+    .sort((a, b) => a.startMs - b.startMs);
+
+  if (!timed.length) return bars;
+
+  const rowStart = Math.max(timed[0]!.startMs, minTime.getTime());
+  const rowEnd = timed.reduce((n, d) => Math.max(n, d.endMs), rowStart);
+  const spanMs = rowEnd - rowStart;
+  if (spanMs <= 0) return bars;
+
+  // Requests, not steps. Summing `plannedStepIDs` across discoveries counts the
+  // same step several times — each per-step discovery re-plans what follows it —
+  // so t19-parallel's four steps came out as "planned 7 steps". The count of
+  // requests is unambiguous and is the thing this row is actually showing.
+  const requests = `${timed.length} request${timed.length === 1 ? '' : 's'}`;
+
+  const row: TimelineBarData = {
+    id: 'run-discovery',
+    name: 'Planning',
+    isPlatform: true,
+    note: requests,
+    startTime: new Date(rowStart),
+    endTime: new Date(rowEnd),
+    style: 'timing.inngest.discovery',
+    status: 'COMPLETED',
+    // One segment per request at its own interval — never a single block
+    // covering the lot, which would claim the run planned continuously.
+    segments: timed.map((d, i) => ({
+      id: `discovery-${d.spanID}-${i}`,
+      startPercent: ((Math.max(d.startMs, rowStart) - rowStart) / spanMs) * 100,
+      widthPercent: Math.max(0.4, ((d.endMs - Math.max(d.startMs, rowStart)) / spanMs) * 100),
+      style: 'timing.inngest.discovery' as const,
+      status: d.status,
+      tooltip:
+        d.planned > 0
+          ? `Planned ${d.planned} step${d.planned === 1 ? '' : 's'}`
+          : 'Planned nothing',
+    })),
+  };
+
+  // Beneath the run, above the steps it planned.
+  return bars.map((bar) =>
+    bar.isRoot ? { ...bar, children: [row, ...(bar.children ?? [])] } : bar
+  );
+}
+
 /**
  * Report the run's queue delay in words on the Run row.
  *

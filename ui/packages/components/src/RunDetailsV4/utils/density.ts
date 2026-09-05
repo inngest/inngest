@@ -49,7 +49,9 @@ function toState(status: string | undefined): DensityState {
 function leaves(bars: TimelineBarData[], out: TimelineBarData[] = []): TimelineBarData[] {
   for (const bar of bars) {
     if (bar.children?.length) leaves(bar.children, out);
-    else if (!bar.isRoot) out.push(bar);
+    // Platform rows are not steps: counting the Planning row as one would make a
+    // strictly sequential run report two concurrent lanes.
+    else if (!bar.isRoot && !bar.isPlatform) out.push(bar);
   }
   return out;
 }

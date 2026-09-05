@@ -369,6 +369,14 @@ export interface TimelineBarData {
    */
   note?: string;
 
+  /**
+   * Platform machinery rather than a step the user wrote — currently the
+   * Planning row. Excluded from anything that counts or lays out steps, such as
+   * the minimap, where treating it as a step would report a sequential run as
+   * having two concurrent lanes.
+   */
+  isPlatform?: boolean;
+
   /** Whether this bar represents the root run (clicking shows TopInfo) */
   isRoot?: boolean;
 

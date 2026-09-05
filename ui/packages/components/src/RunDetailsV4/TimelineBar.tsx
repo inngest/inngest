@@ -119,9 +119,11 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     textColor: 'text-light',
   },
   'timing.inngest.discovery': {
+    // Solid, in a recessive tone. Discovery is the platform doing work, not the
+    // run waiting, so it is not ghosted — and a hollow ring reads as a border
+    // artefact rather than as a quantity.
     barColor: 'bg-surfaceMuted',
     barHeight: 'short',
-    outlined: true,
     labelFormat: 'default',
     textColor: 'text-light',
   },
