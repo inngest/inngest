@@ -92,10 +92,12 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     statusBased: true,
   },
   'timing.waiting': {
-    barColor: 'bg-status-completed',
-    barHeight: 'tall',
-    ghost: true,
-    statusBased: true,
+    // Neutral, not a faded status colour. A step's wait is Inngest's time, and
+    // tinting it green made the platform's share of a row look like the user's
+    // code succeeding for longer than it did.
+    barColor: 'bg-surfaceMuted',
+    dim: 0.25,
+    statusBased: false,
     labelFormat: 'default',
     textColor: 'text-light',
   },
@@ -131,11 +133,8 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
   // view whose value is that it does not invent should not start here. Drawn
   // hollow so it reads as an absence rather than as work.
   'timing.unaccounted': {
-    // A colour, not a hollow outline. An outline reads as a border artefact
-    // rather than as a quantity — the same reason waits stopped being hollow —
-    // and this is real time the run spent, however little is known about it.
-    // Accent rather than a status hue: it is neither success nor failure.
-    barColor: 'bg-accent-subtle',
+    barColor: 'bg-surfaceMuted',
+    dim: 0.25,
     statusBased: false,
     labelFormat: 'default',
     textColor: 'text-light',
@@ -148,34 +147,41 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     textColor: 'text-light',
   },
   //
-  // The three things that can happen to a step before it runs, each its own
-  // tone so a row reads left to right as a sequence rather than as one grey
-  // stretch. All existing tokens — the palette is not extended for this.
+  // EVERYTHING BELOW IS SECOND CLASS.
   //
-  //   queued       waiting its turn; the residual after the reported parts
-  //   concurrency  held by a limit the user configured
-  //   latency      Inngest's own overhead, reported per step
+  // The user's code is what the run is for, so it keeps the status colour at
+  // full weight. Everything Inngest did around it — planning, queueing, holding,
+  // its own latency — is the same neutral grey, separated only by how much
+  // weight it carries. Three hues were tried (blue, grey, orange) and made the
+  // platform's time compete with the step: on `v4pathological` a 1ms step is
+  // 0.045% of the row beside 13% of platform time drawn just as boldly.
+  //
+  //   discovery    0.55  Inngest actively working out what to run
+  //   concurrency  0.55  held by a limit, dotted so a deliberate hold reads as one
+  //   latency      0.40  Inngest's own overhead
+  //   queued       0.25  nothing happening; the step is waiting its turn
   'timing.inngest.queue': {
-    barColor: 'bg-secondary-2xSubtle',
+    barColor: 'bg-surfaceMuted',
+    dim: 0.25,
     labelFormat: 'default',
     textColor: 'text-light',
   },
   'timing.inngest.concurrency': {
-    barColor: 'bg-secondary-moderate',
+    barColor: 'bg-surfaceMuted',
+    dim: 0.7,
+    pattern: 'dotted',
     labelFormat: 'default',
     textColor: 'text-light',
   },
   'timing.inngest.discovery': {
-    // Solid, in a recessive tone. Discovery is the platform doing work, not the
-    // run waiting, so it is not ghosted — and a hollow ring reads as a border
-    // artefact rather than as a quantity.
     barColor: 'bg-surfaceMuted',
-    barHeight: 'short',
+    dim: 0.7,
     labelFormat: 'default',
     textColor: 'text-light',
   },
   'timing.inngest.finalization': {
-    barColor: 'bg-secondary-xSubtle',
+    barColor: 'bg-surfaceMuted',
+    dim: 0.45,
     labelFormat: 'default',
     textColor: 'text-light',
   },
@@ -995,6 +1001,11 @@ const VisualBar = memo(function VisualBar({
                   : isGhost
                   ? { opacity: 0.26 }
                   : segmentPattern),
+                // Second-class weight. Everything Inngest did sits below the
+                // user's code without changing hue, so the parts stay
+                // distinguishable from each other while none of them competes
+                // with the step.
+                ...(segmentStyle.dim !== undefined ? { opacity: segmentStyle.dim } : {}),
               }}
             />
           );
@@ -1018,6 +1029,7 @@ const VisualBar = memo(function VisualBar({
         left: `${startPercent}%`,
         width: `${widthPercent}%`,
         minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
+        ...(barStyle.dim !== undefined ? { opacity: barStyle.dim } : {}),
         // A ghosted bar keeps its colour and loses its weight — waiting is the
         // same substance as work, just less of it.
         opacity: expanded ? 0 : isGhost ? 0.26 : 1,

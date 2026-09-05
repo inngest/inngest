@@ -113,6 +113,17 @@ export interface BarStyle {
    */
   ghost?: boolean;
 
+  /**
+   * How much weight this bar carries, 0–1. Undefined means full.
+   *
+   * The hierarchy the whole view rests on: the user's code is first class and
+   * everything Inngest did is second. Expressed as WEIGHT on one neutral hue
+   * rather than as different colours, because a palette of blues and greys and
+   * oranges made the platform's time — which is usually the longer part —
+   * compete with the 1ms the reader came to look at.
+   */
+  dim?: number;
+
   /** Label format (for timing bars) */
   labelFormat?: 'uppercase' | 'titlecase' | 'default';
 
