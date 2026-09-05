@@ -430,15 +430,21 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
         // the gap before it — so this is the discovery request, not a mystery.
         // Only where the two disagree is it left as time nothing reported.
         style:
-          bar.unaccounted.kind === 'discovery' ? 'timing.inngest.discovery' : 'timing.unaccounted',
+          // Discovery where the metadata says so, queued otherwise.
+          //
+          // The residual before a step began is the step waiting its turn — it
+          // was not running, and nothing reported it as anything else. Calling
+          // it "unaccounted" was accurate and useless: it named a shortcoming
+          // of the payload rather than what the run was doing.
+          bar.unaccounted.kind === 'discovery'
+            ? 'timing.inngest.discovery'
+            : 'timing.inngest.queue',
         startMs: bar.unaccounted.startMs,
         endMs: bar.unaccounted.endMs,
         tooltip:
           bar.unaccounted.kind === 'discovery'
             ? `Inngest spent ${formatDuration(ms)} working out what to run next`
-            : `${formatDuration(
-                ms
-              )} that no span accounts for — queueing, concurrency, latency or processing, but nothing reported which`,
+            : `Queued ${formatDuration(ms)} before this step was picked up`,
       });
     }
   }
@@ -514,22 +520,63 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
   let currentPercent = offset;
 
   // Inngest overhead segment — short gray delay bar
+  // The lead-in, broken into what it was.
+  //
+  // It used to be one anonymous "waiting" bar covering everything between the
+  // step being planned and the step running. `inngest.timing` reports two of
+  // the pieces — concurrency delay and system latency — and whatever is left
+  // after those is the step sitting in the queue.
+  //
+  // Queued is the only INFERRED one, and it is inference of the safe kind: a
+  // residual, not a guess. A step that is not discovering, not held by a
+  // concurrency limit and not yet running is waiting its turn, and the number
+  // is whatever the reported parts do not account for. It is labelled as
+  // queued rather than as anything more specific because that is as far as the
+  // payload goes.
   if (inngestMs > 0) {
-    const inngestPercent = pctOf(inngestMs);
-    segments.push({
-      id: `${bar.id}-seg-delay`,
-      startPercent: currentPercent,
-      widthPercent: inngestPercent,
-      style: 'timing.waiting',
-      status: bar.status,
-      startMs: stepStartMs,
-      endMs: stepStartMs + inngestMs,
-      // The same number the row's `+72ms wait` label carries, from the same
-      // derivation, so hovering a lead-in confirms the label rather than
-      // offering the reader a third figure to reconcile.
-      tooltip: `Waited ${formatDuration(inngestMs)} before this step ran`,
-    });
-    currentPercent += inngestPercent;
+    const known = bar.inngestBreakdown;
+    const concurrencyMs = Math.min(inngestMs, known?.queueDelayMs ?? 0);
+    const latencyMs = Math.min(inngestMs - concurrencyMs, known?.systemLatencyMs ?? 0);
+    const queuedMs = Math.max(0, inngestMs - concurrencyMs - latencyMs);
+
+    const phases: Array<{ ms: number; key: string; style: BarStyleKey; says: string }> = [
+      {
+        ms: queuedMs,
+        key: 'queued',
+        style: 'timing.inngest.queue',
+        says: `Queued ${formatDuration(queuedMs)}, waiting its turn`,
+      },
+      {
+        ms: concurrencyMs,
+        key: 'concurrency',
+        style: 'timing.inngest.concurrency',
+        says: `Held ${formatDuration(concurrencyMs)} by a concurrency limit`,
+      },
+      {
+        ms: latencyMs,
+        key: 'latency',
+        style: 'timing.inngest.finalization',
+        says: `${formatDuration(latencyMs)} of Inngest system latency`,
+      },
+    ];
+
+    let at = stepStartMs;
+    for (const phase of phases) {
+      if (phase.ms <= 0) continue;
+      const width = pctOf(phase.ms);
+      segments.push({
+        id: `${bar.id}-seg-${phase.key}`,
+        startPercent: currentPercent,
+        widthPercent: width,
+        style: phase.style,
+        status: bar.status,
+        startMs: at,
+        endMs: at + phase.ms,
+        tooltip: phase.says,
+      });
+      currentPercent += width;
+      at += phase.ms;
+    }
   }
 
   // Execution segment — root bar uses short status-colored bar, steps use tall barber-pole

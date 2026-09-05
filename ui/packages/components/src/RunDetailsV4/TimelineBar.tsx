@@ -147,15 +147,21 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     labelFormat: 'default',
     textColor: 'text-light',
   },
+  //
+  // The three things that can happen to a step before it runs, each its own
+  // tone so a row reads left to right as a sequence rather than as one grey
+  // stretch. All existing tokens — the palette is not extended for this.
+  //
+  //   queued       waiting its turn; the residual after the reported parts
+  //   concurrency  held by a limit the user configured
+  //   latency      Inngest's own overhead, reported per step
   'timing.inngest.queue': {
-    barColor: 'bg-surfaceMuted',
-    barHeight: 'short',
+    barColor: 'bg-secondary-2xSubtle',
     labelFormat: 'default',
     textColor: 'text-light',
   },
   'timing.inngest.concurrency': {
-    barColor: 'bg-surfaceMuted',
-    barHeight: 'short',
+    barColor: 'bg-secondary-moderate',
     labelFormat: 'default',
     textColor: 'text-light',
   },
@@ -169,9 +175,7 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     textColor: 'text-light',
   },
   'timing.inngest.finalization': {
-    barColor: 'bg-surfaceMuted',
-    barHeight: 'short',
-    outlined: true,
+    barColor: 'bg-secondary-xSubtle',
     labelFormat: 'default',
     textColor: 'text-light',
   },
