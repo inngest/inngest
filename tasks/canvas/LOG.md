@@ -1132,3 +1132,41 @@ row's 774ms — which would have reintroduced the contradiction the previous rou
 - `simple` draws `Run · 32ms` and `Finalization · 32ms` as two identical bars. Truthful — a run with
   no steps *is* its finalization — and odd-looking. Noted, not changed.
 - `longgap`'s note precision, as above.
+
+## Critic round 5 — a focused regression check, and it earned its keep
+
+Scoped deliberately: the previous round's two changes were broad in a way the earlier ones were not
+— the flex change touches the label gutter of every row at every depth, and the segment-stack change
+touches every hover card including bars with no overlap at all. Both broke something.
+
+The critic measured **4033 rows** at full expansion, down to indent 84.
+
+**Names: nothing regressed.** Six clipped in 4033, all losing a few pixels to a working ellipsis, and
+none squeezed toward zero at any depth. `flex-auto` holds all the way down.
+
+**Notes: a graded failure.** On `v4pathological`'s deepest rows the note reached **zero pixels**, and
+one level up rendered as `+…`. The consequence is the one that matters: `deep-child<=deep-parent`
+read `254ms` against a canvas node reading `1ms`, with the number that reconciles them absent — the
+reconciliation established over three rounds is only as good as the note's ability to render, and
+`+…` says nothing while looking like a glitch. A 3rem floor holds `+253ms` and truncates only the
+trailing word; below it the **name** takes the truncation, because the name's ellipsis works.
+
+**The segment stack fired without any overlap.** Adjacent segments share an exact boundary and each
+bar subtracts `SEGMENT_GAP_PX` from its rendered width, so they sit 4px apart on screen while a bare
+interval test called them overlapping — `retry`'s four separate attempt segments returned two
+stacked cards on a row the critic measured as `overlaps=none`. The test now requires the overlap to
+be a quarter of the narrower segment. `retry`'s four are four again; `chains`' genuinely coincident
+marks still stack.
+
+Also: the stacked card drew a bottom rule with nothing under it when the duration, delay and
+breakdown were all suppressed at once, and appended a duration to labels that already carried one.
+
+### The process lesson from this round
+
+One of the four fixes **silently did not apply**. A scripted `.replace()` whose `old` string no
+longer matched — prettier had re-wrapped the expression — returns the input unchanged and reports
+nothing. Build passed, tests passed, three fixes shipped and the fourth did not, and it was caught
+only by going to the browser and finding the behaviour unchanged. Recorded as lesson 18: after a
+scripted multi-edit, `grep -c` a distinctive token from each replacement before doing anything else.
+
+1118 tests, 45 fixtures clean.

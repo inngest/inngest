@@ -137,3 +137,21 @@ minute and would have caught it immediately. The same check later caught a
 second real bug on the first try — a fan-out whose members had all collapsed to
 0% because the segment positions were measured from `queuedAt` while the
 envelope used execution start.
+
+### 18. A scripted `.replace()` that finds nothing fails silently
+Symptom: applied four fixes in one scripted edit, verified the build and the
+tests, and shipped three. The fourth — the one the reviewer had specifically
+asked for — never landed, because prettier had re-wrapped the expression since
+I last read it and my `old` string no longer matched. `.replace()` with no match
+returns the input unchanged and says nothing.
+
+It was caught only because I went to the browser to check the behaviour and
+found it unchanged, then read the file and found my code absent.
+
+**Detection signal**: a behavioural change that "didn't take" after a scripted
+edit, especially in a file that has been through a formatter since it was read.
+**Prevention**: after any scripted multi-edit, `grep -c` for a distinctive token
+from EACH replacement and check the counts before running anything else. One
+line, and it turns a silent no-op into an immediate failure. The `Edit` tool
+errors on a missed match; `.replace()` does not, so the cheap check is the price
+of using a script for several edits at once.
