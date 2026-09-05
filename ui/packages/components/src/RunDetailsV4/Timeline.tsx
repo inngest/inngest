@@ -27,7 +27,7 @@ import type {
 import { TimelineHeader } from './TimelineHeader';
 import { applyCollapseToBars, markBudget, type CollapsePlan } from './canvas/collapse';
 import { formatDuration, useStepHover, useStepSelection } from './runDetailsUtils';
-import { densityBuckets } from './utils/density';
+import { packMinimap } from './utils/density';
 import { buildTimeScale, type Interval, type TimeScale } from './utils/timeScale';
 import { calculateBarPosition, calculateDuration } from './utils/timing';
 
@@ -1202,7 +1202,7 @@ export function Timeline({
   // map of the whole run and must not shrink because the rows below it did —
   // otherwise the one view that is supposed to show you everything hides the
   // same things as everything else.
-  const buckets = useMemo(() => densityBuckets(data.bars, scale), [data.bars, scale]);
+  const minimap = useMemo(() => packMinimap(data.bars, scale), [data.bars, scale]);
 
   return (
     <div className="w-full pb-4 pr-2" data-testid="timeline-container">
@@ -1216,7 +1216,8 @@ export function Timeline({
         selectionStart={viewStartOffset}
         selectionEnd={viewEndOffset}
         scale={scale}
-        buckets={buckets}
+        minimap={minimap}
+        hoveredStepId={hoveredSpanID}
       />
 
       {/* The rows, with the axis breaks drawn behind them. A break spans every

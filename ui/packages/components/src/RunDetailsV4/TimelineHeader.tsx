@@ -12,10 +12,10 @@ import { useCallback, useLayoutEffect, useMemo, useRef, type JSX } from 'react';
 
 import { getStatusBackgroundClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
-import { DensityStrip } from './DensityStrip';
+import { RunMinimap, minimapHeight } from './RunMinimap';
 import { TimeBrush } from './TimeBrush';
 import { formatDuration } from './runDetailsUtils';
-import type { DensityBucket } from './utils/density';
+import type { Minimap } from './utils/density';
 import { scaleTicks, type TimeScale } from './utils/timeScale';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
@@ -41,10 +41,12 @@ type Props = {
    */
   scale?: TimeScale;
   /**
-   * Step activity across the whole run, for the density strip inside the brush.
-   * Always the whole run, however much the views below are collapsing.
+   * The whole run, packed into lanes, drawn inside the brush. Always the whole
+   * run however much the views below are collapsing.
    */
-  buckets?: DensityBucket[];
+  minimap?: Minimap;
+  /** Span hovered anywhere in the run, so the matching mark lifts. */
+  hoveredStepId?: string;
 };
 
 const TIME_MARKERS = [0, 25, 50, 75, 100];
@@ -71,7 +73,8 @@ export function TimelineHeader({
   selectionStart: selStart = 0,
   selectionEnd: selEnd = 100,
   scale,
-  buckets,
+  minimap,
+  hoveredStepId,
 }: Props): JSX.Element {
   const totalMs = maxTime.getTime() - minTime.getTime();
 
@@ -91,7 +94,8 @@ export function TimelineHeader({
     }));
   }, [scale, totalMs, minTime]);
 
-  const hasStrip = Boolean(buckets && buckets.length);
+  const hasStrip = Boolean(minimap && minimap.marks.length);
+  const stripHeight = minimap ? minimapHeight(minimap.rows) : 0;
   const barColorClass = status ? getStatusBackgroundClass(status) : 'bg-primary-moderate';
 
   const isDefault = selStart === 0 && selEnd === 100;
@@ -221,15 +225,22 @@ export function TimelineHeader({
           </>
         )}
 
-        {/* Time brush. The density strip lives inside it rather than beside it,
-            so dragging to set the viewport is the same gesture that was already
-            here — the histogram is what the brush is over, not a new control. */}
+        {/* Time brush. The minimap lives inside it rather than beside it, so
+            dragging to set the viewport is the same gesture that was already
+            here — the map is what the brush is over, not a new control. */}
         <TimeBrush
           onSelectionChange={handleSelectionChange}
           className="mt-1"
-          trackClassName={hasStrip ? 'h-6' : 'h-4'}
+          trackClassName={hasStrip ? undefined : 'h-4'}
+          trackStyle={hasStrip ? { height: Math.max(stripHeight, 8) } : undefined}
         >
-          {hasStrip && <DensityStrip buckets={buckets!} minMs={minTime.getTime()} height={24} />}
+          {hasStrip && (
+            <RunMinimap
+              minimap={minimap!}
+              minMs={minTime.getTime()}
+              hoveredStepId={hoveredStepId}
+            />
+          )}
           {isDefault ? (
             <div
               data-testid="timeline-bar-default"

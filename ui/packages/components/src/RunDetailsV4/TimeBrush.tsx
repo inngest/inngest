@@ -41,6 +41,8 @@ export type TimeBrushProps = {
    * strip, so that dragging still covers the whole of what you can see.
    */
   trackClassName?: string;
+  /** Explicit track height, for content whose height depends on the data. */
+  trackStyle?: React.CSSProperties;
 };
 
 type DragMode = 'none' | 'left-handle' | 'right-handle' | 'selection' | 'create-selection';
@@ -60,6 +62,7 @@ export function TimeBrush({
   children,
   className,
   trackClassName = 'h-4',
+  trackStyle,
 }: TimeBrushProps): JSX.Element {
   // Selection state (0-100 percentages) — single object for atomic updates from raw DOM listeners
   const [selection, setSelection] = useState({ start: initialStart, end: initialEnd });
@@ -289,7 +292,7 @@ export function TimeBrush({
       )}
 
       {/* Track container */}
-      <div className={cn('relative', trackClassName)}>
+      <div className={cn('relative', trackClassName)} style={trackStyle}>
         {/* Background track (extended click target — overflows below the bar for easier interaction) */}
         <div
           data-testid="time-brush-track"

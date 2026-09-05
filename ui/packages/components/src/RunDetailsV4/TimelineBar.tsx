@@ -668,6 +668,9 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
  * Bars are thin, with a near-square radius rather than a pill. At an 18px row
  * a 16px-tall bar is the row; the bar should be a mark on the row, not fill it.
  */
+/** Separation between adjacent segments within one bar. */
+const SEGMENT_GAP_PX = 4;
+
 const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = {
   thin: 'h-1',
   short: 'h-2',
@@ -774,13 +777,17 @@ const VisualBar = memo(function VisualBar({
             <div
               key={segment.id}
               className={cn(
-                'absolute top-1/2 -translate-y-1/2 rounded-[1.5px]',
+                'absolute top-1/2 -translate-y-1/2',
                 segmentHeightClass,
                 isOutlined ? 'bg-canvasBase' : segmentColor
               )}
               style={{
                 left: `${segment.transformedStart}%`,
-                width: `${segment.transformedWidth}%`,
+                // A hairline gap between adjacent segments. A row that goes
+                // queued -> failed -> waited -> retried -> succeeded reads as
+                // five things that happened rather than one striped bar, and
+                // the gap is in pixels so it stays constant at any zoom.
+                width: `calc(${segment.transformedWidth}% - ${SEGMENT_GAP_PX}px)`,
                 minWidth: `${TIMELINE_CONSTANTS.MIN_BAR_WIDTH_PX}px`,
                 ...(isOutlined
                   ? { boxShadow: 'inset 0 0 0 1px rgb(var(--color-background-surface-muted))' }
@@ -802,7 +809,7 @@ const VisualBar = memo(function VisualBar({
     <div
       data-testid="timeline-bar-visual"
       className={cn(
-        'absolute top-1/2 -translate-y-1/2 rounded-[1.5px]',
+        'absolute top-1/2 -translate-y-1/2',
         heightClass,
         isOutlined ? 'bg-canvasBase' : barColor
       )}
