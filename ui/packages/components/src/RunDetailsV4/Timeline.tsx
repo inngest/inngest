@@ -303,13 +303,22 @@ function generateAttemptSegments(bar: TimelineBarData): BarSegment[] | undefined
     // backoff. Drawn as one ghosted stretch rather than left blank, because a
     // gap is the platform waiting on the user's behalf and is worth seeing.
     const previousEnd = i === 0 ? barStart : segmentEnd(attempts[i - 1]!);
+
+    // A backoff belongs to the attempt that FAILED, not the one that follows.
+    //
+    // Taking the upcoming attempt's status painted dead time caused by a
+    // failure in the colour of the success that came after it: on `retry`, 92%
+    // of the row was a green ghost sitting between a red attempt and a green
+    // one. The wait before the FIRST attempt has no prior outcome, so it keeps
+    // the attempt it is waiting for.
+    const waitStatus = i === 0 ? attempt.status : attempts[i - 1]!.status;
     if (started > previousEnd) {
       segments.push({
         id: `${bar.id}-attempt-${i}-wait`,
         startPercent: pct(previousEnd - barStart),
         widthPercent: pct(started - previousEnd),
         style: 'timing.waiting',
-        status: attempt.status,
+        status: waitStatus,
         startMs: previousEnd,
         endMs: started,
         tooltip:
