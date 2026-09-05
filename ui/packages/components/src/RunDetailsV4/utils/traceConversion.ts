@@ -858,14 +858,27 @@ function withPlanning(
         .map((stepID) => nameOfStep.get(stepID))
         .filter((n): n is string => Boolean(n));
 
+      // The bar is longer than its number by exactly this, so this is the term
+      // that reconciles them. Named here rather than in `withWaitNotes`, which
+      // runs BEFORE the widening and so could only ever measure zero — which is
+      // why `gnarly-foreign-async`'s `late` drew a bar across 91% of the plot,
+      // labelled `1ms`, with its 249ms of planning appearing in no text at all.
+      const planningMs = queued - planning.startMs;
+      const note = [
+        planningMs >= LEAD_IN_NOTE_MIN_MS ? `+${formatDuration(planningMs)} planning` : null,
+        bar.note,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
       return {
         ...bar,
         children,
         plannedBy: planning.spanID,
         startTime: new Date(planning.startMs),
-        // The label keeps the step's own span. The bar is longer than its
-        // number by exactly the planning request, which is drawn and named.
+        // The label keeps the step's own span.
         reportedMs: bar.endTime.getTime() - queued,
+        note: note || undefined,
         planning: {
           startMs: planning.startMs,
           endMs: planning.endMs,
@@ -910,12 +923,22 @@ function withPlanning(
       const reported = bar.inngestBreakdown?.discoveryMs ?? 0;
       const isDiscovery = reported > 0 && Math.abs(reported - gapMs) <= 2;
 
+      // Named for the same reason the planning widening is: this moves the bar
+      // left without moving the number beside it, and on `gnarly-foreign-async`
+      // it moved `late` across 91% of the plot while the row still read `1ms`.
+      // Wording follows the segment's own tooltip, so the row and the thing it
+      // describes cannot use two names for one interval.
+      const note = [`+${formatDuration(gapMs)} ${isDiscovery ? 'planning' : 'queued'}`, bar.note]
+        .filter(Boolean)
+        .join(' · ');
+
       return {
         ...bar,
         children,
         startTime: new Date(from),
         reportedMs: bar.reportedMs ?? (bar.endTime ? bar.endTime.getTime() - start : undefined),
         unaccounted: { startMs: from, endMs: start, kind: isDiscovery ? 'discovery' : 'unknown' },
+        note,
       };
     });
   };
