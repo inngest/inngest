@@ -52,6 +52,19 @@ local function get_queue_item(queueKey, queueID)
 	return nil
 end
 
+-- Get the debounce
+local existing = redis.call("HGET", keyDbc, debounceID)
+local existingItem = nil
+if existing ~= false then
+	-- Decode the debounce, and check whether the existing event ID is > the current event ID.  If so,
+	-- don't update the debounce.
+	existingItem = cjson.decode(existing)
+	if existingItem ~= nil and existingItem.e ~= nil and existingItem.e.ts > eventTime then
+		-- The stored event occurs after the event we're updating, so do nothing.
+		return -2
+	end
+end
+
 -- Check that the queue item is not leased (ie. this debounce is not in progress)
 local item = get_queue_item(keyQueueHash, queueJobID)
 if item == nil then
@@ -67,25 +80,15 @@ if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.
 	return -1
 end
 
--- Get the debounce
-local existing = redis.call("HGET", keyDbc, debounceID)
-if existing ~= false then
-	-- Decode the debounce, and check whether the existing event ID is > the current event ID.  If so,
-	-- don't update the debounce.
-	local item = cjson.decode(existing)
-	if item ~= nil and item.e ~= nil and item.e.ts > eventTime then
-		-- The stored event occurs after the event we're updating, so do nothing.
-		return -2
-	end
-
+if existingItem ~= nil then
 	-- Also, if there's an existing debounce, ensure that we respect the max timeout
 	-- for the debounce.  We don't want to keep pushing a debounce out indefinitely,
 	-- so if (now + new TTL in seconds) > the debounce's max time, use the debounce's
 	-- max time instead.
-	if item ~= nil and item.t ~= nil and item.t > 0 then
+	if existingItem.t ~= nil and existingItem.t > 0 then
 		local nextTTL = currentTime + (ttl  * 1000)
-		if nextTTL > item.t then
-			ttl = math.floor((item.t - currentTime) / 1000)
+		if nextTTL > existingItem.t then
+			ttl = math.floor((existingItem.t - currentTime) / 1000)
 			if ttl <= 0 then
 				-- Ensure we always use a minimum.
 				ttl = 1
@@ -99,7 +102,7 @@ if existing ~= false then
 		--
 		-- This makes updates transactional.
 		local next = cjson.decode(debounce)
-		next.t = item.t
+		next.t = existingItem.t
 		debounce = cjson.encode(next)
 	end
 end
