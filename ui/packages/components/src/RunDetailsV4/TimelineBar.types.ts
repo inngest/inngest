@@ -57,6 +57,7 @@ export type BarStyleKey =
    * which is the least interesting thing in the row.
    */
   | 'timing.waiting'
+  | 'timing.backoff'
   | 'timing.inngest' // Queue/delay time (short, gray)
   | 'timing.inngest.queue' // Run queue delay (short, solid gray)
   | 'timing.inngest.concurrency' // Concurrency delay (short, crosshatch gray)

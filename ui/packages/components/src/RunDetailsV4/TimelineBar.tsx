@@ -99,6 +99,30 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     labelFormat: 'default',
     textColor: 'text-light',
   },
+  //
+  // A backoff is DEAD TIME, and dead time already has an encoding.
+  //
+  // Colouring it by the attempt that follows painted a failure's consequence in
+  // the colour of a success that had not happened yet. Colouring it by the
+  // attempt that caused it overshot the other way: `retry`'s only user row went
+  // 92% red on a run that succeeded, and the 6ms of green that makes it a
+  // RECOVERY is about two pixels — so `retry` and `failure` read as the same
+  // kind of event at a glance.
+  //
+  // The colour was being asked to carry both whose fault it was and how it
+  // turned out, and it needs to carry neither. During a backoff the run is
+  // suspended, holding nothing, costing nothing — exactly what `step.sleep` and
+  // `step.waitForEvent` mean, and they are already neutral. Red attempt, neutral
+  // gap, green attempt reads as "failed, waited, succeeded" without blaming an
+  // interval in which nothing happened. The attempts carry the alarm, which is
+  // why `failcluster` reads loudly: its MARKS are red, not its gaps.
+  'timing.backoff': {
+    barColor: 'bg-surfaceMuted',
+    ghost: true,
+    statusBased: false,
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
   'timing.inngest': {
     barColor: 'bg-surfaceMuted',
     barHeight: 'short',
@@ -426,7 +450,7 @@ function BarHoverCardContent({
   delayMs,
   timingDetails,
   styleLabel,
-  segment,
+  segments,
 }: {
   name: string;
   startTime: Date;
@@ -434,8 +458,8 @@ function BarHoverCardContent({
   delayMs?: number;
   timingDetails?: TimingDetail[];
   styleLabel?: string;
-  /** The part of the bar under the pointer, when it is over one. */
-  segment?: BarSegment | null;
+  /** Every part of the bar under the pointer. More than one when they overlap. */
+  segments?: BarSegment[] | null;
 }) {
   // When the pointer is on a part of the bar, the card describes THAT PART.
   //
@@ -446,10 +470,20 @@ function BarHoverCardContent({
   // reporting the row's whole START/END; and `YOUR SERVER 1.015s` on a step
   // that spent 1.000s of it backing off. The last one passed the arithmetic
   // gate because it summed — the gate catches contradiction, not mislabelling.
-  const onSegment = Boolean(segment);
-  const segStart = segment?.startMs !== undefined ? new Date(segment.startMs) : null;
-  const segEnd = segment?.endMs !== undefined ? new Date(segment.endMs) : null;
+  const stack = segments ?? [];
+  const onSegment = stack.length > 0;
+  // Timestamps only when the pointer is unambiguously on ONE thing. Two
+  // concurrent requests under the cursor have two windows, and picking either
+  // would be arbitrary; the lines below name both.
+  const only = stack.length === 1 ? stack[0] : undefined;
+  const segStart = only?.startMs !== undefined ? new Date(only.startMs) : null;
+  const segEnd = only?.endMs !== undefined ? new Date(only.endMs) : null;
 
+  // With SEVERAL things under the pointer there is no single window to report,
+  // and falling back to the row's put its 774ms under two lines describing a
+  // 180ms and a 151ms request — the contradiction this block was rewritten to
+  // remove. The per-line durations above carry it instead.
+  const ambiguous = stack.length > 1;
   const shownStart = segStart ?? startTime;
   const shownEnd = segStart ? segEnd : endTime;
 
@@ -489,8 +523,22 @@ function BarHoverCardContent({
           a backoff, one member of a collapsed group — and the summary below
           describes all of them at once, which left a pale lead-in with no way
           of being asked what it was. */}
-      {segment?.tooltip && (
-        <p className="text-basis border-subtle mb-1.5 border-b pb-1.5">{segment.tooltip}</p>
+      {onSegment && (
+        <div className="border-subtle mb-1.5 space-y-0.5 border-b pb-1.5">
+          {stack.map(
+            (part) =>
+              part.tooltip && (
+                <p key={part.id} className="text-basis">
+                  {part.tooltip}
+                  {stack.length > 1 && part.startMs !== undefined && part.endMs !== undefined && (
+                    <span className="text-light ml-1.5 tabular-nums">
+                      {formatDuration(part.endMs - part.startMs)}
+                    </span>
+                  )}
+                </p>
+              )
+          )}
+        </div>
       )}
       <div className="flex flex-col gap-1">
         <div
@@ -499,12 +547,14 @@ function BarHoverCardContent({
             (hasDetails || delayMs != null) && 'border-subtle border-b pb-1.5'
           )}
         >
-          <div className="flex justify-between gap-6">
-            <span className="text-light font-mono uppercase">Duration</span>
-            <span className="text-basis tabular-nums">
-              {durationMs > 0 ? formatDuration(durationMs) : '-'}
-            </span>
-          </div>
+          {!ambiguous && (
+            <div className="flex justify-between gap-6">
+              <span className="text-light font-mono uppercase">Duration</span>
+              <span className="text-basis tabular-nums">
+                {durationMs > 0 ? formatDuration(durationMs) : '-'}
+              </span>
+            </div>
+          )}
           {delayMs != null && !onSegment && (
             <div className="flex justify-between gap-6">
               <span className="text-light font-mono uppercase">Delay</span>
@@ -528,20 +578,27 @@ function BarHoverCardContent({
           </div>
         )}
 
-        <div
-          className={cn(!hasDetails && delayMs == null && 'mt-0.5', 'flex justify-between gap-6')}
-        >
-          <span className="text-light font-mono uppercase">Start</span>
-          <span className="text-basis tabular-nums">{startTimestamp}</span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-light font-mono uppercase">End</span>
-          {endTimestamp !== null ? (
-            <span className="text-basis tabular-nums">{endTimestamp}</span>
-          ) : (
-            <span className="text-light italic">In progress</span>
-          )}
-        </div>
+        {!ambiguous && (
+          <>
+            <div
+              className={cn(
+                !hasDetails && delayMs == null && 'mt-0.5',
+                'flex justify-between gap-6'
+              )}
+            >
+              <span className="text-light font-mono uppercase">Start</span>
+              <span className="text-basis tabular-nums">{startTimestamp}</span>
+            </div>
+            <div className="flex justify-between gap-6">
+              <span className="text-light font-mono uppercase">End</span>
+              {endTimestamp !== null ? (
+                <span className="text-basis tabular-nums">{endTimestamp}</span>
+              ) : (
+                <span className="text-light italic">In progress</span>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -750,7 +807,7 @@ const VisualBar = memo(function VisualBar({
   style: TimelineBarProps['style'];
   segments?: BarSegment[];
   /** Reports which segment the pointer is over, so the card can speak for it. */
-  onSegmentHover?: (segment: BarSegment | null) => void;
+  onSegmentHover?: (segments: BarSegment[] | null) => void;
   /** Original bar start before transform (for segment calculation) */
   originalBarStart?: number;
   /** Original bar width before transform (for segment calculation) */
@@ -773,31 +830,41 @@ const VisualBar = memo(function VisualBar({
   const transformedSegments = useMemo(() => {
     if (!segments || segments.length === 0) return [];
 
-    return segments
-      .map((segment) => {
-        // Convert segment position from bar-relative to timeline-absolute
-        const barStart = originalBarStart ?? 0;
-        const barWidth = originalBarWidth ?? 100;
-        const segmentAbsoluteStart = barStart + (segment.startPercent / 100) * barWidth;
-        const segmentAbsoluteWidth = (segment.widthPercent / 100) * barWidth;
+    return (
+      segments
+        .map((segment) => {
+          // Convert segment position from bar-relative to timeline-absolute
+          const barStart = originalBarStart ?? 0;
+          const barWidth = originalBarWidth ?? 100;
+          const segmentAbsoluteStart = barStart + (segment.startPercent / 100) * barWidth;
+          const segmentAbsoluteWidth = (segment.widthPercent / 100) * barWidth;
 
-        // Transform to view coordinates
-        const transformed = transformBarPosition(
-          segmentAbsoluteStart,
-          segmentAbsoluteWidth,
-          viewStartOffset,
-          viewEndOffset
-        );
+          // Transform to view coordinates
+          const transformed = transformBarPosition(
+            segmentAbsoluteStart,
+            segmentAbsoluteWidth,
+            viewStartOffset,
+            viewEndOffset
+          );
 
-        if (!transformed) return null;
+          if (!transformed) return null;
 
-        return {
-          ...segment,
-          transformedStart: transformed.startPercent,
-          transformedWidth: transformed.widthPercent,
-        };
-      })
-      .filter(Boolean);
+          return {
+            ...segment,
+            transformedStart: transformed.startPercent,
+            transformedWidth: transformed.widthPercent,
+          };
+        })
+        .filter(Boolean)
+        // Widest first, so the NARROWEST end up last in the DOM and therefore on
+        // top. Overlapping segments are common and the small ones were losing:
+        // two of `chains`' five Planning marks sat almost entirely under a wider
+        // neighbour, so hovering the 151ms request returned the 180ms one's card
+        // and two of the five could not be pointed at at all. This moves nothing
+        // and tells no lie about when anything happened — it only makes the
+        // hard-to-hit ones the hittable ones.
+        .sort((a, b) => (b?.transformedWidth ?? 0) - (a?.transformedWidth ?? 0))
+    );
   }, [segments, originalBarStart, originalBarWidth, viewStartOffset, viewEndOffset]);
 
   // Render compound bar with segments if provided
@@ -835,7 +902,25 @@ const VisualBar = memo(function VisualBar({
               // pointer move, so the browser tooltip never won and the strings
               // never reached anyone. Two tooltips for one pointer is worse than
               // one, so there is only the card.
-              onMouseEnter={() => onSegmentHover?.(segment)}
+              onMouseEnter={() =>
+                onSegmentHover?.(
+                  // Everything under the pointer, not just the topmost.
+                  //
+                  // Concurrent requests overlap almost exactly — two of
+                  // `chains`' five Planning marks sit on top of each other and
+                  // 13 of `wide`'s stack in one band — so whichever loses the
+                  // z-order was unreachable however the order was chosen. The
+                  // overlap is a real fact about the run, so the card states it
+                  // rather than the view trying to lay it out around.
+                  transformedSegments.filter(
+                    (other): other is NonNullable<typeof other> =>
+                      Boolean(other) &&
+                      other!.transformedStart <
+                        segment.transformedStart + segment.transformedWidth &&
+                      other!.transformedStart + other!.transformedWidth > segment.transformedStart
+                  )
+                )
+              }
               onMouseLeave={() => onSegmentHover?.(null)}
               className={cn(
                 'absolute top-1/2 -translate-y-1/2',
@@ -973,7 +1058,7 @@ export function TimelineBar({
   const [hoverCardOpen, setHoverCardOpen] = useState(false);
   // Which part of the bar the pointer is over, so the card answers for that
   // part rather than returning the row's summary for all of it.
-  const [hoveredSegment, setHoveredSegment] = useState<BarSegment | null>(null);
+  const [hoveredSegment, setHoveredSegment] = useState<BarSegment[] | null>(null);
 
   return (
     <div data-testid="timeline-bar-container" className="relative">
@@ -1037,7 +1122,20 @@ export function TimelineBar({
               className={cn(
                 // The label column should recede — the bars are the content.
                 // Monospace, muted, truncating, and never bold.
-                'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] font-normal leading-tight',
+                // A row's NAME outranks its annotation.
+                //
+                // The note was `shrink-0` while this was `flex-1 min-w-0`, so
+                // the annotation never yielded and the identity absorbed all of
+                // the loss: `blocked`'s Run row rendered its name at ONE PIXEL —
+                // not even the ellipsis fit — leaving the row that anchors the
+                // whole timeline identifiable only by its icon. The floor here
+                // is what the note now shrinks against.
+                // `flex-auto`, not `flex-1`. `flex-1` sets `flex-basis: 0`, so
+                // the name has no base to shrink FROM and the note takes its
+                // content width first whatever its shrink factor — which is how
+                // the note came to win outright. With a content base, the
+                // shrink factors below actually apply.
+                'min-w-0 flex-auto overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] font-normal leading-tight',
                 // The platform's own rows recede further than the user's.
                 //
                 // Finalization and Function error are truthful and earn their
@@ -1074,7 +1172,18 @@ export function TimelineBar({
             {/* A faded aside — the run's queue delay, when it was too small to
                 be worth spending plot width on. */}
             {note && (
-              <span className="text-light ml-1.5 shrink-0 font-mono text-[10px] tabular-nums">
+              <span
+                // Shrinks to nothing before the name loses a character.
+                //
+                // It was `shrink-0`, so the annotation never yielded and the
+                // identity absorbed all the loss: `blocked`'s Run row rendered
+                // its name at ONE PIXEL — not even the ellipsis fit — and
+                // `loop40`'s `act-[0…39] × 40` lost the `× 40` that says it is a
+                // group while its neighbour kept it. An enormous shrink factor
+                // states the priority directly, where a minimum width on the
+                // name only moved the threshold.
+                className="text-light ml-1.5 min-w-0 shrink-[9999] overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[10px] tabular-nums"
+              >
                 {note}
               </span>
             )}
@@ -1183,7 +1292,7 @@ export function TimelineBar({
                         delayMs={delayMs}
                         timingDetails={timingDetails}
                         styleLabel={styleLabel}
-                        segment={hoveredSegment}
+                        segments={hoveredSegment}
                       />
                     </HoverCardContent>
                   </HoverCardRoot>

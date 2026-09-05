@@ -304,21 +304,14 @@ function generateAttemptSegments(bar: TimelineBarData): BarSegment[] | undefined
     // gap is the platform waiting on the user's behalf and is worth seeing.
     const previousEnd = i === 0 ? barStart : segmentEnd(attempts[i - 1]!);
 
-    // A backoff belongs to the attempt that FAILED, not the one that follows.
-    //
-    // Taking the upcoming attempt's status painted dead time caused by a
-    // failure in the colour of the success that came after it: on `retry`, 92%
-    // of the row was a green ghost sitting between a red attempt and a green
-    // one. The wait before the FIRST attempt has no prior outcome, so it keeps
-    // the attempt it is waiting for.
-    const waitStatus = i === 0 ? attempt.status : attempts[i - 1]!.status;
     if (started > previousEnd) {
       segments.push({
         id: `${bar.id}-attempt-${i}-wait`,
         startPercent: pct(previousEnd - barStart),
         widthPercent: pct(started - previousEnd),
-        style: 'timing.waiting',
-        status: waitStatus,
+        // Neutral, not the colour of either attempt around it — see
+        // `timing.backoff` in TimelineBar's style table.
+        style: 'timing.backoff',
         startMs: previousEnd,
         endMs: started,
         tooltip:
@@ -540,6 +533,7 @@ function generateInngestSegments(
 /** Human-readable labels for bar style keys shown in the hover tooltip. */
 const STYLE_LABELS: Partial<Record<BarStyleKey, string>> = {
   'timing.waiting': 'Waiting to run',
+  'timing.backoff': 'Suspended between attempts',
   'step.run': 'step.run',
   'step.sleep': 'step.sleep',
   'step.waitForEvent': 'step.waitForEvent',
