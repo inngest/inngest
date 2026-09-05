@@ -50,9 +50,18 @@ describe('generateBarSegments', () => {
     const spanMs = hold.endTime!.getTime() - hold.startTime.getTime();
     expect(hold.timingBreakdown!.totalMs).toBeGreaterThan(spanMs);
 
-    // ...and the step is nonetheless drawn as what it was: work, not waiting.
+    // ...and the step is nonetheless drawn as overwhelmingly work.
+    //
+    // Not zero waiting: a step legitimately owns the short discovery gap that
+    // led to it, and that is drawn as its ghosted lead-in. What it must never
+    // own is the 6.3s hold, which happened before the step existed and belongs
+    // to the run. So the assertion is on proportion, which is what the reader
+    // actually perceives — a hair of lead-in is fine, half the bar is the bug.
     const segments = generateBarSegments(hold) ?? [];
-    const waiting = segments.filter((s) => s.style === 'timing.waiting');
-    expect(waiting).toHaveLength(0);
+    const waiting = segments
+      .filter((s) => s.style === 'timing.waiting')
+      .reduce((n, s) => n + s.widthPercent, 0);
+
+    expect(waiting).toBeLessThan(5);
   });
 });

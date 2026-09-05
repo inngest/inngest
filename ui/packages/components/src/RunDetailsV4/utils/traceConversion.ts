@@ -261,8 +261,29 @@ function traceToBarData(
   const status = trace.status || rootStatus;
 
   // Actual queue delay: time from when the step was queued to when execution started
+
+  // Rows tile: a step's bar begins where the previous one ended, not where the
+  // step was queued.
+  //
+  // The time between is discovery — Inngest asking the function what to do next
+  // — plus queueing and system latency. It is real, it is often the largest
+  // thing in a run, and drawn as nothing it was unexplained horizontal space
+  // that got *more* conspicuous once the leading run delay stopped taking a
+  // quarter of the plot. Extending the bar back over it makes it part of the
+  // step it led to, drawn as that step's ghosted lead-in.
+  //
+  // Only ever backwards, and never past the run's own start (which is what
+  // seeds `discoveryStartAtMs` for the first step).
+  const queuedAtMs = new Date(trace.queuedAt).getTime();
+  const barStartMs =
+    !trace.isRoot && discoveryStartAtMs != null && discoveryStartAtMs < queuedAtMs
+      ? discoveryStartAtMs
+      : queuedAtMs;
+
+  // Measured from the bar's own start, since callers reconstruct "when this
+  // began executing" as `startTime + delayMs`.
   const delayMs = trace.startedAt
-    ? Math.max(0, new Date(trace.startedAt).getTime() - new Date(trace.queuedAt).getTime())
+    ? Math.max(0, new Date(trace.startedAt).getTime() - barStartMs)
     : undefined;
 
   // Per-step Inngest overhead breakdown (discovery + metadata timing)
@@ -299,7 +320,7 @@ function traceToBarData(
     // Present on step.invoke, and the only thing needed to pull the child run
     // in beneath this row.
     childRunID: invokeInfo?.runID ?? undefined,
-    startTime: new Date(trace.queuedAt),
+    startTime: new Date(barStartMs),
     endTime: trace.endedAt ? new Date(trace.endedAt) : null,
     style: getStyleForTrace(trace),
     children: tracesToBarData(
