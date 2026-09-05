@@ -723,7 +723,16 @@ export function traceToTimelineData(
     maxTime,
     bars: markInterrupted(
       withDiscoveryRow(
-        withRunNote(clampToRunStart(bars, drawQueueDelay ? null : minTime), runQueueDelayMs),
+        withRunNote(
+          // When the queue delay is reported as text rather than drawn, the run
+          // bar has to start where the plot does too — otherwise it extends off
+          // the left edge and reports more time than the axis covers, which is
+          // how `simple` ended up with a Run bar longer than the run. Its
+          // duration then reads as time spent executing, and the note carries
+          // the queued part: 497ms + "+156ms queued" rather than a bare 653ms.
+          clampToRunStart(bars, drawQueueDelay ? null : minTime, !drawQueueDelay),
+          runQueueDelayMs
+        ),
         trace.discoveries ?? null,
         minTime
       ),
@@ -925,14 +934,20 @@ function withRunNote(bars: TimelineBarData[], queueDelayMs: number): TimelineBar
   );
 }
 
-function clampToRunStart(bars: TimelineBarData[], runStartedAt: Date | null): TimelineBarData[] {
+function clampToRunStart(
+  bars: TimelineBarData[],
+  runStartedAt: Date | null,
+  includeRoot = false
+): TimelineBarData[] {
   if (!runStartedAt) return bars;
   const floor = runStartedAt.getTime();
 
   const clamp = (list: TimelineBarData[]): TimelineBarData[] =>
     list.map((bar) => {
       const children = bar.children ? clamp(bar.children) : undefined;
-      if (bar.isRoot || bar.startTime.getTime() >= floor) return { ...bar, children };
+      if ((bar.isRoot && !includeRoot) || bar.startTime.getTime() >= floor) {
+        return { ...bar, children };
+      }
 
       // Never past its own end: a step that finished before the run was marked
       // started would otherwise be drawn backwards.
