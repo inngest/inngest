@@ -13,6 +13,7 @@ import invoke from './__fixtures__/invoke.json';
 import loop40 from './__fixtures__/loop40.json';
 import loop from './__fixtures__/loop.json';
 import noretry from './__fixtures__/noretry.json';
+import parallelInferred from './__fixtures__/parallel-inferred.json';
 import parallel from './__fixtures__/parallel.json';
 import retry from './__fixtures__/retry.json';
 import simple from './__fixtures__/simple.json';
@@ -216,7 +217,7 @@ describe('toCanvasGraph', () => {
     });
 
     it('warns only when a parallel level was inferred', () => {
-      expect(build(parallel).warnings.join(' ')).toMatch(
+      expect(build(parallelInferred).warnings.join(' ')).toMatch(
         /inferred from observed execution overlap/
       );
       expect(build(step).warnings.join(' ')).not.toMatch(/inferred/);
@@ -244,8 +245,12 @@ describe('toCanvasGraph', () => {
       expect(graph.warnings).toEqual([]);
     });
 
-    it('falls back to inference, and says so, for a v1-SDK run', () => {
-      const graph = build(parallel);
+    it('falls back to inference, and says so, when no plan was reported', () => {
+      // `parallel-inferred` is deliberately a pre-loader capture: once the
+      // loader began lifting plannedSteps off discovery spans, even v1-SDK runs
+      // started reporting exact groups, and nothing else in the set exercises
+      // the fallback any more.
+      const graph = build(parallelInferred);
       expect(graph.parallelismSource).toBe('inferred');
       expect(shape(graph)).toEqual([['a', 'b', 'c'], ['d']]);
       expect(graph.warnings.join(' ')).toMatch(/inngest-js v4\+/);
@@ -280,5 +285,26 @@ describe('toCanvasGraph', () => {
     it('renders a 40-iteration agent loop as 80 sequential levels', () => {
       expect(shape(build(loop40))).toHaveLength(80);
     });
+  });
+});
+
+describe('what recapturing changed', () => {
+  it('still has one capture that exercises the inference fallback', () => {
+    // Recapturing the fixtures against a current Dev Server made every v3 run
+    // report exact groups, because the loader now lifts `plannedSteps` off
+    // discovery spans. That is better for users and worse for coverage: the
+    // inference path in `toLevels` lost its last fixture.
+    //
+    // `parallel-inferred` is the preserved pre-loader capture. If this ever
+    // fails, the fallback is untested and something has to be recaptured or
+    // synthesised deliberately rather than noticed later.
+    expect(build(parallelInferred).parallelismSource).toBe('inferred');
+  });
+
+  it('reports exact grouping for a v3 run now that plans reach the client', () => {
+    // The improvement, asserted so it is not mistaken for a regression: this
+    // run used to be 'inferred' and is now 'sdk'.
+    expect(build(parallel).parallelismSource).toBe('sdk');
+    expect(shape(build(parallel))).toEqual([['a', 'b', 'c'], ['d']]);
   });
 });

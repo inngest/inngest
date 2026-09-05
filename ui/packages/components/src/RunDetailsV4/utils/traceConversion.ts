@@ -760,6 +760,22 @@ export function traceToTimelineData(
  * absent no row appears, which is the honest result — we do not know, so we do
  * not draw.
  */
+/** Every step actually drawn, so a discovery can be checked against them. */
+function collectStepSpans(bars: TimelineBarData[]): Array<{ startMs: number; endMs: number }> {
+  const out: Array<{ startMs: number; endMs: number }> = [];
+  const walk = (list: TimelineBarData[]) => {
+    for (const bar of list) {
+      if (!bar.isRoot && !bar.isPlatform && bar.endTime) {
+        const started = bar.startTime.getTime() + (bar.delayMs ?? 0);
+        out.push({ startMs: started, endMs: bar.endTime.getTime() });
+      }
+      if (bar.children?.length) walk(bar.children);
+    }
+  };
+  walk(bars);
+  return out;
+}
+
 function withDiscoveryRow(
   bars: TimelineBarData[],
   discoveries: RunDiscovery[] | null,
@@ -779,6 +795,32 @@ function withDiscoveryRow(
     .sort((a, b) => a.startMs - b.startMs);
 
   if (!timed.length) return bars;
+
+  // Only show a discovery that is not ALREADY on screen as a step.
+  //
+  // A discovery span is the parent of the step it planned and shares its
+  // timing: on `failure`, discovery 0 runs 102→199ms and so does `ok step`.
+  // Drawing both says the platform spent 97ms planning when that 97ms *is* the
+  // step running — the same thing twice, which is the mistake this row was
+  // built to avoid in the first place.
+  //
+  // What survives is the discovery that is genuinely its own interval: the
+  // request that planned a fan-out before any of it started, and the final
+  // request that came back with nothing. Those are the ones occupying time
+  // nothing else accounts for.
+  const stepSpans = collectStepSpans(bars);
+  const uncovered = timed.filter((d) => {
+    const span = d.endMs - d.startMs;
+    if (span <= 0) return false;
+    return !stepSpans.some((s) => {
+      const overlap = Math.min(d.endMs, s.endMs) - Math.max(d.startMs, s.startMs);
+      return overlap / span > 0.7;
+    });
+  });
+
+  if (!uncovered.length) return bars;
+  timed.length = 0;
+  timed.push(...uncovered);
 
   const rowStart = Math.max(timed[0]!.startMs, minTime.getTime());
   const rowEnd = timed.reduce((n, d) => Math.max(n, d.endMs), rowStart);

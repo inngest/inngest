@@ -35,6 +35,7 @@ import longgap from './longgap.json';
 import loop40 from './loop40.json';
 import loop from './loop.json';
 import noretry from './noretry.json';
+import parallelInferred from './parallel-inferred.json';
 import parallel from './parallel.json';
 import retry from './retry.json';
 import simple from './simple.json';
@@ -65,10 +66,17 @@ export type FixtureData = {
 /**
  * Which client produced the run.
  *
- * The distinction is load-bearing, not historical: a v3 client runs
- * ExecutionVersion.V1 and reports one opcode per response, so `plannedSteps` is
- * always absent and parallel grouping has to be inferred. Both are kept because
- * they are the only way to test the two code paths in `graph.ts`.
+ * This used to be the load-bearing distinction: a v3 client runs
+ * ExecutionVersion.V1 and reports one opcode per response, so `plannedSteps` was
+ * absent and grouping had to be inferred. That is no longer true. Once the
+ * loader began lifting `plannedSteps` off discovery spans, v3 runs started
+ * reporting exact groups too, and recapturing the fixtures against a current Dev
+ * Server made every one of them 'sdk'.
+ *
+ * So the two code paths in `graph.ts` are now separated by whether a capture
+ * predates that loader change, not by SDK version. `parallel-inferred` is the
+ * one preserved pre-loader capture and the only thing exercising the fallback;
+ * a test asserts that it still does.
  */
 export type FixtureSDK = 'v3' | 'v4';
 
@@ -245,6 +253,14 @@ export const FIXTURES: CanvasFixture[] = [
     sdk: 'v3',
     group: 'parallel',
     data: asData(parallel),
+  },
+  {
+    id: 'parallel-inferred',
+    title: 'The same fan-out, with nothing reported',
+    note: 'Kept from before the loader began lifting `plannedSteps` off discovery spans. Once it did, even v1-SDK runs started reporting exact groups — so this is now the only capture in the set that exercises the inference fallback at all, and the "grouping: inferred" badge with it.',
+    sdk: 'v3',
+    group: 'parallel',
+    data: asData(parallelInferred),
   },
   {
     id: 'v4parallel',
