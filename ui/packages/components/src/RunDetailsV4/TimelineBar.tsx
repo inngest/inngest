@@ -530,40 +530,52 @@ function BarHoverCardContent({
               part.tooltip && (
                 <p key={part.id} className="text-basis">
                   {part.tooltip}
-                  {stack.length > 1 && part.startMs !== undefined && part.endMs !== undefined && (
-                    <span className="text-light ml-1.5 tabular-nums">
-                      {formatDuration(part.endMs - part.startMs)}
-                    </span>
-                  )}
+                  {stack.length > 1 &&
+                    part.startMs !== undefined &&
+                    part.endMs !== undefined &&
+                    // Only where the label does not already say it. "Planned 2
+                    // steps" needs the number; "Backed off 1.000s before attempt
+                    // 2" was getting it twice.
+                    !part.tooltip?.includes(formatDuration(part.endMs - part.startMs)) && (
+                      <span className="text-light ml-1.5 tabular-nums">
+                        {formatDuration(part.endMs - part.startMs)}
+                      </span>
+                    )}
                 </p>
               )
           )}
         </div>
       )}
       <div className="flex flex-col gap-1">
-        <div
-          className={cn(
-            'flex flex-col gap-1',
-            (hasDetails || delayMs != null) && 'border-subtle border-b pb-1.5'
-          )}
-        >
-          {!ambiguous && (
-            <div className="flex justify-between gap-6">
-              <span className="text-light font-mono uppercase">Duration</span>
-              <span className="text-basis tabular-nums">
-                {durationMs > 0 ? formatDuration(durationMs) : '-'}
-              </span>
-            </div>
-          )}
-          {delayMs != null && !onSegment && (
-            <div className="flex justify-between gap-6">
-              <span className="text-light font-mono uppercase">Delay</span>
-              <span className="text-basis tabular-nums">
-                {delayMs > 0 ? formatDuration(delayMs) : '-'}
-              </span>
-            </div>
-          )}
-        </div>
+        {/* Suppressed entirely when it would hold nothing. With a segment
+            hovered the duration, delay and breakdown can all be gone at once,
+            and the wrapper was still drawing its bottom rule — a horizontal
+            line with nothing under it. */}
+        {(!ambiguous || delayMs != null || hasDetails) && (
+          <div
+            className={cn(
+              'flex flex-col gap-1',
+              (hasDetails || delayMs != null) && 'border-subtle border-b pb-1.5'
+            )}
+          >
+            {!ambiguous && (
+              <div className="flex justify-between gap-6">
+                <span className="text-light font-mono uppercase">Duration</span>
+                <span className="text-basis tabular-nums">
+                  {durationMs > 0 ? formatDuration(durationMs) : '-'}
+                </span>
+              </div>
+            )}
+            {delayMs != null && !onSegment && (
+              <div className="flex justify-between gap-6">
+                <span className="text-light font-mono uppercase">Delay</span>
+                <span className="text-basis tabular-nums">
+                  {delayMs > 0 ? formatDuration(delayMs) : '-'}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {hasDetails && (
           <div className="border-subtle flex flex-col gap-1 border-b pb-1.5">
@@ -912,13 +924,26 @@ const VisualBar = memo(function VisualBar({
                   // z-order was unreachable however the order was chosen. The
                   // overlap is a real fact about the run, so the card states it
                   // rather than the view trying to lay it out around.
-                  transformedSegments.filter(
-                    (other): other is NonNullable<typeof other> =>
-                      Boolean(other) &&
-                      other!.transformedStart <
-                        segment.transformedStart + segment.transformedWidth &&
-                      other!.transformedStart + other!.transformedWidth > segment.transformedStart
-                  )
+                  transformedSegments.filter((other): other is NonNullable<typeof other> => {
+                    if (!other) return false;
+                    if (other.id === segment.id) return true;
+
+                    // A MEANINGFUL overlap, not merely touching.
+                    //
+                    // Bare interval intersection collected neighbours that do
+                    // not overlap on screen at all: adjacent segments share an
+                    // exact boundary, and each bar subtracts SEGMENT_GAP_PX
+                    // from its rendered width, so they sit 4px apart in pixels.
+                    // That made `retry`'s four separate attempt segments return
+                    // two stacked cards on a row measured as `overlaps=none`.
+                    const overlap =
+                      Math.min(
+                        other.transformedStart + other.transformedWidth,
+                        segment.transformedStart + segment.transformedWidth
+                      ) - Math.max(other.transformedStart, segment.transformedStart);
+                    const narrower = Math.min(other.transformedWidth, segment.transformedWidth);
+                    return narrower > 0 && overlap > narrower * 0.25;
+                  })
                 )
               }
               onMouseLeave={() => onSegmentHover?.(null)}
@@ -1182,7 +1207,17 @@ export function TimelineBar({
                 // group while its neighbour kept it. An enormous shrink factor
                 // states the priority directly, where a minimum width on the
                 // name only moved the threshold.
-                className="text-light ml-1.5 min-w-0 shrink-[9999] overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[10px] tabular-nums"
+                // Shrinks hard, but not below legibility. `+…` says nothing and
+                // looks like a glitch, and on `v4pathological` the note reached
+                // ZERO pixels — so a row read `254ms` against a canvas node
+                // reading `1ms` with the number that reconciles them absent.
+                // The reconciliation is only as good as the note's ability to
+                // render.
+                //
+                // Below this floor the NAME takes the truncation instead, which
+                // is the better trade: the name's ellipsis works and carries
+                // meaning, and the note survives in full in the hover card.
+                className="text-light ml-1.5 min-w-[3rem] shrink-[9999] overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[10px] tabular-nums"
               >
                 {note}
               </span>
