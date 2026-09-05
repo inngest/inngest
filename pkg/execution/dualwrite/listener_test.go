@@ -19,8 +19,11 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	tracingv3 "github.com/inngest/inngest/pkg/tracing/v3"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func TestListenerOnEventReceivedNonBlockingWhenBufferFull(t *testing.T) {
@@ -836,6 +839,59 @@ func TestListenerOnDeferAbortReusesSameSpanID(t *testing.T) {
 		}
 	}
 	require.True(t, sawAborted, "one of the two rows should carry status=Aborted")
+}
+
+// TestListenerOnExtendedTraceSpanWritesSpan proves OnExtendedTraceSpan --
+// unlike every other hook in this file, invoked from
+// pkg/api/apiv1/traces.go's commitSpan rather than the executor/runner --
+// still lands a row in inngest.run_trace_spans via the same
+// createSpan/spanExporter path, under the package's own
+// tracingv3.SpanNameExtendedTrace name, carrying the caller-supplied
+// tenant/run identity and attributes.
+func TestListenerOnExtendedTraceSpanWritesSpan(t *testing.T) {
+	db, cleanup := newTestDuckDB(t)
+	defer cleanup()
+	l := NewListener(db, func(o *setupOpts) { o.batchInterval = 20 * time.Millisecond })
+
+	accountID, envID, appID, functionID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
+	md := sv2.Metadata{ID: sv2.ID{
+		RunID:      runID,
+		FunctionID: functionID,
+		Tenant:     sv2.Tenant{AccountID: accountID, EnvID: envID, AppID: appID},
+	}}
+	sv2.InitConfig(&md.Config)
+
+	span := execution.ExtendedTraceSpan{
+		AccountID:  accountID,
+		EnvID:      envID,
+		AppID:      appID,
+		FunctionID: functionID,
+		RunID:      runID,
+		Parent:     tracing.RunSpanRefFromMetadata(&md),
+		SpanID:     trace.SpanID{1, 2, 3, 4, 5, 6, 7, 8},
+		Name:       "my.userland.operation",
+		StartTime:  time.Now().Add(-time.Second),
+		EndTime:    time.Now(),
+		Attributes: []attribute.KeyValue{attribute.String("custom.attr", "hello")},
+	}
+	l.OnExtendedTraceSpan(context.Background(), span)
+
+	require.Eventually(t, func() bool {
+		var count int
+		row := db.QueryRowContext(context.Background(), "SELECT count(*) FROM inngest.run_trace_spans WHERE name = ?;", tracingv3.SpanNameExtendedTrace)
+		_ = row.Scan(&count)
+		return count == 1
+	}, 2*time.Second, 20*time.Millisecond, "extended-trace span should land after a batch flush")
+
+	rows := selectRows(t, db, "SELECT run_id, span_id, attributes FROM inngest.run_trace_spans WHERE name = ?;", tracingv3.SpanNameExtendedTrace)
+	require.Len(t, rows, 1)
+	require.Equal(t, runID.String(), rows[0]["run_id"])
+	require.Equal(t, span.SpanID.String(), rows[0]["span_id"])
+
+	attrs, ok := rows[0]["attributes"].(map[string]any)
+	require.True(t, ok, "attributes column should decode to a map, got %T", rows[0]["attributes"])
+	require.Equal(t, "hello", attrs["custom.attr"])
 }
 
 // deferScheduleEventJSON builds the raw JSON of an inngest/deferred.schedule

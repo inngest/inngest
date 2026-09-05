@@ -6,11 +6,16 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // SyncLifecycleListener listens to the same run/step lifecycle events as
@@ -232,6 +237,44 @@ type SyncLifecycleListener interface {
 	// pkg/execution/defers.AbortFromOp). now is the caller's own "this just
 	// happened" timestamp -- see OnFunctionFinished.
 	OnDeferAbort(ctx context.Context, md statev2.Metadata, hashedID string, now time.Time)
+
+	// OnExtendedTraceSpan is called synchronously when a userland (extended-trace)
+	// span is committed via OTLP ingestion
+	// (pkg/api/apiv1/traces.go's commitSpan, POST /v1/traces/userland).
+	// Unlike every other hook, there is no statev2.Metadata available at this
+	// call site -- tenant/run identity comes from request auth plus a
+	// function lookup, not executor state -- so identifiers are carried
+	// individually on span instead. There is also no "now" parameter, unlike
+	// every other hook: span already carries its own StartTime/EndTime (the
+	// span is historical, reported after the fact via OTLP), so there's
+	// nothing here that would need the caller's clock read.
+	OnExtendedTraceSpan(ctx context.Context, span ExtendedTraceSpan)
+}
+
+// ExtendedTraceSpan carries everything OnExtendedTraceSpan needs to record a
+// userland (extended-trace) span. Every other hook derives its identifiers
+// from a statev2.Metadata plus a queue.Item/GeneratorOpcode; neither exists
+// at the OTLP ingestion call site, so this bundles the equivalent fields by
+// hand. Parent is the traceref this span was created under -- its trace ID
+// and span ID (the OTel parent span ID) are recoverable via
+// tracing.SpanContextFromMetadata, the same helper the real TracerProvider
+// uses.
+type ExtendedTraceSpan struct {
+	AccountID  uuid.UUID
+	EnvID      uuid.UUID
+	AppID      uuid.UUID
+	FunctionID uuid.UUID
+	RunID      ulid.ULID
+	Parent     *meta.SpanReference
+	SpanID     trace.SpanID
+	Name       string
+	StartTime  time.Time
+	EndTime    time.Time
+	// Attributes is the span's final, fully-merged attribute set (SDK/OTLP
+	// attributes plus the inngest-added tenant/step attributes) -- the same
+	// raw shape pkg/execution/dualwrite/tracing.go's spanExportRow reads off
+	// a real sdktrace.ReadOnlySpan via span.Attributes().
+	Attributes []attribute.KeyValue
 }
 
 // NoopSyncLifecycleListener does nothing. Embed this into a custom
@@ -293,3 +336,5 @@ func (NoopSyncLifecycleListener) OnDeferAdd(context.Context, statev2.Metadata, s
 
 func (NoopSyncLifecycleListener) OnDeferAbort(context.Context, statev2.Metadata, string, time.Time) {
 }
+
+func (NoopSyncLifecycleListener) OnExtendedTraceSpan(context.Context, ExtendedTraceSpan) {}
