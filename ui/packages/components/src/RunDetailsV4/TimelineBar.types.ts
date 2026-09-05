@@ -384,6 +384,15 @@ export interface TimelineBarData {
    * having two concurrent lanes.
    */
   isPlatform?: boolean;
+  /**
+   * The run's whole life, queue included — set on the root only.
+   *
+   * The bar is clamped to the plot when the queue delay is reported as text
+   * rather than drawn, and without this the clamp shortened the reported number
+   * too, so the Run row's headline meant one thing on a run that queued for 6s
+   * and another on one that queued for 120ms.
+   */
+  runTotalMs?: number;
 
   /**
    * The step never finished, and the run it was in has ended — so its bar is

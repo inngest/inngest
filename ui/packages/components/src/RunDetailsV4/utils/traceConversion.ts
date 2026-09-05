@@ -748,7 +748,8 @@ export function traceToTimelineData(
             // duration then reads as time spent executing, and the note carries
             // the queued part: 497ms + "+156ms queued" rather than a bare 653ms.
             clampToRunStart(bars, drawQueueDelay ? null : minTime, !drawQueueDelay),
-            runQueueDelayMs
+            runQueueDelayMs,
+            !drawQueueDelay
           )
         ),
         trace.discoveries ?? null,
@@ -968,10 +969,29 @@ function withDiscoveryRow(
  * width on it, and the number is the only trace of it left; when it is large the
  * bar shows it too and the number names it.
  */
-function withRunNote(bars: TimelineBarData[], queueDelayMs: number): TimelineBarData[] {
+function withRunNote(
+  bars: TimelineBarData[],
+  queueDelayMs: number,
+  /** True when the delay was reclaimed out of the bar and must be added back. */
+  clamped: boolean
+): TimelineBarData[] {
   if (queueDelayMs <= 0) return bars;
   return bars.map((bar) =>
-    bar.isRoot ? { ...bar, note: `+${formatDuration(queueDelayMs)} queued` } : bar
+    bar.isRoot
+      ? {
+          ...bar,
+          note: `+${formatDuration(queueDelayMs)} queued`,
+          // The clamp above may have shortened the bar so it fits the plot; the
+          // reported number is the run's whole life either way, so the headline
+          // means the same thing whether the queue was drawn or reclaimed.
+          // Only when the bar was clamped. When the delay is DRAWN the span
+          // already contains it, and adding it again would report 18.6s for a
+          // 12.3s run.
+          runTotalMs: bar.endTime
+            ? bar.endTime.getTime() - bar.startTime.getTime() + (clamped ? queueDelayMs : 0)
+            : undefined,
+        }
+      : bar
   );
 }
 

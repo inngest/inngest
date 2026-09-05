@@ -142,6 +142,23 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
     ).toEqual(canvasOrder);
   });
 
+  it('reports one run duration, on the Run row and on the canvas terminal', () => {
+    // The two most prominent numbers on the page. On `blocked` they read
+    // `Completed 6.049s` and `Run 12.348s` — differing by 2x, on the one
+    // fixture whose entire point is the 6.3s it spent queued. Both are now the
+    // run's whole life, queue included, however long that queue was.
+    const { graph, data } = viewsOf(fixture);
+    const root = data.bars[0];
+    const terminal = graph.nodes.find((n) => n.kind === 'result');
+    if (!root?.isRoot || !terminal || terminal.endedAt === null) return;
+
+    const onRow =
+      root.runTotalMs ?? (root.endTime ? root.endTime.getTime() - root.startTime.getTime() : 0);
+    const onCanvas = terminal.endedAt - terminal.queuedAt;
+
+    expect(Math.abs(onRow - onCanvas), `${id}: ${onRow} vs ${onCanvas}`).toBeLessThan(2);
+  });
+
   it('lets a reader subtract the named wait and land on the canvas number', () => {
     // The bridge between the two views: a row headlined 104ms with `+72ms wait`
     // has to leave the 32ms the canvas node reports. It held on 17 of 22 step

@@ -98,15 +98,22 @@ function iconFor(data: CanvasNodeData) {
 function durationOf(data: CanvasNodeData): string | null {
   if (data.endedAt === null) return null;
 
-  // A wait is measured from when it was QUEUED, not from when it started.
+  // A step is measured from when it STARTED — the time it sat before running is
+  // drawn as a lead-in on its row and named there, so the two views reconcile by
+  // subtraction. Two kinds of node are measured from when they were QUEUED
+  // instead, because for them the waiting is not a preamble to the thing:
   //
-  // For a step those differ by the time it sat before running, which the trace
-  // draws as a lead-in and names, so the two views reconcile. A wait has no
-  // lead-in — waiting is the whole substance of it, so the row draws one solid
-  // bar across the entire span — and measuring from `startedAt` had the canvas
-  // reporting 10.000s against the row's 10.012s with nothing accounting for the
-  // 12ms. The run was held for all of it.
-  const from = data.kind === 'wait' ? data.queuedAt : data.startedAt ?? data.queuedAt;
+  //   wait   — waiting is the whole substance of it, and the row draws one solid
+  //            bar across the entire span with no lead-in to name. Measuring
+  //            from `startedAt` had the canvas report 10.000s against the row's
+  //            10.012s with nothing accounting for the 12ms.
+  //   result — this is the RUN's headline, and a run's duration is its whole
+  //            life. On `blocked` it read `Completed 6.049s` beside a Run row
+  //            reading `12.348s`: the two most prominent numbers on the page,
+  //            differing by 2x, on the one fixture whose entire point is the
+  //            6.3s it spent queued.
+  const fromQueue = data.kind === 'wait' || data.kind === 'result';
+  const from = fromQueue ? data.queuedAt : data.startedAt ?? data.queuedAt;
   return formatDuration(data.endedAt - from);
 }
 
