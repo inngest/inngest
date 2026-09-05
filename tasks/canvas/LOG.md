@@ -927,3 +927,72 @@ this view, and it still has to be checked against the spans before acting on it.
 recovered step's final status is COMPLETED, so on the fixture named `retry` the map was one
 unbroken, receded green bar. A mark drawn from more than one attempt keeps the completed colour —
 the run did complete — and stops receding.
+
+## Critic round 2 — the delivery gap
+
+Round 2 confirmed all five of round 1's priorities fixed on screen, and found one mistake that is
+worth recording on its own because of the *kind* of mistake it is.
+
+### I asserted the model and never checked the screen
+
+The segment tooltips shipped as a native `title=`. The row's HoverCard opens on the same pointer
+move — immediately, and styled — so the browser tooltip never won and **not one of those strings
+ever reached a user**. `coherence.test.ts` asserted `segment.tooltip` was truthy and passed, which is
+exactly how it survived: the invariant was on the data, the data was right, and the delivery was
+never in the test's reach.
+
+The lesson is not "write more tests". It is that an assertion about a model is not evidence about a
+view, and I had a browser available the whole time. Each segment now reports its own hover into the
+card, verified by hovering every segment of `retry` and `chains` and reading what came back.
+
+### What that unblocked
+
+The card was also presenting a "breakdown" that was not one. Those figures come from SDK metadata
+and contradict the bar they describe: `chains`' `left-2` reported `DISCOVERY 229ms` inside a 166ms
+row — a component larger than the whole — and `retry`'s `first step` credited `YOUR SERVER` with the
+full 1.093s when 1.003s of it was retry backoff. **Either the parts account for the whole or they
+are not a decomposition of it**, so they are shown only when they add up. Where they do
+(`left-1`: 73 + 67 = 140) they are kept.
+
+### The invariant had a hole, and closing it found another
+
+A wait that was drawn was not always named: the note had a display threshold the total did not, so
+`step`'s `second step` drew a 2ms lead-in, counted it in its 7ms, and stayed silent — a reader
+subtracting the named wait landed on 7 against the canvas's 5. The two thresholds are now one.
+
+The new invariant asserting that subtraction across every step immediately caught `wait`, where the
+canvas measured a `waitForEvent` from `startedAt` while the row spanned the whole hold. A wait has no
+lead-in to name — waiting is its whole substance — so both views measure it from the queue.
+
+Then the same question about the terminal pill: `blocked` read `Completed 6.049s` beside `Run
+12.348s`, the two most prominent numbers on the page differing by 2x on the fixture whose entire
+point is its queue. A run's duration is its whole life, so the pill measures from the queue too —
+**and that exposed the Run row meaning two different things**: 12.348s *including* the queue on
+`blocked`, 35.244s *excluding* it on `cancelled`, beside a note saying `+120ms queued`. The bar is
+still clamped to the plot; the number it reports no longer is.
+
+### A fan-out is not a sequence
+
+`wide`'s twelve steps started within 14ms of each other and were drawn as twelve identical ticks at
+uniform spacing — twelve sequential 8ms steps, the opposite of the truth, and in direct
+contradiction of the minimap one strip above drawing the same twelve overlapping across twelve
+lanes. Two adjacent strips disagreeing about the shape of the run.
+
+Evenly-pitched marks are right for an *iteration* group: a loop body IS a sequence. A *siblings*
+group is not, so it now draws its members at their real intervals — they overlap, they merge into a
+block, and that block is the answer. Measured from execution start, because a fan-out queues all
+twelve together and measuring from the queue flattened the stagger to zero.
+
+### The invoke expansion, finished
+
+Durations on every child node and the child's outcome in the region header, because "what did those
+519ms go on" is the reason to open it. The child's own Trigger and terminal node are gone from the
+preview: they put a second `Trigger` and a second `Completed` into a picture that already had one of
+each at a different weight.
+
+**Left as a known limitation**: the child reads top-to-bottom inside a parent that reads
+left-to-right. Two directions for one grammar, and the critic is right that it is a cost. 186px of
+node width cannot hold a horizontal graph legibly, and widening the node reflows the whole canvas —
+so this stays until the node can be wider.
+
+1074 tests, 45 fixtures rendering clean.
