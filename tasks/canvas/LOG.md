@@ -664,3 +664,80 @@ break (reads as a structural break in the axis, which it is not).
 
 **Where the canvas already gets this right**: the junction node *is* the discovery, and the edge now
 carries the interval between two steps. That is the same fact, shown where it belongs.
+
+---
+
+## Making the views tell the truth (user-driven round)
+
+The user reviewed the fixtures as a reader rather than as their author, and most of what they found
+was real. Recorded here because the *pattern* matters more than the individual fixes: in almost every
+case the data was right and the view was wrong, and in several the view was drawing one thing twice.
+
+### The recapture, and what it revealed
+
+The missing discovery data was **never a server bug**. `loaders/trace.go` already gathers discovery
+spans onto the run; the fixtures simply predated it. Every fixture captured today had the data, every
+older one had none. Recapturing against a live Dev Server fixed it — `wide` went 0 → 38 discoveries,
+`chains` → 14, `loop` → 17.
+
+**Recapturing changed the model.** Because the loader lifts `plannedSteps` off discovery spans, v3
+runs now report exact grouping too: `parallel` went from `inferred` to `sdk`. Better for users, worse
+for coverage — the inference path lost its last fixture and two tests failed. Rather than weaken
+them, the pre-loader capture is preserved as `parallel-inferred`, the tests point at it, and a new
+test asserts it *still* exercises the fallback so the coverage cannot be lost silently again. The
+index's claim that the two SDK versions are "the only way to test the two code paths" was true and is
+now false; it is corrected in place.
+
+### Fixed
+
+- **A retried step read as a plain green bar.** The clearest thing the platform does, hidden behind a
+  disclosure triangle. It now draws its attempts — red, gap, the faded backoff, green — so `retry`
+  reads as what happened without expanding anything.
+- **Steps appeared to start before the run did.** Spans record a step's `queuedAt` as the moment the
+  *run* was queued, so on `failure` the first step claimed +1ms while the run started at +156ms,
+  overlapping the run's own row and counting the same delay twice.
+- **The run row claimed it spent half its life waiting.** The root's breakdown is "total minus what
+  the children executed", so all scattered delay summed into one leading block: 53% of `failure`
+  shown as waiting when it was queued for 24%. The run row is now drawn from its own clock.
+- **A bar reported more time than its own span.** `blocked`'s `hold` carried run-level
+  `queue_delay_ms` in its metadata, so a 5999ms step rendered ~12s wide with half of it shown as
+  waiting it never did. Timestamps now beat metadata whenever metadata claims more than the span.
+- **The "Inngest" row** was named after the company rather than anything the reader wrote, spanned
+  the whole run while showing disconnected fragments, and did not line up with the Run bar above it.
+  Deleted; everything it carried lives somewhere better.
+- **Expanding a row replaced it** with a different decomposition (Inngest / your server) whose parts
+  lined up with nothing. Expansion now unpacks the row the reader was looking at.
+- **The leading run delay** cost a quarter of the plot on every trace. Below a second it is text
+  (`+156ms queued`); above it stays on the axis, because then it is the story.
+- **The scrubber looked like more trace.** Now a packed minimap: sequential work shares a lane,
+  parallelism adds one, so the **lane count is the concurrency profile**. Fixed 16px; lanes thin
+  rather than the strip growing.
+- **Canvas edges carry the inter-step delay**, with arrowheads. The gap between steps is literally
+  what an edge is, and the graph could not previously explain its own gaps.
+- Segments separated by 4px; square bars; label column 35% → 24%; empty badge gutter collapsed.
+
+### The one I got wrong, twice
+
+Extending each step's bar backwards over the gap that preceded it looked right on a sequential run
+and was a fabrication: **a discovery is its own request and can lead to many steps, one, or none**.
+`wide` made a 144ms step claim **719ms**. Reverted.
+
+The replacement — one Planning row with a mark per request — then made the *same* mistake in a new
+guise, because a discovery span is usually the parent of the step it planned and shares its timing.
+Drawing both says the platform spent 97ms planning when that 97ms *is* the step. A discovery is now
+dropped when a step covers more than 70% of it, which separates the cases cleanly:
+
+- `failure` (v3): the discovery **is** the step, 100% covered → no Planning row at all.
+- `t19-parallel` (v4): a 21ms request containing a 1ms step, 5% covered → the other 20ms is real
+  request overhead the step does not account for, and is exactly the gap worth drawing.
+- `wide`: 38 discoveries down to the 13 that are not steps.
+
+**The lesson worth keeping**: every one of these bugs was the view drawing the same time twice in two
+places. It is the failure mode of this codebase, and "does any other row already account for this
+interval?" is the question to ask before drawing anything new.
+
+### Process
+
+`canvas-fixture-critic` reviews one fixture at a time across all three views and treats unexplained
+gaps, views that disagree, and "would the author of this function recognise it" as explicit findings.
+It should have been running from the start rather than waiting for the user to point at things.
