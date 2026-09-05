@@ -40,8 +40,16 @@ export const LAYOUT = {
    * rather than pushing the graph around without limit. The child is a
    * different run and stays inside a border that says so.
    */
-  invokeOpenMinHeight: 96,
-  invokeOpenMaxHeight: 190,
+  invokeOpenMinHeight: 150,
+  invokeOpenMaxHeight: 260,
+  /**
+   * How wide an open invoke gets.
+   *
+   * A summary fitted in 186px; the child's actual graph does not. The level
+   * holding an open invoke is widened by the difference so the child has room
+   * to be a graph rather than a list, and nothing downstream is drawn over.
+   */
+  invokeOpenWidth: 460,
   /** Header, border and padding around the child's levels. */
   invokeChrome: 44,
   /** One level of the child's graph. */
@@ -137,7 +145,12 @@ function position(
   // once nodes have been pulled onto their children's average lane, so this
   // cannot be derived from a simple count.
   const offset = laneMid * LAYOUT.laneGap;
-  const width = node.kind === 'join' ? LAYOUT.joinWidth : LAYOUT.nodeWidth;
+  const width =
+    node.kind === 'join'
+      ? LAYOUT.joinWidth
+      : openChildren?.has(node.id)
+      ? LAYOUT.invokeOpenWidth
+      : LAYOUT.nodeWidth;
   const height = heightOf(node, openChildren, childGraphs);
   return {
     // Centre nodes of differing widths/heights on the level axis, so a join
@@ -174,12 +187,19 @@ export function toFlowElements(
 
   // Levels are evenly pitched except where a junction sits between two of them.
   const junctionLevels = graph.nodes.filter((n) => n.kind === 'join').map((n) => n.level);
+  // A level holding an open invoke needs the extra width that node takes.
+  const openLevels = new Set(
+    graph.nodes.filter((n) => children?.open.has(n.id)).map((n) => n.level)
+  );
   const levelX: number[] = [];
   let cursor = 0;
   for (let level = 0; level < graph.levels.length; level++) {
     levelX[level] = cursor;
     const holdsJunction = junctionLevels.some((l) => l > level && l < level + 1);
-    cursor += LAYOUT.columnGap + (holdsJunction ? LAYOUT.junctionGap : 0);
+    cursor +=
+      LAYOUT.columnGap +
+      (holdsJunction ? LAYOUT.junctionGap : 0) +
+      (openLevels.has(level) ? LAYOUT.invokeOpenWidth - LAYOUT.nodeWidth : 0);
   }
 
   /** x of any level, including the half-levels junctions sit on. */
@@ -233,7 +253,7 @@ export function toFlowElements(
       selected: selectedSpanID !== undefined && node.spanID === selectedSpanID,
       // Declared up front so the initial fitView has real dimensions to work
       // with; without these it fits against zero-sized nodes and overflows.
-      width: LAYOUT.nodeWidth,
+      width: children?.open.has(node.id) ? LAYOUT.invokeOpenWidth : LAYOUT.nodeWidth,
       height: heightOf(node, children?.open, children?.graphs),
     };
   });

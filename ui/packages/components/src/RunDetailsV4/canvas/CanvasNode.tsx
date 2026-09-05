@@ -11,7 +11,7 @@
  * A timeout is neither a success nor a bug in the step, so it gets its own
  * neutral treatment — including invoke timeouts, not just waits.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   RiArrowDownSLine,
   RiArrowRightSLine,
@@ -29,14 +29,27 @@ import {
   RiStopCircleFill,
   RiTimeLine,
 } from '@remixicon/react';
-import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
+import {
+  Handle,
+  Position,
+  ReactFlow,
+  ReactFlowProvider,
+  type Node,
+  type NodeProps,
+} from '@xyflow/react';
 
 import { getStatusBorderClass, getStatusTextClass } from '../../Status/statusClasses';
 import { cn } from '../../utils/classNames';
 import { formatDuration } from '../runDetailsUtils';
 import { groupTitle, type CanvasGroup, type CollapseException } from './collapse';
 import type { CanvasGraph } from './graph.types';
-import { LAYOUT, childPreviewRows, invokeOpenHeight, type CanvasNodeData } from './toFlowElements';
+import {
+  LAYOUT,
+  childPreviewRows,
+  invokeOpenHeight,
+  toFlowElements,
+  type CanvasNodeData,
+} from './toFlowElements';
 
 /** One icon per step type, so the shape of a run is readable at a glance. */
 const STEP_TYPE_ICON = {
@@ -185,7 +198,10 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
     : LAYOUT.nodeHeight;
 
   return (
-    <div className="relative" style={{ width: LAYOUT.nodeWidth, height }}>
+    <div
+      className="relative"
+      style={{ width: childOpen ? LAYOUT.invokeOpenWidth : LAYOUT.nodeWidth, height }}
+    >
       {/* A batch is drawn as a stack of cards rather than as N separate nodes. */}
       {isEvent && (data.batchSize ?? 0) > 1 && (
         <>
@@ -385,8 +401,6 @@ function ChildRunRegion({
   );
 }
 
-/** The child's levels as rows of pills — the same shape, small enough to fit. */
-/** How the child run ended, and how long it took, for the region's header. */
 /**
  * Time in the child run that its steps do not cover — queueing, planning and
  * finalization. Deliberately one number: the parts are not separable from a
@@ -406,6 +420,7 @@ function outsideSteps(graph: CanvasGraph): number {
   return Math.max(0, terminal.endedAt - terminal.queuedAt - (last - first));
 }
 
+/** How the child run ended, and how long it took, for the region's header. */
 function childOutcome(graph: CanvasGraph): { label: string; status: string } | null {
   const terminal = graph.nodes.find((n) => n.kind === 'result');
   if (!terminal) return null;
@@ -417,51 +432,42 @@ function childOutcome(graph: CanvasGraph): { label: string; status: string } | n
   };
 }
 
+/**
+ * The child run's own flow chart, inside the invoke.
+ *
+ * This was a list of pills — a summary, when what the disclosure promises is
+ * the other run. A run is a graph and reads as one; rendered as a column of
+ * chips it loses the shape, which is the only thing the canvas is for.
+ *
+ * Its own React Flow, in its own provider, with interaction turned off: the
+ * child is a picture of another run, and a second pannable, zoomable surface
+ * inside the one already under the pointer fights it for every scroll. To
+ * explore the child, open it.
+ */
 function ChildLevels({ graph }: { graph: CanvasGraph }) {
-  const byID = new Map(graph.nodes.map((n) => [n.id, n]));
-
-  // Only the child's own WORK.
-  //
-  // Its Trigger and its terminal node are structure, and drawn here they put a
-  // second `Trigger` and a second `Completed` into a picture that already has
-  // one of each at a different visual weight — the reader has to work out which
-  // run each belongs to before they can read either. The region's own header
-  // already says whose run this is.
-  const work = (ids: string[]) =>
-    ids
-      .flatMap((id) => byID.get(id) ?? [])
-      .filter((n) => n.kind === 'step' || n.kind === 'wait' || n.kind === 'invoke');
+  const { nodes, edges } = useMemo(() => toFlowElements(graph), [graph]);
 
   return (
-    <div className="flex flex-col gap-0.5">
-      {graph.levels.map((ids, level) => {
-        const nodes = work(ids);
-        if (!nodes.length) return null;
-        return (
-          <div key={level} className="flex min-w-0 flex-wrap items-center gap-1">
-            {nodes.map((node) => {
-              // The parent says `519ms`; without this nothing inside accounts
-              // for it, and accounting for it is the reason to open the thing.
-              const took = durationOf(node as CanvasNodeData);
-              return (
-                <span
-                  key={node.id}
-                  title={took ? `${node.label} — ${took}` : node.label}
-                  className={cn(
-                    'flex min-w-0 items-baseline gap-1 rounded-sm border px-1 py-px text-[9px] leading-tight',
-                    getStatusBorderClass(node.status),
-                    getStatusTextClass(node.status)
-                  )}
-                >
-                  <span className="min-w-0 truncate">{node.label}</span>
-                  {took && <span className="text-muted shrink-0 font-mono">{took}</span>}
-                </span>
-              );
-            })}
-          </div>
-        );
-      })}
-    </div>
+    <ReactFlowProvider>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={CANVAS_NODE_TYPES}
+        fitView
+        fitViewOptions={{ padding: 0.12 }}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        panOnDrag={false}
+        panOnScroll={false}
+        zoomOnScroll={false}
+        zoomOnPinch={false}
+        zoomOnDoubleClick={false}
+        preventScrolling={false}
+        proOptions={{ hideAttribution: true }}
+        className="!bg-transparent"
+      />
+    </ReactFlowProvider>
   );
 }
 

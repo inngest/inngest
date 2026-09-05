@@ -1423,7 +1423,11 @@ export function Timeline({
     // What stays at rest is structural instead: a bracket in the gutter around
     // the rows one request produced, which cannot cross anything because it
     // spans contiguous rows in a column of its own.
-    if (!hoveredSpanID) return [];
+    // Hover OR selection. Hover is a glance and selection is a decision; a
+    // reader who has clicked a step to study it should not lose the lines the
+    // moment the pointer moves away.
+    const focused = hoveredSpanID ?? selectedStepId;
+    if (!focused) return [];
     const byID = new Map<string, TimelineBarData>();
     const collect = (list: TimelineBarData[]) => {
       for (const bar of list) {
@@ -1458,7 +1462,7 @@ export function Timeline({
         // the two axes of this view are not the same kind of thing.
         const toX = xOf(other.startTime.getTime());
         const turn = Math.min(6, Math.abs(toY - fromY) / 2);
-        if (hoveredSpanID !== bar.id && hoveredSpanID !== other.id) continue;
+        if (focused !== bar.id && focused !== other.id) continue;
         paths.push({
           key: `${bar.planning.spanID}-${other.id}`,
           d: `M ${fromX} ${fromY} L ${fromX} ${toY - turn} Q ${fromX} ${toY} ${
@@ -1501,7 +1505,7 @@ export function Timeline({
         const fromY = rowTops.get(feeder.id)!;
         const fromX = xOf(feeder.endTime!.getTime());
         const turn = Math.min(6, Math.abs(toY - fromY) / 2);
-        if (hoveredSpanID !== bar.id && hoveredSpanID !== feeder.id) continue;
+        if (focused !== bar.id && focused !== feeder.id) continue;
         paths.push({
           key: `join-${bar.id}-${feeder.id}`,
           d: `M ${fromX} ${fromY} L ${toX - 0.6} ${fromY} Q ${toX} ${fromY} ${toX} ${
@@ -1511,7 +1515,7 @@ export function Timeline({
       }
     }
     return paths;
-  }, [barsWithChildren, rowTops, scale, leftWidth, plotWidth, hoveredSpanID]);
+  }, [barsWithChildren, rowTops, scale, leftWidth, plotWidth, hoveredSpanID, selectedStepId]);
 
   // Deliberately over `data.bars`, not the collapsed `bars`. The strip is the
   // map of the whole run and must not shrink because the rows below it did —
@@ -1601,13 +1605,32 @@ export function Timeline({
             className="pointer-events-none absolute inset-0 z-[2] h-full w-full"
             style={{ overflow: 'visible' }}
           >
+            {/* Arrowheads, matching the flow chart. These lines say the same
+                thing its edges do — this produced that — so they are drawn the
+                same way: solid, because every one of them is reported by
+                `plannedStepIDs` rather than inferred, and pointed, because the
+                relationship has a direction. */}
+            <defs>
+              <marker
+                id="tl-flow-arrow"
+                viewBox="0 0 8 8"
+                refX="7"
+                refY="4"
+                markerWidth="5"
+                markerHeight="5"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1 L 7 4 L 0 7 z" fill="rgb(var(--color-border-contrast))" />
+              </marker>
+            </defs>
             {planningFlows.map((flow) => (
               <path
                 key={flow.key}
                 d={flow.d}
                 fill="none"
                 stroke="rgb(var(--color-border-contrast))"
-                strokeWidth={1.5}
+                strokeWidth={2}
+                markerEnd="url(#tl-flow-arrow)"
                 vectorEffect="non-scaling-stroke"
               />
             ))}
