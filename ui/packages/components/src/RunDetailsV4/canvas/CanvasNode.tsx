@@ -359,7 +359,26 @@ function ChildRunRegion({
         ) : !graph ? (
           <p className="text-muted text-[10px]">Nothing loaded.</p>
         ) : (
-          <ChildLevels graph={graph} />
+          <>
+            <ChildLevels graph={graph} />
+            {/* What the pills do not account for.
+             *
+             * The preview shows the child's STEPS, and a run is more than its
+             * steps — it queues, it is planned, it finalizes. Without this the
+             * node said 519ms, the header said 271ms and the only row inside
+             * said 16ms, leaving 255ms of the child's life invisible in a box
+             * opened specifically to account for it. Stated as one figure
+             * rather than itemised, because 186px cannot itemise it and
+             * because "outside its steps" is exactly what is known. */}
+            {(() => {
+              const outside = outsideSteps(graph);
+              return outside > 0 ? (
+                <p className="text-muted mt-0.5 text-[9px]">
+                  {formatDuration(outside)} outside its steps
+                </p>
+              ) : null;
+            })()}
+          </>
         )}
       </div>
     </div>
@@ -368,6 +387,25 @@ function ChildRunRegion({
 
 /** The child's levels as rows of pills — the same shape, small enough to fit. */
 /** How the child run ended, and how long it took, for the region's header. */
+/**
+ * Time in the child run that its steps do not cover — queueing, planning and
+ * finalization. Deliberately one number: the parts are not separable from a
+ * graph, and summing step durations under parallelism would be wrong anyway.
+ */
+function outsideSteps(graph: CanvasGraph): number {
+  const terminal = graph.nodes.find((n) => n.kind === 'result');
+  if (!terminal || terminal.endedAt === null) return 0;
+
+  const work = graph.nodes.filter(
+    (n) => n.kind === 'step' || n.kind === 'wait' || n.kind === 'invoke'
+  );
+  if (!work.length) return 0;
+
+  const first = Math.min(...work.map((n) => n.startedAt ?? n.queuedAt));
+  const last = Math.max(...work.map((n) => n.endedAt ?? n.startedAt ?? n.queuedAt));
+  return Math.max(0, terminal.endedAt - terminal.queuedAt - (last - first));
+}
+
 function childOutcome(graph: CanvasGraph): { label: string; status: string } | null {
   const terminal = graph.nodes.find((n) => n.kind === 'result');
   if (!terminal) return null;
