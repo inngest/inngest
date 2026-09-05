@@ -88,6 +88,14 @@ type PhaseDefinition<T> = {
   getMs: (data: T) => number;
 };
 
+/**
+ * The rail's gutter: lane pitch, the tick reaching out of a lane, and the total
+ * width reserved. Horizontal, because vertical is the scarce axis at 22px rows.
+ */
+const RAIL_LANE_PX = 5;
+const RAIL_TICK_PX = 4;
+const RAIL_GUTTER_PX = 16;
+
 const HTTP_PHASES: PhaseDefinition<HTTPTimingBreakdownData>[] = [
   { key: 'dns', label: 'DNS', style: 'timing.http.dns', getMs: (d) => d.dnsLookupMs },
   { key: 'tcp', label: 'TCP', style: 'timing.http.tcp', getMs: (d) => d.tcpConnectionMs },
@@ -1435,38 +1443,104 @@ export function Timeline({
    * however complex the run gets it cannot overlap a span — which is the whole
    * problem with drawing the relationship as lines across the plot.
    */
-  const planningBrackets = useMemo(() => {
+  /**
+   * A rail in the gutter: each request branches into the steps it produced and
+   * merges from the steps whose completion caused it.
+   *
+   * This is the gutter bracket with direction added, and it is the one device
+   * that answers BOTH halves. Containment — a bracket, a band, a collapsed
+   * group — expresses membership, and membership only reads as causation here
+   * because in this data they are the same relation. It provably cannot express
+   * a coalesce: the contributors are the *tails* of rows sitting in earlier
+   * groups, and a container can hold rows but not row-endings.
+   *
+   * A rail can, because its ticks attach to actual rows rather than to a
+   * summary lane. Temporal's Full History draws exactly this for the requests
+   * that drive a workflow — a git-style tree with a thicker main line and
+   * grouping — without putting it on a time axis, which is the part this adds.
+   *
+   * Costs no vertical space, which is the scarce axis at a 22px row.
+   */
+  const planningRail = useMemo(() => {
     const rows = barsWithChildren[0]?.children ?? barsWithChildren;
-    const groups = new Map<string, number[]>();
+    const indexOf = new Map(rows.map((bar, i) => [bar.id, i] as const));
+
+    type Rail = {
+      key: string;
+      lane: number;
+      produced: number[];
+      feeders: number[];
+      topPx: number;
+      heightPx: number;
+    };
+
+    const requests = new Map<string, { produced: number[]; feeders: number[] }>();
 
     rows.forEach((bar, index) => {
       if (!bar.plannedBy || !rowTops.has(bar.id)) return;
-      const list = groups.get(bar.plannedBy);
-      if (list) list.push(index);
-      else groups.set(bar.plannedBy, [index]);
+      const entry = requests.get(bar.plannedBy) ?? { produced: [], feeders: [] };
+      entry.produced.push(index);
+      requests.set(bar.plannedBy, entry);
     });
 
-    return [...groups]
-      .filter(([, indexes]) => {
-        if (indexes.length < 2) return false;
-        // CONTIGUOUS only. A bracket spanning rows that are not adjacent
-        // encloses whatever happens to sit between them, which claims a
-        // relationship those rows do not have. Where the group is interleaved,
-        // saying nothing is better than saying something untrue — the lines on
-        // hover still carry it exactly.
-        const lo = Math.min(...indexes);
-        const hi = Math.max(...indexes);
-        return hi - lo + 1 === indexes.length;
-      })
-      .map(([spanID, indexes]) => {
-        const ys = indexes.map((i) => rowTops.get(rows[i]!.id)!);
-        return {
-          key: spanID,
-          count: indexes.length,
-          topPx: Math.min(...ys),
-          heightPx: Math.max(...ys) - Math.min(...ys),
-        };
+    // A request's feeders are the steps that finished before it began. Taken
+    // from the group that finished LAST, because those are the completions the
+    // request was actually waiting on — earlier groups had already been
+    // reported by the requests that followed them.
+    for (const [spanID, entry] of requests) {
+      const owner = rows[Math.min(...entry.produced)];
+      const beganMs = owner?.planning?.startMs ?? owner?.unaccounted?.startMs;
+      if (beganMs === undefined) continue;
+
+      const before = rows
+        .map((bar, i) => ({ bar, i }))
+        .filter(
+          ({ bar }) =>
+            bar.plannedBy &&
+            bar.plannedBy !== spanID &&
+            bar.endTime &&
+            bar.endTime.getTime() <= beganMs
+        );
+      if (!before.length) continue;
+
+      const last = Math.max(...before.map(({ bar }) => bar.endTime!.getTime()));
+      const from = before.find(({ bar }) => bar.endTime!.getTime() === last)?.bar.plannedBy;
+      entry.feeders = before.filter(({ bar }) => bar.plannedBy === from).map(({ i }) => i);
+    }
+
+    // Lanes, so two requests whose row ranges overlap never share a line.
+    const laneEndsAt: number[] = [];
+    const rails: Rail[] = [];
+
+    for (const [key, entry] of [...requests].sort(
+      (a, b) => Math.min(...a[1].produced) - Math.min(...b[1].produced)
+    )) {
+      const touched = [...entry.produced, ...entry.feeders];
+      if (touched.length < 2) continue;
+
+      const lo = Math.min(...touched);
+      const hi = Math.max(...touched);
+
+      let lane = laneEndsAt.findIndex((end) => end < lo);
+      if (lane === -1) {
+        lane = laneEndsAt.length;
+        laneEndsAt.push(hi);
+      } else {
+        laneEndsAt[lane] = hi;
+      }
+
+      const ys = touched.map((i) => rowTops.get(rows[i]!.id)!);
+      rails.push({
+        key,
+        lane,
+        produced: entry.produced,
+        feeders: entry.feeders,
+        topPx: Math.min(...ys),
+        heightPx: Math.max(...ys) - Math.min(...ys),
       });
+    }
+
+    return { rails, lanes: Math.max(1, laneEndsAt.length), rows, indexOf };
   }, [barsWithChildren, rowTops]);
 
   const planningFlows = useMemo(() => {
@@ -1645,25 +1719,58 @@ export function Timeline({
           </div>
         )}
 
-        {/* One request's steps, bracketed in the gutter. Always visible, never
-            crossing, because it occupies a column of its own. */}
-        {planningBrackets.map((bracket) => (
-          <div
-            key={bracket.key}
-            // Says what it means. Unlabelled it reads as a stronger claim than
-            // it makes: these steps were STARTED BY ONE REQUEST, which for a
-            // fan-out is the whole story and for a chain is only how they
-            // began.
-            title={`Inngest started these ${bracket.count} steps in one request`}
-            className="border-muted absolute z-[2] cursor-help rounded-l-sm border-y border-l"
-            style={{
-              left: 4,
-              top: bracket.topPx - 5,
-              height: bracket.heightPx + 10,
-              width: 4,
-            }}
-          />
-        ))}
+        {/* The rail: a request branches into what it produced and merges from
+            what caused it. Ticks land on real rows, which is what lets it say
+            WHICH steps rather than only that a coalesce happened. */}
+        <svg
+          className="pointer-events-none absolute inset-y-0 left-0 z-[2]"
+          style={{ width: RAIL_GUTTER_PX }}
+          aria-hidden
+        >
+          {planningRail.rails.map((rail) => {
+            const x = 3 + rail.lane * RAIL_LANE_PX;
+            const tick = (y: number, into: boolean) =>
+              `M ${x} ${y} L ${x + (into ? RAIL_TICK_PX : RAIL_TICK_PX)} ${y}`;
+
+            return (
+              <g key={rail.key} className="text-muted">
+                <path
+                  d={`M ${x} ${rail.topPx} L ${x} ${rail.topPx + rail.heightPx}`}
+                  stroke="currentColor"
+                  strokeWidth={1}
+                  fill="none"
+                  opacity={0.5}
+                />
+                {rail.feeders.map((i) => {
+                  const y = planningRail.rows[i] && rowTops.get(planningRail.rows[i]!.id);
+                  return y === undefined ? null : (
+                    <path
+                      key={`f${i}`}
+                      d={tick(y, true)}
+                      stroke="currentColor"
+                      strokeWidth={1}
+                      fill="none"
+                      opacity={0.35}
+                    />
+                  );
+                })}
+                {rail.produced.map((i) => {
+                  const y = planningRail.rows[i] && rowTops.get(planningRail.rows[i]!.id);
+                  return y === undefined ? null : (
+                    <path
+                      key={`p${i}`}
+                      d={tick(y, false)}
+                      stroke="currentColor"
+                      strokeWidth={1.25}
+                      fill="none"
+                      opacity={0.75}
+                    />
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
 
         {planningFlows.length > 0 && (
           <svg
