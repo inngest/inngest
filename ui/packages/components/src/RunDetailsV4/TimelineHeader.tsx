@@ -16,7 +16,7 @@ import { MINIMAP_HEIGHT_PX, RunMinimap } from './RunMinimap';
 import { TimeBrush } from './TimeBrush';
 import { formatDuration } from './runDetailsUtils';
 import type { Minimap } from './utils/density';
-import { scaleTicks, type TimeScale } from './utils/timeScale';
+import { axisLabels, scaleTicks, type TimeScale } from './utils/timeScale';
 import { TIMELINE_CONSTANTS } from './utils/timing';
 
 type Props = {
@@ -82,16 +82,28 @@ export function TimelineHeader({
   // marker landing inside an elided stretch is dropped — labelling a time from a
   // stretch the axis is explicitly not drawing would be worse than no label.
   const markers = useMemo(() => {
-    if (!scale?.compressed) {
-      return TIME_MARKERS.map((percent) => ({
-        percent,
-        label: formatDuration(Math.floor((totalMs * percent) / 100)),
+    const raw = !scale?.compressed
+      ? TIME_MARKERS.map((percent) => ({
+          percent,
+          offsetMs: Math.floor((totalMs * percent) / 100),
+        }))
+      : scaleTicks(scale, TIME_MARKERS.length).map((tick) => ({
+          percent: tick.percent,
+          offsetMs: Math.max(0, tick.ms - minTime.getTime()),
+        }));
+
+    // Under a minute the single figure reads better than a two-tier label
+    // whose coarse half would always be empty.
+    if (totalMs < 60_000) {
+      return raw.map((m) => ({
+        percent: m.percent,
+        coarse: null as string | null,
+        fine: formatDuration(m.offsetMs),
       }));
     }
-    return scaleTicks(scale, TIME_MARKERS.length).map((tick) => ({
-      percent: tick.percent,
-      label: formatDuration(Math.max(0, tick.ms - minTime.getTime())),
-    }));
+
+    const labels = axisLabels(raw.map((m) => m.offsetMs));
+    return raw.map((m, i) => ({ percent: m.percent, ...labels[i]! }));
   }, [scale, totalMs, minTime]);
 
   const hasStrip = Boolean(minimap && minimap.marks.length);
@@ -187,9 +199,20 @@ export function TimelineHeader({
                     : 'translateX(-50%)',
               }}
             >
-              {/* Duration label */}
+              {/* Two tiers, so a long run keeps its resolution.
+               *
+               * A 160-hour run labelled `160.0h`, `160.1h` says nothing: the
+               * work happens in seconds and every tick rounds to the same
+               * hour. The coarse offset goes above and appears only where it
+               * changes; the seconds-and-milliseconds line is always there,
+               * because that is the tier the steps actually live in. */}
+              {marker.coarse && (
+                <span className="text-light whitespace-nowrap text-[10px] tabular-nums">
+                  {marker.coarse}
+                </span>
+              )}
               <span className="text-muted whitespace-nowrap text-xs tabular-nums">
-                {marker.label}
+                {marker.fine}
               </span>
             </div>
           ))}

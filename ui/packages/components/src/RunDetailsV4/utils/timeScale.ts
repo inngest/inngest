@@ -264,3 +264,49 @@ export function percentToMs(scale: TimeScale, percent: number): number {
   }
   return (lo + hi) / 2;
 }
+
+/**
+ * An axis label split into a coarse part and a fine one.
+ *
+ * A run spanning 160 hours labelled `160.0h`, `160.1h`, `160.2h` tells a reader
+ * nothing: the work happens in seconds and every tick rounds to the same hour.
+ * Dropping to seconds instead gives `576000.000s`, which is worse.
+ *
+ * So the label is two tiers, which is what time axes settle on — Grafana's
+ * ticks carry the time and its boundary ticks carry the date, and Gantt charts
+ * band the coarse unit above the fine one. Here the coarse part is the offset
+ * in days/hours/minutes and the fine part is always seconds and milliseconds,
+ * so the resolution where the work actually is never degrades however long the
+ * run.
+ *
+ * The coarse part is returned only when it CHANGES from the previous tick, so
+ * a short run never shows one and a long run shows it once per boundary
+ * instead of on every tick.
+ */
+export type AxisLabel = { coarse: string | null; fine: string };
+
+export function axisLabels(offsets: number[]): AxisLabel[] {
+  let previous: string | null = null;
+
+  return offsets.map((ms) => {
+    const total = Math.max(0, Math.floor(ms));
+    const days = Math.floor(total / 86_400_000);
+    const hours = Math.floor(total / 3_600_000) % 24;
+    const minutes = Math.floor(total / 60_000) % 60;
+
+    const parts: string[] = [];
+    if (days) parts.push(`${days}d`);
+    if (days || hours) parts.push(`${hours}h`);
+    if (days || hours || minutes) parts.push(`${minutes}m`);
+    const coarse = parts.length ? parts.join(' ') : null;
+
+    const seconds = (total % 60_000) / 1000;
+    // Always seconds and milliseconds. This is the tier that has to stay
+    // readable, because it is where every step in a real run lives.
+    const fine = `${seconds.toFixed(3)}s`;
+
+    const changed = coarse !== previous;
+    previous = coarse;
+    return { coarse: changed ? coarse : null, fine };
+  });
+}
