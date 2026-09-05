@@ -778,6 +778,11 @@ const VisualBar = memo(function VisualBar({
           return (
             <div
               key={segment.id}
+              // Each segment answers for itself. Without this every part of a
+              // row returned the row's own hover card, so a pale lead-in — the
+              // one thing on screen with no label anywhere — had no way at all
+              // of being asked what it was.
+              title={segment.tooltip}
               className={cn(
                 'absolute top-1/2 -translate-y-1/2',
                 segmentHeightClass,

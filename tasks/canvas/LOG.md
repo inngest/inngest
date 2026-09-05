@@ -816,3 +816,23 @@ row headlined 104ms next to a node headlined 32ms and no way to tell which is ly
   that it draws only steps.
 - Facts strip says `grouping sdk` while the canvas corner says `grouping: exact` — two labels for
   one thing on one screen.
+
+### Segments answer for themselves
+
+Every part of a row used to return the row's own hover card, so a pale lead-in — the one thing on
+screen with no label anywhere near it — had no way at all of being asked what it was. `BarSegment`
+already carried an unused `tooltip`; it is now populated by every generator and rendered.
+
+Wiring it up immediately exposed a drift of exactly the kind the shared `leadInMs` was introduced to
+prevent. The timestamp re-derivation was **conditional** — applied only when the SDK's metadata
+overshot the span — so on an undershoot the label and the bar took different sources: `chains`'
+`left-2` labelled `+149ms wait` while its own segments reported waiting 119ms and running 17ms, 30ms
+of a 166ms span belonging to nothing, with its sibling `right-2` one row down describing itself
+correctly. The timestamps now win unconditionally.
+
+Two more invariants across all 44 fixtures, so neither comes back by eye:
+
+- a row's segments cover exactly 100% of it — the segments of a bar *are* the bar;
+- every segment it draws has something to say for itself.
+
+889 tests.

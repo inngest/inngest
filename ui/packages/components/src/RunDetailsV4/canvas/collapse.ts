@@ -733,13 +733,14 @@ function memberSegments(
   const pitch = 100 / marks;
   const width = pitch * 0.62;
 
-  const buckets: Array<{ status?: string; index: number }> = [];
-  for (let i = 0; i < marks; i++) buckets.push({ index: i });
+  const buckets: Array<{ status?: string; index: number; names: string[] }> = [];
+  for (let i = 0; i < marks; i++) buckets.push({ index: i, names: [] });
 
   rows.forEach((row, i) => {
     const bucket = buckets[Math.min(marks - 1, Math.floor((i / rows.length) * marks))]!;
     const severity = (s?: string) => SEVERITY[(s ?? 'UNKNOWN') as CanvasStatus] ?? 0;
     if (severity(row.status) > severity(bucket.status)) bucket.status = row.status;
+    bucket.names.push(row.name);
   });
 
   return buckets.map((bucket) => ({
@@ -748,6 +749,15 @@ function memberSegments(
     widthPercent: width,
     style: 'step.run' as const,
     status: bucket.status,
+    // Which members a mark stands for. When several are bucketed into one the
+    // mark takes the worst status of them, so saying only the status would hide
+    // that the red covers four steps of which one failed.
+    tooltip:
+      bucket.names.length === 1
+        ? `${bucket.names[0]}${bucket.status ? ` — ${bucket.status.toLowerCase()}` : ''}`
+        : `${bucket.names.length} steps: ${bucket.names.slice(0, 4).join(', ')}${
+            bucket.names.length > 4 ? ', …' : ''
+          }${bucket.status ? ` — worst: ${bucket.status.toLowerCase()}` : ''}`,
   }));
 }
 

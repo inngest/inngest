@@ -97,6 +97,43 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
     }
   });
 
+  it('splits a row into segments that fill it exactly', () => {
+    // The segments of a bar are the bar. When they do not add up the reader is
+    // given a row headlined 166ms whose parts claim 119ms of waiting and 17ms
+    // of running, with 30ms belonging to nothing — which is how `chains`' two
+    // halves of one fan-out came to describe themselves differently.
+    const { data } = viewsOf(fixture);
+
+    const walk = (bars: typeof data.bars) => {
+      for (const bar of bars) {
+        const segments = generateBarSegments(bar);
+        if (segments?.length) {
+          const covered = segments.reduce((n, s) => n + s.widthPercent, 0);
+          expect(covered, `${id}: ${bar.name} segments cover ${covered}%`).toBeCloseTo(100, 0);
+        }
+        walk(bar.children ?? []);
+      }
+    };
+    walk(data.bars);
+  });
+
+  it('gives every segment it draws something to say for itself', () => {
+    // A row used to return the same hover card for all of it, so a pale lead-in
+    // — the one thing on screen carrying no label anywhere — could not be asked
+    // what it was. Every generated segment now answers for itself.
+    const { data } = viewsOf(fixture);
+
+    const walk = (bars: typeof data.bars) => {
+      for (const bar of bars) {
+        for (const segment of generateBarSegments(bar) ?? []) {
+          expect(segment.tooltip, `${id}: ${bar.name} segment ${segment.id}`).toBeTruthy();
+        }
+        walk(bar.children ?? []);
+      }
+    };
+    walk(data.bars);
+  });
+
   it('never draws a discovery over a span already on screen', () => {
     // The characteristic bug of this view is the same interval drawn twice. A
     // discovery span is usually the parent of what it planned, and the run's

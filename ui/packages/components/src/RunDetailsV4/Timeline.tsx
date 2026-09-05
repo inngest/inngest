@@ -315,6 +315,10 @@ function generateAttemptSegments(bar: TimelineBarData): BarSegment[] | undefined
         widthPercent: pct(started - previousEnd),
         style: 'timing.waiting',
         status: attempt.status,
+        tooltip:
+          i === 0
+            ? `Queued ${formatDuration(started - previousEnd)} before the first attempt`
+            : `Backed off ${formatDuration(started - previousEnd)} before attempt ${i + 1}`,
       });
     }
 
@@ -325,6 +329,9 @@ function generateAttemptSegments(bar: TimelineBarData): BarSegment[] | undefined
         widthPercent: pct(ended - started),
         style: 'step.run',
         status: attempt.status,
+        tooltip: `Attempt ${i + 1} of ${attempts.length} — ${(
+          attempt.status ?? 'ran'
+        ).toLowerCase()} after ${formatDuration(ended - started)}`,
       });
     }
   });
@@ -375,6 +382,7 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
         widthPercent: waitPercent,
         style: 'timing.waiting',
         status: bar.status,
+        tooltip: `Queued ${formatDuration(bar.delayMs)} before the run started`,
       },
       {
         id: `${bar.id}-seg-run-running`,
@@ -382,6 +390,7 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
         widthPercent: 100 - waitPercent,
         style: 'root',
         status: bar.status,
+        tooltip: `Running ${formatDuration(spanMs - bar.delayMs)}`,
       },
     ];
   }
@@ -394,11 +403,17 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
   // The span's own extent, which is what the bar is actually drawn across.
   const spanMs = bar.endTime ? bar.endTime.getTime() - bar.startTime.getTime() : null;
 
-  if (spanMs !== null && spanMs > 0 && totalMs > spanMs) {
-    // Trust the timestamps over the metadata and re-derive the split from the
-    // span: anything left over after execution is this step's own overhead.
-    // `leadInMs` is that same derivation, and the row's `+72ms wait` label comes
-    // through it — one definition, so the bar and its label cannot disagree.
+  if (spanMs !== null && spanMs > 0) {
+    // Trust the timestamps over the metadata, ALWAYS — not only when the
+    // metadata overshoots. Anything left of the span after execution is this
+    // step's own overhead, and `leadInMs` is that derivation. The row's
+    // `+72ms wait` label comes through the same function, so the bar and its
+    // own label cannot disagree.
+    //
+    // Doing this only on an overshoot left them disagreeing on the undershoot:
+    // `chains`' `left-2` labelled `+149ms wait` while its bar reported waiting
+    // 119ms and running 17ms — 30ms of a 166ms span attributed to nothing at
+    // all, and a sibling one row down doing it differently.
     inngestMs = leadInMs(bar);
     totalMs = spanMs;
   }
@@ -417,6 +432,10 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
       widthPercent: inngestPercent,
       style: 'timing.waiting',
       status: bar.status,
+      // The same number the row's `+72ms wait` label carries, from the same
+      // derivation, so hovering a lead-in confirms the label rather than
+      // offering the reader a third figure to reconcile.
+      tooltip: `Waited ${formatDuration(inngestMs)} before this step ran`,
     });
     currentPercent += inngestPercent;
   }
@@ -430,6 +449,8 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
       widthPercent: execPercent,
       style: bar.isRoot ? 'root' : 'timing.server',
       status: bar.status,
+      // What the canvas node reports for this step, said in the trace too.
+      tooltip: `Ran ${formatDuration(executionMs)} on your server`,
     });
   }
 
@@ -461,6 +482,7 @@ function generateDelaySegments(bar: TimelineBarData): BarSegment[] | undefined {
       startPercent: 0,
       widthPercent: delayPercent,
       style: 'timing.inngest',
+      tooltip: `Waited ${formatDuration(bar.delayMs)} before this ran`,
     });
   }
 
@@ -471,6 +493,7 @@ function generateDelaySegments(bar: TimelineBarData): BarSegment[] | undefined {
       widthPercent: execPercent,
       style: bar.style,
       status: bar.status,
+      tooltip: `Ran ${formatDuration(totalMs - bar.delayMs)}`,
     });
   }
 
