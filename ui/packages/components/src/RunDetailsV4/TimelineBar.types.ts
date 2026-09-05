@@ -254,6 +254,11 @@ export interface TimelineBarProps {
   /** Timing breakdown rows shown in the hover tooltip */
   timingDetails?: TimingDetail[];
 
+  /**
+   * The platform's own row rather than one the reader wrote. Its NAME recedes;
+   * its bar keeps its status colour, so a failure stays findable.
+   */
+  platform?: boolean;
   /** Human-readable type label shown in the hover tooltip subtitle (e.g., "step.sleep") */
   styleLabel?: string;
 

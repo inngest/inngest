@@ -791,6 +791,7 @@ function TimelineBarRenderer({
       badgeGutter={badgeGutter}
       note={bar.note}
       interrupted={bar.interrupted}
+      platform={bar.isPlatform}
       hovered={hoveredStepId === bar.id}
       onHoverChange={(on) => onHoverStep?.(on ? bar.id : undefined)}
       orgName={orgName}

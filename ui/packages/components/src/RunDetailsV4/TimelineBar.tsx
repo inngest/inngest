@@ -871,6 +871,7 @@ export function TimelineBar({
   onHoverChange,
   note,
   interrupted,
+  platform,
   badgeGutter = true,
   children,
   orgName,
@@ -980,7 +981,15 @@ export function TimelineBar({
                 // The label column should recede — the bars are the content.
                 // Monospace, muted, truncating, and never bold.
                 'min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] font-normal leading-tight',
-                barStyle.textColor ?? 'text-subtle',
+                // The platform's own rows recede further than the user's.
+                //
+                // Finalization and Function error are truthful and earn their
+                // place, but on `failure` the widest bar after Run is 272ms of
+                // Function error while the thing the reader came to find is a
+                // 43ms step above it. The bar keeps its status colour, so a
+                // failure is still findable; it is the NAME that stops
+                // competing with names the reader actually wrote.
+                platform ? 'text-light' : barStyle.textColor ?? 'text-subtle',
                 !effectiveIcon && 'pl-1.5'
               )}
             >
