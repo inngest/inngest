@@ -119,19 +119,34 @@ durations of the actual work are untouched. The result is ~7 days elapsed and a
 fraction of a second executing, which is the case an elastic time axis exists
 for.
 
-## The two SDK versions matter
+## The two SDK versions no longer separate the two code paths
 
-Fixtures without a `v4`/`t19` prefix come from the v3 client (`inngest@3.11.1-pr-411.4`),
-whose `PREFERRED_EXECUTION_VERSION` is `ExecutionVersion.V1`. A V1 SDK reports **one opcode
-per response**, so `plannedSteps` is always absent and the canvas has to infer parallel
-groups from execution overlap.
+They used to. A v3 client runs `ExecutionVersion.V1` and reports one opcode per
+response, so `plannedSteps` was absent and parallel grouping had to be inferred;
+a v4 client reports whole batches, so grouping was exact.
 
-The v4 fixtures come from `inngest-v4`, which prefers `ExecutionVersion.V2` and reports a
-whole batch in one response. Those carry `plannedSteps`, so the grouping is exact. Keep
-both: they are the only way to test the two code paths in `graph.ts`.
+That stopped being true once the loader began lifting `plannedSteps` off
+discovery spans. Recapturing the fixtures against a current Dev Server made
+**every** run report exact grouping, v3 included — `parallel` went from
+`inferred` to `sdk`.
 
-The v4 functions are in `tests/js/src/inngest/canvas_shapes_v4.ts`, served separately at
+So the two paths in `graph.ts` are now separated by whether a capture predates
+that loader change. `parallel-inferred.json` is the one preserved pre-loader
+capture and the only thing exercising the fallback; `graph.test.ts` asserts that
+it still does, so the coverage cannot be lost again without a test failing.
+
+Both SDK versions are still worth keeping for the _shapes_ they produce — the v4
+set reports step lineage (`parentStepIDs`) and the v3 set does not. The v4
+functions are in `tests/js/src/inngest/canvas_shapes_v4.ts`, served at
 `/api/inngest-v4` so the v3 app is untouched.
+
+## Recapture rather than reason about old payloads
+
+Most fixtures were recaptured on 2026-09-05 because the older ones predated the
+loader gathering `discoveries`, and a view was being judged against payloads
+that no longer reflected the system. If a fixture looks wrong, check when it was
+captured before concluding the view is broken — and prefer recapturing to
+hand-editing.
 
 ## Recapturing
 
