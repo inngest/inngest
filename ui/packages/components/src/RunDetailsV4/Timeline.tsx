@@ -1392,21 +1392,34 @@ export function Timeline({
     const rows = barsWithChildren[0]?.children ?? barsWithChildren;
     const groups = new Map<string, number[]>();
 
-    for (const bar of rows) {
-      const y = rowTops.get(bar.id);
-      if (!bar.plannedBy || y === undefined) continue;
+    rows.forEach((bar, index) => {
+      if (!bar.plannedBy || !rowTops.has(bar.id)) return;
       const list = groups.get(bar.plannedBy);
-      if (list) list.push(y);
-      else groups.set(bar.plannedBy, [y]);
-    }
+      if (list) list.push(index);
+      else groups.set(bar.plannedBy, [index]);
+    });
 
     return [...groups]
-      .filter(([, ys]) => ys.length > 1)
-      .map(([spanID, ys]) => ({
-        key: spanID,
-        topPx: Math.min(...ys),
-        heightPx: Math.max(...ys) - Math.min(...ys),
-      }));
+      .filter(([, indexes]) => {
+        if (indexes.length < 2) return false;
+        // CONTIGUOUS only. A bracket spanning rows that are not adjacent
+        // encloses whatever happens to sit between them, which claims a
+        // relationship those rows do not have. Where the group is interleaved,
+        // saying nothing is better than saying something untrue — the lines on
+        // hover still carry it exactly.
+        const lo = Math.min(...indexes);
+        const hi = Math.max(...indexes);
+        return hi - lo + 1 === indexes.length;
+      })
+      .map(([spanID, indexes]) => {
+        const ys = indexes.map((i) => rowTops.get(rows[i]!.id)!);
+        return {
+          key: spanID,
+          count: indexes.length,
+          topPx: Math.min(...ys),
+          heightPx: Math.max(...ys) - Math.min(...ys),
+        };
+      });
   }, [barsWithChildren, rowTops]);
 
   const planningFlows = useMemo(() => {
@@ -1590,7 +1603,12 @@ export function Timeline({
         {planningBrackets.map((bracket) => (
           <div
             key={bracket.key}
-            className="border-muted pointer-events-none absolute z-[2] rounded-l-sm border-y border-l"
+            // Says what it means. Unlabelled it reads as a stronger claim than
+            // it makes: these steps were STARTED BY ONE REQUEST, which for a
+            // fan-out is the whole story and for a chain is only how they
+            // began.
+            title={`Inngest started these ${bracket.count} steps in one request`}
+            className="border-muted absolute z-[2] cursor-help rounded-l-sm border-y border-l"
             style={{
               left: 4,
               top: bracket.topPx - 5,
