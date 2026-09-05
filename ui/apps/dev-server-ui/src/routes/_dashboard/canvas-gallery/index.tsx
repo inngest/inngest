@@ -32,6 +32,10 @@ import {
   traceRollup,
   traceToTimelineData,
 } from '@inngest/components/RunDetailsV4/utils/traceConversion';
+import {
+  traceWalk,
+  useStepSelection,
+} from '@inngest/components/RunDetailsV4/runDetailsUtils';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParams';
 import { cn } from '@inngest/components/utils/classNames';
 import { createFileRoute, redirect } from '@tanstack/react-router';
@@ -186,6 +190,25 @@ function FixtureView({
   const raw = fixture.data.run.trace as Trace;
 
   const rolledUp = useMemo(() => traceRollup(raw), [raw]);
+
+  // The Timeline reads selection from the shared emitter but does not write to
+  // it — `onSelectStep` is how a host drives it, and it needs a Trace rather
+  // than the bar id the row hands back. `RunDetailsV4` does exactly this; the
+  // gallery did not, so clicking a row here did nothing while clicking the
+  // equivalent canvas node worked, and no causal line ever persisted.
+  const { selectStep } = useStepSelection({ runID });
+  const traceMap = useMemo(() => {
+    const map = new Map<string, Trace>();
+    traceWalk(rolledUp, (t) => map.set(t.spanID, t));
+    return map;
+  }, [rolledUp]);
+  const handleSelectStep = useCallback(
+    (stepID: string) => {
+      const trace = traceMap.get(stepID);
+      if (trace) selectStep({ trace, runID });
+    },
+    [traceMap, selectStep, runID],
+  );
   const graph = useMemo(() => toCanvasGraph(rolledUp), [rolledUp]);
   const timelineData = useMemo(
     () => traceToTimelineData(rolledUp, { runID, functionSlug: fixture.id }),
@@ -313,6 +336,7 @@ function FixtureView({
           data={timelineData}
           runID={runID}
           collapse={aggregated ? plan : undefined}
+          onSelectStep={handleSelectStep}
         />
       </div>
     </div>
