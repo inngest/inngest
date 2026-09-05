@@ -867,3 +867,40 @@ Vite served stale modules a **third** time here, again on a new export imported 
 again cost a debugging cycle chasing a rendering bug that no longer existed. Lesson 16 stands.
 
 896 tests.
+
+## After item F — the rest of the critic's list
+
+**The platform's rows stop competing.** On `failure` the widest bar after Run is 272ms of
+`Function error` while the thing the reader came to find is a 43ms step above it. The red is
+earned — that trailing group genuinely ended FAILED, so it *is* the site of the run's failure —
+which makes this emphasis, not colour. A platform row's NAME now recedes to the weight `Planning`
+already used; the bar keeps its status colour, so a failure is still findable.
+
+**A junction says what its lines cannot.** A junction exists precisely BECAUSE the SDK did not
+report which branch fed which — where it does, the graph draws direct edges and no junction at all.
+Read literally, and arrows are read literally, the lines through one say every step above feeds
+every step below: on `chains` that turns two independent 2-step chains into a lattice.
+`branches resolved 0` was the only admission and it sits in a dev-only strip. The popover and the
+legend now say it outright.
+
+**Top to bottom is the order things started, in both views.** `t19-parallel` drew b, c, a with no
+rule a reader could infer, and a different one on the next capture of the same function. Sorting
+only the canvas made it *worse* — the two then disagreed about where the same three steps went,
+which is the class of defect this whole pass has been about — so the trace sorts too. Where the SDK
+does report branch membership the canvas keeps laying each branch beneath its parent, so a 1:1
+branch still draws straight; the coherence test scopes itself to the unreported case rather than
+asserting past a deliberate difference. The `Planning` row is inserted in time order for the same
+reason: pinning it to the top on "above the steps it planned" was not always true, and on `invoke`
+it was the one row out of order.
+
+**The canvas fit has no zoom floor, deliberately.** A `minZoom` of 0.75 was tried on `chains` and is
+worse than the ~0.55 it replaces: the Trigger and the run's outcome both fall off the ends, and a
+reader who cannot see how a run started or finished has lost more than one who has to squint. The
+empty top and bottom of the pane cannot help — the zoom is bound by width. Full screen is the answer
+for a wide run, and the comment now says so rather than leaving the next person to re-try it.
+
+**Edge delay labels** are not inconsistent so much as junction-shaped: a label needs two real
+endpoints, and every edge in a fan-out run passes through a junction. The gap there is the
+junction's own discovery, which its popover already reports. Left as is.
+
+984 tests.
