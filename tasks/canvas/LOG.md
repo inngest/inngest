@@ -1,5 +1,48 @@
 # Run canvas — running log
 
+> **Read this section only.** Everything below it is the chronological record of how each decision
+> was reached, kept because the reasoning is the useful part. This header is the state.
+
+## Status
+
+Built: the flow chart, the trace, the scrubber, collapsing, the elastic axis, hover/selection sync,
+lineage, inline invoke expansion, and the value line. All 45 fixtures render clean.
+
+## Open
+
+- **Showing relationships in the trace.** Fan-out and coalesce are drawn as arrows on hover. Clunky:
+  22px rows leave an arrow no room to travel and its head lands on another bar. Under research.
+- **`chains` canvas junction** — arrows read as "left-1 feeds right-2". The popover and legend state
+  the uncertainty; the arrows are still read literally.
+- **5 failing tests** — they assert inference paths the recaptured fixtures no longer exercise.
+  Deletable, not fixable. Left alone deliberately.
+
+## Settled, don't reopen without a reason
+
+- **The time axis is never distorted for annotation.** Elastic breaks for idle stretches are marked
+  as breaks; bending it further to route lines would break the trace's contract.
+- **Causal lines are hover/selection only.** Perfetto draws flow arrows only for the selected slice;
+  Chrome DevTools reveals initiator chains only on hover. Nobody draws them at rest.
+- **The user's code is first class; everything Inngest does recedes.** Status colour at full weight
+  for the former, one muted grey at four weights for the latter, one faint blue for discovery
+  because that is what the causal lines attach to.
+- **Queued is a residual, not a guess.** What the reported parts do not account for.
+- **Platform rows keep their status colour** so a failed finalization stays findable; only their
+  labels recede.
+- **`Function error` / `Planning` outweighing user steps is truthful**, and accepted.
+
+## How to work on this
+
+- Gallery: `http://localhost:5177/canvas-gallery`. Vite: `pnpm run --filter @inngest/dev-server-ui dev:vite`.
+- **Restart Vite after adding or removing a module** — it serves stale transforms and has cost
+  several debugging cycles (lessons 16).
+- **Read the rendered DOM, not the model**, for anything user-visible (lessons 17, 18).
+- Recapture fixtures with `__fixtures__/recapture.mjs`; `special.mjs` covers the two shapes a single
+  event cannot produce.
+
+---
+
+
 **Testing bar for this work (set by the user, item A onwards).** This is a proof of concept: enough
 tests to keep iteration from silently breaking things, not a complete suite. Where a test would be
 complex and the risk is low, a comment is preferred. Model-level tests are cheap and stay — the
