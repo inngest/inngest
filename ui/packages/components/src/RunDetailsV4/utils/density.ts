@@ -83,7 +83,7 @@ export type MinimapMark = {
 
 export type Minimap = {
   marks: MinimapMark[];
-  /** How many lanes were needed — the run's maximum concurrency. */
+  /** How many trace rows the map mirrors. */
   rows: number;
 };
 

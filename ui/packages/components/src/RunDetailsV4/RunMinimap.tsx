@@ -7,11 +7,10 @@
  * things that look alike and mean different things is worse than either alone,
  * and it sat exactly where the eye lands first.
  *
- * A minimap has a different job and now has a different shape. Steps are packed
- * into as few rows as possible — sequential work shares one line, and only
- * genuine parallelism forces another — so the **row count is the concurrency
- * profile**, which neither the trace nor the canvas shows. Marks are hairline
- * thin, unlabelled, and visibly a different kind of object from the bars below.
+ * A minimap has a different job and now has a different shape: it mirrors the
+ * trace's own rows, in the trace's own order, squeezed into a fixed height, so
+ * glancing up from a row finds it. Marks are hairline thin, unlabelled, and
+ * visibly a different kind of object from the bars below.
  *
  * It always draws the whole run, however much is collapsed underneath: the map
  * must not shrink because the territory got folded.
@@ -48,18 +47,25 @@ export const MINIMAP_HEIGHT_PX = 16;
 const MAX_ROW_PX = 3;
 
 /**
- * Lane geometry for a given number of lanes.
+ * Row geometry for a given number of trace rows.
  *
- * Lanes never get CHUNKIER than 3px — a fat minimap starts to look like the
+ * Rows never get CHUNKIER than 3px — a fat minimap starts to look like the
  * trace again, which is the thing it exists not to look like — they only get
  * thinner, down to a 1px hairline, and the gap between them is the first thing
  * surrendered when space runs short.
+ *
+ * Past ~16 rows a hairline per row no longer fits, so the PITCH keeps shrinking
+ * below one pixel and rows share y. That is the right failure: the strip is a
+ * fixed piece of furniture and must stay inside itself. Without the pitch clamp
+ * a 500-row run laid its marks out at 1px each and painted 484 of them down the
+ * page over the trace, since every ancestor here is `overflow: visible`.
  */
-function laneGeometry(rows: number): { rowPx: number; gapPx: number } {
+function rowGeometry(rows: number): { rowPx: number; pitchPx: number } {
   const gapPx = rows <= 8 ? 1 : 0;
   const available = MINIMAP_HEIGHT_PX - Math.max(0, rows - 1) * gapPx;
   const rowPx = Math.max(1, Math.min(MAX_ROW_PX, Math.floor(available / rows)));
-  return { rowPx, gapPx };
+  const pitchPx = rows > 1 ? Math.min(rowPx + gapPx, (MINIMAP_HEIGHT_PX - rowPx) / (rows - 1)) : 0;
+  return { rowPx, pitchPx };
 }
 
 type Props = {
@@ -71,7 +77,7 @@ type Props = {
 export function RunMinimap({ minimap, hoveredStepId }: Props): JSX.Element | null {
   if (!minimap.marks.length) return null;
 
-  const { rowPx, gapPx } = laneGeometry(minimap.rows);
+  const { rowPx, pitchPx } = rowGeometry(minimap.rows);
 
   return (
     <div
@@ -81,7 +87,7 @@ export function RunMinimap({ minimap, hoveredStepId }: Props): JSX.Element | nul
       role="img"
       aria-label={`Overview of the run: ${minimap.marks.length} ${
         minimap.marks.length === 1 ? 'step' : 'steps'
-      } across ${minimap.rows} concurrent ${minimap.rows === 1 ? 'lane' : 'lanes'}`}
+      }`}
     >
       {/* The run's own extent, under everything.
        *
@@ -113,7 +119,7 @@ export function RunMinimap({ minimap, hoveredStepId }: Props): JSX.Element | nul
           style={{
             left: `${mark.startPercent}%`,
             width: `${mark.widthPercent}%`,
-            top: mark.row * (rowPx + gapPx),
+            top: mark.row * pitchPx,
             height: rowPx,
           }}
           title={mark.recovered ? `${mark.name} — failed, then recovered` : mark.name}
@@ -123,9 +129,8 @@ export function RunMinimap({ minimap, hoveredStepId }: Props): JSX.Element | nul
   );
 }
 
-/** "12 steps · 3 at once · 1.3s" — what the map is, in one line. */
+/** "12 steps · 1.3s" — what the map is, in one line. */
 export function minimapSummary(minimap: Minimap, totalMs: number): string {
   const steps = `${minimap.marks.length} step${minimap.marks.length === 1 ? '' : 's'}`;
-  const lanes = minimap.rows > 1 ? ` · up to ${minimap.rows} at once` : '';
-  return `${steps}${lanes} · ${formatDuration(totalMs)}`;
+  return `${steps} · ${formatDuration(totalMs)}`;
 }
