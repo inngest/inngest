@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { generateBarSegments } from './Timeline';
 import { FIXTURES } from './canvas/__fixtures__/index';
 import { planCollapse } from './canvas/collapse';
 import { toCanvasGraph } from './canvas/graph';
@@ -76,6 +77,48 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
     expect(minimap.rows).toBeGreaterThanOrEqual(1);
     if (minimap.marks.length > 0) {
       expect(minimap.rows).toBeLessThanOrEqual(minimap.marks.length);
+    }
+  });
+
+  it('draws a waiting lead-in on the Run row only when it says one is there', () => {
+    // The bar and its own label have to agree. This broke because the root fell
+    // through to the synthesised "total minus what the children executed"
+    // figure: `chains` drew 86% of a continuously-busy run as waiting directly
+    // above steps drawn as executing over the very same interval, while its
+    // label said `+100ms queued`.
+    const { data } = viewsOf(fixture);
+    const root = data.bars[0];
+    if (!root?.isRoot) return;
+
+    const segments = generateBarSegments(root);
+    const waiting = segments?.filter((s) => s.style === 'timing.waiting') ?? [];
+    if (!root.delayMs) {
+      expect(waiting, `${id}: Run row draws a wait it does not name`).toHaveLength(0);
+    }
+  });
+
+  it('never draws a discovery over a span already on screen', () => {
+    // The characteristic bug of this view is the same interval drawn twice. A
+    // discovery span is usually the parent of what it planned, and the run's
+    // trailing one *is* the finalization span, so without this the Planning row
+    // sits directly on top of an identical bar one row below.
+    const { data } = viewsOf(fixture);
+    const planning = data.bars[0]?.children?.find((b) => b.id === 'run-discovery');
+    if (!planning) return;
+
+    const drawn = new Set<string>();
+    const walk = (bars: typeof data.bars) => {
+      for (const bar of bars) {
+        if (bar.id !== 'run-discovery') drawn.add(bar.id);
+        walk(bar.children ?? []);
+      }
+    };
+    walk(data.bars);
+
+    for (const segment of planning.segments ?? []) {
+      // `discovery-<spanID>-<i>`.
+      const spanID = segment.id.slice('discovery-'.length, segment.id.lastIndexOf('-'));
+      expect(drawn.has(spanID), `${id}: discovery ${spanID} is already a bar`).toBe(false);
     }
   });
 });

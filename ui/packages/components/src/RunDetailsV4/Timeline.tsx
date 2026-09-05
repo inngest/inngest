@@ -350,27 +350,39 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
   //
   // What is actually true of the run, and all that is claimed here: it was
   // queued for `delayMs`, and then it was running.
-  if (bar.isRoot && bar.endTime && bar.delayMs !== undefined) {
+  // This branch is exclusive: the root NEVER continues on to the breakdown
+  // below, whatever it finds here. Guarding the breakdown instead left two ways
+  // through — a clamped bar whose `delayMs` had been reclaimed into the label,
+  // and a still-running root with no `endTime` — and both drew the synthesised
+  // figure as a lead-in. `chains` came out as 86% waiting, `cancelled` 99.997%,
+  // each directly above steps drawn as executing over the same interval.
+  //
+  // Returning nothing is not a gap: it gives the row one solid bar, which is
+  // exactly what a run with nothing to say about its queue time should look
+  // like. The queued portion is reported as text on the row either way.
+  if (bar.isRoot) {
+    if (!bar.endTime || !bar.delayMs || bar.delayMs <= 0) return undefined;
+
     const spanMs = bar.endTime.getTime() - bar.startTime.getTime();
-    if (spanMs > 0 && bar.delayMs > 0) {
-      const waitPercent = (bar.delayMs / spanMs) * 100;
-      return [
-        {
-          id: `${bar.id}-seg-run-queued`,
-          startPercent: 0,
-          widthPercent: waitPercent,
-          style: 'timing.waiting',
-          status: bar.status,
-        },
-        {
-          id: `${bar.id}-seg-run-running`,
-          startPercent: waitPercent,
-          widthPercent: 100 - waitPercent,
-          style: 'root',
-          status: bar.status,
-        },
-      ];
-    }
+    if (spanMs <= 0) return undefined;
+
+    const waitPercent = (bar.delayMs / spanMs) * 100;
+    return [
+      {
+        id: `${bar.id}-seg-run-queued`,
+        startPercent: 0,
+        widthPercent: waitPercent,
+        style: 'timing.waiting',
+        status: bar.status,
+      },
+      {
+        id: `${bar.id}-seg-run-running`,
+        startPercent: waitPercent,
+        widthPercent: 100 - waitPercent,
+        style: 'root',
+        status: bar.status,
+      },
+    ];
   }
 
   if (!bar.timingBreakdown) return undefined;

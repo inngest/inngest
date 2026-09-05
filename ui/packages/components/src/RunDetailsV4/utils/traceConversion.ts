@@ -817,14 +817,33 @@ function markInterrupted(bars: TimelineBarData[], runEndedAt: Date | null): Time
   return walk(bars);
 }
 
-/** Every step actually drawn, so a discovery can be checked against them. */
-function collectStepSpans(bars: TimelineBarData[]): Array<{ startMs: number; endMs: number }> {
-  const out: Array<{ startMs: number; endMs: number }> = [];
+/**
+ * Every row already drawn on its own line, so a discovery can be checked
+ * against them.
+ *
+ * Two things differ from how bars are filtered everywhere else, both because
+ * the question here is different. Everywhere else asks "is this a step?", which
+ * decides lanes and counts. This asks "does anything already account for this
+ * interval?", which decides whether drawing it a second time is a duplication.
+ *
+ * So platform rows are INCLUDED — the run's trailing discovery *is* the
+ * finalization span, and once Finalization was marked as platform it stopped
+ * being covered and appeared in both rows at once, a grey Planning bar sitting
+ * directly on top of an identical Finalization bar.
+ *
+ * And the extent is the bar's whole drawn extent rather than just its execution.
+ * A discovery inside a step's queue wait is still underneath a bar the eye can
+ * see. This does not extend anything or restate any duration — it only decides
+ * what not to draw twice.
+ */
+function collectStepSpans(
+  bars: TimelineBarData[]
+): Array<{ id: string; startMs: number; endMs: number }> {
+  const out: Array<{ id: string; startMs: number; endMs: number }> = [];
   const walk = (list: TimelineBarData[]) => {
     for (const bar of list) {
-      if (!bar.isRoot && !bar.isPlatform && bar.endTime) {
-        const started = bar.startTime.getTime() + (bar.delayMs ?? 0);
-        out.push({ startMs: started, endMs: bar.endTime.getTime() });
+      if (!bar.isRoot && bar.endTime) {
+        out.push({ id: bar.id, startMs: bar.startTime.getTime(), endMs: bar.endTime.getTime() });
       }
       if (bar.children?.length) walk(bar.children);
     }
@@ -866,9 +885,18 @@ function withDiscoveryRow(
   // request that came back with nothing. Those are the ones occupying time
   // nothing else accounts for.
   const stepSpans = collectStepSpans(bars);
+  const drawnIDs = new Set(stepSpans.map((s) => s.id));
   const uncovered = timed.filter((d) => {
     const span = d.endMs - d.startMs;
     if (span <= 0) return false;
+
+    // A discovery whose span is literally a bar on screen is that bar. On
+    // t19-parallel three of the five "discoveries" carry the same spanIDs as
+    // steps a, b and c, and the overlap test below let them through because it
+    // compared a step's execution against a span that also covers its wait.
+    // Identity is exact where overlap is a guess, so it goes first.
+    if (drawnIDs.has(d.spanID)) return false;
+
     return !stepSpans.some((s) => {
       const overlap = Math.min(d.endMs, s.endMs) - Math.max(d.startMs, s.startMs);
       return overlap / span > 0.7;
