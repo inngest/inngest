@@ -200,6 +200,9 @@ export interface TimelineBarProps {
   /** A short faded aside next to the name. */
   note?: string;
 
+  /** The step was cut off rather than finishing; its duration is a floor. */
+  interrupted?: boolean;
+
   /** Reports the pointer entering or leaving this row, for the other views. */
   onHoverChange?: (hovered: boolean) => void;
 
@@ -376,6 +379,12 @@ export interface TimelineBarData {
    * having two concurrent lanes.
    */
   isPlatform?: boolean;
+
+  /**
+   * The step never finished, and the run it was in has ended — so its bar is
+   * clamped to the run and its duration is a floor, not a measurement.
+   */
+  interrupted?: boolean;
 
   /** Whether this bar represents the root run (clicking shows TopInfo) */
   isRoot?: boolean;

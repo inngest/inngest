@@ -865,6 +865,7 @@ export function TimelineBar({
   hovered,
   onHoverChange,
   note,
+  interrupted,
   badgeGutter = true,
   children,
   orgName,
@@ -1020,6 +1021,10 @@ export function TimelineBar({
             )}
           >
             {formatDuration(duration)}
+            {/* A floor, not a measurement: this step never finished, so the
+                number says how long it had run when the run ended. Naming that
+                beats a bare number the reader would take as a duration. */}
+            {interrupted && <span className="text-light ml-1">cut short</span>}
           </span>
         </div>
 

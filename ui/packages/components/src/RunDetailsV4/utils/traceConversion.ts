@@ -711,10 +711,13 @@ export function traceToTimelineData(
   return {
     minTime,
     maxTime,
-    bars: withDiscoveryRow(
-      withRunNote(clampToRunStart(bars, drawQueueDelay ? null : minTime), runQueueDelayMs),
-      trace.discoveries ?? null,
-      minTime
+    bars: markInterrupted(
+      withDiscoveryRow(
+        withRunNote(clampToRunStart(bars, drawQueueDelay ? null : minTime), runQueueDelayMs),
+        trace.discoveries ?? null,
+        minTime
+      ),
+      trace.endedAt ? new Date(trace.endedAt) : null
     ),
     leftWidth,
     orgName,
@@ -760,6 +763,41 @@ export function traceToTimelineData(
  * absent no row appears, which is the honest result — we do not know, so we do
  * not draw.
  */
+/**
+ * A step that never finished, in a run that did.
+ *
+ * `calculateDuration` measures an unfinished span against *now*, which is right
+ * for a run still in flight and a lie for one that ended. On `cancelled` the
+ * open `waitForEvent` reported **29 minutes** on a run that was cancelled after
+ * 35 seconds, and the number grew every time the page was opened.
+ *
+ * What is true: the wait ran until the run was cancelled, and then stopped
+ * without completing. So the bar ends where the run ended, and the row says the
+ * duration was cut short rather than presenting it as a measurement. This is
+ * Terraform's `(known after apply)` rule — a token where the value would be,
+ * never a silent gap and never a fabricated number.
+ *
+ * A run still in flight is left alone: there, measuring against now is correct.
+ */
+function markInterrupted(bars: TimelineBarData[], runEndedAt: Date | null): TimelineBarData[] {
+  if (!runEndedAt) return bars;
+  const end = runEndedAt.getTime();
+
+  const walk = (list: TimelineBarData[]): TimelineBarData[] =>
+    list.map((bar) => {
+      const children = bar.children ? walk(bar.children) : undefined;
+      if (bar.isRoot || bar.endTime) return { ...bar, children };
+      return {
+        ...bar,
+        endTime: new Date(Math.max(end, bar.startTime.getTime())),
+        interrupted: true,
+        children,
+      };
+    });
+
+  return walk(bars);
+}
+
 /** Every step actually drawn, so a discovery can be checked against them. */
 function collectStepSpans(bars: TimelineBarData[]): Array<{ startMs: number; endMs: number }> {
   const out: Array<{ startMs: number; endMs: number }> = [];
