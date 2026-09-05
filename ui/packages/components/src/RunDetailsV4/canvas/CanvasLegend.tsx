@@ -77,7 +77,10 @@ export function CanvasLegend() {
                 </td>
                 <td className="text-basis whitespace-nowrap align-middle leading-none">Junction</td>
                 <td className="text-muted align-middle leading-snug">
-                  Where the run splits or rejoins.
+                  Where the run splits or rejoins, and which branch followed which was not reported.
+                  Lines through a junction show only that one group ended before the other began.
+                  Where the SDK does report it, the steps are joined directly and there is no
+                  junction.
                 </td>
               </tr>
             </tbody>

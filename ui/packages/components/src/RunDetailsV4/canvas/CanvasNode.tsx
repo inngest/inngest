@@ -412,7 +412,15 @@ export function CanvasJoinNode({ data, selected }: NodeProps<Node<CanvasNodeData
             shape.from
           )} finished, so Inngest carried on with a single request rather than ${shape.from}.`
       : shape?.direction === 'both'
-      ? `${steps(shape.from)} finished, and Inngest started ${steps(shape.to)} in parallel.`
+      ? // The one that invites a false reading. A junction exists precisely
+        // BECAUSE the SDK did not report which branch fed which — where it did,
+        // the graph draws direct edges and no junction at all. Read literally,
+        // the lines through here say every step above feeds every step below,
+        // and on `chains` that turns two independent chains into a lattice. So
+        // the popover says outright what the lines cannot.
+        `${steps(shape.from)} finished, and Inngest started ${steps(shape.to)} in parallel. ` +
+        `Which of them followed which was not reported, so the lines through here ` +
+        `show only that one group ended before the other began.`
       : `Inngest started ${steps(shape?.to ?? 0)} in parallel.`;
 
   return (
