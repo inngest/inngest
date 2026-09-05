@@ -203,17 +203,31 @@ function FixtureView({
   // The gallery has no server, so a child run is resolved from the fixture set:
   // `invoke` and `child` were captured as a pair for exactly this. Real apps
   // supply a loader that fetches the run.
-  const loadChildRun = useCallback(
-    async (childRunID: string) => {
+  const childTrace = useCallback(
+    (childRunID: string) => {
       const candidate = fixtures.find(
         (f) =>
           (f.data.run.trace as Trace).spanID === childRunID || f.id === 'child',
       );
-      if (!candidate) return null;
-      const rolled = traceRollup(candidate.data.run.trace as Trace);
-      return traceToTimelineData(rolled, { runID: childRunID }).bars;
+      return candidate ? traceRollup(candidate.data.run.trace as Trace) : null;
     },
     [fixtures],
+  );
+
+  const loadChildRun = useCallback(
+    async (childRunID: string) => {
+      const rolled = childTrace(childRunID);
+      if (!rolled) return null;
+      return traceToTimelineData(rolled, { runID: childRunID }).bars;
+    },
+    [childTrace],
+  );
+
+  // The canvas wants the child's trace rather than its rows — it builds the
+  // child's own graph from it and draws that inside the invoke node.
+  const loadChildTrace = useCallback(
+    async (childRunID: string) => childTrace(childRunID),
+    [childTrace],
   );
 
   const rows = countBars(
@@ -288,7 +302,7 @@ function FixtureView({
         </ul>
       )}
 
-      <Canvas trace={rolledUp} runID={runID} />
+      <Canvas trace={rolledUp} runID={runID} loadChildRun={loadChildTrace} />
 
       <div className="border-muted border-t pt-2">
         <div className="flex justify-end pb-1">

@@ -13,6 +13,7 @@
  */
 import { useState } from 'react';
 import {
+  RiArrowDownSLine,
   RiArrowRightSLine,
   RiCheckboxCircleFill,
   RiCloseCircleFill,
@@ -34,7 +35,8 @@ import { getStatusBorderClass, getStatusTextClass } from '../../Status/statusCla
 import { cn } from '../../utils/classNames';
 import { formatDuration } from '../runDetailsUtils';
 import { groupTitle, type CanvasGroup, type CollapseException } from './collapse';
-import { LAYOUT, type CanvasNodeData } from './toFlowElements';
+import type { CanvasGraph } from './graph.types';
+import { LAYOUT, invokeOpenHeight, type CanvasNodeData } from './toFlowElements';
 
 /** One icon per step type, so the shape of a run is readable at a glance. */
 const STEP_TYPE_ICON = {
@@ -158,8 +160,13 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
     ? NEUTRAL.text
     : getStatusTextClass(data.status);
 
+  const childOpen = data.childOpen === true;
+  // The same function the layout used to reserve the room, so the box the node
+  // draws and the space the graph left for it are one number, not two guesses.
+  const height = childOpen ? invokeOpenHeight(data.childGraph?.levels.length) : LAYOUT.nodeHeight;
+
   return (
-    <div className="relative" style={{ width: LAYOUT.nodeWidth, height: LAYOUT.nodeHeight }}>
+    <div className="relative" style={{ width: LAYOUT.nodeWidth, height }}>
       {/* A batch is drawn as a stack of cards rather than as N separate nodes. */}
       {isEvent && (data.batchSize ?? 0) > 1 && (
         <>
@@ -170,7 +177,8 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
 
       <div
         className={cn(
-          'absolute inset-0 flex flex-col justify-center gap-0.5 px-3 py-1.5 transition-all',
+          'absolute inset-0 flex flex-col gap-0.5 px-3 py-1.5 transition-all',
+          childOpen ? 'justify-start' : 'justify-center',
           isEvent || isResult ? 'rounded-full' : 'rounded-md',
           // Waits are dashed, echoing the timeline's vertical-lines pattern for
           // sleep / waitForEvent / invoke bars.
@@ -204,6 +212,28 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
               #{data.duplicateIndex}
             </span>
           ) : null}
+
+          {/* An invoke started another run, and that run is the answer to what
+              the invoke did. Shown inside this node rather than only behind a
+              link, so following it does not cost the reader their place. */}
+          {data.onToggleChild && data.childRunID ? (
+            <button
+              type="button"
+              aria-expanded={childOpen}
+              aria-label={childOpen ? 'Hide the invoked run' : 'Show the invoked run'}
+              className="text-muted hover:text-basis ml-auto shrink-0 rounded p-0.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                data.onToggleChild?.(data.id);
+              }}
+            >
+              {childOpen ? (
+                <RiArrowDownSLine className="h-3.5 w-3.5" />
+              ) : (
+                <RiArrowRightSLine className="h-3.5 w-3.5" />
+              )}
+            </button>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-1.5 overflow-hidden text-[10px] leading-none">
@@ -228,8 +258,113 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
           )}
         </div>
 
+        {childOpen && (
+          <ChildRunRegion
+            childRunID={data.childRunID ?? ''}
+            graph={data.childGraph}
+            loading={data.childLoading === true}
+            onOpenRun={data.onOpenChildRun}
+          />
+        )}
+
         <Handle type="source" position={Position.Right} className={HANDLE} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The run an invoke started, drawn inside the invoke.
+ *
+ * Deliberately not a second canvas. A nested pan-and-zoom surface inside a node
+ * competes with the one it sits in — two scroll targets under one pointer — so
+ * the child is drawn as its levels: a row of pills per level. It reads as the
+ * same shape as the graph around it, at a size that fits.
+ *
+ * The dashed border and the header are the point of the whole thing: this is a
+ * DIFFERENT RUN, and nothing here should let a reader take its steps for the
+ * ones belonging to the run they are looking at. "Open" stays available, because
+ * this is a preview rather than a replacement for the child's own page.
+ */
+function ChildRunRegion({
+  childRunID,
+  graph,
+  loading,
+  onOpenRun,
+}: {
+  childRunID: string;
+  graph?: CanvasGraph | null;
+  loading: boolean;
+  onOpenRun?: (childRunID: string) => void;
+}) {
+  return (
+    <div
+      className="border-muted bg-canvasSubtle mt-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-dashed"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="border-muted flex shrink-0 items-center gap-1 border-b border-dashed px-1.5 py-1">
+        <span className="text-muted text-[9px] uppercase tracking-wide">invoked run</span>
+        {onOpenRun && (
+          <button
+            type="button"
+            className="text-muted hover:text-basis ml-auto shrink-0 text-[9px] underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenRun(childRunID);
+            }}
+          >
+            open
+          </button>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-auto px-1.5 py-1">
+        {loading ? (
+          <p className="text-muted text-[10px]">Loading…</p>
+        ) : graph === null ? (
+          // Never a blank region: not knowing is a fact about the run, and is
+          // said outright rather than left as an empty box.
+          <p className="text-muted text-[10px]">Could not load this run.</p>
+        ) : !graph ? (
+          <p className="text-muted text-[10px]">Nothing loaded.</p>
+        ) : (
+          <ChildLevels graph={graph} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** The child's levels as rows of pills — the same shape, small enough to fit. */
+function ChildLevels({ graph }: { graph: CanvasGraph }) {
+  const byID = new Map(graph.nodes.map((n) => [n.id, n]));
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {graph.levels.map((ids, level) => {
+        const nodes = ids.flatMap((id) => byID.get(id) ?? []);
+        if (!nodes.length) return null;
+        return (
+          <div key={level} className="flex items-center gap-1">
+            {level > 0 && <span className="text-muted shrink-0 text-[8px] leading-none">↳</span>}
+            <div className="flex min-w-0 flex-wrap items-center gap-1">
+              {nodes.map((node) => (
+                <span
+                  key={node.id}
+                  title={node.label}
+                  className={cn(
+                    'truncate rounded-sm border px-1 py-px text-[9px] leading-tight',
+                    getStatusBorderClass(node.status),
+                    getStatusTextClass(node.status)
+                  )}
+                >
+                  {node.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

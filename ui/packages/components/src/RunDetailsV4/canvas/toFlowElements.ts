@@ -32,6 +32,20 @@ export const LAYOUT = {
   /** A group node carries a count, a variant line and a sparkline. */
   groupHeight: 72,
   joinWidth: 22,
+  /**
+   * An invoke node with the run it started opened inside it.
+   *
+   * Sized to the child's depth between these bounds, so a two-step child does
+   * not sit in a mostly-empty box and a deep one scrolls inside its own region
+   * rather than pushing the graph around without limit. The child is a
+   * different run and stays inside a border that says so.
+   */
+  invokeOpenMinHeight: 96,
+  invokeOpenMaxHeight: 190,
+  /** Header, border and padding around the child's levels. */
+  invokeChrome: 44,
+  /** One level of the child's graph. */
+  invokeLevelHeight: 17,
 } as const;
 
 export type CanvasNodeData = CanvasNode & {
@@ -43,22 +57,70 @@ export type CanvasNodeData = CanvasNode & {
   group?: CanvasGroup;
   /** Opens this group, so its members are drawn individually. */
   onExpandGroup?: (groupID: string) => void;
+  /** True when this invoke is showing the run it started, inside itself. */
+  childOpen?: boolean;
+  /** The child run's own graph, once fetched. `null` means it could not load. */
+  childGraph?: CanvasGraph | null;
+  /** True between the disclosure being opened and the child arriving. */
+  childLoading?: boolean;
+  /** Opens or closes the child run inside this node. */
+  onToggleChild?: (nodeID: string) => void;
+  /** Leaves this run for the child's own page — the escape, not the only path. */
+  onOpenChildRun?: (childRunID: string) => void;
   [key: string]: unknown;
 };
 
-function heightOf(node: CanvasNode): number {
+/**
+ * How tall an invoke grows to hold the run it started.
+ *
+ * Exported because the node renders itself at this height and the layout
+ * reserves the room for it before that happens. Two independent guesses would
+ * drift and the child would either be clipped or float in an empty box.
+ */
+export function invokeOpenHeight(childLevels: number | undefined): number {
+  const levels = childLevels ?? 2;
+  return Math.max(
+    LAYOUT.invokeOpenMinHeight,
+    Math.min(
+      LAYOUT.invokeOpenMaxHeight,
+      LAYOUT.nodeHeight + LAYOUT.invokeChrome + levels * LAYOUT.invokeLevelHeight
+    )
+  );
+}
+
+function heightOf(
+  node: CanvasNode,
+  openChildren?: ReadonlySet<string>,
+  childGraphs?: ReadonlyMap<string, CanvasGraph | null>
+): number {
   if (node.kind === 'join') return LAYOUT.joinWidth;
   if (node.kind === 'group') return LAYOUT.groupHeight;
+
+  // An open invoke holds another run inside it, so it needs the room BEFORE
+  // layout runs — otherwise the child draws over whatever is in the lane below.
+  // The child's depth is already known here, so the box is sized to it rather
+  // than to a guess, between bounds that keep the reflow predictable.
+  if (openChildren?.has(node.id)) {
+    const child = node.childRunID ? childGraphs?.get(node.childRunID) : undefined;
+    return invokeOpenHeight(child?.levels.length);
+  }
+
   return LAYOUT.nodeHeight;
 }
 
-function position(node: CanvasNode, laneMid: number, xAt: (level: number) => number) {
+function position(
+  node: CanvasNode,
+  laneMid: number,
+  xAt: (level: number) => number,
+  openChildren?: ReadonlySet<string>,
+  childGraphs?: ReadonlyMap<string, CanvasGraph | null>
+) {
   // Centre each level on the middle of its own lane range. Lanes are fractional
   // once nodes have been pulled onto their children's average lane, so this
   // cannot be derived from a simple count.
   const offset = laneMid * LAYOUT.laneGap;
   const width = node.kind === 'join' ? LAYOUT.joinWidth : LAYOUT.nodeWidth;
-  const height = heightOf(node);
+  const height = heightOf(node, openChildren, childGraphs);
   return {
     // Centre nodes of differing widths/heights on the level axis, so a join
     // circle sits on the same centre line as the wide nodes either side of it.
@@ -75,7 +137,15 @@ export function toFlowElements(
     onExpandGroup: (groupID: string) => void;
   },
   /** Span hovered anywhere in this run — here, or in a row below. */
-  hoveredSpanID?: string
+  hoveredSpanID?: string,
+  /** Invoke nodes currently showing the run they started, inside themselves. */
+  children?: {
+    open: ReadonlySet<string>;
+    graphs: ReadonlyMap<string, CanvasGraph | null>;
+    loading: ReadonlySet<string>;
+    onToggle: (nodeID: string) => void;
+    onOpenRun?: (childRunID: string) => void;
+  }
 ): { nodes: Node<CanvasNodeData>[]; edges: Edge[] } {
   const byID = new Map(graph.nodes.map((n) => [n.id, n]));
   const laneMids = graph.levels.map((ids) => {
@@ -114,9 +184,10 @@ export function toFlowElements(
   const junctions = graph.nodes.filter((node) => node.kind === 'join');
 
   const nodes: Node<CanvasNodeData>[] = steps.map((node) => {
-    const pos = position(node, laneMids[node.level] ?? 0, xAt);
+    const pos = position(node, laneMids[node.level] ?? 0, xAt, children?.open, children?.graphs);
     placed.set(node.id, pos);
     const group = collapse?.groupByNodeID.get(node.id);
+    const childRunID = node.childRunID ?? undefined;
     return {
       id: node.id,
       type: node.kind === 'group' ? 'canvasGroup' : 'canvasStep',
@@ -125,6 +196,15 @@ export function toFlowElements(
         ...node,
         hovered: hoveredSpanID !== undefined && node.spanID === hoveredSpanID,
         ...(group ? { group, onExpandGroup: collapse?.onExpandGroup } : {}),
+        ...(children && childRunID
+          ? {
+              childOpen: children.open.has(node.id),
+              childGraph: children.graphs.get(childRunID),
+              childLoading: children.loading.has(childRunID),
+              onToggleChild: children.onToggle,
+              onOpenChildRun: children.onOpenRun,
+            }
+          : {}),
       },
       draggable: false,
       connectable: false,
@@ -136,7 +216,7 @@ export function toFlowElements(
       // Declared up front so the initial fitView has real dimensions to work
       // with; without these it fits against zero-sized nodes and overflows.
       width: LAYOUT.nodeWidth,
-      height: heightOf(node),
+      height: heightOf(node, children?.open, children?.graphs),
     };
   });
 

@@ -32,7 +32,7 @@ import { CanvasLegend } from './CanvasLegend';
 import { CANVAS_NODE_TYPES } from './CanvasNode';
 import { applyCollapse, planCollapse, shouldAggregate } from './collapse';
 import { toCanvasGraph } from './graph';
-import type { CanvasTrigger } from './graph.types';
+import type { CanvasGraph, CanvasTrigger } from './graph.types';
 import { toFlowElements, type CanvasNodeData } from './toFlowElements';
 
 export type CanvasViewMode = 'aggregated' | 'expanded';
@@ -48,6 +48,17 @@ type Props = {
    * nothing left to expand into.
    */
   expanded?: boolean;
+  /**
+   * Fetches the run a `step.invoke` started, so it can be shown inside the
+   * invoke node rather than only behind a link.
+   *
+   * Called only when a node is actually opened, and once per child. Omit it and
+   * invoke nodes carry no disclosure at all — an affordance that does nothing is
+   * worse than none.
+   */
+  loadChildRun?: (childRunID: string) => Promise<Trace | null>;
+  /** Leaves this run for the child's own page. */
+  onOpenChildRun?: (childRunID: string) => void;
 };
 
 const FIT_OPTIONS = { padding: 0.14, maxZoom: 1.2 } as const;
@@ -108,7 +119,7 @@ function ExpandedCanvas({ onClose, ...props }: Props & { onClose: () => void }) 
   );
 }
 
-function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
+function CanvasInner({ trace, runID, getTrigger, expanded, loadChildRun, onOpenChildRun }: Props) {
   const paneRef = useRef<HTMLDivElement>(null);
   const [showExpanded, setShowExpanded] = useState(false);
 
@@ -182,9 +193,79 @@ function CanvasInner({ trace, runID, getTrigger, expanded }: Props) {
     [groupByNodeID, expandGroup]
   );
 
+  // A `step.invoke` started another run, and that run is the answer to what the
+  // invoke did. It is fetched only when someone opens it — a tree of invokes
+  // must not pull the world down on first paint — and kept for the life of the
+  // view once it arrives.
+  const [openChildren, setOpenChildren] = useState<ReadonlySet<string>>(new Set());
+  const [childGraphs, setChildGraphs] = useState<ReadonlyMap<string, CanvasGraph | null>>(
+    new Map()
+  );
+  const [loadingChildren, setLoadingChildren] = useState<ReadonlySet<string>>(new Set());
+
+  const toggleChild = useCallback(
+    (nodeID: string) => {
+      const node = shown.nodes.find((n) => n.id === nodeID);
+      const childRunID = node?.childRunID;
+      if (!childRunID) return;
+
+      setOpenChildren((open) => {
+        const next = new Set(open);
+        if (next.has(nodeID)) {
+          next.delete(nodeID);
+          return next;
+        }
+        next.add(nodeID);
+        return next;
+      });
+
+      // Fetch once. A second open of the same child reuses what came back,
+      // including a failure — retrying silently on every toggle would hammer a
+      // run that is genuinely gone.
+      if (!loadChildRun || childGraphs.has(childRunID)) return;
+
+      setLoadingChildren((l) => new Set(l).add(childRunID));
+      void loadChildRun(childRunID)
+        .then((childTrace) => {
+          setChildGraphs((g) =>
+            new Map(g).set(childRunID, childTrace ? toCanvasGraph(childTrace) : null)
+          );
+        })
+        .catch(() => {
+          setChildGraphs((g) => new Map(g).set(childRunID, null));
+        })
+        .finally(() => {
+          setLoadingChildren((l) => {
+            const next = new Set(l);
+            next.delete(childRunID);
+            return next;
+          });
+        });
+    },
+    [shown, loadChildRun, childGraphs]
+  );
+
+  const children = useMemo(
+    () =>
+      // Depth-capped at one. The preview inside a node shows the child's shape,
+      // not its children's — a tree of invokes drawn inside itself is neither
+      // readable nor bounded. "Open" takes the reader to the child's own page,
+      // where its invokes expand in turn.
+      loadChildRun
+        ? {
+            open: openChildren,
+            graphs: childGraphs,
+            loading: loadingChildren,
+            onToggle: toggleChild,
+            onOpenRun: onOpenChildRun,
+          }
+        : undefined,
+    [loadChildRun, openChildren, childGraphs, loadingChildren, toggleChild, onOpenChildRun]
+  );
+
   const { nodes, edges } = useMemo(
-    () => toFlowElements(shown, selectedSpanID, collapse, hoveredSpanID),
-    [shown, selectedSpanID, collapse, hoveredSpanID]
+    () => toFlowElements(shown, selectedSpanID, collapse, hoveredSpanID, children),
+    [shown, selectedSpanID, collapse, hoveredSpanID, children]
   );
 
   const traceMap = useMemo(() => {

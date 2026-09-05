@@ -836,3 +836,34 @@ Two more invariants across all 44 fixtures, so neither comes back by eye:
 - every segment it draws has something to say for itself.
 
 889 tests.
+
+## Item F (canvas half) — an invoke shows the run it started
+
+The timeline half has worked for a while: `loadChildRun` gives an invoke row indented child rows on
+the same axis. The canvas half was the one thing on the original list never built at all.
+
+An invoke node now carries a disclosure. Opened, a dashed region inside the node holds the child's
+own graph, headed `INVOKED RUN`, with `open` alongside it to leave for the child's own page.
+
+Three decisions worth recording:
+
+- **Not a second canvas.** A nested pan-and-zoom surface inside a node competes with the one it sits
+  in — two scroll targets under one pointer. The child is drawn as its levels instead: a row of
+  pills per level, `↳` between. It reads as the same shape as the graph around it at a size that
+  fits, and it costs nothing.
+- **Depth-capped at one.** The preview shows the child's shape, not its children's. A tree of
+  invokes drawn inside itself is neither readable nor bounded, and `open` is the way down.
+- **The height is one number, computed once.** `invokeOpenHeight` is exported and used by both the
+  layout, which reserves the room before React renders anything, and the node, which draws into it.
+  Two independent guesses would drift and the child would be either clipped or floating in an empty
+  box. The first attempt did exactly that — `height: '100%'` against React Flow's auto-height
+  wrapper collapsed the node to a sliver — and the test that now guards it asserts the two agree.
+
+Fetched only on open, once per child, and a failure is kept rather than retried on every toggle: a
+run that is genuinely gone should not be hammered. Not-knowing is stated in the region rather than
+left as an empty box.
+
+Vite served stale modules a **third** time here, again on a new export imported from two places, and
+again cost a debugging cycle chasing a rendering bug that no longer existed. Lesson 16 stands.
+
+896 tests.
