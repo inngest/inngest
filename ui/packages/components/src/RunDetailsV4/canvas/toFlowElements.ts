@@ -78,7 +78,7 @@ export type CanvasNodeData = CanvasNode & {
  * drift and the child would either be clipped or float in an empty box.
  */
 export function invokeOpenHeight(childLevels: number | undefined): number {
-  const levels = childLevels ?? 2;
+  const levels = childLevels ?? 1;
   return Math.max(
     LAYOUT.invokeOpenMinHeight,
     Math.min(
@@ -86,6 +86,24 @@ export function invokeOpenHeight(childLevels: number | undefined): number {
       LAYOUT.nodeHeight + LAYOUT.invokeChrome + levels * LAYOUT.invokeLevelHeight
     )
   );
+}
+
+/**
+ * Levels of the child that actually draw a row.
+ *
+ * The preview shows only the child's work — its Trigger and terminal node are
+ * structure, and drawing them put a second `Trigger` and a second `Completed`
+ * into a picture that already had one of each. Sizing on `levels.length` then
+ * reserved room for rows that are never drawn, leaving the box mostly empty.
+ */
+export function childPreviewRows(child: CanvasGraph): number {
+  const byID = new Map(child.nodes.map((n) => [n.id, n]));
+  return child.levels.filter((ids) =>
+    ids.some((id) => {
+      const n = byID.get(id);
+      return n?.kind === 'step' || n?.kind === 'wait' || n?.kind === 'invoke';
+    })
+  ).length;
 }
 
 function heightOf(
@@ -102,7 +120,7 @@ function heightOf(
   // than to a guess, between bounds that keep the reflow predictable.
   if (openChildren?.has(node.id)) {
     const child = node.childRunID ? childGraphs?.get(node.childRunID) : undefined;
-    return invokeOpenHeight(child?.levels.length);
+    return invokeOpenHeight(child ? childPreviewRows(child) : undefined);
   }
 
   return LAYOUT.nodeHeight;

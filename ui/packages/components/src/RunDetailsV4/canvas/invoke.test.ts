@@ -14,7 +14,7 @@ import { traceRollup } from '../utils/traceConversion';
 import child from './__fixtures__/child.json';
 import invoke from './__fixtures__/invoke.json';
 import { toCanvasGraph } from './graph';
-import { LAYOUT, invokeOpenHeight, toFlowElements } from './toFlowElements';
+import { LAYOUT, childPreviewRows, invokeOpenHeight, toFlowElements } from './toFlowElements';
 
 function graphOf(fixture: unknown) {
   return toCanvasGraph(traceRollup((fixture as { run: { trace: Trace } }).run.trace));
@@ -61,7 +61,7 @@ describe('an invoke that can be opened', () => {
     expect(node?.data.childGraph).toBe(childGraph);
 
     // The one invariant that matters: the layout reserved what the node draws.
-    expect(node?.height).toBe(invokeOpenHeight(childGraph.levels.length));
+    expect(node?.height).toBe(invokeOpenHeight(childPreviewRows(childGraph)));
     expect(node?.height).toBeGreaterThan(LAYOUT.nodeHeight);
   });
 

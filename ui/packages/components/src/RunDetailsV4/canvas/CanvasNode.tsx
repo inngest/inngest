@@ -36,7 +36,7 @@ import { cn } from '../../utils/classNames';
 import { formatDuration } from '../runDetailsUtils';
 import { groupTitle, type CanvasGroup, type CollapseException } from './collapse';
 import type { CanvasGraph } from './graph.types';
-import { LAYOUT, invokeOpenHeight, type CanvasNodeData } from './toFlowElements';
+import { LAYOUT, childPreviewRows, invokeOpenHeight, type CanvasNodeData } from './toFlowElements';
 
 /** One icon per step type, so the shape of a run is readable at a glance. */
 const STEP_TYPE_ICON = {
@@ -173,7 +173,9 @@ export function CanvasStepNode({ data, selected }: NodeProps<Node<CanvasNodeData
   const childOpen = data.childOpen === true;
   // The same function the layout used to reserve the room, so the box the node
   // draws and the space the graph left for it are one number, not two guesses.
-  const height = childOpen ? invokeOpenHeight(data.childGraph?.levels.length) : LAYOUT.nodeHeight;
+  const height = childOpen
+    ? invokeOpenHeight(data.childGraph ? childPreviewRows(data.childGraph) : undefined)
+    : LAYOUT.nodeHeight;
 
   return (
     <div className="relative" style={{ width: LAYOUT.nodeWidth, height }}>
@@ -314,6 +316,18 @@ function ChildRunRegion({
     >
       <div className="border-muted flex shrink-0 items-center gap-1 border-b border-dashed px-1.5 py-1">
         <span className="text-muted text-[9px] uppercase tracking-wide">invoked run</span>
+        {/* How the child ended, so the region has a headline of its own rather
+            than borrowing the second `Completed` node it used to draw. */}
+        {graph && (
+          <span
+            className={cn(
+              'shrink-0 text-[9px]',
+              getStatusTextClass(childOutcome(graph)?.status ?? 'UNKNOWN')
+            )}
+          >
+            {childOutcome(graph)?.label ?? ''}
+          </span>
+        )}
         {onOpenRun && (
           <button
             type="button"
@@ -346,32 +360,59 @@ function ChildRunRegion({
 }
 
 /** The child's levels as rows of pills — the same shape, small enough to fit. */
+/** How the child run ended, and how long it took, for the region's header. */
+function childOutcome(graph: CanvasGraph): { label: string; status: string } | null {
+  const terminal = graph.nodes.find((n) => n.kind === 'result');
+  if (!terminal) return null;
+
+  const took = durationOf(terminal as CanvasNodeData);
+  return {
+    label: took ? `${terminal.label} ${took}` : terminal.label,
+    status: terminal.status,
+  };
+}
+
 function ChildLevels({ graph }: { graph: CanvasGraph }) {
   const byID = new Map(graph.nodes.map((n) => [n.id, n]));
+
+  // Only the child's own WORK.
+  //
+  // Its Trigger and its terminal node are structure, and drawn here they put a
+  // second `Trigger` and a second `Completed` into a picture that already has
+  // one of each at a different visual weight — the reader has to work out which
+  // run each belongs to before they can read either. The region's own header
+  // already says whose run this is.
+  const work = (ids: string[]) =>
+    ids
+      .flatMap((id) => byID.get(id) ?? [])
+      .filter((n) => n.kind === 'step' || n.kind === 'wait' || n.kind === 'invoke');
 
   return (
     <div className="flex flex-col gap-0.5">
       {graph.levels.map((ids, level) => {
-        const nodes = ids.flatMap((id) => byID.get(id) ?? []);
+        const nodes = work(ids);
         if (!nodes.length) return null;
         return (
-          <div key={level} className="flex items-center gap-1">
-            {level > 0 && <span className="text-muted shrink-0 text-[8px] leading-none">↳</span>}
-            <div className="flex min-w-0 flex-wrap items-center gap-1">
-              {nodes.map((node) => (
+          <div key={level} className="flex min-w-0 flex-wrap items-center gap-1">
+            {nodes.map((node) => {
+              // The parent says `519ms`; without this nothing inside accounts
+              // for it, and accounting for it is the reason to open the thing.
+              const took = durationOf(node as CanvasNodeData);
+              return (
                 <span
                   key={node.id}
-                  title={node.label}
+                  title={took ? `${node.label} — ${took}` : node.label}
                   className={cn(
-                    'truncate rounded-sm border px-1 py-px text-[9px] leading-tight',
+                    'flex min-w-0 items-baseline gap-1 rounded-sm border px-1 py-px text-[9px] leading-tight',
                     getStatusBorderClass(node.status),
                     getStatusTextClass(node.status)
                   )}
                 >
-                  {node.label}
+                  <span className="min-w-0 truncate">{node.label}</span>
+                  {took && <span className="text-muted shrink-0 font-mono">{took}</span>}
                 </span>
-              ))}
-            </div>
+              );
+            })}
           </div>
         );
       })}
