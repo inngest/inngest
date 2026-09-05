@@ -123,6 +123,20 @@ export const BAR_STYLES: Record<BarStyleKey, BarStyle> = {
     labelFormat: 'default',
     textColor: 'text-light',
   },
+  //
+  // Time no span accounts for.
+  //
+  // Deliberately not called "processing", or latency, or queueing. It may be
+  // any of those — what is actually known is that nothing reported it, and a
+  // view whose value is that it does not invent should not start here. Drawn
+  // hollow so it reads as an absence rather than as work.
+  'timing.unaccounted': {
+    barColor: 'bg-surfaceMuted',
+    outlined: true,
+    statusBased: false,
+    labelFormat: 'default',
+    textColor: 'text-light',
+  },
   'timing.inngest': {
     barColor: 'bg-surfaceMuted',
     barHeight: 'short',
@@ -790,9 +804,18 @@ function ScoreHoverCardContent({ scores }: { scores: ScoreBadgeData[] }) {
 /** Separation between adjacent segments within one bar. */
 const SEGMENT_GAP_PX = 4;
 
+/**
+ * One height for everything.
+ *
+ * Three heights were meant to rank the kinds of bar, and what they actually did
+ * was make a row of adjacent segments look ragged — the eye reads the step up
+ * and down as well as along, and the variation carried no information the colour
+ * and the label were not already carrying. Kept as a map so a style can still
+ * ask for a height, but they all answer the same.
+ */
 const BAR_HEIGHT_CLASSES: Record<BarHeight, string> = {
-  thin: 'h-1',
-  short: 'h-2',
+  thin: 'h-3',
+  short: 'h-3',
   tall: 'h-3',
 };
 
@@ -1033,6 +1056,7 @@ export function TimelineBar({
   selected,
   hovered,
   onHoverChange,
+  barID,
   note,
   interrupted,
   platform,
@@ -1090,6 +1114,9 @@ export function TimelineBar({
       {/* Main row */}
       <div
         data-testid="timeline-bar-row"
+        // So the flow overlay can find this row's position after layout,
+        // whatever is expanded above it.
+        data-bar-id={barID}
         className="relative isolate flex cursor-pointer items-center"
         onMouseEnter={() => onHoverChange?.(true)}
         onMouseLeave={() => onHoverChange?.(false)}

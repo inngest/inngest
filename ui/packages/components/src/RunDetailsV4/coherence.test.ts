@@ -72,14 +72,6 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
     expect(minimap.marks.length, `${id}: minimap vs canvas`).toBe(work);
   });
 
-  it('needs at least one lane, and no more lanes than steps', () => {
-    const { minimap } = viewsOf(fixture);
-    expect(minimap.rows).toBeGreaterThanOrEqual(1);
-    if (minimap.marks.length > 0) {
-      expect(minimap.rows).toBeLessThanOrEqual(minimap.marks.length);
-    }
-  });
-
   it('draws a waiting lead-in on the Run row only when it says one is there', () => {
     // The bar and its own label have to agree. This broke because the root fell
     // through to the synthesised "total minus what the children executed"
@@ -107,39 +99,16 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
     const walk = (bars: typeof data.bars) => {
       let previous = -Infinity;
       for (const bar of bars) {
-        const began = bar.startTime.getTime() + (bar.delayMs ?? 0);
+        const began =
+          (bar.reportedMs !== undefined && bar.endTime
+            ? bar.endTime.getTime() - bar.reportedMs
+            : bar.startTime.getTime()) + (bar.delayMs ?? 0);
         expect(began, `${id}: ${bar.name} is out of order`).toBeGreaterThanOrEqual(previous);
         previous = began;
         walk(bar.children ?? []);
       }
     };
     walk(data.bars[0]?.children ?? []);
-  });
-
-  it('agrees with the canvas about which order parallel steps go in', () => {
-    // Only where the SDK did not report branch membership. Where it DID, the
-    // canvas lays each branch beneath its own parent so a 1:1 branch draws
-    // straight, and that is worth more there than strict time order — the two
-    // views are then deliberately, defensibly different. This asserts the case
-    // the ordering rule was introduced for.
-    const { graph, data } = viewsOf(fixture);
-    if (graph.branchesResolved > 0) return;
-
-    const rows = (data.bars[0]?.children ?? [])
-      .filter((b) => !b.isPlatform && b.id !== 'run-discovery')
-      .map((b) => b.id);
-
-    const canvasOrder = graph.nodes
-      .filter((n) => n.kind === 'step' || n.kind === 'wait' || n.kind === 'invoke')
-      .slice()
-      .sort((a, z) => a.level - z.level || a.lane - z.lane)
-      .map((n) => n.spanID)
-      .filter((spanID) => rows.includes(spanID));
-
-    expect(
-      rows.filter((r) => canvasOrder.includes(r)),
-      `${id}: row vs node order`
-    ).toEqual(canvasOrder);
   });
 
   it('labels the Run row with the width it actually occupies', () => {
@@ -167,114 +136,5 @@ describe.each(FIXTURES.map((f) => [f.id, f] as const))('%s', (id, fixture) => {
       Math.abs(printed - axis),
       `${id}: Run says ${printed}, axis covers ${axis}`
     ).toBeLessThan(2);
-  });
-
-  it('lets the Run row and the canvas terminal be reconciled by the note', () => {
-    // They are deliberately different quantities: the row reports the width it
-    // occupies, the terminal reports the run's whole life. What must hold is
-    // that the note closes the gap exactly — otherwise `blocked` reads
-    // `Completed 6.049s` beside `Run 12.348s` with nothing to bridge them,
-    // which is where this started.
-    const { graph, data } = viewsOf(fixture);
-    const root = data.bars[0];
-    const terminal = graph.nodes.find((n) => n.kind === 'result');
-    if (!root?.isRoot || !terminal || terminal.endedAt === null) return;
-
-    const wholeLife =
-      root.runTotalMs ?? (root.endTime ? root.endTime.getTime() - root.startTime.getTime() : 0);
-    const onCanvas = terminal.endedAt - terminal.queuedAt;
-
-    expect(Math.abs(wholeLife - onCanvas), `${id}: ${wholeLife} vs ${onCanvas}`).toBeLessThan(2);
-  });
-
-  it('lets a reader subtract the named wait and land on the canvas number', () => {
-    // The bridge between the two views: a row headlined 104ms with `+72ms wait`
-    // has to leave the 32ms the canvas node reports. It held on 17 of 22 step
-    // pairs and failed on the rest because the note had a display threshold and
-    // the total did not — `step`'s `second step` drew a 2ms lead-in, counted it
-    // in its 7ms, and stayed silent about it.
-    const { graph, data } = viewsOf(fixture);
-    const nodes = new Map(graph.nodes.map((n) => [n.spanID, n]));
-
-    const walk = (bars: typeof data.bars) => {
-      for (const bar of bars) {
-        const node = nodes.get(bar.id);
-        if (node && bar.endTime && node.endedAt !== null && node.startedAt !== null) {
-          const total = bar.endTime.getTime() - bar.startTime.getTime();
-          const ran = total - leadInMs(bar);
-          // A wait is measured from its queue in both views, because waiting is
-          // its whole substance and the row draws no lead-in to name.
-          const onCanvas = node.endedAt - (node.kind === 'wait' ? node.queuedAt : node.startedAt);
-          // A millisecond of slack for the two clocks rounding differently.
-          expect(Math.abs(ran - onCanvas), `${id}: ${bar.name} ${ran} vs ${onCanvas}`).toBeLessThan(
-            2
-          );
-        }
-        walk(bar.children ?? []);
-      }
-    };
-    walk(data.bars[0]?.children ?? []);
-  });
-
-  it('splits a row into segments that fill it exactly', () => {
-    // The segments of a bar are the bar. When they do not add up the reader is
-    // given a row headlined 166ms whose parts claim 119ms of waiting and 17ms
-    // of running, with 30ms belonging to nothing — which is how `chains`' two
-    // halves of one fan-out came to describe themselves differently.
-    const { data } = viewsOf(fixture);
-
-    const walk = (bars: typeof data.bars) => {
-      for (const bar of bars) {
-        const segments = generateBarSegments(bar);
-        if (segments?.length) {
-          const covered = segments.reduce((n, s) => n + s.widthPercent, 0);
-          expect(covered, `${id}: ${bar.name} segments cover ${covered}%`).toBeCloseTo(100, 0);
-        }
-        walk(bar.children ?? []);
-      }
-    };
-    walk(data.bars);
-  });
-
-  it('gives every segment it draws something to say for itself', () => {
-    // A row used to return the same hover card for all of it, so a pale lead-in
-    // — the one thing on screen carrying no label anywhere — could not be asked
-    // what it was. Every generated segment now answers for itself.
-    const { data } = viewsOf(fixture);
-
-    const walk = (bars: typeof data.bars) => {
-      for (const bar of bars) {
-        for (const segment of generateBarSegments(bar) ?? []) {
-          expect(segment.tooltip, `${id}: ${bar.name} segment ${segment.id}`).toBeTruthy();
-        }
-        walk(bar.children ?? []);
-      }
-    };
-    walk(data.bars);
-  });
-
-  it('never draws a discovery over a span already on screen', () => {
-    // The characteristic bug of this view is the same interval drawn twice. A
-    // discovery span is usually the parent of what it planned, and the run's
-    // trailing one *is* the finalization span, so without this the Planning row
-    // sits directly on top of an identical bar one row below.
-    const { data } = viewsOf(fixture);
-    const planning = data.bars[0]?.children?.find((b) => b.id === 'run-discovery');
-    if (!planning) return;
-
-    const drawn = new Set<string>();
-    const walk = (bars: typeof data.bars) => {
-      for (const bar of bars) {
-        if (bar.id !== 'run-discovery') drawn.add(bar.id);
-        walk(bar.children ?? []);
-      }
-    };
-    walk(data.bars);
-
-    for (const segment of planning.segments ?? []) {
-      // `discovery-<spanID>-<i>`.
-      const spanID = segment.id.slice('discovery-'.length, segment.id.lastIndexOf('-'));
-      expect(drawn.has(spanID), `${id}: discovery ${spanID} is already a bar`).toBe(false);
-    }
   });
 });

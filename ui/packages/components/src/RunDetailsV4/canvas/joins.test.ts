@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Trace } from '../types';
 import { traceRollup } from '../utils/traceConversion';
+import parallelInferred from './__fixtures__/parallel-inferred.json';
 import v4parallel from './__fixtures__/v4parallel.json';
 import { toCanvasGraph } from './graph';
 import type { CanvasGraph } from './graph.types';
@@ -155,9 +156,12 @@ describe('joins', () => {
   });
 
   it('leaves a run with no lineage at all untouched', () => {
-    // The fixture as captured: no parents anywhere past the first level.
+    // `parallel-inferred` is kept precisely for this: an SDK that reported no
+    // parent sets, so the graph has to infer. `v4parallel` used to serve here
+    // and no longer can — recaptured against a current server it reports its
+    // branches, which is the whole point of recapturing it.
     const graph = labelled(
-      toCanvasGraph(traceRollup((v4parallel as unknown as Fixture).run.trace))
+      toCanvasGraph(traceRollup((parallelInferred as unknown as Fixture).run.trace))
     );
 
     expect(graph.parentsOf('d')).toEqual([]);

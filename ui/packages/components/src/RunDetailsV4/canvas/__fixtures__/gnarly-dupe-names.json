@@ -2,13 +2,77 @@
   "run": {
     "status": "COMPLETED",
     "trace": {
+      "discoveries": [
+        {
+          "spanID": "fceffbe2be1fd61a",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-05T10:54:27.931Z",
+          "startedAt": "2026-09-05T10:54:28.028Z",
+          "endedAt": "2026-09-05T10:54:28.035Z",
+          "plannedStepIDs": [
+            "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
+            "c6a19b8a41f34304080bb799a194e428a8d0875f"
+          ]
+        },
+        {
+          "spanID": "0e21fb4ecf3865cb",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-05T10:54:28.035Z",
+          "startedAt": "2026-09-05T10:54:28.176Z",
+          "endedAt": "2026-09-05T10:54:28.19Z",
+          "plannedStepIDs": ["e274eeff768c6396088ec6eb091f4bf4d47ab1e0"]
+        },
+        {
+          "spanID": "38edec4daace65cb",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-05T10:54:28.035Z",
+          "startedAt": "2026-09-05T10:54:28.177Z",
+          "endedAt": "2026-09-05T10:54:28.196Z",
+          "plannedStepIDs": ["c6a19b8a41f34304080bb799a194e428a8d0875f"]
+        },
+        {
+          "spanID": "5cb8a75a7de4ba18",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-05T10:54:28.197Z",
+          "startedAt": "2026-09-05T10:54:28.336Z",
+          "endedAt": "2026-09-05T10:54:28.347Z",
+          "plannedStepIDs": [
+            "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
+            "bdb98f043b3253a04f69248ff366baad2a75e090"
+          ]
+        },
+        {
+          "spanID": "61e4f35c54eadbc7",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-05T10:54:28.348Z",
+          "startedAt": "2026-09-05T10:54:28.48Z",
+          "endedAt": "2026-09-05T10:54:28.5Z",
+          "plannedStepIDs": ["2cce4a92f41fe3d55a72c27b922c093bdd0a4267"]
+        },
+        {
+          "spanID": "c86d7bbc632eb965",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-05T10:54:28.348Z",
+          "startedAt": "2026-09-05T10:54:28.479Z",
+          "endedAt": "2026-09-05T10:54:28.492Z",
+          "plannedStepIDs": ["bdb98f043b3253a04f69248ff366baad2a75e090"]
+        },
+        {
+          "spanID": "4433928bb34dfb4c",
+          "status": "COMPLETED",
+          "queuedAt": "2026-09-05T10:54:28.502Z",
+          "startedAt": "2026-09-05T10:54:28.63Z",
+          "endedAt": "2026-09-05T10:54:28.643Z",
+          "plannedStepIDs": ["0737c22d3bfae812339732d14d8c7dbd6dc4e09c"]
+        }
+      ],
       "name": "0737c22d3bfae812339732d14d8c7dbd6dc4e09c",
       "status": "COMPLETED",
       "attempts": 0,
-      "queuedAt": "2026-09-03T20:22:36.173Z",
-      "scheduledAt": "2026-09-03T20:22:36.176Z",
-      "startedAt": "2026-09-03T20:22:36.279Z",
-      "endedAt": "2026-09-03T20:22:36.887Z",
+      "queuedAt": "2026-09-05T10:54:27.926Z",
+      "scheduledAt": "2026-09-05T10:54:27.931Z",
+      "startedAt": "2026-09-05T10:54:28.025Z",
+      "endedAt": "2026-09-05T10:54:28.644Z",
       "isRoot": true,
       "isUserland": false,
       "userlandSpan": null,
@@ -17,22 +81,24 @@
           "scope": "run",
           "kind": "inngest.usage",
           "values": {
-            "metadata_bytes": 1210
+            "metadata_bytes": 1206
           },
-          "updatedAt": "2026-09-03T20:22:36.887Z"
+          "updatedAt": "2026-09-05T10:54:28.644Z"
         }
       ],
-      "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMWU1MDM1NTNlZTU0ZDI2NCIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZSwiaW5fc2lkIjoiZjRmZmViYzA2NjFkZGFkZSJ9",
-      "groupID": "f3925dcf-25f8-44b6-b6ac-c357b1154fa8",
-      "debugRunID": null,
-      "debugSessionID": null,
-      "spanID": "f4ffebc0661ddade",
-      "stepID": "0737c22d3bfae812339732d14d8c7dbd6dc4e09c",
-      "stepOp": null,
-      "stepType": "",
+      "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiN2U0ZWUzNDY4MDdhYTNhMiIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZSwiaW5fc2lkIjoiMDc4MGNkNTkyMDhmOWUwNiJ9",
+      "groupID": "9b34f9d1-ba58-41f0-8caa-6f9e96ef193b",
       "plannedSteps": null,
       "userlandStepID": null,
       "userlandStepIndex": null,
+      "parentStepIDs": null,
+      "parentAlternateStepIDs": null,
+      "debugRunID": null,
+      "debugSessionID": null,
+      "spanID": "0780cd59208f9e06",
+      "stepID": "0737c22d3bfae812339732d14d8c7dbd6dc4e09c",
+      "stepOp": null,
+      "stepType": "",
       "stepInfo": null,
       "response": null,
       "childrenSpans": [
@@ -40,10 +106,10 @@
           "name": "work",
           "status": "COMPLETED",
           "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.293Z",
+          "queuedAt": "2026-09-05T10:54:28.035Z",
           "scheduledAt": null,
-          "startedAt": "2026-09-03T20:22:36.428Z",
-          "endedAt": "2026-09-03T20:22:36.443Z",
+          "startedAt": "2026-09-05T10:54:28.176Z",
+          "endedAt": "2026-09-05T10:54:28.19Z",
           "isRoot": false,
           "isUserland": false,
           "userlandSpan": null,
@@ -59,7 +125,7 @@
                 "tls_handshake_ms": 0,
                 "total_ms": 13
               },
-              "updatedAt": "2026-09-03T20:22:36.444117357Z"
+              "updatedAt": "2026-09-05T10:54:28.190750975Z"
             },
             {
               "scope": "request",
@@ -67,20 +133,14 @@
               "values": {
                 "network_total_ms": 13,
                 "queue_delay_ms": 0,
-                "system_latency_ms": 130,
-                "total_inngest_ms": 130
+                "system_latency_ms": 138,
+                "total_inngest_ms": 138
               },
-              "updatedAt": "2026-09-03T20:22:36.444214321Z"
+              "updatedAt": "2026-09-05T10:54:28.190902885Z"
             }
           ],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMGM2MjQ2NjA5OTg5ZjE3ZiIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "9d752b99-9de8-4521-b95c-9676ca2ca985",
-          "debugRunID": null,
-          "debugSessionID": null,
-          "spanID": "315acab3dc9d4c3d",
-          "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
-          "stepOp": "RUN",
-          "stepType": "RUN",
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiYTUyNjM0ZmE4YmYyMWZmOSIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "2c2626aa-6aae-449a-a965-7a255c985fbf",
           "plannedSteps": [
             {
               "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
@@ -95,6 +155,14 @@
           ],
           "userlandStepID": null,
           "userlandStepIndex": null,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "0e21fb4ecf3865cb",
+          "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
+          "stepOp": "RUN",
+          "stepType": "RUN",
           "stepInfo": {
             "__typename": "RunStepInfo",
             "type": null
@@ -104,16 +172,16 @@
             "headers": {
               "Content-Length": "186",
               "Content-Type": "application/json",
-              "Date": "Thu, 03 Sep 2026 20:22:36 GMT",
-              "Etag": "\"m4az5oke7156\"",
+              "Date": "Sat, 05 Sep 2026 10:54:28 GMT",
+              "Etag": "\"bvtxilqfdo56\"",
               "Server-Timing": "handler, action;dur=2",
-              "Traceparent": "00-d31ee4ae2afbe188e34e5b1aca924fc5-f6ac13f9d105ea1b-01",
-              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-816fec96d7d6e5da50b87026bac203e2-e93dcc1e4382be00-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=e81d3195-f62f-562c-b8a1-1c5eb3a314b4,inngest@app=0ec211b0-e476-5c80-ab6d-d856727300e9",
-              "User-Agent": "inngest-js:v4.3.0",
+              "Traceparent": "00-631870453bf82d37cfce07d1a7baf69e-c4f508ef7bce6f7b-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-8f6258e3c098cd1d32c5c3dfb8e423e9-2739b301b2581c75-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=e81d3195-f62f-562c-b8a1-1c5eb3a314b4,inngest@app=0ec211b0-e476-5c80-ab6d-d856727300e9",
+              "User-Agent": "inngest-js:v4.19.0",
               "Vary": "Accept-Encoding",
               "X-Inngest-Framework": "nextjs",
               "X-Inngest-Req-Version": "2",
-              "X-Inngest-Sdk": "inngest-js:v4.3.0",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
               "X-Inngest-Sdk-Handled": "true"
             }
           },
@@ -123,10 +191,206 @@
           "name": "work",
           "status": "COMPLETED",
           "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.293Z",
+          "queuedAt": "2026-09-05T10:54:28.035Z",
           "scheduledAt": null,
-          "startedAt": "2026-09-03T20:22:36.43Z",
-          "endedAt": "2026-09-03T20:22:36.449Z",
+          "startedAt": "2026-09-05T10:54:28.177Z",
+          "endedAt": "2026-09-05T10:54:28.196Z",
+          "isRoot": false,
+          "isUserland": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 17,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 17
+              },
+              "updatedAt": "2026-09-05T10:54:28.196374601Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 17,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 140,
+                "total_inngest_ms": 140
+              },
+              "updatedAt": "2026-09-05T10:54:28.196475155Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiY2MyZTg0ZGYzMWZmZTZhYiIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "2c2626aa-6aae-449a-a965-7a255c985fbf",
+          "plannedSteps": [
+            {
+              "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
+              "name": "work",
+              "stepOp": "RUN"
+            },
+            {
+              "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
+              "name": "work",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": null,
+          "userlandStepIndex": null,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "38edec4daace65cb",
+          "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "196",
+              "Content-Type": "application/json",
+              "Date": "Sat, 05 Sep 2026 10:54:28 GMT",
+              "Etag": "\"16gnaiu9bnx5g\"",
+              "Server-Timing": "handler, action;dur=3",
+              "Traceparent": "00-631870453bf82d37cfce07d1a7baf69e-c1a60ea166d06fda-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-8f6258e3c098cd1d32c5c3dfb8e423e9-8b7476be4bb8d19c-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=e81d3195-f62f-562c-b8a1-1c5eb3a314b4,inngest@app=0ec211b0-e476-5c80-ab6d-d856727300e9",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "work",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-05T10:54:28.037Z",
+          "scheduledAt": "2026-09-05T10:54:28.037Z",
+          "startedAt": "2026-09-05T10:54:28.189Z",
+          "endedAt": "2026-09-05T10:54:28.19Z",
+          "isRoot": false,
+          "isUserland": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 5,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 5
+              },
+              "updatedAt": "2026-09-05T10:54:28.035526215Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 5,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 93,
+                "total_inngest_ms": 93
+              },
+              "updatedAt": "2026-09-05T10:54:28.035654034Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZDlkODY3MTExNTVhMGExZSIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "5772a28e-6f0e-4d56-ae01-b9624d053b27",
+          "plannedSteps": [
+            {
+              "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
+              "name": "work",
+              "stepOp": "RUN"
+            },
+            {
+              "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
+              "name": "work",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": "work",
+          "userlandStepIndex": 0,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "d9d86711155a0a1e",
+          "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "work",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-05T10:54:28.037Z",
+          "scheduledAt": "2026-09-05T10:54:28.037Z",
+          "startedAt": "2026-09-05T10:54:28.195Z",
+          "endedAt": "2026-09-05T10:54:28.196Z",
+          "isRoot": false,
+          "isUserland": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiYjgxNzM4ZTE3MTM3Yzc3MSIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "2c853157-7163-43e0-8353-bbcb9e090646",
+          "plannedSteps": [
+            {
+              "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
+              "name": "work",
+              "stepOp": "RUN"
+            },
+            {
+              "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
+              "name": "work",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": "work",
+          "userlandStepIndex": 1,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "b81738e17137c771",
+          "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "finish",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-05T10:54:28.348Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-05T10:54:28.48Z",
+          "endedAt": "2026-09-05T10:54:28.5Z",
           "isRoot": false,
           "isUserland": false,
           "userlandSpan": null,
@@ -142,7 +406,7 @@
                 "tls_handshake_ms": 0,
                 "total_ms": 17
               },
-              "updatedAt": "2026-09-03T20:22:36.449738097Z"
+              "updatedAt": "2026-09-05T10:54:28.500896104Z"
             },
             {
               "scope": "request",
@@ -150,210 +414,14 @@
               "values": {
                 "network_total_ms": 17,
                 "queue_delay_ms": 0,
-                "system_latency_ms": 136,
-                "total_inngest_ms": 136
+                "system_latency_ms": 130,
+                "total_inngest_ms": 130
               },
-              "updatedAt": "2026-09-03T20:22:36.449816434Z"
+              "updatedAt": "2026-09-05T10:54:28.500993374Z"
             }
           ],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZGMyNWFmM2QxNTgyNzNlMyIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "9d752b99-9de8-4521-b95c-9676ca2ca985",
-          "debugRunID": null,
-          "debugSessionID": null,
-          "spanID": "9072448964bc57e5",
-          "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
-          "stepOp": "RUN",
-          "stepType": "RUN",
-          "plannedSteps": [
-            {
-              "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
-              "name": "work",
-              "stepOp": "RUN"
-            },
-            {
-              "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
-              "name": "work",
-              "stepOp": "RUN"
-            }
-          ],
-          "userlandStepID": null,
-          "userlandStepIndex": null,
-          "stepInfo": {
-            "__typename": "RunStepInfo",
-            "type": null
-          },
-          "response": {
-            "statusCode": 206,
-            "headers": {
-              "Content-Length": "196",
-              "Content-Type": "application/json",
-              "Date": "Thu, 03 Sep 2026 20:22:36 GMT",
-              "Etag": "\"7wbqay0aw05g\"",
-              "Server-Timing": "handler, action;dur=2",
-              "Traceparent": "00-d31ee4ae2afbe188e34e5b1aca924fc5-3442e0698e5cb07d-01",
-              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-816fec96d7d6e5da50b87026bac203e2-1fe87261acd0e610-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=e81d3195-f62f-562c-b8a1-1c5eb3a314b4,inngest@app=0ec211b0-e476-5c80-ab6d-d856727300e9",
-              "User-Agent": "inngest-js:v4.3.0",
-              "Vary": "Accept-Encoding",
-              "X-Inngest-Framework": "nextjs",
-              "X-Inngest-Req-Version": "2",
-              "X-Inngest-Sdk": "inngest-js:v4.3.0",
-              "X-Inngest-Sdk-Handled": "true"
-            }
-          },
-          "childrenSpans": []
-        },
-        {
-          "name": "work",
-          "status": "COMPLETED",
-          "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.294Z",
-          "scheduledAt": "2026-09-03T20:22:36.294Z",
-          "startedAt": "2026-09-03T20:22:36.442Z",
-          "endedAt": "2026-09-03T20:22:36.443Z",
-          "isRoot": false,
-          "isUserland": false,
-          "userlandSpan": null,
-          "metadata": [
-            {
-              "scope": "request",
-              "kind": "inngest.http.timing",
-              "values": {
-                "content_transfer_ms": 0,
-                "dns_lookup_ms": 0,
-                "server_processing_ms": 11,
-                "tcp_connection_ms": 0,
-                "tls_handshake_ms": 0,
-                "total_ms": 11
-              },
-              "updatedAt": "2026-09-03T20:22:36.293663474Z"
-            },
-            {
-              "scope": "request",
-              "kind": "inngest.timing",
-              "values": {
-                "network_total_ms": 11,
-                "queue_delay_ms": 0,
-                "system_latency_ms": 102,
-                "total_inngest_ms": 102
-              },
-              "updatedAt": "2026-09-03T20:22:36.293774523Z"
-            }
-          ],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZDlkODY3MTExNTVhMGExZSIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "0e03b06c-75c7-482e-83d1-ee70cf236e66",
-          "debugRunID": null,
-          "debugSessionID": null,
-          "spanID": "d9d86711155a0a1e",
-          "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
-          "stepOp": "RUN",
-          "stepType": "RUN",
-          "plannedSteps": [
-            {
-              "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
-              "name": "work",
-              "stepOp": "RUN"
-            },
-            {
-              "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
-              "name": "work",
-              "stepOp": "RUN"
-            }
-          ],
-          "userlandStepID": "work",
-          "userlandStepIndex": 0,
-          "stepInfo": {
-            "__typename": "RunStepInfo",
-            "type": null
-          },
-          "response": null,
-          "childrenSpans": []
-        },
-        {
-          "name": "work",
-          "status": "COMPLETED",
-          "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.294Z",
-          "scheduledAt": "2026-09-03T20:22:36.294Z",
-          "startedAt": "2026-09-03T20:22:36.448Z",
-          "endedAt": "2026-09-03T20:22:36.449Z",
-          "isRoot": false,
-          "isUserland": false,
-          "userlandSpan": null,
-          "metadata": [],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiYjgxNzM4ZTE3MTM3Yzc3MSIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "6836e857-62fa-49e0-a66a-53372cb56e7e",
-          "debugRunID": null,
-          "debugSessionID": null,
-          "spanID": "b81738e17137c771",
-          "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
-          "stepOp": "RUN",
-          "stepType": "RUN",
-          "plannedSteps": [
-            {
-              "stepID": "e274eeff768c6396088ec6eb091f4bf4d47ab1e0",
-              "name": "work",
-              "stepOp": "RUN"
-            },
-            {
-              "stepID": "c6a19b8a41f34304080bb799a194e428a8d0875f",
-              "name": "work",
-              "stepOp": "RUN"
-            }
-          ],
-          "userlandStepID": "work",
-          "userlandStepIndex": 1,
-          "stepInfo": {
-            "__typename": "RunStepInfo",
-            "type": null
-          },
-          "response": null,
-          "childrenSpans": []
-        },
-        {
-          "name": "finish",
-          "status": "COMPLETED",
-          "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.583Z",
-          "scheduledAt": null,
-          "startedAt": "2026-09-03T20:22:36.722Z",
-          "endedAt": "2026-09-03T20:22:36.742Z",
-          "isRoot": false,
-          "isUserland": false,
-          "userlandSpan": null,
-          "metadata": [
-            {
-              "scope": "request",
-              "kind": "inngest.http.timing",
-              "values": {
-                "content_transfer_ms": 0,
-                "dns_lookup_ms": 0,
-                "server_processing_ms": 18,
-                "tcp_connection_ms": 0,
-                "tls_handshake_ms": 0,
-                "total_ms": 18
-              },
-              "updatedAt": "2026-09-03T20:22:36.742680745Z"
-            },
-            {
-              "scope": "request",
-              "kind": "inngest.timing",
-              "values": {
-                "network_total_ms": 18,
-                "queue_delay_ms": 0,
-                "system_latency_ms": 138,
-                "total_inngest_ms": 138
-              },
-              "updatedAt": "2026-09-03T20:22:36.742765036Z"
-            }
-          ],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMjM5NzM5ODA3NzFhZDhkYyIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "e6781be6-c4fa-4a96-a545-e60b282108bf",
-          "debugRunID": null,
-          "debugSessionID": null,
-          "spanID": "9a35013cdec65298",
-          "stepID": "bdb98f043b3253a04f69248ff366baad2a75e090",
-          "stepOp": "RUN",
-          "stepType": "RUN",
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiYmM2MWViNDJjY2I4ZTM0OSIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "252ae773-a16e-437b-893c-5d37e1bc9069",
           "plannedSteps": [
             {
               "stepID": "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
@@ -368,75 +436,77 @@
           ],
           "userlandStepID": null,
           "userlandStepIndex": null,
-          "stepInfo": {
-            "__typename": "RunStepInfo",
-            "type": null
-          },
-          "response": {
-            "statusCode": 206,
-            "headers": {
-              "Content-Length": "202",
-              "Content-Type": "application/json",
-              "Date": "Thu, 03 Sep 2026 20:22:36 GMT",
-              "Etag": "\"juh04m7r9l5m\"",
-              "Server-Timing": "handler, action;dur=3",
-              "Traceparent": "00-d31ee4ae2afbe188e34e5b1aca924fc5-9b2d842b96b9bc7b-01",
-              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-816fec96d7d6e5da50b87026bac203e2-409394dd13af6e79-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=e81d3195-f62f-562c-b8a1-1c5eb3a314b4,inngest@app=0ec211b0-e476-5c80-ab6d-d856727300e9",
-              "User-Agent": "inngest-js:v4.3.0",
-              "Vary": "Accept-Encoding",
-              "X-Inngest-Framework": "nextjs",
-              "X-Inngest-Req-Version": "2",
-              "X-Inngest-Sdk": "inngest-js:v4.3.0",
-              "X-Inngest-Sdk-Handled": "true"
-            }
-          },
-          "childrenSpans": []
-        },
-        {
-          "name": "finish",
-          "status": "COMPLETED",
-          "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.583Z",
-          "scheduledAt": null,
-          "startedAt": "2026-09-03T20:22:36.721Z",
-          "endedAt": "2026-09-03T20:22:36.734Z",
-          "isRoot": false,
-          "isUserland": false,
-          "userlandSpan": null,
-          "metadata": [
-            {
-              "scope": "request",
-              "kind": "inngest.http.timing",
-              "values": {
-                "content_transfer_ms": 0,
-                "dns_lookup_ms": 0,
-                "server_processing_ms": 11,
-                "tcp_connection_ms": 0,
-                "tls_handshake_ms": 0,
-                "total_ms": 11
-              },
-              "updatedAt": "2026-09-03T20:22:36.734622679Z"
-            },
-            {
-              "scope": "request",
-              "kind": "inngest.timing",
-              "values": {
-                "network_total_ms": 11,
-                "queue_delay_ms": 0,
-                "system_latency_ms": 136,
-                "total_inngest_ms": 136
-              },
-              "updatedAt": "2026-09-03T20:22:36.734897857Z"
-            }
-          ],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMDJhN2M2ZTU5ZWE0M2U4ZCIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "e6781be6-c4fa-4a96-a545-e60b282108bf",
+          "parentStepIDs": ["e274eeff768c6396088ec6eb091f4bf4d47ab1e0"],
+          "parentAlternateStepIDs": null,
           "debugRunID": null,
           "debugSessionID": null,
-          "spanID": "c2a928642c372f73",
+          "spanID": "61e4f35c54eadbc7",
           "stepID": "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
           "stepOp": "RUN",
           "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": {
+            "statusCode": 206,
+            "headers": {
+              "Content-Length": "273",
+              "Content-Type": "application/json",
+              "Date": "Sat, 05 Sep 2026 10:54:28 GMT",
+              "Etag": "\"qkd8orympw7l\"",
+              "Server-Timing": "handler, action;dur=4",
+              "Traceparent": "00-631870453bf82d37cfce07d1a7baf69e-7f11490adede51d1-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-8f6258e3c098cd1d32c5c3dfb8e423e9-ba65445c5f676a5a-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=e81d3195-f62f-562c-b8a1-1c5eb3a314b4,inngest@app=0ec211b0-e476-5c80-ab6d-d856727300e9",
+              "User-Agent": "inngest-js:v4.19.0",
+              "Vary": "Accept-Encoding",
+              "X-Inngest-Framework": "nextjs",
+              "X-Inngest-Req-Version": "2",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
+              "X-Inngest-Sdk-Handled": "true"
+            }
+          },
+          "childrenSpans": []
+        },
+        {
+          "name": "finish",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-05T10:54:28.348Z",
+          "scheduledAt": null,
+          "startedAt": "2026-09-05T10:54:28.479Z",
+          "endedAt": "2026-09-05T10:54:28.492Z",
+          "isRoot": false,
+          "isUserland": false,
+          "userlandSpan": null,
+          "metadata": [
+            {
+              "scope": "request",
+              "kind": "inngest.http.timing",
+              "values": {
+                "content_transfer_ms": 0,
+                "dns_lookup_ms": 0,
+                "server_processing_ms": 12,
+                "tcp_connection_ms": 0,
+                "tls_handshake_ms": 0,
+                "total_ms": 12
+              },
+              "updatedAt": "2026-09-05T10:54:28.493253728Z"
+            },
+            {
+              "scope": "request",
+              "kind": "inngest.timing",
+              "values": {
+                "network_total_ms": 12,
+                "queue_delay_ms": 0,
+                "system_latency_ms": 130,
+                "total_inngest_ms": 130
+              },
+              "updatedAt": "2026-09-05T10:54:28.49339926Z"
+            }
+          ],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZTkzYjU2MTI5OTk1ZTE4MSIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "252ae773-a16e-437b-893c-5d37e1bc9069",
           "plannedSteps": [
             {
               "stepID": "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
@@ -451,6 +521,14 @@
           ],
           "userlandStepID": null,
           "userlandStepIndex": null,
+          "parentStepIDs": ["c6a19b8a41f34304080bb799a194e428a8d0875f"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "c86d7bbc632eb965",
+          "stepID": "bdb98f043b3253a04f69248ff366baad2a75e090",
+          "stepOp": "RUN",
+          "stepType": "RUN",
           "stepInfo": {
             "__typename": "RunStepInfo",
             "type": null
@@ -458,18 +536,18 @@
           "response": {
             "statusCode": 206,
             "headers": {
-              "Content-Length": "192",
+              "Content-Length": "283",
               "Content-Type": "application/json",
-              "Date": "Thu, 03 Sep 2026 20:22:36 GMT",
-              "Etag": "\"cqj4bb39g25c\"",
-              "Server-Timing": "handler, action;dur=4",
-              "Traceparent": "00-d31ee4ae2afbe188e34e5b1aca924fc5-5e458d3b978ae3ec-01",
-              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-816fec96d7d6e5da50b87026bac203e2-3f66c9b374a97d16-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=e81d3195-f62f-562c-b8a1-1c5eb3a314b4,inngest@app=0ec211b0-e476-5c80-ab6d-d856727300e9",
-              "User-Agent": "inngest-js:v4.3.0",
+              "Date": "Sat, 05 Sep 2026 10:54:28 GMT",
+              "Etag": "\"149z1ush39t7v\"",
+              "Server-Timing": "handler, action;dur=2",
+              "Traceparent": "00-631870453bf82d37cfce07d1a7baf69e-d64ae04c11f52ea9-01",
+              "Tracestate": "inngest@traceref=%7B%22tp%22%3A%2200-8f6258e3c098cd1d32c5c3dfb8e423e9-1b2e26aae5eca926-01%22%2C%22ts%22%3A%22%22%7D,inngest@fn=e81d3195-f62f-562c-b8a1-1c5eb3a314b4,inngest@app=0ec211b0-e476-5c80-ab6d-d856727300e9",
+              "User-Agent": "inngest-js:v4.19.0",
               "Vary": "Accept-Encoding",
               "X-Inngest-Framework": "nextjs",
               "X-Inngest-Req-Version": "2",
-              "X-Inngest-Sdk": "inngest-js:v4.3.0",
+              "X-Inngest-Sdk": "inngest-js:v4.19.0",
               "X-Inngest-Sdk-Handled": "true"
             }
           },
@@ -479,10 +557,10 @@
           "name": "finish",
           "status": "COMPLETED",
           "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.584Z",
-          "scheduledAt": "2026-09-03T20:22:36.584Z",
-          "startedAt": "2026-09-03T20:22:36.732Z",
-          "endedAt": "2026-09-03T20:22:36.733Z",
+          "queuedAt": "2026-09-05T10:54:28.349Z",
+          "scheduledAt": "2026-09-05T10:54:28.349Z",
+          "startedAt": "2026-09-05T10:54:28.49Z",
+          "endedAt": "2026-09-05T10:54:28.491Z",
           "isRoot": false,
           "isUserland": false,
           "userlandSpan": null,
@@ -493,12 +571,12 @@
               "values": {
                 "content_transfer_ms": 0,
                 "dns_lookup_ms": 0,
-                "server_processing_ms": 9,
+                "server_processing_ms": 10,
                 "tcp_connection_ms": 0,
                 "tls_handshake_ms": 0,
                 "total_ms": 10
               },
-              "updatedAt": "2026-09-03T20:22:36.583681089Z"
+              "updatedAt": "2026-09-05T10:54:28.348218015Z"
             },
             {
               "scope": "request",
@@ -506,61 +584,14 @@
               "values": {
                 "network_total_ms": 10,
                 "queue_delay_ms": 0,
-                "system_latency_ms": 121,
-                "total_inngest_ms": 121
+                "system_latency_ms": 138,
+                "total_inngest_ms": 138
               },
-              "updatedAt": "2026-09-03T20:22:36.583788854Z"
+              "updatedAt": "2026-09-05T10:54:28.348502244Z"
             }
           ],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZGZhMTA1NTMwOGNhODU0MyIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "3d274c87-caff-4cc1-8b2a-332c08b4dff3",
-          "debugRunID": null,
-          "debugSessionID": null,
-          "spanID": "dfa1055308ca8543",
-          "stepID": "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
-          "stepOp": "RUN",
-          "stepType": "RUN",
-          "plannedSteps": [
-            {
-              "stepID": "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
-              "name": "finish",
-              "stepOp": "RUN"
-            },
-            {
-              "stepID": "bdb98f043b3253a04f69248ff366baad2a75e090",
-              "name": "finish",
-              "stepOp": "RUN"
-            }
-          ],
-          "userlandStepID": "finish",
-          "userlandStepIndex": 0,
-          "stepInfo": {
-            "__typename": "RunStepInfo",
-            "type": null
-          },
-          "response": null,
-          "childrenSpans": []
-        },
-        {
-          "name": "finish",
-          "status": "COMPLETED",
-          "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.584Z",
-          "scheduledAt": "2026-09-03T20:22:36.584Z",
-          "startedAt": "2026-09-03T20:22:36.74Z",
-          "endedAt": "2026-09-03T20:22:36.741Z",
-          "isRoot": false,
-          "isUserland": false,
-          "userlandSpan": null,
-          "metadata": [],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMWMxOWQ2MjQyZDY5NzFmNyIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "c7fc1524-8745-4338-a2b2-2603fe4f2ffa",
-          "debugRunID": null,
-          "debugSessionID": null,
-          "spanID": "1c19d6242d6971f7",
-          "stepID": "bdb98f043b3253a04f69248ff366baad2a75e090",
-          "stepOp": "RUN",
-          "stepType": "RUN",
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiMWMxOWQ2MjQyZDY5NzFmNyIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "67d3056e-f74e-4026-bc66-7424bdf54bb4",
           "plannedSteps": [
             {
               "stepID": "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
@@ -575,6 +606,57 @@
           ],
           "userlandStepID": "finish",
           "userlandStepIndex": 1,
+          "parentStepIDs": ["c6a19b8a41f34304080bb799a194e428a8d0875f"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "1c19d6242d6971f7",
+          "stepID": "bdb98f043b3253a04f69248ff366baad2a75e090",
+          "stepOp": "RUN",
+          "stepType": "RUN",
+          "stepInfo": {
+            "__typename": "RunStepInfo",
+            "type": null
+          },
+          "response": null,
+          "childrenSpans": []
+        },
+        {
+          "name": "finish",
+          "status": "COMPLETED",
+          "attempts": 0,
+          "queuedAt": "2026-09-05T10:54:28.349Z",
+          "scheduledAt": "2026-09-05T10:54:28.349Z",
+          "startedAt": "2026-09-05T10:54:28.499Z",
+          "endedAt": "2026-09-05T10:54:28.5Z",
+          "isRoot": false,
+          "isUserland": false,
+          "userlandSpan": null,
+          "metadata": [],
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiZGZhMTA1NTMwOGNhODU0MyIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "3317b87c-ef9a-4699-b77b-8a1cc025f626",
+          "plannedSteps": [
+            {
+              "stepID": "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
+              "name": "finish",
+              "stepOp": "RUN"
+            },
+            {
+              "stepID": "bdb98f043b3253a04f69248ff366baad2a75e090",
+              "name": "finish",
+              "stepOp": "RUN"
+            }
+          ],
+          "userlandStepID": "finish",
+          "userlandStepIndex": 0,
+          "parentStepIDs": ["e274eeff768c6396088ec6eb091f4bf4d47ab1e0"],
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "dfa1055308ca8543",
+          "stepID": "2cce4a92f41fe3d55a72c27b922c093bdd0a4267",
+          "stepOp": "RUN",
+          "stepType": "RUN",
           "stepInfo": {
             "__typename": "RunStepInfo",
             "type": null
@@ -586,25 +668,27 @@
           "name": "executor.nonstep",
           "status": "COMPLETED",
           "attempts": 0,
-          "queuedAt": "2026-09-03T20:22:36.743Z",
-          "scheduledAt": "2026-09-03T20:22:36.743Z",
-          "startedAt": "2026-09-03T20:22:36.871Z",
-          "endedAt": "2026-09-03T20:22:36.887Z",
+          "queuedAt": "2026-09-05T10:54:28.502Z",
+          "scheduledAt": "2026-09-05T10:54:28.502Z",
+          "startedAt": "2026-09-05T10:54:28.63Z",
+          "endedAt": "2026-09-05T10:54:28.644Z",
           "isRoot": false,
           "isUserland": false,
           "userlandSpan": null,
           "metadata": [],
-          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiYTk2ZTM4ZmVjNDVlMDQzZCIsInJpZCI6IjAxTTFNRjAxV0RTRUQyWDZWM1g4NUhFS1I4IiwicHJldmlldyI6dHJ1ZX0=",
-          "groupID": "f3925dcf-25f8-44b6-b6ac-c357b1154fa8",
-          "debugRunID": null,
-          "debugSessionID": null,
-          "spanID": "a96e38fec45e043d",
-          "stepID": null,
-          "stepOp": null,
-          "stepType": "",
+          "outputID": "eyJhY2N0SUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJ3c0lEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwiYXBwSUQiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDAiLCJmbklEIjoiMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwIiwidGlkIjoiIiwic2lkIjoiNmY1MzEyMmZkYmYyYmZiYiIsInJpZCI6IjAxTTFSSzk2SlBLWEJGS1k3UlZNRjREWk5SIiwicHJldmlldyI6dHJ1ZX0=",
+          "groupID": "9b34f9d1-ba58-41f0-8caa-6f9e96ef193b",
           "plannedSteps": null,
           "userlandStepID": null,
           "userlandStepIndex": null,
+          "parentStepIDs": null,
+          "parentAlternateStepIDs": null,
+          "debugRunID": null,
+          "debugSessionID": null,
+          "spanID": "6f53122fdbf2bfbb",
+          "stepID": null,
+          "stepOp": null,
+          "stepType": "",
           "stepInfo": null,
           "response": null,
           "childrenSpans": []

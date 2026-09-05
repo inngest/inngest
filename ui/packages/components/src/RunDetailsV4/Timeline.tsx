@@ -9,7 +9,16 @@
  * - Column resize handling
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type JSX,
+  type ReactNode,
+} from 'react';
 import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
 import { Button } from '../Button';
@@ -29,7 +38,7 @@ import { applyCollapseToBars, markBudget, type CollapsePlan } from './canvas/col
 import { formatDuration, useStepHover, useStepSelection } from './runDetailsUtils';
 import { packMinimap } from './utils/density';
 import { buildTimeScale, type Interval, type TimeScale } from './utils/timeScale';
-import { calculateBarPosition, calculateDuration } from './utils/timing';
+import { TIMELINE_CONSTANTS, calculateBarPosition, calculateDuration } from './utils/timing';
 // IDLE_STYLES lives beside `leadInMs` because that function needs it too: two
 // copies would drift into a bar that draws a lead-in without naming one. These
 // are also the stretches the elastic axis may elide — they cost nothing, and a
@@ -400,13 +409,76 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
     ];
   }
 
-  if (!bar.timingBreakdown) return undefined;
+  // A widened bar leads with the request that planned it.
+  //
+  // Drawn at its real interval in the discovery style, so it is visibly the
+  // platform's work rather than the step's, and identical on every row the same
+  // request produced — which is what makes a fan-out read as one request
+  // opening into several steps instead of N unexplained gaps.
+  const leading: BarSegment[] = [];
+  if (bar.unaccounted && bar.endTime) {
+    const barStart = bar.startTime.getTime();
+    const spanMs = bar.endTime.getTime() - barStart;
+    const ms = bar.unaccounted.endMs - bar.unaccounted.startMs;
+    if (spanMs > 0) {
+      leading.push({
+        id: `${bar.id}-unaccounted`,
+        startPercent: ((bar.unaccounted.startMs - barStart) / spanMs) * 100,
+        widthPercent: (ms / spanMs) * 100,
+        style: 'timing.unaccounted',
+        startMs: bar.unaccounted.startMs,
+        endMs: bar.unaccounted.endMs,
+        tooltip: `${formatDuration(
+          ms
+        )} that no span accounts for — queueing, concurrency, latency or processing, but nothing reported which`,
+      });
+    }
+  }
+
+  const planning: BarSegment[] = [...leading];
+  if (bar.planning && bar.endTime) {
+    const barStart = bar.startTime.getTime();
+    const spanMs = bar.endTime.getTime() - barStart;
+    const width = ((bar.planning.endMs - bar.planning.startMs) / spanMs) * 100;
+    if (spanMs > 0 && width > 0) {
+      const others = bar.planning.steps.filter((n) => n !== bar.name);
+      planning.push({
+        id: `${bar.id}-planning`,
+        startPercent: ((bar.planning.startMs - barStart) / spanMs) * 100,
+        widthPercent: width,
+        style: 'timing.inngest.discovery',
+        startMs: bar.planning.startMs,
+        endMs: bar.planning.endMs,
+        tooltip: others.length
+          ? `Inngest planned this and ${others.length} other step${
+              others.length === 1 ? '' : 's'
+            } in one request: ${others.join(', ')}`
+          : 'Inngest planned this step in its own request',
+      });
+    }
+  }
+
+  if (!bar.timingBreakdown) {
+    return planning.length ? planning : undefined;
+  }
 
   const { executionMs } = bar.timingBreakdown;
   let { inngestMs, totalMs } = bar.timingBreakdown;
 
-  // The span's own extent, which is what the bar is actually drawn across.
-  const spanMs = bar.endTime ? bar.endTime.getTime() - bar.startTime.getTime() : null;
+  // The bar may start earlier than the STEP does, when it is drawn wide enough
+  // to show the request that planned it. The wait and execution below describe
+  // the step, so they are measured from the step's own start and then placed
+  // against the bar — otherwise the wait would swallow the planning request and
+  // draw over the segment that already accounts for it.
+  const barStartMs = bar.startTime.getTime();
+  const drawnMs = bar.endTime ? bar.endTime.getTime() - barStartMs : null;
+  const stepStartMs =
+    bar.reportedMs !== undefined && bar.endTime
+      ? bar.endTime.getTime() - bar.reportedMs
+      : barStartMs;
+
+  // The step's own extent, which is what the wait/execution split is about.
+  const spanMs = bar.endTime ? bar.endTime.getTime() - stepStartMs : null;
 
   if (spanMs !== null && spanMs > 0) {
     // Trust the timestamps over the metadata, ALWAYS — not only when the
@@ -423,22 +495,27 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
     totalMs = spanMs;
   }
 
-  if (totalMs <= 0) return undefined;
+  if (totalMs <= 0 || drawnMs === null || drawnMs <= 0) {
+    return planning.length ? planning : undefined;
+  }
 
-  const segments: BarSegment[] = [];
-  let currentPercent = 0;
+  const segments: BarSegment[] = [...planning];
+  // Percentages are of the DRAWN bar; the millisecond figures are the step's.
+  const pctOf = (ms: number) => (ms / drawnMs) * 100;
+  const offset = pctOf(stepStartMs - barStartMs);
+  let currentPercent = offset;
 
   // Inngest overhead segment — short gray delay bar
   if (inngestMs > 0) {
-    const inngestPercent = (inngestMs / totalMs) * 100;
+    const inngestPercent = pctOf(inngestMs);
     segments.push({
       id: `${bar.id}-seg-delay`,
       startPercent: currentPercent,
       widthPercent: inngestPercent,
       style: 'timing.waiting',
       status: bar.status,
-      startMs: bar.startTime.getTime(),
-      endMs: bar.startTime.getTime() + inngestMs,
+      startMs: stepStartMs,
+      endMs: stepStartMs + inngestMs,
       // The same number the row's `+72ms wait` label carries, from the same
       // derivation, so hovering a lead-in confirms the label rather than
       // offering the reader a third figure to reconcile.
@@ -449,15 +526,15 @@ export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefi
 
   // Execution segment — root bar uses short status-colored bar, steps use tall barber-pole
   if (executionMs > 0) {
-    const execPercent = (executionMs / totalMs) * 100;
+    const execPercent = pctOf(executionMs);
     segments.push({
       id: `${bar.id}-seg-server`,
       startPercent: currentPercent,
       widthPercent: execPercent,
       style: bar.isRoot ? 'root' : 'timing.server',
       status: bar.status,
-      startMs: bar.startTime.getTime() + inngestMs,
-      endMs: bar.startTime.getTime() + inngestMs + executionMs,
+      startMs: stepStartMs + inngestMs,
+      endMs: stepStartMs + inngestMs + executionMs,
       // What the canvas node reports for this step, said in the trace too.
       tooltip: `Ran ${formatDuration(executionMs)} on your server`,
     });
@@ -533,6 +610,7 @@ function generateInngestSegments(
 /** Human-readable labels for bar style keys shown in the hover tooltip. */
 const STYLE_LABELS: Partial<Record<BarStyleKey, string>> = {
   'timing.waiting': 'Waiting to run',
+  'timing.unaccounted': 'Not reported',
   'timing.backoff': 'Suspended between attempts',
   'step.run': 'step.run',
   'step.sleep': 'step.sleep',
@@ -702,7 +780,12 @@ function TimelineBarRenderer({
   //
   // The queued part is carried by the note, whose wording says whether it is
   // inside this number or on top of it.
-  const duration = calculateDuration(bar.startTime, bar.endTime);
+  // The step's own span. The bar may be drawn wider than this to show the
+  // request that planned it, which is a real interval belonging to this step's
+  // causation — but the number beside the row stays the step's own, because
+  // inflating a step's duration with the platform's work is the mistake this
+  // whole approach exists to avoid.
+  const duration = bar.reportedMs ?? calculateDuration(bar.startTime, bar.endTime);
   const hasTimingBreakdown = !!bar.timingBreakdown;
   const hasHTTPTiming = !!bar.httpTimingBreakdown;
   const hasChildren = bar.children && bar.children.length > 0;
@@ -813,6 +896,7 @@ function TimelineBarRenderer({
       onClick={() => onSelectStep?.(bar.id)}
       selected={selectedStepId === bar.id}
       badgeGutter={badgeGutter}
+      barID={bar.id}
       note={bar.note}
       interrupted={bar.interrupted}
       platform={bar.isPlatform}
@@ -1241,6 +1325,99 @@ export function Timeline({
     return buildTimeScale(minTime.getTime(), maxTime.getTime(), busy);
   }, [bars, minTime, maxTime]);
 
+  // Where each request's lines run, measured after layout.
+  //
+  // Row positions are read from the DOM rather than derived from an index,
+  // because what is expanded above a row changes where it sits and an index is
+  // only right when nothing is.
+  const [rowTops, setRowTops] = useState<ReadonlyMap<string, number>>(new Map());
+
+  useLayoutEffect(() => {
+    const plot = plotRef.current;
+    if (!plot) return;
+
+    const measure = () => {
+      const box = plot.getBoundingClientRect();
+      const next = new Map<string, number>();
+      for (const el of plot.querySelectorAll('[data-bar-id]')) {
+        const id = el.getAttribute('data-bar-id');
+        if (!id) continue;
+        const r = el.getBoundingClientRect();
+        next.set(id, r.top - box.top + r.height / 2);
+      }
+      setRowTops((prev) => {
+        if (prev.size === next.size && [...next].every(([k, v]) => prev.get(k) === v)) return prev;
+        return next;
+      });
+    };
+
+    measure();
+
+    // jsdom has no ResizeObserver, and the lines are a rendering concern with
+    // nothing to observe there. Measuring once is correct in that environment
+    // and re-measuring on resize is correct in a browser.
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(plot);
+    return () => observer.disconnect();
+  });
+
+  /**
+   * One request, several steps leading off it — drawn the way the flow chart
+   * draws causation.
+   *
+   * A trace states facts and says nothing about what led to what. These are the
+   * one relationship the payload actually knows: `plannedStepIDs` names the
+   * steps a request produced, so the line is reported rather than inferred. It
+   * leaves the request where it finished and arrives at each step where that
+   * step's own bar begins.
+   */
+  const planningFlows = useMemo(() => {
+    const byID = new Map<string, TimelineBarData>();
+    const collect = (list: TimelineBarData[]) => {
+      for (const bar of list) {
+        byID.set(bar.id, bar);
+        if (bar.children?.length) collect(bar.children);
+      }
+    };
+    collect(barsWithChildren);
+
+    // Pixels, both axes. The lines are drawn in a plain SVG over the plot, and
+    // a percentage x against a pixel y in one coordinate system does not map.
+    const plotFraction = (100 - leftWidth) / 100;
+    const xOf = (ms: number) =>
+      ((leftWidth + scale.toPercent(ms) * plotFraction) / 100) * (plotWidth ?? 0);
+
+    const paths: Array<{ key: string; d: string }> = [];
+    if (!plotWidth) return paths;
+
+    for (const bar of byID.values()) {
+      if (!bar.planning) continue;
+      const fromY = rowTops.get(bar.id);
+      if (fromY === undefined) continue;
+
+      const fromX = xOf(bar.planning.endMs);
+      for (const other of byID.values()) {
+        if (other.id === bar.id || other.plannedBy !== bar.planning.spanID) continue;
+        const toY = rowTops.get(other.id);
+        if (toY === undefined) continue;
+
+        // Down from where the request finished, then a small quarter-turn into
+        // the step's own start. Percentages horizontally, pixels vertically —
+        // the two axes of this view are not the same kind of thing.
+        const toX = xOf(other.startTime.getTime());
+        const turn = Math.min(6, Math.abs(toY - fromY) / 2);
+        paths.push({
+          key: `${bar.planning.spanID}-${other.id}`,
+          d: `M ${fromX} ${fromY} L ${fromX} ${toY - turn} Q ${fromX} ${toY} ${
+            fromX + 0.6
+          } ${toY} L ${toX} ${toY}`,
+        });
+      }
+    }
+    return paths;
+  }, [barsWithChildren, rowTops, scale, leftWidth, plotWidth]);
+
   // Deliberately over `data.bars`, not the collapsed `bars`. The strip is the
   // map of the whole run and must not shrink because the rows below it did —
   // otherwise the one view that is supposed to show you everything hides the
@@ -1307,6 +1484,24 @@ export function Timeline({
               </div>
             ))}
           </div>
+        )}
+
+        {planningFlows.length > 0 && (
+          <svg
+            className="pointer-events-none absolute inset-0 z-[2] h-full w-full"
+            style={{ overflow: 'visible' }}
+          >
+            {planningFlows.map((flow) => (
+              <path
+                key={flow.key}
+                d={flow.d}
+                fill="none"
+                stroke="rgb(var(--color-border-muted))"
+                strokeWidth={1}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+          </svg>
         )}
 
         <div className="relative z-[1]">

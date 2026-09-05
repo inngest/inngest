@@ -58,6 +58,7 @@ export type BarStyleKey =
    */
   | 'timing.waiting'
   | 'timing.backoff'
+  | 'timing.unaccounted'
   | 'timing.inngest' // Queue/delay time (short, gray)
   | 'timing.inngest.queue' // Run queue delay (short, solid gray)
   | 'timing.inngest.concurrency' // Concurrency delay (short, crosshatch gray)
@@ -270,6 +271,8 @@ export interface TimelineBarProps {
    * its bar keeps its status colour, so a failure stays findable.
    */
   platform?: boolean;
+  /** Identifies the rendered row, so the flow overlay can locate it. */
+  barID?: string;
   /** Human-readable type label shown in the hover tooltip subtitle (e.g., "step.sleep") */
   styleLabel?: string;
 
@@ -404,6 +407,21 @@ export interface TimelineBarData {
    * and another on one that queued for 120ms.
    */
   runTotalMs?: number;
+  /** The SDK's step id, which is what a discovery's `plannedStepIDs` names. */
+  stepID?: string | null;
+  /** The step's own span, when the bar is drawn wider to show what planned it. */
+  reportedMs?: number;
+  /**
+   * The request that produced this step, and every step it produced.
+   *
+   * Steps planned by one request carry an identical copy, so a fan-out reads as
+   * one request opening into several rows.
+   */
+  planning?: { startMs: number; endMs: number; steps: string[]; spanID: string };
+  /** Time before this row that no span accounts for. */
+  unaccounted?: { startMs: number; endMs: number };
+  /** The request that produced this step, whichever row actually draws it. */
+  plannedBy?: string;
 
   /**
    * The step never finished, and the run it was in has ended — so its bar is

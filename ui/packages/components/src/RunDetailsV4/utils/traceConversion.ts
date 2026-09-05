@@ -330,6 +330,7 @@ function traceToBarData(
 
   return {
     id: trace.spanID,
+    stepID: trace.stepID ?? null,
     name: getSpanName(trace.name),
     isPlatform: PLATFORM_ROW_NAMES.has(getSpanName(trace.name)),
     // Present on step.invoke, and the only thing needed to pull the child run
@@ -747,7 +748,7 @@ export function traceToTimelineData(
     minTime,
     maxTime,
     bars: markInterrupted(
-      withDiscoveryRow(
+      withPlanning(
         withWaitNotes(
           withRunNote(
             // When the queue delay is reported as text rather than drawn, the run
@@ -761,8 +762,7 @@ export function traceToTimelineData(
             !drawQueueDelay
           )
         ),
-        trace.discoveries ?? null,
-        minTime
+        trace.discoveries ?? null
       ),
       trace.endedAt ? new Date(trace.endedAt) : null
     ),
@@ -770,6 +770,156 @@ export function traceToTimelineData(
     orgName,
   };
 }
+
+/**
+ * The request that planned each step, drawn where the gap actually is.
+ *
+ * `Planning` used to be a row of its own. It was the wrong shape three ways: the
+ * eye had to travel to it and back to read one step, it left gaps unfilled
+ * because it only showed requests that were not already steps, and it said
+ * nothing about WHICH request produced which step — the interesting part,
+ * because one request can produce several.
+ *
+ * The trace says exactly that. On `chains`, one discovery runs 102→180ms with
+ * `plannedStepIDs` naming both `right-1` and `left-1`, and both of those steps
+ * are queued at 181. On `wide`, one request at 104→188 names all twelve. So the
+ * gap before a step is not unexplained latency: it is a specific request, and
+ * the steps that share it are exactly the steps that ran in parallel.
+ *
+ * A request is drawn ONCE, on the first of the steps it planned, and tied down
+ * to the others with a hairline at the moment it finished. Drawing a copy on
+ * each row would say the opposite of the truth — that each step had its own
+ * planning request — when the whole point is that one request produced all of
+ * them. One bar, several steps leading off it.
+ *
+ * The step's own reported duration does NOT change. This is the distinction that
+ * matters, and the reason an earlier attempt at this was reverted: the bar is
+ * widened to show a real, attributed, differently-styled interval, and the
+ * number beside the row is still the step's own. Nothing is inflated.
+ */
+function withPlanning(
+  bars: TimelineBarData[],
+  discoveries: RunDiscovery[] | null
+): TimelineBarData[] {
+  if (!discoveries?.length) return bars;
+
+  const timed = discoveries
+    .map((d) => ({
+      startMs: Date.parse(d.startedAt ?? d.queuedAt),
+      endMs: Date.parse(d.endedAt ?? d.startedAt ?? d.queuedAt),
+      planned: d.plannedStepIDs ?? [],
+      spanID: d.spanID,
+    }))
+    .filter((d) => Number.isFinite(d.startMs) && Number.isFinite(d.endMs) && d.planned.length);
+
+  const nameOfStep = new Map<string, string>();
+  /** Row order, so a request can be drawn on the first step it produced. */
+  const order = new Map<string, number>();
+  let seen = 0;
+  const walkNames = (list: TimelineBarData[]) => {
+    for (const bar of list) {
+      if (bar.stepID) {
+        nameOfStep.set(bar.stepID, bar.name);
+        order.set(bar.stepID, seen++);
+      }
+      if (bar.children?.length) walkNames(bar.children);
+    }
+  };
+  walkNames(bars);
+
+  const walk = (list: TimelineBarData[]): TimelineBarData[] =>
+    list.map((bar) => {
+      const children = bar.children ? walk(bar.children) : undefined;
+      if (bar.isRoot || !bar.stepID || !bar.endTime) return { ...bar, children };
+
+      const queued = bar.startTime.getTime();
+
+      // The request that planned this step and finished before it was queued.
+      // Later requests naming the same step are the ones that REPORTED it,
+      // which is a different thing and belongs to whatever followed.
+      const planning = timed
+        .filter((d) => d.planned.includes(bar.stepID!) && d.endMs <= queued + 1)
+        .sort((a, b) => b.endMs - a.endMs)[0];
+
+      if (!planning || planning.startMs >= queued) return { ...bar, children };
+
+      // Only the FIRST step a request planned carries the bar. The rest record
+      // that they came from it, so the view can draw the tie without repeating.
+      const owner = planning.planned
+        .map((stepID) => order.get(stepID))
+        .filter((i): i is number => i !== undefined)
+        .sort((a, b) => a - b)[0];
+
+      if (owner === undefined || order.get(bar.stepID) !== owner) {
+        return { ...bar, children, plannedBy: planning.spanID };
+      }
+
+      const siblings = planning.planned
+        .map((stepID) => nameOfStep.get(stepID))
+        .filter((n): n is string => Boolean(n));
+
+      return {
+        ...bar,
+        children,
+        plannedBy: planning.spanID,
+        startTime: new Date(planning.startMs),
+        // The label keeps the step's own span. The bar is longer than its
+        // number by exactly the planning request, which is drawn and named.
+        reportedMs: bar.endTime.getTime() - queued,
+        planning: {
+          startMs: planning.startMs,
+          endMs: planning.endMs,
+          steps: siblings,
+          spanID: planning.spanID,
+        },
+      };
+    });
+
+  const withPlan = walk(bars);
+
+  /**
+   * Time no span accounts for, stated as exactly that.
+   *
+   * On `t19-parallel` the three parallel steps end at 186ms and `d` is not
+   * queued until 321ms. Nothing in the payload covers the 135ms between: no
+   * step, no discovery, no attempt. It is real time the run spent, and leaving
+   * it blank is how the trace ends up looking full of unexplained holes.
+   *
+   * It is NOT labelled "processing". That would be an invention, and the whole
+   * value of this view is that it does not invent. What is known is that
+   * nothing was reported, so that is what it says.
+   */
+  const fill = (list: TimelineBarData[]): TimelineBarData[] => {
+    let previousEnd: number | null = null;
+    return list.map((bar) => {
+      const children = bar.children ? fill(bar.children) : undefined;
+      const start = bar.startTime.getTime();
+      const gapMs = previousEnd === null ? 0 : start - previousEnd;
+      const from = previousEnd;
+      if (bar.endTime) previousEnd = Math.max(previousEnd ?? 0, bar.endTime.getTime());
+
+      if (bar.isRoot || from === null || gapMs < UNACCOUNTED_MIN_MS) {
+        return { ...bar, children };
+      }
+
+      return {
+        ...bar,
+        children,
+        startTime: new Date(from),
+        reportedMs: bar.reportedMs ?? (bar.endTime ? bar.endTime.getTime() - start : undefined),
+        unaccounted: { startMs: from, endMs: start },
+      };
+    });
+  };
+
+  return withPlan.map((bar) => (bar.isRoot ? { ...bar, children: fill(bar.children ?? []) } : bar));
+}
+
+/**
+ * Below this a gap is scheduling noise between two adjacent spans, and drawing
+ * it would put a sliver on almost every row for nothing.
+ */
+const UNACCOUNTED_MIN_MS = 20;
 
 /**
  * A step that never finished, in a run that did.
@@ -804,190 +954,6 @@ function markInterrupted(bars: TimelineBarData[], runEndedAt: Date | null): Time
     });
 
   return walk(bars);
-}
-
-/**
- * Every row already drawn on its own line, so a discovery can be checked
- * against them.
- *
- * Two things differ from how bars are filtered everywhere else, both because
- * the question here is different. Everywhere else asks "is this a step?", which
- * decides lanes and counts. This asks "does anything already account for this
- * interval?", which decides whether drawing it a second time is a duplication.
- *
- * So platform rows are INCLUDED — the run's trailing discovery *is* the
- * finalization span, and once Finalization was marked as platform it stopped
- * being covered and appeared in both rows at once, a grey Planning bar sitting
- * directly on top of an identical Finalization bar.
- *
- * And the extent is the bar's whole drawn extent rather than just its execution.
- * A discovery inside a step's queue wait is still underneath a bar the eye can
- * see. This does not extend anything or restate any duration — it only decides
- * what not to draw twice.
- */
-function collectStepSpans(
-  bars: TimelineBarData[]
-): Array<{ id: string; startMs: number; endMs: number }> {
-  const out: Array<{ id: string; startMs: number; endMs: number }> = [];
-  const walk = (list: TimelineBarData[]) => {
-    for (const bar of list) {
-      if (!bar.isRoot && bar.endTime) {
-        out.push({ id: bar.id, startMs: bar.startTime.getTime(), endMs: bar.endTime.getTime() });
-      }
-      if (bar.children?.length) walk(bar.children);
-    }
-  };
-  walk(bars);
-  return out;
-}
-
-/**
- * Discovery gets ONE row, with a mark per discovery.
- *
- * A discovery is Inngest asking the function what to do next. It is its own
- * request with its own timing, and — the part that makes every obvious shortcut
- * wrong — it can lead to MANY steps, one step, or none at all.
- *
- * The tempting version is to fold each discovery into the step it produced, as
- * that step's lead-in. That was tried and reverted: a fan-out's twelve steps all
- * trace back to one discovery, so the same request gets drawn twelve times and
- * the steps inflate to cover it. On `wide` it made a 144ms step claim 719ms.
- *
- * So: one row, marks along it, never merged into anything. One mark before three
- * steps reads as one request that planned three. A mark with nothing after it
- * reads as a request that planned nothing — a real outcome rather than a
- * rendering bug. And a 500-step run adds one row, not five hundred.
- *
- * Only 9 of the 43 captured fixtures carry this at all: the loader omits
- * discovery spans, so only the root's `discoveries` array survives. Where it is
- * absent no row appears, which is the honest result — we do not know, so we do
- * not draw.
- */
-function withDiscoveryRow(
-  bars: TimelineBarData[],
-  discoveries: RunDiscovery[] | null,
-  minTime: Date
-): TimelineBarData[] {
-  if (!discoveries?.length) return bars;
-
-  const timed = discoveries
-    .map((d) => ({
-      startMs: Date.parse(d.startedAt ?? d.queuedAt),
-      endMs: Date.parse(d.endedAt ?? d.startedAt ?? d.queuedAt),
-      planned: d.plannedStepIDs?.length ?? 0,
-      plannedIDs: d.plannedStepIDs ?? [],
-      status: d.status,
-      spanID: d.spanID,
-    }))
-    .filter((d) => Number.isFinite(d.startMs) && Number.isFinite(d.endMs))
-    .sort((a, b) => a.startMs - b.startMs);
-
-  if (!timed.length) return bars;
-
-  // Only show a discovery that is not ALREADY on screen as a step.
-  //
-  // A discovery span is the parent of the step it planned and shares its
-  // timing: on `failure`, discovery 0 runs 102→199ms and so does `ok step`.
-  // Drawing both says the platform spent 97ms planning when that 97ms *is* the
-  // step running — the same thing twice, which is the mistake this row was
-  // built to avoid in the first place.
-  //
-  // What survives is the discovery that is genuinely its own interval: the
-  // request that planned a fan-out before any of it started, and the final
-  // request that came back with nothing. Those are the ones occupying time
-  // nothing else accounts for.
-  const stepSpans = collectStepSpans(bars);
-  const drawnIDs = new Set(stepSpans.map((s) => s.id));
-  const uncovered = timed.filter((d) => {
-    const span = d.endMs - d.startMs;
-    if (span <= 0) return false;
-
-    // A discovery whose span is literally a bar on screen is that bar. On
-    // t19-parallel three of the five "discoveries" carry the same spanIDs as
-    // steps a, b and c, and the overlap test below let them through because it
-    // compared a step's execution against a span that also covers its wait.
-    // Identity is exact where overlap is a guess, so it goes first.
-    if (drawnIDs.has(d.spanID)) return false;
-
-    return !stepSpans.some((s) => {
-      const overlap = Math.min(d.endMs, s.endMs) - Math.max(d.startMs, s.startMs);
-      return overlap / span > 0.7;
-    });
-  });
-
-  if (!uncovered.length) return bars;
-  timed.length = 0;
-  timed.push(...uncovered);
-
-  const rowStart = Math.max(timed[0]!.startMs, minTime.getTime());
-  const rowEnd = timed.reduce((n, d) => Math.max(n, d.endMs), rowStart);
-  const spanMs = rowEnd - rowStart;
-  if (spanMs <= 0) return bars;
-
-  // Requests, not steps. Summing `plannedStepIDs` across discoveries counts the
-  // same step several times — each per-step discovery re-plans what follows it —
-  // so t19-parallel's four steps came out as "planned 7 steps". The count of
-  // requests is unambiguous and is the thing this row is actually showing.
-  const requests = `${timed.length} request${timed.length === 1 ? '' : 's'}`;
-
-  // Whether a request planned something NEW.
-  //
-  // Each per-step discovery re-plans what still follows it, so reading the marks
-  // left to right gave "Planned 2 steps" three times and "Planned 1 step" twice
-  // — eight steps planned in a five-step run. The row label solved this by
-  // counting requests instead; per-segment the temptation to add them up came
-  // straight back. Saying which were re-plans is the precise version.
-  const seen = new Set<string>();
-  const isFresh = timed.map((d) => {
-    const fresh = d.plannedIDs.some((stepID) => !seen.has(stepID));
-    for (const stepID of d.plannedIDs) seen.add(stepID);
-    return fresh;
-  });
-
-  const row: TimelineBarData = {
-    id: 'run-discovery',
-    name: 'Planning',
-    isPlatform: true,
-    note: requests,
-    startTime: new Date(rowStart),
-    endTime: new Date(rowEnd),
-    style: 'timing.inngest.discovery',
-    status: 'COMPLETED',
-    // One segment per request at its own interval — never a single block
-    // covering the lot, which would claim the run planned continuously.
-    segments: timed.map((d, i) => ({
-      id: `discovery-${d.spanID}-${i}`,
-      startPercent: ((Math.max(d.startMs, rowStart) - rowStart) / spanMs) * 100,
-      widthPercent: Math.max(0.4, ((d.endMs - Math.max(d.startMs, rowStart)) / spanMs) * 100),
-      style: 'timing.inngest.discovery' as const,
-      status: d.status,
-      startMs: d.startMs,
-      endMs: d.endMs,
-      tooltip:
-        d.planned > 0
-          ? `${isFresh[i] ? 'Planned' : 'Re-planned'} ${d.planned} step${
-              d.planned === 1 ? '' : 's'
-            }`
-          : 'Planned nothing',
-    })),
-  };
-
-  // In time order, like every other row.
-  //
-  // It was pinned to the top on the reasoning "beneath the run, above the steps
-  // it planned", which is not always true: on `invoke` the first surviving
-  // discovery starts after `before` has already begun, so pinning it made the
-  // one row out of order in a view whose whole claim is that top-to-bottom is
-  // when things happened.
-  const insert = (children: TimelineBarData[]): TimelineBarData[] => {
-    const at = children.findIndex(
-      (child) => child.startTime.getTime() + (child.delayMs ?? 0) > rowStart
-    );
-    if (at < 0) return [...children, row];
-    return [...children.slice(0, at), row, ...children.slice(at)];
-  };
-
-  return bars.map((bar) => (bar.isRoot ? { ...bar, children: insert(bar.children ?? []) } : bar));
 }
 
 /**
@@ -1049,6 +1015,11 @@ function withRunNote(
 export function leadInMs(bar: TimelineBarData): number {
   if (!bar.endTime) return 0;
 
+  // The STEP's span, not the bar's. A bar drawn wide enough to show the request
+  // that planned it is longer than the step, and that extra belongs to the
+  // planning segment rather than to this step's wait.
+  const ownMs = bar.reportedMs ?? bar.endTime.getTime() - bar.startTime.getTime();
+
   // A sleep or a waitForEvent has NO lead-in, by construction: waiting is its
   // whole substance, so it draws one solid bar and both views measure it from
   // its queue. Reporting a lead-in for one would name a thing that is not
@@ -1061,7 +1032,7 @@ export function leadInMs(bar: TimelineBarData): number {
   // the millisecond between them. Its own `delayMs` is exactly that wait.
   if (!bar.timingBreakdown) return Math.max(0, bar.delayMs ?? 0);
 
-  const spanMs = bar.endTime.getTime() - bar.startTime.getTime();
+  const spanMs = ownMs;
   const { executionMs, inngestMs } = bar.timingBreakdown;
   if (spanMs <= 0) return Math.max(0, inngestMs);
 
