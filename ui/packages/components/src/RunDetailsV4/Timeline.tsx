@@ -266,7 +266,113 @@ function generatePhaseSegments<T extends { totalMs: number }>(
  * as waiting the step never did. The 6.3s hold is real, and belongs to the run
  * span, which reports it correctly one row up.
  */
+/**
+ * Draw a retried step as its attempts.
+ *
+ * A step that failed, waited, and succeeded is the clearest thing the platform
+ * does for anyone — and collapsed it was a plain green bar, with the whole story
+ * hidden behind a disclosure triangle. On `retry` the payload has all of it:
+ * attempt 0 runs 137→206ms and FAILS, then nothing until 1209ms (the backoff),
+ * then attempt 1 runs 10ms and succeeds.
+ *
+ * So each attempt contributes a ghosted stretch for the time it spent waiting
+ * and a solid one for the time it ran, each coloured by that attempt's own
+ * outcome. The result reads as: faint red, red, a long faint green wait, green.
+ * The retry is visible without expanding anything, and the backoff — time the
+ * platform spent waiting on the user's behalf — becomes a thing you can see
+ * rather than a gap.
+ */
+const segmentEnd = (bar: TimelineBarData) => (bar.endTime ?? bar.startTime).getTime();
+
+function generateAttemptSegments(bar: TimelineBarData): BarSegment[] | undefined {
+  const attempts = bar.children?.filter((child) => /^Attempt \d+$/.test(child.name));
+  if (!attempts || attempts.length < 2 || !bar.endTime) return undefined;
+
+  const barStart = bar.startTime.getTime();
+  const spanMs = bar.endTime.getTime() - barStart;
+  if (spanMs <= 0) return undefined;
+
+  const pct = (ms: number) => (ms / spanMs) * 100;
+  const segments: BarSegment[] = [];
+
+  attempts.forEach((attempt, i) => {
+    // A bar starts at queuedAt and carries its own queue delay, which is the
+    // only way back to when it actually began executing.
+    const queued = attempt.startTime.getTime();
+    const started = queued + (attempt.delayMs ?? 0);
+    const ended = (attempt.endTime ?? attempt.startTime).getTime();
+
+    // Everything from the end of the previous attempt up to this one starting is
+    // waiting: for the first attempt its own queue time, for the rest the retry
+    // backoff. Drawn as one ghosted stretch rather than left blank, because a
+    // gap is the platform waiting on the user's behalf and is worth seeing.
+    const previousEnd = i === 0 ? barStart : segmentEnd(attempts[i - 1]!);
+    if (started > previousEnd) {
+      segments.push({
+        id: `${bar.id}-attempt-${i}-wait`,
+        startPercent: pct(previousEnd - barStart),
+        widthPercent: pct(started - previousEnd),
+        style: 'timing.waiting',
+        status: attempt.status,
+      });
+    }
+
+    if (ended > started) {
+      segments.push({
+        id: `${bar.id}-attempt-${i}-run`,
+        startPercent: pct(started - barStart),
+        widthPercent: pct(ended - started),
+        style: 'step.run',
+        status: attempt.status,
+      });
+    }
+  });
+
+  return segments.length > 1 ? segments : undefined;
+}
+
 export function generateBarSegments(bar: TimelineBarData): BarSegment[] | undefined {
+  // Attempts win: when a step was retried, that is the most important thing
+  // about it, and the phase breakdown describes only the attempt that stuck.
+  const attemptSegments = generateAttemptSegments(bar);
+  if (attemptSegments) return attemptSegments;
+
+  // The RUN row is drawn from its own clock, not from a breakdown.
+  //
+  // The root's `timingBreakdown` is synthesised as "total minus what the
+  // children spent executing", so every scrap of delay scattered through the
+  // run — discovery between steps, system latency, finalization — is summed
+  // into one number. Drawn as a segment that number becomes a single block at
+  // the FRONT of the bar, claiming the run sat still for all of it before
+  // anything happened. On `failure` that rendered as 53% of the run spent
+  // waiting when it was queued for 156ms of 653ms, and the reader is invited to
+  // conclude the platform sat on their run for half its life.
+  //
+  // What is actually true of the run, and all that is claimed here: it was
+  // queued for `delayMs`, and then it was running.
+  if (bar.isRoot && bar.endTime && bar.delayMs !== undefined) {
+    const spanMs = bar.endTime.getTime() - bar.startTime.getTime();
+    if (spanMs > 0 && bar.delayMs > 0) {
+      const waitPercent = (bar.delayMs / spanMs) * 100;
+      return [
+        {
+          id: `${bar.id}-seg-run-queued`,
+          startPercent: 0,
+          widthPercent: waitPercent,
+          style: 'timing.waiting',
+          status: bar.status,
+        },
+        {
+          id: `${bar.id}-seg-run-running`,
+          startPercent: waitPercent,
+          widthPercent: 100 - waitPercent,
+          style: 'root',
+          status: bar.status,
+        },
+      ];
+    }
+  }
+
   if (!bar.timingBreakdown) return undefined;
 
   const { executionMs } = bar.timingBreakdown;

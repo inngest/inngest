@@ -686,8 +686,53 @@ export function traceToTimelineData(
   return {
     minTime,
     maxTime,
-    bars,
+    bars: clampToRunStart(bars, trace.startedAt ? new Date(trace.startedAt) : null),
     leftWidth,
     orgName,
   };
+}
+
+/**
+ * No step may be drawn as waiting before the run itself started.
+ *
+ * Spans record a step's `queuedAt` as the moment the *run* was queued, so on
+ * `failure` the first step reports `queuedAt` at +1ms while the run did not
+ * start until +156ms. Drawn literally, the step's bar began at the very left of
+ * the plot and overlapped the run's own Inngest row, which covers exactly that
+ * 156ms — the same delay counted twice, in two places, contradicting each other.
+ * A reader sees a step apparently running before anything had started.
+ *
+ * That 156ms is real and belongs to the run, which reports it on its own row.
+ * Before the run started, no individual step was waiting on anything: it had not
+ * been discovered yet. So a step's bar begins no earlier than the run does.
+ *
+ * The root bar is left alone — the run's queue delay is precisely what it is
+ * there to show.
+ */
+function clampToRunStart(bars: TimelineBarData[], runStartedAt: Date | null): TimelineBarData[] {
+  if (!runStartedAt) return bars;
+  const floor = runStartedAt.getTime();
+
+  const clamp = (list: TimelineBarData[]): TimelineBarData[] =>
+    list.map((bar) => {
+      const children = bar.children ? clamp(bar.children) : undefined;
+      if (bar.isRoot || bar.startTime.getTime() >= floor) return { ...bar, children };
+
+      // Never past its own end: a step that finished before the run was marked
+      // started would otherwise be drawn backwards.
+      const end = bar.endTime?.getTime();
+      const start = end !== undefined ? Math.min(floor, end) : floor;
+
+      // `delayMs` is measured from the ORIGINAL start, and callers reconstruct
+      // "when this actually began executing" as `startTime + delayMs`. Moving
+      // the start without shrinking the delay by the same amount would push that
+      // reconstruction forward by however much was clamped — which is how the
+      // retry segments first came out 5% too wide.
+      const shift = start - bar.startTime.getTime();
+      const delayMs = bar.delayMs !== undefined ? Math.max(0, bar.delayMs - shift) : bar.delayMs;
+
+      return { ...bar, startTime: new Date(start), delayMs, children };
+    });
+
+  return clamp(bars);
 }
