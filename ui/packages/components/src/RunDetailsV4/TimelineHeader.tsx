@@ -234,13 +234,7 @@ export function TimelineHeader({
           trackClassName={hasStrip ? undefined : 'h-4'}
           trackStyle={hasStrip ? { height: MINIMAP_HEIGHT_PX } : undefined}
         >
-          {hasStrip && (
-            <RunMinimap
-              minimap={minimap!}
-              minMs={minTime.getTime()}
-              hoveredStepId={hoveredStepId}
-            />
-          )}
+          {hasStrip && <RunMinimap minimap={minimap!} hoveredStepId={hoveredStepId} />}
           {isDefault ? (
             <div
               data-testid="timeline-bar-default"

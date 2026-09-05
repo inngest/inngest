@@ -64,13 +64,11 @@ function laneGeometry(rows: number): { rowPx: number; gapPx: number } {
 
 type Props = {
   minimap: Minimap;
-  /** Run start, so a tooltip can report an offset rather than a wall clock. */
-  minMs: number;
   /** Span hovered anywhere in the run; the matching mark lifts. */
   hoveredStepId?: string;
 };
 
-export function RunMinimap({ minimap, minMs, hoveredStepId }: Props): JSX.Element | null {
+export function RunMinimap({ minimap, hoveredStepId }: Props): JSX.Element | null {
   if (!minimap.marks.length) return null;
 
   const { rowPx, gapPx } = laneGeometry(minimap.rows);

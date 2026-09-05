@@ -479,39 +479,6 @@ function generateInngestSegments(
   return generatePhaseSegments(barId, 'inngest', INNGEST_PHASES, breakdown);
 }
 
-/** Generate segments for a run-level Inngest bar (run queue delay + finalization). */
-function generateRunInngestSegments(
-  barId: string,
-  breakdown: RunInngestBreakdownData,
-  runDurationMs: number
-): BarSegment[] | undefined {
-  if (runDurationMs <= 0) return undefined;
-
-  const segments: BarSegment[] = [];
-
-  // Run queue delay: starts at 0% (beginning of run)
-  if (breakdown.runQueueDelayMs > 0) {
-    segments.push({
-      id: `${barId}-seg-run-inngest-run-queue`,
-      startPercent: 0,
-      widthPercent: (breakdown.runQueueDelayMs / runDurationMs) * 100,
-      style: 'timing.inngest.queue',
-    });
-  }
-
-  // Finalization: positioned at end of run (lastStepEndedAt → runEndedAt)
-  if (breakdown.finalizationMs > 0) {
-    segments.push({
-      id: `${barId}-seg-run-inngest-finalization`,
-      startPercent: ((runDurationMs - breakdown.finalizationMs) / runDurationMs) * 100,
-      widthPercent: (breakdown.finalizationMs / runDurationMs) * 100,
-      style: 'timing.inngest.finalization',
-    });
-  }
-
-  return segments.length > 0 ? segments : undefined;
-}
-
 // ============================================================================
 // Hover Tooltip Timing Details
 // ============================================================================
@@ -754,18 +721,6 @@ function TimelineBarRenderer({
   // Inngest breakdown segments for the Inngest bar's compound visualization
   const inngestBarSegments = hasInngestBreakdown
     ? generateInngestSegments(inngestBarId, bar.inngestBreakdown!)
-    : undefined;
-
-  // Run-level Inngest bar (run queue delay + finalization) — only for root bars
-  const runInngestBarId = `${bar.id}-run-inngest`;
-  const isRunInngestExpandable = hasRunInngestBreakdown;
-  const isRunInngestExpanded = isRunInngestExpandable && expandedBars.has(runInngestBarId);
-  const runInngestBarSegments = hasRunInngestBreakdown
-    ? generateRunInngestSegments(
-        runInngestBarId,
-        bar.runInngestBreakdown!,
-        calculateDuration(bar.startTime, bar.endTime)
-      )
     : undefined;
 
   return (
