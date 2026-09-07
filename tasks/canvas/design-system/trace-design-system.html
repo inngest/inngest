@@ -1037,8 +1037,12 @@
   tabs.forEach(function(t){
     t.addEventListener('click',function(){
       tabs.forEach(function(x){ x.classList.toggle('on',x===t); });
-      ['concepts','scenarios','fixtures'].forEach(function(id){
-        document.getElementById('t-'+id).hidden = (id!==t.dataset.tab);
+      // Derived from the tab buttons, not a hardcoded list: adding the Docs
+      // tab left this at three ids, so clicking it hid every section and
+      // showed none of them.
+      tabs.forEach(function(x){
+        var el=document.getElementById('t-'+x.dataset.tab);
+        if(el) el.hidden = (x!==t);
       });
       window.scrollTo(0,0);
     });

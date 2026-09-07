@@ -220,6 +220,41 @@ session calls.
 Not Playwright or Puppeteer: both download a dynamically-linked Chrome-for-
 Testing build that will not start on NixOS (`libglib-2.0.so.0` missing).
 
+### 22. An injection anchored on a tag the document does not have fails silently
+To screenshot one tab of the artifact I appended a script by replacing
+`</body>`. The generated document has **no `</body>` tag** — it ends at
+`</script>` — so `String.replace` found nothing, returned the input unchanged,
+and every screenshot came back showing the default tab while I read it as the
+tab I had asked for. The same bug was in the earlier "scroll to this section"
+helper, which had therefore never scrolled.
+
+This is the `.replace()` failure from #18 in a new place: **a replace whose
+target is absent is not an error, it is a no-op that looks like success.**
+
+**Detection signal**: a screenshot that looks plausible but shows the default
+state of whatever you tried to drive.
+**Prevention**: append rather than anchor when you control the output, and when
+you must anchor, assert the anchor exists first. `Edit` errors on a missed
+match; `String.replace` does not, and that difference has now cost three
+separate sessions.
+
+**Then it happened again, one layer up.** With the injection working, the helper
+set the tab by writing `hidden` on each section directly. That *bypassed the
+page's own click handler* — which had a hardcoded list of three tab ids and had
+never been updated for the fourth. So the screenshot showed a perfect Docs tab
+and the served page showed nothing at all, and the person looking at
+`localhost:5199` found it before I did.
+
+**The rule this settles: a harness must drive the same path a user does.**
+Setting the end state directly proves the end state can render; it proves
+nothing about the thing that produces it. The helper clicks the real button now,
+and throws if the click leaves every section hidden — so the failure that
+shipped cannot ship silently again.
+
+And the fix in the page itself is the general one: **the handler derives its
+sections from the tab buttons instead of a hardcoded list**, so adding a tab
+cannot leave it stale.
+
 ### 21. A harness that slices HTML produces bugs the page does not have
 To screenshot one section of the design artifact I sliced the built HTML by
 string offset and wrapped the fragment in a new document. The slice cut through
