@@ -176,15 +176,15 @@ const frames=id=>{const e=EX[id];if(!e)throw new Error('no '+id);
  */
 const SCEN=[
  ['oneStep',[
-  ['c14','Queue time: the step waiting for the executor to pick it up.'],
-  ['c16','Held by flow control. Amber hatched — still not SDK execution time.'],
-  ['c17','System latency is queue time and is labelled the same way.'],
-  ['c19','Everything Inngest did is hatched. Only SDK execution is solid.'],
-  ['c22','The ordinary case: the step returned.'],
+  ['c14',['The step returned: solid green bar, filled green resolution mark. The baseline everything else reads against.',
+          'The hatched stretch in front of it is queue time — the step enqueued, waiting for the executor to pick it up.',
+          'System latency is the same substance and is named the same way. Three greys for three kinds of waiting would be three things to learn for no gain.',
+          'Everything Inngest did is hatched and only SDK execution is solid, so the eye lands on your code first.']],
+  ['c16','Held by flow control. Amber hatched — queue time with a reason, still not SDK execution time.'],
   ['c18','Finalization keeps its own row and is not SDK execution time.'],
-  ['c20','Every millisecond between a row’s start and its resolution belongs to a named interval.'],
-  ['h2','A row’s label and its drawing have to agree about which interval the number names.'],
-  ['h3','Nothing is drawn that cannot be asked what it is. Hover any row for its parts.'],
+  ['c20','Every millisecond between a row’s start and its resolution belongs to a named interval — here the queue, a failed attempt, its backoff, the queue again, and the attempt that worked.'],
+  ['h2',['A row’s label and its drawing have to agree about which interval the number names.',
+         'Nothing is drawn that cannot be asked what it is: every interval and every mark decomposes into named parts on hover.']],
  ]],
  ['chain',[
   ['c0','One request, one step. The SDK reports and executes in the same request, so there is no discovery bar.'],
@@ -309,7 +309,13 @@ const scenarios = SCEN.map(([k,items])=>
     <div class="item">
       <div class="col-l">${codeOf(k)}</div>
       <div class="col-r">
-${items.map(([id,note])=>`        <div class="bit" data-fig="${id}"><p class="note">${note}</p>${frames(id)}</div>`).join('\n')}
+${items.map(([id,note])=>`        <div class="bit" data-fig="${id}">`+
+      // One drawing can carry several points. Repeating the figure once per
+      // sentence put four identical pictures under one code example.
+      (Array.isArray(note)
+        ? `<ul class="note">${note.map(n=>`<li>${n}</li>`).join('')}</ul>`
+        : `<p class="note">${note}</p>`)+
+      frames(id)+`</div>`).join('\n')}
       </div>
     </div>
   </section>`).join('\n');
@@ -585,6 +591,11 @@ const page=`<title>Trace Design System</title>
   .sc .col-r{gap:26px}
   .sc .bit{min-width:0}
   .sc .bit .note{margin:0 0 9px;max-width:70ch}
+  /* Several points about one drawing. The marker sits in the gutter so the text
+     block keeps the same left edge as a single-sentence note. */
+  ul.note{padding-left:1.1em;list-style:disc}
+  ul.note li{margin:0 0 5px}
+  ul.note li::marker{color:var(--muted)}
   @media (max-width:1080px){
     .grid .item,.sc .item{grid-template-columns:1fr;gap:12px}
     .col-l{position:static}

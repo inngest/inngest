@@ -385,3 +385,41 @@ grep -o '<rect class="bar[^>]*>' trace-design-system.html | head
 **Prevention**: never isolate a figure by hiding its siblings. Shift the page
 instead — set a negative `margin-top` on `body` so the figure lands at the top of
 the viewport, leaving the whole document in the render tree.
+
+---
+
+## 27. Grouping figures by code invites drawing the same picture four times
+
+**Failure mode**: reorganising the Scenarios page around the code that produced
+each figure, I gave every sentence its own figure. Under `await step.run('a')`
+that produced four identical drawings in a row — queue time, system latency, the
+hatching rule and "the step returned" are four things to say about **one**
+picture, not four pictures. The stakeholder spotted it immediately: "figure 1,
+2, 3, 4 are all the same 😃".
+
+**Detection signal**: two figures in one group whose rows and sequence of bar
+kinds match. Not byte-equality — they differed in where the bars sat, which is
+invisible to a reader and was enough to hide the repetition from a diff.
+
+**Prevention**: `validate.mjs` now compares figures by shape within each group
+and fails on a match, telling you to make them bullets under one of them. A note
+in the scenario list may be a string or a list of strings; the list renders as
+bullets above a single figure.
+
+---
+
+## 28. Never `git checkout --` a file you have been editing this session
+
+**Failure mode**: to undo a two-line probe I had just injected into `ds.mjs`, I
+ran `git checkout -- ds.mjs`. It reverted the file to HEAD, silently discarding
+about forty lines of edits from earlier in the same turn that had not been
+committed yet. The probe was removed; so was the work.
+
+**Detection signal**: the next `grep` for something added minutes earlier
+returned zero. Nothing errored — the build still passed, because the reverted
+file was internally consistent.
+
+**Prevention**: undo an edit with the inverse edit, not with the version control
+system. If a probe needs reverting, write it so removing it is a string
+replacement — or make the probe in a copy under `/tmp` and never touch the real
+file. Reach for `git checkout --` only on a file this session has not written to.

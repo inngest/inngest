@@ -279,10 +279,6 @@ D('h2',{d:'A row’s label and its drawing have to agree. If the bar is drawn ac
      note:'3ms reported · 31ms on the row'},
   ],'','the label reconciles with the drawing')});
 
-D('h3',{d:'Nothing is drawn that cannot be asked what it is. Every interval and every mark on every row decomposes into named parts on hover, which is also how this document proves it has no unexplained pixels.',
-  svg:fig([
-    {n:'req + a', at:[['queued',0],['started',2.8,'disc'],['ok',8],['queued',8],['started',12],['ok',42]],reported:1},
-  ],'','everything decomposes')});
 
 fs.writeFileSync(HERE+'items-more.json',JSON.stringify(
   Object.fromEntries(Object.entries(E).map(([k,v])=>

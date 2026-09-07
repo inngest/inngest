@@ -167,6 +167,46 @@ function checkRunExtent(){
   return bad;
 }
 
+
+/**
+ * Two figures in one group that draw the same thing.
+ *
+ * The page groups figures under the code that produced them, and several points
+ * about one snippet are easily several points about ONE PICTURE — four
+ * identical drawings appeared under `step.run('a')` before anyone noticed,
+ * because each sentence had been given its own figure. Points about the same
+ * drawing belong in a list under it.
+ *
+ * Compared by shape, not by bytes: same rows, same sequence of bar kinds. Two
+ * figures differing only in where the bars happen to sit read as the same
+ * picture, which is the thing being checked.
+ */
+function checkDupeFigures(EX, groups){
+  const shape=svg=>{
+    const rows={};
+    for(const b of svg.matchAll(/<rect class="bar[^"]*"[^>]*?x="([\d.]+)" y="([\d.]+)"[^>]*?fill="url\(#hx-([a-z]+)\)"/g)){
+      const y=Math.round(+b[2]); (rows[y]=rows[y]||[]).push([+b[1],b[3]]);
+    }
+    return Object.keys(rows).sort((a,b)=>a-b)
+      .map(y=>rows[y].sort((p,q)=>p[0]-q[0]).map(v=>v[1]).join('>')).join(' / ');
+  };
+  let bad=0;
+  for(const [k,figs] of groups){
+    const by=new Map();
+    for(const id of figs){
+      const e=EX[id]; if(!e) continue;
+      const s=shape(e.frames[0].svg);
+      if(!by.has(s)) by.set(s,[]);
+      by.get(s).push(id);
+    }
+    for(const [,v] of by) if(v.length>1){
+      bad++;
+      console.log(`  ${k}: [${v.join(', ')}] draw the same figure — make them bullets under one of them`);
+    }
+  }
+  return bad;
+}
+
 async function checkCodeSync(){
   const {CODE}=await import('./code.mjs');
   const ds=fs.readFileSync(HERE+'ds.mjs','utf8');
@@ -231,6 +271,7 @@ async function checkCodeSync(){
       console.log(`  ${k}: steps no figure in the group draws [${orphanSteps.join(', ')}]`);
     }
   }
+  bad+=checkDupeFigures(EX, groups);
   for(const k of Object.keys(CODE)) if(!groups.some(([g])=>g===k)){
     console.log(`  ${k}: code example for a group that no longer renders`); bad++;
   }

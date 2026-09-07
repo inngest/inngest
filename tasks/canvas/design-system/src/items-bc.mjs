@@ -21,12 +21,8 @@ D('c16b',{d:'The same treatment covers every flow-control hold — throttle, rat
 D('c31',{d:'A step.sendEvent() that started runs points out of this run: a short spur, a hollow ring and a count. Hollow because those runs are not in this trace.',
   svg:fig([{n:'notify',at:[['queued',0],['started',6],['ok',42]],lineage:2}],'','outbound lineage','',
     {scale:1.3})});
-D('c17',{d:'Latency is the same substance as queueing and is named the same way. Three shades of grey would be three things to learn for no gain.',
-  svg:fig([{n:'a',at:[['queued',0],['started',18],['ok',72]],note:'+18ms latency  54ms'}],'','system latency')});
 D('c18',{d:'Platform rows keep their own row and the platform colour. They are not your compute and never enter the Run row profile.',
   svg:fig([{n:'a',at:[['started',4],['ok',34]]}],'','finalization')});
-D('c19',{d:'Everything Inngest did is thinner and quieter than your code. The eye lands on green and red first, every time.',
-  svg:fig([{n:'a',at:[['queued',0],['started',28],['ok',74]],note:'46ms of 74ms is yours'}],'','second-class platform time')});
 D('c20',{d:'No unexplained gaps. Every millisecond between the row start and its resolution belongs to a named segment — here a discovery request, the queue, a failed attempt, its backoff, the queue again, and the attempt that worked.',
   svg:fig([{n:'a',at:[['queued',0],['started',34],['retry',62],['queued',72],['started',76],['ok',94]],note:'fully accounted'}],'','gaps filled')});
 D('c21',{d:'The 26ms between one step ending and the next request starting is drawn once — as the arrow and as the interval, the same object.',
@@ -34,8 +30,6 @@ D('c21',{d:'The 26ms between one step ending and the next request starting is dr
     return fig(rows,'','the connector is the interval');})()});
 
 // ---- C. Step outcomes (c22–c30) -----------------------------------------
-D('c22',{d:'Green bar, green resolution circle. The baseline everything else is read against.',
-  svg:fig([{n:'a',at:[['queued',0],['started',10],['ok',60]],note:'50ms'}],'','success')});
 D('c23',{d:'The step is red and so is the run. The failure is the last thing on the row, so nothing after it implies recovery.',
   svg:fig([{n:'doomed',at:[['queued',0],['started',10],['failed',36]],note:'failed  26ms'}
   ],'','run-ending failure')});
