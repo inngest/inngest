@@ -150,9 +150,10 @@ report today.
 ## Scale
 - Repetition with one shape collapses to a single row that reports the count and draws where each member ran.
 - A collapsed group draws **the envelope the members occupied plus a tick per member**, so count and spread read without expanding.
-- A failure cluster must be findable in the first screenful, without scrolling or interacting.
+- A failure cluster must be findable in the first screenful, without scrolling or interacting — **on the Run row**, which is why failure wins over mixed there.
 - About forty rows at rest whatever the step count; any group expands in place.
-- ENCODING: group envelope = surface-2 rect with grey stroke, member ticks floored at 1.2px; density strip = one bar per bucket, red at full opacity vs green at .5.
+- ENCODING: group envelope = surface-2 rect with grey stroke, member ticks floored at 1.2px.
+- **There is no density strip.** It existed to make a failure cluster findable without interacting; the Run row does that itself now that failure wins over mixed. Its one remaining claim was bar *height* as a count per bucket, which is not worth a third overview object on a page that just deleted its second one. If a per-bucket count is ever needed it belongs in the Run row — slice height — not in a new row.
 - DEPENDS: group membership and per-member start/duration **even when collapsed**.
 
 ## Naming and identity

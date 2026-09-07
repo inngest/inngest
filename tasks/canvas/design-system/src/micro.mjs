@@ -94,8 +94,13 @@ export function row(i,r,sc=1){
    */
   const auto=autoDots(segs.map(([k,a,w])=>({kind:k,x:a,w})));
   let lo='', hi='';
-  const put=(on,frag)=>{ if(on) hi+=frag; else lo+=frag; };
-  put(!lit, `<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`);
+  // The dim layer is the WHOLE row, not the leftover after the lit parts are
+  // taken out. Splitting it that way separated bars from marks into different
+  // groups, so a lit bar was drawn OVER a dim mark that belongs on top of it.
+  // Drawing the complete row at `dim` and then repainting only the lit parts
+  // over it keeps bars under marks inside both layers.
+  const put=(on,frag)=>{ lo+=frag; if(on) hi+=frag; };
+  lo+=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
   segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc})); });
   (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
@@ -198,8 +203,9 @@ export function groupRow(i, {n, x, w, members, kind='good', note=''}){
  * rows are meant to be present and plausible rather than legible: the eye
  * should land on the figure's own rows and take the rest as context.
  *
- * Two frame rows sit above the figure (the minimap strip, then Run) and one
- * below (Finalization), so the figure's own rows start at slot 2.
+ * One frame row sits above the figure (Run) and one below (Finalization). A
+ * figure that draws its own Run row gets no slot reserved for the suppressed
+ * one, or it renders with a blank row at the top.
  */
 export const FRAME_ROWS_ABOVE=1;
 const CTX_O=0.34;
@@ -228,7 +234,12 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
   rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>{
     if(COMPUTE.has(base(kd))) intervals.push({a:x,b:x+w,ok:!isFail(kd)});
   }));
-  const run=hasOwnRun?'':runProfile(0,{to:Math.min(end+6,96),intervals,resolved:EV.ok},k);
+  // The run resolves as its LAST interval, not as "did anything fail". A run
+  // that threw and then succeeded is a recovery, and resolving it red would say
+  // the opposite of what the row underneath it shows.
+  const last=intervals.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
+  const run=hasOwnRun?'':runProfile(0,{to:Math.min(end+6,96),intervals,
+    resolved:(last&&last.ok===false)?EV.failed:EV.ok},k);
   // Finalization is a discovery request like any other — it asks the SDK what
   // is next and the answer is "nothing". So it is queued, it waits, it starts,
   // and the bar is `disc`: **your app executes for it**, and you are billed for
@@ -257,7 +268,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     rows=rows.map((r,i)=>opts.rib.rows.includes(i)?{...r,noHalo:[opts.rib.x]}:r);
   }
   const framed=opts.frame!==undefined?!!opts.frame:FRAMED;
-  const ownRun=rows.some(r=>r.run);
+  const ownRun=rows.some(r=>r.run||r.n==='Run');
   const above=framed?(ownRun?0:FRAME_ROWS_ABOVE):0;
   const n=opts.rowCount||rows.length;
   const h=TOP*2+ROW*(n+above+(framed?1:0))+(framed?(opts.pad||0):0);

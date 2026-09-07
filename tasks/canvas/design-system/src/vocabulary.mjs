@@ -57,9 +57,15 @@ export const discovered = k => k.includes('*');
 export const isFail = k => /!\*?$/.test(k) || base(k)==='bad';
 
 /**
- * Hatch weights per substance. Backoff is drawn faded: it is a consequence of
- * a failure rather than a failure itself, and at full strength a recovered run
- * carried more red than a run that actually broke.
+ * Hatch weights per substance. Backoff is red, drawn faded: it is a consequence
+ * of a failure rather than a failure itself, so it carries the cause without
+ * carrying the alarm, and at full strength a recovered run looked more broken
+ * than a run that actually failed.
+ *
+ * NOTE: this contradicts LOG.md critic round 4, which settled backoff as
+ * NEUTRAL, and the React implementation, where `timing.backoff` is
+ * `bg-surfaceMuted` and deliberately untinted. The artifact is the stakeholder's
+ * call and wins here; one of the other two records is stale and needs deciding.
  */
 const HATCH_WEIGHT = {
   wait:   {bg:.16, line:.55},

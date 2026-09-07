@@ -45,7 +45,7 @@ O.backoff=(()=>{
 })();
 
 O.applied=fig([
-  {n:'a (fan-out)',segs:[['disc',0,14],['idle',14,10],['good',24,34]],note:'succeeded'},
+  {n:'a (fan-out)',segs:[['idle',0,5],['disc',5,9],['idle',14,10],['good',24,34]],note:'succeeded'},
   {n:'flaky',segs:[['idle',0,8],['bad',8,16],['backoff',24,14],['idle',38,4],['good',42,26]],note:'recovered'},
   {n:'doomed',segs:[['idle',0,8],['bad',8,18],['backoff',26,8],['idle',34,4],['bad',38,20]],note:'failed'},
 ],'','the vocabulary applied');

@@ -30,7 +30,7 @@ O.key=(()=>{
 
 // The height rule, on one run.
 O.height=fig([
-  {n:'a · owner',segs:[['disc',0,10],['idle',10,8],['good',18,30]],note:'discovery, then the step'},
+  {n:'a · owner',segs:[['idle',0,3.5],['disc',3.5,6.5],['idle',10,8],['good',18,30]],note:'discovery, then the step'},
   {n:'b · member',segs:[['idle',10,8],['good',18,26]],noHalo:[10],note:'planned'},
   {n:'c · seq',segs:[['idle',50,6],['good',56,26]],note:'discovery queued'},
   {n:'nap 2s',segs:[['idle',82,3],['waitok',85,12]],note:'no compute'},

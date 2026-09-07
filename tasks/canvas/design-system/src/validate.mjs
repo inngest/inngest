@@ -33,7 +33,21 @@ function rowsOf(svg){
     if(!out.has(key)) out.set(key,[]);
     out.get(key).push({x:+x,k});
   }
-  for(const arr of out.values()) arr.sort((a,b)=>a.x-b.x);
+  // A row is drawn twice when part of it is lit: the whole row at its dim
+  // opacity, then the lit parts repainted over it. The repaint is the SAME
+  // mark, so a circle at the same position and kind is dropped rather than
+  // counted as a second one.
+  for(const [k,arr] of out){
+    // Dedupe by identity, not against the neighbour: a row can carry two
+    // different marks at the same instant (a wait enqueued and started
+    // together), and after the repaint those four interleave, so an adjacent
+    // comparison drops nothing. Sort is stable, so draw order survives.
+    const seen=new Set();
+    const uniq=arr.filter(d=>{ const id=d.x.toFixed(2)+"|"+d.k;
+      if(seen.has(id)) return false; seen.add(id); return true; });
+    uniq.sort((a,b)=>a.x-b.x);
+    out.set(k, uniq);
+  }
   return out;
 }
 

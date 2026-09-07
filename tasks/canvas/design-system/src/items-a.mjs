@@ -77,7 +77,7 @@ D('c3','Ribbons nest, so depth reads without indentation. Hovering <code>a1</cod
         {n:'req + a1',segs:[['idle',34,2.8],['disc',36.8,5.2],['idle',42,2],['good',44,18]]},
         {n:'a2',segs:[['idle',42,2],['good',44,22]]},
         {n:'req + b1',segs:[['idle',38,2.8],['disc',40.8,5.2],['idle',46,2],['good',48,26]]}],
-    {lit:[{row:0,bars:[12],dots:[32]},2],arrows:[wire(px(32),cy(0),px(34),cy(2))],focus:2,
+    {lit:[{row:0,bars:[12],dots:[12,32]},2],arrows:[wire(px(32),cy(0),px(34),cy(2))],focus:2,
      label:'nested fan-out',hoverNote:'hovering a1',ribs:[{x:10,rows:[0,1]},{x:42,rows:[2,3]}]}));
 
 D('c4','The ribbon covers exactly the members, so an uneven fan-out is legible at rest &mdash; you can see it produced three without counting. Hovering adds nothing here, because the ribbon has already said it.',
@@ -116,7 +116,7 @@ D('c8','Each branch scheduled its own request, so there are two. Hovering shows 
         {n:'b',segs:[['idle',6,2],['good',8,24]]},
         {n:'req + a2',segs:[['idle',26,2],['disc',28,4],['idle',32,2],['good',34,20]]},
         {n:'req + b2',segs:[['idle',32,2],['disc',34,4],['idle',38,2],['good',40,22]]}],
-    {lit:[{row:0,bars:[8],dots:[26]},2],arrows:[wire(px(26),cy(0),px(28),cy(2))],focus:2,
+    {lit:[{row:0,bars:[8],dots:[8,26]},2],arrows:[wire(px(26),cy(0),px(28),cy(2))],focus:2,
      label:'no coalescing',hoverNote:'hovering a2',rib:{x:6,rows:[0,1]}}));
 
 D('c9','The winner is a dependency and gets a solid arrow; the losers were alternates and get dashed ones. Both only appear once you ask.',
