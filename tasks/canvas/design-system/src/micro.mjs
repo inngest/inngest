@@ -473,6 +473,10 @@ export function elastic(total, dead=[], {plot=86, threshold=R.ELASTIC.floor,
   // and the blur always stay: they are what says "not to scale".
   const marks = cuts.map(([a,b])=>({
     p0: at(a), p1: at(b),
+    // How long this band actually stands for, in whatever unit the caller
+    // measured in. A band names its OWN elapsed time; they used to share one
+    // string handed down by the figure, so eight different gaps all read "2m".
+    span: b-a,
     label: bandW>=R.ELASTIC.labelAt, tear: bandW>=R.ELASTIC.tearAt,
   }));
   return {at, bands:marks, bandW, cuts};
@@ -523,7 +527,17 @@ export function layout(total, rows, opts={}){
       at:(r.at||[]).map(mo=>mo.length===3?[mo[0],el.at(mo[1]),mo[2]]:[mo[0],el.at(mo[1])]),
       end:r.end!=null?el.at(r.end):r.end};
   });
-  return {rows:out, breaks:el.bands.map(b=>[b.p0,b.p1,b.label?opts.label||'':'']), el};
+  /**
+   * Each band is named with the time IT compressed.
+   *
+   * A figure that measured in real durations can say how long a cut was; one
+   * working in proportions cannot, and marks the cut without naming it. That is
+   * the whole reason some bands carry a duration and some do not — not a rule
+   * about which cuts deserve one.
+   */
+  const per = opts.unit==='s' ? 1000 : 1;
+  const name = b => b.label ? R.human(b.span*per) : '';
+  return {rows:out, breaks:el.bands.map(b=>[b.p0,b.p1,name(b)]), el};
 }
 
 /**

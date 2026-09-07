@@ -50,7 +50,7 @@ D('t1',{d:'Seven days of dead time, given four percent of the width. The thresho
       {n:'a',   at:[['started',0],['ok',41]]},
       {n:'nap', at:[['started',41],['ok',41+NAP]],kind:'wait',note:'7d'},
       {n:'b',   at:[['queued',B0],['started',B0+6,'disc'],['ok',B0+16],['queued',B0+16],['started',B0+22],['ok',total]],reported:1},
-    ],{label:'7d'});
+    ]);
     return fig(L.rows,'','seven days compressed to a band','',{margin:0,breaks:L.breaks});
   })()});
 
@@ -61,7 +61,7 @@ D('t1b',{d:'What the space left over is worth. Thirty seconds of work on one sid
       {n:'left',  at:[['started',0],['ok',30]],note:'30s'},
       {n:'gap',   at:[['started',30],['ok',30+GAP]],kind:'wait'},
       {n:'right', at:[['started',30+GAP],['ok',total]],note:'10s'},
-    ],{label:'7d'});
+    ],{unit:'s'});
     return fig(L.rows,'','the leftover width splits by real duration','',{margin:0,breaks:L.breaks});
   })()});
 
@@ -93,7 +93,7 @@ D('t1d',{d:'A wait that has not resolved still compresses. The run is asleep rig
     const L=layout(total,[
       {n:'a',   at:[['started',0],['ok',20]]},
       {n:'nap', at:[['started',20]],end:total,kind:'wait',note:'sleeping'},
-    ],{label:'3h'});
+    ],{unit:'s'});
     return fig(L.rows,'','an unresolved wait, compressed','',
       {margin:0,running:true,breaks:L.breaks});
   })()});
@@ -106,7 +106,7 @@ D('t1e',{d:'Choosing where to cut. A gap in <em>one</em> row is not dead time &m
       {n:'b', at:[['started',4],['ok',26]]},
       {n:'c', at:[['started',26],['ok',900],['started',900],['ok',914]],kind:'wait'},
       {n:'d', at:[['started',914],['ok',930]]},
-    ],{label:'15m'});
+    ],{unit:'s'});
     return fig(L.rows,'','only the stretch with nothing running','',{margin:0,breaks:L.breaks});
   })()});
 

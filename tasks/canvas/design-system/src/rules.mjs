@@ -339,10 +339,23 @@ export function leadingQueue(rows){
   return first===Infinity?0:first;
 }
 
-/** A duration, at the precision a label wants. */
+/**
+ * A duration, at the precision a label wants.
+ *
+ * Rounded on purpose. These are measured: a sleep asked for 2s and took
+ * 1.996s, and a band that reads "1.996s" is reporting the measurement error
+ * rather than the sleep. One or two significant figures is what a label on a
+ * compressed band is for -- the exact number lives on the row.
+ */
 export function human(ms){
-  if(ms>=1000) return +(ms/1000).toFixed(ms>=10000?0:3)+'s';
-  return Math.round(ms)+'ms';
+  const s=ms/1000;
+  if(ms<1000)    return Math.round(ms)+'ms';
+  if(s<90)       return +s.toFixed(s<10?1:0)+'s';
+  const m=s/60;
+  if(m<90)       return Math.round(m)+'m';
+  const h=m/60;
+  if(h<36)       return +h.toFixed(h<10?1:0)+'h';
+  return +(h/24).toFixed(h/24<10?1:0)+'d';
 }
 
 /**

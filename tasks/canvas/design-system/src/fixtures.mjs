@@ -163,8 +163,14 @@ const pack=(f)=>{
     const toMs=v=>v/100*f.ms;
     const inMs=f.rows.map(r=>r.run
       ? {...r, to:toMs(r.end), intervals:r.intervals.map(v=>({...v,a:toMs(v.a),b:toMs(v.b)}))}
-      : {...r, segs:r.segs.map(([k,x,w])=>[k,toMs(x),toMs(x+w)])});
-    const laid=layout(f.ms, inMs, {plot:100, label:f.gap});
+      // The moments go over with the bars. layout() derives from `at` where a
+      // row has it, so leaving the moments in percent while the segs were in
+      // milliseconds had it measuring dead time against the wrong axis --
+      // which put a phantom compression band past the end of the run.
+      : {...r, segs:r.segs.map(([k,x,w])=>[k,toMs(x),toMs(x+w)]),
+         at:(r.at||[]).map(mo=>mo.length===3?[mo[0],toMs(mo[1]),mo[2]]:[mo[0],toMs(mo[1])]),
+         end:r.end!=null?toMs(r.end):r.end});
+    const laid=layout(f.ms, inMs, {plot:100});
     f={...f, rows:laid.rows.map((r,i)=>r.run
       ? {...f.rows[i], end:r.to, intervals:r.intervals}
       : {...r, segs:r.segs.map(([k,a,w])=>[k,a,w])}), compress:laid.breaks.filter(b=>b[1]>b[0])};
