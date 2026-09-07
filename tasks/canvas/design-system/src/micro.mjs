@@ -60,7 +60,7 @@ export function row(i,r,sc=1){
   if(r.run) return runProfile(i,r,sc);
   const {n,segs:rawSegs=[],dim=1,dots,note,sel,noHalo,lit,litDots}=r;
   const segs=fillGaps(rawSegs.map(([k,x,w])=>({kind:k,x,w}))).map(g=>[g.kind,g.x,g.w]);
-  const y=cy(i); let s='';
+  const y=cy(i); let s='', hit='';
   /**
    * Attention is per ELEMENT, not per row. Hovering a step lights the parts of
    * other rows that caused it — the discovery bar, the queue circle, the mark
@@ -75,15 +75,32 @@ export function row(i,r,sc=1){
     : (lit.some(v=>typeof v==='string' ? v===base(k) : Math.abs(v-x)<0.01) ? 1 : dim);
   const litDot=p=>!litDots ? dim : (litDots.some(v=>Math.abs(v-p)<0.01) ? 1 : dim);
   if(sel) s+=`<rect x="${LBL-3}" y="${y-7.5}" width="${PLOT+6}" height="15" fill="${C.acc}" opacity=".13" rx="2"/>`;
-  s+=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}" opacity="${dim}">${n}</text>`;
-  segs.forEach(([k,a,w])=>{ s+=barSvg(k,a,w,y,{k:1,floor:sc,o:litBar(k,a)}); });
+  /**
+   * Fading happens on a GROUP, not on each element. Per-element opacity made a
+   * dimmed row translucent to ITSELF: a mark's halo is a disc of surface
+   * colour, so at .15 the bar behind showed straight through it and the row
+   * lost its layering exactly where it was carrying the most meaning.
+   * Compositing the row and fading the result keeps every mark on top of its
+   * bar, at any opacity.
+   *
+   * Two groups rather than one, because attention is per element: the parts of
+   * a row that caused the hovered one stay at full strength while the rest of
+   * that same row fades. The dim group is emitted first, so a lit mark still
+   * lands over a dim bar.
+   *
+   * A mark on a ribbon keeps its halo. It was suppressed so the circle would
+   * read as sitting ON the ribbon, but that cost it the ring of surface every
+   * other mark has. The ribbon threads BETWEEN the halos instead.
+   */
   const auto=autoDots(segs.map(([k,a,w])=>({kind:k,x:a,w})));
-  // A mark on a ribbon still gets its halo. It was suppressed so the circle
-  // would read as sitting ON the ribbon, but that cost it the ring of surface
-  // every other mark has, so it stopped separating from the bar behind it. The
-  // ribbon is drawn under the row, so it now threads BETWEEN the halos — beads
-  // on a string — which says the same thing and keeps the mark readable.
-  (dots||auto).forEach(d=>{const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01); s+=dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),litDot(d.p),3,true);});
+  let lo='', hi='';
+  const put=(on,frag)=>{ if(on) hi+=frag; else lo+=frag; };
+  put(!lit, `<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`);
+  segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc})); });
+  (dots||auto).forEach(d=>{
+    const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
+    put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,3,true));
+  });
   // The note follows the row's own content rather than sitting in a reserved
   // column, so no horizontal space is set aside for it.
   {
@@ -98,14 +115,15 @@ export function row(i,r,sc=1){
       const b=BAR_INFO[base(g[0])]; if(b) parts.push({t:'b',k:base(g[0]),n:b[0],d:b[1]});
     });
     for(;mi<marks.length;mi++){ const e=EVENT_INFO[marks[mi].c]; if(e) parts.push({t:'e',k:marks[mi].c,n:e[0],d:e[1]}); }
-    if(parts.length) s+=`<rect class="rowhit" x="${LBL-6}" y="${y-8}" width="${PLOT+12}" height="16" fill="transparent" data-row="${n}" data-parts='${JSON.stringify(parts).replace(/'/g,"&apos;")}'/>`;
+    if(parts.length) hit=`<rect class="rowhit" x="${LBL-6}" y="${y-8}" width="${PLOT+12}" height="16" fill="transparent" data-row="${n}" data-parts='${JSON.stringify(parts).replace(/'/g,"&apos;")}'/>`;
   }
   if(note && NOTES){
     const last=segs[segs.length-1];
     const at=last?px(last[1]+last[2])+9:LBL;
-    s+=`<text x="${at.toFixed(1)}" y="${y+2.5}" ${MONO} font-size="6.5" fill="${C.mut}" opacity="${dim}">${note}</text>`;
+    lo+=`<text x="${at.toFixed(1)}" y="${y+2.5}" ${MONO} font-size="6.5" fill="${C.mut}">${note}</text>`;
   }
-  return s;
+  const body=(dim===1?lo:`<g opacity="${dim}">${lo}</g>`)+(hi?`<g>${hi}</g>`:'');
+  return s+body+hit;
 }
 
 /**
