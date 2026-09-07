@@ -531,7 +531,17 @@ export function layout(total, rows, opts={}){
     (r.segs||[]).forEach(([kd,a,b])=>{ if(COMPUTE.has(base(kd))) compute.push([a,b]); });
   });
   // With compression off the axis is linear and there are no bands.
-  const el=R.FEAT.compress ? elastic(total, [], {compute, ...opts})
+  /**
+   * The same scale-free threshold fig() applies: a stretch is compressed when
+   * it is longer than ALL the compute in the run put together, several times
+   * over. Without it elastic falls back to "more than 3% of the run", which on
+   * a 14ms run with 13ms of work compresses the 1ms tail -- a band standing for
+   * a millisecond, in a figure whose point is that bands stand for days.
+   */
+  const busy=compute.reduce((n,[a,b])=>n+(b-a),0);
+  const el=R.FEAT.compress ? elastic(total, [], {compute,
+      threshold:Math.max(R.ELASTIC.floor, total>0?busy*R.ELASTIC.computeMultiple/total:0),
+      ...opts})
     : {at:t=>t/total*(opts.plot||100), bands:[], cuts:[]};
   const map=([kd,a,b])=>[kd, el.at(a), el.at(b)-el.at(a)];
   const out=rows.map(r=>{
@@ -605,7 +615,14 @@ export function compression(breaks, h, uid){
   return {clip, over};
 }
 
-let UID=0;
+/**
+ * Generated ids have to be unique across the PAGE, and each generator runs as
+ * its own process with its own counter — so two of them both produced `cmp-5`
+ * and a url(#cmp-5) resolved to whichever came first. Each generator gets a
+ * range. Stable across the feature builds, so two identical drawings still
+ * compare equal and ship once.
+ */
+let UID=+(process.env.DS_UID_BASE||0);
 
 /**
  * Figures that contain a stretch the elastic rule would compress, but which
@@ -662,7 +679,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * pass and before any scale is chosen, so everything downstream simply sees a
    * trace that begins when the work does.
    */
-  let leadLabel='', leadTrimmed=false;
+  let leadLabel=opts.lead||'', leadTrimmed=!!opts.lead;
   if(opts.trimLead && R.FEAT.trim){
     const lead=R.leadingQueue(rows);
     if(lead>0.01){

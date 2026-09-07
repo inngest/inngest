@@ -13,6 +13,7 @@
  * timings.
  */
 import fs from 'fs';
+import * as R from './rules.mjs';
 
 const FIXTURES=new URL('../../../../ui/packages/components/src/RunDetailsV4/canvas/__fixtures__/',
   import.meta.url).pathname;
@@ -38,7 +39,7 @@ export function loadRun(id){
   const j=JSON.parse(fs.readFileSync(FIXTURES+id+'.json','utf8'));
   const t=j.run.trace;
   const t0=ms(t.queuedAt), t1=ms(t.endedAt)||ms(t.startedAt)||t0;
-  const total=Math.max(1, t1-t0);
+  let total=Math.max(1, t1-t0);
   const at=v=>{ const n=ms(v); return n==null?null:n-t0; };
 
   // One row per step. A step has a span of its own and a span per attempt; the
@@ -63,7 +64,7 @@ export function loadRun(id){
     const exec =spans.reduce((m,s)=>ms(s.startedAt)>ms(m.startedAt)?s:m);
     const name=first.name;
     const isFin=name==='Finalization';
-    const kind=isFin?'disc':(KIND[first.stepOp]||'step');
+    const kind=KIND[first.stepOp]||'step';
 
     const q=at(first.queuedAt), st=at(exec.startedAt), en=at(last.endedAt);
     const out=OUTCOME[last.status];
@@ -110,5 +111,31 @@ export function loadRun(id){
     if(mem.length>1){ mem[0].reports=mem.slice(1).map(r=>r.n); }
   }
   rows.forEach(r=>{ delete r._stepID; delete r._planner; delete r._q; });
-  return {id, ms:total, rows};
+
+  /**
+   * The opening queue, named rather than drawn.
+   *
+   * Done here, on real timestamps, because that is the only place it can be
+   * named: after the elastic pass the axis is no longer linear and the same
+   * measurement reads as a different duration.
+   */
+  let lead='';
+  if(R.FEAT.trim){
+    let first=Infinity;
+    for(const r of rows) for(const [k,x] of r.at) if(k==='started') { first=Math.min(first,x); break; }
+    if(first>0 && first<Infinity){
+      lead=R.human(first);
+      const shift=mo=>mo.length===3?[mo[0],mo[1]-first,mo[2]]:[mo[0],mo[1]-first];
+      for(const r of rows){
+        const s=r.at.map(shift);
+        const kept=s.filter(mo=>mo[1]>=0);
+        // a row already queued when the drawing begins keeps the state it was in
+        const open=(kept.length && kept[0][1]===0)?null:s.filter(mo=>mo[1]<0).pop();
+        r.at=(open?[[...open].map((v,j)=>j===1?0:v)]:[]).concat(kept);
+        if(r.end!=null) r.end=Math.max(0,r.end-first);
+      }
+      total-=first;
+    }
+  }
+  return {id, ms:total, rows, lead};
 }

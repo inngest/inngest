@@ -24,7 +24,8 @@ const COMBOS=[
 ];
 const BUILDS={};
 for(const [key,env] of COMBOS){
-  for(const g of GENS) execFileSync('node',[HERE+g+'.mjs'],{stdio:'pipe',env:{...process.env,...env}});
+  GENS.forEach((g,gi)=>execFileSync('node',[HERE+g+'.mjs'],
+    {stdio:'pipe', env:{...process.env, ...env, DS_UID_BASE:String(gi*1000)}}));
   BUILDS[key]=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
 }
 

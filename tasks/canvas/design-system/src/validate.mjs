@@ -70,15 +70,25 @@ function check(seq){
   if(!OPENERS.has(k[0])) p.push(`opens on "${k[0]}" — a row must open on queued, planned or started`);
   for(let i=1;i<k.length;i++) if(k[i]===k[i-1] && Math.abs(seq[i].x-seq[i-1].x)>1)
     p.push(`two "${k[i]}" marks in a row`);
-  for(let i=0;i<k.length-1;i++) if(FINAL.has(k[i]))
-    p.push(`"${k[i]}" is a resolution but is not last`);
+  /**
+   * A resolution mid-row is legitimate when the row goes on to do more work: a
+   * row that carries its own reporting request has the REQUEST's outcome in the
+   * middle and the step's at the end. In a hand-drawn figure those two moments
+   * were placed at the same instant and merged into one circle; a captured run
+   * has them a millisecond apart, and both are real.
+   */
+  for(let i=0;i<k.length-1;i++)
+    if(FINAL.has(k[i]) && !k.slice(i+1).includes('started'))
+      p.push(`"${k[i]}" is a resolution and nothing follows it, but it is not last`);
   // A row may execute more than once, but only for a reason the row shows.
   // Two of them: a `retry` (the attempt threw, another follows) and a `planned`
   // (the discovery request finished and handed the row to the step it reported
   // — a request and the step it planned share one row). A second `started` with
   // neither between them is a row that began executing twice for no stated
   // reason, which is the thing this check exists to catch.
-  const REEXEC=new Set(['retry','planned','queued']);
+  // ...or the request at the head of the row resolving, which is what hands the
+  // row over from the request to the step it reported.
+  const REEXEC=new Set(['retry','planned','queued','ok','failed']);
   for(let i=1,last=-1;i<k.length;i++){
     if(k[i]!=='started') continue;
     if(last<0){ last=i; continue; }
