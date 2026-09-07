@@ -228,31 +228,45 @@ D('i2',{d:'The Run row <em>is</em> the overview. There was a minimap above it dr
 
 // ---- OpenTelemetry ------------------------------------------------------
 
-D('o0',{d:'How they get into the trace. At rest a step with userland spans is still one row &mdash; the spans are <em>inside</em> its execution, so they subdivide the bar rather than adding rows to the run. The notches are where each span began, in the same idiom a collapsed group uses for its members, so you can see there were three things in there and roughly where without expanding anything. The gap after the last notch is your code doing something no span covers, and that is worth seeing too.',
+D('o0',{d:'How they get into the trace. At rest a step with userland spans is still one row, with a <strong>coverage rail</strong> under its bar: where spans covered the execution, and whether any of them failed. It never tints the bar &mdash; a step that returned is green whatever happened in a span inside it, because those are different facts. The break in the rail is your code doing something no span covers, which is worth seeing on its own.',
   frames:(()=>{
-    const spans=[[9,38],[49,12],[63,14]];
-    const notch=x=>`<line x1="${px(x).toFixed(1)}" y1="${cy(0)-3.5}" x2="${px(x).toFixed(1)}" y2="${cy(0)+3.5}" stroke="var(--ground)" stroke-width="1" opacity=".55"/>`;
-    const step={n:'charge',segs:[['idle',0,6],['good',6,74]]};
+    const step={n:'charge',segs:[['idle',0,6],['good',6,74]],
+      rail:[[9,29,'unset'],[49,12,'unset'],[63,14,'unset']],note:'3 spans'};
     return [
-      {l:'at rest', svg:fig([step],
-        spans.map(([a])=>notch(a)).join('')+tag(px(81),cy(0)+2.5,'3 spans'),
-        'spans as notches in the step')},
+      {l:'at rest', svg:fig([step],'','coverage under the step')},
       {l:'expanded', svg:fig([
-        step,
-        {n:'  ↳ POST /pay', segs:[['good',9,38]],thin:true},
-        {n:'  ↳ SELECT',    segs:[['good',49,12]],thin:true},
-        {n:'  ↳ UPDATE',    segs:[['good',63,14]],thin:true},
+        {n:'charge',segs:[['idle',0,6],['good',6,74]]},
+        {n:'  ↳ POST /pay', segs:[['spanunset',9,29]],thin:true},
+        {n:'  ↳ SELECT',    segs:[['spanunset',49,12]],thin:true},
+        {n:'  ↳ UPDATE',    segs:[['spanunset',63,14]],thin:true},
       ],'','the same spans, expanded')},
     ];
   })()});
 
-D('o1',{d:'A step instrumented with <code>@inngest/otel</code> reports what your code did inside it &mdash; HTTP calls, database queries, third-party APIs. Those spans are <em>your code at finer grain</em>, so they keep the status colours a step has and are distinguished by <strong>nesting and weight, not by a new colour</strong>: indented under the step, drawn thinner, because each is a subdivision of the bar above rather than a peer of it. The step is still the thing that retried; a span inside it is not separately retryable.',
+D('o0b',{d:'Why it is coverage and not one mark per span. Inside a <code>Promise.all</code> the spans overlap, and a notch or a tick per span would either stack into a smudge or imply an order that is not there. The rail reports the <em>union</em>: which parts of the step something was covering, and the worst status in each part. Anything finer is the expanded view&rsquo;s job.',
+  frames:(()=>{
+    const step={n:'fanout',segs:[['idle',0,5],['good',5,80]],
+      rail:[[8,34,'unset'],[42,26,'err'],[68,15,'unset']],note:'9 spans · 1 error'};
+    return [
+      {l:'at rest', svg:fig([step],'','overlapping spans, one rail')},
+      {l:'expanded', svg:fig([
+        {n:'fanout',segs:[['idle',0,5],['good',5,80]]},
+        {n:'  ↳ GET /a',  segs:[['spanunset',8,30]],thin:true},
+        {n:'  ↳ GET /b',  segs:[['spanunset',10,26]],thin:true},
+        {n:'  ↳ GET /c',  segs:[['spanerr',12,32]],thin:true,note:'ERROR'},
+        {n:'  ↳ SELECT',  segs:[['spanok',46,22]],thin:true},
+        {n:'  ↳ UPDATE',  segs:[['spanunset',68,15]],thin:true},
+      ],'','five of the nine, expanded')},
+    ];
+  })()});
+
+D('o1',{d:'A span keeps the three states OpenTelemetry gives it. Most instrumentation sets none, so <strong>Unset is the common case and must not read as an outcome</strong>: grey means it ran and nobody said, green means something said OK, red means it failed. The step above is green regardless &mdash; it returned.',
   svg:fig([
-    {n:'charge',        segs:[['idle',0,6],['good',6,74]]},
-    {n:'  ↳ POST /pay', segs:[['good',9,38]],thin:true},
-    {n:'  ↳ SELECT',    segs:[['good',49,12]],thin:true},
-    {n:'  ↳ UPDATE',    segs:[['good',63,14]],thin:true},
-  ],'','userland spans nested under a step')});
+    {n:'charge',       segs:[['idle',0,6],['good',6,74]],rail:[[9,20,'unset'],[31,20,'err'],[53,24,'ok']]},
+    {n:'  ↳ POST /pay',segs:[['spanunset',9,20]],thin:true,note:'Unset'},
+    {n:'  ↳ SELECT',   segs:[['spanerr',31,20]],thin:true,note:'ERROR'},
+    {n:'  ↳ UPDATE',   segs:[['spanok',53,24]],thin:true,note:'OK'},
+  ],'','the three span statuses')});
 
 D('o2',{d:'The nesting is a claim, and the trace has to be able to keep it. A span always sits <em>inside</em> its step&rsquo;s execution, because that is where it ran &mdash; one that starts before its step or outruns it is a clock disagreement between your process and ours, not a slow query, and drawing it as though it were would be the view inventing a fact. Where the extents do not contain each other the row says so rather than clamping quietly.',
   svg:fig([

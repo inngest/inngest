@@ -40,16 +40,17 @@ const SEMANTIC = {
   good:C.good, bad:C.bad, disc:C.disc, idle:C.idle,
   child:C.child, mix:C.mix, running:C.disc,
   wait:C.disc, waitok:C.good, waitout:C.mut, backoff:C.bad,
+  spanok:C.good, spanerr:C.bad, spanunset:C.mut,
   stopped:C.mut, waitstop:C.mut, hold:C.hold,
 };
 export const FILL = Object.fromEntries(
   Object.entries(SEMANTIC).map(([k,v])=>[k,`var(--bar-${k}, ${v})`]));
 
 /** Your app executed for these. Everything else is drawn hatched. */
-export const COMPUTE = new Set(['good','bad','child','running','disc','stopped']);
+export const COMPUTE = new Set(['good','bad','child','running','disc','stopped','spanok','spanerr','spanunset']);
 export const NOCOMPUTE = new Set(['wait','waitok','waitout','idle','backoff','waitstop','hold']);
 /** Kinds that represent work happening, for the resolution rule. */
-export const ACTIVE = new Set(['good','bad','child','running','disc','stopped']);
+export const ACTIVE = new Set(['good','bad','child','running','disc','stopped','spanok','spanerr','spanunset']);
 
 /** A kind may be suffixed `!` to mean "this substance, but it failed". */
 export const base = k => k.replace(/[!*]+$/,'');
@@ -68,6 +69,7 @@ export const isFail = k => /!\*?$/.test(k) || base(k)==='bad';
  * call and wins here; one of the other two records is stale and needs deciding.
  */
 const HATCH_WEIGHT = {
+  // spanok/spanerr/spanunset are solid: a userland span is your code running.
   wait:   {bg:.16, line:.55},
   waitok: {bg:.16, line:.55},
   waitout:{bg:.16, line:.55},
@@ -115,13 +117,13 @@ export const substanceCSS = () =>
  * Only a resolution is ever green or red.
  */
 export const EV = {
-  queued:'queued', started:'hollow', retry:'hollow-bad', ribbon:'ribbon',
+  queued:'queued', started:'hollow', retry:'hollow-bad', ribbon:'ribbon', done:'done',
   ok:'ok', failed:'failed', timeout:'timeout', cancelled:'cancelled',
 };
 
 /** Each mark's own variable, defaulting to the semantic colour it means. */
 const EV_SEMANTIC = {
-  queued:C.queued, ribbon:C.disc, hollow:C.mut, 'hollow-bad':C.bad,
+  queued:C.queued, ribbon:C.disc, hollow:C.mut, 'hollow-bad':C.bad, done:C.mut,
   ok:C.good, failed:C.bad, timeout:C.mut, cancelled:C.mut,
 };
 export const EVC = Object.fromEntries(
@@ -222,6 +224,8 @@ export function autoDots(segs){
   if(!OPEN.has(lastK))
     out.push({p:last.x+last.w, c:
       (lastK==='stopped'||lastK==='waitstop') ? EV.cancelled :
+      lastK==='spanerr' ? EV.failed :
+      lastK==='spanunset' ? EV.done :
       isFail(last.kind) ? EV.failed :
       lastK==='waitout' ? EV.timeout :
       (ACTIVE.has(lastK)||lastK==='waitok') ? EV.ok : EV.queued});
@@ -359,6 +363,9 @@ export const BAR_INFO={
   waitout:['timed out','the wait expired with no match'],
   waitstop:['stopped','waiting when the run was cancelled'],
   backoff:['backoff','retry backoff before the next attempt'],
+  spanok:['span ok','a userland span that reported OK'],
+  spanerr:['span error','a userland span that reported ERROR'],
+  spanunset:['span','a userland span that set no status — the common case'],
   hold:['held','held by concurrency, throttle, rate limit or debounce'],
   idle:['queued','waiting for the executor to pick it up'],
 };
@@ -368,6 +375,7 @@ export const EVENT_INFO={
   ribbon:['planned','enqueued by a discovery request that reported several steps'],
   hollow:['started','execution started'],
   'hollow-bad':['retry','the attempt threw, another will follow'],
+  done:['done','resolved, and no status was reported — OpenTelemetry Unset'],
   ok:['ok','resolved, succeeded'],
   failed:['failed','threw on the final attempt'],
   timeout:['timeout','the wait expired with no match'],

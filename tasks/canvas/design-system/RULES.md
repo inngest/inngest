@@ -60,7 +60,11 @@ report today.
 ## OpenTelemetry
 
 - A step instrumented with `@inngest/otel` reports **userland spans** — HTTP calls, database queries, third-party APIs.
-- **They are your code at finer grain, so they keep the status colours a step has.** What distinguishes them is **nesting and weight, not a new colour**: indented under the step, drawn thinner, because each is a subdivision of the bar above rather than a peer of it.
+- **They are your code at finer grain**, distinguished by **nesting and weight, not a new colour**: indented under the step, drawn thinner, because each is a subdivision of the bar above rather than a peer of it.
+- **A span carries the three states OpenTelemetry gives it — OK, ERROR, Unset — and Unset is the common case.** Most instrumentation sets no status, so Unset must not read as an outcome: grey means *it ran and nobody said*, green means something said OK, red means it failed. Unset resolves on `done`, a filled muted mark, because `ok` would claim something nobody said.
+- **A span's status never tints its step.** A step that returned is green whatever happened in a span inside it; those are different facts, and merging them would make the step's own outcome unreadable.
+- **At rest a step with spans is one row carrying a coverage rail** — a hairline under the bar showing which parts of the execution something covered and the worst status in each part. **It is coverage, not one mark per span**: inside a `Promise.all` the spans overlap, so a tick each would stack into a smudge or imply an order that is not there. A complex span tree's shape cannot survive being compressed into one bar's width without lying, so at rest the row carries what changes your next action — is there anything in there, did any of it fail, and which parts nothing covers — and expanding carries the structure.
+- **A break in the rail is your code doing something no span covers.** Uninstrumented time inside a step is worth seeing on its own.
 - **A span sits inside its step's execution.** One that starts before its step or outruns it is a clock disagreement between the two processes, not a slow query, and the row says so rather than clamping it quietly.
 - The step is the thing that retried; a span inside it is not separately retryable.
 - DEPENDS: userland spans reaching the client at all — span name, kind, service name and attributes.

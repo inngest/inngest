@@ -131,7 +131,24 @@ export function row(i,r,sc=1){
   // A userland span is a subdivision of the step above it, not a peer, so it is
   // drawn thinner. Nesting and weight carry that, not a new colour: an OTel span
   // IS your code, so it keeps the same status colours the step has.
+  /**
+   * The coverage rail. A hairline under a step's bar showing WHERE userland
+   * spans covered its execution and whether any failed — not the spans
+   * themselves.
+   *
+   * Notches were the first attempt and they assume the spans are sequential and
+   * do not overlap, which a `Promise.all` inside a step makes false. A complex
+   * span tree's shape cannot survive being compressed into one bar's width
+   * without lying about it, so at rest the row carries what changes your next
+   * action — is there anything in there, did any of it fail, and which parts of
+   * the step nothing covers — and expanding carries the structure.
+   *
+   * It is drawn UNDER the bar and never tints it: a step that returned is green
+   * whatever happened in a span inside it, because those are different facts.
+   */
   const bh=r.thin?GEOM.BAR_H*0.62:GEOM.BAR_H;
+  if(r.rail) for(const [rx,rw,rk] of r.rail)
+    lo+=barSvg('span'+(rk||'unset'),rx,rw,y+GEOM.BAR_H/2+2.1,{k:1,floor:sc,h:1.8});
   segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh})); });
   (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);

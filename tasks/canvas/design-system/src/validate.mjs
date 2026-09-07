@@ -12,6 +12,7 @@ const KIND=[
   [/ev-ribbon"/,'planned'],
   [/ev-hollow"/,'started'],
   [/ev-disc"/,'discovery'],
+  [/ev-done"/,'done'],
   [/ev-ok"/,'ok'],
   [/ev-failed"/,'failed'],
   [/ev-timeout"/,'timeout'],
@@ -19,7 +20,7 @@ const KIND=[
 const classify=c=>{ for(const [re,name] of KIND) if(re.test(c)) return name; return null; };
 
 const OPENERS=new Set(['queued','planned']);
-const FINAL=new Set(['ok','failed','timeout','cancelled']);
+const FINAL=new Set(['ok','failed','timeout','cancelled','done']);
 
 function rowsOf(svg){
   const out=new Map();
