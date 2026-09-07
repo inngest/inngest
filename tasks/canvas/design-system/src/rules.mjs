@@ -480,3 +480,57 @@ export function runRank(kind){
 
 /** Rank to colour. */
 export const RUN_COLOUR = ['var(--muted)','var(--disc)','var(--good)','var(--warn)'];
+
+/**
+ * What stays lit when a row is hovered or selected.
+ *
+ * Attention is per ELEMENT, not per row: hovering a step lights the parts of
+ * other rows that caused it and leaves the rest of those rows faded. Fading a
+ * whole row would either hide the cause or light work that had nothing to do
+ * with it.
+ *
+ * Three things survive, and they are the three answers to "why is this row
+ * here":
+ *
+ *   - the row itself, entire;
+ *   - on each row a cable comes from, the interval that ENDS where the cable
+ *     starts -- the work whose finishing queued the request -- and the two
+ *     moments bounding it. Not that row's other work, which is unrelated;
+ *   - if the row was planned by a request drawn on another row, that request:
+ *     its bars and moments up to the point it resolved, and the planned mark
+ *     the ribbon threads.
+ *
+ * Returns a map of row index to `true` (all of it) or {bars, dots} of the
+ * positions that survive. Everything absent is dimmed.
+ */
+export function attention(rows, focus){
+  const out=new Map();
+  if(focus==null || focus<0 || !rows[focus]) return out;
+  out.set(focus, true);
+
+  for(const c of cables(rows, focus)){
+    const src=rows[c.from];
+    const at=src.at||[];
+    // the moment the interval ending at the cable's start began
+    let i=at.length-1;
+    while(i>0 && at[i][1]>c.x-1e-9) i--;
+    const a=at[i], b=at.find(m=>Math.abs(m[1]-c.x)<1e-9)||at[i+1];
+    if(!a||!b) continue;
+    out.set(c.from, {bars:[+a[1].toFixed(3)], dots:[+a[1].toFixed(3), +b[1].toFixed(3)]});
+  }
+
+  const g=ribbonGroups(rows).find(x=>x.rows.includes(focus));
+  if(g){
+    const owner=g.rows.find(i=>i!==focus && rows[i] && rows[i].reported);
+    if(owner!=null && !out.has(owner)){
+      const at=rows[owner].at||[];
+      const k=at.findIndex(m=>RESOLVED.has(m[0]));
+      const head=k<0?at:at.slice(0,k+1);
+      out.set(owner, {
+        bars:head.slice(0,-1).map(m=>+m[1].toFixed(3)),
+        dots:[...new Set(head.map(m=>+m[1].toFixed(3)).concat([g.x]))],
+      });
+    }
+  }
+  return out;
+}
