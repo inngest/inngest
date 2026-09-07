@@ -67,7 +67,7 @@ function check(seq){
   // — a request and the step it planned share one row). A second `started` with
   // neither between them is a row that began executing twice for no stated
   // reason, which is the thing this check exists to catch.
-  const REEXEC=new Set(['retry','planned']);
+  const REEXEC=new Set(['retry','planned','queued']);
   for(let i=1,last=-1;i<k.length;i++){
     if(k[i]!=='started') continue;
     if(last<0){ last=i; continue; }

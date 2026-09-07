@@ -222,7 +222,6 @@ export function autoDots(segs){
     out.push({p:g.x, c:
       j===0 ? EV.queued :
       (prev && isFail(prev.kind) && !gap) ? EV.retry :
-      (prev && base(prev.kind)==='disc') ? EV.ribbon :  // the step it just planned
       kindDot(g.kind)});
   });
   const last=segs[segs.length-1], lastK=base(last.kind);

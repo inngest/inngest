@@ -458,7 +458,8 @@ const page=`<title>Trace Design System</title>
   /* The framed body sits a whole number of pitches below the Run row. */
   svg g.dy{transform:translateY(calc(var(--geo-row,17px) * var(--a,0)))}
   /* A ribbon spans N row gaps, so it restretches with the pitch. */
-  svg rect.rib{height:calc(var(--geo-row,17px) * var(--n,1))}
+  svg rect.rib{height:calc(var(--geo-row,17px) * var(--n,1));
+    transform:translateY(calc((var(--geo-row,17px) - 17px) * var(--i,0)))}
   /* The hit target is a row's worth of height, so it never hangs below the
      drawing and holds the box open at a tight pitch. */
   svg rect.rowhit{height:max(6px, var(--geo-row,17px));

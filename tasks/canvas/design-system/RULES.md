@@ -44,6 +44,7 @@ report today.
 ## Structure
 - A discovery request is the SDK reporting what to run next.
 - A discovery bar appears **only** where the request reported more than one step (fan-out, or the run's first step).
+- **A `planned` mark is the claim that a request reported several steps, and the ribbon is what backs it — so it appears only where a ribbon threads it.** After a discovery bar that reported one step the row was simply enqueued, and the mark is `queued`. Emitting `planned` after every discovery bar put dangling blue marks on rows with no ribbon to belong to.
 - A request reporting exactly one step is not a row — it rolls into that step's row as a leading blue interval.
 - The ribbon covers exactly the steps one request reported; cables appear only on hover/select.
 - ENCODING: `disc` blue bar; ribbon = solid blue vertical rect (w 3.4) threaded through members' queue circles, drawn *under* rows so circles sit on it; cables = pale curved wires with dark casing + drop shadow, no arrowhead, ending at the circle's edge (socket metaphor).

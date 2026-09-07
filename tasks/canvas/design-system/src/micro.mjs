@@ -564,6 +564,7 @@ export function ribbon(xp, ys, {o=1, w=3.4, gaps}={}){
   // pitch moves. Without it the ribbon kept its generated height while the rows
   // it threads slid out from under it.
   const n=gaps!=null?gaps:Math.max(1,Math.round(span/ROW));
-  return `<rect class="rib" style="--n:${n}" x="${x-w/2}" y="${ys[0]}" width="${w}" `+
+  const i0=((ys[0]-(TOP+9))/ROW).toFixed(4);
+  return `<rect class="rib" style="--n:${n};--i:${i0}" x="${x-w/2}" y="${ys[0]}" width="${w}" `+
     `height="${span}" fill="${C.disc}" opacity="${0.95*o}"/>`;
 }
