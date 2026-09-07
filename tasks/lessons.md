@@ -273,3 +273,36 @@ technique, and it cannot produce invalid HTML because it never edits structure.
 This is #18 from the other side: there the artefact was real and the check was
 weak; here the check invented a defect. Both are the same rule — the thing you
 read has to be the thing that ships.
+
+### 23. A greedy regex over a whole document will eventually eat the document
+The figure exporter harvested CSS variables with `/--[a-z0-9-]+: *[^;]+;/g`.
+That worked for a month, because every declaration it met had a trailing
+semicolon. Then rows started carrying `style="--i:3;--s:0"` — and the last
+declaration in a style **attribute** has no trailing `;`, so `[^;]+` ran on
+across newlines, through the rest of the SVG and into the page, until it found a
+semicolon somewhere else entirely.
+
+Every exported figure came out at **1.1MB with `</main>` and `<script>` inside
+it**. The docs tab inlined them, the page ended up with sixteen `</main>` against
+one `<main>` and a script that never closed, and the browser parsed the rest of
+the document as JavaScript. Every tab stopped working.
+
+**What makes this one worth recording is what did not notice.** The build was
+clean. The validator was green — 109 figures, 296 rows, code and figures agree.
+Every check I had asked about the *figures*, and the figures were perfect. The
+artefact they were written into was rubble.
+
+**Detection signal**: none from the build. It was found by opening the page,
+again.
+
+**Prevention, in order:**
+- Bound the match: `[^;{}<>\n]{1,60};` cannot leave the declaration it is in.
+- **Assert the size of anything generated.** A figure is a few KB; the exporter
+  now refuses to write one over 60KB, because a silently enormous asset is
+  exactly the sort of thing that ships.
+- **Check the container, not just the contents.** `validate.mjs` now counts
+  `<main>` and `<script>` pairs in the generated page and the size of every doc
+  image. Deliberately appending one `</main>` makes it exit 1.
+
+The general rule, which is #18 once more: every check I had verified the thing I
+was making, and none verified the thing I was making it *into*.

@@ -98,6 +98,36 @@ function check(seq){
  * with the rows beneath it, which is the one thing an overview must never do.
  * Derived now, and asserted here so it stays derived.
  */
+/**
+ * The generated page has to be a well-formed document.
+ *
+ * An unterminated CSS declaration in a style ATTRIBUTE once made the figure
+ * exporter swallow the whole page into every doc image, which the docs tab then
+ * inlined — 16 `</main>` tags, one `<main>`, and a script that never closed, so
+ * the page stopped parsing and every tab died. Nothing in the build noticed:
+ * the figures were right, the rules were right, the HTML was rubble.
+ */
+function checkPageStructure(){
+  const html=fs.readFileSync(HERE+'../trace-design-system.html','utf8');
+  const n=re=>(html.match(re)||[]).length;
+  const bad=[];
+  const pairs=[['<main>',/<main>/g,/<\/main>/g],['<script>',/<script[ >]/g,/<\/script>/g]];
+  for(const [name,open,close] of pairs){
+    const a=n(open), b=n(close);
+    if(a!==b) bad.push(`${a} ${name} against ${b} closing`);
+  }
+  // A doc figure is a few KB; a megabyte means the page leaked into it.
+  let dir=[];
+  try{ dir=fs.readdirSync(HERE+'../../docs/images/'); }catch{}
+  for(const f of dir){
+    if(!f.endsWith('.svg')) continue;
+    const size=fs.statSync(HERE+'../../docs/images/'+f).size;
+    if(size>60000) bad.push(`docs/images/${f} is ${(size/1024).toFixed(0)}KB`);
+  }
+  bad.forEach(b=>console.log('  '+b));
+  return bad.length;
+}
+
 function checkRunExtent(){
   let bad=0;
   for(const g of ['items-a','items-bc','items-disc','items-more']){
@@ -206,10 +236,12 @@ for(const g of GENS){
 }
 console.log(`\n${figures} figures, ${rows} rows, ${bad} with problems`);
 
+const broken=checkPageStructure();
+if(broken) console.log(`\n${broken} structural problem(s) in the generated page`);
 const short=checkRunExtent();
 if(short) console.log(`\n${short} figure(s) whose Run row does not reach the end of the trace`);
 const desync=await checkCodeSync();
 console.log(desync
   ? `\n${desync} figure(s) whose code and drawing disagree`
   : 'code and figures agree');
-if(bad||desync||short) process.exitCode=1;
+if(bad||desync||short||broken) process.exitCode=1;

@@ -19,8 +19,15 @@ const OUT=HERE+'../../docs/images/';
 const HTML=fs.readFileSync(HERE+'../trace-design-system.html','utf8');
 
 // The variables every figure resolves its colours through.
-const VARS=[...new Set(HTML.match(/--[a-z0-9-]+: *[^;]+;/g)||[])]
-  .filter(v=>!/--(body|display|mono|figw):/.test(v))
+//
+// The value pattern is deliberately tight. It was `[^;]+`, which is greedy and
+// happily crosses newlines — so an unterminated declaration in a style
+// ATTRIBUTE (`style="--i:3;--s:0"`, no trailing semicolon) matched onward until
+// the next `;` anywhere in the document, and every exported figure came out at
+// 1.1MB with `</main>` and `<script>` inside it. The docs tab then inlined
+// those and the page stopped parsing.
+const VARS=[...new Set(HTML.match(/--[a-z0-9-]+: *[^;{}<>\n]{1,60};/g)||[])]
+  .filter(v=>!/--(body|display|mono|figw|i|s):/.test(v))
   .join('');
 
 const J=name=>JSON.parse(fs.readFileSync(HERE+name+'.json','utf8'));
@@ -58,6 +65,13 @@ for(const [id,frame,name,alt] of WANT){
     (m,attrs)=>`<svg${attrs} xmlns="http://www.w3.org/2000/svg">`+
       `<style>svg{${VARS}}</style>`+
       `<rect x="-9999" y="-9999" width="19998" height="19998" fill="var(--surface)"/>`);
+  // A figure is a few KB. Anything near a megabyte means the harvest above has
+  // swallowed the page again, and a silently enormous asset is exactly the kind
+  // of thing that ships.
+  if(svg.length > 60000){
+    console.error(`${name}.svg is ${(svg.length/1024).toFixed(0)}KB — refusing to write it`);
+    process.exitCode=1; continue;
+  }
   fs.writeFileSync(OUT+name+'.svg',svg);
   manifest.push({id,name,alt,bytes:svg.length});
 }
