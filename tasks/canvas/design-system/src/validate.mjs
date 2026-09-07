@@ -129,7 +129,14 @@ async function checkCodeSync(){
   const {CODE}=await import('./code.mjs');
   const ds=fs.readFileSync(HERE+'ds.mjs','utf8');
   const sc=ds.slice(ds.indexOf('const SC=['), ds.indexOf('const scenarios ='));
-  const rendered=new Set([...sc.matchAll(/\[.([a-z]+\d+[a-z]*)./g)].map(m=>m[1]));
+  // A figure renders if the scenario list names it OR the Concepts page pulls
+  // it in directly — `frames('o0')` or `EX.o1.frames[0]`. Reading only the
+  // scenario list reported every Concepts-only figure as dead code.
+  const rendered=new Set([
+    ...[...sc.matchAll(/\[.([a-z]+\d+[a-z]*)./g)].map(m=>m[1]),
+    ...[...ds.matchAll(/frames\('([a-z]+\d+[a-z]*)'\)/g)].map(m=>m[1]),
+    ...[...ds.matchAll(/EX\.([a-z]+\d+[a-z]*)\b/g)].map(m=>m[1]),
+  ]);
 
   const EX={};
   for(const g of ['items-a','items-bc','items-disc','items-more'])

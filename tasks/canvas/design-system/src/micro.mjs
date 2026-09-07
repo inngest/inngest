@@ -254,7 +254,7 @@ let FRAMED=false;
 // in docs it reads as something being hidden from the reader.
 export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
-export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[]}){
+export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false}){
   const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
   const finY=cy(above+rows.length);
 
@@ -262,7 +262,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[]}){
   // is next and the answer is "nothing". So it is queued, it waits, it starts,
   // and the bar is `disc`: **your app executes for it**, and you are billed for
   // it. Computed before the Run row, because the Run row has to contain it.
-  const fx=Math.min(end+2,90), fq=2.2, fw=4.5, finEnd=fx+fq+fw;
+  const fx=Math.min(end+2,90), fq=2.2, fw=4.5, finEnd=running?end:fx+fq+fw;
 
   /**
    * The Run row is the whole overview, and it is **derived from every row in
@@ -279,16 +279,18 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[]}){
   const intervals=[];
   const add=(kd,x,w)=>{ if(COMPUTE.has(base(kd))) intervals.push({a:x,b:x+w,ok:!isFail(kd)}); };
   rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>add(kd,x,w)));
-  add('disc',fx+fq,fw);
+  if(!running) add('disc',fx+fq,fw);
 
   // The run resolves as its LAST interval, not as "did anything fail". A run
   // that threw and then succeeded is a recovery, and resolving it red would say
   // the opposite of what the row underneath it shows.
   const last=intervals.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
   const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,breaks,
-    resolved:(last&&last.ok===false)?EV.failed:EV.ok},k);
+    resolved:running?null:((last&&last.ok===false)?EV.failed:EV.ok)},k);
 
-  const fin=tag(2,finY+2.5,'Finalization')+
+  // A run still going has not been finalized. Drawing the row anyway would be
+  // the frame asserting an event that has not happened.
+  const fin=running?'':tag(2,finY+2.5,'Finalization')+
     barSvg('idle',fx,fq,finY,{k:1,floor:k,o:1})+
     barSvg('disc',fx+fq,fw,finY,{k:1,floor:k,o:1})+
     dot(px(fx),finY,EV.queued)+
@@ -332,7 +334,32 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[]}){
  *
  * Returns `at(t)` — real time to drawn position — and the bands to mark.
  */
-export function elastic(total, dead=[], {plot=86, threshold=0.03, budget=16, minBand=1.1, maxBand=4, inset=2}={}){
+/**
+ * The stretches of a run where **nothing at all was executing**.
+ *
+ * This is what decides where compression is allowed. A gap in one row is not
+ * dead time — another row may be working through it — so the compute intervals
+ * of every row are merged first and the holes in that union are the candidates.
+ * Any other rule would compress a stretch that something was running in.
+ */
+export function deadStretches(total, compute=[]){
+  const busy=[...compute].filter(([a,b])=>b>a).sort((x,y)=>x[0]-y[0]);
+  const merged=[];
+  for(const [a,b] of busy){
+    const last=merged[merged.length-1];
+    if(last && a<=last[1]) last[1]=Math.max(last[1],b);
+    else merged.push([a,b]);
+  }
+  const gaps=[]; let at=0;
+  for(const [a,b] of merged){ if(a>at) gaps.push([at,a]); at=Math.max(at,b); }
+  if(at<total) gaps.push([at,total]);
+  return gaps;
+}
+
+export function elastic(total, dead=[], {plot=86, threshold=0.03, budget=16, minBand=1.1, maxBand=4, inset=2, compute}={}){
+  // Given the compute intervals, work out the dead stretches rather than being
+  // told them: only a stretch with nothing running anywhere may be compressed.
+  if(compute) dead=deadStretches(total, compute);
   let cuts=dead
     .map(([a,b])=>[Math.max(0,a),Math.min(total,b)])
     .filter(([a,b])=>b-a > total*threshold)
@@ -457,7 +484,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
-    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[]});
+    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running});
     const soft=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.soft,LBL,k)}</g>`;
     ctx=(opts.breaks&&opts.breaks.length)
       ? stretch(F.sharp,LBL,k)+soft

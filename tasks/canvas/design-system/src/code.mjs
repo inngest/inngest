@@ -45,8 +45,21 @@ export const CODE={
 await step.sleep('gap', '7d')
 await step.run('right', …)    // 10s`,
  t1c:`for (const i of items) {          // 9\n  await step.run('poll', …)\n  await step.sleep('nap', '2m')\n}`,
+ t1d:`await step.run('a', …)
+await step.sleep('nap', '3h')
+// still sleeping`,
+ t1e:`await Promise.all([
+  (async () => {
+    await step.run('a', …)
+    await step.sleep('a', '18s')
+  })(),
+  step.run('b', …),
+])
+await step.sleep('c', '15m')
+await step.run('c', …)
+await step.run('d', …)`,
  t2:`await step.run('a', …)\nawait step.sleep('nap', '7d')\nawait step.run('b', …)`,
- t3:`await step.run('a', …)\nawait step.run('b', …)   // a day later`,
+ t3:`// a run measured in days\n// keeps its resolution`,
  t4:`await step.run('a', …)     // 12ms\nawait step.sleep('nap', '2s')\nawait step.run('b', …)     // 10ms`,
  s1:`await step.run('setup', …)\n\nfor (const i of items) {        // 500\n  await step.run('fetch', …)\n}\n\nawait step.run('teardown', …)`,
  s2:`await Promise.all(\n  items.map(() =>                // 12\n    step.run('worker', …)),\n)\nawait step.run('collect', …)`,
@@ -56,6 +69,7 @@ await step.run('right', …)    // 10s`,
  n2:`await Promise.all([\n  step.run('fetch', …),\n  step.run('fetch', …),\n])\n// the SDK reports them as\n// fetch:1 and fetch:2, assigned\n// by encounter order`,
  i1:`await Promise.all([\n  step.run('a', …),\n  step.run('b', …),\n  step.run('c', …),\n])\nawait step.run('d', …)`,
  i2:`await step.run('b', …)\nawait step.run('c', …)   // threw`,
+ o0:`await step.run('charge', async () => {\n  await fetch('/pay', …)\n  await db.query('SELECT …')\n  await db.query('UPDATE …')\n})`,
  o1:`await step.run('charge', async () => {\n  await fetch('/pay', …)\n  await db.query('SELECT …')\n  await db.query('UPDATE …')\n})`,
  o2:`await step.run('charge', async () => {\n  await fetch('/pay', …)\n  await db.query('SELECT …')\n})`,
  h1:`await Promise.all([\n  step.run('a', …),\n  step.run('b', …),\n])\n// nothing reported which of these\n// caused the request for c\nawait step.run('c', …)`,

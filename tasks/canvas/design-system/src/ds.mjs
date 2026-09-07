@@ -204,6 +204,8 @@ const SC=[
   ['t1','Dead time is worth almost none of the width. The threshold is low, the band is fixed, and only the drawing compresses — every duration is still wall clock.'],
   ['t1b','The width left over splits by real duration, so a second is the same number of pixels wherever it lands.'],
   ['t1c','Many compressions share one budget. Each band thins rather than the trace spending its width on nothing.'],
+  ['t1d','A wait that has not resolved still compresses. No closing mark, and no Finalization row: the run is still going.'],
+  ['t1e','A gap in one row is not dead time. Only a stretch with nothing running anywhere is a candidate.'],
   ['t2','Seven days elapsed, 62ms executing. The fill rule reports that before you have read a number.'],
   ['t3','Two tiers of axis label, so a run measured in days keeps its resolution without a second axis.'],
   ['t4','A step too short to draw is still drawn, at a minimum width, with its real duration beside it.'],
@@ -221,10 +223,6 @@ const SC=[
  ['Interaction', [
   ['i1','Three tiers of attention: the row, what caused it, everything else. Nothing is removed, only quietened.'],
   ['i2','The Run row is the overview. One picture of the run, not two.'],
- ]],
- ['OpenTelemetry', [
-  ['o1','Spans from @inngest/otel are your code at finer grain: nested under the step, thinner, same status colours.'],
-  ['o2','A span sits inside its step. One that outruns it is a clock disagreement, and the row says so rather than clamping.'],
  ]],
  ['Honesty', [
   ['h1','Where the trace cannot say what caused a request, it declines rather than guessing.'],
@@ -579,6 +577,16 @@ ${fig(EX.t1.frames[0].svg,'The cut takes the middle of the sleep, so the bar vis
 ${fig(EX.t1b.frames[0].svg,'Thirty seconds of work on one side and ten on the other: the remaining width splits 75/25.')}
 <p>The bands share one budget, so a run full of idle stretches does not spend its width on the parts where nothing happened. They thin instead, and below a width that can hold them a band drops its label, then its tear, leaving a marked line. The rules and the blur never go — they are what says <em>not to scale</em>.</p>
 ${fig(EX.t1c.frames[0].svg,'Eight compressions sharing one budget. The polls between them still share the one scale.')}
+
+<h2>Your server, in detail</h2>
+<p>A step instrumented with <code>@inngest/otel</code> reports what your code did inside it — HTTP calls, database queries, third-party APIs. Everything above this point is Inngest&rsquo;s own timing; this is the first thing in the trace that is not.</p>
+<p>They are <em>your code at finer grain</em>, so they keep the status colours a step has. What separates them from a step is <strong>nesting and weight, not a new colour</strong>: a span is a subdivision of the bar above it, never a peer of it.</p>
+${frames('o0')}
+<div class="rule">A span subdivides a step. It does not add a row to the run until you ask for one.</div>
+<p>At rest the notches are the same idiom a collapsed group uses for its members: you can see there were three things in there and roughly where, without expanding. The gap after the last notch is your code doing something no span covers, which is worth seeing too.</p>
+${fig(EX.o1.frames[0].svg,'Expanded: indented, thinner, same status colours. The step is still the thing that retried — a span inside it is not separately retryable.')}
+<p>The nesting is a claim, and the trace has to be able to keep it.</p>
+${fig(EX.o2.frames[0].svg,'A span sits inside its step, because that is where it ran. One that outruns it is a clock disagreement between your process and ours, not a slow query, and the row says so rather than clamping quietly.')}
 
 <h2>The selected row</h2>
 <p>A row is plotted against the whole run, so a step that took ten seconds inside a twenty minute run is a few pixels wide and its marks overlap. Selecting it replots that row across the full width using the same bars and marks, and names each piece: intervals with their durations, marks with what happened. Hover a piece for its description.</p>

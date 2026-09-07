@@ -91,6 +91,34 @@ D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts 
       {margin:0,breaks:el.bands.map(b=>[b.p0,b.p1,b.label?'2m':''])});
   })()});
 
+D('t1d',{d:'A wait that has not resolved still compresses. The run is asleep right now: the bar is blue and carries no closing mark, because the missing mark is what says unresolved &mdash; and the dead time inside it is real whether or not it has finished. There is no Finalization row, because the run has not been finalized.',
+  svg:(()=>{
+    const total=20+3*3600;
+    const el=elastic(total, [], {compute:[[0,20]]});
+    const g=(k,a,b)=>[k, el.at(a), el.at(b)-el.at(a)];
+    const bd=el.bands[0];
+    return fig([
+      {n:'a',   segs:[g('good',0,20)]},
+      {n:'nap', segs:[g('wait',20,total)],note:'sleeping'},
+    ],'','an unresolved wait, compressed','',
+      {margin:0,running:true,breaks:[[bd.p0,bd.p1,'3h']]});
+  })()});
+
+D('t1e',{d:'Choosing where to cut. A gap in <em>one</em> row is not dead time &mdash; something else may be running through it &mdash; so the compute of every row is merged first and only the holes in that union are candidates. Here <code>b</code> works straight through <code>a</code>&rsquo;s wait, so nothing is compressed there however long it looks; the one stretch with nothing running anywhere is.',
+  svg:(()=>{
+    const compute=[[0,8],[4,26],[900,914],[914,930]];
+    const total=940;
+    const el=elastic(total, [], {compute});
+    const g=(k,a,b)=>[k, el.at(a), el.at(b)-el.at(a)];
+    return fig([
+      {n:'a', segs:[g('good',0,8),g('waitok',8,26)]},
+      {n:'b', segs:[g('good',4,26)]},
+      {n:'c', segs:[g('waitok',26,900),g('good',900,914)]},
+      {n:'d', segs:[g('good',914,930)]},
+    ],'','only the stretch with nothing running','',
+      {margin:0,breaks:el.bands.map(b=>[b.p0,b.p1,'15m'])});
+  })()});
+
 D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you that before you have read a number, which is the point of the height rule.',
   svg:fig([
     {run:true, end:100, intervals:[{a:0,b:1.2,ok:true},{a:58,b:59,ok:true},{a:63,b:64.5,ok:true}], resolvedAt:100, resolvedAs:EV.ok},
@@ -100,15 +128,12 @@ D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you 
   ],'','62ms of execution inside seven days')});
 
 D('t3',{d:'Two tiers of axis label. The coarse tier carries what the run crossed, the fine tier carries offsets inside it, so a run measured in days keeps its resolution without a second axis.',
-  svg:fig([
-    {n:'a', segs:[['good',0,10]]},
-    {n:'b', segs:[['idle',10,40],['good',50,36]]},
-  ],'','two-tier axis labels','',{pad:52,
-    // Below finalization, because an axis belongs at the foot of the trace. It
-    // was drawn between the rows and finalization, where it read as a stray
-    // timeline someone had left in the middle of the run.
-    over:()=>axis(cy(4)+8,[[0,'0'],[25,'+6h'],[50,'+12h'],[75,'+18h'],[100,'+24h']],
-                  {tier2:[[0,'Mar 4'],[50,'Mar 5']]})})});
+  // No rows. This figure is about the axis, so it draws the axis and nothing
+  // else — put under a trace it reads as a stray timeline left in the middle of
+  // a run, which is exactly what it looked like.
+  svg:fig([],axis(cy(0)+2,[[0,'0'],[25,'+6h'],[50,'+12h'],[75,'+18h'],[100,'+24h']],
+                 {tier2:[[0,'Mar 4'],[50,'Mar 5']]}),
+    'two-tier axis labels','',{frame:false,rowCount:1,pad:26})});
 
 D('t4',{d:'A step too short to draw is still drawn. It gets a minimum width so it can be pointed at, and the number beside it is the real one: the drawing rounds, the reported duration does not.',
   svg:fig([
@@ -203,6 +228,24 @@ D('i2',{d:'The Run row <em>is</em> the overview. There was a minimap above it dr
 
 // ---- OpenTelemetry ------------------------------------------------------
 
+D('o0',{d:'How they get into the trace. At rest a step with userland spans is still one row &mdash; the spans are <em>inside</em> its execution, so they subdivide the bar rather than adding rows to the run. The notches are where each span began, in the same idiom a collapsed group uses for its members, so you can see there were three things in there and roughly where without expanding anything. The gap after the last notch is your code doing something no span covers, and that is worth seeing too.',
+  frames:(()=>{
+    const spans=[[9,38],[49,12],[63,14]];
+    const notch=x=>`<line x1="${px(x).toFixed(1)}" y1="${cy(0)-3.5}" x2="${px(x).toFixed(1)}" y2="${cy(0)+3.5}" stroke="var(--ground)" stroke-width="1" opacity=".55"/>`;
+    const step={n:'charge',segs:[['idle',0,6],['good',6,74]]};
+    return [
+      {l:'at rest', svg:fig([step],
+        spans.map(([a])=>notch(a)).join('')+tag(px(81),cy(0)+2.5,'3 spans'),
+        'spans as notches in the step')},
+      {l:'expanded', svg:fig([
+        step,
+        {n:'  ↳ POST /pay', segs:[['good',9,38]],thin:true},
+        {n:'  ↳ SELECT',    segs:[['good',49,12]],thin:true},
+        {n:'  ↳ UPDATE',    segs:[['good',63,14]],thin:true},
+      ],'','the same spans, expanded')},
+    ];
+  })()});
+
 D('o1',{d:'A step instrumented with <code>@inngest/otel</code> reports what your code did inside it &mdash; HTTP calls, database queries, third-party APIs. Those spans are <em>your code at finer grain</em>, so they keep the status colours a step has and are distinguished by <strong>nesting and weight, not by a new colour</strong>: indented under the step, drawn thinner, because each is a subdivision of the bar above rather than a peer of it. The step is still the thing that retried; a span inside it is not separately retryable.',
   svg:fig([
     {n:'charge',        segs:[['idle',0,6],['good',6,74]]},
@@ -238,5 +281,6 @@ D('h3',{d:'Nothing is drawn that cannot be asked what it is. Every interval and 
   ],'','everything decomposes')});
 
 fs.writeFileSync(HERE+'items-more.json',JSON.stringify(
-  Object.fromEntries(Object.entries(E).map(([k,v])=>[k,{d:v.d,frames:[{l:'at rest',svg:v.svg}]}]))));
+  Object.fromEntries(Object.entries(E).map(([k,v])=>
+    [k,{d:v.d,frames:v.frames||[{l:'at rest',svg:v.svg}]}]))));
 console.log('more',Object.keys(E).length);
