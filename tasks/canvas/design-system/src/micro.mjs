@@ -1,4 +1,5 @@
 import fs from 'fs';
+import * as R from './rules.mjs';
 import { GEOM } from './vocabulary.mjs';
 export const {W,LBL,RGT,PLOT,ROW,TOP}=GEOM;
 export { GEOM };
@@ -10,7 +11,7 @@ export const setNotes=on=>{NOTES=on;};
 export const px=p=>LBL+(p/100)*PLOT;
 export const cy=i=>TOP+9+ROW*i;
 /** Row pitch for a userland span: tight enough that the bars nearly touch. */
-export const SPAN_ROW=9;
+export const SPAN_ROW=R.GEOM.SPAN_ROW;
 /** y for each row, honouring any that sit on the tighter span pitch. */
 export const rowYs=rows=>{
   const ys=[]; let y=cy(0);
@@ -265,7 +266,7 @@ function groupRowAt(i, {n, x, w, members, kind='good', note=''}){
  * one, or it renders with a blank row at the top.
  */
 export const FRAME_ROWS_ABOVE=1;
-const CTX_O=0.34;
+const CTX_O=R.FRAME.opacity;
 
 /**
  * Scenario figures are framed; reference figures (the vocabulary panel, the
@@ -389,7 +390,9 @@ export function deadStretches(total, compute=[]){
   return gaps;
 }
 
-export function elastic(total, dead=[], {plot=86, threshold=0.03, budget=16, minBand=1.1, maxBand=4, inset=2, compute}={}){
+export function elastic(total, dead=[], {plot=86, threshold=R.ELASTIC.floor,
+    budget=R.ELASTIC.budget, minBand=R.ELASTIC.minBand, maxBand=R.ELASTIC.maxBand,
+    inset=R.ELASTIC.inset, compute}={}){
   // Given the compute intervals, work out the dead stretches rather than being
   // told them: only a stretch with nothing running anywhere may be compressed.
   if(compute) dead=deadStretches(total, compute);
@@ -436,7 +439,7 @@ export function elastic(total, dead=[], {plot=86, threshold=0.03, budget=16, min
   // and the blur always stay: they are what says "not to scale".
   const marks = cuts.map(([a,b])=>({
     p0: at(a), p1: at(b),
-    label: bandW>=2.6, tear: bandW>=1.8,
+    label: bandW>=R.ELASTIC.labelAt, tear: bandW>=R.ELASTIC.tearAt,
   }));
   return {at, bands:marks, bandW, cuts};
 }
@@ -503,11 +506,11 @@ export function compression(breaks, h, uid){
   // strength they read as a row of smears cutting the trace up rather than as
   // one region being marked as not-to-scale.
   const n=breaks.length;
-  const sd=Math.max(0.3, 1.4 - (n-1)*0.16);
+  const sd=Math.max(R.BAND.blurFloor, R.BAND.blur - (n-1)*R.BAND.blurFalloff);
   // Two full-height lines mark a cut. Sixteen of them at full strength cut the
   // trace into ribbons and become the loudest thing in it, so they fade as they
   // multiply — the same reasoning as the blur above.
-  const ruleO=Math.max(0.28, 0.9 - (n-1)*0.09).toFixed(2);
+  const ruleO=Math.max(R.BAND.ruleFloor, R.BAND.ruleOpacity - (n-1)*R.BAND.ruleFalloff).toFixed(2);
   const filter=`<filter id="cmp-b-${uid}" x="-30%" y="-10%" width="160%" height="120%">`+
     `<feGaussianBlur stdDeviation="${sd.toFixed(2)}"/><feColorMatrix type="saturate" values="0.55"/></filter>`;
   const rects=breaks.map(([a,b])=>
@@ -577,7 +580,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
        */
       const busy=compute.reduce((n,[a,b])=>n+(b-a),0);
       const el=elastic(end, [], {compute, plot:end, inset:end*0.02,
-        threshold:Math.max(0.03, busy*3/end)});
+        threshold:Math.max(R.ELASTIC.floor, busy*R.ELASTIC.computeMultiple/end)});
       if(el.bands.length){
         const at=el.at;
         rows=rows.map(r=>r.run

@@ -15,13 +15,8 @@
  * including the one that draws the scrubbable fixtures in the browser, reads
  * these rather than restating them.
  */
-export const GEOM = {
-  W:470, LBL:64, RGT:10, PLOT:396,   // PLOT = W - LBL - RGT
-  ROW:17, TOP:6,
-  BAR_H:7, RUN_H:8, TRACK_H:5,       // step bar, run profile slice, run track
-  MARK_R:3, HALO:1.3,                // mark radius, and the ring of surface behind it
-  MIN_W:1.4, MIN_FAIL_W:3.2,         // a bar never narrower than this on screen
-};
+export { GEOM } from './rules.mjs';
+import { GEOM } from './rules.mjs';
 export const cyOf = i => GEOM.TOP + 9 + GEOM.ROW * i;
 export const pxOf = (p, k=1) => GEOM.LBL + ((p/100)*GEOM.PLOT)*k;
 

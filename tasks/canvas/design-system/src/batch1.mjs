@@ -1,7 +1,25 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {lineage,panel,px,cy,arrow,dot,C,W,LBL,PLOT,ROW,TOP,runRow} from './render.mjs';
-const g=JSON.parse(fs.readFileSync(HERE+'geom.json','utf8'));
+import {fig,lineage,px,cy,arrow,dot,C,W,LBL,PLOT,ROW,TOP,setFrame} from './micro.mjs';
+setFrame(true);
+
+/**
+ * The captured fixtures went through a SECOND RENDERER — its own `panel`,
+ * `row` and `runRow`, its own width, row pitch and label gutter — so they got
+ * none of the rules: no frame, no compression, no live geometry, and a Run row
+ * they declared for themselves. They looked authored because they were drawn by
+ * a different program.
+ *
+ * This adapts the captured shape onto the one renderer. The Run row and the
+ * Finalization row are dropped on the way in, because the frame derives both
+ * from the rows beneath — a captured fixture declaring either is a second
+ * account of the same run.
+ */
+const panel=(rows,extra='',label='')=>fig(
+  rows.filter(r=>r.run===undefined && r.name!=='Finalization')
+      .map(r=>({n:r.name, segs:(r.segs||[]).map(g=>[g.kind,g.x,g.w]),
+                note:[r.dur,r.note].filter(Boolean).join(' · ')})),
+  extra, label);
 const F={};
 const note=(t,i,x=LBL)=>`<text x="${x}" y="${cy(i)+4}" font-family="JetBrains Mono, monospace" font-size="7.5" fill="${C.mut}">${t}</text>`;
 

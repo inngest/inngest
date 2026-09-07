@@ -1,6 +1,6 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {panel,px,cy,C,W,LBL,PLOT,ROW,TOP,dot,EV} from './render.mjs';
+import {px,cy,C,W,LBL,PLOT,ROW,TOP,dot,EV} from './micro.mjs';
 const MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 const COMPUTE='var(--compute)';
 

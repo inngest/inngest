@@ -80,6 +80,17 @@ millions; six units of queue beside a hundred of work does not pass at all.
 
 So:
 
+- **`src/rules.mjs` is where the rules live.** Geometry, the elastic thresholds,
+  how a band is drawn, the frame, attention, the panel's controls, and the
+  interval a pair of moments implies. If you are typing a number into
+  `vocabulary.mjs`, `micro.mjs` or `ds.mjs`, it belongs there instead — the rules
+  were spread across 2,142 lines of drawing code, so "change the rule" meant
+  "find every place that encoded it".
+- **There is one renderer.** `render.mjs` was a second one, with its own width,
+  row pitch and label gutter, and the captured fixtures went through it — which
+  is why they had no frame, no compression, no live geometry and a Run row they
+  declared themselves. Deleted. A second renderer is the same interval drawn
+  twice under two names, at the level of the code.
 - `layout(total, rows)` in `micro.mjs` is **the one place the elastic rule
   lives.** It derives the dead stretches from where nothing was executing across
   every row, collapses what is over the threshold, and shares the remaining
