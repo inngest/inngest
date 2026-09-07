@@ -459,7 +459,13 @@ const page=`<title>Trace Design System</title>
                                  + (var(--geo-span,9px) - 9px) * var(--s,0)))}
   /* The framed body sits a whole number of pitches below the Run row. */
   svg g.dy{transform:translateY(calc(var(--geo-row,17px) * var(--a,0)))}
+  /* A compressed stretch is marked across every row, so its height is the
+     figure's — which moves with the pitch sliders. */
+  svg rect.cmpband{height:var(--fig-h)}
+  svg g.cmpmid{transform:translateY(calc((var(--fig-h) - var(--fig-h0)) / 2))}
   /* A ribbon spans N row gaps, so it restretches with the pitch. */
+  svg rect.run-track{height:var(--geo-trk,5px);transform:translateY(calc(var(--geo-trk,5px) / -2))}
+  svg rect.run-slice{height:var(--geo-run,8px);transform:translateY(calc(var(--geo-run,8px) / -2))}
   svg rect.rib{height:calc(var(--geo-row,17px) * var(--n,1));
     transform:translateY(calc((var(--geo-row,17px) - 17px) * var(--i,0)))}
   /* The hit target is a row's worth of height, so it never hangs below the
@@ -819,12 +825,11 @@ ${fig(J.connect.poll)}
       if(c[0]>=t) return;
       var x0=pxOf(c[0],k), x1=pxOf(Math.min(c[1],t),k);
       if(x1<=x0) return;
-      band+='<rect x="'+x0.toFixed(1)+'" y="0" width="'+(x1-x0).toFixed(1)+'" height="'+h+'" fill="var(--ground)" opacity=".28"/>'
-        +'<line x1="'+x0.toFixed(1)+'" y1="0" x2="'+x0.toFixed(1)+'" y2="'+h+'" stroke="var(--rule-2)" stroke-width="1" opacity=".9"/>'
-        +'<line x1="'+x1.toFixed(1)+'" y1="0" x2="'+x1.toFixed(1)+'" y2="'+h+'" stroke="var(--rule-2)" stroke-width="1" opacity=".9"/>'
-        +(c[2]?'<text x="'+((x0+x1)/2).toFixed(1)+'" y="'+(h/2+2).toFixed(1)+'" '+MONO
+      band+='<rect class="cmpband" x="'+x0.toFixed(1)+'" y="0" width="'+(x1-x0).toFixed(1)+'" height="'+h+'" fill="var(--ground)" opacity=".28"/>'
+        +[x0,x1].map(function(x){ return '<rect class="cmpband" x="'+(x-0.5).toFixed(1)+'" y="0" width="1" height="'+h+'" fill="var(--rule-2)" opacity=".9"/>'; }).join('')
+        +(c[2]?'<g class="cmpmid"><text x="'+((x0+x1)/2).toFixed(1)+'" y="'+(h/2+2).toFixed(1)+'" '+MONO
           +' font-size="6.5" fill="var(--ink-2)" text-anchor="middle" paint-order="stroke"'
-          +' stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">'+c[2]+'</text>':'');
+          +' stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">'+c[2]+'</text></g>':'');
     });
     out+=band;
     var label=function(n,y){ return '<text x="2" y="'+(y+2.5)+'" '+MONO+' font-size="7" fill="var(--muted)">'+n+'</text>'; };
@@ -832,17 +837,19 @@ ${fig(J.connect.poll)}
       var y=cyOf(i);
       if(r.run){
         var to=Math.min(t,r.end);
+        out+='<g class="r" style="--i:'+i+';--s:0">';
         out+=label('Run',y);
-        out+='<rect x="'+GEOM.LBL+'" y="'+(y-GEOM.TRACK_H/2)+'" width="'+((to/100)*GEOM.PLOT*k).toFixed(2)+'" height="'+GEOM.TRACK_H+'" rx="1.2" fill="var(--rule-2)"/>';
+        out+='<rect class="run-track" x="'+GEOM.LBL+'" y="'+y+'" width="'+((to/100)*GEOM.PLOT*k).toFixed(2)+'" height="'+GEOM.TRACK_H+'" rx="1.2" fill="var(--rule-2)"/>';
         r.iv.forEach(function(v){
           var b=Math.min(v[1],to); if(b<=v[0]) return;
           var running=v[1]>to;
           var col=running?'var(--disc)':v[2]===0?'var(--warn)':v[2]===2?'var(--muted)':'var(--good)';
           var w=Math.max(v[2]===0&&!running?GEOM.MIN_FAIL_W:GEOM.MIN_W, ((b-v[0])/100)*GEOM.PLOT*k);
-          out+='<rect x="'+pxOf(v[0],k).toFixed(2)+'" y="'+(y-GEOM.RUN_H/2)+'" width="'+w.toFixed(2)+'" height="'+GEOM.RUN_H+'" rx="1.2" fill="'+col+'"/>';
+          out+='<rect class="run-slice" x="'+pxOf(v[0],k).toFixed(2)+'" y="'+y+'" width="'+w.toFixed(2)+'" height="'+GEOM.RUN_H+'" rx="1.2" fill="'+col+'"/>';
         });
         out+=markSvg(GEOM.LBL,y,'queued');
         if(r.ra!=null && t>=r.ra) out+=markSvg(GEOM.LBL+(to/100)*GEOM.PLOT*k,y,r.rs);
+        out+='</g>';
         i++; return;
       }
       var segs=[], parts=[];
@@ -853,6 +860,7 @@ ${fig(J.connect.poll)}
       });
       if(!segs.length) return;
       var marks=r.marks.filter(function(m){ return m[1]<=t+0.001; });
+      out+='<g class="r" style="--i:'+i+';--s:0">';
       out+=label(r.n,y);
       segs.forEach(function(g){ out+=barSvg(g[0],g[1],g[2],y,{k:k}); });
       marks.forEach(function(m){ out+=markSvg(+pxOf(m[1],k).toFixed(2),y,m[0]); });
@@ -867,12 +875,15 @@ ${fig(J.connect.poll)}
         if(bb) parts.push({t:'b',k:kk,n:bb[0],d:bb[1]});
       });
       for(;mi<marks.length;mi++){ var e2=EINFO[marks[mi][0]]; if(e2) parts.push({t:'e',k:marks[mi][0],n:e2[0],d:e2[1]}); }
-      out+='<rect class="rowhit" x="'+(GEOM.LBL-6)+'" y="'+(y-8)+'" width="'+(GEOM.PLOT+12)+'" height="16" fill="transparent" data-row="'+r.n+'" data-parts="'+JSON.stringify(parts).replace(/"/g,'&quot;')+'"/>';
+      out+='<rect class="rowhit" x="'+(GEOM.LBL-6)+'" y="'+y+'" width="'+(GEOM.PLOT+12)+'" height="16" fill="transparent" data-row="'+r.n+'" data-parts="'+JSON.stringify(parts).replace(/"/g,'&quot;')+'"/>';
+      out+='</g>';
       i++;
     });
     // before anything is known: the run, and a step enqueued but not reported
     if(i===1) out+=label('?',cyOf(1))+barSvg('idle',0,t,cyOf(1),{k:k})+markSvg(GEOM.LBL,cyOf(1),'queued');
-    return '<svg viewBox="0 0 '+GEOM.W+' '+h+'" role="img">'+out+'</svg>';
+    // Every row here is on the plain row pitch, so the live height is one term.
+    var figH='calc('+h+'px + (var(--geo-row,'+GEOM.ROW+'px) - '+GEOM.ROW+'px) * '+fx.rowCount+')';
+    return '<svg viewBox="0 0 '+GEOM.W+' '+h+'" style="--fig-h0:'+h+'px;--fig-h:'+figH+'" role="img">'+out+'</svg>';
   }
 
   document.querySelectorAll('.scrub').forEach(function(s){

@@ -21,7 +21,7 @@ export const rowYs=rows=>{
 /** How many gaps of each pitch sit above row i — the multipliers CSS needs. */
 export const rowSteps=rows=>{
   const out=[]; let n=0, m=0;
-  rows.forEach((r,i)=>{ if(i){ if(rows[i].span) m++; else n++; } out.push([n,m]); });
+  rows.forEach((r,i)=>{ if(i){ if(rows[i].span||rows[i-1].span) m++; else n++; } out.push([n,m]); });
   return out;
 };
 export const arrow=(x1,y1,x2,y2,o=1)=>{
@@ -79,10 +79,10 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[]},sc=
     for(const [a,b] of breaks){
       const x0=Math.max(LBL,px(a)), x1=Math.min(end,px(b));
       if(x1<=x0) continue;
-      if(x0>at) s+=`<rect x="${at.toFixed(1)}" y="${y-2.5}" width="${(x0-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
+      if(x0>at) s+=`<rect class="run-track" x="${at.toFixed(1)}" y="${y}" width="${(x0-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
       s+=tear(x0,x1); at=x1;
     }
-    if(end>at) s+=`<rect x="${at.toFixed(1)}" y="${y-2.5}" width="${(end-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
+    if(end>at) s+=`<rect class="run-track" x="${at.toFixed(1)}" y="${y}" width="${(end-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
   }
   // Failures last, so where slices overlap the red is the one left showing.
   const ordered=[...intervals].sort((p,q)=>(p.ok===false?1:0)-(q.ok===false?1:0));
@@ -92,7 +92,7 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[]},sc=
     // Failure stays findable even when the interval is tiny.
     const running=v.b>to;
     const w=Math.max((v.ok===false&&!running?3.2:1.4)/sc, ((b-a)/100)*PLOT);
-    s+=`<rect x="${px(a).toFixed(1)}" y="${y-4}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${running?C.disc:col(v)}"/>`;
+    s+=`<rect class="run-slice" x="${px(a).toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${running?C.disc:col(v)}"/>`;
   }
   s+=dot(LBL,y,EV.queued);
   if(resolved) s+=dot(LBL+(to/100)*PLOT,y,resolved);
@@ -514,15 +514,17 @@ export function compression(breaks, h, uid){
   const filter=`<filter id="cmp-b-${uid}" x="-30%" y="-10%" width="160%" height="120%">`+
     `<feGaussianBlur stdDeviation="${sd.toFixed(2)}"/><feColorMatrix type="saturate" values="0.55"/></filter>`;
   const rects=breaks.map(([a,b])=>
-    `<rect x="${px(a).toFixed(1)}" y="0" width="${(px(b)-px(a)).toFixed(1)}" height="${h}"/>`).join('');
+    `<rect class="cmpband" x="${px(a).toFixed(1)}" y="0" width="${(px(b)-px(a)).toFixed(1)}" height="${h}"/>`).join('');
   const clip=`<defs>${filter}<clipPath id="cmp-${uid}">${rects}</clipPath></defs>`;
   const over=breaks.map(([a,b,t])=>{
     const x0=px(a), x1=px(b), mid=(x0+x1)/2;
-    return `<rect x="${x0.toFixed(1)}" y="0" width="${(x1-x0).toFixed(1)}" height="${h}" fill="var(--ground)" opacity=".28"/>`+
-      [x0,x1].map(x=>`<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${h}" stroke="${C.idle}" stroke-width="1" opacity="${ruleO}"/>`).join('')+
-      (t?`<text x="${mid.toFixed(1)}" y="${(h/2+2).toFixed(1)}" ${MONO} font-size="6.5" `+
+    // The edges are rects rather than lines: a line's y2 is not a CSS
+    // property, so it could not follow the pitch the way the band does.
+    return `<rect class="cmpband" x="${x0.toFixed(1)}" y="0" width="${(x1-x0).toFixed(1)}" height="${h}" fill="var(--ground)" opacity=".28"/>`+
+      [x0,x1].map(x=>`<rect class="cmpband" x="${(x-0.5).toFixed(1)}" y="0" width="1" height="${h}" fill="${C.idle}" opacity="${ruleO}"/>`).join('')+
+      (t?`<g class="cmpmid"><text x="${mid.toFixed(1)}" y="${(h/2+2).toFixed(1)}" ${MONO} font-size="6.5" `+
          `fill="${C.ink2}" text-anchor="middle" paint-order="stroke" `+
-         `stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">${t}</text>`:'');
+         `stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">${t}</text></g>`:'');
   }).join('');
   return {clip, over};
 }
@@ -610,6 +612,12 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const lastY=rows.length?rowYs(rows)[rows.length-1]:cy(0)-ROW;
   const h=lastY+ROW*(1+above+(framed?1:0))+TOP+(opts.pad||0)
     -(rows.length?0:ROW);
+  // The same height expressed in pitch units, so anything drawn full-height
+  // follows the sliders instead of freezing at the pitch it was built at.
+  const _st=rowSteps(rows), _tail=_st.length?_st[_st.length-1]:[0,0];
+  const hRow=_tail[0]+(1+above+(framed?1:0))-(rows.length?0:1), hSpan=_tail[1];
+  const figH=`calc(${h}px + (var(--geo-row,${ROW}px) - ${ROW}px) * ${hRow}`+
+    ` + (var(--geo-span,${SPAN_ROW}px) - ${SPAN_ROW}px) * ${hSpan})`;
   const ends=rows.flatMap(r=>(r.segs||[]).map(([,x,w])=>x+w));
   const max=ends.length?Math.max(...ends):100;
   const k=opts.scale||(max>0?Math.min(86/max,3):1);
@@ -646,7 +654,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     ? `<g clip-path="url(#cmp-${UID})" filter="url(#cmp-b-${UID})">${inner}</g>`
     : '';
   const nr=n+above+(framed?1:0);
-  return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr}" role="img" aria-label="${label}">`+
+  return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${h}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+`</svg>`;
 }
 

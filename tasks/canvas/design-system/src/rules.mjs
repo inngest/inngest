@@ -87,6 +87,7 @@ export const CONTROLS = [
   {k:'--geo-sbar', n:'span bar height',   d:+(GEOM.BAR_H*GEOM.SPAN_BAR).toFixed(1), lo:0, hi:12, st:0.2},
   {k:'--geo-span', n:'span row pitch',    d:GEOM.SPAN_ROW,lo:0, hi:24},
   {k:'--geo-run',  n:'run row height',    d:GEOM.RUN_H,   lo:0, hi:18},
+  {k:'--geo-trk',  n:'run track height',  d:GEOM.TRACK_H, lo:0, hi:14, st:0.5},
   {k:'--geo-gap',  n:'gap between segments', d:0,         lo:0, hi:8,  st:0.25},
 ];
 
