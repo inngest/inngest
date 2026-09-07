@@ -23,12 +23,10 @@ E.c68={d:'Every attempt failed, so no step was ever produced and there is no row
   {l:'at rest',svg:fig([
     {n:'a',segs:[['good',0,18]]},
     {n:'discovery',segs:[['disc!',22,8],['idle',30,10],['disc!',40,8],['idle',48,18],['disc!',66,8]],note:'3 attempts  gave up'},
-    {n:'Run',segs:[['idle',0,74],['bad',74,3]],dim:.6,note:'FAILED'},
   ],'','discovery exhausted')},
   {l:'hovering the request',svg:fig([
     {n:'a',segs:[['good',0,18]],dim:DIM},
     {n:'discovery',segs:[['disc!',22,8],['idle',30,10],['disc!',40,8],['idle',48,18],['disc!',66,8]],note:'gave up',sel:true},
-    {n:'Run',segs:[['idle',0,74],['bad',74,3]],dim:DIM},
   ],arrow(px(18),cy(0),px(22),cy(1))+tag(px(76),cy(1)+2.5,'no step was ever produced',C.mut),'discovery exhausted, hovered')},
  ]};
 

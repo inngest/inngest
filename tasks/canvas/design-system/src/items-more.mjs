@@ -152,7 +152,7 @@ D('s1',{d:'Five hundred sequential steps do not become five hundred rows. Repeti
       {n:'', segs:[]},
       {n:'teardown', segs:[['idle',88,2],['good',90,8]]},
     ], groupRow(1,{n:'× 500 fetch',x:3,w:79,members,note:'500 · 0 failed'}),
-      'five hundred steps, one row');
+      'five hundred steps, one row','',{busy:[[3,82]]});
   })()});
 
 D('s2',{d:'The same collapse for a wide fan-out. The envelope is the level and the ticks are the members, so the stagger of a concurrency limit is visible without expanding anything.',
@@ -163,7 +163,7 @@ D('s2',{d:'The same collapse for a wide fan-out. The envelope is the level and t
       {n:'', segs:[]},
       {n:'collect', segs:[['disc',80,2],['idle',82,3],['good',85,12]]},
     ], groupRow(1,{n:'× 12 worker',x:5,w:70,members,note:'12 · staggered'}),
-      'a wide fan-out, collapsed');
+      'a wide fan-out, collapsed','',{busy:[[5,75]]});
   })()});
 
 D('s3',{d:'A cluster of failures two thirds through a 500-step run is a red smear on the Run row, findable in the first screenful without scrolling or interacting. This is what the failure-wins rule buys: under the old &ldquo;only if every step agrees&rdquo; rule these slices held successes too, so the cluster drew neutral blue and disappeared at exactly the scale it matters.',

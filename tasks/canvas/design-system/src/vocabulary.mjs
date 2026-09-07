@@ -318,6 +318,62 @@ export function wire(x1, y1, x2, y2, { o = 1, r = 3, i = 0 } = {}) {
  * finished SVG about the left edge of the plot, so bars, circles, ribbons and
  * cables all move together. Radii and stroke widths are left alone.
  */
+/**
+ * Rewrite every x in a generated fragment through a mapping of the time axis.
+ *
+ * Rows can be laid out before they are drawn, but arrows, ribbons, cables and
+ * annotations are handed to `fig` already drawn, in pixels. Without this they
+ * stay on the old axis and point at nothing — which is why compression could
+ * only ever be applied to figures that had none of them.
+ *
+ * Modelled on `stretch`, which already proves the technique: the same set of
+ * attributes, the same path walk. Anything left of the label gutter is a label
+ * and does not move.
+ */
+export function remapX(svg, LBL, at){
+  const X = v => {
+    const n = parseFloat(v);
+    if(!(n > LBL)) return String(n);
+    const p = (n - LBL) * 100 / GEOM.PLOT;
+    return (LBL + at(p) / 100 * GEOM.PLOT).toFixed(2);
+  };
+  const defs = svg.match(/<defs>[\s\S]*?<\/defs>/);
+  const head = defs ? defs[0] : '';
+  let body = defs ? svg.replace(head, '\u0000DEFS\u0000') : svg;
+  body = body
+    .replace(/<rect ([^>]*?)x="([\d.-]+)"([^>]*?)width="([\d.]+)"/g,
+      (m,a,x,b,w) => {
+        const x0=parseFloat(x), x1=x0+parseFloat(w);
+        const n0=parseFloat(X(x0)), n1=parseFloat(X(x1));
+        return `<rect ${a}x="${n0.toFixed(2)}"${b}width="${Math.max(0.4,n1-n0).toFixed(2)}"`;
+      })
+    .replace(/--w:([\d.]+)px/g, m => m)   // recomputed below by the width rewrite
+    .replace(/cx="([\d.-]+)"/g, (m,x) => `cx="${X(x)}"`)
+    .replace(/<text ([^>]*?)x="([\d.-]+)"/g, (m,a,x) => `<text ${a}x="${X(x)}"`)
+    .replace(/x1="([\d.-]+)"/g, (m,x) => `x1="${X(x)}"`)
+    .replace(/x2="([\d.-]+)"/g, (m,x) => `x2="${X(x)}"`)
+    .replace(/ d="([^"]+)"/g, (m,d) => {
+      let out='', cmd='';
+      const toks = d.match(/[A-Za-z]|-?[\d.]+/g) || [];
+      const nums = [];
+      const flush = () => {
+        if(!cmd) return;
+        if(cmd==='H') out += ' H' + nums.map(X).join(' ');
+        else if(cmd==='V') out += ' V' + nums.join(' ');
+        else if(cmd==='Z') out += ' Z';
+        else out += ' ' + cmd + nums.map((v,j)=> j%2===0 ? X(v) : v).join(' ');
+        nums.length = 0;
+      };
+      for(const t of toks){
+        if(/[A-Za-z]/.test(t)){ flush(); cmd = t; }
+        else nums.push(t);
+      }
+      flush();
+      return ` d="${out.trim()}"`;
+    });
+  return defs ? body.replace('\u0000DEFS\u0000', head) : body;
+}
+
 export function stretch(svg, LBL, k){
   if(!(k>1.001)) return svg;
   const X = v => { const n = parseFloat(v); return n < LBL ? String(n) : (LBL + (n - LBL) * k).toFixed(2); };

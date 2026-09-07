@@ -3,7 +3,7 @@ import { GEOM } from './vocabulary.mjs';
 export const {W,LBL,RGT,PLOT,ROW,TOP}=GEOM;
 export { GEOM };
 export { C, EV, HATCH, dot, base, isFail, FILL, COMPUTE, NOCOMPUTE, ACTIVE, OPEN, paint, autoDots, discovered, lineage, barSvg, markSvg, cyOf, pxOf, BAR_INFO, EVENT_INFO, EVC, SUBSTANCE, substanceCSS, eventCSS } from './vocabulary.mjs';
-import { C, EV, HATCH, dot, base, paint, autoDots, OPEN, COMPUTE, isFail, barSvg, causalRibbon as _cr, wire, fillGaps, stretch, BAR_INFO, EVENT_INFO } from './vocabulary.mjs';
+import { C, EV, HATCH, dot, base, paint, autoDots, OPEN, COMPUTE, isFail, barSvg, causalRibbon as _cr, wire, fillGaps, stretch, remapX, BAR_INFO, EVENT_INFO } from './vocabulary.mjs';
 const MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 let NOTES=false;
 export const setNotes=on=>{NOTES=on;};
@@ -541,16 +541,58 @@ process.on('exit',()=>{
 });
 
 export function fig(rows,extra='',label='',under='',opts={}){
+  if(under&&typeof under==='object'){ opts=under; under=''; }
+  /**
+   * The elastic rule, applied to every figure rather than to the ones that
+   * remembered to ask.
+   *
+   * A figure's coordinates are already a linear time axis, and the threshold is
+   * a FRACTION of the run — so percentages carry everything the rule needs and
+   * no figure has to invent durations it never measured. What a percentage
+   * cannot give is the band's label, since naming the elapsed time needs a
+   * duration; a converted figure marks the cut without naming it.
+   *
+   * The pre-drawn content — arrows, ribbons, cables, annotations — is remapped
+   * through the same function, which is what made this possible at all.
+   */
   if(!opts.breaks && !opts.linear && rows.some(r=>r.segs)){
-    const compute=[];
-    let end=0;
+    const compute=[]; let end=0;
     rows.forEach(r=>(r.segs||[]).forEach(([kd,a,w])=>{
       end=Math.max(end,a+w);
       if(COMPUTE.has(base(kd))) compute.push([a,a+w]);
     }));
+    (opts.busy||[]).forEach(([a,b])=>{ compute.push([a,b]); end=Math.max(end,b); });
     if(compute.length && end>0){
-      const dead=deadStretches(end, compute).filter(([a,b])=>b-a > end*0.25);
-      if(dead.length) UNRULED.push({label, worst:+(Math.max(...dead.map(d=>d[1]-d[0]))/end*100).toFixed(0)});
+      /**
+       * A dead stretch is only worth compressing when it DWARFS the work — not
+       * merely when it is a few percent of the run. A flat fraction compressed
+       * ordinary queue intervals, which are short, meaningful, and exactly the
+       * thing the trace is there to show.
+       *
+       * The test is scale-free, which matters because a figure has proportions
+       * and not durations: a stretch qualifies when it is longer than all the
+       * compute in the run put together, several times over. Seven days beside
+       * 100ms of work passes by a factor of millions; six units of queue beside
+       * a hundred of work does not pass at all.
+       */
+      const busy=compute.reduce((n,[a,b])=>n+(b-a),0);
+      const el=elastic(end, [], {compute, plot:end, inset:end*0.02,
+        threshold:Math.max(0.03, busy*3/end)});
+      if(el.bands.length){
+        const at=el.at;
+        rows=rows.map(r=>r.run
+          ? {...r, to:r.to!=null?at(r.to):r.to, end:r.end!=null?at(r.end):r.end,
+             intervals:(r.intervals||[]).map(v=>({...v,a:at(v.a),b:at(v.b)}))}
+          : {...r, segs:(r.segs||[]).map(([k,a,w])=>[k,at(a),at(a+w)-at(a)]),
+             dots:r.dots?r.dots.map(d=>({...d,p:at(d.p)})):r.dots,
+             lit:r.lit?r.lit.map(v=>typeof v==='number'?at(v):v):r.lit,
+             litDots:r.litDots?r.litDots.map(at):r.litDots,
+             noHalo:r.noHalo?r.noHalo.map(at):r.noHalo,
+             rail:r.rail?r.rail.map(([x,w,k])=>[at(x),at(x+w)-at(x),k]):r.rail});
+        if(typeof extra==='string') extra=remapX(extra,LBL,at);
+        if(typeof under==='string') under=remapX(under,LBL,at);
+        opts={...opts, breaks:el.bands.map(b=>[b.p0,b.p1,''])};
+      }
     }
   }
   if(under&&typeof under==='object'){ opts=under; under=''; }

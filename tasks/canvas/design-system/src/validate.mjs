@@ -243,13 +243,19 @@ if(unruled.length){
     .forEach(x=>console.log(`  ${String(x.worst).padStart(3)}% idle  ${x.label}`));
   console.log('  (a figure should be a list of events; the drawing follows from the rules)');
 }
-let unruled=[]; try{ unruled=JSON.parse(fs.readFileSync(HERE+'unruled.json','utf8')); }catch{}
-if(unruled.length){
-  console.log(`\n${unruled.length} figure(s) hand-place geometry the elastic rule cannot reach:`);
-  unruled.sort((a,b)=>b.worst-a.worst).slice(0,5)
-    .forEach(x=>console.log(`  ${String(x.worst).padStart(3)}% idle  ${x.label}`));
-  console.log('  (a figure should be a list of events; the drawing follows from the rules)');
-}
+// The Run row is derived, never authored. A figure that draws its own is a
+// second account of the same run, kept in step by hand until it is not.
+const authored=(()=>{
+  let n=0;
+  for(const f of ['items-a.mjs','items-bc.mjs','items-disc.mjs','items-more.mjs','fixtures.mjs',
+                  'batch1.mjs','runbar.mjs','annotated.mjs','attribution.mjs']){
+    let src=''; try{ src=fs.readFileSync(HERE+f,'utf8'); }catch{ continue; }
+    const hits=(src.match(/\{n:'Run'/g)||[]).length;
+    if(hits){ console.log(`  ${f} draws ${hits} Run row(s) by hand`); n+=hits; }
+  }
+  return n;
+})();
+if(authored) console.log(`\n${authored} hand-authored Run row(s) — the Run row is derived from the trace`);
 const broken=checkPageStructure();
 if(broken) console.log(`\n${broken} structural problem(s) in the generated page`);
 const short=checkRunExtent();
@@ -258,4 +264,4 @@ const desync=await checkCodeSync();
 console.log(desync
   ? `\n${desync} figure(s) whose code and drawing disagree`
   : 'code and figures agree');
-if(bad||desync||short||broken) process.exitCode=1;
+if(bad||desync||short||broken||authored) process.exitCode=1;

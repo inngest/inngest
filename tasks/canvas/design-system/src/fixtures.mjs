@@ -1,7 +1,27 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,EV,layout} from './micro.mjs';
-import {autoDots,fillGaps} from './vocabulary.mjs';
+import {autoDots,fillGaps,COMPUTE,base,isFail} from './vocabulary.mjs';
+
+/**
+ * The Run row, derived from the rows beneath it.
+ *
+ * A fixture used to declare its own intervals, which is a second account of the
+ * same run kept in step by hand — and the one thing an overview must never do is
+ * disagree with the rows under it. It is computed now: every compute interval in
+ * the trace, and the run resolves as its last one.
+ */
+function runRowFrom(rows, end){
+  const iv=[];
+  rows.forEach(r=>{ if(r.run) return;
+    (r.segs||[]).forEach(([kd,a,w])=>{
+      if(COMPUTE.has(base(kd))) iv.push({a, b:a+w, ok:!isFail(kd)});
+    });
+  });
+  const last=iv.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
+  return {run:true, end, intervals:iv, resolvedAt:end,
+          resolvedAs:(last&&last.ok===false)?'failed':'ok'};
+}
 
 /**
  * Captured fixtures, scrubbable.
@@ -143,6 +163,12 @@ const pack=(f)=>{
     f={...f, rows:laid.rows.map((r,i)=>r.run
       ? {...f.rows[i], end:r.to, intervals:r.intervals}
       : {...r, segs:r.segs.map(([k,a,w])=>[k,a,w])}), compress:laid.breaks.filter(b=>b[1]>b[0])};
+  }
+  // The declared Run row is replaced by one derived from the trace.
+  {
+    const body=f.rows.filter(r=>!r.run);
+    const end=Math.max(...body.flatMap(r=>(r.segs||[]).map(([,a,w])=>a+w)));
+    f={...f, rows:[runRowFrom(body,end), ...body]};
   }
   const rows=f.rows.map(r=>{
     if(r.run) return {run:1, end:r.end, iv:r.intervals.map(v=>[v.a,v.b,v.ok===false?0:v.ok==='stop'?2:1]),

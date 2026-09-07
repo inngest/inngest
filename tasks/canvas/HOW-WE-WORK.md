@@ -70,10 +70,13 @@ Where this was not true, it bit: compression was written as `elastic()` and then
 of their width long after the rule said dead time is worth almost none of it.
 The rule existed and reached almost nothing.
 
-The specific thing that made it impossible: **figures carried percentages, and
-the rule needs durations.** "The sleep is 96% of the run" cannot be judged — a 2s
-sleep beside 10ms of work and a 7d sleep beside 10ms of work are the same
-percentage and want different drawings. A figure has to say how long things took.
+The threshold is what makes this work without every figure inventing durations
+it never measured. A flat "compress anything idle for more than 3% of the run"
+compresses ordinary queue intervals — short, meaningful, and exactly what the
+trace exists to show. The test that holds is **scale-free**: a stretch is
+compressed when it is longer than all the compute in the run put together,
+several times over. Seven days beside 100ms of work passes by a factor of
+millions; six units of queue beside a hundred of work does not pass at all.
 
 So:
 
@@ -86,6 +89,14 @@ So:
 - `opts.linear` opts out, and needs a reason. Only two figures use it, and both
   exist to show the *uncompressed* proportion — they are the argument for
   compression, so compressing them would delete their point.
+- **The Run row is derived from the trace, never authored.** A drawn Run row is
+  a second account of the same run, kept in step by hand until it is not — and
+  an overview disagreeing with the rows beneath it is the one thing it must
+  never do. `validate.mjs` fails on a hand-written one.
+- **A figure may declare work its rows do not carry** with `busy`, for the case
+  where the drawing is done by something else — a collapsed group draws its
+  members through `groupRow`, and without `busy` the rule reads the whole
+  envelope as idle and compresses the work away.
 - **`validate.mjs` counts what the rule cannot reach** and prints the worst
   offenders. That number is a backlog, and it should go down, never up.
 

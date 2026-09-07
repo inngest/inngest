@@ -38,8 +38,8 @@ D('c21',{d:'The 26ms between one step ending and the next request starting is dr
 D('c22',{d:'Green bar, green resolution circle. The baseline everything else is read against.',
   svg:fig([{n:'a',segs:[['idle',0,10],['good',10,50]],note:'50ms'}],'','success')});
 D('c23',{d:'The step is red and so is the run. The failure is the last thing on the row, so nothing after it implies recovery.',
-  svg:fig([{n:'doomed',segs:[['idle',0,10],['bad',10,26]],note:'failed  26ms'},
-    {n:'Run',segs:[['idle',0,36],['bad',36,4]],dim:.6,note:'FAILED'}],'','run-ending failure')});
+  svg:fig([{n:'doomed',segs:[['idle',0,10],['bad',10,26]],note:'failed  26ms'}
+  ],'','run-ending failure')});
 D('c24',{d:'A red step inside a green run. The row is red at its own resolution; the Run row stays green because userland caught it.',
   svg:fig([{n:'caught',segs:[['idle',0,8],['bad',8,22]],note:'failed  22ms'},
     {n:'after',segs:[['idle',30,6],['good',36,34]],note:'34ms'}],'','caught failure')});
