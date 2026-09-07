@@ -46,8 +46,24 @@ function variantise(node, path){
       seen.get(v).push(key);
     }
     if(seen.size===1) return node;
-    return `<span class="varset">`+[...seen].map(([svg,keys])=>
-      `<span class="v ${keys.map(k=>'v-'+k).join(' ')}">${svg}</span>`).join('')+`</span>`;
+    /**
+     * Namespace the ids the figure generated for itself.
+     *
+     * Each build numbers its clip paths and blur filters from one, so two
+     * variants of the same figure both defined `cmp-7` — and a reference to it
+     * resolves to whichever came first in the DOCUMENT. The second variant's
+     * blur was clipped to the FIRST variant's band, which drew a soft bright
+     * copy of the rows and their labels wherever the other layout had cut.
+     *
+     * Done here rather than by giving each build its own number range, because
+     * ids that differ between builds make two identical drawings look different
+     * and every compressed figure would then ship four times over.
+     */
+    return `<span class="varset">`+[...seen].map(([svg,keys])=>{
+      const ns=keys[0];
+      const tagged=svg.replace(/(id="|url\(#)(cmp-b?-?\d+)/g, (m,pre,id)=>pre+id+'-'+ns);
+      return `<span class="v ${keys.map(k=>'v-'+k).join(' ')}">${tagged}</span>`;
+    }).join('')+`</span>`;
   }
   if(Array.isArray(node)) return node.map((v,i)=>variantise(v,path.concat(i)));
   if(node && typeof node==='object')

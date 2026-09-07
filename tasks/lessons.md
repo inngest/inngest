@@ -531,3 +531,40 @@ again once the fonts are ready:
 ```js
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
 ```
+
+---
+
+## 33. Duplicate SVG ids, again — this time defining different things
+
+**Failure mode**: with four builds of each figure on one page, each build
+numbered its clip paths and blur filters from one. Two variants of the same
+figure both defined `cmp-7`. A `url(#cmp-7)` resolves to whichever came first in
+the DOCUMENT, so the second variant's compression blur was clipped to the FIRST
+variant's band — drawing a soft bright copy of the rows and their labels
+wherever the other layout had put its cut. Reported as "some of the step names
+and events have like a halo and shine slightly".
+
+This is lesson 26's problem with the sign flipped. There, identical definitions
+shared an id and hiding one broke the others. Here, DIFFERENT definitions shared
+an id and the wrong one won. Same root cause: ids are document-global and the
+artifact emits the same generator's output many times over.
+
+**Detection signal**: nothing errors. Grep the built page:
+
+```bash
+grep -o 'id="cmp-[0-9]*"' trace-design-system.html | sort | uniq -c | awk '$1>1'
+```
+
+...but note that a duplicate is only a bug when the definitions DIFFER — the
+same figure rendered on two tabs duplicates its ids harmlessly. The check has to
+compare the bodies, not count the names.
+
+**Prevention**: `validate.mjs` now asserts that every `url(#…)` inside a figure
+variant resolves within that variant, and that no id on the page is defined two
+different ways.
+
+**And the fix that looked obvious was wrong**: giving each build its own number
+range fixed the collision and grew the page 13%, because ids that differ between
+builds make two identical drawings compare as different — so every compressed
+figure shipped four times instead of once. Namespace at the point where the
+variants are merged, not at the point they are generated.

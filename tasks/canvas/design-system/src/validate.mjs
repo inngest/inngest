@@ -207,6 +207,45 @@ function checkDupeFigures(EX, groups){
   return bad;
 }
 
+
+/**
+ * Every `url(#…)` inside a figure variant has to resolve within that variant.
+ *
+ * The page carries several builds of the same figure and each build numbers its
+ * clip paths and blur filters from one, so two variants both defined `cmp-7`.
+ * A reference resolves to whichever came first in the DOCUMENT, so the second
+ * variant's compression blur was clipped to the FIRST variant's band — a soft
+ * bright copy of the rows and their labels, sitting wherever the other layout
+ * had put its cut. Nothing errored and the figure looked almost right.
+ */
+function checkVariantIds(){
+  let html;
+  try{ html=fs.readFileSync(HERE+'../trace-design-system.html','utf8'); }
+  catch{ return 0; }
+  let bad=0, n=0;
+  for(const m of html.matchAll(/<span class="v (v-\d\d[^"]*)">([\s\S]*?)<\/span>/g)){
+    const body=m[2];
+    const defined=new Set([...body.matchAll(/id="([^"]+)"/g)].map(x=>x[1]));
+    n++;
+    for(const u of new Set([...body.matchAll(/url\(#([^)]+)\)/g)].map(x=>x[1])))
+      if(!defined.has(u)){
+        console.log(`  variant ${m[1]} references #${u}, which it does not define`);
+        bad++;
+      }
+  }
+  // and no id may be defined two different ways anywhere on the page
+  const defs=new Map();
+  for(const m of html.matchAll(/<(clipPath|filter) id="([^"]+)"([\s\S]{0,600}?)<\/\1>/g)){
+    if(!defs.has(m[2])) defs.set(m[2], new Set());
+    defs.get(m[2]).add(m[3]);
+  }
+  for(const [id,bodies] of defs) if(bodies.size>1){
+    console.log(`  #${id} is defined ${bodies.size} different ways`);
+    bad++;
+  }
+  return bad;
+}
+
 async function checkCodeSync(){
   const {CODE}=await import('./code.mjs');
   const ds=fs.readFileSync(HERE+'ds.mjs','utf8');
@@ -272,6 +311,7 @@ async function checkCodeSync(){
     }
   }
   bad+=checkDupeFigures(EX, groups);
+  bad+=checkVariantIds();
   for(const k of Object.keys(CODE)) if(!groups.some(([g])=>g===k)){
     console.log(`  ${k}: code example for a group that no longer renders`); bad++;
   }
