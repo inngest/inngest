@@ -15,7 +15,9 @@ const label=(p,t,dy=14)=>
 // 1. Moments. A distributed trace is not a picture, it is a list of things
 //    that happened, each with a time.
 O.events=fig(
-  [{n:'', segs:[], dots:[{p:0,c:EV.queued},{p:34,c:EV.started},{p:86,c:EV.ok}]}],
+  // Timestamps before they are anything else: this figure is the moments, so
+  // it draws them and nothing between them.
+  [{n:'', at:[['queued',0],['started',34],['ok',86]], bars:false}],
   label(0,'queued')+label(34,'started')+label(86,'ok'),
   'three recorded moments','',{pad:14});
 
@@ -37,7 +39,7 @@ O.lifecycle=fig(
 // 4. Hollow or filled — has this finished?
 O.resolved=fig([
   {n:'running',   at:[['queued',0],['started',10]],end:86,
-   dots:[{p:0,c:EV.queued},{p:10,c:EV.started}], note:'not resolved'},
+   note:'not resolved'},
   {n:'succeeded', at:[['queued',0],['started',10],['ok',86]], note:'resolved'},
   {n:'failed',    at:[['queued',0],['started',10],['failed',86]],  note:'resolved'},
 ],'','hollow until it resolves');
@@ -46,7 +48,7 @@ O.resolved=fig([
 O.substance=fig([
   {n:'step.run()', at:[['queued',0],['started',8],['ok',86]],   note:'solid'},
   {n:'step.sleep()',at:[['queued',0],['started',8],['ok',86]],kind:'wait',note:'hatched'},
-  {n:'queued',    at:[['queued',0]],end:86, dots:[{p:0,c:EV.queued}], note:'hatched'},
+  {n:'queued',    at:[['queued',0]],end:86, note:'hatched'},
 ],'','solid is your compute');
 
 fs.writeFileSync(HERE+'primer.json',JSON.stringify(O));

@@ -38,7 +38,7 @@ O.height=fig([
 
 // A step resolving.
 O.resolve=fig([
-  {n:'running',at:[['queued',0],['started',10]],end:54,dots:[{p:0,c:EV.queued},{p:10,c:EV.started}],note:'undecided'},
+  {n:'running',at:[['queued',0],['started',10]],end:54,note:'undecided'},
   {n:'succeeded',at:[['queued',0],['started',10],['ok',60]],note:'50ms'},
   {n:'failed',at:[['queued',0],['started',10],['failed',48]],note:'failed'},
 ],'','a running bar resolves to green or red');

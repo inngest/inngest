@@ -14,7 +14,7 @@ E.c67={d:'The request that would produce <code>b</code> failed twice before it w
   {l:'hovering b',svg:fig([
     {n:'a',at:[['started',0],['ok',18]],dim:DIM},
     {n:'req + b',at:[['started',22],['retry',30],['started',40,'disc'],['retry',48],['started',64,'disc'],['ok',72],['queued',72],['started',76],['ok',96]],reported:1,note:'20ms',sel:true},
-  ],arrow(px(18),cy(0),px(22),cy(1)),'discovery retried, hovered')},
+  ],'','discovery retried, hovered','',{focus:1})},
  ]};
 
 // c68 — it never succeeds, so there is no step to host it.

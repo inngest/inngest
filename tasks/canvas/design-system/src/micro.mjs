@@ -108,6 +108,15 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead
 export function row(i,r,sc=1,yy){
   if(r.run) return runProfile(i,r,sc);
   const {n,segs:rawSegs=[],dim=1,dots,note,sel,noHalo,lit,litDots}=r;
+  /**
+   * Two rows exist that are deliberately half a row.
+   *
+   * `marks:false` is a row with no lifecycle to report — a network phase inside
+   * a request is a duration, not something that is enqueued, starts and
+   * resolves. `bars:false` is the reverse, and there is one: the figure whose
+   * entire point is that a span is three timestamps before it is anything else.
+   */
+  const noMarks=r.marks===false, noBars=r.bars===false;
   const segs=fillGaps(rawSegs.map(([k,x,w])=>({kind:k,x,w}))).map(g=>[g.kind,g.x,g.w]);
   const y=yy!=null?yy:cy(i); let s='', hit='';
   /**
@@ -148,7 +157,8 @@ export function row(i,r,sc=1,yy){
    */
   // Marks come from the row's moments where it has them, and are read back off
   // the bars only for the handful of rows still drawn without any.
-  const auto=r.at&&r.at.length ? R.marks(r.at)
+  const auto=noMarks ? []
+    : r.at&&r.at.length ? R.marks(r.at)
     : autoDots(segs.map(([k,a,w])=>({kind:k,x:a,w})));
   let lo='', hi='';
   // The dim layer is the WHOLE row, not the leftover after the lit parts are
@@ -165,7 +175,7 @@ export function row(i,r,sc=1,yy){
   // drawn thinner. Nesting and weight carry that, not a new colour: an OTel span
   // IS your code, so it keeps the same status colours the step has.
   const bh=(r.thin||r.span)?GEOM.BAR_H*0.6:GEOM.BAR_H;
-  segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh})); });
+  if(!noBars) segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh})); });
   if(!r.span) (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
     put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,3,true));
@@ -487,6 +497,17 @@ export function elastic(total, dead=[], {plot=86, threshold=R.ELASTIC.floor,
  * the result straight to `fig`. Change the rule here and every figure moves.
  */
 export function layout(total, rows, opts={}){
+  /**
+   * Rows may declare moments in real time instead of bars. They are the same
+   * declaration a figure makes anywhere else -- `['started', 0], ['ok', 41]` --
+   * only measured in milliseconds, so the elastic rule has durations to judge
+   * rather than proportions.
+   */
+  rows=rows.map(r=>{
+    if(r.run || !r.at || !r.at.length) return r;
+    const segs=R.derive(r.kind||'step', r.at, r.end, {reported:!!r.reported});
+    return {...r, segs:segs.map(([k,x,w])=>[k,x,x+w])};   // layout works in start/end
+  });
   const compute=[];
   rows.forEach(r=>{
     if(r.run) return;                       // the Run row is derived, not input
@@ -498,7 +519,9 @@ export function layout(total, rows, opts={}){
     if(r.run) return {...r,
       to: el.at(r.to!=null?r.to:total),
       intervals:(r.intervals||[]).map(v=>({...v, a:el.at(v.a), b:el.at(v.b)}))};
-    return {...r, segs:(r.segs||[]).map(map)};
+    return {...r, segs:(r.segs||[]).map(map),
+      at:(r.at||[]).map(mo=>mo.length===3?[mo[0],el.at(mo[1]),mo[2]]:[mo[0],el.at(mo[1])]),
+      end:r.end!=null?el.at(r.end):r.end};
   });
   return {rows:out, breaks:el.bands.map(b=>[b.p0,b.p1,b.label?opts.label||'':'']), el};
 }

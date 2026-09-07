@@ -53,7 +53,7 @@ O.applied=fig([
 O.waits=fig([
   {n:'matched',at:[['queued',0],['started',6],['ok',50]],kind:'wait',note:'event arrived'},
   {n:'timed out',at:[['queued',0],['started',6],['timeout',70]],kind:'wait',note:'nothing matched'},
-  {n:'cancelled',at:[['queued',0],['started',6]],kind:'wait',end:58,dots:[{p:0,c:EV.queued},{p:6,c:EV.started},{p:58,c:EV.cancelled}],note:'run cut'},
+  {n:'cancelled',at:[['queued',0],['started',6],['cancelled',58]],kind:'wait',note:'run cut'},
 ],'','three ways a wait can end');
 
 fs.writeFileSync(HERE+'vocab.json',JSON.stringify(O));

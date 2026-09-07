@@ -51,11 +51,11 @@ D('c26',{d:'One red row does not tint its neighbours or the level. Failure is pe
 D('c27',{d:'Cancelled is its own state — neither green nor red. <code>b</code> was still executing when the run was cut, so its bar is the running amber and it ends on the square: stopped from outside, never resolved.',
   svg:fig([
     {n:'a',at:[['queued',0],['started',8],['ok',38]],note:'30ms'},
-    {n:'b',at:[['queued',0],['started',8]],end:52,dots:[{p:0,c:EV.queued},{p:8,c:EV.started},{p:52,c:EV.cancelled}],note:'cancelled'},
+    {n:'b',at:[['queued',0],['started',8],['cancelled',52]],note:'cancelled'},
   ],'','a step cancelled mid-execution')});
 D('c28',{d:'A <code>waitForEvent</code> still open when the run was cut. It was undecided, so the bar is the amber wait, and it ends on the square rather than a resolution.',
   svg:fig([
-    {n:'waiting',at:[['queued',0],['started',6]],kind:'wait',end:58,dots:[{p:0,c:EV.queued},{p:6,c:EV.started},{p:58,c:EV.cancelled}],note:'cancelled while open'},
+    {n:'waiting',at:[['queued',0],['started',6],['cancelled',58]],kind:'wait',note:'cancelled while open'},
   ],'','a wait cancelled while open')});
 D('c29',{d:'No end time to draw to. The bar is the in-progress blue and has no terminal circle because nothing has resolved.',
   svg:fig([

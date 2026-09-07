@@ -118,12 +118,10 @@ D('c8','Each branch scheduled its own request, so there are two. Hovering shows 
     {focus:2,
      label:'no coalescing',hoverNote:'hovering a2'}));
 
-D('c9','The winner is a dependency and gets a solid arrow; the losers were alternates and get dashed ones. Both only appear once you ask.',
+D('c9','The winner resolved before the next request was queued, so it caused it and gets a cable. The loser resolved after that request had already started &mdash; it cannot have caused it, so it gets nothing. Drawing the loser as a faded alternate was the trace guessing at an intent the spans do not carry.',
   pair([{n:'fast',at:[['started',4],['ok',24]]},{n:'slow',at:[['started',4],['ok',48]]},
         {n:'next',at:[['queued',26],['started',38],['ok',62]]}],
-    {focus:2,
-     hoverExtra:`<path d="M${px(48)} ${cy(1)} C ${px(56)} ${cy(1)}, ${px(30)} ${cy(2)}, ${px(40)} ${cy(2)}" fill="none" stroke="${C.acc}" stroke-width="1.2" stroke-dasharray="2.5 2.5" opacity=".6"/>`,
-     label:'race',hoverNote:'the request selected'}));
+    {focus:2,label:'race',hoverNote:'the request selected'}));
 
 D('c10','A dead end is drawn by absence. Hovering it lights its own row and nothing downstream, because there is nothing downstream.',
   pair([{n:'a',at:[['started',4],['ok',30]]},{n:'orphan',at:[['started',4],['ok',38]]},

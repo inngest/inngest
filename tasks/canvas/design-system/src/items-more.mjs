@@ -1,6 +1,6 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {fig,px,cy,tag,axis,groupRow,arrow,dot,elastic,EV,C,W,LBL,PLOT,ROW,TOP} from './micro.mjs';
+import {fig,px,cy,tag,axis,groupRow,arrow,dot,elastic,layout,EV,C,W,LBL,PLOT,ROW,TOP} from './micro.mjs';
 import {setFrame} from './micro.mjs'; setFrame(true);
 const E={}; const D=(k,v)=>{E[k]=v;};
 const DIM=.22;
@@ -31,7 +31,7 @@ D('w3',{d:'A wait inside a fan-out. It sits on the same axis as its siblings and
 
 D('w4',{d:'Waiting and failing must not read alike. One is hatched and never red; the other is solid and red, and only its final attempt takes a filled mark.',
   svg:fig([
-    {n:'nap',      at:[['started',0]],kind:'wait',end:60,dots:[{p:0,c:EV.queued},{p:0,c:EV.started}]},
+    {n:'nap',      at:[['started',0]],kind:'wait',end:60},
     {n:'a',        at:[['started',0],['retry',26],['queued',40],['started',44],['failed',70]]},
   ],'','the two must not be confused')});
 
@@ -46,27 +46,23 @@ const NAP=7*864e5;
 D('t1',{d:'Seven days of dead time, given four percent of the width. The threshold is low on purpose: if nothing is executing for more than a few percent of the run, that stretch is worth almost none of the space, and an hour and a week get the same few pixels. The cut takes the <em>middle</em> of the sleep, so the bar visibly begins, is torn, and resumes &mdash; it is that bar being compressed, not merely something happening between two rows. Only the drawing compresses: the sleep still reports 7d.',
   svg:(()=>{
     const B0=41+NAP, total=B0+62;
-    const el=elastic(total,[[41,41+NAP]]);
-    const g=(k,a,b)=>[k, el.at(a), el.at(b)-el.at(a)];
-    const bd=el.bands[0];
-    return fig([
-      {n:'a',   segs:[g('good',0,41)]},
-      {n:'nap', segs:[g('waitok',41,41+NAP)],note:'7d'},
-      {n:'b',   segs:[g('idle',B0,B0+6),g('disc',B0+6,B0+16),g('idle',B0+16,B0+22),g('good',B0+22,total)]},
-    ],'','seven days compressed to a band','',{margin:0,breaks:[[bd.p0,bd.p1,'7d']]});
+    const L=layout(total,[
+      {n:'a',   at:[['started',0],['ok',41]]},
+      {n:'nap', at:[['started',41],['ok',41+NAP]],kind:'wait',note:'7d'},
+      {n:'b',   at:[['queued',B0],['started',B0+6,'disc'],['ok',B0+16],['queued',B0+16],['started',B0+22],['ok',total]],reported:1},
+    ],{label:'7d'});
+    return fig(L.rows,'','seven days compressed to a band','',{margin:0,breaks:L.breaks});
   })()});
 
 D('t1b',{d:'What the space left over is worth. Thirty seconds of work on one side of a compressed gap and ten on the other, so the remaining width splits 75/25 &mdash; which is the same thing as saying <strong>a second is the same number of pixels wherever it lands</strong>. Without that rule, compressing a gap would quietly rescale one half of the trace against the other and two spans either side of it would stop being comparable. It is also why several compressions need no special case: the arithmetic is total live width over total live time, applied everywhere.',
   svg:(()=>{
-    const total=30+7*86400+10;
-    const el=elastic(total,[[30,30+7*86400]]);
-    const g=(k,a,b)=>[k, el.at(a), el.at(b)-el.at(a)];
-    const bd=el.bands[0];
-    return fig([
-      {n:'left',  segs:[g('good',0,30)],note:'30s'},
-      {n:'gap',   segs:[g('waitok',30,30+7*86400)]},
-      {n:'right', segs:[g('good',30+7*86400,total)],note:'10s'},
-    ],'','the leftover width splits by real duration','',{margin:0,breaks:[[bd.p0,bd.p1,'7d']]});
+    const GAP=7*86400, total=30+GAP+10;
+    const L=layout(total,[
+      {n:'left',  at:[['started',0],['ok',30]],note:'30s'},
+      {n:'gap',   at:[['started',30],['ok',30+GAP]],kind:'wait'},
+      {n:'right', at:[['started',30+GAP],['ok',total]],note:'10s'},
+    ],{label:'7d'});
+    return fig(L.rows,'','the leftover width splits by real duration','',{margin:0,breaks:L.breaks});
   })()});
 
 D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts fall <em>inside</em> one pair of rows rather than adding rows of their own. The bands share one budget: eight idle stretches do not spend the whole width on the parts where nothing happened, they thin instead, and below a width that can hold them a band drops its label, then its tear, leaving a marked line. The rules and the blur never go &mdash; they are what says <em>not to scale</em>. The polls between the cuts still share the one scale.',
@@ -83,8 +79,8 @@ D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts 
     const members=polls.map(([a,b])=>[at(a), at(b)-at(a), 'good']);
     const naps=dead.map(([a,b])=>[at(a), at(b)-at(a), 'waitok']);
     return fig([
-      {n:'', segs:[]},
-      {n:'', segs:[]},
+      {n:''},
+      {n:''},
     ], groupRow(0,{n:'× 9 poll',x:0,w:at(total),members,note:'9 · 0 failed'})+
        groupRow(1,{n:'× 8 nap',x:at(polls[0][1]),w:at(dead[7][1])-at(polls[0][1]),members:naps}),
       'eight compressions sharing one budget','',
@@ -94,29 +90,24 @@ D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts 
 D('t1d',{d:'A wait that has not resolved still compresses. The run is asleep right now: the bar is blue and carries no closing mark, because the missing mark is what says unresolved &mdash; and the dead time inside it is real whether or not it has finished. There is no Finalization row, because the run has not been finalized.',
   svg:(()=>{
     const total=20+3*3600;
-    const el=elastic(total, [], {compute:[[0,20]]});
-    const g=(k,a,b)=>[k, el.at(a), el.at(b)-el.at(a)];
-    const bd=el.bands[0];
-    return fig([
-      {n:'a',   segs:[g('good',0,20)]},
-      {n:'nap', segs:[g('wait',20,total)],note:'sleeping'},
-    ],'','an unresolved wait, compressed','',
-      {margin:0,running:true,breaks:[[bd.p0,bd.p1,'3h']]});
+    const L=layout(total,[
+      {n:'a',   at:[['started',0],['ok',20]]},
+      {n:'nap', at:[['started',20]],end:total,kind:'wait',note:'sleeping'},
+    ],{label:'3h'});
+    return fig(L.rows,'','an unresolved wait, compressed','',
+      {margin:0,running:true,breaks:L.breaks});
   })()});
 
 D('t1e',{d:'Choosing where to cut. A gap in <em>one</em> row is not dead time &mdash; something else may be running through it &mdash; so the compute of every row is merged first and only the holes in that union are candidates. Here <code>b</code> works straight through <code>a</code>&rsquo;s wait, so nothing is compressed there however long it looks; the one stretch with nothing running anywhere is.',
   svg:(()=>{
-    const compute=[[0,8],[4,26],[900,914],[914,930]];
     const total=940;
-    const el=elastic(total, [], {compute});
-    const g=(k,a,b)=>[k, el.at(a), el.at(b)-el.at(a)];
-    return fig([
-      {n:'a', segs:[g('good',0,8),g('waitok',8,26)]},
-      {n:'b', segs:[g('good',4,26)]},
-      {n:'c', segs:[g('waitok',26,900),g('good',900,914)]},
-      {n:'d', segs:[g('good',914,930)]},
-    ],'','only the stretch with nothing running','',
-      {margin:0,breaks:el.bands.map(b=>[b.p0,b.p1,'15m'])});
+    const L=layout(total,[
+      {n:'a', at:[['started',0],['ok',8],['started',8,'wait'],['ok',26]]},
+      {n:'b', at:[['started',4],['ok',26]]},
+      {n:'c', at:[['started',26],['ok',900],['started',900],['ok',914]],kind:'wait'},
+      {n:'d', at:[['started',914],['ok',930]]},
+    ],{label:'15m'});
+    return fig(L.rows,'','only the stretch with nothing running','',{margin:0,breaks:L.breaks});
   })()});
 
 D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you that before you have read a number, which is the point of the height rule.',
@@ -149,7 +140,7 @@ D('s1',{d:'Five hundred sequential steps do not become five hundred rows. Repeti
     const members=[]; for(let i=0;i<36;i++) members.push([4+i*2.1, 1.3, 'good']);
     return fig([
       {n:'setup', at:[['started',0],['ok',3]]},
-      {n:'', segs:[]},
+      {n:''},
       {n:'teardown', at:[['queued',88],['started',90],['ok',98]]},
     ], groupRow(1,{n:'× 500 fetch',x:3,w:79,members,note:'500 · 0 failed'}),
       'five hundred steps, one row','',{busy:[[3,82]]});
@@ -160,7 +151,7 @@ D('s2',{d:'The same collapse for a wide fan-out. The envelope is the level and t
     const members=[]; for(let i=0;i<12;i++) members.push([6+i*2.9, 21-i*0.6, 'good']);
     return fig([
       {n:'req + worker ×12', at:[['queued',0],['started',2],['ok',4]],kind:'disc'},
-      {n:'', segs:[]},
+      {n:''},
       {n:'collect', at:[['started',80],['ok',82],['queued',82],['started',85],['ok',97]],reported:1},
     ], groupRow(1,{n:'× 12 worker',x:5,w:70,members,note:'12 · staggered'}),
       'a wide fan-out, collapsed','',{busy:[[5,75]]});

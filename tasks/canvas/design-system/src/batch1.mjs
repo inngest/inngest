@@ -24,14 +24,13 @@ const panel=(rows,extra='',label='',ms)=>fig(
   // named on the Run row instead of pushing every row to the right of it.
   extra, label, '', {trimLead:true, ms});
 const F={};
-const note=(t,i,x=LBL)=>`<text x="${x}" y="${cy(i)+4}" font-family="JetBrains Mono, monospace" font-size="7.5" fill="${C.mut}">${t}</text>`;
 
 // ---- simple: no steps at all -------------------------------------------
 F.simple=[{
   cap:'Two rows and nothing to relate. No ribbon, no cables. The design has to be quiet here or it is noise everywhere else.',
   svg:panel([
     {run:[],lbl:'no step spans · 8ms'},
-    {name:'Finalization',dur:'8ms',segs:[{x:0,w:99.5,kind:'good'}]},
+    {name:'Finalization',dur:'8ms',at:[['started',0],['ok',99.5]]},
   ],'','simple: two rows, no relationships',8),
 }];
 
@@ -40,10 +39,10 @@ F.step=[{
   cap:'The sleep is the row. Waiting is its whole substance, so it draws one bar with a circle at each end and no lead-in. The two 12ms steps either side are 2px, honestly, because that is the proportion.',
   svg:panel([
     {run:[{a:0,b:0.5,ok:true},{a:96.9,b:97.4,ok:true}],lbl:'22ms compute / 2.256s'},
-    {name:'first step',dur:'12ms',segs:[{x:0,w:0.5,kind:'good'},]},
-    {name:'for 2s',dur:'2.001s',note:'+1ms planning',segs:[{x:0.5,w:96,kind:'waitok'}]},
-    {name:'second step',dur:'10ms',note:'+2ms wait',segs:[{x:96.5,w:0.4,kind:'idle'},{x:96.9,w:0.5,kind:'good'}]},
-    {name:'Finalization',dur:'60ms',note:'+51ms wait',segs:[{x:97.4,w:1.7,kind:'idle'},{x:99.1,w:0.6,kind:'good'}]},
+    {name:'first step',dur:'12ms',at:[['started',0],['ok',0.5]]},
+    {name:'for 2s',dur:'2.001s',note:'+1ms planning',at:[['started',0.5],['ok',96.5]],kind:'wait'},
+    {name:'second step',dur:'10ms',note:'+2ms wait',at:[['queued',96.5],['started',96.9],['ok',97.4]]},
+    {name:'Finalization',dur:'60ms',note:'+51ms wait',at:[['queued',97.4],['started',99.1],['ok',99.7]]},
   ],'','step: sleep dominates the axis',2256),
 }];
 
@@ -52,10 +51,10 @@ F.v4sequential=[{
   cap:'The point of this fixture is that nothing here is parallel, on a client that could report batches. Every request produced exactly one step, so <strong>no ribbon anywhere</strong> is the correct render, and it is visibly different from <code>v4parallel</code> without reading a label.',
   svg:panel([
     {run:[{a:0.8,b:1.2,ok:true},{a:99.3,b:99.7,ok:true}],lbl:'2ms compute / 2.050s'},
-    {name:'first step',dur:'1ms',segs:[{x:0.8,w:0.4,kind:'good'}]},
-    {name:'for 2s',dur:'2.001s',note:'+1ms planning',segs:[{x:1.2,w:97,kind:'waitok'}]},
-    {name:'second step',dur:'1ms',segs:[{x:99.3,w:0.4,kind:'good'}]},
-    {name:'Finalization',dur:'5ms',segs:[{x:99.7,w:0.3,kind:'good'}]},
+    {name:'first step',dur:'1ms',at:[['started',0.8],['ok',1.2]]},
+    {name:'for 2s',dur:'2.001s',note:'+1ms planning',at:[['started',1.2],['ok',98.2]],kind:'wait'},
+    {name:'second step',dur:'1ms',at:[['started',99.3],['ok',99.7]]},
+    {name:'Finalization',dur:'5ms',at:[['started',99.7],['ok',100]]},
   ],'','v4sequential: no ribbon anywhere',2050),
 }];
 
@@ -65,10 +64,10 @@ F.emit=[{
   svg:(()=>{
     const rows=[
       {run:[{a:27.3,b:29.8,ok:true},{a:45.5,b:60.1,ok:true},{a:75.8,b:78.3,ok:true}],lbl:'7ms compute / 33ms'},
-      {name:'prepare',dur:'1ms',segs:[{x:27.3,w:2.5,kind:'good'}]},
-      {name:'fan-out',dur:'5ms',segs:[{x:45.5,w:14.6,kind:'good'}],lineage:2},
-      {name:'after',dur:'1ms',segs:[{x:75.8,w:2.5,kind:'good'}]},
-      {name:'Finalization',dur:'7ms',segs:[{x:78.8,w:20.7,kind:'good'}]},
+      {name:'prepare',dur:'1ms',at:[['started',27.3],['ok',29.8]]},
+      {name:'fan-out',dur:'5ms',at:[['started',45.5],['ok',60.1]],lineage:2},
+      {name:'after',dur:'1ms',at:[['started',75.8],['ok',78.3]]},
+      {name:'Finalization',dur:'7ms',at:[['started',78.8],['ok',99.5]]},
     ];
     return panel(rows,'','emit: outbound lineage marker',33);
   })(),
@@ -80,22 +79,22 @@ F.invoke=[
   cap:'Today <code>call child</code> draws 17% of its own extent &mdash; the 545ms invocation has no mark at all, leaving the widest void in the gallery. Drawn correctly, the child run is a distinct substance: not your code, not Inngest&rsquo;s, so neither green nor blue.',
   svg:panel([
     {run:[{a:0,b:0.5,ok:true},{a:82.7,b:83.4,ok:true}],lbl:'67ms own compute / 909ms'},
-    {name:'before',dur:'9ms',segs:[{x:0,w:0.5,kind:'good'},]},
+    {name:'before',dur:'9ms',at:[['started',0],['ok',0.5]]},
     {name:'call child',dur:'545ms',note:'+146ms queued · +8ms planning',
-     segs:[{x:1,w:15.5,kind:'idle'},{x:16.5,w:0.6,kind:'disc'},{x:17.1,w:61,kind:'child'}],
+     at:[['queued',1],['started',16.5,'disc'],['ok',17.1],['started',17.1],['ok',78.1]],kind:'child',reported:1,
     },
-    {name:'after',dur:'58ms',note:'+47ms wait',segs:[{x:78.1,w:4.6,kind:'idle'},{x:82.7,w:0.7,kind:'good'}]},
-    {name:'Finalization',dur:'141ms',note:'+130ms wait',segs:[{x:84.5,w:13.8,kind:'idle'},{x:98.3,w:0.7,kind:'good'}]},
+    {name:'after',dur:'58ms',note:'+47ms wait',at:[['queued',78.1],['started',82.7],['ok',83.4]]},
+    {name:'Finalization',dur:'141ms',note:'+130ms wait',at:[['queued',84.5],['started',98.3],['ok',99]]},
   ],'','invoke: the child run drawn as its own substance',909),
  },
  {
   cap:'Expanded, the child&rsquo;s own rows indent under it on the same axis. The parent row keeps its circles; the child&rsquo;s rows get theirs, so the boundary between the two runs is legible without a label.',
   svg:panel([
-    {name:'call child',dur:'545ms',segs:[{x:1,w:15.5,kind:'idle'},{x:16.5,w:0.6,kind:'disc'},{x:17.1,w:61,kind:'child'}]},
-    {name:'  ↳ Run',dur:'271ms',segs:[{x:19,w:50,kind:'good'}]},
-    {name:'  ↳ work',dur:'180ms',segs:[{x:22,w:8,kind:'idle'},{x:30,w:33,kind:'good'}]},
-    {name:'  ↳ finish',dur:'40ms',segs:[{x:63,w:4,kind:'idle'},{x:67,w:2,kind:'good'}]},
-    {name:'after',dur:'58ms',segs:[{x:78.1,w:4.6,kind:'idle'},{x:82.7,w:0.7,kind:'good'}]},
+    {name:'call child',dur:'545ms',at:[['queued',1],['started',16.5,'disc'],['ok',17.1],['started',17.1],['ok',78.1]],kind:'child',reported:1},
+    {name:'  ↳ Run',dur:'271ms',at:[['started',19],['ok',69]]},
+    {name:'  ↳ work',dur:'180ms',at:[['queued',22],['started',30],['ok',63]]},
+    {name:'  ↳ finish',dur:'40ms',at:[['queued',63],['started',67],['ok',69]]},
+    {name:'after',dur:'58ms',at:[['queued',78.1],['started',82.7],['ok',83.4]]},
   ],'','invoke expanded: child rows on the same axis',909),
  },
 ];
