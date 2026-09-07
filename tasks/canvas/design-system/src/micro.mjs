@@ -274,6 +274,50 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
   return {sharp:tagCtx(run), soft:tagCtx(fin)};
 }
 
+/**
+ * A compressed stretch of dead time.
+ *
+ * The rule is simple and the threshold is low: **if nothing is executing for
+ * more than a few percent of the run, that stretch is worth almost none of the
+ * width.** It collapses to a fixed narrow band whatever it actually was — an
+ * hour and seven days get the same few pixels, because the point is that the
+ * space belongs to the work instead.
+ *
+ * Three cues, because one is not enough to overcome how strongly a time axis
+ * reads as linear:
+ *
+ *   - a **torn-page zigzag** down the middle of the band, the same idiom the
+ *     fixture scrubber uses;
+ *   - **full-height rules** at both edges, so the cut crosses every row rather
+ *     than being a mark on the axis that rows quietly ignore;
+ *   - **a blur of whatever passes through the band**, which says "this width is
+ *     not to scale" without hiding that a row is running through it.
+ *
+ * Only the drawing compresses. Every reported duration is still wall clock.
+ */
+export function compression(breaks, h, uid){
+  if(!breaks || !breaks.length) return {clip:'', over:''};
+  const zig=(x,y0,y1)=>{
+    const step=4.6, amp=1.6; let d=`M${(x-amp).toFixed(1)} ${y0}`;
+    for(let y=y0, i=0; y<y1; y+=step, i++)
+      d+=` L${(x+(i%2?-amp:amp)).toFixed(1)} ${Math.min(y+step,y1).toFixed(1)}`;
+    return `<path d="${d}" fill="none" stroke="${C.mut}" stroke-width="1" opacity=".8" stroke-linejoin="round"/>`;
+  };
+  const rects=breaks.map(([a,b])=>
+    `<rect x="${px(a).toFixed(1)}" y="0" width="${(px(b)-px(a)).toFixed(1)}" height="${h}"/>`).join('');
+  const clip=`<clipPath id="cmp-${uid}">${rects}</clipPath>`;
+  const over=breaks.map(([a,b,t])=>{
+    const x0=px(a), x1=px(b), mid=(x0+x1)/2;
+    return `<rect x="${x0.toFixed(1)}" y="0" width="${(x1-x0).toFixed(1)}" height="${h}" fill="var(--ground)" opacity=".28"/>`+
+      [x0,x1].map(x=>`<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${h}" stroke="${C.idle}" stroke-width="1" opacity=".9"/>`).join('')+
+      zig(mid,0,ROW+TOP)+
+      (t?`<text x="${mid.toFixed(1)}" y="${(h-1.5).toFixed(1)}" ${MONO} font-size="6" fill="${C.mut}" text-anchor="middle">${t}</text>`:'');
+  }).join('');
+  return {clip, over};
+}
+
+let UID=0;
+
 export function fig(rows,extra='',label='',under='',opts={}){
   if(under&&typeof under==='object'){ opts=under; under=''; }
   if(opts.rib){
@@ -303,11 +347,18 @@ export function fig(rows,extra='',label='',under='',opts={}){
     const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0});
     ctx=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.sharp+F.soft,LBL,k)}</g>`;
   }
+  // The compressed band blurs whatever runs through it. Done by drawing the
+  // whole figure a second time, clipped to the band and filtered — SVG has no
+  // backdrop-filter, and a flat scrim would hide the row rather than soften it.
+  const cmp=compression(opts.breaks, h, ++UID);
+  const blurred=cmp.clip
+    ? `<g clip-path="url(#cmp-${UID})" filter="url(#cmpblur)">${ctx}${inner}</g>`
+    : '';
   return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" role="img" aria-label="${label}">`+
-    HATCH+BLURDEF+ctx+inner+over+`</svg>`;
+    HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+`</svg>`;
 }
 
-const BLURDEF=`<defs><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+
+const BLURDEF=`<defs><filter id="cmpblur" x="-30%" y="-10%" width="160%" height="120%"><feGaussianBlur stdDeviation="1.4"/></filter><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+
   `<feGaussianBlur stdDeviation="0.62"/>`+
   `<feColorMatrix type="saturate" values="0.25"/>`+
   `</filter></defs>`;

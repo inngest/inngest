@@ -37,13 +37,13 @@ D('w4',{d:'Waiting and failing must not read alike. One is hatched and never red
 
 // ---- Time & the axis ----------------------------------------------------
 
-D('t1',{d:'An idle gap that dwarfs the work is compressed and marked as a break. The axis is the only thing that changes: every duration on the row is still wall clock.',
+D('t1',{d:'Seven days of dead time, given six percent of the width. The threshold is low on purpose: if nothing is executing for more than a few percent of the run, that stretch is worth almost none of the space, and an hour and a week get the same few pixels. The cut crosses every row, the zigzag says the page was torn and rejoined, and what runs through the band is blurred because that width is not to scale. Only the drawing compresses &mdash; the sleep still reports 7d.',
   svg:fig([
-    {n:'a', segs:[['good',0,8]]},
-    {n:'nap', segs:[['waitok',8,50]]},
-    {n:'b', segs:[['disc',58,2],['idle',60,3],['good',63,12]]},
-  ],axis(cy(2)+13,[[0,'0ms'],[8,'+41ms'],[58,'+7d'],[75,'+7d 62ms']],{brk:[[10,56,'⋯ 7d ⋯']],top:cy(0)-9}),
-    'a compressed idle gap','',{margin:0,pad:34})});
+    {n:'a',   segs:[['good',0,11]]},
+    {n:'nap', segs:[['waitok',11,6]],note:'7d'},
+    {n:'b',   segs:[['idle',17,3],['disc',20,4],['idle',24,3],['good',27,59]]},
+  ],axis(cy(2)+13,[[0,'0ms'],[11,'+41ms'],[86,'+7d 62ms']]),
+    'seven days compressed to a band','',{margin:0,pad:22,breaks:[[11,17,'7d']]})});
 
 D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you that before you have read a number, which is the point of the height rule.',
   svg:fig([

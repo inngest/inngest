@@ -201,7 +201,7 @@ const SC=[
   ['w4','Waiting and failing must not read alike. One is hatched and never red; the other is solid and red.'],
  ]],
  ['Time and the axis', [
-  ['t1','An idle gap that dwarfs the work is compressed and marked as a break. Only the axis changes; every duration is still wall clock.'],
+  ['t1','Dead time is worth almost none of the width. The threshold is low, the band is fixed, and only the drawing compresses — every duration is still wall clock.'],
   ['t2','Seven days elapsed, 62ms executing. The fill rule reports that before you have read a number.'],
   ['t3','Two tiers of axis label, so a run measured in days keeps its resolution without a second axis.'],
   ['t4','A step too short to draw is still drawn, at a minimum width, with its real duration beside it.'],

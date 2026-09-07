@@ -140,12 +140,13 @@ report today.
 - ENCODING: `wait` blue hatched, `waitok` green hatched, `waitout` muted hatched, `waitstop` muted hatched + square.
 
 ## Time and the axis
-- An idle gap that dwarfs the work is compressed and **marked** as a break; only the axis changes, **every duration is still wall clock.**
+- **Dead time is worth almost none of the width, and the threshold for that is low.** If nothing is executing for more than a few percent of the run, that stretch collapses to a fixed narrow band — an hour and seven days get the same few pixels, because the space belongs to the work. Only the drawing compresses; **every reported duration is still wall clock.**
+- **A compressed band carries three cues**, because one cannot beat how strongly a time axis reads as linear: a torn-page **zigzag** (the idiom the fixture scrubber already uses), **full-height rules** at both edges so the cut crosses every row rather than being a mark on the axis that rows ignore, and a **blur** of whatever runs through the band — which says "this width is not to scale" without hiding that a row is running through it.
 - Reading the fill alone should report the compute/elapsed ratio before you read a number.
 - Two tiers of axis label — coarse tier carries the date/hour crossed, fine tier the offsets inside it.
 - Ticks come from the scale that placed the bars, so **a label can only name a position the drawing reaches.**
 - A step too short to draw is still drawn at a minimum width, with its real duration beside it: **the drawing rounds, the reported number does not.**
-- ENCODING: break = hatched `hx-idle` band with dashed vertical rules at each edge; `MIN_W` 1.4px floor applied in screen space.
+- ENCODING: break = fixed narrow band, `--ground` scrim at .28, solid full-height rules at both edges, a sawtooth down the band on the Run row, the elapsed time named at the foot, and the figure redrawn clipped to the band through a blur; `MIN_W` 1.4px floor applied in screen space.
 
 ## Scale
 - Repetition with one shape collapses to a single row that reports the count and draws where each member ran.

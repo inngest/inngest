@@ -144,8 +144,13 @@ neither success nor failure, so it ends in a square rather than a circle.
 
 ## Long runs
 
-A run can be nine days elapsed and five seconds executing. The axis compresses
-the idle stretches and marks each one with a break.
+A run can be nine days elapsed and five seconds executing, so idle stretches are
+worth almost none of the width. Anything longer than a few percent of the run
+collapses to a narrow band — an hour and a week get the same few pixels, because
+the space belongs to the work.
+
+The band is marked three ways: a torn-page zigzag, rules crossing every row at
+both edges, and a blur over whatever runs through it.
 
 **Only the axis compresses. Every duration stays wall clock.** A step that took
 890ms says 890ms whatever the axis is doing.
