@@ -58,8 +58,15 @@ fi
 
 # A URL that does not answer still produces a PNG — chromium renders its own
 # error page, and that image read back as evidence is worse than no image.
-CODE=$(curl -s -o /dev/null -m 5 -w "%{http_code}" "$URL")
-[ "$CODE" = "200" ] || { echo "shot: $URL answered $CODE, refusing to screenshot it" >&2; exit 1; }
+# Reachability means different things per scheme, so check the right one.
+case "$URL" in
+  file://*)
+    F="${URL#file://}"
+    [ -r "$F" ] || { echo "shot: $F is not readable, refusing to screenshot it" >&2; exit 1; } ;;
+  *)
+    CODE=$(curl -s -o /dev/null -m 5 -w "%{http_code}" "$URL")
+    [ "$CODE" = "200" ] || { echo "shot: $URL answered $CODE, refusing to screenshot it" >&2; exit 1; } ;;
+esac
 
 COMMON=(--headless --no-sandbox --disable-gpu --hide-scrollbars
         --force-device-scale-factor=1 --window-size="$SIZE"

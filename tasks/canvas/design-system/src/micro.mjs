@@ -43,14 +43,27 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run'},sc=1){
 
 export function row(i,r,sc=1){
   if(r.run) return runProfile(i,r,sc);
-  const {n,segs:rawSegs=[],dim=1,dots,note,sel,noHalo}=r;
+  const {n,segs:rawSegs=[],dim=1,dots,note,sel,noHalo,lit,litDots}=r;
   const segs=fillGaps(rawSegs.map(([k,x,w])=>({kind:k,x,w}))).map(g=>[g.kind,g.x,g.w]);
   const y=cy(i); let s='';
+  /**
+   * Attention is per ELEMENT, not per row. Hovering a step lights the parts of
+   * other rows that caused it — the discovery bar, the queue circle, the mark
+   * the ribbon threads — and leaves the rest of those rows faded. Fading a
+   * whole row would either hide the cause or light an `ok` bar that had nothing
+   * to do with it.
+   *
+   * `lit` names what survives: a bar kind (`'disc'`) or a segment's start x.
+   * `litDots` names mark positions. Absent, the row is uniformly `dim`.
+   */
+  const litBar=(k,x)=>!lit ? dim
+    : (lit.some(v=>typeof v==='string' ? v===base(k) : Math.abs(v-x)<0.01) ? 1 : dim);
+  const litDot=p=>!litDots ? dim : (litDots.some(v=>Math.abs(v-p)<0.01) ? 1 : dim);
   if(sel) s+=`<rect x="${LBL-3}" y="${y-7.5}" width="${PLOT+6}" height="15" fill="${C.acc}" opacity=".13" rx="2"/>`;
   s+=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}" opacity="${dim}">${n}</text>`;
-  segs.forEach(([k,a,w])=>{ s+=barSvg(k,a,w,y,{k:1,floor:sc,o:dim}); });
+  segs.forEach(([k,a,w])=>{ s+=barSvg(k,a,w,y,{k:1,floor:sc,o:litBar(k,a)}); });
   const auto=autoDots(segs.map(([k,a,w])=>({kind:k,x:a,w})));
-  (dots||auto).forEach(d=>{const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01); s+=dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),dim,3,!onRib);});
+  (dots||auto).forEach(d=>{const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01); s+=dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),litDot(d.p),3,!onRib);});
   // The note follows the row's own content rather than sitting in a reserved
   // column, so no horizontal space is set aside for it.
   {

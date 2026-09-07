@@ -5,7 +5,18 @@ const E={};
 const DIM=.15;
 
 /** Same rows twice: at rest, then with everything off the path faded. */
-function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote='hovered',rib,ribs}){
+/**
+ * `lit` names what stays at full opacity in the hovered frame. An entry is
+ * either a row index (the whole row) or `{row, bars, dots}` — the parts of a
+ * row that caused the hovered one. A row that merely *contains* the cause is
+ * not itself the subject: hovering `b` lights `a`'s discovery bar and its queue
+ * circle, and leaves `a`'s `ok` bar faded with everything else.
+ *
+ * `focus` names the row that takes the selection wash. It defaults to the last
+ * fully-lit row, which is right when the frame is described as "hovering x" and
+ * wrong when it is "the request selected", so those pass it explicitly.
+ */
+function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote='hovered',rib,ribs,focus}){
   const all=ribs||(rib?[rib]:[]);
   const under=all.map(r=>ribbon(r.x,r.rows.map(i=>cy(i)))).join('');
   const marked=rows.map((r,i)=>{
@@ -13,9 +24,16 @@ function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote=
     return on?{...r,noHalo:[on.x]}:r;
   });
   const rest=fig(marked,restExtra,label+' at rest',under);
-  const dimmed=marked.map((r,i)=>lit.includes(i)?r:{...r,dim:DIM});
-  const focus = /^hovering/.test(hoverNote) ? lit[lit.length-1] : null;
-  const hov=fig(dimmed.map((r,i)=>i===focus?{...r,sel:true}:r),
+  const spec=new Map(lit.map(v=>typeof v==='number'?[v,null]:[v.row,v]));
+  const dimmed=marked.map((r,i)=>{
+    if(!spec.has(i)) return {...r,dim:DIM};
+    const p=spec.get(i);
+    return p ? {...r,dim:DIM,lit:p.bars,litDots:p.dots} : r;
+  });
+  const whole=lit.filter(v=>typeof v==='number');
+  const focusRow = focus!=null ? focus
+    : (/^hovering/.test(hoverNote) ? whole[whole.length-1] : null);
+  const hov=fig(dimmed.map((r,i)=>i===focusRow?{...r,sel:true}:r),
     arrows.map(a=>Array.isArray(a)?arrow(...a):a).join('')+hoverExtra,label+' hovered',
     all.map(r=>ribbon(r.x,r.rows.map(i=>cy(i)),{o:.35})).join(''));
   return [{l:'at rest',svg:rest},{l:hoverNote,svg:hov}];
@@ -23,24 +41,32 @@ function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote=
 const D=(k,d,frames)=>{E[k]={d,frames};};
 
 D('c0','In a single sequential thread the SDK answers and runs in the same execution &mdash; one HTTP call, not two &mdash; so there is no discovery bar. But the execution still <em>began</em> not knowing what it would run, and the blue start circle says so. A step planned by an earlier request opens on the grey mark instead.',
+  // `b`'s queue begins the instant `a` resolves. There is no gap to draw,
+  // because there is no second request to wait for — which is the whole point
+  // of the figure, and a gap here quietly contradicted it.
   [{l:'at rest',svg:fig([{n:'a',segs:[['idle',0,10],['good',10,34]],note:'discovered'},
-    {n:'b',segs:[['idle',48,8],['good',56,30]],note:'discovered'}],'','sequential')},
+    {n:'b',segs:[['idle',44,12],['good',56,30]],note:'discovered'}],'','sequential')},
    {l:'hovering b',svg:fig([{n:'a',segs:[['idle',0,10],['good',10,34]],dim:DIM},
-    {n:'b',segs:[['idle',48,8],['good',56,30]],note:'discovered',sel:true}],
-    wire(px(44),cy(0),px(48),cy(1)),'sequential hovered')}]);
+    {n:'b',segs:[['idle',44,12],['good',56,30]],note:'discovered',sel:true}],
+    wire(px(44),cy(0),px(44),cy(1)),'sequential hovered')}]);
 
 D('c1','One request made three steps. The ribbon threads their queue circles at rest, so hovering a member draws <em>no</em> cable &mdash; the relationship is already on screen, and nothing preceded this request to cable back to.',
+  // Hovering `b` lights what caused it and nothing else: `b` entire, the ribbon,
+  // and on `a`'s row only the discovery bar, the queued mark that opens it and
+  // the planned mark the ribbon threads. `a`'s own work had nothing to do with
+  // `b` starting, so it stays faded.
   pair([{n:'req + a',segs:[['disc',0,16],['idle',16,6],['good',22,44]],note:'44ms'},
         {n:'b',segs:[['idle',16,6],['good',22,52]],note:'52ms'},
         {n:'c',segs:[['idle',16,6],['good',22,38]],note:'38ms'}],
-    {lit:[0,1],arrows:[],label:'fan-out',hoverNote:'hovering b',rib:{x:16,rows:[0,1,2]}}));
+    {lit:[{row:0,bars:['disc'],dots:[0,16]},1],arrows:[],
+     label:'fan-out',hoverNote:'hovering b',rib:{x:16,rows:[0,1,2]}}));
 
 D('c2','The whole shape: one request fans out to three steps, all three completing causes the next request, and that request produced a single step so it rolls into <code>d</code>&rsquo;s row. The ribbon covers the fan-out at rest; the cables only appear when you ask, and only for the hop the ribbon cannot span.',
   pair([{n:'req + a',segs:[['disc',0,12],['idle',12,2],['good',14,20]],note:'20ms'},
         {n:'b',segs:[['idle',12,2],['good',14,32]],note:'32ms'},
         {n:'c',segs:[['idle',12,2],['good',14,26]],note:'26ms'},
         {n:'d',segs:[['idle',46,10],['good',56,18]],note:'18ms'}],
-    {lit:[0,1,2,3],
+    {lit:[0,1,2,3],focus:3,
      arrows:[wire(px(34),cy(0),px(46),cy(3),{i:0})+wire(px(46),cy(1),px(46),cy(3),{i:2})+wire(px(40),cy(2),px(46),cy(3),{i:1})],
      label:'fan-out then coalesce',hoverNote:'d selected',rib:{x:12,rows:[0,1,2]}}));
 
@@ -54,9 +80,14 @@ D('c3','Chevrons nest naturally, so depth reads without indentation. Hovering on
      label:'nested fan-out',hoverNote:'hovering a1',ribs:[{x:10,rows:[0,1]},{x:42,rows:[2,3]}]}));
 
 D('c4','The ribbon covers exactly the members, so an uneven fan-out is legible at rest &mdash; you can see it produced three without counting. Hovering adds nothing here, because the ribbon has already said it.',
-  pair([{n:'req + a',segs:[['disc',0,12],['good',14,30]],},
-        {n:'b',segs:[['good',14,58]]},{n:'c',segs:[['good',14,12]]},{n:'unrelated',segs:[['good',20,40]]}],
-    {lit:[0,1,2],arrows:[],
+  // Every member of a fan-out is enqueued by the request and waits its turn, so
+  // each carries the same queue interval and the planned mark that opens it.
+  // Without them the ribbon threaded rows that had no circles to thread.
+  pair([{n:'req + a',segs:[['disc',0,12],['idle',12,2],['good',14,30]]},
+        {n:'b',segs:[['idle',12,2],['good',14,58]]},
+        {n:'c',segs:[['idle',12,2],['good',14,12]]},
+        {n:'unrelated',segs:[['good',20,40]]}],
+    {lit:[0,1,2],arrows:[],focus:0,
      label:'unbalanced fan-out',hoverNote:'the request selected',rib:{x:12,rows:[0,1,2]}}));
 
 D('c5','Nothing static predicted the width. The ribbon reports what happened rather than promising a shape, and the one cable worth drawing is the hop from <code>decide</code> into the request &mdash; not the request out to its own members.',
