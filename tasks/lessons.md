@@ -455,3 +455,36 @@ behaviour is silently inert.
 correctly" but **do not parse in injected code**. The handler needed a name; the
 markup should hand it one — `data-sec="${title}"` — and the regex disappears
 rather than being made to survive a round trip through a template literal.
+
+---
+
+## 30. A CSS transition needs a previous computed value; `display:none` has none
+
+**Failure mode**: morphing between two pre-rendered variants of a figure. Both
+were in the DOM with one `display:none`. The approach was: set the incoming
+elements' geometry to the outgoing values, swap which variant is shown, force a
+reflow, then remove the inline values so CSS transitions carry them home.
+
+Nothing animated. The transition was correctly registered — `transition-property`
+computed to `x, cx, width, --w, opacity` — and the start values were applied.
+But an element that was `display:none` until this frame has no *previous*
+computed style, so the first style it gets is a starting state, not a change,
+and there is nothing to transition from.
+
+**Detection signal**: sample the computed value on a timer after the toggle. It
+sat at the final value from `t=0`, which distinguishes "the transition never
+started" from "the transition is too fast" or "the wrong property".
+
+**Prevention**: use `element.animate()` for anything crossing a visibility
+change. It states both endpoints explicitly and does not care what the element's
+style history is. Keep CSS transitions for elements that were already visible.
+
+Two things that bit alongside it, both worth keeping:
+
+- **A custom property must be registered with `@property` to interpolate.** An
+  unregistered `--w` is a string to the animation engine and jumps.
+- **Match elements between two renders per KIND, not across one mixed list.** A
+  compressed figure draws itself twice — once more, clipped, for the blur — so
+  the variants hold different numbers of elements. A single `querySelectorAll`
+  of everything diverges at the first extra and every pair after it is a bar
+  against a circle.

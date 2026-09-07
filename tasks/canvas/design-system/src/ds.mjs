@@ -574,6 +574,14 @@ const page=`<title>Trace Design System</title>
   #side .tg{align-items:flex-start}
   /* Only the variant matching the current feature toggles is shown. A figure
      that draws the same thing whatever they are was never wrapped. */
+  /* --w is what a bar's width comes from, so it has to be a registered custom
+     property or it cannot be transitioned — an unregistered one is a string as
+     far as animation is concerned, and jumps. */
+  @property --w{syntax:'<length>';inherits:false;initial-value:0px}
+  /* The morph is driven by element.animate(), not by these — see morphFeat.
+     --w still has to be a registered custom property or it cannot be
+     interpolated at all: an unregistered one is a string to the animation
+     engine and jumps from one value to the other. */
   .varset{display:contents}
   .varset > .v{display:none}
   html[data-feat="11"] .varset > .v-11,
@@ -1073,7 +1081,9 @@ ${fig(J.connect.poll)}
   }
 
   var SCRUBS=[];
-  function redrawScrubs(){ SCRUBS.forEach(function(f){ f(); }); }
+  // A scrub is rebuilt from its fixture rather than swapped between variants,
+  // so it is morphed out of whatever it was showing a moment ago.
+  function redrawScrubs(){ SCRUBS.forEach(function(f){ f(true); }); }
   document.querySelectorAll('.scrub').forEach(function(s){
     var slot=s.querySelector('.frame'),
         input=s.querySelector('input'), at=s.querySelector('.at'), ev=s.querySelector('.evt'),
@@ -1093,7 +1103,11 @@ ${fig(J.connect.poll)}
     input.addEventListener('input',function(){ show(+input.value/100); });
     ticks.forEach(function(x){ x.addEventListener('click',function(){ show(+x.dataset.p); }); });
     show(100);
-    SCRUBS.push(function(){ show(+input.value/100); });
+    SCRUBS.push(function(morph){
+      var snap=morph?snapGeom(slot):null;
+      show(+input.value/100);
+      if(snap) morphInto(slot, snap);
+    });
   });
 
   // ---- configurator ----------------------------------------------------
@@ -1228,21 +1242,119 @@ ${fig(J.connect.poll)}
   var FKEY='tds.feat.v1', feat={trim:true, compress:true};
   try{ feat=Object.assign(feat, JSON.parse(localStorage.getItem(FKEY)||'{}')); }catch(e){}
   function featKey(){ return (feat.trim?'1':'0')+(feat.compress?'1':'0'); }
-  function applyFeat(){
-    document.documentElement.setAttribute('data-feat', featKey());
+  /**
+   * Morph between two feature variants.
+   *
+   * Both variants are already in the DOM, one of them display:none, and the
+   * elements correspond because the same code drew them. So: read the outgoing
+   * geometry, swap which variant is shown, and animate the incoming one from
+   * where the outgoing one was. What you see is the bars moving between the two
+   * layouts rather than the page cutting between them.
+   *
+   * Read from ATTRIBUTES, not from getBoundingClientRect: the incoming variant
+   * is hidden when it is measured, and a hidden element has no box.
+   *
+   * Driven by element.animate() rather than a CSS transition. A transition
+   * needs a previous computed value to move from, and an element that was
+   * display:none until this frame has none — so it arrived at its final
+   * position instantly, every time.
+   *
+   * Additive by design: if any of it fails the toggle still works, it just
+   * happens at once.
+   */
+  var MORPH={duration:520, easing:'cubic-bezier(.33,1,.68,1)', fill:'none'};
+  function geomOf(el){
+    return {x:el.getAttribute('x'), cx:el.getAttribute('cx'),
+            w:el.getAttribute('width'),
+            vw:(el.style&&el.style.getPropertyValue('--w'))||''};
+  }
+  var MORPH_SEL=['rect.bar','rect.cmpband','rect.rib','rect.run-track','rect.run-slice',
+                 'circle.ev','circle.ev-bg','text'];
+  /** Every animatable element under a root, grouped by kind. */
+  function snapGeom(root){
+    var out={};
+    MORPH_SEL.forEach(function(sel){
+      out[sel]=[].slice.call(root.querySelectorAll(sel)).map(geomOf);
+    });
+    return out;
+  }
+  /** Animate a freshly drawn root out of the geometry the old one had. */
+  function morphInto(root, snap){
+    if(!snap || !root.animate && !document.body.animate) return;
+    MORPH_SEL.forEach(function(sel){
+      var b=root.querySelectorAll(sel), was=snap[sel]||[];
+      for(var i=0;i<b.length;i++){
+        var el=b[i], g=was[i];
+        try{
+          if(!g){ el.animate([{opacity:0},{opacity:1}], MORPH); continue; }
+          var a={}, z={}, moved=false, now=geomOf(el);
+          if(g.x!=null  && now.x!=null  && g.x!==now.x)  { a.x=g.x+'px';   z.x=now.x+'px';   moved=true; }
+          if(g.cx!=null && now.cx!=null && g.cx!==now.cx){ a.cx=g.cx+'px'; z.cx=now.cx+'px'; moved=true; }
+          if(g.vw && now.vw && g.vw!==now.vw)            { a['--w']=g.vw;  z['--w']=now.vw;  moved=true; }
+          else if(g.w!=null && now.w!=null && g.w!==now.w){ a.width=g.w+'px'; z.width=now.w+'px'; moved=true; }
+          if(moved) el.animate([a,z], MORPH);
+        }catch(e){}
+      }
+    });
+  }
+
+  function morphFeat(nextKey){
+    var prevKey=document.documentElement.getAttribute('data-feat');
+    document.documentElement.setAttribute('data-feat', nextKey);
+    if(!prevKey || prevKey===nextKey || !document.body.animate){ refit(); return; }
+
+    var pairs=[];
+    document.querySelectorAll('.varset').forEach(function(set){
+      var from=set.querySelector('.v-'+prevKey), to=set.querySelector('.v-'+nextKey);
+      if(!from || !to || from===to) return;
+      // Matched per KIND, not across one mixed list. A compressed figure draws
+      // itself a second time to blur what passes through the band, so the two
+      // variants hold different numbers of elements; one mixed list diverges at
+      // the first extra and every pair after it is a bar against a circle.
+      ['rect.bar','rect.cmpband','rect.rib','rect.run-track','rect.run-slice',
+       'circle.ev','circle.ev-bg','text'].forEach(function(sel){
+        var a=from.querySelectorAll(sel), b=to.querySelectorAll(sel);
+        var n=Math.min(a.length,b.length);
+        for(var i=0;i<n;i++) pairs.push([b[i], geomOf(a[i])]);
+        for(var j=n;j<b.length;j++) pairs.push([b[j], null]);   // no counterpart: fade in
+      });
+      // A cable is a bezier and two path strings cannot be interpolated, so it
+      // fades rather than pretending to move.
+      to.querySelectorAll('g.cable').forEach(function(c){ pairs.push([c, null]); });
+    });
+
+    pairs.forEach(function(p){
+      var el=p[0], g=p[1];
+      try{
+        if(!g){ el.animate([{opacity:0},{opacity:1}], MORPH); return; }
+        var a={}, b={}, moved=false;
+        var now=geomOf(el);
+        if(g.x!=null  && now.x!=null  && g.x!==now.x)  { a.x=g.x+'px';   b.x=now.x+'px';   moved=true; }
+        if(g.cx!=null && now.cx!=null && g.cx!==now.cx){ a.cx=g.cx+'px'; b.cx=now.cx+'px'; moved=true; }
+        if(g.vw && now.vw && g.vw!==now.vw)            { a['--w']=g.vw;  b['--w']=now.vw;  moved=true; }
+        else if(g.w!=null && now.w!=null && g.w!==now.w){ a.width=g.w+'px'; b.width=now.w+'px'; moved=true; }
+        if(moved) el.animate([a,b], MORPH);
+      }catch(e){}
+    });
+    setTimeout(refit, MORPH.duration+40);
+  }
+
+  function applyFeat(animate){
+    if(animate) morphFeat(featKey());
+    else document.documentElement.setAttribute('data-feat', featKey());
     document.querySelectorAll('#side [data-feat]').forEach(function(b){
       var on=!!feat[b.dataset.feat];
       b.classList.toggle('on',on); b.textContent=on?'on':'off';
     });
     FX=FXV[featKey()]||FXV['11'];
     if(typeof redrawScrubs==='function') redrawScrubs();
-    refit(); requestAnimationFrame(refit);
+    if(!animate){ refit(); requestAnimationFrame(refit); }
   }
   document.querySelectorAll('#side [data-feat]').forEach(function(b){
     b.addEventListener('click',function(){
       feat[b.dataset.feat]=!feat[b.dataset.feat];
       try{ localStorage.setItem(FKEY,JSON.stringify(feat)); }catch(e){}
-      applyFeat();
+      applyFeat(true);
     });
   });
 
