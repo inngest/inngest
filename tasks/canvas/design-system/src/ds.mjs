@@ -582,10 +582,10 @@ ${fig(EX.t1c.frames[0].svg,'Eight compressions sharing one budget. The polls bet
 <p>A step instrumented with <code>@inngest/otel</code> reports what your code did inside it — HTTP calls, database queries, third-party APIs. Everything above this point is Inngest&rsquo;s own timing; this is the first thing in the trace that is not.</p>
 <p>They are <em>your code at finer grain</em>, so they keep the status colours a step has. What separates them from a step is <strong>nesting and weight, not a new colour</strong>: a span is a subdivision of the bar above it, never a peer of it.</p>
 ${frames('o0')}
-<p>It has to be coverage rather than one mark per span, because inside a <code>Promise.all</code> the spans overlap and a tick each would either stack into a smudge or imply an order that is not there. The rail reports the <em>union</em>: which parts of the step something covered, and the worst status in each part.</p>
+<p>The same at any complexity. Spans inside a <code>Promise.all</code> overlap, and on their own pitch that reads as exactly what it is &mdash; several things running at once inside one step &mdash; without a ribbon, a mark or an ordering claim, none of which apply to something the trace did not schedule.</p>
 ${frames('o0b')}
-<div class="rule">A span subdivides a step. It does not add a row to the run until you ask for one.</div>
-<p>At rest the notches are the same idiom a collapsed group uses for its members: you can see there were three things in there and roughly where, without expanding. The gap after the last notch is your code doing something no span covers, which is worth seeing too.</p>
+<div class="rule">A span is a plain bar on a tighter pitch: no queue mark, no start, no resolution circle. The event vocabulary belongs to the trace, and a span is something that happened inside one row of it.</div>
+
 ${fig(EX.o1.frames[0].svg,'Expanded: indented, thinner, same status colours. The step is still the thing that retried — a span inside it is not separately retryable.')}
 <p>The nesting is a claim, and the trace has to be able to keep it.</p>
 ${fig(EX.o2.frames[0].svg,'A span sits inside its step, because that is where it ran. One that outruns it is a clock disagreement between your process and ours, not a slow query, and the row says so rather than clamping quietly.')}

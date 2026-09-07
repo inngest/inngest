@@ -8,6 +8,14 @@ let NOTES=false;
 export const setNotes=on=>{NOTES=on;};
 export const px=p=>LBL+(p/100)*PLOT;
 export const cy=i=>TOP+9+ROW*i;
+/** Row pitch for a userland span: tight enough that the bars nearly touch. */
+export const SPAN_ROW=9;
+/** y for each row, honouring any that sit on the tighter span pitch. */
+export const rowYs=rows=>{
+  const ys=[]; let y=cy(0);
+  rows.forEach((r,i)=>{ if(i) y+=rows[i].span?SPAN_ROW:(rows[i-1].span?SPAN_ROW+4:ROW); ys.push(y); });
+  return ys;
+};
 export const arrow=(x1,y1,x2,y2,o=1)=>{
   const d=Math.max(10,Math.abs(x2-x1)*0.5);
   return `<path d="M${x1} ${y1} C ${x1+d} ${y1}, ${x2-d} ${y2}, ${x2-3} ${y2}" fill="none" stroke="${C.acc}" stroke-width="1.3" opacity="${o}"/>`+
@@ -83,11 +91,11 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[]},sc=
   return s;
 }
 
-export function row(i,r,sc=1){
+export function row(i,r,sc=1,yy){
   if(r.run) return runProfile(i,r,sc);
   const {n,segs:rawSegs=[],dim=1,dots,note,sel,noHalo,lit,litDots}=r;
   const segs=fillGaps(rawSegs.map(([k,x,w])=>({kind:k,x,w}))).map(g=>[g.kind,g.x,g.w]);
-  const y=cy(i); let s='', hit='';
+  const y=yy!=null?yy:cy(i); let s='', hit='';
   /**
    * Attention is per ELEMENT, not per row. Hovering a step lights the parts of
    * other rows that caused it — the discovery bar, the queue circle, the mark
@@ -127,30 +135,16 @@ export function row(i,r,sc=1){
   // Drawing the complete row at `dim` and then repainting only the lit parts
   // over it keeps bars under marks inside both layers.
   const put=(on,frag)=>{ lo+=frag; if(on) hi+=frag; };
-  lo+=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
+  if(r.spans) lo+=[0,1,2].map(j=>
+    `<rect x="${LBL-11}" y="${(y-2.6+j*2.2).toFixed(1)}" width="6" height="1.1" rx="0.5" fill="${C.mut}" opacity="${0.85-j*0.22}"/>`).join('');
+  lo+=`<text x="${r.span?8:2}" y="${y+2.2}" ${MONO} font-size="${r.span?6:7}" `+
+     `fill="${C.mut}" opacity="${r.span?0.78:1}">${n}</text>`;
   // A userland span is a subdivision of the step above it, not a peer, so it is
   // drawn thinner. Nesting and weight carry that, not a new colour: an OTel span
   // IS your code, so it keeps the same status colours the step has.
-  /**
-   * The coverage rail. A hairline under a step's bar showing WHERE userland
-   * spans covered its execution and whether any failed — not the spans
-   * themselves.
-   *
-   * Notches were the first attempt and they assume the spans are sequential and
-   * do not overlap, which a `Promise.all` inside a step makes false. A complex
-   * span tree's shape cannot survive being compressed into one bar's width
-   * without lying about it, so at rest the row carries what changes your next
-   * action — is there anything in there, did any of it fail, and which parts of
-   * the step nothing covers — and expanding carries the structure.
-   *
-   * It is drawn UNDER the bar and never tints it: a step that returned is green
-   * whatever happened in a span inside it, because those are different facts.
-   */
-  const bh=r.thin?GEOM.BAR_H*0.62:GEOM.BAR_H;
-  if(r.rail) for(const [rx,rw,rk] of r.rail)
-    lo+=barSvg('span'+(rk||'unset'),rx,rw,y+GEOM.BAR_H/2+2.1,{k:1,floor:sc,h:1.8});
+  const bh=(r.thin||r.span)?GEOM.BAR_H*0.6:GEOM.BAR_H;
   segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh})); });
-  (dots||auto).forEach(d=>{
+  if(!r.span) (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
     put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,3,true));
   });
@@ -273,7 +267,10 @@ export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
 export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false}){
   const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
-  const finY=cy(above+rows.length);
+  // Finalization sits a full row below whatever the last row was, which may
+  // have been on the tighter span pitch.
+  const ys=rowYs(rows);
+  const finY=(ys.length?ys[ys.length-1]:cy(0)-ROW)+ROW+ROW*above;
 
   // Finalization is a discovery request like any other — it asks the SDK what
   // is next and the answer is "nothing". So it is queued, it waits, it starts,
@@ -485,11 +482,16 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const ownRun=rows.some(r=>r.run||r.n==='Run');
   const above=framed?(ownRun?0:FRAME_ROWS_ABOVE):0;
   const n=opts.rowCount||rows.length;
-  const h=TOP*2+ROW*(n+above+(framed?1:0))+(opts.pad||0);
+  const lastY=rows.length?rowYs(rows)[rows.length-1]:cy(0)-ROW;
+  const h=lastY+ROW*(1+above+(framed?1:0))+TOP+(opts.pad||0)
+    -(rows.length?0:ROW);
   const ends=rows.flatMap(r=>(r.segs||[]).map(([,x,w])=>x+w));
   const max=ends.length?Math.max(...ends):100;
   const k=opts.scale||(max>0?Math.min(86/max,3):1);
-  const body=under+rows.map((r,i)=>row(i,r,k)).join('')+extra;
+  // Rows are placed from their own pitches, so a block of span rows packs
+  // tighter than the trace around it.
+  const ys=rowYs(rows);
+  const body=under+rows.map((r,i)=>row(i,r,k,ys[i])).join('')+extra;
   const M=opts.margin||0;
   // Annotations are placed after the stretch, in final coordinates, so a
   // leader lands on the bar it points at rather than being scaled off it.

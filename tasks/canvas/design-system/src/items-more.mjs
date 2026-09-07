@@ -228,51 +228,49 @@ D('i2',{d:'The Run row <em>is</em> the overview. There was a minimap above it dr
 
 // ---- OpenTelemetry ------------------------------------------------------
 
-D('o0',{d:'How they get into the trace. At rest a step with userland spans is still one row, with a <strong>coverage rail</strong> under its bar: where spans covered the execution, and whether any of them failed. It never tints the bar &mdash; a step that returned is green whatever happened in a span inside it, because those are different facts. The break in the rail is your code doing something no span covers, which is worth seeing on its own.',
+D('o0',{d:'A step with userland spans says so in the gutter and nothing else. Selecting it expands them. They are drawn as <strong>plain bars on a tighter pitch</strong> &mdash; no queue marks, no start or resolution circles &mdash; because the event vocabulary belongs to the trace, and a span is something that happened inside one row of it. Packed until they nearly touch, they read as a block belonging to the step above rather than as more of the run.',
   frames:(()=>{
-    const step={n:'charge',segs:[['idle',0,6],['good',6,74]],
-      rail:[[9,29,'unset'],[49,12,'unset'],[63,14,'unset']],note:'3 spans'};
+    const step={n:'charge',segs:[['idle',0,6],['good',6,74]],spans:true};
     return [
-      {l:'at rest', svg:fig([step],'','coverage under the step')},
-      {l:'expanded', svg:fig([
-        {n:'charge',segs:[['idle',0,6],['good',6,74]]},
-        {n:'  ↳ POST /pay', segs:[['spanunset',9,29]],thin:true},
-        {n:'  ↳ SELECT',    segs:[['spanunset',49,12]],thin:true},
-        {n:'  ↳ UPDATE',    segs:[['spanunset',63,14]],thin:true},
-      ],'','the same spans, expanded')},
+      {l:'at rest', svg:fig([step],'','the gutter says there is more')},
+      {l:'selected', svg:fig([
+        {...step,sel:true},
+        {n:'POST /pay', segs:[['spanunset',9,29]],span:true},
+        {n:'SELECT',    segs:[['spanunset',49,12]],span:true},
+        {n:'UPDATE',    segs:[['spanunset',63,14]],span:true},
+      ],'','expanded on select')},
     ];
   })()});
 
-D('o0b',{d:'Why it is coverage and not one mark per span. Inside a <code>Promise.all</code> the spans overlap, and a notch or a tick per span would either stack into a smudge or imply an order that is not there. The rail reports the <em>union</em>: which parts of the step something was covering, and the worst status in each part. Anything finer is the expanded view&rsquo;s job.',
+D('o0b',{d:'The same at any complexity. Spans inside a <code>Promise.all</code> overlap, and on their own pitch that reads as exactly what it is &mdash; several things running at once inside one step &mdash; without a ribbon, a mark or an ordering claim, none of which apply to something the trace did not schedule.',
   frames:(()=>{
-    const step={n:'fanout',segs:[['idle',0,5],['good',5,80]],
-      rail:[[8,34,'unset'],[42,26,'err'],[68,15,'unset']],note:'9 spans · 1 error'};
+    const step={n:'fanout',segs:[['idle',0,5],['good',5,80]],spans:true};
     return [
-      {l:'at rest', svg:fig([step],'','overlapping spans, one rail')},
-      {l:'expanded', svg:fig([
-        {n:'fanout',segs:[['idle',0,5],['good',5,80]]},
-        {n:'  ↳ GET /a',  segs:[['spanunset',8,30]],thin:true},
-        {n:'  ↳ GET /b',  segs:[['spanunset',10,26]],thin:true},
-        {n:'  ↳ GET /c',  segs:[['spanerr',12,32]],thin:true,note:'ERROR'},
-        {n:'  ↳ SELECT',  segs:[['spanok',46,22]],thin:true},
-        {n:'  ↳ UPDATE',  segs:[['spanunset',68,15]],thin:true},
-      ],'','five of the nine, expanded')},
+      {l:'at rest', svg:fig([step],'','nine spans, one row')},
+      {l:'selected', svg:fig([
+        {...step,sel:true},
+        {n:'GET /a', segs:[['spanunset',8,30]],span:true},
+        {n:'GET /b', segs:[['spanunset',10,26]],span:true},
+        {n:'GET /c', segs:[['spanerr',12,32]],span:true},
+        {n:'SELECT', segs:[['spanok',46,22]],span:true},
+        {n:'UPDATE', segs:[['spanunset',68,15]],span:true},
+      ],'','overlapping spans on their own pitch')},
     ];
   })()});
 
-D('o1',{d:'A span keeps the three states OpenTelemetry gives it. Most instrumentation sets none, so <strong>Unset is the common case and must not read as an outcome</strong>: grey means it ran and nobody said, green means something said OK, red means it failed. The step above is green regardless &mdash; it returned.',
+D('o1',{d:'A span keeps the three states OpenTelemetry gives it. Most instrumentation sets none, so <strong>Unset is the common case and must not read as an outcome</strong>: grey means it ran and nobody said, green means something said OK, red means it failed. <code>charge</code> is green regardless &mdash; it returned, and what happened in a span inside it is a different fact.',
   svg:fig([
-    {n:'charge',       segs:[['idle',0,6],['good',6,74]],rail:[[9,20,'unset'],[31,20,'err'],[53,24,'ok']]},
-    {n:'  ↳ POST /pay',segs:[['spanunset',9,20]],thin:true,note:'Unset'},
-    {n:'  ↳ SELECT',   segs:[['spanerr',31,20]],thin:true,note:'ERROR'},
-    {n:'  ↳ UPDATE',   segs:[['spanok',53,24]],thin:true,note:'OK'},
+    {n:'charge',   segs:[['idle',0,6],['good',6,74]],spans:true},
+    {n:'POST /pay',segs:[['spanunset',9,20]],span:true,note:'Unset'},
+    {n:'SELECT',   segs:[['spanerr',31,20]],span:true,note:'ERROR'},
+    {n:'UPDATE',   segs:[['spanok',53,24]],span:true,note:'OK'},
   ],'','the three span statuses')});
 
 D('o2',{d:'The nesting is a claim, and the trace has to be able to keep it. A span always sits <em>inside</em> its step&rsquo;s execution, because that is where it ran &mdash; one that starts before its step or outruns it is a clock disagreement between your process and ours, not a slow query, and drawing it as though it were would be the view inventing a fact. Where the extents do not contain each other the row says so rather than clamping quietly.',
   svg:fig([
-    {n:'charge',        segs:[['idle',0,6],['good',6,54]]},
-    {n:'  ↳ POST /pay', segs:[['good',9,38]],thin:true},
-    {n:'  ↳ SELECT',    segs:[['good',52,26]],thin:true,note:'outruns its step'},
+    {n:'charge',   segs:[['idle',0,6],['good',6,54]],spans:true},
+    {n:'POST /pay',segs:[['spanunset',9,38]],span:true},
+    {n:'SELECT',   segs:[['spanunset',52,26]],span:true,note:'outruns its step'},
   ],'','a span that leaves its parent')});
 
 // ---- Honesty ------------------------------------------------------------
