@@ -51,9 +51,9 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',scrub},sc=1){
     const w=Math.max((v.ok===false&&!running?3.2:1.4)/sc, ((b-a)/100)*PLOT);
     s+=`<rect x="${px(a).toFixed(1)}" y="${y-4}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${running?C.disc:col(v)}"/>`;
   }
+  if(scrub) s+=scrubWindow(y,scrub,to);
   s+=dot(LBL,y,EV.queued);
   if(resolved) s+=dot(LBL+(to/100)*PLOT,y,resolved);
-  if(scrub) s+=scrubWindow(y,scrub,to);
   return s;
 }
 
@@ -64,12 +64,14 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',scrub},sc=1){
  */
 export function scrubWindow(y,{a=0,b=null},to=86){
   const x0=px(a), x1=px(b==null?to:b);
-  const t=y-7.5, h=15;
-  const grip=x=>
-    `<rect x="${(x-1.6).toFixed(1)}" y="${(t+2).toFixed(1)}" width="3.2" height="${h-4}" rx="1.4" fill="${C.acc}" opacity=".85"/>`+
-    `<line x1="${x.toFixed(1)}" y1="${(t+5).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(t+h-5).toFixed(1)}" stroke="${C.ground}" stroke-width=".7" opacity=".55"/>`;
+  const t=y-9, h=18;
+  const grip=(x,dir)=>{
+    const gx=x+dir*2.2;
+    return `<rect x="${(gx-1.7).toFixed(1)}" y="${(t+2.5).toFixed(1)}" width="3.4" height="${h-5}" rx="1.5" fill="${C.acc}" opacity=".9"/>`+
+      `<line x1="${gx.toFixed(1)}" y1="${(t+6).toFixed(1)}" x2="${gx.toFixed(1)}" y2="${(t+h-6).toFixed(1)}" stroke="${C.ground}" stroke-width=".8" opacity=".6"/>`;
+  };
   return `<rect x="${x0.toFixed(1)}" y="${t}" width="${(x1-x0).toFixed(1)}" height="${h}" rx="2.5" fill="none" stroke="${C.acc}" stroke-width="1" opacity=".5"/>`+
-    grip(x0)+grip(x1);
+    grip(x0,-1)+grip(x1,1);
 }
 
 export function row(i,r,sc=1){
@@ -273,8 +275,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
   let ctx='';
   if(framed){
     const F=traceFrame(rows,k,{end:max,hasOwnRun:rows.some(r=>r.run),pad:opts.pad||0});
-    ctx=stretch(F.sharp,LBL,k)+
-      `<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.soft,LBL,k)}</g>`;
+    ctx=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.sharp+F.soft,LBL,k)}</g>`;
   }
   return `<svg viewBox="${-M} 0 ${W+M*2} ${h+(opts.pad||0)}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+ctx+inner+over+`</svg>`;
