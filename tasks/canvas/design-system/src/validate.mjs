@@ -143,7 +143,7 @@ async function checkCodeSync(){
   for(const g of ['items-a','items-bc','items-disc','items-more'])
     Object.assign(EX, JSON.parse(fs.readFileSync(HERE+g+'.json','utf8')));
 
-  const labels=svg=>[...svg.matchAll(/<text x="2" y="[\d.]+"[^>]*>([^<]*)<\/text>/g)]
+  const labels=svg=>[...svg.matchAll(/<text x="(?:9|15)" y="[\d.]+"[^>]*>([^<]*)<\/text>/g)]
     .map(m=>m[1]).filter(r=>r && !/^(Run|Finalization)$/.test(r));
   const ids=code=>[...code.matchAll(/step\.(?:run|sleep|waitForEvent|waitForSignal|invoke|sendEvent)\(\s*['"\`]([^'"\`]+)/g)]
     .map(m=>m[1]).filter(n=>!n.includes('${'));

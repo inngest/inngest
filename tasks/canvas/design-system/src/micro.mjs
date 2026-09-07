@@ -16,6 +16,12 @@ export const rowYs=rows=>{
   rows.forEach((r,i)=>{ if(i) y+=rows[i].span?SPAN_ROW:(rows[i-1].span?SPAN_ROW+4:ROW); ys.push(y); });
   return ys;
 };
+/** How many gaps of each pitch sit above row i — the multipliers CSS needs. */
+export const rowSteps=rows=>{
+  const out=[]; let n=0, m=0;
+  rows.forEach((r,i)=>{ if(i){ if(rows[i].span) m++; else n++; } out.push([n,m]); });
+  return out;
+};
 export const arrow=(x1,y1,x2,y2,o=1)=>{
   const d=Math.max(10,Math.abs(x2-x1)*0.5);
   return `<path d="M${x1} ${y1} C ${x1+d} ${y1}, ${x2-d} ${y2}, ${x2-3} ${y2}" fill="none" stroke="${C.acc}" stroke-width="1.3" opacity="${o}"/>`+
@@ -47,7 +53,7 @@ export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.
 export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[]},sc=1){
   const y=cy(i);
   const col=v=> v.ok===false?C.bad : v.ok==='stop'?C.mut : v.ok==='mix'?C.mix : C.good;
-  let s=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
+  let s=`<text x="9" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
   /**
    * The grey track is the run's whole extent — and where the axis is
    * compressed, **the track itself tears** rather than running straight under a
@@ -136,8 +142,8 @@ export function row(i,r,sc=1,yy){
   // over it keeps bars under marks inside both layers.
   const put=(on,frag)=>{ lo+=frag; if(on) hi+=frag; };
   if(r.spans) lo+=[0,1,2].map(j=>
-    `<rect x="${LBL-11}" y="${(y-2.6+j*2.2).toFixed(1)}" width="6" height="1.1" rx="0.5" fill="${C.mut}" opacity="${0.85-j*0.22}"/>`).join('');
-  lo+=`<text x="${r.span?8:2}" y="${y+2.2}" ${MONO} font-size="${r.span?6:7}" `+
+    `<rect x="1" y="${(y-2.6+j*2.2).toFixed(1)}" width="5.4" height="1.1" rx="0.5" fill="${C.mut}" opacity="${0.85-j*0.22}"/>`).join('');
+  lo+=`<text x="${r.span?15:9}" y="${y+2.2}" ${MONO} font-size="${r.span?6:7}" `+
      `fill="${C.mut}" opacity="${r.span?0.78:1}">${n}</text>`;
   // A userland span is a subdivision of the step above it, not a peer, so it is
   // drawn thinner. Nesting and weight carry that, not a new colour: an OTel span
@@ -224,7 +230,7 @@ export function axis(y, ticks, {tier2=[], brk=[], top=0, label}={}){
  */
 export function groupRow(i, {n, x, w, members, kind='good', note=''}){
   const y=cy(i);
-  let s=tag(2, y+2.5, n, C.mut);
+  let s=tag(9, y+2.5, n, C.mut);
   s+=`<rect x="${px(x)}" y="${y-5}" width="${(w/100)*PLOT}" height="10" rx="2" fill="var(--surface-2)" stroke="${C.idle}" stroke-width="1"/>`;
   members.forEach(mm=>{
     s+=`<rect x="${px(mm[0])}" y="${y-3.5}" width="${Math.max(1.2,(mm[1]/100)*PLOT)}" height="7" rx="1" fill="url(#hx-${mm[2]||kind})"/>`;
@@ -304,7 +310,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false})
 
   // A run still going has not been finalized. Drawing the row anyway would be
   // the frame asserting an event that has not happened.
-  const fin=running?'':tag(2,finY+2.5,'Finalization')+
+  const fin=running?'':tag(9,finY+2.5,'Finalization')+
     barSvg('idle',fx,fq,finY,{k:1,floor:k,o:1})+
     barSvg('disc',fx+fq,fw,finY,{k:1,floor:k,o:1})+
     dot(px(fx),finY,EV.queued)+
@@ -490,8 +496,9 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const k=opts.scale||(max>0?Math.min(86/max,3):1);
   // Rows are placed from their own pitches, so a block of span rows packs
   // tighter than the trace around it.
-  const ys=rowYs(rows);
-  const body=under+rows.map((r,i)=>row(i,r,k,ys[i])).join('')+extra;
+  const ys=rowYs(rows), st=rowSteps(rows);
+  const body=under+rows.map((r,i)=>
+    `<g class="r" style="--i:${st[i][0]};--s:${st[i][1]}">${row(i,r,k,ys[i])}</g>`).join('')+extra;
   const M=opts.margin||0;
   // Annotations are placed after the stretch, in final coordinates, so a
   // leader lands on the bar it points at rather than being scaled off it.

@@ -136,8 +136,8 @@ export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true){
   const col=EVC[c]||c;
   const bg = !halo ? ''
     : c==='cancelled'
-      ? `<rect x="${x-R}" y="${y-R}" width="${R*2}" height="${R*2}" fill="var(--surface)" opacity="${o}"/>`
-      : `<circle cx="${x}" cy="${y}" r="${R}" fill="var(--surface)" opacity="${o}"/>`;
+      ? `<rect class="ev-bg sq" x="${x-R}" y="${y-R}" width="${R*2}" height="${R*2}" fill="var(--surface)" opacity="${o}"/>`
+      : `<circle class="ev-bg" cx="${x}" cy="${y}" r="${R}" fill="var(--surface)" opacity="${o}"/>`;
   if(c==='cancelled')
     return bg+`<rect class="ev ev-cancelled" x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="0.8" fill="${col}" stroke="${col}" opacity="${o}"/>`;
   if(EV_HOLLOW.indexOf(c)>=0)
@@ -165,7 +165,10 @@ export function barSvg(kind, x, w, y, {k=1, floor=k, o=1, h=GEOM.BAR_H}={}){
   // so the minimum width is a minimum on screen whether the caller scales
   // afterwards (the static figures) or not (the browser).
   const b=kind.replace(/[!*]+$/,'');
-  return `<rect x="${pxOf(x,k).toFixed(2)}" y="${(y-h/2).toFixed(1)}" `+
+  // y is the row's centre line; the CSS centres the bar on it, so changing the
+  // height in the panel does not also move it.
+  const cls=h===GEOM.BAR_H?'bar':(h<3?'bar rail':'bar sm');
+  return `<rect class="${cls}" x="${pxOf(x,k).toFixed(2)}" y="${y.toFixed(1)}" `+
     `width="${Math.max(GEOM.MIN_W*k/floor,(w/100)*GEOM.PLOT*k).toFixed(2)}" height="${h}" `+
     `rx="1" fill="url(#hx-${b})" opacity="${o}"/>`;
 }

@@ -261,6 +261,24 @@ const fixtures=FIX.map(([id,note])=>
  * SVGs follow. Choices are presets, not free values: the point is to try the
  * system in a different key, not to invent a colour per bar.
  */
+/**
+ * Live geometry. Every one of these is a CSS custom property the figures read
+ * through geometry properties (`height`, `r`) and per-row transforms, so the
+ * drawing moves without regenerating — which is the only way to feel what a
+ * density actually reads like rather than arguing about a number.
+ *
+ * All of them go to zero on purpose. A dimension you cannot take away is one
+ * you have not tested.
+ */
+const SLIDERS = [
+  {k:'--geo-bar',  n:'step bar height',    d:7,  lo:0, hi:16},
+  {k:'--geo-row',  n:'row pitch',          d:17, lo:0, hi:40},
+  {k:'--geo-mark', n:'event radius',       d:3,  lo:0, hi:8, st:0.25},
+  {k:'--geo-sbar', n:'span bar height',    d:4.2,lo:0, hi:12, st:0.2},
+  {k:'--geo-span', n:'span row pitch',     d:9,  lo:0, hi:24},
+  {k:'--geo-run',  n:'run row height',     d:8,  lo:0, hi:18},
+];
+
 const PALETTES = {
   default:  {good:'#56c295',warn:'#e08770',disc:'#4a72b0',child:'#7d6cb5',hold:'#c2a05a',queued:'#3c4655',muted:'#8593a5','rule-2':'#333d4a',accent:'#7ba3f0'},
   cool:     {good:'#4fb8b0',warn:'#d97b8f',disc:'#5d7fd6',child:'#8f7ad1',hold:'#b9a25f',queued:'#39414f',muted:'#8b97a8','rule-2':'#2f3946',accent:'#6fa8e8'},
@@ -316,6 +334,9 @@ const sidebar=`<aside id="side">
     <div class="pills">${Object.keys(PALETTES).map((p,i)=>
       `<button class="pill${i?'':' on'}" data-pal="${p}">${p}</button>`).join('')}</div>
   </div>
+  <h5>Spacing <em>every dimension, down to nothing</em></h5>
+  ${SLIDERS.map(sl=>`<div class="sl"><label>${sl.n}<b data-out="${sl.k}">${sl.d}</b></label>
+    <input type="range" data-geo="${sl.k}" min="${sl.lo}" max="${sl.hi}" step="${sl.st||0.5}" value="${sl.d}"></div>`).join('')}
   <h5>Bars <em>colour = kind of work; fill = SDK executing</em></h5>
   ${Object.entries(V.BAR_INFO).map(barRow).join('')}
   <h5>Events <em>colour = kind of moment; hollow = not resolved</em></h5>
@@ -392,6 +413,29 @@ const page=`<title>Trace Design System</title>
   .vsw.ev{width:13px;height:13px;margin-left:15px}
   .ctl{display:none;gap:6px;flex-direction:column;padding:8px 0 4px 53px}
   .vrow.open .ctl{display:flex}
+  .sl{padding:5px 0 7px}
+  .sl label{display:flex;justify-content:space-between;align-items:baseline;
+    font-family:var(--display);font-size:11.5px;color:var(--muted);margin-bottom:3px}
+  .sl label b{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);font-weight:400}
+  .sl input{width:100%;height:14px;-webkit-appearance:none;appearance:none;background:none;cursor:pointer}
+  .sl input::-webkit-slider-runnable-track{height:2px;background:var(--rule-2);border-radius:1px}
+  .sl input::-moz-range-track{height:2px;background:var(--rule-2);border-radius:1px}
+  .sl input::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;
+    background:var(--ink-2);margin-top:-4.5px}
+  .sl input::-moz-range-thumb{width:11px;height:11px;border:0;border-radius:50%;background:var(--ink-2)}
+
+  /* Geometry, live. height and r are CSS geometry properties, so a bar can take
+     its height from a variable; the transform re-centres it on the row's line,
+     which the SVG now uses as the bar's y. */
+  .figure svg{overflow:visible}
+  svg rect.bar{height:var(--geo-bar,7px);transform:translateY(calc(var(--geo-bar,7px) / -2))}
+  svg rect.bar.sm{height:var(--geo-sbar,4.2px);transform:translateY(calc(var(--geo-sbar,4.2px) / -2))}
+  svg rect.bar.rail{height:1.8px;transform:translateY(-0.9px)}
+  svg circle.ev{r:var(--geo-mark,3px)}
+  svg circle.ev-bg{r:calc(var(--geo-mark,3px) + 1.3px)}
+  /* Each row knows how many gaps of each pitch sit above it. */
+  svg g.r{transform:translateY(calc((var(--geo-row,17px) - 17px) * var(--i,0)
+                                 + (var(--geo-span,9px) - 9px) * var(--s,0)))}
   .sws{display:flex;gap:4px}
   .sw{width:16px;height:16px;border-radius:3px;border:1px solid var(--rule-2)!important;padding:0!important;cursor:pointer}
   .sw.on{outline:1.5px solid var(--ink);outline-offset:1px}
@@ -816,6 +860,28 @@ ${fig(J.connect.poll)}
     try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){}
   }
   function set(k,v){ if(v==null) delete state[k]; else state[k]=v; }
+
+  // Sliders write the same state the swatches do, so reset clears them too.
+  var SL=${JSON.stringify(SLIDERS)};
+  document.querySelectorAll('#side input[data-geo]').forEach(function(inp){
+    inp.addEventListener('input',function(){
+      var k=inp.dataset.geo;
+      set(k, inp.value+'px');
+      var out=document.querySelector('[data-out="'+k+'"]');
+      if(out) out.textContent=inp.value;
+      apply();
+    });
+  });
+  function syncSliders(){
+    SL.forEach(function(sl){
+      var inp=document.querySelector('input[data-geo="'+sl.k+'"]');
+      if(!inp) return;
+      var v=state[sl.k]!=null?parseFloat(state[sl.k]):sl.d;
+      inp.value=v;
+      var out=document.querySelector('[data-out="'+sl.k+'"]');
+      if(out) out.textContent=v;
+    });
+  }
 
   document.getElementById('side').addEventListener('click',function(e){
     var b=e.target.closest('button'), row=e.target.closest('.vhead');
