@@ -486,6 +486,31 @@ const FEATURES = [
   {k:'compress', n:'compress dead time',     d:'collapse a stretch with nothing executing to a band'},
 ];
 
+/**
+ * The renderer, shipped to the page.
+ *
+ * The scrubber used to redraw itself in the browser with its own copy of rows,
+ * bars, marks, the Run row and the compression band — a second renderer, which
+ * is why its compressed stretches had no blur and its Run row never tore. The
+ * page carries the REAL modules instead, as ES modules behind an import map, so
+ * a scrubbed frame is the same `fig()` every other figure goes through.
+ *
+ * Data URLs rather than a bundle: the modules already are modules, and rewriting
+ * their relative imports to bare specifiers is enough for the import map to
+ * resolve them. Nothing is transformed on the way in — what the page runs is
+ * what the build ran, byte for byte apart from the specifiers.
+ */
+const MODULES=['rules','vocabulary','micro'];
+const bundle=(()=>{
+  const url=name=>{
+    let src=fs.readFileSync(HERE+name+'.mjs','utf8')
+      .replace(/from '\.\/(\w[\w-]*)\.mjs'/g, (m,d)=>`from 'ds:${d}'`);
+    return 'data:text/javascript;base64,'+Buffer.from(src,'utf8').toString('base64');
+  };
+  const map={}; for(const n of MODULES) map['ds:'+n]=url(n);
+  return `<script type="importmap">${JSON.stringify({imports:map})}<\/script>`;
+})();
+
 const sidebar=`<aside id="side">
   <svg width="0" height="0" aria-hidden="true" style="position:absolute">${V.HATCH}</svg>
   <div class="sh">
@@ -932,6 +957,7 @@ ${fig(J.connect.poll)}
 </section>
 </main>
 <div id="pop" role="tooltip"></div>
+${bundle}
 <script>
 (function(){
   // Derived from the vocabulary at build time: the popover cannot describe a

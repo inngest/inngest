@@ -6,9 +6,10 @@
  * run's opening queue re-lays the whole trace, and compressing dead time
  * changes where every bar sits.
  */
+export const ENV = typeof process !== 'undefined' && process.env ? process.env : {};
 export const FEAT = {
-  trim:     process.env.DS_NOTRIM     !== '1',
-  compress: process.env.DS_NOCOMPRESS !== '1',
+  trim:     ENV.DS_NOTRIM     !== '1',
+  compress: ENV.DS_NOCOMPRESS !== '1',
 };
 
 /**

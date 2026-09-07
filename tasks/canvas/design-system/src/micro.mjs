@@ -1,4 +1,3 @@
-import fs from 'fs';
 import * as R from './rules.mjs';
 import { GEOM } from './vocabulary.mjs';
 export const {W,LBL,RGT,PLOT,ROW,TOP}=GEOM;
@@ -311,7 +310,7 @@ export const setFrameSharp=on=>{FRAME_SHARP=!!on;};
 // DS_FRAME=0 builds the figures unframed, which is how they are exported for the
 // user-facing docs: the blurred surround is a design-review device for us, and
 // in docs it reads as something being hidden from the reader.
-export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
+export const setFrame=on=>{FRAMED=R.ENV.DS_FRAME==='0'?false:on;};
 
 export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,lead='',trimmed=false}){
   // A captured run HAS a finalization, measured. Inventing a second one over
@@ -622,7 +621,7 @@ export function compression(breaks, h, uid){
  * range. Stable across the feature builds, so two identical drawings still
  * compare equal and ship once.
  */
-let UID=+(process.env.DS_UID_BASE||0);
+let UID=+(R.ENV.DS_UID_BASE||0);
 
 /**
  * Figures that contain a stretch the elastic rule would compress, but which
@@ -631,9 +630,15 @@ let UID=+(process.env.DS_UID_BASE||0);
  * and the drawing derived from them, so changing a rule changes every figure.
  */
 export const UNRULED=[];
-const UNRULED_FILE=new URL('./unruled.json',import.meta.url).pathname;
-process.on('exit',()=>{
+// Resolved only under Node: in a page `import.meta.url` is a data URL and
+// there is no relative path to resolve against it.
+const UNRULED_FILE=(typeof process!=='undefined' && process.on)
+  ? new URL('./unruled.json',import.meta.url).pathname : null;
+// Build-time bookkeeping. In a page there is nothing to write to and no build
+// to fail, so it simply does not run.
+if(typeof process!=='undefined' && process.on) process.on('exit',async()=>{
   if(!UNRULED.length) return;
+  const fs=await import('fs');
   let prev=[]; try{ prev=JSON.parse(fs.readFileSync(UNRULED_FILE,'utf8')); }catch{}
   try{ fs.writeFileSync(UNRULED_FILE, JSON.stringify(prev.concat(UNRULED))); }catch{}
 });
@@ -645,8 +650,10 @@ process.on('exit',()=>{
  * something the moments do not carry.
  */
 export const AUTHORED=[];
-const AUTHORED_FILE=new URL('./authored.json',import.meta.url).pathname;
-if(process.env.DS_AUDIT) process.on('exit',()=>{
+const AUTHORED_FILE=(typeof process!=='undefined' && process.on)
+  ? new URL('./authored.json',import.meta.url).pathname : null;
+if(R.ENV.DS_AUDIT && AUTHORED_FILE) process.on('exit',async()=>{
+  const fs=await import('fs');
   let prev=[]; try{ prev=JSON.parse(fs.readFileSync(AUTHORED_FILE,'utf8')); }catch{}
   try{ fs.writeFileSync(AUTHORED_FILE, JSON.stringify(prev.concat(AUTHORED))); }catch{}
 });
@@ -708,7 +715,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
       });
     }
   }
-  if(process.env.DS_AUDIT) rows.forEach(r=>{
+  if(R.ENV.DS_AUDIT) rows.forEach(r=>{
     if(!r.run && r.segs && r.segs.length) AUTHORED.push({n:r.n, segs:r.segs, span:!!r.span});
   });
   if(under&&typeof under==='object'){ opts=under; under=''; }
