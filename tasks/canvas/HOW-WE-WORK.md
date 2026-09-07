@@ -73,6 +73,13 @@ payload. A passing assertion about a model is not evidence about a view.
 - **`--dom` discovers, screenshots confirm.** Reading the DOM and doing the
   arithmetic found the 86% ghost, the duplicated interval, the axis regression,
   the 1px `Run` row and the 0px note. Screenshots found none of them.
+  **The dump is one unwrapped ~130KB line**, so `Read`ing it fails on token
+  limits however you set `offset`/`limit`. Never read it directly — `grep` the
+  fragment you want out of it:
+  ```bash
+  tasks/canvas/shot.sh step --dom > /tmp/d.html
+  grep -o '.\{0,120\}first step.\{0,120\}' /tmp/d.html
+  ```
 - **The three review agents** — `canvas-ux-review` (does it look right),
   `canvas-fixture-critic` (would the author of the function recognise it),
   `canvas-correctness` (does it match the payload). Run them after a change of

@@ -58,31 +58,19 @@ gallery, against `longgap`, `v4pathological`, `blocked` and `loop40`.
 
 ### The ledger
 
-**The two vocabularies are not the same taxonomy, and nobody has reconciled
-them.** That is the state, recorded rather than glossed over.
+**`RULES.md` is the design language as ~90 flat rules** — a greppable reading of the
+artifact, with the `DEPENDS` lines calling out what the engine has to report for a
+rule to be drawable at all. The artifact stays authoritative; that file is a
+reading of it and can go stale.
 
-- The artifact's `SEMANTIC` in `src/vocabulary.mjs` has **13 bar kinds** keyed by
-  *what substance the interval is* — `good` `bad` `running` `stopped` `child`
-  `disc` `wait` `waitok` `waitout` `waitstop` `backoff` `hold` `idle` — crossed
-  with one binary, `COMPUTE` vs `NOCOMPUTE`, which decides solid or hatched.
-- React's `BarStyleKey` in `RunDetailsV4/TimelineBar.types.ts` has **22 keys**
-  organised by *what produced the interval* — step type (`step.run`,
-  `step.sleep`, …), timing category (`timing.waiting`, `timing.backoff`,
-  `timing.inngest.concurrency`, …), and HTTP phase (`timing.http.dns` …).
+**`DELTA.md` is where the two sides actually stand**, reconciled from a full audit of
+both. The headline: they are ahead of each other in different dimensions —
+React on derivation and honesty machinery (collapsing, the elastic axis, gap
+attribution, inference surfacing), the artifact on the drawing language (marks,
+substances, the ribbon, and the invariants that make a row self-describing).
 
-Concrete divergences, verified by reading both lists:
-
-| Artifact has | React has | Note |
-|---|---|---|
-| `hold` — concurrency, throttle, rate limit **or** debounce, as one substance | `timing.inngest.concurrency` only | Three of the four flow-control reasons have no encoding. Item G ("flow control did its job") depends on this. |
-| `stopped`, `waitstop` — executing/waiting when the run was cancelled | *nothing* | Constraint 3 in `PROMPT.md`: cancelled needs a third state. The artifact has one; React does not. |
-| `waitok` vs `waitout` — a wait that matched vs one that expired | `step.waitForEvent`, outcome not in the style key | The outcome is carried elsewhere, not by the substance. |
-| *nothing* | `timing.http.dns` / `.tcp` / `.tls` / `.server` / `.transfer` | The HTTP phase breakdown predates the artifact and the artifact has no opinion on it. |
-| 9 event marks (`EV`) — `queued` `ribbon` `disc` `hollow` `hollow-bad` `ok` `failed` `timeout` `cancelled` | not audited | Compare against `RunMinimap.tsx` before relying on either. |
-
-**Not audited:** whether the artifact's colours resolve to the same design
-tokens React uses, the mark vocabulary above, and the geometry (`GEOM` here vs
-the React row heights). Do not assume agreement on any of them.
+So "port the artifact into React" is the wrong shape of task. The artifact
+supplies a vocabulary that React's existing derivation would feed.
 
 ### The rule that keeps this honest
 
