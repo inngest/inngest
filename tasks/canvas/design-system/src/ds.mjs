@@ -501,6 +501,14 @@ const FEATURES = [
  * what the build ran, byte for byte apart from the specifiers.
  */
 const MODULES=['rules','vocabulary','micro'];
+const dsmod=`<script type="module">
+  // The renderer itself, from the same modules the build used. DS is the only
+  // thing the page script needs; everything else it draws is already drawn.
+  import * as micro from 'ds:micro';
+  import * as rules from 'ds:rules';
+  window.DS = {fig:micro.fig, layout:micro.layout, RESOLVED:rules.RESOLVED};
+  if (window.__scrubsReady) window.__scrubsReady();
+<\/script>`;
 const bundle=(()=>{
   const url=name=>{
     let src=fs.readFileSync(HERE+name+'.mjs','utf8')
@@ -546,9 +554,9 @@ const scrubs=J.fixtures.map(f=>
       <div class="figure frame"></div>
       <div class="scrubbar">
         <div class="rail">
-          ${f.breaks.map(b=>`<i class="brk" style="left:${b.p0}%;width:${(b.p1-b.p0)}%"></i>`).join('')}
-          ${f.events.map(e=>`<button class="tick" data-p="${e.p}"
-            style="left:${e.p}%" title="${e.text}"></button>`).join('')}
+          ${f.stops.map((t,i)=>{const p=(i/(f.stops.length-1))*100;
+            return `<button class="tick" data-p="${p.toFixed(3)}" style="left:${p.toFixed(3)}%"
+              title="${f.events[i].text}"></button>`;}).join('')}
           <i class="head" style="left:100%"></i>
         </div>
         <input type="range" min="0" max="10000" value="10000" step="1"
@@ -958,6 +966,7 @@ ${fig(J.connect.poll)}
 </main>
 <div id="pop" role="tooltip"></div>
 ${bundle}
+${dsmod}
 <script>
 (function(){
   // Derived from the vocabulary at build time: the popover cannot describe a
@@ -1033,125 +1042,74 @@ ${bundle}
   var markSvg=${V.markSvg.toString()};
   // The Run row's rank-to-colour table, shared with every statically drawn one.
   var RUN_COLOUR=${JSON.stringify(R.RUN_COLOUR)};
-  var IN_PROGRESS={good:'running', bad:'running', waitout:'wait', waitok:'wait'};
-  var MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
-
-  /** Where the handle is, in real elapsed time. Harmonic inside a stretch so
-      the picture advances evenly rather than time doing. */
-  function timeAt(axis,p){
-    if(p<=0) return axis[0][0];
-    for(var i=0;i<axis.length;i++){
-      var s=axis[i];
-      if(p<=s[3]){
-        var a=Math.max(s[0],0.15), b=Math.max(s[1],0.15);
-        var u=(s[3]===s[2])?1:(p-s[2])/(s[3]-s[2]);
-        return 1/((1/a)+u*((1/b)-(1/a)));
-      }
-    }
-    return axis[axis.length-1][1];
-  }
-
-  function draw(fx,t){
-    var k=100/Math.max(t,0.15), h=GEOM.TOP*2+GEOM.ROW*fx.rowCount, out='', i=0;
-    // The compressed stretches the fixture derived from its own durations. Drawn
-    // first so the rows sit on top of the band, and only where the scrub has
-    // actually reached them.
-    var band='';
-    (fx.compress||[]).forEach(function(c){
-      if(c[0]>=t) return;
-      var x0=pxOf(c[0],k), x1=pxOf(Math.min(c[1],t),k);
-      if(x1<=x0) return;
-      band+='<rect class="cmpband" x="'+x0.toFixed(1)+'" y="0" width="'+(x1-x0).toFixed(1)+'" height="'+h+'" fill="var(--ground)" opacity=".28"/>'
-        +[x0,x1].map(function(x){ return '<rect class="cmpband" x="'+(x-0.5).toFixed(1)+'" y="0" width="1" height="'+h+'" fill="var(--rule-2)" opacity=".9"/>'; }).join('')
-        +(c[2]?'<g class="cmpmid"><text x="'+((x0+x1)/2).toFixed(1)+'" y="'+(h/2+2).toFixed(1)+'" '+MONO
-          +' font-size="6.5" fill="var(--ink-2)" text-anchor="middle" paint-order="stroke"'
-          +' stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">'+c[2]+'</text></g>':'');
-    });
-    if(band) out+='<g class="nofit">'+band+'</g>';
-    var label=function(n,y){ return '<text x="2" y="'+(y+2.5)+'" '+MONO+' font-size="7" fill="var(--muted)">'+n+'</text>'; };
-    fx.rows.forEach(function(r){
-      var y=cyOf(i);
-      if(r.run){
-        var to=Math.min(t,r.end);
-        out+='<g class="r" style="--i:'+i+';--s:0">';
-        out+=label('Run',y);
-        out+='<rect class="run-track" x="'+GEOM.LBL+'" y="'+y+'" width="'+((to/100)*GEOM.PLOT*k).toFixed(2)+'" height="'+GEOM.TRACK_H+'" rx="1.2" fill="var(--rule-2)"/>';
-        // Same priority as every other Run row: worst last, so where slices
-        // overlap the higher rank is the one left showing.
-        r.iv.slice().sort(function(p,q){ return (p[2]||0)-(q[2]||0); }).forEach(function(v){
-          var b=Math.min(v[1],to); if(b<=v[0]) return;
-          var col=RUN_COLOUR[v[2]==null?2:v[2]];
-          var w=Math.max(v[2]===3?GEOM.MIN_FAIL_W:GEOM.MIN_W, ((b-v[0])/100)*GEOM.PLOT*k);
-          out+='<rect class="run-slice" x="'+pxOf(v[0],k).toFixed(2)+'" y="'+y+'" width="'+w.toFixed(2)+'" height="'+GEOM.RUN_H+'" rx="1.2" fill="'+col+'"/>';
-        });
-        out+=markSvg(GEOM.LBL,y,'queued');
-        if(r.ra!=null && t>=r.ra) out+=markSvg(GEOM.LBL+(to/100)*GEOM.PLOT*k,y,r.rs);
-        out+='</g>';
-        i++; return;
-      }
-      var segs=[], parts=[];
-      r.segs.forEach(function(g){
-        if(g[1]>=t) return;
-        var w=Math.min(g[2],t-g[1]);
-        segs.push([w<g[2]?(IN_PROGRESS[g[0]]||g[0]):g[0], g[1], w]);
-      });
-      if(!segs.length) return;
-      var marks=r.marks.filter(function(m){ return m[1]<=t+0.001; });
-      out+='<g class="r" style="--i:'+i+';--s:0">';
-      out+=label(r.n,y);
-      segs.forEach(function(g){ out+=barSvg(g[0],g[1],g[2],y,{k:k}); });
-      marks.forEach(function(m){ out+=markSvg(+pxOf(m[1],k).toFixed(2),y,m[0]); });
-      // the same decomposition the row popover shows, built from what is drawn
-      var mi=0;
-      segs.forEach(function(g){
-        while(mi<marks.length && marks[mi][1]<=g[1]+0.001){
-          var e=EINFO[marks[mi][0]]; if(e) parts.push({t:'e',k:marks[mi][0],n:e[0],d:e[1]});
-          mi++;
-        }
-        var kk=g[0].replace(/[!*]+$/,''), bb=BINFO[kk];
-        if(bb) parts.push({t:'b',k:kk,n:bb[0],d:bb[1]});
-      });
-      for(;mi<marks.length;mi++){ var e2=EINFO[marks[mi][0]]; if(e2) parts.push({t:'e',k:marks[mi][0],n:e2[0],d:e2[1]}); }
-      out+='<rect class="rowhit" x="'+(GEOM.LBL-6)+'" y="'+y+'" width="'+(GEOM.PLOT+12)+'" height="16" fill="transparent" data-row="'+r.n+'" data-parts="'+JSON.stringify(parts).replace(/"/g,'&quot;')+'"/>';
-      out+='</g>';
-      i++;
-    });
-    // before anything is known: the run, and a step enqueued but not reported
-    if(i===1) out+=label('?',cyOf(1))+barSvg('idle',0,t,cyOf(1),{k:k})+markSvg(GEOM.LBL,cyOf(1),'queued');
-    // Every row here is on the plain row pitch, so the live height is one term.
-    var figH='calc('+h+'px + (var(--geo-row,'+GEOM.ROW+'px) - '+GEOM.ROW+'px) * '+fx.rowCount+')';
-    return '<svg viewBox="0 0 '+GEOM.W+' '+h+'" style="--fig-h0:'+h+'px;--fig-h:'+figH+'" role="img">'+out+'</svg>';
-  }
-
+  /**
+   * A scrubbed frame is the same figure as every other one.
+   *
+   * The run's events are in milliseconds; a position on the scrubber is a time.
+   * Clip the moments to that time, hand them to the real layout() and fig(), and
+   * what comes back went through every rule the static figures went through —
+   * the elastic axis, the torn track, the blur through a compressed stretch, the
+   * derived Run row. Before this the page had a second renderer for exactly
+   * these frames, and none of that reached them.
+   */
   var SCRUBS=[];
-  // A scrub is rebuilt from its fixture rather than swapped between variants,
-  // so it is morphed out of whatever it was showing a moment ago.
   function redrawScrubs(){ SCRUBS.forEach(function(f){ f(true); }); }
+  // Modules are deferred, so this classic script runs first and the renderer
+  // lands after it. Draw once it does.
+  window.__scrubsReady=function(){ SCRUBS.forEach(function(f){ f(false); }); refit(); };
+
+  /** Where the handle is, in elapsed milliseconds. The stops are the trace's
+      own moments, so dragging advances the picture rather than the clock. */
+  function timeAt(fx,p){
+    var s=fx.stops, n=s.length;
+    if(p<=0) return s[0];
+    if(p>=100) return s[n-1];
+    var u=(p/100)*(n-1), i=Math.floor(u), f=u-i;
+    return s[i]+(s[Math.min(i+1,n-1)]-s[i])*f;
+  }
+
   document.querySelectorAll('.scrub').forEach(function(s){
-    var slot=s.querySelector('.frame'),
+    var slot=s.querySelector('.figure'),
         input=s.querySelector('input'), at=s.querySelector('.at'), ev=s.querySelector('.evt'),
         ticks=[].slice.call(s.querySelectorAll('.tick')), head=s.querySelector('.head');
+
     function show(pos){
       var fx=FX[s.dataset.fx];
-      var t=timeAt(fx.axis,pos);
-      slot.innerHTML=draw(fx,t);
-      at.textContent=t.toFixed(1)+'%';
+      if(!window.DS) return;                // the renderer has not landed yet
+      var t=timeAt(fx,pos);
+      // The run as it stood at that time: every moment up to it, and a row that had
+      // started and not resolved is still going.
+      var rows=fx.rows.map(function(r){
+        var kept=r.at.filter(function(m){ return m[1]<=t+1e-6; });
+        if(!kept.length) return null;
+        var last=kept[kept.length-1];
+        var open=!window.DS.RESOLVED.has(last[0]);
+        return Object.assign({}, r, {at:kept, end:open?t:r.end});
+      }).filter(Boolean);
+      var L=window.DS.layout(Math.max(t,1), rows, {plot:100});
+      // Framed like every other captured fixture: the Run row and finalization
+      // are derived from the rows, not carried in the data.
+      slot.innerHTML=window.DS.fig(L.rows,'','','',
+        {frame:true, breaks:L.breaks, lead:fx.lead, running:t<fx.ms-1e-6});
+
+      at.textContent=Math.round(pos)+'%';
       var e=fx.events[0];
       for(var j=0;j<fx.events.length;j++) if(fx.events[j].t<=t+0.001) e=fx.events[j];
-      ev.textContent = pos>=100 ? e.text+' \u00b7 complete' : e.text;
+      ev.textContent = pos>=100 ? e.text+' · complete' : e.text;
       ticks.forEach(function(x){ x.classList.toggle('on', Math.abs(+x.dataset.p-pos)<0.4); });
       head.style.left=pos+'%';
       if(+input.value!==Math.round(pos*100)) input.value=Math.round(pos*100);
     }
     input.addEventListener('input',function(){ show(+input.value/100); });
     ticks.forEach(function(x){ x.addEventListener('click',function(){ show(+x.dataset.p); }); });
-    show(100);
     SCRUBS.push(function(morph){
       var snap=morph?snapGeom(slot):null;
       show(+input.value/100);
       if(snap) morphInto(slot, snap);
     });
+    show(100);
   });
+
 
   // ---- configurator ----------------------------------------------------
   // Nothing is redrawn: every choice is a variable on :root, and the figures
