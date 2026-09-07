@@ -1,6 +1,6 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {fig,EV} from './micro.mjs';
+import {fig,EV,layout} from './micro.mjs';
 import {autoDots,fillGaps} from './vocabulary.mjs';
 
 /**
@@ -123,6 +123,27 @@ const posOf=(segs,t)=>{
  * hundred drawings of it.
  */
 const pack=(f)=>{
+  /**
+   * A fixture declares its real duration, and its rows are laid out by the same
+   * rule as everything else — so a change to the elastic rule reaches the
+   * fixtures without anyone remembering to come here.
+   *
+   * The rows are authored as percentages of the run because that is how they
+   * were measured; `ms` is what turns a percentage into a duration the rule can
+   * judge. Laid back out into the same 0-100 space, so everything downstream —
+   * the scrub stops, the axis, the frames — is unchanged apart from where the
+   * bars actually sit.
+   */
+  if(f.ms){
+    const toMs=v=>v/100*f.ms;
+    const inMs=f.rows.map(r=>r.run
+      ? {...r, to:toMs(r.end), intervals:r.intervals.map(v=>({...v,a:toMs(v.a),b:toMs(v.b)}))}
+      : {...r, segs:r.segs.map(([k,x,w])=>[k,toMs(x),toMs(x+w)])});
+    const laid=layout(f.ms, inMs, {plot:100, label:f.gap});
+    f={...f, rows:laid.rows.map((r,i)=>r.run
+      ? {...f.rows[i], end:r.to, intervals:r.intervals}
+      : {...r, segs:r.segs.map(([k,a,w])=>[k,a,w])}), compress:laid.breaks.filter(b=>b[1]>b[0])};
+  }
   const rows=f.rows.map(r=>{
     if(r.run) return {run:1, end:r.end, iv:r.intervals.map(v=>[v.a,v.b,v.ok===false?0:v.ok==='stop'?2:1]),
                       ra:r.resolvedAt==null?null:r.resolvedAt, rs:r.resolvedAs||null};
@@ -136,6 +157,7 @@ const pack=(f)=>{
   const events=M.map(t=>({t:+t.toFixed(2), p:+posOf(segs,t).toFixed(3), text:label(f.rows, t===EPS?0:+t.toFixed(2))}));
   events.unshift({t:0,p:0,text:'run enqueued, first step not known yet'});
   return {id:f.id, title:f.title, note:f.note, rowCount:f.rows.length, rows, events,
+          compress:f.compress||[],
           axis:segs.map(s=>[s.a,s.b,s.p0,s.p1]),
           breaks:segs.filter(s=>s.cut).map(s=>({p0:s.p0,p1:s.p1}))};
 };
@@ -146,7 +168,7 @@ const pack=(f)=>{
 const F=[];
 
 // step: three steps around a 2s sleep. The sleep is 96% of the run.
-F.push({id:'step', title:'step',
+F.push({id:'step', title:'step', ms:2084, gap:'2s',
   note:'Three steps around a step.sleep(). Each step resolving causes a request to your app to report what runs next; that request is the short blue interval at the head of the next row. At real proportions it is 1ms against a 2s sleep, so it is only visible while the axis is still short.',
   rows:[
     {run:true, end:99.7, intervals:[{a:0,b:0.5,ok:true},{a:0.5,b:0.55,ok:true},{a:96.5,b:96.55,ok:true},
@@ -160,7 +182,7 @@ F.push({id:'step', title:'step',
 
 // v4sequential: an SDK that can report batches, on a run where nothing is
 // parallel. No ribbon anywhere is the correct render.
-F.push({id:'v4sequential', title:'v4sequential',
+F.push({id:'v4sequential', title:'v4sequential', ms:2064, gap:'2s',
   note:'A chain on an SDK that can report batches. Every request reported exactly one step, so no request gets a row of its own and there is no ribbon anywhere. Each one is the blue interval at the head of the step it reported.',
   rows:[
     {run:true, end:100, intervals:[{a:0.8,b:1.2,ok:true},{a:1.2,b:1.25,ok:true},{a:98.2,b:98.25,ok:true},

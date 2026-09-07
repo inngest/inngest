@@ -236,6 +236,20 @@ for(const g of GENS){
 }
 console.log(`\n${figures} figures, ${rows} rows, ${bad} with problems`);
 
+let unruled=[]; try{ unruled=JSON.parse(fs.readFileSync(HERE+'unruled.json','utf8')); }catch{}
+if(unruled.length){
+  console.log(`\n${unruled.length} figure(s) hand-place geometry the elastic rule cannot reach:`);
+  unruled.sort((a,b)=>b.worst-a.worst).slice(0,5)
+    .forEach(x=>console.log(`  ${String(x.worst).padStart(3)}% idle  ${x.label}`));
+  console.log('  (a figure should be a list of events; the drawing follows from the rules)');
+}
+let unruled=[]; try{ unruled=JSON.parse(fs.readFileSync(HERE+'unruled.json','utf8')); }catch{}
+if(unruled.length){
+  console.log(`\n${unruled.length} figure(s) hand-place geometry the elastic rule cannot reach:`);
+  unruled.sort((a,b)=>b.worst-a.worst).slice(0,5)
+    .forEach(x=>console.log(`  ${String(x.worst).padStart(3)}% idle  ${x.label}`));
+  console.log('  (a figure should be a list of events; the drawing follows from the rules)');
+}
 const broken=checkPageStructure();
 if(broken) console.log(`\n${broken} structural problem(s) in the generated page`);
 const short=checkRunExtent();

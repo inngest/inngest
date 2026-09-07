@@ -58,6 +58,37 @@ An encoding that survives the artifact and then fails on `longgap` or
 So: decide meaning in the artifact, prove it in the gallery, and record the
 decision in the artifact README's ledger so the two do not drift.
 
+## A figure is a list of events. The drawing follows from the rules.
+
+**This is the governing rule of the artifact and it outranks convenience.** A
+figure declares what happened — rows of events with whatever small extra data
+they need — and the whole visual result is derived. Change a rule and every
+figure changes with it, without anyone remembering which ones to revisit.
+
+Where this was not true, it bit: compression was written as `elastic()` and then
+*called by three figures*, so the fixtures went on drawing a 2s sleep across 96%
+of their width long after the rule said dead time is worth almost none of it.
+The rule existed and reached almost nothing.
+
+The specific thing that made it impossible: **figures carried percentages, and
+the rule needs durations.** "The sleep is 96% of the run" cannot be judged — a 2s
+sleep beside 10ms of work and a 7d sleep beside 10ms of work are the same
+percentage and want different drawings. A figure has to say how long things took.
+
+So:
+
+- `layout(total, rows)` in `micro.mjs` is **the one place the elastic rule
+  lives.** It derives the dead stretches from where nothing was executing across
+  every row, collapses what is over the threshold, and shares the remaining
+  width by real duration. Pass its result to `fig`.
+- **New figures declare milliseconds and go through it.** A figure that
+  hand-places positions is a figure the rules cannot reach.
+- `opts.linear` opts out, and needs a reason. Only two figures use it, and both
+  exist to show the *uncompressed* proportion — they are the argument for
+  compression, so compressing them would delete their point.
+- **`validate.mjs` counts what the rule cannot reach** and prints the worst
+  offenders. That number is a backlog, and it should go down, never up.
+
 ## A change is not done until every tab agrees
 
 The artifact has four tabs and they all describe the same system:

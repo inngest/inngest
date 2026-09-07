@@ -125,7 +125,7 @@ D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you 
     {n:'a', segs:[['good',0,1.2]]},
     {n:'nap', segs:[['waitok',1.2,56.8]]},
     {n:'b', segs:[['disc',58,1],['idle',59,4],['good',63,1.5]]},
-  ],'','62ms of execution inside seven days')});
+  ],'','62ms of execution inside seven days','',{linear:true})});
 
 D('t3',{d:'Two tiers of axis label. The coarse tier carries what the run crossed, the fine tier carries offsets inside it, so a run measured in days keeps its resolution without a second axis.',
   // No rows. This figure is about the axis, so it draws the axis and nothing
@@ -140,7 +140,7 @@ D('t4',{d:'A step too short to draw is still drawn. It gets a minimum width so i
     {n:'a', segs:[['good',0,0.4]]},
     {n:'nap',  segs:[['waitok',0.4,96]]},
     {n:'b', segs:[['disc',96.4,0.2],['good',96.6,0.4]]},
-  ],tag(px(2),cy(0)+2.5,'12ms')+tag(px(98.5),cy(2)+2.5,'10ms'),'sub-pixel steps drawn honestly')});
+  ],tag(px(2),cy(0)+2.5,'12ms')+tag(px(98.5),cy(2)+2.5,'10ms'),'sub-pixel steps drawn honestly','',{linear:true})});
 
 // ---- Scale --------------------------------------------------------------
 

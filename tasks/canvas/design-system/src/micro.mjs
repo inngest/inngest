@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { GEOM } from './vocabulary.mjs';
 export const {W,LBL,RGT,PLOT,ROW,TOP}=GEOM;
 export { GEOM };
@@ -441,6 +442,41 @@ export function elastic(total, dead=[], {plot=86, threshold=0.03, budget=16, min
 }
 
 /**
+ * Lay a run out from REAL DURATIONS. This is the one place the elastic rule
+ * lives, and every figure that goes through it gets the rule for free.
+ *
+ * Figures used to carry percentages — "the sleep is 96% of the run" — and a
+ * percentage cannot be compressed, because whether a stretch is worth the width
+ * depends on how long it actually was. A 2s sleep next to 10ms of work and a 7d
+ * sleep next to 10ms of work are the same percentage and want different
+ * drawings. So a figure declares milliseconds and this decides the rest:
+ *
+ *   - the dead stretches are derived from where nothing was executing, across
+ *     every row (`deadStretches`), never nominated;
+ *   - anything over the threshold collapses to a band;
+ *   - everything that survives shares one scale.
+ *
+ * Returns rows in drawn coordinates plus the breaks to mark, so a caller passes
+ * the result straight to `fig`. Change the rule here and every figure moves.
+ */
+export function layout(total, rows, opts={}){
+  const compute=[];
+  rows.forEach(r=>{
+    if(r.run) return;                       // the Run row is derived, not input
+    (r.segs||[]).forEach(([kd,a,b])=>{ if(COMPUTE.has(base(kd))) compute.push([a,b]); });
+  });
+  const el=elastic(total, [], {compute, ...opts});
+  const map=([kd,a,b])=>[kd, el.at(a), el.at(b)-el.at(a)];
+  const out=rows.map(r=>{
+    if(r.run) return {...r,
+      to: el.at(r.to!=null?r.to:total),
+      intervals:(r.intervals||[]).map(v=>({...v, a:el.at(v.a), b:el.at(v.b)}))};
+    return {...r, segs:(r.segs||[]).map(map)};
+  });
+  return {rows:out, breaks:el.bands.map(b=>[b.p0,b.p1,b.label?opts.label||'':'']), el};
+}
+
+/**
  * A compressed stretch of dead time.
  *
  * The rule is simple and the threshold is low: **if nothing is executing for
@@ -490,7 +526,33 @@ export function compression(breaks, h, uid){
 
 let UID=0;
 
+/**
+ * Figures that contain a stretch the elastic rule would compress, but which
+ * were not laid out by it — hand-placed geometry that the rule cannot reach.
+ * The goal is for this list to be empty: a figure should be a list of events
+ * and the drawing derived from them, so changing a rule changes every figure.
+ */
+export const UNRULED=[];
+const UNRULED_FILE=new URL('./unruled.json',import.meta.url).pathname;
+process.on('exit',()=>{
+  if(!UNRULED.length) return;
+  let prev=[]; try{ prev=JSON.parse(fs.readFileSync(UNRULED_FILE,'utf8')); }catch{}
+  try{ fs.writeFileSync(UNRULED_FILE, JSON.stringify(prev.concat(UNRULED))); }catch{}
+});
+
 export function fig(rows,extra='',label='',under='',opts={}){
+  if(!opts.breaks && !opts.linear && rows.some(r=>r.segs)){
+    const compute=[];
+    let end=0;
+    rows.forEach(r=>(r.segs||[]).forEach(([kd,a,w])=>{
+      end=Math.max(end,a+w);
+      if(COMPUTE.has(base(kd))) compute.push([a,a+w]);
+    }));
+    if(compute.length && end>0){
+      const dead=deadStretches(end, compute).filter(([a,b])=>b-a > end*0.25);
+      if(dead.length) UNRULED.push({label, worst:+(Math.max(...dead.map(d=>d[1]-d[0]))/end*100).toFixed(0)});
+    }
+  }
   if(under&&typeof under==='object'){ opts=under; under=''; }
   if(opts.rib){
     under=ribbon(opts.rib.x,opts.rib.rows.map(i=>cy(i)))+under;

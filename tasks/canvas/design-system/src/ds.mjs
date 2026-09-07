@@ -2,6 +2,9 @@ const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 import * as V from './vocabulary.mjs';
+// Cleared before the generators run; each appends what the elastic rule could
+// not reach, so an empty file means every figure is derived rather than placed.
+try{ fs.unlinkSync(new URL('./unruled.json',import.meta.url).pathname); }catch{}
 const GENS=['vocab','barvocab','attribution','items-a','items-bc','items-disc','items-more','connect','batch1','runbar','annotated','steptypes','detail','primer','fixtures'];
 for(const g of GENS) execFileSync('node',[HERE+g+'.mjs'],{stdio:'pipe'});
 const J=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
@@ -808,6 +811,22 @@ ${fig(J.connect.poll)}
 
   function draw(fx,t){
     var k=100/Math.max(t,0.15), h=GEOM.TOP*2+GEOM.ROW*fx.rowCount, out='', i=0;
+    // The compressed stretches the fixture derived from its own durations. Drawn
+    // first so the rows sit on top of the band, and only where the scrub has
+    // actually reached them.
+    var band='';
+    (fx.compress||[]).forEach(function(c){
+      if(c[0]>=t) return;
+      var x0=pxOf(c[0],k), x1=pxOf(Math.min(c[1],t),k);
+      if(x1<=x0) return;
+      band+='<rect x="'+x0.toFixed(1)+'" y="0" width="'+(x1-x0).toFixed(1)+'" height="'+h+'" fill="var(--ground)" opacity=".28"/>'
+        +'<line x1="'+x0.toFixed(1)+'" y1="0" x2="'+x0.toFixed(1)+'" y2="'+h+'" stroke="var(--rule-2)" stroke-width="1" opacity=".9"/>'
+        +'<line x1="'+x1.toFixed(1)+'" y1="0" x2="'+x1.toFixed(1)+'" y2="'+h+'" stroke="var(--rule-2)" stroke-width="1" opacity=".9"/>'
+        +(c[2]?'<text x="'+((x0+x1)/2).toFixed(1)+'" y="'+(h/2+2).toFixed(1)+'" '+MONO
+          +' font-size="6.5" fill="var(--ink-2)" text-anchor="middle" paint-order="stroke"'
+          +' stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">'+c[2]+'</text>':'');
+    });
+    out+=band;
     var label=function(n,y){ return '<text x="2" y="'+(y+2.5)+'" '+MONO+' font-size="7" fill="var(--muted)">'+n+'</text>'; };
     fx.rows.forEach(function(r){
       var y=cyOf(i);
