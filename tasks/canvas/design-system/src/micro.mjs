@@ -779,8 +779,12 @@ export function fig(rows,extra='',label='',under='',opts={}){
    */
   const _st=rowSteps(rows), _tail=_st.length?_st[_st.length-1]:[0,0];
   const lowRow=above+(framed?(rows.length?_tail[0]+1:0):_tail[0]), lowSpan=_tail[1];
-  const bandH=cy(0)+ROW*lowRow+SPAN_ROW*lowSpan+6;
-  const figH=`calc(${bandH}px + (var(--geo-row,${ROW}px) - ${ROW}px) * ${lowRow}`+
+  // Half a row of clearance past the last one, so the band still crosses a row
+  // whose bar or mark hangs below the centre line — and half a ROW, not a fixed
+  // number, so it keeps clearing it when the pitch slider moves.
+  const bandRows=lowRow+0.5;
+  const bandH=cy(0)+ROW*bandRows+SPAN_ROW*lowSpan+2;
+  const figH=`calc(${bandH}px + (var(--geo-row,${ROW}px) - ${ROW}px) * ${bandRows}`+
     ` + (var(--geo-span,${SPAN_ROW}px) - ${SPAN_ROW}px) * ${lowSpan})`;
   const ends=rows.flatMap(r=>(r.segs||[]).map(([,x,w])=>x+w));
   const max=ends.length?Math.max(...ends):100;
@@ -859,7 +863,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     : '';
   const nr=n+above+(framed?1:0);
   return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
-    HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+cab+lin+`</svg>`;
+    HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+`<g class="nofit">${cmp.over}</g>`+over+cab+lin+`</svg>`;
 }
 
 const BLURDEF=`<defs><filter id="cmpblur" x="-30%" y="-10%" width="160%" height="120%"><feGaussianBlur stdDeviation="1.4"/><feColorMatrix type="saturate" values="0.55"/></filter><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+

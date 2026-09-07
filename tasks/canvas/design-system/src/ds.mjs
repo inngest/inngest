@@ -1161,6 +1161,27 @@ ${fig(J.connect.poll)}
    * user units, with the CSS transforms applied. The width is left alone so
    * figures stay aligned with each other; only the height follows.
    */
+  /**
+   * What a figure is as tall as.
+   *
+   * A compression band is a backdrop drawn across the rows, starting above the
+   * first one, and measuring it made a compressed figure about 12px taller than
+   * the same figure uncompressed — so toggling the rule moved every figure
+   * below it down the page. The band follows the figure; it does not decide it.
+   *
+   * Done by hiding the band and asking the svg, not by unioning its children:
+   * getBBox() on a child is in that child's OWN user space and excludes its own
+   * transform, and the rows live inside a transformed group. Measuring
+   * per-child got an answer that was wrong in a different way for every figure.
+   */
+  function fitBox(svg){
+    var nf=svg.querySelector('g.nofit'), had=nf&&nf.style.display;
+    if(nf) nf.style.display='none';
+    var box;
+    try{ box=svg.getBBox(); }finally{ if(nf) nf.style.display=had||''; }
+    return box;
+  }
+
   function refit(){
     document.querySelectorAll('.figure svg').forEach(function(svg){
       // Read the attribute every time and validate it before trusting it. The
@@ -1174,7 +1195,7 @@ ${fig(J.connect.poll)}
       for(var i=0;i<4;i++) if(!isFinite(base[i])) return;
       svg.dataset.vb = raw;
       var box;
-      try{ box = svg.getBBox(); }catch(e){ return; }
+      try{ box = fitBox(svg); }catch(e){ return; }
       if(!box || !isFinite(box.height) || !isFinite(box.y)) return;
       if(box.width === 0 && box.height === 0) return;   // hidden: not measurable
       var pad = 3;
