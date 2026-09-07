@@ -112,11 +112,15 @@ export function row(i,r,sc=1,yy){
    * `lit` names what survives: a bar kind (`'disc'`) or a segment's start x.
    * `litDots` names mark positions. Absent, the row is uniformly `dim`.
    */
+  // stretch() is a no-op at or below 1, so only pre-divide when it will
+  // actually scale back up — dividing unconditionally made the band WIDER on
+  // every figure whose content runs past the fit width.
+  const sx = sc > 1.001 ? sc : 1;
   const litBar=(k,x)=>!lit ? dim
     : (lit.some(v=>typeof v==='string' ? v===base(k) : Math.abs(v-x)<0.01) ? 1 : dim);
   const litDot=p=>!litDots ? dim : (litDots.some(v=>Math.abs(v-p)<0.01) ? 1 : dim);
-  if(sel) s+=`<rect class="selband${r.span?' sp':''}" x="${LBL-3}" y="${y}" `+
-    `width="${PLOT+6}" height="15" fill="${C.acc}" opacity=".13" rx="2"/>`;
+  if(sel) s+=`<rect class="selband${r.span?' sp':''}" x="${(LBL-3/sx).toFixed(2)}" y="${y}" `+
+    `width="${((PLOT+6)/sx).toFixed(2)}" height="15" fill="${C.acc}" opacity=".13" rx="2"/>`;
   /**
    * Fading happens on a GROUP, not on each element. Per-element opacity made a
    * dimmed row translucent to ITSELF: a mark's halo is a disc of surface
@@ -169,7 +173,7 @@ export function row(i,r,sc=1,yy){
       const b=BAR_INFO[base(g[0])]; if(b) parts.push({t:'b',k:base(g[0]),n:b[0],d:b[1]});
     });
     for(;mi<marks.length;mi++){ const e=EVENT_INFO[marks[mi].c]; if(e) parts.push({t:'e',k:marks[mi].c,n:e[0],d:e[1]}); }
-    if(parts.length) hit=`<rect class="rowhit" x="${LBL-6}" y="${y}" width="${PLOT+12}" height="16" fill="transparent" data-row="${n}" data-parts='${JSON.stringify(parts).replace(/'/g,"&apos;")}'/>`;
+    if(parts.length) hit=`<rect class="rowhit" x="${(LBL-6/sx).toFixed(2)}" y="${y}" width="${((PLOT+12)/sx).toFixed(2)}" height="16" fill="transparent" data-row="${n}" data-parts='${JSON.stringify(parts).replace(/'/g,"&apos;")}'/>`;
   }
   if(note && NOTES){
     const last=segs[segs.length-1];

@@ -277,6 +277,12 @@ const SLIDERS = [
   {k:'--geo-sbar', n:'span bar height',    d:4.2,lo:0, hi:12, st:0.2},
   {k:'--geo-span', n:'span row pitch',     d:9,  lo:0, hi:24},
   {k:'--geo-run',  n:'run row height',     d:8,  lo:0, hi:18},
+  {k:'--geo-gap',  n:'gap between segments',   d:0,  lo:0, hi:8, st:0.25},
+];
+
+/** Things that can be taken away entirely, to see what the row reads like. */
+const TOGGLES = [
+  {k:'--show-ev', n:'events', on:'inline', off:'none'},
 ];
 
 const PALETTES = {
@@ -337,6 +343,8 @@ const sidebar=`<aside id="side">
   <h5>Spacing <em>every dimension, down to nothing</em></h5>
   ${SLIDERS.map(sl=>`<div class="sl"><label>${sl.n}<b data-out="${sl.k}">${sl.d}</b></label>
     <input type="range" data-geo="${sl.k}" min="${sl.lo}" max="${sl.hi}" step="${sl.st||0.5}" value="${sl.d}"></div>`).join('')}
+  ${TOGGLES.map(t=>`<div class="tg"><label>${t.n}</label>
+    <button class="tgb on" data-tg="${t.k}" data-on="${t.on}" data-off="${t.off}">on</button></div>`).join('')}
   <h5>Bars <em>colour = kind of work; fill = SDK executing</em></h5>
   ${Object.entries(V.BAR_INFO).map(barRow).join('')}
   <h5>Events <em>colour = kind of moment; hollow = not resolved</em></h5>
@@ -413,6 +421,11 @@ const page=`<title>Trace Design System</title>
   .vsw.ev{width:13px;height:13px;margin-left:15px}
   .ctl{display:none;gap:6px;flex-direction:column;padding:8px 0 4px 53px}
   .vrow.open .ctl{display:flex}
+  .tg{display:flex;justify-content:space-between;align-items:center;padding:5px 0 8px}
+  .tg label{font-family:var(--display);font-size:11.5px;color:var(--muted)}
+  .tgb{font-family:var(--mono);font-size:10.5px;padding:2px 9px;border-radius:3px;
+    border:1px solid var(--rule-2);background:none;color:var(--muted);cursor:pointer}
+  .tgb.on{color:var(--ink);border-color:var(--ink-2)}
   .sl{padding:5px 0 7px}
   .sl label{display:flex;justify-content:space-between;align-items:baseline;
     font-family:var(--display);font-size:11.5px;color:var(--muted);margin-bottom:3px}
@@ -427,10 +440,16 @@ const page=`<title>Trace Design System</title>
   /* Geometry, live. height and r are CSS geometry properties, so a bar can take
      its height from a variable; the transform re-centres it on the row's line,
      which the SVG now uses as the bar's y. */
-  .figure svg{overflow:visible}
+  /* No overflow escape: refit() sizes the viewBox to the content, so nothing
+     needs to spill any more — and while it could, a long annotation ran out of
+     the side of its own box. */
   svg rect.bar{height:var(--geo-bar,7px);transform:translateY(calc(var(--geo-bar,7px) / -2))}
   svg rect.bar.sm{height:var(--geo-sbar,4.2px);transform:translateY(calc(var(--geo-sbar,4.2px) / -2))}
   svg rect.bar.rail{height:1.8px;transform:translateY(-0.9px)}
+  /* A bar takes the gap off its own right edge, so segments separate without
+     any of them moving. */
+  svg rect.bar{width:max(0.5px, calc(var(--w,4px) - var(--geo-gap,0px)))}
+  svg circle.ev,svg circle.ev-bg{display:var(--show-ev,inline)}
   svg circle.ev{r:var(--geo-mark,3px)}
   svg circle.ev-bg{r:calc(var(--geo-mark,3px) + 1.3px)}
   /* Each row knows how many gaps of each pitch sit above it. */
@@ -751,6 +770,7 @@ ${fig(J.connect.poll)}
         if(el) el.hidden = (x!==t);
       });
       window.scrollTo(0,0);
+      refit();
     });
   });
 
@@ -908,6 +928,7 @@ ${fig(J.connect.poll)}
       var box;
       try{ box = svg.getBBox(); }catch(e){ return; }
       if(!box || !isFinite(box.height) || !isFinite(box.y)) return;
+      if(box.width === 0 && box.height === 0) return;   // hidden: not measurable
       var pad = 3;
       var top = box.y - pad;
       var height = Math.max(1, box.height + pad * 2);
@@ -918,6 +939,15 @@ ${fig(J.connect.poll)}
 
   // Sliders write the same state the swatches do, so reset clears them too.
   var SL=${JSON.stringify(SLIDERS)};
+  document.querySelectorAll('#side .tgb').forEach(function(b){
+    b.addEventListener('click',function(){
+      var on=!b.classList.contains('on');
+      b.classList.toggle('on',on);
+      b.textContent=on?'on':'off';
+      set(b.dataset.tg, on?null:b.dataset.off);
+      apply();
+    });
+  });
   document.querySelectorAll('#side input[data-geo]').forEach(function(inp){
     inp.addEventListener('input',function(){
       var k=inp.dataset.geo;

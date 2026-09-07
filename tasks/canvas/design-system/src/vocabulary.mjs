@@ -168,8 +168,10 @@ export function barSvg(kind, x, w, y, {k=1, floor=k, o=1, h=GEOM.BAR_H}={}){
   // y is the row's centre line; the CSS centres the bar on it, so changing the
   // height in the panel does not also move it.
   const cls=h===GEOM.BAR_H?'bar':(h<3?'bar rail':'bar sm');
-  return `<rect class="${cls}" x="${pxOf(x,k).toFixed(2)}" y="${y.toFixed(1)}" `+
-    `width="${Math.max(GEOM.MIN_W*k/floor,(w/100)*GEOM.PLOT*k).toFixed(2)}" height="${h}" `+
+  const wpx=Math.max(GEOM.MIN_W*k/floor,(w/100)*GEOM.PLOT*k);
+  return `<rect class="${cls}" style="--w:${wpx.toFixed(2)}px" `+
+    `x="${pxOf(x,k).toFixed(2)}" y="${y.toFixed(1)}" `+
+    `width="${wpx.toFixed(2)}" height="${h}" `+
     `rx="1" fill="url(#hx-${b})" opacity="${o}"/>`;
 }
 
@@ -325,6 +327,7 @@ export function stretch(svg, LBL, k){
   let body = defs ? svg.replace(head, '\u0000DEFS\u0000') : svg;
 
   body = body
+    .replace(/--w:([\d.]+)px/g, (m,w) => `--w:${(parseFloat(w)*k).toFixed(2)}px`)
     .replace(/<rect ([^>]*?)x="([\d.-]+)"([^>]*?)width="([\d.]+)"/g,
       (m,a,x,b,w) => `<rect ${a}x="${X(x)}"${b}width="${(parseFloat(w)*k).toFixed(2)}"`)
     .replace(/cx="([\d.-]+)"/g, (m,x) => `cx="${X(x)}"`)

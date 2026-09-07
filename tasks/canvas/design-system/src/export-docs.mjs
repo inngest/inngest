@@ -62,9 +62,19 @@ for(const [id,frame,name,alt] of WANT){
   // against so it does not depend on the page behind it.
   const svg=f.svg.replace(
     /^<svg([^>]*)>/,
-    (m,attrs)=>`<svg${attrs} xmlns="http://www.w3.org/2000/svg">`+
-      `<style>svg{${VARS}}</style>`+
-      `<rect x="-9999" y="-9999" width="19998" height="19998" fill="var(--surface)"/>`);
+    (m,attrs)=>{
+      // The background is sized to the viewBox, not to a huge arbitrary square.
+      // The square was invisible while the SVG clipped to its viewport, and
+      // became a page-covering slab the moment the artifact set
+      // `overflow: visible` so figures could grow with the row pitch.
+      const vb=(attrs.match(/viewBox="([^"]+)"/)||[])[1];
+      const p=vb?vb.trim().split(/[ ,]+/).map(Number):null;
+      const bg=(p&&p.length===4&&p.every(Number.isFinite))
+        ? `<rect x="${p[0]}" y="${p[1]}" width="${p[2]}" height="${p[3]}" fill="var(--surface)"/>`
+        : '';
+      return `<svg${attrs} xmlns="http://www.w3.org/2000/svg">`+
+        `<style>svg{${VARS}}</style>`+bg;
+    });
   // A figure is a few KB. Anything near a megabyte means the harvest above has
   // swallowed the page again, and a silently enormous asset is exactly the kind
   // of thing that ships.
