@@ -1,6 +1,8 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,px,cy,arrow,causal,wire,tag,ribbon,C,W,LBL,PLOT} from './micro.mjs';
+import * as R from './rules.mjs';
+import {resolveRow} from './micro.mjs';
 import {setFrame} from './micro.mjs'; setFrame(true);
 const E={};
 const DIM=.15;
@@ -17,14 +19,9 @@ const DIM=.15;
  * fully-lit row, which is right when the frame is described as "hovering x" and
  * wrong when it is "the request selected", so those pass it explicitly.
  */
-function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote='hovered',rib,ribs,focus,frame}){
-  const all=ribs||(rib?[rib]:[]);
-  const under=all.map(r=>ribbon(r.x,r.rows.map(i=>cy(i)))).join('');
-  const marked=rows.map((r,i)=>{
-    const on=all.find(g=>g.rows.includes(i));
-    return on?{...r,noHalo:[on.x]}:r;
-  });
-  const rest=fig(marked,restExtra,label+' at rest',under,{frame});
+function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote='hovered',focus,frame}){
+  const marked=rows;
+  const rest=fig(marked,restExtra,label+' at rest','',{frame});
   const spec=new Map(lit.map(v=>typeof v==='number'?[v,null]:[v.row,v]));
   const dimmed=marked.map((r,i)=>{
     if(!spec.has(i)) return {...r,dim:DIM};
@@ -34,9 +31,10 @@ function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote=
   const whole=lit.filter(v=>typeof v==='number');
   const focusRow = focus!=null ? focus
     : (/^hovering/.test(hoverNote) ? whole[whole.length-1] : null);
+  // The ribbon fades with everything else that is not the answer to the hover.
   const hov=fig(dimmed.map((r,i)=>i===focusRow?{...r,sel:true}:r),
     arrows.map(a=>Array.isArray(a)?arrow(...a):a).join('')+hoverExtra,label+' hovered',
-    all.map(r=>ribbon(r.x,r.rows.map(i=>cy(i)),{o:.35})).join(''),{frame});
+    '',{frame,ribO:R.FOCUS.ribbonDim});
   return [{l:'at rest',svg:rest},{l:hoverNote,svg:hov}];
 }
 const D=(k,d,frames)=>{E[k]={d,frames};};
@@ -60,7 +58,7 @@ D('c1','One request made three steps. The ribbon threads their queue circles at 
         {n:'b',at:[['queued',16],['started',22],['ok',74]],note:'52ms'},
         {n:'c',at:[['queued',16],['started',22],['ok',60]],note:'38ms'}],
     {lit:[{row:0,bars:[0,5.6],dots:[0,5.6,16]},1],arrows:[],
-     label:'fan-out',hoverNote:'hovering b',rib:{x:16,rows:[0,1,2]}}));
+     label:'fan-out',hoverNote:'hovering b'}));
 
 D('c2','The whole shape: one request fans out to three steps, all three completing causes the next request, and that request produced a single step so it rolls into <code>d</code>&rsquo;s row. The ribbon covers the fan-out at rest; the cables only appear when you ask, and only for the hop the ribbon cannot span.',
   pair([{n:'req + a',at:[['queued',0],['started',4.2,'disc'],['ok',12],['queued',12],['started',14],['ok',34]],reported:1,note:'20ms'},
@@ -69,7 +67,7 @@ D('c2','The whole shape: one request fans out to three steps, all three completi
         {n:'d',at:[['queued',46],['started',56],['ok',74]],note:'18ms'}],
     {lit:[0,1,2,3],focus:3,
      arrows:[wire(px(34),cy(0),px(46),cy(3),{i:0})+wire(px(46),cy(1),px(46),cy(3),{i:2})+wire(px(40),cy(2),px(46),cy(3),{i:1})],
-     label:'fan-out then coalesce',hoverNote:'d selected',rib:{x:12,rows:[0,1,2]}}));
+     label:'fan-out then coalesce',hoverNote:'d selected'}));
 
 D('c3','Ribbons nest, so depth reads without indentation. Hovering <code>a1</code> lights <code>a1</code>, its ribbon, and the one thing that caused it &mdash; <code>a</code> resolving. Its sibling did not cause it and stays faded.',
   pair([{n:'req + a',at:[['queued',0],['started',3.5,'disc'],['ok',10],['queued',10],['started',12],['ok',32]],reported:1},
@@ -78,7 +76,7 @@ D('c3','Ribbons nest, so depth reads without indentation. Hovering <code>a1</cod
         {n:'a2',at:[['queued',42],['started',44],['ok',66]]},
         {n:'req + b1',at:[['queued',38],['started',40.8,'disc'],['ok',46],['queued',46],['started',48],['ok',74]],reported:1}],
     {lit:[{row:0,bars:[12],dots:[12,32]},2],arrows:[wire(px(32),cy(0),px(34),cy(2))],focus:2,
-     label:'nested fan-out',hoverNote:'hovering a1',ribs:[{x:10,rows:[0,1]},{x:42,rows:[2,3]}]}));
+     label:'nested fan-out',hoverNote:'hovering a1'}));
 
 D('c4','The ribbon covers exactly the members, so an uneven fan-out is legible at rest &mdash; you can see it produced three without counting. Hovering adds nothing here, because the ribbon has already said it.',
   // Every member of a fan-out is enqueued by the request and waits its turn, so
@@ -89,21 +87,21 @@ D('c4','The ribbon covers exactly the members, so an uneven fan-out is legible a
         {n:'c',at:[['queued',12],['started',14],['ok',26]]},
         {n:'unrelated',at:[['started',20],['ok',60]]}],
     {lit:[0,1,2],arrows:[],focus:0,
-     label:'unbalanced fan-out',hoverNote:'the request selected',rib:{x:12,rows:[0,1,2]}}));
+     label:'unbalanced fan-out',hoverNote:'the request selected'}));
 
 D('c5','Nothing static predicted the width. The ribbon reports what happened rather than promising a shape, and the one cable worth drawing is the hop from <code>decide</code> into the request &mdash; not the request out to its own members.',
   pair([{n:'decide',at:[['started',0],['ok',18]]},
         {n:'req + d1',at:[['queued',20],['started',23.5,'disc'],['ok',30],['queued',30],['started',32],['ok',58]],reported:1},
         {n:'d2',at:[['queued',30],['started',32],['ok',62]]},{n:'d3',at:[['queued',30],['started',32],['ok',54]]},{n:'d4',at:[['queued',30],['started',32],['ok',66]]}],
     {lit:[0,1,2,3,4],arrows:[wire(px(18),cy(0),px(20),cy(1))],
-     label:'dynamic width',hoverNote:'the request selected',rib:{x:30,rows:[1,2,3,4]}}));
+     label:'dynamic width',hoverNote:'the request selected'}));
 
 D('c6','The ribbon covers both steps the resumption discovered, so nothing implies an order between them. The cable shows only what caused the resumption.',
   pair([{n:'a',at:[['started',2],['ok',28]]},
         {n:'req + b',at:[['queued',32],['started',36.9,'disc'],['ok',46],['queued',46],['started',48],['ok',76]],reported:1},
         {n:'c',at:[['queued',46],['started',48],['ok',68]]}],
     {lit:[0,1,2],arrows:[wire(px(28),cy(0),px(32),cy(1))],
-     label:'one resumption, two steps',hoverNote:'the request selected',rib:{x:46,rows:[1,2]}}));
+     label:'one resumption, two steps',hoverNote:'the request selected'}));
 
 D('c7','Hovering one branch is the check: its arrow stays inside the branch. A crossed pairing would be visible as a crossed arrow.',
   pair([{n:'left-1',at:[['started',4],['ok',28]]},{n:'right-1',at:[['started',4],['ok',34]]},
@@ -117,7 +115,7 @@ D('c8','Each branch scheduled its own request, so there are two. Hovering shows 
         {n:'req + a2',at:[['queued',26],['started',28,'disc'],['ok',32],['queued',32],['started',34],['ok',54]],reported:1},
         {n:'req + b2',at:[['queued',32],['started',34,'disc'],['ok',38],['queued',38],['started',40],['ok',62]],reported:1}],
     {lit:[{row:0,bars:[8],dots:[8,26]},2],arrows:[wire(px(26),cy(0),px(28),cy(2))],focus:2,
-     label:'no coalescing',hoverNote:'hovering a2',rib:{x:6,rows:[0,1]}}));
+     label:'no coalescing',hoverNote:'hovering a2'}));
 
 D('c9','The winner is a dependency and gets a solid arrow; the losers were alternates and get dashed ones. Both only appear once you ask.',
   pair([{n:'fast',at:[['started',4],['ok',24]]},{n:'slow',at:[['started',4],['ok',48]]},
@@ -135,7 +133,7 @@ D('c12','Rows sort by start, so plan order is not row order. The ribbon carries 
   pair([{n:'req + b',at:[['queued',0],['started',4.2,'disc'],['ok',12],['queued',12],['started',14],['ok',34]],reported:1,note:'planned 2nd'},
         {n:'a',at:[['queued',12],['started',18],['ok',58]],note:'planned 1st'},{n:'c',at:[['queued',12],['started',22],['ok',38]],note:'planned 3rd'}],
     {lit:[0,1,2],arrows:[],
-     label:'plan order vs row order',hoverNote:'the request selected',rib:{x:12,rows:[0,1,2]}}));
+     label:'plan order vs row order',hoverNote:'the request selected'}));
 
 D('c13','Response order stopped reflecting structure, so row order is time order and the arrow is the only structural claim — and only when asked for.',
   pair([{n:'early',at:[['started',2],['ok',16]]},

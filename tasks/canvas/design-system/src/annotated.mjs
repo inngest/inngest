@@ -29,7 +29,7 @@ const O={
       {n:'req + a',at:[['queued',0],['started',4.9,'disc'],['ok',14],['queued',14],['started',18],['ok',86]],reported:1,note:'planned it'},
       {n:'b',at:[['queued',14],['started',18],['ok',80]],note:'planned'},
       {n:'c',at:[['queued',60],['started',66],['ok',86]],note:'discovered'},
-    ],'','the event marks',{rib:{x:14,rows:[0,1]}}),
+    ],'','the event marks'),
     notes:[
       {side:'left', at:0,    row:0, text:'queued — a discovery request'},
       {side:'left', at:14,   row:1, text:'blue — a step already planned'},
@@ -45,7 +45,7 @@ const O={
       {n:'d',at:[['queued',45],['started',55],['ok',86]]},
     ],
       wire(px(37),cy(0),px(45),cy(3),{i:0})+wire(px(45),cy(1),px(45),cy(3),{i:2})+wire(px(41),cy(2),px(45),cy(3),{i:1}),
-      'ribbon and cables',{rib:{x:12,rows:[0,1,2]}}),
+      'ribbon and cables'),
     notes:[
       {side:'left', span:[0,12], row:0, text:'discovery — it planned several'},
       {side:'left', at:12,       row:2, text:'ribbon — the steps it planned'},

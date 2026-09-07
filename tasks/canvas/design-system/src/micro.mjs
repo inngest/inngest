@@ -52,7 +52,11 @@ export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.
  * exactly the scale an overview exists for. The row already bent that way:
  * failed slices have always had a wider minimum so they stay findable.
  */
-export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[]},sc=1){
+export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead=''},sc=1){
+  // The queue the run opened with is named here rather than drawn, so it does
+  // not push every row's work to the right of a gap that says the same thing
+  // about all of them.
+  if(lead) n=n+' (+'+lead+')';
   const y=cy(i);
   const col=v=> v.ok===false?C.bad : v.ok==='stop'?C.mut : v.ok==='mix'?C.mix : C.good;
   let s=`<text x="9" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
@@ -291,7 +295,7 @@ export const setFrameSharp=on=>{FRAME_SHARP=!!on;};
 // in docs it reads as something being hidden from the reader.
 export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
-export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false}){
+export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,lead=''}){
   const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
   // Finalization sits a full row below whatever the last row was, which may
   // have been on the tighter span pitch.
@@ -325,7 +329,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false})
   // that threw and then succeeded is a recovery, and resolving it red would say
   // the opposite of what the row underneath it shows.
   const last=intervals.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
-  const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,breaks,
+  const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,breaks,lead,
     resolved:running?null:((last&&last.ok===false)?EV.failed:EV.ok)},k);
 
   // A run still going has not been finalized. Drawing the row anyway would be
@@ -588,11 +592,41 @@ export function resolveRow(r){
   if(!r.segs || !r.segs.length) return r;
   const filled=fillGaps(r.segs.map(([k,x,w])=>({kind:k,x,w}))).map(g=>[g.kind,g.x,g.w]);
   const mo=R.moments(filled);
-  return {...r, segs:R.derive(mo.kind, mo.at, mo.end, {reported:mo.reported})};
+  // The moments stay on the row: what queued what is a fact about the run, and
+  // everything drawn between rows reads it rather than being handed coordinates.
+  return {...r, at:mo.at, kind:mo.kind, reported:mo.reported,
+          segs:R.derive(mo.kind, mo.at, mo.end, {reported:mo.reported})};
 }
 
 export function fig(rows,extra='',label='',under='',opts={}){
   rows=rows.map(resolveRow);
+  /**
+   * A run's opening queue time is named, not drawn. Done before the elastic
+   * pass and before any scale is chosen, so everything downstream simply sees a
+   * trace that begins when the work does.
+   */
+  let leadLabel='';
+  if(opts.trimLead){
+    const lead=R.leadingQueue(rows);
+    if(lead>0.01){
+      if(opts.ms) leadLabel=R.human(lead/100*opts.ms);
+      const shift=mo=>mo.length===3?[mo[0],mo[1]-lead,mo[2]]:[mo[0],mo[1]-lead];
+      rows=rows.map(r=>{
+        if(r.run || !r.at || !r.at.length) return r;
+        const s=r.at.map(shift);
+        // Rows already queued when the drawing begins keep the state they were
+        // in: the moment that put them there is pulled up to the start rather
+        // than dropped, so the row opens in queue and not in nothing.
+        const open=s.filter(mo=>mo[1]<=0).pop();
+        const at=(open?[[...open].map((v,j)=>j===1?0:v)]:[]).concat(s.filter(mo=>mo[1]>0));
+        if(!at.length) return {...r, at, segs:[]};
+        const end=r.end!=null?r.end-lead:undefined;
+        return {...r, at, end,
+          segs:R.derive(r.kind||'step', at, end, {reported:!!r.reported}),
+          dots:r.dots?r.dots.map(d=>({...d,p:d.p-lead})).filter(d=>d.p>=0):r.dots};
+      });
+    }
+  }
   if(process.env.DS_AUDIT) rows.forEach(r=>{
     if(!r.run && r.segs && r.segs.length) AUTHORED.push({n:r.n, segs:r.segs, span:!!r.span});
   });
@@ -651,9 +685,27 @@ export function fig(rows,extra='',label='',under='',opts={}){
     }
   }
   if(under&&typeof under==='object'){ opts=under; under=''; }
-  if(opts.rib){
-    under=ribbon(opts.rib.x,opts.rib.rows.map(i=>cy(i)))+under;
-    rows=rows.map((r,i)=>opts.rib.rows.includes(i)?{...r,noHalo:[opts.rib.x]}:r);
+  /**
+   * Ribbons are DERIVED, not placed.
+   *
+   * One request can report several steps and they are all queued at the same
+   * instant, so a ribbon is every row whose step was queued at the same moment,
+   * drawn at that moment. Figures used to hand over an x and a list of row
+   * indices, which is the same fact written a second time -- and it drifted:
+   * ribbons hung off rows that had none and were missing between rows that
+   * should have had one.
+   *
+   * The mark a ribbon threads loses its halo, because the ribbon is what the
+   * circle is sitting on. That follows from the ribbon, so it is derived too.
+   */
+  const ribs=opts.noRib?[]:R.ribbonGroups(rows);
+  if(ribs.length){
+    under=ribs.map(g=>ribbon(g.x,g.rows.map(i=>cy(i)),
+      opts.ribO!=null?{o:opts.ribO}:{})).join('')+under;
+    rows=rows.map((r,i)=>{
+      const on=ribs.find(g=>g.rows.includes(i));
+      return on?{...r,noHalo:[...(r.noHalo||[]),on.x]}:r;
+    });
   }
   const framed=opts.frame!==undefined?!!opts.frame:FRAMED;
   const ownRun=rows.some(r=>r.run||r.n==='Run');
@@ -714,7 +766,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
-    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running});
+    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running,lead:leadLabel});
     const dim=t=>`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(t,LBL,k)}</g>`;
     const soft=FRAME_SHARP?stretch(F.soft,LBL,k):dim(F.soft);
     // The Run row is left sharp wherever the axis is compressed: its torn track

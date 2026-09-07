@@ -16,11 +16,13 @@ setFrame(true);
  * from the rows beneath — a captured fixture declaring either is a second
  * account of the same run.
  */
-const panel=(rows,extra='',label='')=>fig(
+const panel=(rows,extra='',label='',ms)=>fig(
   rows.filter(r=>r.run===undefined && r.name!=='Finalization')
       .map(r=>({...r, n:r.name, segs:(r.segs||[]).map(g=>[g.kind,g.x,g.w]),
                 note:[r.dur,r.note].filter(Boolean).join(' · ')})),
-  extra, label);
+  // A captured run starts when it starts working; the queue it opened with is
+  // named on the Run row instead of pushing every row to the right of it.
+  extra, label, '', {trimLead:true, ms});
 const F={};
 const note=(t,i,x=LBL)=>`<text x="${x}" y="${cy(i)+4}" font-family="JetBrains Mono, monospace" font-size="7.5" fill="${C.mut}">${t}</text>`;
 
@@ -30,7 +32,7 @@ F.simple=[{
   svg:panel([
     {run:[],lbl:'no step spans · 8ms'},
     {name:'Finalization',dur:'8ms',segs:[{x:0,w:99.5,kind:'good'}]},
-  ],'','simple: two rows, no relationships'),
+  ],'','simple: two rows, no relationships',8),
 }];
 
 // ---- step: the baseline shape ------------------------------------------
@@ -42,7 +44,7 @@ F.step=[{
     {name:'for 2s',dur:'2.001s',note:'+1ms planning',segs:[{x:0.5,w:96,kind:'waitok'}]},
     {name:'second step',dur:'10ms',note:'+2ms wait',segs:[{x:96.5,w:0.4,kind:'idle'},{x:96.9,w:0.5,kind:'good'}]},
     {name:'Finalization',dur:'60ms',note:'+51ms wait',segs:[{x:97.4,w:1.7,kind:'idle'},{x:99.1,w:0.6,kind:'good'}]},
-  ],'','step: sleep dominates the axis'),
+  ],'','step: sleep dominates the axis',2256),
 }];
 
 // ---- v4sequential: must NOT show parallelism ---------------------------
@@ -54,7 +56,7 @@ F.v4sequential=[{
     {name:'for 2s',dur:'2.001s',note:'+1ms planning',segs:[{x:1.2,w:97,kind:'waitok'}]},
     {name:'second step',dur:'1ms',segs:[{x:99.3,w:0.4,kind:'good'}]},
     {name:'Finalization',dur:'5ms',segs:[{x:99.7,w:0.3,kind:'good'}]},
-  ],'','v4sequential: no ribbon anywhere'),
+  ],'','v4sequential: no ribbon anywhere',2050),
 }];
 
 // ---- emit: lineage the platform does not label -------------------------
@@ -68,7 +70,7 @@ F.emit=[{
       {name:'after',dur:'1ms',segs:[{x:75.8,w:2.5,kind:'good'}]},
       {name:'Finalization',dur:'7ms',segs:[{x:78.8,w:20.7,kind:'good'}]},
     ];
-    return panel(rows,'','emit: outbound lineage marker');
+    return panel(rows,'','emit: outbound lineage marker',33);
   })(),
 }];
 
@@ -84,7 +86,7 @@ F.invoke=[
     },
     {name:'after',dur:'58ms',note:'+47ms wait',segs:[{x:78.1,w:4.6,kind:'idle'},{x:82.7,w:0.7,kind:'good'}]},
     {name:'Finalization',dur:'141ms',note:'+130ms wait',segs:[{x:84.5,w:13.8,kind:'idle'},{x:98.3,w:0.7,kind:'good'}]},
-  ],'','invoke: the child run drawn as its own substance'),
+  ],'','invoke: the child run drawn as its own substance',909),
  },
  {
   cap:'Expanded, the child&rsquo;s own rows indent under it on the same axis. The parent row keeps its circles; the child&rsquo;s rows get theirs, so the boundary between the two runs is legible without a label.',
@@ -94,7 +96,7 @@ F.invoke=[
     {name:'  ↳ work',dur:'180ms',segs:[{x:22,w:8,kind:'idle'},{x:30,w:33,kind:'good'}]},
     {name:'  ↳ finish',dur:'40ms',segs:[{x:63,w:4,kind:'idle'},{x:67,w:2,kind:'good'}]},
     {name:'after',dur:'58ms',segs:[{x:78.1,w:4.6,kind:'idle'},{x:82.7,w:0.7,kind:'good'}]},
-  ],'','invoke expanded: child rows on the same axis'),
+  ],'','invoke expanded: child rows on the same axis',909),
  },
 ];
 

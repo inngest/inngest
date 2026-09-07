@@ -8,9 +8,9 @@ const E={};const D=(k,v)=>{E[k]=v;};
 D('c14',{d:'The step waiting its turn. Thin, quiet, and it ends at the circle where your code starts.',
   svg:fig([{n:'a',at:[['queued',0],['started',34],['ok',74]],note:'+34ms queued  40ms'}],'','queued')});
 D('c15',{d:'Inngest working out what to run next. A discovery bar only appears where the request was a separate execution &mdash; a fan-out, or the first step of a run. Where it produced a single step it is rolled into that step instead.',
-  svg:fig([{n:'req + a',at:[['queued',0],['started',6,'disc'],['ok',26],['queued',26],['started',32],['ok',74]],reported:1,noHalo:[26],note:'+26ms planning  42ms'},
-           {n:'b',at:[['queued',26],['started',32],['ok',66]],noHalo:[26],note:'34ms'}],'',
-    '',ribbon(26,[cy(0),cy(1)]))});
+  svg:fig([{n:'req + a',at:[['queued',0],['started',6,'disc'],['ok',26],['queued',26],['started',32],['ok',74]],reported:1,note:'+26ms planning  42ms'},
+           {n:'b',at:[['queued',26],['started',32],['ok',66]],note:'34ms'}],'',
+    '')});
 D('c16',{d:'Being held by flow control is queue time with a reason, and the reason is worth its own colour: amber hatched, still not your compute, but distinguishable at a glance from a step simply waiting its turn.',
   svg:fig([{n:'a',at:[['queued',0],['held',10],['started',62],['ok',92]],note:'+6.3s held  30ms'}],
     tag(px(22),cy(0)-6,'concurrency: 1',C.mut),'concurrency hold')});

@@ -20,25 +20,25 @@ O.before=fig([
 
 // With it: the ribbon covers exactly the members.
 O.after=fig([
-  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',30],['ok',64]],reported:1,note:'34ms',noHalo:[Q]},
-  {n:'b',at:[['queued',24],['started',30],['ok',72]],note:'42ms',noHalo:[Q]},
-  {n:'c',at:[['queued',24],['started',30],['ok',58]],note:'28ms',noHalo:[Q]},
+  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',30],['ok',64]],reported:1,note:'34ms'},
+  {n:'b',at:[['queued',24],['started',30],['ok',72]],note:'42ms'},
+  {n:'c',at:[['queued',24],['started',30],['ok',58]],note:'28ms'},
   {n:'unrelated',at:[['queued',24],['started',30],['ok',80]],note:'50ms'},
-],'','fan-out with the ribbon',ribbon(Q,[cy(0),cy(1),cy(2)]));
+],'','fan-out with the ribbon');
 
 // Twelve members, one ribbon, no extra rows.
-const many=[...Array(8)].map((_,i)=>({n:'w'+(i+1),segs:[['idle',Q,5],['good',29,20+i*4]],note:(20+i*4)+'ms',noHalo:[Q]}));
+const many=[...Array(8)].map((_,i)=>({n:'w'+(i+1),segs:[['idle',Q,5],['good',29,20+i*4]],note:(20+i*4)+'ms'}));
 O.wide=fig([
-  {n:'req + w0',at:[['queued',10],['started',14.9,'disc'],['ok',24],['queued',24],['started',29],['ok',45]],reported:1,note:'16ms',noHalo:[Q]},
+  {n:'req + w0',at:[['queued',10],['started',14.9,'disc'],['ok',24],['queued',24],['started',29],['ok',45]],reported:1,note:'16ms'},
   ...many,
-],'','wide fan-out',ribbon(Q,[...Array(9)].map((_,i)=>cy(i))));
+],'','wide fan-out');
 
 // Members that queue at slightly different moments.
 O.ragged=fig([
-  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',32],['ok',62]],reported:1,note:'30ms',noHalo:[24]},
-  {n:'b',at:[['queued',26],['started',34],['ok',70]],note:'36ms',noHalo:[26]},
-  {n:'c',at:[['queued',25],['started',33],['ok',57]],note:'24ms',noHalo:[25]},
-],'','ragged queue times',ribbon(25,[cy(0),cy(1),cy(2)]));
+  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',32],['ok',62]],reported:1,reports:['b','c'],note:'30ms'},
+  {n:'b',at:[['queued',26],['started',34],['ok',70]],note:'36ms'},
+  {n:'c',at:[['queued',25],['started',33],['ok',57]],note:'24ms'},
+],'','ragged queue times');
 
 // Coalesce keeps the arrows; there is nothing to group on the way in.
 O.coalesce=fig([

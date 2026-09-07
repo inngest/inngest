@@ -27,7 +27,7 @@ D('w3',{d:'A wait inside a fan-out. It sits on the same axis as its siblings and
     {n:'b',       at:[['started',8],['ok',22]]},
     {n:'c',       at:[['started',8],['ok',62]],kind:'wait'},
     {n:'d',       at:[['started',62],['ok',64],['queued',64],['started',68],['ok',86]],reported:1},
-  ],'','a wait holding a level open','',{rib:{x:8,rows:[0,1,2]}})});
+  ],'','a wait holding a level open')});
 
 D('w4',{d:'Waiting and failing must not read alike. One is hatched and never red; the other is solid and red, and only its final attempt takes a filled mark.',
   svg:fig([
@@ -195,7 +195,7 @@ D('n1',{d:'The same step name on two branches. The name is not the identity: row
     {n:'req + fetch', at:[['queued',0],['started',2.4,'disc'],['ok',7],['started',7],['ok',33]],reported:1},
     {n:'fetch',       at:[['started',7],['ok',25]]},
     {n:'save',        at:[['started',33],['ok',35],['queued',35],['started',38],['ok',58]],reported:1},
-  ],'','the same name twice','',{rib:{x:7,rows:[0,1]}})});
+  ],'','the same name twice')});
 
 D('n2',{d:'The SDK’s :1 and :2 suffixes are not stable under parallelism, so nothing in the drawing depends on them. They are shown as text on the row and used for nothing else.',
   svg:fig([

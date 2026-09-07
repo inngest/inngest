@@ -263,3 +263,84 @@ export function moments(segs){
     mo.length===3 && (mo[2]===kind || (reported && j===0)) ? [mo[0],mo[1]] : mo);
   return {at:trimmed, end:last[1]+last[2], kind, reported};
 }
+
+/**
+ * The grouping ribbon, derived.
+ *
+ * One discovery request can report several steps, and they are all queued at
+ * the same instant -- the instant that request resolved. So a ribbon is not
+ * something a figure places: it is every row whose step was queued at the same
+ * moment, drawn at that moment. Two or more rows make a group; one does not,
+ * which is why a lone step has no ribbon and never should.
+ *
+ * A row that carries its own reporting request at the head has TWO queue
+ * moments: the request's and the step's. The step's is the one that matters,
+ * and it is the first queue after the request resolved.
+ */
+export function ribbonGroups(rows){
+  /**
+   * Where the timing does not imply the relationship, the row states it: a
+   * request row may name the rows it reported. Real spans carry that link
+   * explicitly; identical queue instants are a property of figures, and a
+   * figure showing members that queued a moment apart has to say what ties
+   * them or the ribbon would be inferred away.
+   */
+  const named=[];
+  rows.forEach((r,i)=>{
+    if(!r.reports || !r.at) return;
+    const k=r.at.findIndex(x=>RESOLVED.has(x[0]));
+    if(k<0) return;
+    const mem=[i].concat(r.reports
+      .map(n=>rows.findIndex(o=>o.n===n))
+      .filter(j=>j>=0));
+    if(mem.length>1) named.push({x:+r.at[k][1].toFixed(3), rows:mem});
+  });
+  const claimed=new Set(named.flatMap(g=>g.rows));
+  const marks=[];
+  rows.forEach((r,i)=>{
+    if(r.run || !r.at || !r.at.length) return;
+    const m=r.at;
+    let q;
+    if(r.reported){
+      const k=m.findIndex(x=>RESOLVED.has(x[0]));
+      q = k<0 ? null : m.slice(k+1).find(x=>x[0]==='queued'||x[0]==='planned');
+    }else{
+      q = m.find(x=>x[0]==='queued'||x[0]==='planned');
+    }
+    if(q && !claimed.has(i)) marks.push([i, +q[1].toFixed(3)]);
+  });
+  const by=new Map();
+  for(const [i,x] of marks){ if(!by.has(x)) by.set(x,[]); by.get(x).push(i); }
+  return named.concat([...by.entries()]
+      .filter(([,rs])=>rs.length>1)
+      .map(([x,rs])=>({x, rows:rs})))
+    .sort((a,b)=>a.x-b.x);
+}
+
+/**
+ * The queue time a run starts with, which is worth a label and not a third of
+ * the width.
+ *
+ * Many real runs sit enqueued far longer than they execute, and drawn to scale
+ * that opens a gap at the head of every row before anything has happened. The
+ * elastic rule does not catch it: the stretch is real queue time, and queue
+ * time is exactly what the trace exists to show -- everywhere except here,
+ * where it is the same fact on every row and says nothing about any of them.
+ *
+ * So the drawing starts when the run starts working, and the wait that came
+ * first is named on the Run row instead.
+ */
+export function leadingQueue(rows){
+  let first=Infinity;
+  for(const r of rows){
+    if(r.run) continue;
+    for(const [k,x] of (r.segs||[])) if(WORKING(k)){ first=Math.min(first,x); break; }
+  }
+  return first===Infinity?0:first;
+}
+
+/** A duration, at the precision a label wants. */
+export function human(ms){
+  if(ms>=1000) return +(ms/1000).toFixed(ms>=10000?0:3)+'s';
+  return Math.round(ms)+'ms';
+}
