@@ -214,8 +214,5 @@ Worth knowing, so you do not go looking:
 - **Anything outside a step.** A bare `inngest.send()` outside `step.sendEvent()`
   has no span, so nothing ties it to what it triggered.
 
-Where the view is inferring rather than reading a reported fact, it says so.
-Inferred grouping is drawn dashed, and it never looks like something that was
-reported.
-
-![Inferred grouping drawn with a dashed ribbon and dashed cable](./images/inferred-grouping.svg)
+Where the view is inferring rather than reading a reported fact, it says so
+rather than letting a guess look like something that was reported.

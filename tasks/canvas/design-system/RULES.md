@@ -119,9 +119,10 @@ report today.
 - Response order stops matching branch structure after unrelated waits; the cable is then the only structural claim, and only on demand.
 - A race winner is a dependency and gets a solid cable; losers that resolved after the request started get a dashed one or none.
 - A step started but never awaited has no outgoing cable — **a dead end is drawn by absence.**
-- **Inferred grouping gets a dashed ribbon and a dashed cable, so a guess never looks like a reported fact.**
-- ENCODING: dashed accent stroke (2.5/2.5), dashed chevron head for inferred; causal ribbon variant is orthogonal + dashed (4 3) at the last contributor's end.
-- DEPENDS: **reported parent step per request**; whether grouping was reported or inferred from overlap.
+- **A guess must never look like a reported fact.** Where the trace cannot say what caused something it declines rather than drawing a confident line.
+- ENCODING: dashed accent stroke (2.5/2.5); causal ribbon variant is orthogonal + dashed (4 3) at the last contributor's end.
+- DEPENDS: **reported parent step per request**.
+- **Inferred grouping is no longer drawn.** The artifact had a dashed ribbon and cable for grouping recovered from overlap rather than reported; it was cut as not worth its place. React still surfaces the distinction (`parallelismSource`, the `grouping: exact | inferred` badge), so this is a deliberate gap rather than agreement — see `DELTA.md`.
 
 ## Platform time
 - Queue time is the step waiting for the executor; thin, quiet, ends at the circle where your code starts.

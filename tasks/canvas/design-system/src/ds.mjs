@@ -169,7 +169,6 @@ const SC=[
  ['Attribution', [
   ['c9','Promise.race(). The winner is a dependency of the next request. The loser resolved after that request started, so it has no cable.'],
   ['c10','A step started but never awaited. No outgoing cable.'],
-  ['c11','An SDK that reports one step per response never says these were planned together, so the grouping is recovered from the fact that they overlap. That is a guess, and it is drawn as one: dashed ribbon, dashed cable. Newer SDKs report whole batches and draw solid.'],
  ]],
  ['Platform time', [
   ['c14','Queue time. The step waiting for the executor to pick it up.'],

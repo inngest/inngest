@@ -131,15 +131,6 @@ D('c10','A dead end is drawn by absence. Hovering it lights its own row and noth
         {n:'b',segs:[['idle',32,10],['good',44,22]]}],
     {lit:[1],arrows:[],label:'dead end',hoverNote:'hovering orphan, no outgoing arrow'}));
 
-D('c11','Inferred grouping gets a dashed ribbon and a dashed cable, so a guess never looks like a reported fact.',
-  [{l:'at rest',svg:fig([{n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['good',14,30]]},{n:'b',segs:[['good',14,26]]}],
-    `<path d="M${px(12)+7.5} ${cy(0)-3.6} L${px(12)+11.9} ${cy(0)} L${px(12)+7.5} ${cy(0)+3.6}" fill="none" stroke="${C.acc}" stroke-width="1.5" stroke-dasharray="2 1.6"/>`+
-    tag(px(26),cy(0)-5,'inferred',C.acc),'inferred at rest')},
-   {l:'selected',svg:fig([{n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['good',14,30]],sel:true},{n:'b',segs:[['good',14,26]]}],
-    `<path d="M${px(12)} ${cy(0)} C ${px(16)} ${cy(0)}, ${px(10)} ${cy(1)}, ${px(11)} ${cy(1)}" fill="none" stroke="${C.acc}" stroke-width="1.3" stroke-dasharray="2.5 2.5"/>`+
-    `<path d="M${px(11)} ${cy(1)-2.2} L${px(14)} ${cy(1)} L${px(11)} ${cy(1)+2.2} Z" fill="${C.acc}" opacity=".7"/>`+
-    tag(px(26),cy(1)+9,'grouping inferred from overlap',C.mut),'inferred selected')}]);
-
 D('c12','Rows sort by start, so plan order is not row order. The ribbon carries the plan and the axis carries the time; neither has to lie, and no cable is needed to repeat it.',
   pair([{n:'req + b',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,2],['good',14,20]],note:'planned 2nd'},
         {n:'a',segs:[['idle',12,6],['good',18,40]],note:'planned 1st'},{n:'c',segs:[['idle',12,10],['good',22,16]],note:'planned 3rd'}],

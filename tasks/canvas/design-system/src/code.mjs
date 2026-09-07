@@ -16,7 +16,6 @@ export const CODE={
  c8:`await Promise.all([\n  (async () => {\n    await step.run('a', …)\n    await step.run('a2', …)\n  })(),\n  (async () => {\n    await step.run('b', …)\n    await step.run('b2', …)\n  })(),\n])`,
  c9:`await Promise.race([\n  step.run('fast', …),\n  step.run('slow', …),\n])\nawait step.run('next', …)`,
  c10:`await step.run('a', …)\n\n// started, never awaited\nstep.run('orphan', …)\n\nawait step.run('b', …)`,
- c11:`// an SDK that reports one\n// step per response never\n// says these were planned\n// together\nawait Promise.all([\n  step.run('a', …),\n  step.run('b', …),\n])`,
  c14:`// enqueued, then waits\n// for a worker\nawait step.run('a', …)`,
  c15:`await Promise.all([\n  step.run('a', …),\n  step.run('b', …),\n])`,
  c16:`// { concurrency: { limit: 5 } }\nawait step.run('a', …)`,

@@ -145,6 +145,16 @@ Still absent, in rough order of how much they cost:
   for a drawing language, but they need somewhere to live on the row.
 - **Metadata / headers / input / output tabs** — the panel, not the trace.
 
+## 3d. Deliberately dropped from the artifact
+
+- **Inferred grouping.** The artifact drew a dashed ribbon and dashed cable for
+  a grouping recovered from overlap rather than reported by the SDK. Cut at the
+  stakeholder's call. React still surfaces the distinction — `parallelismSource`,
+  the `grouping: exact | inferred` badge, and a `warnings[]` entry — and the
+  general rule that a guess must never look like a reported fact survives in
+  `RULES.md`. So this is a gap by decision, not by oversight: **do not re-add it
+  to the artifact to "match" React.**
+
 ## 4. Where React is ahead of the artifact
 
 Do not regress these while porting anything above.

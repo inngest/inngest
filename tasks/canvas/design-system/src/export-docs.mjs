@@ -48,7 +48,6 @@ const WANT=[
   ['t2', 0,'compute-vs-elapsed','Seven days elapsed, 62ms executing.'],
   ['s1', 0,'collapsed-group',   'Five hundred steps collapsed to one row.'],
   ['s3', 0,'failure-cluster',   'A failure cluster, visible without interacting.'],
-  ['c11',0,'inferred-grouping', 'Inferred grouping is drawn dashed.'],
 ];
 
 fs.mkdirSync(OUT,{recursive:true});
