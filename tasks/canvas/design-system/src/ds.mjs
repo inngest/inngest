@@ -25,8 +25,12 @@ const GENS=['vocab','barvocab','items-a','items-bc','items-disc','items-more','c
  * properties of the component now, so it re-renders instead, and there is one
  * of everything again.
  */
+// The frameless build's figures are exported and then inlined into the Docs
+// tab by the framed one, so the two must not number their ids alike: the same
+// id defining two different clip paths resolves to whichever came first.
+const UIDBASE=process.env.DS_FRAME==='0'?500000:0;
 GENS.forEach((g,gi)=>execFileSync('node',[HERE+g+'.mjs'],
-  {stdio:'pipe', env:{...process.env, DS_UID_BASE:String(gi*1000)}}));
+  {stdio:'pipe', env:{...process.env, DS_UID_BASE:String(UIDBASE+gi*1000)}}));
 const J=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
 
 /** id -> the events that figure was drawn from, gathered from every generator. */
