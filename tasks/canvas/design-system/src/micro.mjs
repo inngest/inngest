@@ -56,7 +56,7 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[]},sc=
     for(let j=0;j<n;j++)
       d+=` L${(x0+step*(j+0.5)).toFixed(1)} ${(y+(j%2?amp:-amp)).toFixed(1)}`+
          ` L${(x0+step*(j+1)).toFixed(1)} ${y}`;
-    return `<path d="${d}" fill="none" stroke="${C.idle}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    return `<path d="${d}" fill="none" stroke="${C.idle}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>`;
   };
   {
     let at=LBL;
@@ -128,7 +128,11 @@ export function row(i,r,sc=1){
   // over it keeps bars under marks inside both layers.
   const put=(on,frag)=>{ lo+=frag; if(on) hi+=frag; };
   lo+=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
-  segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc})); });
+  // A userland span is a subdivision of the step above it, not a peer, so it is
+  // drawn thinner. Nesting and weight carry that, not a new colour: an OTel span
+  // IS your code, so it keeps the same status colours the step has.
+  const bh=r.thin?GEOM.BAR_H*0.62:GEOM.BAR_H;
+  segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh})); });
   (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
     put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,3,true));
@@ -454,7 +458,10 @@ export function fig(rows,extra='',label='',under='',opts={}){
   let ctx='';
   if(framed){
     const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[]});
-    ctx=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.sharp+F.soft,LBL,k)}</g>`;
+    const soft=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.soft,LBL,k)}</g>`;
+    ctx=(opts.breaks&&opts.breaks.length)
+      ? stretch(F.sharp,LBL,k)+soft
+      : `<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.sharp,LBL,k)}</g>`+soft;
   }
   // The compressed band blurs whatever runs through it. Done by drawing the
   // whole figure a second time, clipped to the band and filtered — SVG has no

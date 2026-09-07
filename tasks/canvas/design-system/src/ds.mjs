@@ -222,6 +222,10 @@ const SC=[
   ['i1','Three tiers of attention: the row, what caused it, everything else. Nothing is removed, only quietened.'],
   ['i2','The Run row is the overview. One picture of the run, not two.'],
  ]],
+ ['OpenTelemetry', [
+  ['o1','Spans from @inngest/otel are your code at finer grain: nested under the step, thinner, same status colours.'],
+  ['o2','A span sits inside its step. One that outruns it is a clock disagreement, and the row says so rather than clamping.'],
+ ]],
  ['Honesty', [
   ['h1','Where the trace cannot say what caused a request, it declines rather than guessing.'],
   ['h2','A row’s label and its drawing have to agree about which interval the number names.'],

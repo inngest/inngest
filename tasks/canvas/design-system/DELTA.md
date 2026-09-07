@@ -118,6 +118,33 @@ The artifact is the stakeholder's call and wins there. One of the other two
 records is stale and it has not been decided which — do not "fix" either side to
 match the other without settling it.
 
+## 3c. What the shipped product has that the design language does not
+
+Read off `inngest.com/docs/platform/monitor/traces`. Addressed:
+
+- **OpenTelemetry / extended traces** — now a section of its own. It was the
+  largest gap: userland spans were absent from the language entirely.
+- **The timing breakdown** — deliberately *moved* rather than added. See
+  `RULES.md` § The selected row.
+
+Still absent, in rough order of how much they cost:
+
+- **`step.waitForSignal`** — named in the vocabulary's own description of
+  `wait`, but no figure. It resolves differently from `waitForEvent` (a signal,
+  not a matched event) and nothing draws that.
+- **The `Connecting` bar** — the docs list it as one of eight bar types
+  (dotted outline, connection phase). React declares `timing.connecting` and
+  never emits it. The artifact has nothing. Worth deciding whether it survives.
+- **Trigger types.** The docs distinguish **event**, **cron** and **batch**
+  triggers, each with different fields. The artifact draws a trigger but does
+  not distinguish them, and a cron run has no event to point at.
+- **The attempt badge** — a retry count coloured by status, beside the step
+  name. The artifact draws attempts as intervals on the row, which is richer,
+  but the badge is what makes a retried step *findable* in a long list.
+- **Rerun from step**, **Cancel**, **Invoke**, **Rerun** — actions. Out of scope
+  for a drawing language, but they need somewhere to live on the row.
+- **Metadata / headers / input / output tabs** — the panel, not the trace.
+
 ## 4. Where React is ahead of the artifact
 
 Do not regress these while porting anything above.

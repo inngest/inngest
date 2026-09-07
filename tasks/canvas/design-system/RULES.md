@@ -57,8 +57,17 @@ report today.
 - ENCODING: `TRACK_H` 5 grey ground, `RUN_H` 8 slices; failed slices floored at `MIN_FAIL_W` 3.2 vs `MIN_W` 1.4 so failure stays findable; queued mark left, resolution mark right.
 - DEPENDS: per-step compute intervals with outcome, to slice the axis at every start/end edge.
 
+## OpenTelemetry
+
+- A step instrumented with `@inngest/otel` reports **userland spans** — HTTP calls, database queries, third-party APIs.
+- **They are your code at finer grain, so they keep the status colours a step has.** What distinguishes them is **nesting and weight, not a new colour**: indented under the step, drawn thinner, because each is a subdivision of the bar above rather than a peer of it.
+- **A span sits inside its step's execution.** One that starts before its step or outruns it is a clock disagreement between the two processes, not a slow query, and the row says so rather than clamping it quietly.
+- The step is the thing that retried; a span inside it is not separately retryable.
+- DEPENDS: userland spans reaching the client at all — span name, kind, service name and attributes.
+
 ## The selected row
 - Selecting a row replots that row alone across the full width — same bars, same marks, **not a second drawing language.**
+- **The timing breakdown lives here, not in the trace.** Today's product expands a step into `Inngest` and `Your server` sub-rows inline, and that is most of what makes the trace tall. A breakdown is detail about *one* row, and it only matters once you have chosen that row — at which point selecting it already gives the full width to name every interval, which is exactly what a breakdown is. (Stakeholder's call.)
 - Every interval gets a name and a duration; every mark gets what happened.
 - ENCODING: interval name + duration centred under each bar; mark names on a second line with alternating high/low ticks.
 

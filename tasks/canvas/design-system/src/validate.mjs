@@ -129,7 +129,7 @@ async function checkCodeSync(){
   const {CODE}=await import('./code.mjs');
   const ds=fs.readFileSync(HERE+'ds.mjs','utf8');
   const sc=ds.slice(ds.indexOf('const SC=['), ds.indexOf('const scenarios ='));
-  const rendered=new Set([...sc.matchAll(/\[.([cwtsnih]\d+[a-z]*)./g)].map(m=>m[1]));
+  const rendered=new Set([...sc.matchAll(/\[.([a-z]+\d+[a-z]*)./g)].map(m=>m[1]));
 
   const EX={};
   for(const g of ['items-a','items-bc','items-disc','items-more'])
@@ -151,7 +151,19 @@ async function checkCodeSync(){
     const code=CODE[id];
     if(!code){ console.log(`  ${id}: rendered but has no code example`); bad++; continue; }
     const drawn=labels(e.frames[0].svg), named=ids(code);
-    const orphanRows=drawn.filter(r=>!named.some(n=>r.includes(n)));
+    // A nested userland span is not a step call — it is a fetch or a query — so
+    // a row is allowed to be named by ANY string literal in the snippet. The
+    // reverse direction stays strict on step ids, or every event name in a
+    // sendEvent would count as a step the figure failed to draw.
+    const anyName=[...code.matchAll(/['"`]([^'"`\n]+)['"`]/g)].map(m=>m[1])
+      .filter(n=>!n.includes('${'));
+    // Either may be the longer: a row reads `↳ SELECT` where the code says
+    // `'SELECT …'`, and a row reads `req + a` where the code says `'a'`.
+    const bare=r=>r.replace(/^[\s↳·]+/,'').trim();
+    const orphanRows=drawn.filter(r=>{
+      const t=bare(r);
+      return !anyName.some(n=>t.includes(n)||n.includes(t));
+    });
     const orphanSteps=named.filter(n=>!drawn.some(r=>r.includes(n)));
     if(orphanRows.length||orphanSteps.length){
       bad++;

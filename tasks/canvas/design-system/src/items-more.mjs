@@ -201,6 +201,23 @@ D('i2',{d:'The Run row <em>is</em> the overview. There was a minimap above it dr
     ], '', 'the Run row is the overview and the scrubber');
   })()});
 
+// ---- OpenTelemetry ------------------------------------------------------
+
+D('o1',{d:'A step instrumented with <code>@inngest/otel</code> reports what your code did inside it &mdash; HTTP calls, database queries, third-party APIs. Those spans are <em>your code at finer grain</em>, so they keep the status colours a step has and are distinguished by <strong>nesting and weight, not by a new colour</strong>: indented under the step, drawn thinner, because each is a subdivision of the bar above rather than a peer of it. The step is still the thing that retried; a span inside it is not separately retryable.',
+  svg:fig([
+    {n:'charge',        segs:[['idle',0,6],['good',6,74]]},
+    {n:'  ↳ POST /pay', segs:[['good',9,38]],thin:true},
+    {n:'  ↳ SELECT',    segs:[['good',49,12]],thin:true},
+    {n:'  ↳ UPDATE',    segs:[['good',63,14]],thin:true},
+  ],'','userland spans nested under a step')});
+
+D('o2',{d:'The nesting is a claim, and the trace has to be able to keep it. A span always sits <em>inside</em> its step&rsquo;s execution, because that is where it ran &mdash; one that starts before its step or outruns it is a clock disagreement between your process and ours, not a slow query, and drawing it as though it were would be the view inventing a fact. Where the extents do not contain each other the row says so rather than clamping quietly.',
+  svg:fig([
+    {n:'charge',        segs:[['idle',0,6],['good',6,54]]},
+    {n:'  ↳ POST /pay', segs:[['good',9,38]],thin:true},
+    {n:'  ↳ SELECT',    segs:[['good',52,26]],thin:true,note:'outruns its step'},
+  ],'','a span that leaves its parent')});
+
 // ---- Honesty ------------------------------------------------------------
 
 D('h1',{d:'Where the trace cannot say which step caused a request, it declines rather than guessing. No cable is drawn and the row says so, which is a smaller cost than a confident wrong line.',

@@ -158,13 +158,13 @@ export const eventCSS = () =>
  * One bar. Every kind is a pattern, so this is the only place a bar is drawn.
  * `k` is the axis scale, so the minimum width is a minimum on screen.
  */
-export function barSvg(kind, x, w, y, {k=1, floor=k, o=1}={}){
+export function barSvg(kind, x, w, y, {k=1, floor=k, o=1, h=GEOM.BAR_H}={}){
   // `k` scales coordinates now; `floor` is the scale the drawing ends up at,
   // so the minimum width is a minimum on screen whether the caller scales
   // afterwards (the static figures) or not (the browser).
   const b=kind.replace(/[!*]+$/,'');
-  return `<rect x="${pxOf(x,k).toFixed(2)}" y="${(y-GEOM.BAR_H/2).toFixed(1)}" `+
-    `width="${Math.max(GEOM.MIN_W*k/floor,(w/100)*GEOM.PLOT*k).toFixed(2)}" height="${GEOM.BAR_H}" `+
+  return `<rect x="${pxOf(x,k).toFixed(2)}" y="${(y-h/2).toFixed(1)}" `+
+    `width="${Math.max(GEOM.MIN_W*k/floor,(w/100)*GEOM.PLOT*k).toFixed(2)}" height="${h}" `+
     `rx="1" fill="url(#hx-${b})" opacity="${o}"/>`;
 }
 
