@@ -52,7 +52,7 @@ export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.
  * exactly the scale an overview exists for. The row already bent that way:
  * failed slices have always had a wider minimum so they stay findable.
  */
-export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead=''},sc=1){
+export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead='',opened='queued'},sc=1){
   // The queue the run opened with is named here rather than drawn, so it does
   // not push every row's work to the right of a gap that says the same thing
   // about all of them.
@@ -100,7 +100,10 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead
     const w=Math.max((v.rank===3?3.2:1.4)/sc, ((b-a)/100)*PLOT);
     s+=`<rect class="run-slice" x="${px(a).toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${col(v)}"/>`;
   }
-  s+=dot(LBL,y,EV.queued);
+  // The Run row opens on the moment the run was actually in when the drawing
+  // starts. Trim its opening queue away and the drawing starts with the run
+  // already executing, which is what its first step says too.
+  s+=dot(LBL,y,opened==='started'?EV.started:EV.queued);
   if(resolved) s+=dot(LBL+(to/100)*PLOT,y,resolved);
   return s;
 }
@@ -310,7 +313,7 @@ export const setFrameSharp=on=>{FRAME_SHARP=!!on;};
 // in docs it reads as something being hidden from the reader.
 export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
-export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,lead=''}){
+export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,lead='',trimmed=false}){
   const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
   // Finalization sits a full row below whatever the last row was, which may
   // have been on the tighter span pitch.
@@ -344,7 +347,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
   // that threw and then succeeded is a recovery, and resolving it red would say
   // the opposite of what the row underneath it shows.
   const last=intervals.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
-  const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,breaks,lead,
+  const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,breaks,lead,opened:trimmed?'started':'queued',
     resolved:running?null:((last&&last.rank===3)?EV.failed:EV.ok)},k);
 
   // A run still going has not been finalized. Drawing the row anyway would be
@@ -649,10 +652,11 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * pass and before any scale is chosen, so everything downstream simply sees a
    * trace that begins when the work does.
    */
-  let leadLabel='';
+  let leadLabel='', leadTrimmed=false;
   if(opts.trimLead && R.FEAT.trim){
     const lead=R.leadingQueue(rows);
     if(lead>0.01){
+      leadTrimmed=true;
       if(opts.ms) leadLabel=R.human(lead/100*opts.ms);
       const shift=mo=>mo.length===3?[mo[0],mo[1]-lead,mo[2]]:[mo[0],mo[1]-lead];
       rows=rows.map(r=>{
@@ -841,7 +845,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
-    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running,lead:leadLabel});
+    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running,lead:leadLabel,trimmed:leadTrimmed});
     const dim=t=>`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(t,LBL,k)}</g>`;
     const soft=FRAME_SHARP?stretch(F.soft,LBL,k):dim(F.soft);
     // The Run row is left sharp wherever the axis is compressed: its torn track
