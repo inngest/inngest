@@ -488,3 +488,46 @@ Two things that bit alongside it, both worth keeping:
   the variants hold different numbers of elements. A single `querySelectorAll`
   of everything diverges at the first extra and every pair after it is a bar
   against a circle.
+
+---
+
+## 31. Fix it in one place, then check the other places that draw the same thing
+
+**Failure mode**: a compression band was inflating the height a figure was
+fitted to. Fixed it in `fig()`, measured it, reported it fixed. The stakeholder
+came back: "Still happening on the Fixtures tab". The scrubber draws its own
+band, in the browser, in a different function — and that one was never wrapped.
+
+**Detection signal**: I verified on the tab where I had made the change. The
+measurement was sound and the conclusion was still wrong, because the sample was
+chosen to match the fix.
+
+**Prevention**: after fixing a drawing rule, grep for every place that emits the
+thing, not every place you edited: `grep -rn 'cmpband' src/`. The artifact draws
+its figures twice on purpose — once at build time and once in the browser for
+the scrubbers — so "the renderer" is two renderers for anything the scrubber
+also draws.
+
+And verify across all four tabs, which `HOW-WE-WORK.md` already says and I did
+not do.
+
+---
+
+## 32. Measure after the webfont lands, or measure twice
+
+**Failure mode**: with the band excluded, figure heights across a feature toggle
+matched to within 0.5px — close enough that I reported it as sub-pixel residue
+and moved on. It was not residue. The bounding boxes were IDENTICAL
+(`y=10.36 h=81.14` both ways); only the viewBox differed, because the first
+`refit()` ran before the display font arrived and measured text against the
+fallback, while every later one measured against the real font.
+
+**Detection signal**: two numbers that differ while the thing they are derived
+from does not. That is not rounding, it is two different measurements.
+
+**Prevention**: anything that sizes a box from `getBBox()` over text has to run
+again once the fonts are ready:
+
+```js
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
+```

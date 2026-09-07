@@ -1024,7 +1024,7 @@ ${fig(J.connect.poll)}
           +' font-size="6.5" fill="var(--ink-2)" text-anchor="middle" paint-order="stroke"'
           +' stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">'+c[2]+'</text></g>':'');
     });
-    out+=band;
+    if(band) out+='<g class="nofit">'+band+'</g>';
     var label=function(n,y){ return '<text x="2" y="'+(y+2.5)+'" '+MONO+' font-size="7" fill="var(--muted)">'+n+'</text>'; };
     fx.rows.forEach(function(r){
       var y=cyOf(i);
@@ -1380,6 +1380,11 @@ ${fig(J.connect.poll)}
   });
 
   applyFeat();
+  // Text metrics change when the display font arrives, and a figure is sized
+  // from its bbox — so the first fit is measured against the fallback and every
+  // later one against the real font. That was the last 0.5px of drift between a
+  // figure's height before and after a toggle.
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ refit(); });
 
   document.addEventListener('mousemove',function(e){
     if(!pop.classList.contains('on')) return;
