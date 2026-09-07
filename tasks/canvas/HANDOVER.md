@@ -1,5 +1,12 @@
 # Run Canvas — handover
 
+> **STALE — historical only.** This describes the end of the *lineage* phase, before any of the
+> visualisation work. Its §3 ("nothing is committed") is no longer true: that work is committed,
+> and ~40 commits of visualisation work sit on top of it. **A cold session should read
+> `HOW-WE-WORK.md` and then `LOG.md`'s header instead.** What is still accurate here, and worth
+> keeping, is §2 — how to get the full Go + SDK + Next.js stack running, and the gotchas under
+> it, which you need only when capturing *new* fixtures.
+
 Written at the end of a long session so the next one can pick up cold. Start here, then read
 `todo.md` (the running log of decisions D1–D49, most recent at the bottom) and `00-recon.md` (the
 Phase 0 recon of how the data layer works).

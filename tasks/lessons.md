@@ -188,3 +188,34 @@ wrong?" is the one that doesn't get asked.
 **Detection signal**: a rendering that is suspiciously uniform — equal widths,
 even spacing, identical rows — where the underlying data has no reason to be.
 Check it against a second view of the same data before accepting it.
+
+### 20. A verification tool pinned to an absolute path is a verification tool that will stop existing
+All three review agents (`canvas-ux-review`, `canvas-fixture-critic`,
+`canvas-correctness`) carried the literal string
+`/nix/store/3qgx41z8882ff85y9prdc5zgbb2id6y8-chromium-152.0.7977.64/bin/chromium`.
+Nix garbage-collected it. Every agent's screenshot step was dead, and nothing
+reported that — an agent asked to review a screen it cannot see writes a report
+about nothing, and the report still arrives looking like a report.
+
+The same file also hardcoded the Vite port (`5175`, and `5177` in `LOG.md`),
+which moves whenever another dev server holds 5173.
+
+**Detection signal**: none, which is the point. The failure is silent from the
+outside and only visible if you run the tool yourself.
+
+**Prevention**: one script, `tasks/canvas/shot.sh`, that every agent and every
+session calls.
+- It resolves Chromium through a **Nix GC root** (`nix build --out-link
+  ~/.cache/canvas-shot/chromium nixpkgs#ungoogled-chromium`), which both creates
+  the symlink and registers it as an indirect root, so the store path cannot be
+  collected while the link exists — and rebuilds it from cache if it is.
+- It **finds the gallery port** rather than assuming it.
+- It `curl`s the URL first and **refuses to screenshot a page that did not
+  answer** — chromium happily renders its own error page into a valid PNG, and
+  that image read back as evidence is worse than no image at all.
+- It **deletes the output file before writing**, so a failure cannot leave the
+  previous run's image behind to be read as the current one. This is #18 again,
+  in a new place.
+
+Not Playwright or Puppeteer: both download a dynamically-linked Chrome-for-
+Testing build that will not start on NixOS (`libglib-2.0.so.0` missing).

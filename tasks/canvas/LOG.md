@@ -33,7 +33,16 @@ lineage, inline invoke expansion, and the value line. All 45 fixtures render cle
 
 ## How to work on this
 
-- Gallery: `http://localhost:5177/canvas-gallery`. Vite: `pnpm run --filter @inngest/dev-server-ui dev:vite`.
+**`HOW-WE-WORK.md` is the method** — the loop, when to stop and ask, and which surface a
+problem gets solved on. Read it before starting.
+
+- Gallery: `cd ui && pnpm run --filter @inngest/dev-server-ui dev:vite`, then
+  `/canvas-gallery`. Vite takes the first free port from 5173, so **do not write the port
+  down** — it has been wrong in this file twice.
+- Screenshots and DOM: **`tasks/canvas/shot.sh <fixture>`**, `--dom` for the HTML. It finds
+  the port, resolves Chromium through a Nix GC root, and refuses to write an image when the
+  page did not load. Never hand-roll a chromium invocation — a pinned `/nix/store` path is
+  what silently broke all three review agents.
 - **Restart Vite after adding or removing a module** — it serves stale transforms and has cost
   several debugging cycles (lessons 16).
 - **Read the rendered DOM, not the model**, for anything user-visible (lessons 17, 18).
