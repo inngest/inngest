@@ -163,6 +163,13 @@ here:** open the rendered artefact, read the number it shows, and compare it
 against something the change did not produce — another view, the axis, the
 payload. A passing assertion about a model is not evidence about a view.
 
+- **The dev server:** `node src/serve.mjs`, then http://localhost:5199. It
+  rebuilds on every save to a `.mjs` under `src/` and reloads the page, keeping
+  your scroll position and open tab; a failed build leaves the last good page up
+  and prints the error across the bottom of it. It polls mtimes rather than
+  using `fs.watch`, which fired once here and then went quiet -- a watcher that
+  stops silently is worse than none, because the page looks live while going
+  stale.
 - **Screenshots and DOM:** `tasks/canvas/shot.sh <fixture>`, `--dom` for the
   HTML. It finds the Vite port, resolves Chromium through a Nix GC root, and
   refuses to write an image when the page did not load. Never hand-roll a
