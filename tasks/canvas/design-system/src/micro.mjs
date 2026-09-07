@@ -58,7 +58,10 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead
   // about all of them.
   if(lead) n=n+' (+'+lead+')';
   const y=cy(i);
-  const col=v=> v.ok===false?C.bad : v.ok==='stop'?C.mut : v.ok==='mix'?C.mix : C.good;
+  // Colour is a priority, not an average: see RUN_RANK. A slice carries the
+  // rank of the bar it came from, and where slices overlap the higher rank is
+  // drawn last and so is the one left showing.
+  const col=v=> R.RUN_COLOUR[v.rank!=null?v.rank:2];
   let s=`<text x="9" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
   /**
    * The grey track is the run's whole extent — and where the axis is
@@ -88,15 +91,14 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[],lead
     }
     if(end>at) s+=`<rect class="run-track" x="${at.toFixed(1)}" y="${y}" width="${(end-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
   }
-  // Failures last, so where slices overlap the red is the one left showing.
-  const ordered=[...intervals].sort((p,q)=>(p.ok===false?1:0)-(q.ok===false?1:0));
+  // Drawn worst-last, so where slices overlap the higher rank survives.
+  const ordered=[...intervals].sort((p,q)=>(p.rank||0)-(q.rank||0));
   for(const v of ordered){
     const a=v.a, b=Math.min(v.b,to);
     if(b<=a) continue;
     // Failure stays findable even when the interval is tiny.
-    const running=v.b>to;
-    const w=Math.max((v.ok===false&&!running?3.2:1.4)/sc, ((b-a)/100)*PLOT);
-    s+=`<rect class="run-slice" x="${px(a).toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${running?C.disc:col(v)}"/>`;
+    const w=Math.max((v.rank===3?3.2:1.4)/sc, ((b-a)/100)*PLOT);
+    s+=`<rect class="run-slice" x="${px(a).toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${col(v)}"/>`;
   }
   s+=dot(LBL,y,EV.queued);
   if(resolved) s+=dot(LBL+(to/100)*PLOT,y,resolved);
@@ -324,7 +326,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
    * disagree with itself.
    */
   const intervals=[];
-  const add=(kd,x,w)=>{ if(COMPUTE.has(base(kd))) intervals.push({a:x,b:x+w,ok:!isFail(kd)}); };
+  const add=(kd,x,w)=>{ const rank=R.runRank(kd); if(rank!=null) intervals.push({a:x,b:x+w,rank}); };
   rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>add(kd,x,w)));
   if(!running) add('disc',fx+fq,fw);
 
@@ -333,7 +335,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
   // the opposite of what the row underneath it shows.
   const last=intervals.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
   const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,breaks,lead,
-    resolved:running?null:((last&&last.ok===false)?EV.failed:EV.ok)},k);
+    resolved:running?null:((last&&last.rank===3)?EV.failed:EV.ok)},k);
 
   // A run still going has not been finalized. Drawing the row anyway would be
   // the frame asserting an event that has not happened.

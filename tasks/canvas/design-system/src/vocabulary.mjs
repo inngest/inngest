@@ -410,13 +410,22 @@ export function stretch(svg, LBL, k){
 
 
 /** What each element is called and what it means, for the row breakdown. */
+/**
+ * `running` and `disc` are ONE substance with two names.
+ *
+ * They were listed separately and drawn identically, which asked a reader to
+ * learn a distinction the drawing does not make. Blue means the same thing in
+ * both cases and it is the useful thing: your compute is in use right now --
+ * a step executing, or the SDK being asked what runs next. Which of the two it
+ * is, is already said by the row it sits on.
+ */
 export const BAR_INFO={
-  running:['running','step.run() executing, not resolved'],
+  running:['running / discovery','your app is executing — a step running, or the SDK reporting what runs next'],
   good:['ok','step.run() returned'],
   bad:['failed','step.run() threw'],
   stopped:['stopped','executing when the run was cancelled'],
   child:['child','step.invoke() child run'],
-  disc:['discovery','the SDK reporting what to run next'],
+  disc:['running / discovery','your app is executing — a step running, or the SDK reporting what runs next'],
   wait:['waiting','step.sleep(), step.waitForEvent() or step.waitForSignal(), not resolved'],
   waitok:['sleep / matched','step.sleep() elapsed, or a wait matched'],
   waitout:['timed out','the wait expired with no match'],

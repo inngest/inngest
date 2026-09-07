@@ -2,6 +2,7 @@ const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 import * as V from './vocabulary.mjs';
+import * as R from './rules.mjs';
 // Cleared before the generators run; each appends what the elastic rule could
 // not reach, so an empty file means every figure is derived rather than placed.
 try{ fs.unlinkSync(new URL('./unruled.json',import.meta.url).pathname); }catch{}
@@ -414,7 +415,9 @@ const sidebar=`<aside id="side">
   ${TOGGLES.map(t=>`<div class="tg"><label>${t.n}</label>
     <button class="tgb on" data-tg="${t.k}" data-on="${t.on}" data-off="${t.off}">on</button></div>`).join('')}
   <h5>Bars <em>colour = kind of work; fill = SDK executing</em></h5>
-  ${Object.entries(V.BAR_INFO).map(barRow).join('')}
+  ${(()=>{const seen=new Set();
+    return Object.entries(V.BAR_INFO).filter(([,i])=>{
+      if(seen.has(i[0])) return false; seen.add(i[0]); return true; }).map(barRow).join('');})()}
   <h5>Events <em>colour = kind of moment; hollow = not resolved</em></h5>
   ${Object.entries(V.EVENT_INFO).map(evRow).join('')}
   <p class="foot">Hollow and filled is a rule, not a preference. It reports whether
@@ -871,6 +874,8 @@ ${fig(J.connect.poll)}
   var pxOf=${V.pxOf.toString()};
   var barSvg=${V.barSvg.toString()};
   var markSvg=${V.markSvg.toString()};
+  // The Run row's rank-to-colour table, shared with every statically drawn one.
+  var RUN_COLOUR=${JSON.stringify(R.RUN_COLOUR)};
   var IN_PROGRESS={good:'running', bad:'running', waitout:'wait', waitok:'wait'};
   var MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 
@@ -914,11 +919,12 @@ ${fig(J.connect.poll)}
         out+='<g class="r" style="--i:'+i+';--s:0">';
         out+=label('Run',y);
         out+='<rect class="run-track" x="'+GEOM.LBL+'" y="'+y+'" width="'+((to/100)*GEOM.PLOT*k).toFixed(2)+'" height="'+GEOM.TRACK_H+'" rx="1.2" fill="var(--rule-2)"/>';
-        r.iv.forEach(function(v){
+        // Same priority as every other Run row: worst last, so where slices
+        // overlap the higher rank is the one left showing.
+        r.iv.slice().sort(function(p,q){ return (p[2]||0)-(q[2]||0); }).forEach(function(v){
           var b=Math.min(v[1],to); if(b<=v[0]) return;
-          var running=v[1]>to;
-          var col=running?'var(--disc)':v[2]===0?'var(--warn)':v[2]===2?'var(--muted)':'var(--good)';
-          var w=Math.max(v[2]===0&&!running?GEOM.MIN_FAIL_W:GEOM.MIN_W, ((b-v[0])/100)*GEOM.PLOT*k);
+          var col=RUN_COLOUR[v[2]==null?2:v[2]];
+          var w=Math.max(v[2]===3?GEOM.MIN_FAIL_W:GEOM.MIN_W, ((b-v[0])/100)*GEOM.PLOT*k);
           out+='<rect class="run-slice" x="'+pxOf(v[0],k).toFixed(2)+'" y="'+y+'" width="'+w.toFixed(2)+'" height="'+GEOM.RUN_H+'" rx="1.2" fill="'+col+'"/>';
         });
         out+=markSvg(GEOM.LBL,y,'queued');

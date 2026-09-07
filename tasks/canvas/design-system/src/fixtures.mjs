@@ -2,6 +2,7 @@ const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,EV,layout,resolveRow} from './micro.mjs';
 import {autoDots,fillGaps,COMPUTE,base,isFail} from './vocabulary.mjs';
+import * as R from './rules.mjs';
 
 /**
  * The Run row, derived from the rows beneath it.
@@ -15,12 +16,13 @@ function runRowFrom(rows, end){
   const iv=[];
   rows.forEach(r=>{ if(r.run) return;
     (r.segs||[]).forEach(([kd,a,w])=>{
-      if(COMPUTE.has(base(kd))) iv.push({a, b:a+w, ok:!isFail(kd)});
+      const rank=R.runRank(kd);
+      if(rank!=null) iv.push({a, b:a+w, rank});
     });
   });
   const last=iv.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
   return {run:true, end, intervals:iv, resolvedAt:end,
-          resolvedAs:(last&&last.ok===false)?'failed':'ok'};
+          resolvedAs:(last&&last.rank===3)?'failed':'ok'};
 }
 
 /**
@@ -174,7 +176,7 @@ const pack=(f)=>{
     f={...f, rows:[runRowFrom(body,end), ...body]};
   }
   const rows=f.rows.map(r=>{
-    if(r.run) return {run:1, end:r.end, iv:r.intervals.map(v=>[v.a,v.b,v.ok===false?0:v.ok==='stop'?2:1]),
+    if(r.run) return {run:1, end:r.end, iv:r.intervals.map(v=>[v.a,v.b,v.rank]),
                       ra:r.resolvedAt==null?null:r.resolvedAt, rs:r.resolvedAs||null};
     const full=fillGaps(r.segs.map(([k,x,w])=>({kind:k,x,w})));
     return {n:r.n, segs:full.map(g=>[g.kind,+g.x.toFixed(3),+g.w.toFixed(3)]),

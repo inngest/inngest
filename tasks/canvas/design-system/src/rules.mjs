@@ -442,3 +442,41 @@ export function marks(at){
   }
   return out;
 }
+
+/**
+ * What a slice of the Run row is worth, and which wins where slices overlap.
+ *
+ * The row is a profile of where the elapsed time went: grey wherever nothing
+ * was executing, and coloured wherever something was. Which colour is a
+ * priority, not an average -- several things can be running at one instant and
+ * an overview has to answer "what is the worst thing happening here":
+ *
+ *   3  a failure, red -- the thing an overview exists to make findable
+ *   2  returned, green
+ *   1  your compute in use, blue -- a step still running or the SDK reporting.
+ *      It ranks last so it never hides an outcome, but it IS a rank, so a
+ *      moment where the only thing happening is a discovery request reads blue
+ *      instead of dropping out of the profile altogether.
+ *   0  ended without an outcome, grey
+ *
+ * Neutral "mix" is deliberately absent. Averaging a failure with the successes
+ * around it rendered a failure cluster blue, losing the signal at exactly the
+ * scale the row exists for.
+ */
+export const RUN_RANK = {
+  bad:3, spanerr:3,
+  good:2, child:2, spanok:2,
+  running:1, disc:1,
+  stopped:0, spanunset:0,
+};
+
+/** The rank of a bar, or null if it is not compute and does not colour the row. */
+export function runRank(kind){
+  const k=kind.replace(/[!*]+$/,'');
+  if(/!\*?$/.test(kind) || k==='bad') return RUN_RANK.bad;
+  const v=RUN_RANK[k];
+  return v===undefined?null:v;
+}
+
+/** Rank to colour. */
+export const RUN_COLOUR = ['var(--muted)','var(--disc)','var(--good)','var(--warn)'];
