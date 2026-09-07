@@ -48,10 +48,10 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[]},sc=
    */
   const end=LBL+(to/100)*PLOT;
   const tear=(x0,x1)=>{
-    // Two or three zigs. One is a notch; five in this little space is a
-    // scribble. A torn edge is legible at very few oscillations and stops being
-    // legible quickly after that.
-    const n=Math.min(3,Math.max(2,Math.round((x1-x0)/8))), step=(x1-x0)/n, amp=4.4;
+    // Small. The tear only has to be legible as a break in the track, and at
+    // any real amplitude it stops being the track and becomes a decoration
+    // sitting where the track used to be.
+    const n=Math.min(3,Math.max(2,Math.round((x1-x0)/8))), step=(x1-x0)/n, amp=1.9;
     let d=`M${x0.toFixed(1)} ${y}`;
     for(let j=0;j<n;j++)
       d+=` L${(x0+step*(j+0.5)).toFixed(1)} ${(y+(j%2?amp:-amp)).toFixed(1)}`+
@@ -252,7 +252,7 @@ export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
 export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[]}){
   const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
-  const finY=cy(above+rows.length)+pad;
+  const finY=cy(above+rows.length);
 
   // Finalization is a discovery request like any other — it asks the SDK what
   // is next and the answer is "nothing". So it is queued, it waits, it starts,
@@ -400,13 +400,24 @@ export function elastic(total, dead=[], {plot=86, threshold=0.03, budget=16, min
  */
 export function compression(breaks, h, uid){
   if(!breaks || !breaks.length) return {clip:'', over:''};
+  // A wide band can take a soft blur; eight narrow ones cannot — at full
+  // strength they read as a row of smears cutting the trace up rather than as
+  // one region being marked as not-to-scale.
+  const n=breaks.length;
+  const sd=Math.max(0.3, 1.4 - (n-1)*0.16);
+  // Two full-height lines mark a cut. Sixteen of them at full strength cut the
+  // trace into ribbons and become the loudest thing in it, so they fade as they
+  // multiply — the same reasoning as the blur above.
+  const ruleO=Math.max(0.28, 0.9 - (n-1)*0.09).toFixed(2);
+  const filter=`<filter id="cmp-b-${uid}" x="-30%" y="-10%" width="160%" height="120%">`+
+    `<feGaussianBlur stdDeviation="${sd.toFixed(2)}"/><feColorMatrix type="saturate" values="0.55"/></filter>`;
   const rects=breaks.map(([a,b])=>
     `<rect x="${px(a).toFixed(1)}" y="0" width="${(px(b)-px(a)).toFixed(1)}" height="${h}"/>`).join('');
-  const clip=`<clipPath id="cmp-${uid}">${rects}</clipPath>`;
+  const clip=`<defs>${filter}<clipPath id="cmp-${uid}">${rects}</clipPath></defs>`;
   const over=breaks.map(([a,b,t])=>{
     const x0=px(a), x1=px(b), mid=(x0+x1)/2;
     return `<rect x="${x0.toFixed(1)}" y="0" width="${(x1-x0).toFixed(1)}" height="${h}" fill="var(--ground)" opacity=".28"/>`+
-      [x0,x1].map(x=>`<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${h}" stroke="${C.idle}" stroke-width="1" opacity=".9"/>`).join('')+
+      [x0,x1].map(x=>`<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${h}" stroke="${C.idle}" stroke-width="1" opacity="${ruleO}"/>`).join('')+
       (t?`<text x="${mid.toFixed(1)}" y="${(h/2+2).toFixed(1)}" ${MONO} font-size="6.5" `+
          `fill="${C.ink2}" text-anchor="middle" paint-order="stroke" `+
          `stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">${t}</text>`:'');
@@ -449,8 +460,11 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // whole figure a second time, clipped to the band and filtered — SVG has no
   // backdrop-filter, and a flat scrim would hide the row rather than soften it.
   const cmp=compression(opts.breaks, h, ++UID);
+  // Only the figure's own rows are blurred. The Run row is deliberately left
+  // sharp: its torn track is what says "compressed here", and blurring the one
+  // element carrying that message defeats drawing it at all.
   const blurred=cmp.clip
-    ? `<g clip-path="url(#cmp-${UID})" filter="url(#cmpblur)">${ctx}${inner}</g>`
+    ? `<g clip-path="url(#cmp-${UID})" filter="url(#cmp-b-${UID})">${inner}</g>`
     : '';
   return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+`</svg>`;

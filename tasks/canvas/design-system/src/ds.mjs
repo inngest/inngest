@@ -565,7 +565,16 @@ ${fig(J.annotated.structure.svg,'Blue is the discovery request. The ribbon threa
 
 <h2>The Run row</h2>
 <p>Today the Run row is a full width bar in the run’s status colour. The header, the status badge and the axis already report that. It could instead report where the elapsed time went.</p>
-${fig(J.runbar.idea,'Grey is elapsed time with no SDK execution. Colour is time the SDK was executing, discovery requests included. A slice is green or red only if every step in it agrees.')}
+${fig(J.runbar.idea,'Grey is elapsed time with no SDK execution. Colour is time the SDK was executing, discovery requests and finalization included. Any failure in a slice colours it red — a cluster of failures among successes is the thing an overview exists to show.')}
+
+<h2>Compressed time</h2>
+<p>A run can be nine days elapsed and five seconds executing. Dead time is worth almost none of the width, and the threshold is low: anything with nothing executing for more than a few percent of the run collapses to a band, and an hour and a week get the same few pixels.</p>
+${fig(EX.t1.frames[0].svg,'The cut takes the middle of the sleep, so the bar visibly begins, is torn, and resumes. The Run row’s own track tears rather than carrying a glyph laid on top of it, and what runs through the band is blurred and desaturated — it is left sharp on the Run row, because the tear is the thing saying “compressed here”.')}
+<div class="rule">Only the drawing compresses. Every reported duration is still wall clock.</div>
+<p>The width left over is split between the surviving stretches in proportion to their real duration, which is the same thing as saying <strong>a second is worth the same number of pixels wherever it lands</strong>. Two spans either side of a compressed gap stay comparable, and several compressions need no special case.</p>
+${fig(EX.t1b.frames[0].svg,'Thirty seconds of work on one side and ten on the other: the remaining width splits 75/25.')}
+<p>The bands share one budget, so a run full of idle stretches does not spend its width on the parts where nothing happened. They thin instead, and below a width that can hold them a band drops its label, then its tear, leaving a marked line. The rules and the blur never go — they are what says <em>not to scale</em>.</p>
+${fig(EX.t1c.frames[0].svg,'Eight compressions sharing one budget. The polls between them still share the one scale.')}
 
 <h2>The selected row</h2>
 <p>A row is plotted against the whole run, so a step that took ten seconds inside a twenty minute run is a few pixels wide and its marks overlap. Selecting it replots that row across the full width using the same bars and marks, and names each piece: intervals with their durations, marks with what happened. Hover a piece for its description.</p>

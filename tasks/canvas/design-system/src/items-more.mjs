@@ -103,8 +103,12 @@ D('t3',{d:'Two tiers of axis label. The coarse tier carries what the run crossed
   svg:fig([
     {n:'a', segs:[['good',0,10]]},
     {n:'b', segs:[['idle',10,40],['good',50,36]]},
-  ],axis(cy(1)+13,[[0,'0'],[25,'+6h'],[50,'+12h'],[75,'+18h'],[100,'+24h']],
-        {tier2:[[0,'Mar 4'],[50,'Mar 5']]}),'two-tier axis labels','',{pad:40})});
+  ],'','two-tier axis labels','',{pad:52,
+    // Below finalization, because an axis belongs at the foot of the trace. It
+    // was drawn between the rows and finalization, where it read as a stray
+    // timeline someone had left in the middle of the run.
+    over:()=>axis(cy(4)+8,[[0,'0'],[25,'+6h'],[50,'+12h'],[75,'+18h'],[100,'+24h']],
+                  {tier2:[[0,'Mar 4'],[50,'Mar 5']]})})});
 
 D('t4',{d:'A step too short to draw is still drawn. It gets a minimum width so it can be pointed at, and the number beside it is the real one: the drawing rounds, the reported duration does not.',
   svg:fig([
