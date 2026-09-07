@@ -617,6 +617,24 @@ func start(ctx context.Context, opts StartOpts) error {
 	// registering functions.
 	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
 
+	// The connect gateway binds all interfaces and its only authentication is
+	// session-JWT verification, so the signing secret must not be a public
+	// repo-wide constant. Whenever a signing key is configured (`inngest start`
+	// requires one; `inngest dev` may set one) derive a per-instance secret
+	// from it; both the token signer and the gateway verifier below share the
+	// same derived secret, so legitimately minted tokens keep working while
+	// tokens forged with the public dev constant are rejected. The public
+	// constant remains only as an escape hatch for single-user `inngest dev`
+	// runs with no signing key configured.
+	connectJwtSecret := consts.DevServerConnectJwtSecret
+	if opts.SigningKey != nil && *opts.SigningKey != "" {
+		derived, err := auth.DeriveSessionJwtSecret(*opts.SigningKey)
+		if err != nil {
+			return fmt.Errorf("failed to derive connect gateway session jwt secret: %w", err)
+		}
+		connectJwtSecret = derived
+	}
+
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -633,7 +651,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			GroupManager:               connectionManager,
 			ConnectManager:             connectionManager,
 			ConnectRequestStateManager: connectionManager,
-			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			Signer:                     auth.NewJWTSessionTokenSigner(connectJwtSecret),
 			RequestAuther:              ds,
 			ConnectGatewayRetriever:    ds,
 			Dev:                        true,
@@ -691,7 +709,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
-		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
+		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(connectJwtSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
 		connect.WithGRPCConfig(opts.ConnectGRPCConfig),
