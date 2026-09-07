@@ -92,6 +92,17 @@ So:
   `audit-derive.mjs` (336/336 round-trip) and by the artifact being
   byte-identical across the change; verified to REACH the figures by changing
   what a wait resolves to and watching 75 bars change with it.
+- **Nothing in a figure is placed by hand.** A figure declares rows of moments
+  and everything else follows: the bars from `derive`, the marks from
+  `marks`, the ribbons from `ribbonGroups` (rows a request PLANNED together),
+  the cables from `cables` (what resolved in the window since the last request
+  went out), what stays lit from `attention`, and the Run row from the trace.
+  The counts that used to sit in the figure sources — 14 annotations, 17 cables,
+  15 mark lists, 12 attention lists, 39 bar lists — are all zero.
+- **The Run row colours by priority, not by average.** Failure beats returned
+  beats compute-in-use beats ended-without-an-outcome, drawn worst-last so an
+  overlap keeps the worse one. `RUN_RANK` in `rules.mjs`, used by the derived
+  frame, the fixtures and the scrubber's own drawing.
 - **`src/rules.mjs` is where the rules live.** Geometry, the elastic thresholds,
   how a band is drawn, the frame, attention, the panel's controls, and the
   interval a pair of moments implies. If you are typing a number into
