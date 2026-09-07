@@ -162,9 +162,9 @@ report today.
 ## Interaction
 - Three tiers of attention on hover/select: the row, what caused it, everything else.
 - **Nothing is removed, only quietened**, so the run's shape stays readable.
-- **The Run row is the overview, and it is what you scrub.** There is no minimap: a second strip above it drew the same run in the same place in the same colours, which is one fact drawn twice and a second overview that can drift out of step with the first.
-- The scrub window is drawn **at rest**, with a handle at each edge — a scrubber nobody finds is a scrubber nobody uses.
-- ENCODING: dim opacity .15–.28 for off-path rows; selected row = accent wash at .13, rx 2; scrub window = accent outline rect with a rounded grip at each edge, over the profile rather than filling it.
+- **The Run row is the overview.** There is no minimap: a second strip above it drew the same run in the same place in the same colours, which is one fact drawn twice and a second overview that can drift out of step with the first.
+- **Scrubbing is unresolved.** A window with edge handles was drawn on the Run row and removed: at rest its edges are the run bounds, so it sat on the first and last mark, and it read as confusing rather than obvious. The affordance still needs somewhere to live.
+- ENCODING: dim opacity .15–.28 for off-path rows; selected row = accent wash at .13, rx 2.
 
 ## Honesty
 - Where the trace cannot say what caused a request, **it declines rather than guessing** — no cable, and the row says so.

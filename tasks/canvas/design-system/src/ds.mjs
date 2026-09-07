@@ -158,7 +158,7 @@ const SC=[
  ]],
  ['Interaction', [
   ['i1','Three tiers of attention: the row, what caused it, everything else. Nothing is removed, only quietened.'],
-  ['i2','The Run row is the overview, and it is what you scrub. One picture of the run, not two.'],
+  ['i2','The Run row is the overview. One picture of the run, not two.'],
  ]],
  ['Honesty', [
   ['h1','Where the trace cannot say what caused a request, it declines rather than guessing.'],

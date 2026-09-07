@@ -24,9 +24,9 @@ export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.
  * carries status.
  */
 /**
- * The Run row: a profile of where the elapsed time went, and the thing you
- * scrub. It replaced the separate minimap above it, which drew the same run in
- * the same place in the same colours — two drawings of one fact, which is the
+ * The Run row: a profile of where the elapsed time went. It replaced the
+ * separate minimap above it, which drew the same run in the same place in the
+ * same colours — two drawings of one fact, which is the
  * characteristic defect of this view, and a second overview that could drift
  * out of step with the first.
  *
@@ -36,7 +36,7 @@ export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.
  * exactly the scale an overview exists for. The row already bent that way:
  * failed slices have always had a wider minimum so they stay findable.
  */
-export function runProfile(i,{to=86,intervals=[],resolved,n='Run',scrub},sc=1){
+export function runProfile(i,{to=86,intervals=[],resolved,n='Run'},sc=1){
   const y=cy(i);
   const col=v=> v.ok===false?C.bad : v.ok==='stop'?C.mut : v.ok==='mix'?C.mix : C.good;
   let s=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
@@ -51,27 +51,9 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run',scrub},sc=1){
     const w=Math.max((v.ok===false&&!running?3.2:1.4)/sc, ((b-a)/100)*PLOT);
     s+=`<rect x="${px(a).toFixed(1)}" y="${y-4}" width="${w.toFixed(1)}" height="8" rx="1.2" fill="${running?C.disc:col(v)}"/>`;
   }
-  if(scrub) s+=scrubWindow(y,scrub,to);
   s+=dot(LBL,y,EV.queued);
   if(resolved) s+=dot(LBL+(to/100)*PLOT,y,resolved);
   return s;
-}
-
-/**
- * The viewport, drawn on the Run row at rest rather than on hover, because a
- * scrubber nobody finds is a scrubber nobody uses. Brackets rather than a fill:
- * a wash over the profile would obscure the thing it is a window onto.
- */
-export function scrubWindow(y,{a=0,b=null},to=86){
-  const x0=px(a), x1=px(b==null?to:b);
-  const t=y-9, h=18;
-  const grip=(x,dir)=>{
-    const gx=x+dir*2.2;
-    return `<rect x="${(gx-1.7).toFixed(1)}" y="${(t+2.5).toFixed(1)}" width="3.4" height="${h-5}" rx="1.5" fill="${C.acc}" opacity=".9"/>`+
-      `<line x1="${gx.toFixed(1)}" y1="${(t+6).toFixed(1)}" x2="${gx.toFixed(1)}" y2="${(t+h-6).toFixed(1)}" stroke="${C.ground}" stroke-width=".8" opacity=".6"/>`;
-  };
-  return `<rect x="${x0.toFixed(1)}" y="${t}" width="${(x1-x0).toFixed(1)}" height="${h}" rx="2.5" fill="none" stroke="${C.acc}" stroke-width="1" opacity=".5"/>`+
-    grip(x0,-1)+grip(x1,1);
 }
 
 export function row(i,r,sc=1){
@@ -218,7 +200,8 @@ let FRAMED=false;
 export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
 export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
-  const finY=cy(FRAME_ROWS_ABOVE+rows.length)+pad;
+  const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
+  const finY=cy(above+rows.length)+pad;
   // The Run row is the whole overview now. There was a minimap above it drawing
   // the same run in the same place in the same colours; the only way to tell
   // them apart was to make one deliberately thinner, which is treating a
@@ -227,7 +210,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
   rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>{
     if(COMPUTE.has(base(kd))) intervals.push({a:x,b:x+w,ok:!isFail(kd)});
   }));
-  const run=hasOwnRun?'':runProfile(0,{to:Math.min(end+6,96),intervals,resolved:EV.ok,scrub:{a:0}},k);
+  const run=hasOwnRun?'':runProfile(0,{to:Math.min(end+6,96),intervals,resolved:EV.ok},k);
   // Finalization is a discovery request like any other — it asks the SDK what
   // is next and the answer is "nothing". So it is queued, it waits, it starts,
   // and the bar is `disc`: **your app executes for it**, and you are billed for
@@ -244,9 +227,8 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
   // row and the figure rows read as one row to anything parsing the SVG back.
   // Tag the frame marks so the validator skips them: context, not rows.
   const tagCtx=t=>t.replace(/<circle class="ev /g,'<circle class="ev ctx ');
-  // Two layers. The Run row is drawn SHARP: it is the overview and the control
-  // you scrub, and blurring the thing whose whole job is to be obvious defeats
-  // it. Only finalization is soft context.
+  // Two layers, both currently soft. Kept split because the Run row is the one
+  // piece of the surround that is sometimes the subject rather than context.
   return {sharp:tagCtx(run), soft:tagCtx(fin)};
 }
 
@@ -257,8 +239,10 @@ export function fig(rows,extra='',label='',under='',opts={}){
     rows=rows.map((r,i)=>opts.rib.rows.includes(i)?{...r,noHalo:[opts.rib.x]}:r);
   }
   const framed=opts.frame!==undefined?!!opts.frame:FRAMED;
+  const ownRun=rows.some(r=>r.run);
+  const above=framed?(ownRun?0:FRAME_ROWS_ABOVE):0;
   const n=opts.rowCount||rows.length;
-  const h=TOP*2+ROW*(n+(framed?FRAME_ROWS_ABOVE+1:0))+(framed?(opts.pad||0):0);
+  const h=TOP*2+ROW*(n+above+(framed?1:0))+(framed?(opts.pad||0):0);
   const ends=rows.flatMap(r=>(r.segs||[]).map(([,x,w])=>x+w));
   const max=ends.length?Math.max(...ends):100;
   const k=opts.scale||(max>0?Math.min(86/max,3):1);
@@ -267,14 +251,14 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // Annotations are placed after the stretch, in final coordinates, so a
   // leader lands on the bar it points at rather than being scaled off it.
   const XS=p=>LBL+(px(p)-LBL)*k;
-  const DY=framed?ROW*FRAME_ROWS_ABOVE:0;
+  const DY=ROW*above;
   const over=opts.over?opts.over(XS,i=>cy(i)+DY):'';
   const inner=framed
     ? `<g transform="translate(0,${DY})">${stretch(body,LBL,k)}</g>`
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
-    const F=traceFrame(rows,k,{end:max,hasOwnRun:rows.some(r=>r.run),pad:opts.pad||0});
+    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0});
     ctx=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.sharp+F.soft,LBL,k)}</g>`;
   }
   return `<svg viewBox="${-M} 0 ${W+M*2} ${h+(opts.pad||0)}" role="img" aria-label="${label}">`+

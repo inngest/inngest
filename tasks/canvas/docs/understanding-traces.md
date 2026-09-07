@@ -178,9 +178,8 @@ it. Expand any group in place.
 ## The Run row
 
 The top row is the whole run: a grey track of elapsed time, coloured wherever
-your code was executing. It is the overview and it is what you scrub — the
-window on it has a handle at each edge, and dragging sets what the rows below
-show.
+your code was executing. It is the overview — one picture of the run, at the
+same scale as everything under it.
 
 **Any failure in a stretch colours it red.** So a cluster of failures two thirds
 through a 500-step run is a red smear on that one row, visible before you scroll
@@ -188,7 +187,7 @@ or click anything.
 
 ![A cluster of failures showing as a red smear in the strip](./images/failure-cluster.svg)
 
-Drag the window to move it, or its handles to narrow it. Click a cluster to jump to it.
+Click a cluster to jump to it.
 
 ## What the trace will not tell you
 

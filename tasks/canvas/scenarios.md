@@ -158,3 +158,15 @@ Decided with the stakeholder, and the reasoning is the durable part.
   on the Run row, because failure-wins put it there. The strip's remaining claim
   is bar *height* as a count per bucket, which the Run row does not carry. Either
   that is worth a row of its own or the strip goes the way of the minimap.
+
+### Scrubbing, parked
+
+- [x] **The scrub window is removed.** Drawn on the Run row with a handle at each
+  edge, it read as confusing: at rest its edges *are* the run bounds, so it sat
+  on the first and last mark of the row it was meant to control, and loosening
+  it only made it look like a second object on the row rather than a control of
+  it. Reverted in full.
+- [ ] **The affordance still needs somewhere to live.** The merge is kept — one
+  overview, failure-wins — so the question is narrower than it was: not "which
+  strip do we scrub" but "how does the Run row say it is draggable without
+  drawing a second thing on top of itself".
