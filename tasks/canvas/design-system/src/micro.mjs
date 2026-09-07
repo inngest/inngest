@@ -229,6 +229,9 @@ export function axis(y, ticks, {tier2=[], brk=[], top=0, label}={}){
  * the spread are both readable without expanding it.
  */
 export function groupRow(i, {n, x, w, members, kind='good', note=''}){
+  return `<g class="r" style="--i:${i};--s:0">${groupRowAt(i,{n,x,w,members,kind,note})}</g>`;
+}
+function groupRowAt(i, {n, x, w, members, kind='good', note=''}){
   const y=cy(i);
   let s=tag(9, y+2.5, n, C.mut);
   s+=`<rect x="${px(x)}" y="${y-5}" width="${(w/100)*PLOT}" height="10" rx="2" fill="var(--surface-2)" stroke="${C.idle}" stroke-width="1"/>`;

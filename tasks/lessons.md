@@ -306,3 +306,31 @@ again.
 
 The general rule, which is #18 once more: every check I had verified the thing I
 was making, and none verified the thing I was making it *into*.
+
+### 24. Code emitted through a template literal loses one level of escaping
+The page's own script is built inside a template literal in `ds.mjs`, so every
+backslash in it is consumed once before it ever reaches the browser. A viewBox
+parser written as `split(/[\s,]+/)` shipped as `split(/[s,]+/)` — a regex that
+splits on the letter **s** — so every `"0 0 470 89"` parsed as a single token,
+the length guard rejected it, and the function that resized every figure ran
+three times and touched nothing. No error, no warning, and the feature simply
+did not happen.
+
+The same file had already eaten backticks three times: a backtick anywhere in an
+injected comment ends the template literal and the build dies with a syntax
+error pointing at the comment.
+
+**Detection signal**: a function that demonstrably runs (a counter proves it) and
+demonstrably does nothing. Instrumenting the *call* is not enough; instrument the
+first line of the body that has an effect.
+
+**Prevention**: in code destined for a template literal, avoid characters that
+carry meaning to the outer layer. Use `[ ,]` instead of `[\s,]`, `\\d` where you
+mean `\d`, and no backticks in comments at all. When in doubt, grep the
+generated artefact for the line you wrote and check it survived:
+
+```bash
+grep -o 'split([^)]*)' trace-design-system.html
+```
+
+This is lesson 18 again — check the rendered artefact, not the source.

@@ -427,11 +427,7 @@ const page=`<title>Trace Design System</title>
   /* Geometry, live. height and r are CSS geometry properties, so a bar can take
      its height from a variable; the transform re-centres it on the row's line,
      which the SVG now uses as the bar's y. */
-  /* Content spills when the pitch grows past what the box was generated for,
-     so the box is given the difference back. Clamped at zero: a tighter pitch
-     leaves the figure short rather than pulling the next one up into it. */
-  .figure svg{overflow:visible;
-    margin-bottom:calc(max(0px, var(--geo-row,17px) - 17px) * var(--nr,0))}
+  .figure svg{overflow:visible}
   svg rect.bar{height:var(--geo-bar,7px);transform:translateY(calc(var(--geo-bar,7px) / -2))}
   svg rect.bar.sm{height:var(--geo-sbar,4.2px);transform:translateY(calc(var(--geo-sbar,4.2px) / -2))}
   svg rect.bar.rail{height:1.8px;transform:translateY(-0.9px)}
@@ -444,6 +440,10 @@ const page=`<title>Trace Design System</title>
   svg g.dy{transform:translateY(calc(var(--geo-row,17px) * var(--a,0)))}
   /* A ribbon spans N row gaps, so it restretches with the pitch. */
   svg rect.rib{height:calc(var(--geo-row,17px) * var(--n,1))}
+  /* A cable spans two rows, so it is scaled about its own start: the far end
+     lands on the row it belongs to whatever the pitch is. */
+  svg g.cable{transform:translateY(calc((var(--geo-row,17px) - 17px) * var(--a,0)))
+                        scaleY(calc(var(--geo-row,17px) / 17px))}
   .sws{display:flex;gap:4px}
   .sw{width:16px;height:16px;border-radius:3px;border:1px solid var(--rule-2)!important;padding:0!important;cursor:pointer}
   .sw.on{outline:1.5px solid var(--ink);outline-offset:1px}
@@ -866,8 +866,43 @@ ${fig(J.connect.poll)}
       b.classList.toggle('on',!!on);
     });
     try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){}
+    // After the variables land, so the measurement sees the new geometry.
+    refit(); requestAnimationFrame(refit);
   }
   function set(k,v){ if(v==null) delete state[k]; else state[k]=v; }
+
+  /**
+   * Refit every figure to what it actually contains.
+   *
+   * A figure's viewBox height is fixed when it is generated, so once the panel
+   * can move the geometry the box is wrong in both directions — content spills
+   * out of it at a loose pitch and it keeps empty space at a tight one. Guessing
+   * the difference from the row count was close and never right.
+   *
+   * getBBox() is the actual answer: it reports the union of what is drawn, in
+   * user units, with the CSS transforms applied. The width is left alone so
+   * figures stay aligned with each other; only the height follows.
+   */
+  function refit(){
+    document.querySelectorAll('.figure svg').forEach(function(svg){
+      // Read the attribute every time and validate it before trusting it. The
+      // first version cached getAttribute('viewBox') straight into dataset, so
+      // any svg without one cached the string "null" and then wrote
+      // "NaN undefined undefined NaN" back over its own viewBox.
+      var raw = svg.dataset.vb || svg.getAttribute('viewBox');
+      if(!raw) return;
+      var base = String(raw).trim().split(/[ ,]+/).map(Number);
+      if(base.length !== 4) return;
+      for(var i=0;i<4;i++) if(!isFinite(base[i])) return;
+      svg.dataset.vb = raw;
+      var box;
+      try{ box = svg.getBBox(); }catch(e){ return; }
+      if(!box || !isFinite(box.height) || !isFinite(box.y)) return;
+      var height = Math.max(1, box.y + box.height + 4 - base[1]);
+      svg.setAttribute('viewBox', base[0]+' '+base[1]+' '+base[2]+' '+height.toFixed(1));
+    });
+  }
+
 
   // Sliders write the same state the swatches do, so reset clears them too.
   var SL=${JSON.stringify(SLIDERS)};

@@ -299,9 +299,12 @@ export function wire(x1, y1, x2, y2, { o = 1, r = 3, i = 0 } = {}) {
   const d = `M${x} ${y1} C ${x + dx} ${y1}, ${end - dx} ${y2}, ${end} ${y2}`;
   // A dark casing under the pale core, so a crossing reads as one cable
   // passing over another rather than two lines merging.
-  return `<g filter="url(#hx-wire)" opacity="${o}">`+
-    `<path d="${d}" fill="none" stroke="var(--ground)" stroke-width="3.2" stroke-linecap="round" opacity=".85"/>`+
-    `<path d="${d}" fill="none" stroke="${C.ink2}" stroke-width="1.5" stroke-linecap="round"/></g>`;
+  const P='vector-effect="non-scaling-stroke"';
+  const a=((y1-(GEOM.TOP+9))/GEOM.ROW).toFixed(4);
+  return `<g class="cable" style="--a:${a};transform-origin:0 ${y1.toFixed(1)}px" `+
+    `filter="url(#hx-wire)" opacity="${o}">`+
+    `<path d="${d}" fill="none" stroke="var(--ground)" stroke-width="3.2" stroke-linecap="round" opacity=".85" ${P}/>`+
+    `<path d="${d}" fill="none" stroke="${C.ink2}" stroke-width="1.5" stroke-linecap="round" ${P}/></g>`;
 }
 
 
