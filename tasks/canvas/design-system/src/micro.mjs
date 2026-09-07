@@ -367,8 +367,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
    * artifact that could not be wrong in the same way as the others.
    */
   const fin=(running||ownFin)?'':row(0, resolveRow(
-    {n:'Finalization', kind:'disc',
-     at:[['queued',fx],['started',fx+fq],['ok',finEnd]]}), k, finY);
+    {n:'Finalization', at:[['queued',fx],['started',fx+fq],['ok',finEnd]]}), k, finY);
 
   // The frame shares the row grid with the figure, and the inner content keeps
   // its own `cy` attributes because it is translated as a group — so the Run
@@ -856,7 +855,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
-    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running,lead:leadLabel,trimmed:leadTrimmed});
+    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running,lead:leadLabel,trimmed:R.leadingQueue(rows)<=0.01});
     const dim=t=>`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(t,LBL,k)}</g>`;
     const soft=FRAME_SHARP?stretch(F.soft,LBL,k):dim(F.soft);
     // The Run row is left sharp wherever the axis is compressed: its torn track
