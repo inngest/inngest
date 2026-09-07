@@ -423,3 +423,35 @@ file was internally consistent.
 system. If a probe needs reverting, write it so removing it is a string
 replacement — or make the probe in a copy under `/tmp` and never touch the real
 file. Reach for `git checkout --` only on a file this session has not written to.
+
+---
+
+## 29. Lesson 24, a third time: no backslashes in a template literal
+
+**Failure mode**: panel sections were given a fold control whose handler
+identified its section by parsing the heading text:
+
+```js
+var name = h.textContent.replace(/›/,'').trim().split(/\s{2,}|\n/)[0];
+```
+
+That line lives inside a JS template literal in `ds.mjs`, so `\s` shipped as
+`s` and `\n` shipped as a real newline — producing an unterminated regex, a
+`SyntaxError`, and **the entire page script failing to run**. The page still
+looked fine: the markup was all server-rendered, so the only symptom was that
+nothing in the panel did anything.
+
+**Detection signal**: a feature that does nothing, with no visible error. The
+way to see it is to ask the page:
+
+```js
+window.addEventListener('error', e => window.__errs.push(e.message + ' @' + e.lineno))
+```
+
+then read `__errs` out of the DOM dump. Worth reaching for whenever injected
+behaviour is silently inert.
+
+**Prevention**: this is the third time (see #24). The real fix is not "escape it
+correctly" but **do not parse in injected code**. The handler needed a name; the
+markup should hand it one — `data-sec="${title}"` — and the regex disappears
+rather than being made to survive a round trip through a template literal.

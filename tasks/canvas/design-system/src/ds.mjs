@@ -7,8 +7,55 @@ import * as R from './rules.mjs';
 // not reach, so an empty file means every figure is derived rather than placed.
 try{ fs.unlinkSync(new URL('./unruled.json',import.meta.url).pathname); }catch{}
 const GENS=['vocab','barvocab','items-a','items-bc','items-disc','items-more','connect','batch1','runbar','annotated','steptypes','detail','primer','fixtures'];
-for(const g of GENS) execFileSync('node',[HERE+g+'.mjs'],{stdio:'pipe'});
-const J=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
+/**
+ * Four builds, because two features change what is drawn.
+ *
+ * `hide the opening queue` re-lays the whole trace and `compress dead time`
+ * moves every bar, so neither can be a CSS variable the way the spacing
+ * sliders are. Each combination is generated and the page carries whichever
+ * figures actually differ between them — most do not, and those stay single.
+ */
+const FEATKEYS=['trim','compress'];
+const COMBOS=[
+  ['11',{}],
+  ['01',{DS_NOTRIM:'1'}],
+  ['10',{DS_NOCOMPRESS:'1'}],
+  ['00',{DS_NOTRIM:'1',DS_NOCOMPRESS:'1'}],
+];
+const BUILDS={};
+for(const [key,env] of COMBOS){
+  for(const g of GENS) execFileSync('node',[HERE+g+'.mjs'],{stdio:'pipe',env:{...process.env,...env}});
+  BUILDS[key]=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
+}
+
+/**
+ * Replace every figure with the set of variants it actually has.
+ *
+ * Walked by path through the default build, so a figure that draws the same
+ * thing under every combination is left exactly as it was and costs nothing.
+ */
+function variantise(node, path){
+  if(typeof node==='string'){
+    if(!node.includes('<svg')) return node;
+    const seen=new Map();
+    for(const [key] of COMBOS){
+      let v=BUILDS[key];
+      for(const p of path){ v = v==null?undefined:v[p]; }
+      if(typeof v!=='string') return node;
+      if(!seen.has(v)) seen.set(v,[]);
+      seen.get(v).push(key);
+    }
+    if(seen.size===1) return node;
+    return `<span class="varset">`+[...seen].map(([svg,keys])=>
+      `<span class="v ${keys.map(k=>'v-'+k).join(' ')}">${svg}</span>`).join('')+`</span>`;
+  }
+  if(Array.isArray(node)) return node.map((v,i)=>variantise(v,path.concat(i)));
+  if(node && typeof node==='object')
+    return Object.fromEntries(Object.entries(node).map(([k,v])=>[k,variantise(v,path.concat(k))]));
+  return node;
+}
+
+const J=Object.fromEntries(GENS.map(g=>[g,variantise(BUILDS['11'][g],[g])]));
 const EX={...J['items-a'],...J['items-bc'],...J['items-disc'],...J['items-more']};
 /**
  * The docs tab shows the EXPORTED figures, not the live framed ones, because
@@ -403,6 +450,25 @@ const evRow=([k,[name,desc]])=>`
       </div>
     </div>`;
 
+/**
+ * A collapsible panel section. The heading is the control, so a long panel can
+ * be folded down to the part you are working in.
+ */
+const sec=(title,sub,body)=>
+  `<section class="sec"><h5><button class="sech" data-sec="${title}" aria-expanded="true">`+
+  `<span class="caret">›</span>${title}${sub?`<em>${sub}</em>`:''}</button></h5>`+
+  `<div class="secb">${body}</div></section>`;
+
+/**
+ * Things the design DOES for you, which you can switch off to see what it was
+ * doing. Unlike the sliders these change what is drawn, not how it is spaced,
+ * so the page carries a variant of every affected figure and swaps between them.
+ */
+const FEATURES = [
+  {k:'trim',     n:'hide the opening queue', d:'name a run’s first wait instead of drawing it'},
+  {k:'compress', n:'compress dead time',     d:'collapse a stretch with nothing executing to a band'},
+];
+
 const sidebar=`<aside id="side">
   <svg width="0" height="0" aria-hidden="true" style="position:absolute">${V.HATCH}</svg>
   <div class="sh">
@@ -410,24 +476,25 @@ const sidebar=`<aside id="side">
     <strong>Vocabulary</strong>
     <button id="reset" title="Back to the proposed defaults">reset</button>
   </div>
-  <div class="pal">
-    <label>Palette</label>
-    <div class="pills">${Object.keys(PALETTES).map((p,i)=>
-      `<button class="pill${i?'':' on'}" data-pal="${p}">${p}</button>`).join('')}</div>
-  </div>
-  <h5>Spacing <em>every dimension, down to nothing</em></h5>
-  ${SLIDERS.map(sl=>`<div class="sl"><label>${sl.n}<b data-out="${sl.k}">${sl.d}</b></label>
-    <input type="range" data-geo="${sl.k}" min="${sl.lo}" max="${sl.hi}" step="${sl.st||0.5}" value="${sl.d}"></div>`).join('')}
-  ${TOGGLES.map(t=>`<div class="tg"><label>${t.n}</label>
-    <button class="tgb on" data-tg="${t.k}" data-on="${t.on}" data-off="${t.off}">on</button></div>`).join('')}
-  <h5>Bars <em>colour = kind of work; fill = SDK executing</em></h5>
-  ${(()=>{const seen=new Set();
-    return Object.entries(V.BAR_INFO).filter(([,i])=>{
-      if(seen.has(i[0])) return false; seen.add(i[0]); return true; }).map(barRow).join('');})()}
-  <h5>Events <em>colour = kind of moment; hollow = not resolved</em></h5>
-  ${Object.entries(V.EVENT_INFO).map(evRow).join('')}
-  <p class="foot">Hollow and filled is a rule, not a preference. It reports whether
-  the row has resolved, so it is not adjustable.</p>
+  ${sec('Features','what the design does for you, on and off',
+    FEATURES.map(f=>`<div class="tg"><label>${f.n}<em>${f.d}</em></label>`+
+      `<button class="tgb on" data-feat="${f.k}">on</button></div>`).join(''))}
+  ${sec('Palette','',
+    `<div class="pills">${Object.keys(PALETTES).map((p,i)=>
+      `<button class="pill${i?'':' on'}" data-pal="${p}">${p}</button>`).join('')}</div>`)}
+  ${sec('Spacing','every dimension, down to nothing',
+    SLIDERS.map(sl=>`<div class="sl"><label>${sl.n}<b data-out="${sl.k}">${sl.d}</b></label>
+    <input type="range" data-geo="${sl.k}" min="${sl.lo}" max="${sl.hi}" step="${sl.st||0.5}" value="${sl.d}"></div>`).join('')+
+    TOGGLES.map(t=>`<div class="tg"><label>${t.n}</label>
+    <button class="tgb on" data-tg="${t.k}" data-on="${t.on}" data-off="${t.off}">on</button></div>`).join(''))}
+  ${sec('Bars','colour = kind of work; fill = SDK executing',
+    (()=>{const seen=new Set();
+      return Object.entries(V.BAR_INFO).filter(([,i])=>{
+        if(seen.has(i[0])) return false; seen.add(i[0]); return true; }).map(barRow).join('');})())}
+  ${sec('Events','colour = kind of moment; hollow = not resolved',
+    Object.entries(V.EVENT_INFO).map(evRow).join('')+
+    `<p class="foot">Hollow and filled is a rule, not a preference. It reports whether
+    the row has resolved, so it is not adjustable.</p>`)}
 </aside>`;
 
 const scrubs=J.fixtures.map(f=>
@@ -487,6 +554,32 @@ const page=`<title>Trace Design System</title>
     color:var(--muted);margin:22px 0 8px;font-weight:600;display:flex;flex-direction:column;gap:2px}
   #side h5 em{font-family:var(--body);font-style:normal;text-transform:none;letter-spacing:0;
     font-size:12px;color:var(--rule-2);filter:brightness(1.7)}
+  /* A section folds from its heading. The caret is the only affordance the
+     panel needs: the heading already reads as the thing it belongs to. */
+  #side .sec{margin:0}
+  #side .sec h5{margin:18px 0 0}
+  #side .sech{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:2px;
+    width:100%;padding:4px 0;position:relative;padding-left:14px}
+  #side .sech:hover{color:var(--ink-2)}
+  #side .sech:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+  #side .caret{position:absolute;left:0;top:4px;font-size:13px;line-height:1;
+    transform:rotate(90deg);transform-origin:center;transition:transform .12s;color:var(--rule-2);filter:brightness(1.7)}
+  #side .sech[aria-expanded="false"] .caret{transform:rotate(0deg)}
+  #side .secb{padding-top:8px}
+  #side .sech[aria-expanded="false"]+.secb,
+  #side .sec:has(.sech[aria-expanded="false"]) .secb{display:none}
+  /* A feature toggle carries a line of explanation, so its label stacks. */
+  #side .tg label{display:flex;flex-direction:column;gap:1px}
+  #side .tg label em{font-style:normal;font-size:11px;color:var(--rule-2);filter:brightness(1.7);line-height:1.35}
+  #side .tg{align-items:flex-start}
+  /* Only the variant matching the current feature toggles is shown. A figure
+     that draws the same thing whatever they are was never wrapped. */
+  .varset{display:contents}
+  .varset > .v{display:none}
+  html[data-feat="11"] .varset > .v-11,
+  html[data-feat="10"] .varset > .v-10,
+  html[data-feat="01"] .varset > .v-01,
+  html[data-feat="00"] .varset > .v-00{display:contents}
   .pal{display:flex;flex-direction:column;gap:5px}
   .pal label{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
   .vrow{padding:6px 0;border-top:1px solid var(--rule)}
@@ -874,7 +967,9 @@ ${fig(J.connect.poll)}
   // ---- fixture scrubbing -------------------------------------------------
   // The state at a moment is computed here rather than picked from a set of
   // pre-drawn frames, so every pixel of the scrubber has its own exact frame.
-  var FX=${JSON.stringify(Object.fromEntries(J.fixtures.map(f=>[f.id,f])))};
+  var FXV=${JSON.stringify(Object.fromEntries(COMBOS.map(([k])=>
+    [k, Object.fromEntries(BUILDS[k].fixtures.map(f=>[f.id,f]))])))};
+  var FX=FXV["11"];
   // Geometry and the two drawing primitives come from the vocabulary, shipped
   // as source rather than restated here: the browser draws a bar and a mark
   // with the same code the figures above were built with.
@@ -977,11 +1072,14 @@ ${fig(J.connect.poll)}
     return '<svg viewBox="0 0 '+GEOM.W+' '+h+'" style="--fig-h0:'+h+'px;--fig-h:'+figH+'" role="img">'+out+'</svg>';
   }
 
+  var SCRUBS=[];
+  function redrawScrubs(){ SCRUBS.forEach(function(f){ f(); }); }
   document.querySelectorAll('.scrub').forEach(function(s){
-    var fx=FX[s.dataset.fx], slot=s.querySelector('.frame'),
+    var slot=s.querySelector('.frame'),
         input=s.querySelector('input'), at=s.querySelector('.at'), ev=s.querySelector('.evt'),
         ticks=[].slice.call(s.querySelectorAll('.tick')), head=s.querySelector('.head');
     function show(pos){
+      var fx=FX[s.dataset.fx];
       var t=timeAt(fx.axis,pos);
       slot.innerHTML=draw(fx,t);
       at.textContent=t.toFixed(1)+'%';
@@ -995,11 +1093,26 @@ ${fig(J.connect.poll)}
     input.addEventListener('input',function(){ show(+input.value/100); });
     ticks.forEach(function(x){ x.addEventListener('click',function(){ show(+x.dataset.p); }); });
     show(100);
+    SCRUBS.push(function(){ show(+input.value/100); });
   });
 
   // ---- configurator ----------------------------------------------------
   // Nothing is redrawn: every choice is a variable on :root, and the figures
   // already read their colours and substances from those variables.
+  // Panel sections fold from their heading, and remember which are folded.
+  var SEC='tds.folded.v1', folded={};
+  try{ folded=JSON.parse(localStorage.getItem(SEC)||'{}'); }catch(e){ folded={}; }
+  document.querySelectorAll('#side .sech').forEach(function(h){
+    var name=h.dataset.sec;
+    if(folded[name]) h.setAttribute('aria-expanded','false');
+    h.addEventListener('click',function(){
+      var open=h.getAttribute('aria-expanded')!=='false';
+      h.setAttribute('aria-expanded', open?'false':'true');
+      folded[name]=open;
+      try{ localStorage.setItem(SEC,JSON.stringify(folded)); }catch(e){}
+    });
+  });
+
   var PAL=${JSON.stringify(PALETTES)}, STY=${JSON.stringify(STYLES)}, WT=${JSON.stringify(WEIGHTS)};
   var root=document.documentElement, KEY='tds.vocab.v1';
   var state={};
@@ -1108,6 +1221,32 @@ ${fig(J.connect.poll)}
     apply();
   });
   apply();
+
+  // ---- feature toggles -------------------------------------------------
+  // These change what is DRAWN, so the page carries a variant per combination
+  // and this picks one. Everything else in the panel is a CSS variable.
+  var FKEY='tds.feat.v1', feat={trim:true, compress:true};
+  try{ feat=Object.assign(feat, JSON.parse(localStorage.getItem(FKEY)||'{}')); }catch(e){}
+  function featKey(){ return (feat.trim?'1':'0')+(feat.compress?'1':'0'); }
+  function applyFeat(){
+    document.documentElement.setAttribute('data-feat', featKey());
+    document.querySelectorAll('#side [data-feat]').forEach(function(b){
+      var on=!!feat[b.dataset.feat];
+      b.classList.toggle('on',on); b.textContent=on?'on':'off';
+    });
+    FX=FXV[featKey()]||FXV['11'];
+    if(typeof redrawScrubs==='function') redrawScrubs();
+    refit(); requestAnimationFrame(refit);
+  }
+  document.querySelectorAll('#side [data-feat]').forEach(function(b){
+    b.addEventListener('click',function(){
+      feat[b.dataset.feat]=!feat[b.dataset.feat];
+      try{ localStorage.setItem(FKEY,JSON.stringify(feat)); }catch(e){}
+      applyFeat();
+    });
+  });
+
+  applyFeat();
 
   document.addEventListener('mousemove',function(e){
     if(!pop.classList.contains('on')) return;

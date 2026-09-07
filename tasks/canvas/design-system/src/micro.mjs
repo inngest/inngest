@@ -517,7 +517,9 @@ export function layout(total, rows, opts={}){
     if(r.run) return;                       // the Run row is derived, not input
     (r.segs||[]).forEach(([kd,a,b])=>{ if(COMPUTE.has(base(kd))) compute.push([a,b]); });
   });
-  const el=elastic(total, [], {compute, ...opts});
+  // With compression off the axis is linear and there are no bands.
+  const el=R.FEAT.compress ? elastic(total, [], {compute, ...opts})
+    : {at:t=>t/total*(opts.plot||100), bands:[], cuts:[]};
   const map=([kd,a,b])=>[kd, el.at(a), el.at(b)-el.at(a)];
   const out=rows.map(r=>{
     if(r.run) return {...r,
@@ -648,7 +650,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * trace that begins when the work does.
    */
   let leadLabel='';
-  if(opts.trimLead){
+  if(opts.trimLead && R.FEAT.trim){
     const lead=R.leadingQueue(rows);
     if(lead>0.01){
       if(opts.ms) leadLabel=R.human(lead/100*opts.ms);
@@ -692,7 +694,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * The pre-drawn content — arrows, ribbons, cables, annotations — is remapped
    * through the same function, which is what made this possible at all.
    */
-  if(!opts.breaks && !opts.linear && rows.some(r=>r.segs)){
+  if(R.FEAT.compress && !opts.breaks && !opts.linear && rows.some(r=>r.segs)){
     const compute=[]; let end=0;
     rows.forEach(r=>(r.segs||[]).forEach(([kd,a,w])=>{
       end=Math.max(end,a+w);

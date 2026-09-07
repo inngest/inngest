@@ -1,4 +1,17 @@
 /**
+ * Features that change WHAT IS DRAWN, switchable at build time.
+ *
+ * The panel offers them as toggles, and the page carries a variant of every
+ * figure they change. They cannot be CSS like the spacing sliders: hiding a
+ * run's opening queue re-lays the whole trace, and compressing dead time
+ * changes where every bar sits.
+ */
+export const FEAT = {
+  trim:     process.env.DS_NOTRIM     !== '1',
+  compress: process.env.DS_NOCOMPRESS !== '1',
+};
+
+/**
  * THE RULES.
  *
  * Every decision the drawing makes, in one file. Change a number here and the
