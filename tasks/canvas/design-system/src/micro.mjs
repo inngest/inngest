@@ -314,6 +314,9 @@ export const setFrameSharp=on=>{FRAME_SHARP=!!on;};
 export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
 export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,lead='',trimmed=false}){
+  // A captured run HAS a finalization, measured. Inventing a second one over
+  // the top of it is the same defect as drawing a second Run row.
+  const ownFin=rows.some(r=>r.n==='Finalization');
   const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
   // Finalization sits a full row below whatever the last row was, which may
   // have been on the tighter span pitch.
@@ -341,7 +344,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
   const intervals=[];
   const add=(kd,x,w)=>{ const rank=R.runRank(kd); if(rank!=null) intervals.push({a:x,b:x+w,rank}); };
   rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>add(kd,x,w)));
-  if(!running) add('disc',fx+fq,fw);
+  if(!running && !ownFin) add('disc',fx+fq,fw);
 
   // The run resolves as its LAST interval, not as "did anything fail". A run
   // that threw and then succeeded is a recovery, and resolving it red would say
@@ -352,12 +355,16 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
 
   // A run still going has not been finalized. Drawing the row anyway would be
   // the frame asserting an event that has not happened.
-  const fin=running?'':tag(9,finY+2.5,'Finalization')+
-    barSvg('idle',fx,fq,finY,{k:1,floor:k,o:1})+
-    barSvg('disc',fx+fq,fw,finY,{k:1,floor:k,o:1})+
-    dot(px(fx),finY,EV.queued)+
-    dot(px(fx+fq),finY,EV.started)+
-    dot(px(finEnd),finY,EV.ok);
+  /**
+   * Finalization is a discovery request like any other -- it asks the SDK what
+   * is next and the answer is "nothing" -- so it is a ROW OF MOMENTS put
+   * through the same renderer as everything else. It used to be four barSvg and
+   * dot calls placed by hand here, which is why it was the one row in the
+   * artifact that could not be wrong in the same way as the others.
+   */
+  const fin=(running||ownFin)?'':row(0, resolveRow(
+    {n:'Finalization', kind:'disc',
+     at:[['queued',fx],['started',fx+fq],['ok',finEnd]]}), k, finY);
 
   // The frame shares the row grid with the figure, and the inner content keeps
   // its own `cy` attributes because it is translated as a group — so the Run

@@ -12,12 +12,14 @@ setFrame(true);
  * a different program.
  *
  * This adapts the captured shape onto the one renderer. The Run row and the
- * Finalization row are dropped on the way in, because the frame derives both
+ * row is dropped on the way in, because the frame derives it. Finalization is
+ * NOT dropped: a captured run measured its own, and the frame's invented one
+ * sat at a fixed 90% with bars it made up.
  * from the rows beneath — a captured fixture declaring either is a second
  * account of the same run.
  */
 const panel=(rows,extra='',label='',ms)=>fig(
-  rows.filter(r=>r.run===undefined && r.name!=='Finalization')
+  rows.filter(r=>r.run===undefined)
       .map(r=>({...r, n:r.name, segs:(r.segs||[]).map(g=>[g.kind,g.x,g.w]),
                 note:[r.dur,r.note].filter(Boolean).join(' · ')})),
   // A captured run starts when it starts working; the queue it opened with is
@@ -30,7 +32,7 @@ F.simple=[{
   cap:'Two rows and nothing to relate. No ribbon, no cables. The design has to be quiet here or it is noise everywhere else.',
   svg:panel([
     {run:[],lbl:'no step spans · 8ms'},
-    {name:'Finalization',dur:'8ms',at:[['started',0],['ok',99.5]]},
+    {name:'Finalization',dur:'8ms',kind:'disc',at:[['started',0],['ok',99.5]]},
   ],'','simple: two rows, no relationships',8),
 }];
 
@@ -42,7 +44,7 @@ F.step=[{
     {name:'first step',dur:'12ms',at:[['started',0],['ok',0.5]]},
     {name:'for 2s',dur:'2.001s',note:'+1ms planning',at:[['started',0.5],['ok',96.5]],kind:'wait'},
     {name:'second step',dur:'10ms',note:'+2ms wait',at:[['queued',96.5],['started',96.9],['ok',97.4]]},
-    {name:'Finalization',dur:'60ms',note:'+51ms wait',at:[['queued',97.4],['started',99.1],['ok',99.7]]},
+    {name:'Finalization',dur:'60ms',note:'+51ms wait',kind:'disc',at:[['queued',97.4],['started',99.1],['ok',99.7]]},
   ],'','step: sleep dominates the axis',2256),
 }];
 
@@ -54,7 +56,7 @@ F.v4sequential=[{
     {name:'first step',dur:'1ms',at:[['started',0.8],['ok',1.2]]},
     {name:'for 2s',dur:'2.001s',note:'+1ms planning',at:[['started',1.2],['ok',98.2]],kind:'wait'},
     {name:'second step',dur:'1ms',at:[['started',99.3],['ok',99.7]]},
-    {name:'Finalization',dur:'5ms',at:[['started',99.7],['ok',100]]},
+    {name:'Finalization',dur:'5ms',kind:'disc',at:[['started',99.7],['ok',100]]},
   ],'','v4sequential: no ribbon anywhere',2050),
 }];
 
@@ -67,7 +69,7 @@ F.emit=[{
       {name:'prepare',dur:'1ms',at:[['started',27.3],['ok',29.8]]},
       {name:'fan-out',dur:'5ms',at:[['started',45.5],['ok',60.1]],lineage:2},
       {name:'after',dur:'1ms',at:[['started',75.8],['ok',78.3]]},
-      {name:'Finalization',dur:'7ms',at:[['started',78.8],['ok',99.5]]},
+      {name:'Finalization',dur:'7ms',kind:'disc',at:[['started',78.8],['ok',99.5]]},
     ];
     return panel(rows,'','emit: outbound lineage marker',33);
   })(),
@@ -84,7 +86,7 @@ F.invoke=[
      at:[['queued',1],['started',16.5,'disc'],['ok',17.1],['started',17.1],['ok',78.1]],kind:'child',reported:1,
     },
     {name:'after',dur:'58ms',note:'+47ms wait',at:[['queued',78.1],['started',82.7],['ok',83.4]]},
-    {name:'Finalization',dur:'141ms',note:'+130ms wait',at:[['queued',84.5],['started',98.3],['ok',99]]},
+    {name:'Finalization',dur:'141ms',note:'+130ms wait',kind:'disc',at:[['queued',84.5],['started',98.3],['ok',99]]},
   ],'','invoke: the child run drawn as its own substance',909),
  },
  {
