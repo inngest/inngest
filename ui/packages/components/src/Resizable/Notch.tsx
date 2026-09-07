@@ -44,27 +44,28 @@ export function Notch({
   return (
     <div
       className={cn(
-        'absolute z-10 flex items-center justify-center',
+        'pointer-events-none absolute z-10 flex items-center justify-center',
         buildCrossAxisSizeClass(orientation),
         buildTrackClasses(orientation)
       )}
-      onPointerDown={handlePointerDown}
     >
       <div
         className={cn(
-          'bg-canvasMuted pointer-events-none absolute',
+          'bg-canvasMuted absolute',
           buildDividerClasses(orientation)
         )}
       />
       <div
         className={cn(
-          'bg-canvasSubtle border-muted pointer-events-none relative rounded-full border',
-          buildHandleSizeClasses(orientation)
+          'bg-canvasSubtle border-muted pointer-events-auto relative rounded-full border',
+          buildHandleSizeClasses(orientation),
+          buildHandleCursorClass(orientation)
         )}
+        onPointerDown={handlePointerDown}
       >
         <div
           className={cn(
-            'bg-surfaceSubtle border-muted absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border',
+            'bg-surfaceSubtle border-muted pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border',
             buildHandleStripeClasses(orientation)
           )}
         />
@@ -89,8 +90,12 @@ function buildHandleStripeClasses(orientation: Orientation): string {
   return orientation === 'vertical' ? 'h-px w-3' : 'h-3 w-px';
 }
 
+function buildHandleCursorClass(orientation: Orientation): string {
+  return orientation === 'vertical' ? 'cursor-row-resize' : 'cursor-col-resize';
+}
+
 function buildTrackClasses(orientation: Orientation): string {
   return orientation === 'vertical'
-    ? 'left-0 right-0 top-[var(--inngest-resizable-split,50%)] -translate-y-1/2 cursor-row-resize'
-    : 'top-0 bottom-0 left-[var(--inngest-resizable-split,50%)] -translate-x-1/2 cursor-col-resize';
+    ? 'left-0 right-0 top-[var(--inngest-resizable-split,50%)] -translate-y-1/2'
+    : 'top-0 bottom-0 left-[var(--inngest-resizable-split,50%)] -translate-x-1/2';
 }
