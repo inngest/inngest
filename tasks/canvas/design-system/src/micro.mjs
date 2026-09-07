@@ -682,6 +682,10 @@ export function fig(rows,extra='',label='',under='',opts={}){
           ? {...r, to:r.to!=null?at(r.to):r.to, end:r.end!=null?at(r.end):r.end,
              intervals:(r.intervals||[]).map(v=>({...v,a:at(v.a),b:at(v.b)}))}
           : {...r, segs:(r.segs||[]).map(([k,a,w])=>[k,at(a),at(a+w)-at(a)]),
+             // The moments move with the bars. Marks are drawn from them now,
+             // so leaving them behind put every circle at the position the
+             // compression had just taken away.
+             at:(r.at||[]).map(mo=>mo.length===3?[mo[0],at(mo[1]),mo[2]]:[mo[0],at(mo[1])]),
              dots:r.dots?r.dots.map(d=>({...d,p:at(d.p)})):r.dots,
              lit:r.lit?r.lit.map(v=>typeof v==='number'?at(v):v):r.lit,
              litDots:r.litDots?r.litDots.map(at):r.litDots,
