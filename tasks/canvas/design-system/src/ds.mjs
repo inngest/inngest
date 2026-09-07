@@ -153,97 +153,163 @@ const mark=k=>`<svg class="chip mk" viewBox="0 0 12 12" aria-hidden="true">${V.d
 const keys=rows=>`<ul class="keylist">`+rows.map(([sw,t])=>`<li>${sw}<span>${t}</span></li>`).join('')+`</ul>`;
 const fig=(svg,cap='',cls='')=>`<figure><div class="figure ${cls}">${svg}</div>${cap?`<figcaption>${cap}</figcaption>`:''}</figure>`;
 const frames=id=>{const e=EX[id];if(!e)throw new Error('no '+id);
+  // A lone frame has no other state to be distinguished from, so its caption is
+  // dropped: "at rest" under every figure on the page is nine words of nothing.
+  const solo=e.frames.length===1;
   return `<div class="frames${e.frames.length>1?' two':''}">`+
-    e.frames.map(f=>`<figure class="frame"><div class="figure">${f.svg}</div><figcaption class="fl">${f.l}</figcaption></figure>`).join('')+`</div>`;};
+    e.frames.map(f=>`<figure class="frame"><div class="figure">${f.svg}</div>`+
+      (solo?'':`<figcaption class="fl">${f.l}</figcaption>`)+`</figure>`).join('')+`</div>`;};
 
-/** id -> one line saying what the scenario shows. */
-const SC=[
- ['Sequential', [
-  ['c0','One request, one step. The SDK reports and executes in the same request, so there is no discovery bar.'],
- ]],
- ['Fan-out and coalesce', [
-  ['c1','One request reports three steps. The ribbon threads their enqueue marks, which are blue because a discovery request put them there.'],
-  ['c2','Three steps resolve and cause the next request. That request reported one step, so it rolls into that step’s row.'],
-  ['c4','The ribbon covers exactly the steps the request reported, so an uneven fan-out is countable without interacting. Nothing static predicted that width: the ribbon reports what happened and promises no shape.'],
-  ['c3','Fan-out inside a fan-out. One ribbon per discovery request.'],
-  ['c6','One resumption reports two steps. Both sit under one ribbon, so no order is implied between them.'],
-  ['c8','Two branches that each caused their own request. Two requests, no ribbon.'],
- ]],
- ['Attribution', [
-  ['c9','Promise.race(). The winner is a dependency of the next request. The loser resolved after that request started, so it has no cable.'],
-  ['c10','A step started but never awaited. No outgoing cable.'],
- ]],
- ['Platform time', [
-  ['c14','Queue time. The step waiting for the executor to pick it up.'],
-  ['c15','A discovery request is a separate execution. It happens at the start of a run and on fan-out.'],
-  ['c16','Held by flow control. Amber hatched, still not SDK execution time.'],
-  ['c16b','Throttle, rate limit and debounce are the same fact and take the same treatment.'],
+/**
+ * The Scenarios page: one code example, then everything worth saying about it.
+ *
+ * Ordered simplest to hardest, and NOT grouped by concept. Grouping by concept
+ * meant reprinting the same code under every heading it was relevant to —
+ * `await step.run('a')` appeared seven times — and left a reader assembling one
+ * program out of seven partial views of it. Reading down a group now answers
+ * "what does the trace show for the code I wrote", which is the question people
+ * actually arrive with.
+ *
+ * Each entry names a snippet in `CODE` and the figures that snippet produced,
+ * each with the one line that says what it shows.
+ */
+const SCEN=[
+ ['oneStep',[
+  ['c14','Queue time: the step waiting for the executor to pick it up.'],
+  ['c16','Held by flow control. Amber hatched — still not SDK execution time.'],
   ['c17','System latency is queue time and is labelled the same way.'],
-  ['c18','Finalization keeps its own row and is not SDK execution time.'],
   ['c19','Everything Inngest did is hatched. Only SDK execution is solid.'],
+  ['c22','The ordinary case: the step returned.'],
+  ['c18','Finalization keeps its own row and is not SDK execution time.'],
   ['c20','Every millisecond between a row’s start and its resolution belongs to a named interval.'],
-  ['c31','step.sendEvent() is the one row that points out of the run. The ring is hollow because those runs are not in this trace, and the count is the way into them.'],
-  ['c21','The gap between a step resolving and the next request starting is drawn once, as the cable and as the interval.'],
- ]],
- ['Outcomes', [
-  ['c22','step.run() returned.'],
-  ['c23','step.run() threw on the final attempt and the run failed.'],
-  ['c24','The function caught the error. Red step, green run.'],
-  ['c25','Threw, backed off, retried, returned.'],
-  ['c30','Every attempt threw. The only place a circle is filled red.'],
-  ['c26','One red row does not tint the rows around it.'],
-  ['c29','Still executing. Blue, and no resolution mark: the missing mark is what says it is unresolved.'],
-  ['c27','Cancelled while executing.'],
-  ['c28','A step.waitForEvent() still open when the run was cancelled.'],
- ]],
-  ['Waiting', [
-  ['w1','A wait that matched. Blue while it is open, green at the mark where the event arrived.'],
-  ['w2','A wait that expired with no match. The run carries on: a timeout is a result the function can act on.'],
-  ['w3','A wait inside a fan-out holds the level open. The next request cannot start until the slowest member resolves.'],
-  ['w4','Waiting and failing must not read alike. One is hatched and never red; the other is solid and red.'],
- ]],
- ['Time and the axis', [
-  ['t1','Dead time is worth almost none of the width. The threshold is low, the band is fixed, and only the drawing compresses — every duration is still wall clock.'],
-  ['t1b','The width left over splits by real duration, so a second is the same number of pixels wherever it lands.'],
-  ['t1c','Many compressions share one budget. Each band thins rather than the trace spending its width on nothing.'],
-  ['t1d','A wait that has not resolved still compresses. No closing mark, and no Finalization row: the run is still going.'],
-  ['t1e','A gap in one row is not dead time. Only a stretch with nothing running anywhere is a candidate.'],
-  ['t2','Seven days elapsed, 62ms executing. The fill rule reports that before you have read a number.'],
-  ['t3','Two tiers of axis label, so a run measured in days keeps its resolution without a second axis.'],
-  ['t4','A step too short to draw is still drawn, at a minimum width, with its real duration beside it.'],
- ]],
- ['Scale', [
-  ['s1','Five hundred sequential steps collapse to one row that reports the count and draws where each member ran.'],
-  ['s2','A wide fan-out collapses the same way. The stagger of a concurrency limit is visible without expanding it.'],
-  ['s3','A failure cluster two thirds through a long run is a red smear on the Run row, findable without interacting.'],
-  ['s4','About forty rows at rest whatever the step count, and any group expands where you are standing.'],
- ]],
- ['Naming and identity', [
-  ['n1','The same step name on two branches. The name is not the identity; the request that reported it is.'],
-  ['n2','The SDK’s :1 and :2 suffixes are not stable under parallelism, so nothing in the drawing depends on them.'],
- ]],
- ['Interaction', [
-  ['i1','Three tiers of attention: the row, what caused it, everything else. Nothing is removed, only quietened.'],
-  ['i2','The Run row is the overview. One picture of the run, not two.'],
- ]],
- ['Honesty', [
-  ['h1','Where the trace cannot say what caused a request, it declines rather than guessing.'],
   ['h2','A row’s label and its drawing have to agree about which interval the number names.'],
   ['h3','Nothing is drawn that cannot be asked what it is. Hover any row for its parts.'],
  ]],
- ['Discovery requests that fail', [
+ ['chain',[
+  ['c0','One request, one step. The SDK reports and executes in the same request, so there is no discovery bar.'],
+  ['c15','A discovery request is a separate execution. It happens at the start of a run and on fan-out.'],
+  ['c21','The gap between a step resolving and the next request starting is drawn once, as the cable and as the interval.'],
+ ]],
+ ['fanout',[
+  ['c1','One request reports three steps. The ribbon threads their enqueue marks, which are blue because a discovery request put them there.'],
+  ['c4','The ribbon covers exactly the steps the request reported, so an uneven fan-out is countable without interacting. Nothing static predicted that width.'],
+  ['c16b','Throttle, rate limit and debounce are the same fact and take the same treatment.'],
+ ]],
+ ['coalesce',[
+  ['c2','Three steps resolve and cause the next request. That request reported one step, so it rolls into that step’s row.'],
+  ['i1','Three tiers of attention: the row, what caused it, everything else. Nothing is removed, only quietened.'],
+  ['i2','The Run row is the overview. One picture of the run, not two.'],
+  ['h1','Where the trace cannot say what caused a request, it declines rather than guessing.'],
+ ]],
+ ['resumeTwo',[
+  ['c6','One resumption reports two steps. Both sit under one ribbon, so no order is implied between them.'],
+ ]],
+ ['nested',[
+  ['c3','Fan-out inside a fan-out. One ribbon per discovery request.'],
+ ]],
+ ['branches',[
+  ['c8','Two branches that each caused their own request. Two requests, no ribbon.'],
+ ]],
+ ['race',[
+  ['c9','The winner is a dependency of the next request. The loser resolved after that request started, so it has no cable.'],
+ ]],
+ ['orphan',[
+  ['c10','A step started but never awaited. No outgoing cable.'],
+ ]],
+ ['emit',[
+  ['c31','step.sendEvent() is the one row that points out of the run. The ring is hollow because those runs are not in this trace, and the count is the way into them.'],
+ ]],
+ ['threw',[
+  ['c23','It threw on the final attempt and the run failed.'],
+  ['c30','Every attempt threw. The only place a circle is filled red.'],
+ ]],
+ ['retried',[
+  ['c25','Threw, backed off, retried, returned. The backoff is the consequence of the failure, not a failure itself.'],
+ ]],
+ ['caught',[
+  ['c24','The function caught the error. Red step, green run.'],
+ ]],
+ ['oneBranchFails',[
+  ['c26','One red row does not tint the rows around it.'],
+ ]],
+ ['stillRunning',[
+  ['c29','Still executing. Blue, and no resolution mark: the missing mark is what says it is unresolved.'],
+ ]],
+ ['cancelled',[
+  ['c27','Cancelled while executing.'],
+ ]],
+ ['cancelledWait',[
+  ['c28','A wait still open when the run was cancelled.'],
+ ]],
+ ['wait',[
+  ['w1','A wait that matched. Blue while it is open, green at the mark where the event arrived.'],
+  ['w2','A wait that expired with no match. The run carries on: a timeout is a result the function can act on.'],
+ ]],
+ ['waitInFanout',[
+  ['w3','A wait inside a fan-out holds the level open. The next request cannot start until the slowest member resolves.'],
+ ]],
+ ['sleepThenThrow',[
+  ['w4','Waiting and failing must not read alike. One is hatched and never red; the other is solid and red.'],
+ ]],
+ ['sleep',[
+  ['t1','Dead time is worth almost none of the width. The threshold is low, the band is fixed, and only the drawing compresses — every duration is still wall clock.'],
+  ['t2','Seven days elapsed, 62ms executing. The fill rule reports that before you have read a number.'],
+  ['t4','A step too short to draw is still drawn, at a minimum width, with its real duration beside it.'],
+  ['t1d','A wait that has not resolved still compresses. No closing mark, and no Finalization row: the run is still going.'],
+ ]],
+ ['sleepShares',[
+  ['t1b','The width left over splits by real duration, so a second is the same number of pixels wherever it lands.'],
+ ]],
+ ['sleepMany',[
+  ['t1c','Many compressions share one budget. Each band thins rather than the trace spending its width on nothing.'],
+ ]],
+ ['sleepParallel',[
+  ['t1e','A gap in one row is not dead time. Only a stretch with nothing running anywhere is a candidate.'],
+ ]],
+ ['days',[
+  ['t3','Two tiers of axis label, so a run measured in days keeps its resolution without a second axis.'],
+ ]],
+ ['loop',[
+  ['s1','Five hundred sequential steps collapse to one row that reports the count and draws where each member ran.'],
+ ]],
+ ['wideFanout',[
+  ['s2','A wide fan-out collapses the same way. The stagger of a concurrency limit is visible without expanding it.'],
+ ]],
+ ['failureCluster',[
+  ['s3','A failure cluster two thirds through a long run is a red smear on the Run row, findable without interacting.'],
+ ]],
+ ['expandGroup',[
+  ['s4','About forty rows at rest whatever the step count, and any group expands where you are standing.'],
+ ]],
+ ['sameName',[
+  ['n1','The same step name on two branches. The name is not the identity; the request that reported it is.'],
+  ['n2','The SDK’s :1 and :2 suffixes are not stable under parallelism, so nothing in the drawing depends on them.'],
+ ]],
+ ['requestFailed',[
   ['c67','The discovery request that would report the next step threw twice before it succeeded.'],
+ ]],
+ ['requestNeverSucceeded',[
   ['c68','It never succeeded, so no step exists to host it.'],
  ]],
- ['Across runs', [
-  ['c51x','']].filter(x=>0)],
+ ['otel',[
+  ['o0','A step instrumented with @inngest/otel. The icon by the name says there are spans inside; selecting the row expands them.'],
+  ['o1','Expanded. Everything above this point is Inngest’s own timing; these rows are the first thing in the trace that is not.'],
+ ]],
+ ['otelFanout',[
+  ['o0b','Parallel work inside one step. The spans overlap, so they cannot be a single rail of notches on the bar.'],
+ ]],
+ ['otelPartial',[
+  ['o2','A span that reported no status. OpenTelemetry’s Unset is its own outcome and is not guessed into success.'],
+ ]],
 ];
 
-const scenarios = SC.filter(([,items])=>items.length).map(([title,items])=>
-`  <section class="sc">
-    <h3>${title}</h3>
-    <div class="grid">
-${items.map(([id,note])=>`      <div class="item" data-sc="${id}"><div class="col-l">${codeOf(id)}<p class="note">${note}</p></div><div class="col-r">${frames(id)}</div></div>`).join('\n')}
+const scenarios = SCEN.map(([k,items])=>
+`  <section class="sc" data-sc="${k}">
+    <div class="item">
+      <div class="col-l">${codeOf(k)}</div>
+      <div class="col-r">
+${items.map(([id,note])=>`        <div class="bit" data-fig="${id}"><p class="note">${note}</p>${frames(id)}</div>`).join('\n')}
+      </div>
     </div>
   </section>`).join('\n');
 
@@ -501,15 +567,23 @@ const page=`<title>Trace Design System</title>
   .doc td{padding:6px 14px 6px 0;vertical-align:top;border-top:1px solid var(--rule)}
   .doc li{margin:0 0 7px}
   .doc .code{max-width:60ch}
-  .grid .item{border-top:1px solid var(--rule);padding:16px 0 10px;min-width:0;
+  .grid .item,.sc .item{border-top:1px solid var(--rule);padding:16px 0 10px;min-width:0;
     display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:28px;align-items:start}
-  /* The code and its explanation stay with you while the figures scroll past.
+  /* The code stays with you while everything said about it scrolls past.
      Offset by the tab bar, which is sticky at the top of the page. */
   .col-l{position:sticky;top:64px;min-width:0}
   .col-r{min-width:0;display:grid;gap:10px}
   .col-l .note{margin:10px 0 0}
+  /* One code example, then prose and figure alternating down the right. The
+     gap between them is the only thing separating two points about the same
+     code, so it has to be bigger than the gap inside one. */
+  .sc{margin:0}
+  .sc .item{padding:26px 0 18px}
+  .sc .col-r{gap:26px}
+  .sc .bit{min-width:0}
+  .sc .bit .note{margin:0 0 9px;max-width:70ch}
   @media (max-width:1080px){
-    .grid .item{grid-template-columns:1fr;gap:12px}
+    .grid .item,.sc .item{grid-template-columns:1fr;gap:12px}
     .col-l{position:static}
   }
   .c-kw{color:var(--accent);font-style:normal}
@@ -698,7 +772,7 @@ ${fig(J.barvocab.notes,'A duration after the bar it belongs to. The same slot ca
 
 <section id="t-scenarios" hidden>
 <h2>Scenarios</h2>
-<p>Ordered from one step to the cases that are hard to draw. Each shows the run at rest and, where it differs, on hover or select.</p>
+<p>Organised by what you wrote. One code example, then everything the trace shows for it — ordered from a single step to the cases that are hard to draw. Where a figure has a second state, it is the hover or selection.</p>
 ${scenarios}
 
 </section>

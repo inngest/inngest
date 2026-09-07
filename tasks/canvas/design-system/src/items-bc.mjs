@@ -24,14 +24,13 @@ D('c31',{d:'A step.sendEvent() that started runs points out of this run: a short
 D('c17',{d:'Latency is the same substance as queueing and is named the same way. Three shades of grey would be three things to learn for no gain.',
   svg:fig([{n:'a',at:[['queued',0],['started',18],['ok',72]],note:'+18ms latency  54ms'}],'','system latency')});
 D('c18',{d:'Platform rows keep their own row and the platform colour. They are not your compute and never enter the Run row profile.',
-  svg:fig([{n:'last step',at:[['started',4],['ok',34]]},
-    {n:'Finalization',at:[['queued',34],['started',54],['ok',62]],dim:.6,note:'platform'}],'','finalization')});
+  svg:fig([{n:'a',at:[['started',4],['ok',34]]}],'','finalization')});
 D('c19',{d:'Everything Inngest did is thinner and quieter than your code. The eye lands on green and red first, every time.',
   svg:fig([{n:'a',at:[['queued',0],['started',28],['ok',74]],note:'46ms of 74ms is yours'}],'','second-class platform time')});
 D('c20',{d:'No unexplained gaps. Every millisecond between the row start and its resolution belongs to a named segment — here a discovery request, the queue, a failed attempt, its backoff, the queue again, and the attempt that worked.',
   svg:fig([{n:'a',at:[['queued',0],['started',34],['retry',62],['queued',72],['started',76],['ok',94]],note:'fully accounted'}],'','gaps filled')});
 D('c21',{d:'The 26ms between one step ending and the next request starting is drawn once — as the arrow and as the interval, the same object.',
-  svg:(()=>{const rows=[{n:'c',at:[['started',4],['ok',40]]},{n:'d',at:[['queued',52],['started',70],['ok',92]]}];
+  svg:(()=>{const rows=[{n:'a',at:[['started',4],['ok',40]]},{n:'b',at:[['queued',52],['started',70],['ok',92]]}];
     return fig(rows,arrow(px(40),cy(0),px(52),cy(1))+tag(px(41),cy(0)-6,'26ms',C.acc),'the connector is the interval');})()});
 
 // ---- C. Step outcomes (c22–c30) -----------------------------------------
@@ -76,8 +75,8 @@ const OUT={};
 for(const [k,v] of Object.entries(E)) OUT[k]={d:v.d,frames:[{l:'at rest',svg:v.svg}]};
 
 OUT.c21.frames=[
- {l:'at rest',svg:F2([{n:'c',at:[['started',4],['ok',40]]},{n:'d',at:[['queued',52],['started',70],['ok',92]]}],'','gap at rest')},
- {l:'hovering c',svg:F2([{n:'c',at:[['started',4],['ok',40]],sel:true},{n:'d',at:[['queued',52],['started',70],['ok',92]]}],
+ {l:'at rest',svg:F2([{n:'a',at:[['started',4],['ok',40]]},{n:'b',at:[['queued',52],['started',70],['ok',92]]}],'','gap at rest')},
+ {l:'hovering a',svg:F2([{n:'a',at:[['started',4],['ok',40]],sel:true},{n:'b',at:[['queued',52],['started',70],['ok',92]]}],
    AR(X(40),Y(0),X(52),Y(1))+TG(X(41),Y(0)-5,'26ms',CC.acc),'gap on hover')},
 ];
 OUT.c26.frames.push({l:'hovering bad-branch',svg:F2([

@@ -170,15 +170,19 @@ function checkRunExtent(){
 async function checkCodeSync(){
   const {CODE}=await import('./code.mjs');
   const ds=fs.readFileSync(HERE+'ds.mjs','utf8');
-  const sc=ds.slice(ds.indexOf('const SC=['), ds.indexOf('const scenarios ='));
-  // A figure renders if the scenario list names it OR the Concepts page pulls
-  // it in directly — `frames('o0')` or `EX.o1.frames[0]`. Reading only the
-  // scenario list reported every Concepts-only figure as dead code.
-  const rendered=new Set([
-    ...[...sc.matchAll(/\[.([a-z]+\d+[a-z]*)./g)].map(m=>m[1]),
-    ...[...ds.matchAll(/frames\('([a-z]+\d+[a-z]*)'\)/g)].map(m=>m[1]),
-    ...[...ds.matchAll(/EX\.([a-z]+\d+[a-z]*)\b/g)].map(m=>m[1]),
-  ]);
+  const sc=ds.slice(ds.indexOf('const SCEN=['), ds.indexOf('const scenarios ='));
+
+  /**
+   * The page groups figures under the code that produced them, so the check is
+   * per GROUP: every row a figure draws has to be named by its group's snippet,
+   * and every step the snippet names has to be drawn by one of the figures in
+   * the group. One snippet standing in for several figures is the whole point
+   * of the arrangement; a snippet naming a step none of them draw is a group
+   * that has drifted from its code.
+   */
+  const groups=[];
+  for(const g of sc.matchAll(/\['([A-Za-z0-9]+)',\[([\s\S]*?)\n \]\]/g))
+    groups.push([g[1], [...g[2].matchAll(/\['([a-z]+\d+[a-z]*)'/g)].map(x=>x[1])]);
 
   const EX={};
   for(const g of ['items-a','items-bc','items-disc','items-more'])
@@ -194,34 +198,41 @@ async function checkCodeSync(){
   // exists. That absence IS the figure. Exemptions carry their reason.
   const EXEMPT={ c68:'the step its code names was never created — that is the point' };
   let bad=0;
-  for(const id of rendered){
-    if(EXEMPT[id]) continue;
-    const e=EX[id]; if(!e) continue;
-    const code=CODE[id];
-    if(!code){ console.log(`  ${id}: rendered but has no code example`); bad++; continue; }
-    const drawn=labels(e.frames[0].svg), named=ids(code);
-    // A nested userland span is not a step call — it is a fetch or a query — so
-    // a row is allowed to be named by ANY string literal in the snippet. The
-    // reverse direction stays strict on step ids, or every event name in a
-    // sendEvent would count as a step the figure failed to draw.
-    const anyName=[...code.matchAll(/['"`]([^'"`\n]+)['"`]/g)].map(m=>m[1])
+  const seen=new Set();
+  for(const [k,figs] of groups){
+    const code=CODE[k];
+    if(!code){ console.log(`  ${k}: a group with no code example`); bad++; continue; }
+    const anyName=[...code.matchAll(/['"\`]([^'"\`\n]+)['"\`]/g)].map(m=>m[1])
       .filter(n=>!n.includes('${'));
-    // Either may be the longer: a row reads `↳ SELECT` where the code says
-    // `'SELECT …'`, and a row reads `req + a` where the code says `'a'`.
     const bare=r=>r.replace(/^[\s↳·]+/,'').trim();
-    const orphanRows=drawn.filter(r=>{
-      const t=bare(r);
-      return !anyName.some(n=>t.includes(n)||n.includes(t));
-    });
-    const orphanSteps=named.filter(n=>!drawn.some(r=>r.includes(n)));
-    if(orphanRows.length||orphanSteps.length){
+    let drawnAll=[];
+    for(const id of figs){
+      seen.add(id);
+      const e=EX[id];
+      if(!e){ console.log(`  ${id}: named by group ${k} but no such figure`); bad++; continue; }
+      const drawn=labels(e.frames[0].svg);
+      drawnAll=drawnAll.concat(drawn);
+      if(EXEMPT[id]) continue;
+      const orphanRows=drawn.filter(r=>{
+        const t=bare(r);
+        return !anyName.some(n=>t.includes(n)||n.includes(t));
+      });
+      if(orphanRows.length){
+        bad++;
+        console.log(`  ${id} (group ${k}): rows the code never names [${orphanRows.join(', ')}]`);
+      }
+    }
+    // A group carrying an exempt figure inherits its exemption: c68's snippet
+    // names the step no request ever managed to create, which is the figure.
+    const exemptGroup=figs.some(id=>EXEMPT[id]);
+    const orphanSteps=exemptGroup?[]:ids(code).filter(n=>!drawnAll.some(r=>r.includes(n)));
+    if(orphanSteps.length){
       bad++;
-      console.log(`  ${id}: rows the code never names [${orphanRows.join(', ')}]`+
-        ` | steps the figure never draws [${orphanSteps.join(', ')}]`);
+      console.log(`  ${k}: steps no figure in the group draws [${orphanSteps.join(', ')}]`);
     }
   }
-  for(const id of Object.keys(CODE)) if(!rendered.has(id)){
-    console.log(`  ${id}: code example for a figure that no longer renders`); bad++;
+  for(const k of Object.keys(CODE)) if(!groups.some(([g])=>g===k)){
+    console.log(`  ${k}: code example for a group that no longer renders`); bad++;
   }
   return bad;
 }
