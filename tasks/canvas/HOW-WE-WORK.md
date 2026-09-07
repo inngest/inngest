@@ -58,6 +58,39 @@ An encoding that survives the artifact and then fails on `longgap` or
 So: decide meaning in the artifact, prove it in the gallery, and record the
 decision in the artifact README's ledger so the two do not drift.
 
+## A change is not done until every tab agrees
+
+The artifact has four tabs and they all describe the same system:
+
+| Tab | What it is |
+|---|---|
+| **Concepts** | The vocabulary and the rules, in the abstract |
+| **Scenarios** | Every behaviour we support, with the code that produced it |
+| **Fixtures** | Real captured runs at measured proportions |
+| **Docs** | The page we would ship, rendered from `docs/understanding-traces.md` |
+
+**Change one and you have probably invalidated the others.** Making the backoff
+neutral changes Concepts (the swatch), Scenarios (every retry figure), and Docs
+(a sentence describing it). Deleting the minimap changed the Interaction
+scenario, a rule in `RULES.md`, and a whole section of the docs. Every one of
+those was missed the first time and caught later by reading, which is the slow
+way.
+
+So after any change to the vocabulary, a rule, or a figure:
+
+1. **`node ds.mjs && node validate.mjs`.** The validator is not just a row
+   checker — it also asserts **every figure's code example names the steps the
+   figure actually draws**. That check exists because 34 of 51 snippets were
+   written from captions rather than rows and named steps the drawings never
+   had. Nothing else would have caught it.
+2. **Re-run `DS_FRAME=0 node ds.mjs && node export-docs.mjs && node ds.mjs`** if
+   any figure the docs use has changed. The Docs tab renders the *exported*
+   files, so a stale image there is the drift made visible.
+3. **Look at all four tabs**, not just the one you changed —
+   `node src/open-tab.mjs <tab>` then `tasks/canvas/shot.sh --url file:///tmp/ds-tab.html --size 1400,2200`.
+4. **Grep the prose.** `RULES.md`, `DELTA.md` and the docs all state rules in
+   words, and words do not fail a build. Search for the thing you changed.
+
 ## Verifying
 
 **The rule, from `lessons.md` #18, which is the most expensive thing learned

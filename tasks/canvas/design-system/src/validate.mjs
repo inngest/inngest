@@ -77,6 +77,57 @@ function check(seq){
   return p;
 }
 
+/**
+ * Every figure's code example must name the steps the figure actually draws.
+ *
+ * The snippets were first written from each figure's caption rather than its
+ * rows, and 34 of 51 named steps the drawing did not have — a step called `a`
+ * beside a row called `doomed`. Nothing caught it, because a caption and a
+ * drawing can disagree forever without either being wrong on its own.
+ *
+ * A row label is the step id. Group rows (`× 40 batch`) and request rows
+ * (`req + a`) carry an id inside them, so a substring match is the right test.
+ */
+async function checkCodeSync(){
+  const {CODE}=await import('./code.mjs');
+  const ds=fs.readFileSync(HERE+'ds.mjs','utf8');
+  const sc=ds.slice(ds.indexOf('const SC=['), ds.indexOf('const scenarios ='));
+  const rendered=new Set([...sc.matchAll(/\[.(c\d+\w*|w\d|t\d|s\d|n\d|i\d|h\d)./g)].map(m=>m[1]));
+
+  const EX={};
+  for(const g of ['items-a','items-bc','items-disc','items-more'])
+    Object.assign(EX, JSON.parse(fs.readFileSync(HERE+g+'.json','utf8')));
+
+  const labels=svg=>[...svg.matchAll(/<text x="2" y="[\d.]+"[^>]*>([^<]*)<\/text>/g)]
+    .map(m=>m[1]).filter(r=>r && !/^(Run|Finalization)$/.test(r));
+  const ids=code=>[...code.matchAll(/step\.(?:run|sleep|waitForEvent|waitForSignal|invoke|sendEvent)\(\s*['"\`]([^'"\`]+)/g)]
+    .map(m=>m[1]).filter(n=>!n.includes('${'));
+
+  // One figure legitimately names a step the drawing does not contain: the
+  // request that would have reported `b` never succeeded, so no row for it
+  // exists. That absence IS the figure. Exemptions carry their reason.
+  const EXEMPT={ c68:'the step its code names was never created — that is the point' };
+  let bad=0;
+  for(const id of rendered){
+    if(EXEMPT[id]) continue;
+    const e=EX[id]; if(!e) continue;
+    const code=CODE[id];
+    if(!code){ console.log(`  ${id}: rendered but has no code example`); bad++; continue; }
+    const drawn=labels(e.frames[0].svg), named=ids(code);
+    const orphanRows=drawn.filter(r=>!named.some(n=>r.includes(n)));
+    const orphanSteps=named.filter(n=>!drawn.some(r=>r.includes(n)));
+    if(orphanRows.length||orphanSteps.length){
+      bad++;
+      console.log(`  ${id}: rows the code never names [${orphanRows.join(', ')}]`+
+        ` | steps the figure never draws [${orphanSteps.join(', ')}]`);
+    }
+  }
+  for(const id of Object.keys(CODE)) if(!rendered.has(id)){
+    console.log(`  ${id}: code example for a figure that no longer renders`); bad++;
+  }
+  return bad;
+}
+
 let figures=0, rows=0, bad=0;
 for(const g of GENS){
   const J=JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'));
@@ -97,3 +148,9 @@ for(const g of GENS){
   });
 }
 console.log(`\n${figures} figures, ${rows} rows, ${bad} with problems`);
+
+const desync=await checkCodeSync();
+console.log(desync
+  ? `\n${desync} figure(s) whose code and drawing disagree`
+  : 'code and figures agree');
+if(bad||desync) process.exitCode=1;

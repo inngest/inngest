@@ -10,14 +10,14 @@ const DIM=.22;
 D('w1',{d:'A wait that matched. The bar is blue while it is open because nothing has decided it, and turns green at the mark where the event arrived.',
   svg:fig([
     {n:'a',              segs:[['good',0,10]]},
-    {n:'waitForEvent',   segs:[['disc',10,2],['waitok',12,52]]},
+    {n:'w',              segs:[['disc',10,2],['waitok',12,52]]},
     {n:'b',              segs:[['disc',64,2],['idle',66,4],['good',70,16]]},
   ],'','a wait that matched')});
 
 D('w2',{d:'A wait that expired without a match. The run carries on: the timeout is a result the function can act on, so the row goes grey and the next step is reported as normal.',
   svg:fig([
     {n:'a',              segs:[['good',0,10]]},
-    {n:'waitForEvent',   segs:[['disc',10,2],['waitout',12,52]]},
+    {n:'w',              segs:[['disc',10,2],['waitout',12,52]]},
     {n:'fallback',       segs:[['disc',64,2],['idle',66,4],['good',70,16]]},
   ],'','a wait that timed out, run continues')});
 
@@ -25,14 +25,14 @@ D('w3',{d:'A wait inside a fan-out. It sits on the same axis as its siblings and
   svg:fig([
     {n:'req + a', segs:[['idle',0,2.8],['disc',2.8,5.2],['good',8,20]]},
     {n:'b',       segs:[['good',8,14]]},
-    {n:'wait c',  segs:[['waitok',8,54]]},
+    {n:'c',       segs:[['waitok',8,54]]},
     {n:'d',       segs:[['disc',62,2],['idle',64,4],['good',68,18]]},
   ],'','a wait holding a level open','',{rib:{x:8,rows:[0,1,2]}})});
 
 D('w4',{d:'Waiting and failing must not read alike. One is hatched and never red; the other is solid and red, and only its final attempt takes a filled mark.',
   svg:fig([
-    {n:'waiting',  segs:[['wait',0,60]],dots:[{p:0,c:EV.queued},{p:0,c:EV.started}]},
-    {n:'failing',  segs:[['bad',0,26],['backoff',26,14],['idle',40,4],['bad',44,26]]},
+    {n:'nap',      segs:[['wait',0,60]],dots:[{p:0,c:EV.queued},{p:0,c:EV.started}]},
+    {n:'a',        segs:[['bad',0,26],['backoff',26,14],['idle',40,4],['bad',44,26]]},
   ],'','the two must not be confused')});
 
 // ---- Time & the axis ----------------------------------------------------
@@ -40,7 +40,7 @@ D('w4',{d:'Waiting and failing must not read alike. One is hatched and never red
 D('t1',{d:'An idle gap that dwarfs the work is compressed and marked as a break. The axis is the only thing that changes: every duration on the row is still wall clock.',
   svg:fig([
     {n:'a', segs:[['good',0,8]]},
-    {n:'sleep 7d', segs:[['waitok',8,50]]},
+    {n:'nap', segs:[['waitok',8,50]]},
     {n:'b', segs:[['disc',58,2],['idle',60,3],['good',63,12]]},
   ],axis(cy(2)+13,[[0,'0ms'],[8,'+41ms'],[58,'+7d'],[75,'+7d 62ms']],{brk:[[10,56,'⋯ 7d ⋯']],top:cy(0)-9}),
     'a compressed idle gap','',{margin:0,pad:34})});
@@ -49,7 +49,7 @@ D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you 
   svg:fig([
     {run:true, end:100, intervals:[{a:0,b:1.2,ok:true},{a:58,b:59,ok:true},{a:63,b:64.5,ok:true}], resolvedAt:100, resolvedAs:EV.ok},
     {n:'a', segs:[['good',0,1.2]]},
-    {n:'sleep 7d', segs:[['waitok',1.2,56.8]]},
+    {n:'nap', segs:[['waitok',1.2,56.8]]},
     {n:'b', segs:[['disc',58,1],['idle',59,4],['good',63,1.5]]},
   ],'','62ms of execution inside seven days')});
 
@@ -62,9 +62,9 @@ D('t3',{d:'Two tiers of axis label. The coarse tier carries what the run crossed
 
 D('t4',{d:'A step too short to draw is still drawn. It gets a minimum width so it can be pointed at, and the number beside it is the real one: the drawing rounds, the reported duration does not.',
   svg:fig([
-    {n:'12ms step', segs:[['good',0,0.4]]},
-    {n:'2s sleep',  segs:[['waitok',0.4,96]]},
-    {n:'10ms step', segs:[['disc',96.4,0.2],['good',96.6,0.4]]},
+    {n:'a', segs:[['good',0,0.4]]},
+    {n:'nap',  segs:[['waitok',0.4,96]]},
+    {n:'b', segs:[['disc',96.4,0.2],['good',96.6,0.4]]},
   ],tag(px(2),cy(0)+2.5,'12ms')+tag(px(98.5),cy(2)+2.5,'10ms'),'sub-pixel steps drawn honestly')});
 
 // ---- Scale --------------------------------------------------------------
@@ -84,7 +84,7 @@ D('s2',{d:'The same collapse for a wide fan-out. The envelope is the level and t
   svg:(()=>{
     const members=[]; for(let i=0;i<12;i++) members.push([6+i*2.9, 21-i*0.6, 'good']);
     return fig([
-      {n:'req + ×12', segs:[['idle',0,2],['disc',2,2]]},
+      {n:'req + worker ×12', segs:[['idle',0,2],['disc',2,2]]},
       {n:'', segs:[]},
       {n:'collect', segs:[['disc',80,2],['idle',82,3],['good',85,12]]},
     ], groupRow(1,{n:'× 12 worker',x:5,w:70,members,note:'12 · staggered'}),
@@ -108,8 +108,8 @@ D('s4',{d:'Whatever the step count, the trace draws about forty rows at rest. Ev
   svg:fig([
     {n:'first', segs:[['good',0,6]]},
     {n:'× 40 batch', segs:[['idle',6,2],['good',8,60]],note:''},
-    {n:'  ↳ member 7', segs:[['idle',20,1],['good',21,6]]},
-    {n:'  ↳ member 8', segs:[['idle',24,1],['good',25,5]]},
+    {n:'  ↳ batch 7', segs:[['idle',20,1],['good',21,6]]},
+    {n:'  ↳ batch 8', segs:[['idle',24,1],['good',25,5]]},
     {n:'last', segs:[['disc',70,2],['idle',72,3],['good',75,12]]},
   ],tag(px(69),cy(1)+2.5,'× 40'),'one group expanded in place')});
 

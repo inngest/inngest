@@ -6,6 +6,20 @@ const GENS=['vocab','barvocab','attribution','items-a','items-bc','items-disc','
 for(const g of GENS) execFileSync('node',[HERE+g+'.mjs'],{stdio:'pipe'});
 const J=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
 const EX={...J['items-a'],...J['items-bc'],...J['items-disc'],...J['items-more']};
+/**
+ * The docs tab shows the EXPORTED figures, not the live framed ones, because
+ * the point of the tab is to be the page that ships. The exports are unframed;
+ * the blurred surround is a review device and would not appear in user docs.
+ * A stale image here means `node export-docs.mjs` has not been re-run, which is
+ * exactly the drift the tab exists to make visible.
+ */
+const DOCFIG=(()=>{
+  const dir=HERE+'../../docs/images/', out={};
+  let names=[]; try{ names=fs.readdirSync(dir); }catch{ return out; }
+  for(const f of names) if(f.endsWith('.svg'))
+    out[f.replace(/\.svg$/,'')]=fs.readFileSync(dir+f,'utf8').replace(/^<\?xml[^>]*>/,'');
+  return out;
+})();
 
 /**
  * Margin notes with leaders that land on an exact point in the plot.
@@ -85,6 +99,52 @@ function highlight(src){
   return t.replace(/\u0000(\d+)\u0000/g,(m,i)=>held[+i]);
 }
 const codeOf=id=>CODE[id]?`<pre class="code">${highlight(CODE[id])}</pre>`:'';
+/**
+ * The user-facing docs, rendered from the same markdown that ships, with its
+ * figures resolved back to the live SVGs rather than the exported files. That
+ * is the point of having it here: if a rule changes, the docs tab shows it
+ * immediately and you can see whether the prose still tells the truth.
+ *
+ * Small on purpose — enough markdown for this one document, not a parser.
+ */
+const DOC=(()=>{
+  let md;
+  try{ md=fs.readFileSync(HERE+'../../docs/understanding-traces.md','utf8'); }
+  catch{ return '<p class="note">docs/understanding-traces.md not found</p>'; }
+  md=md.replace(/^---[\s\S]*?^---\n/m,'');                       // front matter
+  const imgs={};
+  md=md.replace(/!\[([^\]]*)\]\(\.\/images\/([a-z-]+)\.svg\)/g,(m,alt,name)=>{
+    imgs[name]=alt; return '\u0001'+name+'\u0001';
+  });
+  const inline=t=>esc(t)
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/(?<![*\w])\*([^*]+)\*(?!\*)/g,'<em>$1</em>');
+  const out=[];
+  for(const block of md.split(/\n{2,}/)){
+    const b=block.trim(); if(!b) continue;
+    if(b.startsWith('\u0001')){
+      const name=b.replace(/\u0001/g,'');
+      out.push(DOCFIG[name]
+        ? `<figure class="frame"><div class="figure">${DOCFIG[name]}</div><figcaption class="fl">${esc(imgs[name]||'')}</figcaption></figure>`
+        : `<p class="note">missing figure: ${name}</p>`);
+    }
+    else if(b.startsWith('```')) out.push(`<pre class="code">${highlight(b.replace(/^```\w*\n?|\n?```$/g,''))}</pre>`);
+    else if(b.startsWith('## ')) out.push(`<h3>${inline(b.slice(3))}</h3>`);
+    else if(b.startsWith('### ')) out.push(`<h4>${inline(b.slice(4))}</h4>`);
+    else if(b.startsWith('> ')) out.push(`<p class="rule">${inline(b.replace(/^> ?/gm,''))}</p>`);
+    else if(/^\|/.test(b)){
+      const rows=b.split('\n').filter(r=>!/^\|[\s|:-]+\|$/.test(r))
+        .map(r=>r.split('|').slice(1,-1).map(c=>`<td>${inline(c.trim())}</td>`).join(''));
+      out.push(`<table>${rows.map(r=>`<tr>${r}</tr>`).join('')}</table>`);
+    }
+    else if(/^[-*] /m.test(b)) out.push(`<ul>${b.split(/\n(?=[-*] )/).map(li=>`<li>${inline(li.replace(/^[-*] /,'').replace(/\n\s+/g,' '))}</li>`).join('')}</ul>`);
+    else if(/^\d+\. /.test(b)) out.push(`<ol>${b.split(/\n(?=\d+\. )/).map(li=>`<li>${inline(li.replace(/^\d+\. /,'').replace(/\n\s+/g,' '))}</li>`).join('')}</ol>`);
+    else out.push(`<p>${inline(b.replace(/\n/g,' '))}</p>`);
+  }
+  return out.join('\n');
+})();
+
 const chip=k=>`<svg class="chip" viewBox="0 0 30 8" aria-hidden="true"><rect width="30" height="8" rx="1.5" fill="${V.paint(k)}"/></svg>`;
 const mark=k=>`<svg class="chip mk" viewBox="0 0 12 12" aria-hidden="true">${V.dot(6,6,k,1,3.6,false)}</svg>`;
 const keys=rows=>`<ul class="keylist">`+rows.map(([sw,t])=>`<li>${sw}<span>${t}</span></li>`).join('')+`</ul>`;
@@ -339,6 +399,14 @@ const page=`<title>Trace Design System</title>
 
   /* Scenarios tile: the figures keep their size, the page fits more per row. */
   .grid{display:grid;gap:18px 26px;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--figw)),1fr))}
+  .doc{max-width:74ch}
+  .doc h3{margin:34px 0 10px}
+  .doc h4{margin:22px 0 8px;font-family:var(--display);font-size:15px}
+  .doc figure.frame{margin:16px 0}
+  .doc table{margin:14px 0}
+  .doc td{padding:6px 14px 6px 0;vertical-align:top;border-top:1px solid var(--rule)}
+  .doc li{margin:0 0 7px}
+  .doc .code{max-width:60ch}
   .grid .item{border-top:1px solid var(--rule);padding:16px 0 10px;min-width:0;
     display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:28px;align-items:start}
   /* The code and its explanation stay with you while the figures scroll past.
@@ -460,7 +528,7 @@ const page=`<title>Trace Design System</title>
 </style>
 ${sidebar}
 <main>
-<nav class="tabs" role="tablist"><button class="tab on" data-tab="concepts">Concepts</button><button class="tab" data-tab="scenarios">Scenarios</button><button class="tab" data-tab="fixtures">Fixtures</button></nav>
+<nav class="tabs" role="tablist"><button class="tab on" data-tab="concepts">Concepts</button><button class="tab" data-tab="scenarios">Scenarios</button><button class="tab" data-tab="fixtures">Fixtures</button><button class="tab" data-tab="docs">Docs</button></nav>
 <header>
   <h1>Trace Design System</h1>
   <p>How Inngest draws a function run. The vocabulary is in the panel on the left and is live: change it there and every figure on this page changes.</p>
@@ -518,6 +586,12 @@ ${fig(J.barvocab.notes,'A duration after the bar it belongs to. The same slot ca
 <p>Ordered from one step to the cases that are hard to draw. Each shows the run at rest and, where it differs, on hover or select.</p>
 ${scenarios}
 
+</section>
+
+<section id="t-docs" hidden>
+<h2>User docs</h2>
+<p class="note">The page we would ship, rendered from <code>docs/understanding-traces.md</code> with its figures resolved to the live drawings. If a rule changes and this stops being true, that is the signal.</p>
+<div class="doc">${DOC}</div>
 </section>
 
 <section id="t-fixtures" hidden>
