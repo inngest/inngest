@@ -427,7 +427,11 @@ const page=`<title>Trace Design System</title>
   /* Geometry, live. height and r are CSS geometry properties, so a bar can take
      its height from a variable; the transform re-centres it on the row's line,
      which the SVG now uses as the bar's y. */
-  .figure svg{overflow:visible}
+  /* Content spills when the pitch grows past what the box was generated for,
+     so the box is given the difference back. Clamped at zero: a tighter pitch
+     leaves the figure short rather than pulling the next one up into it. */
+  .figure svg{overflow:visible;
+    margin-bottom:calc(max(0px, var(--geo-row,17px) - 17px) * var(--nr,0))}
   svg rect.bar{height:var(--geo-bar,7px);transform:translateY(calc(var(--geo-bar,7px) / -2))}
   svg rect.bar.sm{height:var(--geo-sbar,4.2px);transform:translateY(calc(var(--geo-sbar,4.2px) / -2))}
   svg rect.bar.rail{height:1.8px;transform:translateY(-0.9px)}
@@ -436,6 +440,10 @@ const page=`<title>Trace Design System</title>
   /* Each row knows how many gaps of each pitch sit above it. */
   svg g.r{transform:translateY(calc((var(--geo-row,17px) - 17px) * var(--i,0)
                                  + (var(--geo-span,9px) - 9px) * var(--s,0)))}
+  /* The framed body sits a whole number of pitches below the Run row. */
+  svg g.dy{transform:translateY(calc(var(--geo-row,17px) * var(--a,0)))}
+  /* A ribbon spans N row gaps, so it restretches with the pitch. */
+  svg rect.rib{height:calc(var(--geo-row,17px) * var(--n,1))}
   .sws{display:flex;gap:4px}
   .sw{width:16px;height:16px;border-radius:3px;border:1px solid var(--rule-2)!important;padding:0!important;cursor:pointer}
   .sw.on{outline:1.5px solid var(--ink);outline-offset:1px}

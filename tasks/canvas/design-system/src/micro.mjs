@@ -322,9 +322,13 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false})
   // row and the figure rows read as one row to anything parsing the SVG back.
   // Tag the frame marks so the validator skips them: context, not rows.
   const tagCtx=t=>t.replace(/<circle class="ev /g,'<circle class="ev ctx ');
+  // Finalization sits this many gaps of each pitch below the Run row, so it
+  // tracks the rows above it instead of staying where it was generated.
+  const st=rowSteps(rows), tail=st.length?st[st.length-1]:[0,0];
+  const wrapFin=t=>`<g class="r" style="--i:${above+tail[0]+1};--s:${tail[1]}">${t}</g>`;
   // Two layers, both currently soft. Kept split because the Run row is the one
   // piece of the surround that is sometimes the subject rather than context.
-  return {sharp:tagCtx(run), soft:tagCtx(fin)};
+  return {sharp:tagCtx(run), soft:wrapFin(tagCtx(fin))};
 }
 
 /**
@@ -506,7 +510,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const DY=ROW*above;
   const over=opts.over?opts.over(XS,i=>cy(i)+DY):'';
   const inner=framed
-    ? `<g transform="translate(0,${DY})">${stretch(body,LBL,k)}</g>`
+    ? `<g class="dy" style="--a:${above}">${stretch(body,LBL,k)}</g>`
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
@@ -526,7 +530,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const blurred=cmp.clip
     ? `<g clip-path="url(#cmp-${UID})" filter="url(#cmp-b-${UID})">${inner}</g>`
     : '';
-  return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" role="img" aria-label="${label}">`+
+  const nr=n+above+(framed?1:0);
+  return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+`</svg>`;
 }
 
@@ -543,8 +548,14 @@ const BLURDEF=`<defs><filter id="cmpblur" x="-30%" y="-10%" width="160%" height=
  * rows, so each circle reads as sitting ON it rather than beside it — the
  * grouping costs no row and favours no member.
  */
-export function ribbon(xp, ys, {o=1, w=3.4}={}){
+export function ribbon(xp, ys, {o=1, w=3.4, gaps}={}){
   if(ys.length<2) return '';
   const x=px(xp);
-  return `<rect x="${x-w/2}" y="${ys[0]}" width="${w}" height="${ys[ys.length-1]-ys[0]}" fill="${C.disc}" opacity="${0.95*o}"/>`;
+  const span=ys[ys.length-1]-ys[0];
+  // `gaps` is how many row pitches it spans, so CSS can restretch it when the
+  // pitch moves. Without it the ribbon kept its generated height while the rows
+  // it threads slid out from under it.
+  const n=gaps!=null?gaps:Math.max(1,Math.round(span/ROW));
+  return `<rect class="rib" style="--n:${n}" x="${x-w/2}" y="${ys[0]}" width="${w}" `+
+    `height="${span}" fill="${C.disc}" opacity="${0.95*o}"/>`;
 }
