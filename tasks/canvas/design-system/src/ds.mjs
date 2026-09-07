@@ -61,7 +61,30 @@ const annofig=(o)=>{
 };
 import {CODE} from './code.mjs';
 const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const codeOf=id=>CODE[id]?`<pre class="code">${esc(CODE[id])}</pre>`:'';
+
+/**
+ * Enough colouring to read the shape of a snippet: what is a step call, what is
+ * a name, what is an aside. Deliberately not a real tokeniser — these are eight
+ * lines of pseudo-code, and a full grammar would be more machinery than the
+ * thing it colours.
+ *
+ * Order matters: comments and strings are taken first and stashed, so a keyword
+ * inside a comment is not coloured as a keyword.
+ */
+const KW=/\b(await|const|async|return|for|of|try|catch|export|default|new|throw|if)\b/g;
+function highlight(src){
+  const held=[];
+  const hold=t=>{held.push(t);return '\u0000'+(held.length-1)+'\u0000';};
+  let t=esc(src)
+    .replace(/\/\/[^\n]*/g, m=>hold('<i class="c-com">'+m+'</i>'))
+    .replace(/&#39;[^&]*?&#39;|'[^']*'|`[^`]*`/g, m=>hold('<i class="c-str">'+m+'</i>'));
+  t=t.replace(KW,'<i class="c-kw">$1</i>')
+     .replace(/\b(step|Promise|inngest)\b/g,'<i class="c-obj">$1</i>')
+     .replace(/\.(run|sleep|waitForEvent|waitForSignal|invoke|sendEvent|all|race|map|createFunction)\b/g,'.<i class="c-fn">$1</i>')
+     .replace(/\u2026/g,'<i class="c-dim">\u2026</i>');
+  return t.replace(/\u0000(\d+)\u0000/g,(m,i)=>held[+i]);
+}
+const codeOf=id=>CODE[id]?`<pre class="code">${highlight(CODE[id])}</pre>`:'';
 const chip=k=>`<svg class="chip" viewBox="0 0 30 8" aria-hidden="true"><rect width="30" height="8" rx="1.5" fill="${V.paint(k)}"/></svg>`;
 const mark=k=>`<svg class="chip mk" viewBox="0 0 12 12" aria-hidden="true">${V.dot(6,6,k,1,3.6,false)}</svg>`;
 const keys=rows=>`<ul class="keylist">`+rows.map(([sw,t])=>`<li>${sw}<span>${t}</span></li>`).join('')+`</ul>`;
@@ -154,7 +177,7 @@ const scenarios = SC.filter(([,items])=>items.length).map(([title,items])=>
 `  <section class="sc">
     <h3>${title}</h3>
     <div class="grid">
-${items.map(([id,note])=>`      <div class="item" data-sc="${id}"><p class="note">${note}</p>${codeOf(id)}${frames(id)}</div>`).join('\n')}
+${items.map(([id,note])=>`      <div class="item" data-sc="${id}"><div class="col-l">${codeOf(id)}<p class="note">${note}</p></div><div class="col-r">${frames(id)}</div></div>`).join('\n')}
     </div>
   </section>`).join('\n');
 
@@ -316,10 +339,27 @@ const page=`<title>Trace Design System</title>
 
   /* Scenarios tile: the figures keep their size, the page fits more per row. */
   .grid{display:grid;gap:18px 26px;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--figw)),1fr))}
-  .grid .item{border-top:1px solid var(--rule);padding:12px 0 4px;min-width:0}
-  .code{font-family:var(--mono,ui-monospace,monospace);font-size:11px;line-height:1.55;color:var(--ink-2);
+  .grid .item{border-top:1px solid var(--rule);padding:16px 0 10px;min-width:0;
+    display:grid;grid-template-columns:minmax(280px,360px) 1fr;gap:28px;align-items:start}
+  /* The code and its explanation stay with you while the figures scroll past.
+     Offset by the tab bar, which is sticky at the top of the page. */
+  .col-l{position:sticky;top:64px;min-width:0}
+  .col-r{min-width:0;display:grid;gap:10px}
+  .col-l .note{margin:10px 0 0}
+  @media (max-width:1080px){
+    .grid .item{grid-template-columns:1fr;gap:12px}
+    .col-l{position:static}
+  }
+  .c-kw{color:var(--accent);font-style:normal}
+  .c-obj{color:var(--child);font-style:normal}
+  .c-fn{color:var(--good);font-style:normal}
+  .c-str{color:var(--hold);font-style:normal}
+  .c-com{color:var(--muted);font-style:normal}
+  .c-dim{color:var(--muted);font-style:normal}
+  .code{font-family:var(--mono,ui-monospace,monospace);font-size:13px;line-height:1.6;color:var(--ink-2);
     background:var(--surface-2,rgba(255,255,255,.03));border-left:2px solid var(--rule-2);
-    padding:8px 10px;margin:0 0 10px;overflow-x:auto;white-space:pre;border-radius:0 3px 3px 0}
+    padding:10px 12px;margin:0 0 10px;white-space:pre-wrap;overflow-wrap:break-word;
+    border-radius:0 3px 3px 0;tab-size:2}
   h1{font-family:var(--display);font-weight:700;font-size:32px;letter-spacing:-.02em;margin:0 0 8px}
   h2{font-family:var(--display);font-weight:600;font-size:22px;margin:44px 0 10px;padding-top:22px;border-top:1px solid var(--rule)}
   h3{font-family:var(--display);font-weight:600;font-size:15px;margin:32px 0 10px;color:var(--ink-2)}

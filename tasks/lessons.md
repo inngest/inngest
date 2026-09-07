@@ -219,3 +219,22 @@ session calls.
 
 Not Playwright or Puppeteer: both download a dynamically-linked Chrome-for-
 Testing build that will not start on NixOS (`libglib-2.0.so.0` missing).
+
+### 21. A harness that slices HTML produces bugs the page does not have
+To screenshot one section of the design artifact I sliced the built HTML by
+string offset and wrapped the fragment in a new document. The slice cut through
+an element, so the code block escaped its container and every syntax-highlight
+span rendered on its own line — a page that looked catastrophically broken and
+was not. I nearly "fixed" a layout that was already correct.
+
+**Detection signal**: a rendering failure far larger than the change that
+supposedly caused it, in a region the change did not touch.
+
+**Prevention**: screenshot the *real* document. To reach a section, drive the
+page — flip the tab attribute and inject a `scrollIntoView` — rather than
+cutting the markup up. `tasks/canvas/shot.sh` plus a scroll target is the whole
+technique, and it cannot produce invalid HTML because it never edits structure.
+
+This is #18 from the other side: there the artefact was real and the check was
+weak; here the check invented a defect. Both are the same rule — the thing you
+read has to be the thing that ships.

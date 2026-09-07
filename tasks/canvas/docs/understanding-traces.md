@@ -24,12 +24,9 @@ was running.**
 Only a resolution circle is ever green or red. Everything before it is neutral,
 so the outcome of a row is always the last thing on it.
 
-That is the whole encoding. A row you can read at a glance:
+That is the whole encoding. Two sequential steps, read left to right:
 
-```
-○────────  ●━━━━━━━━━━  ●
-queued     started      ok
-```
+![Two sequential steps, each queued then running then resolved](./images/sequential.svg)
 
 ## Reading a row
 
@@ -64,6 +61,8 @@ await step.run('a', …)
 await step.run('b', …)
 ```
 
+![Sequential steps with no separate discovery bar](./images/sequential.svg)
+
 **Parallel code — the request finds several steps.** It cannot run them all
 here, so it reports them and stops. The next circle is **`planned`**, the only
 blue hollow circle in the trace, and a ribbon drops from it to every step that
@@ -76,6 +75,8 @@ await Promise.all([
   step.run('c', …),
 ])
 ```
+
+![A discovery request reports three steps, with a ribbon threading their planned marks](./images/fan-out.svg)
 
 Each of those steps then starts its own cycle: queued, wait, started, run.
 
@@ -90,6 +91,15 @@ came from one request. It is drawn at rest, not on hover, so:
 - **Two ribbons means two requests.** Two branches that each scheduled their own
   work do not share one.
 
+When those steps all resolve, they cause the next request:
+
+![Three parallel steps resolve and cause the next request](./images/fan-out-coalesce.svg)
+
+An uneven fan-out is countable at rest — you can see it produced three without
+counting them:
+
+![An uneven fan-out under one ribbon](./images/uneven-fan-out.svg)
+
 Ribbons nest, so depth reads without indentation.
 
 ## Waiting
@@ -103,8 +113,12 @@ running and you are not billed for the wait.
 | **Green circle** | The sleep elapsed, or the event arrived. |
 | **Grey circle** | The wait expired with no match. |
 
+![A wait that matched, resolving green](./images/wait-matched.svg)
+
 **A timeout is not a failure.** It is a result your function can act on, so the
 row goes grey and the run carries on.
+
+![A wait that expired with no match, resolving grey](./images/wait-timed-out.svg)
 
 ## Failure and recovery
 
@@ -116,8 +130,16 @@ row goes grey and the run carries on.
 - **A filled red circle** appears only when every attempt failed.
 - **Failure never spreads.** A red row does not tint its neighbours.
 
+![A step that threw, backed off, retried and returned](./images/retry.svg)
+
+A caught error is a red step inside a green run:
+
+![A failed step inside a run that succeeded](./images/caught-failure.svg)
+
 **Cancelled is its own state.** A step running when a run was cancelled is
 neither success nor failure, so it ends in a square rather than a circle.
+
+![A step cancelled while executing, ending in a square](./images/cancelled.svg)
 
 ## Long runs
 
@@ -126,6 +148,13 @@ the idle stretches and marks each one with a break.
 
 **Only the axis compresses. Every duration stays wall clock.** A step that took
 890ms says 890ms whatever the axis is doing.
+
+![A seven-day idle stretch compressed and marked as a break](./images/compressed-axis.svg)
+
+Reading the fill alone tells you the compute-to-elapsed ratio before you read a
+number — here, seven days elapsed and 62ms executing:
+
+![Seven days elapsed against 62ms of execution](./images/compute-vs-elapsed.svg)
 
 A step too short to draw still gets drawn, at a minimum width, with its real
 duration beside it. The drawing rounds; the number does not.
@@ -140,6 +169,8 @@ A collapsed group tells you what varied:
 
 > `38 × search, 2 × write_file`
 
+![Five hundred steps collapsed into one row with a count](./images/collapsed-group.svg)
+
 That is usually what you opened the trace to find. Iteration 7 calling a
 different tool is the interesting one, and collapsing by shape is what surfaces
 it. Expand any group in place.
@@ -149,6 +180,8 @@ it. Expand any group in place.
 The strip above the run is the same trace, in the same order and the same
 colours — one hairline per row. A cluster of failures two thirds through a long
 run is a red smear you can see without scrolling.
+
+![A cluster of failures showing as a red smear in the strip](./images/failure-cluster.svg)
 
 Drag it to set the viewport. Click a cluster to jump to it.
 
@@ -165,3 +198,5 @@ Worth knowing, so you do not go looking:
 Where the view is inferring rather than reading a reported fact, it says so.
 Inferred grouping is drawn dashed, and it never looks like something that was
 reported.
+
+![Inferred grouping drawn with a dashed ribbon and dashed cable](./images/inferred-grouping.svg)

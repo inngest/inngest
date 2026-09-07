@@ -17,7 +17,7 @@ const DIM=.15;
  * fully-lit row, which is right when the frame is described as "hovering x" and
  * wrong when it is "the request selected", so those pass it explicitly.
  */
-function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote='hovered',rib,ribs,focus,frame=true}){
+function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote='hovered',rib,ribs,focus,frame}){
   const all=ribs||(rib?[rib]:[]);
   const under=all.map(r=>ribbon(r.x,r.rows.map(i=>cy(i)))).join('');
   const marked=rows.map((r,i)=>{

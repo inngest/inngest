@@ -174,7 +174,10 @@ const CTX_O=0.34;
  * signatures is how a scripted edit silently misses one.
  */
 let FRAMED=false;
-export const setFrame=on=>{FRAMED=on;};
+// DS_FRAME=0 builds the figures unframed, which is how they are exported for the
+// user-facing docs: the blurred surround is a design-review device for us, and
+// in docs it reads as something being hidden from the reader.
+export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
 export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
   const y0=TOP+4;                                  // minimap strip
@@ -207,8 +210,17 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
   // to prevent.
   const run=hasOwnRun?'':runProfile(1,{to:Math.min(end+6,96),intervals,resolved:EV.ok},k);
   // Finalization is platform work: its own row, recessive label, still coloured.
+  // Finalization is a discovery request like any other — it asks the SDK what
+  // is next and the answer is "nothing". So it is queued, it waits, it starts,
+  // and the bar is `disc`: **your app executes for it**, and you are billed for
+  // it. Drawing it as a bare green bar hid both the wait and the compute.
+  const fx=Math.min(end+2,90), fq=2.2, fw=4.5;
   const fin=tag(2,finY+2.5,'Finalization')+
-    barSvg('good',Math.min(end+2,94),4,finY,{k:1,floor:k,o:1});
+    barSvg('idle',fx,fq,finY,{k:1,floor:k,o:1})+
+    barSvg('disc',fx+fq,fw,finY,{k:1,floor:k,o:1})+
+    dot(px(fx),finY,EV.queued)+
+    dot(px(fx+fq),finY,EV.started)+
+    dot(px(fx+fq+fw),finY,EV.ok);
   // The frame shares the row grid with the figure, and the inner content keeps
   // its own `cy` attributes because it is translated as a group — so the Run
   // row and the figure's second row read as one row to anything parsing the
@@ -246,7 +258,10 @@ export function fig(rows,extra='',label='',under='',opts={}){
     HATCH+BLURDEF+ctx+inner+over+`</svg>`;
 }
 
-const BLURDEF=`<defs><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%"><feGaussianBlur stdDeviation="0.62"/></filter></defs>`;
+const BLURDEF=`<defs><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+
+  `<feGaussianBlur stdDeviation="0.62"/>`+
+  `<feColorMatrix type="saturate" values="0.25"/>`+
+  `</filter></defs>`;
 
 /**
  * The tie between one discovery request and every step it queued.
