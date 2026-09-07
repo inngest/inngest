@@ -149,7 +149,7 @@ const SC=[
  ['Scale', [
   ['s1','Five hundred sequential steps collapse to one row that reports the count and draws where each member ran.'],
   ['s2','A wide fan-out collapses the same way. The stagger of a concurrency limit is visible without expanding it.'],
-  ['s3','A failure cluster two thirds through a long run is a red smear in the strip, findable without interacting.'],
+  ['s3','A failure cluster two thirds through a long run is a red smear on the Run row, findable without interacting.'],
   ['s4','About forty rows at rest whatever the step count, and any group expands where you are standing.'],
  ]],
  ['Naming and identity', [
@@ -158,7 +158,7 @@ const SC=[
  ]],
  ['Interaction', [
   ['i1','Three tiers of attention: the row, what caused it, everything else. Nothing is removed, only quietened.'],
-  ['i2','The strip above the run is a minimap of the same trace, in the same order and the same colours.'],
+  ['i2','The Run row is the overview, and it is what you scrub. One picture of the run, not two.'],
  ]],
  ['Honesty', [
   ['h1','Where the trace cannot say what caused a request, it declines rather than guessing.'],

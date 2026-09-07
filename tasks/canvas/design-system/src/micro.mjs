@@ -23,12 +23,27 @@ export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.
  * idle time or changes outcome, and the resolution — which is the only one that
  * carries status.
  */
-export function runProfile(i,{to=86,intervals=[],resolved,n='Run'},sc=1){
+/**
+ * The Run row: a profile of where the elapsed time went, and the thing you
+ * scrub. It replaced the separate minimap above it, which drew the same run in
+ * the same place in the same colours — two drawings of one fact, which is the
+ * characteristic defect of this view, and a second overview that could drift
+ * out of step with the first.
+ *
+ * **Failure wins over mixed.** A slice holding both a success and a failure
+ * draws red, not the neutral `mix`. The old "only if every step agrees" rule
+ * made a failure cluster among successes render blue — losing the signal at
+ * exactly the scale an overview exists for. The row already bent that way:
+ * failed slices have always had a wider minimum so they stay findable.
+ */
+export function runProfile(i,{to=86,intervals=[],resolved,n='Run',scrub},sc=1){
   const y=cy(i);
   const col=v=> v.ok===false?C.bad : v.ok==='stop'?C.mut : v.ok==='mix'?C.mix : C.good;
   let s=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
   s+=`<rect x="${LBL}" y="${y-2.5}" width="${((to/100)*PLOT).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
-  for(const v of intervals){
+  // Failures last, so where slices overlap the red is the one left showing.
+  const ordered=[...intervals].sort((p,q)=>(p.ok===false?1:0)-(q.ok===false?1:0));
+  for(const v of ordered){
     const a=v.a, b=Math.min(v.b,to);
     if(b<=a) continue;
     // Failure stays findable even when the interval is tiny.
@@ -38,7 +53,23 @@ export function runProfile(i,{to=86,intervals=[],resolved,n='Run'},sc=1){
   }
   s+=dot(LBL,y,EV.queued);
   if(resolved) s+=dot(LBL+(to/100)*PLOT,y,resolved);
+  if(scrub) s+=scrubWindow(y,scrub,to);
   return s;
+}
+
+/**
+ * The viewport, drawn on the Run row at rest rather than on hover, because a
+ * scrubber nobody finds is a scrubber nobody uses. Brackets rather than a fill:
+ * a wash over the profile would obscure the thing it is a window onto.
+ */
+export function scrubWindow(y,{a=0,b=null},to=86){
+  const x0=px(a), x1=px(b==null?to:b);
+  const t=y-7.5, h=15;
+  const grip=x=>
+    `<rect x="${(x-1.6).toFixed(1)}" y="${(t+2).toFixed(1)}" width="3.2" height="${h-4}" rx="1.4" fill="${C.acc}" opacity=".85"/>`+
+    `<line x1="${x.toFixed(1)}" y1="${(t+5).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(t+h-5).toFixed(1)}" stroke="${C.ground}" stroke-width=".7" opacity=".55"/>`;
+  return `<rect x="${x0.toFixed(1)}" y="${t}" width="${(x1-x0).toFixed(1)}" height="${h}" rx="2.5" fill="none" stroke="${C.acc}" stroke-width="1" opacity=".5"/>`+
+    grip(x0)+grip(x1);
 }
 
 export function row(i,r,sc=1){
@@ -63,7 +94,12 @@ export function row(i,r,sc=1){
   s+=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}" opacity="${dim}">${n}</text>`;
   segs.forEach(([k,a,w])=>{ s+=barSvg(k,a,w,y,{k:1,floor:sc,o:litBar(k,a)}); });
   const auto=autoDots(segs.map(([k,a,w])=>({kind:k,x:a,w})));
-  (dots||auto).forEach(d=>{const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01); s+=dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),litDot(d.p),3,!onRib);});
+  // A mark on a ribbon still gets its halo. It was suppressed so the circle
+  // would read as sitting ON the ribbon, but that cost it the ring of surface
+  // every other mark has, so it stopped separating from the bar behind it. The
+  // ribbon is drawn under the row, so it now threads BETWEEN the halos — beads
+  // on a string — which says the same thing and keeps the mark readable.
+  (dots||auto).forEach(d=>{const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01); s+=dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),litDot(d.p),3,true);});
   // The note follows the row's own content rather than sitting in a reserved
   // column, so no horizontal space is set aside for it.
   {
@@ -163,7 +199,7 @@ export function groupRow(i, {n, x, w, members, kind='good', note=''}){
  * Two frame rows sit above the figure (the minimap strip, then Run) and one
  * below (Finalization), so the figure's own rows start at slot 2.
  */
-export const FRAME_ROWS_ABOVE=2;
+export const FRAME_ROWS_ABOVE=1;
 const CTX_O=0.34;
 
 /**
@@ -180,36 +216,16 @@ let FRAMED=false;
 export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
 export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
-  const y0=TOP+4;                                  // minimap strip
-  // A figure with its own axis draws it below its last row, so finalization
-  // has to clear the axis rather than land on the ticks.
   const finY=cy(FRAME_ROWS_ABOVE+rows.length)+pad;
-  // The minimap is the same trace in the same order — one hairline per row,
-  // at the position that row's work occupied. Never a different set of steps.
-  // One hairline per ROW, not per segment. Merging them into a band made the
-  // minimap a second Run row — same position, same colour, same weight — and
-  // two drawings of one fact is the defect this whole language exists to avoid.
-  // It is granular where the Run row is a profile: that is the difference.
-  let mini=`<rect x="${LBL}" y="${y0+2.6}" width="${PLOT}" height="1" fill="${C.idle}"/>`;
-  rows.forEach((r,ri)=>{
-    const cs=(r.segs||[]).filter(([kd])=>COMPUTE.has(base(kd)));
-    if(!cs.length) return;
-    const a=Math.min(...cs.map(([,x])=>x)), b=Math.max(...cs.map(([,x,w])=>x+w));
-    const bad=cs.some(([kd])=>isFail(kd));
-    mini+=`<rect x="${px(a).toFixed(1)}" y="${(y0+0.6+ri*1.5).toFixed(1)}" width="${Math.max(0.8,((b-a)/100)*PLOT).toFixed(1)}" height="1.1" rx="0.4" fill="${bad?C.bad:C.good}" opacity=".95"/>`;
-  });
-  mini+=tag(2,y0+5,'minimap');
-  // The Run row is a profile of where the elapsed time went, not a restatement
-  // of the status: grey ground, coloured only where the SDK was executing.
+  // The Run row is the whole overview now. There was a minimap above it drawing
+  // the same run in the same place in the same colours; the only way to tell
+  // them apart was to make one deliberately thinner, which is treating a
+  // symptom. One overview cannot disagree with itself.
   const intervals=[];
   rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>{
     if(COMPUTE.has(base(kd))) intervals.push({a:x,b:x+w,ok:!isFail(kd)});
   }));
-  // A figure that already draws its own Run row keeps it; two Run rows would
-  // be the same interval drawn twice, which is the defect this language exists
-  // to prevent.
-  const run=hasOwnRun?'':runProfile(1,{to:Math.min(end+6,96),intervals,resolved:EV.ok},k);
-  // Finalization is platform work: its own row, recessive label, still coloured.
+  const run=hasOwnRun?'':runProfile(0,{to:Math.min(end+6,96),intervals,resolved:EV.ok,scrub:{a:0}},k);
   // Finalization is a discovery request like any other — it asks the SDK what
   // is next and the answer is "nothing". So it is queued, it waits, it starts,
   // and the bar is `disc`: **your app executes for it**, and you are billed for
@@ -223,10 +239,13 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
     dot(px(fx+fq+fw),finY,EV.ok);
   // The frame shares the row grid with the figure, and the inner content keeps
   // its own `cy` attributes because it is translated as a group — so the Run
-  // row and the figure's second row read as one row to anything parsing the
-  // SVG back. Tag the frame's marks so the validator skips them: they are
-  // context, not rows under test.
-  return (mini+run+fin).replace(/<circle class="ev /g,'<circle class="ev ctx ');
+  // row and the figure rows read as one row to anything parsing the SVG back.
+  // Tag the frame marks so the validator skips them: context, not rows.
+  const tagCtx=t=>t.replace(/<circle class="ev /g,'<circle class="ev ctx ');
+  // Two layers. The Run row is drawn SHARP: it is the overview and the control
+  // you scrub, and blurring the thing whose whole job is to be obvious defeats
+  // it. Only finalization is soft context.
+  return {sharp:tagCtx(run), soft:tagCtx(fin)};
 }
 
 export function fig(rows,extra='',label='',under='',opts={}){
@@ -251,9 +270,12 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const inner=framed
     ? `<g transform="translate(0,${DY})">${stretch(body,LBL,k)}</g>`
     : stretch(body,LBL,k);
-  const ctx=framed
-    ? `<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(traceFrame(rows,k,{end:max,hasOwnRun:rows.some(r=>r.run),pad:opts.pad||0}),LBL,k)}</g>`
-    : '';
+  let ctx='';
+  if(framed){
+    const F=traceFrame(rows,k,{end:max,hasOwnRun:rows.some(r=>r.run),pad:opts.pad||0});
+    ctx=stretch(F.sharp,LBL,k)+
+      `<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.soft,LBL,k)}</g>`;
+  }
   return `<svg viewBox="${-M} 0 ${W+M*2} ${h+(opts.pad||0)}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+ctx+inner+over+`</svg>`;
 }

@@ -91,16 +91,18 @@ D('s2',{d:'The same collapse for a wide fan-out. The envelope is the level and t
       'a wide fan-out, collapsed');
   })()});
 
-D('s3',{d:'A cluster of failures two thirds through a long run is a red smear in the strip above the trace, findable in the first screenful without scrolling or interacting.',
+D('s3',{d:'A cluster of failures two thirds through a 500-step run is a red smear on the Run row, findable in the first screenful without scrolling or interacting. This is what the failure-wins rule buys: under the old &ldquo;only if every step agrees&rdquo; rule these slices held successes too, so the cluster drew neutral blue and disappeared at exactly the scale it matters.',
   svg:(()=>{
-    let s='';
+    const intervals=[];
     for(let i=0;i<96;i++){
-      const bad = i>60 && i<70;
-      const h = bad?9:4+((i*7)%4);
-      s+=`<rect x="${LBL+i*(PLOT/96)}" y="${cy(0)-h/2}" width="${PLOT/96-0.6}" height="${h}" rx="0.6" fill="${bad?C.bad:C.good}" opacity="${bad?1:.5}"/>`;
+      const a=i*(86/96);
+      intervals.push({a, b:a+(86/96)*0.9, ok:!(i>60&&i<70)});
     }
-    return fig([{n:'',segs:[]},{n:'',segs:[]}], s+tag(px(63),cy(1)+2,'a failure cluster, 500 steps in'),
-      'a failure cluster in the density strip');
+    return fig([
+      {run:true, to:86, intervals, resolved:EV.failed, scrub:{a:0}},
+      {n:'act-[0…499]', segs:[['idle',0,2],['good',2,84]]},
+    ], tag(px(56),cy(1)+2.5,'a failure cluster, 500 steps in'),
+      'a failure cluster on the Run row');
   })()});
 
 D('s4',{d:'Whatever the step count, the trace draws about forty rows at rest. Everything past that is inside a collapsed group, and every collapsed group can be expanded where you are standing.',
@@ -137,16 +139,17 @@ D('i1',{d:'Three tiers of attention on hover: the row itself, what caused it, an
     {n:'d',  segs:[['idle',48,3],['good',51,20]],dim:DIM},
   ],arrow(px(18),cy(0),px(22),cy(1)),'hovered, immediate cause, everything else')});
 
-D('i2',{d:'The strip above the run is a minimap of the same trace, at the same order and the same colours. Dragging it sets the viewport; it never shows a different set of steps from the one below it.',
+D('i2',{d:'The Run row <em>is</em> the overview, and it is what you scrub. There was a minimap above it drawing the same run in the same place in the same colours &mdash; two pictures of one fact, and a second overview that could drift out of step with the first. The window is drawn at rest with a handle at each edge, because a scrubber nobody finds is a scrubber nobody uses.',
   svg:(()=>{
-    let s='';
-    const rows=[[0,18,'good'],[18,30,'good'],[48,10,'bad'],[58,28,'good']];
-    rows.forEach((r,i)=>{ s+=`<rect x="${px(r[0])}" y="${cy(0)-6+i*3}" width="${(r[1]/100)*PLOT}" height="2" rx="1" fill="${r[2]==='bad'?C.bad:C.good}" opacity=".8"/>`; });
-    s+=`<rect x="${px(30)}" y="${cy(0)-8}" width="${(40/100)*PLOT}" height="16" rx="2" fill="none" stroke="${C.acc}" stroke-width="1" opacity=".8"/>`;
-    return fig([{n:'minimap',segs:[]},{n:'',segs:[]},
+    // Failure wins over mixed here: the cluster at 48 is what an overview is
+    // for, and the old "only if every step agrees" rule drew it neutral blue.
+    const intervals=[{a:0,b:18,ok:true},{a:18,b:48,ok:true},
+                     {a:48,b:58,ok:false},{a:58,b:86,ok:true}];
+    return fig([
+      {run:true, to:86, intervals, resolved:EV.ok, scrub:{a:30,b:70}},
       {n:'b', segs:[['idle',30,4],['good',34,26]]},
       {n:'c', segs:[['bad',60,10]]},
-    ], s, 'the minimap mirrors the trace');
+    ], '', 'the Run row is the overview and the scrubber');
   })()});
 
 // ---- Honesty ------------------------------------------------------------

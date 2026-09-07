@@ -175,15 +175,20 @@ That is usually what you opened the trace to find. Iteration 7 calling a
 different tool is the interesting one, and collapsing by shape is what surfaces
 it. Expand any group in place.
 
-## The minimap
+## The Run row
 
-The strip above the run is the same trace, in the same order and the same
-colours — one hairline per row. A cluster of failures two thirds through a long
-run is a red smear you can see without scrolling.
+The top row is the whole run: a grey track of elapsed time, coloured wherever
+your code was executing. It is the overview and it is what you scrub — the
+window on it has a handle at each edge, and dragging sets what the rows below
+show.
+
+**Any failure in a stretch colours it red.** So a cluster of failures two thirds
+through a 500-step run is a red smear on that one row, visible before you scroll
+or click anything.
 
 ![A cluster of failures showing as a red smear in the strip](./images/failure-cluster.svg)
 
-Drag it to set the viewport. Click a cluster to jump to it.
+Drag the window to move it, or its handles to narrow it. Click a cluster to jump to it.
 
 ## What the trace will not tell you
 

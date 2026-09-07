@@ -125,3 +125,36 @@ per-figure polish.
 - [x] **First draft** at `docs/understanding-traces.md` — the two rules, reading
   a row, requests and the ribbon, waiting, failure, long runs, collapsing, the
   minimap, and what a trace will not tell you.
+
+## The minimap is gone; the Run row is the overview
+
+Decided with the stakeholder, and the reasoning is the durable part.
+
+- [x] **Merged.** The minimap and the Run row were two drawings of one fact —
+  the same run, in the same place, in the same colours. That is the
+  characteristic defect of this view (`LOG.md`: *"the same interval drawn twice,
+  in two places, under two names"*), and I had already treated the symptom by
+  making the minimap deliberately thinner just to tell them apart. Merging also
+  removes a surface where two overviews could disagree.
+- [x] **The Run row is what you scrub**, with the window drawn at rest and a
+  handle at each edge. A scrubber nobody finds is a scrubber nobody uses.
+- [x] **Failure wins over mixed.** Forced by the merge: the old *"a slice is
+  green or red only if every step live in it agrees"* rule drew a failure
+  cluster among successes as neutral blue, losing the signal at exactly the
+  scale an overview exists for. The row already bent this way — failed slices
+  have always had a wider minimum width so they stay findable.
+- [x] **The Run row is drawn sharp inside the frame**, not blurred with the rest
+  of the context. It is the overview *and* the control; blurring the thing whose
+  job is to be obvious defeats it. Only finalization stays soft.
+- [x] **`planned` marks got their halo back.** They were drawn without one so
+  they would read as sitting *on* the ribbon, which cost them the ring of
+  surface every other mark has — so they stopped separating from the bar behind
+  them. The ribbon threads between the halos instead, which says the same thing.
+
+### Open, raised by the merge
+
+- [ ] **Is the density strip now redundant too?** `Scale` used to show a failure
+  cluster as a red smear in a separate bucketed strip; that figure now draws it
+  on the Run row, because failure-wins put it there. The strip's remaining claim
+  is bar *height* as a count per bucket, which the Run row does not carry. Either
+  that is worth a row of its own or the strip goes the way of the minimap.

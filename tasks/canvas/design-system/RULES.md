@@ -52,7 +52,7 @@ report today.
 ## The Run row
 - The Run row reports **where elapsed time went**, not the run status — the header, badge and axis already carry status.
 - Grey track = elapsed time with no SDK execution; coloured slices = SDK executing, discovery included.
-- A slice is green or red only if every step live in it agrees; mixed slices fall back to blue/`mix`.
+- **Failure wins.** A slice holding any failure draws red. Mixed successes-and-waits still fall back to blue/`mix`, but a failure is never averaged away — the old "only if every step agrees" rule drew a failure cluster among successes as neutral blue, losing the signal at exactly the scale an overview exists for.
 - Platform rows (Finalization etc.) never enter the Run row profile.
 - ENCODING: `TRACK_H` 5 grey ground, `RUN_H` 8 slices; failed slices floored at `MIN_FAIL_W` 3.2 vs `MIN_W` 1.4 so failure stays findable; queued mark left, resolution mark right.
 - DEPENDS: per-step compute intervals with outcome, to slice the axis at every start/end edge.
@@ -162,8 +162,9 @@ report today.
 ## Interaction
 - Three tiers of attention on hover/select: the row, what caused it, everything else.
 - **Nothing is removed, only quietened**, so the run's shape stays readable.
-- The strip above the run is a minimap of the same trace, same order, same colours; **it never shows a different set of steps.**
-- ENCODING: dim opacity .15–.28 for off-path rows; selected row = accent wash at .13, rx 2; minimap viewport = accent outline rect.
+- **The Run row is the overview, and it is what you scrub.** There is no minimap: a second strip above it drew the same run in the same place in the same colours, which is one fact drawn twice and a second overview that can drift out of step with the first.
+- The scrub window is drawn **at rest**, with a handle at each edge — a scrubber nobody finds is a scrubber nobody uses.
+- ENCODING: dim opacity .15–.28 for off-path rows; selected row = accent wash at .13, rx 2; scrub window = accent outline rect with a rounded grip at each edge, over the profile rather than filling it.
 
 ## Honesty
 - Where the trace cannot say what caused a request, **it declines rather than guessing** — no cable, and the row says so.
