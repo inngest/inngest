@@ -88,6 +88,43 @@ function check(seq){
  * A row label is the step id. Group rows (`× 40 batch`) and request rows
  * (`req + a`) carry an id inside them, so a substring match is the right test.
  */
+/**
+ * The Run row is a profile of the whole run, so it has to reach the end of the
+ * run — which is the end of finalization, not the end of the last user step.
+ *
+ * It was built from the figure's own rows only, so it stopped short and showed
+ * the run doing nothing while finalization executed: the overview disagreeing
+ * with the rows beneath it, which is the one thing an overview must never do.
+ * Derived now, and asserted here so it stays derived.
+ */
+function checkRunExtent(){
+  let bad=0;
+  for(const g of ['items-a','items-bc','items-disc','items-more']){
+    const J=JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'));
+    const svgs=[];
+    const walk=v=>{ if(typeof v==='string'){ if(v.startsWith('<svg')) svgs.push(v); }
+                    else if(Array.isArray(v)) v.forEach(walk);
+                    else if(v&&typeof v==='object') Object.values(v).forEach(walk); };
+    walk(J);
+    svgs.forEach((svg,i)=>{
+      const marks=[...svg.matchAll(/<circle class="ev ctx [^"]*" cx="([\d.]+)" cy="([\d.]+)"/g)]
+        .map(m=>({x:+m[1],y:Math.round(+m[2])}));
+      if(!marks.length) return;                       // unframed figure
+      const byRow={};
+      for(const m of marks) (byRow[m.y]=byRow[m.y]||[]).push(m.x);
+      const ys=Object.keys(byRow).map(Number).sort((a,b)=>a-b);
+      if(ys.length<2) return;                         // figure draws its own Run row
+      const runEnd=Math.max(...byRow[ys[0]]);
+      const finEnd=Math.max(...byRow[ys[ys.length-1]]);
+      if(Math.abs(runEnd-finEnd)>0.5){
+        bad++;
+        console.log(`  ${g} fig#${i}: Run row ends at ${runEnd.toFixed(1)} but the trace ends at ${finEnd.toFixed(1)}`);
+      }
+    });
+  }
+  return bad;
+}
+
 async function checkCodeSync(){
   const {CODE}=await import('./code.mjs');
   const ds=fs.readFileSync(HERE+'ds.mjs','utf8');
@@ -149,8 +186,10 @@ for(const g of GENS){
 }
 console.log(`\n${figures} figures, ${rows} rows, ${bad} with problems`);
 
+const short=checkRunExtent();
+if(short) console.log(`\n${short} figure(s) whose Run row does not reach the end of the trace`);
 const desync=await checkCodeSync();
 console.log(desync
   ? `\n${desync} figure(s) whose code and drawing disagree`
   : 'code and figures agree');
-if(bad||desync) process.exitCode=1;
+if(bad||desync||short) process.exitCode=1;

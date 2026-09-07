@@ -53,7 +53,7 @@ report today.
 - The Run row reports **where elapsed time went**, not the run status — the header, badge and axis already carry status.
 - Grey track = elapsed time with no SDK execution; coloured slices = SDK executing, discovery included.
 - **Failure wins.** A slice holding any failure draws red. Mixed successes-and-waits still fall back to blue/`mix`, but a failure is never averaged away — the old "only if every step agrees" rule drew a failure cluster among successes as neutral blue, losing the signal at exactly the scale an overview exists for.
-- Platform rows (Finalization etc.) never enter the Run row profile.
+- **The Run row is derived from every row in the trace, finalization included**, and reaches the end of the run rather than the end of the last user step. Leaving finalization out showed the run doing nothing while it executed, and stopped the profile short of where the trace actually ended — the overview disagreeing with the rows beneath it. Asserted in `validate.mjs`.
 - ENCODING: `TRACK_H` 5 grey ground, `RUN_H` 8 slices; failed slices floored at `MIN_FAIL_W` 3.2 vs `MIN_W` 1.4 so failure stays findable; queued mark left, resolution mark right.
 - DEPENDS: per-step compute intervals with outcome, to slice the axis at every start/end edge.
 

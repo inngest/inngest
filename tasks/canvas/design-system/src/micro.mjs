@@ -226,31 +226,44 @@ export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
   const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
   const finY=cy(above+rows.length)+pad;
-  // The Run row is the whole overview now. There was a minimap above it drawing
-  // the same run in the same place in the same colours; the only way to tell
-  // them apart was to make one deliberately thinner, which is treating a
-  // symptom. One overview cannot disagree with itself.
+
+  // Finalization is a discovery request like any other — it asks the SDK what
+  // is next and the answer is "nothing". So it is queued, it waits, it starts,
+  // and the bar is `disc`: **your app executes for it**, and you are billed for
+  // it. Computed before the Run row, because the Run row has to contain it.
+  const fx=Math.min(end+2,90), fq=2.2, fw=4.5, finEnd=fx+fq+fw;
+
+  /**
+   * The Run row is the whole overview, and it is **derived from every row in
+   * the trace, finalization included**. It was built from the figure's own rows
+   * only, so the run appeared to do nothing during finalization and stopped
+   * short of where the trace actually ended — the profile disagreeing with the
+   * rows underneath it, which is the one thing it must never do.
+   *
+   * It replaced a separate minimap that drew the same run in the same place in
+   * the same colours; the only way to tell them apart was to make one
+   * deliberately thinner, which was treating a symptom. One overview cannot
+   * disagree with itself.
+   */
   const intervals=[];
-  rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>{
-    if(COMPUTE.has(base(kd))) intervals.push({a:x,b:x+w,ok:!isFail(kd)});
-  }));
+  const add=(kd,x,w)=>{ if(COMPUTE.has(base(kd))) intervals.push({a:x,b:x+w,ok:!isFail(kd)}); };
+  rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>add(kd,x,w)));
+  add('disc',fx+fq,fw);
+
   // The run resolves as its LAST interval, not as "did anything fail". A run
   // that threw and then succeeded is a recovery, and resolving it red would say
   // the opposite of what the row underneath it shows.
   const last=intervals.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
-  const run=hasOwnRun?'':runProfile(0,{to:Math.min(end+6,96),intervals,
+  const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,
     resolved:(last&&last.ok===false)?EV.failed:EV.ok},k);
-  // Finalization is a discovery request like any other — it asks the SDK what
-  // is next and the answer is "nothing". So it is queued, it waits, it starts,
-  // and the bar is `disc`: **your app executes for it**, and you are billed for
-  // it. Drawing it as a bare green bar hid both the wait and the compute.
-  const fx=Math.min(end+2,90), fq=2.2, fw=4.5;
+
   const fin=tag(2,finY+2.5,'Finalization')+
     barSvg('idle',fx,fq,finY,{k:1,floor:k,o:1})+
     barSvg('disc',fx+fq,fw,finY,{k:1,floor:k,o:1})+
     dot(px(fx),finY,EV.queued)+
     dot(px(fx+fq),finY,EV.started)+
-    dot(px(fx+fq+fw),finY,EV.ok);
+    dot(px(finEnd),finY,EV.ok);
+
   // The frame shares the row grid with the figure, and the inner content keeps
   // its own `cy` attributes because it is translated as a group — so the Run
   // row and the figure rows read as one row to anything parsing the SVG back.
