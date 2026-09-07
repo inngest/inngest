@@ -44,7 +44,7 @@ const O={
       {n:'c',at:[['planned',12],['started',15],['ok',41]]},
       {n:'d',at:[['queued',45],['started',55],['ok',86]]},
     ],
-      wire(px(37),cy(0),px(45),cy(3),{i:0})+wire(px(45),cy(1),px(45),cy(3),{i:2})+wire(px(41),cy(2),px(45),cy(3),{i:1}),
+      '',
       'ribbon and cables'),
     notes:[
       {side:'left', span:[0,12], row:0, text:'discovery — it planned several'},

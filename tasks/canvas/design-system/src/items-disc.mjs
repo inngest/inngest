@@ -10,7 +10,7 @@ E.c67={d:'The request that would produce <code>b</code> failed twice before it w
   {l:'at rest',svg:fig([
     {n:'a',at:[['started',0],['ok',18]]},
     {n:'req + b',at:[['started',22],['retry',30],['started',40,'disc'],['retry',48],['started',64,'disc'],['ok',72],['queued',72],['started',76],['ok',96]],reported:1,note:'2 failed requests  20ms'},
-  ],tag(px(31),cy(1)+13,'backoff 1s',C.mut)+tag(px(50),cy(1)+13,'backoff 2s',C.mut),'discovery retried')},
+  ],'','discovery retried')},
   {l:'hovering b',svg:fig([
     {n:'a',at:[['started',0],['ok',18]],dim:DIM},
     {n:'req + b',at:[['started',22],['retry',30],['started',40,'disc'],['retry',48],['started',64,'disc'],['ok',72],['queued',72],['started',76],['ok',96]],reported:1,note:'20ms',sel:true},
@@ -27,7 +27,7 @@ E.c68={d:'Every attempt failed, so no step was ever produced and there is no row
   {l:'hovering the request',svg:fig([
     {n:'a',at:[['started',0],['ok',18]],dim:DIM},
     {n:'discovery',at:[['started',22],['retry',30],['started',40],['retry',48],['started',66],['failed',74]],kind:'disc',note:'gave up',sel:true},
-  ],arrow(px(18),cy(0),px(22),cy(1))+tag(px(76),cy(1)+2.5,'no step was ever produced',C.mut),'discovery exhausted, hovered')},
+  ],'','discovery exhausted, hovered')},
  ]};
 
 fs.writeFileSync(HERE+'items-disc.json',JSON.stringify(E));

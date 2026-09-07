@@ -758,6 +758,23 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const DY=ROW*above;
   const over=opts.over?opts.over(XS,i=>cy(i)+DY):'';
   /**
+   * The cables into whichever row is in focus, derived.
+   *
+   * Every figure gets them, because "what caused this row" is a property of the
+   * trace and not of the figure that happens to be drawing it. The focus is the
+   * selected row, or one a figure names outright; without one there is nothing
+   * to point at and no cables are drawn.
+   */
+  const focusRow = opts.focus!=null ? opts.focus : rows.findIndex(r=>r.sel);
+  // `attributed:false` is a figure saying the trace never reported what caused
+  // the row. Timing alone would answer it -- some earlier step always finished
+  // just before -- and answering it from timing is the guess the design refuses
+  // to make, so the figure has to be able to say the link is not there.
+  const cab = (focusRow<0||focusRow==null||opts.attributed===false) ? ''
+    : R.cables(rows,focusRow)
+        .map(c=>wire(XS(c.x),ys[c.from]+DY,XS(c.q),ys[c.to]+DY,{i:Math.abs(c.to-c.from)-1}))
+        .join('');
+  /**
    * The outbound lineage marker, placed from the row that owns it.
    *
    * It used to be handed absolute coordinates by the figure -- and in the one
@@ -803,7 +820,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     : '';
   const nr=n+above+(framed?1:0);
   return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
-    HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+lin+`</svg>`;
+    HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+cab+lin+`</svg>`;
 }
 
 const BLURDEF=`<defs><filter id="cmpblur" x="-30%" y="-10%" width="160%" height="120%"><feGaussianBlur stdDeviation="1.4"/><feColorMatrix type="saturate" values="0.55"/></filter><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+

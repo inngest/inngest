@@ -5,7 +5,7 @@ const HERE=new URL('./',import.meta.url).pathname;
  */
 import fs from 'fs';
 
-const GENS=['vocab','barvocab','attribution','items-a','items-bc','items-disc','items-more','connect','batch1','runbar'];
+const GENS=['vocab','barvocab','items-a','items-bc','items-disc','items-more','connect','batch1','runbar'];
 const KIND=[
   [/ev-hollow-bad"/,'retry'],
   [/ev-queued"/,'queued'],
@@ -270,7 +270,7 @@ if(unruled.length){
 const authored=(()=>{
   let n=0;
   for(const f of ['items-a.mjs','items-bc.mjs','items-disc.mjs','items-more.mjs','fixtures.mjs',
-                  'batch1.mjs','runbar.mjs','annotated.mjs','attribution.mjs']){
+                  'batch1.mjs','runbar.mjs','annotated.mjs']){
     let src=''; try{ src=fs.readFileSync(HERE+f,'utf8'); }catch{ continue; }
     const hits=(src.match(/\{n:'Run'/g)||[]).length;
     if(hits){ console.log(`  ${f} draws ${hits} Run row(s) by hand`); n+=hits; }

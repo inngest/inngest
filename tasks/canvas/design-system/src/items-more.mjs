@@ -137,10 +137,10 @@ D('t3',{d:'Two tiers of axis label. The coarse tier carries what the run crossed
 
 D('t4',{d:'A step too short to draw is still drawn. It gets a minimum width so it can be pointed at, and the number beside it is the real one: the drawing rounds, the reported duration does not.',
   svg:fig([
-    {n:'a', at:[['started',0],['ok',0.4]]},
+    {n:'a', at:[['started',0],['ok',0.4]],note:'12ms'},
     {n:'nap',  at:[['started',0.4],['ok',96.4]],kind:'wait'},
-    {n:'b', at:[['started',96.4],['ok',96.6],['started',96.6],['ok',97]],reported:1},
-  ],tag(px(2),cy(0)+2.5,'12ms')+tag(px(98.5),cy(2)+2.5,'10ms'),'sub-pixel steps drawn honestly','',{linear:true})});
+    {n:'b', at:[['started',96.4],['ok',96.6],['started',96.6],['ok',97]],reported:1,note:'10ms'},
+  ],'','sub-pixel steps drawn honestly','',{linear:true})});
 
 // ---- Scale --------------------------------------------------------------
 
@@ -175,7 +175,7 @@ D('s3',{d:'A cluster of failures two thirds through a 500-step run is a red smea
     return fig([
       {run:true, to:86, intervals, resolved:EV.failed},
       {n:'act-[0…499]', at:[['queued',0],['started',2],['ok',86]]},
-    ], tag(px(54),cy(2)+3,'a failure cluster, 500 steps in'),
+    ], '',
       'a failure cluster on the Run row', {pad:12});
   })()});
 
@@ -186,7 +186,7 @@ D('s4',{d:'Whatever the step count, the trace draws about forty rows at rest. Ev
     {n:'  ↳ batch 7', at:[['queued',20],['started',21],['ok',27]]},
     {n:'  ↳ batch 8', at:[['queued',24],['started',25],['ok',30]]},
     {n:'last', at:[['started',70],['ok',72],['queued',72],['started',75],['ok',87]],reported:1},
-  ],tag(px(69),cy(1)+2.5,'× 40'),'one group expanded in place')});
+  ],'','one group expanded in place')});
 
 // ---- Naming & identity --------------------------------------------------
 
@@ -201,7 +201,7 @@ D('n2',{d:'The SDK’s :1 and :2 suffixes are not stable under parallelism, so n
   svg:fig([
     {n:'fetch:1', at:[['started',6],['ok',26]]},
     {n:'fetch:2', at:[['started',6],['ok',36]]},
-  ],tag(px(38),cy(0)+2.5,'suffix is reported, not relied on'),'unstable suffixes')});
+  ],'','unstable suffixes')});
 
 // ---- Interaction --------------------------------------------------------
 
@@ -211,7 +211,7 @@ D('i1',{d:'Three tiers of attention on hover: the row itself, what caused it, an
     {n:'b',  at:[['queued',18],['started',22],['ok',48]],sel:true},
     {n:'c',  at:[['started',4],['ok',16]],dim:DIM},
     {n:'d',  at:[['queued',48],['started',51],['ok',71]],dim:DIM},
-  ],arrow(px(18),cy(0),px(22),cy(1)),'hovered, immediate cause, everything else')});
+  ],'','hovered, immediate cause, everything else')});
 
 D('i2',{d:'The Run row <em>is</em> the overview. There was a minimap above it drawing the same run in the same place in the same colours &mdash; two pictures of one fact, and a second overview that could drift out of step with the first. One picture of the run, not two.',
   svg:(()=>{
@@ -280,12 +280,13 @@ D('h1',{d:'Where the trace cannot say which step caused a request, it declines r
     {n:'a', at:[['started',0],['ok',20]],dim:DIM},
     {n:'b', at:[['started',4],['ok',28]],dim:DIM},
     {n:'c', at:[['queued',28],['started',32],['ok',56]],sel:true},
-  ],tag(px(58),cy(2)+2.5,'no reported parent'),'declining to attribute')});
+  ],'','declining to attribute','',{attributed:false})});
 
 D('h2',{d:'A row’s label and its drawing have to agree. If the bar is drawn across a wider interval than the step ran for, the number beside it names the interval that was widened, not the one the SDK reported.',
   svg:fig([
-    {n:'a', at:[['queued',0],['started',2,'disc'],['ok',3],['queued',3],['started',11],['ok',31]],reported:1},
-  ],tag(px(33),cy(0)+2.5,'3ms reported · 31ms on the row'),'the label reconciles with the drawing')});
+    {n:'a', at:[['queued',0],['started',2,'disc'],['ok',3],['queued',3],['started',11],['ok',31]],reported:1,
+     note:'3ms reported · 31ms on the row'},
+  ],'','the label reconciles with the drawing')});
 
 D('h3',{d:'Nothing is drawn that cannot be asked what it is. Every interval and every mark on every row decomposes into named parts on hover, which is also how this document proves it has no unexplained pixels.',
   svg:fig([

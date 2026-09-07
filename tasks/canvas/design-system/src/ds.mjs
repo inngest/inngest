@@ -6,7 +6,7 @@ import * as R from './rules.mjs';
 // Cleared before the generators run; each appends what the elastic rule could
 // not reach, so an empty file means every figure is derived rather than placed.
 try{ fs.unlinkSync(new URL('./unruled.json',import.meta.url).pathname); }catch{}
-const GENS=['vocab','barvocab','attribution','items-a','items-bc','items-disc','items-more','connect','batch1','runbar','annotated','steptypes','detail','primer','fixtures'];
+const GENS=['vocab','barvocab','items-a','items-bc','items-disc','items-more','connect','batch1','runbar','annotated','steptypes','detail','primer','fixtures'];
 for(const g of GENS) execFileSync('node',[HERE+g+'.mjs'],{stdio:'pipe'});
 const J=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
 const EX={...J['items-a'],...J['items-bc'],...J['items-disc'],...J['items-more']};

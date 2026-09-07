@@ -32,14 +32,8 @@ function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote=
   const focusRow = focus!=null ? focus
     : (/^hovering/.test(hoverNote) ? whole[whole.length-1] : null);
   // The ribbon fades with everything else that is not the answer to the hover.
-  // What caused the row in focus, derived. Every cable used to be a wire()
-  // between four hand-worked coordinates.
-  const res=rows.map(resolveRow);
-  const cab=focusRow==null?'':R.cables(res,focusRow)
-    .map(c=>wire(px(c.x),cy(c.from),px(c.q),cy(c.to),{i:Math.abs(c.to-c.from)-1})).join('');
   const hov=fig(dimmed.map((r,i)=>i===focusRow?{...r,sel:true}:r),
-    cab+arrows.map(a=>Array.isArray(a)?arrow(...a):a).join('')+hoverExtra,label+' hovered',
-    '',{frame,ribO:R.FOCUS.ribbonDim});
+    hoverExtra,label+' hovered','',{frame,ribO:R.FOCUS.ribbonDim,focus:focusRow});
   return [{l:'at rest',svg:rest},{l:hoverNote,svg:hov}];
 }
 const D=(k,d,frames)=>{E[k]={d,frames};};
@@ -52,7 +46,7 @@ D('c0','In a single sequential thread the SDK answers and runs in the same execu
     {n:'b',at:[['queued',44],['started',56],['ok',86]],note:'discovered'}],'','sequential')},
    {l:'hovering b',svg:fig([{n:'a',at:[['queued',0],['started',10],['ok',44]],dim:DIM},
     {n:'b',at:[['queued',44],['started',56],['ok',86]],note:'discovered',sel:true}],
-    wire(px(44),cy(0),px(44),cy(1)),'sequential hovered')}]);
+    '','sequential hovered')}]);
 
 D('c1','One request made three steps. The ribbon threads their queue circles at rest, so hovering a member draws <em>no</em> cable &mdash; the relationship is already on screen, and nothing preceded this request to cable back to.',
   // Hovering `b` lights what caused it and nothing else: `b` entire, the ribbon,

@@ -13,7 +13,7 @@ D('c15',{d:'Inngest working out what to run next. A discovery bar only appears w
     '')});
 D('c16',{d:'Being held by flow control is queue time with a reason, and the reason is worth its own colour: amber hatched, still not your compute, but distinguishable at a glance from a step simply waiting its turn.',
   svg:fig([{n:'a',at:[['queued',0],['held',10],['started',62],['ok',92]],note:'+6.3s held  30ms'}],
-    tag(px(22),cy(0)-6,'concurrency: 1',C.mut),'concurrency hold')});
+    '','concurrency hold')});
 D('c16b',{d:'The same treatment covers every flow-control hold — throttle, rate limit, debounce — because they are the same fact about the run: it was ready and Inngest chose not to start it yet.',
   svg:fig([{n:'a',at:[['queued',0],['held',6],['started',36],['ok',60]],note:'throttled'},
            {n:'b',at:[['queued',0],['held',6],['started',60],['ok',84]],note:'rate limited'},
@@ -31,7 +31,7 @@ D('c20',{d:'No unexplained gaps. Every millisecond between the row start and its
   svg:fig([{n:'a',at:[['queued',0],['started',34],['retry',62],['queued',72],['started',76],['ok',94]],note:'fully accounted'}],'','gaps filled')});
 D('c21',{d:'The 26ms between one step ending and the next request starting is drawn once — as the arrow and as the interval, the same object.',
   svg:(()=>{const rows=[{n:'a',at:[['started',4],['ok',40]]},{n:'b',at:[['queued',52],['started',70],['ok',92]]}];
-    return fig(rows,arrow(px(40),cy(0),px(52),cy(1))+tag(px(41),cy(0)-6,'26ms',C.acc),'the connector is the interval');})()});
+    return fig(rows,'','the connector is the interval');})()});
 
 // ---- C. Step outcomes (c22–c30) -----------------------------------------
 D('c22',{d:'Green bar, green resolution circle. The baseline everything else is read against.',
