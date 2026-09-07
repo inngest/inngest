@@ -444,6 +444,12 @@ const page=`<title>Trace Design System</title>
      drawing and holds the box open at a tight pitch. */
   svg rect.rowhit{height:max(6px, var(--geo-row,17px));
     transform:translateY(calc(max(6px, var(--geo-row,17px)) / -2))}
+  /* The selection band is the row it belongs to, so it takes the row's pitch —
+     less a hair, so consecutive selected rows do not fuse into one block. */
+  svg rect.selband{height:max(5px, calc(var(--geo-row,17px) - 2px));
+    transform:translateY(calc(max(5px, calc(var(--geo-row,17px) - 2px)) / -2))}
+  svg rect.selband.sp{height:max(4px, calc(var(--geo-span,9px) - 1px));
+    transform:translateY(calc(max(4px, calc(var(--geo-span,9px) - 1px)) / -2))}
   /* A cable spans two rows, so it is scaled about its own start: the far end
      lands on the row it belongs to whatever the pitch is. */
   svg g.cable{transform:translateY(calc((var(--geo-row,17px) - 17px) * var(--a,0)))

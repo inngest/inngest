@@ -115,7 +115,8 @@ export function row(i,r,sc=1,yy){
   const litBar=(k,x)=>!lit ? dim
     : (lit.some(v=>typeof v==='string' ? v===base(k) : Math.abs(v-x)<0.01) ? 1 : dim);
   const litDot=p=>!litDots ? dim : (litDots.some(v=>Math.abs(v-p)<0.01) ? 1 : dim);
-  if(sel) s+=`<rect x="${LBL-3}" y="${y-7.5}" width="${PLOT+6}" height="15" fill="${C.acc}" opacity=".13" rx="2"/>`;
+  if(sel) s+=`<rect class="selband${r.span?' sp':''}" x="${LBL-3}" y="${y}" `+
+    `width="${PLOT+6}" height="15" fill="${C.acc}" opacity=".13" rx="2"/>`;
   /**
    * Fading happens on a GROUP, not on each element. Per-element opacity made a
    * dimmed row translucent to ITSELF: a mark's halo is a disc of surface
