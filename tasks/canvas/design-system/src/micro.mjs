@@ -327,7 +327,11 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false,l
   // is next and the answer is "nothing". So it is queued, it waits, it starts,
   // and the bar is `disc`: **your app executes for it**, and you are billed for
   // it. Computed before the Run row, because the Run row has to contain it.
-  const fx=Math.min(end+2,90), fq=2.2, fw=4.5, finEnd=running?end:fx+fq+fw;
+  // Where the run ends. With a finalization of its own that is where ITS work
+  // ended; the invented one is placed past the last row and sized to nothing in
+  // particular, and the Run row must not be drawn to a length nothing measured.
+  const fx=Math.min(end+2,90), fq=2.2, fw=4.5;
+  const finEnd=running?end:(ownFin?end:fx+fq+fw);
 
   /**
    * The Run row is the whole overview, and it is **derived from every row in
