@@ -59,6 +59,9 @@ const annofig=(o)=>{
     `<svg class="leads" viewBox="0 0 ${FIG} ${H.toFixed(0)}" width="${FIG}" height="${H.toFixed(0)}" aria-hidden="true"><defs><filter id="pen-shadow" x="-20%" y="-40%" width="140%" height="220%"><feDropShadow dx="0" dy="1.6" stdDeviation="1.4" flood-color="#000" flood-opacity=".65"/></filter></defs>${leaders}</svg>`+
     labels+`</figure>`;
 };
+import {CODE} from './code.mjs';
+const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const codeOf=id=>CODE[id]?`<pre class="code">${esc(CODE[id])}</pre>`:'';
 const chip=k=>`<svg class="chip" viewBox="0 0 30 8" aria-hidden="true"><rect width="30" height="8" rx="1.5" fill="${V.paint(k)}"/></svg>`;
 const mark=k=>`<svg class="chip mk" viewBox="0 0 12 12" aria-hidden="true">${V.dot(6,6,k,1,3.6,false)}</svg>`;
 const keys=rows=>`<ul class="keylist">`+rows.map(([sw,t])=>`<li>${sw}<span>${t}</span></li>`).join('')+`</ul>`;
@@ -155,7 +158,7 @@ const scenarios = SC.filter(([,items])=>items.length).map(([title,items])=>
 `  <section class="sc">
     <h3>${title}</h3>
     <div class="grid">
-${items.map(([id,note])=>`      <div class="item" data-sc="${id}"><p class="note">${note}</p>${frames(id)}</div>`).join('\n')}
+${items.map(([id,note])=>`      <div class="item" data-sc="${id}"><p class="note">${note}</p>${codeOf(id)}${frames(id)}</div>`).join('\n')}
     </div>
   </section>`).join('\n');
 
@@ -318,6 +321,9 @@ const page=`<title>Trace Design System</title>
   /* Scenarios tile: the figures keep their size, the page fits more per row. */
   .grid{display:grid;gap:18px 26px;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--figw)),1fr))}
   .grid .item{border-top:1px solid var(--rule);padding:12px 0 4px;min-width:0}
+  .code{font-family:var(--mono,ui-monospace,monospace);font-size:11px;line-height:1.55;color:var(--ink-2);
+    background:var(--surface-2,rgba(255,255,255,.03));border-left:2px solid var(--rule-2);
+    padding:8px 10px;margin:0 0 10px;overflow-x:auto;white-space:pre;border-radius:0 3px 3px 0}
   h1{font-family:var(--display);font-weight:700;font-size:32px;letter-spacing:-.02em;margin:0 0 8px}
   h2{font-family:var(--display);font-weight:600;font-size:22px;margin:44px 0 10px;padding-top:22px;border-top:1px solid var(--rule)}
   h3{font-family:var(--display);font-weight:600;font-size:15px;margin:32px 0 10px;color:var(--ink-2)}

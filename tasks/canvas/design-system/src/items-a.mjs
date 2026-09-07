@@ -1,6 +1,7 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,px,cy,arrow,causal,wire,tag,ribbon,C,W,LBL,PLOT} from './micro.mjs';
+import {setFrame} from './micro.mjs'; setFrame(true);
 const E={};
 const DIM=.15;
 
@@ -16,14 +17,14 @@ const DIM=.15;
  * fully-lit row, which is right when the frame is described as "hovering x" and
  * wrong when it is "the request selected", so those pass it explicitly.
  */
-function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote='hovered',rib,ribs,focus}){
+function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote='hovered',rib,ribs,focus,frame=true}){
   const all=ribs||(rib?[rib]:[]);
   const under=all.map(r=>ribbon(r.x,r.rows.map(i=>cy(i)))).join('');
   const marked=rows.map((r,i)=>{
     const on=all.find(g=>g.rows.includes(i));
     return on?{...r,noHalo:[on.x]}:r;
   });
-  const rest=fig(marked,restExtra,label+' at rest',under);
+  const rest=fig(marked,restExtra,label+' at rest',under,{frame});
   const spec=new Map(lit.map(v=>typeof v==='number'?[v,null]:[v.row,v]));
   const dimmed=marked.map((r,i)=>{
     if(!spec.has(i)) return {...r,dim:DIM};
@@ -35,7 +36,7 @@ function pair(rows,{lit,arrows=[],restExtra='',hoverExtra='',label='',hoverNote=
     : (/^hovering/.test(hoverNote) ? whole[whole.length-1] : null);
   const hov=fig(dimmed.map((r,i)=>i===focusRow?{...r,sel:true}:r),
     arrows.map(a=>Array.isArray(a)?arrow(...a):a).join('')+hoverExtra,label+' hovered',
-    all.map(r=>ribbon(r.x,r.rows.map(i=>cy(i)),{o:.35})).join(''));
+    all.map(r=>ribbon(r.x,r.rows.map(i=>cy(i)),{o:.35})).join(''),{frame});
   return [{l:'at rest',svg:rest},{l:hoverNote,svg:hov}];
 }
 const D=(k,d,frames)=>{E[k]={d,frames};};
@@ -55,14 +56,14 @@ D('c1','One request made three steps. The ribbon threads their queue circles at 
   // and on `a`'s row only the discovery bar, the queued mark that opens it and
   // the planned mark the ribbon threads. `a`'s own work had nothing to do with
   // `b` starting, so it stays faded.
-  pair([{n:'req + a',segs:[['disc',0,16],['idle',16,6],['good',22,44]],note:'44ms'},
+  pair([{n:'req + a',segs:[['idle',0,5.6],['disc',5.6,10.4],['idle',16,6],['good',22,44]],note:'44ms'},
         {n:'b',segs:[['idle',16,6],['good',22,52]],note:'52ms'},
         {n:'c',segs:[['idle',16,6],['good',22,38]],note:'38ms'}],
-    {lit:[{row:0,bars:['disc'],dots:[0,16]},1],arrows:[],
+    {lit:[{row:0,bars:[0,5.6],dots:[0,5.6,16]},1],arrows:[],
      label:'fan-out',hoverNote:'hovering b',rib:{x:16,rows:[0,1,2]}}));
 
 D('c2','The whole shape: one request fans out to three steps, all three completing causes the next request, and that request produced a single step so it rolls into <code>d</code>&rsquo;s row. The ribbon covers the fan-out at rest; the cables only appear when you ask, and only for the hop the ribbon cannot span.',
-  pair([{n:'req + a',segs:[['disc',0,12],['idle',12,2],['good',14,20]],note:'20ms'},
+  pair([{n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,2],['good',14,20]],note:'20ms'},
         {n:'b',segs:[['idle',12,2],['good',14,32]],note:'32ms'},
         {n:'c',segs:[['idle',12,2],['good',14,26]],note:'26ms'},
         {n:'d',segs:[['idle',46,10],['good',56,18]],note:'18ms'}],
@@ -71,11 +72,11 @@ D('c2','The whole shape: one request fans out to three steps, all three completi
      label:'fan-out then coalesce',hoverNote:'d selected',rib:{x:12,rows:[0,1,2]}}));
 
 D('c3','Chevrons nest naturally, so depth reads without indentation. Hovering one level lights only that level.',
-  pair([{n:'req + a',segs:[['disc',0,10],['idle',10,2],['good',12,20]]},
+  pair([{n:'req + a',segs:[['idle',0,3.5],['disc',3.5,6.5],['idle',10,2],['good',12,20]]},
         {n:'b',segs:[['idle',10,2],['good',12,24]]},
-        {n:'req + a1',segs:[['disc',34,8],['idle',42,2],['good',44,18]]},
+        {n:'req + a1',segs:[['idle',34,2.8],['disc',36.8,5.2],['idle',42,2],['good',44,18]]},
         {n:'a2',segs:[['idle',42,2],['good',44,22]]},
-        {n:'req + b1',segs:[['disc',38,8],['idle',46,2],['good',48,26]]}],
+        {n:'req + b1',segs:[['idle',38,2.8],['disc',40.8,5.2],['idle',46,2],['good',48,26]]}],
     {lit:[0,2,3],arrows:[wire(px(32),cy(0),px(34),cy(2))],
      label:'nested fan-out',hoverNote:'hovering a1',ribs:[{x:10,rows:[0,1]},{x:42,rows:[2,3]}]}));
 
@@ -83,7 +84,7 @@ D('c4','The ribbon covers exactly the members, so an uneven fan-out is legible a
   // Every member of a fan-out is enqueued by the request and waits its turn, so
   // each carries the same queue interval and the planned mark that opens it.
   // Without them the ribbon threaded rows that had no circles to thread.
-  pair([{n:'req + a',segs:[['disc',0,12],['idle',12,2],['good',14,30]]},
+  pair([{n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,2],['good',14,30]]},
         {n:'b',segs:[['idle',12,2],['good',14,58]]},
         {n:'c',segs:[['idle',12,2],['good',14,12]]},
         {n:'unrelated',segs:[['good',20,40]]}],
@@ -92,14 +93,14 @@ D('c4','The ribbon covers exactly the members, so an uneven fan-out is legible a
 
 D('c5','Nothing static predicted the width. The ribbon reports what happened rather than promising a shape, and the one cable worth drawing is the hop from <code>decide</code> into the request &mdash; not the request out to its own members.',
   pair([{n:'decide',segs:[['good',0,18]]},
-        {n:'req + d1',segs:[['disc',20,10],['idle',30,2],['good',32,26]]},
+        {n:'req + d1',segs:[['idle',20,3.5],['disc',23.5,6.5],['idle',30,2],['good',32,26]]},
         {n:'d2',segs:[['idle',30,2],['good',32,30]]},{n:'d3',segs:[['idle',30,2],['good',32,22]]},{n:'d4',segs:[['idle',30,2],['good',32,34]]}],
     {lit:[0,1,2,3,4],arrows:[wire(px(18),cy(0),px(20),cy(1))],
      label:'dynamic width',hoverNote:'the request selected',rib:{x:30,rows:[1,2,3,4]}}));
 
 D('c6','The ribbon covers both steps the resumption discovered, so nothing implies an order between them. The cable shows only what caused the resumption.',
   pair([{n:'a',segs:[['good',2,26]]},
-        {n:'req + b',segs:[['disc',32,14],['idle',46,2],['good',48,28]]},
+        {n:'req + b',segs:[['idle',32,4.9],['disc',36.9,9.1],['idle',46,2],['good',48,28]]},
         {n:'c',segs:[['idle',46,2],['good',48,20]]}],
     {lit:[0,1,2],arrows:[wire(px(28),cy(0),px(32),cy(1))],
      label:'one resumption, two steps',hoverNote:'the request selected',rib:{x:46,rows:[1,2]}}));
@@ -129,16 +130,16 @@ D('c10','A dead end is drawn by absence. Hovering it lights its own row and noth
     {lit:[1],arrows:[],label:'dead end',hoverNote:'hovering orphan, no outgoing arrow'}));
 
 D('c11','Inferred grouping gets a dashed ribbon and a dashed cable, so a guess never looks like a reported fact.',
-  [{l:'at rest',svg:fig([{n:'req + a',segs:[['disc',0,12],['good',14,30]]},{n:'b',segs:[['good',14,26]]}],
+  [{l:'at rest',svg:fig([{n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['good',14,30]]},{n:'b',segs:[['good',14,26]]}],
     `<path d="M${px(12)+7.5} ${cy(0)-3.6} L${px(12)+11.9} ${cy(0)} L${px(12)+7.5} ${cy(0)+3.6}" fill="none" stroke="${C.acc}" stroke-width="1.5" stroke-dasharray="2 1.6"/>`+
     tag(px(26),cy(0)-5,'inferred',C.acc),'inferred at rest')},
-   {l:'selected',svg:fig([{n:'req + a',segs:[['disc',0,12],['good',14,30]],sel:true},{n:'b',segs:[['good',14,26]]}],
+   {l:'selected',svg:fig([{n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['good',14,30]],sel:true},{n:'b',segs:[['good',14,26]]}],
     `<path d="M${px(12)} ${cy(0)} C ${px(16)} ${cy(0)}, ${px(10)} ${cy(1)}, ${px(11)} ${cy(1)}" fill="none" stroke="${C.acc}" stroke-width="1.3" stroke-dasharray="2.5 2.5"/>`+
     `<path d="M${px(11)} ${cy(1)-2.2} L${px(14)} ${cy(1)} L${px(11)} ${cy(1)+2.2} Z" fill="${C.acc}" opacity=".7"/>`+
     tag(px(26),cy(1)+9,'grouping inferred from overlap',C.mut),'inferred selected')}]);
 
 D('c12','Rows sort by start, so plan order is not row order. The ribbon carries the plan and the axis carries the time; neither has to lie, and no cable is needed to repeat it.',
-  pair([{n:'req + b',segs:[['disc',0,12],['idle',12,2],['good',14,20]],note:'planned 2nd'},
+  pair([{n:'req + b',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,2],['good',14,20]],note:'planned 2nd'},
         {n:'a',segs:[['idle',12,6],['good',18,40]],note:'planned 1st'},{n:'c',segs:[['idle',12,10],['good',22,16]],note:'planned 3rd'}],
     {lit:[0,1,2],arrows:[],
      label:'plan order vs row order',hoverNote:'the request selected',rib:{x:12,rows:[0,1,2]}}));

@@ -1,6 +1,7 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,px,cy,tag,axis,groupRow,arrow,dot,EV,C,W,LBL,PLOT,ROW,TOP} from './micro.mjs';
+import {setFrame} from './micro.mjs'; setFrame(true);
 const E={}; const D=(k,v)=>{E[k]=v;};
 const DIM=.22;
 
@@ -22,7 +23,7 @@ D('w2',{d:'A wait that expired without a match. The run carries on: the timeout 
 
 D('w3',{d:'A wait inside a fan-out. It sits on the same axis as its siblings and holds the level open: the request that collects them cannot start until the slowest resolves, which the queue time on the next row reports.',
   svg:fig([
-    {n:'req + a', segs:[['disc',0,8],['good',8,20]]},
+    {n:'req + a', segs:[['idle',0,2.8],['disc',2.8,5.2],['good',8,20]]},
     {n:'b',       segs:[['good',8,14]]},
     {n:'wait c',  segs:[['waitok',8,54]]},
     {n:'d',       segs:[['disc',62,2],['idle',64,4],['good',68,18]]},
@@ -83,7 +84,7 @@ D('s2',{d:'The same collapse for a wide fan-out. The envelope is the level and t
   svg:(()=>{
     const members=[]; for(let i=0;i<12;i++) members.push([6+i*2.9, 21-i*0.6, 'good']);
     return fig([
-      {n:'req + ×12', segs:[['disc',0,4]]},
+      {n:'req + ×12', segs:[['idle',0,2],['disc',2,2]]},
       {n:'', segs:[]},
       {n:'collect', segs:[['disc',80,2],['idle',82,3],['good',85,12]]},
     ], groupRow(1,{n:'× 12 worker',x:5,w:70,members,note:'12 · staggered'}),
@@ -115,7 +116,7 @@ D('s4',{d:'Whatever the step count, the trace draws about forty rows at rest. Ev
 
 D('n1',{d:'The same step name on two branches. The name is not the identity: rows are distinguished by which request reported them, which the ribbon already shows.',
   svg:fig([
-    {n:'req + fetch', segs:[['disc',0,7],['good',7,26]]},
+    {n:'req + fetch', segs:[['idle',0,2.4],['disc',2.4,4.6],['good',7,26]]},
     {n:'fetch',       segs:[['good',7,18]]},
     {n:'save',        segs:[['disc',33,2],['idle',35,3],['good',38,20]]},
   ],'','the same name twice','',{rib:{x:7,rows:[0,1]}})});
@@ -159,12 +160,12 @@ D('h1',{d:'Where the trace cannot say which step caused a request, it declines r
 
 D('h2',{d:'A row’s label and its drawing have to agree. If the bar is drawn across a wider interval than the step ran for, the number beside it names the interval that was widened, not the one the SDK reported.',
   svg:fig([
-    {n:'a', segs:[['disc',0,3],['idle',3,8],['good',11,20]]},
+    {n:'a', segs:[['idle',0,2],['disc',2,1],['idle',3,8],['good',11,20]]},
   ],tag(px(33),cy(0)+2.5,'3ms reported · 31ms on the row'),'the label reconciles with the drawing')});
 
 D('h3',{d:'Nothing is drawn that cannot be asked what it is. Every interval and every mark on every row decomposes into named parts on hover, which is also how this document proves it has no unexplained pixels.',
   svg:fig([
-    {n:'req + a', segs:[['disc',0,8],['idle',8,4],['good',12,30]]},
+    {n:'req + a', segs:[['idle',0,2.8],['disc',2.8,5.2],['idle',8,4],['good',12,30]]},
   ],'','everything decomposes')});
 
 fs.writeFileSync(HERE+'items-more.json',JSON.stringify(

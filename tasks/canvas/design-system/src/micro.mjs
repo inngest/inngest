@@ -2,7 +2,7 @@ import { GEOM } from './vocabulary.mjs';
 export const {W,LBL,RGT,PLOT,ROW,TOP}=GEOM;
 export { GEOM };
 export { C, EV, HATCH, dot, base, isFail, FILL, COMPUTE, NOCOMPUTE, ACTIVE, OPEN, paint, autoDots, discovered, lineage, barSvg, markSvg, cyOf, pxOf, BAR_INFO, EVENT_INFO, EVC, SUBSTANCE, substanceCSS, eventCSS } from './vocabulary.mjs';
-import { C, EV, HATCH, dot, base, paint, autoDots, OPEN, barSvg, causalRibbon as _cr, wire, fillGaps, stretch, BAR_INFO, EVENT_INFO } from './vocabulary.mjs';
+import { C, EV, HATCH, dot, base, paint, autoDots, OPEN, COMPUTE, isFail, barSvg, causalRibbon as _cr, wire, fillGaps, stretch, BAR_INFO, EVENT_INFO } from './vocabulary.mjs';
 const MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 let NOTES=false;
 export const setNotes=on=>{NOTES=on;};
@@ -96,12 +96,34 @@ export function row(i,r,sc=1){
  * fine one carries offsets within it, so a run measured in days keeps its
  * resolution without inventing a second axis.
  */
-export function axis(y, ticks, {tier2=[], brk=[]}={}){
-  let s=`<line x1="${LBL}" y1="${y}" x2="${LBL+PLOT}" y2="${y}" stroke="${C.idle}" stroke-width="1"/>`;
-  for(const b of brk)
-    s+=`<rect x="${px(b[0])}" y="${y-3}" width="${((b[1]-b[0])/100)*PLOT}" height="6" fill="url(#hx-idle)"/>`+
-       `<line x1="${px(b[0])}" y1="${y-4}" x2="${px(b[0])}" y2="${y+4}" stroke="${C.idle}" stroke-width="1" stroke-dasharray="1.5 1.5"/>`+
-       `<line x1="${px(b[1])}" y1="${y-4}" x2="${px(b[1])}" y2="${y+4}" stroke="${C.idle}" stroke-width="1" stroke-dasharray="1.5 1.5"/>`;
+export function axis(y, ticks, {tier2=[], brk=[], top=0, label}={}){
+  let s='';
+  /**
+   * A break is a compression of the AXIS, not a hole in the data — there is
+   * almost always a row running straight through it, usually a step.sleep()
+   * spanning the whole stretch. Filling the band with hatch said "nothing
+   * happened here" and beat the bar that was there, which is the opposite of
+   * the truth.
+   *
+   * So the break is drawn on the axis itself and nowhere else: the rule stops,
+   * a pair of dashed uprights fence the compressed stretch, and the elapsed
+   * time is named between them. The bars keep their own substance and simply
+   * get narrower, which is what compression actually did to them.
+   */
+  const cuts=[];
+  for(const b of brk) cuts.push([px(b[0]),px(b[1]),b[2]]);
+  // The rule is drawn in the segments between cuts, so the axis visibly stops.
+  let at=LBL;
+  for(const [x0,x1] of cuts){
+    if(x0>at) s+=`<line x1="${at}" y1="${y}" x2="${x0}" y2="${y}" stroke="${C.idle}" stroke-width="1"/>`;
+    at=x1;
+  }
+  s+=`<line x1="${at}" y1="${y}" x2="${LBL+PLOT}" y2="${y}" stroke="${C.idle}" stroke-width="1"/>`;
+  for(const [x0,x1,t] of cuts){
+    for(const x of [x0,x1])
+      s+=`<line x1="${x}" y1="${top?top:y-4}" x2="${x}" y2="${y+4}" stroke="${C.idle}" stroke-width="1" stroke-dasharray="1.5 2" opacity=".55"/>`;
+    if(t) s+=`<text x="${((x0+x1)/2).toFixed(1)}" y="${y-4}" ${MONO} font-size="6" fill="${C.mut}" text-anchor="middle">${t}</text>`;
+  }
   for(const [p,t] of ticks)
     s+=`<line x1="${px(p)}" y1="${y}" x2="${px(p)}" y2="${y+3}" stroke="${C.idle}" stroke-width="1"/>`+
        tag(px(p), y+11, t);
@@ -126,13 +148,84 @@ export function groupRow(i, {n, x, w, members, kind='good', note=''}){
   return s;
 }
 
+/**
+ * The surrounding trace: the minimap, the Run row above, finalization below.
+ *
+ * A figure without them is a diagram, and a diagram lets a rule pass that a
+ * real trace would break — most obviously the minimap, which the vocabulary
+ * describes but which no figure ever drew *in place*, so nothing established
+ * where it sits relative to the Run row and the steps.
+ *
+ * It is dimmed **and blurred**. Dimming alone still invites reading, and these
+ * rows are meant to be present and plausible rather than legible: the eye
+ * should land on the figure's own rows and take the rest as context.
+ *
+ * Two frame rows sit above the figure (the minimap strip, then Run) and one
+ * below (Finalization), so the figure's own rows start at slot 2.
+ */
+export const FRAME_ROWS_ABOVE=2;
+const CTX_O=0.34;
+
+/**
+ * Scenario figures are framed; reference figures (the vocabulary panel, the
+ * primer, the detail views) are not, because they are showing a primitive
+ * rather than a run. A generator opts its whole file in with `setFrame(true)`
+ * rather than every call site passing it — 37 call sites with four different
+ * signatures is how a scripted edit silently misses one.
+ */
+let FRAMED=false;
+export const setFrame=on=>{FRAMED=on;};
+
+export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
+  const y0=TOP+4;                                  // minimap strip
+  // A figure with its own axis draws it below its last row, so finalization
+  // has to clear the axis rather than land on the ticks.
+  const finY=cy(FRAME_ROWS_ABOVE+rows.length)+pad;
+  // The minimap is the same trace in the same order — one hairline per row,
+  // at the position that row's work occupied. Never a different set of steps.
+  // One hairline per ROW, not per segment. Merging them into a band made the
+  // minimap a second Run row — same position, same colour, same weight — and
+  // two drawings of one fact is the defect this whole language exists to avoid.
+  // It is granular where the Run row is a profile: that is the difference.
+  let mini=`<rect x="${LBL}" y="${y0+2.6}" width="${PLOT}" height="1" fill="${C.idle}"/>`;
+  rows.forEach((r,ri)=>{
+    const cs=(r.segs||[]).filter(([kd])=>COMPUTE.has(base(kd)));
+    if(!cs.length) return;
+    const a=Math.min(...cs.map(([,x])=>x)), b=Math.max(...cs.map(([,x,w])=>x+w));
+    const bad=cs.some(([kd])=>isFail(kd));
+    mini+=`<rect x="${px(a).toFixed(1)}" y="${(y0+0.6+ri*1.5).toFixed(1)}" width="${Math.max(0.8,((b-a)/100)*PLOT).toFixed(1)}" height="1.1" rx="0.4" fill="${bad?C.bad:C.good}" opacity=".95"/>`;
+  });
+  mini+=tag(2,y0+5,'minimap');
+  // The Run row is a profile of where the elapsed time went, not a restatement
+  // of the status: grey ground, coloured only where the SDK was executing.
+  const intervals=[];
+  rows.forEach(r=>(r.segs||[]).forEach(([kd,x,w])=>{
+    if(COMPUTE.has(base(kd))) intervals.push({a:x,b:x+w,ok:!isFail(kd)});
+  }));
+  // A figure that already draws its own Run row keeps it; two Run rows would
+  // be the same interval drawn twice, which is the defect this language exists
+  // to prevent.
+  const run=hasOwnRun?'':runProfile(1,{to:Math.min(end+6,96),intervals,resolved:EV.ok},k);
+  // Finalization is platform work: its own row, recessive label, still coloured.
+  const fin=tag(2,finY+2.5,'Finalization')+
+    barSvg('good',Math.min(end+2,94),4,finY,{k:1,floor:k,o:1});
+  // The frame shares the row grid with the figure, and the inner content keeps
+  // its own `cy` attributes because it is translated as a group — so the Run
+  // row and the figure's second row read as one row to anything parsing the
+  // SVG back. Tag the frame's marks so the validator skips them: they are
+  // context, not rows under test.
+  return (mini+run+fin).replace(/<circle class="ev /g,'<circle class="ev ctx ');
+}
+
 export function fig(rows,extra='',label='',under='',opts={}){
   if(under&&typeof under==='object'){ opts=under; under=''; }
   if(opts.rib){
     under=ribbon(opts.rib.x,opts.rib.rows.map(i=>cy(i)))+under;
     rows=rows.map((r,i)=>opts.rib.rows.includes(i)?{...r,noHalo:[opts.rib.x]}:r);
   }
-  const h=TOP*2+ROW*(opts.rowCount||rows.length);
+  const framed=opts.frame!==undefined?!!opts.frame:FRAMED;
+  const n=opts.rowCount||rows.length;
+  const h=TOP*2+ROW*(n+(framed?FRAME_ROWS_ABOVE+1:0))+(framed?(opts.pad||0):0);
   const ends=rows.flatMap(r=>(r.segs||[]).map(([,x,w])=>x+w));
   const max=ends.length?Math.max(...ends):100;
   const k=opts.scale||(max>0?Math.min(86/max,3):1);
@@ -141,10 +234,19 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // Annotations are placed after the stretch, in final coordinates, so a
   // leader lands on the bar it points at rather than being scaled off it.
   const XS=p=>LBL+(px(p)-LBL)*k;
-  const over=opts.over?opts.over(XS,cy):'';
+  const DY=framed?ROW*FRAME_ROWS_ABOVE:0;
+  const over=opts.over?opts.over(XS,i=>cy(i)+DY):'';
+  const inner=framed
+    ? `<g transform="translate(0,${DY})">${stretch(body,LBL,k)}</g>`
+    : stretch(body,LBL,k);
+  const ctx=framed
+    ? `<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(traceFrame(rows,k,{end:max,hasOwnRun:rows.some(r=>r.run),pad:opts.pad||0}),LBL,k)}</g>`
+    : '';
   return `<svg viewBox="${-M} 0 ${W+M*2} ${h+(opts.pad||0)}" role="img" aria-label="${label}">`+
-    HATCH+stretch(body,LBL,k)+over+`</svg>`;
+    HATCH+BLURDEF+ctx+inner+over+`</svg>`;
 }
+
+const BLURDEF=`<defs><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%"><feGaussianBlur stdDeviation="0.62"/></filter></defs>`;
 
 /**
  * The tie between one discovery request and every step it queued.

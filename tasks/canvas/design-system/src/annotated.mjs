@@ -26,7 +26,7 @@ const O={
   },
   events:{
     svg:fig([
-      {n:'req + a',segs:[['disc',0,14],['idle',14,4],['good',18,E-18]],note:'planned it'},
+      {n:'req + a',segs:[['idle',0,4.9],['disc',4.9,9.1],['idle',14,4],['good',18,E-18]],note:'planned it'},
       {n:'b',segs:[['idle',14,4],['good',18,E-24]],note:'planned'},
       {n:'c',segs:[['idle',E-26,6],['good',E-20,20]],note:'discovered'},
     ],'','the event marks',{rib:{x:14,rows:[0,1]}}),
@@ -39,7 +39,7 @@ const O={
   },
   structure:{
     svg:fig([
-      {n:'req + a',segs:[['disc',0,12],['idle',12,3],['good',15,22]]},
+      {n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,3],['good',15,22]]},
       {n:'b',segs:[['idle',12,3],['good',15,30]]},
       {n:'c',segs:[['idle',12,3],['good',15,26]]},
       {n:'d',segs:[['idle',45,10],['good',55,E-55]]},

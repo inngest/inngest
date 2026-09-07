@@ -1,13 +1,14 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {lineage,fig,px,cy,arrow,tag,dot,ribbon,EV,C,W,LBL,PLOT} from './micro.mjs';
+import {setFrame} from './micro.mjs'; setFrame(true);
 const E={};const D=(k,v)=>{E[k]=v;};
 
 // ---- B. Inngest's own time (c14–c21) ------------------------------------
 D('c14',{d:'The step waiting its turn. Thin, quiet, and it ends at the circle where your code starts.',
   svg:fig([{n:'a',segs:[['idle',0,34],['good',34,40]],note:'+34ms queued  40ms'}],'','queued')});
 D('c15',{d:'Inngest working out what to run next. A discovery bar only appears where the request was a separate execution &mdash; a fan-out, or the first step of a run. Where it produced a single step it is rolled into that step instead.',
-  svg:fig([{n:'req + a',segs:[['disc',0,26],['idle',26,6],['good',32,42]],noHalo:[26],note:'+26ms planning  42ms'},
+  svg:fig([{n:'req + a',segs:[['idle',0,6],['disc',6,20],['idle',26,6],['good',32,42]],noHalo:[26],note:'+26ms planning  42ms'},
            {n:'b',segs:[['idle',26,6],['good',32,34]],noHalo:[26],note:'34ms'}],'',
     '',ribbon(26,[cy(0),cy(1)]))});
 D('c16',{d:'Being held by flow control is queue time with a reason, and the reason is worth its own colour: amber hatched, still not your compute, but distinguishable at a glance from a step simply waiting its turn.',

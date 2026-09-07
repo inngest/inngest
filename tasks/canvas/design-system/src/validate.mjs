@@ -25,6 +25,9 @@ function rowsOf(svg){
   const out=new Map();
   for(const m of svg.matchAll(/<circle class="ev [^"]*" cx="([\d.]+)" cy="([\d.]+)"[^>]*\/>/g)){
     const [full,x,y]=m;
+    // The trace frame (minimap, Run, Finalization) shares the row grid with the
+    // figure it surrounds. It is context, not a row under test.
+    if(/class="ev ctx /.test(full)) continue;
     const k=classify(full); if(!k) continue;              // background discs
     const key=Math.round(+y);
     if(!out.has(key)) out.set(key,[]);
@@ -43,9 +46,20 @@ function check(seq){
     p.push(`two "${k[i]}" marks in a row`);
   for(let i=0;i<k.length-1;i++) if(FINAL.has(k[i]))
     p.push(`"${k[i]}" is a resolution but is not last`);
-  const cancelled = k.length && !FINAL.has(k[k.length-1]);
-  if(k.filter(x=>x==='started').length>1 && !k.includes('retry'))
-    p.push('more than one "started" without a retry between them');
+  // A row may execute more than once, but only for a reason the row shows.
+  // Two of them: a `retry` (the attempt threw, another follows) and a `planned`
+  // (the discovery request finished and handed the row to the step it reported
+  // — a request and the step it planned share one row). A second `started` with
+  // neither between them is a row that began executing twice for no stated
+  // reason, which is the thing this check exists to catch.
+  const REEXEC=new Set(['retry','planned']);
+  for(let i=1,last=-1;i<k.length;i++){
+    if(k[i]!=='started') continue;
+    if(last<0){ last=i; continue; }
+    if(!k.slice(last+1,i).some(x=>REEXEC.has(x)))
+      p.push('a second "started" with no retry or planned between them');
+    last=i;
+  }
   return p;
 }
 

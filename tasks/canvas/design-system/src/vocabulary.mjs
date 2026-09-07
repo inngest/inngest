@@ -109,19 +109,19 @@ export const substanceCSS = () =>
  * Only a resolution is ever green or red.
  */
 export const EV = {
-  disc:'disc', queued:'queued', started:'hollow', retry:'hollow-bad', ribbon:'ribbon',
+  queued:'queued', started:'hollow', retry:'hollow-bad', ribbon:'ribbon',
   ok:'ok', failed:'failed', timeout:'timeout', cancelled:'cancelled',
 };
 
 /** Each mark's own variable, defaulting to the semantic colour it means. */
 const EV_SEMANTIC = {
-  queued:C.queued, ribbon:C.disc, disc:C.disc, hollow:C.mut, 'hollow-bad':C.bad,
+  queued:C.queued, ribbon:C.disc, hollow:C.mut, 'hollow-bad':C.bad,
   ok:C.good, failed:C.bad, timeout:C.mut, cancelled:C.mut,
 };
 export const EVC = Object.fromEntries(
   Object.entries(EV_SEMANTIC).map(([k,v])=>[k,`var(--ev-${k}, ${v})`]));
 /** Filled marks mean finished; hollow ones mean the row has not resolved. */
-export const EV_HOLLOW = ['queued','ribbon','disc','hollow','hollow-bad'];
+export const EV_HOLLOW = ['queued','ribbon','hollow','hollow-bad'];
 
 export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true){
   const R=r+GEOM.HALO;
@@ -360,7 +360,6 @@ export const BAR_INFO={
 export const EVENT_INFO={
   queued:['queued','enqueued, not started'],
   ribbon:['planned','enqueued by a discovery request that reported several steps'],
-  disc:['discovery','a discovery request started'],
   hollow:['started','execution started'],
   'hollow-bad':['retry','the attempt threw, another will follow'],
   ok:['ok','resolved, succeeded'],

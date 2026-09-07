@@ -1,6 +1,7 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,px,cy,arrow,tag,C,W,LBL,PLOT} from './micro.mjs';
+import {setFrame} from './micro.mjs'; setFrame(true);
 const E={};const DIM=.15;
 
 // c67 — the request fails, is retried, and eventually produces the step.
