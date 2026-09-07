@@ -42,7 +42,7 @@ D('t1',{d:'An idle gap that dwarfs the work is compressed and marked as a break.
     {n:'a', segs:[['good',0,8]]},
     {n:'sleep 7d', segs:[['waitok',8,50]]},
     {n:'b', segs:[['disc',58,2],['idle',60,3],['good',63,12]]},
-  ],axis(cy(2)+13,[[0,'0ms'],[8,'+41ms'],[58,'+7d'],[75,'+7d 62ms']],{brk:[[10,56,'⋯ 7d ⋯']]}),
+  ],axis(cy(2)+13,[[0,'0ms'],[8,'+41ms'],[58,'+7d'],[75,'+7d 62ms']],{brk:[[10,56,'⋯ 7d ⋯']],top:cy(0)-9}),
     'a compressed idle gap','',{margin:0,pad:34})});
 
 D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you that before you have read a number, which is the point of the height rule.',

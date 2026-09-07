@@ -164,7 +164,7 @@ export function axis(y, ticks, {tier2=[], brk=[], top=0, label}={}){
   s+=`<line x1="${at}" y1="${y}" x2="${LBL+PLOT}" y2="${y}" stroke="${C.idle}" stroke-width="1"/>`;
   for(const [x0,x1,t] of cuts){
     for(const x of [x0,x1])
-      s+=`<line x1="${x}" y1="${top?top:y-4}" x2="${x}" y2="${y+4}" stroke="${C.idle}" stroke-width="1" stroke-dasharray="1.5 2" opacity=".55"/>`;
+      s+=`<line x1="${x}" y1="${top?top:y-4}" x2="${x}" y2="${y+4}" stroke="${C.mut}" stroke-width="1" stroke-dasharray="2 2.5" opacity=".8"/>`;
     if(t) s+=`<text x="${((x0+x1)/2).toFixed(1)}" y="${y-4}" ${MONO} font-size="6" fill="${C.mut}" text-anchor="middle">${t}</text>`;
   }
   for(const [p,t] of ticks)
@@ -271,7 +271,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const ownRun=rows.some(r=>r.run||r.n==='Run');
   const above=framed?(ownRun?0:FRAME_ROWS_ABOVE):0;
   const n=opts.rowCount||rows.length;
-  const h=TOP*2+ROW*(n+above+(framed?1:0))+(framed?(opts.pad||0):0);
+  const h=TOP*2+ROW*(n+above+(framed?1:0))+(opts.pad||0);
   const ends=rows.flatMap(r=>(r.segs||[]).map(([,x,w])=>x+w));
   const max=ends.length?Math.max(...ends):100;
   const k=opts.scale||(max>0?Math.min(86/max,3):1);
@@ -290,7 +290,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0});
     ctx=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.sharp+F.soft,LBL,k)}</g>`;
   }
-  return `<svg viewBox="${-M} 0 ${W+M*2} ${h+(opts.pad||0)}" role="img" aria-label="${label}">`+
+  return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+ctx+inner+over+`</svg>`;
 }
 

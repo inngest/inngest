@@ -124,9 +124,10 @@ row goes grey and the run carries on.
 
 - **One red step in a green run** means your code caught the error. The step
   failed; the run did not.
-- **A retry** shows every attempt on one row — red attempt, neutral gap, green
-  attempt. The gap between attempts is backoff: suspended, costing nothing, and
-  drawn neutral because nothing happened in it.
+- **A retry** shows every attempt on one row — a red attempt, the backoff, then
+  a green one. The backoff is hatched, because nothing of yours is running and
+  you are not billed for it, and faded red, because it is a consequence of the
+  failure rather than a failure itself. The attempts carry the alarm.
 - **A filled red circle** appears only when every attempt failed.
 - **Failure never spreads.** A red row does not tint its neighbours.
 
@@ -185,7 +186,7 @@ same scale as everything under it.
 through a 500-step run is a red smear on that one row, visible before you scroll
 or click anything.
 
-![A cluster of failures showing as a red smear in the strip](./images/failure-cluster.svg)
+![A cluster of failures showing as a red smear on the Run row](./images/failure-cluster.svg)
 
 Click a cluster to jump to it.
 

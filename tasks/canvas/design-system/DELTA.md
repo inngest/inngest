@@ -106,6 +106,18 @@ elapsed ratio from the fill, which is the artifact's stated test.
    it, so the execution figure over-reports — drawn as a red wash naming the
    poll interval. No React handling found.
 
+## 3b. Where the two now openly disagree
+
+**Backoff colour.** The artifact draws it **faded red**; React draws it
+**neutral** (`timing.backoff` = `bg-surfaceMuted`, commented "deliberately
+neutral, not tinted by either attempt"); and `LOG.md` critic round 4 records
+neutral as *settled*, on the argument that the colour was being asked to carry
+both whose fault it was and how it turned out, and needs to carry neither.
+
+The artifact is the stakeholder's call and wins there. One of the other two
+records is stale and it has not been decided which — do not "fix" either side to
+match the other without settling it.
+
 ## 4. Where React is ahead of the artifact
 
 Do not regress these while porting anything above.

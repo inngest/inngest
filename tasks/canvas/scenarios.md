@@ -86,13 +86,13 @@ per-figure polish.
 
 ## Time and the axis
 
-- [ ] **"A compressed idle gap" reads as absence, and it is not.** The `sleep 7d`
+- [x] **"A compressed idle gap" reads as absence, and it is not.** Fixed: The `sleep 7d`
   row draws its bar straight *through* the break band. So: no, we do not expect
   gaps — there is essentially always something there, usually a suspended row
   spanning the whole stretch. The break compresses the **axis**; it is not a
   hole in the data, and drawing it as a hatched band that looks like nothing
   happened is the defect.
-- [ ] **The elastic axis needs a better design.** Same root cause: the break band
+- [x] **The elastic axis is redesigned.** Same root cause: the break band
   and the bar running through it are fighting, and the band wins. Note the React
   gallery already has the derivation (`buildTimeScale`, breaks at >=5s and >=15%
   of the run) — the presentation is the problem, not the maths.
@@ -117,7 +117,7 @@ per-figure polish.
 - [ ] **11 disc bars 1–2 units wide are still uncarved.** At that scale the queue
   interval plus its two marks overlap into a smudge. Needs either a wider figure
   or a decision that a sub-2% request does not show its own queue.
-- [ ] **Concepts and Fixtures tabs are unchecked** against the corrected
+- [x] **Concepts and Fixtures tabs checked** against the corrected
   lifecycle. Scenarios are done; those two are not.
 
 ## User-facing docs
@@ -153,7 +153,7 @@ Decided with the stakeholder, and the reasoning is the durable part.
 
 ### Open, raised by the merge
 
-- [ ] **Is the density strip now redundant too?** `Scale` used to show a failure
+- [x] **The density strip is deleted.** `Scale` used to show a failure
   cluster as a red smear in a separate bucketed strip; that figure now draws it
   on the Run row, because failure-wins put it there. The strip's remaining claim
   is bar *height* as a count per bucket, which the Run row does not carry. Either

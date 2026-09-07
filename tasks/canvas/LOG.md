@@ -1245,3 +1245,72 @@ for each replacement's token catches only the case where the edit did not apply.
 genuinely in the file, and the axis label was genuinely computed — both would pass any grep. The rule
 that catches all three is **open the rendered artefact and check its number against something the
 change did not produce**, with the grep as one cheap instance of it rather than the rule itself.
+
+
+## The artifact pass — scenarios as the specification
+
+The stakeholder read the artifact end to end and the scenarios became the working
+list (`scenarios.md`). What generalises from it:
+
+**The request lifecycle was wrong in every figure.** Rows went from a queued mark
+straight into a blue discovery bar, so the request appeared to begin the instant
+it was enqueued. A discovery request is a request: it is queued, it waits for a
+worker, it starts, it runs. 23 rows were given the queue interval, carved off the
+*front* of the disc bar so no downstream position — ribbon, cable, planned mark —
+had to move.
+
+**A mark that is never emitted is still a mark somebody has to learn.** The
+`discovery` event drew as a blue hollow disc, identical to `planned`, and
+`autoDots` had never emitted it once. A request starting is `started`, the same
+white hollow disc as any other execution. Deleting it made `planned` the only
+blue hollow disc, which is what lets it mean *this request reported several
+steps* rather than *a request happened here*.
+
+**Drawing the surrounding trace paid for itself immediately.** Every scenario
+figure now sits inside the run — Run row above, finalization below, dimmed and
+blurred and desaturated. Within minutes it exposed the axis colliding with the
+finalization row, the minimap drawing as a second Run row, a figure resolving
+green on a run that failed, and three figures getting two Run rows. None of those
+were visible while the figures were drawn as isolated diagrams.
+
+**The minimap and the Run row were one fact drawn twice.** Same run, same place,
+same colours. The first fix — make the minimap thinner so you can tell them apart
+— was treating the symptom. The minimap is gone; the Run row is the overview.
+
+That forced a rule change: **failure now wins over mixed**. The old *"a slice is
+green or red only if every step live in it agrees"* drew a failure cluster among
+successes as neutral blue, losing the signal at exactly the scale an overview
+exists for. The row had already bent that way — failed slices have always had a
+wider minimum width so they stay findable.
+
+A scrub window on the Run row was built and removed. At rest its edges *are* the
+run bounds, so it sat on the row's first and last mark, and loosening it only
+made it look like a second object on the row rather than a control of it. The
+affordance still needs somewhere to live.
+
+**Group opacity is not the same as element opacity, and the difference is
+layering.** Fading each element separately made a dimmed row translucent to
+itself: a mark's halo is a disc of surface colour, so the bar behind showed
+straight through it. Compositing the row and fading the result fixes that — but
+the first attempt split the row into "lit" and "dim" groups, which separated
+bars from marks, so a lit bar drew *over* a dim mark that belongs on top of it.
+The dim layer has to be the **whole** row, with the lit parts repainted over it.
+Lighting a bar also has to light the mark that opens it, or that mark stays dim
+under a bright bar and reads as a seam.
+
+**A break in the axis is not a hole in the data.** There is almost always a row
+running straight through it — usually a `step.sleep` spanning the whole stretch.
+Filling the band with hatch said "nothing happened here" and beat the bar that
+was there. The break is drawn on the axis now: the rule stops, dashed uprights
+fence the compressed stretch, the elapsed time is named between them, and the
+bars keep their substance and simply get narrower.
+
+### Open
+
+- **Backoff is three-way inconsistent.** The artifact draws it faded red (the
+  stakeholder's call). `LOG.md` critic round 4 settled it as neutral. React
+  implements it neutral and says so in a comment. One of the three is stale.
+- **Scrubbing has no home** since the window came off the Run row.
+- **The Concepts and Fixtures tabs** are checked against the corrected lifecycle;
+  the fixtures' 0.05–0.6 unit discovery bars are left as captured, because they
+  are drawn at measured proportions and that is real data.
