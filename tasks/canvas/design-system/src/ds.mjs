@@ -78,19 +78,15 @@ const SC=[
  ['Fan-out and coalesce', [
   ['c1','One request reports three steps. The ribbon threads their enqueue marks, which are blue because a discovery request put them there.'],
   ['c2','Three steps resolve and cause the next request. That request reported one step, so it rolls into that step’s row.'],
-  ['c4','The ribbon covers exactly the steps the request reported, so an uneven fan-out is countable without interacting.'],
+  ['c4','The ribbon covers exactly the steps the request reported, so an uneven fan-out is countable without interacting. Nothing static predicted that width: the ribbon reports what happened and promises no shape.'],
   ['c3','Fan-out inside a fan-out. One ribbon per discovery request.'],
-  ['c5','Width is decided at runtime. The ribbon reports what happened and predicts nothing.'],
   ['c6','One resumption reports two steps. Both sit under one ribbon, so no order is implied between them.'],
   ['c8','Two branches that each caused their own request. Two requests, no ribbon.'],
  ]],
  ['Attribution', [
-  ['c7','Pairings stay inside their branch. Selecting a step shows the request that reported it.'],
-  ['c12','Rows sort by start time, so the order steps were reported in is not row order.'],
-  ['c13','A discovery request after unrelated waits. Response order stops matching branch structure.'],
   ['c9','Promise.race(). The winner is a dependency of the next request. The loser resolved after that request started, so it has no cable.'],
   ['c10','A step started but never awaited. No outgoing cable.'],
-  ['c11','Grouping inferred rather than reported by the SDK: dashed ribbon, dashed cable.'],
+  ['c11','An SDK that reports one step per response never says these were planned together, so the grouping is recovered from the fact that they overlap. That is a guess, and it is drawn as one: dashed ribbon, dashed cable. Newer SDKs report whole batches and draw solid.'],
  ]],
  ['Platform time', [
   ['c14','Queue time. The step waiting for the executor to pick it up.'],

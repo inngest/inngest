@@ -71,13 +71,13 @@ D('c2','The whole shape: one request fans out to three steps, all three completi
      arrows:[wire(px(34),cy(0),px(46),cy(3),{i:0})+wire(px(46),cy(1),px(46),cy(3),{i:2})+wire(px(40),cy(2),px(46),cy(3),{i:1})],
      label:'fan-out then coalesce',hoverNote:'d selected',rib:{x:12,rows:[0,1,2]}}));
 
-D('c3','Chevrons nest naturally, so depth reads without indentation. Hovering one level lights only that level.',
+D('c3','Ribbons nest, so depth reads without indentation. Hovering <code>a1</code> lights <code>a1</code>, its ribbon, and the one thing that caused it &mdash; <code>a</code> resolving. Its sibling did not cause it and stays faded.',
   pair([{n:'req + a',segs:[['idle',0,3.5],['disc',3.5,6.5],['idle',10,2],['good',12,20]]},
         {n:'b',segs:[['idle',10,2],['good',12,24]]},
         {n:'req + a1',segs:[['idle',34,2.8],['disc',36.8,5.2],['idle',42,2],['good',44,18]]},
         {n:'a2',segs:[['idle',42,2],['good',44,22]]},
         {n:'req + b1',segs:[['idle',38,2.8],['disc',40.8,5.2],['idle',46,2],['good',48,26]]}],
-    {lit:[0,2,3],arrows:[wire(px(32),cy(0),px(34),cy(2))],
+    {lit:[{row:0,bars:[12],dots:[32]},2],arrows:[wire(px(32),cy(0),px(34),cy(2))],focus:2,
      label:'nested fan-out',hoverNote:'hovering a1',ribs:[{x:10,rows:[0,1]},{x:42,rows:[2,3]}]}));
 
 D('c4','The ribbon covers exactly the members, so an uneven fan-out is legible at rest &mdash; you can see it produced three without counting. Hovering adds nothing here, because the ribbon has already said it.',
@@ -112,10 +112,12 @@ D('c7','Hovering one branch is the check: its arrow stays inside the branch. A c
     {lit:[0,2],arrows:[wire(px(28),cy(0),px(30),cy(2))],label:'branch membership',hoverNote:'hovering left-2'}));
 
 D('c8','Each branch scheduled its own request, so there are two. Hovering shows one feeder, not two.',
-  pair([{n:'a',segs:[['good',2,24]]},{n:'b',segs:[['good',2,30]]},
-        {n:'a2',segs:[['idle',28,10],['good',40,20]]},
-        {n:'b2',segs:[['idle',34,10],['good',46,22]]}],
-    {lit:[0,2],arrows:[wire(px(26),cy(0),px(28),cy(2))],label:'no coalescing',hoverNote:'hovering a2'}));
+  pair([{n:'req + a',segs:[['idle',0,2],['disc',2,4],['idle',6,2],['good',8,18]]},
+        {n:'b',segs:[['idle',6,2],['good',8,24]]},
+        {n:'req + a2',segs:[['idle',26,2],['disc',28,4],['idle',32,2],['good',34,20]]},
+        {n:'req + b2',segs:[['idle',32,2],['disc',34,4],['idle',38,2],['good',40,22]]}],
+    {lit:[{row:0,bars:[8],dots:[26]},2],arrows:[wire(px(26),cy(0),px(28),cy(2))],focus:2,
+     label:'no coalescing',hoverNote:'hovering a2',rib:{x:6,rows:[0,1]}}));
 
 D('c9','The winner is a dependency and gets a solid arrow; the losers were alternates and get dashed ones. Both only appear once you ask.',
   pair([{n:'fast',segs:[['good',4,20]]},{n:'slow',segs:[['good',4,44]]},

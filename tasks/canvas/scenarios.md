@@ -14,11 +14,11 @@ that is the only name a reader can see. Status: `[ ]` open · `[x]` done ·
 The three big ones. Each touches every scenario, so they come before further
 per-figure polish.
 
-- [ ] **A code example on every figure.** Trimmed pseudo-code, enough to say
+- [x] **A code example on every figure.** Trimmed pseudo-code, enough to say
   what this trace is — `await step.run('a'); await step.waitForEvent('b')`.
   A figure you cannot tie back to the code that produced it is asking the
   reader to reverse-engineer the point.
-- [ ] **Surrounding spans, present but obscured.** Every figure should look like
+- [x] **Surrounding spans, present but obscured.** Every figure should look like
   a *real* trace — the run row, the trigger, the other steps, finalization, the
   minimap — with everything irrelevant dimmed **and blurred**, not absent.
   Two reasons, the second being the real one:
@@ -56,9 +56,9 @@ per-figure polish.
   and `c` had no queue interval at all, so no planned marks, and the ribbon was
   threading rows with no circles to thread. Every member of a fan-out is
   enqueued by the request and waits its turn.
-- [ ] **"Fan-out inside a fan-out"** — good figure; apply the same per-element
+- [x] **"Fan-out inside a fan-out"** — good figure; apply the same per-element
   hover rule as above.
-- [?] **"Width is decided at runtime"** — delete, probably. Its one unique claim
+- [x] **"Width is decided at runtime"** — deleted. Its one unique claim
   is that the cable runs from `decide` *into* the request rather than out to its
   members — but "one resumption, two steps" states the same rule with a more
   common shape. Proposal: delete it, and fold "width is decided at runtime" into
@@ -67,18 +67,18 @@ per-figure polish.
   ribbon over two steps implies no order) is already made twice above. Proposal:
   keep, because with a code example it becomes the clearest `Promise.all` shape
   in the section — but it has to earn that.
-- [ ] **"Two branches, two requests, no ribbon"** — should show the discovery
+- [x] **"Two branches, two requests, no ribbon"** — should show the discovery
   requests. Under parallelism we always preplan steps, so two requests exist and
   should be visible. Drawn with none today, which contradicts the rule above.
 
 ## Attribution
 
-- [ ] **Cut the section back to what earns its place.** It is inert until
+- [x] **Cut the section back to what earns its place.** It is inert until
   **"Promise.race()"**, **"a step started but never awaited"**, and
   **"grouping inferred rather than reported"**. Those three are the section.
   The run-up — "pairings stay inside their branch", "plan order is not row
   order", "discovery after unrelated awaits" — is not carrying its weight.
-- [ ] **"Grouping inferred rather than reported" needs to say when that
+- [x] **"Grouping inferred rather than reported" now says when that
   happens.** The dashed ribbon and dashed cable are right, but nothing tells the
   reader *what causes* a grouping to be inferred — an SDK reporting one opcode
   per response, so the grouping is recovered from overlap rather than read off
@@ -102,3 +102,26 @@ per-figure polish.
 - **Outcomes.**
 - **Waiting.**
 - **Fan-out inside a fan-out**, other than the hover rule.
+
+## Added since — the request lifecycle was wrong
+
+- [x] **A discovery request is a request, and waits like one.** Every figure went
+  straight from a queued mark into a blue bar, so the request appeared to begin
+  the instant it was enqueued. 23 rows now open on the grey `queued` mark, carry
+  a hatched queue interval, and only then start.
+- [x] **The `discovery` mark is deleted.** It drew as a blue hollow disc,
+  identical to `planned`, and `autoDots` never emitted it. A request starting is
+  `started` — the same white hollow disc as any other execution. **`planned` is
+  now the only blue hollow disc**, which is what lets it mean "this request
+  reported several steps".
+- [ ] **11 disc bars 1–2 units wide are still uncarved.** At that scale the queue
+  interval plus its two marks overlap into a smudge. Needs either a wider figure
+  or a decision that a sub-2% request does not show its own queue.
+- [ ] **Concepts and Fixtures tabs are unchecked** against the corrected
+  lifecycle. Scenarios are done; those two are not.
+
+## User-facing docs
+
+- [x] **First draft** at `docs/understanding-traces.md` — the two rules, reading
+  a row, requests and the ribbon, waiting, failure, long runs, collapsing, the
+  minimap, and what a trace will not tell you.
