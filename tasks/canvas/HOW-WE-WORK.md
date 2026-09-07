@@ -80,6 +80,18 @@ millions; six units of queue beside a hundred of work does not pass at all.
 
 So:
 
+- **A row is a list of moments, and its bars are derived.** `derive(kind, at,
+  end)` in `rules.mjs` is the whole mapping: the interval between two moments is
+  a bar, and which bar depends on what the row is — `started > ok` is compute on
+  a step, the SDK reporting on a discovery request, a child run on an invoke,
+  elapsed sleep on a wait, a userland span on a span. A `started` moment may
+  name a third thing, the kind of work it opens, for the row that changes
+  substance partway. `moments()` is the inverse, so a figure still authored as
+  `segs` is read back into the moments it implies and re-derived through the
+  same rule — every row in the artifact goes through it. Verified by
+  `audit-derive.mjs` (336/336 round-trip) and by the artifact being
+  byte-identical across the change; verified to REACH the figures by changing
+  what a wait resolves to and watching 75 bars change with it.
 - **`src/rules.mjs` is where the rules live.** Geometry, the elastic thresholds,
   how a band is drawn, the frame, attention, the panel's controls, and the
   interval a pair of moments implies. If you are typing a number into

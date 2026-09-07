@@ -545,7 +545,42 @@ process.on('exit',()=>{
   try{ fs.writeFileSync(UNRULED_FILE, JSON.stringify(prev.concat(UNRULED))); }catch{}
 });
 
+/**
+ * Every row a figure declared, recorded so the moments->bars derivation can be
+ * checked against what is actually authored. The goal is for the derivation to
+ * reproduce all of them; the ones it cannot are the rows that still need to say
+ * something the moments do not carry.
+ */
+export const AUTHORED=[];
+const AUTHORED_FILE=new URL('./authored.json',import.meta.url).pathname;
+if(process.env.DS_AUDIT) process.on('exit',()=>{
+  let prev=[]; try{ prev=JSON.parse(fs.readFileSync(AUTHORED_FILE,'utf8')); }catch{}
+  try{ fs.writeFileSync(AUTHORED_FILE, JSON.stringify(prev.concat(AUTHORED))); }catch{}
+});
+
+/**
+ * A row is a list of moments, and its bars are derived from them.
+ *
+ * A figure may declare `at` directly. One still written as `segs` is read back
+ * into the moments it implies and then re-derived, so a figure authored the
+ * older way goes through the same rule as one authored the new way — and
+ * changing what a substance MEANS changes both. Bars that never passed through
+ * `derive` were the whole problem: the rule existed and reached nothing.
+ */
+export function resolveRow(r){
+  if(r.run) return r;
+  if(r.at) return {...r, segs:R.derive(r.kind||'step', r.at, r.end, {reported:!!r.reported})};
+  if(!r.segs || !r.segs.length) return r;
+  const filled=fillGaps(r.segs.map(([k,x,w])=>({kind:k,x,w}))).map(g=>[g.kind,g.x,g.w]);
+  const mo=R.moments(filled);
+  return {...r, segs:R.derive(mo.kind, mo.at, mo.end, {reported:mo.reported})};
+}
+
 export function fig(rows,extra='',label='',under='',opts={}){
+  if(process.env.DS_AUDIT) rows.forEach(r=>{
+    if(!r.run && r.segs && r.segs.length) AUTHORED.push({n:r.n, segs:r.segs, span:!!r.span});
+  });
+  rows=rows.map(resolveRow);
   if(under&&typeof under==='object'){ opts=under; under=''; }
   /**
    * The elastic rule, applied to every figure rather than to the ones that

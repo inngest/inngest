@@ -113,3 +113,146 @@ export const BETWEEN = {
 
 /** The interval a pair of moments implies, or null if the pair says nothing. */
 export const between = (a, b) => BETWEEN[`${a}>${b}`] || null;
+
+/**
+ * What a row IS, which is the small extra fact the moments cannot carry.
+ *
+ * `started > ok` is compute on a step, the SDK reporting on a discovery
+ * request, a child run on an invoke, elapsed sleep on a wait, and a userland
+ * span on a span. Same pair of moments, five substances — so the row declares
+ * its kind and the pair does the rest.
+ *
+ * `open` is the substance of a row that started and has not resolved: the
+ * trailing bar when the last moment is `started`.
+ */
+export const KINDS = {
+  step:  {ok:'good', failed:'bad', retry:'bad', cancelled:'stopped', open:'running'},
+  disc:  {ok:'disc', failed:'disc!', retry:'disc!', cancelled:'stopped', open:'disc'},
+  child: {ok:'child', failed:'child!', cancelled:'stopped', open:'child'},
+  wait:  {ok:'waitok', timeout:'waitout', cancelled:'waitstop', open:'wait'},
+  span:  {ok:'spanok', failed:'spanerr', done:'spanunset', open:'running'},
+};
+
+/**
+ * The substance of the interval leading UP TO work starting. Which kind of
+ * not-working it was is carried by the moment that opened it, not by the row.
+ */
+export const RESOLVED = new Set(['ok','failed','retry','timeout','cancelled','done']);
+
+export const BEFORE_START = {
+  queued:  'idle',      // waiting for the executor
+  ok:      'idle',      // something resolved; the next thing is waiting
+  failed:  'idle',
+  planned: 'idle',      // a discovery request said this would run
+  retry:   'backoff',   // the attempt threw; this is the wait before the next
+  held:    'hold',      // concurrency, throttle, rate limit or debounce
+};
+
+/**
+ * Moments to bars. `at` is [moment, position] in ascending position; `end` is
+ * where the row stops when its last moment left it running.
+ *
+ * A `started` moment may name a third thing -- the kind of work it opens -- for
+ * the row that changes substance partway: a step that then sleeps is one row,
+ * one list of moments, and only that moment has to say so.
+ *
+ * This is the whole derivation. A figure declares what happened and the bars
+ * follow, so changing what a substance means changes every figure at once
+ * rather than every figure that remembered.
+ */
+export function derive(kind, at, end, opts={}){
+  const K = KINDS[kind] || KINDS.step;
+  // The head of a row can belong to the request that reported the step rather
+  // than to the step: 'the short blue interval at the head of the next row'.
+  // It is still one row of moments; only the first stretch of work is the
+  // request's, so it takes the request's substances.
+  const head = opts.reported ? KINDS.disc : null;
+  let done = !head;                      // has the head request resolved yet?
+  const segs = [];
+  const table = () => done ? K : head;
+  // Widths come out of a time axis, so 'ends exactly here' arrives as a
+  // thousandth of a percent rather than zero. A bar that thin is not a bar.
+  const push = (s, x, w) => { if(s && w > 1e-3) segs.push([s, x, w]); };
+
+  for(let i=0; i<at.length-1; i++){
+    const [a, x, as] = at[i], [b, x2] = at[i+1];
+    if(RESOLVED.has(b)){
+      push((KINDS[as] || table())[b], x, x2 - x);
+      if(!done && b === 'ok') done = true; // the request reported; the step is next
+    }else{
+      push(BEFORE_START[a], x, x2 - x);
+    }
+  }
+  const last = at[at.length-1];
+  if(last && end != null && end > last[1]){
+    // A row that is still in the state its last moment put it in.
+    push(last[0] === 'started' ? (KINDS[last[2]] || table()).open : BEFORE_START[last[0]], last[1], end - last[1]);
+  }
+  return segs;
+}
+
+/** Substances that are work happening, as opposed to waiting for it. */
+const WORKING = k => !['idle','backoff','hold'].includes(k.replace(/[!*]+$/,''));
+
+/** The moment that OPENS an interval of not-working. */
+const OPENS = {idle:'queued', backoff:'retry', hold:'held'};
+
+/** The moment that CLOSES an interval of work. */
+const CLOSES = {good:'ok', disc:'ok', child:'ok', spanok:'ok', waitok:'ok',
+  bad:'failed', spanerr:'failed', spanunset:'done', waitout:'timeout',
+  stopped:'cancelled', waitstop:'cancelled'};
+
+/** Which KINDS table a substance belongs to. */
+const TABLE_OF = {disc:'disc', child:'child', wait:'wait', waitok:'wait',
+  waitout:'wait', waitstop:'wait', spanok:'span', spanerr:'span', spanunset:'span'};
+
+/** Substances a row can sit in without ever resolving. */
+const UNRESOLVED = new Set(['running','wait']);
+
+/**
+ * The moments a row of bars implies -- the inverse of `derive`, and the reading
+ * that lets a figure written the older way still go through the rule.
+ *
+ * Every boundary is a moment. A bar of work ends by RESOLVING, even where the
+ * drawing puts a single circle there and labels it `queued`: the step resolved
+ * and the next thing started waiting, at the same instant.
+ */
+export function moments(segs){
+  if(!segs.length) return {at:[], end:0, kind:'step', reported:false};
+  const bare = k => k.replace(/[!*]+$/,'');
+  const fail = k => /!\*?$/.test(k) || bare(k)==='bad';
+  const at=[];
+  const add=(n,p,s)=>{
+    if(!n) return;
+    const prev=at[at.length-1];
+    if(prev && prev[0]===n && prev[1]===p) return;
+    at.push(s?[n,p,s]:[n,p]);
+  };
+  const lastWork=segs.map(([k])=>WORKING(k)).lastIndexOf(true);
+  segs.forEach(([k,x],i)=>{
+    const prev=segs[i-1];
+    // The previous work resolved here; another attempt still to come makes that
+    // resolution a retry rather than the row's outcome.
+    if(prev && WORKING(prev[0]))
+      add(fail(prev[0]) && i<=lastWork ? 'retry' : CLOSES[bare(prev[0])], x);
+    add(WORKING(k) ? 'started' : OPENS[bare(k)], x, WORKING(k) ? (TABLE_OF[bare(k)]||'step') : null);
+  });
+  const last=segs[segs.length-1];
+  if(WORKING(last[0]) && !UNRESOLVED.has(bare(last[0])))
+    add(fail(last[0]) && bare(last[0])!=='bad' ? 'failed' : CLOSES[bare(last[0])], last[1]+last[2]);
+
+  // What the row IS. A discovery bar followed by work of another substance is
+  // the reported-at-the-head shape: the request is the head of the row and the
+  // step's own work follows it.
+  const work=segs.map(([k])=>k).filter(WORKING);
+  const after=work.filter(k=>bare(k)!=='disc');
+  const reported=work.some(k=>bare(k)==='disc') && after.length>0;
+  const decisive=(reported?after:work)[0];
+  const kind=decisive?(TABLE_OF[bare(decisive)]||'step'):'step';
+
+  // A moment only names its substance where that is not the row's own, so the
+  // ordinary row stays a plain pair.
+  const trimmed=at.map((mo,j)=>
+    mo.length===3 && (mo[2]===kind || (reported && j===0)) ? [mo[0],mo[1]] : mo);
+  return {at:trimmed, end:last[1]+last[2], kind, reported};
+}
