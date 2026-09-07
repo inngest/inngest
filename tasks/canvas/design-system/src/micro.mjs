@@ -168,7 +168,7 @@ export function row(i,r,sc=1,yy){
       const b=BAR_INFO[base(g[0])]; if(b) parts.push({t:'b',k:base(g[0]),n:b[0],d:b[1]});
     });
     for(;mi<marks.length;mi++){ const e=EVENT_INFO[marks[mi].c]; if(e) parts.push({t:'e',k:marks[mi].c,n:e[0],d:e[1]}); }
-    if(parts.length) hit=`<rect class="rowhit" x="${LBL-6}" y="${y-8}" width="${PLOT+12}" height="16" fill="transparent" data-row="${n}" data-parts='${JSON.stringify(parts).replace(/'/g,"&apos;")}'/>`;
+    if(parts.length) hit=`<rect class="rowhit" x="${LBL-6}" y="${y}" width="${PLOT+12}" height="16" fill="transparent" data-row="${n}" data-parts='${JSON.stringify(parts).replace(/'/g,"&apos;")}'/>`;
   }
   if(note && NOTES){
     const last=segs[segs.length-1];

@@ -440,6 +440,10 @@ const page=`<title>Trace Design System</title>
   svg g.dy{transform:translateY(calc(var(--geo-row,17px) * var(--a,0)))}
   /* A ribbon spans N row gaps, so it restretches with the pitch. */
   svg rect.rib{height:calc(var(--geo-row,17px) * var(--n,1))}
+  /* The hit target is a row's worth of height, so it never hangs below the
+     drawing and holds the box open at a tight pitch. */
+  svg rect.rowhit{height:max(6px, var(--geo-row,17px));
+    transform:translateY(calc(max(6px, var(--geo-row,17px)) / -2))}
   /* A cable spans two rows, so it is scaled about its own start: the far end
      lands on the row it belongs to whatever the pitch is. */
   svg g.cable{transform:translateY(calc((var(--geo-row,17px) - 17px) * var(--a,0)))
@@ -898,8 +902,10 @@ ${fig(J.connect.poll)}
       var box;
       try{ box = svg.getBBox(); }catch(e){ return; }
       if(!box || !isFinite(box.height) || !isFinite(box.y)) return;
-      var height = Math.max(1, box.y + box.height + 4 - base[1]);
-      svg.setAttribute('viewBox', base[0]+' '+base[1]+' '+base[2]+' '+height.toFixed(1));
+      var pad = 3;
+      var top = box.y - pad;
+      var height = Math.max(1, box.height + pad * 2);
+      svg.setAttribute('viewBox', base[0]+' '+top.toFixed(1)+' '+base[2]+' '+height.toFixed(1));
     });
   }
 
