@@ -38,12 +38,14 @@ D('w4',{d:'Waiting and failing must not read alike. One is hatched and never red
 // ---- Time & the axis ----------------------------------------------------
 
 D('t1',{d:'Seven days of dead time, given six percent of the width. The threshold is low on purpose: if nothing is executing for more than a few percent of the run, that stretch is worth almost none of the space, and an hour and a week get the same few pixels. The cut crosses every row, the zigzag says the page was torn and rejoined, and what runs through the band is blurred because that width is not to scale. Only the drawing compresses &mdash; the sleep still reports 7d.',
+  // The cut sits INSIDE the nap bar, not on its edges: you see the bar begin,
+  // get torn, and resume before it ends, so it is obvious which bar was
+  // compressed rather than merely that something happened between two rows.
   svg:fig([
     {n:'a',   segs:[['good',0,11]]},
-    {n:'nap', segs:[['waitok',11,6]],note:'7d'},
-    {n:'b',   segs:[['idle',17,3],['disc',20,4],['idle',24,3],['good',27,59]]},
-  ],axis(cy(2)+13,[[0,'0ms'],[11,'+41ms'],[86,'+7d 62ms']]),
-    'seven days compressed to a band','',{margin:0,pad:22,breaks:[[11,17,'7d']]})});
+    {n:'nap', segs:[['waitok',11,8]],note:'7d'},
+    {n:'b',   segs:[['idle',19,3],['disc',22,4],['idle',26,3],['good',29,57]]},
+  ],'','seven days compressed to a band','',{margin:0,breaks:[[13,17,'7d']]})});
 
 D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you that before you have read a number, which is the point of the height rule.',
   svg:fig([

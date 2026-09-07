@@ -140,13 +140,14 @@ report today.
 - ENCODING: `wait` blue hatched, `waitok` green hatched, `waitout` muted hatched, `waitstop` muted hatched + square.
 
 ## Time and the axis
+- **The cut sits inside the compressed bar, not on its edges.** You see the bar begin, get torn, and resume before it ends, so it is obvious *which bar* was compressed rather than merely that something happened between two rows.
 - **Dead time is worth almost none of the width, and the threshold for that is low.** If nothing is executing for more than a few percent of the run, that stretch collapses to a fixed narrow band — an hour and seven days get the same few pixels, because the space belongs to the work. Only the drawing compresses; **every reported duration is still wall clock.**
-- **A compressed band carries three cues**, because one cannot beat how strongly a time axis reads as linear: a torn-page **zigzag** (the idiom the fixture scrubber already uses), **full-height rules** at both edges so the cut crosses every row rather than being a mark on the axis that rows ignore, and a **blur** of whatever runs through the band — which says "this width is not to scale" without hiding that a row is running through it.
+- **A compressed band carries three cues**, because one cannot beat how strongly a time axis reads as linear: **the Run row track tearing** into two or three zigs — the track itself breaks, rather than running straight under a glyph laid on top, because a mark beside a bar reads as an icon while the bar breaking reads as the thing that happened to it, **full-height rules** at both edges so the cut crosses every row rather than being a mark on the axis that rows ignore, and a **blur** of whatever runs through the band — which says "this width is not to scale" without hiding that a row is running through it.
 - Reading the fill alone should report the compute/elapsed ratio before you read a number.
 - Two tiers of axis label — coarse tier carries the date/hour crossed, fine tier the offsets inside it.
 - Ticks come from the scale that placed the bars, so **a label can only name a position the drawing reaches.**
 - A step too short to draw is still drawn at a minimum width, with its real duration beside it: **the drawing rounds, the reported number does not.**
-- ENCODING: break = fixed narrow band, `--ground` scrim at .28, solid full-height rules at both edges, a sawtooth down the band on the Run row, the elapsed time named at the foot, and the figure redrawn clipped to the band through a blur; `MIN_W` 1.4px floor applied in screen space.
+- ENCODING: break = fixed narrow band, `--ground` scrim at .28, solid full-height rules at both edges, the elapsed time named in the middle of the band over a `--ground` halo, and the figure redrawn clipped to the band through a blur that also desaturates; `MIN_W` 1.4px floor applied in screen space.
 
 ## Scale
 - Repetition with one shape collapses to a single row that reports the count and draws where each member ran.

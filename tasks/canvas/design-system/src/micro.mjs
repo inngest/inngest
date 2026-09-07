@@ -36,11 +36,38 @@ export const tag=(x,y,t,c=C.mut)=>`<text x="${x}" y="${y}" ${MONO} font-size="6.
  * exactly the scale an overview exists for. The row already bent that way:
  * failed slices have always had a wider minimum so they stay findable.
  */
-export function runProfile(i,{to=86,intervals=[],resolved,n='Run'},sc=1){
+export function runProfile(i,{to=86,intervals=[],resolved,n='Run',breaks=[]},sc=1){
   const y=cy(i);
   const col=v=> v.ok===false?C.bad : v.ok==='stop'?C.mut : v.ok==='mix'?C.mix : C.good;
   let s=`<text x="2" y="${y+2.5}" ${MONO} font-size="7" fill="${C.mut}">${n}</text>`;
-  s+=`<rect x="${LBL}" y="${y-2.5}" width="${((to/100)*PLOT).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
+  /**
+   * The grey track is the run's whole extent — and where the axis is
+   * compressed, **the track itself tears** rather than running straight under a
+   * separate squiggle laid on top. A glyph beside the bar reads as an icon; the
+   * bar breaking reads as the thing that happened to it.
+   */
+  const end=LBL+(to/100)*PLOT;
+  const tear=(x0,x1)=>{
+    // Two or three zigs. One is a notch; five in this little space is a
+    // scribble. A torn edge is legible at very few oscillations and stops being
+    // legible quickly after that.
+    const n=Math.min(3,Math.max(2,Math.round((x1-x0)/8))), step=(x1-x0)/n, amp=4.4;
+    let d=`M${x0.toFixed(1)} ${y}`;
+    for(let j=0;j<n;j++)
+      d+=` L${(x0+step*(j+0.5)).toFixed(1)} ${(y+(j%2?amp:-amp)).toFixed(1)}`+
+         ` L${(x0+step*(j+1)).toFixed(1)} ${y}`;
+    return `<path d="${d}" fill="none" stroke="${C.idle}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  };
+  {
+    let at=LBL;
+    for(const [a,b] of breaks){
+      const x0=Math.max(LBL,px(a)), x1=Math.min(end,px(b));
+      if(x1<=x0) continue;
+      if(x0>at) s+=`<rect x="${at.toFixed(1)}" y="${y-2.5}" width="${(x0-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
+      s+=tear(x0,x1); at=x1;
+    }
+    if(end>at) s+=`<rect x="${at.toFixed(1)}" y="${y-2.5}" width="${(end-at).toFixed(1)}" height="5" rx="1.2" fill="${C.idle}"/>`;
+  }
   // Failures last, so where slices overlap the red is the one left showing.
   const ordered=[...intervals].sort((p,q)=>(p.ok===false?1:0)-(q.ok===false?1:0));
   for(const v of ordered){
@@ -223,7 +250,7 @@ let FRAMED=false;
 // in docs it reads as something being hidden from the reader.
 export const setFrame=on=>{FRAMED=process.env.DS_FRAME==='0'?false:on;};
 
-export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
+export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[]}){
   const above=hasOwnRun?0:FRAME_ROWS_ABOVE;
   const finY=cy(above+rows.length)+pad;
 
@@ -254,7 +281,7 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
   // that threw and then succeeded is a recovery, and resolving it red would say
   // the opposite of what the row underneath it shows.
   const last=intervals.reduce((m,v)=>(!m||v.b>m.b)?v:m,null);
-  const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,
+  const run=hasOwnRun?'':runProfile(0,{to:finEnd,intervals,breaks,
     resolved:(last&&last.ok===false)?EV.failed:EV.ok},k);
 
   const fin=tag(2,finY+2.5,'Finalization')+
@@ -297,12 +324,6 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0}){
  */
 export function compression(breaks, h, uid){
   if(!breaks || !breaks.length) return {clip:'', over:''};
-  const zig=(x,y0,y1)=>{
-    const step=4.6, amp=1.6; let d=`M${(x-amp).toFixed(1)} ${y0}`;
-    for(let y=y0, i=0; y<y1; y+=step, i++)
-      d+=` L${(x+(i%2?-amp:amp)).toFixed(1)} ${Math.min(y+step,y1).toFixed(1)}`;
-    return `<path d="${d}" fill="none" stroke="${C.mut}" stroke-width="1" opacity=".8" stroke-linejoin="round"/>`;
-  };
   const rects=breaks.map(([a,b])=>
     `<rect x="${px(a).toFixed(1)}" y="0" width="${(px(b)-px(a)).toFixed(1)}" height="${h}"/>`).join('');
   const clip=`<clipPath id="cmp-${uid}">${rects}</clipPath>`;
@@ -310,8 +331,9 @@ export function compression(breaks, h, uid){
     const x0=px(a), x1=px(b), mid=(x0+x1)/2;
     return `<rect x="${x0.toFixed(1)}" y="0" width="${(x1-x0).toFixed(1)}" height="${h}" fill="var(--ground)" opacity=".28"/>`+
       [x0,x1].map(x=>`<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${h}" stroke="${C.idle}" stroke-width="1" opacity=".9"/>`).join('')+
-      zig(mid,0,ROW+TOP)+
-      (t?`<text x="${mid.toFixed(1)}" y="${(h-1.5).toFixed(1)}" ${MONO} font-size="6" fill="${C.mut}" text-anchor="middle">${t}</text>`:'');
+      (t?`<text x="${mid.toFixed(1)}" y="${(h/2+2).toFixed(1)}" ${MONO} font-size="6.5" `+
+         `fill="${C.ink2}" text-anchor="middle" paint-order="stroke" `+
+         `stroke="var(--ground)" stroke-width="2.6" stroke-linejoin="round">${t}</text>`:'');
   }).join('');
   return {clip, over};
 }
@@ -344,7 +366,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
-    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0});
+    const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[]});
     ctx=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.sharp+F.soft,LBL,k)}</g>`;
   }
   // The compressed band blurs whatever runs through it. Done by drawing the
@@ -358,7 +380,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+`</svg>`;
 }
 
-const BLURDEF=`<defs><filter id="cmpblur" x="-30%" y="-10%" width="160%" height="120%"><feGaussianBlur stdDeviation="1.4"/></filter><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+
+const BLURDEF=`<defs><filter id="cmpblur" x="-30%" y="-10%" width="160%" height="120%"><feGaussianBlur stdDeviation="1.4"/><feColorMatrix type="saturate" values="0.55"/></filter><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+
   `<feGaussianBlur stdDeviation="0.62"/>`+
   `<feColorMatrix type="saturate" values="0.25"/>`+
   `</filter></defs>`;
