@@ -1,7 +1,8 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,px,cy,tag,axis,groupRow,arrow,dot,elastic,layout,EV,C,W,LBL,PLOT,ROW,TOP} from './micro.mjs';
-import {setFrame} from './micro.mjs'; setFrame(true);
+import {setFrame} from './micro.mjs';
+import * as R from './rules.mjs'; setFrame(true);
 const E={}; const D=(k,v)=>{E[k]=v;};
 const DIM=.22;
 
@@ -74,7 +75,11 @@ D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts 
       if(i<8){ dead.push([t,t+WAIT]); t+=WAIT; }
     }
     const total=t;
-    const el=elastic(total,dead);
+    // Through the rule, so switching compression off reaches this figure too.
+    // Calling elastic() directly meant it went on compressing with the feature
+    // off -- the one figure on the page that ignored the toggle.
+    const el=R.FEAT.compress ? elastic(total,dead)
+      : {at:t=>t/total*100, bands:[], cuts:[]};
     const at=el.at;
     const members=polls.map(([a,b])=>[at(a), at(b)-at(a), 'good']);
     const naps=dead.map(([a,b])=>[at(a), at(b)-at(a), 'waitok']);

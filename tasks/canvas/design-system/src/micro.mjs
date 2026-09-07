@@ -892,7 +892,17 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // The compressed band blurs whatever runs through it. Done by drawing the
   // whole figure a second time, clipped to the band and filtered — SVG has no
   // backdrop-filter, and a flat scrim would hide the row rather than soften it.
-  const cmp=compression(opts.breaks, bandH, ++UID);
+  /**
+   * The band is drawn OUTSIDE the group the rows are stretched in, so it has to
+   * be given positions in the same space they end up in.
+   *
+   * A figure whose content collapses -- a two-second sleep compressed to a band
+   * leaves 25 units of a 100-unit axis -- gets stretched to fill the width, by
+   * 3x here. The band was placed at the unstretched position, so it marked
+   * 105px while the Run row tore at 187px over the sleep it was supposed to be
+   * cutting. Since px() is linear from LBL, the stretch is just a factor.
+   */
+  const cmp=compression((opts.breaks||[]).map(([a,b,t])=>[a*k,b*k,t]), bandH, ++UID);
   // Only the figure's own rows are blurred. The Run row is deliberately left
   // sharp: its torn track is what says "compressed here", and blurring the one
   // element carrying that message defeats drawing it at all.
