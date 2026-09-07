@@ -528,6 +528,10 @@ export function layout(total, rows, opts={}){
   rows.forEach(r=>{
     if(r.run) return;                       // the Run row is derived, not input
     (r.segs||[]).forEach(([kd,a,b])=>{ if(COMPUTE.has(base(kd))) compute.push([a,b]); });
+    // A collapsed group draws its members rather than its own bars, so without
+    // this the rule reads the whole group as idle and compresses the work away.
+    (r.group?r.group.members||[]:[]).forEach(([a,b,kd])=>{
+      if(COMPUTE.has(base(kd||'good'))) compute.push([a,b]); });
   });
   // With compression off the axis is linear and there are no bands.
   /**
@@ -547,7 +551,15 @@ export function layout(total, rows, opts={}){
     if(r.run) return {...r,
       to: el.at(r.to!=null?r.to:total),
       intervals:(r.intervals||[]).map(v=>({...v, a:el.at(v.a), b:el.at(v.b)}))};
-    return {...r, segs:(r.segs||[]).map(map),
+    return {...r,
+      // A collapsed group's members are intervals in the same real time as
+      // everything else, so they go through the axis with everything else.
+      // They used to be mapped by the figure before it called fig(), which
+      // baked the compression in and left this one figure unable to redraw.
+      group:r.group?{...r.group,
+        members:(r.group.members||[]).map(([a,b,k])=>[el.at(a), el.at(b)-el.at(a), k]),
+        w:el.at(r.group.to!=null?r.group.to:total)}:r.group,
+      segs:(r.segs||[]).map(map),
       at:(r.at||[]).map(mo=>mo.length===3?[mo[0],el.at(mo[1]),mo[2]]:[mo[0],el.at(mo[1])]),
       end:r.end!=null?el.at(r.end):r.end};
   });
@@ -679,45 +691,66 @@ export function resolveRow(r){
           segs:R.derive(mo.kind, mo.at, mo.end, {reported:mo.reported})};
 }
 
+let FIG_ID=+(R.ENV.DS_UID_BASE||0);
+/** What every figure on the page was drawn from, in call order. */
+export const FIGURES=[];
+// Each generator is its own process, so each writes its own file and the page
+// build reads them all back. Keyed by the id range that generator was given.
+if(typeof process!=='undefined' && process.on) process.on('exit',async()=>{
+  if(!FIGURES.length) return;
+  const fs=await import('fs');
+  const out=new URL('./figdata-'+(R.ENV.DS_UID_BASE||0)+'.json',import.meta.url).pathname;
+  try{ fs.writeFileSync(out, JSON.stringify(FIGURES)); }catch{}
+});
+
 export function fig(rows,extra='',label='',under='',opts={}){
+  // Kept before anything derives from them, so the record is what was asked for
+  // rather than what it turned into.
+  const rows0=rows, extra0=typeof extra==='string'?extra:'', under0=typeof under==='string'?under:'',
+        opts0=(under&&typeof under==='object')?under:opts;
   rows=rows.map(resolveRow);
+  /**
+   * Rows measured in real time are laid out HERE.
+   *
+   * Callers used to run layout() themselves and hand over the result plus the
+   * bands it produced, which baked the elastic rule into the figure: switching
+   * compression off could not undo a band that had already been decided. Given
+   * `ms`, fig() owns the whole path from events to drawing, so the same events
+   * redraw differently when what a drawing means changes.
+   */
+  let leadLabel='', leadTrimmed=false;
+  if(opts.ms){
+    let span=opts.ms;
+    /**
+     * The opening queue, named rather than drawn — and done HERE, on the real
+     * timestamps, before the axis stops being linear. Measured after the
+     * elastic pass it names a compressed duration; baked into the events by
+     * whatever loaded them it cannot be switched off at all.
+     */
+    if(opts.trimLead && R.FEAT.trim){
+      let first=Infinity;
+      for(const rw of rows) for(const [k,x] of (rw.at||[])) if(k==='started'){ first=Math.min(first,x); break; }
+      if(first>0 && first<Infinity){
+        leadLabel=R.human(opts.unit==='s'?first*1000:first); leadTrimmed=true;
+        rows=rows.map(rw=>{
+          const s=(rw.at||[]).map(mo=>mo.length===3?[mo[0],mo[1]-first,mo[2]]:[mo[0],mo[1]-first]);
+          const kept=s.filter(mo=>mo[1]>=-1e-9);
+          const open=(kept.length&&kept[0][1]<1e-9)?null:s.filter(mo=>mo[1]<0).pop();
+          return {...rw, at:(open?[[...open].map((v,q)=>q===1?0:v)]:[])
+            .concat(kept.map(mo=>mo[1]<0?[...mo].map((v,q)=>q===1?0:v):mo)),
+            end:rw.end!=null?Math.max(0,rw.end-first):rw.end};
+        });
+        span-=first;
+      }
+    }
+    const L=layout(span, rows, {plot:100, unit:opts.unit});
+    rows=L.rows; opts={...opts, breaks:L.breaks};
+  }
   /**
    * A run's opening queue time is named, not drawn. Done before the elastic
    * pass and before any scale is chosen, so everything downstream simply sees a
    * trace that begins when the work does.
    */
-  let leadLabel=opts.lead||'', leadTrimmed=!!opts.lead;
-  if(opts.trimLead && R.FEAT.trim){
-    const lead=R.leadingQueue(rows);
-    if(lead>0.01){
-      leadTrimmed=true;
-      if(opts.ms) leadLabel=R.human(lead/100*opts.ms);
-      const shift=mo=>mo.length===3?[mo[0],mo[1]-lead,mo[2]]:[mo[0],mo[1]-lead];
-      rows=rows.map(r=>{
-        if(r.run || !r.at || !r.at.length) return r;
-        const s=r.at.map(shift);
-        // Rows already queued when the drawing begins keep the state they were
-        // in: the moment that put them there is pulled up to the start rather
-        // than dropped, so the row opens in queue and not in nothing.
-        const kept=s.filter(mo=>mo[1]>=-1e-9);
-        // The row whose work opens the drawing begins on `started`: its queue is
-        // exactly what was trimmed away, so reinstating a queued mark at zero
-        // would draw the thing the trim exists to remove. Only a row still
-        // waiting when the drawing begins gets its opening moment pulled up.
-        const open=(kept.length && kept[0][1]<1e-9)?null:s.filter(mo=>mo[1]<0).pop();
-        const at=(open?[[...open].map((v,j)=>j===1?0:v)]:[]).concat(kept.map(mo=>
-          mo[1]<0?[...mo].map((v,j)=>j===1?0:v):mo));
-        if(!at.length) return {...r, at, segs:[]};
-        const end=r.end!=null?r.end-lead:undefined;
-        return {...r, at, end,
-          segs:R.derive(r.kind||'step', at, end, {reported:!!r.reported}),
-          dots:r.dots?r.dots.map(d=>({...d,p:d.p-lead})).filter(d=>d.p>=0):r.dots};
-      });
-    }
-  }
-  if(R.ENV.DS_AUDIT) rows.forEach(r=>{
-    if(!r.run && r.segs && r.segs.length) AUTHORED.push({n:r.n, segs:r.segs, span:!!r.span});
-  });
   if(under&&typeof under==='object'){ opts=under; under=''; }
   /**
    * The elastic rule, applied to every figure rather than to the ones that
@@ -831,7 +864,10 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // tighter than the trace around it.
   const ys=rowYs(rows), st=rowSteps(rows);
   const body=under+rows.map((r,i)=>
-    `<g class="r" style="--i:${st[i][0]};--s:${st[i][1]}">${row(i,r,k,ys[i])}</g>`).join('')+extra;
+    `<g class="r" style="--i:${st[i][0]};--s:${st[i][1]}">`+
+      (r.group ? groupRowAt(i,{n:r.group.n, x:0, w:r.group.w, members:r.group.members,
+                               note:r.group.note}) : row(i,r,k,ys[i]))+
+    `</g>`).join('')+extra;
   const M=opts.margin||0;
   // Annotations are placed after the stretch, in final coordinates, so a
   // leader lands on the bar it points at rather than being scaled off it.
@@ -910,7 +946,17 @@ export function fig(rows,extra='',label='',under='',opts={}){
     ? `<g clip-path="url(#cmp-${UID})" filter="url(#cmp-b-${UID})">${inner}</g>`
     : '';
   const nr=n+above+(framed?1:0);
-  return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
+  /**
+   * Every figure carries the events it was drawn from.
+   *
+   * The build draws it once so the page paints without waiting for script, and
+   * the component can redraw the same figure from the same events when
+   * something changes what a drawing means -- a feature toggled off, say. Both
+   * go through fig(); this is what lets the second one happen at all.
+   */
+  const fid=++FIG_ID;
+  FIGURES.push({id:fid, rows:rows0, extra:extra0, label, under:under0, opts:opts0});
+  return `<svg data-fig="${fid}" viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+`<g class="nofit">${cmp.over}</g>`+over+cab+lin+`</svg>`;
 }
 

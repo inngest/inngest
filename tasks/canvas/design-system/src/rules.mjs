@@ -13,6 +13,19 @@ export const FEAT = {
 };
 
 /**
+ * The features are PROPERTIES of a drawing, not of the process drawing it.
+ *
+ * At build time they come from the environment; in the page they come from the
+ * component's props, so switching one re-renders rather than swapping between
+ * four pre-built copies of every figure. Set immediately before rendering and
+ * read synchronously inside it.
+ */
+export function setFeatures(f){
+  if(f && 'trim' in f) FEAT.trim=!!f.trim;
+  if(f && 'compress' in f) FEAT.compress=!!f.compress;
+}
+
+/**
  * THE RULES.
  *
  * Every decision the drawing makes, in one file. Change a number here and the

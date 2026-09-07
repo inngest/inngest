@@ -47,23 +47,23 @@ const NAP=7*864e5;
 D('t1',{d:'Seven days of dead time, given four percent of the width. The threshold is low on purpose: if nothing is executing for more than a few percent of the run, that stretch is worth almost none of the space, and an hour and a week get the same few pixels. The cut takes the <em>middle</em> of the sleep, so the bar visibly begins, is torn, and resumes &mdash; it is that bar being compressed, not merely something happening between two rows. Only the drawing compresses: the sleep still reports 7d.',
   svg:(()=>{
     const B0=41+NAP, total=B0+62;
-    const L=layout(total,[
+    const _rows=[
       {n:'a',   at:[['started',0],['ok',41]]},
       {n:'nap', at:[['started',41],['ok',41+NAP]],kind:'wait',note:'7d'},
       {n:'b',   at:[['queued',B0],['started',B0+6,'disc'],['ok',B0+16],['queued',B0+16],['started',B0+22],['ok',total]],reported:1},
-    ]);
-    return fig(L.rows,'','seven days compressed to a band','',{margin:0,breaks:L.breaks});
+    ];
+    return fig(_rows,'','seven days compressed to a band','',{margin:0,ms:total});
   })()});
 
 D('t1b',{d:'What the space left over is worth. Thirty seconds of work on one side of a compressed gap and ten on the other, so the remaining width splits 75/25 &mdash; which is the same thing as saying <strong>a second is the same number of pixels wherever it lands</strong>. Without that rule, compressing a gap would quietly rescale one half of the trace against the other and two spans either side of it would stop being comparable. It is also why several compressions need no special case: the arithmetic is total live width over total live time, applied everywhere.',
   svg:(()=>{
     const GAP=7*86400, total=30+GAP+10;
-    const L=layout(total,[
+    const _rows=[
       {n:'left',  at:[['started',0],['ok',30]],note:'30s'},
       {n:'gap',   at:[['started',30],['ok',30+GAP]],kind:'wait'},
       {n:'right', at:[['started',30+GAP],['ok',total]],note:'10s'},
-    ],{unit:'s'});
-    return fig(L.rows,'','the leftover width splits by real duration','',{margin:0,breaks:L.breaks});
+    ];
+    return fig(_rows,'','the leftover width splits by real duration','',{margin:0,ms:total,unit:'s'});
   })()});
 
 D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts fall <em>inside</em> one pair of rows rather than adding rows of their own. The bands share one budget: eight idle stretches do not spend the whole width on the parts where nothing happened, they thin instead, and below a width that can hold them a band drops its label, then its tear, leaving a marked line. The rules and the blur never go &mdash; they are what says <em>not to scale</em>. The polls between the cuts still share the one scale.',
@@ -75,44 +75,35 @@ D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts 
       if(i<8){ dead.push([t,t+WAIT]); t+=WAIT; }
     }
     const total=t;
-    // Through the rule, so switching compression off reaches this figure too.
-    // Calling elastic() directly meant it went on compressing with the feature
-    // off -- the one figure on the page that ignored the toggle.
-    const el=R.FEAT.compress ? elastic(total,dead)
-      : {at:t=>t/total*100, bands:[], cuts:[]};
-    const at=el.at;
-    const members=polls.map(([a,b])=>[at(a), at(b)-at(a), 'good']);
-    const naps=dead.map(([a,b])=>[at(a), at(b)-at(a), 'waitok']);
     return fig([
-      {n:''},
-      {n:''},
-    ], groupRow(0,{n:'× 9 poll',x:0,w:at(total),members,note:'9 · 0 failed'})+
-       groupRow(1,{n:'× 8 nap',x:at(polls[0][1]),w:at(dead[7][1])-at(polls[0][1]),members:naps}),
-      'eight compressions sharing one budget','',
-      {margin:0,breaks:el.bands.map(b=>[b.p0,b.p1,b.label?'2m':''])});
+      {n:'', group:{n:'× 9 poll', to:total, note:'9 · 0 failed',
+                    members:polls.map(([a,b])=>[a,b,'good'])}},
+      {n:'', group:{n:'× 8 nap', to:total,
+                    members:dead.map(([a,b])=>[a,b,'waitok'])}},
+    ],'','eight compressions sharing one budget','',{margin:0, ms:total, unit:'s'});
   })()});
 
 D('t1d',{d:'A wait that has not resolved still compresses. The run is asleep right now: the bar is blue and carries no closing mark, because the missing mark is what says unresolved &mdash; and the dead time inside it is real whether or not it has finished. There is no Finalization row, because the run has not been finalized.',
   svg:(()=>{
     const total=20+3*3600;
-    const L=layout(total,[
+    const _rows=[
       {n:'a',   at:[['started',0],['ok',20]]},
       {n:'nap', at:[['started',20]],end:total,kind:'wait',note:'sleeping'},
-    ],{unit:'s'});
-    return fig(L.rows,'','an unresolved wait, compressed','',
-      {margin:0,running:true,breaks:L.breaks});
+    ];
+    return fig(_rows,'','an unresolved wait, compressed','',
+      {margin:0,running:true,ms:total,unit:'s'});
   })()});
 
 D('t1e',{d:'Choosing where to cut. A gap in <em>one</em> row is not dead time &mdash; something else may be running through it &mdash; so the compute of every row is merged first and only the holes in that union are candidates. Here <code>b</code> works straight through <code>a</code>&rsquo;s wait, so nothing is compressed there however long it looks; the one stretch with nothing running anywhere is.',
   svg:(()=>{
     const total=940;
-    const L=layout(total,[
+    const _rows=[
       {n:'a', at:[['started',0],['ok',8],['started',8,'wait'],['ok',26]]},
       {n:'b', at:[['started',4],['ok',26]]},
       {n:'c', at:[['started',26],['ok',900],['started',900],['ok',914]],kind:'wait'},
       {n:'d', at:[['started',914],['ok',930]]},
-    ],{unit:'s'});
-    return fig(L.rows,'','only the stretch with nothing running','',{margin:0,breaks:L.breaks});
+    ];
+    return fig(_rows,'','only the stretch with nothing running','',{margin:0,ms:total,unit:'s'});
   })()});
 
 D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you that before you have read a number, which is the point of the height rule.',
@@ -219,7 +210,7 @@ D('i2',{d:'The Run row <em>is</em> the overview. There was a minimap above it dr
       {run:true, to:86, intervals, resolved:EV.ok},
       {n:'b', at:[['queued',30],['started',34],['ok',60]]},
       {n:'c', at:[['started',60],['failed',70]]},
-    ], '', 'the Run row is the overview and the scrubber');
+    ], '', 'the Run row is the overview');
   })()});
 
 // ---- OpenTelemetry ------------------------------------------------------

@@ -1,6 +1,6 @@
 import React from 'react';
-import { fig, layout, resolveRow } from '../micro.mjs';
-import { RESOLVED } from '../rules.mjs';
+import { fig, resolveRow } from '../micro.mjs';
+import { RESOLVED, setFeatures } from '../rules.mjs';
 
 /**
  * The trace renderer, as a component.
@@ -16,20 +16,24 @@ import { RESOLVED } from '../rules.mjs';
  * reimplementing is deliberate — a second copy in JSX would be a second
  * renderer with a nicer syntax.
  */
-export function Trace({ rows, ms, lead, at, frame = true, running, breaks, ...opts }) {
+export function Trace({ rows, ms, lead, extra = '', under = '', label = '',
+                        frame = true, running, breaks,
+                        trim = true, compress = true, ...opts }) {
   const html = React.useMemo(() => {
-    if (!rows || !rows.length) return '';
-    // Rows measured in real time go through the elastic rule on the way in;
-    // rows given as proportions are already on the figure's axis.
-    if (ms) {
-      const L = layout(ms, rows, { plot: 100 });
-      return fig(L.rows, '', '', '', { frame, running, lead, breaks: L.breaks, ...opts });
-    }
-    return fig(rows, '', '', '', { frame, running, lead, breaks, ...opts });
-  }, [rows, ms, lead, frame, running, breaks, opts]);
+    // No guard on empty rows: a figure can be about the axis, and its content
+    // is in `extra`. Bailing here dropped it from the page entirely.
+    rows = rows || [];
+    // What the design does FOR you, as properties of this drawing.
+    setFeatures({ trim, compress });
+    // Everything goes to fig(). It owns the whole path from events to drawing:
+    // trimming the opening queue, the elastic axis, the bands, the frame. Doing
+    // any of it here would be a second opinion about what the events mean.
+    return fig(rows, extra, label, under, { frame, running, lead, ms, breaks, ...opts });
+  }, [rows, ms, lead, extra, under, label, frame, running, breaks, trim, compress, opts]);
 
+  // No wrapper class: it renders INTO the figure box the page already has.
   return React.createElement('div', {
-    className: 'figure',
+    style: { display: 'contents' },
     dangerouslySetInnerHTML: { __html: html },
   });
 }

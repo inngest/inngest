@@ -112,30 +112,8 @@ export function loadRun(id){
   }
   rows.forEach(r=>{ delete r._stepID; delete r._planner; delete r._q; });
 
-  /**
-   * The opening queue, named rather than drawn.
-   *
-   * Done here, on real timestamps, because that is the only place it can be
-   * named: after the elastic pass the axis is no longer linear and the same
-   * measurement reads as a different duration.
-   */
-  let lead='';
-  if(R.FEAT.trim){
-    let first=Infinity;
-    for(const r of rows) for(const [k,x] of r.at) if(k==='started') { first=Math.min(first,x); break; }
-    if(first>0 && first<Infinity){
-      lead=R.human(first);
-      const shift=mo=>mo.length===3?[mo[0],mo[1]-first,mo[2]]:[mo[0],mo[1]-first];
-      for(const r of rows){
-        const s=r.at.map(shift);
-        const kept=s.filter(mo=>mo[1]>=0);
-        // a row already queued when the drawing begins keeps the state it was in
-        const open=(kept.length && kept[0][1]===0)?null:s.filter(mo=>mo[1]<0).pop();
-        r.at=(open?[[...open].map((v,j)=>j===1?0:v)]:[]).concat(kept);
-        if(r.end!=null) r.end=Math.max(0,r.end-first);
-      }
-      total-=first;
-    }
-  }
-  return {id, ms:total, rows, lead};
+  // The run as it happened. What to hide is a drawing decision, made where
+  // the drawing is: trimming here would bake it in and the toggle could not
+  // undo it.
+  return {ms:total, rows};
 }

@@ -132,10 +132,24 @@ function checkPageStructure(){
   const html=fs.readFileSync(HERE+'../trace-design-system.html','utf8');
   const n=re=>(html.match(re)||[]).length;
   const bad=[];
-  const pairs=[['<main>',/<main>/g,/<\/main>/g],['<script>',/<script[ >]/g,/<\/script>/g]];
-  for(const [name,open,close] of pairs){
-    const a=n(open), b=n(close);
-    if(a!==b) bad.push(`${a} ${name} against ${b} closing`);
+  const mains=n(/<main>/g), mainc=n(/<\/main>/g);
+  if(mains!==mainc) bad.push(`${mains} <main> against ${mainc} closing`);
+  /**
+   * Scripts are PAIRED, not counted.
+   *
+   * The page carries a minified bundle, and minified JavaScript contains the
+   * string "<script" — so counting occurrences finds opens that are text inside
+   * another script's body. What actually matters is whether every script that
+   * OPENS the document has a closer before the next one does.
+   */
+  {
+    let i=-1, unclosed=0, guard=0;
+    while((i=html.indexOf('<script', i+1))!==-1 && guard++<200){
+      const close=html.indexOf('<\/script>', i);
+      if(close<0){ unclosed++; break; }
+      i=close;                       // skip the body: anything in it is text
+    }
+    if(unclosed) bad.push(`a <script> is never closed`);
   }
   // A doc figure is a few KB; a megabyte means the page leaked into it.
   let dir=[];
@@ -360,7 +374,7 @@ if(unruled.length){
 // second account of the same run, kept in step by hand until it is not.
 const authored=(()=>{
   let n=0;
-  for(const f of ['items-a.mjs','items-bc.mjs','items-disc.mjs','items-more.mjs','fixtures.mjs',
+  for(const f of ['items-a.mjs','items-bc.mjs','items-disc.mjs','items-more.mjs',
                   'batch1.mjs','runbar.mjs','annotated.mjs']){
     let src=''; try{ src=fs.readFileSync(HERE+f,'utf8'); }catch{ continue; }
     const hits=(src.match(/\{n:'Run'/g)||[]).length;

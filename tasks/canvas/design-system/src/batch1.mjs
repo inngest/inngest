@@ -29,11 +29,10 @@ setFrame(true);
  */
 const capture=(id,extra='',label='')=>{
   const r=loadRun(id);
-  // The events are in milliseconds, because that is what the run measured.
-  // layout() puts them on the figure's axis and applies the elastic rule on the
-  // way -- from real durations, which is the only way it can judge dead time.
-  const L=layout(r.ms, r.rows, {plot:100});
-  return fig(L.rows, extra, label, '', {breaks:L.breaks, lead:r.lead});
+  // The events, and how long the run took. fig() owns everything after that --
+  // trimming the opening queue, the elastic axis, the bands -- so the same
+  // events redraw differently when what a drawing means changes.
+  return fig(r.rows, extra, label, '', {ms:r.ms, trimLead:true});
 };
 
 const panel=(rows,extra='',label='',ms)=>fig(

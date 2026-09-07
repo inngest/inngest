@@ -1,3 +1,5 @@
+const ESBUILD=new URL('../../../../ui/node_modules/.pnpm/node_modules/.bin/esbuild',import.meta.url).pathname;
+const UI_MODULES=new URL('../../../../ui/node_modules',import.meta.url).pathname;
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import { execFileSync } from 'child_process';
@@ -6,7 +8,7 @@ import * as R from './rules.mjs';
 // Cleared before the generators run; each appends what the elastic rule could
 // not reach, so an empty file means every figure is derived rather than placed.
 try{ fs.unlinkSync(new URL('./unruled.json',import.meta.url).pathname); }catch{}
-const GENS=['vocab','barvocab','items-a','items-bc','items-disc','items-more','connect','batch1','runbar','annotated','steptypes','detail','primer','fixtures'];
+const GENS=['vocab','barvocab','items-a','items-bc','items-disc','items-more','connect','batch1','runbar','annotated','steptypes','detail','primer'];
 /**
  * Four builds, because two features change what is drawn.
  *
@@ -15,64 +17,38 @@ const GENS=['vocab','barvocab','items-a','items-bc','items-disc','items-more','c
  * sliders are. Each combination is generated and the page carries whichever
  * figures actually differ between them — most do not, and those stay single.
  */
-const FEATKEYS=['trim','compress'];
-const COMBOS=[
-  ['11',{}],
-  ['01',{DS_NOTRIM:'1'}],
-  ['10',{DS_NOCOMPRESS:'1'}],
-  ['00',{DS_NOTRIM:'1',DS_NOCOMPRESS:'1'}],
-];
-const BUILDS={};
-for(const [key,env] of COMBOS){
-  GENS.forEach((g,gi)=>execFileSync('node',[HERE+g+'.mjs'],
-    {stdio:'pipe', env:{...process.env, ...env, DS_UID_BASE:String(gi*1000)}}));
-  BUILDS[key]=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
-}
-
 /**
- * Replace every figure with the set of variants it actually has.
+ * One build, and the events every figure was drawn from.
  *
- * Walked by path through the default build, so a figure that draws the same
- * thing under every combination is left exactly as it was and costs nothing.
+ * The page used to carry four builds of each figure -- one per combination of
+ * the features that change what is drawn -- and swap between them. They are
+ * properties of the component now, so it re-renders instead, and there is one
+ * of everything again.
  */
-function variantise(node, path){
-  if(typeof node==='string'){
-    if(!node.includes('<svg')) return node;
-    const seen=new Map();
-    for(const [key] of COMBOS){
-      let v=BUILDS[key];
-      for(const p of path){ v = v==null?undefined:v[p]; }
-      if(typeof v!=='string') return node;
-      if(!seen.has(v)) seen.set(v,[]);
-      seen.get(v).push(key);
-    }
-    if(seen.size===1) return node;
-    /**
-     * Namespace the ids the figure generated for itself.
-     *
-     * Each build numbers its clip paths and blur filters from one, so two
-     * variants of the same figure both defined `cmp-7` — and a reference to it
-     * resolves to whichever came first in the DOCUMENT. The second variant's
-     * blur was clipped to the FIRST variant's band, which drew a soft bright
-     * copy of the rows and their labels wherever the other layout had cut.
-     *
-     * Done here rather than by giving each build its own number range, because
-     * ids that differ between builds make two identical drawings look different
-     * and every compressed figure would then ship four times over.
-     */
-    return `<span class="varset">`+[...seen].map(([svg,keys])=>{
-      const ns=keys[0];
-      const tagged=svg.replace(/(id="|url\(#)(cmp-b?-?\d+)/g, (m,pre,id)=>pre+id+'-'+ns);
-      return `<span class="v ${keys.map(k=>'v-'+k).join(' ')}">${tagged}</span>`;
-    }).join('')+`</span>`;
-  }
-  if(Array.isArray(node)) return node.map((v,i)=>variantise(v,path.concat(i)));
-  if(node && typeof node==='object')
-    return Object.fromEntries(Object.entries(node).map(([k,v])=>[k,variantise(v,path.concat(k))]));
-  return node;
-}
+GENS.forEach((g,gi)=>execFileSync('node',[HERE+g+'.mjs'],
+  {stdio:'pipe', env:{...process.env, DS_UID_BASE:String(gi*1000)}}));
+const J=Object.fromEntries(GENS.map(g=>[g,JSON.parse(fs.readFileSync(HERE+g+'.json','utf8'))]));
 
-const J=Object.fromEntries(GENS.map(g=>[g,variantise(BUILDS['11'][g],[g])]));
+/** id -> the events that figure was drawn from, gathered from every generator. */
+const FIGDATA=(()=>{
+  const out={};
+  for(const f of fs.readdirSync(HERE)) if(/^figdata-\d+\.json$/.test(f))
+    for(const d of JSON.parse(fs.readFileSync(HERE+f,'utf8'))) out[d.id]=d;
+  return out;
+})();
+
+/** The renderer and its payload translator, bundled for the page. */
+const kit=(()=>{
+  const out=HERE+'.kit.js';
+  execFileSync(ESBUILD,[HERE+'trace/entry.jsx','--bundle','--format=iife','--jsx=automatic',
+    '--external:fs','--minify','--define:process.env.NODE_ENV="production"',
+    '--outfile='+out,'--log-level=error'],
+    {cwd:HERE, env:{...process.env, NODE_PATH:UI_MODULES}, stdio:'pipe'});
+  const js=fs.readFileSync(out,'utf8');
+  fs.unlinkSync(out);
+  return js;
+})();
+
 const EX={...J['items-a'],...J['items-bc'],...J['items-disc'],...J['items-more']};
 /**
  * The docs tab shows the EXPORTED figures, not the live framed ones, because
@@ -489,11 +465,8 @@ const FEATURES = [
 /**
  * The renderer, shipped to the page.
  *
- * The scrubber used to redraw itself in the browser with its own copy of rows,
- * bars, marks, the Run row and the compression band — a second renderer, which
- * is why its compressed stretches had no blur and its Run row never tore. The
- * page carries the REAL modules instead, as ES modules behind an import map, so
- * a scrubbed frame is the same `fig()` every other figure goes through.
+ * The page draws every figure through the same component, so the renderer has
+ * to be there rather than restated.
  *
  * Data URLs rather than a bundle: the modules already are modules, and rewriting
  * their relative imports to bare specifiers is enough for the import map to
@@ -502,12 +475,46 @@ const FEATURES = [
  */
 const MODULES=['rules','vocabulary','micro'];
 const dsmod=`<script type="module">
-  // The renderer itself, from the same modules the build used. DS is the only
-  // thing the page script needs; everything else it draws is already drawn.
+  /**
+   * Every figure on the page, drawn by the component.
+   *
+   * The build draws each one once so the page paints without waiting for
+   * script; this then takes them over, rendering the SAME events through the
+   * SAME renderer. It is what makes the feature toggles properties of a
+   * drawing: switching one re-renders every figure instead of swapping between
+   * four pre-built copies of it.
+   */
   import * as micro from 'ds:micro';
   import * as rules from 'ds:rules';
-  window.DS = {fig:micro.fig, layout:micro.layout, RESOLVED:rules.RESOLVED};
-  if (window.__scrubsReady) window.__scrubsReady();
+  window.DS = {fig:micro.fig, layout:micro.layout, RESOLVED:rules.RESOLVED,
+               setFeatures:rules.setFeatures};
+
+  const K = window.TraceKit;
+  const DATA = window.__FIGDATA || {};
+  let mounts = null;
+
+  window.__renderFigures = function(feat){
+    if(!K) return;
+    // Found once. After the first render the DOM holds the component's output,
+    // whose figures carry ids from the bundle's own counter -- so re-reading
+    // data-fig on the second pass finds nothing and the toggle does nothing.
+    if(!mounts){
+      mounts=[];
+      for(const el of document.querySelectorAll('svg[data-fig]')){
+        const d=DATA[el.dataset.fig];
+        if(!d) continue;
+        const host=el.parentNode;
+        mounts.push({host, d, root:K.createRoot(host)});
+      }
+    }
+    for(const m of mounts)
+      m.root.render(K.React.createElement(K.Trace, {
+        key: m.d.id,
+        rows: m.d.rows, extra: m.d.extra, under: m.d.under, label: m.d.label,
+        ...m.d.opts, ...feat,
+      }));
+  };
+
 <\/script>`;
 const bundle=(()=>{
   const url=name=>{
@@ -547,24 +554,7 @@ const sidebar=`<aside id="side">
     the row has resolved, so it is not adjustable.</p>`)}
 </aside>`;
 
-const scrubs=J.fixtures.map(f=>
-`  <div class="item">
-    <p class="note"><code>${f.id}</code> ${f.note}</p>
-    <div class="scrub" data-fx="${f.id}">
-      <div class="figure frame"></div>
-      <div class="scrubbar">
-        <div class="rail">
-          ${f.stops.map((t,i)=>{const p=(i/(f.stops.length-1))*100;
-            return `<button class="tick" data-p="${p.toFixed(3)}" style="left:${p.toFixed(3)}%"
-              title="${f.events[i].text}"></button>`;}).join('')}
-          <i class="head" style="left:100%"></i>
-        </div>
-        <input type="range" min="0" max="10000" value="10000" step="1"
-               aria-label="Scrub ${f.id} through elapsed time">
-      </div>
-      <p class="say"><span class="at">100%</span><span class="evt">complete</span></p>
-    </div>
-  </div>`).join('\n');
+
 
 const page=`<title>Trace Design System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -820,34 +810,6 @@ const page=`<title>Trace Design System</title>
 
   /* Scrubbing: one tick per state the trace was actually in. The frame is
      swapped in place and nothing around it moves. */
-  .scrubbar{position:relative;height:22px;margin:12px 4px 0}
-  .scrubbar .rail{position:absolute;inset:0;pointer-events:none;z-index:2}
-  .scrubbar .rail::before{content:"";position:absolute;left:0;right:0;top:10px;height:2px;
-    background:var(--rule-2);border-radius:2px}
-  .scrubbar .tick{position:absolute;top:4px;width:2px;height:14px;margin-left:-1px;padding:0;
-    border:0;border-radius:1px;background:var(--rule-2);cursor:pointer;pointer-events:auto}
-  .scrubbar .tick:hover{background:var(--muted)}
-  .scrubbar .tick.on{background:var(--accent);width:3px;margin-left:-1.5px}
-  .scrubbar .head{position:absolute;top:2px;width:2px;height:18px;margin-left:-1px;
-    background:var(--accent);opacity:.35;pointer-events:none}
-  /* A stretch where nothing happened, pulled in: marked so the compression is
-     visible rather than silently distorting the axis. */
-  .scrubbar .brk{position:absolute;top:9px;height:4px;pointer-events:none;border-radius:2px;
-    background:repeating-linear-gradient(45deg,var(--rule-2) 0 2px,transparent 2px 4px)}
-  .scrubbar input{position:absolute;inset:0;z-index:1;width:100%;height:22px;margin:0;
-    -webkit-appearance:none;appearance:none;background:none;cursor:grab}
-  .scrubbar input:active{cursor:grabbing}
-  .scrubbar input::-webkit-slider-runnable-track{height:22px;background:none}
-  .scrubbar input::-moz-range-track{height:22px;background:none}
-  .scrubbar input::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;margin-top:4.5px;
-    border-radius:50%;background:var(--accent);border:2px solid var(--ground);box-shadow:0 0 0 1px var(--accent)}
-  .scrubbar input::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--accent);
-    border:2px solid var(--ground);box-shadow:0 0 0 1px var(--accent)}
-  .scrubbar input:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-  .scrub .say{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:baseline;margin:8px 4px 0}
-  .scrub .at{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;
-    font-variant-numeric:tabular-nums}
-  .scrub .evt{font-family:var(--display);font-size:13.5px;color:var(--ink-2)}
   .fold{margin:0}
   .fold>summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:12px}
   .fold>summary::-webkit-details-marker{display:none}
@@ -949,9 +911,7 @@ ${scenarios}
 </section>
 
 <section id="t-fixtures" hidden>
-<h2>Scrub a real run</h2>
-<p>Each fixture is a captured run at its measured proportions, shown complete. Drag the slider to move back through every intermediate state: rows appear as their spans are created, intervals that have not finished are blue because their outcome is not decided yet, and the axis rescales so the elapsed part always fills the width.</p>
-<div class="grid">${scrubs}</div>
+
 
 <h2>Captured fixtures</h2>
 <p>Runs from the captured fixture set, drawn at their measured proportions.</p>
@@ -965,6 +925,7 @@ ${fig(J.connect.poll)}
 </section>
 </main>
 <div id="pop" role="tooltip"></div>
+<script>${kit}<\/script>
 ${bundle}
 ${dsmod}
 <script>
@@ -1027,90 +988,10 @@ ${dsmod}
   // ---- fixture scrubbing -------------------------------------------------
   // The state at a moment is computed here rather than picked from a set of
   // pre-drawn frames, so every pixel of the scrubber has its own exact frame.
-  var FXV=${JSON.stringify(Object.fromEntries(COMBOS.map(([k])=>
-    [k, Object.fromEntries(BUILDS[k].fixtures.map(f=>[f.id,f]))])))};
-  var FX=FXV["11"];
-  // Geometry and the two drawing primitives come from the vocabulary, shipped
-  // as source rather than restated here: the browser draws a bar and a mark
-  // with the same code the figures above were built with.
-  var BINFO=${JSON.stringify(V.BAR_INFO)}, EINFO=${JSON.stringify(V.EVENT_INFO)};
-  var GEOM=${JSON.stringify(V.GEOM)};
-  var EV_HOLLOW=${JSON.stringify(V.EV_HOLLOW)};
-  var cyOf=${V.cyOf.toString()};
-  var pxOf=${V.pxOf.toString()};
-  var barSvg=${V.barSvg.toString()};
-  var markSvg=${V.markSvg.toString()};
-  // The Run row's rank-to-colour table, shared with every statically drawn one.
-  var RUN_COLOUR=${JSON.stringify(R.RUN_COLOUR)};
-  /**
-   * A scrubbed frame is the same figure as every other one.
-   *
-   * The run's events are in milliseconds; a position on the scrubber is a time.
-   * Clip the moments to that time, hand them to the real layout() and fig(), and
-   * what comes back went through every rule the static figures went through —
-   * the elastic axis, the torn track, the blur through a compressed stretch, the
-   * derived Run row. Before this the page had a second renderer for exactly
-   * these frames, and none of that reached them.
-   */
-  var SCRUBS=[];
-  function redrawScrubs(){ SCRUBS.forEach(function(f){ f(true); }); }
-  // Modules are deferred, so this classic script runs first and the renderer
-  // lands after it. Draw once it does.
-  window.__scrubsReady=function(){ SCRUBS.forEach(function(f){ f(false); }); refit(); };
-
-  /** Where the handle is, in elapsed milliseconds. The stops are the trace's
-      own moments, so dragging advances the picture rather than the clock. */
-  function timeAt(fx,p){
-    var s=fx.stops, n=s.length;
-    if(p<=0) return s[0];
-    if(p>=100) return s[n-1];
-    var u=(p/100)*(n-1), i=Math.floor(u), f=u-i;
-    return s[i]+(s[Math.min(i+1,n-1)]-s[i])*f;
-  }
-
-  document.querySelectorAll('.scrub').forEach(function(s){
-    var slot=s.querySelector('.figure'),
-        input=s.querySelector('input'), at=s.querySelector('.at'), ev=s.querySelector('.evt'),
-        ticks=[].slice.call(s.querySelectorAll('.tick')), head=s.querySelector('.head');
-
-    function show(pos){
-      var fx=FX[s.dataset.fx];
-      if(!window.DS) return;                // the renderer has not landed yet
-      var t=timeAt(fx,pos);
-      // The run as it stood at that time: every moment up to it, and a row that had
-      // started and not resolved is still going.
-      var rows=fx.rows.map(function(r){
-        var kept=r.at.filter(function(m){ return m[1]<=t+1e-6; });
-        if(!kept.length) return null;
-        var last=kept[kept.length-1];
-        var open=!window.DS.RESOLVED.has(last[0]);
-        return Object.assign({}, r, {at:kept, end:open?t:r.end});
-      }).filter(Boolean);
-      var L=window.DS.layout(Math.max(t,1), rows, {plot:100});
-      // Framed like every other captured fixture: the Run row and finalization
-      // are derived from the rows, not carried in the data.
-      slot.innerHTML=window.DS.fig(L.rows,'','','',
-        {frame:true, breaks:L.breaks, lead:fx.lead, running:t<fx.ms-1e-6});
-
-      at.textContent=Math.round(pos)+'%';
-      var e=fx.events[0];
-      for(var j=0;j<fx.events.length;j++) if(fx.events[j].t<=t+0.001) e=fx.events[j];
-      ev.textContent = pos>=100 ? e.text+' · complete' : e.text;
-      ticks.forEach(function(x){ x.classList.toggle('on', Math.abs(+x.dataset.p-pos)<0.4); });
-      head.style.left=pos+'%';
-      if(+input.value!==Math.round(pos*100)) input.value=Math.round(pos*100);
-    }
-    input.addEventListener('input',function(){ show(+input.value/100); });
-    ticks.forEach(function(x){ x.addEventListener('click',function(){ show(+x.dataset.p); }); });
-    SCRUBS.push(function(morph){
-      var snap=morph?snapGeom(slot):null;
-      show(+input.value/100);
-      if(snap) morphInto(slot, snap);
-    });
-    show(100);
-  });
-
-
+  // One set of runs. The features that change what is drawn are properties of
+  // the component now, so there is nothing to switch between.
+  var FIGDATA=${JSON.stringify(FIGDATA)};
+  window.__FIGDATA=FIGDATA;
   // ---- configurator ----------------------------------------------------
   // Nothing is redrawn: every choice is a variable on :root, and the figures
   // already read their colours and substances from those variables.
@@ -1362,15 +1243,15 @@ ${dsmod}
   }
 
   function applyFeat(animate){
-    if(animate) morphFeat(featKey());
-    else document.documentElement.setAttribute('data-feat', featKey());
+    document.documentElement.setAttribute('data-feat', featKey());
+    // The features are properties of a drawing. Every figure re-renders from
+    // the events it was drawn from, through the same component.
+    if(window.__renderFigures) window.__renderFigures({trim:feat.trim, compress:feat.compress});
     document.querySelectorAll('#side [data-feat]').forEach(function(b){
       var on=!!feat[b.dataset.feat];
       b.classList.toggle('on',on); b.textContent=on?'on':'off';
     });
-    FX=FXV[featKey()]||FXV['11'];
-    if(typeof redrawScrubs==='function') redrawScrubs();
-    if(!animate){ refit(); requestAnimationFrame(refit); }
+    refit(); requestAnimationFrame(refit);
   }
   document.querySelectorAll('#side [data-feat]').forEach(function(b){
     b.addEventListener('click',function(){
