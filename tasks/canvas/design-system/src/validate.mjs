@@ -19,7 +19,7 @@ const KIND=[
 ];
 const classify=c=>{ for(const [re,name] of KIND) if(re.test(c)) return name; return null; };
 
-const OPENERS=new Set(['queued','planned']);
+const OPENERS=new Set(['queued','planned','started']);
 const FINAL=new Set(['ok','failed','timeout','cancelled','done']);
 
 function rowsOf(svg){
@@ -39,6 +39,7 @@ function rowsOf(svg){
   // mark, so a circle at the same position and kind is dropped rather than
   // counted as a second one.
   for(const [k,arr] of out){
+
     // Dedupe by identity, not against the neighbour: a row can carry two
     // different marks at the same instant (a wait enqueued and started
     // together), and after the repaint those four interleave, so an adjacent
@@ -56,7 +57,17 @@ function check(seq){
   const p=[];
   const k=seq.map(s=>s.k);
   if(!k.length) return p;
-  if(!OPENERS.has(k[0])) p.push(`opens on "${k[0]}" — a row must open on queued or planned`);
+  /**
+   * A row opens on the moment it was actually in.
+   *
+   * This used to insist on queued or planned, because marks were read back off
+   * the bars and the reader called a row's first mark queued whatever it was.
+   * Marks come from the row's moments now, so a row with no queue in front of
+   * it opens on `started` and says so -- which is what a captured fixture looks
+   * like once the run's leading queue has been trimmed off the front, and what
+   * an unresolved sleep looks like at any time.
+   */
+  if(!OPENERS.has(k[0])) p.push(`opens on "${k[0]}" — a row must open on queued, planned or started`);
   for(let i=1;i<k.length;i++) if(k[i]===k[i-1] && Math.abs(seq[i].x-seq[i-1].x)>1)
     p.push(`two "${k[i]}" marks in a row`);
   for(let i=0;i<k.length-1;i++) if(FINAL.has(k[i]))

@@ -6,15 +6,15 @@ const O={};
 // Fan-out: the request stays in a's row, the ribbon ties all three queues.
 const Q=24;
 O.fan=fig([
-  {n:'req + a',at:[['started',8],['ok',24],['queued',24],['started',30],['ok',64]],reported:1,note:'34ms'},
-  {n:'b',at:[['queued',24],['started',30],['ok',72]],note:'42ms'},
-  {n:'c',at:[['queued',24],['started',30],['ok',58]],note:'28ms'},
+  {n:'req + a',at:[['started',8],['ok',24],['planned',24],['started',30],['ok',64]],reported:1,note:'34ms'},
+  {n:'b',at:[['planned',24],['started',30],['ok',72]],note:'42ms'},
+  {n:'c',at:[['planned',24],['started',30],['ok',58]],note:'28ms'},
 ],'','fan-out tied by a ribbon');
 
 O.compare=fig([
-  {n:'req + a',at:[['started',8],['ok',24],['queued',24],['started',30],['ok',64]],reported:1},
-  {n:'b',at:[['queued',24],['started',30],['ok',72]]},
-  {n:'c',at:[['queued',24],['started',30],['ok',58]]},
+  {n:'req + a',at:[['started',8],['ok',24],['planned',24],['started',30],['ok',64]],reported:1},
+  {n:'b',at:[['planned',24],['started',30],['ok',72]]},
+  {n:'c',at:[['planned',24],['started',30],['ok',58]]},
 ],'','fan-out without the ribbon','',{noRib:true});
 
 // Wide: twelve members, one ribbon.

@@ -144,7 +144,10 @@ export function row(i,r,sc=1,yy){
    * read as sitting ON the ribbon, but that cost it the ring of surface every
    * other mark has. The ribbon threads BETWEEN the halos instead.
    */
-  const auto=autoDots(segs.map(([k,a,w])=>({kind:k,x:a,w})));
+  // Marks come from the row's moments where it has them, and are read back off
+  // the bars only for the handful of rows still drawn without any.
+  const auto=r.at&&r.at.length ? R.marks(r.at)
+    : autoDots(segs.map(([k,a,w])=>({kind:k,x:a,w})));
   let lo='', hi='';
   // The dim layer is the WHOLE row, not the leftover after the lit parts are
   // taken out. Splitting it that way separated bars from marks into different
@@ -617,8 +620,14 @@ export function fig(rows,extra='',label='',under='',opts={}){
         // Rows already queued when the drawing begins keep the state they were
         // in: the moment that put them there is pulled up to the start rather
         // than dropped, so the row opens in queue and not in nothing.
-        const open=s.filter(mo=>mo[1]<=0).pop();
-        const at=(open?[[...open].map((v,j)=>j===1?0:v)]:[]).concat(s.filter(mo=>mo[1]>0));
+        const kept=s.filter(mo=>mo[1]>=-1e-9);
+        // The row whose work opens the drawing begins on `started`: its queue is
+        // exactly what was trimmed away, so reinstating a queued mark at zero
+        // would draw the thing the trim exists to remove. Only a row still
+        // waiting when the drawing begins gets its opening moment pulled up.
+        const open=(kept.length && kept[0][1]<1e-9)?null:s.filter(mo=>mo[1]<0).pop();
+        const at=(open?[[...open].map((v,j)=>j===1?0:v)]:[]).concat(kept.map(mo=>
+          mo[1]<0?[...mo].map((v,j)=>j===1?0:v):mo));
         if(!at.length) return {...r, at, segs:[]};
         const end=r.end!=null?r.end-lead:undefined;
         return {...r, at, end,

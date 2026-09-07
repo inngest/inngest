@@ -12,18 +12,18 @@ O.seq=fig([
 
 // Fan-out without the tie: which steps did that request produce?
 O.before=fig([
-  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',30],['ok',64]],reported:1,note:'34ms'},
-  {n:'b',at:[['queued',24],['started',30],['ok',72]],note:'42ms'},
-  {n:'c',at:[['queued',24],['started',30],['ok',58]],note:'28ms'},
-  {n:'unrelated',at:[['queued',24],['started',30],['ok',80]],note:'50ms'},
+  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['planned',24],['started',30],['ok',64]],reported:1,note:'34ms'},
+  {n:'b',at:[['planned',24],['started',30],['ok',72]],note:'42ms'},
+  {n:'c',at:[['planned',24],['started',30],['ok',58]],note:'28ms'},
+  {n:'unrelated',at:[['planned',24],['started',30],['ok',80]],note:'50ms'},
 ],'','fan-out without the ribbon');
 
 // With it: the ribbon covers exactly the members.
 O.after=fig([
-  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',30],['ok',64]],reported:1,note:'34ms'},
-  {n:'b',at:[['queued',24],['started',30],['ok',72]],note:'42ms'},
-  {n:'c',at:[['queued',24],['started',30],['ok',58]],note:'28ms'},
-  {n:'unrelated',at:[['queued',24],['started',30],['ok',80]],note:'50ms'},
+  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['planned',24],['started',30],['ok',64]],reported:1,note:'34ms'},
+  {n:'b',at:[['planned',24],['started',30],['ok',72]],note:'42ms'},
+  {n:'c',at:[['planned',24],['started',30],['ok',58]],note:'28ms'},
+  {n:'unrelated',at:[['planned',24],['started',30],['ok',80]],note:'50ms'},
 ],'','fan-out with the ribbon');
 
 // Twelve members, one ribbon, no extra rows.

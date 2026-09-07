@@ -30,8 +30,8 @@ O.key=(()=>{
 
 // The height rule, on one run.
 O.height=fig([
-  {n:'a · owner',at:[['queued',0],['started',3.5,'disc'],['ok',10],['queued',10],['started',18],['ok',48]],reported:1,note:'discovery, then the step'},
-  {n:'b · member',at:[['queued',10],['started',18],['ok',44]],note:'planned'},
+  {n:'a · owner',at:[['queued',0],['started',3.5,'disc'],['ok',10],['planned',10],['started',18],['ok',48]],reported:1,note:'discovery, then the step'},
+  {n:'b · member',at:[['planned',10],['started',18],['ok',44]],note:'planned'},
   {n:'c · seq',at:[['queued',50],['started',56],['ok',82]],note:'discovery queued'},
   {n:'nap 2s',at:[['queued',82],['started',85],['ok',97]],kind:'wait',note:'no compute'},
 ],'','solid is your compute, hatched is not');

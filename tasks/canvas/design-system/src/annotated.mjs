@@ -26,8 +26,8 @@ const O={
   },
   events:{
     svg:fig([
-      {n:'req + a',at:[['queued',0],['started',4.9,'disc'],['ok',14],['queued',14],['started',18],['ok',86]],reported:1,note:'planned it'},
-      {n:'b',at:[['queued',14],['started',18],['ok',80]],note:'planned'},
+      {n:'req + a',at:[['queued',0],['started',4.9,'disc'],['ok',14],['planned',14],['started',18],['ok',86]],reported:1,note:'planned it'},
+      {n:'b',at:[['planned',14],['started',18],['ok',80]],note:'planned'},
       {n:'c',at:[['queued',60],['started',66],['ok',86]],note:'discovered'},
     ],'','the event marks'),
     notes:[
@@ -39,9 +39,9 @@ const O={
   },
   structure:{
     svg:fig([
-      {n:'req + a',at:[['queued',0],['started',4.2,'disc'],['ok',12],['queued',12],['started',15],['ok',37]],reported:1},
-      {n:'b',at:[['queued',12],['started',15],['ok',45]]},
-      {n:'c',at:[['queued',12],['started',15],['ok',41]]},
+      {n:'req + a',at:[['queued',0],['started',4.2,'disc'],['ok',12],['planned',12],['started',15],['ok',37]],reported:1},
+      {n:'b',at:[['planned',12],['started',15],['ok',45]]},
+      {n:'c',at:[['planned',12],['started',15],['ok',41]]},
       {n:'d',at:[['queued',45],['started',55],['ok',86]]},
     ],
       wire(px(37),cy(0),px(45),cy(3),{i:0})+wire(px(45),cy(1),px(45),cy(3),{i:2})+wire(px(41),cy(2),px(45),cy(3),{i:1}),

@@ -303,9 +303,9 @@ export function ribbonGroups(rows){
     let q;
     if(r.reported){
       const k=m.findIndex(x=>RESOLVED.has(x[0]));
-      q = k<0 ? null : m.slice(k+1).find(x=>x[0]==='queued'||x[0]==='planned');
+      q = k<0 ? null : m.slice(k+1).find(x=>x[0]==='planned');
     }else{
-      q = m.find(x=>x[0]==='queued'||x[0]==='planned');
+      q = m.find(x=>x[0]==='planned');
     }
     if(q && !claimed.has(i)) marks.push([i, +q[1].toFixed(3)]);
   });
@@ -343,4 +343,102 @@ export function leadingQueue(rows){
 export function human(ms){
   if(ms>=1000) return +(ms/1000).toFixed(ms>=10000?0:3)+'s';
   return Math.round(ms)+'ms';
+}
+
+/**
+ * The instant the REQUEST at the head of a row was queued -- which is the
+ * moment some earlier work finished and caused it. A cable ends here.
+ */
+export function requestQueuedAt(r){
+  if(r.run || !r.at || !r.at.length) return null;
+  const q=r.at.find(x=>x[0]==='queued'||x[0]==='planned');
+  return q ? +q[1].toFixed(3) : null;
+}
+
+/** The instant a row's own step was queued, or null if it never waited. */
+export function queuedAt(r){
+  if(r.run || !r.at || !r.at.length) return null;
+  const m=r.at;
+  let q;
+  if(r.reported){
+    const k=m.findIndex(x=>RESOLVED.has(x[0]));
+    q = k<0 ? null : m.slice(k+1).find(x=>x[0]==='queued'||x[0]==='planned');
+  }else{
+    q = m.find(x=>x[0]==='queued'||x[0]==='planned');
+  }
+  return q ? +q[1].toFixed(3) : null;
+}
+
+/** The instant a row finished -- its own outcome, not its request's. */
+export function resolvedAt(r){
+  if(r.run || !r.at || !r.at.length) return null;
+  for(let i=r.at.length-1;i>=0;i--) if(RESOLVED.has(r.at[i][0])) return +r.at[i][1].toFixed(3);
+  return null;
+}
+
+/**
+ * The cables into one row: what had to finish before the request that produced
+ * it could be queued.
+ *
+ * A step is queued because a discovery request said so, and that request was
+ * queued because some work finished. So the causes of a row queued at Q are the
+ * rows that RESOLVED in the window since the last request went out -- which is
+ * why a Promise.all draws three cables into the step after it and a race draws
+ * one, without either figure being told which.
+ *
+ * A row queued alongside others is reached by the ribbon instead; a ribbon
+ * already says "one request produced all of these", and a cable to each would
+ * be the same fact drawn twice.
+ */
+export function cables(rows, target){
+  const t=rows[target];
+  if(!t) return [];
+  // Where the request was queued, not where the step was: on a row that
+  // carries its own request those are different moments, and it is the request
+  // that the earlier work caused.
+  const q=requestQueuedAt(t);
+  if(q==null) return [];
+  const others=rows.map((r,i)=>i===target?null:requestQueuedAt(r)).filter(v=>v!=null&&v<q);
+  const prev=others.length?Math.max(...others):-Infinity;
+  return rows.map((r,i)=>{
+    if(i===target) return null;
+    const e=resolvedAt(r);
+    return (e!=null && e>prev && e<=q) ? {from:i, x:e, to:target, q} : null;
+  }).filter(Boolean);
+}
+
+/**
+ * The mark each moment draws.
+ *
+ * Marks used to be read back off the bars by `autoDots`, which had to guess:
+ * it called a row's first mark `queued` whatever it was, so a row that opens
+ * already running -- a captured fixture whose leading queue has been trimmed
+ * away -- still drew the queue mark the trim exists to remove.
+ *
+ * A moment knows what it is. `held` draws the queue mark because being held is
+ * still waiting; the bar it opens is what says the wait had a reason.
+ */
+export const MARK_OF = {
+  queued:'queued', held:'queued', planned:'ribbon', started:'hollow',
+  retry:'hollow-bad', ok:'ok', failed:'failed', timeout:'timeout',
+  cancelled:'cancelled', done:'done',
+};
+
+/** The marks a row draws, from its moments. */
+export function marks(at){
+  const out=[];
+  for(const [n,x] of at||[]){
+    const c=MARK_OF[n];
+    if(!c) continue;
+    // Two moments at one instant -- a request resolving as the next step is
+    // queued -- are one circle, and it is the later one that names it.
+    if(out.length && Math.abs(out[out.length-1].p-x)<1e-9) out.pop();
+    // A mark says something CHANGED. Queue time becoming a named flow-control
+    // hold, or one stretch of work becoming another, changes the substance of
+    // the bar without changing the state of the row, so the second mark would
+    // repeat the first and is dropped.
+    if(out.length && out[out.length-1].c===c) continue;
+    out.push({p:x, c});
+  }
+  return out;
 }
