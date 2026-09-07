@@ -1,6 +1,6 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {fig,EV,layout} from './micro.mjs';
+import {fig,EV,layout,resolveRow} from './micro.mjs';
 import {autoDots,fillGaps,COMPUTE,base,isFail} from './vocabulary.mjs';
 
 /**
@@ -143,6 +143,9 @@ const posOf=(segs,t)=>{
  * hundred drawings of it.
  */
 const pack=(f)=>{
+  // The rows are moments; everything below works in bars, so derive them once
+  // here rather than teaching each step of the pack to read both forms.
+  f={...f, rows:f.rows.map(resolveRow)};
   /**
    * A fixture declares its real duration, and its rows are laid out by the same
    * rule as everything else — so a change to the elastic rule reaches the
@@ -200,10 +203,10 @@ F.push({id:'step', title:'step', ms:2084, gap:'2s',
     {run:true, end:99.7, intervals:[{a:0,b:0.5,ok:true},{a:0.5,b:0.55,ok:true},{a:96.5,b:96.55,ok:true},
                                     {a:96.9,b:97.4,ok:true},{a:99.1,b:99.7,ok:true}],
      resolvedAt:99.7, resolvedAs:EV.ok},
-    {n:'first step',   segs:[['good',0,0.5]]},
-    {n:'for 2s',       segs:[['disc',0.5,0.05],['waitok',0.55,95.95]]},
-    {n:'second step',  segs:[['disc',96.5,0.05],['idle',96.55,0.35],['good',96.9,0.5]]},
-    {n:'Finalization', segs:[['idle',97.4,1.7],['good',99.1,0.6]]},
+    {n:'first step',   at:[['started',0],['ok',0.5]]},
+    {n:'for 2s',       at:[['started',0.5],['ok',0.55],['started',0.55],['ok',96.5]],kind:'wait',reported:1},
+    {n:'second step',  at:[['started',96.5],['ok',96.55],['queued',96.55],['started',96.9],['ok',97.4]],reported:1},
+    {n:'Finalization', at:[['queued',97.4],['started',99.1],['ok',99.7]]},
   ]});
 
 // v4sequential: an SDK that can report batches, on a run where nothing is
@@ -214,10 +217,10 @@ F.push({id:'v4sequential', title:'v4sequential', ms:2064, gap:'2s',
     {run:true, end:100, intervals:[{a:0.8,b:1.2,ok:true},{a:1.2,b:1.25,ok:true},{a:98.2,b:98.25,ok:true},
                                     {a:99.3,b:99.7,ok:true},{a:99.7,b:100,ok:true}],
      resolvedAt:100, resolvedAs:EV.ok},
-    {n:'first step',   segs:[['idle',0,0.8],['good',0.8,0.4]]},
-    {n:'for 2s',       segs:[['disc',1.2,0.05],['waitok',1.25,96.95]]},
-    {n:'second step',  segs:[['disc',98.2,0.05],['idle',98.25,1.05],['good',99.3,0.4]]},
-    {n:'Finalization', segs:[['good',99.7,0.3]]},
+    {n:'first step',   at:[['queued',0],['started',0.8],['ok',1.2]]},
+    {n:'for 2s',       at:[['started',1.2],['ok',1.25],['started',1.25],['ok',98.2]],kind:'wait',reported:1},
+    {n:'second step',  at:[['started',98.2],['ok',98.25],['queued',98.25],['started',99.3],['ok',99.7]],reported:1},
+    {n:'Finalization', at:[['started',99.7],['ok',100]]},
   ]});
 
 // invoke: a child run drawn as its own substance inside the parent's row.
@@ -226,10 +229,10 @@ F.push({id:'invoke', title:'invoke',
   rows:[
     {run:true, end:99, intervals:[{a:0,b:0.5,ok:true},{a:16.5,b:17.1,ok:true},{a:82.7,b:83.4,ok:true},{a:98.3,b:99,ok:true}],
      resolvedAt:99, resolvedAs:EV.ok},
-    {n:'before',       segs:[['good',0,0.5]]},
-    {n:'call child',   segs:[['idle',1,15.5],['disc',16.5,0.6],['child',17.1,61]]},
-    {n:'after',        segs:[['idle',78.1,4.6],['good',82.7,0.7]]},
-    {n:'Finalization', segs:[['idle',84.5,13.8],['good',98.3,0.7]]},
+    {n:'before',       at:[['started',0],['ok',0.5]]},
+    {n:'call child',   at:[['queued',1],['started',16.5,'disc'],['ok',17.1],['started',17.1],['ok',78.1]],kind:'child',reported:1},
+    {n:'after',        at:[['queued',78.1],['started',82.7],['ok',83.4]]},
+    {n:'Finalization', at:[['queued',84.5],['started',98.3],['ok',99]]},
   ]});
 
 fs.writeFileSync(HERE+'fixtures.json',JSON.stringify(F.map(pack)));

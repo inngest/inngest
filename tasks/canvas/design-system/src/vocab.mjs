@@ -33,9 +33,9 @@ O.key=(()=>{
 
 // Circles must read on a bar of their own colour.
 O.halo=fig([
-  {n:'on green',segs:[['good',0,60]]},
-  {n:'on red',segs:[['bad',0,60]]},
-  {n:'on blue',segs:[['disc',0,60]]},
+  {n:'on green',at:[['started',0],['ok',60]]},
+  {n:'on red',at:[['started',0],['failed',60]]},
+  {n:'on blue',at:[['started',0],['ok',60]],kind:'disc'},
 ],'','circles on same-coloured bars');
 
 // The backoff is knowable, so draw it.
@@ -45,15 +45,15 @@ O.backoff=(()=>{
 })();
 
 O.applied=fig([
-  {n:'a (fan-out)',segs:[['idle',0,5],['disc',5,9],['idle',14,10],['good',24,34]],note:'succeeded'},
-  {n:'flaky',segs:[['idle',0,8],['bad',8,16],['backoff',24,14],['idle',38,4],['good',42,26]],note:'recovered'},
-  {n:'doomed',segs:[['idle',0,8],['bad',8,18],['backoff',26,8],['idle',34,4],['bad',38,20]],note:'failed'},
+  {n:'a (fan-out)',at:[['queued',0],['started',5,'disc'],['ok',14],['queued',14],['started',24],['ok',58]],reported:1,note:'succeeded'},
+  {n:'flaky',at:[['queued',0],['started',8],['retry',24],['queued',38],['started',42],['ok',68]],note:'recovered'},
+  {n:'doomed',at:[['queued',0],['started',8],['retry',26],['queued',34],['started',38],['failed',58]],note:'failed'},
 ],'','the vocabulary applied');
 
 O.waits=fig([
-  {n:'matched',segs:[['idle',0,6],['waitok',6,44]],note:'event arrived'},
-  {n:'timed out',segs:[['idle',0,6],['waitout',6,64]],note:'nothing matched'},
-  {n:'cancelled',segs:[['idle',0,6],['wait',6,52]],dots:[{p:0,c:EV.queued},{p:6,c:EV.started},{p:58,c:EV.cancelled}],note:'run cut'},
+  {n:'matched',at:[['queued',0],['started',6],['ok',50]],kind:'wait',note:'event arrived'},
+  {n:'timed out',at:[['queued',0],['started',6],['timeout',70]],kind:'wait',note:'nothing matched'},
+  {n:'cancelled',at:[['queued',0],['started',6]],kind:'wait',end:58,dots:[{p:0,c:EV.queued},{p:6,c:EV.started},{p:58,c:EV.cancelled}],note:'run cut'},
 ],'','three ways a wait can end');
 
 fs.writeFileSync(HERE+'vocab.json',JSON.stringify(O));

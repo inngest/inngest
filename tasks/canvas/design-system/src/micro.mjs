@@ -577,10 +577,10 @@ export function resolveRow(r){
 }
 
 export function fig(rows,extra='',label='',under='',opts={}){
+  rows=rows.map(resolveRow);
   if(process.env.DS_AUDIT) rows.forEach(r=>{
     if(!r.run && r.segs && r.segs.length) AUTHORED.push({n:r.n, segs:r.segs, span:!!r.span});
   });
-  rows=rows.map(resolveRow);
   if(under&&typeof under==='object'){ opts=under; under=''; }
   /**
    * The elastic rule, applied to every figure rather than to the ones that

@@ -30,33 +30,33 @@ O.key=(()=>{
 
 // The height rule, on one run.
 O.height=fig([
-  {n:'a · owner',segs:[['idle',0,3.5],['disc',3.5,6.5],['idle',10,8],['good',18,30]],note:'discovery, then the step'},
-  {n:'b · member',segs:[['idle',10,8],['good',18,26]],noHalo:[10],note:'planned'},
-  {n:'c · seq',segs:[['idle',50,6],['good',56,26]],note:'discovery queued'},
-  {n:'nap 2s',segs:[['idle',82,3],['waitok',85,12]],note:'no compute'},
+  {n:'a · owner',at:[['queued',0],['started',3.5,'disc'],['ok',10],['queued',10],['started',18],['ok',48]],reported:1,note:'discovery, then the step'},
+  {n:'b · member',at:[['queued',10],['started',18],['ok',44]],noHalo:[10],note:'planned'},
+  {n:'c · seq',at:[['queued',50],['started',56],['ok',82]],note:'discovery queued'},
+  {n:'nap 2s',at:[['queued',82],['started',85],['ok',97]],kind:'wait',note:'no compute'},
 ],'','solid is your compute, hatched is not');
 
 // A step resolving.
 O.resolve=fig([
-  {n:'running',segs:[['idle',0,10],['running',10,44]],dots:[{p:0,c:EV.queued},{p:10,c:EV.started}],note:'undecided'},
-  {n:'succeeded',segs:[['idle',0,10],['good',10,50]],note:'50ms'},
-  {n:'failed',segs:[['idle',0,10],['bad',10,38]],note:'failed'},
+  {n:'running',at:[['queued',0],['started',10]],end:54,dots:[{p:0,c:EV.queued},{p:10,c:EV.started}],note:'undecided'},
+  {n:'succeeded',at:[['queued',0],['started',10],['ok',60]],note:'50ms'},
+  {n:'failed',at:[['queued',0],['started',10],['failed',48]],note:'failed'},
 ],'','a running bar resolves to green or red');
 
 // Waits resolving.
 O.waits=fig([
-  {n:'sleep 2s',segs:[['idle',0,6],['waitok',6,54]],note:'cannot fail'},
-  {n:'matched',segs:[['idle',0,6],['waitok',6,44]],note:'event arrived'},
-  {n:'timed out',segs:[['idle',0,6],['waitout',6,64]],note:'nothing matched'},
-  {n:'still open',segs:[['idle',0,6],['wait',6,88]],note:'undecided'},
+  {n:'sleep 2s',at:[['queued',0],['started',6],['ok',60]],kind:'wait',note:'cannot fail'},
+  {n:'matched',at:[['queued',0],['started',6],['ok',50]],kind:'wait',note:'event arrived'},
+  {n:'timed out',at:[['queued',0],['started',6],['timeout',70]],kind:'wait',note:'nothing matched'},
+  {n:'still open',at:[['queued',0],['started',6]],kind:'wait',end:94,note:'undecided'},
 ],'','how waiting is going to go');
 
 setNotes(true);
 O.notes=fig([
-  {n:'a',segs:[['idle',0,8],['good',8,34]],note:'34ms'},
-  {n:'b',segs:[['idle',0,8],['bad',8,18],['backoff',26,10],['idle',36,4],['good',40,20]],note:'2 attempts · 20ms'},
-  {n:'c',segs:[['idle',0,8],['good',8,52]],note:'planned 3rd'},
-  {n:'nap 2s',segs:[['idle',0,4],['waitok',4,74]],note:'no compute'},
+  {n:'a',at:[['queued',0],['started',8],['ok',42]],note:'34ms'},
+  {n:'b',at:[['queued',0],['started',8],['retry',26],['queued',36],['started',40],['ok',60]],note:'2 attempts · 20ms'},
+  {n:'c',at:[['queued',0],['started',8],['ok',60]],note:'planned 3rd'},
+  {n:'nap 2s',at:[['queued',0],['started',4],['ok',78]],kind:'wait',note:'no compute'},
 ],'','annotations sit after the bar they describe');
 
 fs.writeFileSync(HERE+'barvocab.json',JSON.stringify(O));

@@ -21,7 +21,7 @@ O.events=fig(
 
 // 2. Intervals. The gap between two moments is the thing you actually want.
 O.durations=fig(
-  [{n:'', segs:[['idle',0,34],['good',34,52]]}],
+  [{n:'', at:[['queued',0],['started',34],['ok',86]]}],
   label(17,'queued')+label(60,'step.run()'),
   'the same moments with the time between them','',{pad:14});
 
@@ -36,17 +36,17 @@ O.lifecycle=fig(
 
 // 4. Hollow or filled — has this finished?
 O.resolved=fig([
-  {n:'running',   segs:[['idle',0,10],['running',10,76]],
+  {n:'running',   at:[['queued',0],['started',10]],end:86,
    dots:[{p:0,c:EV.queued},{p:10,c:EV.started}], note:'not resolved'},
-  {n:'succeeded', segs:[['idle',0,10],['good',10,76]], note:'resolved'},
-  {n:'failed',    segs:[['idle',0,10],['bad',10,76]],  note:'resolved'},
+  {n:'succeeded', at:[['queued',0],['started',10],['ok',86]], note:'resolved'},
+  {n:'failed',    at:[['queued',0],['started',10],['failed',86]],  note:'resolved'},
 ],'','hollow until it resolves');
 
 // 5. Solid or hatched — was your app running?
 O.substance=fig([
-  {n:'step.run()', segs:[['idle',0,8],['good',8,78]],   note:'solid'},
-  {n:'step.sleep()',segs:[['idle',0,8],['waitok',8,78]],note:'hatched'},
-  {n:'queued',    segs:[['idle',0,86]], dots:[{p:0,c:EV.queued}], note:'hatched'},
+  {n:'step.run()', at:[['queued',0],['started',8],['ok',86]],   note:'solid'},
+  {n:'step.sleep()',at:[['queued',0],['started',8],['ok',86]],kind:'wait',note:'hatched'},
+  {n:'queued',    at:[['queued',0]],end:86, dots:[{p:0,c:EV.queued}], note:'hatched'},
 ],'','solid is your compute');
 
 fs.writeFileSync(HERE+'primer.json',JSON.stringify(O));

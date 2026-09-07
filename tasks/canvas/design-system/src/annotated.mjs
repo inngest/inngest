@@ -11,10 +11,10 @@ const E=86;
 const O={
   bars:{
     svg:fig([
-      {n:'a',segs:[['idle',0,10],['good',10,E-10]],note:'40ms'},
-      {n:'b',segs:[['idle',0,8],['bad',8,26],['backoff',34,12],['idle',46,4],['good',50,E-50]],note:'recovered'},
-      {n:'wait',segs:[['idle',0,6],['waitout',6,E-6]],note:'nothing matched'},
-      {n:'live',segs:[['idle',0,8],['running',8,E-8]],note:'undecided'},
+      {n:'a',at:[['queued',0],['started',10],['ok',86]],note:'40ms'},
+      {n:'b',at:[['queued',0],['started',8],['retry',34],['queued',46],['started',50],['ok',86]],note:'recovered'},
+      {n:'wait',at:[['queued',0],['started',6],['timeout',86]],kind:'wait',note:'nothing matched'},
+      {n:'live',at:[['queued',0],['started',8]],end:86,note:'undecided'},
     ],'','bar colours follow what the code did'),
     notes:[
       {side:'left', span:[0,10], row:0, text:'hatched — not your compute'},
@@ -26,9 +26,9 @@ const O={
   },
   events:{
     svg:fig([
-      {n:'req + a',segs:[['idle',0,4.9],['disc',4.9,9.1],['idle',14,4],['good',18,E-18]],note:'planned it'},
-      {n:'b',segs:[['idle',14,4],['good',18,E-24]],note:'planned'},
-      {n:'c',segs:[['idle',E-26,6],['good',E-20,20]],note:'discovered'},
+      {n:'req + a',at:[['queued',0],['started',4.9,'disc'],['ok',14],['queued',14],['started',18],['ok',86]],reported:1,note:'planned it'},
+      {n:'b',at:[['queued',14],['started',18],['ok',80]],note:'planned'},
+      {n:'c',at:[['queued',60],['started',66],['ok',86]],note:'discovered'},
     ],'','the event marks',{rib:{x:14,rows:[0,1]}}),
     notes:[
       {side:'left', at:0,    row:0, text:'queued — a discovery request'},
@@ -39,10 +39,10 @@ const O={
   },
   structure:{
     svg:fig([
-      {n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,3],['good',15,22]]},
-      {n:'b',segs:[['idle',12,3],['good',15,30]]},
-      {n:'c',segs:[['idle',12,3],['good',15,26]]},
-      {n:'d',segs:[['idle',45,10],['good',55,E-55]]},
+      {n:'req + a',at:[['queued',0],['started',4.2,'disc'],['ok',12],['queued',12],['started',15],['ok',37]],reported:1},
+      {n:'b',at:[['queued',12],['started',15],['ok',45]]},
+      {n:'c',at:[['queued',12],['started',15],['ok',41]]},
+      {n:'d',at:[['queued',45],['started',55],['ok',86]]},
     ],
       wire(px(37),cy(0),px(45),cy(3),{i:0})+wire(px(45),cy(1),px(45),cy(3),{i:2})+wire(px(41),cy(2),px(45),cy(3),{i:1}),
       'ribbon and cables',{rib:{x:12,rows:[0,1,2]}}),

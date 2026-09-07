@@ -45,10 +45,10 @@ D('c0','In a single sequential thread the SDK answers and runs in the same execu
   // `b`'s queue begins the instant `a` resolves. There is no gap to draw,
   // because there is no second request to wait for — which is the whole point
   // of the figure, and a gap here quietly contradicted it.
-  [{l:'at rest',svg:fig([{n:'a',segs:[['idle',0,10],['good',10,34]],note:'discovered'},
-    {n:'b',segs:[['idle',44,12],['good',56,30]],note:'discovered'}],'','sequential')},
-   {l:'hovering b',svg:fig([{n:'a',segs:[['idle',0,10],['good',10,34]],dim:DIM},
-    {n:'b',segs:[['idle',44,12],['good',56,30]],note:'discovered',sel:true}],
+  [{l:'at rest',svg:fig([{n:'a',at:[['queued',0],['started',10],['ok',44]],note:'discovered'},
+    {n:'b',at:[['queued',44],['started',56],['ok',86]],note:'discovered'}],'','sequential')},
+   {l:'hovering b',svg:fig([{n:'a',at:[['queued',0],['started',10],['ok',44]],dim:DIM},
+    {n:'b',at:[['queued',44],['started',56],['ok',86]],note:'discovered',sel:true}],
     wire(px(44),cy(0),px(44),cy(1)),'sequential hovered')}]);
 
 D('c1','One request made three steps. The ribbon threads their queue circles at rest, so hovering a member draws <em>no</em> cable &mdash; the relationship is already on screen, and nothing preceded this request to cable back to.',
@@ -56,27 +56,27 @@ D('c1','One request made three steps. The ribbon threads their queue circles at 
   // and on `a`'s row only the discovery bar, the queued mark that opens it and
   // the planned mark the ribbon threads. `a`'s own work had nothing to do with
   // `b` starting, so it stays faded.
-  pair([{n:'req + a',segs:[['idle',0,5.6],['disc',5.6,10.4],['idle',16,6],['good',22,44]],note:'44ms'},
-        {n:'b',segs:[['idle',16,6],['good',22,52]],note:'52ms'},
-        {n:'c',segs:[['idle',16,6],['good',22,38]],note:'38ms'}],
+  pair([{n:'req + a',at:[['queued',0],['started',5.6,'disc'],['ok',16],['queued',16],['started',22],['ok',66]],reported:1,note:'44ms'},
+        {n:'b',at:[['queued',16],['started',22],['ok',74]],note:'52ms'},
+        {n:'c',at:[['queued',16],['started',22],['ok',60]],note:'38ms'}],
     {lit:[{row:0,bars:[0,5.6],dots:[0,5.6,16]},1],arrows:[],
      label:'fan-out',hoverNote:'hovering b',rib:{x:16,rows:[0,1,2]}}));
 
 D('c2','The whole shape: one request fans out to three steps, all three completing causes the next request, and that request produced a single step so it rolls into <code>d</code>&rsquo;s row. The ribbon covers the fan-out at rest; the cables only appear when you ask, and only for the hop the ribbon cannot span.',
-  pair([{n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,2],['good',14,20]],note:'20ms'},
-        {n:'b',segs:[['idle',12,2],['good',14,32]],note:'32ms'},
-        {n:'c',segs:[['idle',12,2],['good',14,26]],note:'26ms'},
-        {n:'d',segs:[['idle',46,10],['good',56,18]],note:'18ms'}],
+  pair([{n:'req + a',at:[['queued',0],['started',4.2,'disc'],['ok',12],['queued',12],['started',14],['ok',34]],reported:1,note:'20ms'},
+        {n:'b',at:[['queued',12],['started',14],['ok',46]],note:'32ms'},
+        {n:'c',at:[['queued',12],['started',14],['ok',40]],note:'26ms'},
+        {n:'d',at:[['queued',46],['started',56],['ok',74]],note:'18ms'}],
     {lit:[0,1,2,3],focus:3,
      arrows:[wire(px(34),cy(0),px(46),cy(3),{i:0})+wire(px(46),cy(1),px(46),cy(3),{i:2})+wire(px(40),cy(2),px(46),cy(3),{i:1})],
      label:'fan-out then coalesce',hoverNote:'d selected',rib:{x:12,rows:[0,1,2]}}));
 
 D('c3','Ribbons nest, so depth reads without indentation. Hovering <code>a1</code> lights <code>a1</code>, its ribbon, and the one thing that caused it &mdash; <code>a</code> resolving. Its sibling did not cause it and stays faded.',
-  pair([{n:'req + a',segs:[['idle',0,3.5],['disc',3.5,6.5],['idle',10,2],['good',12,20]]},
-        {n:'b',segs:[['idle',10,2],['good',12,24]]},
-        {n:'req + a1',segs:[['idle',34,2.8],['disc',36.8,5.2],['idle',42,2],['good',44,18]]},
-        {n:'a2',segs:[['idle',42,2],['good',44,22]]},
-        {n:'req + b1',segs:[['idle',38,2.8],['disc',40.8,5.2],['idle',46,2],['good',48,26]]}],
+  pair([{n:'req + a',at:[['queued',0],['started',3.5,'disc'],['ok',10],['queued',10],['started',12],['ok',32]],reported:1},
+        {n:'b',at:[['queued',10],['started',12],['ok',36]]},
+        {n:'req + a1',at:[['queued',34],['started',36.8,'disc'],['ok',42],['queued',42],['started',44],['ok',62]],reported:1},
+        {n:'a2',at:[['queued',42],['started',44],['ok',66]]},
+        {n:'req + b1',at:[['queued',38],['started',40.8,'disc'],['ok',46],['queued',46],['started',48],['ok',74]],reported:1}],
     {lit:[{row:0,bars:[12],dots:[12,32]},2],arrows:[wire(px(32),cy(0),px(34),cy(2))],focus:2,
      label:'nested fan-out',hoverNote:'hovering a1',ribs:[{x:10,rows:[0,1]},{x:42,rows:[2,3]}]}));
 
@@ -84,63 +84,63 @@ D('c4','The ribbon covers exactly the members, so an uneven fan-out is legible a
   // Every member of a fan-out is enqueued by the request and waits its turn, so
   // each carries the same queue interval and the planned mark that opens it.
   // Without them the ribbon threaded rows that had no circles to thread.
-  pair([{n:'req + a',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,2],['good',14,30]]},
-        {n:'b',segs:[['idle',12,2],['good',14,58]]},
-        {n:'c',segs:[['idle',12,2],['good',14,12]]},
-        {n:'unrelated',segs:[['good',20,40]]}],
+  pair([{n:'req + a',at:[['queued',0],['started',4.2,'disc'],['ok',12],['queued',12],['started',14],['ok',44]],reported:1},
+        {n:'b',at:[['queued',12],['started',14],['ok',72]]},
+        {n:'c',at:[['queued',12],['started',14],['ok',26]]},
+        {n:'unrelated',at:[['started',20],['ok',60]]}],
     {lit:[0,1,2],arrows:[],focus:0,
      label:'unbalanced fan-out',hoverNote:'the request selected',rib:{x:12,rows:[0,1,2]}}));
 
 D('c5','Nothing static predicted the width. The ribbon reports what happened rather than promising a shape, and the one cable worth drawing is the hop from <code>decide</code> into the request &mdash; not the request out to its own members.',
-  pair([{n:'decide',segs:[['good',0,18]]},
-        {n:'req + d1',segs:[['idle',20,3.5],['disc',23.5,6.5],['idle',30,2],['good',32,26]]},
-        {n:'d2',segs:[['idle',30,2],['good',32,30]]},{n:'d3',segs:[['idle',30,2],['good',32,22]]},{n:'d4',segs:[['idle',30,2],['good',32,34]]}],
+  pair([{n:'decide',at:[['started',0],['ok',18]]},
+        {n:'req + d1',at:[['queued',20],['started',23.5,'disc'],['ok',30],['queued',30],['started',32],['ok',58]],reported:1},
+        {n:'d2',at:[['queued',30],['started',32],['ok',62]]},{n:'d3',at:[['queued',30],['started',32],['ok',54]]},{n:'d4',at:[['queued',30],['started',32],['ok',66]]}],
     {lit:[0,1,2,3,4],arrows:[wire(px(18),cy(0),px(20),cy(1))],
      label:'dynamic width',hoverNote:'the request selected',rib:{x:30,rows:[1,2,3,4]}}));
 
 D('c6','The ribbon covers both steps the resumption discovered, so nothing implies an order between them. The cable shows only what caused the resumption.',
-  pair([{n:'a',segs:[['good',2,26]]},
-        {n:'req + b',segs:[['idle',32,4.9],['disc',36.9,9.1],['idle',46,2],['good',48,28]]},
-        {n:'c',segs:[['idle',46,2],['good',48,20]]}],
+  pair([{n:'a',at:[['started',2],['ok',28]]},
+        {n:'req + b',at:[['queued',32],['started',36.9,'disc'],['ok',46],['queued',46],['started',48],['ok',76]],reported:1},
+        {n:'c',at:[['queued',46],['started',48],['ok',68]]}],
     {lit:[0,1,2],arrows:[wire(px(28),cy(0),px(32),cy(1))],
      label:'one resumption, two steps',hoverNote:'the request selected',rib:{x:46,rows:[1,2]}}));
 
 D('c7','Hovering one branch is the check: its arrow stays inside the branch. A crossed pairing would be visible as a crossed arrow.',
-  pair([{n:'left-1',segs:[['good',4,24]]},{n:'right-1',segs:[['good',4,30]]},
-        {n:'left-2',segs:[['idle',30,10],['good',42,22]]},
-        {n:'right-2',segs:[['idle',36,10],['good',48,26]]}],
+  pair([{n:'left-1',at:[['started',4],['ok',28]]},{n:'right-1',at:[['started',4],['ok',34]]},
+        {n:'left-2',at:[['queued',30],['started',42],['ok',64]]},
+        {n:'right-2',at:[['queued',36],['started',48],['ok',74]]}],
     {lit:[0,2],arrows:[wire(px(28),cy(0),px(30),cy(2))],label:'branch membership',hoverNote:'hovering left-2'}));
 
 D('c8','Each branch scheduled its own request, so there are two. Hovering shows one feeder, not two.',
-  pair([{n:'req + a',segs:[['idle',0,2],['disc',2,4],['idle',6,2],['good',8,18]]},
-        {n:'b',segs:[['idle',6,2],['good',8,24]]},
-        {n:'req + a2',segs:[['idle',26,2],['disc',28,4],['idle',32,2],['good',34,20]]},
-        {n:'req + b2',segs:[['idle',32,2],['disc',34,4],['idle',38,2],['good',40,22]]}],
+  pair([{n:'req + a',at:[['queued',0],['started',2,'disc'],['ok',6],['queued',6],['started',8],['ok',26]],reported:1},
+        {n:'b',at:[['queued',6],['started',8],['ok',32]]},
+        {n:'req + a2',at:[['queued',26],['started',28,'disc'],['ok',32],['queued',32],['started',34],['ok',54]],reported:1},
+        {n:'req + b2',at:[['queued',32],['started',34,'disc'],['ok',38],['queued',38],['started',40],['ok',62]],reported:1}],
     {lit:[{row:0,bars:[8],dots:[8,26]},2],arrows:[wire(px(26),cy(0),px(28),cy(2))],focus:2,
      label:'no coalescing',hoverNote:'hovering a2',rib:{x:6,rows:[0,1]}}));
 
 D('c9','The winner is a dependency and gets a solid arrow; the losers were alternates and get dashed ones. Both only appear once you ask.',
-  pair([{n:'fast',segs:[['good',4,20]]},{n:'slow',segs:[['good',4,44]]},
-        {n:'next',segs:[['idle',26,10],['good',38,24]]}],
+  pair([{n:'fast',at:[['started',4],['ok',24]]},{n:'slow',at:[['started',4],['ok',48]]},
+        {n:'next',at:[['queued',26],['started',38],['ok',62]]}],
     {lit:[0,1,2],arrows:[wire(px(24),cy(0),px(26),cy(2))],
      hoverExtra:`<path d="M${px(48)} ${cy(1)} C ${px(56)} ${cy(1)}, ${px(30)} ${cy(2)}, ${px(40)} ${cy(2)}" fill="none" stroke="${C.acc}" stroke-width="1.2" stroke-dasharray="2.5 2.5" opacity=".6"/>`,
      label:'race',hoverNote:'the request selected'}));
 
 D('c10','A dead end is drawn by absence. Hovering it lights its own row and nothing downstream, because there is nothing downstream.',
-  pair([{n:'a',segs:[['good',4,26]]},{n:'orphan',segs:[['good',4,34]]},
-        {n:'b',segs:[['idle',32,10],['good',44,22]]}],
+  pair([{n:'a',at:[['started',4],['ok',30]]},{n:'orphan',at:[['started',4],['ok',38]]},
+        {n:'b',at:[['queued',32],['started',44],['ok',66]]}],
     {lit:[1],arrows:[],label:'dead end',hoverNote:'hovering orphan, no outgoing arrow'}));
 
 D('c12','Rows sort by start, so plan order is not row order. The ribbon carries the plan and the axis carries the time; neither has to lie, and no cable is needed to repeat it.',
-  pair([{n:'req + b',segs:[['idle',0,4.2],['disc',4.2,7.8],['idle',12,2],['good',14,20]],note:'planned 2nd'},
-        {n:'a',segs:[['idle',12,6],['good',18,40]],note:'planned 1st'},{n:'c',segs:[['idle',12,10],['good',22,16]],note:'planned 3rd'}],
+  pair([{n:'req + b',at:[['queued',0],['started',4.2,'disc'],['ok',12],['queued',12],['started',14],['ok',34]],reported:1,note:'planned 2nd'},
+        {n:'a',at:[['queued',12],['started',18],['ok',58]],note:'planned 1st'},{n:'c',at:[['queued',12],['started',22],['ok',38]],note:'planned 3rd'}],
     {lit:[0,1,2],arrows:[],
      label:'plan order vs row order',hoverNote:'the request selected',rib:{x:12,rows:[0,1,2]}}));
 
 D('c13','Response order stopped reflecting structure, so row order is time order and the arrow is the only structural claim — and only when asked for.',
-  pair([{n:'early',segs:[['good',2,14]]},
-        {n:'late',segs:[['idle',18,56.0],['good',74,10]],note:'+249ms planning'},
-        {n:'other',segs:[['good',74,14]]}],
+  pair([{n:'early',at:[['started',2],['ok',16]]},
+        {n:'late',at:[['queued',18],['started',74],['ok',84]],note:'+249ms planning'},
+        {n:'other',at:[['started',74],['ok',88]]}],
     {lit:[0,1],arrows:[wire(px(16),cy(0),px(18),cy(1))],label:'discovery after unrelated awaits',hoverNote:'hovering late'}));
 
 fs.writeFileSync(HERE+'items-a.json',JSON.stringify(E));

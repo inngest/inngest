@@ -15,9 +15,9 @@ const MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 
 // The row as it appears in the run: 6% of the width, marks overlapping.
 const inTrace = fig([
-  {n:'a',      segs:[['good',0,26]]},
-  {n:'b',      segs:[['idle',26,4],['good',30,52]]},
-  {n:'c',      segs:[['idle',82,1],['bad',83,1],['backoff',84,1],['good',85,1]],sel:true,note:'10.3s'},
+  {n:'a',      at:[['started',0],['ok',26]]},
+  {n:'b',      at:[['queued',26],['started',30],['ok',82]]},
+  {n:'c',      at:[['queued',82],['started',83],['retry',84],['started',85],['ok',86]],sel:true,note:'10.3s'},
 ], '', 'a short row inside a long run');
 
 // The same row, re-plotted on its own axis.

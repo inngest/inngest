@@ -334,3 +334,54 @@ grep -o 'split([^)]*)' trace-design-system.html
 ```
 
 This is lesson 18 again — check the rendered artefact, not the source.
+
+---
+
+## 25. A byte-identical gate proves nothing moved, not that it was right
+
+**Failure mode**: converting 300 hand-authored rows of bars into derived rows, I
+gated the whole conversion on the built artifact being byte-identical. It was —
+and I reported that as success. But I had built the bars-to-moments reader by
+tuning it until it reproduced the authoring, so the gate could only ever pass.
+The stakeholder saw it immediately: "it could be that byte equivalence isn't
+true btw, as doing this may genuinely fix some of the figures haha".
+
+It did. Two rows drew the same event two different ways: a *step* that threw
+with another attempt coming was followed by `backoff` (red hatch), while a
+*discovery request* that threw with another attempt coming was followed by plain
+`idle` queue — in a figure whose own annotations read "backoff 1s" and "backoff
+2s" over the grey.
+
+**Detection signal**: a verification that cannot fail. If the oracle was derived
+from the thing under test, it is a consistency check, not a correctness one.
+
+**Prevention**: when converting authored data to derived data, byte-identity is
+the *regression* check. Add a separate **disagreement scan** for the correctness
+one: enumerate every (event, what followed it) pair actually drawn and group
+them. One event drawn two ways is a defect in one of them. Do that scan before
+declaring the conversion done.
+
+---
+
+## 26. `display:none` on one figure kills the fills on all of them
+
+**Failure mode**: to screenshot a single figure I hid its siblings with
+`display:none`. The screenshot came back with every bar missing and only the
+event circles left, which looked like the change under test had broken the
+renderer.
+
+Each `<svg>` emits its own copy of `HATCH`, so `#hx-good`, `#hx-disc` and the
+rest are duplicated across ~145 figures. A `url(#hx-good)` fill resolves to the
+*first* one in the document — and hiding the earlier figures took it out of the
+render tree, so every fill on the page silently resolved to nothing.
+
+**Detection signal**: a screenshot that contradicts the artifact's own markup.
+Grep the built HTML for the element before believing the picture:
+
+```bash
+grep -o '<rect class="bar[^>]*>' trace-design-system.html | head
+```
+
+**Prevention**: never isolate a figure by hiding its siblings. Shift the page
+instead — set a negative `margin-top` on `body` so the figure lands at the top of
+the viewport, leaving the whole document in the render tree.

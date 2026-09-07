@@ -233,9 +233,16 @@ export function moments(segs){
     const prev=segs[i-1];
     // The previous work resolved here; another attempt still to come makes that
     // resolution a retry rather than the row's outcome.
-    if(prev && WORKING(prev[0]))
-      add(fail(prev[0]) && i<=lastWork ? 'retry' : CLOSES[bare(prev[0])], x);
-    add(WORKING(k) ? 'started' : OPENS[bare(k)], x, WORKING(k) ? (TABLE_OF[bare(k)]||'step') : null);
+    let retried=false;
+    if(prev && WORKING(prev[0])){
+      retried = fail(prev[0]) && i<=lastWork;
+      add(retried ? 'retry' : CLOSES[bare(prev[0])], x);
+    }
+    // A retry already opens the interval that follows it, and it opens it as
+    // backoff. Letting a `queued` in at the same instant would say the run was
+    // waiting for the executor when it was waiting out a failure.
+    if(!(retried && !WORKING(k)))
+      add(WORKING(k) ? 'started' : OPENS[bare(k)], x, WORKING(k) ? (TABLE_OF[bare(k)]||'step') : null);
   });
   const last=segs[segs.length-1];
   if(WORKING(last[0]) && !UNRESOLVED.has(bare(last[0])))

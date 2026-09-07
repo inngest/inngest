@@ -6,46 +6,46 @@ const Q=24;
 
 // Sequential: the request becomes the step. Nothing to group.
 O.seq=fig([
-  {n:'a',segs:[['good',0,20]]},
-  {n:'b',segs:[['idle',30,8],['good',38,34]],note:'discovered'},
+  {n:'a',at:[['started',0],['ok',20]]},
+  {n:'b',at:[['queued',30],['started',38],['ok',72]],note:'discovered'},
 ],'','sequential');
 
 // Fan-out without the tie: which steps did that request produce?
 O.before=fig([
-  {n:'req + a',segs:[['idle',8,5.6],['disc',13.6,10.4],['idle',Q,6],['good',30,34]],note:'34ms'},
-  {n:'b',segs:[['idle',Q,6],['good',30,42]],note:'42ms'},
-  {n:'c',segs:[['idle',Q,6],['good',30,28]],note:'28ms'},
-  {n:'unrelated',segs:[['idle',Q,6],['good',30,50]],note:'50ms'},
+  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',30],['ok',64]],reported:1,note:'34ms'},
+  {n:'b',at:[['queued',24],['started',30],['ok',72]],note:'42ms'},
+  {n:'c',at:[['queued',24],['started',30],['ok',58]],note:'28ms'},
+  {n:'unrelated',at:[['queued',24],['started',30],['ok',80]],note:'50ms'},
 ],'','fan-out without the ribbon');
 
 // With it: the ribbon covers exactly the members.
 O.after=fig([
-  {n:'req + a',segs:[['idle',8,5.6],['disc',13.6,10.4],['idle',Q,6],['good',30,34]],note:'34ms',noHalo:[Q]},
-  {n:'b',segs:[['idle',Q,6],['good',30,42]],note:'42ms',noHalo:[Q]},
-  {n:'c',segs:[['idle',Q,6],['good',30,28]],note:'28ms',noHalo:[Q]},
-  {n:'unrelated',segs:[['idle',Q,6],['good',30,50]],note:'50ms'},
+  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',30],['ok',64]],reported:1,note:'34ms',noHalo:[Q]},
+  {n:'b',at:[['queued',24],['started',30],['ok',72]],note:'42ms',noHalo:[Q]},
+  {n:'c',at:[['queued',24],['started',30],['ok',58]],note:'28ms',noHalo:[Q]},
+  {n:'unrelated',at:[['queued',24],['started',30],['ok',80]],note:'50ms'},
 ],'','fan-out with the ribbon',ribbon(Q,[cy(0),cy(1),cy(2)]));
 
 // Twelve members, one ribbon, no extra rows.
 const many=[...Array(8)].map((_,i)=>({n:'w'+(i+1),segs:[['idle',Q,5],['good',29,20+i*4]],note:(20+i*4)+'ms',noHalo:[Q]}));
 O.wide=fig([
-  {n:'req + w0',segs:[['idle',10,4.9],['disc',14.9,9.1],['idle',Q,5],['good',29,16]],note:'16ms',noHalo:[Q]},
+  {n:'req + w0',at:[['queued',10],['started',14.9,'disc'],['ok',24],['queued',24],['started',29],['ok',45]],reported:1,note:'16ms',noHalo:[Q]},
   ...many,
 ],'','wide fan-out',ribbon(Q,[...Array(9)].map((_,i)=>cy(i))));
 
 // Members that queue at slightly different moments.
 O.ragged=fig([
-  {n:'req + a',segs:[['idle',8,5.6],['disc',13.6,10.4],['idle',24,8],['good',32,30]],note:'30ms',noHalo:[24]},
-  {n:'b',segs:[['idle',26,8],['good',34,36]],note:'36ms',noHalo:[26]},
-  {n:'c',segs:[['idle',25,8],['good',33,24]],note:'24ms',noHalo:[25]},
+  {n:'req + a',at:[['queued',8],['started',13.6,'disc'],['ok',24],['queued',24],['started',32],['ok',62]],reported:1,note:'30ms',noHalo:[24]},
+  {n:'b',at:[['queued',26],['started',34],['ok',70]],note:'36ms',noHalo:[26]},
+  {n:'c',at:[['queued',25],['started',33],['ok',57]],note:'24ms',noHalo:[25]},
 ],'','ragged queue times',ribbon(25,[cy(0),cy(1),cy(2)]));
 
 // Coalesce keeps the arrows; there is nothing to group on the way in.
 O.coalesce=fig([
-  {n:'a',segs:[['good',2,26]]},
-  {n:'b',segs:[['good',2,34]]},
-  {n:'c',segs:[['good',2,30]]},
-  {n:'d',segs:[['idle',40,16.0],['good',56,22]],note:'22ms'},
+  {n:'a',at:[['started',2],['ok',28]]},
+  {n:'b',at:[['started',2],['ok',36]]},
+  {n:'c',at:[['started',2],['ok',32]]},
+  {n:'d',at:[['queued',40],['started',56],['ok',78]],note:'22ms'},
 ],'','coalesce');
 
 fs.writeFileSync(HERE+'attribution.json',JSON.stringify(O));

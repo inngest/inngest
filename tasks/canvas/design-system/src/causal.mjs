@@ -21,10 +21,10 @@ function ribbonTo(sources, target, {o=1}={}){
 }
 
 const ROWS_COAL=[
-  {n:'a',segs:[['idle',0,6],['good',6,30]]},
-  {n:'b',segs:[['idle',0,6],['good',6,42]]},
-  {n:'c',segs:[['idle',0,6],['good',6,36]]},
-  {n:'d',segs:[['disc',56,12],['idle',68,4],['good',72,22]]},
+  {n:'a',at:[['queued',0],['started',6],['ok',36]]},
+  {n:'b',at:[['queued',0],['started',6],['ok',48]]},
+  {n:'c',at:[['queued',0],['started',6],['ok',42]]},
+  {n:'d',at:[['started',56],['ok',68],['queued',68],['started',72],['ok',94]],reported:1},
 ];
 O.coalCurve=fig(ROWS_COAL,
   arrow(px(36),cy(0),px(56),cy(3))+arrow(px(48),cy(1),px(56),cy(3))+arrow(px(42),cy(2),px(56),cy(3)),
@@ -34,18 +34,18 @@ O.coalRibbon=fig(ROWS_COAL,
   'coalesce with an orthogonal ribbon');
 
 const ROWS_SEQ=[
-  {n:'a',segs:[['idle',0,8],['good*',8,30]]},
-  {n:'b',segs:[['idle',44,6],['good*',50,34]]},
+  {n:'a',at:[['queued',0],['started',8],['ok',38]]},
+  {n:'b',at:[['queued',44],['started',50],['ok',84]]},
 ];
 O.seqCurve=fig(ROWS_SEQ, arrow(px(38),cy(0),px(50),cy(1)), 'sequential with a curve');
 O.seqRibbon=fig(ROWS_SEQ, ribbonTo([{x:38,row:0}],{x:50,row:1}), 'sequential with a ribbon');
 
 // two branches at once — where curves stop working
 const ROWS_CH=[
-  {n:'left-1',segs:[['idle',0,6],['good',6,24]]},
-  {n:'right-1',segs:[['idle',0,6],['good',6,32]]},
-  {n:'left-2',segs:[['disc',36,8],['idle',44,3],['good',47,20]]},
-  {n:'right-2',segs:[['disc',42,8],['idle',50,3],['good',53,24]]},
+  {n:'left-1',at:[['queued',0],['started',6],['ok',30]]},
+  {n:'right-1',at:[['queued',0],['started',6],['ok',38]]},
+  {n:'left-2',at:[['started',36],['ok',44],['queued',44],['started',47],['ok',67]],reported:1},
+  {n:'right-2',at:[['started',42],['ok',50],['queued',50],['started',53],['ok',77]],reported:1},
 ];
 O.chCurve=fig(ROWS_CH,
   arrow(px(30),cy(0),px(36),cy(2))+arrow(px(38),cy(1),px(42),cy(3)),
@@ -56,9 +56,9 @@ O.chRibbon=fig(ROWS_CH,
 
 // a race: the winner is a dependency, the losers are not
 const ROWS_RACE=[
-  {n:'fast',segs:[['idle',0,6],['good',6,22]]},
-  {n:'slow',segs:[['idle',0,6],['good',6,46]]},
-  {n:'next',segs:[['disc',34,10],['idle',44,3],['good',47,26]]},
+  {n:'fast',at:[['queued',0],['started',6],['ok',28]]},
+  {n:'slow',at:[['queued',0],['started',6],['ok',52]]},
+  {n:'next',at:[['started',34],['ok',44],['queued',44],['started',47],['ok',73]],reported:1},
 ];
 O.race=fig(ROWS_RACE.map((r,i)=>i===1?{...r,dim:.28}:r),
   ribbonTo([{x:28,row:0}],{x:34,row:2}),
