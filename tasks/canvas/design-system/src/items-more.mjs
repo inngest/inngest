@@ -1,6 +1,6 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
-import {fig,px,cy,tag,axis,groupRow,arrow,dot,EV,C,W,LBL,PLOT,ROW,TOP} from './micro.mjs';
+import {fig,px,cy,tag,axis,groupRow,arrow,dot,elastic,EV,C,W,LBL,PLOT,ROW,TOP} from './micro.mjs';
 import {setFrame} from './micro.mjs'; setFrame(true);
 const E={}; const D=(k,v)=>{E[k]=v;};
 const DIM=.22;
@@ -37,15 +37,59 @@ D('w4',{d:'Waiting and failing must not read alike. One is hatched and never red
 
 // ---- Time & the axis ----------------------------------------------------
 
-D('t1',{d:'Seven days of dead time, given six percent of the width. The threshold is low on purpose: if nothing is executing for more than a few percent of the run, that stretch is worth almost none of the space, and an hour and a week get the same few pixels. The cut crosses every row, the zigzag says the page was torn and rejoined, and what runs through the band is blurred because that width is not to scale. Only the drawing compresses &mdash; the sleep still reports 7d.',
-  // The cut sits INSIDE the nap bar, not on its edges: you see the bar begin,
-  // get torn, and resume before it ends, so it is obvious which bar was
-  // compressed rather than merely that something happened between two rows.
-  svg:fig([
-    {n:'a',   segs:[['good',0,11]]},
-    {n:'nap', segs:[['waitok',11,8]],note:'7d'},
-    {n:'b',   segs:[['idle',19,3],['disc',22,4],['idle',26,3],['good',29,57]]},
-  ],'','seven days compressed to a band','',{margin:0,breaks:[[13,17,'7d']]})});
+// Every figure in this section is LAID OUT by `elastic()` from real durations
+// rather than placed by hand, so the rules it demonstrates are the rules that
+// produced it. A figure that illustrates a layout rule by hand-placing bars is
+// only a drawing of what we hope the rule does.
+const NAP=7*864e5;
+
+D('t1',{d:'Seven days of dead time, given four percent of the width. The threshold is low on purpose: if nothing is executing for more than a few percent of the run, that stretch is worth almost none of the space, and an hour and a week get the same few pixels. The cut takes the <em>middle</em> of the sleep, so the bar visibly begins, is torn, and resumes &mdash; it is that bar being compressed, not merely something happening between two rows. Only the drawing compresses: the sleep still reports 7d.',
+  svg:(()=>{
+    const B0=41+NAP, total=B0+62;
+    const el=elastic(total,[[41,41+NAP]]);
+    const g=(k,a,b)=>[k, el.at(a), el.at(b)-el.at(a)];
+    const bd=el.bands[0];
+    return fig([
+      {n:'a',   segs:[g('good',0,41)]},
+      {n:'nap', segs:[g('waitok',41,41+NAP)],note:'7d'},
+      {n:'b',   segs:[g('idle',B0,B0+6),g('disc',B0+6,B0+16),g('idle',B0+16,B0+22),g('good',B0+22,total)]},
+    ],'','seven days compressed to a band','',{margin:0,breaks:[[bd.p0,bd.p1,'7d']]});
+  })()});
+
+D('t1b',{d:'What the space left over is worth. Thirty seconds of work on one side of a compressed gap and ten on the other, so the remaining width splits 75/25 &mdash; which is the same thing as saying <strong>a second is the same number of pixels wherever it lands</strong>. Without that rule, compressing a gap would quietly rescale one half of the trace against the other and two spans either side of it would stop being comparable. It is also why several compressions need no special case: the arithmetic is total live width over total live time, applied everywhere.',
+  svg:(()=>{
+    const total=30+7*86400+10;
+    const el=elastic(total,[[30,30+7*86400]]);
+    const g=(k,a,b)=>[k, el.at(a), el.at(b)-el.at(a)];
+    const bd=el.bands[0];
+    return fig([
+      {n:'left',  segs:[g('good',0,30)],note:'30s'},
+      {n:'gap',   segs:[g('waitok',30,30+7*86400)]},
+      {n:'right', segs:[g('good',30+7*86400,total)],note:'10s'},
+    ],'','the leftover width splits by real duration','',{margin:0,breaks:[[bd.p0,bd.p1,'7d']]});
+  })()});
+
+D('t1c',{d:'Many compressions. A polling loop is a collapsed group, so the cuts fall <em>inside</em> one pair of rows rather than adding rows of their own. The bands share one budget: eight idle stretches do not spend the whole width on the parts where nothing happened, they thin instead, and below a width that can hold them a band drops its label, then its tear, leaving a marked line. The rules and the blur never go &mdash; they are what says <em>not to scale</em>. The polls between the cuts still share the one scale.',
+  svg:(()=>{
+    const POLL=4, WAIT=120;
+    const polls=[], dead=[]; let t=0;
+    for(let i=0;i<9;i++){
+      polls.push([t,t+POLL]); t+=POLL;
+      if(i<8){ dead.push([t,t+WAIT]); t+=WAIT; }
+    }
+    const total=t;
+    const el=elastic(total,dead);
+    const at=el.at;
+    const members=polls.map(([a,b])=>[at(a), at(b)-at(a), 'good']);
+    const naps=dead.map(([a,b])=>[at(a), at(b)-at(a), 'waitok']);
+    return fig([
+      {n:'', segs:[]},
+      {n:'', segs:[]},
+    ], groupRow(0,{n:'× 9 poll',x:0,w:at(total),members,note:'9 · 0 failed'})+
+       groupRow(1,{n:'× 8 nap',x:at(polls[0][1]),w:at(dead[7][1])-at(polls[0][1]),members:naps}),
+      'eight compressions sharing one budget','',
+      {margin:0,breaks:el.bands.map(b=>[b.p0,b.p1,b.label?'2m':''])});
+  })()});
 
 D('t2',{d:'Seven days elapsed, 62ms executing. Reading the fill alone tells you that before you have read a number, which is the point of the height rule.',
   svg:fig([

@@ -129,7 +129,7 @@ async function checkCodeSync(){
   const {CODE}=await import('./code.mjs');
   const ds=fs.readFileSync(HERE+'ds.mjs','utf8');
   const sc=ds.slice(ds.indexOf('const SC=['), ds.indexOf('const scenarios ='));
-  const rendered=new Set([...sc.matchAll(/\[.(c\d+\w*|w\d|t\d|s\d|n\d|i\d|h\d)./g)].map(m=>m[1]));
+  const rendered=new Set([...sc.matchAll(/\[.([cwtsnih]\d+[a-z]*)./g)].map(m=>m[1]));
 
   const EX={};
   for(const g of ['items-a','items-bc','items-disc','items-more'])

@@ -140,6 +140,21 @@ report today.
 - ENCODING: `wait` blue hatched, `waitok` green hatched, `waitout` muted hatched, `waitstop` muted hatched + square.
 
 ## Time and the axis
+- **Everything that survives compression shares ONE scale.** The width left over
+  is divided between the live stretches in proportion to their real duration —
+  30s on one side of a gap and 10s on the other get 75% and 25% of it. Which is
+  the same thing as saying **a second is worth the same number of pixels wherever
+  it lands**, so two spans in different parts of the run stay comparable. Without
+  it, compressing a gap silently rescales one half of the trace against the
+  other. It is also why N compressions need no special case: the arithmetic is
+  total live width over total live time, applied everywhere.
+- **The bands share a budget.** All of them together get at most ~16% of the
+  plot, so a trace with twenty idle stretches does not spend its width on the
+  parts where nothing happened — each band thins instead, down to a single
+  marked line. **A band never grows to fit its content**, because its content is
+  precisely the thing not worth space. Below a width that can hold them a band
+  drops its label, then its tear; the rules and the blur never go, because those
+  are what says *not to scale*.
 - **The cut sits inside the compressed bar, not on its edges.** You see the bar begin, get torn, and resume before it ends, so it is obvious *which bar* was compressed rather than merely that something happened between two rows.
 - **Dead time is worth almost none of the width, and the threshold for that is low.** If nothing is executing for more than a few percent of the run, that stretch collapses to a fixed narrow band — an hour and seven days get the same few pixels, because the space belongs to the work. Only the drawing compresses; **every reported duration is still wall clock.**
 - **A compressed band carries three cues**, because one cannot beat how strongly a time axis reads as linear: **the Run row track tearing** into two or three zigs — the track itself breaks, rather than running straight under a glyph laid on top, because a mark beside a bar reads as an icon while the bar breaking reads as the thing that happened to it, **full-height rules** at both edges so the cut crosses every row rather than being a mark on the axis that rows ignore, and a **blur** of whatever runs through the band — which says "this width is not to scale" without hiding that a row is running through it.

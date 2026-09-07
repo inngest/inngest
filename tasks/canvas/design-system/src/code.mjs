@@ -41,6 +41,10 @@ export const CODE={
  w3:`await Promise.all([\n  step.run('a', …),\n  step.run('b', …),\n  step.waitForEvent('c', {\n    event: 'x',\n    timeout: '1h',\n  }),\n])\nawait step.run('d', …)`,
  w4:`await step.sleep('nap', '2s')\n\nawait step.run('a', async () => {\n  throw new Error('boom')\n})`,
  t1:`await step.run('a', …)\nawait step.sleep('nap', '7d')\nawait step.run('b', …)`,
+ t1b:`await step.run('left', …)     // 30s
+await step.sleep('gap', '7d')
+await step.run('right', …)    // 10s`,
+ t1c:`for (const i of items) {          // 9\n  await step.run('poll', …)\n  await step.sleep('nap', '2m')\n}`,
  t2:`await step.run('a', …)\nawait step.sleep('nap', '7d')\nawait step.run('b', …)`,
  t3:`await step.run('a', …)\nawait step.run('b', …)   // a day later`,
  t4:`await step.run('a', …)     // 12ms\nawait step.sleep('nap', '2s')\nawait step.run('b', …)     // 10ms`,

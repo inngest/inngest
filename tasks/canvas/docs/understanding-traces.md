@@ -149,8 +149,17 @@ worth almost none of the width. Anything longer than a few percent of the run
 collapses to a narrow band — an hour and a week get the same few pixels, because
 the space belongs to the work.
 
-The band is marked three ways: a torn-page zigzag, rules crossing every row at
-both edges, and a blur over whatever runs through it.
+The band is marked three ways: the Run row's own track tears, rules cross every
+row at both edges, and whatever runs through the band is blurred.
+
+**Everything left over shares one scale.** The width freed up is split between
+the surviving stretches in proportion to how long they really took — 30 seconds
+of work on one side of a gap and 10 on the other get 75% and 25% of it. So a
+second is the same width wherever it lands, and two steps either side of a
+compressed gap are still worth comparing.
+
+A run with many idle stretches does not fill up with bands: they share a fixed
+budget and get thinner, down to a single marked line.
 
 **Only the axis compresses. Every duration stays wall clock.** A step that took
 890ms says 890ms whatever the axis is doing.

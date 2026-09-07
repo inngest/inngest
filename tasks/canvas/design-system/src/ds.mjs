@@ -202,6 +202,8 @@ const SC=[
  ]],
  ['Time and the axis', [
   ['t1','Dead time is worth almost none of the width. The threshold is low, the band is fixed, and only the drawing compresses — every duration is still wall clock.'],
+  ['t1b','The width left over splits by real duration, so a second is the same number of pixels wherever it lands.'],
+  ['t1c','Many compressions share one budget. Each band thins rather than the trace spending its width on nothing.'],
   ['t2','Seven days elapsed, 62ms executing. The fill rule reports that before you have read a number.'],
   ['t3','Two tiers of axis label, so a run measured in days keeps its resolution without a second axis.'],
   ['t4','A step too short to draw is still drawn, at a minimum width, with its real duration beside it.'],

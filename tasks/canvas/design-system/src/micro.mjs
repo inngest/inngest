@@ -302,6 +302,82 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[]}){
 }
 
 /**
+ * The elastic axis, computed rather than placed by hand.
+ *
+ * Two rules, and the second is the one that makes the first safe:
+ *
+ * 1. **Dead time is worth almost none of the width.** Any stretch with nothing
+ *    executing, longer than `threshold` of the run, collapses to a band.
+ *
+ * 2. **Everything that survives shares ONE scale.** The width left over is
+ *    divided between the live stretches in proportion to their real duration —
+ *    30s on the left and 10s on the right get 75% and 25% of it. Which is the
+ *    same thing as saying a second is worth the same number of pixels wherever
+ *    it lands, so two spans in different parts of the run are still honestly
+ *    comparable. Without this, compressing a gap would silently rescale one
+ *    half of the trace against the other.
+ *
+ * Rule 2 is why N compressions need no special case: the arithmetic is total
+ * live width over total live time, applied everywhere.
+ *
+ * **The bands share a budget.** All of them together get at most `budget` of the
+ * plot, so a trace with twenty idle stretches does not spend its whole width on
+ * the parts where nothing happened — each band just gets thinner, down to a
+ * single marked line. A band never grows to fit its content, because its
+ * content is precisely the thing not worth space.
+ *
+ * Returns `at(t)` — real time to drawn position — and the bands to mark.
+ */
+export function elastic(total, dead=[], {plot=86, threshold=0.03, budget=16, minBand=1.1, maxBand=4, inset=2}={}){
+  let cuts=dead
+    .map(([a,b])=>[Math.max(0,a),Math.min(total,b)])
+    .filter(([a,b])=>b-a > total*threshold)
+    .sort((x,y)=>x[0]-y[0]);
+  const given=cuts.slice();
+
+  // The cut takes the MIDDLE of a dead stretch, leaving its ends drawn to
+  // scale, so the bar visibly begins, gets torn, and resumes. Cutting at the
+  // edges of the stretch says only that something happened between two rows;
+  // cutting inside it says which bar was compressed. Two passes, because how
+  // much real time `inset` drawn units buys depends on the scale the cuts set.
+  for(let pass=0; pass<2 && cuts.length; pass++){
+    const w = Math.max(minBand, Math.min(maxBand, budget/cuts.length));
+    const live = total - cuts.reduce((n,[x,y])=>n+(y-x), 0);
+    const per = live>0 ? (plot - w*cuts.length)/live : 0;
+    if(!per) break;
+    const grab = inset/per;
+    cuts = given.map(([oa,ob])=>{
+      const g=Math.min(grab, Math.max(0,(ob-oa)/2 - 1));
+      return [oa+g, ob-g];
+    }).filter(([x,y])=>y>x);
+  }
+
+  const bandW = cuts.length ? Math.max(minBand, Math.min(maxBand, budget/cuts.length)) : 0;
+  const liveTime = total - cuts.reduce((n,[a,b])=>n+(b-a), 0);
+  const perUnit = liveTime>0 ? (plot - bandW*cuts.length)/liveTime : 0;
+
+  const at=t=>{
+    let x=0, seen=0;
+    for(const [a,b] of cuts){
+      if(t<=a) break;
+      x += Math.max(0,(Math.min(t,a)-seen))*perUnit;
+      seen = Math.min(t,a);
+      if(t<=b){ return x + bandW*((t-a)/(b-a)); }   // inside the band
+      x += bandW; seen = b;
+    }
+    return x + (t-seen)*perUnit;
+  };
+
+  // A band too narrow to hold them drops its label, then its tear. The rules
+  // and the blur always stay: they are what says "not to scale".
+  const marks = cuts.map(([a,b])=>({
+    p0: at(a), p1: at(b),
+    label: bandW>=2.6, tear: bandW>=1.8,
+  }));
+  return {at, bands:marks, bandW, cuts};
+}
+
+/**
  * A compressed stretch of dead time.
  *
  * The rule is simple and the threshold is low: **if nothing is executing for
