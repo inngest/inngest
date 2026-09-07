@@ -65,9 +65,10 @@ for(const [type,cap,states] of GROUPS){
   }
   // step.sendEvent() is the one row that points out of the run: a spur to a
   // hollow ring and a count of the runs its events started.
-  const opts = type==='step.sendEvent'
-    ? {scale:1.6, over:(X,CY)=>lineage(X(E-46),CY(0),2)}
-    : {};
+  // step.sendEvent()'s row points out of the run; the row says so and the
+  // marker is placed from where that row's own work ended.
+  if(type==='step.sendEvent' && rows.length) rows[0]={...rows[0], lineage:2};
+  const opts = type==='step.sendEvent' ? {scale:1.6} : {};
   O[type]={svg:fig(rows,'',type+' states','',opts), cap};
 }
 

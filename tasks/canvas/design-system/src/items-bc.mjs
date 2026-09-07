@@ -19,8 +19,8 @@ D('c16b',{d:'The same treatment covers every flow-control hold — throttle, rat
            {n:'b',at:[['queued',0],['held',6],['started',60],['ok',84]],note:'rate limited'},
            {n:'c',at:[['queued',0],['held',6],['started',24],['ok',44]],note:'debounced'}],'','flow control holds')});
 D('c31',{d:'A step.sendEvent() that started runs points out of this run: a short spur, a hollow ring and a count. Hollow because those runs are not in this trace.',
-  svg:fig([{n:'notify',at:[['queued',0],['started',6],['ok',42]]}],'','outbound lineage','',
-    {scale:1.3, over:(X,CY)=>lineage(X(42),CY(0),2)})});
+  svg:fig([{n:'notify',at:[['queued',0],['started',6],['ok',42]],lineage:2}],'','outbound lineage','',
+    {scale:1.3})});
 D('c17',{d:'Latency is the same substance as queueing and is named the same way. Three shades of grey would be three things to learn for no gain.',
   svg:fig([{n:'a',at:[['queued',0],['started',18],['ok',72]],note:'+18ms latency  54ms'}],'','system latency')});
 D('c18',{d:'Platform rows keep their own row and the platform colour. They are not your compute and never enter the Run row profile.',

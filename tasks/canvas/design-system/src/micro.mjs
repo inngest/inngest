@@ -4,7 +4,7 @@ import { GEOM } from './vocabulary.mjs';
 export const {W,LBL,RGT,PLOT,ROW,TOP}=GEOM;
 export { GEOM };
 export { C, EV, HATCH, dot, base, isFail, FILL, COMPUTE, NOCOMPUTE, ACTIVE, OPEN, paint, autoDots, discovered, lineage, barSvg, markSvg, cyOf, pxOf, BAR_INFO, EVENT_INFO, EVC, SUBSTANCE, substanceCSS, eventCSS } from './vocabulary.mjs';
-import { C, EV, HATCH, dot, base, paint, autoDots, OPEN, COMPUTE, isFail, barSvg, causalRibbon as _cr, wire, fillGaps, stretch, remapX, BAR_INFO, EVENT_INFO } from './vocabulary.mjs';
+import { C, EV, HATCH, dot, base, paint, autoDots, lineage, OPEN, COMPUTE, isFail, barSvg, causalRibbon as _cr, wire, fillGaps, stretch, remapX, BAR_INFO, EVENT_INFO } from './vocabulary.mjs';
 const MONO="font-family='JetBrains Mono, ui-monospace, monospace'";
 let NOTES=false;
 export const setNotes=on=>{NOTES=on;};
@@ -276,6 +276,16 @@ const CTX_O=R.FRAME.opacity;
  * signatures is how a scripted edit silently misses one.
  */
 let FRAMED=false;
+/**
+ * Whether the frame is CONTEXT or part of the subject.
+ *
+ * On Scenarios the Run row and Finalization are surround: the figure is making
+ * a point about the rows between them, and fading the frame is what keeps the
+ * eye there. On Fixtures the whole trace IS the subject -- it is a captured run
+ * shown at its measured proportions -- so there is nothing there to fade.
+ */
+let FRAME_SHARP=false;
+export const setFrameSharp=on=>{FRAME_SHARP=!!on;};
 // DS_FRAME=0 builds the figures unframed, which is how they are exported for the
 // user-facing docs: the blurred surround is a design-review device for us, and
 // in docs it reads as something being hidden from the reader.
@@ -334,8 +344,13 @@ export function traceFrame(rows,k,{end,hasOwnRun,pad=0,breaks=[],running=false})
   const tagCtx=t=>t.replace(/<circle class="ev /g,'<circle class="ev ctx ');
   // Finalization sits this many gaps of each pitch below the Run row, so it
   // tracks the rows above it instead of staying where it was generated.
+  // ...which is one gap below the last row, or level with the body when there
+  // is no last row. Using tail[0]+1 unconditionally moved an empty fixture's
+  // Finalization by a gap it had not been drawn a gap below, so it climbed onto
+  // the Run row as soon as the pitch came off 17.
   const st=rowSteps(rows), tail=st.length?st[st.length-1]:[0,0];
-  const wrapFin=t=>`<g class="r" style="--i:${above+tail[0]+1};--s:${tail[1]}">${t}</g>`;
+  const finRow=above+(rows.length?tail[0]+1:0);
+  const wrapFin=t=>`<g class="r" style="--i:${finRow};--s:${tail[1]}">${t}</g>`;
   // Two layers, both currently soft. Kept split because the Run row is the one
   // piece of the surround that is sometimes the subject rather than context.
   return {sharp:tagCtx(run), soft:wrapFin(tagCtx(fin))};
@@ -647,12 +662,20 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const lastY=rows.length?rowYs(rows)[rows.length-1]:cy(0)-ROW;
   const h=lastY+ROW*(1+above+(framed?1:0))+TOP+(opts.pad||0)
     -(rows.length?0:ROW);
-  // The same height expressed in pitch units, so anything drawn full-height
-  // follows the sliders instead of freezing at the pitch it was built at.
+  /**
+   * How far down the LOWEST ROW sits, in gaps of each pitch — which is what a
+   * full-height mark should span.
+   *
+   * Not `h`: the figure's nominal height carries a row of slack below the last
+   * row, and a band drawn to it held the box open by that much on exactly the
+   * figure that had one. The compressed figures were the ones with the empty
+   * strip underneath.
+   */
   const _st=rowSteps(rows), _tail=_st.length?_st[_st.length-1]:[0,0];
-  const hRow=_tail[0]+(1+above+(framed?1:0))-(rows.length?0:1), hSpan=_tail[1];
-  const figH=`calc(${h}px + (var(--geo-row,${ROW}px) - ${ROW}px) * ${hRow}`+
-    ` + (var(--geo-span,${SPAN_ROW}px) - ${SPAN_ROW}px) * ${hSpan})`;
+  const lowRow=above+(framed?(rows.length?_tail[0]+1:0):_tail[0]), lowSpan=_tail[1];
+  const bandH=cy(0)+ROW*lowRow+SPAN_ROW*lowSpan+6;
+  const figH=`calc(${bandH}px + (var(--geo-row,${ROW}px) - ${ROW}px) * ${lowRow}`+
+    ` + (var(--geo-span,${SPAN_ROW}px) - ${SPAN_ROW}px) * ${lowSpan})`;
   const ends=rows.flatMap(r=>(r.segs||[]).map(([,x,w])=>x+w));
   const max=ends.length?Math.max(...ends):100;
   const k=opts.scale||(max>0?Math.min(86/max,3):1);
@@ -667,21 +690,44 @@ export function fig(rows,extra='',label='',under='',opts={}){
   const XS=p=>LBL+(px(p)-LBL)*k;
   const DY=ROW*above;
   const over=opts.over?opts.over(XS,i=>cy(i)+DY):'';
+  /**
+   * The outbound lineage marker, placed from the row that owns it.
+   *
+   * It used to be handed absolute coordinates by the figure -- and in the one
+   * fixture that used it the figure indexed the rows it declared while the
+   * drawing used the rows left after the Run and Finalization were dropped, so
+   * the marker sat one row below the step whose events started the runs.
+   *
+   * Drawn in the over layer rather than in the row, because it is a fixed-size
+   * glyph: inside the row it would be scaled horizontally with the time axis.
+   */
+  const lin=rows.map((r,i)=>{
+    if(!r.lineage) return '';
+    const segs=r.segs||[];
+    if(!segs.length) return '';
+    const end=Math.max(...segs.map(([,x,w])=>x+w));
+    return `<g class="r" style="--i:${above+st[i][0]};--s:${st[i][1]}">`+
+      lineage(XS(end), ys[i]+DY, r.lineage)+'</g>';
+  }).join('');
   const inner=framed
     ? `<g class="dy" style="--a:${above}">${stretch(body,LBL,k)}</g>`
     : stretch(body,LBL,k);
   let ctx='';
   if(framed){
     const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running});
-    const soft=`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.soft,LBL,k)}</g>`;
-    ctx=(opts.breaks&&opts.breaks.length)
+    const dim=t=>`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(t,LBL,k)}</g>`;
+    const soft=FRAME_SHARP?stretch(F.soft,LBL,k):dim(F.soft);
+    // The Run row is left sharp wherever the axis is compressed: its torn track
+    // is what says "compressed here", and blurring the one element carrying
+    // that message defeats drawing it.
+    ctx=(FRAME_SHARP||(opts.breaks&&opts.breaks.length))
       ? stretch(F.sharp,LBL,k)+soft
-      : `<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(F.sharp,LBL,k)}</g>`+soft;
+      : dim(F.sharp)+soft;
   }
   // The compressed band blurs whatever runs through it. Done by drawing the
   // whole figure a second time, clipped to the band and filtered — SVG has no
   // backdrop-filter, and a flat scrim would hide the row rather than soften it.
-  const cmp=compression(opts.breaks, h, ++UID);
+  const cmp=compression(opts.breaks, bandH, ++UID);
   // Only the figure's own rows are blurred. The Run row is deliberately left
   // sharp: its torn track is what says "compressed here", and blurring the one
   // element carrying that message defeats drawing it at all.
@@ -689,8 +735,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
     ? `<g clip-path="url(#cmp-${UID})" filter="url(#cmp-b-${UID})">${inner}</g>`
     : '';
   const nr=n+above+(framed?1:0);
-  return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${h}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
-    HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+`</svg>`;
+  return `<svg viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
+    HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+cmp.over+over+lin+`</svg>`;
 }
 
 const BLURDEF=`<defs><filter id="cmpblur" x="-30%" y="-10%" width="160%" height="120%"><feGaussianBlur stdDeviation="1.4"/><feColorMatrix type="saturate" values="0.55"/></filter><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+

@@ -1,6 +1,7 @@
 const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,lineage,px,cy,arrow,dot,C,W,LBL,PLOT,ROW,TOP,setFrame} from './micro.mjs';
+import {setFrameSharp} from './micro.mjs'; setFrameSharp(true);
 setFrame(true);
 
 /**
@@ -17,7 +18,7 @@ setFrame(true);
  */
 const panel=(rows,extra='',label='')=>fig(
   rows.filter(r=>r.run===undefined && r.name!=='Finalization')
-      .map(r=>({n:r.name, segs:(r.segs||[]).map(g=>[g.kind,g.x,g.w]),
+      .map(r=>({...r, n:r.name, segs:(r.segs||[]).map(g=>[g.kind,g.x,g.w]),
                 note:[r.dur,r.note].filter(Boolean).join(' · ')})),
   extra, label);
 const F={};
@@ -63,13 +64,11 @@ F.emit=[{
     const rows=[
       {run:[{a:27.3,b:29.8,ok:true},{a:45.5,b:60.1,ok:true},{a:75.8,b:78.3,ok:true}],lbl:'7ms compute / 33ms'},
       {name:'prepare',dur:'1ms',segs:[{x:27.3,w:2.5,kind:'good'}]},
-      {name:'fan-out',dur:'5ms',segs:[{x:45.5,w:14.6,kind:'good'}]},
+      {name:'fan-out',dur:'5ms',segs:[{x:45.5,w:14.6,kind:'good'}],lineage:2},
       {name:'after',dur:'1ms',segs:[{x:75.8,w:2.5,kind:'good'}]},
       {name:'Finalization',dur:'7ms',segs:[{x:78.8,w:20.7,kind:'good'}]},
     ];
-    const y=cy(2), x=px(60.1);
-    const out=lineage(x,y,2);
-    return panel(rows,out,'emit: outbound lineage marker');
+    return panel(rows,'','emit: outbound lineage marker');
   })(),
 }];
 
