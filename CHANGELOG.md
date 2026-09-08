@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.44.0] - 2026-08-26
+
+### 🚀 Features
+
+- *(ai)* Add run-level AI usage summary (#4758)
+- *(ui)* Show run AI usage summary (#4759)
+- *(scores)* Show recorded scores on timeline bars (#4736)
+
+### 🐛 Bug Fixes
+
+- *(queue)* Renew capacity leases before dispatch (#4766)
+- *(insights)* Fix broken download with invalid dates (#4769)
+- *(connect)* Track reply delivery outcomes (#4774)
+
+### 🚜 Refactor
+
+- *(connect)* Remove executor ACK RPC (#4751)
+
+### ⚡ Performance
+
+- *(expressions)* Avoid cloning event data per evaluation (#4762)
+- *(batching)* Adding metrics for batching to capture redis memory usage and batch duration (#4763)
+
+### ⚙️ Miscellaneous Tasks
+
+- Update CODEOWNERS (#4771)
+- Remove former owners from CODEOWNERS (#4785)
+
 ## [v1.43.0] - 2026-08-20
 
 ### 🚀 Features
@@ -12,6 +40,10 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - *(ci)* Add --force-with-lease to the Sync Staging workflow push (#4629)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* V1.43.0 (#4756)
 
 ## [v1.42.0] - 2026-08-19
 

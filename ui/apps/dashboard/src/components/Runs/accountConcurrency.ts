@@ -9,8 +9,9 @@
 // 1-minute buckets, so this window is 10 buckets wide.
 export const CONCURRENCY_WINDOW_MS = 10 * 60 * 1000;
 
-// The banner copy names this window, so derive it rather than hardcoding the
-// number in the string — otherwise tuning the window silently makes the copy lie.
+// Reported on the banner's view event so reactions can be read against the
+// window the signal was measured over. Derived rather than hardcoded so tuning
+// the window can't silently desync the two.
 export const CONCURRENCY_WINDOW_MINUTES = CONCURRENCY_WINDOW_MS / 60_000;
 
 // How far behind "now" the window ends. The newest bucket is the least
@@ -96,45 +97,106 @@ export function isConcurrencyPressured(buckets: Bucket[] | undefined): boolean {
   return countMinutesWithHits(buckets) >= CONCURRENCY_HIT_MINUTES_THRESHOLD;
 }
 
-const VIEW_TRACKED_STORAGE_KEY_PREFIX = 'viewedAccountConcurrencyBanner';
+/**
+ * Which billing CTA the banner offers alongside "View usage", or null for no
+ * second CTA at all.
+ *
+ * Marketplace accounts (Vercel, AWS, DigitalOcean, partner) are billed by the
+ * provider, and every billing route but /billing/usage redirects them away
+ * (see MarketplaceAccessControl) — so any in-app upgrade CTA is a dead end.
+ * We have no installation-level URL to send them to instead, so they get none.
+ *
+ * Otherwise the label tracks what the user is actually buying: a free account
+ * changes tier ("Upgrade"), while a paid one is topping up a single
+ * entitlement, not moving tiers ("Increase concurrency").
+ */
+export type ConcurrencyBillingCTA = 'increase-concurrency' | 'upgrade';
+
+export function resolveBillingCTA({
+  isFreePlan,
+  isMarketplace,
+}: {
+  // Undefined until the account query resolves. Withholding the CTA until then
+  // is what keeps the wrong label from flashing on a paid account.
+  isFreePlan: boolean | undefined;
+  isMarketplace: boolean;
+}): ConcurrencyBillingCTA | null {
+  if (isMarketplace || isFreePlan === undefined) return null;
+
+  return isFreePlan ? 'upgrade' : 'increase-concurrency';
+}
 
 /**
- * Session-scoped so the view event fires at most once per account per browser
- * session. The banner re-resolves on every mount and every Refresh, so without
- * this the impression count inflates and the click/dismiss rates it exists to
- * anchor come out too low.
+ * One appearance of the banner, minted when it becomes visible and carried on
+ * every event that appearance produces.
  *
- * Keyed by scope as well as account: the banner renders on both the
- * environment-wide and per-function runs lists, and click/dismiss events carry
- * the scope they fired from. An account-only key would let a view on one scope
- * suppress the impression for the other, leaving those events without a
- * matching denominator.
+ * The `id` is what lets a click or a dismissal be attributed to the exact
+ * impression it came from, so click and dismiss rates share a denominator
+ * counted in the same unit they are. Everything else is a snapshot taken at
+ * mint time rather than read live at click time: a Refresh can refetch while
+ * the banner sits on screen, and without the snapshot a click would report a
+ * different signal strength than the view it belongs to.
+ *
+ * The snapshot is also what the banner renders from, so the CTAs a viewer saw
+ * and the CTAs reported on the view event cannot disagree.
  */
-export function viewTrackedStorageKey(
-  accountID: string,
-  scope?: string,
-): string {
-  return `${VIEW_TRACKED_STORAGE_KEY_PREFIX}:${accountID}:${scope ?? 'none'}`;
-}
+export type BannerImpression = {
+  id: string;
+  // Held to detect an org switch as a new appearance, and reported on every
+  // event: the warehouse's event rows carry only a user id, and a user in two
+  // accounts can't be attributed from membership alone.
+  accountID: string;
+  minutesWithHits: number;
+  windowMinutes: number;
+  scope: string | undefined;
+  cta: string;
+  billingCTA: ConcurrencyBillingCTA | null;
+};
 
-export function hasTrackedView(accountID: string, scope?: string): boolean {
-  try {
-    const key = viewTrackedStorageKey(accountID, scope);
-    return window.sessionStorage.getItem(key) !== null;
-  } catch (error) {
-    // Treat an unreadable store as "already tracked" so a failure here can
-    // only ever under-count, never spam duplicate impressions.
-    console.warn('error reading sessionStorage for banner view:', error);
-    return true;
-  }
-}
+type ImpressionInput = {
+  isVisible: boolean;
+  accountID: string | undefined;
+  scope: string | undefined;
+  minutesWithHits: number;
+  cta: string;
+  billingCTA: ConcurrencyBillingCTA | null;
+};
 
-export function markViewTracked(accountID: string, scope?: string): void {
-  try {
-    window.sessionStorage.setItem(viewTrackedStorageKey(accountID, scope), '1');
-  } catch (error) {
-    console.warn('error writing sessionStorage for banner view:', error);
+/**
+ * The impression that should be current, given the one that already is.
+ *
+ * Returns `prev` by identity whenever the banner is still the same appearance,
+ * so the caller's tracking effect stays a no-op. A new impression is minted
+ * only on a genuine new appearance: the banner becoming visible, or the
+ * account or scope changing underneath it. Notably `minutesWithHits` changing
+ * does NOT mint one — the pressure reading moved, the appearance did not.
+ *
+ * `mintID` is injected so tests get deterministic ids without mocking ulid.
+ */
+export function nextImpression(
+  prev: BannerImpression | null,
+  input: ImpressionInput,
+  mintID: () => string,
+): BannerImpression | null {
+  if (!input.isVisible || !input.accountID) return null;
+
+  if (
+    prev &&
+    prev.accountID === input.accountID &&
+    prev.scope === input.scope
+  ) {
+    return prev;
   }
+
+  return {
+    id: mintID(),
+    accountID: input.accountID,
+    minutesWithHits: input.minutesWithHits,
+    windowMinutes: CONCURRENCY_WINDOW_MINUTES,
+    scope: input.scope,
+    cta: input.cta,
+    billingCTA: input.billingCTA,
+  };
 }
 
 /**

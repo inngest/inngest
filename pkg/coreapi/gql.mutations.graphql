@@ -22,10 +22,6 @@ type Mutation {
     debugSessionID: ULID
     debugRunID: ULID
   ): ULID!
-
-  createDebugSession(
-    input: CreateDebugSessionInput!
-  ): CreateDebugSessionResponse!
 }
 
 input CreateAppInput {
@@ -42,13 +38,3 @@ input RerunFromStepInput {
   input: Bytes
 }
 
-input CreateDebugSessionInput {
-  workspaceId: ID! = "local"
-  functionSlug: String!
-  runID: String
-}
-
-type CreateDebugSessionResponse {
-  debugSessionID: ULID!
-  debugRunID: ULID!
-}

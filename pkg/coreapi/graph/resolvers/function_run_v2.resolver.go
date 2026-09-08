@@ -166,15 +166,10 @@ func (r *runDeferredFromResolver) Run(ctx context.Context, df *models.RunDeferre
 	return models.MakeFunctionRunV2(run)
 }
 
-func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error) {
-	targetLoader := loader.FromCtx(ctx).LegacyRunTraceLoader
-	if preview != nil && *preview {
-		targetLoader = loader.FromCtx(ctx).RunTraceLoader
-	}
-
+func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2) (*models.RunTraceSpan, error) {
 	return loader.LoadOne[models.RunTraceSpan](
 		ctx,
-		targetLoader,
+		loader.FromCtx(ctx).RunTraceLoader,
 		&loader.TraceRequestKey{
 			TraceRunIdentifier: &cqrs.TraceRunIdentifier{
 				AppID:      fn.AppID,

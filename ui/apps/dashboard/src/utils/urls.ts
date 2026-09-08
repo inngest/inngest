@@ -31,10 +31,15 @@ export function setSkipCacheSearchParam(url: string): string {
  * option. Splat routes (e.g. Clerk's /sign-in/factor-one) should pass their
  * base path so all sub-paths collapse to one canonical URL.
  */
+/** Resolves an app-relative path to an absolute URL. */
+export function absoluteUrl(path: string) {
+  return new URL(path, import.meta.env.VITE_APP_URL).toString();
+}
+
 export function canonicalLink(path: string) {
   return {
     rel: 'canonical',
-    href: new URL(path, import.meta.env.VITE_APP_URL).toString(),
+    href: absoluteUrl(path),
   };
 }
 

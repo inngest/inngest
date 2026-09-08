@@ -146,6 +146,7 @@ func NewManager(opts Opts) InvocationManager {
 		request:    opts.Request,
 		indexes:    map[string]int{},
 		l:          &sync.RWMutex{},
+		opsLock:    &sync.Mutex{},
 		signingKey: opts.SigningKey,
 		seen:       map[string]struct{}{},
 		seenLock:   &sync.RWMutex{},
@@ -157,6 +158,7 @@ func NewManager(opts Opts) InvocationManager {
 			RunID:              opts.Request.CallCtx.RunID,
 			FnID:               opts.Request.CallCtx.FunctionID,
 			QueueItemRef:       opts.Request.CallCtx.QueueItemRef,
+			Environment:        opts.Request.CallCtx.Env,
 			SigningKey:         opts.SigningKey,
 			SigningKeyFallback: opts.SigningKeyFallback,
 			Config:             checkpointConfig,
@@ -187,6 +189,8 @@ type requestCtxManager struct {
 	// Ops holds a list of buffered generator opcodes to send to the executor
 	// after this invocation.
 	ops []GeneratorOpcode
+	// guards the response buffer shared by appends, checkpoints, and response reads.
+	opsLock *sync.Mutex
 	// request represents the incoming request.
 	request *Request
 	// Indexes represents a map of indexes for each unhashed op.
@@ -244,11 +248,13 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 	// Always add the current parallelism mode to the opcode we're appending.
 	op.SetParallelMode(ParallelMode(ctx))
 
+	r.opsLock.Lock()
 	if r.ops == nil {
 		r.ops = []GeneratorOpcode{op}
 	} else {
 		r.ops = append(r.ops, op)
 	}
+	r.opsLock.Unlock()
 
 	// If we're planning multiple steps, append and continue on without any hijacking
 	// in every case.  Without this, we won't continue to plan the next set of parallel
@@ -293,14 +299,15 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 
 		r.checkpointer.WithStep(ctx, op, func(done []opcode.Step, err error) {
 			if err == nil {
-				// Remove each step that's checkpointed from our buffer.  The manager's buffer
-				// is used as the response data, and given these steps have already been checkpointed
-				// we no longer need to send them in the SDK response.
+				// drop checkpointed steps from the response buffer.  the callback shares
+				// this slice with appends and response reads.
+				r.opsLock.Lock()
 				for _, op := range done {
 					r.ops = slices.DeleteFunc(r.ops, func(f opcode.Step) bool {
 						return op.ID == f.ID
 					})
 				}
+				r.opsLock.Unlock()
 				return
 			}
 			logger.Default().Warn("error checkpointing state, falling back to async response", "error", err)
@@ -311,7 +318,10 @@ func (r *requestCtxManager) AppendOp(ctx context.Context, op GeneratorOpcode) {
 }
 
 func (r *requestCtxManager) Ops() []GeneratorOpcode {
-	return r.ops
+	// copy the response buffer because checkpoint callbacks share the slice.
+	r.opsLock.Lock()
+	defer r.opsLock.Unlock()
+	return slices.Clone(r.ops)
 }
 
 func (r *requestCtxManager) CallContext() middleware.CallContext {

@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -145,51 +144,6 @@ func (w wrapper) GetSpansByRunIDsAndName(
 	}
 
 	return out, nil
-}
-
-func (w wrapper) GetSpansByDebugRunID(ctx context.Context, debugRunID ulid.ULID) ([]*cqrs.OtelSpan, error) {
-	spans, err := w.q.GetSpansByDebugRunID(ctx, sql.NullString{String: debugRunID.String(), Valid: true})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error getting spans by debug run ID", "error", err)
-		return nil, err
-	}
-
-	if len(spans) == 0 {
-		return nil, nil
-	}
-
-	return buildDebugRunSpan(ctx, spans)
-}
-
-func (w wrapper) GetSpansByDebugSessionID(ctx context.Context, debugSessionID ulid.ULID) ([][]*cqrs.OtelSpan, error) {
-	spans, err := w.q.GetSpansByDebugSessionID(ctx, sql.NullString{String: debugSessionID.String(), Valid: true})
-	if err != nil {
-		logger.StdlibLogger(ctx).Error("error getting spans by debug session ID", "error", err)
-		return nil, err
-	}
-
-	if len(spans) == 0 {
-		return nil, nil
-	}
-
-	spansByDebugSession := make(map[string][]*dbpkg.SpanRow)
-	for _, span := range spans {
-		if span.DebugRunID.Valid {
-			spansByDebugSession[span.DebugRunID.String] = append(spansByDebugSession[span.DebugRunID.String], span)
-		}
-	}
-
-	var allDebugRuns [][]*cqrs.OtelSpan
-
-	for _, runSpans := range spansByDebugSession {
-		debugRunSpans, err := buildDebugRunSpan(ctx, runSpans)
-		if err != nil {
-			return nil, err
-		}
-		allDebugRuns = append(allDebugRuns, debugRunSpans)
-	}
-
-	return allDebugRuns, nil
 }
 
 var _ normalizedSpan = (*dbpkg.SpanRow)(nil)
@@ -1039,36 +993,6 @@ func encodeSpanOutputID(runID string, outputSpanID *string, inputSpanID *string)
 	return &encoded, nil
 }
 
-// group by run id, sort by started at, let the frontend handle overlay.
-func buildDebugRunSpan[T normalizedSpan](ctx context.Context, spans []T) ([]*cqrs.OtelSpan, error) {
-	if len(spans) == 0 {
-		return nil, nil
-	}
-
-	spansByRunID := make(map[string][]T)
-	for _, span := range spans {
-		runID := span.GetRunID()
-		spansByRunID[runID] = append(spansByRunID[runID], span)
-	}
-
-	runSpans := make([]*cqrs.OtelSpan, 0, len(spansByRunID))
-	for _, runSpansGroup := range spansByRunID {
-		runSpan, err := mapRootSpansFromRows(ctx, runSpansGroup)
-		if err != nil {
-			return nil, err
-		}
-		if runSpan != nil {
-			runSpans = append(runSpans, runSpan)
-		}
-	}
-
-	if len(runSpans) == 0 {
-		return nil, nil
-	}
-
-	return runSpans, nil
-}
-
 func sorter(span *cqrs.OtelSpan) {
 	sort.Slice(span.Children, func(i, j int) bool {
 		if !span.Children[i].StartTime.Equal(span.Children[j].StartTime) {
@@ -1675,6 +1599,7 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := []*cqrs.Event{}
 	for rows.Next() {
@@ -2133,74 +2058,6 @@ type traceRunCursorFilter struct {
 	Value int64
 }
 
-func (w wrapper) GetTraceSpansByRun(ctx context.Context, id cqrs.TraceRunIdentifier) ([]*cqrs.Span, error) {
-	spans, err := w.q.GetTraceSpans(ctx, dbpkg.GetTraceSpansParams{
-		TraceID: id.TraceID,
-		RunID:   id.RunID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	res := []*cqrs.Span{}
-	seen := map[string]bool{}
-	for _, s := range spans {
-		// identifier to used for checking if this span is seen already
-		m := map[string]any{
-			"ts":  s.Timestamp.UnixMilli(),
-			"tid": s.TraceID,
-			"sid": s.SpanID,
-		}
-		byt, err := json.Marshal(m)
-		if err != nil {
-			return nil, err
-		}
-		ident := base64.StdEncoding.EncodeToString(byt)
-		if _, ok := seen[ident]; ok {
-			// already seen, so continue
-			continue
-		}
-
-		span := &cqrs.Span{
-			Timestamp:    s.Timestamp,
-			TraceID:      string(s.TraceID),
-			SpanID:       string(s.SpanID),
-			SpanName:     s.SpanName,
-			SpanKind:     s.SpanKind,
-			ServiceName:  s.ServiceName,
-			ScopeName:    s.ScopeName,
-			ScopeVersion: s.ScopeVersion,
-			Duration:     time.Duration(s.Duration * int64(time.Millisecond)),
-			StatusCode:   s.StatusCode,
-			RunID:        &s.RunID,
-		}
-
-		if s.StatusMessage.Valid {
-			span.StatusMessage = &s.StatusMessage.String
-		}
-
-		if s.ParentSpanID.Valid {
-			span.ParentSpanID = &s.ParentSpanID.String
-		}
-		if s.TraceState.Valid {
-			span.TraceState = &s.TraceState.String
-		}
-
-		var resourceAttr, spanAttr map[string]string
-		if err := json.Unmarshal(s.ResourceAttributes, &resourceAttr); err == nil {
-			span.ResourceAttributes = resourceAttr
-		}
-		if err := json.Unmarshal(s.SpanAttributes, &spanAttr); err == nil {
-			span.SpanAttributes = spanAttr
-		}
-
-		res = append(res, span)
-		seen[ident] = true
-	}
-
-	return res, nil
-}
-
 func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreateTraceRunOpt) (*cqrs.TraceRun, error) {
 	run, err := w.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: opts.RunID})
 	if err == nil {
@@ -2526,41 +2383,6 @@ func (w wrapper) LegacyGetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifi
 	return nil, fmt.Errorf("no output found")
 }
 
-func (w wrapper) GetSpanStack(ctx context.Context, opts cqrs.SpanIdentifier) ([]string, error) {
-	if opts.TraceID == "" {
-		return nil, fmt.Errorf("traceID is required to retrieve stack")
-	}
-	if opts.SpanID == "" {
-		return nil, fmt.Errorf("spanID is required to retrieve stack")
-	}
-
-	// query spans in descending order
-	spans, err := w.q.GetTraceSpanOutput(ctx, dbpkg.GetTraceSpanOutputParams{
-		TraceID: opts.TraceID,
-		SpanID:  opts.SpanID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving spans for stack: %w", err)
-	}
-
-	for _, s := range spans {
-		var evts []cqrs.SpanEvent
-		err := json.Unmarshal(s.Events, &evts)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing span outputs: %w", err)
-		}
-
-		for _, evt := range evts {
-			if _, isStackEvt := evt.Attributes[consts.OtelSysStepStack]; isStackEvt {
-				// Data is kept in the `Name` field
-				return strings.Split(evt.Name, ","), nil
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("no stack found")
-}
-
 type runsQueryBuilder struct {
 	filter       []sq.Expression
 	order        []sqexp.OrderedExpression
@@ -2619,7 +2441,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 	reqcursor := &cqrs.TracePageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			l.Error("error decoding function run cursor", "error", err, "cursor", opt.Cursor)
+			l.Error("error decoding function run cursor", "error", err, "cursor", util.SanitizeLogField(opt.Cursor))
 		}
 	}
 
@@ -3177,7 +2999,7 @@ func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerCon
 	reqcursor := &cqrs.WorkerConnectionPageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			l.Error("error decoding worker connection history cursor", "error", err, "cursor", opt.Cursor)
+			l.Error("error decoding worker connection history cursor", "error", err, "cursor", util.SanitizeLogField(opt.Cursor))
 		}
 	}
 
@@ -3334,6 +3156,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := []*cqrs.WorkerConnection{}
 	var count uint
@@ -3970,15 +3793,17 @@ func spanRunCELFilters(
 		run.WithExpressionSQLConverter(h.CELConverter()),
 	)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("%w: %v", cqrs.ErrInvalidRunExpression, err)
 	}
+	// CEL parsing can succeed for identifiers this SQL backend cannot filter on.
+	// Reject those expressions instead of silently returning unfiltered runs.
 	if !expHandler.HasFilters() {
-		return celFilters, useJoin, nil
+		return nil, false, fmt.Errorf("%w: expression has no supported predicates", cqrs.ErrInvalidRunExpression)
 	}
 
 	celFilters, err = expHandler.ToSQLFilters(ctx)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("%w: %v", cqrs.ErrInvalidRunExpression, err)
 	}
 	useJoin = needsEventJoin(opt.Filter.CEL)
 

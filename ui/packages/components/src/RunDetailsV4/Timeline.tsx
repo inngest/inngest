@@ -9,7 +9,7 @@
  * - Column resize handling
  */
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type JSX, type ReactNode } from 'react';
 import { RiContractUpDownLine, RiExpandUpDownLine } from '@remixicon/react';
 
 import { Button } from '../Button';
@@ -607,6 +607,7 @@ function TimelineBarRenderer({
       hasExperiment={bar.hasExperiment}
       insideExperiment={insideExperiment}
       experimentMetadata={bar.experimentMetadata}
+      scores={bar.scores}
     >
       {/* Inngest timing bar — positioned to match the queue segment of the parent.
           Only for non-root bars; the root uses timingBreakdown only for compound segments. */}

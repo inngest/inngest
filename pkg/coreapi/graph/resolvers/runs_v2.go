@@ -21,8 +21,8 @@ const (
 	maxRunItems     = 400
 )
 
-func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2, preview *bool) (*models.RunsV2Connection, error) {
-	opts := toRunsQueryOpt(num, cur, order, filter, preview)
+func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
+	opts := toRunsQueryOpt(num, cur, order, filter)
 	runs, err := qr.Data.GetTraceRuns(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving runs: %w", err)
@@ -410,8 +410,8 @@ func (qr *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.
 	return &resp, nil
 }
 
-func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection, preview *bool) (int, error) {
-	opts := toRunsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter, preview)
+func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error) {
+	opts := toRunsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter)
 	count, err := r.Data.GetTraceRunsCount(ctx, opts)
 	if err != nil {
 		return 0, fmt.Errorf("error retrieving count for runs: %w", err)
@@ -425,7 +425,6 @@ func toRunsQueryOpt(
 	cur *string,
 	order []*models.RunsV2OrderBy,
 	filter models.RunsFilterV2,
-	preview *bool,
 ) cqrs.GetTraceRunOpt {
 	tsfield := enums.TraceRunTimeQueuedAt
 	switch *filter.TimeField {
@@ -524,6 +523,6 @@ func toRunsQueryOpt(
 		Order:   orderBy,
 		Cursor:  cursor,
 		Items:   uint(items),
-		Preview: preview == nil || *preview,
+		Preview: true,
 	}
 }

@@ -8,12 +8,11 @@ export function useGetRun() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error>();
 
-  return useCallback(async ({ runID, preview }: GetRunPayload) => {
+  return useCallback(async ({ runID }: GetRunPayload) => {
     setLoading(true);
     setError(undefined);
     const data: GetRunQuery = await client.request(GetRunDocument, {
       runID,
-      preview,
     });
     const run = data.run;
 

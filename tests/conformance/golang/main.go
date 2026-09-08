@@ -33,15 +33,13 @@ func main() {
 	addr := getenv("PORT", defaultAddr)
 	eventKey := getenv("INNGEST_EVENT_KEY", "test")
 	signingKey := getenv("INNGEST_SIGNING_KEY", "7468697320697320612074657374206b6579")
-	allowInBandSync := true
 	devMode := true
 
 	client, err := inngestgo.NewClient(inngestgo.ClientOpts{
-		AppID:           appID,
-		EventKey:        inngestgo.StrPtr(eventKey),
-		SigningKey:      inngestgo.StrPtr(signingKey),
-		AllowInBandSync: &allowInBandSync,
-		Dev:             &devMode,
+		AppID:      appID,
+		EventKey:   inngestgo.StrPtr(eventKey),
+		SigningKey: inngestgo.StrPtr(signingKey),
+		Dev:        &devMode,
 	})
 	if err != nil {
 		log.Fatalf("create client: %v", err)

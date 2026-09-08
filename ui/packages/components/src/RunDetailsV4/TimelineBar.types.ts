@@ -226,6 +226,17 @@ export interface TimelineBarProps {
     variantWeights?: Record<string, number>;
     functionSlug?: string;
   };
+
+  /** Scores recorded on this span (shows badge with hover card) */
+  scores?: ScoreBadgeData[];
+}
+
+/**
+ * A single score recorded on a span, shown in the score badge hover card.
+ */
+export interface ScoreBadgeData {
+  name: string;
+  value: number | boolean;
 }
 
 /**
@@ -312,6 +323,9 @@ export interface TimelineBarData {
     variantWeights?: Record<string, number>;
     functionSlug?: string;
   };
+
+  /** Scores recorded on this span */
+  scores?: ScoreBadgeData[];
 }
 
 /**

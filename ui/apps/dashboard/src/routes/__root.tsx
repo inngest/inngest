@@ -7,6 +7,7 @@ import {
   Outlet,
   Scripts,
   createRootRouteWithContext,
+  useLocation,
 } from '@tanstack/react-router';
 
 import CustomerIOAnalytics from '@/components/Analytics/CustomerIOAnalytics';
@@ -85,10 +86,34 @@ export const Route = createRootRouteWithContext<{
   component: RootComponent,
 });
 
+/**
+ * Sign-up is always dark, regardless of the viewer's app theme: it is a
+ * marketing surface with a fixed treatment, and most visitors arrive with no
+ * stored preference anyway.
+ *
+ * Sign-in is deliberately NOT included. It is a returning-user surface, so
+ * forcing it dark would flash every light-mode user on the way in and flash
+ * them again when the app loads in their actual theme. The two live on separate
+ * URLs, so they can differ.
+ */
+const FORCED_DARK_ROUTES = /^\/sign-up(\/|$)/;
+
 function RootComponent() {
+  const { pathname } = useLocation();
+
+  // Sign-in and sign-up are marketing-adjacent and ship a fixed dark
+  // treatment. `forcedTheme` overrides for these routes only and does not
+  // write to the stored preference, so the rest of the app keeps whatever
+  // theme the viewer chose.
+  const forcedTheme = FORCED_DARK_ROUTES.test(pathname) ? 'dark' : undefined;
+
   return (
     <RootDocument>
-      <ThemeProvider attribute="class" defaultTheme="system">
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        forcedTheme={forcedTheme}
+      >
         <InngestClerkProvider>
           <URQLProviderWrapper>
             <SentryUserIdentification />

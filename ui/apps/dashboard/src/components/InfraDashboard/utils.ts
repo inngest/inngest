@@ -885,7 +885,7 @@ export function latestBucketMetricTotal(
       total +
       metric.data.reduce((metricTotal, point) => {
         return point.bucket === latestBucket
-          ? metricTotal + point.value
+          ? metricTotal + (point.value ?? 0)
           : metricTotal;
       }, 0)
     );
@@ -910,7 +910,7 @@ export function sumTimeSeriesValues(
 export function sumDataValues(
   data: Array<Pick<MetricsData, 'value'>> | undefined,
 ): number {
-  return data?.reduce((total, point) => total + point.value, 0) ?? 0;
+  return data?.reduce((total, point) => total + (point.value ?? 0), 0) ?? 0;
 }
 
 export function calculateUsageShare(value: number, total: number): number {

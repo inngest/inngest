@@ -47,7 +47,7 @@ export const sumScopedMetricsByGroup = (
         buckets.push(bucket);
       }
 
-      totals.set(bucket, (totals.get(bucket) ?? 0) + value);
+      totals.set(bucket, (totals.get(bucket) ?? 0) + (value ?? 0));
     }
   }
 

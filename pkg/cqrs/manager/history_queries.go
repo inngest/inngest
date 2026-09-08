@@ -48,10 +48,6 @@ func (w wrapper) GetSkippedRunsByEventID(ctx context.Context, eventID ulid.ULID,
 	return (&reader{q: w.q}).GetSkippedRunsByEventID(ctx, eventID, opts)
 }
 
-func (w wrapper) GetUsage(ctx context.Context, opts cqrs.GetUsageOpts) ([]cqrs.HistoryUsage, error) {
-	return (&reader{q: w.q}).GetUsage(ctx, opts)
-}
-
 func (w wrapper) GetActiveRunIDs(ctx context.Context, opts cqrs.GetActiveRunIDsOpts) ([]ulid.ULID, error) {
 	return (&reader{q: w.q}).GetActiveRunIDs(ctx, opts)
 }

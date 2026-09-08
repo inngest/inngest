@@ -279,4 +279,32 @@ describe('TimelineBar', () => {
       expect(onClick).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('score badge', () => {
+    it('renders no badge when the span has no scores', () => {
+      render(<TimelineBar {...defaultProps} />, { wrapper: Wrapper });
+      expect(screen.queryByTestId('score-badge')).toBeNull();
+    });
+
+    it('renders a badge when the span has scores', () => {
+      render(<TimelineBar {...defaultProps} scores={[{ name: 'relevance', value: 0.9 }]} />, {
+        wrapper: Wrapper,
+      });
+      expect(screen.getByTestId('score-badge')).toBeTruthy();
+    });
+
+    it('lets badge clicks fall through to row selection', () => {
+      const onClick = vi.fn();
+      render(
+        <TimelineBar
+          {...defaultProps}
+          onClick={onClick}
+          scores={[{ name: 'relevance', value: 0.9 }]}
+        />,
+        { wrapper: Wrapper }
+      );
+      fireEvent.click(screen.getByTestId('score-badge'));
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
+  });
 });

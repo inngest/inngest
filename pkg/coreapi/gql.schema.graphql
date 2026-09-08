@@ -508,7 +508,7 @@ type FunctionRunV2 {
 
   output: Bytes
 
-  trace(preview: Boolean): RunTraceSpan
+  trace: RunTraceSpan
   hasAI: Boolean!
   defers: [RunDefer!]!
   siblingDefers: [RunDefer!]!
@@ -519,7 +519,7 @@ type FunctionRunV2 {
 type RunsV2Connection {
   edges: [FunctionRunV2Edge!]!
   pageInfo: PageInfo!
-  totalCount(preview: Boolean): Int!
+  totalCount: Int!
 }
 
 type FunctionRunV2Edge {
@@ -701,26 +701,6 @@ type RunTraceTrigger {
   isBatch: Boolean! # indicates if this trigger is a batch trigger
   batchID: ULID # the batchID of this list of events if available
   cron: String # The cron expression if available
-}
-
-# debug types
-
-type DebugRun {
-  debugTraces: [RunTraceSpan!]
-}
-
-type DebugSessionRun {
-  status: RunTraceSpanStatus!
-  queuedAt: Time!
-  startedAt: Time
-  endedAt: Time
-  debugRunID: ULID
-  tags: [String!]
-  versions: [String!]
-}
-
-type DebugSession {
-  debugRuns: [DebugSessionRun!]
 }
 
 type RunStep {

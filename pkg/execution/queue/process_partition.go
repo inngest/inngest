@@ -350,7 +350,14 @@ func (q *queueProcessor) ProcessPartition(ctx context.Context, p *QueuePartition
 			// Semaphore-blocked items stay in the ready queue and can be picked up
 			// quickly once capacity is freed. Use a shorter requeue to reduce latency
 			// between run completion and the next run starting.
-			requeue = PartitionSemaphoreLimitRequeueExtension
+			requeue = q.SemaphoreRequeueExtension()
+		}
+
+		if iter.CtrSuccess.Load() == 0 {
+			// nothing was dispatched, so no completion will re-add this partition as
+			// a continuation.  drop any existing continuation, otherwise the next tick
+			// re-processes the partition and ignores the forced requeue below.
+			q.removeContinue(ctx, p, false)
 		}
 
 		// Requeue this partition as we hit concurrency limits.

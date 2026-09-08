@@ -7,6 +7,7 @@ import (
 	"iter"
 	"time"
 
+	"github.com/inngest/inngest/pkg/constraintapi"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -84,6 +85,9 @@ type LeaseItemResult struct {
 	Status     LeaseItemStatus
 	Err        error
 	RetryAfter time.Time
+	// ExhaustedSemaphores lists the semaphores that had no capacity for this item.
+	// the iterator uses it to skip later items that carry the same semaphore.
+	ExhaustedSemaphores []constraintapi.SemaphoreConstraint
 }
 
 type RunResult struct {

@@ -174,6 +174,10 @@ type ItemLeaseConstraintCheckResult struct {
 	LimitingConstraint enums.QueueConstraint
 
 	RetryAfter time.Time
+
+	// ExhaustedSemaphores lists the semaphores that had no capacity when no
+	// lease was granted.  empty when a lease was granted.
+	ExhaustedSemaphores []constraintapi.SemaphoreConstraint
 }
 
 func ConstraintConfigFromConstraints(
@@ -572,8 +576,9 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 		span.SetAttributes(attribute.Bool("constrained", true))
 
 		return ItemLeaseConstraintCheckResult{
-			LimitingConstraint: constraint,
-			RetryAfter:         res.RetryAfter,
+			LimitingConstraint:  constraint,
+			RetryAfter:          res.RetryAfter,
+			ExhaustedSemaphores: exhaustedSemaphores(res.ExhaustedConstraints),
 		}, nil
 	}
 
@@ -587,6 +592,31 @@ func (q *queueProcessor) ItemLeaseConstraintCheck(
 			IssuedAtMS: now.UnixMilli(),
 		},
 	}, nil
+}
+
+// exhaustedSemaphores returns the semaphore constraints in the given exhausted
+// constraint list.
+func exhaustedSemaphores(exhausted []constraintapi.ConstraintItem) []constraintapi.SemaphoreConstraint {
+	var sems []constraintapi.SemaphoreConstraint
+	for _, ci := range exhausted {
+		if ci.Kind != constraintapi.ConstraintKindSemaphore || ci.Semaphore == nil {
+			continue
+		}
+		sems = append(sems, *ci.Semaphore)
+	}
+	return sems
+}
+
+// hasAppSemaphore reports whether any of the given semaphores is an app worker
+// concurrency semaphore.  every item of a connect app carries the app semaphore,
+// so one exhausted app semaphore blocks the whole partition.
+func hasAppSemaphore(sems []constraintapi.SemaphoreConstraint) bool {
+	for _, s := range sems {
+		if s.Kind() == constraintapi.SemaphoreKindApp {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *queueProcessor) hasReusableCapacityLease(item *QueueItem, now time.Time) bool {

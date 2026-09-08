@@ -33,6 +33,26 @@ func TestPartitionBacklogSizeConcurrencyOption(t *testing.T) {
 	})
 }
 
+func TestSemaphoreRequeueExtensionOption(t *testing.T) {
+	t.Run("default", func(t *testing.T) {
+		opts := NewQueueOptions()
+		require.Equal(t, PartitionSemaphoreLimitRequeueExtension, opts.SemaphoreRequeueExtension())
+	})
+
+	t.Run("custom", func(t *testing.T) {
+		opts := NewQueueOptions(WithSemaphoreRequeueExtension(2 * time.Second))
+		require.Equal(t, 2*time.Second, opts.SemaphoreRequeueExtension())
+	})
+
+	t.Run("non-positive falls back to default", func(t *testing.T) {
+		opts := NewQueueOptions(WithSemaphoreRequeueExtension(0))
+		require.Equal(t, PartitionSemaphoreLimitRequeueExtension, opts.SemaphoreRequeueExtension())
+
+		opts = NewQueueOptions(WithSemaphoreRequeueExtension(-time.Second))
+		require.Equal(t, PartitionSemaphoreLimitRequeueExtension, opts.SemaphoreRequeueExtension())
+	})
+}
+
 func (r retryableError) Retryable() bool {
 	return r.retry
 }

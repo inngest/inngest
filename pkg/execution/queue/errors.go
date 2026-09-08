@@ -92,8 +92,9 @@ var (
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 
 	// ErrSemaphoreLimit represents a semaphore capacity limit for a specific queue item.
-	// Unlike partition/account limits, this is per-item (only start jobs carry semaphores),
-	// so the iterator should skip the item and continue scanning.
+	// app semaphores are on every item of a connect app, so the iterator stops on the
+	// first hit.  fn and fnkey semaphores are only on start items, so the iterator skips
+	// the item and keeps scanning.
 	ErrSemaphoreLimit = fmt.Errorf("at semaphore capacity limit")
 )
 

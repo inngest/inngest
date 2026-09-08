@@ -55,7 +55,7 @@ const mapRateList = (
   functions: EntityLookup,
 ): Rate[] => {
   return failed.slice(0, 6).map((f) => {
-    const failures = f.data.filter((d) => d.value > 0);
+    const failures = f.data.filter((d) => (d.value ?? 0) > 0);
     const totalFailures = sum(failures);
     const lastOccurence = failures.at(-1)?.bucket;
     return {

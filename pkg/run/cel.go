@@ -91,7 +91,7 @@ func (h *ExpressionHandler) add(ctx context.Context, cel []string) error {
 
 	for _, e := range cel {
 		// empty string, skip
-		for len(e) == 0 {
+		if len(e) == 0 {
 			continue
 		}
 

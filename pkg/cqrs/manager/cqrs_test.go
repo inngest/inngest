@@ -2358,6 +2358,29 @@ func TestCQRSGetSpanRunsCELJoinQualifiesTenantFilters(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
+func TestCQRSGetSpanRunsRejectsUnsupportedCELPredicates(t *testing.T) {
+	cm, cleanup := initCQRS(t)
+	defer cleanup()
+
+	for _, expression := range []string{
+		`foo.bar == 1`,
+		`event.data.tenant == "target" || foo.bar == 1`,
+	} {
+		t.Run(expression, func(t *testing.T) {
+			_, err := cm.GetTraceRuns(t.Context(), cqrs.GetTraceRunOpt{
+				Filter: cqrs.GetTraceRunFilter{
+					TimeField: enums.TraceRunTimeStartedAt,
+					From:      time.Now().Add(-time.Hour),
+					Until:     time.Now().Add(time.Hour),
+					CEL:       expression,
+				},
+				Preview: true,
+			})
+			require.ErrorIs(t, err, cqrs.ErrInvalidRunExpression)
+		})
+	}
+}
+
 // Root-page results must derive end_time/status from EXTEND spans.
 func TestCQRSGetSpanRunsEnrichmentFromExtendSpans(t *testing.T) {
 	ctx := context.Background()
@@ -2907,71 +2930,6 @@ func TestCQRSGetSpan(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "dyn-root", result.SpanID)
 		assert.Len(t, result.Children, 1, "Root should have 1 child")
-	})
-
-	t.Run("by debug run ID", func(t *testing.T) {
-		cm, cleanup := initCQRS(t)
-		defer cleanup()
-
-		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		debugRunID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-root", DebugRunID: debugRunID.String()})
-		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-child", ParentSpanID: "dyn-root", DebugRunID: debugRunID.String()})
-
-		result, err := cm.GetSpansByDebugRunID(t.Context(), debugRunID)
-		require.NoError(t, err)
-		require.Len(t, result, 1, "Should return 1 root span for the single run")
-		assert.Len(t, result[0].Children, 1, "Root should have 1 child")
-	})
-
-	t.Run("by debug session ID", func(t *testing.T) {
-		cm, cleanup := initCQRS(t)
-		defer cleanup()
-
-		runID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		debugRunID := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		debugSessionID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-root", DebugRunID: debugRunID, DebugSessionID: debugSessionID.String()})
-		insertTestSpan(t, cm, testSpanFields{RunID: runID, DynamicSpanID: "dyn-child", ParentSpanID: "dyn-root", DebugRunID: debugRunID, DebugSessionID: debugSessionID.String()})
-
-		result, err := cm.GetSpansByDebugSessionID(t.Context(), debugSessionID)
-		require.NoError(t, err)
-		require.Len(t, result, 1, "Should return 1 debug run group")
-		require.Len(t, result[0], 1, "Debug run group should have 1 root span")
-		assert.Len(t, result[0][0].Children, 1, "Root should have 1 child")
-	})
-
-	t.Run("by debug session ID keeps runs separate when dynamic span IDs collide", func(t *testing.T) {
-		cm, cleanup := initCQRS(t)
-		defer cleanup()
-
-		debugSessionID := ulid.MustNew(ulid.Now(), rand.Reader)
-
-		runIDOne := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		runIDTwo := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		debugRunIDOne := ulid.MustNew(ulid.Now(), rand.Reader).String()
-		debugRunIDTwo := ulid.MustNew(ulid.Now(), rand.Reader).String()
-
-		insertTestSpan(t, cm, testSpanFields{
-			RunID:          runIDOne,
-			DynamicSpanID:  "dyn-root",
-			DebugRunID:     debugRunIDOne,
-			DebugSessionID: debugSessionID.String(),
-		})
-		insertTestSpan(t, cm, testSpanFields{
-			RunID:          runIDTwo,
-			DynamicSpanID:  "dyn-root",
-			DebugRunID:     debugRunIDTwo,
-			DebugSessionID: debugSessionID.String(),
-		})
-
-		result, err := cm.GetSpansByDebugSessionID(t.Context(), debugSessionID)
-		require.NoError(t, err)
-		require.Len(t, result, 2, "separate runs in the same debug session must not collapse into one group")
-		require.Len(t, result[0], 1)
-		require.Len(t, result[1], 1)
 	})
 }
 

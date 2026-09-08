@@ -447,20 +447,20 @@ type ExecutorRealtimeConfig struct {
 	PublishURL string
 }
 
-// AllowStepMetadata determines if step metadata should be enabled for the account
+// AllowStepMetadata is kept only so existing callers (e.g. the monorepo)
+// constructing a WithAllowStepMetadata option still compile.
+//
+// Deprecated: step metadata is now always enabled; this type and
+// WithAllowStepMetadata no longer have any effect and will be removed.
 type AllowStepMetadata func(ctx context.Context, acctID uuid.UUID) bool
 
-func (am AllowStepMetadata) Enabled(ctx context.Context, acctID uuid.UUID) bool {
-	if am == nil {
-		return false
-	}
-
-	return am(ctx, acctID)
-}
-
+// WithAllowStepMetadata is a no-op.
+//
+// Deprecated: step metadata is now always enabled; this option no longer has
+// any effect and will be removed. Kept temporarily for compatibility with
+// existing callers in the monorepo.
 func WithAllowStepMetadata(md AllowStepMetadata) ExecutorOpt {
 	return func(e execution.Executor) error {
-		e.(*executor).allowStepMetadata = md
 		return nil
 	}
 }
@@ -555,8 +555,7 @@ type executor struct {
 	traceReader    cqrs.TraceReader
 	tracerProvider tracing.TracerProvider
 
-	allowStepMetadata AllowStepMetadata
-	clock             clockwork.Clock
+	clock clockwork.Clock
 
 	conditionalTracer itrace.ConditionalTracer
 }
@@ -2261,38 +2260,36 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return nil, err
 		}
 
-		if e.allowStepMetadata.Enabled(ctx, instance.Metadata().ID.Tenant.AccountID) {
-			// Extract HTTP timing metadata from httpstat if available.
-			// This captures the detailed connection timing breakdown (DNS, TCP, TLS, TTFB, transfer)
-			// from the HTTP request to the user's SDK function.
-			if resp.HTTPStat != nil {
-				httpTimingMd := extractors.ExtractHTTPTimingMetadata(resp.HTTPStat)
-				_, err := e.createMetadataSpanOnParent(
-					ctx,
-					&instance,
-					"executor.httpTiming",
-					httpTimingMd,
-					enums.MetadataScopeRequest,
-					instance.execSpan,
-				)
-				if err != nil {
-					l.Warn("error creating HTTP timing metadata span", "error", err)
-				}
+		// Extract HTTP timing metadata from httpstat if available.
+		// This captures the detailed connection timing breakdown (DNS, TCP, TLS, TTFB, transfer)
+		// from the HTTP request to the user's SDK function.
+		if resp.HTTPStat != nil {
+			httpTimingMd := extractors.ExtractHTTPTimingMetadata(resp.HTTPStat)
+			_, err := e.createMetadataSpanOnParent(
+				ctx,
+				&instance,
+				"executor.httpTiming",
+				httpTimingMd,
+				enums.MetadataScopeRequest,
+				instance.execSpan,
+			)
+			if err != nil {
+				l.Warn("error creating HTTP timing metadata span", "error", err)
 			}
+		}
 
-			// Attach timing breakdown metadata (queue delay, system latency, network total)
-			if timingMd := extractors.BuildTimingMetadata(instance.item.RunInfo, resp.HTTPStat); timingMd != nil {
-				_, err := e.createMetadataSpanOnParent(
-					ctx,
-					&instance,
-					"executor.timing",
-					timingMd,
-					enums.MetadataScopeRequest,
-					instance.execSpan,
-				)
-				if err != nil {
-					l.Warn("error creating timing metadata span", "error", err)
-				}
+		// Attach timing breakdown metadata (queue delay, system latency, network total)
+		if timingMd := extractors.BuildTimingMetadata(instance.item.RunInfo, resp.HTTPStat); timingMd != nil {
+			_, err := e.createMetadataSpanOnParent(
+				ctx,
+				&instance,
+				"executor.timing",
+				timingMd,
+				enums.MetadataScopeRequest,
+				instance.execSpan,
+			)
+			if err != nil {
+				l.Warn("error creating timing metadata span", "error", err)
 			}
 		}
 
@@ -6208,21 +6205,19 @@ func (e *executor) emitStepSpan(ctx context.Context, runCtx execution.RunContext
 		logger.StdlibLogger(ctx).Warn("error creating step span", "error", err)
 	}
 
-	if e.allowStepMetadata.Enabled(ctx, runCtx.Metadata().ID.Tenant.AccountID) {
-		e.handleGeneratorMetadata(ctx, runCtx, gen, extraMetadata...)
+	e.handleGeneratorMetadata(ctx, runCtx, gen, extraMetadata...)
 
-		// Extract experiment metadata from opcode opts. The SDK spreads
-		// group.experiment() variant context (experimentName, variant,
-		// selectionStrategy) onto variant sub-steps' opts; landing the
-		// same data as a step-scoped metadata span means ClickHouse
-		// can aggregate variant output metrics in a single-row query.
-		//
-		// Performing this emission server-side (rather than via an SDK
-		// addMetadata() call) means clients receive experiment data
-		// without needing to upgrade their SDK, and keeps the metadata
-		// contract consistent across SDK languages.
-		e.emitExperimentMetadataFromOpts(ctx, runCtx, gen)
-	}
+	// Extract experiment metadata from opcode opts. The SDK spreads
+	// group.experiment() variant context (experimentName, variant,
+	// selectionStrategy) onto variant sub-steps' opts; landing the
+	// same data as a step-scoped metadata span means ClickHouse
+	// can aggregate variant output metrics in a single-row query.
+	//
+	// Performing this emission server-side (rather than via an SDK
+	// addMetadata() call) means clients receive experiment data
+	// without needing to upgrade their SDK, and keeps the metadata
+	// contract consistent across SDK languages.
+	e.emitExperimentMetadataFromOpts(ctx, runCtx, gen)
 }
 
 func (e *executor) emitNonStepSpan(ctx context.Context, runCtx execution.RunContext, gen *state.GeneratorOpcode, result *apiresult.APIResult, status enums.StepStatus) {

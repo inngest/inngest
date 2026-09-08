@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/history_reader"
-	"github.com/inngest/inngest/pkg/usage"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -213,13 +212,6 @@ func (r *reader) GetSkippedRunsByEventID(
 	_ ulid.ULID,
 	_ history_reader.GetRunsByEventIDOpts,
 ) ([]history_reader.SkippedRun, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (r *reader) GetUsage(
-	ctx context.Context,
-	opts history_reader.GetUsageOpts,
-) ([]usage.UsageSlot, error) {
 	return nil, errors.New("not implemented")
 }
 

@@ -81,6 +81,7 @@ message CreateSandboxRequest {
   uint32 vcpu = 2;
   uint32 memory_mb = 3;
   map<string, string> environment = 4;
+  optional string snapshot_id = 5;
 }
 
 message ListSandboxesRequest {
@@ -147,7 +148,7 @@ message WriteSandboxFileRequest {
 
 message WriteSandboxFileData {
   string path = 1;
-  uint64 bytes_written = 2;
+  uint32 bytes_written = 2;
 }
 
 message WriteSandboxFileResponse {

@@ -8,7 +8,7 @@ export const PopoverTrigger = PopoverPrimitive.Trigger;
 export const PopoverClose = PopoverPrimitive.Close;
 
 export const PopoverContent = forwardRef<
-  React.ElementRef<typeof PopoverPrimitive.Portal>,
+  React.ComponentRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
 >(({ children, className, ...props }, forwardedRef) => {
   const container = typeof document !== 'undefined' ? document.getElementById('modals') : undefined;

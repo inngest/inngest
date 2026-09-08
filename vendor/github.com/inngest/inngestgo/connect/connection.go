@@ -519,7 +519,9 @@ func (h *connectHandler) handleWorkerRequestExtendLeaseAck(msg *connectproto.Con
 		}
 		h.workerPool.inProgressLeases[payload.RequestId] = *payload.NewLeaseId
 	} else {
-		// remove local request lease to stop extending
+		// Stop extending this lease, but do not alter worker-pool accounting or
+		// cancel execution. The function may still finish and its reply can be
+		// written or buffered for HTTP flush.
 		delete(h.workerPool.inProgressLeases, payload.RequestId)
 	}
 

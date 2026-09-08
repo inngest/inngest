@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/executor/queueref"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	sv1 "github.com/inngest/inngest/pkg/execution/state"
@@ -129,7 +128,7 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 
 	t.Run("step with metadata creates spans", func(t *testing.T) {
 		// Async checkpoint with metadata-bearing opcodes creates both
-		// step and metadata spans when AllowStepMetadata returns true.
+		// step and metadata spans.
 		ctx := context.Background()
 		require := require.New(t)
 
@@ -158,15 +157,11 @@ func TestCheckpointAsyncSteps(t *testing.T) {
 
 		mocks, testData := setupAsyncCheckpointTest(t, ops...)
 
-		// Replace checkpointer with AllowStepMetadata enabled
 		testData.checkpointer = New(Opts{
 			State:           mocks.state,
 			TracerProvider:  mocks.tracer,
 			Queue:           mocks.queue,
 			MetricsProvider: mocks.metrics,
-			AllowStepMetadata: executor.AllowStepMetadata(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
 		})
 
 		expectedData := map[string]any{"data": json.RawMessage(`{"result": "step 1 output"}`)}

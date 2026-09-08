@@ -47,6 +47,50 @@ func requireDebounce(t *testing.T, debouncer Debouncer, ctx context.Context, di 
 	return debounceID
 }
 
+func TestStartExecutionWithRemovedDebounceConfig(t *testing.T) {
+	ctx := context.Background()
+	functionID := uuid.New()
+	shard := &startExecutionQueueShard{name: "debounce"}
+	registry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	manager := debouncer{
+		shards:           registry,
+		primaryShardName: shard.name,
+		shouldMigrate:    func(context.Context, uuid.UUID) bool { return false },
+	}
+	item := DebounceItem{
+		AccountID:   uuid.New(),
+		WorkspaceID: uuid.New(),
+		FunctionID:  functionID,
+	}
+	fn := inngest.Function{ID: functionID}
+
+	require.NoError(t, manager.StartExecution(ctx, item, fn, ulid.Make()))
+	require.Equal(t, functionID.String(), shard.debounceKey)
+}
+
+type startExecutionQueueShard struct {
+	queue.QueueShard
+
+	name        string
+	debounceKey string
+}
+
+func (s *startExecutionQueueShard) Name() string {
+	return s.name
+}
+
+func (s *startExecutionQueueShard) DebounceStartExecution(
+	_ context.Context,
+	_ queue.Scope,
+	key string,
+	_, _ ulid.ULID,
+) (queue.DebounceStartStatus, error) {
+	s.debounceKey = key
+	return queue.DebounceStartStarted, nil
+}
+
 type setPointerFailingShard struct {
 	queue.QueueShard
 	err                  error
@@ -1241,6 +1285,108 @@ func TestDebounceExplicitMigration(t *testing.T) {
 			require.Empty(t, unshardedCluster.HGet(newSystemDebounceClient.KeyGenerator().Debounce(ctx), debounceIds[0]))
 		}
 	})
+}
+
+func TestDebounceUpdateMissingQueueItemPreservesNewerEvent(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+
+	opts := []queue.QueueOpt{
+		queue.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	}
+
+	shard := redis_state.NewQueueShard(consts.DefaultQueueShardName, unshardedClient.Queue(), opts...)
+
+	shardRegistry, err := queue.NewSingleShardRegistry(shard)
+	require.NoError(t, err)
+
+	q, err := queue.New(context.Background(), "debounce-test", shardRegistry, opts...)
+	require.NoError(t, err)
+	kg := shard.Client().KeyGenerator()
+
+	fakeClock := clockwork.NewFakeClock()
+
+	deb, err := NewDebouncerWithMigration(DebouncerOpts{
+		Shards:           shardRegistry,
+		PrimaryShardName: shard.Name(),
+		Queue:            q,
+		Clock:            fakeClock,
+	})
+	require.NoError(t, err)
+	redisDebouncer := deb.(debouncer)
+
+	ctx := context.Background()
+	accountId, workspaceId, appId, functionId := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+
+	fn := inngest.Function{
+		ID: functionId,
+		Debounce: &inngest.Debounce{
+			Key:    nil,
+			Period: "10s",
+		},
+	}
+
+	newerEventTime := fakeClock.Now().Add(2 * time.Second)
+	newerEventId := ulid.MustNew(ulid.Timestamp(newerEventTime), rand.Reader)
+	newerDi := DebounceItem{
+		AccountID:   accountId,
+		WorkspaceID: workspaceId,
+		AppID:       appId,
+		FunctionID:  functionId,
+		EventID:     newerEventId,
+		Event: event.Event{
+			Name:      "future",
+			ID:        newerEventId.String(),
+			Timestamp: newerEventTime.UnixMilli(),
+		},
+	}
+
+	debounceID := requireDebounce(t, redisDebouncer, ctx, newerDi, fn)
+	unshardedCluster.HDel(kg.QueueItem(), queue.HashID(ctx, debounceID.String()))
+
+	olderEventTime := fakeClock.Now()
+	olderEventId := ulid.MustNew(ulid.Timestamp(olderEventTime), rand.Reader)
+	olderDi := DebounceItem{
+		AccountID:   accountId,
+		WorkspaceID: workspaceId,
+		AppID:       appId,
+		FunctionID:  functionId,
+		EventID:     olderEventId,
+		Event: event.Event{
+			Name:      "now",
+			ID:        olderEventId.String(),
+			Timestamp: olderEventTime.UnixMilli(),
+		},
+	}
+
+	require.NoError(t, redisDebouncer.updateDebounce(ctx, olderDi, fn, 10*time.Second, *debounceID, false))
+
+	queueItemID := queue.HashID(ctx, debounceID.String())
+	recoveredQueueItem, err := shard.LoadQueueItem(ctx, queueItemID)
+	require.NoError(t, err)
+	require.Equal(t, queue.KindDebounce, recoveredQueueItem.Data.Kind)
+
+	rawPayload, ok := recoveredQueueItem.Data.Payload.(json.RawMessage)
+	require.True(t, ok)
+	var payload DebouncePayload
+	require.NoError(t, json.Unmarshal(rawPayload, &payload))
+	require.Equal(t, *debounceID, payload.DebounceID)
+
+	di, err := redisDebouncer.GetDebounceItem(ctx, testScope(accountId, workspaceId, functionId), *debounceID)
+	require.NoError(t, err)
+	di.Event.ClearSize()
+	require.Equal(t, newerDi, *di)
+
+	require.NoError(t, redisDebouncer.StartExecution(ctx, *di, fn, payload.DebounceID))
 }
 
 func TestDebouncePrimaryChooser(t *testing.T) {

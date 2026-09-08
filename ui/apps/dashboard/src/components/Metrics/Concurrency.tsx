@@ -36,7 +36,7 @@ export const mapConcurrency = (
         lineStyle: { color: resolveColor(borderColor.subtle, dark, '#E2E2E2') },
       },
     },
-    xAxis: getXAxis(runningMetrics),
+    xAxis: getXAxis(runningMetrics[0]?.data),
     series: [
       ...visibleMetrics.map((f, i) => ({
         ...seriesOptions,

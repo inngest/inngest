@@ -1,5 +1,5 @@
 type UsageSlot = { slot: string };
-type MetricBucket = { bucket: string; value: number };
+type MetricBucket = { bucket: string; value: number | null };
 
 export function concurrencyLimitReachedBySlot(
   slots: UsageSlot[],
@@ -7,7 +7,7 @@ export function concurrencyLimitReachedBySlot(
 ): boolean[] {
   const reachedBuckets = new Set(
     metrics
-      ?.filter(({ value }) => value > 0)
+      ?.filter(({ value }) => (value ?? 0) > 0)
       .map(({ bucket }) => new Date(bucket).getTime()),
   );
 

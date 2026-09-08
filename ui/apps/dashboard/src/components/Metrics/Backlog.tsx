@@ -17,7 +17,8 @@ export const Backlog = ({
   entities: EntityLookup;
 }) => {
   const metrics =
-    workspace && mapEntityLines(workspace.backlog.metrics, entities);
+    workspace &&
+    mapEntityLines(workspace.backlog.metrics, entities, { connectNulls: true });
 
   return (
     <div className="bg-canvasBase border-subtle relative flex h-[384px] w-full flex-col overflow-x-hidden rounded-md border p-5">

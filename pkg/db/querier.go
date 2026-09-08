@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/oklog/ulid/v2"
@@ -78,8 +77,6 @@ type Querier interface {
 	InsertSpan(ctx context.Context, arg InsertSpanParams) error
 	GetSpansByRunID(ctx context.Context, runID string) ([]*SpanRow, error)
 	GetSpansByRunIDsAndName(ctx context.Context, runIDs []string, name string) ([]*SpanRow, error)
-	GetSpansByDebugRunID(ctx context.Context, debugRunID sql.NullString) ([]*SpanRow, error)
-	GetSpansByDebugSessionID(ctx context.Context, debugSessionID sql.NullString) ([]*SpanRow, error)
 	GetRunSpanByRunID(ctx context.Context, arg GetRunSpanByRunIDParams) (*SpanRow, error)
 	GetSpanBySpanID(ctx context.Context, arg GetSpanBySpanIDParams) (*SpanRow, error)
 	GetStepSpanByStepID(ctx context.Context, arg GetStepSpanByStepIDParams) (*SpanRow, error)
