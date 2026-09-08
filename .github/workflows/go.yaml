@@ -33,7 +33,7 @@ jobs:
       - name: Lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.11.4
+          version: v2.13.2
           args: --verbose
 
   gen:
