@@ -219,7 +219,7 @@ function checkDupeFigures(EX, groups){
     const by=new Map();
     for(const id of figs){
       const e=EX[id]; if(!e) continue;
-      const s=shape(e.frames[0].svg);
+      const s=e.frames.map(f=>shape(f.svg)).join(' || ');
       if(!by.has(s)) by.set(s,[]);
       by.get(s).push(id);
     }
@@ -292,7 +292,7 @@ async function checkCodeSync(){
     Object.assign(EX, JSON.parse(fs.readFileSync(HERE+g+'.json','utf8')));
 
   const labels=svg=>[...svg.matchAll(/<text x="(?:9|15)" y="[\d.]+"[^>]*>([^<]*)<\/text>/g)]
-    .map(m=>m[1]).filter(r=>r && !/^(Run|Finalization)$/.test(r));
+    .map(m=>m[1]).filter(r=>r && !/^(Run\b|Finalization$)/.test(r));
   const ids=code=>[...code.matchAll(/step\.(?:run|sleep|waitForEvent|waitForSignal|invoke|sendEvent)\(\s*['"\`]([^'"\`]+)/g)]
     .map(m=>m[1]).filter(n=>!n.includes('${'));
 
@@ -313,7 +313,7 @@ async function checkCodeSync(){
       seen.add(id);
       const e=EX[id];
       if(!e){ console.log(`  ${id}: named by group ${k} but no such figure`); bad++; continue; }
-      const drawn=labels(e.frames[0].svg);
+      const drawn=[...new Set(e.frames.flatMap(f=>labels(f.svg)))];
       drawnAll=drawnAll.concat(drawn);
       if(EXEMPT[id]) continue;
       const orphanRows=drawn.filter(r=>{

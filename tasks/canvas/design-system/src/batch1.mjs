@@ -27,21 +27,22 @@ setFrame(true);
  * a second copy of a measurement, which drifted from it: the transcriptions had
  * no opening queue at all, and gave `simple` an 8ms run that really took 67.
  */
-const capture=(id,extra='',label='')=>{
+const capture=(id,extra='',label='',adjust)=>{
   const r=loadRun(id);
+  if(adjust) r.rows=adjust(r.rows);
   // The events, and how long the run took. fig() owns everything after that --
   // trimming the opening queue, the elastic axis, the bands -- so the same
   // events redraw differently when what a drawing means changes.
   return fig(r.rows, extra, label, '', {ms:r.ms, trimLead:true});
 };
 
-const panel=(rows,extra='',label='',ms)=>fig(
+const panel=(rows,extra='',label='')=>fig(
   rows.filter(r=>r.run===undefined)
       .map(r=>({...r, n:r.name, segs:(r.segs||[]).map(g=>[g.kind,g.x,g.w]),
                 note:[r.dur,r.note].filter(Boolean).join(' · ')})),
   // A captured run starts when it starts working; the queue it opened with is
   // named on the Run row instead of pushing every row to the right of it.
-  extra, label, '', {trimLead:true, ms});
+  extra, label);
 const F={};
 
 // ---- simple: no steps at all -------------------------------------------
@@ -65,16 +66,10 @@ F.v4sequential=[{
 // ---- emit: lineage the platform does not label -------------------------
 F.emit=[{
   cap:'<code>fan-out</code> sent two events that each started a run. That is real lineage, and it leaves this run entirely, so it is <em>not</em> a ribbon, which groups steps <em>within</em> this trace. A distinct outbound marker keeps the two kinds from being confused.',
-  svg:(()=>{
-    const rows=[
-      {run:[{a:27.3,b:29.8,ok:true},{a:45.5,b:60.1,ok:true},{a:75.8,b:78.3,ok:true}],lbl:'7ms compute / 33ms'},
-      {name:'prepare',dur:'1ms',at:[['started',27.3],['ok',29.8]]},
-      {name:'fan-out',dur:'5ms',at:[['started',45.5],['ok',60.1]],lineage:2},
-      {name:'after',dur:'1ms',at:[['started',75.8],['ok',78.3]]},
-      {name:'Finalization',dur:'7ms',at:[['started',78.8],['ok',99.5]]},
-    ];
-    return panel(rows,'','emit: outbound lineage marker',33);
-  })(),
+  // The outbound marker is a fact about the row: its events started runs
+  // elsewhere. The rest is the capture.
+  svg:capture('emit','','emit: outbound lineage marker',
+    rows=>rows.map(r=>r.n==='fan-out'?{...r, lineage:2}:r)),
 }];
 
 // ---- invoke: a whole other run inside a row -----------------------------

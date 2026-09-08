@@ -718,32 +718,61 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * `ms`, fig() owns the whole path from events to drawing, so the same events
    * redraw differently when what a drawing means changes.
    */
-  let leadLabel='', leadTrimmed=false;
-  if(opts.ms){
-    let span=opts.ms;
-    /**
-     * The opening queue, named rather than drawn — and done HERE, on the real
-     * timestamps, before the axis stops being linear. Measured after the
-     * elastic pass it names a compressed duration; baked into the events by
-     * whatever loaded them it cannot be switched off at all.
-     */
-    if(opts.trimLead && R.FEAT.trim){
-      let first=Infinity;
-      for(const rw of rows) for(const [k,x] of (rw.at||[])) if(k==='started'){ first=Math.min(first,x); break; }
-      if(first>0 && first<Infinity){
-        leadLabel=R.human(opts.unit==='s'?first*1000:first); leadTrimmed=true;
-        rows=rows.map(rw=>{
-          const s=(rw.at||[]).map(mo=>mo.length===3?[mo[0],mo[1]-first,mo[2]]:[mo[0],mo[1]-first]);
-          const kept=s.filter(mo=>mo[1]>=-1e-9);
-          const open=(kept.length&&kept[0][1]<1e-9)?null:s.filter(mo=>mo[1]<0).pop();
-          return {...rw, at:(open?[[...open].map((v,q)=>q===1?0:v)]:[])
-            .concat(kept.map(mo=>mo[1]<0?[...mo].map((v,q)=>q===1?0:v):mo)),
-            end:rw.end!=null?Math.max(0,rw.end-first):rw.end};
-        });
-        span-=first;
-      }
+  /**
+   * Every figure is a run, measured.
+   *
+   * A figure declares moments and nothing else; where it does not also declare
+   * how long the run took, the last moment IS how long it took. That makes the
+   * numbers milliseconds rather than proportions, so the rules that need a
+   * duration -- the scale-free compression threshold, the opening-queue trim --
+   * reach every figure instead of only the ones that came from a capture.
+   * Positions are unchanged where no rule fires: laying 0..86 out across the
+   * axis puts it exactly where 0..86 was.
+   */
+  if(opts.ms==null && rows.some(r=>r.at&&r.at.length)){
+    let end=0;
+    for(const rw of rows){
+      for(const [,x] of (rw.at||[])) end=Math.max(end,x);
+      if(rw.end!=null) end=Math.max(end,rw.end);
     }
-    const L=layout(span, rows, {plot:100, unit:opts.unit});
+    if(end>0) opts={...opts, ms:end};
+  }
+
+  /**
+   * The opening queue, hidden rather than drawn.
+   *
+   * Applies to any figure whose rows are moments, not just to the ones that
+   * came from a captured run: hiding a run's first wait is a property of the
+   * DRAWING, and a figure drawn from proportions has an opening wait too. Only
+   * the label needs a duration, so a figure that never measured one is trimmed
+   * without being told how much was taken.
+   */
+  let leadLabel='', leadTrimmed=false;
+  // Only where the figure is a RUN. A figure drawn from proportions has an
+  // opening wait too, but several exist precisely to show it -- queue time,
+  // flow control, finalization -- and trimming those leaves three identical
+  // pictures where there were three different points. The feature hides a
+  // real run's first wait; it is not a global eraser.
+  if(R.FEAT.trim && opts.ms && opts.trimLead!==false){
+    let first=Infinity;
+    for(const rw of rows) for(const [k,x] of (rw.at||[])) if(k==='started'){ first=Math.min(first,x); break; }
+    if(first>1e-9 && first<Infinity){
+      leadTrimmed=true;
+      if(opts.ms) leadLabel=R.human(opts.unit==='s'?first*1000:first);
+      rows=rows.map(rw=>{
+        const s=(rw.at||[]).map(mo=>mo.length===3?[mo[0],mo[1]-first,mo[2]]:[mo[0],mo[1]-first]);
+        const kept=s.filter(mo=>mo[1]>=-1e-9);
+        const open=(kept.length&&kept[0][1]<1e-9)?null:s.filter(mo=>mo[1]<0).pop();
+        return {...rw, at:(open?[[...open].map((v,q)=>q===1?0:v)]:[])
+          .concat(kept.map(mo=>mo[1]<0?[...mo].map((v,q)=>q===1?0:v):mo)),
+          end:rw.end!=null?Math.max(0,rw.end-first):rw.end,
+          segs:undefined};
+      }).map(resolveRow);
+      if(opts.ms) opts={...opts, ms:opts.ms-first};
+    }
+  }
+  if(opts.ms){
+    const L=layout(opts.ms, rows, {plot:100, unit:opts.unit});
     rows=L.rows; opts={...opts, breaks:L.breaks};
   }
   /**

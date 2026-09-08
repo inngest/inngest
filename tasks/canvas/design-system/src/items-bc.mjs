@@ -6,14 +6,14 @@ const E={};const D=(k,v)=>{E[k]=v;};
 
 // ---- B. Inngest's own time (c14–c21) ------------------------------------
 D('c14',{d:'The step waiting its turn. Thin, quiet, and it ends at the circle where your code starts.',
-  svg:fig([{n:'a',at:[['queued',0],['started',34],['ok',74]],note:'+34ms queued  40ms'}],'','queued')});
+  svg:fig([{n:'a',at:[['queued',0],['started',34],['ok',74]],note:'+34ms queued  40ms'}],'','queued','',{trimLead:false})});
 D('c15',{d:'Inngest working out what to run next. A discovery bar only appears where the request was a separate execution &mdash; a fan-out, or the first step of a run. Where it produced a single step it is rolled into that step instead.',
   svg:fig([{n:'req + a',at:[['queued',0],['started',6,'disc'],['ok',26],['planned',26],['started',32],['ok',74]],reported:1,note:'+26ms planning  42ms'},
            {n:'b',at:[['planned',26],['started',32],['ok',66]],note:'34ms'}],'',
     '')});
 D('c16',{d:'Being held by flow control is queue time with a reason, and the reason is worth its own colour: amber hatched, still not your compute, but distinguishable at a glance from a step simply waiting its turn.',
   svg:fig([{n:'a',at:[['queued',0],['held',10],['started',62],['ok',92]],note:'+6.3s held  30ms'}],
-    '','concurrency hold')});
+    '','concurrency hold','',{trimLead:false})});
 D('c16b',{d:'The same treatment covers every flow-control hold — throttle, rate limit, debounce — because they are the same fact about the run: it was ready and Inngest chose not to start it yet.',
   svg:fig([{n:'a',at:[['queued',0],['held',6],['started',36],['ok',60]],note:'throttled'},
            {n:'b',at:[['queued',0],['held',6],['started',60],['ok',84]],note:'rate limited'},
@@ -22,7 +22,7 @@ D('c31',{d:'A step.sendEvent() that started runs points out of this run: a short
   svg:fig([{n:'notify',at:[['queued',0],['started',6],['ok',42]],lineage:2}],'','outbound lineage','',
     {scale:1.3})});
 D('c18',{d:'Platform rows keep their own row and the platform colour. They are not your compute and never enter the Run row profile.',
-  svg:fig([{n:'a',at:[['started',4],['ok',34]]}],'','finalization')});
+  svg:fig([{n:'a',at:[['started',4],['ok',34]]}],'','finalization','',{trimLead:false})});
 D('c20',{d:'No unexplained gaps. Every millisecond between the row start and its resolution belongs to a named segment — here a discovery request, the queue, a failed attempt, its backoff, the queue again, and the attempt that worked.',
   svg:fig([{n:'a',at:[['queued',0],['started',34],['retry',62],['queued',72],['started',76],['ok',94]],note:'fully accounted'}],'','gaps filled')});
 D('c21',{d:'The 26ms between one step ending and the next request starting is drawn once — as the arrow and as the interval, the same object.',
@@ -31,13 +31,13 @@ D('c21',{d:'The 26ms between one step ending and the next request starting is dr
 
 // ---- C. Step outcomes (c22–c30) -----------------------------------------
 D('c23',{d:'The step is red and so is the run. The failure is the last thing on the row, so nothing after it implies recovery.',
-  svg:fig([{n:'doomed',at:[['queued',0],['started',10],['failed',36]],note:'failed  26ms'}
+  svg:fig([{n:'a',at:[['queued',0],['started',10],['failed',36]],note:'failed  26ms'}
   ],'','run-ending failure')});
 D('c24',{d:'A red step inside a green run. The row is red at its own resolution; the Run row stays green because userland caught it.',
   svg:fig([{n:'caught',at:[['queued',0],['started',8],['failed',30]],note:'failed  22ms'},
     {n:'after',at:[['queued',30],['started',36],['ok',70]],note:'34ms'}],'','caught failure')});
 D('c25',{d:'Attempt one is red, the circle after it is neutral and means retrying, and only the resolution is green. The recovery is the shape of the row.',
-  svg:fig([{n:'flaky',at:[['queued',0],['started',8],['retry',28],['queued',46],['started',50],['ok',80]],note:'2 attempts  recovered'}],'','retry into success')});
+  svg:fig([{n:'a',at:[['queued',0],['started',8],['retry',28],['queued',46],['started',50],['ok',80]],note:'2 attempts  recovered'}],'','retry into success')});
 D('c26',{d:'One red row does not tint its neighbours or the level. Failure is per-row and per-slice, never inherited.',
   svg:fig([{n:'ok-branch',at:[['queued',0],['started',8],['ok',48]],note:'40ms'},
     {n:'bad-branch',at:[['queued',0],['started',8],['failed',34]],note:'failed'},
@@ -49,7 +49,7 @@ D('c27',{d:'Cancelled is its own state — neither green nor red. <code>b</code>
   ],'','a step cancelled mid-execution')});
 D('c28',{d:'A <code>waitForEvent</code> still open when the run was cut. It was undecided, so the bar is the amber wait, and it ends on the square rather than a resolution.',
   svg:fig([
-    {n:'waiting',at:[['queued',0],['started',6],['cancelled',58]],kind:'wait',note:'cancelled while open'},
+    {n:'w',at:[['queued',0],['started',6],['cancelled',58]],kind:'wait',note:'cancelled while open'},
   ],'','a wait cancelled while open')});
 D('c29',{d:'No end time to draw to. The bar is the in-progress blue and has no terminal circle because nothing has resolved.',
   svg:fig([
@@ -57,7 +57,7 @@ D('c29',{d:'No end time to draw to. The bar is the in-progress blue and has no t
     {n:'still going',at:[['queued',0],['started',8]],end:94,note:'running'},
   ],'','a step still running')});
 D('c30',{d:'Every attempt failed. Three red bars, neutral retry circles between them, and a red resolution — the only circle that ever goes red.',
-  svg:fig([{n:'doomed',at:[['started',0],['retry',14],['queued',22],['started',24],['retry',40],['queued',52],['started',54],['failed',74]],note:'3 attempts  failed'}],'','retries exhausted')});
+  svg:fig([{n:'a',at:[['started',0],['retry',14],['queued',22],['started',24],['retry',40],['queued',52],['started',54],['failed',74]],note:'3 attempts  failed'}],'','retries exhausted')});
 
 fs.writeFileSync(HERE+'items-bc.json',JSON.stringify(E));
 console.log('items',Object.keys(E).length);
@@ -79,7 +79,7 @@ OUT.c26.frames.push({l:'hovering bad-branch',svg:F2([
   {n:'after',at:[['queued',50],['started',56],['ok',86]],dim:.15}],
   '','failure stays local on hover')});
 OUT.c25.frames.push({l:'hovering the backoff',svg:F2([
-  {n:'flaky',at:[['queued',0],['started',8],['retry',28],['queued',46],['started',50],['ok',80]],sel:true}],
+  {n:'a',at:[['queued',0],['started',8],['retry',28],['queued',46],['started',50],['ok',80]],sel:true}],
   TG(X(30),Y(0)-6,'waited 2s before retrying',CC.mut),'backoff on hover')});
 
 fs.writeFileSync(HERE+'items-bc.json',JSON.stringify(OUT));
