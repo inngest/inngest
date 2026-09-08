@@ -189,8 +189,11 @@ func (o *ScheduleBatchOpts) JobID() string {
 }
 
 type ScheduleBatchPayload struct {
-	BatchID                    ulid.ULID  `json:"batchID"`
-	BatchPointer               string     `json:"batchPointer"`
+	BatchID      ulid.ULID `json:"batchID"`
+	BatchPointer string    `json:"batchPointer"`
+	// BatchCluster pins follow-up work to the backend that owns this batch.
+	// It is empty for jobs created before function-level batch routing.
+	BatchCluster               string     `json:"batchCluster,omitempty"`
 	AccountID                  uuid.UUID  `json:"acctID"`
 	WorkspaceID                uuid.UUID  `json:"wsID"`
 	AppID                      uuid.UUID  `json:"appID"`

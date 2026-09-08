@@ -22,6 +22,21 @@ type recordedBatchDelete struct {
 	residencyDuration time.Duration
 }
 
+func TestScheduleBatchPayloadBatchClusterJSON(t *testing.T) {
+	payload := ScheduleBatchPayload{
+		BatchID:      ulid.MustNew(ulid.Now(), rand.Reader),
+		BatchCluster: "valkey-batching-a",
+	}
+
+	raw, err := json.Marshal(payload)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"batchCluster":"valkey-batching-a"`)
+
+	var decoded ScheduleBatchPayload
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	require.Equal(t, payload.BatchCluster, decoded.BatchCluster)
+}
+
 type recordingBatchMetricRecorder struct {
 	committedBytes []int64
 	deletes        []recordedBatchDelete
