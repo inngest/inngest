@@ -7,6 +7,7 @@ import BottomBar from './BottomBar';
 import SideBarV2 from './SideBarV2';
 import TopBar from './TopBar';
 import { ActiveBanners } from '../ActiveBanners/ActiveBanners';
+import { ExecutionLimitPill } from '../ExecutionLimit/ExecutionLimitPill';
 import IncidentBanner from '../Incident/IncidentBanner';
 import { PaymentStatusBanner } from '../PaymentStatusBanner/PaymentStatusBanner';
 import useOnboardingWidget from '../Onboarding/useOnboardingWidget';
@@ -47,7 +48,9 @@ export default function Layout({
         activeEnv={activeEnv}
         profile={profile}
         showOnboardingWidget={showWidget}
-      />
+      >
+        <ExecutionLimitPill />
+      </TopBar>
 
       <div className="border-subtle bg-canvasBase shadow-xs mx-3 flex flex-1 flex-row overflow-hidden rounded-lg border">
         {!hideSidebar && (
