@@ -73,6 +73,8 @@ const KIND={
 
 /** Spans the trace carries that are not rows of the run. */
 const INTERNAL=/^executor\./;
+/** The span that covers a request which produced no step of its own. */
+const NONSTEP='executor.nonstep';
 
 export function loadRun(id){
   const j=JSON.parse(fs.readFileSync(FIXTURES+id+'.json','utf8'));
@@ -286,6 +288,37 @@ export function loadRun(id){
   }
 
   rows.sort((a,b)=>a._q-b._q);
+
+  /**
+   * The finalization, where the run did not make a request for it.
+   *
+   * v3 finalizes in a request of its own and the executor gives that request a
+   * span named `Finalization`. v4 does not: the function returns inside the
+   * last step's request, so `RunComplete` comes back in that response and
+   * there is no separate span to name. The work is still there -- five to ten
+   * milliseconds of it, the SDK running your function to its return -- inside
+   * the `executor.nonstep` span that covers the last request and carries the
+   * run's output.
+   *
+   * So the row is read off that span rather than invented: it starts where the
+   * last step ended and ends where the run did, both measured. Where the run
+   * DID make a finalization request there is a span called Finalization
+   * already and this does nothing.
+   */
+  if(!rows.some(r=>r.n==='Finalization')){
+    const last=rows.reduce((m,r)=>{
+      for(const [,x] of (r.at||[])) m=Math.max(m,x);
+      return m; }, 0);
+    // The request that was open when the run ended, and nothing else: a
+    // nonstep span that stops short of the run is some earlier request.
+    const tail=(t.childrenSpans||[])
+      .filter(sp=>(sp.name||'')===NONSTEP && at(sp.endedAt)!=null)
+      .find(sp=>Math.abs(at(sp.endedAt)-total)<2);
+    if(tail && total-last > 0.5){
+      rows.push({_q:last, n:'Finalization', kind:'step',
+        at:[['started',last],['ok',total]]});
+    }
+  }
 
   // Steps a single request reported together are one ribbon; the capture says
   // which, so nothing has to be inferred from when they happened to be queued.
