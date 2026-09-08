@@ -1297,7 +1297,6 @@ func TestDebounceUpdateMissingQueueItemPreservesNewerEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
-	debounceClient := unshardedClient.Debounce()
 
 	opts := []queue.QueueOpt{
 		queue.WithKindToQueueMapping(map[string]string{
@@ -1371,15 +1370,23 @@ func TestDebounceUpdateMissingQueueItemPreservesNewerEvent(t *testing.T) {
 
 	require.NoError(t, redisDebouncer.updateDebounce(ctx, olderDi, fn, 10*time.Second, *debounceID, false))
 
-	var di DebounceItem
-	err = json.Unmarshal([]byte(unshardedCluster.HGet(debounceClient.KeyGenerator().Debounce(ctx), debounceID.String())), &di)
+	queueItemID := queue.HashID(ctx, debounceID.String())
+	recoveredQueueItem, err := shard.LoadQueueItem(ctx, queueItemID)
+	require.NoError(t, err)
+	require.Equal(t, queue.KindDebounce, recoveredQueueItem.Data.Kind)
+
+	rawPayload, ok := recoveredQueueItem.Data.Payload.(json.RawMessage)
+	require.True(t, ok)
+	var payload DebouncePayload
+	require.NoError(t, json.Unmarshal(rawPayload, &payload))
+	require.Equal(t, *debounceID, payload.DebounceID)
+
+	di, err := redisDebouncer.GetDebounceItem(ctx, testScope(accountId, workspaceId, functionId), *debounceID)
 	require.NoError(t, err)
 	di.Event.ClearSize()
-	require.Equal(t, newerDi, di)
+	require.Equal(t, newerDi, *di)
 
-	queueItemIDs, err := unshardedCluster.HKeys(kg.QueueItem())
-	require.NoError(t, err)
-	require.Empty(t, queueItemIDs)
+	require.NoError(t, redisDebouncer.StartExecution(ctx, *di, fn, payload.DebounceID))
 }
 
 func TestDebouncePrimaryChooser(t *testing.T) {
