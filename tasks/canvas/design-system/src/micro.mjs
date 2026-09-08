@@ -221,7 +221,10 @@ export function row(i,r,sc=1,yy){
   if(!noBars) segs.forEach(([k,a,w])=>{ put(litBar(k,a)===1, barSvg(k,a,w,y,{k:1,floor:sc,h:bh})); });
   if(!r.span) (dots||auto).forEach(d=>{
     const onRib=(noHalo||[]).some(p=>Math.abs(p-d.p)<0.01);
-    put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,R.GEOM.MARK_R,true));
+    // How we came to know a moment is a fact about the moment, so it is
+    // carried on the row as the instants that arrived by checkpoint.
+    const cp=(r.cp||[]).some(p=>Math.abs(p-d.p)<0.01);
+    put(litDot(d.p)===1, dot(px(d.p),y,onRib?'ribbon':(d.c||C.mut),1,R.GEOM.MARK_R,true,cp));
   });
   // The note follows the row's own content rather than sitting in a reserved
   // column, so no horizontal space is set aside for it.
@@ -573,6 +576,7 @@ export function layout(total, rows, opts={}){
         w:el.at(r.group.to!=null?r.group.to:total)}:r.group,
       segs:(r.segs||[]).map(map),
       at:(r.at||[]).map(mo=>mo.length===3?[mo[0],el.at(mo[1]),mo[2]]:[mo[0],el.at(mo[1])]),
+      cp:r.cp?r.cp.map(el.at):r.cp,
       end:r.end!=null?el.at(r.end):r.end};
   });
   /**
@@ -820,7 +824,8 @@ export function fig(rows,extra='',label='',under='',opts={}){
          */
         if(at.length>1 && (at[0][0]==='queued'||at[0][0]==='held')
            && Math.abs(at[0][1])<1e-9 && Math.abs(at[1][1])<1e-9) at=at.slice(1);
-        return {...rw, at,
+        const cp0=(rw.cp||[]).map(t=>t-first).filter(t=>t>=-1e-9).map(t=>Math.max(0,t));
+        return {...rw, cp:rw.cp?cp0:undefined, at,
           end:rw.end!=null?Math.max(0,rw.end-first):rw.end,
           segs:undefined};
       }).map(resolveRow);
@@ -901,6 +906,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
              lit:r.lit?r.lit.map(v=>typeof v==='number'?at(v):v):r.lit,
              litDots:r.litDots?r.litDots.map(at):r.litDots,
              noHalo:r.noHalo?r.noHalo.map(at):r.noHalo,
+             cp:r.cp?r.cp.map(at):r.cp,
              rail:r.rail?r.rail.map(([x,w,k])=>[at(x),at(x+w)-at(x),k]):r.rail});
         if(typeof extra==='string') extra=remapX(extra,LBL,at);
         if(typeof under==='string') under=remapX(under,LBL,at);

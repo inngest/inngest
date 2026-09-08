@@ -203,7 +203,21 @@ export function loadRun(id){
 
     // Sorted by when the STEP was queued, not by when the request that
     // reported it was: a row belongs where its own work sits.
-    rows.push({_q:q==null?0:q, n:name, kind, at:moments, reported:sep||undefined,
+    /**
+     * Which of this row's moments arrived by CHECKPOINT.
+     *
+     * The span carries `isCheckpoint`, and it covers the STEP's moments only:
+     * where a separate request planned the step, that request's own moments
+     * came back in the response like any other and are not marked. So the
+     * checkpointed instants are the ones after the request's, which is exactly
+     * the tail of the list.
+     */
+    const isCp = spans.some(sp=>sp.isCheckpoint);
+    const cp = (isCp && st!=null)
+      ? moments.filter(mo=>mo[1]>=st).map(mo=>mo[1])
+      : undefined;
+
+    rows.push({_q:q==null?0:q, n:name, kind, at:moments, cp, reported:sep||undefined,
                end:out?undefined:total, _stepID:first.stepID, _planner:d&&d.spanID});
   }
 

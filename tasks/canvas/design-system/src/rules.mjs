@@ -63,6 +63,18 @@ export const GEOM = {
   LBL_PAD:3,                         // clearance kept between a label and the divider
   LBL_FONT:5.5, LBL_SPAN_FONT:5,     // row label size, and the smaller one a span gets
   LBL_CH:0.6,                        // monospace advance, as a fraction of the font size
+  /**
+   * The ring that says a moment arrived by CHECKPOINT.
+   *
+   * A third channel, because the two a mark already has are taken: fill says
+   * whether the row has resolved, colour says what happened. How we came to
+   * know a moment is orthogonal to both and can land on any of them, so it
+   * cannot borrow either. A concentric ring is purely additive -- it composes
+   * with every colour and both fills, and implies nothing about good or bad.
+   */
+  CP_GAP:1.9,                        // how far outside the mark the ring sits
+  CP_W:0.8,                          // ...and how heavy it is
+  CP_O:0.55,                         // ...and how loud
 };
 
 /**

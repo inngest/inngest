@@ -506,10 +506,24 @@ const sidebar=`<aside id="side">
     (()=>{const seen=new Set();
       return Object.entries(V.BAR_INFO).filter(([,i])=>{
         if(seen.has(i[0])) return false; seen.add(i[0]); return true; }).map(barRow).join('');})())}
-  ${sec('Events','colour = kind of moment; hollow = not resolved',
+  ${sec('Events','colour = kind of moment; hollow = not resolved; ring = how we heard',
     Object.entries(V.EVENT_INFO).map(evRow).join('')+
+    /**
+     * The third channel, documented beside the two it does not touch. Fill
+     * says whether the row has resolved and colour says what happened; how we
+     * came to KNOW a moment is orthogonal to both and can land on any of them,
+     * which is why it is a ring rather than another colour or another shape.
+     */
+    `<div class="vrow"><div class="vhead">
+      <svg class="vsw ev" viewBox="0 0 15 15" aria-hidden="true">${V.dot(7.5,7.5,'hollow',1,3.4,false,true)}</svg>
+      <b>reported by checkpoint</b><code>ring</code>
+      <span>the SDK ran this step inline and told us while the request was still open,
+      rather than the executor scheduling it and being told in the response</span>
+    </div></div>`+
     `<p class="foot">Hollow and filled is a rule, not a preference. It reports whether
-    the row has resolved, so it is not adjustable.</p>`)}
+    the row has resolved, so it is not adjustable. The ring is the same kind of rule:
+    it says the moment reached us by a different route, and it can land on any of
+    the marks above.</p>`)}
 </aside>`;
 
 

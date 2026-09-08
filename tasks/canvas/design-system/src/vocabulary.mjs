@@ -126,18 +126,30 @@ export const EVC = Object.fromEntries(
 /** Filled marks mean finished; hollow ones mean the row has not resolved. */
 export const EV_HOLLOW = ['queued','ribbon','hollow','hollow-bad'];
 
-export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true){
+export function markSvg(x, y, c, o=1, r=GEOM.MARK_R, halo=true, cp=false){
   const R=r+GEOM.HALO;
   const col=EVC[c]||c;
+  /**
+   * The checkpoint ring, outside everything else the mark draws.
+   *
+   * Outside the halo too, so the halo still does its job of putting a ring of
+   * surface between the mark and whatever it sits on. A square mark
+   * (`cancelled`) gets a square ring, so the silhouette stays the one thing
+   * that says "stopped from outside".
+   */
+  const ring = !cp ? ''
+    : c==='cancelled'
+      ? `<rect class="ev-cp sq" x="${x-r-GEOM.CP_GAP}" y="${y-r-GEOM.CP_GAP}" width="${(r+GEOM.CP_GAP)*2}" height="${(r+GEOM.CP_GAP)*2}" rx="1" fill="none" stroke="${col}" stroke-width="${GEOM.CP_W}" opacity="${o*GEOM.CP_O}"/>`
+      : `<circle class="ev-cp" cx="${x}" cy="${y}" r="${r+GEOM.CP_GAP}" fill="none" stroke="${col}" stroke-width="${GEOM.CP_W}" opacity="${o*GEOM.CP_O}"/>`;
   const bg = !halo ? ''
     : c==='cancelled'
       ? `<rect class="ev-bg sq" x="${x-R}" y="${y-R}" width="${R*2}" height="${R*2}" fill="var(--surface)" opacity="${o}"/>`
       : `<circle class="ev-bg" cx="${x}" cy="${y}" r="${R}" fill="var(--surface)" opacity="${o}"/>`;
   if(c==='cancelled')
-    return bg+`<rect class="ev ev-cancelled" x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="0.8" fill="${col}" stroke="${col}" opacity="${o}"/>`;
+    return bg+ring+`<rect class="ev ev-cancelled" x="${x-r}" y="${y-r}" width="${r*2}" height="${r*2}" rx="0.8" fill="${col}" stroke="${col}" opacity="${o}"/>`;
   if(EV_HOLLOW.indexOf(c)>=0)
-    return bg+`<circle class="ev ev-${c}" cx="${x}" cy="${y}" r="${r}" fill="var(--surface)" stroke="${col}" opacity="${o}"/>`;
-  return bg+`<circle class="ev ev-${c}" cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="${col}" opacity="${o}"/>`;
+    return bg+ring+`<circle class="ev ev-${c}" cx="${x}" cy="${y}" r="${r}" fill="var(--surface)" stroke="${col}" opacity="${o}"/>`;
+  return bg+ring+`<circle class="ev ev-${c}" cx="${x}" cy="${y}" r="${r}" fill="${col}" stroke="${col}" opacity="${o}"/>`;
 }
 export const dot = markSvg;
 
