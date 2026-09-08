@@ -454,8 +454,3 @@ func TestStandardErrorSerialize(t *testing.T) {
 		})
 	}
 }
-
-//go:fix inline
-func strptr(s string) *string {
-	return new(s)
-}

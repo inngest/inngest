@@ -72,12 +72,6 @@ func TestRunTraceEnded(t *testing.T) {
 	}
 }
 
-//go:fix inline
-func boolPtr(b bool) *bool { return new(b) }
-
-//go:fix inline
-func strPtr(s string) *string { return new(s) }
-
 func TestConvertRunSpanToGQL_UserlandCollapse(t *testing.T) {
 	tr := &traceReader{}
 	ctx := context.Background()
@@ -405,12 +399,10 @@ func TestConvertRunSpanToGQL_FinalizationGroup(t *testing.T) {
 	completed := enums.StepStatusCompleted
 	failed := enums.StepStatusFailed
 
-	intPtr := func(i int) *int { return &i }
-
 	execChild := func(spanID string, attempt int, status enums.StepStatus, functionOutput bool, outputID string) *cqrs.OtelSpan {
 		attrs := &meta.ExtractedValues{
 			DynamicStatus: &status,
-			StepAttempt:   intPtr(attempt),
+			StepAttempt:   new(attempt),
 		}
 		if functionOutput {
 			attrs.IsFunctionOutput = new(true)

@@ -153,8 +153,3 @@ func mapSingletonMode(internalEnum enums.SingletonMode) SingletonMode {
 
 	return SingletonModeSkip
 }
-
-//go:fix inline
-func boolPtr(b bool) *bool {
-	return new(b)
-}

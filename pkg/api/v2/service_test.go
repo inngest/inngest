@@ -251,26 +251,6 @@ func TestService_Metadata_Timestamp(t *testing.T) {
 	})
 }
 
-//go:fix inline
-func boolPtr(value bool) *bool {
-	return new(value)
-}
-
-//go:fix inline
-func strPtr(value string) *string {
-	return new(value)
-}
-
-//go:fix inline
-func intPtr(value int) *int {
-	return new(value)
-}
-
-//go:fix inline
-func int32Ptr(value int32) *int32 {
-	return new(value)
-}
-
 func TestService_GetApp(t *testing.T) {
 	appID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	createdAt := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
@@ -483,7 +463,7 @@ func TestService_GetApps(t *testing.T) {
 
 		resp, err := NewService(ServiceOptions{Apps: apps}).GetApps(context.Background(), &apiv2.GetAppsRequest{
 			Cursor: new(firstID.String()),
-			Limit:  int32Ptr(1),
+			Limit:  new(int32(1)),
 		})
 
 		require.NoError(t, err)
@@ -523,7 +503,7 @@ func TestService_GetApps(t *testing.T) {
 	t.Run("validates limit", func(t *testing.T) {
 		resp, err := NewService(ServiceOptions{Apps: &mockAppProvider{}}).GetApps(
 			context.Background(),
-			&apiv2.GetAppsRequest{Limit: int32Ptr(maxAppsLimit + 1)},
+			&apiv2.GetAppsRequest{Limit: new(int32(maxAppsLimit + 1))},
 		)
 
 		require.Nil(t, resp)
@@ -808,7 +788,7 @@ func TestService_GetFunctions(t *testing.T) {
 		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{
 			AppId:  "my-app",
 			Cursor: new(firstID.String()),
-			Limit:  int32Ptr(1),
+			Limit:  new(int32(1)),
 		})
 
 		require.NoError(t, err)
@@ -832,7 +812,7 @@ func TestService_GetFunctions(t *testing.T) {
 		service := NewService(ServiceOptions{Functions: &mockFunctionProvider{}})
 		resp, err := service.GetFunctions(context.Background(), &apiv2.GetFunctionsRequest{
 			AppId: "my-app",
-			Limit: int32Ptr(maxFunctionsLimit + 1),
+			Limit: new(int32(maxFunctionsLimit + 1)),
 		})
 
 		require.Nil(t, resp)

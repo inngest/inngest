@@ -100,7 +100,7 @@ func TestStateOperationsAcrossBackends(t *testing.T) {
 					HasAI:           true,
 					ForceStepPlan:   true,
 					EventIDs:        []ulid.ULID{eventID},
-					PriorityFactor:  int64Ptr(50),
+					PriorityFactor:  new(int64(50)),
 					CustomConcurrencyKeys: []statev2.CustomConcurrency{
 						{
 							Key:   "f:" + functionID.String() + ":user-test",
@@ -402,9 +402,4 @@ func TestStateOperationsAcrossBackends(t *testing.T) {
 		_, err = svc.LoadMetadata(ctx, id)
 		assert.Error(t, err, "LoadMetadata should error after delete")
 	})
-}
-
-//go:fix inline
-func int64Ptr(v int64) *int64 {
-	return new(v)
 }

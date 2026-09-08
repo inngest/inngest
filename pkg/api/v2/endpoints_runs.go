@@ -626,11 +626,6 @@ func jsonToStruct(raw json.RawMessage) *structpb.Struct {
 	}
 }
 
-//go:fix inline
-func optionalString(value string) *string {
-	return new(value)
-}
-
 func toFunctionTrace(ctx context.Context, reader FunctionTraceReader, root *cqrs.OtelSpan, includeOutput bool) (*apiv2.FunctionTrace, error) {
 	span, err := loader.ConvertRunSpan(ctx, root)
 	if err != nil {

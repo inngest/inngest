@@ -489,10 +489,3 @@ func TestConvertToConstraintConfiguration(t *testing.T) {
 		})
 	}
 }
-
-// Helper function to create string pointers
-//
-//go:fix inline
-func stringPtr(s string) *string {
-	return new(s)
-}

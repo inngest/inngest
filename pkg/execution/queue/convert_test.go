@@ -1208,11 +1208,6 @@ func assertItemEqual(t *testing.T, expected, actual Item) {
 	require.Equal(t, expected.RunInfo.ScavengeCount, actual.RunInfo.ScavengeCount)
 }
 
-//go:fix inline
-func protoStringPtr(value string) *string {
-	return new(value)
-}
-
 func validIdentifierProto() *pb.Identifier {
 	return &pb.Identifier{
 		RunId:           ulid.Make().String(),

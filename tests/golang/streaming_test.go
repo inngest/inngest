@@ -184,8 +184,3 @@ func TestStreaming(t *testing.T) {
 		}, 10*time.Second, time.Second)
 	})
 }
-
-//go:fix inline
-func toPtr[T any](v T) *T {
-	return new(v)
-}

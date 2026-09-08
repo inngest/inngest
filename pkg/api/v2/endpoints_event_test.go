@@ -314,13 +314,3 @@ func TestHTTPGateway_SendEventBodyLimitDoesNotApplyToOtherRoutes(t *testing.T) {
 
 	require.NotEqual(t, http.StatusRequestEntityTooLarge, recorder.Code)
 }
-
-//go:fix inline
-func stringPointer(value string) *string {
-	return new(value)
-}
-
-//go:fix inline
-func int64Pointer(value int64) *int64 {
-	return new(value)
-}

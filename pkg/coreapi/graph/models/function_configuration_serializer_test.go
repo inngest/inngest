@@ -308,8 +308,3 @@ func mergeWithDefaultFunctionConfiguration(overlay *FunctionConfiguration) *Func
 	}
 	return base
 }
-
-//go:fix inline
-func intPtr(b int) *int {
-	return new(b)
-}

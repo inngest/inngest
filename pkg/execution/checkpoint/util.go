@@ -4,7 +4,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/tracing/meta"
-	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -16,7 +15,7 @@ func stepRunAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, runID
 			meta.Attr(meta.Attrs.QueuedAt, new(op.Timing.Start())),
 			meta.Attr(meta.Attrs.StartedAt, new(op.Timing.Start())),
 			meta.Attr(meta.Attrs.EndedAt, new(op.Timing.End())),
-			meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted)),
+			meta.Attr(meta.Attrs.DynamicStatus, new(enums.StepStatusCompleted)),
 			meta.Attr(meta.Attrs.IsCheckpoint, new(true)),
 		),
 	)
@@ -27,7 +26,7 @@ func stepPlannedAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, r
 		meta.NewAttrSet(
 			meta.Attr(meta.Attrs.QueuedAt, new(op.Timing.Start())),
 			meta.Attr(meta.Attrs.StartedAt, new(op.Timing.Start())),
-			meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusRunning)),
+			meta.Attr(meta.Attrs.DynamicStatus, new(enums.StepStatusRunning)),
 		),
 	)
 }

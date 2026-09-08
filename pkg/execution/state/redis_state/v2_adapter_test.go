@@ -98,7 +98,7 @@ func TestV2Adapter(t *testing.T) {
 					RequestVersion:  1,
 					HasAI:           true,
 					ForceStepPlan:   true,
-					PriorityFactor:  int64Ptr(100),
+					PriorityFactor:  new(int64(100)),
 					CustomConcurrencyKeys: []statev2.CustomConcurrency{
 						{
 							Key:   "f:" + functionID.String() + ":user-123",
@@ -763,11 +763,6 @@ func TestV2AdapterWithDisabledRetries(t *testing.T) {
 		_, err = v2svc.SaveStep(ctx, createdState.Metadata.ID, "no-retry-step", stepData)
 		require.NoError(t, err)
 	})
-}
-
-//go:fix inline
-func int64Ptr(v int64) *int64 {
-	return new(v)
 }
 
 // mustV2Service spins up a miniredis, wires a sharded manager against it, and

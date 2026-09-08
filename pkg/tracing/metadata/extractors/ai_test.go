@@ -6,7 +6,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/tracing/metadata"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	commonv1 "go.opentelemetry.io/proto/otlp/common/v1"
@@ -155,14 +154,14 @@ func TestExtractAIMetadata_TotalTokens(t *testing.T) {
 				// 100 != 17 + 44
 				intAttr("gen_ai.usage.total_tokens", 100),
 			},
-			want: util.ToPtr[int64](100),
+			want: new(int64(100)),
 		},
 		{
 			name: "computed from input only when total absent",
 			attrs: []*commonv1.KeyValue{
 				intAttr("gen_ai.usage.input_tokens", 10),
 			},
-			want: util.ToPtr[int64](10),
+			want: new(int64(10)),
 		},
 		{
 			name: "computed from input+output when total absent",
@@ -170,7 +169,7 @@ func TestExtractAIMetadata_TotalTokens(t *testing.T) {
 				intAttr("gen_ai.usage.input_tokens", 56),
 				intAttr("gen_ai.usage.output_tokens", 30),
 			},
-			want: util.ToPtr[int64](86),
+			want: new(int64(86)),
 		},
 	}
 

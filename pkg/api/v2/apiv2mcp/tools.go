@@ -336,8 +336,3 @@ func ToolError(message string, structured any) *mcp.CallToolResult {
 		IsError:           true,
 	}
 }
-
-//go:fix inline
-func boolPointer(value bool) *bool {
-	return new(value)
-}

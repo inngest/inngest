@@ -570,11 +570,6 @@ func TestGetBatchInfo(t *testing.T) {
 	})
 }
 
-//go:fix inline
-func strPtr(s string) *string {
-	return new(s)
-}
-
 // TestPerEventIdempotenceKeys verifies that per-event SET keys are used for dedup
 // instead of the legacy sorted set, and that they expire independently.
 func TestPerEventIdempotenceKeys(t *testing.T) {

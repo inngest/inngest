@@ -96,11 +96,6 @@ func activeRoleLease(q queueImpl, roleName string) *ulid.ULID {
 	return nil
 }
 
-//go:fix inline
-func max(i int) *int {
-	return new(i)
-}
-
 func TestQueueRunBasic(t *testing.T) {
 	customQueueName := "custom-queue-name"
 

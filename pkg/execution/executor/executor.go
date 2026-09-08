@@ -57,7 +57,6 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/inngest/inngest/pkg/util/strtimeout"
-	"github.com/inngest/inngestgo"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
@@ -4628,7 +4627,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, runCtx execution.Ru
 		handledAt := e.opcodeHandledAt(group)
 		tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
 	}
-	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusSleeping))
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusSleeping))
 
 	// Create a new span that we'll use to record the sleep as complete.
 	// This is going to be attached to the same parent (the discovery step that started this sleep).
@@ -5058,7 +5057,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, runCtx exec
 		handledAt := e.opcodeHandledAt(group)
 		tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
 	}
-	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusWaiting))
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusWaiting))
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		ctx,
@@ -5285,7 +5284,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, runCtx exe
 	tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
 	// Always correlate the triggering event ID with the invoked step.
 	meta.AddAttr(attrs, meta.Attrs.StepInvokeTriggerEventID, &evt.ID)
-	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusInvoking))
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusInvoking))
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -5515,7 +5514,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, runCtx execu
 		handledAt := e.opcodeHandledAt(group)
 		tracing.AddTimingAttrs(attrs, handledAt, handledAt, time.Time{}, time.Time{})
 	}
-	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusWaiting))
+	meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusWaiting))
 
 	lifecycleItem := runCtx.LifecycleItem()
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -6160,26 +6159,26 @@ func (e *executor) emitStepSpan(ctx context.Context, runCtx execution.RunContext
 	switch gen.Op {
 	case enums.OpcodeStepError:
 		if IsStepRetryable(gen, runCtx) {
-			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusErrored))
+			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusErrored))
 			seed = tracing.RetryStepDynamicSeed(gen.ID, runCtx.AttemptCount())
 		} else {
-			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusFailed))
+			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusFailed))
 		}
 	case enums.OpcodeStepFailed:
-		meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusFailed))
+		meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusFailed))
 	case enums.OpcodeGateway, enums.OpcodeAIGateway:
 		if gen.Error != nil {
 			if IsStepRetryable(gen, runCtx) {
-				meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusErrored))
+				meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusErrored))
 			} else {
-				meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusFailed))
+				meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusFailed))
 			}
 		} else {
-			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted))
+			meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusCompleted))
 		}
 	default:
 		// TODO: handle other generator ops that should emit step spans with appropriate status
-		meta.AddAttr(attrs, meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusCompleted))
+		meta.AddAttr(attrs, meta.Attrs.DynamicStatus, new(enums.StepStatusCompleted))
 	}
 
 	attrs = attrs.Merge(extraAttrs)

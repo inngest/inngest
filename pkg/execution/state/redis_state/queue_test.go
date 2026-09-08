@@ -86,7 +86,7 @@ func TestQueueItemScore(t *testing.T) {
 					Kind: kind,
 					Identifier: state.Identifier{
 						RunID:          runID,
-						PriorityFactor: int64ptr(-60),
+						PriorityFactor: new(int64(-60)),
 					},
 				},
 			}
@@ -113,7 +113,7 @@ func TestQueueItemScore(t *testing.T) {
 				Kind: osqueue.KindSleep,
 				Identifier: state.Identifier{
 					RunID:          runID,
-					PriorityFactor: int64ptr(-60),
+					PriorityFactor: new(int64(-60)),
 				},
 			},
 		}
@@ -2412,9 +2412,6 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 		UnhashedEvaluatedKeyValue: value,
 	}
 }
-
-//go:fix inline
-func int64ptr(i int64) *int64 { return new(i) }
 
 func TestQueueEnqueueToBacklog(t *testing.T) {
 	t.Run("simple item", func(t *testing.T) {

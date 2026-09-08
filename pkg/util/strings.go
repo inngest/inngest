@@ -2,11 +2,6 @@ package util
 
 import "strings"
 
-//go:fix inline
-func StrPtr(s string) *string {
-	return new(s)
-}
-
 var logSanitizer = strings.NewReplacer(
 	"\r", "",
 	"\n", "",

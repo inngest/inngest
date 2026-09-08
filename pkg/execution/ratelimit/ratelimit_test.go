@@ -64,8 +64,3 @@ func TestRateLimitKey(t *testing.T) {
 		require.EqualValues(t, hash("jj--", id), key)
 	})
 }
-
-//go:fix inline
-func str(s string) *string {
-	return new(s)
-}

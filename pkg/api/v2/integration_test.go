@@ -300,14 +300,6 @@ func TestGRPCIntegration_InvokeFunction(t *testing.T) {
 		require.Contains(t, err.Error(), "not_implemented")
 	})
 }
-
-// Helper function to create string pointer for optional fields
-//
-//go:fix inline
-func stringPtr(s string) *string {
-	return new(s)
-}
-
 func BenchmarkGRPCIntegration_Health(b *testing.B) {
 	client, cleanup := setupGRPCTestServer(b)
 	defer cleanup()

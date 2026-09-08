@@ -17,7 +17,7 @@ import (
 func TestStepRetry(t *testing.T) {
 	c := client.New(t)
 
-	t.Run("Step-level error with Retries: inngestgo.IntPtr(0) means no retry", func(t *testing.T) {
+	t.Run("Step-level error with Retries: new(0) means no retry", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		r := require.New(t)
@@ -67,7 +67,7 @@ func TestStepRetry(t *testing.T) {
 		r.Equal("oh no", stepError.Error())
 	})
 
-	t.Run("Step-level error with Retries: inngestgo.IntPtr(1) means one retry", func(t *testing.T) {
+	t.Run("Step-level error with Retries: new(1) means one retry", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		r := require.New(t)
@@ -120,7 +120,7 @@ func TestStepRetry(t *testing.T) {
 		r.Equal("oh no", stepError.Error())
 	})
 
-	t.Run("Step-level NoRetryError with Retries: inngestgo.IntPtr(1) means no retry", func(t *testing.T) {
+	t.Run("Step-level NoRetryError with Retries: new(1) means no retry", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		r := require.New(t)
@@ -170,7 +170,7 @@ func TestStepRetry(t *testing.T) {
 		r.Equal("permanent failure", stepError.Error())
 	})
 
-	t.Run("Function-level error with Retries: inngestgo.IntPtr(0) means no retry", func(t *testing.T) {
+	t.Run("Function-level error with Retries: new(0) means no retry", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		r := require.New(t)
@@ -210,7 +210,7 @@ func TestStepRetry(t *testing.T) {
 		r.Equal(int32(1), functionExecutions.Load(), "function should execute exactly once (no retries)")
 	})
 
-	t.Run("Function-level NoRetryError with Retries: inngestgo.IntPtr(1) means no retry", func(t *testing.T) {
+	t.Run("Function-level NoRetryError with Retries: new(1) means no retry", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		r := require.New(t)

@@ -527,6 +527,3 @@ func TestDuplicateCronExpressionRejected(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorContains(t, err, "duplicate cron expression")
 }
-
-//go:fix inline
-func strptr(s string) *string { return new(s) }
