@@ -316,7 +316,18 @@ export function loadRun(id){
                end:out?undefined:total, _stepID:first.stepID, _planner:d&&d.spanID});
   }
 
-  rows.sort((a,b)=>a._q-b._q);
+  /**
+   * Rows sort by when they were queued, and by NAME where that ties.
+   *
+   * A request that planned several steps queued all of them at one instant, so
+   * without a tie-break their order is whatever order the payload happened to
+   * list them in -- which put the row drawing the request in the middle of its
+   * own ribbon, and made the ribbon reach up as well as down. Sorted by name
+   * they come out in the same order as the rule that picks which of them draws
+   * the request, so it is always the top of the group and the ribbon only ever
+   * runs downwards.
+   */
+  rows.sort((a,b)=>a._q-b._q || (a.n<b.n?-1:a.n>b.n?1:0));
 
   /**
    * The finalization, where the run did not make a request for it.
