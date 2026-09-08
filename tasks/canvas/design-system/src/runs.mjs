@@ -112,10 +112,12 @@ export function loadRun(id){
    * already the thing that says they share a request; the bar only has to
    * appear on one of them.
    *
-   * Which one is decided by name, lexicographically, so it does not move when
-   * the rows do: sorting by when they started would hand the bar to whichever
-   * of a parallel batch happened to be picked up first, and it would land
-   * somewhere different on the next capture of the same function.
+   * Which one is the FIRST the request reported. `plannedStepIDs` is the order
+   * the SDK sent them in, which is the order they were written --
+   * `Promise.all([a, b, c])` reports a, b, c -- so it is the order the person
+   * reading the trace already has in their head. Sorting by when they started
+   * would instead hand the bar to whichever of a parallel batch happened to be
+   * picked up first, and put it somewhere different on the next capture.
    */
   const nameOfStep=new Map();
   for(const [key,spans] of byStep){
@@ -124,9 +126,12 @@ export function loadRun(id){
     nameOfStep.set(key, first.name);
   }
   const drawsRequest=new Map();   // discovery spanID -> the one row that draws it
+  const planIndex=new Map();      // step name -> where its request listed it
   for(const d of (t.discoveries||[])){
     const names=(d.plannedStepIDs||[]).map(id=>nameOfStep.get(id)).filter(Boolean);
-    if(names.length) drawsRequest.set(d.spanID, names.slice().sort()[0]);
+    if(!names.length) continue;
+    drawsRequest.set(d.spanID, names[0]);
+    names.forEach((n,i)=>{ if(!planIndex.has(n)) planIndex.set(n,i); });
   }
 
   const rows=[];
@@ -317,17 +322,21 @@ export function loadRun(id){
   }
 
   /**
-   * Rows sort by when they were queued, and by NAME where that ties.
+   * Rows sort by when they were queued, then by the order their request
+   * REPORTED them.
    *
    * A request that planned several steps queued all of them at one instant, so
    * without a tie-break their order is whatever order the payload happened to
    * list them in -- which put the row drawing the request in the middle of its
-   * own ribbon, and made the ribbon reach up as well as down. Sorted by name
-   * they come out in the same order as the rule that picks which of them draws
-   * the request, so it is always the top of the group and the ribbon only ever
-   * runs downwards.
+   * own ribbon and made the ribbon reach up as well as down. The reported order
+   * is the order they were written, so the rows come out the way the function
+   * reads, and the row that draws the request is the first of them: the ribbon
+   * only ever runs downwards, from the bar.
+   *
+   * Name is the last resort, for rows no request reported together.
    */
-  rows.sort((a,b)=>a._q-b._q || (a.n<b.n?-1:a.n>b.n?1:0));
+  const pi=r=>planIndex.has(r.n)?planIndex.get(r.n):Infinity;
+  rows.sort((a,b)=>a._q-b._q || pi(a)-pi(b) || (a.n<b.n?-1:a.n>b.n?1:0));
 
   /**
    * The finalization, where the run did not make a request for it.
