@@ -315,8 +315,14 @@ export function loadRun(id){
       .filter(sp=>(sp.name||'')===NONSTEP && at(sp.endedAt)!=null)
       .find(sp=>Math.abs(at(sp.endedAt)-total)<2);
     if(tail && total-last > 0.5){
+      // It opens on the instant the last step ended, so where that step was
+      // checkpointed the finalization opens on a checkpointed instant -- the
+      // same borrowing every other row does. The resolution is not: the run
+      // completing came back in the response.
+      const lastCp=(t.childrenSpans||[]).some(sp=>sp.isCheckpoint &&
+        at(sp.endedAt)!=null && Math.abs(at(sp.endedAt)-last)<1e-9);
       rows.push({_q:last, n:'Finalization', kind:'step',
-        at:[['started',last],['ok',total]]});
+        at:[['started',last],['ok',total]], cp:lastCp?[last]:undefined});
     }
   }
 

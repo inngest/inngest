@@ -746,17 +746,21 @@ export function tickStrip(at, total, unit, k, breaks=[]){
   const inv=x=>{ let lo=0, hi=total;
     for(let i=0;i<48;i++){ const mid=(lo+hi)/2; if(at(mid)<x) lo=mid; else hi=mid; }
     return (lo+hi)/2; };
-  const n=R.AXIS.ticks, y=-R.AXIS.strip;
+  const n=R.AXIS.ticks;
+  // The tick marks sit at the bottom of the strip, the two label lines above.
+  const yTick=-3, yLo=yTick-R.AXIS.tick-1.8, yHi=yLo-R.AXIS.line;
   const inBand=p=>(breaks||[]).some(([a,b])=>p>a+1e-9 && p<b-1e-9);
-  let s=`<line x1="${LBL}" y1="${y+R.AXIS.tick}" x2="${(LBL+PLOT).toFixed(1)}" y2="${y+R.AXIS.tick}" stroke="${C.idle}" stroke-width="0.6" opacity=".45"/>`;
+  let s=`<line x1="${LBL}" y1="${yTick}" x2="${(LBL+PLOT).toFixed(1)}" y2="${yTick}" stroke="${C.idle}" stroke-width="0.6" opacity=".45"/>`;
   for(let i=0;i<n;i++){
     const p=(i/(n-1))*100;
     if(inBand(p*k)) continue;
     const x=LBL+((p*k)/100)*PLOT;
-    const t=R.human(unit==='s' ? inv(p)*1000 : inv(p));
-    s+=`<line x1="${x.toFixed(1)}" y1="${y}" x2="${x.toFixed(1)}" y2="${(y+R.AXIS.tick).toFixed(1)}" stroke="${C.idle}" stroke-width="0.8" opacity=".7"/>`
-      +`<text x="${x.toFixed(1)}" y="${(y-1.6).toFixed(1)}" ${MONO} font-size="${R.AXIS.font}" fill="${C.mut}" opacity=".8" `
-      +`text-anchor="${i===0?'start':i===n-1?'end':'middle'}">${t}</text>`;
+    const [hi,lo]=R.tickLabel(unit==='s' ? inv(p)*1000 : inv(p));
+    const anchor=i===0?'start':i===n-1?'end':'middle';
+    const label=(t,yy,o)=>t?`<text x="${x.toFixed(1)}" y="${yy.toFixed(1)}" ${MONO} `+
+      `font-size="${R.AXIS.font}" fill="${C.mut}" opacity="${o}" text-anchor="${anchor}">${t}</text>`:'';
+    s+=`<line x1="${x.toFixed(1)}" y1="${(yTick-R.AXIS.tick).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yTick}" stroke="${C.idle}" stroke-width="0.8" opacity=".7"/>`
+      +label(hi,yHi,'.85')+label(lo,yLo,hi?'.6':'.85');
   }
   return s;
 }

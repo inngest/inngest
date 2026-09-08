@@ -168,10 +168,38 @@ export const FRAME = {
  */
 export const AXIS = {
   ticks: 5,                          // including both ends
-  strip: 13,                         // the height it takes above the figure
+  strip: 20,                         // the height it takes above the figure
   tick: 3,                           // the length of a tick mark
+  line: 6,                           // ...and the gap between the two label lines
   font: 5.5,
 };
+
+/**
+ * A tick's label, split across two lines.
+ *
+ * One line cannot carry both. `human()` rounds to a single unit, so on a run
+ * measured in seconds two adjacent ticks both read "2s" and the axis stops
+ * being able to tell them apart -- which is the whole reason the strip exists.
+ * So the seconds and above go on top, the milliseconds below, and the bottom
+ * line is always there: it is the resolution the timestamps actually have.
+ *
+ * Zero-padded when there is a line above it, because then it is a fraction of
+ * that number rather than a quantity of its own -- "2s / 067ms" reads as one
+ * time, "2s / 67ms" reads as two.
+ */
+export function tickLabel(ms){
+  const t=Math.max(0, Math.round(ms));
+  const rem=t%1000, secs=Math.floor(t/1000);
+  if(!secs) return ['', rem+'ms'];
+  const d=Math.floor(secs/86400), h=Math.floor(secs%86400/3600),
+        m=Math.floor(secs%3600/60), s=secs%60;
+  const parts=[];
+  if(d) parts.push(d+'d');
+  if(h) parts.push(h+'h');
+  if(m) parts.push(m+'m');
+  if(s||!parts.length) parts.push(s+'s');
+  return [parts.join(' '), String(rem).padStart(3,'0')+'ms'];
+}
 
 /** Attention. */
 export const FOCUS = {
