@@ -129,7 +129,35 @@ export function loadRun(id){
      * also collapses it with that resolution into the one circle it is -- they
      * were a millisecond apart and drew two overlapping marks.
      */
-    const qq=sep ? at(d.endedAt) : q;
+    /**
+     * A step nobody planned was still QUEUED -- inside the request that ran it.
+     *
+     * A sequential `step.run` is discovered and run in one execution, so it
+     * has no plan of its own and the only record that it was ever waiting is
+     * the request that did both: the run sat in the queue, the executor picked
+     * it up, the SDK worked its way down to the step. The span's own
+     * `queuedAt` is the instant the SDK started running it, which is not when
+     * it began waiting -- so the row opened on a queue of zero width and the
+     * first step of every v4 capture appeared to have started the moment the
+     * run did.
+     *
+     * Where the request ran SEVERAL steps the wait is only the part after the
+     * previous one returned; the rest was that step's, not this one's.
+     */
+    const ran = sep ? null : (t.discoveries||[]).find(x=>{
+      const a=at(x.queuedAt), b=at(x.endedAt);
+      return a!=null && b!=null && st!=null && a<=st && st<=b; });
+    let ranFrom=null;
+    if(ran){
+      ranFrom=at(ran.queuedAt);
+      for(const o of (t.childrenSpans||[])){
+        if(INTERNAL.test(o.name||'')) continue;
+        if((o.stepID||o.name)===key) continue;
+        const b=at(o.endedAt);
+        if(b!=null && b>ranFrom && b<=st) ranFrom=b;
+      }
+    }
+    const qq=sep ? at(d.endedAt) : (ranFrom!=null ? Math.min(ranFrom, st) : q);
     if(qq!=null && (st==null || qq<=st)) moments.push([sep?'planned':'queued', qq]);
     if(st!=null) moments.push(['started', st]);
     if(out && en!=null && (moments.length===0 || en>=moments[moments.length-1][1]))
