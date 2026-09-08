@@ -83,10 +83,8 @@ export const BAND = {
   ruleOpacity: 0.9,                  // at one band...
   ruleFalloff: 0.09,                 // ...less this per extra band
   ruleFloor: 0.28,
-  blur: 1.4,                         // stdDeviation at one band...
   blurFalloff: 0.16,                 // ...less this per extra band
   blurFloor: 0.3,
-  desaturate: 0.55,
   tearZigs: [2, 3],                  // min, max oscillations
   tearAmp: 1.9,
   tearWidth: 1.3,
@@ -102,9 +100,7 @@ export const FRAME = {
    * they run past the overview above them. The rest is that room.
    */
   rowsAxis: 86,
-  opacity: 0.34,
   blur: 0.62,
-  desaturate: 0.25,
   finQueue: 2.2,                     // finalization waits, then runs
   finRun: 4.5,
 };

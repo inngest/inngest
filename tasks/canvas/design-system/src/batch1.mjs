@@ -2,7 +2,6 @@ const HERE=new URL('./',import.meta.url).pathname;
 import fs from 'fs';
 import {fig,lineage,px,cy,arrow,dot,C,W,LBL,PLOT,ROW,TOP,setFrame,layout} from './micro.mjs';
 import {loadRun} from './runs.mjs';
-import {setFrameSharp} from './micro.mjs'; setFrameSharp(true);
 setFrame(true);
 
 /**

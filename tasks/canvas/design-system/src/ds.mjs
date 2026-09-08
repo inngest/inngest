@@ -458,14 +458,18 @@ const dsmod=`<script type="module">
         const d=DATA[el.dataset.fig];
         if(!d) continue;
         const host=el.parentNode;
-        mounts.push({host, d, root:K.createRoot(host)});
+        // Concepts figures ignore the toggles. That page demonstrates one mark
+        // or one bar at a time, and a feature switched off elsewhere would
+        // quietly change what the vocabulary says a thing looks like.
+        const fixed=!!el.closest('#t-concepts');
+        mounts.push({host, d, fixed, root:K.createRoot(host)});
       }
     }
     for(const m of mounts)
       m.root.render(K.React.createElement(K.Trace, {
         key: m.d.id,
         rows: m.d.rows, extra: m.d.extra, under: m.d.under, label: m.d.label,
-        ...m.d.opts, ...feat,
+        ...m.d.opts, ...(m.fixed ? {trim:true, compress:true} : feat),
       }));
   };
 

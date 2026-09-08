@@ -289,7 +289,6 @@ function groupRowAt(i, {n, x, w, members, kind='good', note=''}){
  * one, or it renders with a blank row at the top.
  */
 export const FRAME_ROWS_ABOVE=1;
-const CTX_O=R.FRAME.opacity;
 
 /**
  * Scenario figures are framed; reference figures (the vocabulary panel, the
@@ -299,16 +298,6 @@ const CTX_O=R.FRAME.opacity;
  * signatures is how a scripted edit silently misses one.
  */
 let FRAMED=false;
-/**
- * Whether the frame is CONTEXT or part of the subject.
- *
- * On Scenarios the Run row and Finalization are surround: the figure is making
- * a point about the rows between them, and fading the frame is what keeps the
- * eye there. On Fixtures the whole trace IS the subject -- it is a captured run
- * shown at its measured proportions -- so there is nothing there to fade.
- */
-let FRAME_SHARP=false;
-export const setFrameSharp=on=>{FRAME_SHARP=!!on;};
 // DS_FRAME=0 builds the figures unframed, which is how they are exported for the
 // user-facing docs: the blurred surround is a design-review device for us, and
 // in docs it reads as something being hidden from the reader.
@@ -632,17 +621,16 @@ export function compression(breaks, h, uid){
   // A wide band can take a soft blur; eight narrow ones cannot — at full
   // strength they read as a row of smears cutting the trace up rather than as
   // one region being marked as not-to-scale.
-  const n=breaks.length;
-  const sd=Math.max(R.BAND.blurFloor, R.BAND.blur - (n-1)*R.BAND.blurFalloff);
+  const n=breaks.length;   // how many cuts share the page
+
   // Two full-height lines mark a cut. Sixteen of them at full strength cut the
   // trace into ribbons and become the loudest thing in it, so they fade as they
   // multiply — the same reasoning as the blur above.
   const ruleO=Math.max(R.BAND.ruleFloor, R.BAND.ruleOpacity - (n-1)*R.BAND.ruleFalloff).toFixed(2);
-  const filter=`<filter id="cmp-b-${uid}" x="-30%" y="-10%" width="160%" height="120%">`+
-    `<feGaussianBlur stdDeviation="${sd.toFixed(2)}"/><feColorMatrix type="saturate" values="0.55"/></filter>`;
+
   const rects=breaks.map(([a,b])=>
     `<rect class="cmpband" x="${px(a).toFixed(1)}" y="0" width="${(px(b)-px(a)).toFixed(1)}" height="${h}"/>`).join('');
-  const clip=`<defs>${filter}<clipPath id="cmp-${uid}">${rects}</clipPath></defs>`;
+  const clip='';
   const over=breaks.map(([a,b,t])=>{
     const x0=px(a), x1=px(b), mid=(x0+x1)/2;
     // The edges are rects rather than lines: a line's y2 is not a CSS
@@ -1003,14 +991,16 @@ export function fig(rows,extra='',label='',under='',opts={}){
   let ctx='';
   if(framed){
     const F=traceFrame(rows,k,{end:max,hasOwnRun:ownRun,pad:opts.pad||0,breaks:opts.breaks||[],running:!!opts.running,lead:leadLabel,trimmed:R.leadingQueue(rows)<=0.01});
-    const dim=t=>`<g filter="url(#ctxblur)" opacity="${CTX_O}">${stretch(t,LBL,k)}</g>`;
-    const soft=FRAME_SHARP?stretch(F.soft,LBL,k):dim(F.soft);
-    // The Run row is left sharp wherever the axis is compressed: its torn track
-    // is what says "compressed here", and blurring the one element carrying
-    // that message defeats drawing it.
-    ctx=(FRAME_SHARP||(opts.breaks&&opts.breaks.length))
-      ? stretch(F.sharp,LBL,k)+soft
-      : dim(F.sharp)+soft;
+    /**
+     * The frame is drawn like everything else.
+     *
+     * It used to be blurred and desaturated to say "context, not the subject",
+     * which was one more thing to read on a page whose whole job is to be
+     * readable -- and it fought every figure whose point WAS the Run row. The
+     * frame is already quieter than the rows: it is thinner, and it is grey
+     * wherever nothing was executing.
+     */
+    ctx=stretch(F.sharp,LBL,k)+stretch(F.soft,LBL,k);
   }
   // The compressed band blurs whatever runs through it. Done by drawing the
   // whole figure a second time, clipped to the band and filtered — SVG has no
@@ -1029,9 +1019,16 @@ export function fig(rows,extra='',label='',under='',opts={}){
   // Only the figure's own rows are blurred. The Run row is deliberately left
   // sharp: its torn track is what says "compressed here", and blurring the one
   // element carrying that message defeats drawing it at all.
-  const blurred=cmp.clip
-    ? `<g clip-path="url(#cmp-${UID})" filter="url(#cmp-b-${UID})">${inner}</g>`
-    : '';
+  /**
+   * No blur through the band.
+   *
+   * It was a second copy of the whole figure, clipped and filtered, to say
+   * "this width is not to scale". Three things already say that and say it
+   * without a duplicate: the scrim, the rules at both edges, and the Run row's
+   * own track tearing. What the blur added was a halo over whatever it passed,
+   * and a clip path per figure whose id collided with the next one's.
+   */
+  const blurred='';
   const nr=n+above+(framed?1:0);
   /**
    * Every figure carries the events it was drawn from.
@@ -1042,15 +1039,18 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * go through fig(); this is what lets the second one happen at all.
    */
   const fid=++FIG_ID;
-  FIGURES.push({id:fid, rows:rows0, extra:extra0, label, under:under0, opts:opts0});
+  // Whether the figure was FRAMED is part of what it is, and it comes from a
+  // module-level default as often as from the call -- so it is recorded as
+  // resolved. Without it the component framed everything it redrew, putting a
+  // Run row and a finalization under the Concepts figures, which are about one
+  // mark or one bar and have no run to overview.
+  FIGURES.push({id:fid, rows:rows0, extra:extra0, label, under:under0,
+                opts:{...opts0, frame:framed}});
   return `<svg data-fig="${fid}" viewBox="${-M} 0 ${W+M*2} ${h}" style="--nr:${nr};--fig-h0:${bandH}px;--fig-h:${figH}" role="img" aria-label="${label}">`+
     HATCH+BLURDEF+cmp.clip+ctx+inner+blurred+`<g class="nofit">${cmp.over}</g>`+over+cab+lin+`</svg>`;
 }
 
-const BLURDEF=`<defs><filter id="cmpblur" x="-30%" y="-10%" width="160%" height="120%"><feGaussianBlur stdDeviation="1.4"/><feColorMatrix type="saturate" values="0.55"/></filter><filter id="ctxblur" x="-4%" y="-30%" width="108%" height="160%">`+
-  `<feGaussianBlur stdDeviation="0.62"/>`+
-  `<feColorMatrix type="saturate" values="0.25"/>`+
-  `</filter></defs>`;
+const BLURDEF='';
 
 /**
  * The tie between one discovery request and every step it queued.
