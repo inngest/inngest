@@ -12,23 +12,42 @@
  * ribbons and cables come out of the capture rather than out of coincident
  * timings.
  *
- * ## What the captures do not say
+ * ## Why a v4 run has fewer requests than it has steps
  *
- * Three gaps, all in the v4 payloads, all of which this file compensates for
- * rather than corrects -- they want fixing at the source:
+ * Confirmed by instrumenting the executor, because none of it is visible in
+ * the payload. `v4sequential` -- three steps and a finalize -- makes exactly
+ * TWO requests:
  *
- *   - **Requests go unrecorded.** `v4sequential` lists two, for a run that
- *     made at least four (run `first step`; plan the sleep; run `second
- *     step`; finalize). `step` and `v4parallel` list every one of theirs.
- *     So a step can have no request in the payload at all, and the request
- *     that produced it has to be found by which window contains it.
- *   - **A request can carry the RUN's `queuedAt` instead of its own.**
- *     `v4sequential`'s surviving request reports 1ms -- the run's queue --
- *     though it cannot have been enqueued before the step that preceded it
- *     returned at 68ms.
- *   - **A request that plans a sleep records `startedAt === endedAt`.** True
- *     of `v4sequential` and of `step`, and of nothing else. There is no
- *     execution window, so that request cannot be drawn as one.
+ *     request 1   checkpoint: StepRun("first step")     <- out of band
+ *                 response:   1 op, Sleep("2s")
+ *     ... 2s ...
+ *     request 2   checkpoint: StepRun("second step")
+ *                 response:   1 op, RunComplete
+ *
+ * A response still carries ONE op, as it always did. What is new in v4 is
+ * that a `step.run` the SDK can execute inline is CHECKPOINTED -- reported
+ * out of band while the request is still open -- so the SDK carries on into
+ * the next step and the response is the op it could not run itself. One
+ * request therefore both runs a step and reports the next one.
+ *
+ * Two things follow, and both are why this file looks the way it does:
+ *
+ *   - A checkpointed step has no request of its own and no queue of its own:
+ *     its span's `queuedAt` is the instant the SDK ran it. The wait it really
+ *     had belongs to the request that carried it, which is what `ranFrom`
+ *     below recovers.
+ *   - The request that plans the sleep is the SAME request that ran
+ *     `first step`, so its `queuedAt` is legitimately the run's. Only the
+ *     part of it after the step belongs to the sleep, which is what `prior`
+ *     below is for.
+ *
+ * ## What the payload still gets wrong
+ *
+ * One thing, and it wants fixing at the source: **a discovery reports
+ * `startedAt === endedAt`**. The executor knows when the request began -- it
+ * sets it on the execution span at creation -- but the stored span comes back
+ * with the start replaced by the end, so the request has no window to draw.
+ * True of `v4sequential` and of `step`.
  */
 import fs from 'fs';
 import * as R from './rules.mjs';
@@ -106,21 +125,20 @@ export function loadRun(id){
     if(sep){
       const dq=at(d.queuedAt), ds=at(d.startedAt), de=at(d.endedAt);
       /**
-       * Where a request's own queue is not recorded, take the end of the work
-       * that preceded it.
+       * A request can RUN steps before it plans the next one.
        *
-       * A request is enqueued when the previous one returns, so the request
-       * that plans a step cannot have been waiting through the execution of a
-       * step that ran before it. The v4 capture reports the RUN's `queuedAt`
-       * on the request that plans the sleep, which put all of that in the
-       * sleep's row: it appeared to have been waiting since the run was
-       * enqueued, through `first step`'s whole execution.
+       * In v4 a sequential `step.run` is checkpointed out of band, so the SDK
+       * carries straight on and the same request goes on to report the sleep
+       * (see the note at the top of this file). That request's queue is the
+       * run's queue and its first stretch of work is `first step`, neither of
+       * which has anything to do with the sleep -- so drawing the request from
+       * its `queuedAt` put all of it in the sleep's row, which then appeared
+       * to have been waiting since the run was enqueued, through another
+       * step's whole execution.
        *
-       * So the request is drawn from the end of the last step that finished
-       * inside its reported window. That is a floor, not the real queue -- the
-       * queue between the two is real and is simply not in the data (see the
-       * capture notes below). Where the request records a queue of its own,
-       * which every other fixture does, this does not fire.
+       * The part of the request that produced THIS step is what came after the
+       * last thing it ran. There is no queue in front of it because the step
+       * did not exist to be queued.
        */
       let prior=null;
       for(const o of (t.childrenSpans||[])){
