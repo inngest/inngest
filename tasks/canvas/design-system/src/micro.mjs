@@ -542,7 +542,9 @@ export function layout(total, rows, opts={}){
    * a millisecond, in a figure whose point is that bands stand for days.
    */
   const busy=compute.reduce((n,[a,b])=>n+(b-a),0);
-  const el=R.FEAT.compress ? elastic(total, [], {compute,
+  // `linear` is a figure opting out: two of them exist to show the UNCOMPRESSED
+  // proportion, so compressing them deletes their point.
+  const el=(R.FEAT.compress && !opts.linear) ? elastic(total, [], {compute,
       threshold:Math.max(R.ELASTIC.floor, total>0?busy*R.ELASTIC.computeMultiple/total:0),
       ...opts})
     : {at:t=>t/total*(opts.plot||100), bands:[], cuts:[]};
@@ -772,7 +774,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
     }
   }
   if(opts.ms){
-    const L=layout(opts.ms, rows, {plot:100, unit:opts.unit});
+    const L=layout(opts.ms, rows, {plot:100, unit:opts.unit, linear:opts.linear});
     rows=L.rows; opts={...opts, breaks:L.breaks};
   }
   /**
@@ -888,7 +890,19 @@ export function fig(rows,extra='',label='',under='',opts={}){
     ` + (var(--geo-span,${SPAN_ROW}px) - ${SPAN_ROW}px) * ${lowSpan})`;
   const ends=rows.flatMap(r=>(r.segs||[]).map(([,x,w])=>x+w));
   const max=ends.length?Math.max(...ends):100;
-  const k=opts.scale||(max>0?Math.min(86/max,3):1);
+  /**
+   * How much the drawn content is scaled up to fill the width.
+   *
+   * A figure laid out from a duration is already normalised -- layout() put it
+   * across the whole axis -- so there is nothing to fit and k is 1. Only a
+   * figure whose positions were written by hand can come up short.
+   *
+   * And it is only ever a scale UP: stretch() is a no-op at or below 1, so a k
+   * below 1 does not shrink anything, it just tells everything downstream a
+   * scale that was never applied. That is what put the compression bands 14%
+   * away from the bars they were cutting.
+   */
+  const k=opts.scale||(opts.ms!=null?1:(max>0?Math.max(1,Math.min(86/max,3)):1));
   // Rows are placed from their own pitches, so a block of span rows packs
   // tighter than the trace around it.
   const ys=rowYs(rows), st=rowSteps(rows);
@@ -967,7 +981,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
    * 105px while the Run row tore at 187px over the sleep it was supposed to be
    * cutting. Since px() is linear from LBL, the stretch is just a factor.
    */
-  const cmp=compression((opts.breaks||[]).map(([a,b,t])=>[a*k,b*k,t]), bandH, ++UID);
+  const cmp=compression((opts.breaks||[]).map(([a,b,t])=>[a*k,b*k,t]), bandH, ++UID);   // k is 1 unless the content was scaled up
   // Only the figure's own rows are blurred. The Run row is deliberately left
   // sharp: its torn track is what says "compressed here", and blurring the one
   // element carrying that message defeats drawing it at all.
