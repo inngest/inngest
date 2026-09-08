@@ -23,6 +23,10 @@ export const FEAT = {
 export function setFeatures(f){
   if(f && 'trim' in f) FEAT.trim=!!f.trim;
   if(f && 'compress' in f) FEAT.compress=!!f.compress;
+  // The threshold is a rule, not a feature -- but it is the rule most worth
+  // arguing with, so it is reachable from the panel too. Written back onto
+  // ELASTIC because that is where every caller reads it.
+  if(f && f.multiple!=null && isFinite(f.multiple)) ELASTIC.computeMultiple=+f.multiple;
 }
 
 /**

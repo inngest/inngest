@@ -5,6 +5,8 @@ import fs from 'fs';
 import { execFileSync } from 'child_process';
 import * as V from './vocabulary.mjs';
 import * as R from './rules.mjs';
+// The panel opens where the rule sits, rather than restating the number.
+const MULT_DEFAULT=R.ELASTIC.computeMultiple;
 // Cleared before the generators run; each appends what the elastic rule could
 // not reach, so an empty file means every figure is derived rather than placed.
 try{ fs.unlinkSync(new URL('./unruled.json',import.meta.url).pathname); }catch{}
@@ -482,7 +484,7 @@ const dsmod=`<script type="module">
       m.root.render(K.React.createElement(K.Trace, {
         key: m.d.id,
         rows: m.d.rows, extra: m.d.extra, under: m.d.under, label: m.d.label,
-        ...m.d.opts, ...(m.fixed ? {trim:true, compress:true} : feat),
+        ...m.d.opts, ...(m.fixed ? {trim:true, compress:true, multiple:${MULT_DEFAULT}} : feat),
       }));
   };
 
@@ -506,7 +508,16 @@ const sidebar=`<aside id="side">
   </div>
   ${sec('Features','what the design does for you, on and off',
     FEATURES.map(f=>`<div class="tg"><label>${f.n}<em>${f.d}</em></label>`+
-      `<button class="tgb on" data-feat="${f.k}">on</button></div>`).join(''))}
+      `<button class="tgb on" data-feat="${f.k}">on</button></div>`).join('')+
+    /* The one rule worth arguing with from the panel: how much longer than the
+       run's whole compute a stretch has to be before it is worth compressing.
+       Lower compresses more eagerly; at 0 every dead stretch goes. */
+    `<div class="sl"><label>dead time worth compressing<b data-out="mult">${MULT_DEFAULT}×</b></label>
+    <input type="range" data-mult min="0" max="12" step="0.5" value="${MULT_DEFAULT}"></div>
+    <p class="foot">A stretch with nothing executing is compressed when it is
+    this many times longer than <em>all</em> the compute in the run put together.
+    Scale-free on purpose: a flat fraction of the run would compress ordinary
+    queue intervals, which are short and are exactly what the trace is for.</p>`)}
   ${sec('Palette','',
     `<div class="pills">${Object.keys(PALETTES).map((p,i)=>
       `<button class="pill${i?'':' on'}" data-pal="${p}">${p}</button>`).join('')}</div>`)}
@@ -1152,7 +1163,7 @@ ${dsmod}
   // ---- feature toggles -------------------------------------------------
   // These change what is DRAWN, so the page carries a variant per combination
   // and this picks one. Everything else in the panel is a CSS variable.
-  var FKEY='tds.feat.v1', feat={trim:true, compress:true};
+  var FKEY='tds.feat.v1', feat={trim:true, compress:true, multiple:${MULT_DEFAULT}};
   try{ feat=Object.assign(feat, JSON.parse(localStorage.getItem(FKEY)||'{}')); }catch(e){}
   function featKey(){ return (feat.trim?'1':'0')+(feat.compress?'1':'0'); }
   /**
@@ -1239,7 +1250,7 @@ ${dsmod}
     }
     // The features are properties of a drawing. Every figure re-renders from
     // the events it was drawn from, through the same component.
-    if(window.__renderFigures) window.__renderFigures({trim:feat.trim, compress:feat.compress});
+    if(window.__renderFigures) window.__renderFigures({trim:feat.trim, compress:feat.compress, multiple:feat.multiple});
     document.querySelectorAll('#side [data-feat]').forEach(function(b){
       var on=!!feat[b.dataset.feat];
       b.classList.toggle('on',on); b.textContent=on?'on':'off';
@@ -1255,6 +1266,18 @@ ${dsmod}
         if(svg) morphInto(svg, p[1]);
       });
       setTimeout(refit, MORPH.duration+40);
+    });
+  }
+  var multOut=document.querySelector('[data-out="mult"]'),
+      multIn=document.querySelector('input[data-mult]');
+  if(multIn){
+    multIn.value=feat.multiple;
+    if(multOut) multOut.textContent=feat.multiple+'\u00d7';
+    multIn.addEventListener('input',function(){
+      feat.multiple=+multIn.value;
+      if(multOut) multOut.textContent=feat.multiple+'\u00d7';
+      try{ localStorage.setItem(FKEY,JSON.stringify(feat)); }catch(e){}
+      applyFeat(true);
     });
   }
   document.querySelectorAll('#side [data-feat]').forEach(function(b){

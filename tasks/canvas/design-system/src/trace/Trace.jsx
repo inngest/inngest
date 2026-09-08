@@ -18,18 +18,18 @@ import { RESOLVED, setFeatures } from '../rules.mjs';
  */
 export function Trace({ rows, ms, lead, extra = '', under = '', label = '',
                         frame = true, running, breaks,
-                        trim = true, compress = true, ...opts }) {
+                        trim = true, compress = true, multiple, ...opts }) {
   const html = React.useMemo(() => {
     // No guard on empty rows: a figure can be about the axis, and its content
     // is in `extra`. Bailing here dropped it from the page entirely.
     rows = rows || [];
     // What the design does FOR you, as properties of this drawing.
-    setFeatures({ trim, compress });
+    setFeatures({ trim, compress, multiple });
     // Everything goes to fig(). It owns the whole path from events to drawing:
     // trimming the opening queue, the elastic axis, the bands, the frame. Doing
     // any of it here would be a second opinion about what the events mean.
     return fig(rows, extra, label, under, { frame, running, lead, ms, breaks, ...opts });
-  }, [rows, ms, lead, extra, under, label, frame, running, breaks, trim, compress, opts]);
+  }, [rows, ms, lead, extra, under, label, frame, running, breaks, trim, compress, multiple, opts]);
 
   // No wrapper class: it renders INTO the figure box the page already has.
   return React.createElement('div', {
