@@ -103,6 +103,32 @@ export function loadRun(id){
   for(const d of (t.discoveries||[]))
     for(const sid of (d.plannedStepIDs||[])) if(!planner.has(sid)) planner.set(sid, d);
 
+  /**
+   * One request, drawn once.
+   *
+   * A discovery that planned several steps is ONE execution, and every row it
+   * planned was going to draw it -- the same blue bar, at the same instants, on
+   * three rows, which says three requests ran where one did. The ribbon is
+   * already the thing that says they share a request; the bar only has to
+   * appear on one of them.
+   *
+   * Which one is decided by name, lexicographically, so it does not move when
+   * the rows do: sorting by when they started would hand the bar to whichever
+   * of a parallel batch happened to be picked up first, and it would land
+   * somewhere different on the next capture of the same function.
+   */
+  const nameOfStep=new Map();
+  for(const [key,spans] of byStep){
+    const first=spans.reduce((m,sp)=>ms(sp.queuedAt)<ms(m.queuedAt)?sp:m);
+    if(first.stepID) nameOfStep.set(first.stepID, first.name);
+    nameOfStep.set(key, first.name);
+  }
+  const drawsRequest=new Map();   // discovery spanID -> the one row that draws it
+  for(const d of (t.discoveries||[])){
+    const names=(d.plannedStepIDs||[]).map(id=>nameOfStep.get(id)).filter(Boolean);
+    if(names.length) drawsRequest.set(d.spanID, names.slice().sort()[0]);
+  }
+
   const rows=[];
   for(const [key,spans] of byStep){
     const first=spans.reduce((m,s)=>ms(s.queuedAt)<ms(m.queuedAt)?s:m);
@@ -125,7 +151,10 @@ export function loadRun(id){
      * the rule the Concepts page states; here it is a fact in the capture
      * rather than a judgement, because both spans carry their own timestamps.
      */
-    const sep = d && !isFin && at(d.endedAt)!=null && st!=null && at(d.endedAt) <= st;
+    // Was this step PLANNED by a separate request, and does this row draw it?
+    // Every planned row gets the moment; only one of them gets the bar.
+    const planned = d && !isFin && at(d.endedAt)!=null && st!=null && at(d.endedAt) <= st;
+    const sep = planned && drawsRequest.get(d.spanID) === name;
     const moments=[];
     /**
      * Whether the instant this row OPENS on reached us by checkpoint.
@@ -206,7 +235,7 @@ export function loadRun(id){
      * Where the request ran SEVERAL steps the wait is only the part after the
      * previous one returned; the rest was that step's, not this one's.
      */
-    const ran = sep ? null : (t.discoveries||[]).find(x=>{
+    const ran = planned ? null : (t.discoveries||[]).find(x=>{
       const a=at(x.queuedAt), b=at(x.endedAt);
       return a!=null && b!=null && st!=null && a<=st && st<=b; });
     let ranFrom=null;
@@ -238,7 +267,7 @@ export function loadRun(id){
      * first in its request has no waiting part at all -- the request was
      * already running when the previous step returned.
      */
-    let qq=sep ? at(d.endedAt) : (ranFrom!=null ? Math.min(ranFrom, st) : q);
+    let qq=planned ? at(d.endedAt) : (ranFrom!=null ? Math.min(ranFrom, st) : q);
     if(ran && ranFrom!=null && st!=null && ranFrom<st){
       const rstart=at(ran.startedAt), rend=at(ran.endedAt);
       // A request whose startedAt equals its endedAt recorded no window at
@@ -261,7 +290,7 @@ export function loadRun(id){
       }
       qq=null;
     }
-    if(qq!=null && (st==null || qq<=st)) moments.push([sep?'planned':'queued', qq]);
+    if(qq!=null && (st==null || qq<=st)) moments.push([planned?'planned':'queued', qq]);
     if(st!=null) moments.push(['started', st]);
     if(out && en!=null && (moments.length===0 || en>=moments[moments.length-1][1]))
       moments.push([out, en]);
@@ -332,7 +361,15 @@ export function loadRun(id){
     const ids=d.plannedStepIDs||[];
     if(ids.length<2) continue;
     const mem=rows.filter(r=>ids.includes(r._stepID));
-    if(mem.length>1){ mem[0].reports=mem.slice(1).map(r=>r.n); }
+    // The link goes on the row that DRAWS the request, not on whichever came
+    // first in row order. The ribbon is hung at that row's resolution -- the
+    // instant the request reported them -- and only the drawing row has that
+    // moment; on any of the others it is their own step resolving, which is
+    // somewhere else entirely.
+    if(mem.length>1){
+      const lead=mem.find(r=>r.n===drawsRequest.get(d.spanID)) || mem[0];
+      lead.reports=mem.filter(r=>r!==lead).map(r=>r.n);
+    }
   }
   rows.forEach(r=>{ delete r._stepID; delete r._planner; delete r._q; });
 

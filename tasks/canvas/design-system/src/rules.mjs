@@ -432,7 +432,7 @@ export function ribbonGroups(rows){
     const mem=[i].concat(r.reports
       .map(n=>rows.findIndex(o=>o.n===n))
       .filter(j=>j>=0));
-    if(mem.length>1) named.push({x:+r.at[k][1].toFixed(3), rows:mem});
+    if(mem.length>1) named.push({x:+r.at[k][1].toFixed(3), rows:mem.slice().sort((p,q)=>p-q)});
   });
   const claimed=new Set(named.flatMap(g=>g.rows));
   const marks=[];
@@ -503,8 +503,17 @@ export function human(ms){
  */
 export function requestQueuedAt(r){
   if(r.run || !r.at || !r.at.length) return null;
-  const q=r.at.find(x=>x[0]==='queued'||x[0]==='planned');
-  return q ? +q[1].toFixed(3) : null;
+  /**
+   * A row that was PLANNED says so, and that moment wins.
+   *
+   * The rows a request reported together share the instant it reported them,
+   * not the instant it was itself enqueued -- and the one row that draws the
+   * request also carries the request's own queue, which is earlier. Taking the
+   * first queued-or-planned moment therefore gave that row a different answer
+   * from its siblings and dropped it out of its own ribbon.
+   */
+  const p=r.at.find(x=>x[0]==='planned') || r.at.find(x=>x[0]==='queued');
+  return p ? +p[1].toFixed(3) : null;
 }
 
 /** The instant a row's own step was queued, or null if it never waited. */
