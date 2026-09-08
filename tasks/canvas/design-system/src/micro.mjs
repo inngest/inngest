@@ -161,7 +161,8 @@ export function row(i,r,sc=1,yy){
    * entire point is that a span is three timestamps before it is anything else.
    */
   const noMarks=r.marks===false, noBars=r.bars===false;
-  const segs=fillGaps(rawSegs.map(([k,x,w])=>({kind:k,x,w}))).map(g=>[g.kind,g.x,g.w]);
+  const segs=fillGaps(rawSegs.map(([k,x,w,ms])=>({kind:k,x,w,ms})))
+    .map(g=>[g.kind,g.x,g.w,g.ms]);
   const y=yy!=null?yy:cy(i); let s='', hit='';
   /**
    * Attention is per ELEMENT, not per row. Hovering a step lights the parts of
@@ -237,7 +238,9 @@ export function row(i,r,sc=1,yy){
         const e=EVENT_INFO[marks[mi].c]; if(e) parts.push({t:'e',k:marks[mi].c,n:e[0],d:e[1]});
         mi++;
       }
-      const b=BAR_INFO[base(g[0])]; if(b) parts.push({t:'b',k:base(g[0]),n:b[0],d:b[1]});
+      const b=BAR_INFO[base(g[0])];
+      if(b) parts.push({t:'b',k:base(g[0]),n:b[0],d:b[1],
+                        ms:g[3]!=null?R.human(g[3]):undefined});
     });
     for(;mi<marks.length;mi++){ const e=EVENT_INFO[marks[mi].c]; if(e) parts.push({t:'e',k:marks[mi].c,n:e[0],d:e[1]}); }
     if(parts.length) hit=`<rect class="rowhit" x="${(LBL-6/sx).toFixed(2)}" y="${y}" width="${((PLOT+12)/sx).toFixed(2)}" height="16" fill="transparent" data-row="${n}" data-parts='${JSON.stringify(parts).replace(/'/g,"&apos;")}'/>`;
@@ -561,7 +564,18 @@ export function layout(total, rows, opts={}){
       threshold:Math.max(R.ELASTIC.floor, total>0?busy*R.ELASTIC.computeMultiple/total:0),
       ...opts})
     : {at:t=>t/total*(opts.plot||100), bands:[], cuts:[]};
-  const map=([kd,a,b])=>[kd, el.at(a), el.at(b)-el.at(a)];
+  /**
+   * A bar keeps its real duration as well as its drawn one.
+   *
+   * The drawn width is a fraction of an axis that may be compressed, so it
+   * cannot be read back as a time -- and the popover has to name the interval,
+   * not the number of pixels it got. Carried in the segment because that is
+   * what survives every later pass; recovering it afterwards would mean
+   * inverting the elastic axis, which is the arithmetic this is here to avoid
+   * repeating.
+   */
+  const msPer = opts.unit==='s' ? 1000 : 1;
+  const map=([kd,a,b])=>[kd, el.at(a), el.at(b)-el.at(a), (b-a)*msPer];
   const out=rows.map(r=>{
     if(r.run) return {...r,
       to: el.at(r.to!=null?r.to:total),
@@ -897,7 +911,7 @@ export function fig(rows,extra='',label='',under='',opts={}){
         rows=rows.map(r=>r.run
           ? {...r, to:r.to!=null?at(r.to):r.to, end:r.end!=null?at(r.end):r.end,
              intervals:(r.intervals||[]).map(v=>({...v,a:at(v.a),b:at(v.b)}))}
-          : {...r, segs:(r.segs||[]).map(([k,a,w])=>[k,at(a),at(a+w)-at(a)]),
+          : {...r, segs:(r.segs||[]).map(([k,a,w,ms])=>[k,at(a),at(a+w)-at(a),ms]),
              // The moments move with the bars. Marks are drawn from them now,
              // so leaving them behind put every circle at the position the
              // compression had just taken away.

@@ -765,6 +765,9 @@ const page=`<title>Trace Design System</title>
   #pop .p{display:contents}
   #pop .p i{display:block;justify-self:center}
   #pop .p b{font-weight:600;color:var(--ink);white-space:nowrap}
+  /* The duration sits with the name, quieter, so the column still scans. */
+  #pop .p b u{text-decoration:none;color:var(--muted);font-weight:400;margin-left:6px;
+    font-family:var(--mono);font-size:11px}
   #pop .p span{color:var(--muted);font-size:11.5px;white-space:nowrap}
   /* A section that is reference rather than argument, folded away until asked for. */
   .keylist{list-style:none;padding:0;margin:10px 0 14px;display:grid;gap:7px}
@@ -929,7 +932,12 @@ ${dsmod}
     var raw=el.getAttribute('data-parts'); if(!raw) return;
     var parts; try{ parts=JSON.parse(raw.replace(/&apos;/g,"'")); }catch(e){ return; }
     pop.innerHTML='<h4>'+(el.getAttribute('data-row')||'row').trim()+'</h4>'+
-      '<div class="rows">'+parts.map(function(p){ return '<div class="p">'+swatch(p)+'<b>'+p.n+'</b><span>'+p.d+'</span></div>'; }).join('')+'</div>';
+      '<div class="rows">'+parts.map(function(p){
+        // How long the interval was, where the bar came from a run that was
+        // measured. Not the drawn width: the axis it was drawn on may be
+        // compressed, so the pixels are not the time.
+        var t=p.ms?'<u>'+p.ms+'</u>':'';
+        return '<div class="p">'+swatch(p)+'<b>'+p.n+t+'</b><span>'+p.d+'</span></div>'; }).join('')+'</div>';
     pop.classList.add('on');
     var r=pop.getBoundingClientRect(), x=ev.clientX+16, y=ev.clientY+16;
     if(x+r.width>innerWidth-12) x=ev.clientX-r.width-16;

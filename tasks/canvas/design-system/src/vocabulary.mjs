@@ -209,7 +209,11 @@ export function fillGaps(segs){
   const merged=[];
   for(const g of out){
     const last=merged[merged.length-1];
-    if(last && last.kind===g.kind && Math.abs(last.x+last.w-g.x)<0.01) last.w+=g.w;
+    if(last && last.kind===g.kind && Math.abs(last.x+last.w-g.x)<0.01){
+      last.w+=g.w;
+      // Two intervals merged into one are one duration too.
+      if(last.ms!=null || g.ms!=null) last.ms=(last.ms||0)+(g.ms||0);
+    }
     else merged.push({...g});
   }
   return merged;
