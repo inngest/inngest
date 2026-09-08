@@ -4,6 +4,9 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=master";
     flake-utils.url = "github:numtide/flake-utils";
+    # Temporary until the next nixpkgs lock update provides golangci-lint 2.13.2.
+    golangci-lint-override.url =
+      "github:nixos/nixpkgs/0968519e14f7aa7d3e9b389682bd74d2b51c8ce8";
   };
 
   outputs =
@@ -11,6 +14,7 @@
       self,
       nixpkgs,
       flake-utils,
+      golangci-lint-override,
       ...
     }:
     flake-utils.lib.eachDefaultSystem (
@@ -21,6 +25,7 @@
 
           config.allowUnfree = true;
         };
+        golangci-lint = golangci-lint-override.legacyPackages.${system}.golangci-lint;
         corepack = pkgs.stdenv.mkDerivation {
           name = "corepack";
           buildInputs = [ pkgs.nodejs_22 ];
