@@ -218,6 +218,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		DebugSessionID: debugSessionID,
 		SpanTypeName:   span.Name,
 		IsUserland:     isUserland,
+		IsCheckpoint:   span.Attributes != nil && span.Attributes.IsCheckpoint != nil && *span.Attributes.IsCheckpoint,
 		UserlandSpan:   userlandSpan,
 	}
 

@@ -666,6 +666,11 @@ type RunTraceSpan {
   parentSpanID: String
   parentSpan: RunTraceSpan # the parent span of this span
   isUserland: Boolean! # whether this span is a userland span
+  # Whether this span was reported by a CHECKPOINT rather than by the response
+  # to the request. In v4 the SDK runs a step it can execute inline and reports
+  # it out of band while the request is still open, so the moments on this span
+  # arrived by a different route than the ones on a planned step.
+  isCheckpoint: Boolean!
   userlandSpan: UserlandSpan
   debugRunID: ULID
   debugSessionID: ULID

@@ -51,6 +51,7 @@ type RunTraceSpan struct {
 	ParentSpanID           *string                   `json:"parentSpanID,omitempty"`
 	ParentSpan             *RunTraceSpan             `json:"parentSpan,omitempty"`
 	IsUserland             bool                      `json:"isUserland"`
+	IsCheckpoint           bool                      `json:"isCheckpoint"`
 	UserlandSpan           *UserlandSpan             `json:"userlandSpan,omitempty"`
 	DebugRunID             *ulid.ULID                `json:"debugRunID,omitempty"`
 	DebugSessionID         *ulid.ULID                `json:"debugSessionID,omitempty"`

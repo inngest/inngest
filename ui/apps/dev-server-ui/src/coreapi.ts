@@ -385,6 +385,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     endedAt
     isRoot
     isUserland
+    isCheckpoint
     userlandSpan {
       spanName
       spanKind

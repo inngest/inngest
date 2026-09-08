@@ -26,6 +26,7 @@ const TRACE_DETAILS = `
     endedAt
     isRoot
     isUserland
+    isCheckpoint
     userlandSpan {
       spanName
       spanKind

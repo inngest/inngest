@@ -28,6 +28,10 @@ func stepPlannedAttrs(attrs *meta.SerializableAttrs, op state.GeneratorOpcode, r
 			meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
 			meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
 			meta.Attr(meta.Attrs.DynamicStatus, inngestgo.Ptr(enums.StepStatusRunning)),
+			// Planned BY a checkpoint: the request that is still open told us
+			// this step exists. Marked like the steps it ran, because how we
+			// came to know a moment is the same fact either way.
+			meta.Attr(meta.Attrs.IsCheckpoint, inngestgo.Ptr(true)),
 		),
 	)
 }

@@ -466,6 +466,7 @@ type ComplexityRoot struct {
 		EndedAt                func(childComplexity int) int
 		FunctionID             func(childComplexity int) int
 		GroupID                func(childComplexity int) int
+		IsCheckpoint           func(childComplexity int) int
 		IsRoot                 func(childComplexity int) int
 		IsUserland             func(childComplexity int) int
 		Metadata               func(childComplexity int) int
@@ -2788,6 +2789,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.GroupID(childComplexity), true
 
+	case "RunTraceSpan.isCheckpoint":
+		if e.complexity.RunTraceSpan.IsCheckpoint == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.IsCheckpoint(childComplexity), true
+
 	case "RunTraceSpan.isRoot":
 		if e.complexity.RunTraceSpan.IsRoot == nil {
 			break
@@ -4348,6 +4356,11 @@ type RunTraceSpan {
   parentSpanID: String
   parentSpan: RunTraceSpan # the parent span of this span
   isUserland: Boolean! # whether this span is a userland span
+  # Whether this span was reported by a CHECKPOINT rather than by the response
+  # to the request. In v4 the SDK runs a step it can execute inline and reports
+  # it out of band while the request is still open, so the moments on this span
+  # arrived by a different route than the ones on a planned step.
+  isCheckpoint: Boolean!
   userlandSpan: UserlandSpan
   debugRunID: ULID
   debugSessionID: ULID
@@ -12133,6 +12146,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
 			case "isUserland":
 				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+			case "isCheckpoint":
+				return ec.fieldContext_RunTraceSpan_isCheckpoint(ctx, field)
 			case "userlandSpan":
 				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
 			case "debugRunID":
@@ -15065,6 +15080,8 @@ func (ec *executionContext) fieldContext_Query_runTrace(ctx context.Context, fie
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
 			case "isUserland":
 				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+			case "isCheckpoint":
+				return ec.fieldContext_RunTraceSpan_isCheckpoint(ctx, field)
 			case "userlandSpan":
 				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
 			case "debugRunID":
@@ -19142,6 +19159,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
 			case "isUserland":
 				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+			case "isCheckpoint":
+				return ec.fieldContext_RunTraceSpan_isCheckpoint(ctx, field)
 			case "userlandSpan":
 				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
 			case "debugRunID":
@@ -19515,6 +19534,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
 			case "isUserland":
 				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+			case "isCheckpoint":
+				return ec.fieldContext_RunTraceSpan_isCheckpoint(ctx, field)
 			case "userlandSpan":
 				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
 			case "debugRunID":
@@ -19582,6 +19603,50 @@ func (ec *executionContext) _RunTraceSpan_isUserland(ctx context.Context, field 
 }
 
 func (ec *executionContext) fieldContext_RunTraceSpan_isUserland(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_isCheckpoint(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_isCheckpoint(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsCheckpoint, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_isCheckpoint(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RunTraceSpan",
 		Field:      field,
@@ -29089,6 +29154,13 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 		case "isUserland":
 
 			out.Values[i] = ec._RunTraceSpan_isUserland(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "isCheckpoint":
+
+			out.Values[i] = ec._RunTraceSpan_isCheckpoint(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++
