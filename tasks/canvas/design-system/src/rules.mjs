@@ -172,6 +172,15 @@ export const AXIS = {
   tick: 3,                           // the length of a tick mark
   line: 6,                           // ...and the gap between the two label lines
   font: 5.5,
+  /**
+   * Ticks are spaced within each STRETCH of the axis, not across the whole of
+   * it. A compressed band is a discontinuity -- the time either side of it is
+   * not the same distance apart as the pixels say -- so a tick placed across
+   * one measures nothing, and the readings that matter most are the ones at
+   * its edges: what the clock said going in, and what it said coming out.
+   */
+  spacing: 25,                       // drawn units between ticks within a stretch
+  minSeg: 9,                         // ...below which a stretch gets a single one
 };
 
 /**

@@ -746,21 +746,45 @@ export function tickStrip(at, total, unit, k, breaks=[]){
   const inv=x=>{ let lo=0, hi=total;
     for(let i=0;i<48;i++){ const mid=(lo+hi)/2; if(at(mid)<x) lo=mid; else hi=mid; }
     return (lo+hi)/2; };
-  const n=R.AXIS.ticks;
   // The tick marks sit at the bottom of the strip, the two label lines above.
   const yTick=-3, yLo=yTick-R.AXIS.tick-1.8, yHi=yLo-R.AXIS.line;
-  const inBand=p=>(breaks||[]).some(([a,b])=>p>a+1e-9 && p<b-1e-9);
-  let s=`<line x1="${LBL}" y1="${yTick}" x2="${(LBL+PLOT).toFixed(1)}" y2="${yTick}" stroke="${C.idle}" stroke-width="0.6" opacity=".45"/>`;
-  for(let i=0;i<n;i++){
-    const p=(i/(n-1))*100;
-    if(inBand(p*k)) continue;
-    const x=LBL+((p*k)/100)*PLOT;
-    const [hi,lo]=R.tickLabel(unit==='s' ? inv(p)*1000 : inv(p));
-    const anchor=i===0?'start':i===n-1?'end':'middle';
-    const label=(t,yy,o)=>t?`<text x="${x.toFixed(1)}" y="${yy.toFixed(1)}" ${MONO} `+
-      `font-size="${R.AXIS.font}" fill="${C.mut}" opacity="${o}" text-anchor="${anchor}">${t}</text>`:'';
-    s+=`<line x1="${x.toFixed(1)}" y1="${(yTick-R.AXIS.tick).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yTick}" stroke="${C.idle}" stroke-width="0.8" opacity=".7"/>`
-      +label(hi,yHi,'.85')+label(lo,yLo,hi?'.6':'.85');
+  const X=u=>LBL+(u/100)*PLOT;
+  /**
+   * The stretches of the axis the bands leave behind, in drawn units.
+   *
+   * Ticks are spaced inside each one rather than across the whole width, so a
+   * band always has a tick on both of its edges -- the time going in and the
+   * time coming out -- and no tick is ever placed across a discontinuity,
+   * where the distance between it and its neighbour would mean nothing.
+   */
+  const cuts=(breaks||[]).map(([a,b])=>a<b?[a,b]:[b,a]).sort((x,y)=>x[0]-y[0]);
+  const end=100*k, segs=[];
+  let cur=0;
+  for(const [a,b] of cuts){ if(a>cur+0.01) segs.push([cur,Math.min(a,end)]); cur=Math.max(cur,b); }
+  if(cur<end-0.01) segs.push([cur,end]);
+  if(!segs.length) segs.push([0,end]);
+
+  // The rule tears where the axis does, which is what the gap in it says.
+  let s=segs.map(([a,b])=>`<line x1="${X(a).toFixed(1)}" y1="${yTick}" x2="${X(b).toFixed(1)}" y2="${yTick}" `+
+    `stroke="${C.idle}" stroke-width="0.6" opacity=".45"/>`).join('');
+
+  for(const [a,b] of segs){
+    const w=b-a;
+    // A stretch too narrow for two labels gets one, in the middle of it: two
+    // would grow into each other whichever way they were anchored.
+    const n=w<R.AXIS.minSeg ? 1 : Math.max(2, Math.round(w/R.AXIS.spacing)+1);
+    for(let i=0;i<n;i++){
+      const u=n===1 ? (a+b)/2 : a+(w*i)/(n-1);
+      const x=X(u);
+      const [hi,lo]=R.tickLabel(unit==='s' ? inv(u/k)*1000 : inv(u/k));
+      // Labels grow AWAY from the edge they sit on, so the pair either side of
+      // a band do not collide across it.
+      const anchor=n===1?'middle':i===0?'start':i===n-1?'end':'middle';
+      const label=(t,yy,o)=>t?`<text x="${x.toFixed(1)}" y="${yy.toFixed(1)}" ${MONO} `+
+        `font-size="${R.AXIS.font}" fill="${C.mut}" opacity="${o}" text-anchor="${anchor}">${t}</text>`:'';
+      s+=`<line x1="${x.toFixed(1)}" y1="${(yTick-R.AXIS.tick).toFixed(1)}" x2="${x.toFixed(1)}" y2="${yTick}" stroke="${C.idle}" stroke-width="0.8" opacity=".7"/>`
+        +label(hi,yHi,'.85')+label(lo,yLo,hi?'.6':'.85');
+    }
   }
   return s;
 }
@@ -819,8 +843,16 @@ export function fig(rows,extra='',label='',under='',opts={}){
     let first=Infinity;
     // Stops at the first thing that is not plain waiting. Being held by flow
     // control is queue time WITH A REASON, and hiding it would hide the reason.
-    for(const rw of rows) for(const [k,x] of (rw.at||[]))
-      if(k==='started' || k==='held'){ first=Math.min(first,x); break; }
+    for(const rw of rows){
+      for(const [k,x] of (rw.at||[]))
+        if(k==='started' || k==='held'){ first=Math.min(first,x); break; }
+      // A collapsed group draws its members instead of its own bars, so it has
+      // no moments of its own -- but its members are work, and the run was
+      // running when the first of them did. Without this, a figure whose only
+      // rows are groups had nothing to stop the trim until the finalization,
+      // and the whole run was hidden as though it were an opening queue.
+      for(const [a] of (r=>r&&r.members||[])(rw.group)) first=Math.min(first,a);
+    }
     if(first>1e-9 && first<Infinity){
       leadTrimmed=true;
       if(opts.ms) leadLabel=R.human(opts.unit==='s'?first*1000:first);
